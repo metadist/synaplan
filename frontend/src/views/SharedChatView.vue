@@ -254,11 +254,19 @@
         </p>
         <div class="flex gap-4 justify-center">
           <a
+            v-if="config.billing.enabled"
             href="https://synaplan.com/register"
             class="btn-primary px-6 py-3 rounded-lg font-medium inline-block"
           >
             {{ $t('shared.getStarted') }}
           </a>
+          <router-link
+            v-else
+            to="/register"
+            class="btn-primary px-6 py-3 rounded-lg font-medium inline-block"
+          >
+            {{ $t('shared.getStarted') }}
+          </router-link>
           <a
             href="https://synaplan.com"
             class="px-6 py-3 rounded-lg border border-light-border dark:border-dark-border hover-surface transition-colors font-medium inline-block"
@@ -309,10 +317,12 @@ import MessageText from '../components/MessageText.vue'
 import CookieConsent from '../components/CookieConsent.vue'
 import { type CookieConsent as CookieConsentType } from '../composables/useCookieConsent'
 import { useGoogleTag } from '../composables/useGoogleTag'
+import { useConfigStore } from '@/stores/config'
 import { httpClient } from '@/services/api/httpClient'
 import { supportedLanguages, type SupportedLanguage } from '@/i18n'
 import { parseAIResponse } from '@/utils/responseParser'
 
+const config = useConfigStore()
 const route = useRoute()
 const router = useRouter()
 const { locale, t } = useI18n()

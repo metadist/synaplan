@@ -65,8 +65,8 @@ class FileControllerTest extends WebTestCase
         $this->assertCount(1, $data['files']);
         $this->assertArrayHasKey('id', $data['files'][0]);
         $this->assertArrayHasKey('extracted_text_length', $data['files'][0]);
-        $this->assertArrayHasKey('chunks_created', $data['files'][0]);
         $this->assertGreaterThan(0, $data['files'][0]['extracted_text_length']);
+        $this->assertArrayHasKey('vectorized', $data['files'][0]);
     }
 
     public function testUploadMultipleFiles(): void
@@ -114,7 +114,7 @@ class FileControllerTest extends WebTestCase
 
         $this->assertTrue($data['success']);
         $this->assertArrayHasKey('extracted_text_length', $data['files'][0]);
-        $this->assertArrayHasKey('chunks_created', $data['files'][0]);
+        $this->assertArrayNotHasKey('vectorized', $data['files'][0], 'Extract-only should not attempt vectorization');
     }
 
     public function testUploadWithInvalidProcessLevel(): void
@@ -136,7 +136,8 @@ class FileControllerTest extends WebTestCase
 
         $data = json_decode($response->getContent(), true);
         $this->assertTrue($data['success']);
-        $this->assertArrayHasKey('chunks_created', $data['files'][0]);
+        $this->assertArrayHasKey('extracted_text_length', $data['files'][0]);
+        $this->assertEquals('vectorize', $data['process_level'], 'Invalid process level should default to vectorize');
     }
 
     public function testUploadWithoutAuthentication(): void

@@ -306,9 +306,7 @@ const navItems = computed<NavItem[]>(() => {
 
   items.push({ path: '/statistics', label: t('nav.statistics'), icon: ChartBarIcon })
 
-  // Subscription - show for all users (different label based on level)
-  // Admin users don't need this as they have unlimited access
-  if (!authStore.isAdmin) {
+  if (!authStore.isAdmin && configStore.billing.enabled) {
     const subscriptionLabel = authStore.isPro ? t('nav.subscription') : t('nav.upgrade')
     const isUpgradeStyle = !authStore.isPro
     items.push({

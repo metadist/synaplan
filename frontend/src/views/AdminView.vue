@@ -73,7 +73,7 @@
             />
 
             <!-- Active Subscriptions Overview -->
-            <div class="surface-card rounded-lg p-6">
+            <div v-if="config.billing.enabled" class="surface-card rounded-lg p-6">
               <h3 class="text-lg font-semibold txt-primary mb-4 flex items-center gap-2">
                 <Icon icon="mdi:credit-card-outline" class="w-5 h-5" />
                 {{ $t('admin.usage.activeSubscriptions') }}
@@ -651,11 +651,13 @@ import {
   type RegistrationAnalytics,
 } from '@/services/api/adminApi'
 import { useAuthStore } from '@/stores/auth'
+import { useConfigStore } from '@/stores/config'
 import { useI18n } from 'vue-i18n'
 import { useNotification } from '@/composables/useNotification'
 
 const { t } = useI18n()
 const authStore = useAuthStore()
+const config = useConfigStore()
 const { success, error: showError } = useNotification()
 
 type TabId = 'overview' | 'users' | 'prompts' | 'usage'

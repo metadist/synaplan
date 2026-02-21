@@ -93,13 +93,9 @@ class FileController extends AbstractController
 
         // Get parameters
         $groupKey = $request->request->get('group_key') ?: null;
-        $processLevel = 'vectorize'; // Always vectorize for optimal RAG performance
-
-        // Legacy support: Accept process_level parameter but ignore it
-        if ($request->request->has('process_level')) {
-            $this->logger->debug('FileController: process_level parameter ignored (always vectorize)', [
-                'requested_level' => $request->request->get('process_level'),
-            ]);
+        $processLevel = $request->request->get('process_level', 'vectorize');
+        if (!in_array($processLevel, ['extract', 'vectorize', 'full'], true)) {
+            $processLevel = 'vectorize';
         }
 
         // Get uploaded files

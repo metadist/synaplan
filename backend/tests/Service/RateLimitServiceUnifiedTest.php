@@ -4,6 +4,7 @@ namespace App\Tests\Service;
 
 use App\Entity\User;
 use App\Repository\ConfigRepository;
+use App\Service\BillingService;
 use App\Service\RateLimitService;
 use Doctrine\DBAL\Connection;
 use Doctrine\ORM\EntityManagerInterface;
@@ -38,10 +39,13 @@ class RateLimitServiceUnifiedTest extends TestCase
             return $this->configMap[$group] ?? [];
         });
 
+        $billingService = new BillingService('sk_test_valid_key', 'price_1RealProId');
+
         $this->service = new RateLimitService(
             $this->configRepository,
             $this->em,
-            $this->logger
+            $this->logger,
+            $billingService
         );
     }
 

@@ -25,6 +25,7 @@ class RateLimitService
         private ConfigRepository $configRepository,
         private EntityManagerInterface $em,
         private LoggerInterface $logger,
+        private BillingService $billingService,
     ) {
     }
 
@@ -37,6 +38,18 @@ class RateLimitService
      */
     public function checkLimit(User $user, string $action): array
     {
+        // If billing is disabled (Open Source Mode), all users have unlimited usage
+        if (!$this->billingService->isEnabled()) {
+            return [
+                'allowed' => true,
+                'limit' => PHP_INT_MAX,
+                'used' => 0,
+                'remaining' => PHP_INT_MAX,
+                'reset_at' => null,
+                'limit_type' => 'unlimited',
+            ];
+        }
+
         $level = $user->getRateLimitLevel();
 
         $this->logger->debug('Rate limit check', [

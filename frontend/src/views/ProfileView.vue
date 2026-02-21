@@ -115,7 +115,11 @@
             </div>
           </section>
 
-          <section class="surface-card rounded-lg p-6" data-testid="section-billing">
+          <section
+            v-if="config.billing.enabled"
+            class="surface-card rounded-lg p-6"
+            data-testid="section-billing"
+          >
             <h2 class="text-xl font-semibold txt-primary mb-6 flex items-center gap-2">
               <Icon icon="mdi:map-marker" class="w-5 h-5" />
               {{ $t('profile.billingAddress.title') }}
@@ -525,10 +529,12 @@ import { useNotification } from '@/composables/useNotification'
 import { useUnsavedChanges } from '@/composables/useUnsavedChanges'
 import { profileApi } from '@/services/api'
 import { useAuthStore } from '@/stores/auth'
+import { useConfigStore } from '@/stores/config'
 
 const router = useRouter()
 const route = useRoute()
 const authStore = useAuthStore()
+const config = useConfigStore()
 const { error } = useNotification()
 
 const memoriesSection = ref<HTMLElement | null>(null)

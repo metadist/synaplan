@@ -8,7 +8,10 @@
       <div>
         <h3 class="text-sm font-medium txt-primary">{{ $t('storage.title') }}</h3>
         <p class="text-xs txt-secondary mt-0.5">
-          {{ $t('storage.plan') }}: <span class="font-medium txt-brand">{{ planName }}</span>
+          {{ $t('storage.plan') }}:
+          <span class="font-medium txt-brand">{{
+            config.billing.enabled ? planName : $t('storage.unlimited')
+          }}</span>
         </p>
       </div>
       <Icon :icon="storageIcon" :class="['w-6 h-6', storageIconColor]" />
@@ -42,7 +45,7 @@
         }}
       </p>
       <button
-        v-if="stats?.user_level === 'NEW'"
+        v-if="config.billing.enabled && stats?.user_level === 'NEW'"
         class="mt-2 w-full btn-primary text-xs py-1.5 px-3 rounded"
         data-testid="btn-storage-upgrade"
         @click="$emit('upgrade')"
@@ -58,10 +61,13 @@ import { ref, computed, onMounted } from 'vue'
 import { Icon } from '@iconify/vue'
 import filesService from '@/services/filesService'
 
+import { useConfigStore } from '@/stores/config'
+
 defineEmits<{
   upgrade: []
 }>()
 
+const config = useConfigStore()
 const stats = ref<any>(null)
 const loading = ref(true)
 

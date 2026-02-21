@@ -58,13 +58,16 @@ make -C backend test
 # Step 4: Frontend lint (Prettier + ESLint)
 make -C frontend lint
 
-# Step 5: Frontend tests (Vitest)
+# Step 5: Frontend type check (vue-tsc -b — catches errors ESLint misses!)
+docker compose exec -T frontend npm run check:types
+
+# Step 6: Frontend tests (Vitest)
 make -C frontend test
 ```
 
 **Or run everything in one shot:**
 ```bash
-make lint && make -C backend phpstan && make test
+make lint && make -C backend phpstan && make test && docker compose exec -T frontend npm run check:types
 ```
 
 **Rules:**
@@ -72,6 +75,7 @@ make lint && make -C backend phpstan && make test
 - If `make -C backend phpstan` fails, fix the type errors before committing
 - If you changed frontend Vue/TS files, the frontend lint and tests are mandatory
 - If you only changed backend PHP files, you may skip frontend checks
+- If you changed backend OpenAPI annotations, run `make -C frontend generate-schemas` then re-run `vue-tsc`
 - **NEVER** commit with failing tests — this blocks the entire CI/CD pipeline
 
 ## Essential Commands
