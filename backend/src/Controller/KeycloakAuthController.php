@@ -180,6 +180,7 @@ class KeycloakAuthController extends AbstractController
             $tokenData = $tokenResponse->toArray();
             $accessToken = $tokenData['access_token'] ?? null;
             $refreshToken = $tokenData['refresh_token'] ?? null;
+            $idToken = $tokenData['id_token'] ?? null;
             $expiresIn = $tokenData['expires_in'] ?? 300;
 
             if (!$accessToken) {
@@ -217,7 +218,8 @@ class KeycloakAuthController extends AbstractController
                 $accessToken,
                 $refreshToken,
                 $expiresIn,
-                'keycloak'
+                'keycloak',
+                $idToken,
             );
 
             // Also generate our app tokens for internal use
