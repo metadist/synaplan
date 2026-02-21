@@ -149,7 +149,7 @@
               <span>{{ $t('nav.statistics') }}</span>
             </button>
             <button
-              v-if="!authStore.isAdmin"
+              v-if="!authStore.isAdmin && configStore.billing.enabled"
               role="menuitem"
               class="dropdown-item"
               :class="{ 'text-amber-500 dark:text-amber-400': !authStore.isPro }"

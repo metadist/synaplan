@@ -22,6 +22,7 @@ class StorageQuotaService
         private ConfigRepository $configRepository,
         private EntityManagerInterface $em,
         private LoggerInterface $logger,
+        private BillingService $billingService,
     ) {
     }
 
@@ -30,6 +31,11 @@ class StorageQuotaService
      */
     public function getStorageLimit(User $user): int
     {
+        // If billing is disabled (Open Source Mode), unlimited storage (100 TB)
+        if (!$this->billingService->isEnabled()) {
+            return 100 * 1024 * 1024 * 1024 * 1024;
+        }
+
         $level = $user->getRateLimitLevel();
 
         // Get limit from config (in MB or GB depending on plan)

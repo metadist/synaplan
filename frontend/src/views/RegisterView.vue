@@ -359,6 +359,7 @@
       <!-- Back to homepage link -->
       <p class="mt-6 text-center text-xs text-gray-500 dark:text-gray-400">
         <a
+          v-if="config.billing.enabled"
           href="https://www.synaplan.com"
           class="hover:underline"
           target="_blank"
@@ -366,6 +367,16 @@
           data-testid="link-homepage"
         >
           {{ $t('auth.backToHomepage') }}
+        </a>
+        <a
+          v-else
+          href="https://www.synaplan.com"
+          class="hover:underline opacity-75 hover:opacity-100 transition-opacity"
+          target="_blank"
+          rel="noopener noreferrer"
+          data-testid="link-powered-by"
+        >
+          {{ $t('auth.poweredBySynaplan') }}
         </a>
       </p>
     </div>

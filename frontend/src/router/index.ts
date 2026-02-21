@@ -5,6 +5,15 @@ import { authReady } from '@/stores/auth'
 import { i18n } from '@/i18n'
 import LoadingView from '@/views/LoadingView.vue'
 
+const guardSubscription = (_to: any, _from: any, next: any) => {
+  const configStore = useConfigStore()
+  if (!configStore.billing.enabled) {
+    next({ name: 'chat' })
+  } else {
+    next()
+  }
+}
+
 export const APP_NAME = 'Synaplan'
 
 const router = createRouter({
@@ -270,18 +279,21 @@ const router = createRouter({
       name: 'subscription',
       component: () => import('@/views/SubscriptionView.vue'),
       meta: { requiresAuth: true, titleKey: 'pageTitles.subscription' },
+      beforeEnter: guardSubscription,
     },
     {
       path: '/subscription/success',
       name: 'subscription-success',
       component: () => import('@/views/SubscriptionSuccessView.vue'),
       meta: { requiresAuth: true, titleKey: 'pageTitles.subscriptionSuccess' },
+      beforeEnter: guardSubscription,
     },
     {
       path: '/subscription/cancel',
       name: 'subscription-cancel',
       component: () => import('@/views/SubscriptionCancelView.vue'),
       meta: { requiresAuth: true, titleKey: 'pageTitles.subscriptionCancel' },
+      beforeEnter: guardSubscription,
     },
     // 404 - Must be last
     {

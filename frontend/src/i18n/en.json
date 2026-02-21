@@ -982,6 +982,7 @@
     "unavailableDesc": "The subscription service is currently being configured. Please check back later or contact support for more information.",
     "serviceNotConfigured": "Subscription service is currently unavailable. Please contact support.",
     "checkoutFailed": "Failed to start checkout. Please try again.",
+    "selfHosted": "Self-Hosted Edition — All features included",
     "manage": {
       "title": "Manage Your Subscription",
       "subtitle": "View and manage your subscription details",
@@ -1163,7 +1164,8 @@
     "showPassword": "Show password",
     "hidePassword": "Hide password",
     "redirectingToSso": "Redirecting to SSO...",
-    "loginWithSso": "Login with SSO"
+    "loginWithSso": "Login with SSO",
+    "poweredBySynaplan": "Powered by Synaplan"
   },
   "unsavedChanges": {
     "title": "You have unsaved changes",
@@ -1896,7 +1898,8 @@
     "used": "Used",
     "limitReached": "Storage limit reached! Please delete some files or upgrade your plan.",
     "almostFull": "Storage almost full! Only {remaining} remaining.",
-    "upgradePlan": "Upgrade Plan"
+    "upgradePlan": "Upgrade Plan",
+    "unlimited": "Unlimited"
   },
   "settings": {
     "title": "Settings",

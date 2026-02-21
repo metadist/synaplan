@@ -298,6 +298,12 @@ services:
             $appUrl: '%env(APP_URL)%'
             $frontendUrl: '%env(FRONTEND_URL)%'
 
+    # Billing Service (checks if Stripe is configured)
+    App\Service\BillingService:
+        arguments:
+            $stripeSecretKey: '%env(STRIPE_SECRET_KEY)%'
+            $stripePricePro: '%env(STRIPE_PRICE_PRO)%'
+
     # Stripe Payment Controllers (with rate limiting via cache)
     App\Controller\SubscriptionController:
         arguments:

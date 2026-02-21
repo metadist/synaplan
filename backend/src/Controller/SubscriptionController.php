@@ -4,6 +4,7 @@ namespace App\Controller;
 
 use App\Entity\User;
 use App\Repository\UserRepository;
+use App\Service\BillingService;
 use Doctrine\ORM\EntityManagerInterface;
 use OpenApi\Attributes as OA;
 use Psr\Cache\CacheItemPoolInterface;
@@ -41,19 +42,8 @@ class SubscriptionController extends AbstractController
         private string $stripePriceBusiness,
         private string $frontendUrl,
         private string $stripePaymentMethods,
+        private BillingService $billingService,
     ) {
-    }
-
-    /**
-     * Check if Stripe is properly configured.
-     */
-    private function isStripeConfigured(): bool
-    {
-        return !empty($this->stripeSecretKey)
-            && 'your_stripe_secret_key_here' !== $this->stripeSecretKey
-            && !empty($this->stripePricePro)
-            && 'price_xxx' !== $this->stripePricePro
-            && 'price_pro' !== $this->stripePricePro;
     }
 
     /**
@@ -88,7 +78,7 @@ class SubscriptionController extends AbstractController
             [
                 'id' => 'PRO',
                 'name' => 'Pro',
-                'stripePriceId' => $this->isStripeConfigured() ? $this->stripePricePro : null,
+                'stripePriceId' => $this->billingService->isEnabled() ? $this->stripePricePro : null,
                 'price' => 19.99,
                 'currency' => 'EUR',
                 'interval' => 'month',
@@ -103,7 +93,7 @@ class SubscriptionController extends AbstractController
             [
                 'id' => 'TEAM',
                 'name' => 'Team',
-                'stripePriceId' => $this->isStripeConfigured() ? $this->stripePriceTeam : null,
+                'stripePriceId' => $this->billingService->isEnabled() ? $this->stripePriceTeam : null,
                 'price' => 49.99,
                 'currency' => 'EUR',
                 'interval' => 'month',
@@ -119,7 +109,7 @@ class SubscriptionController extends AbstractController
             [
                 'id' => 'BUSINESS',
                 'name' => 'Business',
-                'stripePriceId' => $this->isStripeConfigured() ? $this->stripePriceBusiness : null,
+                'stripePriceId' => $this->billingService->isEnabled() ? $this->stripePriceBusiness : null,
                 'price' => 99.99,
                 'currency' => 'EUR',
                 'interval' => 'month',
@@ -137,7 +127,7 @@ class SubscriptionController extends AbstractController
 
         return $this->json([
             'plans' => $plans,
-            'stripeConfigured' => $this->isStripeConfigured(),
+            'stripeConfigured' => $this->billingService->isEnabled(),
         ]);
     }
 
@@ -194,7 +184,7 @@ class SubscriptionController extends AbstractController
         }
 
         // Check if Stripe is configured
-        if (!$this->isStripeConfigured()) {
+        if (!$this->billingService->isEnabled()) {
             $this->logger->warning('Stripe checkout attempted but Stripe is not configured');
 
             return $this->json([
@@ -367,7 +357,7 @@ class SubscriptionController extends AbstractController
             return $this->json(['error' => 'Authentication required'], Response::HTTP_UNAUTHORIZED);
         }
 
-        if (!$this->isStripeConfigured()) {
+        if (!$this->billingService->isEnabled()) {
             return $this->json([
                 'error' => 'Subscription service is currently unavailable.',
                 'code' => 'STRIPE_NOT_CONFIGURED',
@@ -514,7 +504,7 @@ class SubscriptionController extends AbstractController
             return $this->json(['error' => 'Authentication required'], Response::HTTP_UNAUTHORIZED);
         }
 
-        if (!$this->isStripeConfigured()) {
+        if (!$this->billingService->isEnabled()) {
             return $this->json([
                 'error' => 'Subscription service is currently unavailable.',
                 'code' => 'STRIPE_NOT_CONFIGURED',
@@ -583,7 +573,7 @@ class SubscriptionController extends AbstractController
             return $this->json(['error' => 'Authentication required'], Response::HTTP_UNAUTHORIZED);
         }
 
-        if (!$this->isStripeConfigured()) {
+        if (!$this->billingService->isEnabled()) {
             return $this->json([
                 'error' => 'Subscription service is currently unavailable.',
             ], Response::HTTP_SERVICE_UNAVAILABLE);

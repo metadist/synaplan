@@ -157,11 +157,13 @@ make test    # Run tests
 
 ## Test Users
 
-| Email | Password | Level |
-|-------|----------|-------|
-| admin@synaplan.com | admin123 | BUSINESS |
-| demo@synaplan.com | demo123 | PRO |
-| test@example.com | test123 | NEW |
+These accounts are created by the database fixtures (`make -C backend fixtures`):
+
+| Email | Password | Level | Verified |
+|-------|----------|-------|----------|
+| admin@synaplan.com | admin123 | ADMIN | Yes |
+| demo@synaplan.com | demo123 | PRO | Yes |
+| test@example.com | test123 | NEW | No |
 
 ---
 

@@ -47,6 +47,16 @@ const config = {
   },
 
   /**
+   * Billing/Subscription configuration
+   * Loaded from backend at runtime
+   */
+  billing: {
+    get enabled(): boolean {
+      return getConfigSync().billing?.enabled ?? false
+    },
+  },
+
+  /**
    * Google reCAPTCHA v3 configuration
    * Loaded from backend at runtime
    */

@@ -7,6 +7,7 @@ use App\Entity\Config;
 use App\Entity\User;
 use App\Repository\ConfigRepository;
 use App\Repository\ModelRepository;
+use App\Service\BillingService;
 use App\Service\Plugin\PluginManager;
 use App\Service\Search\BraveSearchService;
 use App\Service\UserMemoryService;
@@ -33,6 +34,7 @@ class ConfigController extends AbstractController
         private BraveSearchService $braveSearchService,
         private WhisperService $whisperService,
         private PluginManager $pluginManager,
+        private BillingService $billingService,
         private UserMemoryService $memoryService,
         #[Autowire('%env(string:default::QDRANT_SERVICE_URL)%')]
         private readonly string $qdrantServiceUrl,
@@ -270,6 +272,9 @@ class ConfigController extends AbstractController
         }
 
         $response = [
+            'billing' => [
+                'enabled' => $this->billingService->isEnabled(),
+            ],
             'recaptcha' => $recaptchaConfig,
             'features' => $features,
             'speech' => $speech,

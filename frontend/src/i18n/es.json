@@ -520,7 +520,8 @@
     "showPassword": "Mostrar contraseña",
     "hidePassword": "Ocultar contraseña",
     "redirectingToSso": "Redirigiendo al SSO...",
-    "loginWithSso": "Iniciar sesión con SSO"
+    "loginWithSso": "Iniciar sesión con SSO",
+    "poweredBySynaplan": "Powered by Synaplan"
   },
   "unsavedChanges": {
     "title": "Tienes cambios sin guardar",
@@ -1015,7 +1016,8 @@
     "used": "Usado",
     "limitReached": "¡Límite de almacenamiento alcanzado! Por favor elimina algunos archivos o mejora tu plan.",
     "almostFull": "¡Almacenamiento casi lleno! Solo quedan {remaining}.",
-    "upgradePlan": "Mejorar Plan"
+    "upgradePlan": "Mejorar Plan",
+    "unlimited": "Ilimitado"
   },
   "files": {
     "uploadTitle": "Subir Archivos RAG",

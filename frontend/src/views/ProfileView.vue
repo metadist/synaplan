@@ -115,7 +115,11 @@
             </div>
           </section>
 
-          <section class="surface-card rounded-lg p-6" data-testid="section-billing">
+          <section
+            v-if="config.billing.enabled"
+            class="surface-card rounded-lg p-6"
+            data-testid="section-billing"
+          >
             <h2 class="text-xl font-semibold txt-primary mb-6 flex items-center gap-2">
               <Icon icon="mdi:map-marker" class="w-5 h-5" />
               {{ $t('profile.billingAddress.title') }}

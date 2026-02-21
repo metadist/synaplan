@@ -1087,6 +1087,7 @@
     "unavailableDesc": "Der Abonnement-Service wird derzeit konfiguriert. Bitte versuche es später noch einmal oder kontaktiere den Support.",
     "serviceNotConfigured": "Abonnement-Service ist derzeit nicht verfügbar. Bitte kontaktiere den Support.",
     "checkoutFailed": "Checkout konnte nicht gestartet werden. Bitte versuche es erneut.",
+    "selfHosted": "Self-Hosted Edition — Alle Funktionen inklusive",
     "manage": {
       "title": "Dein Abonnement verwalten",
       "subtitle": "Sieh und verwalte deine Abonnement-Details",
@@ -1347,7 +1348,8 @@
     "used": "Genutzt",
     "limitReached": "Speicherlimit erreicht! Bitte löschen Sie Dateien oder upgraden Sie Ihren Tarif.",
     "almostFull": "Speicher fast voll! Nur noch {remaining} verfügbar.",
-    "upgradePlan": "Tarif upgraden"
+    "upgradePlan": "Tarif upgraden",
+    "unlimited": "Unbegrenzt"
   },
   "settings": {
     "title": "Einstellungen",
@@ -1852,7 +1854,8 @@
     "showPassword": "Passwort anzeigen",
     "hidePassword": "Passwort ausblenden",
     "redirectingToSso": "Weiterleitung zum SSO...",
-    "loginWithSso": "Mit SSO anmelden"
+    "loginWithSso": "Mit SSO anmelden",
+    "poweredBySynaplan": "Powered by Synaplan"
   },
   "cookies": {
     "title": "Cookie-Einstellungen",

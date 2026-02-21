@@ -520,7 +520,8 @@
     "showPassword": "Şifreyi göster",
     "hidePassword": "Şifreyi gizle",
     "redirectingToSso": "SSO'ya yönlendiriliyor...",
-    "loginWithSso": "SSO ile Giriş Yap"
+    "loginWithSso": "SSO ile Giriş Yap",
+    "poweredBySynaplan": "Powered by Synaplan"
   },
   "unsavedChanges": {
     "title": "Kaydedilmemiş değişiklikleriniz var",
@@ -875,6 +876,7 @@
     "unavailableDesc": "Abonelik hizmeti şu anda yapılandırılıyor. Lütfen daha sonra tekrar kontrol edin veya destek ile iletişime geçin.",
     "serviceNotConfigured": "Abonelik hizmeti şu anda kullanılamıyor. Lütfen destek ile iletişime geçin.",
     "checkoutFailed": "Ödeme başlatılamadı. Lütfen tekrar deneyin.",
+    "selfHosted": "Self-Hosted Sürümü — Tüm özellikler dahil",
     "manage": {
       "title": "Aboneliğinizi Yönetin",
       "subtitle": "Abonelik detaylarınızı görüntüleyin ve yönetin",
@@ -1015,7 +1017,8 @@
     "used": "Kullanılan",
     "limitReached": "Depolama limitine ulaşıldı! Lütfen bazı dosyaları silin veya planınızı yükseltin.",
     "almostFull": "Depolama neredeyse dolu! Sadece {remaining} kaldı.",
-    "upgradePlan": "Planı Yükselt"
+    "upgradePlan": "Planı Yükselt",
+    "unlimited": "Sınırsız"
   },
   "files": {
     "uploadTitle": "RAG Dosyaları Yükle",
