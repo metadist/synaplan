@@ -7,7 +7,10 @@
     "install:browsers": "npx playwright install chromium",
     "record": "npx playwright test",
     "record:headed": "npx playwright test --headed",
-    "record:scenario": "npx playwright test --grep"
+    "record:scenario": "npx playwright test --grep",
+    "record:silent": "npx playwright test --grep-invert 'Narrated'",
+    "record:narrated": "npx playwright test --grep 'Narrated' --headed",
+    "check:tts": "curl -sf http://127.0.0.1:10200/health | node -e \"const d=JSON.parse(require('fs').readFileSync('/dev/stdin','utf8'));console.log('TTS:',d.status,'—',d.voices_loaded,'voices loaded')\" || echo 'TTS service not reachable at http://127.0.0.1:10200'"
   },
   "devDependencies": {
     "@playwright/test": "^1.50.0",
