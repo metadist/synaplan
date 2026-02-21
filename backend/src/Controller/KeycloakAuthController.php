@@ -396,9 +396,21 @@ class KeycloakAuthController extends AbstractController
             $userDetails['full_name'] = $userInfo['name'];
         }
 
-        // Sync Keycloak roles if available
-        if (isset($userInfo['realm_access']['roles'])) {
-            $userDetails['oidc_roles'] = $userInfo['realm_access']['roles'];
+        // Sync Keycloak roles if available (realm_access + resource_access for this client)
+        $oidcRoles = [];
+        if (isset($userInfo['realm_access']['roles']) && is_array($userInfo['realm_access']['roles'])) {
+            $oidcRoles = $userInfo['realm_access']['roles'];
+        }
+        $clientId = $this->oidcClientId;
+        if (isset($userInfo['resource_access'][$clientId]['roles']) && is_array($userInfo['resource_access'][$clientId]['roles'])) {
+            $oidcRoles = array_values(array_unique(array_merge($oidcRoles, $userInfo['resource_access'][$clientId]['roles'])));
+        }
+        // Also check the 'groups' claim (standard OIDC groups scope)
+        if (isset($userInfo['groups']) && is_array($userInfo['groups'])) {
+            $oidcRoles = array_values(array_unique(array_merge($oidcRoles, $userInfo['groups'])));
+        }
+        if (!empty($oidcRoles)) {
+            $userDetails['oidc_roles'] = $oidcRoles;
         }
 
         $user->setUserDetails($userDetails);

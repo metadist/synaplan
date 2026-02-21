@@ -456,7 +456,9 @@ class AuthController extends AbstractController
             }
 
             // Get end session URL for frontend redirect
-            $postLogoutRedirectUri = $_ENV['FRONTEND_URL'] ?? 'http://localhost:5173';
+            // Must point to /logged-out (not /login) to avoid auto-redirect loop with OIDC_AUTO_REDIRECT
+            $frontendUrl = rtrim($_ENV['FRONTEND_URL'] ?? 'http://localhost:5173', '/');
+            $postLogoutRedirectUri = $frontendUrl.'/logged-out';
             $logoutUrl = $this->oidcTokenService->getEndSessionUrl($postLogoutRedirectUri, $oidcProvider);
 
             if ($logoutUrl) {

@@ -68,6 +68,12 @@ const router = createRouter({
       component: () => import('../components/auth/OAuthCallback.vue'),
       meta: { requiresAuth: false, public: true, titleKey: 'pageTitles.login' },
     },
+    {
+      path: '/logged-out',
+      name: 'logged-out',
+      component: () => import('@/views/LoggedOutView.vue'),
+      meta: { requiresAuth: false, public: true, titleKey: 'pageTitles.loggedOut' },
+    },
     // Shared chat with optional language parameter for SEO
     // /shared/de/abc123 -> German UI
     // /shared/en/abc123 -> English UI

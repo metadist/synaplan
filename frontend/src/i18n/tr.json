@@ -30,6 +30,7 @@
     "subscription": "Abonelik",
     "subscriptionSuccess": "Abonelik Başarılı",
     "subscriptionCancel": "Abonelik İptal Edildi",
+    "loggedOut": "Oturum Kapatıldı",
     "notFound": "Sayfa Bulunamadı",
     "memories": "Anılar",
     "feedback": "Geri Bildirim",
@@ -521,7 +522,10 @@
     "hidePassword": "Şifreyi gizle",
     "redirectingToSso": "SSO'ya yönlendiriliyor...",
     "loginWithSso": "SSO ile Giriş Yap",
-    "poweredBySynaplan": "Powered by Synaplan"
+    "poweredBySynaplan": "Powered by Synaplan",
+    "loggedOutTitle": "Oturumunuz kapatıldı",
+    "loggedOutDesc": "Oturumunuz başarıyla sonlandırıldı. Bu pencereyi kapatabilir veya tekrar giriş yapabilirsiniz.",
+    "loginAgain": "Tekrar giriş yap"
   },
   "unsavedChanges": {
     "title": "Kaydedilmemiş değişiklikleriniz var",
