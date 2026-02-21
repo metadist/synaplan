@@ -17,14 +17,14 @@ test('@ci @smoke @auth logout should clear session id=005', async ({ page }) => 
   // After logout the user lands on /logged-out (OIDC) or /login (standard).
   // Accept either destination as proof that the session was cleared.
   await expect(
-    page.locator(`${selectors.login.email}, ${selectors.loggedOut.page}`).first(),
+    page.locator(`${selectors.login.email}, ${selectors.loggedOut.page}`).first()
   ).toBeVisible({ timeout: 15_000 })
   await expect(page).toHaveURL(/login|logged-out/)
 
   // Navigating to a protected route must not restore the session
   await page.goto('/profile')
   await expect(
-    page.locator(`${selectors.login.email}, ${selectors.loggedOut.page}`).first(),
+    page.locator(`${selectors.login.email}, ${selectors.loggedOut.page}`).first()
   ).toBeVisible({ timeout: 15_000 })
   await expect(page).toHaveURL(/login|logged-out/)
 })
