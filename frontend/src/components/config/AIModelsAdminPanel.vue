@@ -420,7 +420,7 @@ async function generatePreview() {
     validationErrors.value = res.validation.errors || []
     statements.value = res.validation.statements || []
   } catch (e: any) {
-    showError(e?.response?.data?.error || t('config.aiModels.admin.failedGenerate'))
+    showError(e?.message || t('config.aiModels.admin.failedGenerate'))
   } finally {
     importLoading.value = false
   }
@@ -436,7 +436,7 @@ async function applySql() {
     success(t('config.aiModels.admin.appliedStatements', { count: res.applied }))
     await loadModels()
   } catch (e: any) {
-    showError(e?.response?.data?.error || t('config.aiModels.admin.failedApply'))
+    showError(e?.message || t('config.aiModels.admin.failedApply'))
   } finally {
     applyLoading.value = false
   }
@@ -448,7 +448,7 @@ async function loadModels() {
     const res = await adminModelsApi.list()
     adminModels.value = res.models
   } catch (e: any) {
-    showError(e?.response?.data?.error || t('config.aiModels.admin.failedLoad'))
+    showError(e?.message || t('config.aiModels.admin.failedLoad'))
   } finally {
     modelsLoading.value = false
   }
@@ -472,7 +472,7 @@ async function createModel() {
     newModel.value = { service: '', tag: '', providerId: '', name: '' }
     await loadModels()
   } catch (e: any) {
-    showError(e?.response?.data?.error || t('config.aiModels.admin.failedCreate'))
+    showError(e?.message || t('config.aiModels.admin.failedCreate'))
   } finally {
     createLoading.value = false
   }
@@ -499,7 +499,7 @@ async function saveModel(m: AdminModel) {
     })
     success(t('config.aiModels.admin.modelSaved'))
   } catch (e: any) {
-    showError(e?.response?.data?.error || t('config.aiModels.admin.failedSave'))
+    showError(e?.message || t('config.aiModels.admin.failedSave'))
     await loadModels()
   } finally {
     rowSavingId.value = null
@@ -530,7 +530,7 @@ async function deleteModel(m: AdminModel) {
     success(t('config.aiModels.admin.modelDeleted'))
     await loadModels()
   } catch (e: any) {
-    showError(e?.response?.data?.error || t('config.aiModels.admin.failedDelete'))
+    showError(e?.message || t('config.aiModels.admin.failedDelete'))
   } finally {
     rowDeletingId.value = null
   }

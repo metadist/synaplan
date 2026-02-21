@@ -24,6 +24,7 @@ class OidcTokenService
     // Cookie names for OIDC tokens
     public const OIDC_ACCESS_COOKIE = 'oidc_access_token';
     public const OIDC_REFRESH_COOKIE = 'oidc_refresh_token';
+    public const OIDC_ID_TOKEN_COOKIE = 'oidc_id_token';
     public const OIDC_PROVIDER_COOKIE = 'oidc_provider';
 
     private ?array $discoveryCache = null;
@@ -51,6 +52,7 @@ class OidcTokenService
         string $refreshToken,
         int $expiresIn,
         string $provider = 'keycloak',
+        ?string $idToken = null,
     ): Response {
         // Access token cookie (shorter lifetime based on token expiry)
         $accessExpiry = time() + min($expiresIn, 3600); // Max 1 hour
@@ -66,6 +68,15 @@ class OidcTokenService
             $refreshToken,
             time() + 86400 * 30 // 30 days
         ));
+
+        // ID token cookie (needed for RP-Initiated Logout id_token_hint)
+        if ($idToken) {
+            $response->headers->setCookie($this->createCookie(
+                self::OIDC_ID_TOKEN_COOKIE,
+                $idToken,
+                time() + 86400 * 30
+            ));
+        }
 
         // Provider cookie (to know which OIDC provider to refresh against)
         $response->headers->setCookie($this->createCookie(
@@ -311,11 +322,13 @@ class OidcTokenService
      * Returns the URL where the user should be redirected to logout from the OIDC provider.
      * This implements the OIDC RP-Initiated Logout specification.
      *
-     * @param string $postLogoutRedirectUri URL to redirect to after logout
+     * @param string      $postLogoutRedirectUri URL to redirect to after logout
+     * @param string      $provider              OIDC provider name
+     * @param string|null $idTokenHint           ID token for automatic redirect (skips confirmation page)
      *
      * @return string|null Logout URL or null if not supported
      */
-    public function getEndSessionUrl(string $postLogoutRedirectUri, string $provider = 'keycloak'): ?string
+    public function getEndSessionUrl(string $postLogoutRedirectUri, string $provider = 'keycloak', ?string $idTokenHint = null): ?string
     {
         try {
             $discovery = $this->getDiscoveryConfig($provider);
@@ -332,6 +345,10 @@ class OidcTokenService
                 'post_logout_redirect_uri' => $postLogoutRedirectUri,
                 'client_id' => $this->oidcClientId,
             ];
+
+            if ($idTokenHint) {
+                $params['id_token_hint'] = $idTokenHint;
+            }
 
             return $discovery['end_session_endpoint'].'?'.http_build_query($params);
         } catch (\Exception $e) {
@@ -351,6 +368,7 @@ class OidcTokenService
     {
         $response->headers->setCookie($this->createCookie(self::OIDC_ACCESS_COOKIE, '', 1));
         $response->headers->setCookie($this->createCookie(self::OIDC_REFRESH_COOKIE, '', 1));
+        $response->headers->setCookie($this->createCookie(self::OIDC_ID_TOKEN_COOKIE, '', 1));
         $response->headers->setCookie($this->createCookie(self::OIDC_PROVIDER_COOKIE, '', 1));
 
         return $response;

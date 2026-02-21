@@ -15,7 +15,8 @@ test.describe('@oidc @oidc-button button login', () => {
     await page.locator(selectors.userMenu.button).click()
     await page.locator(selectors.userMenu.logoutBtn).click()
 
-    await expect(page.locator(selectors.login.email)).toBeVisible({ timeout: 10_000 })
-    await expect(page).toHaveURL(/login/)
+    // OIDC logout redirects through Keycloak and lands on /logged-out
+    await expect(page.locator(selectors.loggedOut.page)).toBeVisible({ timeout: 15_000 })
+    await expect(page).toHaveURL(/logged-out/)
   })
 })

@@ -135,23 +135,34 @@ export const authService = {
 
     isLoggingOut.value = true
 
+    let oidcLogoutUrl: string | null = null
+
     try {
-      // Only call logout endpoint if we're not already logged out (silent = false means user initiated)
       if (!silent) {
-        await fetch(`${API_BASE_URL}/api/v1/auth/logout`, {
+        const response = await fetch(`${API_BASE_URL}/api/v1/auth/logout`, {
           method: 'POST',
           credentials: 'include',
         })
+
+        if (response.ok) {
+          const data = await response.json()
+          oidcLogoutUrl = data.oidc_logout_url || null
+        }
       }
     } catch (error) {
       // Ignore errors during logout - session might already be expired
     } finally {
-      // Clear local state (memory only)
       user.value = null
-      // Clear SSE token cache
       clearSseToken()
       clearSessionHint()
       isLoggingOut.value = false
+    }
+
+    // Redirect to OIDC provider logout to end the Keycloak session.
+    // This must happen after clearing local state so the user is logged out
+    // even if the redirect fails.
+    if (oidcLogoutUrl) {
+      window.location.href = oidcLogoutUrl
     }
   },
 
