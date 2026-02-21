@@ -529,10 +529,12 @@ import { useNotification } from '@/composables/useNotification'
 import { useUnsavedChanges } from '@/composables/useUnsavedChanges'
 import { profileApi } from '@/services/api'
 import { useAuthStore } from '@/stores/auth'
+import { useConfigStore } from '@/stores/config'
 
 const router = useRouter()
 const route = useRoute()
 const authStore = useAuthStore()
+const config = useConfigStore()
 const { error } = useNotification()
 
 const memoriesSection = ref<HTMLElement | null>(null)

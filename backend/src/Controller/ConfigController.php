@@ -90,6 +90,14 @@ class ConfigController extends AbstractController
         content: new OA\JsonContent(
             properties: [
                 new OA\Property(
+                    property: 'billing',
+                    type: 'object',
+                    description: 'Billing/subscription status (false for open-source deployments)',
+                    properties: [
+                        new OA\Property(property: 'enabled', type: 'boolean', example: false),
+                    ]
+                ),
+                new OA\Property(
                     property: 'recaptcha',
                     type: 'object',
                     properties: [
