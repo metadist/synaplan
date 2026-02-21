@@ -30,7 +30,7 @@ export default defineConfig({
 
   reporter: [
     ['list'],
-    ['html', { open: 'never', outputFolder: './videos/report' }],
+    ['html', { open: 'never', outputFolder: './playwright-report' }],
   ],
 
   projects: [

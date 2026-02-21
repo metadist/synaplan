@@ -65,3 +65,4 @@ _devextras/screenvideo/videos/*
 _devextras/screenvideo/node_modules/
 _devextras/screenvideo/test-results/
 _devextras/screenvideo/playwright-report/
+_devextras/screenvideo/.narration-tmp/
