@@ -1,0 +1,16 @@
+{
+  "name": "synaplan-screenvideo",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Automated demo screen recordings for Synaplan using Playwright",
+  "scripts": {
+    "install:browsers": "npx playwright install chromium",
+    "record": "npx playwright test",
+    "record:headed": "npx playwright test --headed",
+    "record:scenario": "npx playwright test --grep"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.50.0",
+    "dotenv": "^16.4.0"
+  }
+}
