@@ -428,6 +428,7 @@ class AuthController extends AbstractController
         $refreshTokenString = $request->cookies->get(TokenService::REFRESH_COOKIE);
         $oidcAccessToken = $request->cookies->get(OidcTokenService::OIDC_ACCESS_COOKIE);
         $oidcRefreshToken = $request->cookies->get(OidcTokenService::OIDC_REFRESH_COOKIE);
+        $oidcIdToken = $request->cookies->get(OidcTokenService::OIDC_ID_TOKEN_COOKIE);
         $oidcProvider = $request->cookies->get(OidcTokenService::OIDC_PROVIDER_COOKIE);
 
         // Revoke internal refresh token
@@ -459,7 +460,7 @@ class AuthController extends AbstractController
             // Must point to /logged-out (not /login) to avoid auto-redirect loop with OIDC_AUTO_REDIRECT
             $frontendUrl = rtrim($_ENV['FRONTEND_URL'] ?? 'http://localhost:5173', '/');
             $postLogoutRedirectUri = $frontendUrl.'/logged-out';
-            $logoutUrl = $this->oidcTokenService->getEndSessionUrl($postLogoutRedirectUri, $oidcProvider);
+            $logoutUrl = $this->oidcTokenService->getEndSessionUrl($postLogoutRedirectUri, $oidcProvider, $oidcIdToken);
 
             if ($logoutUrl) {
                 $responseData['oidc_logout_url'] = $logoutUrl;
