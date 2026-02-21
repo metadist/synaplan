@@ -16,14 +16,11 @@ test('@smoke semantic search completes and shows results summary id=007', async 
   const sidebar = page.locator(selectors.nav.sidebar)
   await sidebar.waitFor({ state: 'visible' })
 
-  const filesLink = sidebar.getByRole('link', { name: /files/i })
-  if (await filesLink.count()) {
-    await filesLink.first().click()
-  } else {
-    const filesToggle = sidebar.getByRole('button', { name: /files/i })
-    await filesToggle.click()
-    await sidebar.getByRole('link', { name: /file manager/i }).click()
-  }
+  const filesBtn = sidebar.getByRole('button', { name: /files/i })
+  await filesBtn.click()
+  const navDropdown = page.locator(selectors.nav.navDropdown)
+  await navDropdown.waitFor({ state: 'visible' })
+  await navDropdown.getByRole('link', { name: /file manager/i }).click()
 
   await page.locator(selectors.files.page).waitFor({ state: 'visible' })
 
@@ -45,13 +42,10 @@ test('@smoke semantic search completes and shows results summary id=007', async 
   await expect.soft(uploadedRow).toBeVisible({ timeout: 30_000 })
   await expect.soft(uploadedRow).toContainText(/uploaded|extracted|vectorized/i)
 
-  let ragLink = sidebar.getByRole('link', { name: /semantic search/i })
-  if ((await ragLink.count()) === 0) {
-    const filesToggle = sidebar.getByRole('button', { name: /files/i })
-    await filesToggle.click()
-    ragLink = sidebar.getByRole('link', { name: /semantic search/i })
-  }
-  await ragLink.first().click()
+  await filesBtn.click()
+  const ragDropdown = page.locator(selectors.nav.navDropdown)
+  await ragDropdown.waitFor({ state: 'visible' })
+  await ragDropdown.getByRole('link', { name: /semantic search/i }).click()
 
   await page.locator(selectors.rag.page).waitFor({ state: 'visible' })
 
