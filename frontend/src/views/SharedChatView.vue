@@ -319,6 +319,8 @@ import { type CookieConsent as CookieConsentType } from '../composables/useCooki
 import { useGoogleTag } from '../composables/useGoogleTag'
 import { useConfigStore } from '@/stores/config'
 import { httpClient } from '@/services/api/httpClient'
+import { supportedLanguages, type SupportedLanguage } from '@/i18n'
+import { parseAIResponse } from '@/utils/responseParser'
 
 const config = useConfigStore()
 const route = useRoute()

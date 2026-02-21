@@ -58,8 +58,8 @@ make -C backend test
 # Step 4: Frontend lint (Prettier + ESLint)
 make -C frontend lint
 
-# Step 5: Frontend type check (vue-tsc — catches errors ESLint misses!)
-docker compose exec -T frontend npx vue-tsc --noEmit
+# Step 5: Frontend type check (vue-tsc -b — catches errors ESLint misses!)
+docker compose exec -T frontend npm run check:types
 
 # Step 6: Frontend tests (Vitest)
 make -C frontend test
@@ -67,7 +67,7 @@ make -C frontend test
 
 **Or run everything in one shot:**
 ```bash
-make lint && make -C backend phpstan && make test && docker compose exec -T frontend npx vue-tsc --noEmit
+make lint && make -C backend phpstan && make test && docker compose exec -T frontend npm run check:types
 ```
 
 **Rules:**
