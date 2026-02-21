@@ -32,7 +32,7 @@ $KCADM create clients -r synaplan \
   -s directAccessGrantsEnabled=true \
   -s "redirectUris=[\"${KC_CALLBACK}\"]" \
   -s "webOrigins=[\"${KC_ORIGIN}\"]" \
-  -s 'attributes={"pkce.code.challenge.method":"S256"}'
+  -s 'attributes={"pkce.code.challenge.method":"S256","post.logout.redirect.uris":"'"${KC_ORIGIN}"'/*"}'
 
 $KCADM create users -r synaplan \
   -s username=testuser \

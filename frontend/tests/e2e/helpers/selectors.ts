@@ -75,5 +75,9 @@ export const selectors = {
     redirectSection: '[data-testid="section-oidc-redirect"]',
     sessionExpiredSection: '[data-testid="section-oidc-session-expired"]',
   },
+  loggedOut: {
+    page: '[data-testid="page-logged-out"]',
+    loginAgainBtn: '[data-testid="btn-login-again"]',
+  },
   toast: {},
 } as const
