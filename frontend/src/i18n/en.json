@@ -524,6 +524,8 @@
     "standalone": "Standalone",
     "attachedToMessage": "This file is attached to a message",
     "standaloneFile": "This file is standalone (not attached to any message)",
+    "selectAll": "Select all ({count})",
+    "deselectAll": "Deselect all",
     "deleteSelected": "Delete Selected",
     "deleteSelectedConfirmTitle": "Delete Selected Files?",
     "deleteSelectedConfirmMessage": "Are you sure you want to delete {count} selected file(s)? This action cannot be undone and the files will be permanently deleted.",
@@ -1243,6 +1245,7 @@
     "yesterday": "Yesterday",
     "sessions": "Sessions",
     "messages": "Messages",
+    "visitorMessages": "Visitor Messages",
     "sentiment": "Sentiment",
     "positive": "Positive",
     "negative": "Negative",
@@ -1256,6 +1259,11 @@
     "addInfo": "Add",
     "improveInfo": "Improve",
     "neutral": "Neutral",
+    "negativeMessages": "Negative Messages",
+    "neutralMessages": "Neutral Messages",
+    "visitor": "Visitor",
+    "response": "Response",
+    "noSentimentMessages": "No messages in this category",
     "teamRequired": "Team Plan Required",
     "teamRequiredDescription": "AI-powered conversation summaries and insights are available for Team and Business plans. Upgrade to unlock this feature.",
     "upgrade": "Upgrade Plan",
@@ -1504,7 +1512,31 @@
         "branding": "Branding",
         "behavior": "Behavior",
         "security": "Security",
-        "assistant": "AI Assistant"
+        "assistant": "AI Assistant",
+        "aiPrompts": "AI Prompts"
+      },
+      "aiPrompts": {
+        "modelLabel": "AI Model",
+        "modelAutomatic": "Automatic (System Default)",
+        "placeholderInfo": "Available placeholders (automatically replaced at runtime):",
+        "resetToDefault": "Reset to Default",
+        "resetConfirmTitle": "Reset Prompt?",
+        "resetConfirmMessage": "This will discard your custom prompt and model selection and restore the system defaults. This action cannot be undone.",
+        "resetSuccess": "Prompt reset to default",
+        "customBadge": "Custom",
+        "defaultBadge": "Default"
+      },
+      "summaryPrompt": {
+        "title": "Summary Analysis",
+        "description": "Controls how the AI analyzes your widget's chat conversations.",
+        "modelHelp": "Select which AI model should generate the conversation summaries.",
+        "placeholderConversations": "Replaced with the chat conversations to analyze",
+        "placeholderSystemPrompt": "Replaced with the widget's current system prompt"
+      },
+      "setupPrompt": {
+        "title": "AI Setup Interview",
+        "description": "Controls the AI assistant that guides users through widget configuration.",
+        "modelHelp": "Select which AI model should conduct the setup interview."
       },
       "position": "Widget Position",
       "theme": "Default Theme",

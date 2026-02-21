@@ -19,6 +19,8 @@ export interface EventSubscription {
 
 export interface SubscribeOptions {
   apiUrl?: string
+  /** Start from this event ID to skip historical events. Prevents replay of old state-changing events. */
+  initialLastEventId?: number
 }
 
 /**
@@ -49,7 +51,7 @@ export function subscribeToSession(
       baseUrl = window.location.origin
     }
   }
-  let lastEventId = 0
+  let lastEventId = options?.initialLastEventId ?? 0
   let eventSource: EventSource | null = null
   let isActive = true
 

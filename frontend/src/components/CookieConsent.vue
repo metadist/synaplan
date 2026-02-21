@@ -56,7 +56,9 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import { getStoredConsent, storeConsent, type CookieConsent } from '@/composables/useCookieConsent'
+import { useConfigStore } from '@/stores/config'
 
+const config = useConfigStore()
 const showBanner = ref(false)
 
 const emit = defineEmits<{
@@ -76,6 +78,9 @@ function rejectAll() {
 }
 
 onMounted(() => {
+  // Only show banner when analytics is configured (Google Tag enabled)
+  if (!config.googleTag.enabled) return
+
   // Show banner if no consent stored or consent version outdated
   const consent = getStoredConsent()
   if (!consent) {

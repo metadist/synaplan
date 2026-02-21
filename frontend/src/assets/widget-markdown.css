@@ -277,7 +277,7 @@
 .dark .markdown-content table td,
 .dark .markdown-content .markdown-table th,
 .dark .markdown-content .markdown-table td {
-  border-color: rgba(255, 255, 255, 0.2);
+  border-color: rgba(255, 255, 255, 0.08);
 }
 
 .dark .markdown-content table th,
