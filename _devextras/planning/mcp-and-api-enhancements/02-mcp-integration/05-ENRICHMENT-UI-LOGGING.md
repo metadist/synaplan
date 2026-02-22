@@ -1,4 +1,4 @@
-# 04 — Enrichment UI & Logging in Chat GUI
+# 05 — Enrichment UI & Logging in Chat GUI
 
 ## Goal
 
@@ -15,18 +15,18 @@ All enrichment data (Internet Search, File Search, URL Screenshot, MCP results) 
 
 ### What's Missing
 
-- **MCP results:** No display (doesn't exist yet — see `02-MCP-PROMPT-ENRICHMENT.md`)
-- **URL Screenshot results:** No display (partially implemented, see `03-URL-SCREENSHOT-AUDIT.md`)
-- **Enriched prompt view:** Users can't see the final prompt that was sent to the model
-- **Backend logging:** Enrichment details are partially logged but not structured for easy debugging
+- **MCP results:** No display (doesn't exist yet).
+- **URL Screenshot results:** No display.
+- **Enriched prompt view:** Users can't see the final prompt that was sent to the model.
+- **Backend logging:** Enrichment details are partially logged but not structured for easy debugging.
 
 ## What Changes
 
-### Step 4.1 — Unified Enrichment Data Structure
+### Step 5.1 — Unified Enrichment Data Structure
 
-**Where:** Backend DTOs
+**Where:** Backend DTOs (Core or Plugin?)
 
-Create a standard enrichment result format that all enrichment sources use:
+If MCP is a plugin, it should return a standard structure that the core understands, or the core needs a generic "EnrichmentResult" DTO.
 
 ```php
 final readonly class EnrichmentResult
@@ -59,7 +59,7 @@ final readonly class EnrichmentItem
 
 **Test:** DTOs serialize to JSON correctly.
 
-### Step 4.2 — SSE Events for All Enrichment Sources
+### Step 5.2 — SSE Events for All Enrichment Sources
 
 **Where:** `MessageProcessor.php`, `StreamController.php`
 
@@ -81,7 +81,7 @@ Keep backward compatibility: existing `searching` / `search_complete` events sti
 
 **Test:** Each enrichment source emits correct SSE events. Frontend processes them.
 
-### Step 4.3 — MCP Results Display in Chat GUI
+### Step 5.3 — MCP Results Display in Chat GUI
 
 **Where:** `ChatMessage.vue`
 
@@ -108,13 +108,12 @@ Display MCP results alongside web search results. Reuse the collapsible carousel
 
 **Files to change:**
 - `frontend/src/components/ChatMessage.vue` — add MCP + URL sections
-- New: `frontend/src/components/MessageMcpResults.vue`
+- New: `frontend/src/components/MessageMcpResults.vue` (or inside plugin `plugins/mcp/frontend/components/`)
 - Update: `frontend/src/components/MessageScreenshot.vue` — text-only mode
-- i18n: `en.json` + `de.json`
 
 **Test:** MCP results render with server name and tool info. Collapsible. Handles 0 results gracefully.
 
-### Step 4.4 — Enriched Prompt Viewer (Debug Mode)
+### Step 5.4 — Enriched Prompt Viewer (Debug Mode)
 
 **Where:** Chat GUI, new component
 
@@ -139,11 +138,10 @@ Add a "View enriched prompt" toggle/button on assistant messages (visible in a d
 - New: `frontend/src/components/MessageEnrichedPrompt.vue`
 - `frontend/src/components/ChatMessage.vue` — add debug section
 - `backend/src/Service/Message/Handler/ChatHandler.php` — save enriched prompt to metadata
-- i18n: `en.json` + `de.json`
 
 **Test:** Debug mode on = enriched prompt saved and visible. Debug mode off = not saved (no storage waste).
 
-### Step 4.5 — Backend Structured Logging
+### Step 5.5 — Backend Structured Logging
 
 **Where:** `MessageProcessor.php`, enrichment services
 
@@ -171,11 +169,5 @@ $this->logger->info('Prompt enrichment complete', [
 ## Implementation Order
 
 ```
-4.1 (DTOs) → 4.2 (SSE events) → 4.3 (MCP display) → 4.4 (debug viewer) → 4.5 (logging)
+5.1 (DTOs) → 5.2 (SSE events) → 5.3 (MCP display) → 5.4 (debug viewer) → 5.5 (logging)
 ```
-
-## Notes
-
-- Step 4.3 depends on `02-MCP-PROMPT-ENRICHMENT.md` being implemented
-- Step 4.4 (debug mode) is optional for v1 but highly recommended for dogfooding
-- Keep the carousel pattern consistent — users already understand it from web search

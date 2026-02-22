@@ -13,6 +13,7 @@ use App\Service\Message\SearchQueryGenerator;
 use App\Service\ModelConfigService;
 use App\Service\PromptService;
 use App\Service\Search\BraveSearchService;
+use App\Service\UrlContentService;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
 
@@ -53,6 +54,7 @@ class MessageProcessorTest extends TestCase
             $this->promptService,
             $this->braveSearchService,
             $this->searchQueryGenerator,
+            $this->createMock(UrlContentService::class),
             $this->logger
         );
     }
