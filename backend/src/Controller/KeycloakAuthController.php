@@ -413,6 +413,17 @@ class KeycloakAuthController extends AbstractController
         }
         if (!empty($oidcRoles)) {
             $userDetails['oidc_roles'] = $oidcRoles;
+
+            // Promote to ADMIN in the DB if Keycloak grants an admin role
+            $adminRoleNames = ['admin', 'realm-admin', 'synaplan-admin', 'administrator'];
+            $hasAdmin = !empty(array_intersect(array_map('strtolower', $oidcRoles), $adminRoleNames));
+            if ($hasAdmin && 'ADMIN' !== $user->getUserLevel()) {
+                $user->setUserLevel('ADMIN');
+                $this->logger->info('User promoted to ADMIN via OIDC role', [
+                    'user_id' => $user->getId(),
+                    'oidc_roles' => $oidcRoles,
+                ]);
+            }
         }
 
         $user->setUserDetails($userDetails);
