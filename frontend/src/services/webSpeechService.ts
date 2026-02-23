@@ -181,32 +181,27 @@ export class WebSpeechService {
 
     this.recognition.onstart = () => {
       this.isListening = true
-      console.log('🎙️ Web Speech: Started listening')
       this.options.onStart?.()
     }
 
     this.recognition.onend = () => {
       this.isListening = false
-      console.log('🎙️ Web Speech: Stopped listening')
       this.options.onEnd?.()
     }
 
     this.recognition.onresult = (event: SpeechRecognitionEventType) => {
-      // Get the latest result
       const resultIndex = event.resultIndex
       const result = event.results[resultIndex]
 
       if (result) {
         const transcript = result[0].transcript
         const isFinal = result.isFinal
-
-        console.log(`🎙️ Web Speech: "${transcript}" (${isFinal ? 'final' : 'interim'})`)
         this.options.onResult?.(transcript, isFinal)
       }
     }
 
     this.recognition.onerror = (event: SpeechRecognitionErrorEventType) => {
-      console.error('🎙️ Web Speech error:', event.error, event.message)
+      console.error('Web Speech error:', event.error, event.message)
 
       const error = this.parseError(event.error, event.message)
       this.options.onError?.(error)
@@ -237,7 +232,6 @@ export class WebSpeechService {
    */
   stop(): void {
     if (this.recognition && this.isListening) {
-      console.log('🎙️ Web Speech: Stopping...')
       this.recognition.stop()
       this.isListening = false
     }
