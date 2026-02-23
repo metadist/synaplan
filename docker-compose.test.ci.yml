@@ -2,6 +2,10 @@
 # This file configures the setup for CI by:
 #   1. Using a pre-built Docker image (via APP_IMAGE env var)
 #   2. Removing volume mounts to use the baked image content
+#   3. whatsapp-stub: no ports (stub only reachable in-network), no container_name
+#
+# When using this override: if E2E runs on the host, keep stub ports in base compose for that job;
+# or run Playwright in a container on synaplan-test-network with WHATSAPP_STUB_URL=http://whatsapp-stub:3999.
 #
 # Usage in CI:
 #   docker compose -f docker-compose.test.yml -f docker-compose.test.ci.yml up
@@ -13,3 +17,8 @@ services:
     # Remove all volume mounts to use the baked image content
     # The !reset tag is required to clear inherited volumes from base file
     volumes: !reset []
+
+  whatsapp-stub:
+    # CI: no host port binding; stub only reachable from app_test. E2E must use WHATSAPP_STUB_URL=http://whatsapp-stub:3999 from a container on same network.
+    ports: !reset []
+    container_name: !reset null
