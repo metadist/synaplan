@@ -895,19 +895,19 @@ const filteredChatList = computed(() => {
   const q = chatSearchQuery.value.toLowerCase().trim()
   if (!q) return chatList.value
   return chatList.value.filter((c) => {
-    const title = c.firstMessagePreview || c.title
-    return title.toLowerCase().includes(q)
+    return getDisplayTitle(c).toLowerCase().includes(q)
   })
 })
 
+const isDefaultTitle = (title: string): boolean =>
+  title === t('chat.newChat') ||
+  title === 'New Chat' ||
+  title === 'Neuer Chat' ||
+  title.startsWith('Chat ')
+
 const getDisplayTitle = (chat: StoreChat): string => {
+  if (!isDefaultTitle(chat.title)) return chat.title
   if (chat.firstMessagePreview) return chat.firstMessagePreview
-  const isDefault =
-    chat.title === t('chat.newChat') ||
-    chat.title === 'New Chat' ||
-    chat.title === 'Neuer Chat' ||
-    chat.title.startsWith('Chat ')
-  if (!isDefault) return chat.title
   return t('chat.newChat')
 }
 

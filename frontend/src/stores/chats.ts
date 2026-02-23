@@ -214,6 +214,7 @@ export const useChatsStore = defineStore('chats', () => {
       const chat = chats.value.find((c) => c.id === chatId)
       if (chat) {
         chat.title = title
+        chat.firstMessagePreview = null
       }
     } catch (err: any) {
       error.value = err.message || 'Failed to update chat'
