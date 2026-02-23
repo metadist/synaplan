@@ -6,14 +6,13 @@
 import { test, expect } from '../e2e/test-setup'
 import { clearMailHog, fetchMessages, getPlainTextBody, toMatches } from './helpers/email'
 import { getApiUrl, isTestStack } from '../e2e/config/config'
+import { INTEGRATION } from '../e2e/config/integration-data'
 
 const WEBHOOK_PATH = '/api/v1/webhooks/email'
 const MAILHOG_POLL_TIMEOUT_MS = 3000
 const MAILHOG_POLL_INTERVAL_MS = 200
 
-const TEST_FROM = 'user@example.com'
-const TEST_TO = 'smart@synaplan.net'
-const TEST_PROVIDER_REPLY_MARKER = 'TestProvider response'
+const { TEST_FROM, TEST_TO, TEST_PROVIDER_REPLY_MARKER } = INTEGRATION.EMAIL
 
 function webhookUrl(): string {
   return `${getApiUrl()}${WEBHOOK_PATH}`
@@ -30,7 +29,6 @@ test.describe('Smart-Email smoke @smoke', () => {
   test('Inbound → Reply sent: webhook 2xx, exactly one reply in MailHog with TestProvider text', async ({
     request,
   }) => {
-    test.skip(!isTestStack(), 'Smart-email smoke requires test stack (E2E_STACK=test, MailHog, TestProvider)')
     await test.step('Arrange: verify 0 messages', async () => {
       const messages = await fetchMessages(request)
       expect(messages.length, 'MailHog should be empty before trigger').toBe(0)
@@ -85,7 +83,6 @@ test.describe('Smart-Email smoke @smoke', () => {
   test('Invalid payload → 400, error body, no reply in MailHog', async ({
     request,
   }) => {
-    test.skip(!isTestStack(), 'Smart-email smoke requires test stack')
     await test.step('Arrange: empty MailHog', async () => {
       const messages = await fetchMessages(request)
       expect(messages.length).toBe(0)

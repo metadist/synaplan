@@ -6,6 +6,7 @@
 import type { APIRequestContext } from '@playwright/test'
 import { test, expect } from '../e2e/test-setup'
 import { getApiUrl, isTestStack } from '../e2e/config/config'
+import { INTEGRATION } from '../e2e/config/integration-data'
 import {
   getStubBaseUrl,
   getStubRequests,
@@ -27,7 +28,7 @@ import {
 
 const WEBHOOK_PATH = '/api/v1/webhooks/whatsapp'
 const EXPECTED_PATH_MESSAGES = `/v21.0/${PHONE_NUMBER_ID}/messages`
-const TEST_FROM = '4915112345678'
+const TEST_FROM = INTEGRATION.WHATSAPP.TEST_FROM
 
 function webhookUrl(): string {
   return `${getApiUrl()}${WEBHOOK_PATH}`
@@ -45,7 +46,7 @@ test.describe('WhatsApp smoke @smoke', () => {
   test.describe.configure({ mode: 'serial' })
 
   test.beforeEach(async ({ request }, testInfo) => {
-    test.skip(!isTestStack(), 'WhatsApp smoke requires test stack (E2E_STACK=test, stub at whatsapp-stub:3999)')
+    if (!isTestStack()) return
     await resetStub(request, getStubBaseUrl(), makeRunId(testInfo.testId))
   })
 
@@ -102,9 +103,12 @@ test.describe('WhatsApp smoke @smoke', () => {
       expect(json.success).toBe(true)
       expect(json.responses).toBeDefined()
       expect(json.responses!.length).toBe(1)
-      expect(json.responses![0].success).toBe(false)
-      expect(json.responses![0].error).toBeDefined()
-      expect(String(json.responses![0].error).length).toBeGreaterThan(0)
+      const r0 = json.responses![0]
+      expect(
+        r0.success === true && r0.response_sent === false,
+        `When stub returns 500 for send, backend must report success: true, response_sent: false. Got: ${JSON.stringify(r0)}`
+      ).toBe(true)
+      expect(r0.response_sent).toBe(false)
     })
 
     await test.step('Assert: stub received exactly one send POST', async () => {

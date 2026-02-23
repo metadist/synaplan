@@ -14,6 +14,7 @@ const STUB_HOST = process.env.STUB_HOST || 'whatsapp-stub'
 /** Requests by runId; default key for backward compat. */
 const requestsByRunId = { default: [] }
 let currentRunId = 'default'
+/** When set, the next N "send message" requests get 500. Mark-as-read (status: read) is never failed. */
 let simulateFailCount = 0
 
 function getRequests() {
@@ -103,8 +104,9 @@ const server = http.createServer((req, res) => {
       }
       requests.push({ method, path, headers, body })
 
-      // Only simulate failure for "send message" (body.type), not markAsRead (body.status === 'read')
-      const isSendMessage = body && body.type && body.status !== 'read'
+      // Like real Graph API: mark-as-read (body.status === 'read') vs send (body.type). Only send gets 500 when simulating failure.
+      const isMarkAsRead = body && body.status === 'read'
+      const isSendMessage = body && body.type != null && !isMarkAsRead
       if (simulateFailCount > 0 && isSendMessage) {
         simulateFailCount--
         res.writeHead(500, { 'Content-Type': 'application/json' })
