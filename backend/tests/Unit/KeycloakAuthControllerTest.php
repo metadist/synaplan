@@ -212,7 +212,7 @@ class KeycloakAuthControllerTest extends TestCase
 
         $result = $this->invokePrivateMethod($controller, 'findOrCreateUser', $userInfo, null);
 
-        $this->assertSame('FREE', $result->getUserLevel());
+        $this->assertSame('NEW', $result->getUserLevel());
     }
 
     public function testFindOrCreateUserKeepsAdminWhenOidcRoleStillPresent(): void
@@ -238,7 +238,7 @@ class KeycloakAuthControllerTest extends TestCase
     public function testFindOrCreateUserDoesNotPromoteWhenNoMatchingRole(): void
     {
         $controller = $this->createController('administrator');
-        $user = $this->makeKeycloakUser('test@example.com', 'FREE');
+        $user = $this->makeKeycloakUser('test@example.com', 'NEW');
 
         $this->userRepository->method('findOneBy')->willReturn($user);
         $this->em->expects($this->once())->method('persist');
@@ -252,7 +252,7 @@ class KeycloakAuthControllerTest extends TestCase
 
         $result = $this->invokePrivateMethod($controller, 'findOrCreateUser', $userInfo, null);
 
-        $this->assertSame('FREE', $result->getUserLevel());
+        $this->assertSame('NEW', $result->getUserLevel());
     }
 
     public function testFindOrCreateUserAdminMatchIsCaseInsensitive(): void

@@ -440,7 +440,7 @@ class KeycloakAuthController extends AbstractController
                     'oidc_roles' => $oidcRoles,
                 ]);
             } elseif (!$hasAdmin && 'ADMIN' === $user->getUserLevel()) {
-                $user->setUserLevel('FREE');
+                $user->setUserLevel('NEW');
                 $this->logger->info('User demoted from ADMIN — OIDC roles no longer include admin', [
                     'user_id' => $user->getId(),
                     'oidc_roles' => $oidcRoles,
