@@ -81,6 +81,10 @@ You can e.g. run smoke tests (id=003) locally against the test provider.
 - **Same as CI:** Start the test stack (`make test-stack-build`), then run tests with `npm run test:e2e:teststack`. Matches the CI environment (port 8001, TestProvider, tmpfs DB).
 - **Switching stacks:** See [Switching between dev stack and test stack](#switching-between-dev-stack-and-test-stack) above.
 
+## Multi-worker (parallel tests)
+
+Tests run with multiple workers. Each worker has a dedicated user (worker 0: admin, workers 1–3: `e2e-worker-1@synaplan.com` …); after each test we clean only that user’s data so parallel runs don’t share state. UserFixtures include these E2E users. **Keep `workers` ≤ number of defined users (currently 4), or add more users in `credentials.ts` and UserFixtures.**
+
 ## Test commands
 
 From the **frontend** directory:

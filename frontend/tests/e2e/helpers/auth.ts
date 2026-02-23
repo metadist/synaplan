@@ -79,11 +79,16 @@ export async function getAuthHeaders(
 }
 
 /**
- * Delete user by email via admin API
+ * Delete user by email via admin API (uses admin credentials for the request)
  */
-export async function deleteUser(request: APIRequestContext, userEmail: string): Promise<boolean> {
+export async function deleteUser(
+  request: APIRequestContext,
+  userEmail: string,
+  adminCredentials?: { user: string; pass: string }
+): Promise<boolean> {
   try {
-    const cookieHeader = await loginViaApi(request)
+    const creds = adminCredentials ?? CREDENTIALS.getAdminCredentials()
+    const cookieHeader = await loginViaApi(request, creds)
     const usersResponse = await request.get(
       `${apiBaseUrl()}/api/v1/admin/users?search=${encodeURIComponent(userEmail)}`,
       {
@@ -129,14 +134,17 @@ export async function deleteUser(request: APIRequestContext, userEmail: string):
 }
 
 /**
- * Cleanup user data but keep user account (for idempotent tests)
+ * Cleanup user data but keep user account (for idempotent tests).
+ * Uses admin credentials for the admin API request.
  */
 export async function cleanupUserData(
   request: APIRequestContext,
-  userEmail: string
+  userEmail: string,
+  adminCredentials?: { user: string; pass: string }
 ): Promise<boolean> {
   try {
-    const cookieHeader = await loginViaApi(request)
+    const creds = adminCredentials ?? CREDENTIALS.getAdminCredentials()
+    const cookieHeader = await loginViaApi(request, creds)
     const usersResponse = await request.get(
       `${apiBaseUrl()}/api/v1/admin/users?search=${encodeURIComponent(userEmail)}`,
       {
