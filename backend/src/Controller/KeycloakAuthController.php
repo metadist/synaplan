@@ -35,6 +35,9 @@ class KeycloakAuthController extends AbstractController
 {
     private string $appEnv;
 
+    /** @var array<string> */
+    private array $adminRoleNames;
+
     public function __construct(
         private HttpClientInterface $httpClient,
         private UserRepository $userRepository,
@@ -46,10 +49,14 @@ class KeycloakAuthController extends AbstractController
         private string $oidcClientId,
         private string $oidcClientSecret,
         private string $oidcDiscoveryUrl,
+        string $oidcAdminRoles,
         private string $appUrl,
         private string $frontendUrl,
     ) {
         $this->appEnv = $_ENV['APP_ENV'] ?? 'prod';
+        $this->adminRoleNames = !empty($oidcAdminRoles)
+            ? array_map('strtolower', array_map('trim', explode(',', $oidcAdminRoles)))
+            : ['admin', 'realm-admin', 'synaplan-admin', 'administrator'];
     }
 
     #[Route('/login', name: 'keycloak_auth_login', methods: ['GET'])]
@@ -414,12 +421,16 @@ class KeycloakAuthController extends AbstractController
         if (!empty($oidcRoles)) {
             $userDetails['oidc_roles'] = $oidcRoles;
 
-            // Promote to ADMIN in the DB if Keycloak grants an admin role
-            $adminRoleNames = ['admin', 'realm-admin', 'synaplan-admin', 'administrator'];
-            $hasAdmin = !empty(array_intersect(array_map('strtolower', $oidcRoles), $adminRoleNames));
+            $hasAdmin = !empty(array_intersect(array_map('strtolower', $oidcRoles), $this->adminRoleNames));
             if ($hasAdmin && 'ADMIN' !== $user->getUserLevel()) {
                 $user->setUserLevel('ADMIN');
                 $this->logger->info('User promoted to ADMIN via OIDC role', [
+                    'user_id' => $user->getId(),
+                    'oidc_roles' => $oidcRoles,
+                ]);
+            } elseif (!$hasAdmin && 'ADMIN' === $user->getUserLevel()) {
+                $user->setUserLevel('FREE');
+                $this->logger->info('User demoted from ADMIN — OIDC roles no longer include admin', [
                     'user_id' => $user->getId(),
                     'oidc_roles' => $oidcRoles,
                 ]);

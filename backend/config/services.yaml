@@ -295,6 +295,7 @@ services:
             $oidcClientId: '%env(OIDC_CLIENT_ID)%'
             $oidcClientSecret: '%env(OIDC_CLIENT_SECRET)%'
             $oidcDiscoveryUrl: '%env(OIDC_DISCOVERY_URL)%'
+            $oidcAdminRoles: '%env(string:OIDC_ADMIN_ROLES)%'
             $appUrl: '%env(APP_URL)%'
             $frontendUrl: '%env(FRONTEND_URL)%'
 
