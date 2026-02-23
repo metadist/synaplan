@@ -38,8 +38,10 @@ class KeycloakAuthControllerTest extends TestCase
         $this->oauthStateService = new OAuthStateService($this->logger, 'test-secret');
     }
 
-    private function createController(string $oidcAdminRoles = 'admin,realm-admin,synaplan-admin,administrator'): KeycloakAuthController
-    {
+    private function createController(
+        string $oidcAdminRoles = 'admin,realm-admin,synaplan-admin,administrator',
+        string $oidcRoleClaims = 'realm_access.roles,resource_access.{client_id}.roles,groups',
+    ): KeycloakAuthController {
         return new KeycloakAuthController(
             $this->httpClient,
             $this->userRepository,
@@ -52,6 +54,7 @@ class KeycloakAuthControllerTest extends TestCase
             'test-client-secret',
             'https://keycloak.example.com/realms/test',
             $oidcAdminRoles,
+            $oidcRoleClaims,
             'https://app.example.com',
             'https://app.example.com',
         );
@@ -100,12 +103,13 @@ class KeycloakAuthControllerTest extends TestCase
         $this->assertSame(['admin', 'realm-admin', 'superuser'], $roles);
     }
 
-    public function testConstructorUsesDefaultsWhenAdminRolesEmpty(): void
+    public function testConstructorHandlesEmptyAdminRoles(): void
     {
         $controller = $this->createController('');
         $roles = $this->getPrivateProperty($controller, 'adminRoleNames');
 
-        $this->assertSame(['admin', 'realm-admin', 'synaplan-admin', 'administrator'], $roles);
+        // Empty string results in a single empty element — defaults are in services.yaml
+        $this->assertSame([''], $roles);
     }
 
     public function testConstructorHandlesSingleAdminRole(): void
@@ -310,6 +314,115 @@ class KeycloakAuthControllerTest extends TestCase
             'sub' => 'sub-123',
             'email' => 'test@example.com',
             'groups' => ['administrator', '/users'],
+        ];
+
+        $result = $this->invokePrivateMethod($controller, 'findOrCreateUser', $userInfo, null);
+
+        $this->assertSame('ADMIN', $result->getUserLevel());
+    }
+
+    // ========== Constructor: OIDC_ROLE_CLAIMS parsing ==========
+
+    public function testConstructorParsesDefaultClaimPaths(): void
+    {
+        $controller = $this->createController();
+        $paths = $this->getPrivateProperty($controller, 'roleClaimPaths');
+
+        $this->assertCount(3, $paths);
+        $this->assertSame(['realm_access', 'roles'], $paths[0]);
+        $this->assertSame(['resource_access', 'test-client-id', 'roles'], $paths[1]);
+        $this->assertSame(['groups'], $paths[2]);
+    }
+
+    public function testConstructorParsesCustomClaimPaths(): void
+    {
+        $controller = $this->createController(oidcRoleClaims: 'roles,custom.nested.path');
+        $paths = $this->getPrivateProperty($controller, 'roleClaimPaths');
+
+        $this->assertCount(2, $paths);
+        $this->assertSame(['roles'], $paths[0]);
+        $this->assertSame(['custom', 'nested', 'path'], $paths[1]);
+    }
+
+    public function testConstructorReplacesClientIdPlaceholder(): void
+    {
+        $controller = $this->createController(oidcRoleClaims: 'resource_access.{client_id}.roles');
+        $paths = $this->getPrivateProperty($controller, 'roleClaimPaths');
+
+        $this->assertCount(1, $paths);
+        $this->assertSame(['resource_access', 'test-client-id', 'roles'], $paths[0]);
+    }
+
+    public function testConstructorTrimsWhitespaceInClaimPaths(): void
+    {
+        $controller = $this->createController(oidcRoleClaims: ' roles , groups ');
+        $paths = $this->getPrivateProperty($controller, 'roleClaimPaths');
+
+        $this->assertCount(2, $paths);
+        $this->assertSame(['roles'], $paths[0]);
+        $this->assertSame(['groups'], $paths[1]);
+    }
+
+    public function testConstructorSkipsEmptyClaimPathSegments(): void
+    {
+        $controller = $this->createController(oidcRoleClaims: 'roles,,groups,');
+        $paths = $this->getPrivateProperty($controller, 'roleClaimPaths');
+
+        $this->assertCount(2, $paths);
+        $this->assertSame(['roles'], $paths[0]);
+        $this->assertSame(['groups'], $paths[1]);
+    }
+
+    public function testConstructorHandlesEscapedDotsInClaimPaths(): void
+    {
+        $controller = $this->createController(oidcRoleClaims: 'https://myapp\.com/roles');
+        $paths = $this->getPrivateProperty($controller, 'roleClaimPaths');
+
+        $this->assertCount(1, $paths);
+        $this->assertSame(['https://myapp.com/roles'], $paths[0]);
+    }
+
+    // ========== findOrCreateUser: custom claim paths ==========
+
+    public function testFindOrCreateUserExtractsFlatRolesClaim(): void
+    {
+        $controller = $this->createController(
+            oidcAdminRoles: 'administrator',
+            oidcRoleClaims: 'roles',
+        );
+        $user = $this->makeKeycloakUser('test@example.com', 'NEW');
+
+        $this->userRepository->method('findOneBy')->willReturn($user);
+        $this->em->expects($this->once())->method('persist');
+        $this->em->expects($this->once())->method('flush');
+
+        $userInfo = [
+            'sub' => 'sub-123',
+            'email' => 'test@example.com',
+            'roles' => ['administrator', 'viewer'],
+        ];
+
+        $result = $this->invokePrivateMethod($controller, 'findOrCreateUser', $userInfo, null);
+
+        $this->assertSame('ADMIN', $result->getUserLevel());
+    }
+
+    public function testFindOrCreateUserExtractsEscapedDotClaim(): void
+    {
+        $controller = $this->createController(
+            oidcAdminRoles: 'admin',
+            oidcRoleClaims: 'https://myapp\.com/roles',
+        );
+        $user = $this->makeKeycloakUser('test@example.com', 'NEW');
+
+        $this->userRepository->method('findOneBy')->willReturn($user);
+        $this->em->expects($this->once())->method('persist');
+        $this->em->expects($this->once())->method('flush');
+
+        $userInfo = [
+            'sub' => 'sub-123',
+            'email' => 'test@example.com',
+            'https://myapp.com/roles' => ['admin', 'user'],
         ];
 
         $result = $this->invokePrivateMethod($controller, 'findOrCreateUser', $userInfo, null);

@@ -42,6 +42,7 @@ services:
       OIDC_DISCOVERY_URL: http://host.docker.internal:${KEYCLOAK_TEST_PORT:-8081}/realms/synaplan
       OIDC_AUTO_REDIRECT: ${OIDC_AUTO_REDIRECT:-false}
       OIDC_ADMIN_ROLES: administrator
+      OIDC_ROLE_CLAIMS: realm_access.roles,resource_access.{client_id}.roles,groups
       LOCK_DSN: flock
       # FIXME: these shouldnt be required
       GOOGLE_GEMINI_API_KEY: "test-key"
