@@ -472,11 +472,16 @@ class WhatsAppService
     }
 
     /**
-     * Mark message as read.
+     * Mark message as read, optionally showing a typing indicator.
      *
-     * @param string $phoneNumberId The WhatsApp Phone Number ID (extracted from webhook metadata)
+     * When $withTypingIndicator is true, the user sees blue checkmarks AND
+     * a "typing…" animation. The animation auto-dismisses after 25 seconds
+     * or when a response message is sent — whichever comes first.
+     *
+     * @param string $phoneNumberId       The WhatsApp Phone Number ID (extracted from webhook metadata)
+     * @param bool   $withTypingIndicator Show typing animation while preparing a response
      */
-    public function markAsRead(string $messageId, string $phoneNumberId): array
+    public function markAsRead(string $messageId, string $phoneNumberId, bool $withTypingIndicator = false): array
     {
         if (!$this->isAvailable()) {
             throw new \RuntimeException('WhatsApp service is not available');
@@ -492,17 +497,23 @@ class WhatsAppService
             $phoneNumberId
         );
 
+        $payload = [
+            'messaging_product' => 'whatsapp',
+            'status' => 'read',
+            'message_id' => $messageId,
+        ];
+
+        if ($withTypingIndicator) {
+            $payload['typing_indicator'] = ['type' => 'text'];
+        }
+
         try {
             $response = $this->httpClient->request('POST', $url, [
                 'headers' => [
                     'Authorization' => 'Bearer '.$this->accessToken,
                     'Content-Type' => 'application/json',
                 ],
-                'json' => [
-                    'messaging_product' => 'whatsapp',
-                    'status' => 'read',
-                    'message_id' => $messageId,
-                ],
+                'json' => $payload,
             ]);
 
             return [
@@ -512,6 +523,7 @@ class WhatsAppService
         } catch (\Exception $e) {
             $this->logger->error('Failed to mark WhatsApp message as read', [
                 'message_id' => $messageId,
+                'typing_indicator' => $withTypingIndicator,
                 'error' => $e->getMessage(),
             ]);
 
@@ -640,8 +652,8 @@ class WhatsAppService
             ];
         }
 
-        // 6. Mark as read (usage recording moved to after AI response for token estimation)
-        $this->markAsRead($dto->messageId, $dto->phoneNumberId);
+        // 6. Mark as read + show typing indicator while AI processes the request
+        $this->markAsRead($dto->messageId, $dto->phoneNumberId, withTypingIndicator: true);
 
         // 7. AI Pipeline Processing (use streaming mode to support TTS/media generation)
         $collectedResponse = '';
