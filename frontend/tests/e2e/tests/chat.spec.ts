@@ -13,8 +13,8 @@ const e2eDir = path.join(__dirname, '..')
 
 const VISION_FIXTURE = readFileSync(path.join(e2eDir, FIXTURE_PATHS.VISION_PATTERN_64))
 
-test('@003 @smoke Standard model generates answer', async ({ page }) => {
-  await login(page)
+test('@003 @smoke Standard model generates answer', async ({ page, credentials }) => {
+  await login(page, credentials)
   const chat = new ChatHelper(page)
 
   await test.step('Arrange: start new chat', async () => {
@@ -37,12 +37,13 @@ test('@003 @smoke Standard model generates answer', async ({ page }) => {
 
 test('@004 @noci @nightly User can chat with all models and get a "success" answer', async ({
   page,
+  credentials,
 }) => {
   test.setTimeout(120_000)
   const failures: string[] = []
   const chat = new ChatHelper(page)
 
-  await login(page)
+  await login(page, credentials)
   await chat.startNewChat()
 
   try {
@@ -68,11 +69,12 @@ test('@004 @noci @nightly User can chat with all models and get a "success" answ
 
 test('@008 @noci @regression User can upload an image and gets a discription from all models', async ({
   page,
+  credentials,
 }) => {
   const failures: string[] = []
   const chat = new ChatHelper(page)
 
-  await login(page)
+  await login(page, credentials)
   await chat.ensureAdvancedMode()
   await chat.startNewChat()
 
@@ -99,11 +101,12 @@ test('@008 @noci @regression User can upload an image and gets a discription fro
 
 test('@009 @noci @regression User can generate an image and test all models', async ({
   page,
+  credentials,
 }) => {
   const failures: string[] = []
   const chat = new ChatHelper(page)
 
-  await login(page)
+  await login(page, credentials)
   await chat.ensureAdvancedMode()
   await chat.startNewChat()
 
@@ -122,11 +125,14 @@ test('@009 @noci @regression User can generate an image and test all models', as
   }
 })
 
-test('@010 @noci @regression User can generate a video and test all models', async ({ page }) => {
+test('@010 @noci @regression User can generate a video and test all models', async ({
+  page,
+  credentials,
+}) => {
   const failures: string[] = []
   const chat = new ChatHelper(page)
 
-  await login(page)
+  await login(page, credentials)
   await chat.ensureAdvancedMode()
   await chat.startNewChat()
 

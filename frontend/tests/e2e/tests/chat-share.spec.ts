@@ -5,11 +5,14 @@ import { ChatHelper } from '../helpers/chat'
 import { TIMEOUTS } from '../config/config'
 
 test.describe('Chat Share', () => {
-  test('User can share a chat and open shared link in incognito id=share-001', async ({ page }) => {
+  test('User can share a chat and open shared link in incognito id=share-001', async ({
+    page,
+    credentials,
+  }) => {
     const uniqueMessage = `Chat share E2E ${Date.now()} – please reply briefly.`
 
     await test.step('Arrange: login via UI', async () => {
-      await login(page)
+      await login(page, credentials)
     })
 
     let previousBubbleCount = 0

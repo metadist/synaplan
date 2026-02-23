@@ -4,13 +4,13 @@ import { selectors } from '../helpers/selectors'
 import { clearMailHog, waitForVerificationHref, normalizeVerificationUrl } from '../helpers/email'
 import { URLS, TIMEOUTS, INTERVALS } from '../config/config'
 
-test('@002 @smoke @auth should successfully login', async ({ page }) => {
-  await login(page)
+test('@002 @smoke @auth should successfully login', async ({ page, credentials }) => {
+  await login(page, credentials)
   await expect(page.locator(selectors.chat.textInput)).toBeVisible({ timeout: 10_000 })
 })
 
-test('@005 @smoke @auth logout should clear session', async ({ page }) => {
-  await login(page)
+test('@005 @smoke @auth logout should clear session', async ({ page, credentials }) => {
+  await login(page, credentials)
 
   await page.locator(selectors.userMenu.button).waitFor({ state: 'visible' })
   await page.locator(selectors.userMenu.button).click()
