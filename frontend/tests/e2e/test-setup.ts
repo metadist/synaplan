@@ -13,6 +13,7 @@ export const test = base.extend({
 })
 
 test.afterEach(async ({ request }, testInfo) => {
+  if (testInfo.file && testInfo.file.includes('integration')) return
   const testUserEmail = CREDENTIALS.DEFAULT_USER
   try {
     await cleanupUserData(request, testUserEmail)
