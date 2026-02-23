@@ -244,7 +244,7 @@ class WordPressIntegrationService
             'aiModel' => -1,
             'tool_internet' => false,
             'tool_files' => true,
-            'tool_screenshot' => false,
+            'tool_url_screenshot' => false,
             'tool_transfer' => false,
             'tool_files_keyword' => self::GROUP_KEY,
         ];
