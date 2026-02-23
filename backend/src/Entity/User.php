@@ -339,7 +339,7 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
      */
     public function isAdmin(): bool
     {
-        return 'ADMIN' === $this->userLevel || in_array('ROLE_ADMIN', $this->getRoles(), true);
+        return 'ADMIN' === $this->userLevel;
     }
 
     /**
