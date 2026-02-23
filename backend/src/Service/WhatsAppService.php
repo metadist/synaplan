@@ -478,6 +478,7 @@ class WhatsAppService
      * a "typing…" animation. The animation auto-dismisses after 25 seconds
      * or when a response message is sent — whichever comes first.
      *
+     * @param string $messageId           The WhatsApp message ID to mark as read
      * @param string $phoneNumberId       The WhatsApp Phone Number ID (extracted from webhook metadata)
      * @param bool   $withTypingIndicator Show typing animation while preparing a response
      */
