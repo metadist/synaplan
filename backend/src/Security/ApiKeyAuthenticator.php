@@ -19,6 +19,7 @@ use Symfony\Component\Security\Http\Authenticator\Passport\SelfValidatingPasspor
  *
  * Supports:
  * - Header: X-API-Key: your-api-key
+ * - Header: Authorization: Bearer your-api-key (OpenAI-compatible)
  * - Query: ?api_key=your-api-key
  *
  * Used for webhooks (Email, WhatsApp) and other external integrations
@@ -36,8 +37,17 @@ class ApiKeyAuthenticator extends AbstractAuthenticator
      */
     public function supports(Request $request): ?bool
     {
-        // Check for X-API-Key header or api_key query parameter
-        return $request->headers->has('X-API-Key') || $request->query->has('api_key');
+        if ($request->headers->has('X-API-Key') || $request->query->has('api_key')) {
+            return true;
+        }
+
+        // Authorization: Bearer support for OpenAI-compatible /v1/ endpoints only
+        if (str_starts_with($request->getPathInfo(), '/v1/')
+            && str_starts_with((string) $request->headers->get('Authorization', ''), 'Bearer ')) {
+            return true;
+        }
+
+        return false;
     }
 
     /**
@@ -45,9 +55,16 @@ class ApiKeyAuthenticator extends AbstractAuthenticator
      */
     public function authenticate(Request $request): Passport
     {
-        // Extract API key from header or query
         $apiKey = $request->headers->get('X-API-Key')
                   ?? $request->query->get('api_key');
+
+        // Fall back to Authorization: Bearer for /v1/ routes
+        if (!$apiKey) {
+            $authHeader = (string) $request->headers->get('Authorization', '');
+            if (str_starts_with($authHeader, 'Bearer ')) {
+                $apiKey = substr($authHeader, 7);
+            }
+        }
 
         if (!$apiKey) {
             throw new AuthenticationException('No API key provided');

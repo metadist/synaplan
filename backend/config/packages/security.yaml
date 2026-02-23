@@ -15,6 +15,13 @@ security:
             pattern: ^/(_(profiler|wdt)|css|images|js)/
             security: false
 
+        openai_compat:
+            pattern: ^/v1
+            stateless: true
+            provider: app_user_provider
+            custom_authenticators:
+                - App\Security\ApiKeyAuthenticator
+
         api:
             pattern: ^/api
             stateless: true
@@ -29,6 +36,9 @@ security:
             provider: app_user_provider
 
     access_control:
+        # OpenAI-compatible endpoints (require API key auth)
+        - { path: ^/v1, roles: IS_AUTHENTICATED_FULLY }
+
         # Public API documentation (Swagger)
         - { path: ^/api/doc, roles: PUBLIC_ACCESS }
 
