@@ -783,10 +783,8 @@ const toggleRecording = async () => {
 
   // Start recording - Web Speech API has priority for real-time streaming
   if (useWebSpeech.value) {
-    console.log('🎙️ Using Web Speech API (real-time streaming)')
     await startWebSpeechRecording()
   } else {
-    console.log('🎙️ Using Whisper backend (record-then-transcribe)')
     await startWhisperRecording()
   }
 }
@@ -808,23 +806,15 @@ const startWebSpeechRecording = async () => {
     speechFinalTranscript.value = ''
     interimTranscript.value = ''
 
-    console.log(
-      '🎙️ Web Speech: Starting with base message:',
-      JSON.stringify(speechBaseMessage.value)
-    )
-    console.log('🎙️ Web Speech: Using language:', speechLanguage.value)
-
     webSpeechService.value = new WebSpeechService({
       language: speechLanguage.value,
       interimResults: true,
       continuous: true,
       onStart: () => {
-        console.log('🎙️ Web Speech: onStart fired')
         isRecording.value = true
         success(t('chatInput.listeningStarted'))
       },
       onEnd: () => {
-        console.log('🎙️ Web Speech: onEnd fired')
         isRecording.value = false
         // Finalize: set message to base + finals + any remaining interim
         const base = speechBaseMessage.value
@@ -833,42 +823,31 @@ const startWebSpeechRecording = async () => {
         const separator = base && (finals || interim) ? ' ' : ''
         message.value = base + separator + finals + (finals && interim ? ' ' : '') + interim
 
-        console.log('🎙️ Web Speech: Final message:', JSON.stringify(message.value))
-
         // Reset speech tracking
         speechBaseMessage.value = ''
         speechFinalTranscript.value = ''
         interimTranscript.value = ''
       },
       onResult: (text: string, isFinal: boolean) => {
-        console.log(`🎙️ Web Speech: onResult - "${text}" (isFinal: ${isFinal})`)
-
         const base = speechBaseMessage.value
         const separator = base ? ' ' : ''
 
         if (isFinal) {
-          // Final result - add to accumulated finals
           const finalSeparator = speechFinalTranscript.value ? ' ' : ''
           speechFinalTranscript.value += finalSeparator + text
           interimTranscript.value = ''
 
-          // Update input field: base + all finals
           message.value = base + separator + speechFinalTranscript.value
-          console.log('🎙️ Final result, message now:', JSON.stringify(message.value))
         } else {
-          // Interim result - update live in input field
           interimTranscript.value = text
           const finals = speechFinalTranscript.value
           const interimSeparator = finals ? ' ' : ''
 
-          // Update input field: base + finals + interim (real-time!)
           message.value = base + separator + finals + interimSeparator + text
-          console.log('🎙️ Interim result, message now:', JSON.stringify(message.value))
         }
       },
       onError: (error) => {
-        console.error('❌ Web Speech error:', error)
-        // Only show error for actual problems, not 'no-speech' during pauses
+        console.error('Web Speech error:', error)
         if (error.type !== 'no_speech') {
           showError(error.userMessage)
         }
@@ -877,9 +856,8 @@ const startWebSpeechRecording = async () => {
     })
 
     await webSpeechService.value.start()
-    console.log('🎙️ Web Speech: start() completed')
   } catch (err: unknown) {
-    console.error('❌ Failed to start Web Speech:', err)
+    console.error('Failed to start Web Speech:', err)
     const errMessage = err instanceof Error ? err.message : 'Unknown error'
     showError(t('chatInput.speechError', { error: errMessage }))
     isRecording.value = false
