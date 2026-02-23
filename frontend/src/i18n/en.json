@@ -32,6 +32,7 @@
     "subscription": "Subscription",
     "subscriptionSuccess": "Subscription Successful",
     "subscriptionCancel": "Subscription Cancelled",
+    "loggedOut": "Logged Out",
     "notFound": "Page Not Found",
     "widgetSessions": "Widget Sessions",
     "widgetChats": "Widget Chats",
@@ -1167,7 +1168,10 @@
     "hidePassword": "Hide password",
     "redirectingToSso": "Redirecting to SSO...",
     "loginWithSso": "Login with SSO",
-    "poweredBySynaplan": "Powered by Synaplan"
+    "poweredBySynaplan": "Powered by Synaplan",
+    "loggedOutTitle": "You have been logged out",
+    "loggedOutDesc": "Your session has been ended successfully. You can close this window or log in again.",
+    "loginAgain": "Log in again"
   },
   "unsavedChanges": {
     "title": "You have unsaved changes",

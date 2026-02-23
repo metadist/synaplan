@@ -6,6 +6,13 @@ parameters:
     # Synaplan public URL
     synaplan_url: '%env(SYNAPLAN_URL)%'
 
+    # OIDC admin role claim values (comma-separated, case-insensitive)
+    env(OIDC_ADMIN_ROLES): 'admin,realm-admin,synaplan-admin,administrator'
+
+    # OIDC role claim paths (comma-separated dot-notation)
+    # Use {client_id} as placeholder for OIDC_CLIENT_ID. Escape literal dots with \
+    env(OIDC_ROLE_CLAIMS): 'realm_access.roles,resource_access.{client_id}.roles,groups'
+
     # Logging
     # LOG_FORMAT: json (default) or line (human-readable)
     # LOG_LEVEL: debug, info, notice, warning, error (see monolog.yaml)
@@ -295,6 +302,8 @@ services:
             $oidcClientId: '%env(OIDC_CLIENT_ID)%'
             $oidcClientSecret: '%env(OIDC_CLIENT_SECRET)%'
             $oidcDiscoveryUrl: '%env(OIDC_DISCOVERY_URL)%'
+            $oidcAdminRoles: '%env(string:OIDC_ADMIN_ROLES)%'
+            $oidcRoleClaims: '%env(string:OIDC_ROLE_CLAIMS)%'
             $appUrl: '%env(APP_URL)%'
             $frontendUrl: '%env(FRONTEND_URL)%'
 

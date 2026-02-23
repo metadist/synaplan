@@ -30,6 +30,7 @@
     "subscription": "Suscripción",
     "subscriptionSuccess": "Suscripción exitosa",
     "subscriptionCancel": "Suscripción cancelada",
+    "loggedOut": "Sesión cerrada",
     "notFound": "Página no encontrada",
     "memories": "Recuerdos",
     "feedback": "Comentarios",
@@ -521,7 +522,10 @@
     "hidePassword": "Ocultar contraseña",
     "redirectingToSso": "Redirigiendo al SSO...",
     "loginWithSso": "Iniciar sesión con SSO",
-    "poweredBySynaplan": "Powered by Synaplan"
+    "poweredBySynaplan": "Powered by Synaplan",
+    "loggedOutTitle": "Has cerrado sesión",
+    "loggedOutDesc": "Tu sesión se ha cerrado correctamente. Puedes cerrar esta ventana o iniciar sesión de nuevo.",
+    "loginAgain": "Iniciar sesión de nuevo"
   },
   "unsavedChanges": {
     "title": "Tienes cambios sin guardar",
