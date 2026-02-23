@@ -66,7 +66,7 @@ class PromptService
             'aiModel' => -1, // -1 = AUTOMATED
             'tool_internet' => false,
             'tool_files' => false,
-            'tool_screenshot' => false,
+            'tool_url_screenshot' => false,
             'tool_transfer' => false,
         ];
 

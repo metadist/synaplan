@@ -1,4 +1,4 @@
-# 07 — Test Strategy
+# 06 — Test Strategy: MCP Integration
 
 ## Principles
 
@@ -10,18 +10,14 @@
 
 ## Test Matrix
 
-### 01 — OpenAI API Compatible
+### 01 — Plugin Architecture
 
 | Step | Test File | Type | What to Test |
 |------|-----------|------|-------------|
-| 1.1 | `tests/Unit/Service/EncryptedConfigServiceTest.php` | Unit | Encrypt/decrypt roundtrip, key derivation, corrupted data handling |
-| 1.1 | `tests/Unit/Service/ModelConfigServiceTest.php` | Unit | `getUserApiKey()` returns user key, falls back to platform key |
-| 1.2 | `tests/Unit/AI/Provider/OpenAIProviderTest.php` | Unit | Custom base URL used in factory, default URL fallback |
-| 1.3 | `tests/Unit/AI/Service/ProviderRegistryTest.php` | Unit | `getProviderForUser()` returns user-specific provider, fallback to shared |
-| 1.4 | `tests/Integration/Controller/ConfigControllerTest.php` | Integration | `POST /api/v1/config/test-provider` validates connection |
-| 1.5 | `tests/Integration/OpenApiTest.php` | Integration | New endpoint appears in `/api/doc.json` |
+| 1.1 | `tests/Integration/Plugin/PluginServiceTest.php` | Integration | Plugin loads, services registered |
+| 1.2 | `tests/Unit/Service/PluginDataServiceTest.php` | Unit | Data stored/retrieved correctly |
 
-### 02 — MCP Prompt Enrichment
+### 02 — MCP Client: Enrichment (Pull)
 
 | Step | Test File | Type | What to Test |
 |------|-----------|------|-------------|
@@ -33,45 +29,32 @@
 | 2.5 | `tests/Unit/Service/Message/MessageProcessorTest.php` | Unit | MCP step runs when enabled, skipped when disabled |
 | 2.6 | `tests/Integration/Repository/SearchResultRepositoryTest.php` | Integration | MCP results stored and retrieved |
 
-### 03 — URL Screenshot Audit
+### 03 — MCP Server: Push (Action)
 
 | Step | Test File | Type | What to Test |
 |------|-----------|------|-------------|
-| 3.1 | `tests/Unit/Service/PromptServiceTest.php` | Unit | `tool_url_screenshot` in defaults, no `tool_screenshot` |
-| 3.2 | `tests/Unit/Service/UrlScreenshotServiceTest.php` | Unit | URL fetch, text extraction, timeout, SSRF block |
-| 3.3 | `tests/Unit/Service/Message/MessageProcessorTest.php` | Unit | URL regex extracts valid URLs |
-| 3.4 | `tests/Unit/Service/Message/MessageProcessorTest.php` | Unit | URL results in prompt when enabled, not when disabled |
-| 3.5 | `tests/Frontend/components/MessageScreenshot.test.ts` | Component | Renders with text-only data, handles missing image |
+| 3.1 | `tests/Unit/Service/MCP/McpToolRegistryTest.php` | Unit | Converts MCP tools to OpenAI tools format |
+| 3.2 | `tests/Unit/Service/MCP/McpActionServiceTest.php` | Unit | Intercepts tool calls, routes to correct server/tool |
+| 3.3 | `tests/Unit/Service/MCP/McpActionServiceTest.php` | Unit | Sensitive actions pause for confirmation |
+| 3.4 | `tests/Frontend/components/ChatMessage.test.ts` | Component | Displays confirmation card, handles approve/deny |
 
-### 04 — Enrichment UI & Logging
-
-| Step | Test File | Type | What to Test |
-|------|-----------|------|-------------|
-| 4.1 | `tests/Unit/DTO/EnrichmentResultTest.php` | Unit | Serialization, all fields |
-| 4.2 | `tests/Unit/Service/Message/MessageProcessorTest.php` | Unit | SSE events emitted for each enrichment source |
-| 4.3 | `tests/Frontend/components/MessageMcpResults.test.ts` | Component | Renders results, collapses, empty state |
-| 4.4 | `tests/Frontend/components/MessageEnrichedPrompt.test.ts` | Component | Shows prompt in debug mode, hidden otherwise |
-| 4.5 | `tests/Unit/Service/Message/MessageProcessorTest.php` | Unit | Structured log output matches expected format |
-
-### 05 — API Custom Prompts
+### 04 — UI/UX Design
 
 | Step | Test File | Type | What to Test |
 |------|-----------|------|-------------|
-| 5.1 | `tests/Integration/Controller/StreamControllerTest.php` | Integration | `promptTopic` param accepted, correct prompt loaded |
-| 5.2 | `tests/Integration/Controller/StreamControllerTest.php` | Integration | `promptId` param accepted, ownership validated |
-| 5.3 | `tests/Integration/Controller/PromptControllerTest.php` | Integration | Scope enforcement: no scope → 403, correct scope → 200 |
-| 5.4 | `tests/Integration/OpenApiTest.php` | Integration | New params in spec |
+| 4.1 | `tests/Frontend/views/McpSettingsView.test.ts` | Component | Server list renders, add/edit modal works |
+| 4.2 | `tests/Frontend/components/McpToolBrowser.test.ts` | Component | Tools list renders, search works |
+| 4.3 | `tests/Frontend/components/McpPromptMapper.test.ts` | Component | Maps tools to prompts correctly |
 
-### 06 — BONUS: MCP Server
+### 05 — Enrichment UI & Logging
 
 | Step | Test File | Type | What to Test |
 |------|-----------|------|-------------|
-| 6.1 | `tests/Integration/Controller/McpServerControllerTest.php` | Integration | SSE connection, auth required |
-| 6.2 | `tests/Unit/Service/MCP/McpToolCatalogTest.php` | Unit | Tools from allowlist, schema generation |
-| 6.3 | `tests/Unit/Service/MCP/McpToolInvokerTest.php` | Unit | Routes to correct controller, validates args |
-| 6.4 | `tests/Unit/Service/MCP/McpServerServiceTest.php` | Unit | JSON-RPC handling for each method |
-| 6.5 | `tests/Unit/Service/MCP/McpToolCatalogTest.php` | Unit | Plugin tools included when installed |
-| 6.6 | `tests/Integration/Controller/McpServerControllerTest.php` | Integration | Calls logged in BUSELOG |
+| 5.1 | `tests/Unit/DTO/EnrichmentResultTest.php` | Unit | Serialization, all fields |
+| 5.2 | `tests/Unit/Service/Message/MessageProcessorTest.php` | Unit | SSE events emitted for each enrichment source |
+| 5.3 | `tests/Frontend/components/MessageMcpResults.test.ts` | Component | Renders results, collapses, empty state |
+| 5.4 | `tests/Frontend/components/MessageEnrichedPrompt.test.ts` | Component | Shows prompt in debug mode, hidden otherwise |
+| 5.5 | `tests/Unit/Service/Message/MessageProcessorTest.php` | Unit | Structured log output matches expected format |
 
 ## Test Patterns
 
@@ -156,17 +139,4 @@ make -C frontend test
 
 # Specific frontend test
 cd frontend && npx vitest run src/components/__tests__/MessageMcpResults.test.ts
-
-# Full pre-commit gate (as always)
-make lint && make -C backend phpstan && make test
 ```
-
-## Definition of Done
-
-A step is **done** when:
-1. Code compiles without errors
-2. `make -C backend lint` passes
-3. `make -C backend phpstan` passes
-4. Step-specific tests pass
-5. `make -C frontend lint` passes (if frontend changed)
-6. No regressions in existing tests
