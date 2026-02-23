@@ -888,7 +888,7 @@ const loadingModels = ref(false)
 const availableTools: ToolOption[] = [
   { value: 'internet-search', label: 'Internet Search', icon: 'heroicons:magnifying-glass' },
   { value: 'files-search', label: 'Files Search', icon: 'heroicons:document-magnifying-glass' },
-  { value: 'url-screenshot', label: 'URL Screenshot', icon: 'heroicons:camera' },
+  { value: 'url-screenshot', label: 'URL Content', icon: 'heroicons:globe-alt' },
 ]
 
 // Group models by capability for dropdown

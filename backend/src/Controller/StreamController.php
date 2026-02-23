@@ -5,11 +5,13 @@ namespace App\Controller;
 use App\AI\Service\AiFacade;
 use App\Entity\File;
 use App\Entity\Message;
+use App\Entity\Prompt;
 use App\Entity\User;
 use App\Service\File\FileHelper;
 use App\Service\File\UserUploadPathBuilder;
 use App\Service\Message\MessageProcessor;
 use App\Service\ModelConfigService;
+use App\Service\PromptService;
 use App\Service\RateLimitService;
 use App\Service\TtsTextSanitizer;
 use App\Service\WidgetService;
@@ -39,6 +41,7 @@ class StreamController extends AbstractController
         private RateLimitService $rateLimitService,
         private string $uploadDir,
         private UserUploadPathBuilder $userUploadPathBuilder,
+        private PromptService $promptService,
     ) {
     }
 
@@ -105,6 +108,20 @@ class StreamController extends AbstractController
         required: false,
         description: 'Generate audio (MP3) voice reply in addition to text (1 or 0)',
         schema: new OA\Schema(type: 'string', enum: ['0', '1'], example: '0')
+    )]
+    #[OA\Parameter(
+        name: 'promptTopic',
+        in: 'query',
+        required: false,
+        description: 'Topic of a custom prompt to use (e.g., "customersupport", "legal-review"). Overrides auto-classification. Use GET /api/v1/prompts to list available topics.',
+        schema: new OA\Schema(type: 'string', example: 'customersupport')
+    )]
+    #[OA\Parameter(
+        name: 'promptId',
+        in: 'query',
+        required: false,
+        description: 'ID of a specific prompt to use. Takes precedence over promptTopic. The prompt must belong to the current user or be a system prompt.',
+        schema: new OA\Schema(type: 'integer', example: 42)
     )]
     #[OA\Response(
         response: 200,
@@ -206,6 +223,8 @@ class StreamController extends AbstractController
 
         $voiceReply = '1' === $request->query->get('voiceReply', '0');
         $fileIds = $request->query->get('fileIds', ''); // NEW: comma-separated list or single ID
+        $promptTopic = $request->query->get('promptTopic');
+        $promptId = $request->query->get('promptId');
 
         // Parse fileIds (can be comma-separated string or single ID)
         $fileIdArray = [];
@@ -219,6 +238,24 @@ class StreamController extends AbstractController
 
         if (!$chatId) {
             return $this->json(['error' => 'Chat ID is required'], Response::HTTP_BAD_REQUEST);
+        }
+
+        // Resolve prompt selection: promptId takes precedence over promptTopic
+        if (!$isWidgetMode && $promptId) {
+            $promptEntity = $this->em->getRepository(Prompt::class)->find((int) $promptId);
+            if (!$promptEntity) {
+                return $this->json(['error' => 'PROMPT_NOT_FOUND', 'message' => 'No prompt found with ID '.$promptId], Response::HTTP_NOT_FOUND);
+            }
+            if (0 !== $promptEntity->getOwnerId() && $promptEntity->getOwnerId() !== $user->getId()) {
+                return $this->json(['error' => 'ACCESS_DENIED', 'message' => 'You do not have access to this prompt'], Response::HTTP_FORBIDDEN);
+            }
+            $fixedTaskPromptTopic = $promptEntity->getTopic();
+        } elseif (!$isWidgetMode && $promptTopic) {
+            $promptData = $this->promptService->getPromptWithMetadata($promptTopic, $user->getId());
+            if (!$promptData) {
+                return $this->json(['error' => 'PROMPT_NOT_FOUND', 'message' => 'No prompt found with topic "'.$promptTopic.'"'], Response::HTTP_BAD_REQUEST);
+            }
+            $fixedTaskPromptTopic = $promptTopic;
         }
 
         $this->logger->info('StreamController: Received request', [
@@ -451,6 +488,14 @@ class StreamController extends AbstractController
                             'task_prompt' => $fixedTaskPromptTopic,
                         ]);
                     }
+                }
+
+                // API prompt selection (promptTopic or promptId)
+                if (!$isWidgetMode && $fixedTaskPromptTopic) {
+                    $processingOptions['fixed_task_prompt'] = $fixedTaskPromptTopic;
+                    $this->logger->info('StreamController: Using API-selected task prompt', [
+                        'task_prompt' => $fixedTaskPromptTopic,
+                    ]);
                 }
 
                 // Check if selected model supports streaming

@@ -130,6 +130,45 @@ class ApiKeyAuthenticatorTest extends TestCase
         }
     }
 
+    public function testSupportsReturnsTrueWithBearerOnV1Route(): void
+    {
+        $request = Request::create('/v1/chat/completions', 'POST');
+        $request->headers->set('Authorization', 'Bearer sk-test-key');
+
+        $this->assertTrue($this->authenticator->supports($request));
+    }
+
+    public function testSupportsReturnsFalseWithBearerOnApiRoute(): void
+    {
+        $request = Request::create('/api/v1/messages/stream', 'GET');
+        $request->headers->set('Authorization', 'Bearer some-session-token');
+
+        $this->assertFalse($this->authenticator->supports($request));
+    }
+
+    public function testAuthenticateWithBearerOnV1Route(): void
+    {
+        $apiKey = $this->createMock(ApiKey::class);
+        $apiKey->method('isActive')->willReturn(true);
+        $apiKey->method('getId')->willReturn(1);
+        $apiKey->method('getOwnerId')->willReturn(10);
+        $apiKey->method('getName')->willReturn('Test Key');
+        $apiKey->method('getScopes')->willReturn(['openai:*']);
+
+        $request = Request::create('/v1/chat/completions', 'POST');
+        $request->headers->set('Authorization', 'Bearer sk-valid-key');
+
+        $this->apiKeyRepository->method('findActiveByKey')
+            ->with('sk-valid-key')
+            ->willReturn($apiKey);
+        $this->apiKeyRepository->method('save');
+
+        $passport = $this->authenticator->authenticate($request);
+
+        $this->assertInstanceOf(\Symfony\Component\Security\Http\Authenticator\Passport\Passport::class, $passport);
+        $this->assertSame($apiKey, $request->attributes->get('api_key'));
+    }
+
     public function testAuthenticateLogsSuccessfulAuth(): void
     {
         $apiKey = $this->createMock(ApiKey::class);
