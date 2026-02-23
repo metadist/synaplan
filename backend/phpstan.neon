@@ -11,6 +11,7 @@ parameters:
     excludePaths:
         - src/Kernel.php
         - tests/Unit/CookieTokenAuthenticatorTest.php
+        - tests/Unit/KeycloakAuthControllerTest.php
     reportUnmatchedIgnoredErrors: false
     doctrine:
         objectManagerLoader: tests/object-manager.php

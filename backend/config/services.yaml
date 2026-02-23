@@ -6,6 +6,9 @@ parameters:
     # Synaplan public URL
     synaplan_url: '%env(SYNAPLAN_URL)%'
 
+    # OIDC admin role claim values (comma-separated, case-insensitive)
+    env(OIDC_ADMIN_ROLES): 'admin,realm-admin,synaplan-admin,administrator'
+
     # Logging
     # LOG_FORMAT: json (default) or line (human-readable)
     # LOG_LEVEL: debug, info, notice, warning, error (see monolog.yaml)

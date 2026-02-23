@@ -203,6 +203,17 @@ class KeycloakAuthController extends AbstractController
 
             $userInfo = $userInfoResponse->toArray();
 
+            // Merge role claims from the access token JWT (realm_access, resource_access)
+            // The userinfo endpoint typically omits these; the JWT always has them.
+            $tokenClaims = $this->decodeJwtPayload($accessToken);
+            if ($tokenClaims) {
+                foreach (['realm_access', 'resource_access', 'groups'] as $claim) {
+                    if (isset($tokenClaims[$claim]) && !isset($userInfo[$claim])) {
+                        $userInfo[$claim] = $tokenClaims[$claim];
+                    }
+                }
+            }
+
             $this->logger->info('Keycloak user info retrieved', [
                 'sub' => $userInfo['sub'] ?? 'unknown',
                 'email' => $userInfo['email'] ?? 'unknown',
@@ -447,5 +458,28 @@ class KeycloakAuthController extends AbstractController
         $this->em->flush();
 
         return $user;
+    }
+
+    /**
+     * Decode the payload of a JWT without signature verification.
+     * Safe here because the token was received directly from the OIDC token endpoint.
+     *
+     * @return array<string, mixed>|null
+     */
+    private function decodeJwtPayload(string $jwt): ?array
+    {
+        $parts = explode('.', $jwt);
+        if (3 !== count($parts)) {
+            return null;
+        }
+
+        $payload = base64_decode(strtr($parts[1], '-_', '+/'), true);
+        if (false === $payload) {
+            return null;
+        }
+
+        $decoded = json_decode($payload, true);
+
+        return is_array($decoded) ? $decoded : null;
     }
 }

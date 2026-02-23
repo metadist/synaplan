@@ -45,4 +45,9 @@ $KCADM create users -r synaplan \
 $KCADM set-password -r synaplan \
   --username testuser --new-password testpass123
 
+# Create "administrator" realm role and assign to test user
+# This exercises the configurable OIDC_ADMIN_ROLES flow in E2E tests
+$KCADM create roles -r synaplan -s name=administrator
+$KCADM add-roles -r synaplan --uusername testuser --rolename administrator
+
 echo "Keycloak provisioning complete"
