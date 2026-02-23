@@ -157,7 +157,7 @@ import {
   ClockIcon,
 } from '@heroicons/vue/24/outline'
 import { Icon } from '@iconify/vue'
-import { useChatsStore, type Chat as StoreChat } from '@/stores/chats'
+import { useChatsStore, isDefaultChatTitle, type Chat as StoreChat } from '@/stores/chats'
 import { useDialog } from '@/composables/useDialog'
 import { useRouter } from 'vue-router'
 import ChatShareModal from './ChatShareModal.vue'
@@ -243,16 +243,13 @@ const formatTimestamp = (dateStr: string): string => {
   return `${month}/${day}`
 }
 
-const isDefaultTitle = (title: string): boolean =>
-  title === 'New Chat' || title === 'Neuer Chat' || title.startsWith('Chat ')
-
 const getDisplayTitle = (chat: {
   id: number
   title: string
   firstMessagePreview?: string | null
   messageCount?: number
 }): string => {
-  if (!isDefaultTitle(chat.title)) return chat.title
+  if (!isDefaultChatTitle(chat.title, t('chat.newChat'))) return chat.title
   if (chat.firstMessagePreview) return chat.firstMessagePreview
   return t('chat.newChat')
 }
@@ -290,7 +287,7 @@ const isChatEmpty = (chat: {
 }): boolean => {
   if (chat.messageCount && chat.messageCount > 0) return false
   if (chat.firstMessagePreview) return false
-  if (!isDefaultTitle(chat.title)) return false
+  if (!isDefaultChatTitle(chat.title, t('chat.newChat'))) return false
   return true
 }
 

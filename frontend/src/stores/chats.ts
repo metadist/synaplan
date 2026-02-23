@@ -39,6 +39,15 @@ export interface WidgetSessionInfo {
   expires: number
 }
 
+export function isDefaultChatTitle(title: string, localizedNewChat?: string): boolean {
+  return (
+    title === 'New Chat' ||
+    title === 'Neuer Chat' ||
+    title.startsWith('Chat ') ||
+    (localizedNewChat !== undefined && title === localizedNewChat)
+  )
+}
+
 export const useChatsStore = defineStore('chats', () => {
   const chats = ref<Chat[]>([])
   const activeChatId = ref<number | null>(readActiveChatId())
@@ -159,10 +168,7 @@ export const useChatsStore = defineStore('chats', () => {
     // Has first message preview - not empty
     if (chat.firstMessagePreview) return false
 
-    // Has a non-default title - not empty (user renamed it or title was auto-generated)
-    const isDefaultTitle =
-      chat.title === 'New Chat' || chat.title === 'Neuer Chat' || chat.title.startsWith('Chat ')
-    if (!isDefaultTitle) return false
+    if (!isDefaultChatTitle(chat.title)) return false
 
     return true
   }
@@ -214,7 +220,6 @@ export const useChatsStore = defineStore('chats', () => {
       const chat = chats.value.find((c) => c.id === chatId)
       if (chat) {
         chat.title = title
-        chat.firstMessagePreview = null
       }
     } catch (err: any) {
       error.value = err.message || 'Failed to update chat'
