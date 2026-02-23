@@ -163,6 +163,7 @@ services:
             $uploadsDir: '%kernel.project_dir%/var/uploads'
             $whatsappUserId: 2  # WhatsApp messages use User ID 2 for model selection
             $appUrl: '%env(APP_URL)%'
+            $whatsappGraphApiBaseUrl: '%env(default::WHATSAPP_GRAPH_API_BASE_URL)%'
 
     # Webhook Controller - Bind WhatsApp Verify Token
     App\Controller\WebhookController:
