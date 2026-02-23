@@ -35,6 +35,12 @@ class KeycloakAuthController extends AbstractController
 {
     private string $appEnv;
 
+    /** @var array<string> */
+    private array $adminRoleNames;
+
+    /** @var array<array<string>> Each element is an array of path segments, e.g. ['realm_access', 'roles'] */
+    private array $roleClaimPaths;
+
     public function __construct(
         private HttpClientInterface $httpClient,
         private UserRepository $userRepository,
@@ -46,10 +52,14 @@ class KeycloakAuthController extends AbstractController
         private string $oidcClientId,
         private string $oidcClientSecret,
         private string $oidcDiscoveryUrl,
+        string $oidcAdminRoles,
+        string $oidcRoleClaims,
         private string $appUrl,
         private string $frontendUrl,
     ) {
         $this->appEnv = $_ENV['APP_ENV'] ?? 'prod';
+        $this->adminRoleNames = array_map('strtolower', array_map('trim', explode(',', $oidcAdminRoles)));
+        $this->roleClaimPaths = $this->parseRoleClaims($oidcRoleClaims);
     }
 
     #[Route('/login', name: 'keycloak_auth_login', methods: ['GET'])]
@@ -195,6 +205,17 @@ class KeycloakAuthController extends AbstractController
             ]);
 
             $userInfo = $userInfoResponse->toArray();
+
+            // Merge role claims from the access token JWT.
+            // The userinfo endpoint typically omits these; the JWT always has them.
+            $tokenClaims = $this->decodeJwtPayload($accessToken);
+            if ($tokenClaims) {
+                foreach ($this->getTopLevelRoleClaimKeys() as $claim) {
+                    if (isset($tokenClaims[$claim]) && !isset($userInfo[$claim])) {
+                        $userInfo[$claim] = $tokenClaims[$claim];
+                    }
+                }
+            }
 
             $this->logger->info('Keycloak user info retrieved', [
                 'sub' => $userInfo['sub'] ?? 'unknown',
@@ -398,21 +419,31 @@ class KeycloakAuthController extends AbstractController
             $userDetails['full_name'] = $userInfo['name'];
         }
 
-        // Sync Keycloak roles if available (realm_access + resource_access for this client)
+        // Sync OIDC roles from configured claim paths
         $oidcRoles = [];
-        if (isset($userInfo['realm_access']['roles']) && is_array($userInfo['realm_access']['roles'])) {
-            $oidcRoles = $userInfo['realm_access']['roles'];
-        }
-        $clientId = $this->oidcClientId;
-        if (isset($userInfo['resource_access'][$clientId]['roles']) && is_array($userInfo['resource_access'][$clientId]['roles'])) {
-            $oidcRoles = array_values(array_unique(array_merge($oidcRoles, $userInfo['resource_access'][$clientId]['roles'])));
-        }
-        // Also check the 'groups' claim (standard OIDC groups scope)
-        if (isset($userInfo['groups']) && is_array($userInfo['groups'])) {
-            $oidcRoles = array_values(array_unique(array_merge($oidcRoles, $userInfo['groups'])));
+        foreach ($this->roleClaimPaths as $segments) {
+            $value = $this->resolveClaimPath($userInfo, $segments);
+            if (is_array($value)) {
+                $oidcRoles = array_values(array_unique(array_merge($oidcRoles, $value)));
+            }
         }
         if (!empty($oidcRoles)) {
             $userDetails['oidc_roles'] = $oidcRoles;
+
+            $hasAdmin = !empty(array_intersect(array_map('strtolower', $oidcRoles), $this->adminRoleNames));
+            if ($hasAdmin && 'ADMIN' !== $user->getUserLevel()) {
+                $user->setUserLevel('ADMIN');
+                $this->logger->info('User promoted to ADMIN via OIDC role', [
+                    'user_id' => $user->getId(),
+                    'oidc_roles' => $oidcRoles,
+                ]);
+            } elseif (!$hasAdmin && 'ADMIN' === $user->getUserLevel()) {
+                $user->setUserLevel('NEW');
+                $this->logger->info('User demoted from ADMIN — OIDC roles no longer include admin', [
+                    'user_id' => $user->getId(),
+                    'oidc_roles' => $oidcRoles,
+                ]);
+            }
         }
 
         $user->setUserDetails($userDetails);
@@ -425,5 +456,93 @@ class KeycloakAuthController extends AbstractController
         $this->em->flush();
 
         return $user;
+    }
+
+    /**
+     * Parse OIDC_ROLE_CLAIMS into an array of claim path segments.
+     *
+     * Each path is a dot-separated string (e.g. "realm_access.roles").
+     * Backslash-escaped dots (\.) are treated as literal dots in key names.
+     * The placeholder {client_id} is replaced with the actual OIDC client ID.
+     * Empty/unset input falls back to Keycloak-compatible defaults.
+     *
+     * @return array<array<string>>
+     */
+    private function parseRoleClaims(string $oidcRoleClaims): array
+    {
+        $raw = array_map('trim', explode(',', $oidcRoleClaims));
+
+        $paths = [];
+        foreach ($raw as $path) {
+            if ('' === $path) {
+                continue;
+            }
+            $path = str_replace('{client_id}', $this->oidcClientId, $path);
+            // Split on unescaped dots (backslash-escaped dots are literal)
+            $segments = preg_split('/(?<!\\\\)\./', $path);
+            $segments = array_map(static fn (string $s) => str_replace('\\.', '.', $s), $segments);
+            $paths[] = $segments;
+        }
+
+        return $paths;
+    }
+
+    /**
+     * Resolve a value from a nested array by following a path of segments.
+     *
+     * @param array<string, mixed> $data
+     * @param array<string>        $segments
+     */
+    private function resolveClaimPath(array $data, array $segments): mixed
+    {
+        $current = $data;
+        foreach ($segments as $segment) {
+            if (!is_array($current) || !array_key_exists($segment, $current)) {
+                return null;
+            }
+            $current = $current[$segment];
+        }
+
+        return $current;
+    }
+
+    /**
+     * Get the unique set of top-level claim keys needed for role extraction.
+     *
+     * Used to merge JWT claims into userInfo (the userinfo endpoint often omits them).
+     *
+     * @return array<string>
+     */
+    private function getTopLevelRoleClaimKeys(): array
+    {
+        $keys = [];
+        foreach ($this->roleClaimPaths as $segments) {
+            $keys[] = $segments[0];
+        }
+
+        return array_values(array_unique($keys));
+    }
+
+    /**
+     * Decode the payload of a JWT without signature verification.
+     * Safe here because the token was received directly from the OIDC token endpoint.
+     *
+     * @return array<string, mixed>|null
+     */
+    private function decodeJwtPayload(string $jwt): ?array
+    {
+        $parts = explode('.', $jwt);
+        if (3 !== count($parts)) {
+            return null;
+        }
+
+        $payload = base64_decode(strtr($parts[1], '-_', '+/'), true);
+        if (false === $payload) {
+            return null;
+        }
+
+        $decoded = json_decode($payload, true);
+
+        return is_array($decoded) ? $decoded : null;
     }
 }
