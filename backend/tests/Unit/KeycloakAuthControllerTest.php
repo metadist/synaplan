@@ -11,17 +11,18 @@ use App\Service\OAuthStateService;
 use App\Service\OidcTokenService;
 use App\Service\TokenService;
 use Doctrine\ORM\EntityManagerInterface;
+use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
 use Symfony\Contracts\HttpClient\HttpClientInterface;
 
 class KeycloakAuthControllerTest extends TestCase
 {
-    private HttpClientInterface $httpClient;
-    private UserRepository $userRepository;
-    private EntityManagerInterface $em;
-    private TokenService $tokenService;
-    private OidcTokenService $oidcTokenService;
+    private HttpClientInterface&MockObject $httpClient;
+    private UserRepository&MockObject $userRepository;
+    private EntityManagerInterface&MockObject $em;
+    private TokenService&MockObject $tokenService;
+    private OidcTokenService&MockObject $oidcTokenService;
     private OAuthStateService $oauthStateService;
     private NullLogger $logger;
 

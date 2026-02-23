@@ -979,18 +979,6 @@ parameters:
 			path: tests/Unit/InternalEmailServiceTest.php
 
 		-
-			message: '#^Call to an undefined method App\\Repository\\UserRepository\:\:method\(\)\.$#'
-			identifier: method.notFound
-			count: 7
-			path: tests/Unit/KeycloakAuthControllerTest.php
-
-		-
-			message: '#^Call to an undefined method Doctrine\\ORM\\EntityManagerInterface\:\:expects\(\)\.$#'
-			identifier: method.notFound
-			count: 14
-			path: tests/Unit/KeycloakAuthControllerTest.php
-
-		-
 			message: '#^Call to method PHPUnit\\Framework\\Assert\:\:assertTrue\(\) with true and ''Password reset…'' will always evaluate to true\.$#'
 			identifier: method.alreadyNarrowedType
 			count: 1
