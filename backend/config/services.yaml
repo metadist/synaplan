@@ -398,6 +398,12 @@ services:
         tags:
             - { name: 'controller.service_arguments' }
 
+    App\Controller\WidgetController:
+        arguments:
+            $uploadDir: '%kernel.project_dir%/var/uploads'
+        tags:
+            - { name: 'controller.service_arguments' }
+
     App\Service\File\DataUrlFixer:
         arguments:
             $uploadDir: '%kernel.project_dir%/var/uploads'

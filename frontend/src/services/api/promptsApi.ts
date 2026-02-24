@@ -78,11 +78,13 @@ export type SortingPromptUpdatePayload = z.infer<typeof UpdateSortingPromptRespo
 
 class PromptsApi {
   /**
-   * Get all accessible prompts (system + user-specific)
+   * Get all accessible prompts (system + user-specific).
+   * Pass empty string to skip language filtering and return all prompts.
    */
-  async getPrompts(language: string = 'en'): Promise<TaskPrompt[]> {
+  async getPrompts(language: string = ''): Promise<TaskPrompt[]> {
+    const params = language ? `?language=${language}` : ''
     const data = await httpClient<{ success: boolean; prompts: TaskPrompt[] }>(
-      `/api/v1/prompts?language=${language}`,
+      `/api/v1/prompts${params}`,
       {
         method: 'GET',
       }
