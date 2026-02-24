@@ -19,6 +19,7 @@ services:
     volumes: !reset []
 
   whatsapp-stub:
-    # CI: no host port binding; stub only reachable from app_test. E2E must use WHATSAPP_STUB_URL=http://whatsapp-stub:3999 from a container on same network.
-    ports: !reset []
+    # CI: expose 3999 so Playwright (running on host) can reach stub at localhost:3999 for integration tests.
+    # app_test reaches stub at http://whatsapp-stub:3999 via backend/.env.test (WHATSAPP_GRAPH_API_BASE_URL).
+    ports: ["3999:3999"]
     container_name: !reset null

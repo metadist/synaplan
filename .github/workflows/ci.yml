@@ -375,34 +375,6 @@ jobs:
           echo "Services are ready!"
           docker compose -f docker-compose.test.yml -f docker-compose.test.ci.yml ps
 
-      - name: Diagnose test container (E2E debug)
-        run: |
-          DC="docker compose -f docker-compose.test.yml -f docker-compose.test.ci.yml"
-          echo "=== APP_ENV in container ==="
-          $DC exec -T app_test printenv APP_ENV || echo "FAILED to read APP_ENV"
-
-          echo ""
-          echo "=== TestProvider model 900 in DB ==="
-          $DC exec -T app_test php bin/console dbal:run-sql "SELECT BID,BSERVICE,BNAME,BTAG FROM BMODELS WHERE BID=900" 2>&1 || echo "QUERY FAILED"
-
-          echo ""
-          echo "=== Default model config (CHAT) ==="
-          $DC exec -T app_test php bin/console dbal:run-sql "SELECT * FROM BCONFIG WHERE BGROUP='DEFAULTMODEL' AND BSETTING='CHAT'" 2>&1 || echo "QUERY FAILED"
-
-          echo ""
-          echo "=== Widget files in /var/www/widgets/ ==="
-          $DC exec -T app_test ls -la /var/www/widgets/ 2>&1 || echo "DIRECTORY MISSING"
-          $DC exec -T app_test ls -la /var/www/widgets/chunks/ 2>&1 || echo "CHUNKS DIRECTORY MISSING"
-
-          echo ""
-          echo "=== HTTP check: /widget.js ==="
-          $DC exec -T app_test curl -sS -o /dev/null -w "HTTP %{http_code} | Content-Type: %{content_type}\n" http://localhost:80/widget.js || echo "CURL FAILED"
-
-          echo ""
-          echo "=== HTTP check: /widget.js first 200 chars ==="
-          $DC exec -T app_test curl -sS http://localhost:80/widget.js 2>&1 | head -c 200 || echo "CURL FAILED"
-          echo ""
-
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:

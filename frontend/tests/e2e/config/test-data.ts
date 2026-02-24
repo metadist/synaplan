@@ -66,4 +66,6 @@ export const WIDGET_TEST_URLS = {
 /** Paths to test fixture files (relative to e2e dir). Use with path.join(e2eDir, path). */
 export const FIXTURE_PATHS = {
   VISION_PATTERN_64: 'test_data/vision-pattern-64.png',
+  /** RAG smoke: upload and search with this phrase. */
+  RAG_MOST_IMPORTANT: 'test_data/most_important_thing.txt',
 } as const

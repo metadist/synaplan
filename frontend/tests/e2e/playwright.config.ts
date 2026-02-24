@@ -25,7 +25,7 @@ export default defineConfig({
   ],
 
   outputDir: 'test-results',
-  workers: 1,
+  workers: 4,
 
   projects: [
     {
