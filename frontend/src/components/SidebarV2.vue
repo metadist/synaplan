@@ -542,7 +542,7 @@ import { useAppModeStore } from '../stores/appMode'
 import { useConfigStore } from '../stores/config'
 import { useAuth } from '../composables/useAuth'
 import { useTheme } from '../composables/useTheme'
-import { useChatsStore, type Chat as StoreChat } from '../stores/chats'
+import { useChatsStore, isDefaultChatTitle, type Chat as StoreChat } from '../stores/chats'
 import { useDialog } from '../composables/useDialog'
 import { getFeaturesStatus } from '../services/featuresService'
 import { useI18n } from 'vue-i18n'
@@ -895,19 +895,13 @@ const filteredChatList = computed(() => {
   const q = chatSearchQuery.value.toLowerCase().trim()
   if (!q) return chatList.value
   return chatList.value.filter((c) => {
-    const title = c.firstMessagePreview || c.title
-    return title.toLowerCase().includes(q)
+    return getDisplayTitle(c).toLowerCase().includes(q)
   })
 })
 
 const getDisplayTitle = (chat: StoreChat): string => {
+  if (!isDefaultChatTitle(chat.title, t('chat.newChat'))) return chat.title
   if (chat.firstMessagePreview) return chat.firstMessagePreview
-  const isDefault =
-    chat.title === t('chat.newChat') ||
-    chat.title === 'New Chat' ||
-    chat.title === 'Neuer Chat' ||
-    chat.title.startsWith('Chat ')
-  if (!isDefault) return chat.title
   return t('chat.newChat')
 }
 

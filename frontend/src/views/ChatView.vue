@@ -219,7 +219,7 @@ import ChatInput from '@/components/ChatInput.vue'
 import ChatMessage from '@/components/ChatMessage.vue'
 import LimitReachedModal from '@/components/common/LimitReachedModal.vue'
 import { useHistoryStore, type Message } from '@/stores/history'
-import { useChatsStore } from '@/stores/chats'
+import { useChatsStore, isDefaultChatTitle } from '@/stores/chats'
 import { useModelsStore } from '@/stores/models'
 import { useAiConfigStore } from '@/stores/aiConfig'
 import { useAuthStore } from '@/stores/auth'
@@ -471,13 +471,7 @@ async function generateChatTitleFromFirstMessage(firstMessage: string) {
   const chat = chatsStore.activeChat
   if (!chat) return
 
-  // Only generate if chat has default title (check both English and German)
-  const isDefaultTitle =
-    !chat.title ||
-    chat.title === 'New Chat' ||
-    chat.title === 'Neuer Chat' ||
-    chat.title.startsWith('Chat ')
-  if (!isDefaultTitle) return
+  if (chat.title && !isDefaultChatTitle(chat.title)) return
 
   // Only generate for user messages from this chat
   const userMessages = historyStore.messages.filter((m) => m.role === 'user')
