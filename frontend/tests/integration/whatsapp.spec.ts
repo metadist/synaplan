@@ -42,7 +42,7 @@ async function postWebhookAndAssert2xx(request: APIRequestContext, payload: obje
   expect(json.success).toBe(true)
 }
 
-test.describe('WhatsApp smoke @smoke', () => {
+test.describe('@ci WhatsApp smoke @smoke', () => {
   test.describe.configure({ mode: 'serial' })
 
   test.beforeEach(async ({ request }, testInfo) => {

@@ -18,7 +18,7 @@ function webhookUrl(): string {
   return `${getApiUrl()}${WEBHOOK_PATH}`
 }
 
-test.describe('Smart-Email smoke @smoke', () => {
+test.describe('@ci Smart-Email smoke @smoke', () => {
   test.describe.configure({ mode: 'serial' })
 
   test.beforeEach(async ({ request }) => {
