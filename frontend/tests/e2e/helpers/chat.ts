@@ -47,11 +47,21 @@ export class ChatHelper {
     }
   }
 
+  /**
+   * Start a new chat. Supports V2 (sidebar plus button) and V1 (chat toggle + dropdown).
+   * Waits for the new chat input to be visible, empty, and enabled.
+   */
   async startNewChat(): Promise<void> {
-    await this.page.locator(selectors.chat.chatBtnToggle).waitFor({ state: 'visible' })
-    await this.page.locator(selectors.chat.chatBtnToggle).click()
-    await this.page.locator(selectors.chat.newChatButton).waitFor({ state: 'visible' })
-    await this.page.locator(selectors.chat.newChatButton).click()
+    const v2NewChatBtn = this.page.locator(selectors.nav.sidebarV2NewChat)
+    try {
+      await v2NewChatBtn.waitFor({ state: 'visible', timeout: TIMEOUTS.SHORT })
+      await v2NewChatBtn.click()
+    } catch {
+      await this.page.locator(selectors.chat.chatBtnToggle).waitFor({ state: 'visible' })
+      await this.page.locator(selectors.chat.chatBtnToggle).click()
+      await this.page.locator(selectors.chat.newChatButton).waitFor({ state: 'visible' })
+      await this.page.locator(selectors.chat.newChatButton).click()
+    }
 
     const textInput = this.page.locator(selectors.chat.textInput)
     await textInput.waitFor({ state: 'visible', timeout: TIMEOUTS.STANDARD })

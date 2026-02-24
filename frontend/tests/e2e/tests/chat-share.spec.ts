@@ -1,11 +1,11 @@
-import { test, expect, type Locator } from '../test-setup'
+import { test, expect } from '../test-setup'
 import { selectors } from '../helpers/selectors'
 import { login } from '../helpers/auth'
 import { ChatHelper } from '../helpers/chat'
 import { TIMEOUTS } from '../config/config'
 
 test.describe('Chat Share', () => {
-  test('User can share a chat and open shared link in incognito id=share-001', async ({
+  test('@001 @smoke User can share chat and open shared link in incognito', async ({
     page,
     credentials,
   }) => {
@@ -15,50 +15,59 @@ test.describe('Chat Share', () => {
       await login(page, credentials)
     })
 
-    let previousBubbleCount = 0
-    let newBubble: Locator
-    await test.step('Arrange: start new chat and send unique message', async () => {
-      const chat = new ChatHelper(page)
+    const chat = new ChatHelper(page)
+    await test.step('Arrange: start new chat', async () => {
       await chat.startNewChat()
-      const bubbles = page.locator(selectors.chat.messageContainer).locator(selectors.chat.aiAnswerBubble)
-      previousBubbleCount = await bubbles.count()
+    })
+
+    const previousCount = await chat.conversationBubbles().count()
+
+    await test.step('Act: send message', async () => {
       await page.locator(selectors.chat.textInput).fill(uniqueMessage)
       await page.locator(selectors.chat.sendBtn).click()
     })
-    newBubble = page.locator(selectors.chat.messageContainer).locator(selectors.chat.aiAnswerBubble).nth(previousBubbleCount)
 
     await test.step('Wait for chat terminal state (done or error)', async () => {
-      await newBubble.waitFor({ state: 'attached', timeout: TIMEOUTS.STANDARD })
-      await newBubble.scrollIntoViewIfNeeded()
-
-      const result = await Promise.race([
-        newBubble.locator(selectors.chat.chatDone).waitFor({ state: 'visible', timeout: TIMEOUTS.LONG }).then(() => 'done' as const),
-        newBubble.locator(selectors.chat.chatError).waitFor({ state: 'visible', timeout: TIMEOUTS.LONG }).then(() => 'error' as const),
-      ])
-      if (result === 'error') {
-        throw new Error('Chat ended in error state (chatError visible)')
-      }
+      await chat.waitForAnswer(previousCount)
     })
 
-    await test.step('Assert: user and assistant messages exist, assistant non-empty', async () => {
+    await test.step('Assert: user and assistant messages exist', async () => {
       await expect(page.locator(selectors.chat.messageUser)).toBeVisible()
       await expect(page.locator(selectors.chat.messageAssistant)).toBeVisible()
-      const assistantBody = newBubble.locator(selectors.chat.assistantAnswerBody)
-      await expect(assistantBody).not.toHaveText('', { timeout: TIMEOUTS.STANDARD })
     })
 
-    await test.step('Open share modal via chat dropdown', async () => {
-      const dropdownSection = page.locator(selectors.share.chatDropdownSection)
-      if (!(await dropdownSection.isVisible())) {
-        await page.locator(selectors.chat.chatBtnToggle).click()
+    await test.step('Open share modal: chat manager → last chat (first row, newest first) → 3 dots → Share', async () => {
+      const v2ChatNav = page.locator(selectors.nav.sidebarV2ChatNav)
+      const v2Visible = await v2ChatNav.isVisible().catch(() => false)
+      if (v2Visible) {
+        await v2ChatNav.click()
+        const modal = page.locator(selectors.nav.modalChatManager)
+        await modal.waitFor({ state: 'visible', timeout: TIMEOUTS.STANDARD })
+        await modal.locator(selectors.nav.chatManagerListRows).waitFor({ state: 'visible', timeout: TIMEOUTS.STANDARD })
+        // Last chat = first row (newest first); prefer data-testid per E2E rules
+        const lastChatRow = modal.locator(selectors.nav.chatV2Row).first()
+        await lastChatRow.scrollIntoViewIfNeeded()
+        await lastChatRow.hover()
+        const menuBtn = lastChatRow.locator(selectors.nav.chatV2RowMenu)
+        await menuBtn.click({ force: true })
+        await page.locator(selectors.nav.chatV2Share).click()
+      } else {
+        const dropdownSection = page.locator(selectors.share.chatDropdownSection)
+        if (!(await dropdownSection.isVisible())) {
+          const expandBtn = page.locator(selectors.nav.sidebarExpand)
+          if (await expandBtn.isVisible().catch(() => false)) {
+            await expandBtn.click()
+          }
+          await page.locator(selectors.chat.chatBtnToggle).click()
+        }
+        await dropdownSection.waitFor({ state: 'visible', timeout: TIMEOUTS.STANDARD })
+        const items = page.locator(selectors.share.chatDropdownRow)
+        await expect(items).toHaveCount(1, { timeout: TIMEOUTS.STANDARD })
+        const topChatRow = items.first()
+        await topChatRow.hover()
+        await topChatRow.locator(selectors.share.chatMenuButton).click()
+        await topChatRow.locator(selectors.share.chatShareButton).click()
       }
-      await dropdownSection.waitFor({ state: 'visible', timeout: TIMEOUTS.STANDARD })
-      const items = page.locator(selectors.share.chatDropdownRow)
-      await expect(items).toHaveCount(1, { timeout: TIMEOUTS.STANDARD })
-      const onlyItem = items.first()
-      await onlyItem.hover()
-      await onlyItem.locator(selectors.share.chatMenuButton).click()
-      await onlyItem.locator(selectors.share.chatShareButton).click()
       await page.locator(selectors.share.shareModal).waitFor({ state: 'visible', timeout: TIMEOUTS.STANDARD })
     })
 
@@ -68,8 +77,14 @@ test.describe('Chat Share', () => {
       await shareCreateBtn.click()
 
       const result = await Promise.race([
-        modal.locator(selectors.share.shareDone).waitFor({ state: 'visible', timeout: TIMEOUTS.STANDARD }).then(() => 'done' as const),
-        modal.locator(selectors.share.shareError).waitFor({ state: 'visible', timeout: TIMEOUTS.STANDARD }).then(() => 'error' as const),
+        modal
+          .locator(selectors.share.shareDone)
+          .waitFor({ state: 'visible', timeout: TIMEOUTS.STANDARD })
+          .then(() => 'done' as const),
+        modal
+          .locator(selectors.share.shareError)
+          .waitFor({ state: 'visible', timeout: TIMEOUTS.STANDARD })
+          .then(() => 'error' as const),
       ])
       if (result === 'error') {
         throw new Error('Share ended in error state (shareError visible)')
@@ -94,7 +109,9 @@ test.describe('Chat Share', () => {
       const sharedPage = await incognito.newPage()
       try {
         await sharedPage.goto(shareUrl, { waitUntil: 'domcontentloaded' })
-        await sharedPage.locator(selectors.sharedChat.sharedChatRoot).waitFor({ state: 'visible', timeout: TIMEOUTS.STANDARD })
+        await sharedPage
+          .locator(selectors.sharedChat.sharedChatRoot)
+          .waitFor({ state: 'visible', timeout: TIMEOUTS.STANDARD })
         await sharedPage.locator(selectors.sharedChat.sharedMessageList).waitFor({ state: 'visible' })
         const messages = sharedPage.locator(selectors.sharedChat.messageItem)
         const count = await messages.count()

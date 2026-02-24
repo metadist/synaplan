@@ -28,6 +28,20 @@ export const selectors = {
     navDropdown: '[data-testid="dropdown-sidebar-v2-nav"]',
     /** Expand sidebar when collapsed (so chat dropdown is visible) */
     sidebarExpand: '[data-testid="btn-sidebar-expand"]',
+    /** V2 sidebar: single plus button to start new chat (no toggle/dropdown) */
+    sidebarV2NewChat: '[data-testid="btn-sidebar-v2-new-chat"]',
+    /** V2 sidebar: chat nav icon opens chat list modal (path "/" → testid "btn-sidebar-v2--") */
+    sidebarV2ChatNav: '[data-testid="btn-sidebar-v2--"]',
+    /** V2 chat list modal */
+    modalChatManager: '[data-testid="modal-chat-manager"]',
+    /** V2 chat list: container visible when at least one chat exists; use to wait before targeting rows */
+    chatManagerListRows: '[data-testid="list-chat-manager-rows"]',
+    /** V2 chat list: one row per chat; scope menu to this */
+    chatV2Row: '[data-testid="row-chat-v2"]',
+    /** V2 chat row: 3-dots menu button */
+    chatV2RowMenu: '[data-testid="btn-chat-v2-row-menu"]',
+    /** V2 chat context menu: Share button */
+    chatV2Share: '[data-testid="btn-chat-v2-share"]',
   },
   models: {
     page: '[data-testid="page-config-ai-models"]',
