@@ -384,10 +384,6 @@ services:
         arguments:
             $uploadDir: '%kernel.project_dir%/var/uploads'
 
-    App\Controller\TtsController:
-        arguments:
-            $ttsUrl: '%env(default:synaplan_tts_url_default:SYNAPLAN_TTS_URL)%'
-
     App\Controller\StreamController:
         arguments:
             $uploadDir: '%kernel.project_dir%/var/uploads'

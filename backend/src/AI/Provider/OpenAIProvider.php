@@ -862,6 +862,93 @@ class OpenAIProvider implements ChatProviderInterface, EmbeddingProviderInterfac
         }
     }
 
+    public function synthesizeStream(string $text, array $options = []): \Generator
+    {
+        if (!$this->apiKey) {
+            throw ProviderException::missingApiKey('openai', 'OPENAI_API_KEY');
+        }
+
+        $model = $options['model'] ?? 'tts-1';
+        $voice = $options['voice'] ?? 'alloy';
+        $format = $options['format'] ?? 'mp3';
+        $speed = $options['speed'] ?? 1.0;
+
+        $this->logger->info('OpenAI: Streaming TTS', [
+            'model' => $model,
+            'voice' => $voice,
+            'format' => $format,
+            'text_length' => strlen($text),
+        ]);
+
+        $ch = curl_init('https://api.openai.com/v1/audio/speech');
+        $payload = json_encode([
+            'model' => $model,
+            'voice' => $voice,
+            'input' => $text,
+            'response_format' => $format,
+            'speed' => $speed,
+        ]);
+
+        $buffer = '';
+        $headersDone = false;
+        $httpCode = 0;
+
+        curl_setopt_array($ch, [
+            CURLOPT_POST => true,
+            CURLOPT_HTTPHEADER => [
+                'Content-Type: application/json',
+                'Authorization: Bearer '.$this->apiKey,
+            ],
+            CURLOPT_POSTFIELDS => $payload,
+            CURLOPT_RETURNTRANSFER => false,
+            CURLOPT_HEADER => false,
+            CURLOPT_TIMEOUT => 120,
+            CURLOPT_WRITEFUNCTION => function ($ch, $data) use (&$buffer) {
+                $buffer .= $data;
+
+                return strlen($data);
+            },
+        ]);
+
+        curl_exec($ch);
+        $httpCode = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        $curlError = curl_error($ch);
+        curl_close($ch);
+
+        if ($curlError) {
+            throw new ProviderException('OpenAI TTS stream cURL error: '.$curlError, 'openai');
+        }
+
+        if (200 !== $httpCode) {
+            throw new ProviderException('OpenAI TTS stream HTTP '.$httpCode.': '.substr($buffer, 0, 500), 'openai');
+        }
+
+        $chunkSize = 8192;
+        $offset = 0;
+        $length = strlen($buffer);
+        while ($offset < $length) {
+            yield substr($buffer, $offset, $chunkSize);
+            $offset += $chunkSize;
+        }
+    }
+
+    public function getStreamContentType(array $options = []): string
+    {
+        $format = $options['format'] ?? 'mp3';
+
+        return match ($format) {
+            'opus' => 'audio/ogg',
+            'aac' => 'audio/aac',
+            'flac' => 'audio/flac',
+            default => 'audio/mpeg',
+        };
+    }
+
+    public function supportsStreaming(): bool
+    {
+        return true;
+    }
+
     public function getVoices(): array
     {
         // OpenAI TTS voices (static list)
