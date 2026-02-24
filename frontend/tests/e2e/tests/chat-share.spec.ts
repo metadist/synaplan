@@ -5,7 +5,7 @@ import { ChatHelper } from '../helpers/chat'
 import { TIMEOUTS } from '../config/config'
 
 test.describe('Chat Share', () => {
-  test('@001 @smoke User can share chat and open shared link in incognito', async ({
+  test('@001 @ci @smoke User can share chat and open shared link in incognito', async ({
     page,
     credentials,
   }) => {

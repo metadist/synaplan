@@ -13,7 +13,7 @@ const e2eDir = path.join(__dirname, '..')
 
 const VISION_FIXTURE = readFileSync(path.join(e2eDir, FIXTURE_PATHS.VISION_PATTERN_64))
 
-test('@003 @smoke Standard model generates answer', async ({ page, credentials }) => {
+test('@003 @ci @smoke Standard model generates answer', async ({ page, credentials }) => {
   await login(page, credentials)
   const chat = new ChatHelper(page)
 

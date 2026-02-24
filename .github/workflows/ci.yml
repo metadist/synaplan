@@ -418,7 +418,7 @@ jobs:
           echo "============================================"
           echo "Running E2E tests with ${{ matrix.browser }} (${{ matrix.auth_method }})"
           echo "============================================"
-          npx playwright test --config=tests/e2e/playwright.config.ts --project=${{ matrix.project }} --grep "@ci"
+          npm run ${{ matrix.npm_script }}${{ matrix.grep_filter && format(' -- --grep "{0}"', matrix.grep_filter) || '' }}
 
       - name: Upload Playwright test results
         if: always()

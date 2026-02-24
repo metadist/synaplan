@@ -4,12 +4,12 @@ import { selectors } from '../helpers/selectors'
 import { clearMailHog, waitForVerificationHref, normalizeVerificationUrl } from '../helpers/email'
 import { URLS, TIMEOUTS, INTERVALS } from '../config/config'
 
-test('@002 @smoke @auth should successfully login', async ({ page, credentials }) => {
+test('@002 @ci @smoke @auth should successfully login', async ({ page, credentials }) => {
   await login(page, credentials)
   await expect(page.locator(selectors.chat.textInput)).toBeVisible({ timeout: 10_000 })
 })
 
-test('@005 @smoke @auth logout should clear session', async ({ page, credentials }) => {
+test('@005 @ci @smoke @auth logout should clear session', async ({ page, credentials }) => {
   await login(page, credentials)
 
   await page.locator(selectors.userMenu.button).waitFor({ state: 'visible' })
@@ -32,7 +32,7 @@ test('@005 @smoke @auth logout should clear session', async ({ page, credentials
 })
 
 // TODO: Use a pre-verified DB fixture + delete before test, then assert login fails (avoids MailHog/verify flow).
-test('@011 @auth @smoke deleted user cannot login', async ({ page, request }) => {
+test('@011 @ci @auth @smoke deleted user cannot login', async ({ page, request }) => {
   const email = `deleted-user-${Date.now()}@example.test`
   const password = 'DeleteMe123!'
 

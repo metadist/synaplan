@@ -111,7 +111,7 @@ test('@013 @noci @smoke @widget @security Widget: overlay receives response', as
   }
 })
 
-test('@014 @smoke @widget Widget: applies settings and auto-open', async ({
+test('@014 @ci @smoke @widget Widget: applies settings and auto-open', async ({
   page,
   credentials,
 }) => {
@@ -158,7 +158,7 @@ test('@014 @smoke @widget Widget: applies settings and auto-open', async ({
 })
 
 // Widget allows only example.com; page is localhost → backend returns 403 domain_not_whitelisted.
-test('@015 @smoke @widget @security Widget: blocked on non-whitelisted domain', async ({
+test('@015 @ci @smoke @widget @security Widget: blocked on non-whitelisted domain', async ({
   page,
 }) => {
   await login(page)
@@ -401,7 +401,7 @@ test('@017 @noci @smoke @widget Widget: task prompt returns answer', async ({
   expect(aiText.length).toBeGreaterThan(0)
 })
 
-test('@020 @smoke @widget Widget: embedded chat receives response', async ({
+test('@020 @ci @smoke @widget Widget: embedded chat receives response', async ({
   page,
   credentials,
 }) => {
