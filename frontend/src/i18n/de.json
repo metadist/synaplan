@@ -1607,6 +1607,8 @@
       "aiModelHelp": "Wählen Sie das KI-Modell für dieses Widget. Automatisch wählt das beste verfügbare Modell.",
       "automated": "Automatisch (System wählt bestes Modell)",
       "availableTools": "Verfügbare Agents",
+      "promptLanguage": "Prompt-Sprache",
+      "promptLanguageHelp": "Die Sprache, in der dieser Prompt verfasst ist. Ein Wechsel der Oberflächensprache hat keinen Einfluss auf diesen Prompt.",
       "promptContent": "System-Prompt",
       "promptContentPlaceholder": "Geben Sie die Anweisungen für Ihren KI-Assistenten ein...",
       "promptContentHelp": "Dies ist der System-Prompt, der definiert, wie sich Ihr KI-Assistent verhält und antwortet.",

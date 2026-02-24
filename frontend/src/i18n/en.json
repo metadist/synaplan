@@ -1588,6 +1588,8 @@
       "aiModelHelp": "Select the AI model to use for this widget. Automated will choose the best model available.",
       "automated": "Automated (System chooses best model)",
       "availableTools": "Available Agents",
+      "promptLanguage": "Prompt Language",
+      "promptLanguageHelp": "The language this prompt is written in. Changing the frontend language will not affect this prompt.",
       "promptContent": "System Prompt",
       "promptContentPlaceholder": "Enter the instructions for your AI assistant...",
       "promptContentHelp": "This is the system prompt that defines how your AI assistant behaves and responds.",

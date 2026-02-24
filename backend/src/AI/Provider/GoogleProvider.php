@@ -988,6 +988,43 @@ class GoogleProvider implements ChatProviderInterface, ImageGenerationProviderIn
         }
     }
 
+    public function synthesizeStream(string $text, array $options = []): \Generator
+    {
+        $filename = $this->synthesize($text, $options);
+        $fullPath = $this->uploadDir.'/'.$filename;
+
+        if (!file_exists($fullPath)) {
+            throw new ProviderException('Google TTS: synthesized file not found', 'google');
+        }
+
+        $handle = fopen($fullPath, 'rb');
+        if (!$handle) {
+            throw new ProviderException('Google TTS: cannot read synthesized file', 'google');
+        }
+
+        try {
+            while (!feof($handle)) {
+                $chunk = fread($handle, 8192);
+                if (false !== $chunk && '' !== $chunk) {
+                    yield $chunk;
+                }
+            }
+        } finally {
+            fclose($handle);
+            @unlink($fullPath);
+        }
+    }
+
+    public function getStreamContentType(array $options = []): string
+    {
+        return 'audio/wav';
+    }
+
+    public function supportsStreaming(): bool
+    {
+        return false;
+    }
+
     public function getVoices(): array
     {
         // Google Cloud TTS voices would be loaded here

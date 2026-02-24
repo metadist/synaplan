@@ -7,6 +7,7 @@ use App\Entity\User;
 use App\Entity\Widget;
 use App\Repository\PromptRepository;
 use App\Repository\WidgetRepository;
+use App\Service\File\UserUploadPathBuilder;
 use App\Service\WidgetService;
 use App\Service\WidgetSessionService;
 use App\Service\WidgetSetupService;
@@ -35,8 +36,10 @@ class WidgetController extends AbstractController
         private WidgetSetupService $setupService,
         private WidgetRepository $widgetRepository,
         private PromptRepository $promptRepository,
+        private UserUploadPathBuilder $userUploadPathBuilder,
         private EntityManagerInterface $em,
         private LoggerInterface $logger,
+        private string $uploadDir,
     ) {
     }
 
@@ -497,28 +500,31 @@ class WidgetController extends AbstractController
         }
 
         try {
-            // Create upload directory if it doesn't exist
-            $uploadDir = $this->getParameter('kernel.project_dir').'/public/uploads/widget-icons';
-            if (!is_dir($uploadDir)) {
-                mkdir($uploadDir, 0755, true);
+            // Build per-user sharded path: widget-icons/{shard}/{year}/{month}/{filename}
+            $userBase = $this->userUploadPathBuilder->buildUserBaseRelativePath($user->getId());
+            $year = date('Y');
+            $month = date('m');
+
+            $extension = $uploadedFile->guessExtension() ?? 'png';
+            $filename = 'wicon_'.bin2hex(random_bytes(8)).'_'.time().'.'.$extension;
+
+            $relativePath = 'widget-icons/'.$userBase.'/'.$year.'/'.$month.'/'.$filename;
+            $absoluteDir = $this->uploadDir.'/widget-icons/'.$userBase.'/'.$year.'/'.$month;
+
+            if (!is_dir($absoluteDir)) {
+                mkdir($absoluteDir, 0755, true);
             }
 
-            // Generate unique filename
-            $extension = $uploadedFile->guessExtension() ?? 'png';
-            $filename = uniqid('icon_').'_'.time().'.'.$extension;
+            $uploadedFile->move($absoluteDir, $filename);
 
-            // Move file to upload directory
-            $uploadedFile->move($uploadDir, $filename);
-
-            // Generate public URL using SYNAPLAN_URL (public backend URL)
-            // Fallback to request host if not configured
+            // Public URL via file-serving API (works cross-origin for embedded widgets)
             $baseUrl = $_ENV['SYNAPLAN_URL'] ?? $request->getSchemeAndHttpHost();
             $baseUrl = rtrim($baseUrl, '/');
-            $iconUrl = $baseUrl.'/uploads/widget-icons/'.$filename;
+            $iconUrl = $baseUrl.'/api/v1/files/uploads/'.$relativePath;
 
             $this->logger->info('Widget icon uploaded', [
                 'widget_id' => $widgetId,
-                'filename' => $filename,
+                'relative_path' => $relativePath,
                 'url' => $iconUrl,
             ]);
 
