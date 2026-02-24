@@ -19,7 +19,7 @@
     </div>
 
     <!-- Wrapper for thinking blocks + bubble -->
-    <div class="flex flex-col max-w-3xl gap-2">
+    <div class="flex flex-col max-w-3xl min-w-0 gap-2">
       <!-- Thinking blocks (ABOVE bubble, only for assistant) -->
       <template v-if="role === 'assistant'">
         <MessagePart
@@ -31,7 +31,10 @@
 
       <!-- Single bubble with content + footer -->
       <div
-        :class="['flex flex-col', role === 'user' ? 'bubble-user' : 'bubble-ai']"
+        :class="[
+          'flex flex-col relative group/bubble',
+          role === 'user' ? 'bubble-user' : 'bubble-ai',
+        ]"
         :data-testid="role === 'user' ? 'user-message-bubble' : 'assistant-message-bubble'"
       >
         <!-- E2E: visible when streaming finished so tests can wait for message-done -->
@@ -41,6 +44,20 @@
           class="sr-only"
           aria-hidden="true"
         />
+        <!-- Copy button (assistant only, hidden during streaming) -->
+        <button
+          v-if="role === 'assistant' && !isStreaming"
+          type="button"
+          class="absolute top-2 right-2 z-10 p-1.5 rounded-md txt-secondary transition-opacity duration-150 bg-black/5 dark:bg-white/10 hover:bg-black/10 dark:hover:bg-white/20 hover:txt-primary pointer-fine:opacity-0 pointer-fine:group-hover/bubble:opacity-100"
+          :aria-label="t('chatMessage.copy')"
+          data-testid="btn-message-copy"
+          @click="copyMessageText"
+        >
+          <CheckIcon v-if="copied" class="w-4 h-4 text-green-500" />
+          <ClipboardDocumentIcon v-else class="w-4 h-4" />
+        </button>
+
+
         <!-- Processing Status (inside bubble, before content) -->
         <div
           v-if="isStreaming && processingStatus && role === 'assistant'"
@@ -362,9 +379,11 @@
 
             <!-- Carousel Container (collapsible) -->
             <div v-show="sourcesExpanded" class="py-2 px-3">
-              <div class="relative overflow-x-hidden">
+              <div
+                class="relative overflow-x-auto sm:overflow-x-hidden scroll-thin snap-x snap-mandatory sm:snap-none"
+              >
                 <div
-                  class="flex gap-2 transition-transform duration-300"
+                  class="flex gap-2 sm:transition-transform sm:duration-300"
                   :style="{
                     transform: `translateX(calc(-${carouselPage * 100}%))`,
                   }"
@@ -373,8 +392,8 @@
                     v-for="(result, index) in searchResults"
                     :key="index"
                     :class="[
-                      'group flex flex-col gap-2 p-2 sm:p-3 rounded-lg transition-all cursor-pointer flex-shrink-0',
-                      'w-full sm:w-[calc(33.333%-0.5rem)]',
+                      'group flex flex-col gap-2 p-2 sm:p-3 rounded-lg transition-all cursor-pointer flex-shrink-0 snap-start',
+                      'w-[85%] sm:w-[calc(33.333%-0.5rem)]',
                       'bg-[var(--bg-chip)] border shadow-sm',
                       highlightedSource === index
                         ? '!border-[var(--brand)] border-2 bg-[var(--brand-alpha-light)] shadow-lg'
@@ -491,7 +510,7 @@
               >
                 <Icon :icon="getModelTypeIcon" class="w-3.5 h-3.5" />
                 <span class="hidden sm:inline">{{ getModelTypeLabel }}:</span>
-                <span class="font-semibold">{{ aiModels.chat.model }}</span>
+                <span class="font-semibold">{{ shortenModel(aiModels.chat.model) }}</span>
               </button>
 
               <!-- Sorting Model Badge -->
@@ -499,13 +518,13 @@
                 v-if="aiModels.sorting"
                 type="button"
                 class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-xs font-medium bg-purple-500/10 hover:bg-purple-500/20 text-purple-600 dark:text-purple-400 transition-colors cursor-pointer"
-                :title="$t('config.aiModels.messageClassification')"
+                :title="`${$t('config.aiModels.messageClassification')}: ${aiModels.sorting.model}`"
                 data-testid="btn-message-model-sorting"
                 @click="showModelDetails('sorting')"
               >
                 <Icon icon="mdi:sort" class="w-3.5 h-3.5" />
                 <span class="hidden sm:inline">{{ $t('config.aiModels.sorting') }}:</span>
-                <span class="font-semibold">{{ aiModels.sorting.model }}</span>
+                <span class="font-semibold">{{ shortenModel(aiModels.sorting.model) }}</span>
               </button>
 
               <span
@@ -696,7 +715,13 @@
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
-import { UserIcon, ArrowPathIcon, ChevronDownIcon } from '@heroicons/vue/24/outline'
+import {
+  UserIcon,
+  ArrowPathIcon,
+  ChevronDownIcon,
+  ClipboardDocumentIcon,
+  CheckIcon,
+} from '@heroicons/vue/24/outline'
 import { Icon } from '@iconify/vue'
 import { useModelSelection, type ModelOption } from '@/composables/useModelSelection'
 import { useNotification } from '@/composables/useNotification'
@@ -786,6 +811,27 @@ interface Props {
 }
 
 const props = defineProps<Props>()
+
+// Copy message text to clipboard
+const copied = ref(false)
+
+const copyMessageText = async () => {
+  const text = props.parts
+    .filter((p) => p.type !== 'thinking')
+    .map((p) => p.content ?? '')
+    .join('\n')
+    .trim()
+  if (!text) return
+  try {
+    await navigator.clipboard.writeText(text)
+    copied.value = true
+    setTimeout(() => {
+      copied.value = false
+    }, 2000)
+  } catch {
+    console.error('Failed to copy message text')
+  }
+}
 
 // Badge collapse state
 const showAllBadges = ref(false)
@@ -987,6 +1033,12 @@ const emit = defineEmits<{
 
 const router = useRouter()
 const modelDropdownOpen = ref(false)
+
+const shortenModel = (name: string): string => {
+  const stripped = name.replace(/^[^/]+\//, '')
+  if (stripped.length <= 24) return stripped
+  return stripped.slice(0, 22) + '…'
+}
 
 // Use model selection composable
 const againDataComputed = computed(() => props.againData)

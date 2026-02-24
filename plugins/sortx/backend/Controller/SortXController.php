@@ -409,6 +409,107 @@ class SortXController extends AbstractController
     }
 
     /**
+     * Bulk sync categories from the local SortX tool.
+     *
+     * Replaces all server-side categories with the provided set.
+     * This is the upstream push — local edits become the source of truth.
+     */
+    #[Route('/categories/sync', name: 'categories_sync', methods: ['POST'])]
+    #[OA\Post(
+        path: '/api/v1/user/{userId}/plugins/sortx/categories/sync',
+        summary: 'Bulk sync categories from local tool',
+        description: 'Replaces all server-side categories with the provided set. Local tool is source of truth.',
+        security: [['Bearer' => []]],
+        tags: ['SortX Plugin']
+    )]
+    #[OA\RequestBody(
+        required: true,
+        content: new OA\JsonContent(
+            required: ['categories'],
+            properties: [
+                new OA\Property(
+                    property: 'categories',
+                    type: 'array',
+                    items: new OA\Items(
+                        type: 'object',
+                        properties: [
+                            new OA\Property(property: 'key', type: 'string'),
+                            new OA\Property(property: 'name', type: 'string'),
+                            new OA\Property(property: 'description', type: 'string'),
+                            new OA\Property(property: 'sort_order', type: 'integer'),
+                            new OA\Property(property: 'fields', type: 'array', items: new OA\Items(type: 'object')),
+                        ]
+                    )
+                ),
+            ]
+        )
+    )]
+    #[OA\Response(response: 200, description: 'Categories synced')]
+    public function syncCategories(
+        Request $request,
+        int $userId,
+        #[CurrentUser] ?User $user,
+    ): JsonResponse {
+        if (!$this->canAccessPlugin($user, $userId)) {
+            return $this->json(['success' => false, 'error' => 'Unauthorized'], Response::HTTP_UNAUTHORIZED);
+        }
+
+        $data = json_decode($request->getContent(), true);
+        if (!isset($data['categories']) || !is_array($data['categories'])) {
+            return $this->json(['success' => false, 'error' => 'categories array required'], Response::HTTP_BAD_REQUEST);
+        }
+
+        // Delete all existing categories for this user
+        $existing = $this->pluginData->list($userId, self::PLUGIN_NAME, self::DATA_TYPE_CATEGORY);
+        foreach ($existing as $key => $item) {
+            $this->pluginData->delete($userId, self::PLUGIN_NAME, self::DATA_TYPE_CATEGORY, $key);
+        }
+
+        // Insert the incoming categories
+        $count = 0;
+        foreach ($data['categories'] as $i => $cat) {
+            $key = $cat['key'] ?? null;
+            if (!$key) {
+                continue;
+            }
+
+            $fields = [];
+            foreach ($cat['fields'] ?? [] as $field) {
+                $fields[] = [
+                    'key' => $field['key'] ?? '',
+                    'name' => $field['name'] ?? $field['key'] ?? '',
+                    'type' => $field['type'] ?? 'text',
+                    'enum_values' => $field['enum_values'] ?? [],
+                    'description' => $field['description'] ?? '',
+                    'required' => $field['required'] ?? false,
+                ];
+            }
+
+            $catData = [
+                'name' => $cat['name'] ?? $key,
+                'description' => $cat['description'] ?? '',
+                'enabled' => true,
+                'sort_order' => $cat['sort_order'] ?? $i,
+                'fields' => $fields,
+            ];
+
+            $this->pluginData->set($userId, self::PLUGIN_NAME, self::DATA_TYPE_CATEGORY, $key, $catData);
+            $count++;
+        }
+
+        $this->logger->info('SortX categories synced from local tool', [
+            'user_id' => $userId,
+            'count' => $count,
+        ]);
+
+        return $this->json([
+            'success' => true,
+            'message' => "Synced {$count} categories",
+            'count' => $count,
+        ]);
+    }
+
+    /**
      * Classify document text and optionally extract metadata.
      */
     #[Route('/classify', name: 'classify', methods: ['POST'])]

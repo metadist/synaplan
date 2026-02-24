@@ -8,6 +8,7 @@ use App\Repository\SearchResultRepository;
 use App\Service\ModelConfigService;
 use App\Service\PromptService;
 use App\Service\Search\BraveSearchService;
+use App\Service\UrlContentService;
 use Psr\Log\LoggerInterface;
 
 /**
@@ -33,6 +34,7 @@ class MessageProcessor
         private PromptService $promptService,
         private BraveSearchService $braveSearchService,
         private SearchQueryGenerator $searchQueryGenerator,
+        private UrlContentService $urlContentService,
         private LoggerInterface $logger,
     ) {
     }
@@ -79,26 +81,31 @@ class MessageProcessor
             $promptMetadata = [];
 
             if ($hasFixedPrompt) {
-                // Widget Mode: Run AI classification for language detection, override topic with fixed prompt
-                $this->logger->info('MessageProcessor: Widget mode with fixed task prompt', [
+                $isWidget = !empty($options['is_widget_mode']);
+                $source = $isWidget ? 'widget' : 'api';
+
+                $this->logger->info('MessageProcessor: Fixed task prompt mode', [
                     'task_prompt' => $options['fixed_task_prompt'],
+                    'source' => $source,
                 ]);
 
-                // Run classification (same as normal chat) to detect language via AI
+                // Run classification to detect language via AI
                 $classification = $this->classifier->classify($message, $conversationHistory);
 
                 // Override topic with the fixed task prompt (skip routing result)
                 $classification['topic'] = $options['fixed_task_prompt'];
-                $classification['source'] = 'widget';
-                $classification['is_widget_mode'] = true;
+                $classification['source'] = $source;
+                $classification['is_widget_mode'] = $isWidget;
 
-                $this->logger->info('MessageProcessor: Widget AI classification complete', [
+                $this->logger->info('MessageProcessor: Classification complete with fixed prompt', [
                     'detected_language' => $classification['language'] ?? 'en',
                     'fixed_topic' => $options['fixed_task_prompt'],
+                    'source' => $source,
                 ]);
 
                 $this->notify($statusCallback, 'classified', sprintf(
-                    'Widget: Language %s detected, using fixed prompt',
+                    '%s: Language %s detected, using fixed prompt',
+                    ucfirst($source),
                     $classification['language'] ?? 'en'
                 ));
 
@@ -240,8 +247,6 @@ class MessageProcessor
                 $options['web_search'] = false;
             }
 
-            // TODO: Add similar logic for files_search and url_screenshot when implemented
-
             // Step 2.5: Web Search (if requested or AI-classified)
             $searchResults = null;
             $shouldSearch = $options['web_search'] ?? false;
@@ -321,6 +326,22 @@ class MessageProcessor
 
                     // Continue processing even if search fails
                     $this->notify($statusCallback, 'search_failed', 'Web search failed, continuing without results');
+                }
+            }
+
+            // Step 2.7: URL Content Extraction (if tool_url_screenshot enabled)
+            if ($promptMetadata['tool_url_screenshot'] ?? false) {
+                $urls = $this->urlContentService->extractUrls($message->getText());
+                if (!empty($urls)) {
+                    $this->notify($statusCallback, 'fetching_urls', sprintf('Fetching content from %d URL(s)...', count($urls)));
+
+                    $urlContentResults = $this->urlContentService->fetchMultiple($urls);
+                    $successCount = count(array_filter($urlContentResults, static fn ($r) => $r->success));
+
+                    if ($successCount > 0) {
+                        $classification['url_content'] = $this->urlContentService->formatForPrompt($urlContentResults);
+                        $this->notify($statusCallback, 'urls_fetched', sprintf('Extracted content from %d URL(s)', $successCount));
+                    }
                 }
             }
 
@@ -482,18 +503,22 @@ class MessageProcessor
             }
 
             if ($hasFixedPrompt) {
-                $this->logger->info('MessageProcessor: Using fixed task prompt (Widget mode)', [
+                $isWidget = !empty($options['is_widget_mode']);
+                $source = $isWidget ? 'widget' : 'api';
+
+                $this->logger->info('MessageProcessor: Using fixed task prompt', [
                     'task_prompt' => $options['fixed_task_prompt'],
+                    'source' => $source,
                 ]);
 
                 $classification = [
                     'topic' => $options['fixed_task_prompt'],
                     'language' => $languageOverride ?? 'en',
-                    'source' => 'widget',
+                    'source' => $source,
                     'intent' => 'chat',
                 ];
 
-                $this->notify($statusCallback, 'classified', 'Using widget task prompt (skipped classification)', [
+                $this->notify($statusCallback, 'classified', sprintf('Using %s task prompt (skipped classification)', $source), [
                     'topic' => $classification['topic'],
                     'language' => $classification['language'],
                     'source' => $classification['source'],
@@ -661,6 +686,22 @@ class MessageProcessor
 
             if ($searchResults) {
                 $classification['search_results'] = $searchResults;
+            }
+
+            // Step 2.7: URL Content Extraction (if tool_url_screenshot enabled)
+            if (!empty($promptMetadata['tool_url_screenshot'])) {
+                $urls = $this->urlContentService->extractUrls($message->getText());
+                if (!empty($urls)) {
+                    $this->notify($statusCallback, 'fetching_urls', sprintf('Fetching content from %d URL(s)...', count($urls)));
+
+                    $urlContentResults = $this->urlContentService->fetchMultiple($urls);
+                    $successCount = count(array_filter($urlContentResults, static fn ($r) => $r->success));
+
+                    if ($successCount > 0) {
+                        $classification['url_content'] = $this->urlContentService->formatForPrompt($urlContentResults);
+                        $this->notify($statusCallback, 'urls_fetched', sprintf('Extracted content from %d URL(s)', $successCount));
+                    }
+                }
             }
 
             // Step 3: Inference (AI Response)

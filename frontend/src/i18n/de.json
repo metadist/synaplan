@@ -8,7 +8,7 @@
     "emailVerified": "E-Mail bestätigt",
     "error": "Fehler",
     "chat": "Chat",
-    "tools": "Werkzeuge",
+    "tools": "Agents",
     "chatWidget": "Chat-Widget",
     "docSummary": "Dokumentzusammenfassung",
     "mailHandler": "E-Mail-Bearbeitung",
@@ -19,7 +19,7 @@
     "ragSearch": "Semantische Suche",
     "configInbound": "Eingangskanäle",
     "configAiModels": "KI-Modelle",
-    "configTaskPrompts": "Aufgaben-Prompts",
+    "configTaskPrompts": "KI-Prompts",
     "configSortingPrompt": "Sortierungs-Prompt",
     "configApiKeys": "API-Schlüssel",
     "configApiDocs": "API-Dokumentation",
@@ -32,6 +32,7 @@
     "subscription": "Abonnement",
     "subscriptionSuccess": "Abonnement erfolgreich",
     "subscriptionCancel": "Abonnement gekündigt",
+    "loggedOut": "Abgemeldet",
     "notFound": "Seite nicht gefunden",
     "widgetSessions": "Widget-Sitzungen",
     "widgetChats": "Widget-Chats",
@@ -42,6 +43,10 @@
     "title": "Chat",
     "newChat": "Neuer Chat",
     "noChats": "Keine Chats vorhanden",
+    "timeNow": "jetzt",
+    "timeMinutes": "{n}m",
+    "timeHours": "{n}h",
+    "timeDays": "{n}d",
     "showMore": "Mehr anzeigen",
     "showLess": "Weniger anzeigen",
     "showAll": "Alle anzeigen",
@@ -203,20 +208,23 @@
   "nav": {
     "chat": "Chat",
     "profile": "Profil",
-    "tools": "Werkzeuge",
+    "tools": "Agents",
     "toolsIntroduction": "Einführung",
     "toolsChatWidget": "Chat-Widget",
-    "toolsDocSummary": "Dok-Zusammenfassung",
-    "toolsMailHandler": "E-Mail-Handler",
+    "toolsDocSummary": "Zusammenfasser",
+    "toolsMailHandler": "E-Mail-Integration",
     "plugins": "Plugins",
     "files": "Dateien",
-    "filesAndRag": "Dateien & RAG",
+    "filesAndRag": "Dateimanager",
     "fileManager": "Dateimanager",
     "semanticSearch": "Semantische Suche",
+    "settings": "Einstellungen",
+    "settingsChannels": "Kanäle",
+    "settingsAiTools": "KI & Agents",
     "aiConfig": "KI-Konfiguration",
     "configInbound": "Eingehend",
     "configAiModels": "KI-Modelle",
-    "configTaskPrompts": "Aufgaben-Prompts",
+    "configTaskPrompts": "KI-Prompts",
     "configSortingPrompt": "Sortier-Prompt",
     "configApiKeys": "API-Schlüssel",
     "statistics": "Statistiken",
@@ -241,6 +249,7 @@
     "voiceReply": "Sprachantwort",
     "voiceReplyTooltip": "Audioantwort (MP3) anhängen",
     "send": "Nachricht senden",
+    "waitForStreaming": "Bitte warten Sie, bis die aktuelle Antwort abgeschlossen ist, bevor Sie eine weitere Nachricht senden.",
     "share": "Teilen",
     "enhance": "Verbessern",
     "thinking": "Denken",
@@ -259,7 +268,7 @@
     "dropFilesHint": "Bilder, Dokumente, Audiodateien...",
     "filesPasted": "{count} Datei eingefügt | {count} Dateien eingefügt",
     "tools": {
-      "label": "Werkzeuge",
+      "label": "Agents",
       "webSearch": "Web-Suche",
       "webSearchDesc": "Im Internet suchen",
       "imageGen": "Bilderzeugung",
@@ -272,7 +281,8 @@
   "chatMessage": {
     "again": "Nochmal",
     "againWith": "Nochmal mit",
-    "regenerateWith": "Neu generieren mit"
+    "regenerateWith": "Neu generieren mit",
+    "copy": "Nachricht kopieren"
   },
   "commands": {
     "noResults": "Keine Befehle gefunden",
@@ -303,8 +313,8 @@
     "sent": "Gesendet"
   },
   "tools": {
-    "title": "Verfügbare Werkzeuge",
-    "description": "Entdecke und nutze leistungsstarke Werkzeuge zur Verbesserung deines Workflows",
+    "title": "Verfügbare Agents",
+    "description": "Entdecke und nutze leistungsstarke Agents zur Verbesserung deines Workflows",
     "category": "Kategorie",
     "commands": "Befehle",
     "noCommands": "Keine Befehle verfügbar",
@@ -347,6 +357,7 @@
     "yesterday": "Gestern",
     "sessions": "Sitzungen",
     "messages": "Nachrichten",
+    "visitorMessages": "Besucher-Nachrichten",
     "sentiment": "Stimmung",
     "positive": "Positiv",
     "negative": "Negativ",
@@ -360,12 +371,67 @@
     "addInfo": "Hinzufügen",
     "improveInfo": "Verbessern",
     "neutral": "Neutral",
+    "negativeMessages": "Negative Nachrichten",
+    "neutralMessages": "Neutrale Nachrichten",
+    "visitor": "Besucher",
+    "response": "Antwort",
+    "noSentimentMessages": "Keine Nachrichten in dieser Kategorie",
     "teamRequired": "Team-Plan erforderlich",
     "teamRequiredDescription": "KI-gestützte Gesprächszusammenfassungen und Einblicke sind für Team- und Business-Pläne verfügbar. Upgraden Sie, um diese Funktion freizuschalten.",
     "upgrade": "Plan upgraden",
     "existingFound": "Bestehende Analyse gefunden",
     "existingFoundInfo": "Eine Analyse für genau diesen Zeitraum existiert bereits. Sie sehen die zuvor erstellte Zusammenfassung.",
-    "regenerateAnyway": "Trotzdem neu generieren"
+    "regenerateAnyway": "Trotzdem neu generieren",
+    "description": "Konfiguriere das KI-Modell, um dein Dokument zusammenzufassen.",
+    "summaryType": "Zusammenfassungstyp:",
+    "summaryTypeHelp": "Art der zu generierenden Zusammenfassung",
+    "length": "Länge:",
+    "lengthHelp": "Gewünschte Länge der Zusammenfassung",
+    "customLength": "Benutzerdefinierte Länge:",
+    "customLengthHelp": "Anzahl der Wörter (50-2000)",
+    "outputLanguage": "Ausgabesprache:",
+    "outputLanguageHelp": "Sprache für die Zusammenfassung",
+    "focusAreas": "Schwerpunktbereiche:",
+    "focusAreasHelp": "Wähle worauf in der Zusammenfassung fokussiert werden soll",
+    "documentInput": "Dokumenteingabe",
+    "inputMethod": "Eingabemethode:",
+    "textInput": "Texteingabe",
+    "documentText": "Dokumenttext:",
+    "documentTextPlaceholder": "Füge deinen Dokumenttext hier ein...",
+    "charactersCount": "{count} Zeichen | {words} Wörter | {tokens} geschätzte Tokens",
+    "generateSummary": "Zusammenfassung generieren",
+    "showSummary": "Zusammenfassung anzeigen",
+    "regenerateSummary": "Zusammenfassung neu generieren",
+    "usingModel": "Verwendetes KI-Modell",
+    "loadingModel": "Lädt...",
+    "clearForm": "Formular zurücksetzen",
+    "processingNote": "Die Verarbeitung großer Dokumente kann mehrere Minuten dauern. Bitte habe Geduld.",
+    "quickPresets": "Schnelle Voreinstellungen",
+    "presets": {
+      "invoice": {
+        "title": "Rechnung",
+        "desc": "Optimiert für Finanzdokumente"
+      },
+      "contract": {
+        "title": "Vertrag",
+        "desc": "Fokus auf Bedingungen und Konditionen"
+      },
+      "generic": {
+        "title": "Allgemein",
+        "desc": "Ausgewogen für alle Dokumenttypen"
+      }
+    },
+    "dragDropTitle": "Datei hier ablegen oder klicken zum Durchsuchen",
+    "dragDropDesc": "Lade ein Dokument hoch, um dessen Inhalt zu extrahieren und zusammenzufassen",
+    "supportedFormats": "Unterstützte Formate",
+    "maxSize": "Max. Größe",
+    "orPasteText": "oder Text direkt einfügen",
+    "uploadingFile": "Lade hoch und extrahiere Text...",
+    "uploadingFileDesc": "Bitte warte, während wir deine Datei verarbeiten",
+    "selectFromExisting": "Aus bereits hochgeladenen Dateien auswählen",
+    "fileUploadSuccess": "Datei \"{filename}\" erfolgreich hochgeladen und Text extrahiert!",
+    "fileExtractionFailed": "Datei hochgeladen, aber kein Text konnte extrahiert werden.",
+    "fileUploadFailed": "Fehler beim Hochladen der Datei. Bitte versuche es erneut."
   },
   "export": {
     "title": "Export",
@@ -632,60 +698,6 @@
     "saveChanges": "Änderungen speichern",
     "cancel": "Abbrechen"
   },
-  "summary": {
-    "title": "Zusammenfassungskonfiguration",
-    "description": "Dies erstellt einen Prompt für das konfigurierte KI-Modell, um den übermittelten Text zusammenzufassen.",
-    "summaryType": "Zusammenfassungstyp:",
-    "summaryTypeHelp": "Art der zu generierenden Zusammenfassung",
-    "length": "Länge:",
-    "lengthHelp": "Gewünschte Länge der Zusammenfassung",
-    "customLength": "Benutzerdefinierte Länge:",
-    "customLengthHelp": "Anzahl der Wörter (50-2000)",
-    "outputLanguage": "Ausgabesprache:",
-    "outputLanguageHelp": "Sprache für die Zusammenfassung",
-    "focusAreas": "Schwerpunktbereiche:",
-    "focusAreasHelp": "Wähle worauf in der Zusammenfassung fokussiert werden soll",
-    "documentInput": "Dokumenteingabe",
-    "inputMethod": "Eingabemethode:",
-    "textInput": "Texteingabe",
-    "documentText": "Dokumenttext:",
-    "documentTextPlaceholder": "Füge deinen Dokumenttext hier ein...",
-    "charactersCount": "{count} Zeichen | {words} Wörter | {tokens} geschätzte Tokens",
-    "generateSummary": "Zusammenfassung generieren",
-    "generating": "Generiere...",
-    "showSummary": "Zusammenfassung anzeigen",
-    "regenerateSummary": "Zusammenfassung neu generieren",
-    "usingModel": "Verwendetes KI-Modell",
-    "loadingModel": "Lädt...",
-    "clearForm": "Formular zurücksetzen",
-    "processingNote": "Die Verarbeitung großer Dokumente kann mehrere Minuten dauern. Bitte habe Geduld.",
-    "quickPresets": "Schnelle Voreinstellungen",
-    "presets": {
-      "invoice": {
-        "title": "Rechnung",
-        "desc": "Optimiert für Finanzdokumente"
-      },
-      "contract": {
-        "title": "Vertrag",
-        "desc": "Fokus auf Bedingungen und Konditionen"
-      },
-      "generic": {
-        "title": "Allgemein",
-        "desc": "Ausgewogen für alle Dokumenttypen"
-      }
-    },
-    "dragDropTitle": "Datei hier ablegen oder klicken zum Durchsuchen",
-    "dragDropDesc": "Lade ein Dokument hoch, um dessen Inhalt zu extrahieren und zusammenzufassen",
-    "supportedFormats": "Unterstützte Formate",
-    "maxSize": "Max. Größe",
-    "orPasteText": "oder Text direkt einfügen",
-    "uploadingFile": "Lade hoch und extrahiere Text...",
-    "uploadingFileDesc": "Bitte warte, während wir deine Datei verarbeiten",
-    "selectFromExisting": "Aus bereits hochgeladenen Dateien auswählen",
-    "fileUploadSuccess": "Datei \"{filename}\" erfolgreich hochgeladen und Text extrahiert!",
-    "fileExtractionFailed": "Datei hochgeladen, aber kein Text konnte extrahiert werden.",
-    "fileUploadFailed": "Fehler beim Hochladen der Datei. Bitte versuche es erneut."
-  },
   "processing": {
     "started": "Starte Verarbeitung...",
     "startedTitle": "Verarbeite deine Nachricht",
@@ -745,7 +757,19 @@
   "config": {
     "inbound": {
       "title": "Eingänge",
-      "description": "Sie können diese Plattform über verschiedene Kanäle erreichen."
+      "description": "Sie können diese Plattform über verschiedene Kanäle erreichen.",
+      "whatsappChannels": "WhatsApp-Kanal/Kanäle",
+      "emailChannels": "E-Mail-Kanal/Kanäle",
+      "apiChannel": "API-Kanal",
+      "webWidget": "Web-Widget",
+      "defaultHandling": "Standardverarbeitung",
+      "addKeyword": "Prüfen Sie, ob ein Keyword frei ist, um Ihre eigene Verarbeitung hinzuzufügen:",
+      "keywordPlaceholder": "Keyword",
+      "yourEmailAddress": "Ihre E-Mail-Adresse: {email}",
+      "noKeywordSet": "Sie haben noch kein persönliches Keyword festgelegt. Sie können nur anonym an den Standard-Handler schreiben!",
+      "apiDescription": "Einfache API-Aufrufe mit Ihrem persönlichen API-Schlüssel:",
+      "apiDocumentationInfo": "Für eine ausführliche API-Dokumentation mit allen verfügbaren Endpunkten, Anfrage-/Antwortformaten und Authentifizierungsmethoden besuchen Sie bitte unsere umfassende API-Dokumentation.",
+      "viewApiDocumentation": "API-Dokumentation ansehen"
     },
     "aiModels": {
       "title": "KI-Modelle",
@@ -856,8 +880,9 @@
       "selectPromptDescription": "Wählen Sie einen vorhandenen Prompt zum Anzeigen oder Bearbeiten",
       "promptDetails": "Prompt-Details",
       "rulesForSelection": "Auswahlregeln",
+      "rulesHelp": "Wann soll dieses Prompt verwendet werden? Regeln für die automatische Auswahl",
       "aiModel": "KI-Modell",
-      "availableTools": "Verfügbare Tools",
+      "availableTools": "Verfügbare Agents",
       "promptContent": "Prompt-Inhalt",
       "contentPlaceholder": "Geben Sie Ihren System-Prompt hier ein...",
       "promptContentPlaceholder": "Geben Sie den System-Prompt ein, der das Verhalten der KI für diese Aufgabe steuert...",
@@ -889,11 +914,15 @@
     },
     "sortingPrompt": {
       "title": "Preprocessor",
-      "description": "Der Preprocessor verarbeitet eingehende Nachrichten"
+      "description": "Der Preprocessor verarbeitet eingehende Nachrichten",
+      "promptEditorLink": "um bestehende Prompts zu ändern ODER neue Prompts hinzuzufügen",
+      "yourTasks": "Ihre Aufgaben"
     },
     "apiKeys": {
       "title": "API-Schlüssel",
       "description": "Erstellen und verwalten Sie API-Schlüssel für den API-Zugriff.",
+      "docsTitle": "API-Dokumentation",
+      "docsDesc": "Alle verfügbaren Endpunkte, Anfrageformate und Authentifizierungsmethoden ansehen.",
       "createKey": "API-Schlüssel erstellen",
       "namePlaceholder": "Name (z.B. Server A)",
       "tableHeaders": {
@@ -1066,6 +1095,7 @@
     "unavailableDesc": "Der Abonnement-Service wird derzeit konfiguriert. Bitte versuche es später noch einmal oder kontaktiere den Support.",
     "serviceNotConfigured": "Abonnement-Service ist derzeit nicht verfügbar. Bitte kontaktiere den Support.",
     "checkoutFailed": "Checkout konnte nicht gestartet werden. Bitte versuche es erneut.",
+    "selfHosted": "Self-Hosted Edition — Alle Funktionen inklusive",
     "manage": {
       "title": "Dein Abonnement verwalten",
       "subtitle": "Sieh und verwalte deine Abonnement-Details",
@@ -1177,7 +1207,8 @@
     "disabled": "Deaktiviert",
     "reset": "Zurücksetzen",
     "remove": "Entfernen",
-    "clearSelection": "Auswahl aufheben"
+    "clearSelection": "Auswahl aufheben",
+    "view": "Ansehen"
   },
   "search": {
     "sources": "Quellen",
@@ -1205,23 +1236,34 @@
     "revoke": "Öffentlichen Zugriff Widerrufen"
   },
   "files": {
-    "uploadTitle": "RAG-Dateien hochladen",
-    "groupKeyword": "Gruppen-Schlüsselwort:",
-    "groupKeywordPlaceholder": "Schlüsselwort für Dateigruppierung eingeben",
-    "groupKeywordHelp": "Geben Sie ein Schlüsselwort ein, um verwandte Dateien für die RAG-Suche zu gruppieren",
-    "orSelectExisting": "Oder vorhandene auswählen...",
+    "uploadTitle": "Dateien hochladen",
+    "groupKeyword": "Ordner:",
+    "groupKeywordPlaceholder": "Ordnernamen eingeben",
+    "groupKeywordHelp": "Wähle oder erstelle einen Ordner, um deine Dateien zu organisieren",
+    "orSelectExisting": "Oder vorhandenen Ordner wählen...",
+    "folderPicker": {
+      "title": "In Ordner hochladen",
+      "hint": "Wähle einen bestehenden Ordner oder erstelle einen neuen",
+      "createNew": "Neuer Ordner",
+      "newPlaceholder": "Ordnername...",
+      "uploadTo": "Hochladen in",
+      "noFolders": "Noch keine Ordner — erstelle einen, um loszulegen"
+    },
     "selectFiles": "Dateien auswählen:",
     "selectFilesButton": "Dateien auswählen",
+    "selectAndUpload": "Dateien auswählen",
+    "uploadCount": "{count} Datei hochladen | {count} Dateien hochladen",
+    "addMore": "Weitere hinzufügen",
     "noFileSelected": "Keine ausgewählt",
-    "supportedFormats": "Wählen Sie eine oder mehrere Dateien (PDF, DOCX, TXT, JPG, PNG, MP3, MP4)",
+    "supportedFormats": "PDF, DOCX, TXT, JPG, PNG, MP3, MP4",
     "autoProcessingTitle": "Automatische Verarbeitung",
-    "autoProcessingInfo": "Alle Dateien werden automatisch extrahiert und vektorisiert für optimale RAG-Performance mit semantischer Suche.",
-    "uploadAndProcess": "Dateien hochladen und verarbeiten",
+    "autoProcessingInfo": "Alle Dateien werden automatisch verarbeitet und durchsuchbar gemacht.",
+    "uploadAndProcess": "Dateien hochladen",
     "yourFiles": "Ihre Dateien",
-    "filterByGroup": "Nach Gruppe filtern:",
-    "allFiles": "Alle Dateien...",
+    "filterByGroup": "Nach Ordner filtern:",
+    "allFiles": "Alle Dateien",
     "filterButton": "Filtern",
-    "filterHelp": "Wählen Sie eine Dateigruppe, um die Ergebnisse zu filtern. Laden Sie neue Dateien oben hoch, um neue Gruppen zu erstellen.",
+    "filterHelp": "Wähle einen Ordner, um die Ergebnisse zu filtern. Lade neue Dateien hoch, um neue Ordner zu erstellen.",
     "fileId": "DATEI-ID",
     "name": "NAME",
     "size": "GRÖßE",
@@ -1230,16 +1272,25 @@
     "uploaded": "HOCHGELADEN",
     "action": "AKTION",
     "status_uploaded": "Hochgeladen",
-    "status_extracted": "Extrahiert",
-    "status_vectorized": "Vektorisiert",
+    "status_extracted": "Wird verarbeitet",
+    "status_vectorized": "Bereit",
     "attached": "Angehängt",
     "standalone": "Eigenständig",
     "attachedToMessage": "Diese Datei ist an eine Nachricht angehängt",
     "standaloneFile": "Diese Datei ist eigenständig (nicht an eine Nachricht angehängt)",
+    "selectAll": "Alle auswählen ({count})",
+    "deselectAll": "Auswahl aufheben",
     "deleteSelected": "Ausgewählte löschen",
     "deleteSelectedConfirmTitle": "Ausgewählte Dateien löschen?",
     "deleteSelectedConfirmMessage": "Möchten Sie wirklich {count} ausgewählte Datei(en) löschen? Diese Aktion kann nicht rückgängig gemacht werden und die Dateien werden dauerhaft gelöscht.",
     "noFiles": "Noch keine Dateien hochgeladen",
+    "moveTo": "Verschieben nach",
+    "movedSuccess": "Datei nach \"{folder}\" verschoben",
+    "emptyState": {
+      "title": "Noch keine Dateien",
+      "description": "Lade Dateien hoch, um loszulegen. Du kannst sie in Ordnern organisieren.",
+      "emptyFolder": "Dieser Ordner ist leer"
+    },
     "page": "Seite",
     "showing": "Anzeige",
     "files": "Dateien",
@@ -1248,21 +1299,26 @@
     "delete": "Löschen",
     "download": "Herunterladen",
     "downloadFailed": "Download fehlgeschlagen. Bitte versuchen Sie es erneut.",
+    "removeFile": "Datei entfernen",
     "dropFiles": "Dateien hier ablegen zum Hochladen",
     "dropFilesHint": "Loslassen, um Dateien zur Upload-Warteschlange hinzuzufügen",
     "filesAddedToQueue": "{count} Datei hinzugefügt - bereit zum Hochladen | {count} Dateien hinzugefügt - bereit zum Hochladen",
+    "droppedToFolder": "{count} Datei in {folder} hochgeladen | {count} Dateien in {folder} hochgeladen",
+    "target": "Ziel",
+    "rootFolder": "Alle Dateien",
+    "changeTarget": "Ändern",
     "filesLostAfterReload": "Hinweis: Nach dem Neuladen der Seite gingen {count} ausgewählte Datei(en) verloren ({names}). Bitte wählen Sie die Dateien erneut aus.",
     "uploading": "Wird hochgeladen...",
     "uploadProgress": "Upload-Fortschritt",
     "uploadingBytes": "{loaded} von {total} hochgeladen",
     "processingFiles": "Dateien werden auf dem Server verarbeitet...",
-    "groupKey": "Gruppe / Tag",
+    "groupKey": "Ordner",
     "migrateToQdrant": "Vektoren zu Qdrant migrieren",
     "migratingToQdrant": "Vektoren werden zu Qdrant migriert...",
     "migrationSuccess": "{count} Chunks erfolgreich zu Qdrant migriert",
     "migrationPartial": "Migration teilweise abgeschlossen: {migrated} migriert, {errors} Fehler",
     "migrationFailed": "Migration fehlgeschlagen",
-    "reVectorize": "Datei neu vektorisieren"
+    "reVectorize": "Datei neu verarbeiten"
   },
   "fileSelection": {
     "title": "Dateien auswählen oder hochladen",
@@ -1273,7 +1329,27 @@
     "uploadNew": "Neue Dateien hochladen",
     "uploading": "Lade {current} von {total} hoch...",
     "orDragDrop": "oder Dateien hierher ziehen",
-    "dropHere": "Dateien hier ablegen zum Hochladen"
+    "dropHere": "Dateien hier ablegen zum Hochladen",
+    "viewContent": "Inhalt anzeigen",
+    "download": "Herunterladen",
+    "downloadFailed": "Download fehlgeschlagen",
+    "deleteFile": "Datei löschen",
+    "deleteSelected": "Ausgewählte löschen",
+    "deleteConfirmTitle": "Datei löschen",
+    "deleteConfirmMessage": "Möchten Sie diese Datei wirklich löschen? Diese Aktion kann nicht rückgängig gemacht werden.",
+    "deleteConfirmButton": "Löschen",
+    "fileDeleted": "Datei erfolgreich gelöscht",
+    "deleteFailed": "Datei konnte nicht gelöscht werden",
+    "bulkDeleteSuccess": "{count} Datei(en) erfolgreich gelöscht",
+    "bulkDeletePartial": "{success} gelöscht, {failed} fehlgeschlagen",
+    "reVectorize": "Neu verarbeiten",
+    "reVectorizeSuccess": "Datei erfolgreich neu verarbeitet ({chunks} Teile indiziert)",
+    "reVectorizeFailed": "Neuverarbeitung fehlgeschlagen"
+  },
+  "fileMention": {
+    "hint": "Tippen um Dateien zu suchen — Enter zum Anhängen",
+    "noResults": "Keine Dateien gefunden",
+    "fileAttached": "{name} angehängt"
   },
   "storage": {
     "title": "Speicherplatz",
@@ -1282,7 +1358,8 @@
     "used": "Genutzt",
     "limitReached": "Speicherlimit erreicht! Bitte löschen Sie Dateien oder upgraden Sie Ihren Tarif.",
     "almostFull": "Speicher fast voll! Nur noch {remaining} verfügbar.",
-    "upgradePlan": "Tarif upgraden"
+    "upgradePlan": "Tarif upgraden",
+    "unlimited": "Unbegrenzt"
   },
   "settings": {
     "title": "Einstellungen",
@@ -1297,7 +1374,7 @@
       "easy": "Easy Mode",
       "easyDesc": "Vereinfachte Oberfläche mit wesentlichen Funktionen",
       "advanced": "Advanced Mode",
-      "advancedDesc": "Voller Zugriff auf alle Funktionen und Tools"
+      "advancedDesc": "Voller Zugriff auf alle Funktionen und Agents"
     },
     "theme": {
       "title": "Design",
@@ -1355,7 +1432,15 @@
     "filterToDate": "Bis Datum",
     "recommended": "Empfohlen",
     "proOnly": "PRO+",
-    "deleteHandlerConfirmTitle": "Mail-Handler löschen?",
+    "savedHandlers": "E-Mail-Agents",
+    "savedHandlersDesc": "Automatisiere deinen Posteingang mit KI-gestützten E-Mail-Agents, die Nachrichten lesen, sortieren und weiterleiten.",
+    "createHandler": "Neuer E-Mail-Agent",
+    "editHandler": "Agent bearbeiten",
+    "noHandlers": "Noch keine E-Mail-Agents",
+    "noHandlersDesc": "Erstelle deinen ersten E-Mail-Agent, um eingehende E-Mails automatisch zu verarbeiten, an das richtige Team weiterzuleiten und die KI den Rest erledigen zu lassen.",
+    "createFirst": "Ersten Agent erstellen",
+    "deleteHandler": "Agent löschen",
+    "deleteHandlerConfirmTitle": "E-Mail-Agent löschen?",
     "deleteHandlerConfirmMessage": "Möchten Sie {name} wirklich löschen? Diese Aktion kann nicht rückgängig gemacht werden.",
     "selectedCount": "{count} ausgewählt",
     "activate": "Aktivieren",
@@ -1450,7 +1535,31 @@
         "branding": "Branding",
         "behavior": "Verhalten",
         "security": "Sicherheit",
-        "assistant": "KI-Assistent"
+        "assistant": "KI-Assistent",
+        "aiPrompts": "KI-Prompts"
+      },
+      "aiPrompts": {
+        "modelLabel": "KI-Modell",
+        "modelAutomatic": "Automatisch (Systemstandard)",
+        "placeholderInfo": "Verfügbare Platzhalter (werden automatisch zur Laufzeit ersetzt):",
+        "resetToDefault": "Auf Standard zurücksetzen",
+        "resetConfirmTitle": "Prompt zurücksetzen?",
+        "resetConfirmMessage": "Dein benutzerdefinierter Prompt und die Modellauswahl werden verworfen und die Systemstandards wiederhergestellt. Diese Aktion kann nicht rückgängig gemacht werden.",
+        "resetSuccess": "Prompt auf Standard zurückgesetzt",
+        "customBadge": "Benutzerdefiniert",
+        "defaultBadge": "Standard"
+      },
+      "summaryPrompt": {
+        "title": "Zusammenfassungs-Analyse",
+        "description": "Steuert, wie die KI die Chat-Konversationen deines Widgets analysiert.",
+        "modelHelp": "Wähle, welches KI-Modell die Konversationszusammenfassungen generieren soll.",
+        "placeholderConversations": "Wird durch die zu analysierenden Chat-Konversationen ersetzt",
+        "placeholderSystemPrompt": "Wird durch den aktuellen System-Prompt des Widgets ersetzt"
+      },
+      "setupPrompt": {
+        "title": "KI-Setup-Interview",
+        "description": "Steuert den KI-Assistenten, der Nutzer durch die Widget-Konfiguration führt.",
+        "modelHelp": "Wähle, welches KI-Modell das Setup-Interview durchführen soll."
       },
       "position": "Widget-Position",
       "theme": "Standard-Theme",
@@ -1497,7 +1606,7 @@
       "aiModel": "KI-Modell",
       "aiModelHelp": "Wählen Sie das KI-Modell für dieses Widget. Automatisch wählt das beste verfügbare Modell.",
       "automated": "Automatisch (System wählt bestes Modell)",
-      "availableTools": "Verfügbare Werkzeuge",
+      "availableTools": "Verfügbare Agents",
       "promptContent": "System-Prompt",
       "promptContentPlaceholder": "Geben Sie die Anweisungen für Ihren KI-Assistenten ein...",
       "promptContentHelp": "Dies ist der System-Prompt, der definiert, wie sich Ihr KI-Assistent verhält und antwortet.",
@@ -1521,7 +1630,7 @@
       "title": "Dateien auswählen",
       "searchPlaceholder": "Dateien suchen...",
       "noResults": "Keine Dateien gefunden.",
-      "noFiles": "Keine vektorisierten Dateien verfügbar. Laden Sie zuerst Dateien im Dateimanager hoch.",
+      "noFiles": "Keine Dateien verfügbar. Laden Sie zuerst Dateien im Dateimanager hoch.",
       "selected": "{count} ausgewählt",
       "addFiles": "Dateien hinzufügen"
     },
@@ -1777,7 +1886,13 @@
     "authenticationRequired": "Anmeldung erforderlich. Bitte melde dich an, um fortzufahren.",
     "tokenRefreshFailed": "Sitzung konnte nicht erneuert werden. Bitte melde dich erneut an.",
     "showPassword": "Passwort anzeigen",
-    "hidePassword": "Passwort ausblenden"
+    "hidePassword": "Passwort ausblenden",
+    "redirectingToSso": "Weiterleitung zum SSO...",
+    "loginWithSso": "Mit SSO anmelden",
+    "poweredBySynaplan": "Powered by Synaplan",
+    "loggedOutTitle": "Du wurdest abgemeldet",
+    "loggedOutDesc": "Deine Sitzung wurde erfolgreich beendet. Du kannst dieses Fenster schließen oder dich erneut anmelden.",
+    "loginAgain": "Erneut anmelden"
   },
   "cookies": {
     "title": "Cookie-Einstellungen",
@@ -2159,5 +2274,55 @@
     "dontAskAgain": "Diese Warnung nicht mehr anzeigen",
     "cancel": "Abbrechen",
     "open": "Link öffnen"
+  },
+  "header": {
+    "switchToV2": "Zum V2-Design wechseln",
+    "switchToV1": "Zum klassischen Design wechseln"
+  },
+  "promoTips": {
+    "dontShowAgain": "Nicht mehr anzeigen",
+    "chatWidget": {
+      "title": "KI-Chat auf deiner Website einbetten",
+      "description": "Erstelle ein anpassbares Chat-Widget für jede Website. Deine Besucher erhalten sofort KI-gestützte Antworten basierend auf deiner Wissensdatenbank.",
+      "action": "Widget erstellen"
+    },
+    "filesUpload": {
+      "title": "Dokumente für bessere Antworten hochladen",
+      "description": "Lade PDFs, Word-Dokumente oder Textdateien hoch. Die KI nutzt sie als Kontext für genauere, wissensbasierte Antworten.",
+      "action": "Dateien hochladen"
+    },
+    "aiConfig": {
+      "title": "KI-Modelle anpassen",
+      "description": "Wechsle zwischen verschiedenen KI-Anbietern und Modellen. Passe Prompts an und konfiguriere, wie die KI deine Anfragen verarbeitet.",
+      "action": "KI konfigurieren"
+    },
+    "docSummary": {
+      "title": "Dokumente sofort zusammenfassen",
+      "description": "Lade ein beliebiges Dokument hoch und erhalte in Sekunden eine prägnante Zusammenfassung. Perfekt für lange Berichte, Forschungsarbeiten oder Meetingnotizen.",
+      "action": "Zusammenfasser testen"
+    },
+    "upgradePro": {
+      "title": "Mehr mit Pro freischalten",
+      "description": "Erhalte höhere Nachrichtenlimits, bevorzugten Zugang zu Premium-Modellen und erweiterte Funktionen wie benutzerdefinierte Prompts und API-Zugang.",
+      "action": "Pläne ansehen"
+    },
+    "fileMention": {
+      "title": "Dateien mit @ erwähnen",
+      "description": "Tippe @ im Chat, um schnell auf deine hochgeladenen Dateien zu verweisen. Die KI liest den Dateiinhalt und nutzt ihn zur Beantwortung deiner Frage.",
+      "action": ""
+    },
+    "widgetPreview": {
+      "aiGreeting": "Hallo! Wie kann ich Ihnen helfen?",
+      "userMessage": "Was sind Ihre Öffnungszeiten?",
+      "aiResponse": "Wir sind Mo\u2013Fr von 9\u201318 Uhr erreichbar. Wie kann ich helfen?",
+      "inputPlaceholder": "Nachricht eingeben...",
+      "featureCustomizable": "Farben & Branding vollständig anpassbar",
+      "featureAiPowered": "KI-gestützte Antworten aus deiner Wissensdatenbank",
+      "featureEasyEmbed": "Ein-Zeilen-Embed-Code für jede Website",
+      "featureResponsive": "Perfekt auf Desktop & Mobilgeräten"
+    }
+  },
+  "system": {
+    "missingApiKeys": "Einige API-Schlüssel fehlen — folgende Anbieter sind deaktiviert: {providers}"
   }
 }

@@ -115,7 +115,11 @@
             </div>
           </section>
 
-          <section class="surface-card rounded-lg p-6" data-testid="section-billing">
+          <section
+            v-if="config.billing.enabled"
+            class="surface-card rounded-lg p-6"
+            data-testid="section-billing"
+          >
             <h2 class="text-xl font-semibold txt-primary mb-6 flex items-center gap-2">
               <Icon icon="mdi:map-marker" class="w-5 h-5" />
               {{ $t('profile.billingAddress.title') }}
@@ -408,7 +412,7 @@
     <UnsavedChangesBar :show="hasUnsavedChanges" @save="handleSave" @discard="handleDiscard" />
 
     <!-- Delete Account Modal -->
-    <Teleport to="body">
+    <Teleport to="#app">
       <div
         v-if="showDeleteModal"
         class="fixed inset-0 bg-black/50 dark:bg-black/70 flex items-center justify-center z-50 px-4"
@@ -525,10 +529,12 @@ import { useNotification } from '@/composables/useNotification'
 import { useUnsavedChanges } from '@/composables/useUnsavedChanges'
 import { profileApi } from '@/services/api'
 import { useAuthStore } from '@/stores/auth'
+import { useConfigStore } from '@/stores/config'
 
 const router = useRouter()
 const route = useRoute()
 const authStore = useAuthStore()
+const config = useConfigStore()
 const { error } = useNotification()
 
 const memoriesSection = ref<HTMLElement | null>(null)

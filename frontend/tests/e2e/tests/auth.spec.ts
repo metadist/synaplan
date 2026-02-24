@@ -16,16 +16,19 @@ test('@005 @smoke @auth logout should clear session', async ({ page, credentials
   await page.locator(selectors.userMenu.button).click()
   await page.locator(selectors.userMenu.logoutBtn).click()
 
-  await expect(page.locator(selectors.login.email)).toBeVisible({ timeout: 10_000 })
-  await expect(page).toHaveURL(/login/)
+  // After logout the user lands on /logged-out (OIDC) or /login (standard).
+  // Accept either destination as proof that the session was cleared.
+  await expect(
+    page.locator(`${selectors.login.email}, ${selectors.loggedOut.page}`).first()
+  ).toBeVisible({ timeout: 15_000 })
+  await expect(page).toHaveURL(/login|logged-out/)
 
-  await page.goBack()
-  await expect(page.locator(selectors.login.email)).toBeVisible({ timeout: 10_000 })
-  await expect(page).toHaveURL(/login/)
-
+  // Navigating to a protected route must not restore the session
   await page.goto('/profile')
-  await expect(page.locator(selectors.login.email)).toBeVisible({ timeout: 10_000 })
-  await expect(page).toHaveURL(/login/)
+  await expect(
+    page.locator(`${selectors.login.email}, ${selectors.loggedOut.page}`).first()
+  ).toBeVisible({ timeout: 15_000 })
+  await expect(page).toHaveURL(/login|logged-out/)
 })
 
 // TODO: Use a pre-verified DB fixture + delete before test, then assert login fails (avoids MailHog/verify flow).

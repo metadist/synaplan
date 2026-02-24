@@ -46,12 +46,13 @@ echo "GROQ_API_KEY=your_key" >> backend/.env && docker compose restart backend
 | phpMyAdmin | http://localhost:8082 |
 | MailHog | http://localhost:8025 |
 
-**Test Users:**
+**Default Login Credentials:**
 
-| Email | Password |
-|-------|----------|
-| admin@synaplan.com | admin123 |
-| demo@synaplan.com | demo123 |
+| Email | Password | Level |
+|-------|----------|-------|
+| admin@synaplan.com | admin123 | ADMIN |
+| demo@synaplan.com | demo123 | PRO |
+| test@example.com | test123 | NEW (unverified) |
 
 ---
 

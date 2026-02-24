@@ -332,6 +332,10 @@ class WidgetSessionController extends AbstractController
             }
         }
 
+        // Get the latest event ID so the frontend can subscribe to SSE
+        // starting from this point, avoiding replay of historical events
+        $latestEventId = $this->eventCache->getLatestEventId($widgetId, $session->getSessionId());
+
         return $this->json([
             'success' => true,
             'session' => [
@@ -354,6 +358,7 @@ class WidgetSessionController extends AbstractController
                 'title' => $session->getTitle(),
             ],
             'messages' => $messages,
+            'latestEventId' => $latestEventId,
         ]);
     }
 

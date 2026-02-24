@@ -6,6 +6,7 @@ use App\Entity\Config;
 use App\Entity\User;
 use App\Repository\ConfigRepository;
 use App\Repository\FileRepository;
+use App\Service\BillingService;
 use App\Service\StorageQuotaService;
 use Doctrine\ORM\EntityManagerInterface;
 use Doctrine\ORM\Query;
@@ -28,11 +29,14 @@ class StorageQuotaServiceTest extends TestCase
         $this->em = $this->createMock(EntityManagerInterface::class);
         $this->logger = $this->createMock(LoggerInterface::class);
 
+        $billingService = new BillingService('sk_test_valid_key', 'price_1RealProId');
+
         $this->service = new StorageQuotaService(
             $this->fileRepository,
             $this->configRepository,
             $this->em,
-            $this->logger
+            $this->logger,
+            $billingService
         );
     }
 

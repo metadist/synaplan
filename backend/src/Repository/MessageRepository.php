@@ -136,6 +136,25 @@ class MessageRepository extends ServiceEntityRepository
     }
 
     /**
+     * Find all messages for a chat, ordered chronologically. No character or count limits.
+     * Used for summary analysis where we need the complete conversation.
+     *
+     * @return Message[]
+     */
+    public function findAllByChatId(int $userId, int $chatId): array
+    {
+        return $this->createQueryBuilder('m')
+            ->where('m.userId = :userId')
+            ->andWhere('m.chatId = :chatId')
+            ->setParameter('userId', $userId)
+            ->setParameter('chatId', $chatId)
+            ->orderBy('m.unixTimestamp', 'ASC')
+            ->addOrderBy('m.id', 'ASC')
+            ->getQuery()
+            ->getResult();
+    }
+
+    /**
      * Save message.
      */
     public function save(Message $message, bool $flush = true): void

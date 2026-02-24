@@ -118,6 +118,18 @@ On first start, the system:
 **First startup:** ~1-2 minutes  
 **Subsequent restarts:** ~15-30 seconds
 
+## Default Login Credentials
+
+After first startup, the following test accounts are available:
+
+| Email | Password | Level |
+|-------|----------|-------|
+| admin@synaplan.com | admin123 | ADMIN |
+| demo@synaplan.com | demo123 | PRO |
+| test@example.com | test123 | NEW (unverified) |
+
+Log in at http://localhost:5173 with any of these accounts. The admin account has full access to all settings.
+
 ---
 
 ## Line Endings (Windows Users)

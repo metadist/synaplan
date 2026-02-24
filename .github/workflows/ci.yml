@@ -296,38 +296,35 @@ jobs:
           retention-days: 1
 
   e2e:
-    name: E2E Tests (${{ matrix.browser }})
+    name: E2E Tests (${{ matrix.browser }}${{ matrix.auth_method == 'oidc' && ' OIDC' || matrix.auth_method == 'oidc-redirect' && ' OIDC Redirect' || '' }})
     runs-on: ubuntu-latest
     needs: [docker-build]
     strategy:
       fail-fast: false
       matrix:
-        browser: [chromium, firefox]
         include:
-          # Basic browser configurations
+          # Standard password auth (both browsers) — exclude @oidc tests (no Keycloak running)
           - browser: chromium
-            project: chromium
+            auth_method: password
+            npm_script: "test:e2e"
+            grep_filter: "@ci"
           - browser: firefox
-            project: firefox
-
-          # Example: Add environment-specific test configurations
-          # Uncomment and modify as needed:
-          # - browser: chromium
-          #   project: chromium
-          #   env_name: staging
-          #   ai_provider: groq
-          #   test_tag: "@smoke"
-          # - browser: firefox
-          #   project: firefox
-          #   env_name: production-like
-          #   ai_provider: openai
-          #   test_tag: "@critical"
+            auth_method: password
+            npm_script: "test:e2e:firefox"
+            grep_filter: "@ci"
+          # OIDC auth (chromium only — auth flow testing, not browser compat)
+          - browser: chromium
+            auth_method: oidc
+            npm_script: "test:e2e:oidc"
+            grep_filter: "@ci"
+          # OIDC auto-redirect (starts app with OIDC_AUTO_REDIRECT=true)
+          - browser: chromium
+            auth_method: oidc-redirect
+            npm_script: "test:e2e:oidc-redirect"
+            grep_filter: ""
     env:
       APP_IMAGE: synaplan-test:ci
       APP_URL: http://localhost:8001
-      # You can add matrix-specific env vars here:
-      # AI_DEFAULT_PROVIDER: ${{ matrix.ai_provider || 'test' }}
-      # TEST_ENV: ${{ matrix.env_name || 'test' }}
 
     steps:
       - name: Checkout
@@ -351,29 +348,50 @@ jobs:
           docker tag $IMAGE_TAG synaplan-test:ci
           docker images
 
+      - name: Add host.docker.internal to /etc/hosts
+        if: contains(matrix.auth_method, 'oidc')
+        run: echo "127.0.0.1 host.docker.internal" | sudo tee -a /etc/hosts
+
       - name: Start test services and show logs
+        env:
+          OIDC_AUTO_REDIRECT: ${{ matrix.auth_method == 'oidc-redirect' && 'true' || 'false' }}
         run: |
+          COMPOSE="docker compose -f docker-compose.test.yml -f docker-compose.test.ci.yml"
+          PROFILE=""
+          if [[ "${{ matrix.auth_method }}" == oidc* ]]; then
+            PROFILE="--profile oidc"
+          fi
+
           # app_test entrypoint loads fixtures on first run (APP_ENV=test, empty DB)
           # so TestProvider model (id 900) and admin user exist for E2E (e.g. id=003).
           echo "Starting services..."
-          docker compose -f docker-compose.test.yml -f docker-compose.test.ci.yml up -d
+          $COMPOSE $PROFILE up -d
 
           # Start following logs in background
-          docker compose -f docker-compose.test.yml -f docker-compose.test.ci.yml logs -f &
-          LOGS_PID=$!
+          $COMPOSE $PROFILE logs -f &
 
           echo "Waiting for services to be healthy..."
-          docker compose -f docker-compose.test.yml -f docker-compose.test.ci.yml up --wait || {
+          $COMPOSE $PROFILE up --wait || {
             echo "Failed to start services. Status:"
-            docker compose -f docker-compose.test.yml -f docker-compose.test.ci.yml ps
+            $COMPOSE $PROFILE ps
             echo ""
             echo "Container logs:"
-            docker compose -f docker-compose.test.yml -f docker-compose.test.ci.yml logs
+            $COMPOSE $PROFILE logs
             exit 1
           }
 
+          # Wait for Keycloak provisioning to complete (if OIDC)
+          if [[ "${{ matrix.auth_method }}" == oidc* ]]; then
+            echo "Waiting for Keycloak provisioning..."
+            # Use -a to include exited containers (setup is a one-shot sidecar)
+            SETUP_ID=$($COMPOSE $PROFILE ps -a -q keycloak_setup)
+            if [ -n "$SETUP_ID" ]; then
+              docker wait "$SETUP_ID" || true
+            fi
+          fi
+
           echo "Services are ready!"
-          docker compose -f docker-compose.test.yml -f docker-compose.test.ci.yml ps
+          $COMPOSE $PROFILE ps
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -394,21 +412,19 @@ jobs:
         working-directory: frontend
         env:
           BASE_URL: http://localhost:8001
-          AUTH_USER: admin@synaplan.com
-          AUTH_PASS: admin123
           MAILHOG_URL: http://localhost:8025
           E2E_STACK: test
         run: |
           echo "============================================"
-          echo "Running E2E tests with ${{ matrix.browser }}"
+          echo "Running E2E tests with ${{ matrix.browser }} (${{ matrix.auth_method }})"
           echo "============================================"
-          npx playwright test --config=tests/e2e/playwright.config.ts --project=${{ matrix.project }} --grep-invert "@noci"
+          npx playwright test --config=tests/e2e/playwright.config.ts --project=${{ matrix.project }} --grep "@ci"
 
       - name: Upload Playwright test results
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: playwright-results-${{ matrix.browser }}
+          name: playwright-results-${{ matrix.browser }}-${{ matrix.auth_method }}
           path: |
             frontend/tests/e2e/test-results/
             frontend/tests/e2e/reports/
@@ -417,7 +433,13 @@ jobs:
 
       - name: Stop test services
         if: always()
-        run: docker compose -f docker-compose.test.yml -f docker-compose.test.ci.yml down -v
+        run: |
+          COMPOSE="docker compose -f docker-compose.test.yml -f docker-compose.test.ci.yml"
+          PROFILE=""
+          if [[ "${{ matrix.auth_method }}" == oidc* ]]; then
+            PROFILE="--profile oidc"
+          fi
+          $COMPOSE $PROFILE down -v
 
   docker-push:
     name: Push Docker Image

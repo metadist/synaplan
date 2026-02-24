@@ -43,6 +43,7 @@ export default defineConfig({
               },
             }),
       },
+      grepInvert: /@oidc-redirect/,
     },
     {
       name: 'firefox',
@@ -59,6 +60,12 @@ export default defineConfig({
               },
             }),
       },
+      grepInvert: /@oidc-redirect/,
+    },
+    {
+      name: 'chromium-oidc-redirect',
+      use: { ...devices['Desktop Chrome'] },
+      grep: /@oidc-redirect/,
     },
   ],
 })

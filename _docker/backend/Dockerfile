@@ -39,6 +39,10 @@ RUN mkdir -p /var/www/backend/var/cache /var/www/backend/var/log /var/www/backen
     chown -R www-data:www-data /var/www/backend/var /var/www/backend/public/up && \
     chmod -R 775 /var/www/backend/var /var/www/backend/public/up
 
+# Copy plugins BEFORE composer install so the autoloader includes plugin classes
+# Without this, --classmap-authoritative locks the autoloader to only backend classes
+COPY plugins/ /plugins/
+
 # Install dependencies with production optimizations
 # Flags explained:
 # --no-dev: Skip dev dependencies (phpunit, fixtures, etc.) for smaller image
@@ -53,7 +57,8 @@ RUN composer install --prefer-dist --no-interaction --no-dev --no-scripts --opti
 
 # Copy and setup entrypoint scripts
 COPY _docker/backend/docker-entrypoint.sh /usr/local/bin/
-RUN chmod +x /usr/local/bin/docker-entrypoint.sh
+COPY _docker/backend/synaplan /usr/local/bin/
+RUN chmod +x /usr/local/bin/docker-entrypoint.sh /usr/local/bin/synaplan
 
 # Copy built frontend (built externally in CI, empty in dev)
 COPY frontend/dist /var/www/frontend
@@ -69,9 +74,6 @@ RUN if [ -z "$(ls -A /var/www/widgets 2>/dev/null)" ] && [ "${CI:-false}" = "tru
       echo "::warning::Widget files are missing in CI build - this should not happen!" && \
       echo "::warning::Continuing build, but widget functionality may not work correctly"; \
     fi || true
-
-# Copy plugins directory (for SortX and other plugins)
-COPY plugins/ /plugins/
 
 # Copy Caddyfile for production routing (API vs SPA)
 COPY _docker/backend/Caddyfile /etc/caddy/Caddyfile

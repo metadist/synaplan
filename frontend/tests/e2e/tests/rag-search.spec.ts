@@ -36,7 +36,9 @@ test('@007 @noci @smoke semantic search finds uploaded content (real AI)', async
       await filesLink.click()
     } else {
       await sidebar.getByRole('button', { name: /files/i }).click()
-      await sidebar.getByRole('link', { name: /file manager/i }).click()
+      const navDropdown = page.locator(selectors.nav.navDropdown)
+      await navDropdown.waitFor({ state: 'visible' })
+      await navDropdown.getByRole('link', { name: /file manager/i }).click()
     }
     await page.locator(selectors.files.page).waitFor({ state: 'visible' })
   })

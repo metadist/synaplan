@@ -1,5 +1,5 @@
 <template>
-  <Teleport to="body">
+  <Teleport to="#app">
     <div
       class="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4"
       data-testid="modal-setup-chat"
@@ -76,7 +76,14 @@
                   : 'surface-chip txt-primary rounded-bl-md',
               ]"
             >
-              <p class="text-sm whitespace-pre-wrap">{{ message.content }}</p>
+              <p v-if="message.role === 'user'" class="text-sm whitespace-pre-wrap">
+                {{ message.content }}
+              </p>
+              <div
+                v-else
+                class="text-sm prose prose-sm dark:prose-invert max-w-none"
+                v-html="renderMarkdown(message.content)"
+              />
             </div>
           </div>
 
@@ -198,6 +205,7 @@ import { ref, computed, onMounted, nextTick } from 'vue'
 import { Icon } from '@iconify/vue'
 import { useI18n } from 'vue-i18n'
 import { useNotification } from '@/composables/useNotification'
+import { useMarkdown } from '@/composables/useMarkdown'
 import * as widgetsApi from '@/services/api/widgetsApi'
 
 // Disable attribute inheritance since we use Teleport as root
@@ -216,6 +224,7 @@ const emit = defineEmits<{
 
 const { t, locale } = useI18n()
 const { success, error: showError } = useNotification()
+const { render: renderMarkdown } = useMarkdown()
 
 interface Message {
   role: 'user' | 'assistant'

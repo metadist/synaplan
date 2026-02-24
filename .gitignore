@@ -59,3 +59,11 @@ frontend/tests/e2e/tests/reports/
 platform/
 _devextras/agents_yusuf.md
 _devextras/agents_furkan.md
+
+# Screenvideo outputs
+_devextras/screenvideo/videos/*
+!_devextras/screenvideo/videos/.gitkeep
+_devextras/screenvideo/node_modules/
+_devextras/screenvideo/test-results/
+_devextras/screenvideo/playwright-report/
+_devextras/screenvideo/.narration-tmp/

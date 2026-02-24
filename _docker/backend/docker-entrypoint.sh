@@ -10,15 +10,24 @@ if [ ! -f /var/www/backend/.env ]; then
     touch /var/www/backend/.env
 fi
 
-# In test env: use only Docker Compose environment (same as CI, which has no backend volume mount).
-# Do not source .env/.env.test so BASE_URL, DATABASE_*, MAILER_DSN etc. come from compose only.
-if [ "${APP_ENV:-}" != "test" ]; then
-  if [ -f /var/www/backend/.env ]; then
-    echo "📄 Loading environment from .env file..."
-    set -a
-    source /var/www/backend/.env
-    set +a
-  fi
+# Source .env file as defaults (existing env vars from docker-compose take precedence)
+if [ -f /var/www/backend/.env ]; then
+    echo "📄 Loading defaults from .env file (existing env vars take precedence)..."
+    while IFS='=' read -r key value; do
+        # Skip comments and empty lines
+        [[ -z "$key" || "$key" =~ ^[[:space:]]*# ]] && continue
+        # Trim whitespace from key
+        key="$(echo "$key" | tr -d '[:space:]')"
+        # Skip invalid variable names
+        [[ "$key" =~ ^[a-zA-Z_][a-zA-Z0-9_]*$ ]] || continue
+        # Only export if not already set in environment
+        if [ -z "${!key+x}" ]; then
+            # Strip surrounding quotes from value
+            value="${value#\"}" ; value="${value%\"}"
+            value="${value#\'}" ; value="${value%\'}"
+            export "${key}=${value}"
+        fi
+    done < /var/www/backend/.env
 fi
 
 # Validate required environment variables
@@ -119,14 +128,6 @@ echo "✅ Database schema ready!"
 FIXTURES_MARKER="/var/www/backend/var/.fixtures_loaded"
 
 if [ "$APP_ENV" = "dev" ] || [ "$APP_ENV" = "test" ]; then
-    # Guard: if marker exists but DB is empty (e.g. tmpfs wipe), remove stale marker
-    if [ -f "$FIXTURES_MARKER" ]; then
-        _uc=$(php bin/console dbal:run-sql "SELECT COUNT(*) as count FROM BUSER" 2>/dev/null | grep -oE '[0-9]+' | tail -1)
-        if [ "${_uc:-0}" -eq 0 ]; then
-            rm -f "$FIXTURES_MARKER" 2>/dev/null || true
-        fi
-    fi
-
     if [ -f "$FIXTURES_MARKER" ]; then
         echo "✅ Fixtures already loaded (marker present)"
         echo "   👤 Login: admin@synaplan.com / admin123"

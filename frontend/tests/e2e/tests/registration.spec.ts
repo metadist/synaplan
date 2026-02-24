@@ -19,10 +19,11 @@ async function acceptCookiesIfShown(page: import('@playwright/test').Page) {
   await button.click()
 }
 
-test('@006 @auth @smoke User can register and login with email verification', async ({
+test('@ci @password @auth @smoke registration flow with email verification id=006', async ({
   page,
   request,
 }) => {
+  test.skip(process.env.AUTH_METHOD === 'oidc', 'Registration tests only run with password auth')
   const uniqueSuffix = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
   const testEmail = `test+${uniqueSuffix}@test.com`
   const testPassword = 'Test1234'

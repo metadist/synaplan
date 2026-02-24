@@ -1,5 +1,10 @@
 @import 'tailwindcss';
 
+@theme {
+  --color-light-border: rgb(0 0 0);
+  --color-dark-border: rgb(255 255 255);
+}
+
 /* Base */
 @layer base {
   body {
@@ -222,16 +227,16 @@
   }
 
   .border-light-border {
-    border-color: rgba(0, 0, 0, 0.1);
+    border-color: rgba(0, 0, 0, 0.08);
   }
   .dark .border-light-border {
-    border-color: rgba(255, 255, 255, 0.1);
+    border-color: rgba(255, 255, 255, 0.05);
   }
   .border-dark-border {
-    border-color: rgba(0, 0, 0, 0.2);
+    border-color: rgba(0, 0, 0, 0.15);
   }
   .dark .border-dark-border {
-    border-color: rgba(255, 255, 255, 0.15);
+    border-color: rgba(255, 255, 255, 0.07);
   }
 
   /* Primärbutton */
@@ -287,11 +292,11 @@
     pointer-events: none;
   }
   .dark .btn-secondary {
-    border-color: rgba(255, 255, 255, 0.1);
+    border-color: rgba(255, 255, 255, 0.06);
   }
   .dark .btn-secondary:hover {
     background: rgba(255, 255, 255, 0.05);
-    border-color: rgba(255, 255, 255, 0.15);
+    border-color: rgba(255, 255, 255, 0.1);
   }
 
   /* Dropdowns */

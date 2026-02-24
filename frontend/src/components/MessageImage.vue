@@ -35,8 +35,8 @@
     <p v-if="alt" class="mt-2 text-sm txt-secondary">{{ alt }}</p>
   </div>
 
-  <!-- Fullscreen Modal - Teleported to body to ensure highest z-index -->
-  <Teleport to="body">
+  <!-- Fullscreen Modal - Teleported to #app to overlay other app content -->
+  <Teleport to="#app">
     <Transition
       enter-active-class="transition-opacity duration-300"
       enter-from-class="opacity-0"

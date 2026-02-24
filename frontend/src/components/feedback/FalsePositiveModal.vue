@@ -359,7 +359,7 @@ const isMemory = computed(() => props.classification === 'memory')
 </script>
 
 <template>
-  <Teleport to="body">
+  <Teleport to="#app">
     <Transition name="fade">
       <div
         v-if="isOpen"
@@ -432,32 +432,46 @@ const isMemory = computed(() => props.classification === 'memory')
               </div>
 
               <!-- Segments List -->
-              <div class="space-y-2 max-h-[40vh] overflow-y-auto scroll-thin">
+              <div class="space-y-2 max-h-[40vh] overflow-y-auto scroll-thin px-0.5">
                 <div
                   v-for="(segment, index) in segments"
                   :key="`segment-${index}`"
-                  class="rounded-xl transition-all cursor-pointer"
+                  class="relative rounded-xl border-2 transition-all duration-200 select-none"
                   :class="[
-                    selectedIndexes.has(index) && !useFullText
-                      ? 'surface-chip ring-2 ring-brand/50'
-                      : 'surface-chip hover:ring-1 hover:ring-brand/20',
+                    useFullText
+                      ? 'border-transparent bg-black/[0.03] dark:bg-white/[0.03] opacity-50 cursor-default'
+                      : selectedIndexes.has(index)
+                        ? 'border-brand/50 bg-brand/[0.04] dark:bg-brand/[0.06] cursor-pointer shadow-sm'
+                        : 'border-transparent bg-black/[0.03] dark:bg-white/[0.04] cursor-pointer hover:border-brand/20 hover:bg-black/[0.05] dark:hover:bg-white/[0.06]',
                   ]"
+                  role="checkbox"
+                  :aria-checked="selectedIndexes.has(index)"
+                  :tabindex="useFullText ? -1 : 0"
                   @click="!useFullText && toggleSegment(index)"
+                  @keydown.space.prevent="!useFullText && toggleSegment(index)"
                 >
-                  <label class="flex items-start gap-3 p-3 cursor-pointer">
+                  <!-- Left accent bar for selected segments -->
+                  <div
+                    class="absolute left-0 top-2 bottom-2 w-[3px] rounded-full transition-all duration-200"
+                    :class="
+                      selectedIndexes.has(index) && !useFullText
+                        ? 'bg-brand opacity-100'
+                        : 'bg-transparent opacity-0'
+                    "
+                  />
+                  <div class="flex items-start gap-3 p-3 pl-4">
                     <input
-                      :checked="selectedIndexes.has(index)"
+                      :checked="selectedIndexes.has(index) && !useFullText"
                       type="checkbox"
-                      class="mt-1 rounded border-gray-300 text-brand focus:ring-brand"
+                      class="mt-1 w-4 h-4 rounded border-gray-300 dark:border-gray-600 text-brand focus:ring-brand/30 cursor-pointer flex-shrink-0 pointer-events-none"
                       :disabled="useFullText"
-                      @click.stop
-                      @change="toggleSegment(index)"
+                      tabindex="-1"
                     />
                     <div
-                      class="text-sm txt-primary prose prose-sm dark:prose-invert max-w-none"
+                      class="text-sm txt-primary prose prose-sm dark:prose-invert max-w-none pointer-events-none flex-1 min-w-0"
                       v-html="renderMarkdown(segment)"
                     />
-                  </label>
+                  </div>
                 </div>
               </div>
 

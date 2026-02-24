@@ -272,7 +272,7 @@
     />
 
     <!-- Test Chat Overlay -->
-    <Teleport to="body">
+    <Teleport to="#app">
       <div
         v-if="testWidget"
         class="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4"

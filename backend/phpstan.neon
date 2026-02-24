@@ -11,6 +11,10 @@ parameters:
     excludePaths:
         - src/Kernel.php
         - tests/Unit/CookieTokenAuthenticatorTest.php
+    ignoreErrors:
+        -
+            identifier: varTag.misplaced
+            path: lib/grpc/*
     reportUnmatchedIgnoredErrors: false
     doctrine:
         objectManagerLoader: tests/object-manager.php

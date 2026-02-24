@@ -6,6 +6,13 @@ parameters:
     # Synaplan public URL
     synaplan_url: '%env(SYNAPLAN_URL)%'
 
+    # OIDC admin role claim values (comma-separated, case-insensitive)
+    env(OIDC_ADMIN_ROLES): 'admin,realm-admin,synaplan-admin,administrator'
+
+    # OIDC role claim paths (comma-separated dot-notation)
+    # Use {client_id} as placeholder for OIDC_CLIENT_ID. Escape literal dots with \
+    env(OIDC_ROLE_CLAIMS): 'realm_access.roles,resource_access.{client_id}.roles,groups'
+
     # Logging
     # LOG_FORMAT: json (default) or line (human-readable)
     # LOG_LEVEL: debug, info, notice, warning, error (see monolog.yaml)
@@ -14,9 +21,41 @@ parameters:
     log_level_default: 'info'     # Production: less verbose
     log_level_dev: 'debug'        # Development: show everything
 
-    # Qdrant/Memory Service defaults (empty = disabled)
+    # Optional API keys — empty string default means "not configured"
+    env(ANTHROPIC_API_KEY): ''
+    env(OPENAI_API_KEY): ''
+    env(GROQ_API_KEY): ''
+    env(GOOGLE_GEMINI_API_KEY): ''
+    env(GOOGLE_CLOUD_PROJECT_ID): ''
+    env(THEHIVE_API_KEY): ''
+    env(HUGGINGFACE_API_KEY): ''
+    env(BRAVE_SEARCH_API_KEY): ''
+    env(DISCORD_WEBHOOK_URL): ''
+    env(GMAIL_USERNAME): ''
+    env(GMAIL_PASSWORD): ''
+    env(TIKA_HTTP_USER): ''
+    env(TIKA_HTTP_PASS): ''
+    env(VECTOR_STORAGE_PROVIDER): ''
     env(QDRANT_SERVICE_URL): ''
     env(QDRANT_SERVICE_API_KEY): ''
+    env(QDRANT_DOCUMENTS_COLLECTION): ''
+    env(TRITON_SERVER_URL): ''
+    env(GOOGLE_CLIENT_ID): ''
+    env(GITHUB_CLIENT_ID): ''
+    env(OIDC_CLIENT_ID): ''
+    env(OIDC_DISCOVERY_URL): ''
+    env(RECAPTCHA_SECRET_KEY): ''
+    env(GOOGLE_CLIENT_SECRET): ''
+    env(GITHUB_CLIENT_SECRET): ''
+    env(OIDC_CLIENT_SECRET): ''
+    env(STRIPE_SECRET_KEY): ''
+    env(STRIPE_WEBHOOK_SECRET): ''
+    env(STRIPE_PRICE_PRO): ''
+    env(STRIPE_PRICE_TEAM): ''
+    env(STRIPE_PRICE_BUSINESS): ''
+    env(STRIPE_PAYMENT_METHODS): ''
+    env(WHATSAPP_ACCESS_TOKEN): ''
+    env(WHATSAPP_WEBHOOK_VERIFY_TOKEN): ''
 
     # Piper TTS Service default
     env(SYNAPLAN_TTS_URL): ''
@@ -77,7 +116,7 @@ services:
 
     App\AI\Provider\TritonProvider:
         arguments:
-            $serverUrl: '%env(string:default::TRITON_SERVER_URL)%'
+            $serverUrl: '%env(TRITON_SERVER_URL)%'
         tags:
             - { name: 'app.ai.chat' }
 
@@ -93,7 +132,7 @@ services:
     App\AI\Provider\GoogleProvider:
         arguments:
             $apiKey: '%env(GOOGLE_GEMINI_API_KEY)%'
-            $projectId: '%env(string:default::GOOGLE_CLOUD_PROJECT_ID)%'
+            $projectId: '%env(GOOGLE_CLOUD_PROJECT_ID)%'
             $region: 'us-central1'
             $uploadDir: '%kernel.project_dir%/var/uploads'
         tags:
@@ -150,7 +189,7 @@ services:
     # Discord Webhook Notification Service
     App\Service\DiscordNotificationService:
         arguments:
-            $webhookUrl: '%env(default::DISCORD_WEBHOOK_URL)%'
+            $webhookUrl: '%env(DISCORD_WEBHOOK_URL)%'
 
     # WhatsApp Business API Service - Fully Dynamic Multi-Number Support
     # Uses cache + lock for atomic duplicate message detection (WhatsApp webhook retries)
@@ -217,8 +256,8 @@ services:
     App\Service\InboundEmailService:
         arguments:
             $mailhogApiUrl: 'http://mailhog:8025/api/v2'
-            $gmailUsername: '%env(default::GMAIL_USERNAME)%'
-            $gmailPassword: '%env(default::GMAIL_PASSWORD)%'
+            $gmailUsername: '%env(GMAIL_USERNAME)%'
+            $gmailPassword: '%env(GMAIL_PASSWORD)%'
 
     # Process Emails Command
     App\Command\ProcessEmailsCommand:
@@ -247,6 +286,11 @@ services:
             $appUrl: '%env(APP_URL)%'
             $frontendUrl: '%env(FRONTEND_URL)%'
 
+    # OIDC Discovery Controller
+    App\Controller\OidcController:
+        arguments:
+            $oidcAutoRedirect: '%env(string:default::OIDC_AUTO_REDIRECT)%'
+
     # OIDC Token Service for Keycloak integration
     App\Service\OidcTokenService:
         arguments:
@@ -261,8 +305,16 @@ services:
             $oidcClientId: '%env(OIDC_CLIENT_ID)%'
             $oidcClientSecret: '%env(OIDC_CLIENT_SECRET)%'
             $oidcDiscoveryUrl: '%env(OIDC_DISCOVERY_URL)%'
+            $oidcAdminRoles: '%env(string:OIDC_ADMIN_ROLES)%'
+            $oidcRoleClaims: '%env(string:OIDC_ROLE_CLAIMS)%'
             $appUrl: '%env(APP_URL)%'
             $frontendUrl: '%env(FRONTEND_URL)%'
+
+    # Billing Service (checks if Stripe is configured)
+    App\Service\BillingService:
+        arguments:
+            $stripeSecretKey: '%env(STRIPE_SECRET_KEY)%'
+            $stripePricePro: '%env(STRIPE_PRICE_PRO)%'
 
     # Stripe Payment Controllers (with rate limiting via cache)
     App\Controller\SubscriptionController:
@@ -296,6 +348,7 @@ services:
             $githubClientId: '%env(string:default::GITHUB_CLIENT_ID)%'
             $oidcClientId: '%env(string:default::OIDC_CLIENT_ID)%'
             $oidcDiscoveryUrl: '%env(string:default::OIDC_DISCOVERY_URL)%'
+            $oidcAutoRedirect: '%env(string:default::OIDC_AUTO_REDIRECT)%'
 
     # OAuth State Service (signed tokens for CSRF protection)
     App\Service\OAuthStateService:
@@ -310,7 +363,7 @@ services:
     # reCAPTCHA Service
     App\Service\RecaptchaService:
         arguments:
-            $secretKey: '%env(string:default::RECAPTCHA_SECRET_KEY)%'
+            $secretKey: '%env(RECAPTCHA_SECRET_KEY)%'
             $enabled: '%env(string:default:recaptcha_enabled_default:RECAPTCHA_ENABLED)%'
             $minScore: '%env(string:default:recaptcha_min_score_default:RECAPTCHA_MIN_SCORE)%'
 
@@ -323,8 +376,8 @@ services:
             $tikaTimeoutMs: '%env(int:TIKA_TIMEOUT_MS)%'
             $tikaRetries: '%env(int:TIKA_RETRIES)%'
             $tikaRetryBackoffMs: '%env(int:TIKA_RETRY_BACKOFF_MS)%'
-            $tikaHttpUser: '%env(default::TIKA_HTTP_USER)%'
-            $tikaHttpPass: '%env(default::TIKA_HTTP_PASS)%'
+            $tikaHttpUser: '%env(TIKA_HTTP_USER)%'
+            $tikaHttpPass: '%env(TIKA_HTTP_PASS)%'
 
     App\Service\File\FileStorageService:
         arguments:
@@ -434,10 +487,10 @@ services:
     # Vector Storage Configuration
     App\Service\RAG\VectorStorage\VectorStorageConfig:
         arguments:
-            $envProvider: '%env(default::VECTOR_STORAGE_PROVIDER)%'
-            $qdrantServiceUrl: '%env(default::QDRANT_SERVICE_URL)%'
-            $qdrantApiKey: '%env(default::QDRANT_SERVICE_API_KEY)%'
-            $qdrantDocumentsCollection: '%env(default::QDRANT_DOCUMENTS_COLLECTION)%'
+            $envProvider: '%env(VECTOR_STORAGE_PROVIDER)%'
+            $qdrantServiceUrl: '%env(QDRANT_SERVICE_URL)%'
+            $qdrantApiKey: '%env(QDRANT_SERVICE_API_KEY)%'
+            $qdrantDocumentsCollection: '%env(QDRANT_DOCUMENTS_COLLECTION)%'
 
     # Vector Storage Implementations
     App\Service\RAG\VectorStorage\MariaDBVectorStorage: ~

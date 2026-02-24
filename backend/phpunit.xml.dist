@@ -34,6 +34,11 @@
         <!-- Qdrant / Memory Service (defaults for testing) -->
         <env name="QDRANT_SERVICE_URL" value="" />
         <env name="QDRANT_SERVICE_API_KEY" value="" />
+        <!-- Stripe / Billing (force valid-looking keys so BillingService::isEnabled()=true in tests) -->
+        <env name="STRIPE_SECRET_KEY" value="sk_test_fakeKeyForTestSuite000000000000" force="true" />
+        <env name="STRIPE_PRICE_PRO" value="price_1TestSuitePro" force="true" />
+        <env name="STRIPE_PRICE_TEAM" value="price_1TestSuiteTeam" force="true" />
+        <env name="STRIPE_PRICE_BUSINESS" value="price_1TestSuiteBusiness" force="true" />
         <!-- Whisper / TTS (defaults for testing) -->
         <env name="WHISPER_BINARY" value="/usr/local/bin/whisper" />
         <env name="WHISPER_MODELS_PATH" value="/tmp/whisper-models" />

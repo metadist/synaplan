@@ -158,7 +158,7 @@ import {
   ClockIcon,
 } from '@heroicons/vue/24/outline'
 import { Icon } from '@iconify/vue'
-import { useChatsStore, type Chat as StoreChat } from '@/stores/chats'
+import { useChatsStore, isDefaultChatTitle, type Chat as StoreChat } from '@/stores/chats'
 import { useDialog } from '@/composables/useDialog'
 import { useRouter } from 'vue-router'
 import ChatShareModal from './ChatShareModal.vue'
@@ -244,27 +244,14 @@ const formatTimestamp = (dateStr: string): string => {
   return `${month}/${day}`
 }
 
-// Get the display title - prefer first message preview, then title
 const getDisplayTitle = (chat: {
   id: number
   title: string
   firstMessagePreview?: string | null
   messageCount?: number
 }): string => {
-  // If we have a first message preview, use it
-  if (chat.firstMessagePreview) {
-    return chat.firstMessagePreview
-  }
-
-  // If title is not default, use the title
-  const isDefaultTitle =
-    chat.title === 'New Chat' || chat.title === 'Neuer Chat' || chat.title.startsWith('Chat ')
-  if (!isDefaultTitle) {
-    return chat.title
-  }
-
-  // Fallback for empty chats - use localized "New Chat"
-  // Note: Non-active empty chats are filtered out, so this is typically the active chat
+  if (!isDefaultChatTitle(chat.title, t('chat.newChat'))) return chat.title
+  if (chat.firstMessagePreview) return chat.firstMessagePreview
   return t('chat.newChat')
 }
 
@@ -294,20 +281,14 @@ const getChannelIconClass = (chat: StoreChat): string => {
   }
 }
 
-// Check if a chat is empty (no messages, no content, default title)
 const isChatEmpty = (chat: {
   messageCount?: number
   firstMessagePreview?: string | null
   title: string
 }): boolean => {
-  // Has messages - not empty
   if (chat.messageCount && chat.messageCount > 0) return false
-  // Has first message preview - not empty
   if (chat.firstMessagePreview) return false
-  // Has a non-default title - not empty
-  const isDefaultTitle =
-    chat.title === 'New Chat' || chat.title === 'Neuer Chat' || chat.title.startsWith('Chat ')
-  if (!isDefaultTitle) return false
+  if (!isDefaultChatTitle(chat.title, t('chat.newChat'))) return false
   return true
 }
 
