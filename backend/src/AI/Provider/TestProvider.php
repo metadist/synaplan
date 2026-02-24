@@ -202,6 +202,22 @@ class TestProvider implements ChatProviderInterface, EmbeddingProviderInterface,
         return '/tmp/test_audio.mp3';
     }
 
+    public function synthesizeStream(string $text, array $options = []): \Generator
+    {
+        yield 'fake-audio-chunk-1';
+        yield 'fake-audio-chunk-2';
+    }
+
+    public function getStreamContentType(array $options = []): string
+    {
+        return 'audio/mpeg';
+    }
+
+    public function supportsStreaming(): bool
+    {
+        return true;
+    }
+
     public function getVoices(): array
     {
         return [['id' => 'test', 'name' => 'Test Voice', 'language' => 'en']];

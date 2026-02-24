@@ -3,9 +3,24 @@ import * as fs from 'fs'
 import * as path from 'path'
 import { execSync } from 'child_process'
 
+/**
+ * TTS provider: 'piper' (local, free) or 'openai' (remote, higher quality).
+ * Set via TTS_PROVIDER env var. Defaults to piper when TTS_URL is set, openai otherwise.
+ */
+type TtsProvider = 'piper' | 'openai'
+
 const TTS_URL = process.env.TTS_URL || 'http://127.0.0.1:10200'
+const OPENAI_API_KEY = process.env.OPENAI_API_KEY || ''
+const OPENAI_TTS_MODEL = process.env.OPENAI_TTS_MODEL || 'tts-1'
+const OPENAI_TTS_VOICE = process.env.OPENAI_TTS_VOICE || 'nova'
 const TTS_VOICE = process.env.TTS_VOICE || 'en_US-lessac-medium'
 const TTS_SPEED = parseFloat(process.env.TTS_SPEED || '1.0')
+
+function resolveProvider(): TtsProvider {
+  const explicit = process.env.TTS_PROVIDER?.toLowerCase()
+  if (explicit === 'openai' || explicit === 'piper') return explicit
+  return OPENAI_API_KEY ? 'openai' : 'piper'
+}
 
 interface NarrationClip {
   text: string
@@ -17,8 +32,12 @@ interface NarrationClip {
 /**
  * Generates TTS narration clips timed to a Playwright scenario.
  *
- * During recording, each say() call synthesizes audio via the TTS service
- * and pauses the browser for the clip's duration so timing stays in sync.
+ * During recording, each say() call synthesizes audio via the configured TTS
+ * provider and pauses the browser for the clip's duration so timing stays in sync.
+ *
+ * Supports two providers:
+ *   - **piper** (local): Self-hosted Piper TTS, free, robotic voice
+ *   - **openai** (remote): OpenAI TTS API, paid, natural voice
  *
  * After the test finishes and Playwright writes the video, call buildAudioTrack()
  * to produce a combined WAV, then use merge-narration.sh to combine video + audio.
@@ -29,15 +48,27 @@ export class Narrator {
   private tempDir: string
   private voice: string
   private speed: number
+  private provider: TtsProvider
 
   constructor(
     private scenarioName: string,
-    options?: { voice?: string; speed?: number },
+    options?: { voice?: string; speed?: number; provider?: TtsProvider },
   ) {
-    this.voice = options?.voice || TTS_VOICE
+    this.provider = options?.provider || resolveProvider()
     this.speed = options?.speed || TTS_SPEED
     this.tempDir = path.join(__dirname, '.narration-tmp')
     fs.mkdirSync(this.tempDir, { recursive: true })
+
+    if (this.provider === 'openai') {
+      this.voice = options?.voice || OPENAI_TTS_VOICE
+      if (!OPENAI_API_KEY) {
+        throw new Error('OPENAI_API_KEY env var required for openai TTS provider')
+      }
+      console.log(`  Narrator: using OpenAI TTS (model=${OPENAI_TTS_MODEL}, voice=${this.voice})`)
+    } else {
+      this.voice = options?.voice || TTS_VOICE
+      console.log(`  Narrator: using Piper TTS (voice=${this.voice}, url=${TTS_URL})`)
+    }
   }
 
   /** Call once at the start of the scenario to anchor timestamps. */
@@ -53,12 +84,13 @@ export class Narrator {
   async say(page: Page, text: string, extraPauseMs: number = 500): Promise<void> {
     const offsetMs = Date.now() - this.startTime
     const clipIndex = this.clips.length
-    const wavPath = path.join(this.tempDir, `${this.scenarioName}-${clipIndex}.wav`)
+    const ext = this.provider === 'openai' ? 'mp3' : 'wav'
+    const wavPath = path.join(this.tempDir, `${this.scenarioName}-${clipIndex}.${ext}`)
 
-    const wavBuffer = await this.synthesize(text)
-    fs.writeFileSync(wavPath, Buffer.from(wavBuffer))
+    const audioBuffer = await this.synthesize(text)
+    fs.writeFileSync(wavPath, Buffer.from(audioBuffer))
 
-    const durationMs = getWavDurationMs(wavPath)
+    const durationMs = getAudioDurationMs(wavPath)
 
     this.clips.push({ text, wavPath, offsetMs, durationMs })
 
@@ -94,7 +126,6 @@ export class Narrator {
       { stdio: 'pipe' },
     )
 
-    // Clean up individual clips
     for (const clip of this.clips) {
       try { fs.unlinkSync(clip.wavPath) } catch {}
     }
@@ -130,6 +161,13 @@ export class Narrator {
   }
 
   private async synthesize(text: string): Promise<ArrayBuffer> {
+    if (this.provider === 'openai') {
+      return this.synthesizeOpenAI(text)
+    }
+    return this.synthesizePiper(text)
+  }
+
+  private async synthesizePiper(text: string): Promise<ArrayBuffer> {
     const response = await fetch(`${TTS_URL}/api/tts`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -141,16 +179,39 @@ export class Narrator {
     })
 
     if (!response.ok) {
-      throw new Error(`TTS synthesis failed (${response.status}): ${await response.text()}`)
+      throw new Error(`Piper TTS failed (${response.status}): ${await response.text()}`)
+    }
+
+    return response.arrayBuffer()
+  }
+
+  private async synthesizeOpenAI(text: string): Promise<ArrayBuffer> {
+    const response = await fetch('https://api.openai.com/v1/audio/speech', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${OPENAI_API_KEY}`,
+      },
+      body: JSON.stringify({
+        model: OPENAI_TTS_MODEL,
+        voice: this.voice,
+        input: text,
+        response_format: 'mp3',
+        speed: this.speed,
+      }),
+    })
+
+    if (!response.ok) {
+      throw new Error(`OpenAI TTS failed (${response.status}): ${await response.text()}`)
     }
 
     return response.arrayBuffer()
   }
 }
 
-function getWavDurationMs(wavPath: string): number {
+function getAudioDurationMs(filePath: string): number {
   const output = execSync(
-    `ffprobe -v error -show_entries format=duration -of csv=p=0 "${wavPath}"`,
+    `ffprobe -v error -show_entries format=duration -of csv=p=0 "${filePath}"`,
     { encoding: 'utf-8' },
   )
   return Math.ceil(parseFloat(output.trim()) * 1000)

@@ -64,6 +64,13 @@ class StaticUploadController extends AbstractController
             return $this->serveFile($path, $request);
         }
 
+        // Widget icons are public assets displayed on third-party websites
+        $isWidgetIcon = str_starts_with($path, 'widget-icons/');
+
+        if ($isWidgetIcon) {
+            return $this->serveFile($path, $request);
+        }
+
         // Check if this is an AI-generated file that should bypass strict auth
         // Browser <audio> and <video> tags can't send Authorization headers,
         // so we identify AI-generated files by their naming patterns:

@@ -718,6 +718,37 @@
                   </p>
                 </div>
 
+                <!-- Prompt Language -->
+                <div>
+                  <label class="block text-sm font-medium txt-primary mb-2 flex items-center gap-2">
+                    <Icon icon="heroicons:language" class="w-4 h-4" />
+                    {{ $t('widgets.advancedConfig.promptLanguage') }}
+                  </label>
+                  <select
+                    v-model="promptLanguage"
+                    :disabled="isSystemPrompt"
+                    :class="[
+                      'w-full px-4 py-2.5 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)]',
+                      isSystemPrompt ? 'bg-gray-100 dark:bg-gray-800 cursor-not-allowed' : '',
+                    ]"
+                    data-testid="input-prompt-language"
+                  >
+                    <option value="en">English</option>
+                    <option value="de">Deutsch</option>
+                    <option value="fr">Français</option>
+                    <option value="es">Español</option>
+                    <option value="it">Italiano</option>
+                    <option value="nl">Nederlands</option>
+                    <option value="pt">Português</option>
+                    <option value="ru">Русский</option>
+                    <option value="sv">Svenska</option>
+                    <option value="tr">Türkçe</option>
+                  </select>
+                  <p class="text-xs txt-secondary mt-1">
+                    {{ $t('widgets.advancedConfig.promptLanguageHelp') }}
+                  </p>
+                </div>
+
                 <!-- Prompt Content -->
                 <div>
                   <label class="block text-sm font-medium txt-primary mb-2 flex items-center gap-2">
@@ -967,7 +998,7 @@ const emit = defineEmits<{
   startAiSetup: []
 }>()
 
-const { t, locale } = useI18n()
+const { t } = useI18n()
 const { success, error: showError } = useNotification()
 
 // Check if widget has a custom/configured prompt (not the default)
@@ -1185,6 +1216,7 @@ const promptData = reactive({
 })
 const promptLoading = ref(false)
 const promptError = ref<string | null>(null)
+const promptLanguage = ref('en')
 const creatingManualPrompt = ref(false)
 const manualPromptCreated = ref(false) // Flag to show form after manual creation
 
@@ -1378,11 +1410,16 @@ const loadPromptData = async () => {
   promptError.value = null
 
   try {
-    const prompts = await promptsApi.getPrompts(locale.value || 'en')
+    // Load ALL prompts without language filter so widget prompts always appear
+    // regardless of the current UI language
+    const prompts = await promptsApi.getPrompts()
     const prompt = prompts.find((p) => p.topic === props.widget.taskPromptTopic)
 
     if (prompt) {
       const metadata = prompt.metadata || {}
+
+      // Track the prompt's stored language independently of the UI locale
+      promptLanguage.value = prompt.language || 'en'
 
       // Determine AI Model string from metadata.aiModel (ID)
       let aiModelString =
@@ -1666,6 +1703,7 @@ const savePromptData = async () => {
   await promptsApi.updatePrompt(promptData.id, {
     shortDescription: promptData.name,
     prompt: finalContent,
+    language: promptLanguage.value,
     selectionRules: promptData.rules || null,
     metadata,
   })

@@ -1,6 +1,10 @@
 <template>
   <div class="space-y-6" data-testid="page-config-ai-models">
-    <div class="surface-card p-6" data-testid="section-default-config">
+    <div
+      class="surface-card p-6 relative"
+      :class="openDropdown ? 'z-20' : 'z-0'"
+      data-testid="section-default-config"
+    >
       <h2 class="text-2xl font-semibold txt-primary mb-6 flex items-center gap-2">
         <CpuChipIcon class="w-6 h-6 text-[var(--brand)]" />
         {{ $t('config.aiModels.defaultConfigTitle') }}
@@ -22,12 +26,13 @@
               if (el) capabilityRefs[capability as Capability] = el as HTMLElement
             }
           "
-          class="space-y-2 transition-all duration-300"
-          :class="
+          class="space-y-2 transition-all duration-300 relative"
+          :class="[
             highlightedCapability === capability || highlightedCapability === 'ALL'
               ? 'ring-4 ring-[var(--brand)] ring-offset-4 rounded-xl p-3 bg-[var(--brand)]/5'
-              : ''
-          "
+              : '',
+            openDropdown === capability ? 'z-10' : 'z-0',
+          ]"
           data-testid="item-capability"
         >
           <label class="flex flex-wrap items-center gap-2 text-sm font-semibold txt-primary">

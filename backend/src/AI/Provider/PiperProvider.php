@@ -2,6 +2,7 @@
 
 namespace App\AI\Provider;
 
+use App\AI\Exception\ProviderException;
 use App\AI\Interface\TextToSpeechProviderInterface;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\DependencyInjection\Attribute\Autowire;
@@ -117,7 +118,7 @@ class PiperProvider implements TextToSpeechProviderInterface
         ]);
 
         if (200 !== $response->getStatusCode()) {
-            throw new \RuntimeException('Piper TTS failed: '.$response->getContent(false));
+            throw new ProviderException('Piper TTS failed: '.$response->getContent(false), 'piper');
         }
 
         $wavContent = $response->getContent();
@@ -145,10 +146,44 @@ class PiperProvider implements TextToSpeechProviderInterface
         $this->filesystem->remove($wavPath);
 
         if (!$process->isSuccessful()) {
-            throw new \RuntimeException('FFmpeg conversion failed: '.$process->getErrorOutput());
+            throw new ProviderException('FFmpeg conversion failed: '.$process->getErrorOutput(), 'piper');
         }
 
         // 4. Return filename (AiFacade expects this)
         return $filename;
+    }
+
+    public function synthesizeStream(string $text, array $options = []): \Generator
+    {
+        $response = $this->httpClient->request('GET', $this->ttsUrl.'/api/tts', [
+            'query' => [
+                'text' => $text,
+                'voice' => $options['voice'] ?? null,
+                'language' => $options['language'] ?? null,
+                'stream' => 'true',
+            ],
+            'buffer' => false,
+        ]);
+
+        if (200 !== $response->getStatusCode()) {
+            throw new ProviderException('Piper TTS streaming failed: '.$response->getContent(false), 'piper');
+        }
+
+        foreach ($this->httpClient->stream($response) as $chunk) {
+            $content = $chunk->getContent();
+            if ('' !== $content) {
+                yield $content;
+            }
+        }
+    }
+
+    public function getStreamContentType(array $options = []): string
+    {
+        return 'audio/webm';
+    }
+
+    public function supportsStreaming(): bool
+    {
+        return true;
     }
 }
