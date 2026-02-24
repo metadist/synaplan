@@ -4,7 +4,6 @@ namespace App\Controller;
 
 use App\AI\Service\AiFacade;
 use App\Entity\User;
-use App\Service\ModelConfigService;
 use App\Service\TtsTextSanitizer;
 use OpenApi\Attributes as OA;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -20,7 +19,6 @@ class TtsController extends AbstractController
 {
     public function __construct(
         private AiFacade $aiFacade,
-        private ModelConfigService $modelConfigService,
     ) {
     }
 
@@ -35,7 +33,7 @@ class TtsController extends AbstractController
     #[OA\Parameter(name: 'text', in: 'query', required: true, schema: new OA\Schema(type: 'string'))]
     #[OA\Parameter(name: 'voice', in: 'query', required: false, schema: new OA\Schema(type: 'string'))]
     #[OA\Parameter(name: 'language', in: 'query', required: false, schema: new OA\Schema(type: 'string'))]
-    #[OA\Parameter(name: 'format', in: 'query', required: false, description: 'Audio format (mp3, opus, aac, flac) — only for OpenAI', schema: new OA\Schema(type: 'string', default: 'mp3'))]
+    #[OA\Parameter(name: 'format', in: 'query', required: false, description: 'Audio format (mp3, opus, aac, flac)', schema: new OA\Schema(type: 'string', default: 'mp3'))]
     #[OA\Parameter(name: 'speed', in: 'query', required: false, schema: new OA\Schema(type: 'number', default: 1.0))]
     public function streamAudio(Request $request, #[CurrentUser] ?User $user): Response
     {
@@ -56,19 +54,16 @@ class TtsController extends AbstractController
 
         $voice = $request->query->get('voice');
         $language = $request->query->get('language');
-        $format = $request->query->get('format', 'mp3');
+        $format = $request->query->get('format');
         $speed = (float) $request->query->get('speed', '1.0');
-
-        $ttsModelId = $this->modelConfigService->getDefaultModel('TEXT2SOUND', $user->getId());
-        $ttsProvider = $ttsModelId ? $this->modelConfigService->getProviderForModel($ttsModelId) : null;
+        $speed = max(0.25, min(4.0, $speed));
 
         $options = array_filter([
             'voice' => $voice,
             'language' => $language,
             'format' => $format,
             'speed' => $speed,
-            'provider' => $ttsProvider ? strtolower($ttsProvider) : null,
-        ]);
+        ], fn ($v) => null !== $v);
 
         try {
             $result = $this->aiFacade->synthesizeStream($text, $user->getId(), $options);

@@ -12,6 +12,7 @@ use App\AI\Interface\VisionProviderInterface;
 use App\Service\File\FileHelper;
 use OpenAI;
 use Psr\Log\LoggerInterface;
+use Symfony\Contracts\HttpClient\HttpClientInterface;
 
 class OpenAIProvider implements ChatProviderInterface, EmbeddingProviderInterface, ImageGenerationProviderInterface, VisionProviderInterface, SpeechToTextProviderInterface, TextToSpeechProviderInterface
 {
@@ -20,6 +21,7 @@ class OpenAIProvider implements ChatProviderInterface, EmbeddingProviderInterfac
 
     public function __construct(
         private LoggerInterface $logger,
+        private HttpClientInterface $httpClient,
         private ?string $apiKey = null,
         private string $uploadDir = '/var/www/backend/var/uploads',
     ) {
@@ -880,55 +882,31 @@ class OpenAIProvider implements ChatProviderInterface, EmbeddingProviderInterfac
             'text_length' => strlen($text),
         ]);
 
-        $ch = curl_init('https://api.openai.com/v1/audio/speech');
-        $payload = json_encode([
-            'model' => $model,
-            'voice' => $voice,
-            'input' => $text,
-            'response_format' => $format,
-            'speed' => $speed,
-        ]);
-
-        $buffer = '';
-        $headersDone = false;
-        $httpCode = 0;
-
-        curl_setopt_array($ch, [
-            CURLOPT_POST => true,
-            CURLOPT_HTTPHEADER => [
-                'Content-Type: application/json',
-                'Authorization: Bearer '.$this->apiKey,
+        $response = $this->httpClient->request('POST', 'https://api.openai.com/v1/audio/speech', [
+            'headers' => [
+                'Authorization' => 'Bearer '.$this->apiKey,
+                'Content-Type' => 'application/json',
             ],
-            CURLOPT_POSTFIELDS => $payload,
-            CURLOPT_RETURNTRANSFER => false,
-            CURLOPT_HEADER => false,
-            CURLOPT_TIMEOUT => 120,
-            CURLOPT_WRITEFUNCTION => function ($ch, $data) use (&$buffer) {
-                $buffer .= $data;
-
-                return strlen($data);
-            },
+            'json' => [
+                'model' => $model,
+                'voice' => $voice,
+                'input' => $text,
+                'response_format' => $format,
+                'speed' => $speed,
+            ],
+            'buffer' => false,
+            'timeout' => 120,
         ]);
 
-        curl_exec($ch);
-        $httpCode = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
-        $curlError = curl_error($ch);
-        curl_close($ch);
-
-        if ($curlError) {
-            throw new ProviderException('OpenAI TTS stream cURL error: '.$curlError, 'openai');
+        if (200 !== $response->getStatusCode()) {
+            throw new ProviderException('OpenAI TTS stream HTTP '.$response->getStatusCode().': '.substr($response->getContent(false), 0, 500), 'openai');
         }
 
-        if (200 !== $httpCode) {
-            throw new ProviderException('OpenAI TTS stream HTTP '.$httpCode.': '.substr($buffer, 0, 500), 'openai');
-        }
-
-        $chunkSize = 8192;
-        $offset = 0;
-        $length = strlen($buffer);
-        while ($offset < $length) {
-            yield substr($buffer, $offset, $chunkSize);
-            $offset += $chunkSize;
+        foreach ($this->httpClient->stream($response) as $chunk) {
+            $content = $chunk->getContent();
+            if ('' !== $content) {
+                yield $content;
+            }
         }
     }
 
