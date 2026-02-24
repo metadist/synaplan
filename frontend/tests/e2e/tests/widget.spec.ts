@@ -338,10 +338,7 @@ test('@018 @noci @smoke @widget Widget: enforces file upload limit', async ({
   expect(fileCount).toBe(1)
 })
 
-test('@019 @noci @smoke @widget Widget: enforces max file size', async ({
-  page,
-  credentials,
-}) => {
+test('@019 @noci @smoke @widget Widget: enforces max file size', async ({ page, credentials }) => {
   await login(page, credentials)
 
   const widgetName = WIDGET_NAMES.unique('Test Widget Max File Size')

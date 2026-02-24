@@ -5,7 +5,7 @@ import { isTestStack } from './config/config'
 
 export const test = base.extend<{ credentials: { user: string; pass: string } }>({
   // Credentials for the current worker (enables parallel E2E with isolated user per worker)
-  credentials: async ({}, use, testInfo) => {
+  credentials: async (_deps, use, testInfo) => {
     const creds = CREDENTIALS.getCredentialsForWorker(testInfo.parallelIndex)
     await use(creds)
   },
@@ -20,7 +20,7 @@ export const test = base.extend<{ credentials: { user: string; pass: string } }>
 })
 
 // Integration tests require test stack (E2E_STACK=test). Skip from one place.
-test.beforeEach(({}, testInfo) => {
+test.beforeEach((_opts, testInfo) => {
   if (testInfo.file?.includes('integration') && !isTestStack()) {
     test.skip(true, 'Integration tests require test stack (E2E_STACK=test)')
   }

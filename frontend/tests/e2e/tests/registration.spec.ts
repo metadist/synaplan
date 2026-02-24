@@ -51,7 +51,7 @@ test('@ci @password @auth @smoke registration flow with email verification id=00
       await page.locator(selectors.register.submit).click()
     })
 
-      await test.step('See registration success or error (fail-fast)', async () => {
+    await test.step('See registration success or error (fail-fast)', async () => {
       const successLocator = page.locator(selectors.register.successSection)
       const errorLocator = page.locator(selectors.register.errorAlert)
       const result = await Promise.race([

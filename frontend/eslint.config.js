@@ -66,6 +66,16 @@ export default [
       'no-loss-of-precision': 'warn',
     },
   },
+  // Node stub (e2e WhatsApp stub runs in Docker/Node)
+  {
+    files: ['tests/e2e/stub/**/*.mjs'],
+    languageOptions: {
+      globals: {
+        ...globals.node,
+        ...globals.es2021,
+      },
+    },
+  },
   // Test files (need both browser and node globals + vitest)
   {
     files: ['**/*.spec.ts', '**/*.spec.js', 'tests/**/*.{js,ts}'],

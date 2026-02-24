@@ -369,12 +369,7 @@
             </div>
 
             <!-- Chat Cards -->
-            <div
-              v-else
-              class="space-y-1.5"
-              role="list"
-              data-testid="list-chat-manager-rows"
-            >
+            <div v-else class="space-y-1.5" role="list" data-testid="list-chat-manager-rows">
               <div
                 v-for="chat in filteredChatList"
                 :key="chat.id"

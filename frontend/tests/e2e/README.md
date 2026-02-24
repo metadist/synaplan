@@ -97,7 +97,7 @@ From the **frontend** directory:
 | **Test stack**: CI-like (no @noci) | `npm run test:e2e:teststack -- --grep-invert "@noci"`         |
 | **Test stack**: single test        | `npm run test:e2e:teststack -- -g "id=020"`                   |
 | **Test stack**: Playwright UI      | `npm run test:e2e:teststack:ui`                               |
-| **Integration tests only**        | `npm run test:e2e -- --grep "@api"` (or `test:e2e:teststack`) |
+| **Integration tests only**         | `npm run test:e2e -- --grep "@api"` (or `test:e2e:teststack`) |
 
 Everything after `--` is passed through to Playwright. Integration tests live in `tests/integration/` and use the same config and helpers; they hit the backend via `getApiUrl()` and can use `getAuthHeaders(request)` for authenticated calls.
 

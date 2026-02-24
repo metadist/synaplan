@@ -21,7 +21,11 @@ export function getStubBaseUrl(): string {
 
 /** Throws on non-200 (fail-fast). */
 export async function getStubRequests(
-  request: { get: (url: string) => Promise<{ status: () => number; json: () => Promise<StubRequestRecord[]> }> },
+  request: {
+    get: (
+      url: string
+    ) => Promise<{ status: () => number; json: () => Promise<StubRequestRecord[]> }>
+  },
   baseUrl = getStubBaseUrl(),
   runId?: string
 ): Promise<StubRequestRecord[]> {
@@ -54,7 +58,8 @@ export async function simulateStubFail(
 }
 
 function isSendMessageRequest(r: StubRequestRecord): boolean {
-  if (r.method !== 'POST' || !new RegExp(`^/${API_VERSION}/[^/]+/messages$`).test(r.path)) return false
+  if (r.method !== 'POST' || !new RegExp(`^/${API_VERSION}/[^/]+/messages$`).test(r.path))
+    return false
   const body = r.body as Record<string, unknown> | null
   return body != null && 'type' in body && body.status !== 'read'
 }
@@ -67,7 +72,9 @@ export function getPostMessageRecords(requests: StubRequestRecord[]): StubReques
   return requests.filter(isSendMessageRequest)
 }
 
-export function getPostMessageBodies(requests: StubRequestRecord[]): Array<Record<string, unknown>> {
+export function getPostMessageBodies(
+  requests: StubRequestRecord[]
+): Array<Record<string, unknown>> {
   return getPostMessageRecords(requests).map((r) => (r.body as Record<string, unknown>) ?? {})
 }
 

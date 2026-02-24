@@ -36,7 +36,8 @@ function decodeQP(s: string): string {
 
 /** Extract text/plain part from a decoded MIME body, or return as-is if no boundary. */
 function extractPlainFromMultipart(decoded: string): string {
-  const ctPlain = /Content-Type:\s*text\/plain[\s\S]*?\r?\n\r?\n([\s\S]*?)(?=\r?\n--|\r?\nContent-Type:|$)/i
+  const ctPlain =
+    /Content-Type:\s*text\/plain[\s\S]*?\r?\n\r?\n([\s\S]*?)(?=\r?\n--|\r?\nContent-Type:|$)/i
   const m = decoded.match(ctPlain)
   if (m?.[1]) return m[1].trim()
   return decoded

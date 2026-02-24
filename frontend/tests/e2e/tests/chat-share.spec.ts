@@ -43,7 +43,9 @@ test.describe('Chat Share', () => {
         await v2ChatNav.click()
         const modal = page.locator(selectors.nav.modalChatManager)
         await modal.waitFor({ state: 'visible', timeout: TIMEOUTS.STANDARD })
-        await modal.locator(selectors.nav.chatManagerListRows).waitFor({ state: 'visible', timeout: TIMEOUTS.STANDARD })
+        await modal
+          .locator(selectors.nav.chatManagerListRows)
+          .waitFor({ state: 'visible', timeout: TIMEOUTS.STANDARD })
         // Last chat = first row (newest first); prefer data-testid per E2E rules
         const lastChatRow = modal.locator(selectors.nav.chatV2Row).first()
         await lastChatRow.scrollIntoViewIfNeeded()
@@ -68,7 +70,9 @@ test.describe('Chat Share', () => {
         await topChatRow.locator(selectors.share.chatMenuButton).click()
         await topChatRow.locator(selectors.share.chatShareButton).click()
       }
-      await page.locator(selectors.share.shareModal).waitFor({ state: 'visible', timeout: TIMEOUTS.STANDARD })
+      await page
+        .locator(selectors.share.shareModal)
+        .waitFor({ state: 'visible', timeout: TIMEOUTS.STANDARD })
     })
 
     await test.step('Create share link and wait for share terminal state', async () => {
@@ -112,7 +116,9 @@ test.describe('Chat Share', () => {
         await sharedPage
           .locator(selectors.sharedChat.sharedChatRoot)
           .waitFor({ state: 'visible', timeout: TIMEOUTS.STANDARD })
-        await sharedPage.locator(selectors.sharedChat.sharedMessageList).waitFor({ state: 'visible' })
+        await sharedPage
+          .locator(selectors.sharedChat.sharedMessageList)
+          .waitFor({ state: 'visible' })
         const messages = sharedPage.locator(selectors.sharedChat.messageItem)
         const count = await messages.count()
         expect(count).toBeGreaterThanOrEqual(1)

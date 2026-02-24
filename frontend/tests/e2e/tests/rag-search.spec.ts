@@ -26,7 +26,9 @@ test('@007 @noci @smoke semantic search finds uploaded content (real AI)', async
     const filesBtn = page.locator('[data-testid="btn-sidebar-v2--files"]')
     await filesBtn.waitFor({ state: 'visible', timeout: TIMEOUTS.STANDARD })
     await filesBtn.click()
-    await page.locator(selectors.files.page).waitFor({ state: 'visible', timeout: TIMEOUTS.STANDARD })
+    await page
+      .locator(selectors.files.page)
+      .waitFor({ state: 'visible', timeout: TIMEOUTS.STANDARD })
   })
 
   const fileName = path.basename(ragFixturePath)
@@ -36,10 +38,12 @@ test('@007 @noci @smoke semantic search finds uploaded content (real AI)', async
   })
 
   await test.step('Assert: file appears in file list', async () => {
-    await page.locator(selectors.files.table).waitFor({ state: 'visible', timeout: TIMEOUTS.VERY_LONG })
-    await expect(
-      page.getByRole('row', { name: fileName }),
-    ).toBeVisible({ timeout: TIMEOUTS.VERY_LONG })
+    await page
+      .locator(selectors.files.table)
+      .waitFor({ state: 'visible', timeout: TIMEOUTS.VERY_LONG })
+    await expect(page.getByRole('row', { name: fileName })).toBeVisible({
+      timeout: TIMEOUTS.VERY_LONG,
+    })
   })
 
   await test.step('Act: navigate to Semantic Search and run query', async () => {
@@ -53,9 +57,7 @@ test('@007 @noci @smoke semantic search finds uploaded content (real AI)', async
     const summary = page.locator(selectors.rag.searchSummary)
     const errorBanner = page.getByText(/error|failed|not found|model.*not found/i)
     const result = await Promise.race([
-      summary
-        .waitFor({ state: 'visible', timeout: TIMEOUTS.EXTREME })
-        .then(() => 'done' as const),
+      summary.waitFor({ state: 'visible', timeout: TIMEOUTS.EXTREME }).then(() => 'done' as const),
       errorBanner
         .waitFor({ state: 'visible', timeout: TIMEOUTS.EXTREME })
         .then(() => 'error' as const),
@@ -69,7 +71,7 @@ test('@007 @noci @smoke semantic search finds uploaded content (real AI)', async
     const count = await results.count()
     expect(
       count,
-      'Semantic search should find at least one chunk for the uploaded phrase',
+      'Semantic search should find at least one chunk for the uploaded phrase'
     ).toBeGreaterThan(0)
   })
 })

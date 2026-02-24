@@ -57,7 +57,6 @@
           <ClipboardDocumentIcon v-else class="w-4 h-4" />
         </button>
 
-
         <!-- Processing Status (inside bubble, before content) -->
         <div
           v-if="isStreaming && processingStatus && role === 'assistant'"

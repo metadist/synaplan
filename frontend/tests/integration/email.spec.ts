@@ -80,9 +80,7 @@ test.describe('@ci Smart-Email smoke @smoke', () => {
     })
   })
 
-  test('Invalid payload → 400, error body, no reply in MailHog', async ({
-    request,
-  }) => {
+  test('Invalid payload → 400, error body, no reply in MailHog', async ({ request }) => {
     await test.step('Arrange: empty MailHog', async () => {
       const messages = await fetchMessages(request)
       expect(messages.length).toBe(0)
