@@ -2,8 +2,36 @@ import { defineConfig, loadEnv, Plugin } from 'vite'
 import vue from '@vitejs/plugin-vue'
 import { fileURLToPath, URL } from 'node:url'
 import { resolve } from 'path'
+import { readFileSync } from 'node:fs'
 
 const projectRoot = fileURLToPath(new URL('.', import.meta.url))
+const widgetTestPagePath = resolve(projectRoot, 'tests/e2e/fixtures/widget-test.html')
+
+/**
+ * In dev, serve E2E widget test page at /widget-test.html from fixtures (not from public/).
+ * Keeps the page out of the production build while allowing widget E2E against the dev stack.
+ */
+export function widgetTestPagePlugin(): Plugin {
+  return {
+    name: 'widget-test-page',
+    configureServer(server) {
+      server.middlewares.use((req, res, next) => {
+        const pathname = req.url?.split('?')[0] ?? ''
+        if (pathname !== '/widget-test.html') {
+          next()
+          return
+        }
+        try {
+          const html = readFileSync(widgetTestPagePath, 'utf-8')
+          res.setHeader('Content-Type', 'text/html; charset=utf-8')
+          res.end(html)
+        } catch {
+          next()
+        }
+      })
+    },
+  }
+}
 
 /**
  * Plugin to create .gitkeep file in output directory after build
@@ -41,7 +69,7 @@ export default defineConfig(({ mode }) => {
 
   return {
     base: basePath,
-    plugins: [vue(), gitkeepPlugin()],
+    plugins: [vue(), widgetTestPagePlugin(), gitkeepPlugin()],
     build: {
       outDir: 'dist',
       emptyOutDir: true,
