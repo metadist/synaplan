@@ -20,30 +20,5 @@
   <body>
     <div id="app"></div>
     <script type="module" src="/src/main.ts"></script>
-<!-- Synaplan Chat Widget (ES Module with Auto Code-Splitting) -->
-<!-- Skip widget loading in test environment (Playwright sets window.__PLAYWRIGHT__) -->
-<script type="module">
-  // Don't load widget in test environment
-  if (!window.__PLAYWRIGHT__ && !window.navigator.webdriver) {
-    import('http://localhost:8000/widget.js').then((module) => {
-      const SynaplanWidget = module.default
-      SynaplanWidget.init({
-        widgetId: 'wdg_73a34e81b115d163d62ee93870a04547',
-        position: 'bottom-right',
-        primaryColor: '#007bff',
-        iconColor: '#ffffff',
-        buttonIcon: 'chat',
-        defaultTheme: 'light',
-        autoOpen: false,
-        autoMessage: 'Hello! How can I help you today?',
-        messageLimit: 50,
-        maxFileSize: 10,
-        allowFileUpload: false,
-        fileUploadLimit: 3,
-        lazy: true  // Load chat on button click (set to false for immediate load)
-      })
-    })
-  }
-</script>
   </body>
 </html>
