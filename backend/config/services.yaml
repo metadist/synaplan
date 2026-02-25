@@ -119,6 +119,7 @@ services:
             $serverUrl: '%env(TRITON_SERVER_URL)%'
         tags:
             - { name: 'app.ai.chat' }
+            - { name: 'app.ai.embedding' }
 
     App\AI\Provider\GroqProvider:
         arguments:
