@@ -1,4 +1,12 @@
+/** Global notification toasts (useNotification / showError) */
+const notificationError =
+  '[data-testid="comp-notification-item"][data-notification-type="error"]'
+
 export const selectors = {
+  notification: {
+    /** Error toast – use for fail-fast when racing with success state */
+    error: notificationError,
+  },
   login: {
     email: '#email',
     password: '#password',
@@ -90,7 +98,6 @@ export const selectors = {
     shareCreate: '[data-testid="btn-chat-share-make-public"]',
     shareLinkInput: '[data-testid="share-link-input"]',
     shareDone: '[data-testid="share-done"]',
-    shareError: '[data-testid="share-error"]',
     makePublicBtn: '[data-testid="btn-chat-share-make-public"]',
     copyBtn: '[data-testid="btn-chat-share-copy"]',
     closeBtn: '[data-testid="btn-chat-share-close"]',

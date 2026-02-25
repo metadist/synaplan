@@ -85,13 +85,13 @@ test.describe('Chat Share', () => {
           .locator(selectors.share.shareDone)
           .waitFor({ state: 'visible', timeout: TIMEOUTS.STANDARD })
           .then(() => 'done' as const),
-        modal
-          .locator(selectors.share.shareError)
+        page
+          .locator(selectors.notification.error)
           .waitFor({ state: 'visible', timeout: TIMEOUTS.STANDARD })
           .then(() => 'error' as const),
       ])
       if (result === 'error') {
-        throw new Error('Share ended in error state (shareError visible)')
+        throw new Error('Share ended in error (showError toast visible)')
       }
     })
 
