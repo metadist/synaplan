@@ -26,8 +26,8 @@ services:
       - ./backend:/var/www/backend
       - ./plugins:/plugins
       - ./_docker/backend/docker-entrypoint.sh:/usr/local/bin/docker-entrypoint.sh:ro
-      # E2E widget test page (not in production image; mount from E2E fixtures)
-      - ./frontend/tests/e2e/fixtures/widget-test.html:/var/www/backend/public/widget-test.html:ro
+      # E2E widget test page (mounted outside backend/public to avoid ghost files from overlapping volumes)
+      - ./frontend/tests/e2e/fixtures/widget-test.html:/var/www/test-fixtures/widget-test.html:ro
     environment:
       APP_ENV: test
       APP_SECRET: test_secret_not_for_production

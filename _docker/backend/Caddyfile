@@ -62,6 +62,15 @@
 		file_server
 	}
 
+	# E2E widget test page (test stack mounts fixture to /var/www/test-fixtures/)
+	@widget_test_page {
+		path /widget-test.html
+	}
+	handle @widget_test_page {
+		root * /var/www/test-fixtures
+		file_server
+	}
+
 	# Frontend files second (static files from frontend build)
 	@frontend_file {
 		file {
@@ -74,9 +83,9 @@
 		file_server
 	}
 
-	# Backend static files third (bundles, uploads, widget-test page for E2E)
+	# Backend static files third (bundles, uploads)
 	@backend_file {
-		path /bundles/* /uploads/* /widget-test.html
+		path /bundles/* /uploads/*
 		file {
 			root /var/www/backend/public
 			try_files {path}
