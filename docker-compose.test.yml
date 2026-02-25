@@ -61,8 +61,6 @@ services:
         condition: service_healthy
       mailhog_test:
         condition: service_started
-      whatsapp-stub:
-        condition: service_started
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost/api/health"]
       interval: 10s
@@ -128,8 +126,9 @@ services:
     networks:
       - synaplan-test-network
 
-  # WhatsApp Graph API stub (E2E gate). Backend uses WHATSAPP_GRAPH_API_BASE_URL=http://whatsapp-stub:3999
+  # WhatsApp Graph API stub (only for jobs that run WhatsApp integration tests; not needed for OIDC-only).
   whatsapp-stub:
+    profiles: [whatsapp]
     build:
       context: frontend/tests/e2e/stub-servers/whatsapp
       dockerfile: Dockerfile

@@ -101,7 +101,7 @@ From the **frontend** directory:
 | **Test stack**: Playwright UI      | `npm run test:e2e:teststack:ui`                               |
 | **Integration tests only**         | `npm run test:e2e -- --grep "@api"` (or `test:e2e:teststack`) |
 
-Everything after `--` is passed through to Playwright. Integration tests live in `tests/integration/` and use the same config and helpers; they hit the backend via `getApiUrl()` and can use `getAuthHeaders(request)` for authenticated calls. Stub servers (e.g. WhatsApp Graph API stub for `@api` tests) live under `tests/e2e/stub-servers/` (e.g. `stub-servers/whatsapp/`) and are built/started via `docker-compose.test.yml`.
+Everything after `--` is passed through to Playwright. Integration tests live in `tests/integration/` and use the same config and helpers; they hit the backend via `getApiUrl()` and can use `getAuthHeaders(request)` for authenticated calls. Stub servers (e.g. WhatsApp Graph API stub for `@api` tests) live under `tests/e2e/stub-servers/` (e.g. `stub-servers/whatsapp/`) and are built/started via `docker-compose.test.yml`. The WhatsApp stub is behind the Compose profile `whatsapp`; for local runs of integration tests that need it, start the test stack with `--profile whatsapp` (e.g. `docker compose -f docker-compose.test.yml --profile whatsapp up -d` after building).
 
 ## Reload fixtures (test stack)
 

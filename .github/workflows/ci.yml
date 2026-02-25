@@ -308,20 +308,24 @@ jobs:
           # Standard password auth (both browsers) — exclude @oidc tests (no Keycloak running)
           - browser: chromium
             auth_method: password
+            compose_profiles: "--profile whatsapp"
             npm_script: "test:e2e"
             grep_filter: "@ci"
           - browser: firefox
             auth_method: password
+            compose_profiles: "--profile whatsapp"
             npm_script: "test:e2e:firefox"
             grep_filter: "@ci"
           # OIDC auth (chromium only — auth flow testing, not browser compat)
           - browser: chromium
             auth_method: oidc
+            compose_profiles: "--profile oidc"
             npm_script: "test:e2e:oidc"
             grep_filter: "@oidc"
           # OIDC auto-redirect (starts app with OIDC_AUTO_REDIRECT=true)
           - browser: chromium
             auth_method: oidc-redirect
+            compose_profiles: "--profile oidc"
             npm_script: "test:e2e:oidc-redirect"
             grep_filter: ""
     env:
@@ -359,10 +363,7 @@ jobs:
           OIDC_AUTO_REDIRECT: ${{ matrix.auth_method == 'oidc-redirect' && 'true' || 'false' }}
         run: |
           COMPOSE="docker compose -f docker-compose.test.yml -f docker-compose.test.ci.yml"
-          PROFILE=""
-          if [[ "${{ matrix.auth_method }}" == oidc* ]]; then
-            PROFILE="--profile oidc"
-          fi
+          PROFILE="${{ matrix.compose_profiles }}"
 
           # app_test entrypoint loads fixtures on first run (APP_ENV=test, empty DB)
           # so TestProvider model (id 900) and admin user exist for E2E (e.g. id=003).
@@ -437,10 +438,7 @@ jobs:
         if: always()
         run: |
           COMPOSE="docker compose -f docker-compose.test.yml -f docker-compose.test.ci.yml"
-          PROFILE=""
-          if [[ "${{ matrix.auth_method }}" == oidc* ]]; then
-            PROFILE="--profile oidc"
-          fi
+          PROFILE="${{ matrix.compose_profiles }}"
           $COMPOSE $PROFILE down -v
 
   docker-push:

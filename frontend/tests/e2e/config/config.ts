@@ -5,7 +5,7 @@ export const URLS = {
   MAILHOG_URL: process.env.MAILHOG_URL || 'http://localhost:8025',
 
   get TEST_PAGE_URL() {
-    return `${this.BASE_URL}/test-widget.html`
+    return `${this.BASE_URL}/widget-test.html`
   },
 } as const
 
