@@ -66,9 +66,9 @@ export default [
       'no-loss-of-precision': 'warn',
     },
   },
-  // Node stub (e2e WhatsApp stub runs in Docker/Node)
+  // Node stub servers (e2e WhatsApp stub runs in Docker/Node)
   {
-    files: ['tests/e2e/stub/**/*.mjs'],
+    files: ['tests/e2e/stub-servers/**/*.mjs'],
     languageOptions: {
       globals: {
         ...globals.node,

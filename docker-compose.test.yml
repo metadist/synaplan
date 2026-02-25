@@ -26,6 +26,8 @@ services:
       - ./backend:/var/www/backend
       - ./plugins:/plugins
       - ./_docker/backend/docker-entrypoint.sh:/usr/local/bin/docker-entrypoint.sh:ro
+      # E2E widget test page (not in production image; mount from E2E fixtures)
+      - ./frontend/tests/e2e/fixtures/widget-test.html:/var/www/backend/public/widget-test.html:ro
     environment:
       APP_ENV: test
       APP_SECRET: test_secret_not_for_production
@@ -129,7 +131,7 @@ services:
   # WhatsApp Graph API stub (E2E gate). Backend uses WHATSAPP_GRAPH_API_BASE_URL=http://whatsapp-stub:3999
   whatsapp-stub:
     build:
-      context: frontend/tests/e2e/stub
+      context: frontend/tests/e2e/stub-servers/whatsapp
       dockerfile: Dockerfile
     container_name: synaplan-whatsapp-stub
     ports:

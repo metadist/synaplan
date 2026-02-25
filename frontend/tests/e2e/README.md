@@ -60,6 +60,8 @@ Permission error on `frontend/dist/` (container creates it as root): `sudo rm -r
 | **MailHog**   | :8025 / :1025                   | :8025 / :1025 (shared ports!)                  |
 | **Login**     | admin@synaplan.com / admin123   | admin@synaplan.com / admin123                  |
 
+Widget E2E tests use the page at `/widget-test.html`. In dev it is served by Vite from `tests/e2e/fixtures/widget-test.html`; in the test stack the same file is mounted into the backend container.
+
 ### Selecting TestProvider in the dev stack
 
 In the **dev stack** (localhost:5173 + 8000) the TestProvider is shown in **Settings → AI Models** when `APP_ENV=dev` (default in docker-compose). The test model (id 900) must exist in the database; load only the model fixtures once if you don’t see it (avoids duplicate-key errors from other fixtures when using `--append`):
@@ -99,7 +101,7 @@ From the **frontend** directory:
 | **Test stack**: Playwright UI      | `npm run test:e2e:teststack:ui`                               |
 | **Integration tests only**         | `npm run test:e2e -- --grep "@api"` (or `test:e2e:teststack`) |
 
-Everything after `--` is passed through to Playwright. Integration tests live in `tests/integration/` and use the same config and helpers; they hit the backend via `getApiUrl()` and can use `getAuthHeaders(request)` for authenticated calls.
+Everything after `--` is passed through to Playwright. Integration tests live in `tests/integration/` and use the same config and helpers; they hit the backend via `getApiUrl()` and can use `getAuthHeaders(request)` for authenticated calls. Stub servers (e.g. WhatsApp Graph API stub for `@api` tests) live under `tests/e2e/stub-servers/` (e.g. `stub-servers/whatsapp/`) and are built/started via `docker-compose.test.yml`.
 
 ## Reload fixtures (test stack)
 
