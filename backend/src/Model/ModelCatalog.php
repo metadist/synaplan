@@ -1222,7 +1222,7 @@ class ModelCatalog
             'id' => 102,
             'service' => 'triton',
             'name' => 'bge-m3',
-            'tag' => 'VECTORIZE',
+            'tag' => 'vectorize',
             'selectable' => 1,
             'active' => 1,
             'providerId' => 'bge-m3',

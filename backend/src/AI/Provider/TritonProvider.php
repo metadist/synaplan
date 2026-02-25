@@ -653,7 +653,12 @@ class TritonProvider implements ChatProviderInterface, EmbeddingProviderInterfac
      */
     private function decodeFp32Array(string $rawData): array
     {
-        $floatCount = strlen($rawData) / 4;
+        $byteLength = strlen($rawData);
+        if (0 === $byteLength) {
+            return [];
+        }
+
+        $floatCount = intdiv($byteLength, 4);
         $embedding = [];
 
         for ($i = 0; $i < $floatCount; ++$i) {
