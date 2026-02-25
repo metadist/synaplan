@@ -12,11 +12,15 @@ use App\Repository\EmailVerificationAttemptRepository;
 use App\Repository\FileRepository;
 use App\Repository\InboundEmailHandlerRepository;
 use App\Repository\MessageRepository;
+use App\Repository\PluginDataRepository;
+use App\Repository\PromptMetaRepository;
+use App\Repository\PromptRepository;
 use App\Repository\SessionRepository;
 use App\Repository\TokenRepository;
 use App\Repository\UseLogRepository;
 use App\Repository\VerificationTokenRepository;
 use App\Repository\WidgetRepository;
+use App\Repository\WidgetSessionRepository;
 use App\Service\File\FileStorageService;
 use App\Service\RAG\VectorStorage\VectorStorageFacade;
 use Doctrine\ORM\EntityManagerInterface;
@@ -38,6 +42,10 @@ final readonly class UserDeletionService
         private FileRepository $fileRepository,
         private InboundEmailHandlerRepository $inboundEmailHandlerRepository,
         private ConfigRepository $configRepository,
+        private PromptRepository $promptRepository,
+        private PromptMetaRepository $promptMetaRepository,
+        private PluginDataRepository $pluginDataRepository,
+        private WidgetSessionRepository $widgetSessionRepository,
         private FileStorageService $fileStorageService,
         private VectorStorageFacade $vectorStorageFacade,
         private LoggerInterface $logger,
@@ -76,6 +84,9 @@ final readonly class UserDeletionService
             $this->deleteEmailVerificationAttempts($email);
             $this->deleteFiles($userId);
             $this->deleteInboundEmailHandlers($userId);
+            $this->deleteConfigs($userId);
+            $this->deletePrompts($userId);
+            $this->deletePluginData($userId);
 
             // Finally, delete the user account
             $this->em->remove($user);
@@ -139,6 +150,8 @@ final readonly class UserDeletionService
             $this->deleteFiles($userId);
             $this->deleteInboundEmailHandlers($userId);
             $this->deleteConfigs($userId);
+            $this->deletePrompts($userId);
+            $this->deletePluginData($userId);
 
             $this->em->flush();
             $this->em->getConnection()->commit();
@@ -222,6 +235,10 @@ final readonly class UserDeletionService
     {
         $widgets = $this->widgetRepository->findBy(['ownerId' => $userId]);
         foreach ($widgets as $widget) {
+            $sessions = $this->widgetSessionRepository->findBy(['widgetId' => $widget->getWidgetId()]);
+            foreach ($sessions as $session) {
+                $this->em->remove($session);
+            }
             $this->em->remove($widget);
         }
     }
@@ -308,6 +325,29 @@ final readonly class UserDeletionService
         $handlers = $this->inboundEmailHandlerRepository->findBy(['userId' => $userId]);
         foreach ($handlers as $handler) {
             $this->em->remove($handler);
+        }
+    }
+
+    private function deletePrompts(int $userId): void
+    {
+        $prompts = $this->promptRepository->findBy(['ownerId' => $userId]);
+        foreach ($prompts as $prompt) {
+            $promptId = $prompt->getId();
+            if (null !== $promptId) {
+                $metaRows = $this->promptMetaRepository->findByPrompt($promptId);
+                foreach ($metaRows as $meta) {
+                    $this->em->remove($meta);
+                }
+            }
+            $this->em->remove($prompt);
+        }
+    }
+
+    private function deletePluginData(int $userId): void
+    {
+        $pluginData = $this->pluginDataRepository->findBy(['userId' => $userId]);
+        foreach ($pluginData as $item) {
+            $this->em->remove($item);
         }
     }
 

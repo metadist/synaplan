@@ -128,154 +128,22 @@ make lint
 ## Project Structure
 
 ```
-synaplan-dev/
-├── _devextras/              # Development extras
-├── _docker/                 # Docker configurations
-│   ├── backend/             # Backend Dockerfile & scripts
-│   └── frontend/            # Frontend Dockerfile & nginx
-├── backend/                 # Symfony Backend (PHP 8.3)
-├── frontend/                # Vue.js Frontend
-├── docker-compose.yml       # Standard install (Ollama + Whisper, recommended)
-└── docker-compose-minimal.yml # Minimal install (cloud AI only)
+synaplan/
+├── backend/        # Symfony PHP API
+├── frontend/       # Vue.js SPA
+├── docs/           # Documentation
+├── _docker/        # Docker configs
+└── plugins/        # Plugin system
 ```
 
-## ⚙️ Environment Configuration
+---
 
-Environment files are auto-generated on first start:
-- `backend/.env` (created from `.env.example` by install script, stores API keys and server settings)
+## Contributing
 
-**Note:** `backend/.env` is never overwritten if it exists. To reset: delete the file and run the install script again.
+See [AGENTS.md](AGENTS.md) for development guidelines and code standards.
 
-Example files provided:
-- `backend/.env.example` (reference)
+---
 
-### Required Configuration for Production
+## License
 
-**`SYNAPLAN_URL`** (backend/.env): The publicly accessible URL where Synaplan is hosted
-- Development: `http://localhost:8000`
-- Production: `https://web.synaplan.com`
-- Used for: Widget embed code generation, public URLs, CORS configuration
-
-## 📚 Developer Documentation
-
-For technical deep-dives and "vibe coding" guides, check the `_devextras/planning/` directory. These documents are kept up to date and cover:
-- **Authentication**: Cookie-based & OIDC flows.
-- **Plugins**: Scalable user plugin architecture.
-- **Development**: Coding standards and quick commands.
-- **Infrastructure**: WSL and Ubuntu setup guides.
-
-## 🛠️ Development
-
-```bash
-# View logs
-docker compose logs -f
-
-# Restart services
-docker compose restart backend
-docker compose restart frontend
-
-# Reset database (deletes all data!)
-docker compose down -v
-docker compose up -d
-
-# Run migrations
-docker compose exec backend php bin/console doctrine:migrations:migrate
-
-# Install packages
-docker compose exec backend composer require <package>
-docker compose exec frontend npm install <package>
-```
-
-## ✅ Tests
-
-For details on running the Playwright E2E tests (browser-based UI tests), see the dedicated README in the frontend:
-
-- `frontend/tests/e2e/README.md`
-
-
-## 🤖 AI Models
-
-- **bge-m3 (Ollama)** – Always pulled during install (required for RAG/vector search). This is a small embedding model (~1.5GB).
-- **gpt-oss:20b (Ollama)** – Only pulled if "Local Ollama" option selected during install. Large model (~12GB) for local chat without API keys.
-- **All cloud models (Groq, OpenAI, etc.)** – Instantly available once their respective API keys are set. Groq is recommended (free tier, fast).
-
-Disable the auto download by running:
-```bash
-AUTO_DOWNLOAD_MODELS=false docker compose up -d
-```
-
-## ✨ Features
-
-- ✅ **AI Chat**: Multiple providers (Ollama, OpenAI, Anthropic, Groq, Gemini)
-- ✅ **Embeddable Chat Widget**: Add AI chat to any website with a single script tag
-- ✅ **RAG System**: Semantic search with MariaDB VECTOR + bge-m3 embeddings (1024 dim)
-- ✅ **Optional Memories Backend (Qdrant)**: Connect [synaplan-memories](https://github.com/metadist/synaplan-memories) to enable user profiling / AI memories (separate Rust + Qdrant stack)
-- ✅ **Document Processing**: PDF, Word, Excel, Images (Tika + OCR)
-- ✅ **Audio Transcription**: Whisper.cpp integration
-- ✅ **File Management**: Upload, share (public/private), organize with expiry
-- ✅ **App Modes**: Easy mode (simplified) and Advanced mode (full features)
-- ✅ **Security**: Private files by default, secure sharing with tokens
-- ✅ **Multi-user**: Role-based access with JWT authentication
-- ✅ **Responsive UI**: Vue.js 3 + TypeScript + Tailwind CSS
-
-## 🧠 Optional: synaplan-memories (User Profiling / AI Memories)
-
-Synaplan can run without an external vector DB for memories.
-
-If you want AI “memories” (user profiling) backed by **Qdrant**, install:
-
-- [metadist/synaplan-memories](https://github.com/metadist/synaplan-memories)
-
-It contains a small Rust microservice + Qdrant and can be connected via:
-
-- `QDRANT_SERVICE_URL`
-- `QDRANT_SERVICE_API_KEY`
-
-Benchmarking (Qdrant vs MariaDB VECTOR) is available here:
-
-- [metadist/synaplan-vectordb-test](https://github.com/metadist/synaplan-vectordb-test)
-
-## 💬 Embeddable Chat Widget
-
-Synaplan includes a production-ready chat widget that can be embedded on any website:
-
-### Features
-- **ES Module with Code-Splitting**: Loads only what's needed, when needed
-- **Lazy Loading**: Button loads first, chat loads on click
-- **Automatic Configuration**: Fetches widget settings from server
-- **Customizable**: Colors, icons, position, themes, auto-messages
-- **Smart API Detection**: Automatically detects the correct API URL from script source
-- **CORS-ready**: Designed to work across domains
-
-### Usage Example
-```html
-<script type="module">
-  import SynaplanWidget from 'https://web.synaplan.com/widget.js'
-
-  SynaplanWidget.init({
-    widgetId: 'wdg_abc123',
-    position: 'bottom-right',
-    primaryColor: '#007bff',
-    lazy: true
-  })
-</script>
-```
-
-### Widget Management
-- Create widgets in the web interface (Widgets section)
-- Configure appearance, behavior, and limits
-- Domain whitelisting for security
-- Rate limiting per subscription level
-- Copy embed code directly from UI
-
-### Building Widgets (Development)
-```bash
-cd frontend
-npm run build:widget    # Builds widget to dist-widget/
-```
-
-The widget build is automatically included in CI/CD and Docker images.
-
-## 📄 License
-
-See [LICENSE](LICENSE)
+[Apache-2.0](LICENSE)

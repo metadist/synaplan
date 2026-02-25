@@ -63,14 +63,11 @@ RUN chmod +x /usr/local/bin/docker-entrypoint.sh /usr/local/bin/synaplan
 # Copy built frontend (built externally in CI, empty in dev)
 COPY frontend/dist /var/www/frontend
 
-# Widget E2E test page (served by Caddy from backend public so it's always available in test stack)
-COPY frontend/public/widget-test.html /var/www/backend/public/widget-test.html
-
 # Copy built widgets (built externally in CI, empty in dev)
-# Note: In CI, widget files should exist (verified in workflow), but we don't fail the build if missing
-# to allow local development where dist-widget might be empty
+# In CI, widget files should exist (verified in workflow). Warn in CI if missing but don't fail (allows local dev with empty dist-widget).
 COPY frontend/dist-widget /var/www/widgets
-RUN if [ -z "$(ls -A /var/www/widgets 2>/dev/null)" ] && [ "${CI:-false}" = "true" ]; then \
+ARG CI=false
+RUN if [ -z "$(ls -A /var/www/widgets 2>/dev/null)" ] && [ "${CI}" = "true" ]; then \
       echo "::warning::Widget files are missing in CI build - this should not happen!" && \
       echo "::warning::Continuing build, but widget functionality may not work correctly"; \
     fi || true

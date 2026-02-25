@@ -13,6 +13,7 @@ use Doctrine\ORM\EntityManagerInterface;
 use OpenApi\Attributes as OA;
 use Psr\Log\LoggerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
+use Symfony\Component\DependencyInjection\Attribute\Autowire;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -31,6 +32,8 @@ class AdminController extends AbstractController
         private UsageStatsService $usageStatsService,
         private UserDeletionService $userDeletionService,
         private LoggerInterface $logger,
+        #[Autowire('%kernel.environment%')]
+        private readonly string $kernelEnvironment,
     ) {
     }
 
@@ -311,6 +314,7 @@ class AdminController extends AbstractController
 
     /**
      * Cleanup user data but keep user account (admin only, for idempotent tests).
+     * Only registered in dev and test (E2E); not available in prod.
      */
     #[Route('/users/{id}/cleanup', name: 'admin_cleanup_user_data', methods: ['POST'])]
     #[OA\Post(
@@ -329,13 +333,17 @@ class AdminController extends AbstractController
     )]
     #[OA\Response(response: 200, description: 'User data cleaned up')]
     #[OA\Response(response: 403, description: 'Not authorized')]
-    #[OA\Response(response: 404, description: 'User not found')]
+    #[OA\Response(response: 404, description: 'User not found or endpoint not available in this environment')]
     public function cleanupUserData(
         int $id,
         #[CurrentUser] ?User $user,
     ): JsonResponse {
         if (!$user || !$user->isAdmin()) {
             return $this->json(['error' => 'Admin access required'], Response::HTTP_FORBIDDEN);
+        }
+
+        if (!\in_array($this->kernelEnvironment, ['dev', 'test'], true)) {
+            return $this->json(['error' => 'Not found'], Response::HTTP_NOT_FOUND);
         }
 
         $targetUser = $this->userRepository->find($id);
