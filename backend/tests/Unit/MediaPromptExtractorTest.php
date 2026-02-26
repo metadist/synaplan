@@ -100,6 +100,7 @@ class MediaPromptExtractorTest extends TestCase
     {
         $chatHandler = $this->createMock(ChatHandler::class);
         $logger = $this->createMock(LoggerInterface::class);
+        $this->message->setText('Bitte hilf mir bei einer Frage');
 
         $chatHandler->expects($this->once())
             ->method('handle')
@@ -227,6 +228,33 @@ class MediaPromptExtractorTest extends TestCase
         $result = $extractor->extract($this->message, [], $this->classification);
 
         $this->assertSame('Hallo, was geht?', $result['prompt']);
+        $this->assertSame('audio', $result['media_type']);
+    }
+
+    public function testInfersAudioIntentWhenJsonDoesNotContainMediaType(): void
+    {
+        $chatHandler = $this->createMock(ChatHandler::class);
+        $logger = $this->createMock(LoggerInterface::class);
+
+        $this->message->setText('Sende mir eine Audiodatei und sag Hallo, wie gehts dir?');
+
+        $chatHandler->expects($this->exactly(2))
+            ->method('handle')
+            ->willReturnCallback(function ($message, $thread, $classification, $progress) {
+                if ('mediamaker' === $classification['topic']) {
+                    // JSON without BMEDIA should trigger inference + audio fallback extraction
+                    return ['content' => '{"BTEXT":"some generic media prompt"}'];
+                }
+
+                $this->assertSame('tools:mediamaker_audio_extract', $classification['topic']);
+
+                return ['content' => 'Hallo, wie gehts dir?'];
+            });
+
+        $extractor = new MediaPromptExtractor($chatHandler, $logger);
+        $result = $extractor->extract($this->message, [], $this->classification);
+
+        $this->assertSame('Hallo, wie gehts dir?', $result['prompt']);
         $this->assertSame('audio', $result['media_type']);
     }
 }

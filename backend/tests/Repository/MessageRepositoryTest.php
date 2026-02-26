@@ -270,6 +270,54 @@ class MessageRepositoryTest extends KernelTestCase
         $this->assertEmpty($history, 'Should return empty array for wrong user');
     }
 
+    public function testFindLatestIncomingEmailByExternalIdFindsMatchingMessage(): void
+    {
+        $matchingMessage = new Message();
+        $matchingMessage->setUserId($this->testUser->getId());
+        $matchingMessage->setChat($this->testChat);
+        $matchingMessage->setTrackingId(time());
+        $matchingMessage->setUnixTimestamp(time());
+        $matchingMessage->setDateTime(date('YmdHis'));
+        $matchingMessage->setText('Incoming email');
+        $matchingMessage->setDirection('IN');
+        $matchingMessage->setProviderIndex('EMAIL');
+        $matchingMessage->setMessageType('MAIL');
+        $matchingMessage->setTopic('CHAT');
+        $matchingMessage->setLanguage('en');
+        $matchingMessage->setStatus('complete');
+        $this->em->persist($matchingMessage);
+        $this->em->flush();
+        $matchingMessage->setMeta('channel', 'email');
+        $matchingMessage->setMeta('external_id', '<abc123@example.com>');
+        $matchingMessage->setMeta('from_email', 'sender@example.com');
+        $this->em->flush();
+
+        $otherMessage = new Message();
+        $otherMessage->setUserId($this->testUser->getId());
+        $otherMessage->setChat($this->testChat);
+        $otherMessage->setTrackingId(time() + 1);
+        $otherMessage->setUnixTimestamp(time() + 1);
+        $otherMessage->setDateTime(date('YmdHis', time() + 1));
+        $otherMessage->setText('Different sender');
+        $otherMessage->setDirection('IN');
+        $otherMessage->setProviderIndex('EMAIL');
+        $otherMessage->setMessageType('MAIL');
+        $otherMessage->setTopic('CHAT');
+        $otherMessage->setLanguage('en');
+        $otherMessage->setStatus('complete');
+        $this->em->persist($otherMessage);
+        $this->em->flush();
+        $otherMessage->setMeta('channel', 'email');
+        $otherMessage->setMeta('external_id', '<abc123@example.com>');
+        $otherMessage->setMeta('from_email', 'other@example.com');
+        $this->em->flush();
+
+        $found = $this->repository->findLatestIncomingEmailByExternalId('<ABC123@example.com>', 'Sender@Example.com');
+
+        $this->assertNotNull($found);
+        $this->assertSame($matchingMessage->getId(), $found->getId());
+    }
+
     /**
      * Helper to create test message.
      */
