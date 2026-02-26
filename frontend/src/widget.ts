@@ -189,9 +189,7 @@ class SynaplanWidget {
 
     this.themeObserver = new MutationObserver(() => {
       const theme = this.detectHostTheme()
-      window.dispatchEvent(
-        new CustomEvent('synaplan-widget-theme-sync', { detail: { theme } })
-      )
+      window.dispatchEvent(new CustomEvent('synaplan-widget-theme-sync', { detail: { theme } }))
     })
 
     this.themeObserver.observe(document.documentElement, {

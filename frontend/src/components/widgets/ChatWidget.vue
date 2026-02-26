@@ -5,7 +5,11 @@
       widgetTheme === 'dark' ? 'dark' : '',
       testMode ? 'relative w-full h-full' : isPreview ? 'absolute' : 'fixed',
       testMode ? '' : 'z-[9999]',
-      testMode ? '' : (isFullscreen && isOpen ? 'inset-0 flex items-center justify-center' : positionClass),
+      testMode
+        ? ''
+        : isFullscreen && isOpen
+          ? 'inset-0 flex items-center justify-center'
+          : positionClass,
     ]"
     data-testid="comp-chat-widget"
     style="pointer-events: auto"
@@ -22,7 +26,11 @@
       <div
         v-if="isFullscreen && isOpen"
         class="absolute inset-0"
-        style="background: rgba(0, 0, 0, 0.4); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px)"
+        style="
+          background: rgba(0, 0, 0, 0.4);
+          backdrop-filter: blur(8px);
+          -webkit-backdrop-filter: blur(8px);
+        "
         data-testid="fullscreen-backdrop"
         @click="closeChat"
       ></div>
@@ -78,7 +86,11 @@
     >
       <div
         v-if="isOpen"
-        :class="['flex flex-col overflow-hidden shadow-2xl', isFullscreen ? 'relative z-10' : '', ...chatWindowClasses]"
+        :class="[
+          'flex flex-col overflow-hidden shadow-2xl',
+          isFullscreen ? 'relative z-10' : '',
+          ...chatWindowClasses,
+        ]"
         :style="{
           backgroundColor: widgetTheme === 'dark' ? '#1a1a1a' : '#ffffff',
           ...chatWindowStyle,

@@ -193,17 +193,14 @@ test.describe('@plugin Synaplan Plugin — config endpoints', () => {
   })
 
   test('PUT /plugins/castingdata/config saves configuration', async ({ request }) => {
-    const res = await request.put(
-      `${SYNAPLAN_API}/api/v1/user/1/plugins/castingdata/config`,
-      {
-        headers: { Cookie: cookieHeader, 'Content-Type': 'application/json' },
-        data: {
-          api_url: CASTAPP_URL,
-          api_key: CASTAPP_API_KEY,
-          enabled: true,
-        },
+    const res = await request.put(`${SYNAPLAN_API}/api/v1/user/1/plugins/castingdata/config`, {
+      headers: { Cookie: cookieHeader, 'Content-Type': 'application/json' },
+      data: {
+        api_url: CASTAPP_URL,
+        api_key: CASTAPP_API_KEY,
+        enabled: true,
       },
-    )
+    })
     expect(res.status()).toBe(200)
 
     const body = await res.json()
@@ -214,12 +211,9 @@ test.describe('@plugin Synaplan Plugin — config endpoints', () => {
   })
 
   test('GET /plugins/castingdata/config returns config with masked key', async ({ request }) => {
-    const res = await request.get(
-      `${SYNAPLAN_API}/api/v1/user/1/plugins/castingdata/config`,
-      {
-        headers: { Cookie: cookieHeader },
-      },
-    )
+    const res = await request.get(`${SYNAPLAN_API}/api/v1/user/1/plugins/castingdata/config`, {
+      headers: { Cookie: cookieHeader },
+    })
     expect(res.status()).toBe(200)
 
     const body = await res.json()
@@ -235,7 +229,7 @@ test.describe('@plugin Synaplan Plugin — config endpoints', () => {
       `${SYNAPLAN_API}/api/v1/user/1/plugins/castingdata/test-connection`,
       {
         headers: { Cookie: cookieHeader },
-      },
+      }
     )
     expect(res.status()).toBe(200)
 
@@ -326,8 +320,14 @@ test.describe('@plugin Chat Widget — AI casting queries', () => {
     await sendWidgetMessage(page, 'Welche Produktionen gibt es gerade?')
 
     // Wait for AI streaming response — poll for assistant message bubble
-    const assistantMsg = page.locator('[data-testid="section-messages"] .message-assistant, [data-testid="section-messages"] [class*="assistant"]').first()
-    await expect(assistantMsg).toBeVisible({ timeout: 30_000 }).catch(() => {})
+    const assistantMsg = page
+      .locator(
+        '[data-testid="section-messages"] .message-assistant, [data-testid="section-messages"] [class*="assistant"]'
+      )
+      .first()
+    await expect(assistantMsg)
+      .toBeVisible({ timeout: 30_000 })
+      .catch(() => {})
 
     // Allow streaming to complete
     await page.waitForTimeout(15_000)
@@ -342,11 +342,14 @@ test.describe('@plugin Chat Widget — AI casting queries', () => {
     const messagesText = await messagesSection.innerText().catch(() => '')
     // Should contain at least some production-related keywords from CastApp test data
     const hasContext = ['Mamma Mia', 'Hamlet', 'West Side Story', 'Produktion', 'produktion'].some(
-      (keyword) => messagesText.includes(keyword),
+      (keyword) => messagesText.includes(keyword)
     )
 
     expect
-      .soft(hasContext, `AI response should mention known productions. Got: ${messagesText.slice(0, 200)}`)
+      .soft(
+        hasContext,
+        `AI response should mention known productions. Got: ${messagesText.slice(0, 200)}`
+      )
       .toBe(true)
   })
 
@@ -357,8 +360,14 @@ test.describe('@plugin Chat Widget — AI casting queries', () => {
     await sendWidgetMessage(page, 'Gibt es Auditions in Wien?')
 
     // Wait for AI streaming response
-    const assistantMsg = page.locator('[data-testid="section-messages"] .message-assistant, [data-testid="section-messages"] [class*="assistant"]').first()
-    await expect(assistantMsg).toBeVisible({ timeout: 30_000 }).catch(() => {})
+    const assistantMsg = page
+      .locator(
+        '[data-testid="section-messages"] .message-assistant, [data-testid="section-messages"] [class*="assistant"]'
+      )
+      .first()
+    await expect(assistantMsg)
+      .toBeVisible({ timeout: 30_000 })
+      .catch(() => {})
 
     // Allow streaming to complete
     await page.waitForTimeout(15_000)
@@ -370,12 +379,15 @@ test.describe('@plugin Chat Widget — AI casting queries', () => {
 
     const messagesSection = page.locator('[data-testid="section-messages"]')
     const messagesText = await messagesSection.innerText().catch(() => '')
-    const hasContext = ['Wien', 'Audition', 'audition', 'Vorsprechen', 'Casting'].some(
-      (keyword) => messagesText.includes(keyword),
+    const hasContext = ['Wien', 'Audition', 'audition', 'Vorsprechen', 'Casting'].some((keyword) =>
+      messagesText.includes(keyword)
     )
 
     expect
-      .soft(hasContext, `AI response should mention Wien/Audition. Got: ${messagesText.slice(0, 200)}`)
+      .soft(
+        hasContext,
+        `AI response should mention Wien/Audition. Got: ${messagesText.slice(0, 200)}`
+      )
       .toBe(true)
   })
 })
