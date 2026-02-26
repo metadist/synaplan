@@ -1,6 +1,5 @@
 /** Global notification toasts (useNotification / showError) */
-const notificationError =
-  '[data-testid="comp-notification-item"][data-notification-type="error"]'
+const notificationError = '[data-testid="comp-notification-item"][data-notification-type="error"]'
 
 export const selectors = {
   notification: {
