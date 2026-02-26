@@ -279,4 +279,94 @@ describe('ChatWidget — Fullscreen Feature', () => {
       expect(wrapper.find('[data-testid="btn-fullscreen"]').exists()).toBe(false)
     })
   })
+
+  // --- Fullscreen sizing ---
+
+  describe('fullscreen sizing', () => {
+    it('applies larger max-width class in fullscreen mode', async () => {
+      const wrapper = mountWidget({
+        fullscreenMode: true,
+        openImmediately: true,
+        testMode: false,
+      })
+      await flushPromises()
+      await nextTick()
+
+      const chatWindow = wrapper.find('[data-testid="section-chat-window"]')
+      expect(chatWindow.exists()).toBe(true)
+      expect(chatWindow.classes()).toContain('max-w-[1100px]')
+    })
+
+    it('applies standard max-width in non-fullscreen mode', async () => {
+      const wrapper = mountWidget({
+        fullscreenMode: false,
+        openImmediately: true,
+        testMode: false,
+      })
+      await flushPromises()
+      await nextTick()
+
+      const chatWindow = wrapper.find('[data-testid="section-chat-window"]')
+      if (chatWindow.exists()) {
+        expect(chatWindow.classes()).toContain('max-w-[420px]')
+      }
+    })
+  })
+
+  // --- Theme sync event ---
+
+  describe('theme sync from host page', () => {
+    it('switches to dark mode when theme-sync event fires', async () => {
+      const wrapper = mountWidget({
+        defaultTheme: 'light',
+        openImmediately: true,
+      })
+      await flushPromises()
+      await nextTick()
+
+      window.dispatchEvent(
+        new CustomEvent('synaplan-widget-theme-sync', { detail: { theme: 'dark' } })
+      )
+      await nextTick()
+
+      const root = wrapper.find('[data-testid="comp-chat-widget"]')
+      expect(root.classes()).toContain('dark')
+    })
+
+    it('switches to light mode when theme-sync event fires', async () => {
+      const wrapper = mountWidget({
+        defaultTheme: 'dark',
+        openImmediately: true,
+      })
+      await flushPromises()
+      await nextTick()
+
+      const root = wrapper.find('[data-testid="comp-chat-widget"]')
+      expect(root.classes()).toContain('dark')
+
+      window.dispatchEvent(
+        new CustomEvent('synaplan-widget-theme-sync', { detail: { theme: 'light' } })
+      )
+      await nextTick()
+
+      expect(root.classes()).not.toContain('dark')
+    })
+
+    it('ignores invalid theme values', async () => {
+      const wrapper = mountWidget({
+        defaultTheme: 'light',
+        openImmediately: true,
+      })
+      await flushPromises()
+      await nextTick()
+
+      window.dispatchEvent(
+        new CustomEvent('synaplan-widget-theme-sync', { detail: { theme: 'invalid' } })
+      )
+      await nextTick()
+
+      const root = wrapper.find('[data-testid="comp-chat-widget"]')
+      expect(root.classes()).not.toContain('dark')
+    })
+  })
 })

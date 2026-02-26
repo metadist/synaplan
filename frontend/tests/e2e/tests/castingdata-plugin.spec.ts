@@ -75,10 +75,19 @@ async function synaplanLoginViaApi(request: APIRequestContext): Promise<string> 
 }
 
 async function openWidget(page: Page) {
-  const btn = page.locator('#synaplan-widget-button')
-  await expect(btn).toBeVisible({ timeout: 15_000 })
-  await btn.click()
-  // Wait for Shadow DOM chat to mount
+  // CastApp uses a header button (#synaplanChatBtn) with hideButton: true
+  const headerBtn = page.locator('#synaplanChatBtn')
+  const floatingBtn = page.locator('#synaplan-widget-button')
+
+  const useHeaderBtn = await headerBtn.isVisible().catch(() => false)
+
+  if (useHeaderBtn) {
+    await headerBtn.click()
+  } else {
+    await expect(floatingBtn).toBeVisible({ timeout: 15_000 })
+    await floatingBtn.click()
+  }
+
   const chatWindow = page.locator('[data-testid="section-chat-window"]')
   await expect(chatWindow).toBeVisible({ timeout: 15_000 })
 }
@@ -239,34 +248,36 @@ test.describe('@plugin Synaplan Plugin — config endpoints', () => {
 // --- 3. Chat Widget on CastApp — visual / integration -----------------------
 
 test.describe('@plugin Chat Widget on CastApp', () => {
-  // Warm up Synaplan server before first browser test so widget.js loads fast
   test.beforeAll(async ({ request }) => {
     await request.get(`${SYNAPLAN_API}/api/v1/health`).catch(() => {})
   })
 
-  test('widget button appears after performer login', async ({ page }) => {
+  test('header chat button appears after performer login', async ({ page }) => {
     await castappLogin(page)
 
-    const btn = page.locator('#synaplan-widget-button')
-    await expect(btn).toBeVisible({ timeout: 30_000 })
+    const headerBtn = page.locator('#synaplanChatBtn')
+    await expect(headerBtn).toBeVisible({ timeout: 30_000 })
 
-    await page.screenshot({ path: 'tests/e2e/test-results/plugin-widget-button.png' })
+    await page.screenshot({ path: 'tests/e2e/test-results/plugin-header-button.png' })
   })
 
-  test('widget opens chat panel on click', async ({ page }) => {
+  test('widget opens in fullscreen with backdrop on header button click', async ({ page }) => {
     await castappLogin(page)
     await openWidget(page)
 
     const chatWindow = page.locator('[data-testid="section-chat-window"]')
     await expect(chatWindow).toBeVisible()
 
+    const backdrop = page.locator('[data-testid="fullscreen-backdrop"]')
+    await expect(backdrop).toBeVisible()
+
     const input = page.locator('[data-testid="input-message"]')
     await expect(input).toBeVisible()
 
-    await page.screenshot({ path: 'tests/e2e/test-results/plugin-widget-open.png' })
+    await page.screenshot({ path: 'tests/e2e/test-results/plugin-widget-fullscreen.png' })
   })
 
-  test('widget can be closed and button reappears', async ({ page }) => {
+  test('widget closes when close button is clicked', async ({ page }) => {
     await castappLogin(page)
     await openWidget(page)
 
@@ -274,8 +285,32 @@ test.describe('@plugin Chat Widget on CastApp', () => {
     await closeBtn.click()
     await page.waitForTimeout(1_000)
 
-    const btn = page.locator('#synaplan-widget-button')
-    await expect(btn).toBeVisible({ timeout: 5_000 })
+    const chatWindow = page.locator('[data-testid="section-chat-window"]')
+    await expect(chatWindow).not.toBeVisible()
+
+    const headerBtn = page.locator('#synaplanChatBtn')
+    await expect(headerBtn).toBeVisible()
+  })
+
+  test('widget closes when backdrop is clicked', async ({ page }) => {
+    await castappLogin(page)
+    await openWidget(page)
+
+    const backdrop = page.locator('[data-testid="fullscreen-backdrop"]')
+    await expect(backdrop).toBeVisible()
+    await backdrop.click({ position: { x: 10, y: 10 } })
+    await page.waitForTimeout(1_000)
+
+    const chatWindow = page.locator('[data-testid="section-chat-window"]')
+    await expect(chatWindow).not.toBeVisible()
+  })
+
+  test('fullscreen toggle button is visible in chat header', async ({ page }) => {
+    await castappLogin(page)
+    await openWidget(page)
+
+    const fullscreenBtn = page.locator('[data-testid="btn-fullscreen"]')
+    await expect(fullscreenBtn).toBeVisible()
   })
 })
 

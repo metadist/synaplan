@@ -5,7 +5,7 @@ export default {
    * @param {Object} context - Context provided by the host app (userId, apiBaseUrl, pluginBaseUrl, token)
    */
   mount(el, context) {
-    const baseUrl = context.pluginBaseUrl
+    const baseUrl = context.pluginBaseUrl.replace(/\/assets$/, '')
 
     el.innerHTML = `
       <div style="padding: 20px; font-family: sans-serif; max-width: 600px;">
@@ -104,14 +104,15 @@ export default {
         'Content-Type': 'application/json',
         ...options.headers,
       }
-      if (context.token) {
-        headers['Authorization'] = `Bearer ${context.token}`
-      }
-      const response = await fetch(`${baseUrl}${path}`, {
+      const url = `${baseUrl}${path}`
+      const response = await fetch(url, {
         ...options,
         headers,
         credentials: 'include',
       })
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText} (${url})`)
+      }
       return response.json()
     }
 
@@ -126,7 +127,8 @@ export default {
           keyHint.textContent = 'API key is configured. Leave empty to keep current key.'
         }
       } catch (e) {
-        showStatus('Failed to load configuration', false)
+        console.error('CastingData: loadConfig failed', e)
+        showStatus('Failed to load configuration: ' + e.message, false)
       }
     }
 

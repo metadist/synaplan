@@ -5,12 +5,30 @@
       widgetTheme === 'dark' ? 'dark' : '',
       testMode ? 'relative w-full h-full' : isPreview ? 'absolute' : 'fixed',
       testMode ? '' : 'z-[9999]',
-      testMode ? '' : positionClass,
+      testMode ? '' : (isFullscreen && isOpen ? 'inset-0 flex items-center justify-center' : positionClass),
     ]"
     data-testid="comp-chat-widget"
     style="pointer-events: auto"
   >
-    <!-- Chat Button - absolute positioned to avoid layout shift -->
+    <!-- Fullscreen Backdrop -->
+    <Transition
+      enter-active-class="transition-opacity duration-300 ease-out"
+      enter-from-class="opacity-0"
+      enter-to-class="opacity-100"
+      leave-active-class="transition-opacity duration-200 ease-in"
+      leave-from-class="opacity-100"
+      leave-to-class="opacity-0"
+    >
+      <div
+        v-if="isFullscreen && isOpen"
+        class="absolute inset-0"
+        style="background: rgba(0, 0, 0, 0.4); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px)"
+        data-testid="fullscreen-backdrop"
+        @click="closeChat"
+      ></div>
+    </Transition>
+
+    <!-- Chat Button -->
     <Transition
       enter-active-class="transition-all duration-300 ease-out"
       enter-from-class="scale-0 opacity-0"
@@ -52,15 +70,15 @@
     <!-- Chat Window -->
     <Transition
       enter-active-class="transition-all duration-300 ease-out"
-      enter-from-class="translate-y-full opacity-0"
-      enter-to-class="translate-y-0 opacity-100"
+      :enter-from-class="isFullscreen ? 'scale-95 opacity-0' : 'translate-y-full opacity-0'"
+      :enter-to-class="isFullscreen ? 'scale-100 opacity-100' : 'translate-y-0 opacity-100'"
       leave-active-class="transition-all duration-200 ease-in"
-      leave-from-class="translate-y-0 opacity-100"
-      leave-to-class="translate-y-full opacity-0"
+      :leave-from-class="isFullscreen ? 'scale-100 opacity-100' : 'translate-y-0 opacity-100'"
+      :leave-to-class="isFullscreen ? 'scale-95 opacity-0' : 'translate-y-full opacity-0'"
     >
       <div
         v-if="isOpen"
-        :class="['flex flex-col overflow-hidden shadow-2xl', ...chatWindowClasses]"
+        :class="['flex flex-col overflow-hidden shadow-2xl', isFullscreen ? 'relative z-10' : '', ...chatWindowClasses]"
         :style="{
           backgroundColor: widgetTheme === 'dark' ? '#1a1a1a' : '#ffffff',
           ...chatWindowStyle,
@@ -104,6 +122,16 @@
             >
               <SunIcon v-if="widgetTheme === 'dark'" class="w-5 h-5 text-white" />
               <MoonIcon v-else class="w-5 h-5 text-white" />
+            </button>
+            <button
+              v-if="allowFullscreen && !isMobile"
+              class="w-8 h-8 rounded-lg bg-white/10 hover:bg-white/20 transition-colors flex items-center justify-center"
+              :aria-label="isFullscreen ? 'Minimize' : 'Maximize'"
+              data-testid="btn-fullscreen"
+              @click="toggleFullscreen"
+            >
+              <ArrowsPointingInIcon v-if="isFullscreen" class="w-5 h-5 text-white" />
+              <ArrowsPointingOutIcon v-else class="w-5 h-5 text-white" />
             </button>
             <button
               class="w-8 h-8 rounded-lg bg-white/10 hover:bg-white/20 transition-colors flex items-center justify-center"
@@ -498,6 +526,8 @@ import {
   ExclamationTriangleIcon,
   XCircleIcon,
   ArrowDownTrayIcon,
+  ArrowsPointingOutIcon,
+  ArrowsPointingInIcon,
 } from '@heroicons/vue/24/outline'
 
 import { uploadWidgetFile, sendWidgetMessage } from '@/services/api/widgetsApi'
@@ -526,6 +556,8 @@ interface Props {
   allowFileUpload?: boolean
   fileUploadLimit?: number
   hideButton?: boolean
+  fullscreenMode?: boolean
+  allowFullscreen?: boolean
   testMode?: boolean
 }
 
@@ -544,6 +576,8 @@ const props = withDefaults(defineProps<Props>(), {
   allowFileUpload: false,
   fileUploadLimit: 3,
   hideButton: false,
+  fullscreenMode: false,
+  allowFullscreen: false,
   testMode: false,
 })
 
@@ -573,6 +607,7 @@ interface Message {
 }
 
 const isOpen = ref(false)
+const isFullscreen = ref(props.fullscreenMode)
 const widgetTheme = ref<'light' | 'dark'>(props.defaultTheme)
 const inputMessage = ref('')
 
@@ -658,9 +693,11 @@ const chatWindowClasses = computed(() => {
   if (isMobile.value && !props.isPreview) {
     return ['fixed inset-0 rounded-none w-screen h-screen']
   }
-  // Test mode: fill parent container completely
   if (props.testMode) {
     return ['rounded-2xl w-full h-full']
+  }
+  if (isFullscreen.value) {
+    return ['rounded-2xl w-full max-w-[1100px]']
   }
   return ['rounded-2xl w-full max-w-[420px]']
 })
@@ -673,11 +710,17 @@ const chatWindowStyle = computed(() => {
     }
   }
 
-  // Test mode: fill the parent container completely
   if (props.testMode) {
     return {
       width: '100%',
       height: '100%',
+    }
+  }
+
+  if (isFullscreen.value) {
+    return {
+      width: 'min(95vw, 1100px)',
+      height: 'min(92vh, 900px)',
     }
   }
 
@@ -763,6 +806,10 @@ const toggleChat = () => {
 
 const toggleTheme = () => {
   widgetTheme.value = widgetTheme.value === 'dark' ? 'light' : 'dark'
+}
+
+const toggleFullscreen = () => {
+  isFullscreen.value = !isFullscreen.value
 }
 
 // Format a date for the export
@@ -1482,6 +1529,13 @@ const handleCloseEvent = (event: Event) => {
   closeChat()
 }
 
+const handleThemeSyncEvent = (event: Event) => {
+  const theme = (event as CustomEvent).detail?.theme
+  if (theme === 'dark' || theme === 'light') {
+    widgetTheme.value = theme
+  }
+}
+
 const normalizeServerMessage = (raw: any): Message => {
   let content = raw.text ?? ''
   if (typeof content === 'string') {
@@ -1756,6 +1810,7 @@ onMounted(() => {
 
   window.addEventListener('synaplan-widget-open', handleOpenEvent)
   window.addEventListener('synaplan-widget-close', handleCloseEvent)
+  window.addEventListener('synaplan-widget-theme-sync', handleThemeSyncEvent)
 
   // In test mode, create a temporary session without localStorage persistence
   if (isTestEnvironment.value) {
@@ -1801,6 +1856,7 @@ onBeforeUnmount(() => {
 
   window.removeEventListener('synaplan-widget-open', handleOpenEvent)
   window.removeEventListener('synaplan-widget-close', handleCloseEvent)
+  window.removeEventListener('synaplan-widget-theme-sync', handleThemeSyncEvent)
 
   // Unsubscribe from SSE events
   if (eventSubscription) {
