@@ -663,18 +663,24 @@ class WebhookController extends AbstractController
             return null;
         }
 
-        $absolutePath = $this->getParameter('kernel.project_dir').'/var/uploads/'.ltrim($relativePath, '/');
+        $baseDir = $this->getParameter('kernel.project_dir').'/var/uploads';
+        $absolutePath = $baseDir.'/'.ltrim($relativePath, '/');
+        $resolvedPath = realpath($absolutePath);
 
-        if (!is_file($absolutePath)) {
-            $this->logger->warning('Email attachment not found on disk', [
+        $isWithinBaseDir = false !== $resolvedPath
+            && ($resolvedPath === $baseDir || str_starts_with($resolvedPath, $baseDir.DIRECTORY_SEPARATOR));
+
+        if (false === $resolvedPath || !$isWithinBaseDir || !is_file($resolvedPath)) {
+            $this->logger->warning('Email attachment not found or outside allowed directory', [
                 'media_type' => $mediaType,
                 'relative_path' => $relativePath,
                 'absolute_path' => $absolutePath,
+                'resolved_path' => $resolvedPath,
             ]);
 
             return null;
         }
 
-        return $absolutePath;
+        return $resolvedPath;
     }
 }

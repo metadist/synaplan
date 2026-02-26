@@ -257,4 +257,20 @@ class MediaPromptExtractorTest extends TestCase
         $this->assertSame('Hallo, wie gehts dir?', $result['prompt']);
         $this->assertSame('audio', $result['media_type']);
     }
+
+    public function testNormalizesAudiodateiMediaTypeFromJson(): void
+    {
+        $chatHandler = $this->createMock(ChatHandler::class);
+        $logger = $this->createMock(LoggerInterface::class);
+
+        $chatHandler->expects($this->once())
+            ->method('handle')
+            ->willReturn(['content' => '{"BMEDIA":"Audiodatei","BTEXT":"Hallo, wie gehts dir?"}']);
+
+        $extractor = new MediaPromptExtractor($chatHandler, $logger);
+        $result = $extractor->extract($this->message, [], $this->classification);
+
+        $this->assertSame('Hallo, wie gehts dir?', $result['prompt']);
+        $this->assertSame('audio', $result['media_type']);
+    }
 }

@@ -182,7 +182,7 @@ class MediaPromptExtractor
         $value = strtolower(trim($value));
 
         return match ($value) {
-            'audio', 'sound', 'voice', 'tts', 'text2sound', 'mp3', 'wav', 'ogg' => 'audio',
+            'audio', 'audiodatei', 'audiofile', 'sprachnachricht', 'sprachdatei', 'voice', 'voice note', 'speech', 'sound', 'tts', 'text2sound', 'mp3', 'wav', 'ogg' => 'audio',
             'video', 'vid', 'text2vid' => 'video',
             'image', 'img', 'picture', 'pic', 'text2pic' => 'image',
             default => null,
@@ -218,10 +218,7 @@ class MediaPromptExtractor
 
         $text = $message->getText();
 
-        return (bool) preg_match(
-            '/(audiodatei|audiofile|audio|tonspur|sprachnachricht|sprachdatei|sound|sprach[a-z]*|voice(?:\s?note)?|tts|sprich|sage|lies|vorlesen|vortragen|mp3|wav|ogg|musik|music)/i',
-            $text
-        );
+        return $this->isAudioIntentText($text);
     }
 
     private function inferMediaTypeFromMessageText(string $text): ?string
