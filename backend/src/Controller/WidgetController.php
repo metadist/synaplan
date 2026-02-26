@@ -2,9 +2,12 @@
 
 namespace App\Controller;
 
+use App\Entity\Prompt;
 use App\Entity\User;
 use App\Entity\Widget;
+use App\Repository\PromptRepository;
 use App\Repository\WidgetRepository;
+use App\Service\File\UserUploadPathBuilder;
 use App\Service\WidgetService;
 use App\Service\WidgetSessionService;
 use App\Service\WidgetSetupService;
@@ -32,8 +35,11 @@ class WidgetController extends AbstractController
         private WidgetSessionService $sessionService,
         private WidgetSetupService $setupService,
         private WidgetRepository $widgetRepository,
+        private PromptRepository $promptRepository,
+        private UserUploadPathBuilder $userUploadPathBuilder,
         private EntityManagerInterface $em,
         private LoggerInterface $logger,
+        private string $uploadDir,
     ) {
     }
 
@@ -494,28 +500,31 @@ class WidgetController extends AbstractController
         }
 
         try {
-            // Create upload directory if it doesn't exist
-            $uploadDir = $this->getParameter('kernel.project_dir').'/public/uploads/widget-icons';
-            if (!is_dir($uploadDir)) {
-                mkdir($uploadDir, 0755, true);
+            // Build per-user sharded path: widget-icons/{shard}/{year}/{month}/{filename}
+            $userBase = $this->userUploadPathBuilder->buildUserBaseRelativePath($user->getId());
+            $year = date('Y');
+            $month = date('m');
+
+            $extension = $uploadedFile->guessExtension() ?? 'png';
+            $filename = 'wicon_'.bin2hex(random_bytes(8)).'_'.time().'.'.$extension;
+
+            $relativePath = 'widget-icons/'.$userBase.'/'.$year.'/'.$month.'/'.$filename;
+            $absoluteDir = $this->uploadDir.'/widget-icons/'.$userBase.'/'.$year.'/'.$month;
+
+            if (!is_dir($absoluteDir)) {
+                mkdir($absoluteDir, 0755, true);
             }
 
-            // Generate unique filename
-            $extension = $uploadedFile->guessExtension() ?? 'png';
-            $filename = uniqid('icon_').'_'.time().'.'.$extension;
+            $uploadedFile->move($absoluteDir, $filename);
 
-            // Move file to upload directory
-            $uploadedFile->move($uploadDir, $filename);
-
-            // Generate public URL using SYNAPLAN_URL (public backend URL)
-            // Fallback to request host if not configured
+            // Public URL via file-serving API (works cross-origin for embedded widgets)
             $baseUrl = $_ENV['SYNAPLAN_URL'] ?? $request->getSchemeAndHttpHost();
             $baseUrl = rtrim($baseUrl, '/');
-            $iconUrl = $baseUrl.'/uploads/widget-icons/'.$filename;
+            $iconUrl = $baseUrl.'/api/v1/files/uploads/'.$relativePath;
 
             $this->logger->info('Widget icon uploaded', [
                 'widget_id' => $widgetId,
-                'filename' => $filename,
+                'relative_path' => $relativePath,
                 'url' => $iconUrl,
             ]);
 
@@ -730,5 +739,208 @@ class WidgetController extends AbstractController
                 'error' => 'Failed to generate prompt',
             ], Response::HTTP_INTERNAL_SERVER_ERROR);
         }
+    }
+
+    /**
+     * Get the setup interview prompt for a widget.
+     */
+    #[Route('/{widgetId}/setup/prompt', name: 'get_setup_prompt', methods: ['GET'])]
+    #[OA\Get(
+        path: '/api/v1/widgets/{widgetId}/setup/prompt',
+        summary: 'Get the AI setup interview prompt for a widget',
+        description: 'Returns the custom prompt if one exists, otherwise returns the system default.',
+        security: [['Bearer' => []]],
+        tags: ['Widgets'],
+        parameters: [
+            new OA\Parameter(name: 'widgetId', in: 'path', required: true, schema: new OA\Schema(type: 'string')),
+        ],
+        responses: [
+            new OA\Response(
+                response: 200,
+                description: 'Setup prompt',
+                content: new OA\JsonContent(
+                    required: ['success', 'prompt', 'isDefault', 'modelId'],
+                    properties: [
+                        new OA\Property(property: 'success', type: 'boolean', example: true),
+                        new OA\Property(property: 'prompt', type: 'string'),
+                        new OA\Property(property: 'isDefault', type: 'boolean', example: true),
+                        new OA\Property(property: 'modelId', type: 'integer', example: -1, description: '-1 = automated, positive = specific model ID'),
+                    ]
+                )
+            ),
+            new OA\Response(response: 401, description: 'Not authenticated'),
+            new OA\Response(response: 404, description: 'Widget not found'),
+        ]
+    )]
+    public function getSetupPrompt(
+        string $widgetId,
+        #[CurrentUser] ?User $user,
+    ): JsonResponse {
+        if (!$user) {
+            return $this->json(['error' => 'Not authenticated'], Response::HTTP_UNAUTHORIZED);
+        }
+
+        $widget = $this->widgetRepository->findByWidgetId($widgetId);
+        if (!$widget || $widget->getOwnerId() !== $user->getId()) {
+            return $this->json(['error' => 'Widget not found'], Response::HTTP_NOT_FOUND);
+        }
+
+        $customTopic = WidgetSetupService::getSetupTopicForWidget($widget);
+        $customPrompt = $this->promptRepository->findOneBy([
+            'topic' => $customTopic,
+            'ownerId' => $user->getId(),
+        ]);
+
+        if ($customPrompt) {
+            return $this->json([
+                'success' => true,
+                'prompt' => $customPrompt->getPrompt(),
+                'isDefault' => false,
+                'modelId' => WidgetSetupService::parseModelId($customPrompt),
+            ]);
+        }
+
+        $defaultPrompt = $this->promptRepository->findOneBy([
+            'topic' => WidgetSetupService::SETUP_INTERVIEW_TOPIC,
+            'ownerId' => 0,
+        ]);
+
+        return $this->json([
+            'success' => true,
+            'prompt' => $defaultPrompt?->getPrompt() ?? WidgetSetupService::getDefaultPromptText(),
+            'isDefault' => true,
+            'modelId' => -1,
+        ]);
+    }
+
+    /**
+     * Create or update a custom setup interview prompt for a widget.
+     */
+    #[Route('/{widgetId}/setup/prompt', name: 'update_setup_prompt', methods: ['PUT'])]
+    #[OA\Put(
+        path: '/api/v1/widgets/{widgetId}/setup/prompt',
+        summary: 'Set a custom AI setup interview prompt for a widget',
+        security: [['Bearer' => []]],
+        tags: ['Widgets'],
+        parameters: [
+            new OA\Parameter(name: 'widgetId', in: 'path', required: true, schema: new OA\Schema(type: 'string')),
+        ],
+        requestBody: new OA\RequestBody(
+            required: true,
+            content: new OA\JsonContent(
+                required: ['prompt'],
+                properties: [
+                    new OA\Property(property: 'prompt', type: 'string'),
+                    new OA\Property(property: 'modelId', type: 'integer', example: -1),
+                ]
+            )
+        ),
+        responses: [
+            new OA\Response(
+                response: 200,
+                description: 'Prompt saved',
+                content: new OA\JsonContent(
+                    required: ['success'],
+                    properties: [new OA\Property(property: 'success', type: 'boolean', example: true)]
+                )
+            ),
+            new OA\Response(response: 400, description: 'Invalid request'),
+            new OA\Response(response: 401, description: 'Not authenticated'),
+            new OA\Response(response: 404, description: 'Widget not found'),
+        ]
+    )]
+    public function updateSetupPrompt(
+        string $widgetId,
+        Request $request,
+        #[CurrentUser] ?User $user,
+    ): JsonResponse {
+        if (!$user) {
+            return $this->json(['error' => 'Not authenticated'], Response::HTTP_UNAUTHORIZED);
+        }
+
+        $widget = $this->widgetRepository->findByWidgetId($widgetId);
+        if (!$widget || $widget->getOwnerId() !== $user->getId()) {
+            return $this->json(['error' => 'Widget not found'], Response::HTTP_NOT_FOUND);
+        }
+
+        $data = json_decode($request->getContent(), true) ?? [];
+        $promptText = $data['prompt'] ?? null;
+        if (!$promptText || !is_string($promptText) || '' === trim($promptText)) {
+            return $this->json(['error' => 'Prompt text is required'], Response::HTTP_BAD_REQUEST);
+        }
+
+        $modelId = isset($data['modelId']) ? (int) $data['modelId'] : -1;
+
+        $customTopic = WidgetSetupService::getSetupTopicForWidget($widget);
+        $prompt = $this->promptRepository->findOneBy([
+            'topic' => $customTopic,
+            'ownerId' => $user->getId(),
+        ]);
+
+        if (!$prompt) {
+            $prompt = new Prompt();
+            $prompt->setOwnerId($user->getId());
+            $prompt->setLanguage('en');
+            $prompt->setTopic($customTopic);
+        }
+
+        $prompt->setPrompt($promptText);
+        $prompt->setShortDescription($modelId > 0 ? (string) $modelId : '');
+        $this->em->persist($prompt);
+        $this->em->flush();
+
+        return $this->json(['success' => true]);
+    }
+
+    /**
+     * Reset setup interview prompt to system default.
+     */
+    #[Route('/{widgetId}/setup/prompt', name: 'delete_setup_prompt', methods: ['DELETE'])]
+    #[OA\Delete(
+        path: '/api/v1/widgets/{widgetId}/setup/prompt',
+        summary: 'Reset setup interview prompt to default',
+        security: [['Bearer' => []]],
+        tags: ['Widgets'],
+        parameters: [
+            new OA\Parameter(name: 'widgetId', in: 'path', required: true, schema: new OA\Schema(type: 'string')),
+        ],
+        responses: [
+            new OA\Response(
+                response: 200,
+                description: 'Prompt reset to default',
+                content: new OA\JsonContent(
+                    required: ['success'],
+                    properties: [new OA\Property(property: 'success', type: 'boolean', example: true)]
+                )
+            ),
+            new OA\Response(response: 401, description: 'Not authenticated'),
+            new OA\Response(response: 404, description: 'Widget not found'),
+        ]
+    )]
+    public function deleteSetupPrompt(
+        string $widgetId,
+        #[CurrentUser] ?User $user,
+    ): JsonResponse {
+        if (!$user) {
+            return $this->json(['error' => 'Not authenticated'], Response::HTTP_UNAUTHORIZED);
+        }
+
+        $widget = $this->widgetRepository->findByWidgetId($widgetId);
+        if (!$widget || $widget->getOwnerId() !== $user->getId()) {
+            return $this->json(['error' => 'Widget not found'], Response::HTTP_NOT_FOUND);
+        }
+
+        $customTopic = WidgetSetupService::getSetupTopicForWidget($widget);
+        $prompt = $this->promptRepository->findOneBy([
+            'topic' => $customTopic,
+            'ownerId' => $user->getId(),
+        ]);
+
+        if ($prompt) {
+            $this->em->remove($prompt);
+            $this->em->flush();
+        }
+
+        return $this->json(['success' => true]);
     }
 }

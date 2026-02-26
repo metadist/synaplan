@@ -291,13 +291,16 @@ class WhatsAppServiceTest extends TestCase
             'success' => true,
         ]);
 
+        $capturedOptions = [];
         $this->httpClient
             ->expects($this->once())
             ->method('request')
             ->with(
                 'POST',
                 $this->stringContains('/messages'),
-                $this->callback(function ($options) {
+                $this->callback(function ($options) use (&$capturedOptions) {
+                    $capturedOptions = $options;
+
                     return isset($options['json']['messaging_product'])
                         && 'whatsapp' === $options['json']['messaging_product']
                         && isset($options['json']['status'])
@@ -308,10 +311,45 @@ class WhatsAppServiceTest extends TestCase
             )
             ->willReturn($response);
 
-        $this->service->markAsRead('wamid.test123', $this->testPhoneNumberId);
+        $result = $this->service->markAsRead('wamid.test123', $this->testPhoneNumberId);
 
-        // If no exception thrown, test passes
-        $this->assertTrue(true);
+        $this->assertTrue($result['success']);
+        $this->assertArrayNotHasKey('typing_indicator', $capturedOptions['json']);
+    }
+
+    public function testMarkAsReadWithTypingIndicator(): void
+    {
+        $response = $this->createMock(ResponseInterface::class);
+        $response->method('toArray')->willReturn([
+            'success' => true,
+        ]);
+
+        $capturedOptions = [];
+        $this->httpClient
+            ->expects($this->once())
+            ->method('request')
+            ->with(
+                'POST',
+                $this->stringContains('/messages'),
+                $this->callback(function ($options) use (&$capturedOptions) {
+                    $capturedOptions = $options;
+
+                    return isset($options['json']['messaging_product'])
+                        && 'whatsapp' === $options['json']['messaging_product']
+                        && isset($options['json']['status'])
+                        && 'read' === $options['json']['status']
+                        && isset($options['json']['message_id'])
+                        && 'wamid.test123' === $options['json']['message_id']
+                        && isset($options['json']['typing_indicator'])
+                        && ['type' => 'text'] === $options['json']['typing_indicator'];
+                })
+            )
+            ->willReturn($response);
+
+        $result = $this->service->markAsRead('wamid.test123', $this->testPhoneNumberId, withTypingIndicator: true);
+
+        $this->assertTrue($result['success']);
+        $this->assertSame(['type' => 'text'], $capturedOptions['json']['typing_indicator']);
     }
 
     public function testMarkAsReadWhenDisabled(): void

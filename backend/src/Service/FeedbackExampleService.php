@@ -141,6 +141,9 @@ final readonly class FeedbackExampleService
 
     /**
      * Update a feedback example.
+     *
+     * Searches both feedback namespaces because getMemoryById only checks the
+     * default namespace, which does NOT contain feedback entries.
      */
     public function updateFeedback(User $user, int $id, string $value): array
     {
@@ -148,32 +151,46 @@ final readonly class FeedbackExampleService
             throw new \RuntimeException('Memory service unavailable');
         }
 
-        // Try to find the feedback in either namespace
-        $memory = $this->memoryService->getMemoryById($id, $user);
+        // Search both feedback namespaces to find the entry
+        $namespacesToSearch = [
+            'false_positive' => FeedbackConstants::NAMESPACE_FALSE_POSITIVE,
+            'positive' => FeedbackConstants::NAMESPACE_POSITIVE,
+        ];
 
-        if (!$memory) {
+        $foundType = null;
+        $foundNamespace = null;
+        $foundMemory = null;
+
+        foreach ($namespacesToSearch as $type => $namespace) {
+            $pointId = "mem_{$user->getId()}_{$id}";
+            $payload = $this->memoryService->getQdrantClient()->getMemory($pointId, $namespace);
+            if ($payload) {
+                $foundType = $type;
+                $foundNamespace = $namespace;
+                $foundMemory = $payload;
+                break;
+            }
+        }
+
+        if (!$foundMemory) {
             throw new \InvalidArgumentException('Feedback not found');
         }
 
-        // Determine the type based on namespace/category
-        $type = 'feedback_negative' === $memory->category ? 'false_positive' : 'positive';
-        $namespace = 'false_positive' === $type ? FeedbackConstants::NAMESPACE_FALSE_POSITIVE : FeedbackConstants::NAMESPACE_POSITIVE;
-
-        // Update the memory
+        // Update the memory in the correct namespace
         $updated = $this->memoryService->updateMemory(
             $id,
             $user,
             $value,
             'user_edited',
-            $memory->messageId,
+            $foundMemory['message_id'] ?? null,
             null, // key stays the same
             null, // category stays the same
-            $namespace
+            $foundNamespace
         );
 
         return [
             'id' => $updated->id,
-            'type' => $type,
+            'type' => $foundType,
             'value' => $updated->value,
             'messageId' => $updated->messageId,
             'created' => $updated->created,
@@ -191,14 +208,18 @@ final readonly class FeedbackExampleService
         }
 
         // Try both feedback namespaces since getMemoryById doesn't support namespaces
+        $deleted = false;
         foreach ([FeedbackConstants::NAMESPACE_FALSE_POSITIVE, FeedbackConstants::NAMESPACE_POSITIVE] as $namespace) {
             try {
                 $this->memoryService->deleteMemory($id, $user, $namespace);
-
-                return;
+                $deleted = true;
             } catch (\Exception) {
                 // Not found in this namespace, try the next one
             }
+        }
+
+        if ($deleted) {
+            return;
         }
 
         throw new \InvalidArgumentException('Feedback not found');

@@ -15,6 +15,7 @@ class AuthProvidersController extends AbstractController
         private ?string $githubClientId,
         private ?string $oidcClientId,
         private ?string $oidcDiscoveryUrl,
+        private ?string $oidcAutoRedirect,
     ) {
     }
 
@@ -67,6 +68,7 @@ class AuthProvidersController extends AbstractController
                             && !empty($this->oidcDiscoveryUrl)
                             && !in_array($this->oidcClientId, ['your-oidc-client-id', 'change-me', ''], true),
                 'icon' => 'key',
+                'auto_redirect' => filter_var($this->oidcAutoRedirect ?? 'false', FILTER_VALIDATE_BOOLEAN),
             ],
         ];
 

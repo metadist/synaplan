@@ -7,76 +7,16 @@ parameters:
 			path: lib/grpc/Inference/BatchInput.php
 
 		-
-			message: '#^If condition is always false\.$#'
-			identifier: if.alwaysFalse
-			count: 1
-			path: lib/grpc/Inference/BatchInput_Kind.php
-
-		-
 			message: '#^Static method Google\\Protobuf\\Internal\\GPBUtil\:\:checkEnum\(\) invoked with 2 parameters, 1 required\.$#'
 			identifier: arguments.count
 			count: 1
 			path: lib/grpc/Inference/BatchOutput.php
 
 		-
-			message: '#^If condition is always false\.$#'
-			identifier: if.alwaysFalse
-			count: 1
-			path: lib/grpc/Inference/BatchOutput_Kind.php
-
-		-
-			message: '#^If condition is always false\.$#'
-			identifier: if.alwaysFalse
-			count: 1
-			path: lib/grpc/Inference/CudaSharedMemoryStatusResponse_RegionStatus.php
-
-		-
-			message: '#^If condition is always false\.$#'
-			identifier: if.alwaysFalse
-			count: 1
-			path: lib/grpc/Inference/LogSettingsRequest_SettingValue.php
-
-		-
-			message: '#^If condition is always false\.$#'
-			identifier: if.alwaysFalse
-			count: 1
-			path: lib/grpc/Inference/LogSettingsResponse_SettingValue.php
-
-		-
-			message: '#^If condition is always false\.$#'
-			identifier: if.alwaysFalse
-			count: 1
-			path: lib/grpc/Inference/ModelEnsembling_Step.php
-
-		-
-			message: '#^If condition is always false\.$#'
-			identifier: if.alwaysFalse
-			count: 1
-			path: lib/grpc/Inference/ModelInferRequest_InferInputTensor.php
-
-		-
-			message: '#^If condition is always false\.$#'
-			identifier: if.alwaysFalse
-			count: 1
-			path: lib/grpc/Inference/ModelInferRequest_InferRequestedOutputTensor.php
-
-		-
-			message: '#^If condition is always false\.$#'
-			identifier: if.alwaysFalse
-			count: 1
-			path: lib/grpc/Inference/ModelInferResponse_InferOutputTensor.php
-
-		-
 			message: '#^Static method Google\\Protobuf\\Internal\\GPBUtil\:\:checkEnum\(\) invoked with 2 parameters, 1 required\.$#'
 			identifier: arguments.count
 			count: 2
 			path: lib/grpc/Inference/ModelInput.php
-
-		-
-			message: '#^If condition is always false\.$#'
-			identifier: if.alwaysFalse
-			count: 1
-			path: lib/grpc/Inference/ModelInput_Format.php
 
 		-
 			message: '#^Static method Google\\Protobuf\\Internal\\GPBUtil\:\:checkEnum\(\) invoked with 2 parameters, 1 required\.$#'
@@ -91,106 +31,10 @@ parameters:
 			path: lib/grpc/Inference/ModelInstanceGroup/SecondaryDevice.php
 
 		-
-			message: '#^If condition is always false\.$#'
-			identifier: if.alwaysFalse
-			count: 1
-			path: lib/grpc/Inference/ModelInstanceGroup_Kind.php
-
-		-
-			message: '#^If condition is always false\.$#'
-			identifier: if.alwaysFalse
-			count: 1
-			path: lib/grpc/Inference/ModelInstanceGroup_SecondaryDevice.php
-
-		-
-			message: '#^If condition is always false\.$#'
-			identifier: if.alwaysFalse
-			count: 1
-			path: lib/grpc/Inference/ModelInstanceGroup_SecondaryDevice_SecondaryDeviceKind.php
-
-		-
-			message: '#^If condition is always false\.$#'
-			identifier: if.alwaysFalse
-			count: 1
-			path: lib/grpc/Inference/ModelMetadataResponse_TensorMetadata.php
-
-		-
-			message: '#^If condition is always false\.$#'
-			identifier: if.alwaysFalse
-			count: 1
-			path: lib/grpc/Inference/ModelMetrics_MetricControl.php
-
-		-
-			message: '#^If condition is always false\.$#'
-			identifier: if.alwaysFalse
-			count: 1
-			path: lib/grpc/Inference/ModelMetrics_MetricControl_HistogramOptions.php
-
-		-
-			message: '#^If condition is always false\.$#'
-			identifier: if.alwaysFalse
-			count: 1
-			path: lib/grpc/Inference/ModelMetrics_MetricControl_MetricIdentifier.php
-
-		-
 			message: '#^Static method Google\\Protobuf\\Internal\\GPBUtil\:\:checkEnum\(\) invoked with 2 parameters, 1 required\.$#'
 			identifier: arguments.count
 			count: 1
 			path: lib/grpc/Inference/ModelOptimizationPolicy.php
-
-		-
-			message: '#^If condition is always false\.$#'
-			identifier: if.alwaysFalse
-			count: 1
-			path: lib/grpc/Inference/ModelOptimizationPolicy_Cuda.php
-
-		-
-			message: '#^If condition is always false\.$#'
-			identifier: if.alwaysFalse
-			count: 1
-			path: lib/grpc/Inference/ModelOptimizationPolicy_Cuda_GraphSpec.php
-
-		-
-			message: '#^If condition is always false\.$#'
-			identifier: if.alwaysFalse
-			count: 1
-			path: lib/grpc/Inference/ModelOptimizationPolicy_Cuda_GraphSpec_LowerBound.php
-
-		-
-			message: '#^If condition is always false\.$#'
-			identifier: if.alwaysFalse
-			count: 1
-			path: lib/grpc/Inference/ModelOptimizationPolicy_Cuda_GraphSpec_Shape.php
-
-		-
-			message: '#^If condition is always false\.$#'
-			identifier: if.alwaysFalse
-			count: 1
-			path: lib/grpc/Inference/ModelOptimizationPolicy_ExecutionAccelerators.php
-
-		-
-			message: '#^If condition is always false\.$#'
-			identifier: if.alwaysFalse
-			count: 1
-			path: lib/grpc/Inference/ModelOptimizationPolicy_ExecutionAccelerators_Accelerator.php
-
-		-
-			message: '#^If condition is always false\.$#'
-			identifier: if.alwaysFalse
-			count: 1
-			path: lib/grpc/Inference/ModelOptimizationPolicy_Graph.php
-
-		-
-			message: '#^If condition is always false\.$#'
-			identifier: if.alwaysFalse
-			count: 1
-			path: lib/grpc/Inference/ModelOptimizationPolicy_ModelPriority.php
-
-		-
-			message: '#^If condition is always false\.$#'
-			identifier: if.alwaysFalse
-			count: 1
-			path: lib/grpc/Inference/ModelOptimizationPolicy_PinnedMemoryBuffer.php
 
 		-
 			message: '#^Static method Google\\Protobuf\\Internal\\GPBUtil\:\:checkEnum\(\) invoked with 2 parameters, 1 required\.$#'
@@ -203,24 +47,6 @@ parameters:
 			identifier: arguments.count
 			count: 1
 			path: lib/grpc/Inference/ModelQueuePolicy.php
-
-		-
-			message: '#^If condition is always false\.$#'
-			identifier: if.alwaysFalse
-			count: 1
-			path: lib/grpc/Inference/ModelQueuePolicy_TimeoutAction.php
-
-		-
-			message: '#^If condition is always false\.$#'
-			identifier: if.alwaysFalse
-			count: 1
-			path: lib/grpc/Inference/ModelRateLimiter_Resource.php
-
-		-
-			message: '#^If condition is always false\.$#'
-			identifier: if.alwaysFalse
-			count: 1
-			path: lib/grpc/Inference/ModelRepositoryAgents_Agent.php
 
 		-
 			message: '#^Static method Google\\Protobuf\\Internal\\GPBUtil\:\:checkEnum\(\) invoked with 2 parameters, 1 required\.$#'
@@ -241,100 +67,10 @@ parameters:
 			path: lib/grpc/Inference/ModelSequenceBatching/State.php
 
 		-
-			message: '#^If condition is always false\.$#'
-			identifier: if.alwaysFalse
-			count: 1
-			path: lib/grpc/Inference/ModelSequenceBatching_Control.php
-
-		-
-			message: '#^If condition is always false\.$#'
-			identifier: if.alwaysFalse
-			count: 1
-			path: lib/grpc/Inference/ModelSequenceBatching_ControlInput.php
-
-		-
-			message: '#^If condition is always false\.$#'
-			identifier: if.alwaysFalse
-			count: 1
-			path: lib/grpc/Inference/ModelSequenceBatching_Control_Kind.php
-
-		-
-			message: '#^If condition is always false\.$#'
-			identifier: if.alwaysFalse
-			count: 1
-			path: lib/grpc/Inference/ModelSequenceBatching_InitialState.php
-
-		-
-			message: '#^If condition is always false\.$#'
-			identifier: if.alwaysFalse
-			count: 1
-			path: lib/grpc/Inference/ModelSequenceBatching_State.php
-
-		-
-			message: '#^If condition is always false\.$#'
-			identifier: if.alwaysFalse
-			count: 1
-			path: lib/grpc/Inference/ModelSequenceBatching_StrategyDirect.php
-
-		-
-			message: '#^If condition is always false\.$#'
-			identifier: if.alwaysFalse
-			count: 1
-			path: lib/grpc/Inference/ModelSequenceBatching_StrategyOldest.php
-
-		-
-			message: '#^If condition is always false\.$#'
-			identifier: if.alwaysFalse
-			count: 1
-			path: lib/grpc/Inference/ModelVersionPolicy_All.php
-
-		-
-			message: '#^If condition is always false\.$#'
-			identifier: if.alwaysFalse
-			count: 1
-			path: lib/grpc/Inference/ModelVersionPolicy_Latest.php
-
-		-
-			message: '#^If condition is always false\.$#'
-			identifier: if.alwaysFalse
-			count: 1
-			path: lib/grpc/Inference/ModelVersionPolicy_Specific.php
-
-		-
 			message: '#^Static method Google\\Protobuf\\Internal\\GPBUtil\:\:checkEnum\(\) invoked with 2 parameters, 1 required\.$#'
 			identifier: arguments.count
 			count: 1
 			path: lib/grpc/Inference/ModelWarmup/Input.php
-
-		-
-			message: '#^If condition is always false\.$#'
-			identifier: if.alwaysFalse
-			count: 1
-			path: lib/grpc/Inference/ModelWarmup_Input.php
-
-		-
-			message: '#^If condition is always false\.$#'
-			identifier: if.alwaysFalse
-			count: 1
-			path: lib/grpc/Inference/RepositoryIndexResponse_ModelIndex.php
-
-		-
-			message: '#^If condition is always false\.$#'
-			identifier: if.alwaysFalse
-			count: 1
-			path: lib/grpc/Inference/SystemSharedMemoryStatusResponse_RegionStatus.php
-
-		-
-			message: '#^If condition is always false\.$#'
-			identifier: if.alwaysFalse
-			count: 1
-			path: lib/grpc/Inference/TraceSettingRequest_SettingValue.php
-
-		-
-			message: '#^If condition is always false\.$#'
-			identifier: if.alwaysFalse
-			count: 1
-			path: lib/grpc/Inference/TraceSettingResponse_SettingValue.php
 
 		-
 			message: '#^Offset ''model'' on non\-empty\-array on left side of \?\? always exists and is not nullable\.$#'
@@ -435,7 +171,7 @@ parameters:
 		-
 			message: '#^Strict comparison using \!\=\= between null and null will always evaluate to false\.$#'
 			identifier: notIdentical.alwaysFalse
-			count: 2
+			count: 1
 			path: src/Controller/FileController.php
 
 		-
@@ -517,12 +253,6 @@ parameters:
 			path: src/Controller/StreamController.php
 
 		-
-			message: '#^Property App\\Controller\\StreamController\:\:\$aiFacade is never read, only written\.$#'
-			identifier: property.onlyWritten
-			count: 1
-			path: src/Controller/StreamController.php
-
-		-
 			message: '#^Access to an undefined property Stripe\\StripeObject\:\:\$object\.$#'
 			identifier: property.notFound
 			count: 8
@@ -559,18 +289,6 @@ parameters:
 			path: src/Controller/WidgetPublicController.php
 
 		-
-			message: '#^Parameter \#5 \$fileType of method App\\Service\\File\\VectorizationService\:\:vectorizeAndStore\(\) expects int, string given\.$#'
-			identifier: argument.type
-			count: 1
-			path: src/Controller/WidgetPublicController.php
-
-		-
-			message: '#^Property App\\Controller\\WidgetPublicController\:\:\$uploadDir is never read, only written\.$#'
-			identifier: property.onlyWritten
-			count: 1
-			path: src/Controller/WidgetPublicController.php
-
-		-
 			message: '#^Call to an undefined method Doctrine\\Persistence\\ObjectManager\:\:getConnection\(\)\.$#'
 			identifier: method.notFound
 			count: 1
@@ -581,18 +299,6 @@ parameters:
 			identifier: method.notFound
 			count: 1
 			path: src/Repository/MessageRepository.php
-
-		-
-			message: '#^Property App\\Security\\CookieTokenAuthenticator\:\:\$logger is never read, only written\.$#'
-			identifier: property.onlyWritten
-			count: 1
-			path: src/Security/CookieTokenAuthenticator.php
-
-		-
-			message: '#^Call to an undefined method App\\Repository\\RagDocumentRepository\:\:findSimilar\(\)\.$#'
-			identifier: method.notFound
-			count: 1
-			path: src/Service/File/VectorizationService.php
 
 		-
 			message: '#^Method App\\Repository\\PromptRepository\:\:findByTopic\(\) invoked with 3 parameters, 1\-2 required\.$#'
@@ -653,12 +359,6 @@ parameters:
 			identifier: variable.undefined
 			count: 1
 			path: src/Service/Message/MessageProcessor.php
-
-		-
-			message: '#^Method App\\Repository\\PromptRepository\:\:findByTopic\(\) invoked with 3 parameters, 1\-2 required\.$#'
-			identifier: arguments.count
-			count: 1
-			path: src/Service/Message/MessageSorter.php
 
 		-
 			message: '#^Method App\\Repository\\PromptRepository\:\:findByTopic\(\) invoked with 3 parameters, 1\-2 required\.$#'
@@ -931,24 +631,6 @@ parameters:
 			path: tests/Service/VectorSearchServiceTest.php
 
 		-
-			message: '#^Call to an undefined method Psr\\Log\\LoggerInterface\:\:expects\(\)\.$#'
-			identifier: method.notFound
-			count: 8
-			path: tests/Service/WhatsAppServiceTest.php
-
-		-
-			message: '#^Call to an undefined method Symfony\\Contracts\\HttpClient\\HttpClientInterface\:\:expects\(\)\.$#'
-			identifier: method.notFound
-			count: 13
-			path: tests/Service/WhatsAppServiceTest.php
-
-		-
-			message: '#^Call to method PHPUnit\\Framework\\Assert\:\:assertIsArray\(\) with array will always evaluate to true\.$#'
-			identifier: method.alreadyNarrowedType
-			count: 2
-			path: tests/Service/WhatsAppServiceTest.php
-
-		-
 			message: '#^Call to method PHPUnit\\Framework\\Assert\:\:assertTrue\(\) with true will always evaluate to true\.$#'
 			identifier: method.alreadyNarrowedType
 			count: 1
@@ -963,7 +645,7 @@ parameters:
 		-
 			message: '#^Call to an undefined method App\\Repository\\ApiKeyRepository\:\:method\(\)\.$#'
 			identifier: method.notFound
-			count: 4
+			count: 6
 			path: tests/Unit/ApiKeyAuthenticatorTest.php
 
 		-
@@ -1225,6 +907,12 @@ parameters:
 			path: tests/Unit/ModelConfigServiceTest.php
 
 		-
+			message: '#^Call to an undefined method App\\Repository\\UserRepository\:\:expects\(\)\.$#'
+			identifier: method.notFound
+			count: 9
+			path: tests/Unit/ModelConfigServiceTest.php
+
+		-
 			message: '#^Call to an undefined method Psr\\Cache\\CacheItemInterface\:\:method\(\)\.$#'
 			identifier: method.notFound
 			count: 6
@@ -1243,10 +931,28 @@ parameters:
 			path: tests/Unit/ModelConfigServiceTest.php
 
 		-
-			message: '#^Call to an undefined method App\\Repository\\UserRepository\:\:expects\(\)\.$#'
+			message: '#^Call to an undefined method App\\AI\\Service\\AiFacade\:\:method\(\)\.$#'
 			identifier: method.notFound
-			count: 9
-			path: tests/Unit/ModelConfigServiceTest.php
+			count: 2
+			path: tests/Unit/OpenAICompatibleControllerTest.php
+
+		-
+			message: '#^Call to an undefined method App\\Repository\\ModelRepository\:\:method\(\)\.$#'
+			identifier: method.notFound
+			count: 2
+			path: tests/Unit/OpenAICompatibleControllerTest.php
+
+		-
+			message: '#^Call to an undefined method App\\Service\\ModelConfigService\:\:method\(\)\.$#'
+			identifier: method.notFound
+			count: 1
+			path: tests/Unit/OpenAICompatibleControllerTest.php
+
+		-
+			message: '#^Call to an undefined method App\\Service\\RateLimitService\:\:method\(\)\.$#'
+			identifier: method.notFound
+			count: 3
+			path: tests/Unit/OpenAICompatibleControllerTest.php
 
 		-
 			message: '#^Call to an undefined method Psr\\Log\\LoggerInterface\:\:expects\(\)\.$#'

@@ -51,7 +51,7 @@ defineExpose({ shouldShowWarning })
 </script>
 
 <template>
-  <Teleport to="body">
+  <Teleport to="#app">
     <Transition name="fade">
       <div
         v-if="isOpen"

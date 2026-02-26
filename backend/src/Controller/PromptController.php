@@ -110,7 +110,7 @@ class PromptController extends AbstractController
             return $this->json(['error' => 'Not authenticated'], Response::HTTP_UNAUTHORIZED);
         }
 
-        $language = $request->query->get('language', 'en');
+        $language = $request->query->get('language', '');
 
         // Get all system prompts (ownerId = 0, excluding tools:*)
         // No language filter: system prompts are always visible regardless of UI language
@@ -123,13 +123,21 @@ class PromptController extends AbstractController
             ->getResult();
 
         // Get all user-specific prompts
-        $userPrompts = $this->promptRepository->createQueryBuilder('p')
+        // When language is empty: return ALL user prompts (no language filter)
+        // When language is set: filter by language but always include widget prompts (w_*)
+        $userQb = $this->promptRepository->createQueryBuilder('p')
             ->where('p.ownerId = :userId')
-            ->andWhere('p.language = :lang')
             ->andWhere('p.topic NOT LIKE :toolsPrefix')
             ->setParameter('userId', $user->getId())
-            ->setParameter('lang', $language)
-            ->setParameter('toolsPrefix', 'tools:%')
+            ->setParameter('toolsPrefix', 'tools:%');
+
+        if ('' !== $language) {
+            $userQb->andWhere('(p.language = :lang OR p.topic LIKE :widgetPrefix)')
+                ->setParameter('lang', $language)
+                ->setParameter('widgetPrefix', 'w\\_%');
+        }
+
+        $userPrompts = $userQb
             ->orderBy('p.topic', 'ASC')
             ->getQuery()
             ->getResult();

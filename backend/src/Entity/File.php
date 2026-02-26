@@ -14,6 +14,7 @@ use Doctrine\ORM\Mapping as ORM;
 #[ORM\Index(columns: ['BUSERSESSIONID'], name: 'idx_file_session')]
 #[ORM\Index(columns: ['BFILETYPE'], name: 'idx_file_type')]
 #[ORM\Index(columns: ['BSTATUS'], name: 'idx_file_status')]
+#[ORM\Index(columns: ['BGROUPKEY'], name: 'idx_file_groupkey')]
 class File
 {
     #[ORM\Id]
@@ -51,6 +52,9 @@ class File
 
     #[ORM\Column(name: 'BSTATUS', length: 32, options: ['default' => 'uploaded'])]
     private string $status = 'uploaded';
+
+    #[ORM\Column(name: 'BGROUPKEY', length: 128, nullable: true)]
+    private ?string $groupKey = null;
 
     #[ORM\Column(name: 'BCREATEDAT', type: 'bigint')]
     private int $createdAt;
@@ -171,6 +175,18 @@ class File
     public function setCreatedAt(int $createdAt): self
     {
         $this->createdAt = $createdAt;
+
+        return $this;
+    }
+
+    public function getGroupKey(): ?string
+    {
+        return $this->groupKey;
+    }
+
+    public function setGroupKey(?string $groupKey): self
+    {
+        $this->groupKey = $groupKey;
 
         return $this;
     }

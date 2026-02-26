@@ -181,6 +181,14 @@ class ChatHandler implements MessageHandlerInterface
         // Append plugin context (external data sources like casting platforms)
         $systemPrompt = $this->appendPluginContext($systemPrompt, $message, $classification, []);
 
+        $urlContent = $classification['url_content'] ?? null;
+        if (is_string($urlContent) && '' !== $urlContent) {
+            $systemPrompt .= "\n\n".$urlContent;
+            $this->logger->info('ChatHandler: URL content appended to system prompt', [
+                'url_content_length' => strlen($urlContent),
+            ]);
+        }
+
         // Append explicit language directive based on detected language from classification.
         $languageNames = [
             'en' => 'English', 'de' => 'German', 'fr' => 'French', 'es' => 'Spanish',

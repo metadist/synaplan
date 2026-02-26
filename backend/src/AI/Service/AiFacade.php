@@ -588,6 +588,40 @@ class AiFacade
     }
 
     /**
+     * Stream TTS audio via the user's configured provider.
+     *
+     * @param string   $text    Text to synthesize
+     * @param int|null $userId  User ID for config lookup
+     * @param array    $options Additional options (provider, model, voice, speed, format, language, etc.)
+     *
+     * @return array{generator: \Generator, contentType: string, provider: string, supportsStreaming: bool}
+     */
+    public function synthesizeStream(string $text, ?int $userId = null, array $options = []): array
+    {
+        $providerName = $options['provider'] ?? null;
+
+        if (!$providerName && $userId > 0) {
+            $providerName = $this->modelConfig->getDefaultProvider($userId, 'text_to_speech');
+        }
+
+        $provider = $this->registry->getTextToSpeechProvider($providerName);
+
+        $this->logger->info('AI TTS stream request', [
+            'provider' => $provider->getName(),
+            'user_id' => $userId,
+            'text_length' => strlen($text),
+            'supports_streaming' => $provider->supportsStreaming(),
+        ]);
+
+        return [
+            'generator' => $provider->synthesizeStream($text, $options),
+            'contentType' => $provider->getStreamContentType($options),
+            'provider' => $provider->getName(),
+            'supportsStreaming' => $provider->supportsStreaming(),
+        ];
+    }
+
+    /**
      * Move a file from uploadDir root to user-based path structure.
      *
      * @param string   $filename     The filename in uploadDir root (e.g., tts_xxx.mp3)

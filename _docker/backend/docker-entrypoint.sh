@@ -10,12 +10,24 @@ if [ ! -f /var/www/backend/.env ]; then
     touch /var/www/backend/.env
 fi
 
-# Source .env file if it exists
+# Source .env file as defaults (existing env vars from docker-compose take precedence)
 if [ -f /var/www/backend/.env ]; then
-    echo "📄 Loading environment from .env file..."
-    set -a  # automatically export all variables
-    source /var/www/backend/.env
-    set +a
+    echo "📄 Loading defaults from .env file (existing env vars take precedence)..."
+    while IFS='=' read -r key value; do
+        # Skip comments and empty lines
+        [[ -z "$key" || "$key" =~ ^[[:space:]]*# ]] && continue
+        # Trim whitespace from key
+        key="$(echo "$key" | tr -d '[:space:]')"
+        # Skip invalid variable names
+        [[ "$key" =~ ^[a-zA-Z_][a-zA-Z0-9_]*$ ]] || continue
+        # Only export if not already set in environment
+        if [ -z "${!key+x}" ]; then
+            # Strip surrounding quotes from value
+            value="${value#\"}" ; value="${value%\"}"
+            value="${value#\'}" ; value="${value%\'}"
+            export "${key}=${value}"
+        fi
+    done < /var/www/backend/.env
 fi
 
 # Validate required environment variables

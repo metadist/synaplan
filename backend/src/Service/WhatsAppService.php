@@ -111,20 +111,23 @@ class WhatsAppService
                 ];
             }
 
-            // Atomic get-or-create: callback only runs on cache miss (new message)
-            $cachedAt = $this->cache->get($cacheKey, function (ItemInterface $item): int {
+            // Atomic duplicate detection using unique token pattern.
+            // CacheInterface::get() calls the callback only on cache MISS.
+            // On cache HIT, it returns the previously stored value.
+            // By comparing the returned value to our unique token, we know
+            // if WE created the entry (new message) or someone else did (duplicate).
+            $myToken = bin2hex(random_bytes(8));
+            $storedToken = $this->cache->get($cacheKey, function (ItemInterface $item) use ($myToken): string {
                 $item->expiresAfter(self::DUPLICATE_CACHE_TTL);
 
-                return time();
+                return $myToken;
             });
 
-            // If cached time is more than 1 second ago, it's a duplicate
-            if (abs(time() - $cachedAt) > 1) {
-                $this->logger->info('WhatsApp: Duplicate message detected, skipping', [
+            if ($storedToken !== $myToken) {
+                // Cache HIT - another request already stored a different token
+                $this->logger->info('WhatsApp: Duplicate message detected (cache hit)', [
                     'message_id' => $dto->messageId,
                     'from' => $dto->from,
-                    'cached_at' => $cachedAt,
-                    'age_seconds' => time() - $cachedAt,
                 ]);
 
                 $lock->release();
@@ -137,7 +140,9 @@ class WhatsAppService
                 ];
             }
 
-            // New message - lock will auto-release, let processing continue
+            // Cache MISS - our callback ran, this is a new message
+            $lock->release();
+
             return null;
         } catch (\Throwable $e) {
             // Graceful degradation: if cache/lock fails, process the message anyway
@@ -155,6 +160,9 @@ class WhatsAppService
     /**
      * Send text message.
      *
+     * Automatically splits messages exceeding WhatsApp's 4096-character limit
+     * into multiple sequential messages, breaking at paragraph boundaries.
+     *
      * @param string $phoneNumberId The WhatsApp Phone Number ID to send from (extracted from webhook metadata)
      */
     public function sendMessage(string $to, string $message, string $phoneNumberId): array
@@ -170,6 +178,49 @@ class WhatsAppService
         // Convert standard Markdown to WhatsApp-compatible formatting
         $formattedMessage = $this->convertToWhatsAppMarkdown($message);
 
+        // WhatsApp Business API limit: 4096 characters per text message
+        $maxLength = 4096;
+
+        if (mb_strlen($formattedMessage) <= $maxLength) {
+            return $this->sendSingleMessage($to, $formattedMessage, $phoneNumberId);
+        }
+
+        // Split into chunks at paragraph boundaries
+        $chunks = $this->splitMessageIntoChunks($formattedMessage, $maxLength);
+
+        $this->logger->info('WhatsApp: Splitting long message into chunks', [
+            'to' => $to,
+            'total_length' => mb_strlen($formattedMessage),
+            'chunks' => count($chunks),
+        ]);
+
+        $lastResult = ['success' => false, 'error' => 'No chunks to send'];
+        foreach ($chunks as $i => $chunk) {
+            $lastResult = $this->sendSingleMessage($to, $chunk, $phoneNumberId);
+            if (!$lastResult['success']) {
+                $this->logger->error('WhatsApp: Failed to send chunk', [
+                    'chunk_index' => $i,
+                    'chunk_length' => mb_strlen($chunk),
+                    'error' => $lastResult['error'] ?? 'Unknown',
+                ]);
+
+                return $lastResult;
+            }
+
+            // Small delay between chunks to maintain order
+            if ($i < count($chunks) - 1) {
+                usleep(300000); // 300ms
+            }
+        }
+
+        return $lastResult;
+    }
+
+    /**
+     * Send a single text message (no length validation).
+     */
+    private function sendSingleMessage(string $to, string $formattedMessage, string $phoneNumberId): array
+    {
         $url = sprintf(
             'https://graph.facebook.com/%s/%s/messages',
             $this->apiVersion,
@@ -217,6 +268,48 @@ class WhatsAppService
                 'error' => $e->getMessage(),
             ];
         }
+    }
+
+    /**
+     * Split a long message into chunks at paragraph/line boundaries.
+     *
+     * @return string[]
+     */
+    private function splitMessageIntoChunks(string $text, int $maxLength): array
+    {
+        $chunks = [];
+        $remaining = $text;
+
+        while (mb_strlen($remaining) > $maxLength) {
+            $chunk = mb_substr($remaining, 0, $maxLength);
+
+            // Try to break at a paragraph boundary (double newline)
+            $breakPos = mb_strrpos($chunk, "\n\n");
+
+            // Fall back to single newline
+            if (false === $breakPos || $breakPos < $maxLength * 0.3) {
+                $breakPos = mb_strrpos($chunk, "\n");
+            }
+
+            // Fall back to space
+            if (false === $breakPos || $breakPos < $maxLength * 0.3) {
+                $breakPos = mb_strrpos($chunk, ' ');
+            }
+
+            // Last resort: hard cut
+            if (false === $breakPos || $breakPos < $maxLength * 0.3) {
+                $breakPos = $maxLength;
+            }
+
+            $chunks[] = mb_substr($remaining, 0, $breakPos);
+            $remaining = ltrim(mb_substr($remaining, $breakPos));
+        }
+
+        if ('' !== $remaining) {
+            $chunks[] = $remaining;
+        }
+
+        return $chunks;
     }
 
     /**
@@ -379,11 +472,17 @@ class WhatsAppService
     }
 
     /**
-     * Mark message as read.
+     * Mark message as read, optionally showing a typing indicator.
      *
-     * @param string $phoneNumberId The WhatsApp Phone Number ID (extracted from webhook metadata)
+     * When $withTypingIndicator is true, the user sees blue checkmarks AND
+     * a "typing…" animation. The animation auto-dismisses after 25 seconds
+     * or when a response message is sent — whichever comes first.
+     *
+     * @param string $messageId           The WhatsApp message ID to mark as read
+     * @param string $phoneNumberId       The WhatsApp Phone Number ID (extracted from webhook metadata)
+     * @param bool   $withTypingIndicator Show typing animation while preparing a response
      */
-    public function markAsRead(string $messageId, string $phoneNumberId): array
+    public function markAsRead(string $messageId, string $phoneNumberId, bool $withTypingIndicator = false): array
     {
         if (!$this->isAvailable()) {
             throw new \RuntimeException('WhatsApp service is not available');
@@ -399,17 +498,23 @@ class WhatsAppService
             $phoneNumberId
         );
 
+        $payload = [
+            'messaging_product' => 'whatsapp',
+            'status' => 'read',
+            'message_id' => $messageId,
+        ];
+
+        if ($withTypingIndicator) {
+            $payload['typing_indicator'] = ['type' => 'text'];
+        }
+
         try {
             $response = $this->httpClient->request('POST', $url, [
                 'headers' => [
                     'Authorization' => 'Bearer '.$this->accessToken,
                     'Content-Type' => 'application/json',
                 ],
-                'json' => [
-                    'messaging_product' => 'whatsapp',
-                    'status' => 'read',
-                    'message_id' => $messageId,
-                ],
+                'json' => $payload,
             ]);
 
             return [
@@ -419,6 +524,7 @@ class WhatsAppService
         } catch (\Exception $e) {
             $this->logger->error('Failed to mark WhatsApp message as read', [
                 'message_id' => $messageId,
+                'typing_indicator' => $withTypingIndicator,
                 'error' => $e->getMessage(),
             ]);
 
@@ -547,8 +653,8 @@ class WhatsAppService
             ];
         }
 
-        // 6. Mark as read (usage recording moved to after AI response for token estimation)
-        $this->markAsRead($dto->messageId, $dto->phoneNumberId);
+        // 6. Mark as read + show typing indicator while AI processes the request
+        $this->markAsRead($dto->messageId, $dto->phoneNumberId, withTypingIndicator: true);
 
         // 7. AI Pipeline Processing (use streaming mode to support TTS/media generation)
         $collectedResponse = '';
@@ -676,7 +782,7 @@ class WhatsAppService
         }
 
         // PRIORITY 2: Audio/Video input → Generate TTS response
-        if (!$responseSent && $shouldSendAudioResponse && !empty($responseText)) {
+        if (!$responseSent && $shouldSendAudioResponse && !empty($responseText) && !empty($this->appUrl)) {
             $detectedLanguage = $message->getLanguage() ?: 'en';
             $ttsResult = $this->generateTtsResponse($responseText, $effectiveUserId, $detectedLanguage);
 

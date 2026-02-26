@@ -12,6 +12,10 @@ interface AdminUsersResponse {
 }
 
 export async function login(page: Page, credentials?: { user: string; pass: string }) {
+  if (process.env.AUTH_METHOD === 'oidc') {
+    return loginViaOidcButton(page, credentials)
+  }
+
   const user = credentials?.user ?? process.env.AUTH_USER ?? 'admin@synaplan.com'
   const pass = credentials?.pass ?? process.env.AUTH_PASS ?? 'admin123'
 
@@ -26,6 +30,41 @@ export async function login(page: Page, credentials?: { user: string; pass: stri
   } catch {
     throw new Error(`Login fehlgeschlagen. Aktuelle URL: ${page.url()}`)
   }
+}
+
+export async function loginViaOidcButton(page: Page, credentials?: { user: string; pass: string }) {
+  const user = credentials?.user ?? process.env.OIDC_USER ?? 'testuser@synaplan.com'
+  const pass = credentials?.pass ?? process.env.OIDC_PASS ?? 'testpass123'
+
+  await page.goto('/login')
+  await page.click(selectors.oidc.keycloakButton)
+
+  // Keycloak login form
+  await page.fill(selectors.oidc.keycloakUsername, user)
+  await page.fill(selectors.oidc.keycloakPassword, pass)
+  await page.click(selectors.oidc.keycloakSubmit)
+
+  // Wait for redirect back + auth
+  await page.waitForSelector(selectors.chat.textInput, { timeout: 15_000 })
+}
+
+export async function loginViaOidcRedirect(
+  page: Page,
+  credentials?: { user: string; pass: string }
+) {
+  const user = credentials?.user ?? process.env.OIDC_USER ?? 'testuser@synaplan.com'
+  const pass = credentials?.pass ?? process.env.OIDC_PASS ?? 'testpass123'
+
+  await page.goto('/login')
+
+  // Should auto-redirect to Keycloak - wait for Keycloak login form
+  await page.waitForSelector(selectors.oidc.keycloakSubmit, { timeout: 15_000 })
+
+  await page.fill(selectors.oidc.keycloakUsername, user)
+  await page.fill(selectors.oidc.keycloakPassword, pass)
+  await page.click(selectors.oidc.keycloakSubmit)
+
+  await page.waitForSelector(selectors.chat.textInput, { timeout: 15_000 })
 }
 
 /**

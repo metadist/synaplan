@@ -192,6 +192,7 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
+import { useRouter } from 'vue-router'
 import { Icon } from '@iconify/vue'
 import { useI18n } from 'vue-i18n'
 import {
@@ -200,11 +201,14 @@ import {
   type SubscriptionStatus,
 } from '@/services/api/subscriptionApi'
 import { useAuthStore } from '@/stores/auth'
+import { useConfigStore } from '@/stores/config'
 import { useDialog } from '@/composables/useDialog'
 import MainLayout from '@/components/MainLayout.vue'
 
 const { t } = useI18n()
+const router = useRouter()
 const authStore = useAuthStore()
+const config = useConfigStore()
 const dialog = useDialog()
 const plans = ref<SubscriptionPlan[]>([])
 const loading = ref(false)
@@ -360,6 +364,10 @@ function formatDate(timestamp: string | number): string {
 }
 
 onMounted(async () => {
+  if (!config.billing.enabled) {
+    router.push('/')
+    return
+  }
   await loadPlans()
   await loadSubscriptionStatus()
 })

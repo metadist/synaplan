@@ -7,8 +7,15 @@
  * This is a simple wrapper around httpClient config functions to avoid circular dependency.
  */
 
-import { getConfig, getConfigSync, getApiBaseUrl, reloadConfig } from '@/services/api/httpClient'
+import {
+  getConfig,
+  getConfigSync,
+  getApiBaseUrl,
+  reloadConfig,
+  getUnavailableProviders,
+} from '@/services/api/httpClient'
 import { checkMemoryServiceAvailability } from '@/services/api/configApi'
+import { i18n } from '@/i18n'
 import { ref } from 'vue'
 
 // Async state for memory service availability
@@ -37,6 +44,16 @@ const config = {
    */
   get apiBaseUrl(): string {
     return getApiBaseUrl()
+  },
+
+  /**
+   * Billing/Subscription configuration
+   * Loaded from backend at runtime
+   */
+  billing: {
+    get enabled(): boolean {
+      return getConfigSync().billing?.enabled ?? false
+    },
   },
 
   /**
@@ -164,8 +181,17 @@ const config = {
    */
   async reload(): Promise<void> {
     await reloadConfig()
-    // Re-check memory service after reload
     this.checkMemoryServiceAsync()
+    this.checkUnavailableProviders()
+  },
+
+  checkUnavailableProviders(): void {
+    const unavailable = getUnavailableProviders()
+    if (unavailable.length > 0) {
+      console.warn(
+        `[Synaplan] ${i18n.global.t('system.missingApiKeys', { providers: unavailable.join(', ') })}`
+      )
+    }
   },
 
   /**

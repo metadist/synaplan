@@ -12,6 +12,7 @@ use App\AI\Interface\VisionProviderInterface;
 use App\Service\File\FileHelper;
 use OpenAI;
 use Psr\Log\LoggerInterface;
+use Symfony\Contracts\HttpClient\HttpClientInterface;
 
 class OpenAIProvider implements ChatProviderInterface, EmbeddingProviderInterface, ImageGenerationProviderInterface, VisionProviderInterface, SpeechToTextProviderInterface, TextToSpeechProviderInterface
 {
@@ -20,6 +21,7 @@ class OpenAIProvider implements ChatProviderInterface, EmbeddingProviderInterfac
 
     public function __construct(
         private LoggerInterface $logger,
+        private HttpClientInterface $httpClient,
         private ?string $apiKey = null,
         private string $uploadDir = '/var/www/backend/var/uploads',
     ) {
@@ -860,6 +862,69 @@ class OpenAIProvider implements ChatProviderInterface, EmbeddingProviderInterfac
         } catch (\Exception $e) {
             throw new ProviderException('OpenAI TTS error: '.$e->getMessage(), 'openai');
         }
+    }
+
+    public function synthesizeStream(string $text, array $options = []): \Generator
+    {
+        if (!$this->apiKey) {
+            throw ProviderException::missingApiKey('openai', 'OPENAI_API_KEY');
+        }
+
+        $model = $options['model'] ?? 'tts-1';
+        $voice = $options['voice'] ?? 'alloy';
+        $format = $options['format'] ?? 'mp3';
+        $speed = $options['speed'] ?? 1.0;
+
+        $this->logger->info('OpenAI: Streaming TTS', [
+            'model' => $model,
+            'voice' => $voice,
+            'format' => $format,
+            'text_length' => strlen($text),
+        ]);
+
+        $response = $this->httpClient->request('POST', 'https://api.openai.com/v1/audio/speech', [
+            'headers' => [
+                'Authorization' => 'Bearer '.$this->apiKey,
+                'Content-Type' => 'application/json',
+            ],
+            'json' => [
+                'model' => $model,
+                'voice' => $voice,
+                'input' => $text,
+                'response_format' => $format,
+                'speed' => $speed,
+            ],
+            'buffer' => false,
+            'timeout' => 120,
+        ]);
+
+        if (200 !== $response->getStatusCode()) {
+            throw new ProviderException('OpenAI TTS stream HTTP '.$response->getStatusCode().': '.substr($response->getContent(false), 0, 500), 'openai');
+        }
+
+        foreach ($this->httpClient->stream($response) as $chunk) {
+            $content = $chunk->getContent();
+            if ('' !== $content) {
+                yield $content;
+            }
+        }
+    }
+
+    public function getStreamContentType(array $options = []): string
+    {
+        $format = $options['format'] ?? 'mp3';
+
+        return match ($format) {
+            'opus' => 'audio/ogg',
+            'aac' => 'audio/aac',
+            'flac' => 'audio/flac',
+            default => 'audio/mpeg',
+        };
+    }
+
+    public function supportsStreaming(): bool
+    {
+        return true;
     }
 
     public function getVoices(): array

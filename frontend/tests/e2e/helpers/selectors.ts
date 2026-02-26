@@ -22,7 +22,8 @@ export const selectors = {
     modeToggle: '[data-testid="btn-mode-toggle"]',
   },
   nav: {
-    sidebar: '[data-testid="nav-sidebar"]',
+    sidebar: '[data-testid="comp-sidebar-v2"]',
+    navDropdown: '[data-testid="dropdown-sidebar-v2-nav"]',
   },
   models: {
     page: '[data-testid="page-config-ai-models"]',
@@ -63,8 +64,20 @@ export const selectors = {
     emptyState: '[data-testid="state-empty"]',
   },
   userMenu: {
-    button: '[data-testid="btn-user-menu-toggle"]',
-    logoutBtn: '[data-testid="btn-user-logout"]',
+    button: '[data-testid="btn-sidebar-v2-user"]',
+    logoutBtn: '[data-testid="btn-sidebar-v2-logout"]',
+  },
+  oidc: {
+    keycloakButton: '[data-testid="btn-social-keycloak"]',
+    keycloakUsername: '#username',
+    keycloakPassword: '#password',
+    keycloakSubmit: '#kc-login',
+    redirectSection: '[data-testid="section-oidc-redirect"]',
+    sessionExpiredSection: '[data-testid="section-oidc-session-expired"]',
+  },
+  loggedOut: {
+    page: '[data-testid="page-logged-out"]',
+    loginAgainBtn: '[data-testid="btn-login-again"]',
   },
   toast: {},
 } as const

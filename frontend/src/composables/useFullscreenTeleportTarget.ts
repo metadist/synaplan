@@ -6,10 +6,10 @@ import { onBeforeUnmount, onMounted, ref } from 'vue'
  * target that switches to document.fullscreenElement when present.
  */
 export function useFullscreenTeleportTarget() {
-  const teleportTarget = ref<HTMLElement | string>('body')
+  const teleportTarget = ref<HTMLElement | string>('#app')
 
   const update = () => {
-    teleportTarget.value = (document.fullscreenElement as HTMLElement | null) ?? 'body'
+    teleportTarget.value = (document.fullscreenElement as HTMLElement | null) ?? '#app'
   }
 
   onMounted(() => {

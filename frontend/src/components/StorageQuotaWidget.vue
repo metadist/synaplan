@@ -8,35 +8,26 @@
       <div>
         <h3 class="text-sm font-medium txt-primary">{{ $t('storage.title') }}</h3>
         <p class="text-xs txt-secondary mt-0.5">
-          {{ $t('storage.plan') }}: <span class="font-medium txt-brand">{{ planName }}</span>
+          {{ $t('storage.plan') }}:
+          <span class="font-medium txt-brand">{{
+            config.billing.enabled ? planName : $t('storage.unlimited')
+          }}</span>
         </p>
       </div>
       <Icon :icon="storageIcon" :class="['w-6 h-6', storageIconColor]" />
     </div>
 
     <!-- Progress Bar -->
-    <div class="mb-3">
-      <div class="flex items-center justify-between text-xs txt-secondary mb-1">
-        <span>{{ stats?.storage.usage_formatted || '0 B' }}</span>
-        <span>{{ stats?.storage.limit_formatted || '100 MB' }}</span>
-      </div>
-      <div class="h-2 bg-black/10 dark:bg-white/10 rounded-full overflow-hidden">
+    <div>
+      <div class="h-2 bg-black/10 dark:bg-white/10 rounded-full overflow-hidden mb-1.5">
         <div
           :class="['h-full transition-all duration-300 rounded-full', progressBarColor]"
           :style="{ width: `${percentage}%` }"
         ></div>
       </div>
-    </div>
-
-    <!-- Usage Details -->
-    <div class="grid grid-cols-2 gap-2 text-xs">
-      <div class="bg-black/5 dark:bg-white/5 rounded-lg p-2">
-        <div class="txt-secondary mb-0.5">{{ $t('storage.remaining') }}</div>
-        <div class="txt-primary font-medium">{{ stats?.storage.remaining_formatted || '0 B' }}</div>
-      </div>
-      <div class="bg-black/5 dark:bg-white/5 rounded-lg p-2">
-        <div class="txt-secondary mb-0.5">{{ $t('storage.used') }}</div>
-        <div class="txt-primary font-medium">{{ percentage.toFixed(1) }}%</div>
+      <div class="text-xs txt-secondary">
+        {{ stats?.storage.usage_formatted || '0 B' }} /
+        {{ stats?.storage.limit_formatted || '100 MB' }}
       </div>
     </div>
 
@@ -54,7 +45,7 @@
         }}
       </p>
       <button
-        v-if="stats?.user_level === 'NEW'"
+        v-if="config.billing.enabled && stats?.user_level === 'NEW'"
         class="mt-2 w-full btn-primary text-xs py-1.5 px-3 rounded"
         data-testid="btn-storage-upgrade"
         @click="$emit('upgrade')"
@@ -70,10 +61,13 @@ import { ref, computed, onMounted } from 'vue'
 import { Icon } from '@iconify/vue'
 import filesService from '@/services/filesService'
 
+import { useConfigStore } from '@/stores/config'
+
 defineEmits<{
   upgrade: []
 }>()
 
+const config = useConfigStore()
 const stats = ref<any>(null)
 const loading = ref(true)
 

@@ -4,9 +4,12 @@ declare(strict_types=1);
 
 namespace App\Controller;
 
+use App\Entity\Prompt;
 use App\Entity\User;
+use App\Repository\PromptRepository;
 use App\Repository\WidgetRepository;
 use App\Service\WidgetSummaryService;
+use Doctrine\ORM\EntityManagerInterface;
 use OpenApi\Attributes as OA;
 use Psr\Log\LoggerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -28,6 +31,8 @@ class WidgetSummaryController extends AbstractController
     public function __construct(
         private WidgetRepository $widgetRepository,
         private WidgetSummaryService $summaryService,
+        private PromptRepository $promptRepository,
+        private EntityManagerInterface $em,
         private LoggerInterface $logger,
     ) {
     }
@@ -99,6 +104,7 @@ class WidgetSummaryController extends AbstractController
                 'recommendations' => $s->getRecommendations(),
                 'summary' => $s->getSummaryText(),
                 'promptSuggestions' => $s->getPromptSuggestions(),
+                'sentimentMessages' => $s->getSentimentMessages(),
                 'fromDate' => $s->getFromDate(),
                 'toDate' => $s->getToDate(),
                 'dateRange' => $s->getFormattedDateRange(),
@@ -110,7 +116,7 @@ class WidgetSummaryController extends AbstractController
     /**
      * Get summary for a specific date.
      */
-    #[Route('/{date}', name: 'get', methods: ['GET'])]
+    #[Route('/{date}', name: 'get', methods: ['GET'], requirements: ['date' => '\d+'])]
     #[OA\Get(
         path: '/api/v1/widgets/{widgetId}/summaries/{date}',
         summary: 'Get summary for a specific date',
@@ -163,6 +169,7 @@ class WidgetSummaryController extends AbstractController
                 'issues' => $summary->getIssues(),
                 'recommendations' => $summary->getRecommendations(),
                 'summary' => $summary->getSummaryText(),
+                'sentimentMessages' => $summary->getSentimentMessages(),
                 'created' => $summary->getCreated(),
             ],
         ]);
@@ -234,6 +241,7 @@ class WidgetSummaryController extends AbstractController
                     'issues' => $summary->getIssues(),
                     'recommendations' => $summary->getRecommendations(),
                     'summary' => $summary->getSummaryText(),
+                    'sentimentMessages' => $summary->getSentimentMessages(),
                     'created' => $summary->getCreated(),
                 ],
             ]);
@@ -349,5 +357,230 @@ class WidgetSummaryController extends AbstractController
                 'error' => 'Failed to generate analysis: '.$e->getMessage(),
             ], Response::HTTP_INTERNAL_SERVER_ERROR);
         }
+    }
+
+    /**
+     * Get the summary prompt for a widget.
+     */
+    #[Route('/prompt', name: 'get_prompt', methods: ['GET'])]
+    #[OA\Get(
+        path: '/api/v1/widgets/{widgetId}/summaries/prompt',
+        summary: 'Get the summary analysis prompt for a widget',
+        description: 'Returns the custom prompt if one exists, otherwise returns the system default.',
+        security: [['Bearer' => []]],
+        tags: ['Widget Summaries'],
+        parameters: [
+            new OA\Parameter(
+                name: 'widgetId',
+                in: 'path',
+                required: true,
+                schema: new OA\Schema(type: 'string')
+            ),
+        ],
+        responses: [
+            new OA\Response(
+                response: 200,
+                description: 'Summary prompt',
+                content: new OA\JsonContent(
+                    required: ['success', 'prompt', 'isDefault', 'modelId'],
+                    properties: [
+                        new OA\Property(property: 'success', type: 'boolean', example: true),
+                        new OA\Property(property: 'prompt', type: 'string'),
+                        new OA\Property(property: 'isDefault', type: 'boolean', example: true),
+                        new OA\Property(property: 'modelId', type: 'integer', example: -1, description: '-1 = automated (system default), positive = specific model ID'),
+                    ]
+                )
+            ),
+            new OA\Response(response: 401, description: 'Not authenticated'),
+            new OA\Response(response: 403, description: 'Access denied'),
+            new OA\Response(response: 404, description: 'Widget not found'),
+        ]
+    )]
+    public function getPrompt(
+        string $widgetId,
+        #[CurrentUser] ?User $user,
+    ): JsonResponse {
+        if (!$user) {
+            return $this->json(['error' => 'Not authenticated'], Response::HTTP_UNAUTHORIZED);
+        }
+
+        $widget = $this->widgetRepository->findByWidgetId($widgetId);
+        if (!$widget || $widget->getOwnerId() !== $user->getId()) {
+            return $this->json(['error' => 'Widget not found'], Response::HTTP_NOT_FOUND);
+        }
+
+        $customTopic = WidgetSummaryService::getSummaryTopicForWidget($widget);
+        $customPrompt = $this->promptRepository->findOneBy([
+            'topic' => $customTopic,
+            'ownerId' => $user->getId(),
+        ]);
+
+        if ($customPrompt) {
+            return $this->json([
+                'success' => true,
+                'prompt' => $customPrompt->getPrompt(),
+                'isDefault' => false,
+                'modelId' => WidgetSummaryService::parseModelId($customPrompt),
+            ]);
+        }
+
+        $defaultPrompt = $this->promptRepository->findOneBy([
+            'topic' => WidgetSummaryService::DEFAULT_SUMMARY_TOPIC,
+            'ownerId' => 0,
+        ]);
+
+        return $this->json([
+            'success' => true,
+            'prompt' => $defaultPrompt?->getPrompt() ?? WidgetSummaryService::getDefaultPromptText(),
+            'isDefault' => true,
+            'modelId' => -1,
+        ]);
+    }
+
+    /**
+     * Create or update a custom summary prompt for a widget.
+     */
+    #[Route('/prompt', name: 'update_prompt', methods: ['PUT'])]
+    #[OA\Put(
+        path: '/api/v1/widgets/{widgetId}/summaries/prompt',
+        summary: 'Set a custom summary prompt for a widget',
+        description: 'Creates or updates the custom summary analysis prompt. Use {{CONVERSATIONS}} and {{SYSTEM_PROMPT}} as placeholders.',
+        security: [['Bearer' => []]],
+        tags: ['Widget Summaries'],
+        parameters: [
+            new OA\Parameter(
+                name: 'widgetId',
+                in: 'path',
+                required: true,
+                schema: new OA\Schema(type: 'string')
+            ),
+        ],
+        requestBody: new OA\RequestBody(
+            required: true,
+            content: new OA\JsonContent(
+                required: ['prompt'],
+                properties: [
+                    new OA\Property(property: 'prompt', type: 'string', description: 'The summary prompt text with {{CONVERSATIONS}} and {{SYSTEM_PROMPT}} placeholders'),
+                    new OA\Property(property: 'modelId', type: 'integer', description: '-1 = automated (system default), positive = specific model ID', example: -1),
+                ]
+            )
+        ),
+        responses: [
+            new OA\Response(
+                response: 200,
+                description: 'Prompt saved',
+                content: new OA\JsonContent(
+                    required: ['success'],
+                    properties: [
+                        new OA\Property(property: 'success', type: 'boolean', example: true),
+                    ]
+                )
+            ),
+            new OA\Response(response: 400, description: 'Invalid request'),
+            new OA\Response(response: 401, description: 'Not authenticated'),
+            new OA\Response(response: 404, description: 'Widget not found'),
+        ]
+    )]
+    public function updatePrompt(
+        string $widgetId,
+        Request $request,
+        #[CurrentUser] ?User $user,
+    ): JsonResponse {
+        if (!$user) {
+            return $this->json(['error' => 'Not authenticated'], Response::HTTP_UNAUTHORIZED);
+        }
+
+        $widget = $this->widgetRepository->findByWidgetId($widgetId);
+        if (!$widget || $widget->getOwnerId() !== $user->getId()) {
+            return $this->json(['error' => 'Widget not found'], Response::HTTP_NOT_FOUND);
+        }
+
+        $data = json_decode($request->getContent(), true) ?? [];
+        $promptText = $data['prompt'] ?? null;
+        if (!$promptText || !is_string($promptText) || '' === trim($promptText)) {
+            return $this->json(['error' => 'Prompt text is required'], Response::HTTP_BAD_REQUEST);
+        }
+
+        $modelId = isset($data['modelId']) ? (int) $data['modelId'] : -1;
+
+        $customTopic = WidgetSummaryService::getSummaryTopicForWidget($widget);
+        $prompt = $this->promptRepository->findOneBy([
+            'topic' => $customTopic,
+            'ownerId' => $user->getId(),
+        ]);
+
+        if (!$prompt) {
+            $prompt = new Prompt();
+            $prompt->setOwnerId($user->getId());
+            $prompt->setLanguage('en');
+            $prompt->setTopic($customTopic);
+        }
+
+        $prompt->setPrompt($promptText);
+        $prompt->setShortDescription($modelId > 0 ? (string) $modelId : '');
+        $this->em->persist($prompt);
+        $this->em->flush();
+
+        return $this->json(['success' => true]);
+    }
+
+    /**
+     * Reset summary prompt to system default.
+     */
+    #[Route('/prompt', name: 'delete_prompt', methods: ['DELETE'])]
+    #[OA\Delete(
+        path: '/api/v1/widgets/{widgetId}/summaries/prompt',
+        summary: 'Reset summary prompt to default',
+        description: 'Deletes the custom summary prompt, reverting to the system default.',
+        security: [['Bearer' => []]],
+        tags: ['Widget Summaries'],
+        parameters: [
+            new OA\Parameter(
+                name: 'widgetId',
+                in: 'path',
+                required: true,
+                schema: new OA\Schema(type: 'string')
+            ),
+        ],
+        responses: [
+            new OA\Response(
+                response: 200,
+                description: 'Prompt reset to default',
+                content: new OA\JsonContent(
+                    required: ['success'],
+                    properties: [
+                        new OA\Property(property: 'success', type: 'boolean', example: true),
+                    ]
+                )
+            ),
+            new OA\Response(response: 401, description: 'Not authenticated'),
+            new OA\Response(response: 404, description: 'Widget not found'),
+        ]
+    )]
+    public function deletePrompt(
+        string $widgetId,
+        #[CurrentUser] ?User $user,
+    ): JsonResponse {
+        if (!$user) {
+            return $this->json(['error' => 'Not authenticated'], Response::HTTP_UNAUTHORIZED);
+        }
+
+        $widget = $this->widgetRepository->findByWidgetId($widgetId);
+        if (!$widget || $widget->getOwnerId() !== $user->getId()) {
+            return $this->json(['error' => 'Widget not found'], Response::HTTP_NOT_FOUND);
+        }
+
+        $customTopic = WidgetSummaryService::getSummaryTopicForWidget($widget);
+        $prompt = $this->promptRepository->findOneBy([
+            'topic' => $customTopic,
+            'ownerId' => $user->getId(),
+        ]);
+
+        if ($prompt) {
+            $this->em->remove($prompt);
+            $this->em->flush();
+        }
+
+        return $this->json(['success' => true]);
     }
 }

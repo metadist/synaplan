@@ -24,8 +24,8 @@ services:
     environment:
       APP_ENV: test
       APP_SECRET: test_secret_not_for_production
-      APP_URL: ${APP_URL:-http://localhost:8001}
-      FRONTEND_URL: ${APP_URL:-http://localhost:8001}
+      APP_URL: http://localhost:8001
+      FRONTEND_URL: http://localhost:8001
       PLUGINS_DIR: /plugins
       DATABASE_WRITE_URL: mysql://synaplan_test:synaplan_test@db_test:3306/synaplan?serverVersion=11.8&charset=utf8mb4
       DATABASE_READ_URL: mysql://synaplan_test:synaplan_test@db_test:3306/synaplan?serverVersion=11.8&charset=utf8mb4
@@ -35,9 +35,13 @@ services:
       MAILER_DSN: smtp://mailhog_test:1025
       AUTO_DOWNLOAD_MODELS: "false"
       TOKEN_SECRET: "test_token_secret"
-      OIDC_CLIENT_ID: "test_client_id"
-      OIDC_CLIENT_SECRET: "test_client_secret"
-      OIDC_DISCOVERY_URL: "https://test.example.com"
+      # OIDC defaults match the Keycloak setup script (_docker/keycloak/setup.sh)
+      # These work with --profile oidc; without it, Keycloak is not running but the provider shows as enabled (harmless)
+      OIDC_CLIENT_ID: synaplan-app
+      OIDC_CLIENT_SECRET: test-oidc-secret
+      OIDC_DISCOVERY_URL: http://host.docker.internal:${KEYCLOAK_TEST_PORT:-8081}/realms/synaplan
+      OIDC_AUTO_REDIRECT: ${OIDC_AUTO_REDIRECT:-false}
+      OIDC_ADMIN_ROLES: administrator
       LOCK_DSN: flock
       # FIXME: these shouldnt be required
       GOOGLE_GEMINI_API_KEY: "test-key"
@@ -57,6 +61,8 @@ services:
       retries: 10
       start_period: 60s
     restart: "no"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     networks:
       - synaplan-test-network
 
@@ -120,6 +126,48 @@ services:
     ports:
       - "8025:8025"  # Web UI / API
       - "1025:1025"  # SMTP
+    restart: "no"
+    networks:
+      - synaplan-test-network
+
+  # Keycloak OIDC Identity Provider (optional - activated with --profile oidc)
+  keycloak_test:
+    image: quay.io/keycloak/keycloak:26.1
+    container_name: synaplan-keycloak-test
+    command: start-dev
+    environment:
+      KC_BOOTSTRAP_ADMIN_USERNAME: admin
+      KC_BOOTSTRAP_ADMIN_PASSWORD: admin
+      KC_HEALTH_ENABLED: "true"
+    ports:
+      - "${KEYCLOAK_TEST_PORT:-8081}:8080"
+    healthcheck:
+      test: ["CMD-SHELL", "exec 3<>/dev/tcp/localhost/9000 && echo -en 'GET /health/ready HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n' >&3 && cat <&3 | grep -q '\"status\": \"UP\"'"]
+      interval: 10s
+      timeout: 5s
+      retries: 15
+      start_period: 60s
+    profiles: [oidc]
+    restart: "no"
+    networks:
+      - synaplan-test-network
+
+  keycloak_setup:
+    image: quay.io/keycloak/keycloak:26.1
+    container_name: synaplan-keycloak-setup-test
+    depends_on:
+      keycloak_test:
+        condition: service_healthy
+    entrypoint: ["/bin/bash", "/setup/setup.sh"]
+    environment:
+      KC_SERVER: http://keycloak_test:8080
+      KC_CALLBACK: http://localhost:8001/api/v1/auth/keycloak/callback
+      KC_ORIGIN: http://localhost:8001
+      KC_CLIENT_ID: synaplan-app
+      KC_CLIENT_SECRET: test-oidc-secret
+    volumes:
+      - ./_docker/keycloak/setup.sh:/setup/setup.sh:ro
+    profiles: [oidc]
     restart: "no"
     networks:
       - synaplan-test-network

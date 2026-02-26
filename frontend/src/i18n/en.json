@@ -8,7 +8,7 @@
     "emailVerified": "Email Verified",
     "error": "Error",
     "chat": "Chat",
-    "tools": "Tools",
+    "tools": "Agents",
     "chatWidget": "Chat Widget",
     "docSummary": "Document Summary",
     "mailHandler": "Mail Handler",
@@ -32,6 +32,7 @@
     "subscription": "Subscription",
     "subscriptionSuccess": "Subscription Successful",
     "subscriptionCancel": "Subscription Cancelled",
+    "loggedOut": "Logged Out",
     "notFound": "Page Not Found",
     "widgetSessions": "Widget Sessions",
     "widgetChats": "Widget Chats",
@@ -41,12 +42,16 @@
   "chat": {
     "title": "Chat",
     "historyLog": "History Log",
-    "tools": "Tools",
-    "files": "Files & RAG",
+    "tools": "Agents",
+    "files": "Files",
     "config": "AI Config",
     "statistics": "Statistics",
     "newChat": "New Chat",
     "noChats": "No chats available",
+    "timeNow": "now",
+    "timeMinutes": "{n}m",
+    "timeHours": "{n}h",
+    "timeDays": "{n}d",
     "showMore": "Show more",
     "showLess": "Show less",
     "showAll": "Show All",
@@ -208,21 +213,24 @@
   "nav": {
     "chat": "Chat",
     "profile": "Profile",
-    "tools": "Tools",
+    "tools": "Agents",
     "toolsIntroduction": "Introduction",
     "toolsChatWidget": "Chat Widget",
-    "toolsDocSummary": "Doc Summary",
-    "toolsMailHandler": "Mail Handler",
+    "toolsDocSummary": "Summarizer",
+    "toolsMailHandler": "Email Integration",
     "plugins": "Plugins",
     "files": "Files",
-    "filesAndRag": "Files & RAG",
+    "filesAndRag": "File Manager",
     "fileManager": "File Manager",
     "semanticSearch": "Semantic Search",
+    "settings": "Settings",
+    "settingsChannels": "Channels",
+    "settingsAiTools": "AI & Agents",
     "aiConfig": "AI Config",
-    "configInbound": "Inbound",
+    "configInbound": "Connections",
     "configAiModels": "AI Models",
-    "configTaskPrompts": "Task Prompts",
-    "configSortingPrompt": "Sorting Prompt",
+    "configTaskPrompts": "AI Prompts",
+    "configSortingPrompt": "Smart Routing",
     "configApiKeys": "API Keys",
     "statistics": "Statistics",
     "subscription": "Subscription",
@@ -262,9 +270,10 @@
     "voiceReply": "Voice reply",
     "voiceReplyTooltip": "Include audio response (MP3)",
     "send": "Send message",
+    "waitForStreaming": "Please wait for the current response to finish before sending another message.",
     "share": "Share",
     "tools": {
-      "label": "Tools",
+      "label": "Agents",
       "webSearch": "Web Search",
       "webSearchDesc": "Search the internet",
       "imageGen": "Image Generation",
@@ -277,7 +286,8 @@
   "chatMessage": {
     "again": "Again",
     "againWith": "Again with",
-    "regenerateWith": "Regenerate with"
+    "regenerateWith": "Regenerate with",
+    "copy": "Copy message"
   },
   "commands": {
     "noResults": "No commands found",
@@ -313,8 +323,8 @@
     "notFound": "Plugin not found or not enabled for your account"
   },
   "tools": {
-    "title": "Available Tools",
-    "description": "Explore and use powerful tools to enhance your workflow",
+    "title": "Available Agents",
+    "description": "Explore and use powerful agents to enhance your workflow",
     "category": "Category",
     "commands": "Commands",
     "noCommands": "No commands available",
@@ -327,57 +337,6 @@
     "close": "Close",
     "gotIt": "Got it!",
     "noContent": "No help available for this page"
-  },
-  "summary": {
-    "title": "Summary Configuration",
-    "description": "This builds a prompt for the configured AI model to summarize the submitted text.",
-    "summaryType": "Summary Type:",
-    "summaryTypeHelp": "Type of summary to generate",
-    "length": "Length:",
-    "lengthHelp": "Desired summary length",
-    "customLength": "Custom Length:",
-    "customLengthHelp": "Number of words (50-2000)",
-    "outputLanguage": "Output Language:",
-    "outputLanguageHelp": "Language for the summary output",
-    "focusAreas": "Focus Areas:",
-    "focusAreasHelp": "Select what to focus on in the summary",
-    "documentInput": "Document Input",
-    "inputMethod": "Input Method:",
-    "textInput": "Text Input",
-    "documentText": "Document Text:",
-    "documentTextPlaceholder": "Paste your document text here...",
-    "charactersCount": "{count} characters | {words} words | {tokens} estimated tokens",
-    "generateSummary": "Generate Summary",
-    "generating": "Generating...",
-    "showSummary": "Show Summary",
-    "regenerateSummary": "Regenerate Summary",
-    "usingModel": "Using AI Model",
-    "loadingModel": "Loading...",
-    "clearForm": "Clear Form",
-    "processingNote": "Processing large documents may take several minutes. Please be patient.",
-    "quickPresets": "Quick Presets",
-    "presets": {
-      "invoice": {
-        "title": "Invoice",
-        "desc": "Optimized for financial documents"
-      },
-      "contract": {
-        "title": "Contract",
-        "desc": "Focus on terms and conditions"
-      },
-      "generic": {
-        "title": "Generic",
-        "desc": "Balanced for any document type"
-      }
-    },
-    "dragDropTitle": "Drop your file here or click to browse",
-    "dragDropDesc": "Upload a document to extract and summarize its content",
-    "supportedFormats": "Supported formats",
-    "maxSize": "Max size",
-    "orPasteText": "or paste text directly",
-    "uploadingFile": "Uploading and extracting text...",
-    "uploadingFileDesc": "Please wait while we process your file",
-    "selectFromExisting": "Select from previously uploaded files"
   },
   "mail": {
     "title": "Mail Handler Configuration",
@@ -461,13 +420,13 @@
     "testing": "Testing Connection...",
     "testSuccess": "Connection Successful",
     "testFailed": "Connection Failed",
-    "savedHandlers": "Mail Handlers",
-    "savedHandlersDesc": "Manage your automated email processing configurations",
-    "createHandler": "Create Handler",
-    "editHandler": "Edit Handler",
-    "noHandlers": "No Mail Handlers",
-    "noHandlersDesc": "Create your first mail handler to start automating email processing",
-    "createFirst": "Create First Handler",
+    "savedHandlers": "Email Agents",
+    "savedHandlersDesc": "Automate your inbox with AI-powered email agents that read, sort, and forward messages.",
+    "createHandler": "New Email Agent",
+    "editHandler": "Edit Agent",
+    "noHandlers": "No Email Agents yet",
+    "noHandlersDesc": "Set up your first email agent to automatically process incoming emails, route them to the right team, and let AI handle the rest.",
+    "createFirst": "Create your first Agent",
     "deleteHandler": "Delete Handler",
     "selectedCount": "{count} selected",
     "activate": "Activate",
@@ -524,23 +483,34 @@
     "proOnly": "PRO+"
   },
   "files": {
-    "uploadTitle": "Upload RAG Files",
-    "groupKeyword": "Group Keyword:",
-    "groupKeywordPlaceholder": "Enter keyword for file grouping",
-    "groupKeywordHelp": "Enter a keyword to group related files together for RAG search",
-    "orSelectExisting": "Or select existing...",
+    "uploadTitle": "Upload Files",
+    "groupKeyword": "Folder:",
+    "groupKeywordPlaceholder": "Enter a folder name",
+    "groupKeywordHelp": "Choose or create a folder to organize your files",
+    "orSelectExisting": "Or select existing folder...",
+    "folderPicker": {
+      "title": "Upload to Folder",
+      "hint": "Select an existing folder or create a new one",
+      "createNew": "New Folder",
+      "newPlaceholder": "Folder name...",
+      "uploadTo": "Uploading to",
+      "noFolders": "No folders yet — create one to get started"
+    },
     "selectFiles": "Select Files:",
     "selectFilesButton": "Select files",
+    "selectAndUpload": "Select Files",
+    "uploadCount": "Upload {count} file | Upload {count} files",
+    "addMore": "Add more",
     "noFileSelected": "None selected",
-    "supportedFormats": "Select one or more files (PDF, DOCX, TXT, JPG, PNG, MP3, MP4)",
+    "supportedFormats": "PDF, DOCX, TXT, JPG, PNG, MP3, MP4",
     "autoProcessingTitle": "Automatic Processing",
-    "autoProcessingInfo": "All files are automatically extracted and vectorized for optimal RAG performance with semantic search.",
-    "uploadAndProcess": "Upload and Process Files",
+    "autoProcessingInfo": "All files are automatically processed and made searchable.",
+    "uploadAndProcess": "Upload Files",
     "yourFiles": "Your Files",
-    "filterByGroup": "Filter by Group:",
-    "allFiles": "All files...",
+    "filterByGroup": "Filter by Folder:",
+    "allFiles": "All files",
     "filterButton": "Filter",
-    "filterHelp": "Choose a file group to filter the results. Upload new files above to create new groups.",
+    "filterHelp": "Choose a folder to filter the results. Upload new files to create new folders.",
     "fileId": "FILE ID",
     "name": "NAME",
     "size": "SIZE",
@@ -549,16 +519,25 @@
     "uploaded": "UPLOADED",
     "action": "ACTION",
     "status_uploaded": "Uploaded",
-    "status_extracted": "Extracted",
-    "status_vectorized": "Vectorized",
+    "status_extracted": "Processing",
+    "status_vectorized": "Ready",
     "attached": "Attached",
     "standalone": "Standalone",
     "attachedToMessage": "This file is attached to a message",
     "standaloneFile": "This file is standalone (not attached to any message)",
+    "selectAll": "Select all ({count})",
+    "deselectAll": "Deselect all",
     "deleteSelected": "Delete Selected",
     "deleteSelectedConfirmTitle": "Delete Selected Files?",
     "deleteSelectedConfirmMessage": "Are you sure you want to delete {count} selected file(s)? This action cannot be undone and the files will be permanently deleted.",
     "noFiles": "No files uploaded yet",
+    "moveTo": "Move to",
+    "movedSuccess": "File moved to \"{folder}\"",
+    "emptyState": {
+      "title": "No files yet",
+      "description": "Upload files to get started. You can organize them into folders.",
+      "emptyFolder": "This folder is empty"
+    },
     "page": "Page",
     "showing": "Showing",
     "files": "files",
@@ -571,18 +550,22 @@
     "dropFiles": "Drop files here to upload",
     "dropFilesHint": "Release to add files to the upload queue",
     "filesAddedToQueue": "{count} file added - ready to upload | {count} files added - ready to upload",
+    "droppedToFolder": "{count} file uploaded to {folder} | {count} files uploaded to {folder}",
+    "target": "Target",
+    "rootFolder": "All Files",
+    "changeTarget": "Change",
     "filesLostAfterReload": "Note: After reloading the page, {count} selected file(s) were lost ({names}). Please select the files again.",
     "uploading": "Uploading...",
     "uploadProgress": "Upload progress",
     "uploadingBytes": "{loaded} of {total} uploaded",
     "processingFiles": "Processing files on server...",
-    "groupKey": "Group / Tag",
+    "groupKey": "Folder",
     "migrateToQdrant": "Migrate vectors to Qdrant",
     "migratingToQdrant": "Migrating vectors to Qdrant...",
     "migrationSuccess": "Successfully migrated {count} chunks to Qdrant",
     "migrationPartial": "Migration partially complete: {migrated} migrated, {errors} errors",
     "migrationFailed": "Migration failed",
-    "reVectorize": "Re-vectorize this file"
+    "reVectorize": "Reprocess file"
   },
   "fileSelection": {
     "title": "Select or Upload Files",
@@ -593,7 +576,27 @@
     "uploadNew": "Upload New Files",
     "uploading": "Uploading {current} of {total}...",
     "orDragDrop": "or drag & drop files here",
-    "dropHere": "Drop files here to upload"
+    "dropHere": "Drop files here to upload",
+    "viewContent": "View content",
+    "download": "Download",
+    "downloadFailed": "Download failed",
+    "deleteFile": "Delete file",
+    "deleteSelected": "Delete selected",
+    "deleteConfirmTitle": "Delete File",
+    "deleteConfirmMessage": "Are you sure you want to delete this file? This action cannot be undone.",
+    "deleteConfirmButton": "Delete",
+    "fileDeleted": "File deleted successfully",
+    "deleteFailed": "Failed to delete file",
+    "bulkDeleteSuccess": "{count} file(s) deleted successfully",
+    "bulkDeletePartial": "{success} deleted, {failed} failed",
+    "reVectorize": "Reprocess",
+    "reVectorizeSuccess": "File reprocessed successfully ({chunks} parts indexed)",
+    "reVectorizeFailed": "Reprocessing failed"
+  },
+  "fileMention": {
+    "hint": "Type to search files — press Enter to attach",
+    "noResults": "No files found",
+    "fileAttached": "{name} attached"
   },
   "config": {
     "inbound": {
@@ -754,8 +757,8 @@
       "aiModel": "AI Model",
       "aiModelHelp": "Select which AI model to use for this prompt. Models are grouped by their capabilities.",
       "automated": "Automated (Best Model)",
-      "availableTools": "Available Tools",
-      "availableToolsHelp": "Enable tools that will be available when using this prompt",
+      "availableTools": "Available Agents",
+      "availableToolsHelp": "Enable agents that will be available when using this prompt",
       "promptContent": "Prompt Content",
       "contentPlaceholder": "Enter your system prompt here...",
       "promptContentPlaceholder": "Enter the system prompt that will guide the AI's behavior for this task...",
@@ -793,7 +796,7 @@
       "tabRendered": "Rendered Result",
       "tabSource": "Prompt Source",
       "tabJson": "JSON Object",
-      "mainTitle": "Set BTOPIC and Tools in JSON",
+      "mainTitle": "Set BTOPIC and Agents in JSON",
       "mainDescription": "Define the intention of the user with every request. You will have the history, but put your focus on the new message.",
       "yourTasks": "Your tasks",
       "categories": "Categories",
@@ -808,6 +811,8 @@
     "apiKeys": {
       "title": "API Keys",
       "description": "Create and manage API keys for accessing the API.",
+      "docsTitle": "API Documentation",
+      "docsDesc": "Explore all available endpoints, request formats, and authentication methods.",
       "createKey": "Create API Key",
       "namePlaceholder": "Name (e.g. Server A)",
       "tableHeaders": {
@@ -980,6 +985,7 @@
     "unavailableDesc": "The subscription service is currently being configured. Please check back later or contact support for more information.",
     "serviceNotConfigured": "Subscription service is currently unavailable. Please contact support.",
     "checkoutFailed": "Failed to start checkout. Please try again.",
+    "selfHosted": "Self-Hosted Edition — All features included",
     "manage": {
       "title": "Manage Your Subscription",
       "subtitle": "View and manage your subscription details",
@@ -1091,7 +1097,8 @@
     "disabled": "Disabled",
     "reset": "Reset",
     "remove": "Remove",
-    "clearSelection": "Clear selection"
+    "clearSelection": "Clear selection",
+    "view": "View"
   },
   "search": {
     "sources": "Sources",
@@ -1158,7 +1165,13 @@
     "authenticationRequired": "Authentication required. Please log in to continue.",
     "tokenRefreshFailed": "Failed to refresh your session. Please log in again.",
     "showPassword": "Show password",
-    "hidePassword": "Hide password"
+    "hidePassword": "Hide password",
+    "redirectingToSso": "Redirecting to SSO...",
+    "loginWithSso": "Login with SSO",
+    "poweredBySynaplan": "Powered by Synaplan",
+    "loggedOutTitle": "You have been logged out",
+    "loggedOutDesc": "Your session has been ended successfully. You can close this window or log in again.",
+    "loginAgain": "Log in again"
   },
   "unsavedChanges": {
     "title": "You have unsaved changes",
@@ -1170,9 +1183,56 @@
     "confirmLeave": "You have unsaved changes. Are you sure you want to leave?"
   },
   "summary": {
-    "title": "AI Summary",
+    "title": "Summary Configuration",
+    "description": "Configure the AI model to summarize your document.",
+    "summaryType": "Summary Type:",
+    "summaryTypeHelp": "Type of summary to generate",
+    "length": "Length:",
+    "lengthHelp": "Desired summary length",
+    "customLength": "Custom Length:",
+    "customLengthHelp": "Number of words (50-2000)",
+    "outputLanguage": "Output Language:",
+    "outputLanguageHelp": "Language for the summary output",
+    "focusAreas": "Focus Areas:",
+    "focusAreasHelp": "Select what to focus on in the summary",
+    "documentInput": "Document Input",
+    "inputMethod": "Input Method:",
+    "textInput": "Text Input",
+    "documentText": "Document Text:",
+    "documentTextPlaceholder": "Paste your document text here...",
+    "charactersCount": "{count} characters | {words} words | {tokens} estimated tokens",
+    "generateSummary": "Generate Summary",
+    "generating": "Generating...",
+    "showSummary": "Show Summary",
+    "regenerateSummary": "Regenerate Summary",
+    "usingModel": "Using AI Model",
+    "loadingModel": "Loading...",
+    "clearForm": "Clear Form",
+    "processingNote": "Processing large documents may take several minutes. Please be patient.",
+    "quickPresets": "Quick Presets",
+    "presets": {
+      "invoice": {
+        "title": "Invoice",
+        "desc": "Optimized for financial documents"
+      },
+      "contract": {
+        "title": "Contract",
+        "desc": "Focus on terms and conditions"
+      },
+      "generic": {
+        "title": "Generic",
+        "desc": "Balanced for any document type"
+      }
+    },
+    "dragDropTitle": "Drop your file here or click to browse",
+    "dragDropDesc": "Upload a document to extract and summarize its content",
+    "supportedFormats": "Supported formats",
+    "maxSize": "Max size",
+    "orPasteText": "or paste text directly",
+    "uploadingFile": "Uploading and extracting text...",
+    "uploadingFileDesc": "Please wait while we process your file",
+    "selectFromExisting": "Select from previously uploaded files",
     "generate": "Generate",
-    "generating": "Analyzing...",
     "generateFirst": "Generate First Summary",
     "generateSuccess": "Analysis completed successfully",
     "generateAI": "Generate AI Analysis",
@@ -1189,6 +1249,7 @@
     "yesterday": "Yesterday",
     "sessions": "Sessions",
     "messages": "Messages",
+    "visitorMessages": "Visitor Messages",
     "sentiment": "Sentiment",
     "positive": "Positive",
     "negative": "Negative",
@@ -1202,6 +1263,11 @@
     "addInfo": "Add",
     "improveInfo": "Improve",
     "neutral": "Neutral",
+    "negativeMessages": "Negative Messages",
+    "neutralMessages": "Neutral Messages",
+    "visitor": "Visitor",
+    "response": "Response",
+    "noSentimentMessages": "No messages in this category",
     "teamRequired": "Team Plan Required",
     "teamRequiredDescription": "AI-powered conversation summaries and insights are available for Team and Business plans. Upgrade to unlock this feature.",
     "upgrade": "Upgrade Plan",
@@ -1450,7 +1516,31 @@
         "branding": "Branding",
         "behavior": "Behavior",
         "security": "Security",
-        "assistant": "AI Assistant"
+        "assistant": "AI Assistant",
+        "aiPrompts": "AI Prompts"
+      },
+      "aiPrompts": {
+        "modelLabel": "AI Model",
+        "modelAutomatic": "Automatic (System Default)",
+        "placeholderInfo": "Available placeholders (automatically replaced at runtime):",
+        "resetToDefault": "Reset to Default",
+        "resetConfirmTitle": "Reset Prompt?",
+        "resetConfirmMessage": "This will discard your custom prompt and model selection and restore the system defaults. This action cannot be undone.",
+        "resetSuccess": "Prompt reset to default",
+        "customBadge": "Custom",
+        "defaultBadge": "Default"
+      },
+      "summaryPrompt": {
+        "title": "Summary Analysis",
+        "description": "Controls how the AI analyzes your widget's chat conversations.",
+        "modelHelp": "Select which AI model should generate the conversation summaries.",
+        "placeholderConversations": "Replaced with the chat conversations to analyze",
+        "placeholderSystemPrompt": "Replaced with the widget's current system prompt"
+      },
+      "setupPrompt": {
+        "title": "AI Setup Interview",
+        "description": "Controls the AI assistant that guides users through widget configuration.",
+        "modelHelp": "Select which AI model should conduct the setup interview."
       },
       "position": "Widget Position",
       "theme": "Default Theme",
@@ -1497,7 +1587,9 @@
       "aiModel": "AI Model",
       "aiModelHelp": "Select the AI model to use for this widget. Automated will choose the best model available.",
       "automated": "Automated (System chooses best model)",
-      "availableTools": "Available Tools",
+      "availableTools": "Available Agents",
+      "promptLanguage": "Prompt Language",
+      "promptLanguageHelp": "The language this prompt is written in. Changing the frontend language will not affect this prompt.",
       "promptContent": "System Prompt",
       "promptContentPlaceholder": "Enter the instructions for your AI assistant...",
       "promptContentHelp": "This is the system prompt that defines how your AI assistant behaves and responds.",
@@ -1521,7 +1613,7 @@
       "title": "Select Files",
       "searchPlaceholder": "Search files...",
       "noResults": "No files match your search.",
-      "noFiles": "No vectorized files available. Upload files first in the File Manager.",
+      "noFiles": "No files available. Upload files first in the File Manager.",
       "selected": "{count} selected",
       "addFiles": "Add Files"
     },
@@ -1844,7 +1936,8 @@
     "used": "Used",
     "limitReached": "Storage limit reached! Please delete some files or upgrade your plan.",
     "almostFull": "Storage almost full! Only {remaining} remaining.",
-    "upgradePlan": "Upgrade Plan"
+    "upgradePlan": "Upgrade Plan",
+    "unlimited": "Unlimited"
   },
   "settings": {
     "title": "Settings",
@@ -1859,7 +1952,7 @@
       "easy": "Easy Mode",
       "easyDesc": "Simplified interface with essential features",
       "advanced": "Advanced Mode",
-      "advancedDesc": "Full access to all features and tools"
+      "advancedDesc": "Full access to all features and agents"
     },
     "theme": {
       "title": "Theme",
@@ -2263,5 +2356,55 @@
     "dontAskAgain": "Don't show this warning again",
     "cancel": "Cancel",
     "open": "Open link"
+  },
+  "header": {
+    "switchToV2": "Switch to V2 design",
+    "switchToV1": "Switch to classic design"
+  },
+  "promoTips": {
+    "dontShowAgain": "Don't show again",
+    "chatWidget": {
+      "title": "Embed AI Chat on Your Website",
+      "description": "Create a customizable chat widget that you can embed on any website. Your visitors get instant AI-powered answers based on your knowledge base.",
+      "action": "Create Widget"
+    },
+    "filesUpload": {
+      "title": "Upload Documents for Smarter Answers",
+      "description": "Upload PDFs, Word docs, or text files. The AI will use them as context to give you more accurate, knowledge-based responses.",
+      "action": "Upload Files"
+    },
+    "aiConfig": {
+      "title": "Customize Your AI Models",
+      "description": "Switch between different AI providers and models. Fine-tune prompts and configure how the AI handles your requests.",
+      "action": "Configure AI"
+    },
+    "docSummary": {
+      "title": "Summarize Documents Instantly",
+      "description": "Upload any document and get a concise summary in seconds. Perfect for long reports, research papers, or meeting notes.",
+      "action": "Try Summarizer"
+    },
+    "upgradePro": {
+      "title": "Unlock More with Pro",
+      "description": "Get higher message limits, priority access to premium models, and advanced features like custom prompts and API access.",
+      "action": "View Plans"
+    },
+    "fileMention": {
+      "title": "Mention Files with @",
+      "description": "Type @ in the chat to quickly reference your uploaded files. The AI will read the file content and use it to answer your question.",
+      "action": ""
+    },
+    "widgetPreview": {
+      "aiGreeting": "Hi! How can I help you today?",
+      "userMessage": "What are your business hours?",
+      "aiResponse": "We're open Mon\u2013Fri, 9 AM \u2013 6 PM. How can I help?",
+      "inputPlaceholder": "Type a message...",
+      "featureCustomizable": "Fully customizable colors & branding",
+      "featureAiPowered": "AI-powered answers from your knowledge base",
+      "featureEasyEmbed": "One-line embed code for any website",
+      "featureResponsive": "Works perfectly on desktop & mobile"
+    }
+  },
+  "system": {
+    "missingApiKeys": "Some API keys are missing — the following providers are disabled: {providers}"
   }
 }

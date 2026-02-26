@@ -1,5 +1,5 @@
 <template>
-  <Teleport to="body">
+  <Teleport to="#app">
     <Transition name="fade">
       <div
         v-if="isOpen"
@@ -8,6 +8,7 @@
       >
         <div
           class="surface-card rounded-xl shadow-2xl w-full max-w-4xl max-h-[95vh] sm:max-h-[90vh] flex flex-col overflow-hidden"
+          data-testid="modal-memories-dialog"
           @click.stop
         >
           <!-- Header -->

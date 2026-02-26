@@ -30,6 +30,7 @@
     "subscription": "Abonelik",
     "subscriptionSuccess": "Abonelik Başarılı",
     "subscriptionCancel": "Abonelik İptal Edildi",
+    "loggedOut": "Oturum Kapatıldı",
     "notFound": "Sayfa Bulunamadı",
     "memories": "Anılar",
     "feedback": "Geri Bildirim",
@@ -254,6 +255,7 @@
     "dropFilesHint": "Resimler, belgeler, ses dosyaları...",
     "filesPasted": "{count} dosya yapıştırıldı",
     "send": "Mesaj gönder",
+    "waitForStreaming": "Lütfen başka bir mesaj göndermeden önce mevcut yanıtın tamamlanmasını bekleyin.",
     "share": "Paylaş",
     "tools": {
       "label": "Araçlar",
@@ -269,7 +271,8 @@
   "chatMessage": {
     "again": "Tekrar",
     "againWith": "Şununla tekrar",
-    "regenerateWith": "Şununla yeniden oluştur"
+    "regenerateWith": "Şununla yeniden oluştur",
+    "copy": "Mesajı kopyala"
   },
   "commands": {
     "noResults": "Komut bulunamadı",
@@ -516,7 +519,13 @@
     "authenticationRequired": "Kimlik doğrulama gerekli. Devam etmek için lütfen giriş yapın.",
     "tokenRefreshFailed": "Oturumunuz yenilenemedi. Lütfen tekrar giriş yapın.",
     "showPassword": "Şifreyi göster",
-    "hidePassword": "Şifreyi gizle"
+    "hidePassword": "Şifreyi gizle",
+    "redirectingToSso": "SSO'ya yönlendiriliyor...",
+    "loginWithSso": "SSO ile Giriş Yap",
+    "poweredBySynaplan": "Powered by Synaplan",
+    "loggedOutTitle": "Oturumunuz kapatıldı",
+    "loggedOutDesc": "Oturumunuz başarıyla sonlandırıldı. Bu pencereyi kapatabilir veya tekrar giriş yapabilirsiniz.",
+    "loginAgain": "Tekrar giriş yap"
   },
   "unsavedChanges": {
     "title": "Kaydedilmemiş değişiklikleriniz var",
@@ -871,6 +880,7 @@
     "unavailableDesc": "Abonelik hizmeti şu anda yapılandırılıyor. Lütfen daha sonra tekrar kontrol edin veya destek ile iletişime geçin.",
     "serviceNotConfigured": "Abonelik hizmeti şu anda kullanılamıyor. Lütfen destek ile iletişime geçin.",
     "checkoutFailed": "Ödeme başlatılamadı. Lütfen tekrar deneyin.",
+    "selfHosted": "Self-Hosted Sürümü — Tüm özellikler dahil",
     "manage": {
       "title": "Aboneliğinizi Yönetin",
       "subtitle": "Abonelik detaylarınızı görüntüleyin ve yönetin",
@@ -1011,7 +1021,8 @@
     "used": "Kullanılan",
     "limitReached": "Depolama limitine ulaşıldı! Lütfen bazı dosyaları silin veya planınızı yükseltin.",
     "almostFull": "Depolama neredeyse dolu! Sadece {remaining} kaldı.",
-    "upgradePlan": "Planı Yükselt"
+    "upgradePlan": "Planı Yükselt",
+    "unlimited": "Sınırsız"
   },
   "files": {
     "uploadTitle": "RAG Dosyaları Yükle",
@@ -1021,8 +1032,11 @@
     "orSelectExisting": "Veya mevcut olanı seçin...",
     "selectFiles": "Dosya Seç:",
     "selectFilesButton": "Dosya seç",
+    "selectAndUpload": "Dosya Seç",
+    "uploadCount": "{count} dosya yükle",
+    "addMore": "Daha fazla ekle",
     "noFileSelected": "Seçili yok",
-    "supportedFormats": "Bir veya daha fazla dosya seçin (PDF, DOCX, TXT, JPG, PNG, MP3, MP4)",
+    "supportedFormats": "PDF, DOCX, TXT, JPG, PNG, MP3, MP4",
     "autoProcessingTitle": "Otomatik İşleme",
     "autoProcessingInfo": "Tüm dosyalar anlamsal arama ile optimum RAG performansı için otomatik olarak çıkarılır ve vektörleştirilir.",
     "uploadAndProcess": "Dosyaları Yükle ve İşle",
@@ -1045,6 +1059,8 @@
     "standalone": "Bağımsız",
     "attachedToMessage": "Bu dosya bir mesaja ekli",
     "standaloneFile": "Bu dosya bağımsız (herhangi bir mesaja ekli değil)",
+    "selectAll": "Tümünü seç ({count})",
+    "deselectAll": "Seçimi kaldır",
     "deleteSelected": "Seçilenleri Sil",
     "deleteSelectedConfirmTitle": "Seçili Dosyalar Silinsin mi?",
     "deleteSelectedConfirmMessage": "{count} seçili dosyayı silmek istediğinizden emin misiniz? Bu işlem geri alınamaz ve dosyalar kalıcı olarak silinecektir.",
@@ -1060,6 +1076,10 @@
     "dropFiles": "Yüklemek için dosyaları buraya bırakın",
     "dropFilesHint": "Yükleme kuyruğuna dosya eklemek için bırakın",
     "filesAddedToQueue": "{count} dosya eklendi - yüklemeye hazır",
+    "droppedToFolder": "{count} dosya {folder} klasörüne yüklendi",
+    "target": "Hedef",
+    "rootFolder": "Tüm Dosyalar",
+    "changeTarget": "Değiştir",
     "filesLostAfterReload": "Not: Sayfa yenilendikten sonra {count} seçili dosya kayboldu ({names}). Lütfen dosyaları tekrar seçin.",
     "uploading": "Yükleniyor...",
     "uploadProgress": "Yükleme ilerleme",
@@ -1208,6 +1228,8 @@
     "apiKeys": {
       "title": "API Anahtarları",
       "description": "API'ye erişim için API anahtarları oluşturun ve yönetin.",
+      "docsTitle": "API Dokümantasyonu",
+      "docsDesc": "Tüm mevcut uç noktaları, istek formatlarını ve kimlik doğrulama yöntemlerini inceleyin.",
       "createKey": "API Anahtarı Oluştur",
       "namePlaceholder": "Ad (ör. Sunucu A)",
       "tableHeaders": {
@@ -1861,5 +1883,8 @@
     "dontAskAgain": "Bu uyarıyı bir daha gösterme",
     "cancel": "İptal",
     "open": "Bağlantıyı aç"
+  },
+  "system": {
+    "missingApiKeys": "Bazı API anahtarları eksik — şu sağlayıcılar devre dışı: {providers}"
   }
 }

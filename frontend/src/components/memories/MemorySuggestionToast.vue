@@ -62,7 +62,7 @@ function handleClose() {
 </script>
 
 <template>
-  <Teleport to="body">
+  <Teleport to="#app">
     <Transition
       enter-active-class="transition-all duration-300"
       enter-from-class="opacity-0 translate-y-4"

@@ -1,5 +1,5 @@
 <template>
-  <Teleport to="body">
+  <Teleport to="#app">
     <div
       class="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-2 sm:p-4"
       data-testid="modal-advanced-config"
@@ -669,28 +669,6 @@
                   />
                 </div>
 
-                <!-- Selection Rules -->
-                <div>
-                  <label class="block text-sm font-medium txt-primary mb-2 flex items-center gap-2">
-                    <Icon icon="heroicons:funnel" class="w-4 h-4" />
-                    {{ $t('widgets.advancedConfig.selectionRules') }}
-                  </label>
-                  <textarea
-                    v-model="promptData.rules"
-                    rows="2"
-                    :readonly="isSystemPrompt"
-                    :class="[
-                      'w-full px-4 py-3 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)] resize-none',
-                      isSystemPrompt ? 'bg-gray-100 dark:bg-gray-800 cursor-not-allowed' : '',
-                    ]"
-                    :placeholder="$t('widgets.advancedConfig.selectionRulesPlaceholder')"
-                    data-testid="input-selection-rules"
-                  ></textarea>
-                  <p class="text-xs txt-secondary mt-1">
-                    {{ $t('widgets.advancedConfig.selectionRulesHelp') }}
-                  </p>
-                </div>
-
                 <!-- AI Model Selection -->
                 <div>
                   <label class="block text-sm font-medium txt-primary mb-2 flex items-center gap-2">
@@ -734,35 +712,35 @@
                   </p>
                 </div>
 
-                <!-- Available Tools -->
+                <!-- Prompt Language -->
                 <div>
-                  <label class="block text-sm font-medium txt-primary mb-3 flex items-center gap-2">
-                    <Icon icon="heroicons:wrench-screwdriver" class="w-4 h-4" />
-                    {{ $t('widgets.advancedConfig.availableTools') }}
+                  <label class="block text-sm font-medium txt-primary mb-2 flex items-center gap-2">
+                    <Icon icon="heroicons:language" class="w-4 h-4" />
+                    {{ $t('widgets.advancedConfig.promptLanguage') }}
                   </label>
-                  <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                    <label
-                      v-for="tool in availableTools"
-                      :key="tool.value"
-                      :class="[
-                        'flex items-center gap-3 p-3 rounded-lg surface-chip transition-colors',
-                        isSystemPrompt
-                          ? 'cursor-not-allowed opacity-60'
-                          : 'cursor-pointer hover:bg-[var(--brand)]/5',
-                      ]"
-                      data-testid="item-tool"
-                    >
-                      <input
-                        v-model="promptData.availableTools"
-                        type="checkbox"
-                        :value="tool.value"
-                        :disabled="isSystemPrompt"
-                        class="w-5 h-5 rounded border-light-border/30 dark:border-dark-border/20 text-[var(--brand)] focus:ring-2 focus:ring-[var(--brand)]"
-                      />
-                      <Icon :icon="tool.icon" class="w-5 h-5 txt-secondary" />
-                      <span class="text-sm txt-primary">{{ tool.label }}</span>
-                    </label>
-                  </div>
+                  <select
+                    v-model="promptLanguage"
+                    :disabled="isSystemPrompt"
+                    :class="[
+                      'w-full px-4 py-2.5 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)]',
+                      isSystemPrompt ? 'bg-gray-100 dark:bg-gray-800 cursor-not-allowed' : '',
+                    ]"
+                    data-testid="input-prompt-language"
+                  >
+                    <option value="en">English</option>
+                    <option value="de">Deutsch</option>
+                    <option value="fr">Français</option>
+                    <option value="es">Español</option>
+                    <option value="it">Italiano</option>
+                    <option value="nl">Nederlands</option>
+                    <option value="pt">Português</option>
+                    <option value="ru">Русский</option>
+                    <option value="sv">Svenska</option>
+                    <option value="tr">Türkçe</option>
+                  </select>
+                  <p class="text-xs txt-secondary mt-1">
+                    {{ $t('widgets.advancedConfig.promptLanguageHelp') }}
+                  </p>
                 </div>
 
                 <!-- Prompt Content -->
@@ -857,7 +835,9 @@
                           />
                           <div class="min-w-0">
                             <p class="text-sm txt-primary truncate">{{ file.fileName }}</p>
-                            <p class="text-xs txt-secondary">{{ file.chunks }} chunks</p>
+                            <p v-if="file.chunks > 0" class="text-xs txt-secondary">
+                              {{ file.chunks }} chunks
+                            </p>
                           </div>
                         </div>
                         <div class="flex items-center gap-2">
@@ -928,6 +908,15 @@
               </template>
             </template>
           </div>
+
+          <!-- Summary Prompt Tab -->
+          <WidgetSummaryPromptTab
+            v-if="activeTab === 'ai-prompts'"
+            ref="summaryPromptTab"
+            :widget-id="widget.widgetId"
+            :models="allModels"
+            :loading-models="loadingModels"
+          />
         </div>
 
         <!-- Footer -->
@@ -979,6 +968,7 @@ import { promptsApi, type AvailableFile } from '@/services/api/promptsApi'
 import { configApi } from '@/services/api/configApi'
 import type { AIModel, Capability } from '@/types/ai-models'
 import FilePicker from './FilePicker.vue'
+import WidgetSummaryPromptTab from './WidgetSummaryPromptTab.vue'
 
 // Disable attribute inheritance since we use Teleport as root
 defineOptions({
@@ -1002,7 +992,7 @@ const emit = defineEmits<{
   startAiSetup: []
 }>()
 
-const { t, locale } = useI18n()
+const { t } = useI18n()
 const { success, error: showError } = useNotification()
 
 // Check if widget has a custom/configured prompt (not the default)
@@ -1052,12 +1042,18 @@ const tabs = computed(() => {
       icon: 'heroicons:sparkles',
       labelKey: 'widgets.advancedConfig.tabs.assistant',
     },
+    {
+      id: 'ai-prompts',
+      icon: 'heroicons:cpu-chip',
+      labelKey: 'widgets.advancedConfig.tabs.aiPrompts',
+    },
   ]
 })
 
 const activeTab = ref(props.initialTab || 'branding')
 const saving = ref(false)
 const newDomain = ref('')
+const summaryPromptTab = ref<InstanceType<typeof WidgetSummaryPromptTab> | null>(null)
 
 // Widget config
 const config = reactive<widgetsApi.WidgetConfig>({
@@ -1209,12 +1205,12 @@ const promptData = reactive({
   name: '',
   rules: '',
   aiModel: 'AUTOMATED - Tries to define the best model for the task on SYNAPLAN [System Model]',
-  availableTools: [] as string[],
   content: '',
   isDefault: false, // true = system prompt (read-only), false = user-specific (editable)
 })
 const promptLoading = ref(false)
 const promptError = ref<string | null>(null)
+const promptLanguage = ref('en')
 const creatingManualPrompt = ref(false)
 const manualPromptCreated = ref(false) // Flag to show form after manual creation
 
@@ -1238,13 +1234,6 @@ const excludedFileIds = computed(() => promptFiles.value.map((f) => f.id))
 // AI Models
 const allModels = ref<Partial<Record<Capability, AIModel[]>>>({})
 const loadingModels = ref(false)
-
-// Available tools
-const availableTools = [
-  { value: 'internet-search', label: 'Internet Search', icon: 'heroicons:magnifying-glass' },
-  { value: 'files-search', label: 'Files Search', icon: 'heroicons:document-magnifying-glass' },
-  { value: 'url-screenshot', label: 'URL Screenshot', icon: 'heroicons:camera' },
-]
 
 // Group models by capability for dropdown
 const groupedModels = computed(() => {
@@ -1310,14 +1299,12 @@ Be friendly, professional, and concise in your responses.`
     )
 
     // Update local state to show the form
-    // Match the backend's default format for selection rules
     const widgetName = props.widget.name || 'this'
     promptData.id = result.promptId
     promptData.name = `${widgetName} Assistant`
-    promptData.rules = `Use for customer inquiries on ${widgetName} website`
+    promptData.rules = ''
     promptData.aiModel =
       'AUTOMATED - Tries to define the best model for the task on SYNAPLAN [System Model]'
-    promptData.availableTools = []
     promptData.content = defaultPromptContent
 
     // Set flag to show the form (without closing modal)
@@ -1381,6 +1368,11 @@ const handleSave = async () => {
       await savePromptData()
     }
 
+    // Save summary prompt if the tab component is mounted
+    if (summaryPromptTab.value) {
+      await summaryPromptTab.value.save()
+    }
+
     success(t('widgets.advancedConfig.saveSuccess'))
     emit('saved')
   } catch (err: any) {
@@ -1412,11 +1404,16 @@ const loadPromptData = async () => {
   promptError.value = null
 
   try {
-    const prompts = await promptsApi.getPrompts(locale.value || 'en')
+    // Load ALL prompts without language filter so widget prompts always appear
+    // regardless of the current UI language
+    const prompts = await promptsApi.getPrompts()
     const prompt = prompts.find((p) => p.topic === props.widget.taskPromptTopic)
 
     if (prompt) {
       const metadata = prompt.metadata || {}
+
+      // Track the prompt's stored language independently of the UI locale
+      promptLanguage.value = prompt.language || 'en'
 
       // Determine AI Model string from metadata.aiModel (ID)
       let aiModelString =
@@ -1433,21 +1430,14 @@ const loadPromptData = async () => {
         }
       }
 
-      // Parse available tools from metadata
-      const tools: string[] = []
-      if (metadata.tool_internet_search) tools.push('internet-search')
-      if (metadata.tool_files_search) tools.push('files-search')
-      if (metadata.tool_url_screenshot) tools.push('url-screenshot')
-
       Object.assign(promptData, {
         id: prompt.id,
         topic: prompt.topic,
         name: prompt.shortDescription || prompt.name,
         rules: prompt.selectionRules || '',
         aiModel: aiModelString,
-        availableTools: tools,
         content: prompt.prompt,
-        isDefault: prompt.isDefault ?? false, // Track if this is a system prompt (read-only)
+        isDefault: prompt.isDefault ?? false,
       })
 
       // Load files for this prompt
@@ -1473,7 +1463,47 @@ const loadPromptFiles = async () => {
     }))
   } catch (err) {
     console.error('Failed to load prompt files:', err)
-    // Don't show error, just have empty file list
+  }
+
+  // If the API returned no files but the prompt content has a Knowledge Base section,
+  // extract file names from it so they can be displayed and removed by the user
+  if (promptFiles.value.length === 0) {
+    extractFilesFromPromptContent()
+  }
+}
+
+/**
+ * Extract file entries from the Knowledge Base section in prompt content.
+ * Used as a fallback when the vector storage query returns empty.
+ */
+const extractFilesFromPromptContent = () => {
+  const content = promptData.content || ''
+  const kbMatch = content.match(
+    /<!-- KNOWLEDGE_BASE_START -->([\s\S]*?)<!-- KNOWLEDGE_BASE_END -->/
+  )
+  if (!kbMatch) return
+
+  const kbContent = kbMatch[1]
+  const fileMatches = [...kbContent.matchAll(/### (.+)\n([\s\S]*?)(?=\n### |$)/g)]
+
+  if (fileMatches.length === 0) return
+
+  const extracted: { id: number; fileName: string; chunks: number }[] = []
+  for (let i = 0; i < fileMatches.length; i++) {
+    const fileName = fileMatches[i][1].trim()
+    const summary = fileMatches[i][2].trim()
+    // Use negative IDs as placeholder IDs for files extracted from prompt content
+    const placeholderId = -(i + 1)
+    extracted.push({ id: placeholderId, fileName, chunks: 0 })
+    // Also restore the summary so it can be re-saved
+    if (summary) {
+      fileSummaries.value.set(placeholderId, summary)
+    }
+  }
+
+  if (extracted.length > 0) {
+    promptFiles.value = extracted
+    fileSummaries.value = new Map(fileSummaries.value)
   }
 }
 
@@ -1520,11 +1550,16 @@ const handleDeleteFile = async (fileId: number) => {
   deletingFileId.value = fileId
 
   try {
-    await promptsApi.deletePromptFile(props.widget.taskPromptTopic, fileId)
+    // Files with negative IDs are extracted from the prompt content (not in vector storage)
+    // Only call the backend delete API for real files
+    if (fileId > 0) {
+      await promptsApi.deletePromptFile(props.widget.taskPromptTopic, fileId)
+    }
     // Remove from local list
     promptFiles.value = promptFiles.value.filter((f) => f.id !== fileId)
-    // Also remove summary
+    // Also remove summary and refresh prompt content
     fileSummaries.value.delete(fileId)
+    refreshPromptContent()
     success(t('widgets.advancedConfig.fileDeleteSuccess'))
   } catch (err: any) {
     console.error('Failed to delete file:', err)
@@ -1545,6 +1580,7 @@ const generateFileSummary = async (fileId: number) => {
     const { summary } = await promptsApi.summarizeFile(props.widget.taskPromptTopic, fileId)
     fileSummaries.value.set(fileId, summary)
     fileSummaries.value = new Map(fileSummaries.value)
+    refreshPromptContent()
   } catch (err: any) {
     console.error('Failed to generate summary:', err)
     showError(err.message || t('widgets.advancedConfig.summaryError'))
@@ -1606,6 +1642,12 @@ const buildKnowledgeBaseSection = (): string => {
   return section
 }
 
+// Update the visible prompt content with the latest Knowledge Base section
+const refreshPromptContent = () => {
+  const base = removeKnowledgeBaseSection(promptData.content)
+  promptData.content = base + buildKnowledgeBaseSection()
+}
+
 // Remove existing Knowledge Base section from prompt content
 const removeKnowledgeBaseSection = (content: string): string => {
   // First, remove any Knowledge Base block delimited by explicit markers
@@ -1648,11 +1690,6 @@ const savePromptData = async () => {
     metadata.aiModel = -1
   }
 
-  // Set tool flags
-  metadata.tool_internet_search = promptData.availableTools.includes('internet-search')
-  metadata.tool_files_search = promptData.availableTools.includes('files-search')
-  metadata.tool_url_screenshot = promptData.availableTools.includes('url-screenshot')
-
   // Build final prompt content with Knowledge Base section
   let finalContent = removeKnowledgeBaseSection(promptData.content)
   finalContent += buildKnowledgeBaseSection()
@@ -1660,6 +1697,7 @@ const savePromptData = async () => {
   await promptsApi.updatePrompt(promptData.id, {
     shortDescription: promptData.name,
     prompt: finalContent,
+    language: promptLanguage.value,
     selectionRules: promptData.rules || null,
     metadata,
   })

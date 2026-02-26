@@ -22,8 +22,8 @@ describe('useFullscreenTeleportTarget', () => {
       setup() {
         const { teleportTarget } = useFullscreenTeleportTarget()
         const label = computed(() => {
-          if (teleportTarget.value === 'body') {
-            return 'body'
+          if (teleportTarget.value === '#app') {
+            return '#app'
           }
           return (teleportTarget.value as HTMLElement).tagName
         })
@@ -32,7 +32,7 @@ describe('useFullscreenTeleportTarget', () => {
     }
 
     const wrapper = mount(TestComponent)
-    expect(wrapper.text()).toContain('body')
+    expect(wrapper.text()).toContain('#app')
 
     const fsEl = document.createElement('div')
     ;(document.fullscreenElement as any) = fsEl
@@ -44,6 +44,6 @@ describe('useFullscreenTeleportTarget', () => {
     document.dispatchEvent(new Event('fullscreenchange'))
     await nextTick()
 
-    expect(wrapper.text()).toContain('body')
+    expect(wrapper.text()).toContain('#app')
   })
 })
