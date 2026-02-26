@@ -270,6 +270,129 @@ class MessageRepositoryTest extends KernelTestCase
         $this->assertEmpty($history, 'Should return empty array for wrong user');
     }
 
+    public function testFindLatestIncomingEmailByExternalIdFindsMatchingMessage(): void
+    {
+        $matchingMessage = new Message();
+        $matchingMessage->setUserId($this->testUser->getId());
+        $matchingMessage->setChat($this->testChat);
+        $matchingMessage->setTrackingId(time());
+        $matchingMessage->setUnixTimestamp(time());
+        $matchingMessage->setDateTime(date('YmdHis'));
+        $matchingMessage->setText('Incoming email');
+        $matchingMessage->setDirection('IN');
+        $matchingMessage->setProviderIndex('EMAIL');
+        $matchingMessage->setMessageType('MAIL');
+        $matchingMessage->setTopic('CHAT');
+        $matchingMessage->setLanguage('en');
+        $matchingMessage->setStatus('complete');
+        $this->em->persist($matchingMessage);
+        $this->em->flush();
+        $matchingMessage->setMeta('channel', 'email');
+        $matchingMessage->setMeta('external_id', '<abc123@example.com>');
+        $matchingMessage->setMeta('from_email', 'sender@example.com');
+        $this->em->flush();
+
+        $otherMessage = new Message();
+        $otherMessage->setUserId($this->testUser->getId());
+        $otherMessage->setChat($this->testChat);
+        $otherMessage->setTrackingId(time() + 1);
+        $otherMessage->setUnixTimestamp(time() + 1);
+        $otherMessage->setDateTime(date('YmdHis', time() + 1));
+        $otherMessage->setText('Different sender');
+        $otherMessage->setDirection('IN');
+        $otherMessage->setProviderIndex('EMAIL');
+        $otherMessage->setMessageType('MAIL');
+        $otherMessage->setTopic('CHAT');
+        $otherMessage->setLanguage('en');
+        $otherMessage->setStatus('complete');
+        $this->em->persist($otherMessage);
+        $this->em->flush();
+        $otherMessage->setMeta('channel', 'email');
+        $otherMessage->setMeta('external_id', '<abc123@example.com>');
+        $otherMessage->setMeta('from_email', 'other@example.com');
+        $this->em->flush();
+
+        $found = $this->repository->findLatestIncomingEmailByExternalId('<abc123@example.com>', 'sender@example.com');
+
+        $this->assertNotNull($found);
+        $this->assertSame($matchingMessage->getId(), $found->getId());
+    }
+
+    public function testFindRecentIncomingEmailByFingerprintReturnsMostRecentMatch(): void
+    {
+        $now = time();
+
+        $olderMessage = new Message();
+        $olderMessage->setUserId($this->testUser->getId());
+        $olderMessage->setChat($this->testChat);
+        $olderMessage->setTrackingId($now - 120);
+        $olderMessage->setUnixTimestamp($now - 120);
+        $olderMessage->setDateTime(date('YmdHis', $now - 120));
+        $olderMessage->setText('Old incoming email');
+        $olderMessage->setDirection('IN');
+        $olderMessage->setProviderIndex('EMAIL');
+        $olderMessage->setMessageType('MAIL');
+        $olderMessage->setTopic('CHAT');
+        $olderMessage->setLanguage('en');
+        $olderMessage->setStatus('complete');
+        $this->em->persist($olderMessage);
+        $this->em->flush();
+        $olderMessage->setMeta('channel', 'email');
+        $olderMessage->setMeta('email_fingerprint', 'fp-123');
+        $this->em->flush();
+
+        $newerMessage = new Message();
+        $newerMessage->setUserId($this->testUser->getId());
+        $newerMessage->setChat($this->testChat);
+        $newerMessage->setTrackingId($now - 60);
+        $newerMessage->setUnixTimestamp($now - 60);
+        $newerMessage->setDateTime(date('YmdHis', $now - 60));
+        $newerMessage->setText('New incoming email');
+        $newerMessage->setDirection('IN');
+        $newerMessage->setProviderIndex('EMAIL');
+        $newerMessage->setMessageType('MAIL');
+        $newerMessage->setTopic('CHAT');
+        $newerMessage->setLanguage('en');
+        $newerMessage->setStatus('complete');
+        $this->em->persist($newerMessage);
+        $this->em->flush();
+        $newerMessage->setMeta('channel', 'email');
+        $newerMessage->setMeta('email_fingerprint', 'fp-123');
+        $this->em->flush();
+
+        $found = $this->repository->findRecentIncomingEmailByFingerprint('fp-123', 600);
+
+        $this->assertNotNull($found);
+        $this->assertSame($newerMessage->getId(), $found->getId());
+    }
+
+    public function testFindRecentIncomingEmailByFingerprintReturnsNullWhenNoMatch(): void
+    {
+        $now = time();
+        $message = new Message();
+        $message->setUserId($this->testUser->getId());
+        $message->setChat($this->testChat);
+        $message->setTrackingId($now);
+        $message->setUnixTimestamp($now);
+        $message->setDateTime(date('YmdHis', $now));
+        $message->setText('Incoming email without matching fingerprint');
+        $message->setDirection('IN');
+        $message->setProviderIndex('EMAIL');
+        $message->setMessageType('MAIL');
+        $message->setTopic('CHAT');
+        $message->setLanguage('en');
+        $message->setStatus('complete');
+        $this->em->persist($message);
+        $this->em->flush();
+        $message->setMeta('channel', 'email');
+        $message->setMeta('email_fingerprint', 'different-fp');
+        $this->em->flush();
+
+        $found = $this->repository->findRecentIncomingEmailByFingerprint('fp-123', 600);
+
+        $this->assertNull($found);
+    }
+
     /**
      * Helper to create test message.
      */

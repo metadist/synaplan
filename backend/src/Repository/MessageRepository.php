@@ -167,6 +167,67 @@ class MessageRepository extends ServiceEntityRepository
     }
 
     /**
+     * Find latest incoming email message by external message ID and sender.
+     *
+     * This is used for webhook idempotency to prevent duplicate email processing
+     * when upstream providers retry delivery.
+     */
+    public function findLatestIncomingEmailByExternalId(string $externalMessageId, string $fromEmail): ?Message
+    {
+        return $this->createQueryBuilder('m')
+            ->innerJoin('m.metadata', 'externalMeta', 'WITH', 'externalMeta.metaKey = :externalKey')
+            ->innerJoin('m.metadata', 'fromMeta', 'WITH', 'fromMeta.metaKey = :fromKey')
+            ->innerJoin('m.metadata', 'channelMeta', 'WITH', 'channelMeta.metaKey = :channelKey')
+            ->where('LOWER(externalMeta.metaValue) = :externalMessageId')
+            ->andWhere('LOWER(fromMeta.metaValue) = :fromEmail')
+            ->andWhere('LOWER(channelMeta.metaValue) = :channel')
+            ->andWhere('m.messageType = :messageType')
+            ->andWhere('m.direction = :direction')
+            ->setParameter('externalKey', 'external_id')
+            ->setParameter('fromKey', 'from_email')
+            ->setParameter('channelKey', 'channel')
+            ->setParameter('externalMessageId', $externalMessageId)
+            ->setParameter('fromEmail', $fromEmail)
+            ->setParameter('channel', 'email')
+            ->setParameter('messageType', 'MAIL')
+            ->setParameter('direction', 'IN')
+            ->orderBy('m.id', 'DESC')
+            ->setMaxResults(1)
+            ->getQuery()
+            ->getOneOrNullResult();
+    }
+
+    /**
+     * Find a recent incoming email by deterministic fingerprint.
+     *
+     * Used as a fallback idempotency strategy when external message ID is missing.
+     */
+    public function findRecentIncomingEmailByFingerprint(string $fingerprint, int $withinSeconds = 180): ?Message
+    {
+        $cutoff = time() - max(1, $withinSeconds);
+
+        return $this->createQueryBuilder('m')
+            ->innerJoin('m.metadata', 'fingerprintMeta', 'WITH', 'fingerprintMeta.metaKey = :fingerprintKey')
+            ->innerJoin('m.metadata', 'channelMeta', 'WITH', 'channelMeta.metaKey = :channelKey')
+            ->where('fingerprintMeta.metaValue = :fingerprint')
+            ->andWhere('LOWER(channelMeta.metaValue) = :channel')
+            ->andWhere('m.messageType = :messageType')
+            ->andWhere('m.direction = :direction')
+            ->andWhere('m.unixTimestamp >= :cutoff')
+            ->setParameter('fingerprintKey', 'email_fingerprint')
+            ->setParameter('channelKey', 'channel')
+            ->setParameter('fingerprint', $fingerprint)
+            ->setParameter('channel', 'email')
+            ->setParameter('messageType', 'MAIL')
+            ->setParameter('direction', 'IN')
+            ->setParameter('cutoff', $cutoff)
+            ->orderBy('m.id', 'DESC')
+            ->setMaxResults(1)
+            ->getQuery()
+            ->getOneOrNullResult();
+    }
+
+    /**
      * Check if a file is attached to any message in a specific chat.
      *
      * Used for security validation in widget file downloads.

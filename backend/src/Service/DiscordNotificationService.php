@@ -337,6 +337,74 @@ class DiscordNotificationService
     }
 
     /**
+     * Notify duplicate email webhook detection.
+     */
+    public function notifyDuplicateEmailWebhook(
+        string $fromEmail,
+        string $toEmail,
+        string $subject,
+        int $existingMessageId,
+        ?int $chatId = null,
+        ?string $externalMessageId = null,
+        string $detectionMethod = 'external_id',
+    ): void {
+        if (!$this->isEnabled()) {
+            return;
+        }
+
+        $fields = [
+            [
+                'name' => '📥 From',
+                'value' => $this->truncate($fromEmail, 120),
+                'inline' => true,
+            ],
+            [
+                'name' => '📤 To',
+                'value' => $this->truncate($toEmail, 120),
+                'inline' => true,
+            ],
+            [
+                'name' => '🧾 Subject',
+                'value' => $this->truncate($subject, self::MAX_USER_MESSAGE),
+                'inline' => false,
+            ],
+            [
+                'name' => '🆔 Existing Message ID',
+                'value' => (string) $existingMessageId,
+                'inline' => true,
+            ],
+            [
+                'name' => '🔎 Detection Method',
+                'value' => $detectionMethod,
+                'inline' => true,
+            ],
+        ];
+
+        if (null !== $chatId) {
+            $fields[] = [
+                'name' => '💬 Chat ID',
+                'value' => (string) $chatId,
+                'inline' => true,
+            ];
+        }
+
+        if (null !== $externalMessageId && '' !== $externalMessageId) {
+            $fields[] = [
+                'name' => '📨 External Message ID',
+                'value' => $this->truncate($externalMessageId, 200),
+                'inline' => false,
+            ];
+        }
+
+        $this->sendEmbed(
+            title: '♻️ Duplicate Email Webhook Detected',
+            color: 0xFFA500,
+            fields: $fields,
+            footer: 'Synaplan Email Webhook'
+        );
+    }
+
+    /**
      * Mask phone number for privacy (show last 4 digits).
      */
     private function maskPhoneNumber(string $phone): string
