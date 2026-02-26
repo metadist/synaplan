@@ -1,7 +1,7 @@
 # CI overrides for docker-compose.test.yml
 # This file configures the setup for CI by:
 #   1. Using a pre-built Docker image (via APP_IMAGE env var)
-#   2. Replacing volume mounts: only widget-test.html kept so E2E widget tests have the page; no backend/plugins mounts
+#   2. Removing volume mounts: no backend/plugins mounts (baked into image)
 #   3. whatsapp-stub: expose 3999 so Playwright (on host) can reach stub for integration tests; keep container_name
 #
 # app_test reaches the stub at http://whatsapp-stub:3999 via backend/.env.test (WHATSAPP_GRAPH_API_BASE_URL).
@@ -13,9 +13,8 @@ services:
   app_test:
     # Use pre-built image from CI (e.g., synaplan-test:ci)
     image: ${APP_IMAGE:-}
-    # No backend/plugins mounts; only widget-test.html from E2E fixtures so E2E widget tests have the page
-    volumes: !reset
-      - ./frontend/tests/e2e/fixtures/widget-test.html:/var/www/test-fixtures/widget-test.html:ro
+ 
+    volumes: !reset []
 
   whatsapp-stub:
     ports: ["3999:3999"]

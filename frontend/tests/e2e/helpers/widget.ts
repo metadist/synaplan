@@ -4,8 +4,15 @@ import { TIMEOUTS, INTERVALS, getApiUrl } from '../config/config'
 import { WIDGET_DEFAULTS, WIDGET_TEST_URLS } from '../config/test-data'
 import { selectors } from './selectors'
 import path from 'path'
+import { readFileSync } from 'fs'
+import { fileURLToPath } from 'url'
 
 export { getApiUrl }
+
+const widgetTestHtml = readFileSync(
+  path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../fixtures/widget-test.html'),
+  'utf-8'
+)
 
 /** Go to widget-test.html with widgetId and apiUrl in query; works on dev (5173→8000) and test stack (8001). */
 export async function gotoWidgetTestPage(
@@ -13,6 +20,10 @@ export async function gotoWidgetTestPage(
   widgetId: string,
   apiUrl: string
 ): Promise<void> {
+  await page.route(/\/widget-test\.html/, async (route) => {
+    await route.fulfill({ contentType: 'text/html', body: widgetTestHtml })
+  })
+
   const url = `/widget-test.html?widgetId=${encodeURIComponent(widgetId)}&apiUrl=${encodeURIComponent(apiUrl)}`
   await page.goto(url, { waitUntil: 'domcontentloaded' })
 
