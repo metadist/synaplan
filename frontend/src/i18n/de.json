@@ -36,6 +36,7 @@
     "notFound": "Seite nicht gefunden",
     "widgetSessions": "Widget-Sitzungen",
     "widgetChats": "Widget-Chats",
+    "widgetDetail": "Widget-Detail",
     "liveSupport": "Live-Support"
   },
   "welcome": "Willkommen bei Synaplan",
@@ -1528,6 +1529,31 @@
       "editHintTitle": "Möchten Sie Ihren Assistenten feinabstimmen?",
       "editHintDescription": "Nach dem Speichern können Sie die KI-Assistenten-Konfiguration jederzeit in den erweiterten Einstellungen unter dem Tab 'KI-Assistent' bearbeiten."
     },
+    "detail": {
+      "back": "Zurück zu Widgets",
+      "notFound": "Widget nicht gefunden",
+      "aiButton": "Mit KI konfigurieren",
+      "flowTitle": "Widget-Flow",
+      "flowSubtitle": "Verbinde Fragen mit Antworten. Dein Widget folgt diesen Regeln.",
+      "flowHintStart": "Klicke eine Frage, um eine Verbindung zu starten.",
+      "flowHintConnect": "Jetzt klicke eine Antwort zum Verbinden — oder nochmal zum Trennen.",
+      "triggersLabel": "Fragen",
+      "responsesLabel": "Antworten",
+      "addTrigger": "Frage hinzufügen...",
+      "addResponse": "Antwort hinzufügen...",
+      "defaultTriggers": {
+        "location": "Standortfrage",
+        "general": "Allgemeine Frage"
+      },
+      "defaultResponses": {
+        "locationLink": "Standort-Link einfügen",
+        "locationImage": "Standort-Bild einfügen",
+        "concise": "Kurz und knapp antworten",
+        "cta": "Mit Call-to-Action enden"
+      },
+      "filesTitle": "Verbundene Dateien",
+      "expertPrompt": "Experte: System-Prompt bearbeiten"
+    },
     "advancedConfig": {
       "title": "Erweiterte Konfiguration",
       "editPrompt": "KI-Prompt bearbeiten",
@@ -1560,6 +1586,76 @@
         "title": "KI-Setup-Interview",
         "description": "Steuert den KI-Assistenten, der Nutzer durch die Widget-Konfiguration führt.",
         "modelHelp": "Wähle, welches KI-Modell das Setup-Interview durchführen soll."
+      },
+      "behaviorRules": {
+        "title": "Geführte Verhaltensregeln",
+        "description": "Wähle, wie der Assistent antworten soll. Diese Optionen erzeugen automatisch saubere Systemprompt-Regeln.",
+        "reset": "Regeln zurücksetzen",
+        "locationLinkRequired": "Bei Standortfragen immer einen Standort-Link ausgeben",
+        "locationImageLink": "Bei Standortfragen zusätzlich einen Bildlink ausgeben",
+        "conciseReplies": "Kurz und konkret antworten",
+        "ctaRequired": "Immer mit Call-to-Action enden",
+        "regenerate": "Regeln neu generieren",
+        "conflictTitle": "Konflikt im Regelblock erkannt",
+        "conflictDescription": "Im Prompt gibt es einen manuellen Regelblock, der nicht zu den Checkboxen passt. Neu generieren, um Verhalten zu synchronisieren.",
+        "relationTitle": "Zusammenhang: Regel → Antwortverhalten",
+        "sections": {
+          "location": {
+            "title": "Thema: Standortfragen",
+            "description": "Regelt, welche Standort-Informationen zwingend in Antworten enthalten sind.",
+            "effect": "Effekt: Bei Standortfragen werden je nach aktiven Schaltern Links und/oder Bildhinweise ergänzt."
+          },
+          "style": {
+            "title": "Thema: Antwortstil",
+            "description": "Steuert, ob Antworten kompakt und auf den Punkt formuliert werden.",
+            "effect": "Effekt: Bei Aktivierung werden Antworten kürzer, direkter und fokussierter."
+          },
+          "finish": {
+            "title": "Thema: Abschluss",
+            "description": "Definiert, ob jede Antwort mit einer klaren Handlungsaufforderung endet.",
+            "effect": "Effekt: Antworten schließen mit einer nächsten Aktion (z. B. Rückfrage oder Vorschlag)."
+          }
+        },
+        "relationStates": {
+          "locationLinkOn": "Bei Standortfragen wird immer ein Standort-Link ergänzt.",
+          "locationLinkOff": "Es wird kein zusätzlicher Standort-Link erzwungen.",
+          "locationImageOn": "Bei Standortfragen wird zusätzlich ein Bildlink ergänzt.",
+          "locationImageOff": "Es wird kein zusätzlicher Bildlink erzwungen.",
+          "conciseOn": "Antworten bleiben kurz und konkret.",
+          "conciseOff": "Antworten können ausführlicher formuliert sein.",
+          "ctaOn": "Antworten enden mit einem klaren Call-to-Action.",
+          "ctaOff": "Antworten enden ohne verpflichtenden Call-to-Action."
+        },
+        "previewTitle": "So antwortet die KI",
+        "scenarios": {
+          "timeQuestion": "Wenn Nutzer nach Uhrzeit fragt",
+          "locationQuestion": "Wenn Nutzer nach Standort fragt",
+          "genericQuestion": "Wenn Nutzer allgemein fragt"
+        },
+        "previewReplies": {
+          "time": {
+            "concise": "Es ist aktuell 14:35 Uhr.",
+            "default": "Aktuell ist es 14:35 Uhr. Wenn du willst, kann ich dir auch die passende Zeitzone für deinen Standort nennen.",
+            "cta": "Soll ich dir auch die Öffnungszeiten zeigen?"
+          },
+          "location": {
+            "concise": "Unser Standort ist in Berlin-Mitte.",
+            "default": "Unser Hauptstandort befindet sich in Berlin-Mitte, zentral und gut erreichbar.",
+            "link": "Link: https://maps.google.com/?q=berlin+mitte",
+            "image": "Bild: https://example.com/location-photo.jpg",
+            "cta": "Möchtest du direkt eine Route dorthin?"
+          },
+          "generic": {
+            "concise": "Klar, ich helfe dir dabei.",
+            "default": "Klar, ich helfe dir gerne dabei und führe dich Schritt für Schritt durch.",
+            "cta": "Soll ich direkt mit dem ersten Schritt starten?"
+          }
+        },
+        "presets": {
+          "location": "Preset: Standort-Fokus",
+          "conciseCta": "Preset: Kurz + CTA",
+          "all": "Preset: Alles aktiv"
+        }
       },
       "position": "Widget-Position",
       "theme": "Standard-Theme",

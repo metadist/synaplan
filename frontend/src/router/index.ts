@@ -131,6 +131,12 @@ const router = createRouter({
       meta: { requiresAuth: true, titleKey: 'pageTitles.widgetChats' },
     },
     {
+      path: '/tools/chat-widget/:widgetId',
+      name: 'widget-detail',
+      component: () => import('@/views/WidgetDetailView.vue'),
+      meta: { requiresAuth: true, titleKey: 'pageTitles.widgetDetail' },
+    },
+    {
       path: '/tools/chat-widget/live-support',
       name: 'live-support',
       component: () => import('../views/LiveSupportView.vue'),

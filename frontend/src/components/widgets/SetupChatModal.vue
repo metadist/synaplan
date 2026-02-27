@@ -207,6 +207,8 @@ import { useI18n } from 'vue-i18n'
 import { useNotification } from '@/composables/useNotification'
 import { useMarkdown } from '@/composables/useMarkdown'
 import * as widgetsApi from '@/services/api/widgetsApi'
+import { promptsApi } from '@/services/api/promptsApi'
+import { parseWidgetSetupOutput } from '@/utils/widgetSetupOutput'
 
 // Disable attribute inheritance since we use Teleport as root
 defineOptions({
@@ -358,11 +360,24 @@ const saveGeneratedPrompt = async () => {
 
   isSending.value = true
   try {
+    const parsedOutput = parseWidgetSetupOutput(generatedPrompt.value)
+
     const result = await widgetsApi.generateWidgetPrompt(
       props.widget.widgetId,
-      generatedPrompt.value,
+      parsedOutput.promptText,
       conversationHistory.value
     )
+
+    await promptsApi.updatePrompt(result.promptId, {
+      prompt: parsedOutput.promptText,
+      metadata: {
+        aiModel: -1,
+        widgetBehaviorRules: JSON.stringify(parsedOutput.rules),
+        widgetBehaviorVersion: '1',
+        widgetBehaviorScenarios: JSON.stringify(parsedOutput.scenarios),
+        widgetKnowledgeMapping: JSON.stringify(parsedOutput.knowledgeMapping),
+      },
+    })
 
     success(t('widgets.setupChat.saveSuccess'))
     emit('completed', result.promptTopic)

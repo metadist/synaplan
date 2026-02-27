@@ -36,6 +36,7 @@
     "notFound": "Page Not Found",
     "widgetSessions": "Widget Sessions",
     "widgetChats": "Widget Chats",
+    "widgetDetail": "Widget Detail",
     "liveSupport": "Live Support"
   },
   "welcome": "Welcome",
@@ -1509,6 +1510,31 @@
       "editHintTitle": "Want to fine-tune your assistant?",
       "editHintDescription": "After saving, you can edit the AI assistant configuration anytime in the widget's Advanced Settings under the 'AI Assistant' tab."
     },
+    "detail": {
+      "back": "Back to widgets",
+      "notFound": "Widget not found",
+      "aiButton": "Configure with AI",
+      "flowTitle": "Widget Flow",
+      "flowSubtitle": "Connect questions to responses. Your widget follows these rules.",
+      "flowHintStart": "Click a question to start connecting.",
+      "flowHintConnect": "Now click a response to connect — or click again to disconnect.",
+      "triggersLabel": "Questions",
+      "responsesLabel": "Responses",
+      "addTrigger": "Add question...",
+      "addResponse": "Add response...",
+      "defaultTriggers": {
+        "location": "Location question",
+        "general": "General question"
+      },
+      "defaultResponses": {
+        "locationLink": "Include location link",
+        "locationImage": "Include location image",
+        "concise": "Answer concisely",
+        "cta": "End with call-to-action"
+      },
+      "filesTitle": "Connected Files",
+      "expertPrompt": "Expert: Edit system prompt"
+    },
     "advancedConfig": {
       "title": "Advanced Configuration",
       "editPrompt": "Edit AI Prompt",
@@ -1541,6 +1567,76 @@
         "title": "AI Setup Interview",
         "description": "Controls the AI assistant that guides users through widget configuration.",
         "modelHelp": "Select which AI model should conduct the setup interview."
+      },
+      "behaviorRules": {
+        "title": "Guided Behavior Rules",
+        "description": "Choose how the assistant should respond. These options generate clean system prompt rules automatically.",
+        "reset": "Reset rules",
+        "locationLinkRequired": "For location questions, always include a location link",
+        "locationImageLink": "For location questions, include an image link",
+        "conciseReplies": "Keep replies short and concrete",
+        "ctaRequired": "Always end with a call-to-action",
+        "regenerate": "Regenerate rules",
+        "conflictTitle": "Rule block conflict detected",
+        "conflictDescription": "The prompt contains a manual rules block that differs from the selected checkboxes. Regenerate to sync behavior.",
+        "relationTitle": "Rule-to-Response Mapping",
+        "sections": {
+          "location": {
+            "title": "Section: Location Questions",
+            "description": "Controls which location details must be included in location-related replies.",
+            "effect": "Effect: Location replies include map links and/or image links based on active toggles."
+          },
+          "style": {
+            "title": "Section: Response Style",
+            "description": "Defines whether answers should be compact and to the point.",
+            "effect": "Effect: Enabled state keeps replies short, direct, and focused."
+          },
+          "finish": {
+            "title": "Section: Closing",
+            "description": "Defines whether every reply should end with a clear next action.",
+            "effect": "Effect: Replies end with a call-to-action prompt for the user."
+          }
+        },
+        "relationStates": {
+          "locationLinkOn": "Location questions always include a location link.",
+          "locationLinkOff": "No location link is enforced.",
+          "locationImageOn": "Location questions include an additional image link.",
+          "locationImageOff": "No image link is enforced.",
+          "conciseOn": "Replies are short and concrete.",
+          "conciseOff": "Replies may be more detailed.",
+          "ctaOn": "Replies end with a clear call-to-action.",
+          "ctaOff": "Replies end without a required call-to-action."
+        },
+        "previewTitle": "How AI will respond",
+        "scenarios": {
+          "timeQuestion": "When user asks for time",
+          "locationQuestion": "When user asks for location",
+          "genericQuestion": "When user asks a general question"
+        },
+        "previewReplies": {
+          "time": {
+            "concise": "It's currently 2:35 PM.",
+            "default": "It's currently 2:35 PM. If you want, I can also share the matching timezone for your location.",
+            "cta": "Would you like me to also show opening hours?"
+          },
+          "location": {
+            "concise": "Our location is in Berlin Mitte.",
+            "default": "Our main location is in Berlin Mitte, centrally located and easy to reach.",
+            "link": "Link: https://maps.google.com/?q=berlin+mitte",
+            "image": "Image: https://example.com/location-photo.jpg",
+            "cta": "Would you like me to provide directions right away?"
+          },
+          "generic": {
+            "concise": "Sure, I can help with that.",
+            "default": "Sure, I can help with that and guide you step by step.",
+            "cta": "Should I start with the first step now?"
+          }
+        },
+        "presets": {
+          "location": "Preset: Location-heavy",
+          "conciseCta": "Preset: Short + CTA",
+          "all": "Preset: All enabled"
+        }
       },
       "position": "Widget Position",
       "theme": "Default Theme",

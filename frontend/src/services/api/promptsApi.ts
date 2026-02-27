@@ -1,5 +1,17 @@
 import { z } from 'zod'
 import { httpClient } from './httpClient'
+import type { WidgetBehaviorRules } from '@/utils/widgetBehaviorRules'
+
+export interface PromptMetadata {
+  aiModel?: number
+  tool_internet?: boolean
+  tool_files?: boolean
+  tool_url_screenshot?: boolean
+  tool_transfer?: boolean
+  widgetBehaviorRules?: string | WidgetBehaviorRules
+  widgetBehaviorVersion?: string | number
+  [key: string]: unknown
+}
 
 export interface TaskPrompt {
   id: number
@@ -11,7 +23,7 @@ export interface TaskPrompt {
   isDefault: boolean
   isUserOverride?: boolean
   selectionRules?: string | null
-  metadata?: Record<string, any>
+  metadata?: PromptMetadata
 }
 
 export interface CreatePromptRequest {
@@ -20,7 +32,7 @@ export interface CreatePromptRequest {
   prompt: string
   language?: string
   selectionRules?: string | null
-  metadata?: Record<string, any>
+  metadata?: PromptMetadata
 }
 
 export interface UpdatePromptRequest {
@@ -28,7 +40,7 @@ export interface UpdatePromptRequest {
   prompt?: string
   language?: string
   selectionRules?: string | null
-  metadata?: Record<string, any>
+  metadata?: PromptMetadata
 }
 
 export interface PromptFile {
