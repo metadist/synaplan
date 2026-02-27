@@ -66,4 +66,8 @@ export default defineConfig({
 
   // Default filter: only run @smoke tests
   // grep: /@smoke/,
+
+  // Plugin tests (@plugin) are excluded from standard runs via --grep-invert
+  // in the npm scripts. They require external services and must be run
+  // explicitly via: npm run test:e2e:plugin:castingdata
 })
