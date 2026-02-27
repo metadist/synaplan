@@ -1533,7 +1533,16 @@
         "cta": "End with call-to-action"
       },
       "filesTitle": "Connected Files",
-      "expertPrompt": "Expert: Edit system prompt"
+      "expertPrompt": "Expert: Edit system prompt",
+      "sources": {
+        "title": "Sources",
+        "addUrl": "https://example.com",
+        "empty": "No sources yet — add a URL or file.",
+        "hourly": "Every hour",
+        "daily": "Daily",
+        "weekly": "Weekly",
+        "monthly": "Monthly"
+      }
     },
     "advancedConfig": {
       "title": "Advanced Configuration",

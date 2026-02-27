@@ -86,68 +86,235 @@
 
               <!-- Flow canvas -->
               <div ref="flowRef" class="relative">
-                <!-- SVG connections overlay -->
+                <!-- SVG connections -->
                 <svg
                   v-if="svgLines.length"
                   :width="svgWidth"
                   :height="svgHeight"
                   class="absolute top-0 left-0 pointer-events-none z-10"
                 >
-                  <path
-                    v-for="line in svgLines"
-                    :key="line.id"
-                    :d="line.path"
-                    fill="none"
-                    stroke="var(--brand)"
-                    stroke-width="2.5"
-                    stroke-linecap="round"
-                    opacity="0.7"
-                  />
+                  <defs>
+                    <linearGradient id="flowGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+                      <stop offset="0%" stop-color="var(--brand)" stop-opacity="0.9" />
+                      <stop offset="100%" stop-color="var(--brand)" stop-opacity="0.35" />
+                    </linearGradient>
+                  </defs>
+                  <g v-for="line in svgLines" :key="line.id">
+                    <path
+                      :d="line.path"
+                      fill="none"
+                      stroke="var(--brand)"
+                      stroke-width="8"
+                      opacity="0.06"
+                      stroke-linecap="round"
+                    />
+                    <path
+                      :d="line.path"
+                      fill="none"
+                      stroke="url(#flowGrad)"
+                      stroke-width="2.5"
+                      stroke-linecap="round"
+                    />
+                  </g>
                 </svg>
+
+                <!-- Animated neural dots -->
+                <div
+                  v-for="(line, lineIdx) in svgLines"
+                  :key="'dot-' + line.id"
+                  class="absolute w-1.5 h-1.5 rounded-full pointer-events-none z-10"
+                  :style="{
+                    background: 'var(--brand)',
+                    boxShadow: '0 0 6px var(--brand)',
+                    offsetPath: `path('${line.path}')`,
+                    animation: `flowDot ${2 + lineIdx * 0.25}s linear infinite`,
+                  }"
+                />
 
                 <!-- Two-column layout -->
                 <div class="flex gap-8 sm:gap-14 lg:gap-24">
-                  <!-- LEFT: Triggers (Questions) -->
+                  <!-- LEFT: Triggers -->
                   <div class="flex-1 space-y-3">
                     <p class="text-[11px] font-bold uppercase tracking-widest txt-secondary mb-1">
                       {{ $t('widgets.detail.triggersLabel') }}
                     </p>
 
-                    <div
-                      v-for="trigger in triggers"
-                      :key="trigger.id"
-                      :ref="(el) => setRef('trigger', trigger.id, el)"
-                      :class="[
-                        'group relative p-4 rounded-xl border-2 cursor-pointer transition-all duration-200 flex items-center justify-between gap-2',
-                        selectedTriggerId === trigger.id
-                          ? 'border-[var(--brand)] bg-[var(--brand)]/5 shadow-lg shadow-[var(--brand)]/10 scale-[1.02]'
-                          : hasConnectionFrom(trigger.id)
-                            ? 'border-[var(--brand)]/30 bg-[var(--brand)]/[0.02]'
-                            : 'border-light-border/30 dark:border-dark-border/20 hover:border-[var(--brand)]/40',
-                      ]"
-                      @click="selectTrigger(trigger.id)"
-                    >
-                      <span class="text-sm font-medium txt-primary truncate">{{
-                        trigger.label
-                      }}</span>
-                      <button
-                        class="opacity-0 group-hover:opacity-100 transition-opacity txt-secondary hover:text-red-500 flex-shrink-0"
-                        @click.stop="removeTrigger(trigger.id)"
-                      >
-                        <Icon icon="heroicons:x-mark" class="w-3.5 h-3.5" />
-                      </button>
-                      <!-- Connection dot (right edge) -->
-                      <span
+                    <template v-for="trigger in triggers" :key="trigger.id">
+                      <!-- Trigger card -->
+                      <div
+                        :ref="(el) => setRef('trigger', trigger.id, el)"
                         :class="[
-                          'absolute right-0 top-1/2 translate-x-1/2 -translate-y-1/2 w-3 h-3 rounded-full border-2 z-20 transition-all',
+                          'group relative p-4 rounded-xl border-2 cursor-pointer transition-all duration-200',
                           selectedTriggerId === trigger.id
-                            ? 'border-[var(--brand)] bg-[var(--brand)] scale-125'
+                            ? 'border-[var(--brand)] bg-[var(--brand)]/5 shadow-lg shadow-[var(--brand)]/10 scale-[1.02]'
                             : hasConnectionFrom(trigger.id)
-                              ? 'border-[var(--brand)] bg-[var(--brand)]/50'
-                              : 'border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800',
+                              ? 'border-[var(--brand)]/30 bg-[var(--brand)]/[0.02] hover:border-[var(--brand)]/50'
+                              : 'border-light-border/30 dark:border-dark-border/20 hover:border-[var(--brand)]/40',
                         ]"
-                      />
-                    </div>
+                        @click="selectTrigger(trigger.id)"
+                      >
+                        <div class="flex items-center justify-between gap-2">
+                          <div class="flex-1 min-w-0">
+                            <input
+                              v-if="editingNodeId === trigger.id"
+                              ref="editInputRef"
+                              v-model="editingLabel"
+                              class="w-full text-sm font-medium txt-primary bg-transparent border-b-2 border-[var(--brand)] focus:outline-none py-0.5"
+                              @click.stop
+                              @blur="finishEditing(trigger.id, 'trigger')"
+                              @keydown.enter.prevent="finishEditing(trigger.id, 'trigger')"
+                              @keydown.escape="cancelEditing"
+                            />
+                            <span v-else class="text-sm font-medium txt-primary truncate block">
+                              {{ trigger.label }}
+                            </span>
+                            <!-- Source badges -->
+                            <div v-if="trigger.sources?.length" class="flex gap-1 mt-1.5">
+                              <span
+                                v-for="s in trigger.sources"
+                                :key="s.id"
+                                :class="[
+                                  'w-5 h-5 rounded-md flex items-center justify-center',
+                                  s.type === 'website' ? 'bg-blue-500/10' : 'bg-amber-500/10',
+                                ]"
+                              >
+                                <Icon
+                                  :icon="sourceIcon(s.type)"
+                                  class="w-3 h-3"
+                                  :class="s.type === 'website' ? 'text-blue-500' : 'text-amber-500'"
+                                />
+                              </span>
+                            </div>
+                          </div>
+                          <div class="flex items-center gap-0.5 flex-shrink-0">
+                            <button
+                              class="p-1 rounded opacity-0 group-hover:opacity-100 transition-opacity txt-secondary hover:txt-primary"
+                              @click.stop="startEditing(trigger.id, trigger.label)"
+                            >
+                              <Icon icon="heroicons:pencil-square" class="w-3.5 h-3.5" />
+                            </button>
+                            <button
+                              class="p-1 rounded opacity-0 group-hover:opacity-100 transition-opacity txt-secondary hover:text-red-500"
+                              @click.stop="removeTrigger(trigger.id)"
+                            >
+                              <Icon icon="heroicons:x-mark" class="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        </div>
+                        <!-- Connection dot (right edge) -->
+                        <span
+                          :class="[
+                            'absolute right-0 top-1/2 translate-x-1/2 -translate-y-1/2 w-3 h-3 rounded-full border-2 z-20 transition-all',
+                            selectedTriggerId === trigger.id
+                              ? 'border-[var(--brand)] bg-[var(--brand)] scale-125'
+                              : hasConnectionFrom(trigger.id)
+                                ? 'border-[var(--brand)] bg-[var(--brand)]/50'
+                                : 'border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800',
+                          ]"
+                        />
+                      </div>
+
+                      <!-- Source editor (appears below selected trigger) -->
+                      <Transition
+                        enter-active-class="transition-all duration-300 ease-out"
+                        enter-from-class="opacity-0 -translate-y-1"
+                        enter-to-class="opacity-100 translate-y-0"
+                        leave-active-class="transition-all duration-200 ease-in"
+                        leave-from-class="opacity-100 translate-y-0"
+                        leave-to-class="opacity-0 -translate-y-1"
+                      >
+                        <div
+                          v-if="selectedTriggerId === trigger.id"
+                          class="rounded-xl border border-[var(--brand)]/20 bg-white/60 dark:bg-black/20 p-4 space-y-3"
+                          @click.stop
+                        >
+                          <p class="text-[10px] font-bold uppercase tracking-widest txt-secondary">
+                            {{ $t('widgets.detail.sources.title') }}
+                          </p>
+
+                          <!-- Existing sources -->
+                          <div
+                            v-for="source in trigger.sources || []"
+                            :key="source.id"
+                            class="flex items-center gap-3 p-3 rounded-xl bg-gray-50 dark:bg-white/5 border border-light-border/15 dark:border-dark-border/10"
+                          >
+                            <div
+                              :class="[
+                                'w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0',
+                                source.type === 'website' ? 'bg-blue-500/10' : 'bg-amber-500/10',
+                              ]"
+                            >
+                              <Icon
+                                :icon="sourceIcon(source.type)"
+                                class="w-4 h-4"
+                                :class="
+                                  source.type === 'website' ? 'text-blue-500' : 'text-amber-500'
+                                "
+                              />
+                            </div>
+                            <div class="flex-1 min-w-0">
+                              <p class="text-sm font-medium txt-primary truncate">
+                                {{ source.url }}
+                              </p>
+                            </div>
+                            <select
+                              :value="source.crawlInterval"
+                              class="text-xs px-2 py-1.5 rounded-lg border border-light-border/30 dark:border-dark-border/20 surface-card txt-primary focus:outline-none focus:ring-1 focus:ring-[var(--brand)]"
+                              @change="
+                                updateSourceInterval(
+                                  trigger.id,
+                                  source.id,
+                                  ($event.target as HTMLSelectElement).value
+                                )
+                              "
+                            >
+                              <option value="hourly">
+                                {{ $t('widgets.detail.sources.hourly') }}
+                              </option>
+                              <option value="daily">
+                                {{ $t('widgets.detail.sources.daily') }}
+                              </option>
+                              <option value="weekly">
+                                {{ $t('widgets.detail.sources.weekly') }}
+                              </option>
+                              <option value="monthly">
+                                {{ $t('widgets.detail.sources.monthly') }}
+                              </option>
+                            </select>
+                            <button
+                              class="p-1 txt-secondary hover:text-red-500 transition-colors"
+                              @click="removeSource(trigger.id, source.id)"
+                            >
+                              <Icon icon="heroicons:trash" class="w-4 h-4" />
+                            </button>
+                          </div>
+
+                          <!-- Empty state -->
+                          <p v-if="!trigger.sources?.length" class="text-xs txt-secondary py-2">
+                            {{ $t('widgets.detail.sources.empty') }}
+                          </p>
+
+                          <!-- Add source form -->
+                          <form
+                            class="flex gap-2 items-center"
+                            @submit.prevent="addSource(trigger.id)"
+                          >
+                            <input
+                              v-model="newSourceUrl"
+                              :placeholder="$t('widgets.detail.sources.addUrl')"
+                              class="flex-1 min-w-0 px-3 py-2 rounded-lg text-sm border border-light-border/30 dark:border-dark-border/20 surface-card txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)]/40"
+                            />
+                            <button
+                              type="submit"
+                              :disabled="!newSourceUrl.trim()"
+                              class="px-3 py-2 rounded-lg bg-[var(--brand)] text-white text-sm font-medium disabled:opacity-30 disabled:cursor-not-allowed hover:opacity-90 transition-opacity"
+                            >
+                              <Icon icon="heroicons:plus" class="w-4 h-4" />
+                            </button>
+                          </form>
+                        </div>
+                      </Transition>
+                    </template>
 
                     <!-- Add trigger -->
                     <form class="flex gap-2" @submit.prevent="addTrigger">
@@ -177,7 +344,7 @@
                       :key="response.id"
                       :ref="(el) => setRef('response', response.id, el)"
                       :class="[
-                        'group relative p-4 pl-5 rounded-xl border-2 transition-all duration-200 flex items-center justify-between gap-2',
+                        'group relative p-4 pl-5 rounded-xl border-2 transition-all duration-200',
                         selectedTriggerId
                           ? isConnected(selectedTriggerId, response.id)
                             ? 'border-[var(--brand)] bg-[var(--brand)]/5 shadow-lg shadow-[var(--brand)]/10 cursor-pointer'
@@ -201,15 +368,37 @@
                                 : 'border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800',
                         ]"
                       />
-                      <span class="text-sm font-medium txt-primary truncate">{{
-                        response.label
-                      }}</span>
-                      <button
-                        class="opacity-0 group-hover:opacity-100 transition-opacity txt-secondary hover:text-red-500 flex-shrink-0"
-                        @click.stop="removeResponse(response.id)"
-                      >
-                        <Icon icon="heroicons:x-mark" class="w-3.5 h-3.5" />
-                      </button>
+                      <div class="flex items-center justify-between gap-2">
+                        <div class="flex-1 min-w-0">
+                          <input
+                            v-if="editingNodeId === response.id"
+                            ref="editInputRef"
+                            v-model="editingLabel"
+                            class="w-full text-sm font-medium txt-primary bg-transparent border-b-2 border-[var(--brand)] focus:outline-none py-0.5"
+                            @click.stop
+                            @blur="finishEditing(response.id, 'response')"
+                            @keydown.enter.prevent="finishEditing(response.id, 'response')"
+                            @keydown.escape="cancelEditing"
+                          />
+                          <span v-else class="text-sm font-medium txt-primary truncate block">
+                            {{ response.label }}
+                          </span>
+                        </div>
+                        <div class="flex items-center gap-0.5 flex-shrink-0">
+                          <button
+                            class="p-1 rounded opacity-0 group-hover:opacity-100 transition-opacity txt-secondary hover:txt-primary"
+                            @click.stop="startEditing(response.id, response.label)"
+                          >
+                            <Icon icon="heroicons:pencil-square" class="w-3.5 h-3.5" />
+                          </button>
+                          <button
+                            class="p-1 rounded opacity-0 group-hover:opacity-100 transition-opacity txt-secondary hover:text-red-500"
+                            @click.stop="removeResponse(response.id)"
+                          >
+                            <Icon icon="heroicons:x-mark" class="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      </div>
                     </div>
 
                     <!-- Add response -->
@@ -322,9 +511,16 @@ import {
 } from '@/utils/widgetBehaviorRules'
 import { useI18n } from 'vue-i18n'
 
+interface FlowSource {
+  id: string
+  type: 'website' | 'file' | 'custom'
+  url: string
+  crawlInterval: 'hourly' | 'daily' | 'weekly' | 'monthly'
+}
 interface FlowNode {
   id: string
   label: string
+  sources?: FlowSource[]
 }
 interface FlowConnection {
   from: string
@@ -363,6 +559,14 @@ const selectedTriggerId = ref<string | null>(null)
 const newTriggerText = ref('')
 const newResponseText = ref('')
 
+// Editing state
+const editingNodeId = ref<string | null>(null)
+const editingLabel = ref('')
+const editInputRef = ref<HTMLInputElement[] | null>(null)
+
+// Source state
+const newSourceUrl = ref('')
+
 // SVG state
 const flowRef = ref<HTMLElement | null>(null)
 const svgWidth = ref(0)
@@ -379,11 +583,8 @@ const setRef = (
   el: Element | ComponentPublicInstance | null
 ) => {
   const map = type === 'trigger' ? triggerEls : responseEls
-  if (el instanceof HTMLElement) {
-    map.set(id, el)
-  } else {
-    map.delete(id)
-  }
+  if (el instanceof HTMLElement) map.set(id, el)
+  else map.delete(id)
 }
 
 // SVG line calculation
@@ -396,7 +597,6 @@ const recalcLines = () => {
   const cr = container.getBoundingClientRect()
   svgWidth.value = cr.width
   svgHeight.value = cr.height
-
   const lines: SvgLine[] = []
   for (const conn of connections.value) {
     const tEl = triggerEls.get(conn.from)
@@ -426,7 +626,9 @@ watch(flowRef, (el) => {
     nextTick(recalcLines)
   }
 })
-watch([triggers, responses, connections], () => nextTick(recalcLines), { deep: true })
+watch([triggers, responses, connections, selectedTriggerId], () => nextTick(recalcLines), {
+  deep: true,
+})
 onMounted(() => window.addEventListener('resize', recalcLines))
 onBeforeUnmount(() => {
   resizeObs?.disconnect()
@@ -439,20 +641,30 @@ const isConnected = (triggerId: string, responseId: string) =>
 const hasConnectionFrom = (triggerId: string) => connections.value.some((c) => c.from === triggerId)
 const hasConnectionTo = (responseId: string) => connections.value.some((c) => c.to === responseId)
 
+const sourceIcon = (type: FlowSource['type']): string => {
+  switch (type) {
+    case 'website':
+      return 'heroicons:globe-alt'
+    case 'file':
+      return 'heroicons:document'
+    default:
+      return 'heroicons:light-bulb'
+  }
+}
+
 // Interaction
 const selectTrigger = (id: string) => {
+  if (editingNodeId.value === id) return
   selectedTriggerId.value = selectedTriggerId.value === id ? null : id
+  newSourceUrl.value = ''
 }
 
 const handleResponseClick = (responseId: string) => {
+  if (!selectedTriggerId.value) return
   const tid = selectedTriggerId.value
-  if (!tid) return
   const idx = connections.value.findIndex((c) => c.from === tid && c.to === responseId)
-  if (idx >= 0) {
-    connections.value.splice(idx, 1)
-  } else {
-    connections.value.push({ from: tid, to: responseId })
-  }
+  if (idx >= 0) connections.value.splice(idx, 1)
+  else connections.value.push({ from: tid, to: responseId })
 }
 
 const addTrigger = () => {
@@ -475,6 +687,53 @@ const removeTrigger = (id: string) => {
 const removeResponse = (id: string) => {
   responses.value = responses.value.filter((n) => n.id !== id)
   connections.value = connections.value.filter((c) => c.to !== id)
+}
+
+// Inline editing
+const startEditing = (nodeId: string, label: string) => {
+  editingNodeId.value = nodeId
+  editingLabel.value = label
+  nextTick(() => {
+    if (editInputRef.value?.length) editInputRef.value[0].focus()
+  })
+}
+const finishEditing = (nodeId: string, type: 'trigger' | 'response') => {
+  const label = editingLabel.value.trim()
+  if (label) {
+    const list = type === 'trigger' ? triggers.value : responses.value
+    const node = list.find((n) => n.id === nodeId)
+    if (node) node.label = label
+  }
+  editingNodeId.value = null
+}
+const cancelEditing = () => {
+  editingNodeId.value = null
+}
+
+// Sources
+const addSource = (triggerId: string) => {
+  const url = newSourceUrl.value.trim()
+  if (!url) return
+  const trigger = triggers.value.find((n) => n.id === triggerId)
+  if (!trigger) return
+  if (!trigger.sources) trigger.sources = []
+  trigger.sources.push({
+    id: `s-${Date.now()}`,
+    type: url.startsWith('http') ? 'website' : 'custom',
+    url,
+    crawlInterval: 'daily',
+  })
+  newSourceUrl.value = ''
+}
+const removeSource = (triggerId: string, sourceId: string) => {
+  const trigger = triggers.value.find((n) => n.id === triggerId)
+  if (!trigger?.sources) return
+  trigger.sources = trigger.sources.filter((s) => s.id !== sourceId)
+}
+const updateSourceInterval = (triggerId: string, sourceId: string, interval: string) => {
+  const trigger = triggers.value.find((n) => n.id === triggerId)
+  const source = trigger?.sources?.find((s) => s.id === sourceId)
+  if (source) source.crawlInterval = interval as FlowSource['crawlInterval']
 }
 
 // Defaults
@@ -646,3 +905,14 @@ const handleAdvancedSaved = async () => {
 
 onMounted(loadData)
 </script>
+
+<style>
+@keyframes flowDot {
+  0% {
+    offset-distance: 0%;
+  }
+  100% {
+    offset-distance: 100%;
+  }
+}
+</style>
