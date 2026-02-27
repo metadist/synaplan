@@ -112,7 +112,8 @@ open http://localhost:8082
 # Build widget
 cd frontend && npm run build:widget
 
-# Test widget locally: open http://localhost:5173/widget-test.html (dev) or use E2E test stack
+# Test widget locally
+# Open frontend/widget-test.html in browser
 ```
 
 ---
