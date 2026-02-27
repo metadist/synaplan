@@ -80,6 +80,7 @@ services:
             - '../src/DependencyInjection/'
             - '../src/Entity/'
             - '../src/Kernel.php'
+            - '../src/Test/'
 
     # AI Providers - TestProvider supports all capabilities
     App\AI\Provider\TestProvider:
@@ -208,6 +209,7 @@ services:
             $uploadsDir: '%kernel.project_dir%/var/uploads'
             $whatsappUserId: 2  # WhatsApp messages use User ID 2 for model selection
             $appUrl: '%env(APP_URL)%'
+            $whatsappGraphApiBaseUrl: '%env(default::WHATSAPP_GRAPH_API_BASE_URL)%'
 
     # Webhook Controller - Bind WhatsApp Verify Token
     App\Controller\WebhookController:
@@ -248,7 +250,9 @@ services:
     App\Service\CircuitBreaker: ~
 
     # Model Configuration Service
-    App\Service\ModelConfigService: ~
+    App\Service\ModelConfigService:
+        arguments:
+            $appEnv: '%kernel.environment%'
 
     # Rate Limiter Service
     App\Service\RateLimiterService: ~
@@ -527,3 +531,25 @@ services:
     # Alias for injection
     App\Service\RAG\VectorStorage\VectorStorageInterface:
         alias: App\Service\RAG\VectorStorage\VectorStorageFacade
+
+when@dev:
+    services:
+        App\Test\Controller\UserCleanupController:
+            arguments:
+                $userRepository: '@App\Repository\UserRepository'
+                $userDeletionService: '@App\Service\UserDeletionService'
+                $logger: '@monolog.logger'
+            calls:
+                - [setContainer, ['@service_container']]
+            tags: ['controller.service_arguments']
+
+when@test:
+    services:
+        App\Test\Controller\UserCleanupController:
+            arguments:
+                $userRepository: '@App\Repository\UserRepository'
+                $userDeletionService: '@App\Service\UserDeletionService'
+                $logger: '@monolog.logger'
+            calls:
+                - [setContainer, ['@service_container']]
+            tags: ['controller.service_arguments']

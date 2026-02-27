@@ -170,6 +170,7 @@
             v-for="message in sortedMessages"
             :key="message.id"
             :class="['flex', message.role === 'user' ? 'justify-end' : 'justify-start']"
+            :data-testid="`message-${message.role}`"
           >
             <div
               :class="['max-w-[80%] rounded-2xl px-4 py-2', message.role === 'user' ? '' : '']"
@@ -179,6 +180,12 @@
                   : { backgroundColor: widgetTheme === 'dark' ? '#2a2a2a' : '#f3f4f6' }
               "
             >
+              <span
+                v-if="message.role === 'assistant' && !isTyping"
+                data-testid="message-done"
+                class="sr-only"
+                aria-hidden="true"
+              />
               <template v-if="message.type === 'text'">
                 <div
                   v-if="message.role === 'assistant' && message.content === '' && isTyping"
@@ -196,6 +203,13 @@
                 <div
                   v-else
                   class="text-sm break-words markdown-content overflow-x-auto"
+                  :data-testid="
+                    message.role === 'assistant' && message.content === autoMessage
+                      ? 'message-auto-text'
+                      : message.role === 'assistant'
+                        ? 'message-ai-text'
+                        : 'message-user-text'
+                  "
                   :style="{
                     color:
                       message.role === 'user'
@@ -304,6 +318,7 @@
           <!-- Limit Warning -->
           <div v-if="showLimitWarning" class="flex justify-center">
             <div
+              data-testid="warning-message-limit"
               class="bg-orange-500/10 border border-orange-500/30 rounded-xl px-4 py-3 max-w-[90%]"
             >
               <div class="flex items-start gap-2">
@@ -320,7 +335,10 @@
 
           <!-- Limit Reached -->
           <div v-if="limitReached" class="flex justify-center">
-            <div class="bg-red-500/10 border border-red-500/30 rounded-xl px-4 py-3 max-w-[90%]">
+            <div
+              data-testid="error-message-limit-reached"
+              class="bg-red-500/10 border border-red-500/30 rounded-xl px-4 py-3 max-w-[90%]"
+            >
               <div class="flex items-start gap-2">
                 <XCircleIcon class="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5" />
                 <div>
@@ -340,6 +358,7 @@
         >
           <div
             v-if="fileUploadError"
+            data-testid="error-file-upload"
             class="mb-2 p-2 bg-red-500/10 border border-red-500/30 rounded-lg"
           >
             <div class="flex items-start gap-2">
@@ -350,6 +369,7 @@
 
           <div
             v-if="allowFileUploads && fileLimitReached && selectedFiles.length === 0"
+            data-testid="error-file-upload-limit"
             class="mb-2 p-2 bg-amber-500/10 border border-amber-500/30 rounded-lg"
           >
             <div class="flex items-start gap-2">
@@ -400,6 +420,7 @@
           <!-- File Size Error -->
           <div
             v-if="fileSizeError"
+            data-testid="error-file-size"
             class="mb-2 p-2 bg-red-500/10 border border-red-500/30 rounded-lg"
           >
             <div class="flex items-start gap-2">

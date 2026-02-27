@@ -14,12 +14,18 @@ class ConfigFixtures extends Fixture implements DependentFixtureInterface
 {
     public function load(ObjectManager $manager): void
     {
+        // Use TestProvider (model 900) in test env so tests don't call real APIs; Groq elsewhere.
+        $isTest = 'test' === (getenv('APP_ENV') ?: '');
+        $chatModel = $isTest ? '900' : '76';
+        $sortModel = $isTest ? '900' : '9';
+        $defaultProvider = $isTest ? 'test' : 'groq';
+
         $configs = [
-            // Default AI Models - Using Groq models (free tier, fast)
-            ['ownerId' => 0, 'group' => 'DEFAULTMODEL', 'setting' => 'CHAT', 'value' => '76'],       // Groq GPT-OSS-120B
-            ['ownerId' => 0, 'group' => 'DEFAULTMODEL', 'setting' => 'TOOLS', 'value' => '76'],      // Groq GPT-OSS-120B (internal tasks: feedback, memories, contradictions)
-            ['ownerId' => 0, 'group' => 'DEFAULTMODEL', 'setting' => 'SORT', 'value' => '9'],        // Groq Llama 70b
-            ['ownerId' => 0, 'group' => 'DEFAULTMODEL', 'setting' => 'SUMMARIZE', 'value' => '9'],   // Groq Llama 70b
+            // DEFAULTMODEL: value = ModelFixtures id. TestProvider (900) in test, Groq (76/9) in dev/prod.
+            ['ownerId' => 0, 'group' => 'DEFAULTMODEL', 'setting' => 'CHAT', 'value' => $chatModel],
+            ['ownerId' => 0, 'group' => 'DEFAULTMODEL', 'setting' => 'TOOLS', 'value' => $chatModel],  // Feedback, memories, contradictions
+            ['ownerId' => 0, 'group' => 'DEFAULTMODEL', 'setting' => 'SORT', 'value' => $sortModel],
+            ['ownerId' => 0, 'group' => 'DEFAULTMODEL', 'setting' => 'SUMMARIZE', 'value' => $sortModel],
             ['ownerId' => 0, 'group' => 'DEFAULTMODEL', 'setting' => 'TEXT2PIC', 'value' => '29'],
             ['ownerId' => 0, 'group' => 'DEFAULTMODEL', 'setting' => 'TEXT2VID', 'value' => '45'],
             ['ownerId' => 0, 'group' => 'DEFAULTMODEL', 'setting' => 'TEXT2SOUND', 'value' => '140'],
@@ -28,7 +34,7 @@ class ConfigFixtures extends Fixture implements DependentFixtureInterface
             ['ownerId' => 0, 'group' => 'DEFAULTMODEL', 'setting' => 'VECTORIZE', 'value' => '13'],
 
             // AI Provider Config
-            ['ownerId' => 0, 'group' => 'ai', 'setting' => 'default_chat_provider', 'value' => 'groq'],
+            ['ownerId' => 0, 'group' => 'ai', 'setting' => 'default_chat_provider', 'value' => $defaultProvider],
 
             // Example Widget Config (for user 2)
             ['ownerId' => 2, 'group' => 'widget_1', 'setting' => 'color', 'value' => '#007bff'],

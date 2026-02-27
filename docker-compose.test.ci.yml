@@ -1,7 +1,10 @@
 # CI overrides for docker-compose.test.yml
 # This file configures the setup for CI by:
 #   1. Using a pre-built Docker image (via APP_IMAGE env var)
-#   2. Removing volume mounts to use the baked image content
+#   2. Removing volume mounts: no backend/plugins mounts (baked into image)
+#   3. whatsapp-stub: expose 3999 so Playwright (on host) can reach stub for integration tests; keep container_name
+#
+# app_test reaches the stub at http://whatsapp-stub:3999 via backend/.env.test (WHATSAPP_GRAPH_API_BASE_URL).
 #
 # Usage in CI:
 #   docker compose -f docker-compose.test.yml -f docker-compose.test.ci.yml up
@@ -10,6 +13,9 @@ services:
   app_test:
     # Use pre-built image from CI (e.g., synaplan-test:ci)
     image: ${APP_IMAGE:-}
-    # Remove all volume mounts to use the baked image content
-    # The !reset tag is required to clear inherited volumes from base file
+ 
     volumes: !reset []
+
+  whatsapp-stub:
+    ports: ["3999:3999"]
+    container_name: synaplan-whatsapp-stub

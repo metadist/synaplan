@@ -38,6 +38,8 @@ class ConfigController extends AbstractController
         private UserMemoryService $memoryService,
         #[Autowire('%env(string:default::QDRANT_SERVICE_URL)%')]
         private readonly string $qdrantServiceUrl,
+        #[Autowire('%kernel.environment%')]
+        private readonly string $kernelEnvironment,
     ) {
     }
 
@@ -456,6 +458,37 @@ class ConfigController extends AbstractController
             }
         }
 
+        // In test or dev: add TestProvider (900) to every capability so UI shows "test-model (test)" for all
+        if (in_array($this->kernelEnvironment, ['test', 'dev'], true)) {
+            $testModel = $this->modelRepository->find(900);
+            if ($testModel) {
+                $testModelEntry = [
+                    'id' => $testModel->getId(),
+                    'service' => $testModel->getService(),
+                    'name' => $testModel->getName(),
+                    'providerId' => $testModel->getProviderId(),
+                    'description' => $testModel->getDescription(),
+                    'quality' => $testModel->getQuality(),
+                    'rating' => $testModel->getRating(),
+                    'tag' => strtoupper($testModel->getTag()),
+                    'isSystemModel' => $testModel->isSystemModel(),
+                    'features' => $testModel->getFeatures(),
+                ];
+                foreach (array_keys($grouped) as $cap) {
+                    $hasTest = false;
+                    foreach ($grouped[$cap] as $m) {
+                        if (($m['id'] ?? null) === 900) {
+                            $hasTest = true;
+                            break;
+                        }
+                    }
+                    if (!$hasTest) {
+                        $grouped[$cap][] = $testModelEntry;
+                    }
+                }
+            }
+        }
+
         return $this->json([
             'success' => true,
             'models' => $grouped,
@@ -476,6 +509,19 @@ class ConfigController extends AbstractController
         $capabilities = ['SORT', 'CHAT', 'VECTORIZE', 'PIC2TEXT', 'TEXT2PIC', 'TEXT2VID', 'SOUND2TEXT', 'TEXT2SOUND', 'ANALYZE'];
 
         $defaults = [];
+
+        // In test environment: return TestProvider (900) for all capabilities
+        // so CI/E2E tests never accidentally use real AI providers with dummy keys
+        if ('test' === $this->kernelEnvironment) {
+            foreach ($capabilities as $capability) {
+                $defaults[$capability] = 900;
+            }
+
+            return $this->json([
+                'success' => true,
+                'defaults' => $defaults,
+            ]);
+        }
 
         foreach ($capabilities as $capability) {
             // Try user-specific config first

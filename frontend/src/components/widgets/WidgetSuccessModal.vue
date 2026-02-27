@@ -43,7 +43,7 @@
           </div>
 
           <!-- Embed Code Section -->
-          <div class="space-y-3">
+          <div class="space-y-3" data-testid="section-embed-code">
             <label class="block text-sm font-medium txt-primary">
               {{ $t('widgets.success.embedCodeLabel') }}
             </label>

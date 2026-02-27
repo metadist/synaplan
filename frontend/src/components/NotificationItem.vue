@@ -6,6 +6,7 @@
       typeClasses[notification.type],
     ]"
     data-testid="comp-notification-item"
+    :data-notification-type="notification.type"
   >
     <div class="flex-shrink-0 mt-0.5">
       <CheckCircleIcon v-if="notification.type === 'success'" class="w-5 h-5" />

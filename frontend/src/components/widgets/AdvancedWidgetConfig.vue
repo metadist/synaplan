@@ -54,7 +54,7 @@
                 'flex-1 sm:flex-none px-2 sm:px-4 py-3 font-medium text-xs sm:text-sm transition-colors relative whitespace-nowrap',
                 activeTab === tab.id ? 'txt-primary' : 'txt-secondary hover:txt-primary',
               ]"
-              data-testid="btn-tab"
+              :data-testid="`btn-tab-${tab.id}`"
               @click="activeTab = tab.id"
             >
               <span class="flex items-center justify-center sm:justify-start gap-1 sm:gap-2">
@@ -365,6 +365,7 @@
             <div class="surface-chip rounded-lg">
               <label
                 class="p-4 flex items-center justify-between cursor-pointer hover:opacity-80 transition-opacity"
+                data-testid="label-allow-file-upload"
               >
                 <div>
                   <p class="font-medium txt-primary">
@@ -375,7 +376,12 @@
                   </p>
                 </div>
                 <div class="relative inline-flex items-center flex-shrink-0">
-                  <input v-model="config.allowFileUpload" type="checkbox" class="sr-only peer" />
+                  <input
+                    v-model="config.allowFileUpload"
+                    type="checkbox"
+                    class="sr-only peer"
+                    data-testid="input-allow-file-upload"
+                  />
                   <div
                     class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-[var(--brand)]/20 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[var(--brand)]"
                   ></div>

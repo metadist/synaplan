@@ -185,7 +185,7 @@ cd frontend
 npm run build:widget    # Outputs to dist-widget/
 ```
 
-Test locally with `frontend/widget-test.html`.
+Test locally: open `/widget-test.html` on the dev server (Vite serves it from `frontend/tests/e2e/fixtures/widget-test.html`).
 
 ---
 

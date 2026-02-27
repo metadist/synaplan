@@ -63,6 +63,43 @@ class UserFixtures extends Fixture
                     'lastName' => 'User',
                 ],
             ],
+            // E2E worker users (one per Playwright worker for parallel test isolation)
+            [
+                'id' => 4,
+                'mail' => 'e2e-worker-1@synaplan.com',
+                'password' => 'e2e123',
+                'userLevel' => 'PRO',
+                'emailVerified' => true,
+                'type' => 'WEB',
+                'userDetails' => [
+                    'firstName' => 'E2E',
+                    'lastName' => 'Worker1',
+                ],
+            ],
+            [
+                'id' => 5,
+                'mail' => 'e2e-worker-2@synaplan.com',
+                'password' => 'e2e123',
+                'userLevel' => 'PRO',
+                'emailVerified' => true,
+                'type' => 'WEB',
+                'userDetails' => [
+                    'firstName' => 'E2E',
+                    'lastName' => 'Worker2',
+                ],
+            ],
+            [
+                'id' => 6,
+                'mail' => 'e2e-worker-3@synaplan.com',
+                'password' => 'e2e123',
+                'userLevel' => 'PRO',
+                'emailVerified' => true,
+                'type' => 'WEB',
+                'userDetails' => [
+                    'firstName' => 'E2E',
+                    'lastName' => 'Worker3',
+                ],
+            ],
         ];
 
         if (!$manager instanceof EntityManagerInterface) {

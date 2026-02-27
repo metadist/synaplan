@@ -138,8 +138,8 @@
               </button>
             </div>
 
-            <!-- Already Public -->
-            <div v-else class="space-y-4">
+            <!-- Already Public (E2E: share-done) -->
+            <div v-else class="space-y-4" data-testid="share-done">
               <div class="flex items-center gap-2 text-green-600 dark:text-green-400">
                 <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path
@@ -175,6 +175,7 @@
                   </button>
                 </div>
                 <div
+                  data-testid="share-link-input"
                   class="p-3 rounded bg-white dark:bg-black/20 font-mono text-sm break-all txt-primary"
                 >
                   {{ fullShareUrl }}

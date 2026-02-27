@@ -7,6 +7,8 @@
     ]"
     data-testid="message-container"
   >
+    <!-- E2E: role marker for message-user / message-assistant -->
+    <span :data-testid="`message-${role}`" class="sr-only" aria-hidden="true" />
     <!-- Avatar with provider logo for assistant -->
     <div
       v-if="role === 'assistant'"
@@ -35,6 +37,13 @@
         ]"
         :data-testid="role === 'user' ? 'user-message-bubble' : 'assistant-message-bubble'"
       >
+        <!-- E2E: visible when streaming finished so tests can wait for message-done -->
+        <span
+          v-if="role === 'assistant' && !isStreaming"
+          data-testid="message-done"
+          class="sr-only"
+          aria-hidden="true"
+        />
         <!-- Copy button (assistant only, hidden during streaming) -->
         <button
           v-if="role === 'assistant' && !isStreaming"
@@ -477,6 +486,7 @@
             <template v-if="role === 'assistant' && topic">
               <router-link
                 :to="`/config/task-prompts?topic=${topic}`"
+                :data-testid="topic === 'ERROR' ? 'message-topic-error' : 'message-topic-badge'"
                 class="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-medium bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/20 transition-colors leading-tight cursor-pointer max-w-[9rem]"
                 :title="`Topic: ${topic} - Click to view prompt`"
               >

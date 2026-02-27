@@ -45,9 +45,12 @@ class WhatsAppService
      */
     private const DUPLICATE_CACHE_TTL = 300;
 
+    private const DEFAULT_GRAPH_BASE = 'https://graph.facebook.com';
+
     private string $accessToken;
     private bool $enabled;
     private string $apiVersion = 'v21.0';
+    private string $graphBaseUrl;
 
     public function __construct(
         private HttpClientInterface $httpClient,
@@ -66,9 +69,13 @@ class WhatsAppService
         private string $uploadsDir,
         private int $whatsappUserId,
         private string $appUrl = '',
+        ?string $whatsappGraphApiBaseUrl = null,
     ) {
         $this->accessToken = $whatsappAccessToken;
         $this->enabled = $whatsappEnabled;
+        $this->graphBaseUrl = (null !== $whatsappGraphApiBaseUrl && '' !== $whatsappGraphApiBaseUrl)
+            ? rtrim($whatsappGraphApiBaseUrl, '/')
+            : self::DEFAULT_GRAPH_BASE;
     }
 
     /**
@@ -222,7 +229,8 @@ class WhatsAppService
     private function sendSingleMessage(string $to, string $formattedMessage, string $phoneNumberId): array
     {
         $url = sprintf(
-            'https://graph.facebook.com/%s/%s/messages',
+            '%s/%s/%s/messages',
+            $this->graphBaseUrl,
             $this->apiVersion,
             $phoneNumberId
         );
@@ -337,7 +345,8 @@ class WhatsAppService
         }
 
         $url = sprintf(
-            'https://graph.facebook.com/%s/%s/messages',
+            '%s/%s/%s/messages',
+            $this->graphBaseUrl,
             $this->apiVersion,
             $phoneNumberId
         );
@@ -419,7 +428,8 @@ class WhatsAppService
         }
 
         $url = sprintf(
-            'https://graph.facebook.com/%s/%s/messages',
+            '%s/%s/%s/messages',
+            $this->graphBaseUrl,
             $this->apiVersion,
             $phoneNumberId
         );
@@ -493,7 +503,8 @@ class WhatsAppService
         }
 
         $url = sprintf(
-            'https://graph.facebook.com/%s/%s/messages',
+            '%s/%s/%s/messages',
+            $this->graphBaseUrl,
             $this->apiVersion,
             $phoneNumberId
         );
@@ -1484,7 +1495,8 @@ class WhatsAppService
         }
 
         $url = sprintf(
-            'https://graph.facebook.com/%s/%s',
+            '%s/%s/%s',
+            $this->graphBaseUrl,
             $this->apiVersion,
             $mediaId
         );
