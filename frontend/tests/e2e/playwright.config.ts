@@ -35,13 +35,14 @@ export default defineConfig({
           Object.entries(devices['Desktop Chrome']).filter(([key]) => key !== 'deviceScaleFactor')
         ),
         viewport: process.env.CI ? { width: 1920, height: 1080 } : null,
-        ...(process.env.CI
-          ? {}
-          : {
-              launchOptions: {
-                args: ['--start-maximized'],
-              },
-            }),
+        // Chrome 142+ Local Network Access: disable prompt so dev-stack (5173→8000) widget tests
+        // run without user interaction. Test stack (8001) is same-origin anyway.
+        launchOptions: {
+          args: [
+            ...(process.env.CI ? [] : ['--start-maximized']),
+            '--disable-features=LocalNetworkAccessChecks',
+          ],
+        },
       },
       grepInvert: /@oidc-redirect/,
     },

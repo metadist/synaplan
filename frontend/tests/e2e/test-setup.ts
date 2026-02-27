@@ -10,14 +10,6 @@ export const test = base.extend<{ credentials: { user: string; pass: string } }>
     const creds = CREDENTIALS.getCredentialsForWorker(testInfo.parallelIndex)
     await use(creds)
   },
-
-  // Mark test env so index.html does not load the widget
-  page: async ({ page }, use) => {
-    await page.addInitScript(() => {
-      ;(window as any).__PLAYWRIGHT__ = true
-    })
-    await use(page)
-  },
 })
 
 // Integration tests require test stack (E2E_STACK=test). Skip from one place.

@@ -199,16 +199,6 @@ jobs:
         working-directory: frontend
         run: npm run build:widget
 
-      - name: Verify widget build
-        working-directory: frontend
-        run: |
-          if [ ! -d "dist-widget" ] || [ -z "$(ls -A dist-widget)" ]; then
-            echo "::warning::Widget build verification failed: dist-widget directory is missing or empty (E2E widget tests may fail)"
-          else
-            echo "✅ Widget build verified: dist-widget contains files"
-            ls -la dist-widget/
-          fi
-
       - name: Upload frontend build artifact
         uses: actions/upload-artifact@v4
         with:
@@ -246,15 +236,6 @@ jobs:
         with:
           name: widget-dist
           path: frontend/dist-widget/
-
-      - name: Verify widget artifact before Docker build
-        run: |
-          if [ ! -d "frontend/dist-widget" ] || [ -z "$(ls -A frontend/dist-widget)" ]; then
-            echo "::warning::Widget artifact missing: frontend/dist-widget is empty before Docker build (E2E widget tests may fail)"
-          else
-            echo "✅ Widget artifact verified: frontend/dist-widget contains files"
-            ls -la frontend/dist-widget/
-          fi
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3

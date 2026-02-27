@@ -185,8 +185,7 @@ class Message
 
     public function setTopic(string $topic): self
     {
-        // Truncate to column length (64) to prevent DB errors
-        $this->topic = mb_substr($topic, 0, 64);
+        $this->topic = $topic;
 
         return $this;
     }

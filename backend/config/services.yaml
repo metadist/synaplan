@@ -75,6 +75,7 @@ services:
             - '../src/DependencyInjection/'
             - '../src/Entity/'
             - '../src/Kernel.php'
+            - '../src/Test/'
 
     # AI Providers - TestProvider supports all capabilities
     App\AI\Provider\TestProvider:
@@ -518,3 +519,25 @@ services:
     # Alias for injection
     App\Service\RAG\VectorStorage\VectorStorageInterface:
         alias: App\Service\RAG\VectorStorage\VectorStorageFacade
+
+when@dev:
+    services:
+        App\Test\Controller\UserCleanupController:
+            arguments:
+                $userRepository: '@App\Repository\UserRepository'
+                $userDeletionService: '@App\Service\UserDeletionService'
+                $logger: '@monolog.logger'
+            calls:
+                - [setContainer, ['@service_container']]
+            tags: ['controller.service_arguments']
+
+when@test:
+    services:
+        App\Test\Controller\UserCleanupController:
+            arguments:
+                $userRepository: '@App\Repository\UserRepository'
+                $userDeletionService: '@App\Service\UserDeletionService'
+                $logger: '@monolog.logger'
+            calls:
+                - [setContainer, ['@service_container']]
+            tags: ['controller.service_arguments']
