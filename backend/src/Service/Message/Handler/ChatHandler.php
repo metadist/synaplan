@@ -179,7 +179,9 @@ class ChatHandler implements MessageHandlerInterface
         }
 
         // Append plugin context (external data sources like casting platforms)
-        $systemPrompt = $this->appendPluginContext($systemPrompt, $message, $classification, []);
+        $systemPrompt = $this->appendPluginContext($systemPrompt, $message, $classification, [
+            'channel' => $classification['source'] ?? null,
+        ]);
 
         $urlContent = $classification['url_content'] ?? null;
         if (is_string($urlContent) && '' !== $urlContent) {

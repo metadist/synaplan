@@ -14,7 +14,7 @@ use Psr\Log\LoggerInterface;
  * productions and auditions from the external API and formats them as
  * context that the LLM can use to answer performer questions.
  */
-final class CastingContextProvider implements PluginContextProviderInterface
+final readonly class CastingContextProvider implements PluginContextProviderInterface
 {
     private const MAX_CONTEXT_LENGTH = 4000;
 
@@ -26,6 +26,13 @@ final class CastingContextProvider implements PluginContextProviderInterface
 
     public function supports(int $userId, array $classification, array $options): bool
     {
+        $isWidgetContext = 'widget' === ($classification['source'] ?? null)
+            || 'WIDGET' === ($options['channel'] ?? null);
+
+        if (!$isWidgetContext) {
+            return false;
+        }
+
         $config = $this->apiClient->getConfig($userId);
 
         if (!$config) {

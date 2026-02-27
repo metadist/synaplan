@@ -28,7 +28,7 @@ use Symfony\Component\Security\Http\Attribute\CurrentUser;
  */
 #[Route('/api/v1/user/{userId}/plugins/castingdata', name: 'api_plugin_castingdata_')]
 #[OA\Tag(name: 'Casting Data Plugin')]
-class CastingDataController extends AbstractController
+final class CastingDataController extends AbstractController
 {
     private const PLUGIN_NAME = 'castingdata';
 
@@ -126,8 +126,17 @@ class CastingDataController extends AbstractController
 
         $existingConfig = $this->pluginData->get($userId, self::PLUGIN_NAME, 'config', 'settings') ?? [];
 
+        $apiUrl = trim($data['api_url'] ?? $existingConfig['api_url'] ?? '');
+
+        if ('' !== $apiUrl) {
+            $validationError = $this->validateApiUrl($apiUrl);
+            if (null !== $validationError) {
+                return $this->json(['error' => $validationError], Response::HTTP_BAD_REQUEST);
+            }
+        }
+
         $newConfig = [
-            'api_url' => trim($data['api_url'] ?? $existingConfig['api_url'] ?? ''),
+            'api_url' => $apiUrl,
             'api_key' => $existingConfig['api_key'] ?? '',
             'enabled' => (bool) ($data['enabled'] ?? $existingConfig['enabled'] ?? false),
         ];
@@ -221,6 +230,46 @@ class CastingDataController extends AbstractController
         }
 
         return substr($key, 0, 4).'...'.str_repeat('*', 4);
+    }
+
+    /**
+     * Validate that api_url is safe (prevent SSRF).
+     *
+     * Blocks private IPs, loopback, link-local, and reserved ranges.
+     * Only HTTPS is allowed in production-like URLs.
+     */
+    private function validateApiUrl(string $url): ?string
+    {
+        $parts = parse_url($url);
+        if (false === $parts || !isset($parts['scheme'], $parts['host'])) {
+            return 'Invalid API URL format';
+        }
+
+        $scheme = strtolower($parts['scheme']);
+        if (!in_array($scheme, ['http', 'https'], true)) {
+            return 'API URL must use HTTP or HTTPS';
+        }
+
+        $host = strtolower($parts['host']);
+        if ('localhost' === $host || str_ends_with($host, '.local') || str_ends_with($host, '.internal')) {
+            return 'API URL must not point to localhost or internal hosts';
+        }
+
+        $ip = filter_var($host, FILTER_VALIDATE_IP);
+        if (false === $ip) {
+            $resolved = gethostbyname($host);
+            if ($resolved !== $host) {
+                $ip = $resolved;
+            }
+        }
+
+        if (false !== $ip && null !== $ip) {
+            if (false === filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE)) {
+                return 'API URL must not resolve to a private or reserved IP address';
+            }
+        }
+
+        return null;
     }
 
     /**

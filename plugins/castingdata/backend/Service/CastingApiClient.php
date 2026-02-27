@@ -19,7 +19,7 @@ use Symfony\Contracts\HttpClient\HttpClientInterface;
  *
  * Config (api_url, api_key) is loaded per-user from PluginDataService.
  */
-final class CastingApiClient
+final readonly class CastingApiClient
 {
     private const PLUGIN_NAME = 'castingdata';
     private const TIMEOUT = 8;
@@ -84,14 +84,37 @@ final class CastingApiClient
 
     /**
      * Test connection to the external API.
+     *
+     * Issues a direct HTTP request (bypassing the error-swallowing request() method)
+     * to verify that the API is reachable and responds with valid data.
      */
     public function testConnection(int $userId): bool
     {
-        try {
-            $result = $this->request($userId, 'GET', '/api/v1/productions', ['limit' => 1]);
+        $config = $this->getConfig($userId);
 
-            return is_array($result);
-        } catch (\Throwable) {
+        if (!$config || empty($config['api_url']) || empty($config['api_key'])) {
+            return false;
+        }
+
+        $url = rtrim($config['api_url'], '/').'/api/v1/productions';
+
+        try {
+            $response = $this->httpClient->request('GET', $url, [
+                'query' => ['limit' => 1],
+                'headers' => [
+                    'Authorization' => 'Bearer '.$config['api_key'],
+                    'Accept' => 'application/json',
+                ],
+                'timeout' => self::TIMEOUT,
+            ]);
+
+            return $response->getStatusCode() < 400;
+        } catch (\Throwable $e) {
+            $this->logger->debug('CastingApiClient: Connection test failed', [
+                'url' => $url,
+                'error' => $e->getMessage(),
+            ]);
+
             return false;
         }
     }

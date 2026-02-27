@@ -795,6 +795,7 @@ const openChat = () => {
 const closeChat = () => {
   if (isOpen.value) {
     isOpen.value = false
+    isFullscreen.value = props.fullscreenMode
     // Dispatch close event for lazy-loaded widget button to reappear
     window.dispatchEvent(
       new CustomEvent('synaplan-widget-close', {
