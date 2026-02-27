@@ -2,6 +2,8 @@
 
 namespace App\Service;
 
+use App\Entity\User;
+use App\Repository\UserRepository;
 use Psr\Log\LoggerInterface;
 use Symfony\Contracts\HttpClient\HttpClientInterface;
 
@@ -9,6 +11,7 @@ use Symfony\Contracts\HttpClient\HttpClientInterface;
  * Discord Webhook Notification Service.
  *
  * Sends notifications to Discord via webhook for monitoring WhatsApp interactions.
+ * Notifications are restricted to admin users only — non-admin activity is silently skipped.
  */
 class DiscordNotificationService
 {
@@ -25,6 +28,7 @@ class DiscordNotificationService
     public function __construct(
         private HttpClientInterface $httpClient,
         private LoggerInterface $logger,
+        private UserRepository $userRepository,
         private ?string $webhookUrl = null,
     ) {
     }
@@ -39,6 +43,25 @@ class DiscordNotificationService
     }
 
     /**
+     * Determine whether a notification should be sent.
+     * Requires both an active webhook and an admin user.
+     */
+    private function shouldNotify(?int $userId): bool
+    {
+        if (!$this->isEnabled()) {
+            return false;
+        }
+
+        if (null === $userId) {
+            return false;
+        }
+
+        $user = $this->userRepository->find($userId);
+
+        return $user instanceof User && $user->isAdmin();
+    }
+
+    /**
      * Notify successful WhatsApp message processing.
      */
     public function notifyWhatsAppSuccess(
@@ -47,8 +70,9 @@ class DiscordNotificationService
         string $userMessage,
         string $responseText,
         array $metadata = [],
+        ?int $userId = null,
     ): void {
-        if (!$this->isEnabled()) {
+        if (!$this->shouldNotify($userId)) {
             return;
         }
 
@@ -138,8 +162,9 @@ class DiscordNotificationService
         string $userMessage,
         string $error,
         array $metadata = [],
+        ?int $userId = null,
     ): void {
-        if (!$this->isEnabled()) {
+        if (!$this->shouldNotify($userId)) {
             return;
         }
 
@@ -265,7 +290,7 @@ class DiscordNotificationService
         array $classificationResult,
         ?int $userId = null,
     ): void {
-        if (!$this->isEnabled()) {
+        if (!$this->shouldNotify($userId)) {
             return;
         }
 
@@ -347,8 +372,9 @@ class DiscordNotificationService
         ?int $chatId = null,
         ?string $externalMessageId = null,
         string $detectionMethod = 'external_id',
+        ?int $userId = null,
     ): void {
-        if (!$this->isEnabled()) {
+        if (!$this->shouldNotify($userId)) {
             return;
         }
 

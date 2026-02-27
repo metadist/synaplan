@@ -154,7 +154,8 @@ class WebhookController extends AbstractController
                     existingMessageId: $existingMessage->getId(),
                     chatId: $existingMessage->getChatId(),
                     externalMessageId: $normalizedMessageId,
-                    detectionMethod: 'external_id'
+                    detectionMethod: 'external_id',
+                    userId: $existingMessage->getUserId(),
                 );
 
                 return $this->json([
@@ -177,7 +178,8 @@ class WebhookController extends AbstractController
                     existingMessageId: $existingMessage->getId(),
                     chatId: $existingMessage->getChatId(),
                     externalMessageId: null,
-                    detectionMethod: 'fingerprint'
+                    detectionMethod: 'fingerprint',
+                    userId: $existingMessage->getUserId(),
                 );
 
                 return $this->json([
