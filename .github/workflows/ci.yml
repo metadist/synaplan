@@ -261,8 +261,6 @@ jobs:
         with:
           context: .
           file: _docker/backend/Dockerfile
-          build-args: |
-            CI=true
           push: false
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
