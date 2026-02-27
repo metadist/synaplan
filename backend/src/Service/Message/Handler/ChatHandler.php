@@ -856,9 +856,12 @@ class ChatHandler implements MessageHandlerInterface
 
     /**
      * Collect and append context from all registered plugin context providers.
+     *
+     * Total plugin context is capped at 8000 chars to prevent prompt bloat.
      */
     private function appendPluginContext(string $systemPrompt, Message $message, array $classification, array $options): string
     {
+        $maxTotalLength = 8000;
         $pluginContext = '';
 
         foreach ($this->pluginContextProviders as $provider) {
@@ -873,6 +876,14 @@ class ChatHandler implements MessageHandlerInterface
 
                     if (!empty($ctx)) {
                         $pluginContext .= $ctx;
+
+                        if (strlen($pluginContext) >= $maxTotalLength) {
+                            $pluginContext = substr($pluginContext, 0, $maxTotalLength)."\n[... plugin context truncated]\n";
+                            $this->logger->warning('ChatHandler: Plugin context truncated', [
+                                'max_length' => $maxTotalLength,
+                            ]);
+                            break;
+                        }
                     }
                 }
             } catch (\Throwable $e) {

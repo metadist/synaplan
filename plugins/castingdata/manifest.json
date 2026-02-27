@@ -13,9 +13,6 @@
     { "path": "/config", "method": "PUT", "description": "Update plugin configuration" },
     { "path": "/test-connection", "method": "POST", "description": "Test API connection" }
   ],
-  "migrations": [
-    "001_setup.sql"
-  ],
   "config": {
     "group": "P_castingdata",
     "settings": [

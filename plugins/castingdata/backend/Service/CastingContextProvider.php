@@ -16,6 +16,8 @@ use Psr\Log\LoggerInterface;
  */
 final class CastingContextProvider implements PluginContextProviderInterface
 {
+    private const MAX_CONTEXT_LENGTH = 4000;
+
     public function __construct(
         private CastingApiClient $apiClient,
         private LoggerInterface $logger,
@@ -55,23 +57,34 @@ final class CastingContextProvider implements PluginContextProviderInterface
             return '';
         }
 
-        $context = "\n\n## Casting Platform Data (live from connected platform):\n";
+        $context = "\n\n--- BEGIN PLUGIN CONTEXT: Casting Platform (live data) ---\n";
 
         if (!empty($productions)) {
             $context .= "\n### Productions matching query:\n";
             foreach ($productions as $idx => $production) {
                 $context .= $this->formatProduction($idx + 1, $production);
+                if (strlen($context) > self::MAX_CONTEXT_LENGTH) {
+                    break;
+                }
             }
         }
 
-        if (!empty($auditions)) {
+        if (strlen($context) < self::MAX_CONTEXT_LENGTH && !empty($auditions)) {
             $context .= "\n### Active Auditions:\n";
             foreach ($auditions as $idx => $audition) {
                 $context .= $this->formatAudition($idx + 1, $audition);
+                if (strlen($context) > self::MAX_CONTEXT_LENGTH) {
+                    break;
+                }
             }
         }
 
+        if (strlen($context) > self::MAX_CONTEXT_LENGTH) {
+            $context = substr($context, 0, self::MAX_CONTEXT_LENGTH)."\n[... truncated]\n";
+        }
+
         $context .= "\nUse this data to answer the user's question accurately. If the data doesn't contain relevant information, say so honestly.\n";
+        $context .= "--- END PLUGIN CONTEXT ---\n";
 
         $this->logger->info('CastingContextProvider: Context built', [
             'user_id' => $userId,
