@@ -39,6 +39,10 @@ interface WidgetConfig {
   fileUploadLimit?: number
   lazy?: boolean
   vueUrl?: string | null // undefined = default CDN, null = skip, string = custom URL
+  fullscreenMode?: boolean
+  allowFullscreen?: boolean
+  hideButton?: boolean
+  detectTheme?: boolean
 }
 
 const DEFAULT_VUE_CDN = 'https://cdn.jsdelivr.net/npm/vue@3/dist/vue.global.prod.js'
@@ -46,6 +50,7 @@ const DEFAULT_VUE_CDN = 'https://cdn.jsdelivr.net/npm/vue@3/dist/vue.global.prod
 class SynaplanWidget {
   private config: WidgetConfig | null = null
   private button: HTMLElement | null = null
+  private themeObserver: MutationObserver | null = null
   private app: any = null
   private container: HTMLElement | null = null
   private chatLoaded = false
@@ -75,6 +80,10 @@ class SynaplanWidget {
       allowFileUpload: false,
       fileUploadLimit: 3,
       lazy: true, // Default to lazy loading
+      fullscreenMode: false,
+      allowFullscreen: false,
+      hideButton: false,
+      detectTheme: false,
       ...config,
     }
 
@@ -103,10 +112,10 @@ class SynaplanWidget {
       return
     }
 
-    // Always create button in lazy mode (needed for reopening after close)
-    this.createButton()
+    if (!this.config?.hideButton) {
+      this.createButton()
+    }
 
-    // If autoOpen is enabled, hide button and load chat immediately
     if (this.config?.autoOpen) {
       if (this.button) {
         this.button.style.display = 'none'
@@ -169,6 +178,24 @@ class SynaplanWidget {
       console.error('Synaplan Widget: Failed to load remote config', error)
       return false
     }
+  }
+
+  private detectHostTheme(): 'light' | 'dark' {
+    return document.documentElement.classList.contains('dark') ? 'dark' : 'light'
+  }
+
+  private startThemeObserver() {
+    if (this.themeObserver) return
+
+    this.themeObserver = new MutationObserver(() => {
+      const theme = this.detectHostTheme()
+      window.dispatchEvent(new CustomEvent('synaplan-widget-theme-sync', { detail: { theme } }))
+    })
+
+    this.themeObserver.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ['class'],
+    })
   }
 
   private getIconContent(): string {
@@ -373,15 +400,19 @@ class SynaplanWidget {
       )
       shadow.appendChild(root)
 
+      const resolvedTheme = this.config!.detectTheme
+        ? this.detectHostTheme()
+        : this.config!.defaultTheme
+
       // Mount Vue app into Shadow DOM root
       this.app = createApp(ChatWidget.default, {
         widgetId: this.config!.widgetId,
         position: this.config!.position,
         primaryColor: this.config!.primaryColor,
         iconColor: this.config!.iconColor,
-        defaultTheme: this.config!.defaultTheme,
+        defaultTheme: resolvedTheme,
         autoOpen: this.config!.autoOpen,
-        openImmediately: this.shouldOpenImmediately, // Open immediately if user clicked button
+        openImmediately: this.shouldOpenImmediately,
         autoMessage: this.config!.autoMessage,
         messageLimit: this.config!.messageLimit,
         maxFileSize: this.config!.maxFileSize,
@@ -389,19 +420,24 @@ class SynaplanWidget {
         apiUrl: this.config!.apiUrl,
         allowFileUpload: this.config!.allowFileUpload,
         fileUploadLimit: this.config!.fileUploadLimit,
-        hideButton: this.config!.lazy, // Hide ChatWidget's button in lazy mode
+        hideButton: this.config!.lazy || this.config!.hideButton,
+        fullscreenMode: this.config!.fullscreenMode,
+        allowFullscreen: this.config!.allowFullscreen,
         isPreview: false,
       })
 
       this.app.use(i18n)
       this.app.mount(root)
 
-      // In lazy mode: listen for close event to show button again
-      if (this.config?.lazy && this.button) {
+      if (this.config?.detectTheme) {
+        this.startThemeObserver()
+      }
+
+      if (this.config?.lazy && this.button && !this.config?.hideButton) {
         const handleClose = () => {
           if (this.button) {
             this.button.style.display = 'flex'
-            this.button.innerHTML = this.getIconContent() // Restore original icon
+            this.button.innerHTML = this.getIconContent()
             this.shouldOpenImmediately = false
           }
         }
@@ -457,7 +493,11 @@ class SynaplanWidget {
   }
 
   destroy() {
-    // Remove event listener if it exists
+    if (this.themeObserver) {
+      this.themeObserver.disconnect()
+      this.themeObserver = null
+    }
+
     if (this.closeEventHandler) {
       window.removeEventListener('synaplan-widget-close', this.closeEventHandler)
       this.closeEventHandler = null
@@ -482,8 +522,15 @@ class SynaplanWidget {
     this.chatLoaded = false
   }
 
-  open() {
+  async open() {
     if (!this.config) return
+
+    if (!this.chatLoaded && !this.chatLoading) {
+      this.shouldOpenImmediately = true
+      await this.loadChat()
+      return
+    }
+
     window.dispatchEvent(
       new CustomEvent('synaplan-widget-open', {
         detail: { widgetId: this.config.widgetId },

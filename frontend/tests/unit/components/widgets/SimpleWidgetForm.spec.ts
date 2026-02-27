@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { mount, flushPromises } from '@vue/test-utils'
 import SimpleWidgetForm from '@/components/widgets/SimpleWidgetForm.vue'
 
@@ -17,7 +17,13 @@ vi.mock('@/composables/useNotification', () => ({
 
 describe('SimpleWidgetForm', () => {
   beforeEach(() => {
+    vi.useFakeTimers()
     vi.clearAllMocks()
+  })
+
+  afterEach(() => {
+    vi.runOnlyPendingTimers()
+    vi.useRealTimers()
   })
 
   it('should render the form with name and website inputs', () => {

@@ -23,15 +23,14 @@ test: ## Run all tests (backend + frontend unit tests)
 test-e2e: ## Run e2e tests
 	$(MAKE) -C frontend test-e2e
 
+test-e2e-plugin-castingdata: ## Run Casting Data plugin e2e tests (CastApp + Synaplan must be running)
+	$(MAKE) -C frontend test-e2e-plugin-castingdata
+
 test-stack-build: ## Build frontend + widget + test Docker image + start test stack on port 8001
 	docker compose -f docker-compose.test.yml down 2>/dev/null || true
 	cd frontend && npm run build && npm run build:widget
 	docker compose -f docker-compose.test.yml build
 	docker compose -f docker-compose.test.yml up -d
-	@echo ""
-	@echo "Test stack starting on http://localhost:8001 — waiting for healthy..."
-	@until curl -sf http://localhost:8001/api/health > /dev/null; do sleep 5; done
-	@echo "Test stack ready."
 
 audit: ## Run security audit (backend)
 	$(MAKE) -C backend audit

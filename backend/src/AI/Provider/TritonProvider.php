@@ -4,6 +4,7 @@ namespace App\AI\Provider;
 
 use App\AI\Exception\ProviderException;
 use App\AI\Interface\ChatProviderInterface;
+use App\AI\Interface\EmbeddingProviderInterface;
 use Grpc\BaseStub;
 use Grpc\ChannelCredentials;
 use Inference\InferTensorContents;
@@ -35,15 +36,31 @@ class GRPCInferenceServiceClient extends BaseStub
             $options
         );
     }
+
+    public function ModelInfer(
+        ModelInferRequest $argument,
+        array $metadata = [],
+        array $options = [],
+    ) {
+        return $this->_simpleRequest(
+            '/inference.GRPCInferenceService/ModelInfer',
+            $argument,
+            ['\Inference\ModelInferResponse', 'decode'],
+            $metadata,
+            $options
+        );
+    }
 }
 
 /**
  * Triton Inference Server Provider.
  *
  * Handles AI inference via NVIDIA Triton Inference Server using gRPC.
- * Supports streaming text generation with various LLM models.
+ * Chat requests go through the "streaming" BLS wrapper which applies
+ * chat templates and handles harmony channel detection.
+ * Embedding requests go directly to the embedding model (e.g. bge-m3).
  */
-class TritonProvider implements ChatProviderInterface
+class TritonProvider implements ChatProviderInterface, EmbeddingProviderInterface
 {
     private ?GRPCInferenceServiceClient $client = null;
 
@@ -99,7 +116,7 @@ class TritonProvider implements ChatProviderInterface
 
     public function getCapabilities(): array
     {
-        return ['chat'];
+        return ['chat', 'embedding'];
     }
 
     public function getDefaultModels(): array
@@ -152,6 +169,8 @@ class TritonProvider implements ChatProviderInterface
         ];
     }
 
+    // ==================== Chat ====================
+
     public function chat(array $messages, array $options = []): string
     {
         if (!$this->client) {
@@ -172,7 +191,7 @@ class TritonProvider implements ChatProviderInterface
             ]);
 
             $prompt = $this->buildPrompt($messages);
-            $answer = $this->streamInference($prompt, $model, $maxTokens, false);
+            $answer = $this->collectInference($prompt, $model, $maxTokens);
 
             return $answer;
         } catch (\Exception $e) {
@@ -199,19 +218,20 @@ class TritonProvider implements ChatProviderInterface
         $maxTokens = $options['max_tokens'] ?? 4096;
 
         try {
-            $this->logger->info('🔵 Triton streaming chat START', [
+            $this->logger->info('Triton streaming chat START', [
                 'model' => $model,
                 'message_count' => count($messages),
             ]);
 
             $prompt = $this->buildPrompt($messages);
-            $request = $this->createInferRequest($prompt, $model, $maxTokens);
+            $request = $this->createChatInferRequest($prompt, $model, $maxTokens);
 
             $call = $this->client->ModelStreamInfer($request);
 
             $chunkCount = 0;
             $fullResponse = '';
             $pendingText = '';
+            $pendingChannel = 'content';
 
             foreach ($call->responses() as $response) {
                 // Check for errors first
@@ -229,6 +249,7 @@ class TritonProvider implements ChatProviderInterface
                 }
 
                 $textChunk = '';
+                $channel = 'content';
                 $isFinal = false;
 
                 // Try structured output parsing first
@@ -240,6 +261,14 @@ class TritonProvider implements ChatProviderInterface
                             $bytesContents = $contents->getBytesContents();
                             if (!empty($bytesContents)) {
                                 $textChunk = $bytesContents[0];
+                            }
+                        }
+                    } elseif ('channel' === $output->getName()) {
+                        $contents = $output->getContents();
+                        if ($contents) {
+                            $bytesContents = $contents->getBytesContents();
+                            if (!empty($bytesContents)) {
+                                $channel = $bytesContents[0];
                             }
                         }
                     } elseif ('is_final' === $output->getName()) {
@@ -254,13 +283,17 @@ class TritonProvider implements ChatProviderInterface
                 }
 
                 // Fallback to raw contents if no structured output
+                // Raw output order matches config.pbtxt: text_output[0], channel[1], is_final[2]
                 if (empty($textChunk)) {
                     $rawContents = $inferResponse->getRawOutputContents();
                     if (!empty($rawContents) && isset($rawContents[0])) {
                         $textChunk = $this->decodeProtobufData($rawContents[0]);
                     }
-                    if (count($rawContents) > 1 && isset($rawContents[1])) {
-                        $isFinal = !empty(trim($rawContents[1]));
+                    if (isset($rawContents[1]) && strlen($rawContents[1]) >= 4) {
+                        $channel = $this->decodeProtobufData($rawContents[1]);
+                    }
+                    if (isset($rawContents[2]) && strlen($rawContents[2]) >= 1) {
+                        $isFinal = 0 !== ord($rawContents[2][0]);
                     }
                 }
 
@@ -271,18 +304,27 @@ class TritonProvider implements ChatProviderInterface
                     $textChunk = mb_convert_encoding($textChunk, 'UTF-8', 'UTF-8');
 
                     $fullResponse .= $textChunk;
+
+                    // Flush pending text if channel changed
+                    if (!empty($pendingText) && $channel !== $pendingChannel) {
+                        $callback($this->buildChunk($pendingText, $pendingChannel));
+                        $pendingText = '';
+                        ++$chunkCount;
+                    }
+
                     $pendingText .= $textChunk;
+                    $pendingChannel = $channel;
 
                     // Stream meaningful chunks
                     if (strlen($pendingText) > 5 || (strlen($pendingText) > 0 && '' !== trim($pendingText))) {
-                        $callback($pendingText);
+                        $callback($this->buildChunk($pendingText, $pendingChannel));
                         $pendingText = '';
                         ++$chunkCount;
 
                         if (1 === $chunkCount) {
-                            $this->logger->info('🟢 Triton: First chunk sent!', [
+                            $this->logger->info('Triton: First chunk sent', [
                                 'length' => strlen($textChunk),
-                                'preview' => substr($textChunk, 0, 50),
+                                'channel' => $channel,
                             ]);
                         }
                     }
@@ -295,10 +337,10 @@ class TritonProvider implements ChatProviderInterface
 
             // Flush remaining text
             if (!empty($pendingText)) {
-                $callback($pendingText);
+                $callback($this->buildChunk($pendingText, $pendingChannel));
             }
 
-            $this->logger->info('🔵 Triton: Streaming complete', [
+            $this->logger->info('Triton: Streaming complete', [
                 'chunks_sent' => $chunkCount,
                 'total_length' => strlen($fullResponse),
             ]);
@@ -309,7 +351,7 @@ class TritonProvider implements ChatProviderInterface
         } catch (ProviderException $e) {
             throw $e;
         } catch (\Exception $e) {
-            $this->logger->error('🔴 Triton streaming error', [
+            $this->logger->error('Triton streaming error', [
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString(),
             ]);
@@ -317,6 +359,66 @@ class TritonProvider implements ChatProviderInterface
             throw new ProviderException('Triton streaming error: '.$e->getMessage(), 'triton', null, 0, $e);
         }
     }
+
+    // ==================== Embedding ====================
+
+    public function embed(string $text, array $options = []): array
+    {
+        if (!$this->client) {
+            throw new ProviderException('Triton client not initialized', 'triton');
+        }
+
+        if (!isset($options['model'])) {
+            throw new ProviderException('Embedding model must be specified in options', 'triton');
+        }
+
+        $model = $options['model'];
+
+        try {
+            $request = $this->createEmbedInferRequest($text, $model);
+
+            /** @var \Grpc\UnaryCall $call */
+            $call = $this->client->ModelInfer($request);
+            /** @var \Inference\ModelInferResponse $response */
+            [$response, $status] = $call->wait();
+
+            if (0 !== $status->code) {
+                throw new \RuntimeException('gRPC error: '.$status->details);
+            }
+
+            // Parse FP32 embedding from raw output
+            $rawContents = $response->getRawOutputContents();
+            if (!isset($rawContents[0]) || '' === $rawContents[0]) {
+                throw new \RuntimeException('No embedding output returned');
+            }
+
+            return $this->decodeFp32Array($rawContents[0]);
+        } catch (ProviderException $e) {
+            throw $e;
+        } catch (\Exception $e) {
+            $this->logger->error('Triton embedding error', [
+                'error' => $e->getMessage(),
+                'model' => $model,
+            ]);
+
+            throw new ProviderException('Triton embedding error: '.$e->getMessage(), 'triton');
+        }
+    }
+
+    public function embedBatch(array $texts, array $options = []): array
+    {
+        return array_map(fn ($text) => $this->embed($text, $options), $texts);
+    }
+
+    public function getDimensions(string $model): int
+    {
+        return match (true) {
+            str_contains($model, 'bge-m3') => 1024,
+            default => 1024,
+        };
+    }
+
+    // ==================== Private helpers ====================
 
     /**
      * Build prompt from messages array (OpenAI format).
@@ -339,11 +441,28 @@ class TritonProvider implements ChatProviderInterface
     }
 
     /**
-     * Create a Triton inference request.
+     * Build a structured chunk for the stream callback.
+     *
+     * Maps Triton channel names to the type format used by
+     * StreamController (matching OpenAI/Anthropic providers).
      */
-    private function createInferRequest(string $prompt, string $modelName, int $maxTokens = 4096): ModelInferRequest
+    private function buildChunk(string $text, string $channel): array
     {
-        // Text input tensor
+        // analysis/commentary map to reasoning (rendered as <think> by StreamController)
+        $type = match ($channel) {
+            'analysis', 'commentary' => 'reasoning',
+            default => 'content',
+        };
+
+        return ['type' => $type, 'content' => $text];
+    }
+
+    /**
+     * Create a chat inference request targeting the "streaming" BLS wrapper.
+     */
+    private function createChatInferRequest(string $prompt, string $modelName, int $maxTokens = 4096): ModelInferRequest
+    {
+        // Conversation input tensor
         $textInput = new InferInputTensor();
         $textInput->setName('conversation');
         $textInput->setDatatype('BYTES');
@@ -352,6 +471,16 @@ class TritonProvider implements ChatProviderInterface
         $textContents = new InferTensorContents();
         $textContents->setBytesContents([$prompt]);
         $textInput->setContents($textContents);
+
+        // Model name tensor — tells the streaming wrapper which backend model to use
+        $modelNameInput = new InferInputTensor();
+        $modelNameInput->setName('model_name');
+        $modelNameInput->setDatatype('BYTES');
+        $modelNameInput->setShape([1, 1]);
+
+        $modelNameContents = new InferTensorContents();
+        $modelNameContents->setBytesContents([$modelName]);
+        $modelNameInput->setContents($modelNameContents);
 
         // Max tokens tensor
         $maxTokensInput = new InferInputTensor();
@@ -367,28 +496,57 @@ class TritonProvider implements ChatProviderInterface
         $textOutput = new InferRequestedOutputTensor();
         $textOutput->setName('text_output');
 
+        $channelOutput = new InferRequestedOutputTensor();
+        $channelOutput->setName('channel');
+
         $finalOutput = new InferRequestedOutputTensor();
         $finalOutput->setName('is_final');
 
-        // Create request
+        // Always target the "streaming" BLS wrapper model
         $request = new ModelInferRequest();
-        $request->setModelName($modelName);
+        $request->setModelName('streaming');
         $request->setId('req-'.uniqid());
-        $request->setInputs([$textInput, $maxTokensInput]);
-        $request->setOutputs([$textOutput, $finalOutput]);
+        $request->setInputs([$textInput, $modelNameInput, $maxTokensInput]);
+        $request->setOutputs([$textOutput, $channelOutput, $finalOutput]);
 
         return $request;
     }
 
     /**
-     * Non-streaming inference (collects all output).
+     * Create an embedding inference request.
      */
-    private function streamInference(string $prompt, string $modelName, int $maxTokens = 4096, bool $stream = true): string
+    private function createEmbedInferRequest(string $text, string $modelName): ModelInferRequest
+    {
+        $textInput = new InferInputTensor();
+        $textInput->setName('text_input');
+        $textInput->setDatatype('BYTES');
+        $textInput->setShape([1, 1]); // batch dim required by max_batch_size > 0
+
+        $textContents = new InferTensorContents();
+        $textContents->setBytesContents([$text]);
+        $textInput->setContents($textContents);
+
+        $embeddingOutput = new InferRequestedOutputTensor();
+        $embeddingOutput->setName('embedding');
+
+        $request = new ModelInferRequest();
+        $request->setModelName($modelName);
+        $request->setId('emb-'.uniqid());
+        $request->setInputs([$textInput]);
+        $request->setOutputs([$embeddingOutput]);
+
+        return $request;
+    }
+
+    /**
+     * Non-streaming chat inference (collects all output into a string).
+     */
+    private function collectInference(string $prompt, string $modelName, int $maxTokens = 4096): string
     {
         $answer = '';
 
         try {
-            $request = $this->createInferRequest($prompt, $modelName, $maxTokens);
+            $request = $this->createChatInferRequest($prompt, $modelName, $maxTokens);
             $call = $this->client->ModelStreamInfer($request);
 
             foreach ($call->responses() as $response) {
@@ -404,6 +562,7 @@ class TritonProvider implements ChatProviderInterface
                 }
 
                 $textChunk = '';
+                $channel = 'content';
                 $isFinal = false;
 
                 // Try structured output
@@ -415,6 +574,14 @@ class TritonProvider implements ChatProviderInterface
                             $bytesContents = $contents->getBytesContents();
                             if (!empty($bytesContents)) {
                                 $textChunk = $bytesContents[0];
+                            }
+                        }
+                    } elseif ('channel' === $output->getName()) {
+                        $contents = $output->getContents();
+                        if ($contents) {
+                            $bytesContents = $contents->getBytesContents();
+                            if (!empty($bytesContents)) {
+                                $channel = $bytesContents[0];
                             }
                         }
                     } elseif ('is_final' === $output->getName()) {
@@ -434,12 +601,16 @@ class TritonProvider implements ChatProviderInterface
                     if (!empty($rawContents) && isset($rawContents[0])) {
                         $textChunk = $this->decodeProtobufData($rawContents[0]);
                     }
-                    if (count($rawContents) > 1 && isset($rawContents[1])) {
-                        $isFinal = !empty(trim($rawContents[1]));
+                    if (isset($rawContents[1]) && strlen($rawContents[1]) >= 4) {
+                        $channel = $this->decodeProtobufData($rawContents[1]);
+                    }
+                    if (isset($rawContents[2]) && strlen($rawContents[2]) >= 1) {
+                        $isFinal = 0 !== ord($rawContents[2][0]);
                     }
                 }
 
-                if (!empty($textChunk)) {
+                // Only collect final/content channel text (skip reasoning for non-streaming)
+                if (!empty($textChunk) && ('final' === $channel || 'content' === $channel)) {
                     $textChunk = rtrim($textChunk, "\0\x00-\x1F\x7F-\x9F");
                     $textChunk = mb_convert_encoding($textChunk, 'UTF-8', 'UTF-8');
                     $answer .= $textChunk;
@@ -458,7 +629,7 @@ class TritonProvider implements ChatProviderInterface
     }
 
     /**
-     * Decode protobuf length-prefixed data.
+     * Decode protobuf length-prefixed BYTES data.
      */
     private function decodeProtobufData(string $rawData): string
     {
@@ -475,5 +646,25 @@ class TritonProvider implements ChatProviderInterface
         }
 
         return $rawData;
+    }
+
+    /**
+     * Decode raw FP32 binary data into a PHP float array.
+     */
+    private function decodeFp32Array(string $rawData): array
+    {
+        $byteLength = strlen($rawData);
+        if (0 === $byteLength) {
+            return [];
+        }
+
+        $floatCount = intdiv($byteLength, 4);
+        $embedding = [];
+
+        for ($i = 0; $i < $floatCount; ++$i) {
+            $embedding[] = unpack('g', substr($rawData, $i * 4, 4))[1];
+        }
+
+        return $embedding;
     }
 }

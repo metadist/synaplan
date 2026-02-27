@@ -60,9 +60,11 @@ class MediaPromptExtractor
                 'message_id' => $message->getId(),
             ]);
 
+            $fallbackMediaType = $mediaTypeFromSorter ?? $this->inferMediaTypeFromMessageText($message->getText());
+
             return [
                 'prompt' => $message->getText(),
-                'media_type' => $mediaTypeFromSorter,
+                'media_type' => $fallbackMediaType,
                 'raw' => '',
             ];
         }
@@ -72,11 +74,13 @@ class MediaPromptExtractor
 
         $prompt = '';
         $mediaType = null;
+        $mediaTypeFromJson = null;
 
         if (is_array($decoded)) {
             // AI returned JSON - extract prompt and optionally media type
             $prompt = trim((string) ($decoded['BTEXT'] ?? $decoded['prompt'] ?? $decoded['text'] ?? ''));
-            $mediaType = $this->normalizeMediaType($decoded['BMEDIA'] ?? $decoded['media'] ?? null);
+            $mediaTypeFromJson = $this->normalizeMediaType($decoded['BMEDIA'] ?? $decoded['media'] ?? null);
+            $mediaType = $mediaTypeFromJson;
         }
 
         // Use media type from sorter as primary source (more reliable)
@@ -86,6 +90,14 @@ class MediaPromptExtractor
             $this->logger->info('MediaPromptExtractor: Using media_type from sorter', [
                 'media_type' => $mediaType,
             ]);
+        } elseif (null === $mediaType) {
+            $inferredMediaType = $this->inferMediaTypeFromMessageText($message->getText());
+            if (null !== $inferredMediaType) {
+                $mediaType = $inferredMediaType;
+                $this->logger->info('MediaPromptExtractor: Inferred media_type from message text', [
+                    'media_type' => $mediaType,
+                ]);
+            }
         }
 
         $usingJson = is_array($decoded);
@@ -99,7 +111,7 @@ class MediaPromptExtractor
         // 1. We didn't get JSON (so mediamaker prompt didn't follow format)
         // 2. Media type is explicitly audio OR message clearly indicates audio
         // 3. Media type is not already set to something else (image/video)
-        if (!$usingJson && $this->shouldForceAudioExtraction($mediaType, $message)) {
+        if ($this->shouldForceAudioExtraction($mediaType, $message) && (!$usingJson || null === $mediaTypeFromJson)) {
             $this->logger->info('MediaPromptExtractor: Triggering audio-only extraction fallback');
             try {
                 $audioContent = $this->runPrompt($message, $thread, $classification, self::AUDIO_EXTRACTION_TOPIC);
@@ -170,7 +182,7 @@ class MediaPromptExtractor
         $value = strtolower(trim($value));
 
         return match ($value) {
-            'audio', 'sound', 'voice', 'tts', 'text2sound', 'mp3', 'wav', 'ogg' => 'audio',
+            'audio', 'audiodatei', 'audiofile', 'sprachnachricht', 'sprachdatei', 'voice', 'voice note', 'speech', 'sound', 'tts', 'text2sound', 'mp3', 'wav', 'ogg' => 'audio',
             'video', 'vid', 'text2vid' => 'video',
             'image', 'img', 'picture', 'pic', 'text2pic' => 'image',
             default => null,
@@ -183,7 +195,7 @@ class MediaPromptExtractor
         $promptClassification['topic'] = $topic;
         $promptClassification['intent'] = 'image_generation';
 
-        $language = $promptClassification['language'] ?? $message->getLanguage() ?? 'en';
+        $language = $promptClassification['language'] ?? $message->getLanguage();
         $promptClassification['language'] = $language && 'NN' !== $language ? $language : 'en';
 
         unset(
@@ -204,10 +216,24 @@ class MediaPromptExtractor
             return true;
         }
 
-        $text = $message->getText() ?? '';
+        $text = $message->getText();
 
+        return $this->isAudioIntentText($text);
+    }
+
+    private function inferMediaTypeFromMessageText(string $text): ?string
+    {
+        if ($this->isAudioIntentText($text)) {
+            return 'audio';
+        }
+
+        return null;
+    }
+
+    private function isAudioIntentText(string $text): bool
+    {
         return (bool) preg_match(
-            '/\b(audio|tonspur|sound|sprach[a-z]*|voice|tts|sprich|sage|lies|vorlesen|vor|vortragen|mp3|wav|ogg|musik|music)\b/i',
+            '/(audiodatei|audiofile|audio|tonspur|sprachnachricht|sprachdatei|sound|sprach[a-z]*|voice(?:\s?note)?|tts|sprich|sage|lies|vorlesen|vortragen|mp3|wav|ogg|musik|music)/i',
             $text
         );
     }

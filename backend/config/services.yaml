@@ -69,6 +69,11 @@ services:
         autowire: true
         autoconfigure: true
 
+    # Plugin Context Providers — plugins can inject context into chat system prompts
+    _instanceof:
+        App\Service\Plugin\PluginContextProviderInterface:
+            tags: ['app.plugin.context_provider']
+
     App\:
         resource: '../src/'
         exclude:
@@ -120,6 +125,7 @@ services:
             $serverUrl: '%env(TRITON_SERVER_URL)%'
         tags:
             - { name: 'app.ai.chat' }
+            - { name: 'app.ai.embedding' }
 
     App\AI\Provider\GroqProvider:
         arguments:
@@ -224,6 +230,7 @@ services:
     App\Service\Message\Handler\ChatHandler:
         arguments:
             $uploadDir: '%kernel.project_dir%/var/uploads'
+            $pluginContextProviders: !tagged_iterator app.plugin.context_provider
         tags:
             - { name: 'app.message.handler' }
 
@@ -481,6 +488,11 @@ services:
     Plugin\SortX\Controller\SortXController:
         arguments:
             $uploadDir: '%kernel.project_dir%/var/uploads'
+
+    # Plugin discovery - Casting Data Connector
+    Plugin\CastingData\:
+        resource: '%plugins_dir%/castingdata/backend/'
+        exclude: '%plugins_dir%/castingdata/backend/{Entity,migrations,tests}'
 
     # System Configuration Service (Admin .env editor)
     App\Service\Admin\SystemConfigService:

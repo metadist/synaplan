@@ -6,7 +6,9 @@ use App\AI\Service\AiFacade;
 use App\DTO\WhatsApp\IncomingMessageDto;
 use App\Entity\Message;
 use App\Entity\User;
+use App\Service\DiscordNotificationService;
 use App\Service\EmailChatService;
+use App\Service\EmailWebhookIdempotencyService;
 use App\Service\InternalEmailService;
 use App\Service\Message\MessageProcessor;
 use App\Service\ModelConfigService;
@@ -30,10 +32,12 @@ class WebhookController extends AbstractController
     public function __construct(
         private EntityManagerInterface $em,
         private MessageProcessor $messageProcessor,
+        private EmailWebhookIdempotencyService $emailWebhookIdempotencyService,
         private RateLimitService $rateLimitService,
         private WhatsAppService $whatsAppService,
         private EmailChatService $emailChatService,
         private InternalEmailService $internalEmailService,
+        private DiscordNotificationService $discordNotificationService,
         private LoggerInterface $logger,
         private string $whatsappWebhookVerifyToken,
         private AiFacade $aiFacade,
@@ -107,12 +111,22 @@ class WebhookController extends AbstractController
             ], Response::HTTP_BAD_REQUEST);
         }
 
-        $fromEmail = $data['from'];
-        $toEmail = $data['to'];
+        $fromEmail = strtolower(trim((string) $data['from']));
+        $toEmail = strtolower(trim((string) $data['to']));
         $subject = $data['subject'] ?? '(no subject)';
         $body = $data['body'];
         $messageId = $data['message_id'] ?? null;
         $inReplyTo = $data['in_reply_to'] ?? null;
+        $idempotency = $this->emailWebhookIdempotencyService->findDuplicate(
+            $fromEmail,
+            $toEmail,
+            $subject,
+            $body,
+            $messageId
+        );
+        $existingMessage = $idempotency['existing'];
+        $emailFingerprint = $idempotency['fingerprint'];
+        $normalizedMessageId = $idempotency['normalized_message_id'];
 
         // Parse keyword from to-address (smart+keyword@synaplan.net)
         $keyword = $this->emailChatService->parseEmailKeyword($toEmail);
@@ -124,6 +138,56 @@ class WebhookController extends AbstractController
             'subject' => $subject,
             'body_length' => strlen($body),
         ]);
+
+        // Idempotency guard: skip retried webhook deliveries for already-processed emails.
+        if ($normalizedMessageId) {
+            if ($existingMessage) {
+                $this->logger->warning('Duplicate email webhook detected; skipping processing', [
+                    'external_message_id' => $normalizedMessageId,
+                    'from' => $fromEmail,
+                    'existing_message_id' => $existingMessage->getId(),
+                ]);
+                $this->discordNotificationService->notifyDuplicateEmailWebhook(
+                    fromEmail: $fromEmail,
+                    toEmail: $toEmail,
+                    subject: $subject,
+                    existingMessageId: $existingMessage->getId(),
+                    chatId: $existingMessage->getChatId(),
+                    externalMessageId: $normalizedMessageId,
+                    detectionMethod: 'external_id'
+                );
+
+                return $this->json([
+                    'success' => true,
+                    'duplicate' => true,
+                    'message_id' => $existingMessage->getId(),
+                    'chat_id' => $existingMessage->getChatId(),
+                ]);
+            }
+        } else {
+            if ($existingMessage) {
+                $this->logger->warning('Duplicate email webhook detected via fingerprint; skipping processing', [
+                    'from' => $fromEmail,
+                    'existing_message_id' => $existingMessage->getId(),
+                ]);
+                $this->discordNotificationService->notifyDuplicateEmailWebhook(
+                    fromEmail: $fromEmail,
+                    toEmail: $toEmail,
+                    subject: $subject,
+                    existingMessageId: $existingMessage->getId(),
+                    chatId: $existingMessage->getChatId(),
+                    externalMessageId: null,
+                    detectionMethod: 'fingerprint'
+                );
+
+                return $this->json([
+                    'success' => true,
+                    'duplicate' => true,
+                    'message_id' => $existingMessage->getId(),
+                    'chat_id' => $existingMessage->getChatId(),
+                ]);
+            }
+        }
 
         // Find or create user from email
         $userResult = $this->emailChatService->findOrCreateUserFromEmail($fromEmail);
@@ -193,6 +257,7 @@ class WebhookController extends AbstractController
             $message->setMeta('channel', 'email');
             $message->setMeta('from_email', $fromEmail);
             $message->setMeta('to_email', $toEmail);
+            $message->setMeta('email_fingerprint', $emailFingerprint);
 
             if ($keyword) {
                 $message->setMeta('email_keyword', $keyword);
@@ -200,8 +265,8 @@ class WebhookController extends AbstractController
             if (!empty($subject)) {
                 $message->setMeta('email_subject', $subject);
             }
-            if ($messageId) {
-                $message->setMeta('external_id', $messageId);
+            if ($normalizedMessageId) {
+                $message->setMeta('external_id', $normalizedMessageId);
                 // Note: Email threading is handled via Chat titles (Email: keyword or Email Conversation)
             }
             if (!empty($data['attachments'])) {
@@ -237,6 +302,7 @@ class WebhookController extends AbstractController
             $aiResponse = $result['response'];
             $responseText = $aiResponse['content'] ?? '';
             $metadata = $aiResponse['metadata'] ?? [];
+            $attachmentPath = $this->resolveAttachmentPathFromAiMetadata($metadata);
 
             // Extract provider and model from metadata
             $provider = $metadata['provider'] ?? null;
@@ -253,9 +319,8 @@ class WebhookController extends AbstractController
                 'input_text' => $message->getText(),
             ]);
 
-            // Generate TTS if voice_reply is set
-            $attachmentPath = null;
-            if ('1' === $message->getMeta('voice_reply')) {
+            // Generate TTS if voice_reply is set and no media attachment already exists.
+            if (null === $attachmentPath && '1' === $message->getMeta('voice_reply')) {
                 try {
                     $ttsText = TtsTextSanitizer::sanitize($responseText);
                     if (!empty(trim($ttsText))) {
@@ -572,5 +637,50 @@ class WebhookController extends AbstractController
                 'error' => 'Internal error',
             ], Response::HTTP_INTERNAL_SERVER_ERROR);
         }
+    }
+
+    private function resolveAttachmentPathFromAiMetadata(array $metadata): ?string
+    {
+        $mediaType = strtolower((string) ($metadata['media_type'] ?? ''));
+        if (!in_array($mediaType, ['image', 'video', 'audio'], true)) {
+            return null;
+        }
+
+        $relativePath = $metadata['local_path'] ?? null;
+
+        // Fallback: derive relative path from StreamController-compatible file.path.
+        if (!is_string($relativePath) || '' === trim($relativePath)) {
+            $filePath = $metadata['file']['path'] ?? null;
+            if (is_string($filePath)) {
+                $prefix = '/api/v1/files/uploads/';
+                if (str_starts_with($filePath, $prefix)) {
+                    $relativePath = substr($filePath, strlen($prefix));
+                }
+            }
+        }
+
+        if (!is_string($relativePath) || '' === trim($relativePath)) {
+            return null;
+        }
+
+        $baseDir = $this->getParameter('kernel.project_dir').'/var/uploads';
+        $absolutePath = $baseDir.'/'.ltrim($relativePath, '/');
+        $resolvedPath = realpath($absolutePath);
+
+        $isWithinBaseDir = false !== $resolvedPath
+            && ($resolvedPath === $baseDir || str_starts_with($resolvedPath, $baseDir.DIRECTORY_SEPARATOR));
+
+        if (false === $resolvedPath || !$isWithinBaseDir || !is_file($resolvedPath)) {
+            $this->logger->warning('Email attachment not found or outside allowed directory', [
+                'media_type' => $mediaType,
+                'relative_path' => $relativePath,
+                'absolute_path' => $absolutePath,
+                'resolved_path' => $resolvedPath,
+            ]);
+
+            return null;
+        }
+
+        return $resolvedPath;
     }
 }
