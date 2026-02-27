@@ -60,7 +60,7 @@ Permission error on `frontend/dist/` (container creates it as root): `sudo rm -r
 | **MailHog**   | :8025 / :1025                   | :8025 / :1025 (shared ports!)                  |
 | **Login**     | admin@synaplan.com / admin123   | admin@synaplan.com / admin123                  |
 
-Widget E2E tests use the page at `/widget-test.html`. In dev it is served by Vite from `tests/e2e/fixtures/widget-test.html`; in the test stack the same file is mounted into the backend container.
+Widget E2E tests use the page at `/widget-test.html`. Tests use `page.route()` to serve the fixture from disk; in dev Vite also serves it from `tests/e2e/fixtures/widget-test.html`.
 
 ### Selecting TestProvider in the dev stack
 

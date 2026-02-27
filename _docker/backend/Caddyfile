@@ -62,15 +62,6 @@
 		file_server
 	}
 
-	# E2E widget test page (test stack mounts fixture to /var/www/test-fixtures/)
-	@widget_test_page {
-		path /widget-test.html
-	}
-	handle @widget_test_page {
-		root * /var/www/test-fixtures
-		file_server
-	}
-
 	# Frontend files second (static files from frontend build)
 	@frontend_file {
 		file {
