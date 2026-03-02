@@ -108,7 +108,7 @@ class OidcTokenServiceTest extends TestCase
         $this->assertTrue($result);
     }
 
-    public function testStoreOidcTokensSkipsRefreshCookieWhenNull(): void
+    public function testStoreOidcTokensClearsRefreshCookieWhenNull(): void
     {
         $service = $this->createService();
 
@@ -116,11 +116,16 @@ class OidcTokenServiceTest extends TestCase
         $service->storeOidcTokens($response, 'access-token', null, 300, 'keycloak');
 
         $cookies = $response->headers->getCookies();
-        $cookieNames = array_map(fn ($c) => $c->getName(), $cookies);
+        $refreshCookie = null;
+        foreach ($cookies as $cookie) {
+            if ($cookie->getName() === OidcTokenService::OIDC_REFRESH_COOKIE) {
+                $refreshCookie = $cookie;
+            }
+        }
 
-        $this->assertContains(OidcTokenService::OIDC_ACCESS_COOKIE, $cookieNames);
-        $this->assertContains(OidcTokenService::OIDC_PROVIDER_COOKIE, $cookieNames);
-        $this->assertNotContains(OidcTokenService::OIDC_REFRESH_COOKIE, $cookieNames);
+        // Refresh cookie should be set as expired (clearing any stale cookie)
+        $this->assertNotNull($refreshCookie);
+        $this->assertTrue($refreshCookie->isCleared());
     }
 
     public function testStoreOidcTokensSetsRefreshCookieWhenProvided(): void

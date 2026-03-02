@@ -200,9 +200,14 @@ class KeycloakAuthController extends AbstractController
             }
 
             if (!$refreshToken) {
-                $this->logger->warning('No refresh token received from OIDC provider (offline_access scope may not be granted)', [
-                    'scopes_requested' => $this->oidcScopes,
-                ]);
+                $offlineRequested = str_contains($this->oidcScopes, 'offline_access');
+                $this->logger->log(
+                    $offlineRequested ? 'warning' : 'info',
+                    $offlineRequested
+                        ? 'No refresh token received despite requesting offline_access scope'
+                        : 'No refresh token received (offline_access not requested, app token provides fallback)',
+                    ['scopes_requested' => $this->oidcScopes],
+                );
             }
 
             // Fetch user info from Keycloak

@@ -69,6 +69,9 @@ class OidcTokenService
                 $refreshToken,
                 time() + 86400 * 30 // 30 days
             ));
+        } else {
+            // Clear any stale refresh cookie from a previous session (e.g. scopes changed at deploy time)
+            $response->headers->setCookie($this->createCookie(self::OIDC_REFRESH_COOKIE, '', 1));
         }
 
         // ID token cookie (needed for RP-Initiated Logout id_token_hint)
