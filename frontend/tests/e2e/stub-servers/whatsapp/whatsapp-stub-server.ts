@@ -11,17 +11,30 @@ const PORT = Number(process.env.PORT) || 3999
 const API_VERSION = 'v21.0'
 const STUB_HOST = process.env.STUB_HOST || 'whatsapp-stub'
 
+type RequestRecord = {
+  method: string
+  path: string
+  headers: Record<string, string>
+  body: unknown
+}
+
+function getBody(obj: unknown): Record<string, unknown> | null {
+  return obj != null && typeof obj === 'object' && !Array.isArray(obj)
+    ? (obj as Record<string, unknown>)
+    : null
+}
+
 /** Requests by runId; default key for backward compat. */
-const requestsByRunId = { default: [] }
+const requestsByRunId: Record<string, RequestRecord[]> = { default: [] }
 let currentRunId = 'default'
 /** When set, the next N "send message" requests get 500. Mark-as-read (status: read) is never failed. */
 let simulateFailCount = 0
 
-function getRequests() {
+function getRequests(): RequestRecord[] {
   return requestsByRunId[currentRunId] ?? (requestsByRunId[currentRunId] = [])
 }
 
-function parsePath(url) {
+function parsePath(url: string): string {
   try {
     return new URL(url, 'http://x').pathname
   } catch {
@@ -29,22 +42,23 @@ function parsePath(url) {
   }
 }
 
-function collectHeaders(req) {
-  const h = {}
+function collectHeaders(req: http.IncomingMessage): Record<string, string> {
+  const h: Record<string, string> = {}
   for (const [k, v] of Object.entries(req.headers)) {
-    h[k.toLowerCase()] = v
+    if (typeof v === 'string') h[k.toLowerCase()] = v
+    else if (Array.isArray(v)) h[k.toLowerCase()] = v[0] ?? ''
   }
   return h
 }
 
 const server = http.createServer((req, res) => {
-  const path = parsePath(req.url || '')
-  const method = req.method || 'GET'
+  const path = parsePath(req.url ?? '')
+  const method = req.method ?? 'GET'
 
-  const chunks = []
-  req.on('data', (chunk) => chunks.push(chunk))
+  const chunks: Buffer[] = []
+  req.on('data', (chunk: Buffer) => chunks.push(chunk))
   req.on('end', () => {
-    let body = null
+    let body: unknown = null
     if (chunks.length > 0) {
       const raw = Buffer.concat(chunks).toString('utf8')
       try {
@@ -53,15 +67,16 @@ const server = http.createServer((req, res) => {
         body = raw
       }
     }
+    const bodyObj = getBody(body)
 
     const headers = collectHeaders(req)
     const requests = getRequests()
 
     // Control: return requests (for test assertions). GET /__requests?runId=xxx
     if (method === 'GET' && path.startsWith('/__requests')) {
-      const u = new URL(req.url || '/__requests', 'http://x')
-      const runId = u.searchParams.get('runId') || currentRunId
-      const list = requestsByRunId[runId] || []
+      const u = new URL(req.url ?? '/__requests', 'http://x')
+      const runId = u.searchParams.get('runId') ?? currentRunId
+      const list = requestsByRunId[runId] ?? []
       res.writeHead(200, { 'Content-Type': 'application/json' })
       res.end(JSON.stringify(list))
       return
@@ -69,7 +84,7 @@ const server = http.createServer((req, res) => {
 
     // Control: clear requests. POST /__reset body { runId?: string } sets currentRunId and clears that bucket
     if (method === 'POST' && path === '/__reset') {
-      const runId = (body && body.runId) || `run-${Date.now()}`
+      const runId = (bodyObj?.runId as string) ?? `run-${Date.now()}`
       currentRunId = runId
       requestsByRunId[runId] = []
       simulateFailCount = 0
@@ -80,7 +95,7 @@ const server = http.createServer((req, res) => {
 
     // Control: next N POST .../messages will return 500
     if (method === 'POST' && path === '/__simulate_fail') {
-      const n = (body && typeof body.nextResponses === 'number') ? body.nextResponses : 1
+      const n = typeof bodyObj?.nextResponses === 'number' ? bodyObj.nextResponses : 1
       simulateFailCount = n
       res.writeHead(200, { 'Content-Type': 'application/json' })
       res.end(JSON.stringify({ ok: true, nextFailCount: n }))
@@ -96,7 +111,7 @@ const server = http.createServer((req, res) => {
         res.end(JSON.stringify({ error: { message: 'Missing or invalid Authorization' } }))
         return
       }
-      const ct = headers['content-type'] || ''
+      const ct = headers['content-type'] ?? ''
       if (!ct.includes('application/json')) {
         res.writeHead(400, { 'Content-Type': 'application/json' })
         res.end(JSON.stringify({ error: { message: 'Content-Type must be application/json' } }))
@@ -105,8 +120,8 @@ const server = http.createServer((req, res) => {
       requests.push({ method, path, headers, body })
 
       // Like real Graph API: mark-as-read (body.status === 'read') vs send (body.type). Only send gets 500 when simulating failure.
-      const isMarkAsRead = body && body.status === 'read'
-      const isSendMessage = body && body.type != null && !isMarkAsRead
+      const isMarkAsRead = bodyObj?.status === 'read'
+      const isSendMessage = bodyObj?.type != null && !isMarkAsRead
       if (simulateFailCount > 0 && isSendMessage) {
         simulateFailCount--
         res.writeHead(500, { 'Content-Type': 'application/json' })
