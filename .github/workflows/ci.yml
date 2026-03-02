@@ -287,12 +287,12 @@ jobs:
           # Standard password auth (both browsers) — exclude @oidc tests (no Keycloak running)
           - browser: chromium
             auth_method: password
-            compose_profiles: "--profile whatsapp"
+            compose_profiles: ""
             npm_script: "test:e2e"
             grep_filter: "@ci"
           - browser: firefox
             auth_method: password
-            compose_profiles: "--profile whatsapp"
+            compose_profiles: ""
             npm_script: "test:e2e:firefox"
             grep_filter: "@ci"
           # OIDC auth (chromium only — auth flow testing, not browser compat)
