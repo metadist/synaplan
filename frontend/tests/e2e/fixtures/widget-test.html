@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Widget Test Page</title>
+</head>
+<body>
+  <h1>Widget Test Page</h1>
+  <p>Widget loads automatically from URL parameters.</p>
+
+  <script type="module">
+    const params = new URLSearchParams(window.location.search)
+    const widgetId = params.get('widgetId')
+    const apiUrl = params.get('apiUrl') || window.location.origin
+
+    if (!widgetId) {
+      document.body.innerHTML += '<p style="color:red">Missing ?widgetId= parameter</p>'
+    } else {
+      try {
+        const widgetUrl = apiUrl + '/widget.js'
+        const mod = await import(widgetUrl)
+        const SynaplanWidget = mod.default || mod
+        SynaplanWidget.init({
+          widgetId,
+          position: params.get('position') || 'bottom-right',
+          primaryColor: params.get('primaryColor') || '#007bff',
+          iconColor: params.get('iconColor') || '#ffffff',
+          defaultTheme: params.get('defaultTheme') || 'light',
+          lazy: params.get('lazy') !== 'false',
+          apiUrl,
+        })
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err)
+        console.error('[widget-test] Failed to load widget:', msg)
+        document.body.innerHTML += '<p data-testid="widget-load-error" style="color:red;font-family:monospace">'
+          + 'Widget load error: ' + msg + '</p>'
+      }
+    }
+  </script>
+</body>
+</html>

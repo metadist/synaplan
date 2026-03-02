@@ -346,6 +346,7 @@ class SynaplanWidget {
       // Create container with Shadow DOM for 100% CSS isolation
       this.container = document.createElement('div')
       this.container.id = 'synaplan-widget-host'
+      this.container.setAttribute('data-testid', 'widget-host')
 
       // Set container styles (outside Shadow DOM)
       this.container.setAttribute(

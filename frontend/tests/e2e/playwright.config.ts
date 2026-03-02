@@ -1,60 +1,66 @@
+import './load-env'
 import { defineConfig, devices } from '@playwright/test'
-import dotenv from 'dotenv'
-import path from 'path'
-import { fileURLToPath } from 'url'
+import { URLS } from './config/config'
 
-// Get __dirname equivalent in ES modules
-const __filename = fileURLToPath(import.meta.url)
-const __dirname = path.dirname(__filename)
-
-// Load .env file from e2e directory
-dotenv.config({ path: path.join(__dirname, '.env.local') })
-
-/**
- * Playwright E2E Test Configuration
- * BaseURL: http://localhost:5173 (overridable via BASE_URL ENV)
- */
+/** E2E + integration smoke config. testDir '..' = tests/; testMatch restricts to e2e and integration (excludes unit). */
 export default defineConfig({
-  // Test directory (relative to this config file)
-  testDir: './tests',
-
-  // Retries and timeout
-  retries: 0,
+  testDir: '..',
+  testMatch: ['e2e/tests/**/*.spec.ts', 'integration/**/*.spec.ts'],
+  testIgnore: ['**/unit/**'],
+  retries: process.env.CI ? 1 : 0,
   timeout: 60_000,
 
-  // BaseURL from ENV or default
   use: {
-    baseURL: process.env.BASE_URL || 'http://localhost:5173',
+    baseURL: URLS.BASE_URL,
     headless: process.env.CI ? true : false,
     screenshot: 'only-on-failure',
     video: 'retain-on-failure',
     trace: 'retain-on-failure',
   },
 
-  // Reporters
   reporter: [
     ['list'],
     ['junit', { outputFile: 'reports/junit.xml' }],
     ['html', { outputFolder: 'reports/html', open: 'never' }],
   ],
 
-  // Output directory for traces, screenshots, etc.
   outputDir: 'test-results',
+  workers: 4,
 
-  // Worker configuration
-  workers: 1,
-
-  // Browser projects
-  // Both browsers defined for CI, but local dev uses --project=chromium for speed
   projects: [
     {
       name: 'chromium',
-      use: { ...devices['Desktop Chrome'] },
+      use: {
+        ...Object.fromEntries(
+          Object.entries(devices['Desktop Chrome']).filter(([key]) => key !== 'deviceScaleFactor')
+        ),
+        viewport: process.env.CI ? { width: 1920, height: 1080 } : null,
+        // Chrome 142+ Local Network Access: disable prompt so dev-stack (5173→8000) widget tests
+        // run without user interaction. Test stack (8001) is same-origin anyway.
+        launchOptions: {
+          args: [
+            ...(process.env.CI ? [] : ['--start-maximized']),
+            '--disable-features=LocalNetworkAccessChecks',
+          ],
+        },
+      },
       grepInvert: /@oidc-redirect/,
     },
     {
       name: 'firefox',
-      use: { ...devices['Desktop Firefox'] },
+      use: {
+        ...Object.fromEntries(
+          Object.entries(devices['Desktop Firefox']).filter(([key]) => key !== 'deviceScaleFactor')
+        ),
+        viewport: process.env.CI ? { width: 1920, height: 1080 } : null,
+        ...(process.env.CI
+          ? {}
+          : {
+              launchOptions: {
+                args: ['--start-maximized'],
+              },
+            }),
+      },
       grepInvert: /@oidc-redirect/,
     },
     {
