@@ -49,7 +49,7 @@ class OidcTokenService
     public function storeOidcTokens(
         Response $response,
         string $accessToken,
-        string $refreshToken,
+        ?string $refreshToken,
         int $expiresIn,
         string $provider = 'keycloak',
         ?string $idToken = null,
@@ -62,12 +62,14 @@ class OidcTokenService
             $accessExpiry
         ));
 
-        // Refresh token cookie (longer lifetime)
-        $response->headers->setCookie($this->createCookie(
-            self::OIDC_REFRESH_COOKIE,
-            $refreshToken,
-            time() + 86400 * 30 // 30 days
-        ));
+        // Refresh token cookie (longer lifetime) — only set when provider returned one
+        if ($refreshToken) {
+            $response->headers->setCookie($this->createCookie(
+                self::OIDC_REFRESH_COOKIE,
+                $refreshToken,
+                time() + 86400 * 30 // 30 days
+            ));
+        }
 
         // ID token cookie (needed for RP-Initiated Logout id_token_hint)
         if ($idToken) {
@@ -248,7 +250,7 @@ class OidcTokenService
      *
      * @return bool True if revocation succeeded or is not supported, false on error
      */
-    public function revokeOidcTokens(string $accessToken, string $refreshToken, string $provider = 'keycloak'): bool
+    public function revokeOidcTokens(string $accessToken, ?string $refreshToken, string $provider = 'keycloak'): bool
     {
         try {
             $discovery = $this->getDiscoveryConfig($provider);
@@ -266,23 +268,25 @@ class OidcTokenService
             $revocationSuccess = true;
 
             // Revoke refresh token (more important - can create new access tokens)
-            try {
-                $this->httpClient->request('POST', $revocationEndpoint, [
-                    'body' => [
-                        'token' => $refreshToken,
-                        'token_type_hint' => 'refresh_token',
-                        'client_id' => $this->oidcClientId,
-                        'client_secret' => $this->oidcClientSecret,
-                    ],
-                ]);
+            if ($refreshToken) {
+                try {
+                    $this->httpClient->request('POST', $revocationEndpoint, [
+                        'body' => [
+                            'token' => $refreshToken,
+                            'token_type_hint' => 'refresh_token',
+                            'client_id' => $this->oidcClientId,
+                            'client_secret' => $this->oidcClientSecret,
+                        ],
+                    ]);
 
-                $this->logger->info('OIDC refresh token revoked', ['provider' => $provider]);
-            } catch (\Exception $e) {
-                $this->logger->warning('Failed to revoke OIDC refresh token', [
-                    'error' => $e->getMessage(),
-                    'provider' => $provider,
-                ]);
-                $revocationSuccess = false;
+                    $this->logger->info('OIDC refresh token revoked', ['provider' => $provider]);
+                } catch (\Exception $e) {
+                    $this->logger->warning('Failed to revoke OIDC refresh token', [
+                        'error' => $e->getMessage(),
+                        'provider' => $provider,
+                    ]);
+                    $revocationSuccess = false;
+                }
             }
 
             // Revoke access token

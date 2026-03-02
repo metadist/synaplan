@@ -54,6 +54,7 @@ class KeycloakAuthController extends AbstractController
         private string $oidcDiscoveryUrl,
         string $oidcAdminRoles,
         string $oidcRoleClaims,
+        private string $oidcScopes,
         private string $appUrl,
         private string $frontendUrl,
     ) {
@@ -89,7 +90,7 @@ class KeycloakAuthController extends AbstractController
                 'client_id' => $this->oidcClientId,
                 'redirect_uri' => $redirectUri,
                 'response_type' => 'code',
-                'scope' => 'openid email profile offline_access', // offline_access for refresh token
+                'scope' => $this->oidcScopes,
                 'state' => $state,
                 // PKCE parameters (RFC 7636)
                 'code_challenge' => $codeChallenge,
@@ -101,6 +102,7 @@ class KeycloakAuthController extends AbstractController
             $this->logger->info('Keycloak OAuth login initiated with PKCE', [
                 'redirect_uri' => $redirectUri,
                 'pkce_enabled' => true,
+                'scopes' => $this->oidcScopes,
             ]);
 
             return $this->redirect($authUrl);
@@ -195,6 +197,12 @@ class KeycloakAuthController extends AbstractController
 
             if (!$accessToken) {
                 throw new \Exception('Access token not received from Keycloak');
+            }
+
+            if (!$refreshToken) {
+                $this->logger->warning('No refresh token received from OIDC provider (offline_access scope may not be granted)', [
+                    'scopes_requested' => $this->oidcScopes,
+                ]);
             }
 
             // Fetch user info from Keycloak

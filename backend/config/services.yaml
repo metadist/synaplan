@@ -13,6 +13,9 @@ parameters:
     # Use {client_id} as placeholder for OIDC_CLIENT_ID. Escape literal dots with \
     env(OIDC_ROLE_CLAIMS): 'realm_access.roles,resource_access.{client_id}.roles,groups'
 
+    # OIDC scopes requested during login (space-separated)
+    env(OIDC_SCOPES): 'openid email profile offline_access'
+
     # Logging
     # LOG_FORMAT: json (default) or line (human-readable)
     # LOG_LEVEL: debug, info, notice, warning, error (see monolog.yaml)
@@ -315,6 +318,7 @@ services:
             $oidcDiscoveryUrl: '%env(OIDC_DISCOVERY_URL)%'
             $oidcAdminRoles: '%env(string:OIDC_ADMIN_ROLES)%'
             $oidcRoleClaims: '%env(string:OIDC_ROLE_CLAIMS)%'
+            $oidcScopes: '%env(string:OIDC_SCOPES)%'
             $appUrl: '%env(APP_URL)%'
             $frontendUrl: '%env(FRONTEND_URL)%'
 
