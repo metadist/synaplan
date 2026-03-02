@@ -53,7 +53,7 @@ export async function getFeaturesStatus(): Promise<FeaturesStatus> {
     const response = await api.get<FeaturesStatus>('/api/v1/config/features')
     return FeaturesStatusSchema.parse(response.data)
   } catch (error) {
-    if (error instanceof Error && error.message.includes('403')) {
+    if (error instanceof Error && error.message.startsWith('API Error: 403')) {
       throw new DevOnlyFeatureError()
     }
     throw error
