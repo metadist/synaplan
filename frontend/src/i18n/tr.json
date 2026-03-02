@@ -1011,7 +1011,9 @@
       "loading": "Özellikler yükleniyor...",
       "requiredConfig": "Gerekli Yapılandırma:",
       "set": "Ayarlandı",
-      "notSet": "Ayarlanmadı"
+      "notSet": "Ayarlanmadı",
+      "devOnlyTitle": "Yalnızca Geliştirme Modu",
+      "devOnlyMessage": "Bu sayfa yalnızca geliştirme ortamlarında kullanılabilir. Sistem durumu izleme üretimde kısıtlanmıştır."
     }
   },
   "storage": {

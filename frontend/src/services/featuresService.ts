@@ -30,12 +30,26 @@ export interface FeaturesStatus {
   }
 }
 
+export class DevOnlyFeatureError extends Error {
+  constructor() {
+    super('Feature only available in development mode')
+    this.name = 'DevOnlyFeatureError'
+  }
+}
+
 /**
  * Get status of all optional features
  */
 export async function getFeaturesStatus(): Promise<FeaturesStatus> {
-  const response = await api.get<FeaturesStatus>('/api/v1/config/features')
-  return response.data // Extrahiere data aus der Response
+  try {
+    const response = await api.get<FeaturesStatus>('/api/v1/config/features')
+    return response.data
+  } catch (error) {
+    if (error instanceof Error && error.message.includes('403')) {
+      throw new DevOnlyFeatureError()
+    }
+    throw error
+  }
 }
 
 /**

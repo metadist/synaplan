@@ -1395,7 +1395,9 @@
       "loading": "Lade Features...",
       "requiredConfig": "Erforderliche Konfiguration:",
       "set": "Gesetzt",
-      "notSet": "Nicht gesetzt"
+      "notSet": "Nicht gesetzt",
+      "devOnlyTitle": "Nur im Entwicklungsmodus verfügbar",
+      "devOnlyMessage": "Diese Seite ist nur in Entwicklungsumgebungen verfügbar. Die Systemstatusüberwachung ist in der Produktion eingeschränkt."
     }
   },
   "mail": {

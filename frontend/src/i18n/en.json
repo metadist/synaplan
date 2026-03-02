@@ -1973,7 +1973,9 @@
       "loading": "Loading features...",
       "requiredConfig": "Required Configuration:",
       "set": "Set",
-      "notSet": "Not Set"
+      "notSet": "Not Set",
+      "devOnlyTitle": "Development Mode Only",
+      "devOnlyMessage": "This page is only available in development environments. System status monitoring is restricted in production."
     }
   },
   "cookies": {

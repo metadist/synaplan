@@ -24,6 +24,19 @@
           <div class="txt-secondary">{{ $t('settings.features.loading') }}</div>
         </div>
 
+        <!-- Dev-Only State -->
+        <div
+          v-else-if="isDevOnly"
+          class="surface-card p-8 text-center"
+          data-testid="state-features-dev-only"
+        >
+          <Icon icon="mdi:code-braces" class="w-12 h-12 mx-auto mb-4 txt-secondary" />
+          <h2 class="text-xl font-semibold txt-primary mb-2">
+            {{ $t('settings.features.devOnlyTitle') }}
+          </h2>
+          <p class="txt-secondary">{{ $t('settings.features.devOnlyMessage') }}</p>
+        </div>
+
         <!-- Error State -->
         <div
           v-else-if="!featuresStatus || !featuresStatus.features"
@@ -194,9 +207,15 @@
 import { ref, computed, onMounted } from 'vue'
 import { Icon } from '@iconify/vue'
 import MainLayout from '@/components/MainLayout.vue'
-import { getFeaturesStatus, type FeaturesStatus, type Feature } from '@/services/featuresService'
+import {
+  getFeaturesStatus,
+  DevOnlyFeatureError,
+  type FeaturesStatus,
+  type Feature,
+} from '@/services/featuresService'
 const featuresStatus = ref<FeaturesStatus | null>(null)
 const isLoadingFeatures = ref(false)
+const isDevOnly = ref(false)
 
 // Group features by category with custom ordering
 const featuresByCategory = computed(() => {
@@ -254,17 +273,20 @@ const getStatusClass = (status: string) => {
   }
 }
 
-// Load features
 const loadFeatures = async () => {
   isLoadingFeatures.value = true
   featuresStatus.value = null
+  isDevOnly.value = false
 
   try {
     const data = await getFeaturesStatus()
-    console.log('Features loaded:', data)
     featuresStatus.value = data
   } catch (error) {
-    console.error('Failed to load features:', error)
+    if (error instanceof DevOnlyFeatureError) {
+      isDevOnly.value = true
+    } else {
+      console.error('Failed to load features:', error)
+    }
     featuresStatus.value = null
   } finally {
     isLoadingFeatures.value = false
