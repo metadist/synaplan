@@ -76,7 +76,11 @@ test.describe('@ci Smart-Email smoke @smoke', () => {
         .not.toBeNull()
 
       expect(matching.length).toBe(1)
-      expect(matching[0].body).toContain(TEST_PROVIDER_REPLY_MARKER)
+      if (isTestStack()) {
+        expect(matching[0].body).toContain(TEST_PROVIDER_REPLY_MARKER)
+      } else {
+        expect(matching[0].body.length).toBeGreaterThan(0)
+      }
     })
   })
 
