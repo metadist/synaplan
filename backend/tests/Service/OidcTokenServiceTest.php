@@ -118,7 +118,7 @@ class OidcTokenServiceTest extends TestCase
         $cookies = $response->headers->getCookies();
         $refreshCookie = null;
         foreach ($cookies as $cookie) {
-            if ($cookie->getName() === OidcTokenService::OIDC_REFRESH_COOKIE) {
+            if (OidcTokenService::OIDC_REFRESH_COOKIE === $cookie->getName()) {
                 $refreshCookie = $cookie;
             }
         }
