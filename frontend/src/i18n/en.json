@@ -1974,6 +1974,12 @@
       "requiredConfig": "Required Configuration:",
       "set": "Set",
       "notSet": "Not Set",
+      "allOperational": "All Systems Operational",
+      "issuesDetected": "Issues Detected",
+      "ready": "Ready",
+      "healthSummary": "{healthy} of {total} services healthy",
+      "model": "model",
+      "models": "models",
       "devOnlyTitle": "Development Mode Only",
       "devOnlyMessage": "This page is only available in development environments. System status monitoring is restricted in production."
     }

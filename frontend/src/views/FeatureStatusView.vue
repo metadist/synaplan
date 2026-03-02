@@ -58,7 +58,11 @@
           <!-- Summary Card -->
           <div
             class="surface-card p-6 border-l-4"
-            :class="featuresStatus.summary.all_ready ? 'border-green-500' : 'border-yellow-500'"
+            :class="
+              featuresStatus.summary.all_ready
+                ? 'border-[var(--status-success)]'
+                : 'border-[var(--status-warning)]'
+            "
             data-testid="section-features-summary"
           >
             <div class="flex items-center justify-between gap-4">
@@ -69,16 +73,18 @@
                 <div>
                   <h3 class="text-xl font-bold txt-primary mb-1">
                     {{
-                      featuresStatus.summary.all_ready ? 'All Systems Operational' : 'System Status'
+                      featuresStatus.summary.all_ready
+                        ? $t('settings.features.allOperational')
+                        : $t('settings.features.title')
                     }}
                   </h3>
                   <p class="txt-secondary text-sm">
-                    <span class="font-semibold text-green-600 dark:text-green-400">{{
-                      featuresStatus.summary.healthy
-                    }}</span>
-                    <span class="mx-1">of</span>
-                    <span class="font-semibold">{{ featuresStatus.summary.total }}</span>
-                    <span class="ml-1">services healthy</span>
+                    {{
+                      $t('settings.features.healthSummary', {
+                        healthy: featuresStatus.summary.healthy,
+                        total: featuresStatus.summary.total,
+                      })
+                    }}
                   </p>
                 </div>
               </div>
@@ -87,11 +93,15 @@
                 :class="[
                   'px-5 py-2.5 rounded-lg text-sm font-semibold shadow-sm',
                   featuresStatus.summary.all_ready
-                    ? 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-200'
-                    : 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-200',
+                    ? 'bg-[var(--status-success-muted)] text-[var(--status-success-text)]'
+                    : 'bg-[var(--status-warning-muted)] text-[var(--status-warning-text)]',
                 ]"
               >
-                {{ featuresStatus.summary.all_ready ? 'Ready' : 'Issues Detected' }}
+                {{
+                  featuresStatus.summary.all_ready
+                    ? $t('settings.features.ready')
+                    : $t('settings.features.issuesDetected')
+                }}
               </div>
             </div>
           </div>
@@ -106,7 +116,7 @@
             <!-- Category Header -->
             <div class="flex items-center gap-3 px-2 mb-4">
               <h2 class="text-xl font-semibold txt-primary">{{ categoryName }}</h2>
-              <div class="h-px flex-1 bg-gray-200 dark:bg-gray-700"></div>
+              <div class="h-px flex-1 bg-[var(--divider)]"></div>
             </div>
 
             <!-- Features in this category -->
@@ -125,7 +135,7 @@
                     <!-- Version Badge -->
                     <span
                       v-if="feature.version"
-                      class="px-2.5 py-1 rounded-md text-xs font-mono font-semibold bg-gradient-to-br from-blue-500 to-blue-600 text-white shadow-sm"
+                      class="px-2.5 py-1 rounded-md text-xs font-mono font-semibold bg-[var(--status-info)] text-white shadow-sm"
                     >
                       v{{ feature.version }}
                     </span>
@@ -133,10 +143,14 @@
                     <!-- Models Count Badge -->
                     <span
                       v-if="feature.models_available !== undefined && feature.models_available > 0"
-                      class="px-2.5 py-1 rounded-md text-xs font-semibold bg-gradient-to-br from-purple-500 to-purple-600 text-white shadow-sm"
+                      class="px-2.5 py-1 rounded-md text-xs font-semibold bg-[var(--brand)] text-white shadow-sm"
                     >
                       {{ feature.models_available }}
-                      {{ feature.models_available !== 1 ? 'models' : 'model' }}
+                      {{
+                        feature.models_available !== 1
+                          ? $t('settings.features.models')
+                          : $t('settings.features.model')
+                      }}
                     </span>
                   </div>
 
@@ -258,18 +272,17 @@ const featuresByCategory = computed(() => {
   return sorted
 })
 
-// Get status class based on status
 const getStatusClass = (status: string) => {
   switch (status) {
     case 'healthy':
-      return 'bg-green-500 text-white shadow-sm'
+      return 'bg-[var(--status-success)] text-white shadow-sm'
     case 'active':
-      return 'bg-blue-500 text-white shadow-sm'
+      return 'bg-[var(--status-info)] text-white shadow-sm'
     case 'unhealthy':
-      return 'bg-red-500 text-white shadow-sm'
+      return 'bg-[var(--status-error)] text-white shadow-sm'
     case 'disabled':
     default:
-      return 'bg-gray-400 dark:bg-gray-600 text-white shadow-sm'
+      return 'bg-[var(--status-neutral)] text-white shadow-sm'
   }
 }
 
