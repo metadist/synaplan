@@ -15,10 +15,13 @@ const FeatureSchema = z.object({
   status: z.enum(['active', 'disabled', 'healthy', 'unhealthy']),
   message: z.string(),
   setup_required: z.boolean(),
-  env_vars: z.record(z.string(), FeatureEnvVarSchema).optional(),
+  env_vars: z
+    .union([z.record(z.string(), FeatureEnvVarSchema), z.array(z.unknown())])
+    .optional()
+    .transform((val) => (Array.isArray(val) ? undefined : val)),
   models_available: z.number().optional(),
-  url: z.string().optional(),
-  version: z.string().optional(),
+  url: z.string().nullable().optional(),
+  version: z.string().nullable().optional(),
 })
 
 const FeaturesStatusSchema = z.object({
