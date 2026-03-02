@@ -82,7 +82,6 @@ services:
       APP_URL: http://localhost:8000
       PLUGINS_DIR: /plugins
       FRONTEND_URL: http://localhost:5173
-      SYNAPLAN_URL: http://localhost:8000
       DATABASE_WRITE_URL: mysql://synaplan_user:synaplan_password@db:3306/synaplan?serverVersion=11.8&charset=utf8mb4
       DATABASE_READ_URL: mysql://synaplan_user:synaplan_password@db:3306/synaplan?serverVersion=11.8&charset=utf8mb4
       # No Ollama - use external AI providers

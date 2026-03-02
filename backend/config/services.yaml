@@ -3,8 +3,8 @@ parameters:
     recaptcha_enabled_default: false
     recaptcha_min_score_default: 0.5
 
-    # Synaplan public URL
-    synaplan_url: '%env(SYNAPLAN_URL)%'
+    # Public app URL (widgets, shared links, OAuth callbacks)
+    synaplan_url: '%env(APP_URL)%'
 
     # OIDC admin role claim values (comma-separated, case-insensitive)
     env(OIDC_ADMIN_ROLES): 'admin,realm-admin,synaplan-admin,administrator'
@@ -347,7 +347,7 @@ services:
     # Shared Chat Page Controller (serves Open Graph meta tags for social media)
     App\Controller\SharedChatPageController:
         arguments:
-            $synaplanUrl: '%env(SYNAPLAN_URL)%'
+            $synaplanUrl: '%env(APP_URL)%'
 
     # Auth Providers Controller (returns enabled providers)
     App\Controller\AuthProvidersController:
