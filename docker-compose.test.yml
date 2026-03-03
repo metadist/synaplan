@@ -132,6 +132,7 @@ services:
     container_name: synaplan-whatsapp-stub
     ports:
       - "3999:3999"
+    init: true
     restart: "no"
     networks:
       - synaplan-test-network

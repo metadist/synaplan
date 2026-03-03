@@ -357,15 +357,6 @@ jobs:
             echo "Failed to start services. Status:"
             $COMPOSE $PROFILE ps
             echo ""
-            echo "=== Memory at failure ==="
-            free -h
-            echo ""
-            echo "=== OOM killer / dmesg (last 30 lines) ==="
-            dmesg 2>/dev/null | grep -iE "oom|killed process|out of memory" | tail -30 || echo "(dmesg not available)"
-            echo ""
-            echo "=== whatsapp-stub container state (OOMKilled?) ==="
-            docker inspect synaplan-whatsapp-stub 2>/dev/null | grep -E "OOMKilled|ExitCode|Status" || echo "(container not found)"
-            echo ""
             echo "Container logs:"
             $COMPOSE $PROFILE logs
             exit 1
