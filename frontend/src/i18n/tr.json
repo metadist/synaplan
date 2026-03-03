@@ -1011,7 +1011,15 @@
       "loading": "Özellikler yükleniyor...",
       "requiredConfig": "Gerekli Yapılandırma:",
       "set": "Ayarlandı",
-      "notSet": "Ayarlanmadı"
+      "notSet": "Ayarlanmadı",
+      "allOperational": "Tüm Sistemler Çalışıyor",
+      "issuesDetected": "Sorunlar Tespit Edildi",
+      "ready": "Hazır",
+      "healthSummary": "{total} servisten {healthy} tanesi sağlıklı",
+      "model": "model",
+      "models": "model",
+      "devOnlyTitle": "Yalnızca Geliştirme Modu",
+      "devOnlyMessage": "Bu sayfa yalnızca geliştirme ortamlarında kullanılabilir. Sistem durumu izleme üretimde kısıtlanmıştır."
     }
   },
   "storage": {
