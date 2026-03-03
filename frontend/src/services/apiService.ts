@@ -17,6 +17,7 @@ export interface DefaultModelConfig {
 // Base configuration
 const API_BASE_URL = getApiBaseUrl()
 const API_TIMEOUT = import.meta.env.VITE_API_TIMEOUT || 30000
+const API_UPLOAD_TIMEOUT = import.meta.env.VITE_API_UPLOAD_TIMEOUT || 120000
 const CSRF_HEADER = import.meta.env.VITE_CSRF_HEADER_NAME || 'X-CSRF-Token'
 
 // Token refresh stampede protection
