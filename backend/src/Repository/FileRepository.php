@@ -19,6 +19,9 @@ class FileRepository extends ServiceEntityRepository
     }
 
     /**
+     * @param array<int>                                                                     $vectorFileIds
+     * @param array{search?: ?string, file_type?: ?string, date_from?: ?int, date_to?: ?int} $filters
+     *
      * @return array{files: File[], total: int}
      */
     public function findByUserPaginated(
@@ -27,6 +30,7 @@ class FileRepository extends ServiceEntityRepository
         int $offset,
         int $limit,
         array $vectorFileIds = [],
+        array $filters = [],
     ): array {
         $qb = $this->createQueryBuilder('mf')
             ->where('mf.userId = :userId')
@@ -41,6 +45,36 @@ class FileRepository extends ServiceEntityRepository
                 $qb->andWhere('mf.groupKey = :groupKey')
                     ->setParameter('groupKey', $groupKey);
             }
+        }
+
+        $search = $filters['search'] ?? null;
+        if (null !== $search && '' !== $search) {
+            $qb->andWhere('(mf.fileName LIKE :search OR mf.fileText LIKE :search)')
+                ->setParameter('search', '%'.$search.'%');
+        }
+
+        $fileType = $filters['file_type'] ?? null;
+        if (null !== $fileType && '' !== $fileType) {
+            $types = array_filter(array_map('trim', explode(',', $fileType)));
+            if (1 === count($types)) {
+                $qb->andWhere('mf.fileType = :fileType')
+                    ->setParameter('fileType', $types[0]);
+            } elseif (count($types) > 1) {
+                $qb->andWhere('mf.fileType IN (:fileTypes)')
+                    ->setParameter('fileTypes', $types);
+            }
+        }
+
+        $dateFrom = $filters['date_from'] ?? null;
+        if (null !== $dateFrom) {
+            $qb->andWhere('mf.createdAt >= :dateFrom')
+                ->setParameter('dateFrom', $dateFrom);
+        }
+
+        $dateTo = $filters['date_to'] ?? null;
+        if (null !== $dateTo) {
+            $qb->andWhere('mf.createdAt <= :dateTo')
+                ->setParameter('dateTo', $dateTo);
         }
 
         $qb->orderBy('mf.createdAt', 'DESC');

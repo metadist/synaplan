@@ -173,10 +173,14 @@ class FileController extends AbstractController
     #[Route('', name: 'list', methods: ['GET'])]
     #[OA\Get(
         path: '/api/v1/files',
-        summary: 'List uploaded files with pagination',
+        summary: 'List uploaded files with pagination and search',
         tags: ['Files'],
         parameters: [
             new OA\Parameter(name: 'group_key', in: 'query', required: false, schema: new OA\Schema(type: 'string')),
+            new OA\Parameter(name: 'search', in: 'query', required: false, description: 'Search in file name and content', schema: new OA\Schema(type: 'string')),
+            new OA\Parameter(name: 'file_type', in: 'query', required: false, description: 'Filter by file extension(s), comma-separated for groups', schema: new OA\Schema(type: 'string', example: 'jpg,jpeg,png')),
+            new OA\Parameter(name: 'date_from', in: 'query', required: false, description: 'Unix timestamp lower bound', schema: new OA\Schema(type: 'integer')),
+            new OA\Parameter(name: 'date_to', in: 'query', required: false, description: 'Unix timestamp upper bound', schema: new OA\Schema(type: 'integer')),
             new OA\Parameter(name: 'page', in: 'query', required: false, schema: new OA\Schema(type: 'integer', default: 1)),
             new OA\Parameter(name: 'limit', in: 'query', required: false, schema: new OA\Schema(type: 'integer', default: 50)),
         ],
@@ -196,6 +200,13 @@ class FileController extends AbstractController
         $limit = min(100, max(1, (int) $request->query->get('limit', 50)));
         $offset = ($page - 1) * $limit;
 
+        $filters = [
+            'search' => $request->query->get('search'),
+            'file_type' => $request->query->get('file_type'),
+            'date_from' => $request->query->getInt('date_from') ?: null,
+            'date_to' => $request->query->getInt('date_to') ?: null,
+        ];
+
         $vectorFileIds = [];
         if ($groupKey) {
             try {
@@ -205,7 +216,7 @@ class FileController extends AbstractController
             }
         }
 
-        $result = $this->fileRepository->findByUserPaginated($user->getId(), $groupKey, $offset, $limit, $vectorFileIds);
+        $result = $this->fileRepository->findByUserPaginated($user->getId(), $groupKey, $offset, $limit, $vectorFileIds, $filters);
         $messageFiles = $result['files'];
 
         $vectorChunkMap = $this->resolveVectorGroupKeys($user->getId(), $messageFiles);
