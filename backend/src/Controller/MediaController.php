@@ -4,8 +4,11 @@ declare(strict_types=1);
 
 namespace App\Controller;
 
+use App\AI\Exception\ProviderException;
 use App\Entity\User;
-use App\Service\MediaGenerationService;
+use App\Service\Exception\NoModelAvailableException;
+use App\Service\Exception\RateLimitExceededException;
+use App\Service\MediaGenerationServiceInterface;
 use OpenApi\Attributes as OA;
 use Psr\Log\LoggerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -20,7 +23,7 @@ use Symfony\Component\Security\Http\Attribute\CurrentUser;
 final class MediaController extends AbstractController
 {
     public function __construct(
-        private MediaGenerationService $mediaService,
+        private MediaGenerationServiceInterface $mediaService,
         private LoggerInterface $logger,
     ) {
     }
@@ -145,27 +148,27 @@ final class MediaController extends AbstractController
             return $this->json($result);
         } catch (\InvalidArgumentException $e) {
             return $this->json(['error' => $e->getMessage()], Response::HTTP_BAD_REQUEST);
+        } catch (RateLimitExceededException $e) {
+            return $this->json(['error' => $e->getMessage()], Response::HTTP_TOO_MANY_REQUESTS);
+        } catch (NoModelAvailableException $e) {
+            return $this->json(['error' => $e->getMessage()], Response::HTTP_UNPROCESSABLE_ENTITY);
+        } catch (ProviderException $e) {
+            $this->logger->error('Media generation provider error', [
+                'user_id' => $user->getId(),
+                'type' => $type,
+                'provider' => $e->getProviderName(),
+                'error' => $e->getMessage(),
+            ]);
+
+            return $this->json(['error' => $e->getMessage()], Response::HTTP_INTERNAL_SERVER_ERROR);
         } catch (\RuntimeException $e) {
-            $message = $e->getMessage();
-
-            if (str_contains($message, 'Rate limit exceeded')) {
-                return $this->json(['error' => $message], Response::HTTP_TOO_MANY_REQUESTS);
-            }
-
-            if (str_contains($message, 'No model available')) {
-                return $this->json(['error' => $message], Response::HTTP_UNPROCESSABLE_ENTITY);
-            }
-
             $this->logger->error('Media generation failed', [
                 'user_id' => $user->getId(),
                 'type' => $type,
-                'error' => $message,
+                'error' => $e->getMessage(),
             ]);
 
-            return $this->json(
-                ['error' => 'Media generation failed: '.$message],
-                Response::HTTP_INTERNAL_SERVER_ERROR
-            );
+            return $this->json(['error' => $e->getMessage()], Response::HTTP_INTERNAL_SERVER_ERROR);
         }
     }
 }

@@ -8,12 +8,14 @@ use App\AI\Exception\ProviderException;
 use App\AI\Service\AiFacade;
 use App\Entity\Model;
 use App\Entity\User;
+use App\Service\Exception\NoModelAvailableException;
+use App\Service\Exception\RateLimitExceededException;
 use App\Service\File\FileHelper;
 use App\Service\File\UserUploadPathBuilder;
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;
 
-final readonly class MediaGenerationService
+final readonly class MediaGenerationService implements MediaGenerationServiceInterface
 {
     private const CURL_TIMEOUT_SECONDS = 60;
     private const CURL_CONNECT_TIMEOUT_SECONDS = 30;
@@ -37,8 +39,11 @@ final readonly class MediaGenerationService
      *
      * @return array{success: true, file: array{url: string, type: string, mimeType: string}, provider: string, model: string}
      *
-     * @throws \InvalidArgumentException on bad input
-     * @throws \RuntimeException         on generation or storage failure
+     * @throws \InvalidArgumentException  on bad input
+     * @throws RateLimitExceededException when user exceeds quota
+     * @throws NoModelAvailableException  when no model is configured
+     * @throws ProviderException          on AI provider failure
+     * @throws \RuntimeException          on storage failure
      */
     public function generate(User $user, string $prompt, string $type, ?int $modelId = null): array
     {
@@ -104,7 +109,7 @@ final readonly class MediaGenerationService
         $check = $this->rateLimitService->checkLimit($user, $action);
 
         if (!$check['allowed']) {
-            throw new \RuntimeException(sprintf('Rate limit exceeded for %s. Used: %d/%d', $action, $check['used'], $check['limit']));
+            throw new RateLimitExceededException($action, (int) $check['used'], (int) $check['limit']);
         }
     }
 
@@ -119,12 +124,12 @@ final readonly class MediaGenerationService
         }
 
         if (null === $modelId) {
-            throw new \RuntimeException('No model available for '.$type.' generation');
+            throw new NoModelAvailableException('No model available for '.$type.' generation');
         }
 
         $model = $this->em->getRepository(Model::class)->find($modelId);
         if (null === $model) {
-            throw new \RuntimeException('Model not found: '.$modelId);
+            throw new NoModelAvailableException('Model not found: '.$modelId);
         }
 
         return [
@@ -145,32 +150,23 @@ final readonly class MediaGenerationService
         ?string $modelName,
         array $modelConfig,
     ): array {
-        try {
-            if ('video' === $type) {
-                return $this->aiFacade->generateVideo($prompt, $user->getId(), [
-                    'provider' => $provider,
-                    'model' => $modelName,
-                    'duration' => self::DEFAULT_VIDEO_DURATION,
-                    'aspect_ratio' => self::DEFAULT_VIDEO_ASPECT_RATIO,
-                ]);
-            }
-
-            return $this->aiFacade->generateImage($prompt, $user->getId(), [
+        if ('video' === $type) {
+            return $this->aiFacade->generateVideo($prompt, $user->getId(), [
                 'provider' => $provider,
                 'model' => $modelName,
-                'modelConfig' => $modelConfig,
-                'quality' => 'standard',
-                'style' => 'vivid',
-                'size' => self::DEFAULT_IMAGE_SIZE,
+                'duration' => self::DEFAULT_VIDEO_DURATION,
+                'aspect_ratio' => self::DEFAULT_VIDEO_ASPECT_RATIO,
             ]);
-        } catch (ProviderException $e) {
-            $this->logger->error('Media generation provider error', [
-                'error' => $e->getMessage(),
-                'provider' => $provider,
-                'type' => $type,
-            ]);
-            throw new \RuntimeException('Media generation failed: '.$e->getMessage(), 0, $e);
         }
+
+        return $this->aiFacade->generateImage($prompt, $user->getId(), [
+            'provider' => $provider,
+            'model' => $modelName,
+            'modelConfig' => $modelConfig,
+            'quality' => 'standard',
+            'style' => 'vivid',
+            'size' => self::DEFAULT_IMAGE_SIZE,
+        ]);
     }
 
     private function extractMediaUrl(array $result, string $type): ?string
@@ -189,7 +185,17 @@ final readonly class MediaGenerationService
             return $first;
         }
 
-        return $first['url'] ?? $first['b64_json'] ?? $first['data'] ?? null;
+        if (isset($first['url'])) {
+            return $first['url'];
+        }
+
+        if (isset($first['b64_json'])) {
+            $mime = $first['content_type'] ?? ('video' === $type ? 'video/mp4' : 'image/png');
+
+            return 'data:'.$mime.';base64,'.$first['b64_json'];
+        }
+
+        return $first['data'] ?? null;
     }
 
     private function persistMedia(string $mediaUrl, int $userId, ?string $provider, string $type): ?string
@@ -242,7 +248,6 @@ final readonly class MediaGenerationService
 
         $content = curl_exec($ch);
         $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-        $contentType = curl_getinfo($ch, CURLINFO_CONTENT_TYPE);
         curl_close($ch);
 
         if (false === $content || 200 !== $httpCode) {
@@ -251,7 +256,10 @@ final readonly class MediaGenerationService
             return null;
         }
 
-        $extension = FileHelper::getExtensionFromMimeType($contentType ?: ('video' === $type ? 'video/mp4' : 'image/png'));
+        $finfo = new \finfo(FILEINFO_MIME_TYPE);
+        $mimeType = $finfo->buffer($content) ?: ('video' === $type ? 'video/mp4' : 'image/png');
+        $extension = FileHelper::getExtensionFromMimeType($mimeType, 'video' === $type ? 'mp4' : 'png');
+
         $filename = $this->buildFilename($userId, $provider, $extension);
         $relativePath = $this->buildRelativePath($userId, $filename);
         $absolutePath = $this->uploadDir.'/'.$relativePath;
