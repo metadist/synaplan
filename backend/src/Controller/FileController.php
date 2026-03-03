@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Controller;
 
+use App\Entity\File;
 use App\Entity\User;
 use App\Repository\FileRepository;
 use App\Repository\MessageRepository;
@@ -339,7 +340,7 @@ class FileController extends AbstractController
             return $this->json(['error' => 'File not found'], Response::HTTP_NOT_FOUND);
         }
 
-        $data = json_decode($request->getContent(), true);
+        $data = $request->toArray();
         $expiryDays = $data['expiry_days'] ?? 7;
 
         $message->setPublic(true);
@@ -539,6 +540,7 @@ class FileController extends AbstractController
         ),
         responses: [
             new OA\Response(response: 200, description: 'GroupKey updated'),
+            new OA\Response(response: 400, description: 'Missing groupKey'),
             new OA\Response(response: 401, description: 'Not authenticated'),
             new OA\Response(response: 403, description: 'Access denied'),
             new OA\Response(response: 404, description: 'File not found'),
@@ -558,7 +560,7 @@ class FileController extends AbstractController
             return $this->json(['error' => 'Access denied'], Response::HTTP_FORBIDDEN);
         }
 
-        $data = json_decode($request->getContent(), true);
+        $data = $request->toArray();
         $newGroupKey = $data['groupKey'] ?? null;
         if (!$newGroupKey) {
             return $this->json(['error' => 'groupKey is required'], Response::HTTP_BAD_REQUEST);
@@ -587,7 +589,9 @@ class FileController extends AbstractController
             new OA\Response(response: 200, description: 'File re-vectorized'),
             new OA\Response(response: 401, description: 'Not authenticated'),
             new OA\Response(response: 403, description: 'Access denied'),
-            new OA\Response(response: 404, description: 'File not found'),
+            new OA\Response(response: 404, description: 'File not found or missing on disk'),
+            new OA\Response(response: 422, description: 'Text extraction produced no content'),
+            new OA\Response(response: 500, description: 'Vectorization or extraction failed'),
         ]
     )]
     public function reVectorize(int $id, Request $request, #[CurrentUser] ?User $user): JsonResponse
@@ -604,7 +608,7 @@ class FileController extends AbstractController
             return $this->json(['error' => 'Access denied'], Response::HTTP_FORBIDDEN);
         }
 
-        $data = json_decode($request->getContent(), true);
+        $data = $request->toArray();
         $groupKey = $data['groupKey'] ?? $file->getGroupKey() ?? '';
 
         $result = $this->uploadService->reVectorize($file, $user, $groupKey);
@@ -622,7 +626,7 @@ class FileController extends AbstractController
         return $this->json($result, $statusCode);
     }
 
-    private function isFileAccessibleByUser(\App\Entity\File $file, User $user): bool
+    private function isFileAccessibleByUser(File $file, User $user): bool
     {
         if ($file->getUserId() === $user->getId()) {
             return true;
@@ -647,7 +651,7 @@ class FileController extends AbstractController
     /**
      * Resolve group keys from vector store for legacy files missing DB column.
      *
-     * @param \App\Entity\File[] $files
+     * @param File[] $files
      *
      * @return array<int, string>
      */
