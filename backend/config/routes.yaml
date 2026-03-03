@@ -10,3 +10,10 @@ plugin_sortx:
         path: /plugins/sortx/backend/Controller/
         namespace: Plugin\SortX\Controller
     type: attribute
+
+# Plugin routes - Casting Data Connector
+plugin_castingdata:
+    resource:
+        path: /plugins/castingdata/backend/Controller/
+        namespace: Plugin\CastingData\Controller
+    type: attribute

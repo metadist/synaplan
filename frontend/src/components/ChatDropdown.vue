@@ -56,6 +56,7 @@
           :key="chat.id"
           class="group/item relative flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors min-h-[36px]"
           :class="chat.id === activeChat ? 'bg-brand/10 txt-brand' : 'txt-secondary hover-surface'"
+          data-testid="row-chat-item"
         >
           <!-- Channel icon for non-web sources -->
           <Icon
@@ -67,7 +68,7 @@
 
           <button
             class="flex-1 text-left flex flex-col min-w-0 py-0.5"
-            :data-testid="`btn-chat-item-${chat.id}`"
+            data-testid="btn-chat-item"
             @click="handleChatItemClick(chat.id)"
           >
             <span class="truncate text-sm max-w-[150px]">{{ getDisplayTitle(chat) }}</span>
@@ -80,7 +81,7 @@
           <div class="relative">
             <button
               class="opacity-0 group-hover/item:opacity-100 p-1 rounded hover:bg-black/5 dark:hover:bg-white/5 transition-all"
-              :data-testid="`btn-chat-menu-${chat.id}`"
+              data-testid="btn-chat-menu"
               @click.stop="toggleChatMenu(chat.id)"
             >
               <EllipsisVerticalIcon class="w-4 h-4" />
@@ -93,21 +94,21 @@
             >
               <button
                 class="dropdown-item"
-                :data-testid="`btn-chat-share-${chat.id}`"
+                data-testid="btn-chat-share"
                 @click.stop="handleShare(chat.id)"
               >
                 {{ $t('common.share') }}
               </button>
               <button
                 class="dropdown-item"
-                :data-testid="`btn-chat-rename-${chat.id}`"
+                data-testid="btn-chat-rename"
                 @click.stop="handleRename(chat.id)"
               >
                 {{ $t('common.rename') }}
               </button>
               <button
                 class="dropdown-item dropdown-item--danger"
-                :data-testid="`btn-chat-delete-${chat.id}`"
+                data-testid="btn-chat-delete"
                 @click.stop="handleDelete(chat.id)"
               >
                 {{ $t('common.delete') }}

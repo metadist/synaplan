@@ -14,6 +14,7 @@
 *.swo
 *~
 .claude/
+.cursor/
 
 # OS
 .DS_Store
@@ -50,7 +51,6 @@ frontend/.vite/
 *.cache
 frontend/tests/e2e/tests/test-results/
 frontend/tests/e2e/tests/reports/
-frontend/tests/e2e/prompts/*
 
 # Editor artifacts
 *.code-workspace
@@ -58,6 +58,7 @@ frontend/tests/e2e/prompts/*
 # Platform configs
 platform/
 _devextras/agents_yusuf.md
+_devextras/agents_furkan.md
 
 # Screenvideo outputs
 _devextras/screenvideo/videos/*

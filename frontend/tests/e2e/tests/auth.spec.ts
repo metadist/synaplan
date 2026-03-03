@@ -1,14 +1,16 @@
-import { test, expect } from '@playwright/test'
-import { login } from '../helpers/auth'
+import { test, expect } from '../test-setup'
+import { deleteUser, login } from '../helpers/auth'
 import { selectors } from '../helpers/selectors'
+import { clearMailHog, waitForVerificationHref, normalizeVerificationUrl } from '../helpers/email'
+import { URLS, TIMEOUTS, INTERVALS } from '../config/config'
 
-test('@ci @smoke @auth should successfully login id=002', async ({ page }) => {
-  await login(page)
+test('@002 @ci @smoke @auth should successfully login', async ({ page, credentials }) => {
+  await login(page, credentials)
   await expect(page.locator(selectors.chat.textInput)).toBeVisible({ timeout: 10_000 })
 })
 
-test('@ci @smoke @auth logout should clear session id=005', async ({ page }) => {
-  await login(page)
+test('@005 @ci @smoke @auth logout should clear session', async ({ page, credentials }) => {
+  await login(page, credentials)
 
   await page.locator(selectors.userMenu.button).waitFor({ state: 'visible' })
   await page.locator(selectors.userMenu.button).click()
@@ -27,4 +29,51 @@ test('@ci @smoke @auth logout should clear session id=005', async ({ page }) => 
     page.locator(`${selectors.login.email}, ${selectors.loggedOut.page}`).first()
   ).toBeVisible({ timeout: 15_000 })
   await expect(page).toHaveURL(/login|logged-out/)
+})
+
+// TODO: Use a pre-verified DB fixture + delete before test, then assert login fails (avoids MailHog/verify flow).
+test('@011 @ci @auth @smoke deleted user cannot login', async ({ page, request }) => {
+  const email = `deleted-user-${Date.now()}@example.test`
+  const password = 'DeleteMe123!'
+
+  await clearMailHog(request)
+
+  const register = await request.post(`${URLS.BASE_URL}/api/v1/auth/register`, {
+    data: { email, password, recaptchaToken: '' },
+  })
+  expect(register.ok()).toBeTruthy()
+
+  const href = await waitForVerificationHref(request, email, {
+    timeout: TIMEOUTS.LONG,
+    intervals: INTERVALS.FAST(),
+  })
+  await page.goto(normalizeVerificationUrl(href))
+  await page
+    .locator(selectors.verifyEmail.successState)
+    .waitFor({ state: 'visible', timeout: TIMEOUTS.STANDARD })
+
+  await page.locator(selectors.verifyEmail.goToLoginLink).click()
+  await expect(page).toHaveURL(/\/login/)
+
+  await login(page, { user: email, pass: password })
+  await expect(page.locator(selectors.chat.textInput)).toBeVisible({ timeout: TIMEOUTS.STANDARD })
+
+  await page.locator(selectors.userMenu.button).click()
+  await page.locator(selectors.userMenu.logoutBtn).click()
+  await expect(page.locator(selectors.login.email)).toBeVisible({ timeout: TIMEOUTS.STANDARD })
+
+  const deleted = await deleteUser(request, email)
+  expect(deleted, 'Admin API must delete the user so login can be asserted').toBe(true)
+
+  await page.goto('/login')
+  await page.fill(selectors.login.email, email)
+  await page.fill(selectors.login.password, password)
+  await page.locator(selectors.login.submit).click()
+
+  const errorEl = page.locator('.alert-error-text')
+  await errorEl.waitFor({ state: 'visible', timeout: TIMEOUTS.STANDARD })
+  const text = (await errorEl.innerText()).trim().toLowerCase()
+  expect(text).toContain('invalid')
+  expect(text).toContain('credentials')
+  await expect(page).toHaveURL(/login/)
 })

@@ -45,9 +45,12 @@ class WhatsAppService
      */
     private const DUPLICATE_CACHE_TTL = 300;
 
+    private const DEFAULT_GRAPH_BASE = 'https://graph.facebook.com';
+
     private string $accessToken;
     private bool $enabled;
     private string $apiVersion = 'v21.0';
+    private string $graphBaseUrl;
 
     public function __construct(
         private HttpClientInterface $httpClient,
@@ -66,9 +69,13 @@ class WhatsAppService
         private string $uploadsDir,
         private int $whatsappUserId,
         private string $appUrl = '',
+        ?string $whatsappGraphApiBaseUrl = null,
     ) {
         $this->accessToken = $whatsappAccessToken;
         $this->enabled = $whatsappEnabled;
+        $this->graphBaseUrl = (null !== $whatsappGraphApiBaseUrl && '' !== $whatsappGraphApiBaseUrl)
+            ? rtrim($whatsappGraphApiBaseUrl, '/')
+            : self::DEFAULT_GRAPH_BASE;
     }
 
     /**
@@ -222,7 +229,8 @@ class WhatsAppService
     private function sendSingleMessage(string $to, string $formattedMessage, string $phoneNumberId): array
     {
         $url = sprintf(
-            'https://graph.facebook.com/%s/%s/messages',
+            '%s/%s/%s/messages',
+            $this->graphBaseUrl,
             $this->apiVersion,
             $phoneNumberId
         );
@@ -337,7 +345,8 @@ class WhatsAppService
         }
 
         $url = sprintf(
-            'https://graph.facebook.com/%s/%s/messages',
+            '%s/%s/%s/messages',
+            $this->graphBaseUrl,
             $this->apiVersion,
             $phoneNumberId
         );
@@ -419,7 +428,8 @@ class WhatsAppService
         }
 
         $url = sprintf(
-            'https://graph.facebook.com/%s/%s/messages',
+            '%s/%s/%s/messages',
+            $this->graphBaseUrl,
             $this->apiVersion,
             $phoneNumberId
         );
@@ -493,7 +503,8 @@ class WhatsAppService
         }
 
         $url = sprintf(
-            'https://graph.facebook.com/%s/%s/messages',
+            '%s/%s/%s/messages',
+            $this->graphBaseUrl,
             $this->apiVersion,
             $phoneNumberId
         );
@@ -643,7 +654,8 @@ class WhatsAppService
                 [
                     'message_type' => $dto->type,
                     'file_type' => $dto->incomingMsg[$dto->type]['mime_type'] ?? 'unknown',
-                ]
+                ],
+                $user->getId(),
             );
 
             return [
@@ -695,7 +707,8 @@ class WhatsAppService
                 $dto->from,
                 $message->getText(),
                 $errorMessage,
-                ['message_type' => $dto->type]
+                ['message_type' => $dto->type],
+                $user->getId(),
             );
 
             return [
@@ -761,7 +774,8 @@ class WhatsAppService
                             'provider' => $metadata['provider'] ?? null,
                             'model' => $metadata['model'] ?? null,
                             'media_type' => $generatedMediaType,
-                        ]
+                        ],
+                        $user->getId(),
                     );
                 } else {
                     $this->logger->warning('WhatsApp: Failed to send AI media, falling back', [
@@ -775,7 +789,8 @@ class WhatsAppService
                         $dto->from,
                         $message->getText(),
                         $sendResult['error'] ?? 'Unknown error',
-                        ['media_type' => $generatedMediaType]
+                        ['media_type' => $generatedMediaType],
+                        $user->getId(),
                     );
                 }
             }
@@ -810,7 +825,8 @@ class WhatsAppService
                             'provider' => $ttsResult['provider'] ?? null,
                             'model' => $ttsResult['model'] ?? null,
                             'media_type' => 'audio',
-                        ]
+                        ],
+                        $user->getId(),
                     );
                 } else {
                     $this->logger->warning('WhatsApp: TTS send failed, falling back to text', [
@@ -823,7 +839,8 @@ class WhatsAppService
                         $dto->from,
                         $message->getText(),
                         $sendResult['error'] ?? 'Unknown error',
-                        ['media_type' => 'audio']
+                        ['media_type' => 'audio'],
+                        $user->getId(),
                     );
                 }
             } else {
@@ -835,7 +852,8 @@ class WhatsAppService
                     $dto->from,
                     $message->getText(),
                     'TTS generation failed',
-                    ['message_type' => $dto->type]
+                    ['message_type' => $dto->type],
+                    $user->getId(),
                 );
             }
         }
@@ -856,7 +874,8 @@ class WhatsAppService
                     [
                         'provider' => $metadata['provider'] ?? null,
                         'model' => $metadata['model'] ?? null,
-                    ]
+                    ],
+                    $user->getId(),
                 );
             } else {
                 $this->logger->error('WhatsApp: Failed to send text response', [
@@ -869,7 +888,8 @@ class WhatsAppService
                     $dto->from,
                     $message->getText(),
                     $sendResult['error'] ?? 'Unknown error',
-                    ['message_type' => 'text']
+                    ['message_type' => 'text'],
+                    $user->getId(),
                 );
             }
         }
@@ -888,7 +908,8 @@ class WhatsAppService
                 $dto->from,
                 $message->getText(),
                 'No response could be sent to user',
-                ['message_type' => $dto->type]
+                ['message_type' => $dto->type],
+                $user->getId(),
             );
         }
 
@@ -1484,7 +1505,8 @@ class WhatsAppService
         }
 
         $url = sprintf(
-            'https://graph.facebook.com/%s/%s',
+            '%s/%s/%s',
+            $this->graphBaseUrl,
             $this->apiVersion,
             $mediaId
         );

@@ -369,11 +369,13 @@
             </div>
 
             <!-- Chat Cards -->
-            <div v-else class="space-y-1.5">
+            <div v-else class="space-y-1.5" role="list" data-testid="list-chat-manager-rows">
               <div
                 v-for="chat in filteredChatList"
                 :key="chat.id"
+                role="listitem"
                 class="group/chat relative flex items-center gap-3 px-3.5 py-3 rounded-xl cursor-pointer transition-all duration-150 active:scale-[0.99]"
+                data-testid="row-chat-v2"
                 :class="
                   chat.id === chatsStore.activeChatId
                     ? 'bg-[var(--brand)]/[0.08] ring-1 ring-[var(--brand)]/20'
@@ -440,6 +442,7 @@
                   <button
                     class="w-9 h-9 sm:w-8 sm:h-8 rounded-lg flex items-center justify-center sm:opacity-0 sm:group-hover/chat:opacity-100 focus:opacity-100 hover:bg-black/5 dark:hover:bg-white/5 transition-all"
                     :class="chatMenuOpenId === chat.id && '!opacity-100 bg-black/5 dark:bg-white/5'"
+                    data-testid="btn-chat-v2-row-menu"
                     @click="toggleChatMenu(chat.id, $event)"
                   >
                     <Icon icon="mdi:dots-horizontal" class="w-4.5 h-4.5 txt-secondary" />
@@ -487,7 +490,11 @@
         @click="chatMenuOpenId = null"
       >
         <div class="fixed w-44 dropdown-panel origin-top-right" :style="chatMenuStyle" @click.stop>
-          <button class="dropdown-item" @click="handleChatShare(chatMenuOpenId!)">
+          <button
+            class="dropdown-item"
+            data-testid="btn-chat-v2-share"
+            @click="handleChatShare(chatMenuOpenId!)"
+          >
             <Icon icon="mdi:share-variant-outline" class="w-4 h-4" />
             {{ $t('common.share') }}
           </button>

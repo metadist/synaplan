@@ -1,9 +1,6 @@
 import { defineConfig, loadEnv, Plugin } from 'vite'
 import vue from '@vitejs/plugin-vue'
 import { fileURLToPath, URL } from 'node:url'
-import { resolve } from 'path'
-
-const projectRoot = fileURLToPath(new URL('.', import.meta.url))
 
 /**
  * Plugin to create .gitkeep file in output directory after build

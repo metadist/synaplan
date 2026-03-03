@@ -1,4 +1,4 @@
-.PHONY: help lint format check-types test test-e2e deps deps-host build build-widget generate-schemas
+.PHONY: help lint format check-types test test-e2e test-e2e-plugin-castingdata deps deps-host build build-widget generate-schemas
 
 help: ## Show this help
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-20s\033[0m %s\n", $$1, $$2}'
@@ -33,6 +33,9 @@ test: ## Run unit tests
 
 test-e2e: ## Run e2e tests
 	npm run test:e2e
+
+test-e2e-plugin-castingdata: ## Run Casting Data plugin e2e tests (requires CastApp + Synaplan running)
+	npm run test:e2e:plugin:castingdata
 
 ## Dependencies
 deps-host: ## Install npm dependencies on host (not in container) for playwright

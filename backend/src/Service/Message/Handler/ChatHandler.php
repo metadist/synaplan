@@ -14,6 +14,7 @@ use App\Service\File\FileHelper;
 use App\Service\File\UserUploadPathBuilder;
 use App\Service\MemoryExtractionService;
 use App\Service\ModelConfigService;
+use App\Service\Plugin\PluginContextProviderInterface;
 use App\Service\PromptService;
 use App\Service\RAG\VectorSearchService;
 use App\Service\UserMemoryService;
@@ -29,6 +30,9 @@ use Symfony\Component\DependencyInjection\Attribute\AutoconfigureTag;
 #[AutoconfigureTag('app.message.handler')]
 class ChatHandler implements MessageHandlerInterface
 {
+    /** @var iterable<PluginContextProviderInterface> */
+    private iterable $pluginContextProviders;
+
     public function __construct(
         private AiFacade $aiFacade,
         private PromptRepository $promptRepository,
@@ -43,7 +47,9 @@ class ChatHandler implements MessageHandlerInterface
         private UserMemoryService $memoryService,
         private MemoryExtractionService $memoryExtractionService,
         private FeedbackConfigService $feedbackConfig,
+        iterable $pluginContextProviders = [],
     ) {
+        $this->pluginContextProviders = $pluginContextProviders;
     }
 
     public function getName(): string
@@ -171,6 +177,11 @@ class ChatHandler implements MessageHandlerInterface
                 'rag_context_length' => strlen($ragContext),
             ]);
         }
+
+        // Append plugin context (external data sources like casting platforms)
+        $systemPrompt = $this->appendPluginContext($systemPrompt, $message, $classification, [
+            'channel' => $classification['source'] ?? null,
+        ]);
 
         $urlContent = $classification['url_content'] ?? null;
         if (is_string($urlContent) && '' !== $urlContent) {
@@ -706,6 +717,9 @@ class ChatHandler implements MessageHandlerInterface
             ]);
         }
 
+        // Append plugin context (external data sources like casting platforms)
+        $systemPrompt = $this->appendPluginContext($systemPrompt, $message, $classification, $options);
+
         // Append explicit language directive based on detected language from classification.
         // The sort prompt detects the user's language (BLANG), but the system prompt only says
         // "answer in the user's language" without specifying WHICH language was detected.
@@ -840,6 +854,56 @@ class ChatHandler implements MessageHandlerInterface
                 'feedbacks' => $loadedFeedbacks, // Include feedback examples used for this response
             ],
         ];
+    }
+
+    /**
+     * Collect and append context from all registered plugin context providers.
+     *
+     * Total plugin context is capped at 8000 chars to prevent prompt bloat.
+     */
+    private function appendPluginContext(string $systemPrompt, Message $message, array $classification, array $options): string
+    {
+        $maxTotalLength = 8000;
+        $pluginContext = '';
+
+        foreach ($this->pluginContextProviders as $provider) {
+            try {
+                if ($provider->supports($message->getUserId(), $classification, $options)) {
+                    $ctx = $provider->getContext(
+                        $message->getUserId(),
+                        $message->getText(),
+                        $classification,
+                        $options
+                    );
+
+                    if (!empty($ctx)) {
+                        $pluginContext .= $ctx;
+
+                        if (strlen($pluginContext) >= $maxTotalLength) {
+                            $pluginContext = substr($pluginContext, 0, $maxTotalLength)."\n[... plugin context truncated]\n";
+                            $this->logger->warning('ChatHandler: Plugin context truncated', [
+                                'max_length' => $maxTotalLength,
+                            ]);
+                            break;
+                        }
+                    }
+                }
+            } catch (\Throwable $e) {
+                $this->logger->warning('ChatHandler: Plugin context provider failed', [
+                    'provider' => $provider::class,
+                    'error' => $e->getMessage(),
+                ]);
+            }
+        }
+
+        if (!empty($pluginContext)) {
+            $systemPrompt .= $pluginContext;
+            $this->logger->info('ChatHandler: Plugin context appended to system prompt', [
+                'plugin_context_length' => strlen($pluginContext),
+            ]);
+        }
+
+        return $systemPrompt;
     }
 
     private function getSystemPrompt(int $userId, string $language): string

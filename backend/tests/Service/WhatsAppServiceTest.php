@@ -1130,7 +1130,7 @@ class WhatsAppServiceTest extends TestCase
 
     public function testDiscordMockCanBeConfiguredForSuccessNotifications(): void
     {
-        // Configure mock to expect success notification
+        // Configure mock to expect success notification with userId
         $this->discord->expects($this->once())
             ->method('notifyWhatsAppSuccess')
             ->with(
@@ -1138,16 +1138,16 @@ class WhatsAppServiceTest extends TestCase
                 $this->isType('string'),
                 $this->isType('string'),
                 $this->isType('string'),
-                $this->isType('array')
+                $this->isType('array'),
+                $this->equalTo(1)
             );
 
-        // Trigger the mock directly to verify it works
-        $this->discord->notifyWhatsAppSuccess('text', '+1234', 'Hello', 'Response', []);
+        $this->discord->notifyWhatsAppSuccess('text', '+1234', 'Hello', 'Response', [], 1);
     }
 
     public function testDiscordMockCanBeConfiguredForErrorNotifications(): void
     {
-        // Configure mock to expect error notification
+        // Configure mock to expect error notification with userId
         $this->discord->expects($this->once())
             ->method('notifyWhatsAppError')
             ->with(
@@ -1155,11 +1155,11 @@ class WhatsAppServiceTest extends TestCase
                 $this->isType('string'),
                 $this->isType('string'),
                 $this->isType('string'),
-                $this->isType('array')
+                $this->isType('array'),
+                $this->equalTo(1)
             );
 
-        // Trigger the mock directly to verify it works
-        $this->discord->notifyWhatsAppError('processing', '+1234', 'Hello', 'Error message', []);
+        $this->discord->notifyWhatsAppError('processing', '+1234', 'Hello', 'Error message', [], 1);
     }
 
     public function testDuplicateMessageDetection(): void

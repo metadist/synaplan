@@ -23,6 +23,7 @@ class ModelConfigService
         private UserRepository $userRepository,
         private CacheItemPoolInterface $cache,
         private ProviderRegistry $providerRegistry,
+        private string $appEnv = '',
     ) {
     }
 
@@ -30,12 +31,17 @@ class ModelConfigService
      * Holt Default-Provider für einen User und Capability.
      *
      * Reihenfolge:
+     * 0. APP_ENV=test → 'test' (für E2E/CI ohne echte API-Keys)
      * 1. User-spezifische Config (BCONFIG: BOWNERID=userId, BGROUP='ai', BSETTING='default_chat_provider')
      * 2. Global Default Config (BOWNERID=0)
      * 3. Fallback: 'test'
      */
     public function getDefaultProvider(?int $userId, string $capability = 'chat'): string
     {
+        if ('test' === $this->getAppEnv()) {
+            return 'test';
+        }
+
         $cacheKey = "model_config.provider.{$userId}.{$capability}";
         $item = $this->cache->getItem($cacheKey);
 
@@ -274,10 +280,16 @@ class ModelConfigService
     /**
      * Get default model ID for a specific capability.
      *
-     * Priority: User Config > Global Config > Fallback
+     * Priority: APP_ENV=test → 900 (TestProvider) for all capabilities so CI/test stack use mocks by default.
+     * To use real AI in a test, change defaults via UI (AI Models config) or API (e.g. POST /api/v1/config/models/defaults, Swagger).
+     * Otherwise: User Config > Global Config > Fallback.
      */
     public function getDefaultModel(string $capability, ?int $userId = null): ?int
     {
+        if ('test' === $this->getAppEnv()) {
+            return 900; // TestProvider (ModelFixtures) – all capabilities mocked in CI/test stack
+        }
+
         // Normalize capability key
         $configKey = 'DEFAULTMODEL/'.strtoupper($capability);
 
@@ -450,5 +462,10 @@ class ModelConfigService
 
         // For web/other channels: always use user-specific models
         return $userId;
+    }
+
+    private function getAppEnv(): string
+    {
+        return $this->appEnv;
     }
 }

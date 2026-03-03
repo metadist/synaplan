@@ -1,0 +1,14 @@
+# Test-only controllers (user cleanup for idempotent E2E). Not loaded in prod.
+when@dev:
+    _test_controllers:
+        resource:
+            path: ../../src/Test/Controller/
+            namespace: App\Test\Controller
+        type: attribute
+
+when@test:
+    _test_controllers:
+        resource:
+            path: ../../src/Test/Controller/
+            namespace: App\Test\Controller
+        type: attribute
