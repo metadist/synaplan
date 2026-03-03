@@ -255,13 +255,17 @@ class FileController extends AbstractController
             $merged = $this->fileRepository->getGroupCountsByUser($user->getId());
 
             try {
+                $vectorGroups = [];
                 $allChunks = $this->vectorStorageFacade->getFilesWithChunks($user->getId());
                 foreach ($allChunks as $info) {
                     $gk = $info['groupKey'] ?? '';
                     if ('' === $gk || 'DEFAULT' === $gk) {
                         continue;
                     }
-                    $merged[$gk] = max($merged[$gk] ?? 0, ($merged[$gk] ?? 0) + 1);
+                    $vectorGroups[$gk] = ($vectorGroups[$gk] ?? 0) + 1;
+                }
+                foreach ($vectorGroups as $gk => $count) {
+                    $merged[$gk] = max($merged[$gk] ?? 0, $count);
                 }
             } catch (\Throwable $e) {
                 $this->logger->warning('FileController: Vector store group lookup failed', ['error' => $e->getMessage()]);
@@ -605,7 +609,17 @@ class FileController extends AbstractController
 
         $result = $this->uploadService->reVectorize($file, $user, $groupKey);
 
-        return $this->json($result, $result['success'] ? Response::HTTP_OK : Response::HTTP_INTERNAL_SERVER_ERROR);
+        if ($result['success']) {
+            return $this->json($result);
+        }
+
+        $statusCode = match ($result['errorType'] ?? null) {
+            'not_found' => Response::HTTP_NOT_FOUND,
+            'empty_content' => Response::HTTP_UNPROCESSABLE_ENTITY,
+            default => Response::HTTP_INTERNAL_SERVER_ERROR,
+        };
+
+        return $this->json($result, $statusCode);
     }
 
     private function isFileAccessibleByUser(\App\Entity\File $file, User $user): bool

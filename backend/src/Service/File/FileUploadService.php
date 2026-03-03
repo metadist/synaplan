@@ -264,12 +264,13 @@ final readonly class FileUploadService
     /**
      * Delete existing vectors, re-extract text if needed, and re-vectorize.
      *
-     * @return array{success: bool, error?: string, chunksCreated?: int, extractedTextLength?: int, groupKey?: string, provider?: string}
+     * @return array{success: bool, error?: string, errorType?: string, chunksCreated?: int, extractedTextLength?: int, groupKey?: string, provider?: string}
      */
     public function reVectorize(File $file, User $user, string $groupKey): array
     {
         if ('' !== $groupKey && 'DEFAULT' !== $groupKey) {
             $file->setGroupKey($groupKey);
+            $this->em->flush();
         }
 
         $this->vectorStorageFacade->deleteByFile($user->getId(), $file->getId());
@@ -280,20 +281,21 @@ final readonly class FileUploadService
         if ('' === trim($extractedText)) {
             $absolutePath = $this->uploadDir.'/'.ltrim($file->getFilePath(), '/');
             if (!FileHelper::fileExistsNfs($absolutePath)) {
-                return ['success' => false, 'error' => 'File not found on disk'];
+                return ['success' => false, 'error' => 'File not found on disk', 'errorType' => 'not_found'];
             }
 
             try {
                 [$extractedText] = $this->fileProcessor->extractText($file->getFilePath(), $fileExtension, $user->getId());
                 $file->setFileText($extractedText);
                 $file->setStatus('extracted');
+                $this->em->flush();
             } catch (\Throwable $e) {
-                return ['success' => false, 'error' => 'Text extraction failed: '.$e->getMessage()];
+                return ['success' => false, 'error' => 'Text extraction failed: '.$e->getMessage(), 'errorType' => 'extraction_failed'];
             }
         }
 
         if ('' === trim($extractedText)) {
-            return ['success' => false, 'error' => 'Text extraction produced no content'];
+            return ['success' => false, 'error' => 'Text extraction produced no content', 'errorType' => 'empty_content'];
         }
 
         try {
