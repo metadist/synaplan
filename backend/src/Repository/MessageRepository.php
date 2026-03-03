@@ -154,6 +154,20 @@ class MessageRepository extends ServiceEntityRepository
             ->getResult();
     }
 
+    public function findUserFileMessage(int $messageId, int $userId): ?Message
+    {
+        return $this->findOneBy([
+            'id' => $messageId,
+            'userId' => $userId,
+            'file' => 1,
+        ]);
+    }
+
+    public function flush(): void
+    {
+        $this->getEntityManager()->flush();
+    }
+
     /**
      * Save message.
      */

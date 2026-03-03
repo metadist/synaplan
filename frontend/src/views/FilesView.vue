@@ -259,10 +259,140 @@
         </Teleport>
 
         <div class="surface-card p-4 sm:p-6" data-testid="section-files-list">
+          <!-- Search & Filter Bar -->
+          <div class="mb-5">
+            <div class="flex flex-col sm:flex-row sm:items-center gap-3">
+              <h2 class="text-xl font-semibold txt-primary shrink-0">
+                {{ openFolder ? openFolder : $t('files.yourFiles') }}
+              </h2>
+              <div class="flex-1 flex items-center gap-2 sm:gap-3">
+                <div class="relative flex-1">
+                  <Icon
+                    icon="heroicons:magnifying-glass"
+                    class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 txt-secondary pointer-events-none"
+                  />
+                  <input
+                    v-model="searchQuery"
+                    type="text"
+                    class="w-full pl-9 pr-8 py-2 text-sm rounded-xl bg-black/[0.04] dark:bg-white/[0.04] border border-black/[0.06] dark:border-white/[0.06] txt-primary placeholder:txt-secondary focus:outline-none focus:ring-2 focus:ring-[var(--brand)]/30 transition-all"
+                    :placeholder="$t('files.searchPlaceholder')"
+                    data-testid="input-search"
+                    @input="onSearchInput"
+                  />
+                  <button
+                    v-if="searchQuery"
+                    class="absolute right-2 top-1/2 -translate-y-1/2 p-0.5 rounded hover:bg-black/10 dark:hover:bg-white/10 txt-secondary transition-colors"
+                    @click="clearSearch"
+                  >
+                    <XMarkIcon class="w-4 h-4" />
+                  </button>
+                </div>
+                <button
+                  class="flex items-center gap-1.5 px-3 py-2 text-sm rounded-xl border transition-all shrink-0"
+                  :class="
+                    showFilters
+                      ? 'border-[var(--brand)] bg-[var(--brand)]/10 text-[var(--brand)]'
+                      : 'border-black/[0.06] dark:border-white/[0.06] txt-secondary hover:border-[var(--brand)]/50 hover:text-[var(--brand)]'
+                  "
+                  data-testid="btn-filter-toggle"
+                  @click="showFilters = !showFilters"
+                >
+                  <Icon icon="heroicons:funnel" class="w-4 h-4" />
+                  <span class="hidden sm:inline">{{ $t('files.filterToggle') }}</span>
+                  <span
+                    v-if="activeFilterCount > 0"
+                    class="inline-flex items-center justify-center min-w-[1.25rem] h-5 px-1.5 rounded-full text-[10px] font-bold bg-[var(--brand)] text-white"
+                  >
+                    {{ activeFilterCount }}
+                  </span>
+                </button>
+              </div>
+            </div>
+
+            <!-- Filter Panel (collapsible) -->
+            <Transition name="filter-slide">
+              <div
+                v-if="showFilters"
+                class="mt-3 pt-3 border-t border-light-border/20 dark:border-dark-border/5"
+              >
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div>
+                    <label
+                      class="block text-[11px] font-medium txt-secondary uppercase tracking-wider mb-1"
+                    >
+                      {{ $t('files.filterType') }}
+                    </label>
+                    <select
+                      v-model="filterFileType"
+                      class="w-full px-3 py-2 text-sm rounded-lg bg-black/[0.04] dark:bg-white/[0.04] border border-black/[0.06] dark:border-white/[0.06] txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)]/30"
+                      data-testid="select-file-type"
+                      @change="onFilterChange"
+                    >
+                      <option value="">{{ $t('files.filterTypeAll') }}</option>
+                      <option value="pdf">{{ $t('files.filterTypePdf') }}</option>
+                      <option value="docx,doc">{{ $t('files.filterTypeDocx') }}</option>
+                      <option value="txt">{{ $t('files.filterTypeTxt') }}</option>
+                      <option value="jpg,jpeg,png,gif,webp">
+                        {{ $t('files.filterTypeImages') }}
+                      </option>
+                      <option value="mp3,mp4">{{ $t('files.filterTypeAudio') }}</option>
+                      <option value="xlsx,csv">{{ $t('files.filterTypeSpreadsheet') }}</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label
+                      class="block text-[11px] font-medium txt-secondary uppercase tracking-wider mb-1"
+                    >
+                      {{ $t('files.filterDateFrom') }}
+                    </label>
+                    <input
+                      v-model="filterDateFrom"
+                      type="date"
+                      class="w-full px-3 py-2 text-sm rounded-lg bg-black/[0.04] dark:bg-white/[0.04] border border-black/[0.06] dark:border-white/[0.06] txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)]/30"
+                      data-testid="input-date-from"
+                      @change="onFilterChange"
+                    />
+                  </div>
+                  <div>
+                    <label
+                      class="block text-[11px] font-medium txt-secondary uppercase tracking-wider mb-1"
+                    >
+                      {{ $t('files.filterDateTo') }}
+                    </label>
+                    <input
+                      v-model="filterDateTo"
+                      type="date"
+                      class="w-full px-3 py-2 text-sm rounded-lg bg-black/[0.04] dark:bg-white/[0.04] border border-black/[0.06] dark:border-white/[0.06] txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)]/30"
+                      data-testid="input-date-to"
+                      @change="onFilterChange"
+                    />
+                  </div>
+                </div>
+                <div class="flex justify-end mt-3">
+                  <button
+                    v-if="activeFilterCount > 0"
+                    class="text-xs txt-secondary hover:text-[var(--brand)] transition-colors flex items-center gap-1"
+                    @click="resetFilters"
+                  >
+                    <Icon icon="heroicons:x-circle" class="w-3.5 h-3.5" />
+                    {{ $t('files.filterReset') }}
+                  </button>
+                </div>
+              </div>
+            </Transition>
+
+            <!-- Active search indicator -->
+            <div v-if="searchQuery && !isLoading" class="mt-3 flex items-center gap-2 text-sm">
+              <Icon icon="heroicons:magnifying-glass" class="w-4 h-4 text-[var(--brand)]" />
+              <span class="txt-secondary">
+                {{ $t('files.searchResults', { query: searchQuery }) }}
+              </span>
+              <span class="text-xs txt-secondary">({{ totalCount }})</span>
+            </div>
+          </div>
+
           <!-- ====== ROOT VIEW: Folders + All Files ====== -->
           <template v-if="!openFolder">
-            <h2 class="text-xl font-semibold txt-primary mb-6">{{ $t('files.yourFiles') }}</h2>
-
             <!-- Loading -->
             <div
               v-if="isLoading"
@@ -289,6 +419,27 @@
                   d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
                 ></path>
               </svg>
+            </div>
+
+            <!-- No search results -->
+            <div
+              v-else-if="hasActiveSearch && paginatedFiles.length === 0"
+              class="flex flex-col items-center justify-center py-20 gap-4"
+              data-testid="state-no-results"
+            >
+              <div
+                class="w-20 h-20 rounded-2xl bg-[var(--brand)]/10 flex items-center justify-center"
+              >
+                <Icon icon="heroicons:magnifying-glass" class="w-10 h-10 text-[var(--brand)]/40" />
+              </div>
+              <div class="text-center">
+                <p class="text-base font-medium txt-primary mb-1">
+                  {{ $t('files.noSearchResults', { query: searchQuery || '' }) }}
+                </p>
+                <p class="text-sm txt-secondary max-w-sm">
+                  {{ $t('files.noSearchResultsHint') }}
+                </p>
+              </div>
             </div>
 
             <!-- Empty: no folders AND no files -->
@@ -612,41 +763,32 @@
 
           <!-- ====== FOLDER VIEW: Files inside a folder ====== -->
           <template v-else>
-            <!-- Breadcrumb header -->
-            <div class="flex items-center gap-2 sm:gap-3 mb-4 sm:mb-6">
+            <!-- Breadcrumb navigation -->
+            <div class="flex items-center gap-2 mb-4">
               <button
-                class="p-2 rounded-xl hover:bg-black/5 dark:hover:bg-white/5 txt-secondary hover:txt-primary transition-colors shrink-0"
+                class="p-1.5 rounded-lg hover:bg-black/5 dark:hover:bg-white/5 txt-secondary hover:txt-primary transition-colors shrink-0"
                 data-testid="btn-back-to-root"
                 @click="exitFolder"
               >
-                <Icon icon="heroicons:arrow-left" class="w-5 h-5" />
+                <Icon icon="heroicons:arrow-left" class="w-4 h-4" />
               </button>
-              <div class="flex items-center gap-1.5 sm:gap-2.5 min-w-0 flex-wrap">
-                <button
-                  class="text-xs sm:text-sm txt-secondary hover:txt-primary hover:underline transition-colors shrink-0"
-                  @click="exitFolder"
-                >
-                  {{ $t('files.yourFiles') }}
-                </button>
-                <Icon
-                  icon="heroicons:chevron-right"
-                  class="w-3 h-3 sm:w-3.5 sm:h-3.5 txt-secondary/30 shrink-0"
-                />
-                <Icon
-                  icon="heroicons:folder-open-solid"
-                  class="w-4 h-4 sm:w-5 sm:h-5 text-[var(--brand)] shrink-0"
-                />
-                <h2
-                  class="text-base sm:text-lg font-semibold txt-primary truncate max-w-[50vw] sm:max-w-none"
-                >
-                  {{ openFolder }}
-                </h2>
-                <span
-                  class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium bg-[var(--brand)]/10 text-[var(--brand)]"
-                >
-                  {{ totalCount }} {{ $t('files.files') }}
-                </span>
-              </div>
+              <button
+                class="text-xs txt-secondary hover:txt-primary hover:underline transition-colors"
+                @click="exitFolder"
+              >
+                {{ $t('files.yourFiles') }}
+              </button>
+              <Icon icon="heroicons:chevron-right" class="w-3 h-3 txt-secondary/30 shrink-0" />
+              <Icon
+                icon="heroicons:folder-open-solid"
+                class="w-4 h-4 text-[var(--brand)] shrink-0"
+              />
+              <span class="text-sm font-medium txt-primary truncate">{{ openFolder }}</span>
+              <span
+                class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-[var(--brand)]/10 text-[var(--brand)]"
+              >
+                {{ totalCount }}
+              </span>
             </div>
 
             <!-- Bulk actions -->
@@ -1040,6 +1182,24 @@ const isUploading = ref(false)
 const uploadProgress = ref<UploadProgress | null>(null)
 const isLoading = ref(false)
 
+// Search & filter state
+const searchQuery = ref('')
+const showFilters = ref(false)
+const filterFileType = ref('')
+const filterDateFrom = ref('')
+const filterDateTo = ref('')
+let searchDebounceTimer: ReturnType<typeof setTimeout> | null = null
+
+const activeFilterCount = computed(() => {
+  let count = 0
+  if (filterFileType.value) count++
+  if (filterDateFrom.value) count++
+  if (filterDateTo.value) count++
+  return count
+})
+
+const hasActiveSearch = computed(() => searchQuery.value !== '' || activeFilterCount.value > 0)
+
 // Drag & Drop state
 const isDragging = ref(false)
 const dragCounter = ref(0)
@@ -1367,25 +1527,38 @@ const handleUpgrade = () => {
   showInfo('Upgrade functionality coming soon! Contact support@synaplan.com for premium plans.')
 }
 
+const buildDateTimestamp = (dateStr: string, end = false): number | undefined => {
+  if (!dateStr) return undefined
+  const d = new Date(dateStr)
+  if (isNaN(d.getTime())) return undefined
+  if (end) {
+    d.setHours(23, 59, 59, 999)
+  }
+  return Math.floor(d.getTime() / 1000)
+}
+
 const loadFiles = async (page = currentPage.value) => {
   isLoading.value = true
 
   try {
-    const response = await filesService.listFiles(
-      filterGroup.value || undefined,
+    const response = await filesService.listFiles({
+      groupKey: filterGroup.value || undefined,
+      search: searchQuery.value || undefined,
+      fileType: filterFileType.value || undefined,
+      dateFrom: buildDateTimestamp(filterDateFrom.value),
+      dateTo: buildDateTimestamp(filterDateTo.value, true),
       page,
-      itemsPerPage
-    )
+      limit: itemsPerPage,
+    })
 
     files.value = response.files
     totalCount.value = response.pagination.total
     currentPage.value = response.pagination.page
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Failed to load files:', error)
 
-    // Handle 401 (not authenticated) gracefully
-    if (error.message && error.message.includes('401')) {
-      // Silently fail - router should redirect to login
+    const msg = error instanceof Error ? error.message : ''
+    if (msg.includes('401')) {
       files.value = []
       totalCount.value = 0
     } else {
@@ -1394,6 +1567,33 @@ const loadFiles = async (page = currentPage.value) => {
   } finally {
     isLoading.value = false
   }
+}
+
+const onSearchInput = () => {
+  if (searchDebounceTimer) clearTimeout(searchDebounceTimer)
+  searchDebounceTimer = setTimeout(() => {
+    currentPage.value = 1
+    loadFiles(1)
+  }, 300)
+}
+
+const clearSearch = () => {
+  searchQuery.value = ''
+  currentPage.value = 1
+  loadFiles(1)
+}
+
+const onFilterChange = () => {
+  currentPage.value = 1
+  loadFiles(1)
+}
+
+const resetFilters = () => {
+  filterFileType.value = ''
+  filterDateFrom.value = ''
+  filterDateTo.value = ''
+  currentPage.value = 1
+  loadFiles(1)
 }
 
 const loadFileGroups = async () => {
@@ -1424,11 +1624,15 @@ const toggleSelectAll = async () => {
     selectedFileIds.value = []
   } else {
     try {
-      const response = await filesService.listFiles(
-        filterGroup.value || undefined,
-        1,
-        totalCount.value || 1000
-      )
+      const response = await filesService.listFiles({
+        groupKey: filterGroup.value || undefined,
+        search: searchQuery.value || undefined,
+        fileType: filterFileType.value || undefined,
+        dateFrom: buildDateTimestamp(filterDateFrom.value),
+        dateTo: buildDateTimestamp(filterDateTo.value, true),
+        page: 1,
+        limit: totalCount.value || 1000,
+      })
       selectedFileIds.value = response.files.map((f) => f.id)
     } catch {
       paginatedFiles.value.forEach((file) => {
@@ -1584,6 +1788,7 @@ onMounted(async () => {
 
 onUnmounted(() => {
   document.removeEventListener('click', closeFolderMenu)
+  if (searchDebounceTimer) clearTimeout(searchDebounceTimer)
 })
 </script>
 
@@ -1621,5 +1826,25 @@ onUnmounted(() => {
     opacity: 1;
     transform: scale(1);
   }
+}
+
+.filter-slide-enter-active,
+.filter-slide-leave-active {
+  transition: all 0.2s ease;
+  overflow: hidden;
+}
+
+.filter-slide-enter-from,
+.filter-slide-leave-to {
+  opacity: 0;
+  max-height: 0;
+  margin-top: 0;
+  padding-top: 0;
+}
+
+.filter-slide-enter-to,
+.filter-slide-leave-from {
+  opacity: 1;
+  max-height: 200px;
 }
 </style>
