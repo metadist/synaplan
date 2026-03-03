@@ -252,6 +252,14 @@ services:
     # Circuit Breaker
     App\Service\CircuitBreaker: ~
 
+    # Media Generation Service (synchronous endpoint for external integrations)
+    App\Service\MediaGenerationService:
+        arguments:
+            $uploadDir: '%kernel.project_dir%/var/uploads'
+
+    App\Service\MediaGenerationServiceInterface:
+        alias: App\Service\MediaGenerationService
+
     # Model Configuration Service
     App\Service\ModelConfigService:
         arguments:
