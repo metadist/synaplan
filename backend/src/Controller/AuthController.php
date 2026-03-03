@@ -288,6 +288,13 @@ class AuthController extends AbstractController
             return $this->refreshOidcTokens($request, $oidcRefreshToken, $oidcProvider);
         }
 
+        // OIDC user without refresh token — fall through to internal app token refresh
+        if (!$oidcRefreshToken && $oidcProvider) {
+            $this->logger->debug('OIDC user has no refresh token, falling back to internal app token refresh', [
+                'provider' => $oidcProvider,
+            ]);
+        }
+
         // Regular user - use our internal refresh token
         $refreshTokenString = $request->cookies->get(TokenService::REFRESH_COOKIE);
 
@@ -442,7 +449,7 @@ class AuthController extends AbstractController
         ];
 
         // Handle OIDC logout (Keycloak, Google, etc.)
-        if ($oidcAccessToken && $oidcRefreshToken && $oidcProvider) {
+        if ($oidcAccessToken && $oidcProvider) {
             $this->logger->info('OIDC user logout initiated', ['provider' => $oidcProvider]);
 
             // Revoke tokens at OIDC provider
