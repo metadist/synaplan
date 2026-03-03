@@ -155,7 +155,10 @@ async function httpClient<T = unknown, S extends z.Schema | undefined = undefine
               const errorData = JSON.parse(await retryResponse.text())
               retryErrorMessage = errorData.error || errorData.message || retryErrorMessage
               if (errorData.debug) {
-                console.error(`API Debug [${options.method || 'GET'} ${endpoint}]:`, errorData.debug)
+                console.error(
+                  `API Debug [${options.method || 'GET'} ${endpoint}]:`,
+                  errorData.debug
+                )
               }
             } catch {
               // response wasn't JSON
