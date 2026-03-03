@@ -6,7 +6,7 @@ use Monolog\Formatter\FormatterInterface;
 use Monolog\Formatter\JsonFormatter;
 use Monolog\Formatter\LineFormatter;
 
-class MonologFormatterFactory
+final readonly class MonologFormatterFactory
 {
     public function __construct(
         private string $logFormat,

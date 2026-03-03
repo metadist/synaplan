@@ -10,7 +10,7 @@ use Psr\Log\LoggerInterface;
  * Converts PDF pages to PNG images using Imagick or pdftoppm as fallback.
  * Used when Tika extraction fails or produces low-quality text.
  */
-class PdfRasterizer
+final class PdfRasterizer
 {
     private string $lastEngine = '';
     private int $lastDpi = 0;

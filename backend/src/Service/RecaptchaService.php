@@ -5,7 +5,7 @@ namespace App\Service;
 use Psr\Log\LoggerInterface;
 use ReCaptcha\ReCaptcha;
 
-class RecaptchaService
+final readonly class RecaptchaService
 {
     private bool $enabled;
     private ?ReCaptcha $recaptcha;

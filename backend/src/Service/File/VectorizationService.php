@@ -15,7 +15,7 @@ use Psr\Log\LoggerInterface;
  * Converts text chunks into vector embeddings and stores them in the configured vector storage.
  * Uses configurable embedding models from BCONFIG/BMODELS tables.
  */
-class VectorizationService
+final readonly class VectorizationService
 {
     private const VECTOR_DIMENSION = 1024;
 

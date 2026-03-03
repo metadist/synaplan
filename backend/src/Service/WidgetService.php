@@ -14,7 +14,7 @@ use Psr\Log\LoggerInterface;
  *
  * Handles widget CRUD operations and embed code generation
  */
-class WidgetService
+final readonly class WidgetService
 {
     public function __construct(
         private EntityManagerInterface $em,

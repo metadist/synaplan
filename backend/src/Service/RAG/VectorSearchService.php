@@ -9,7 +9,7 @@ use App\Service\RAG\VectorStorage\VectorStorageFacade;
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;
 
-class VectorSearchService
+final readonly class VectorSearchService
 {
     public function __construct(
         private EntityManagerInterface $em,

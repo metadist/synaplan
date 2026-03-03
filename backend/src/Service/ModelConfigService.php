@@ -15,7 +15,7 @@ use Psr\Cache\CacheItemPoolInterface;
  *
  * Ermöglicht User-spezifische Default-Modelle aus BCONFIG + BMODELS Tabellen
  */
-class ModelConfigService
+final readonly class ModelConfigService
 {
     public function __construct(
         private ConfigRepository $configRepository,

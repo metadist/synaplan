@@ -12,7 +12,7 @@ use Psr\Log\LoggerInterface;
  * Generates thumbnails for video files and manages their lifecycle.
  * Thumbnail naming convention: {videoBasename}_thumb.jpg
  */
-final class ThumbnailService
+final readonly class ThumbnailService
 {
     private const THUMBNAIL_SUFFIX = '_thumb.jpg';
     private const DEFAULT_TIMESTAMP = '00:00:01'; // 1 second into video

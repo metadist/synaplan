@@ -28,7 +28,7 @@ use Symfony\Component\DependencyInjection\Attribute\AutoconfigureTag;
  * Uses user-defined model from BCONFIG or falls back to global default
  */
 #[AutoconfigureTag('app.message.handler')]
-class ChatHandler implements MessageHandlerInterface
+final readonly class ChatHandler implements MessageHandlerInterface
 {
     /** @var iterable<PluginContextProviderInterface> */
     private iterable $pluginContextProviders;

@@ -21,7 +21,7 @@ use Symfony\Contracts\HttpClient\HttpClientInterface;
 /**
  * Handles WordPress onboarding (legacy compatible wizard).
  */
-class WordPressIntegrationService
+final readonly class WordPressIntegrationService
 {
     private const GROUP_KEY = 'WORDPRESS_WIZARD';
 

@@ -19,7 +19,7 @@ use Psr\Log\LoggerInterface;
  *
  * Images are stored in a dedicated og/ directory under uploads.
  */
-final class OgImageService
+final readonly class OgImageService
 {
     private const OG_DIRECTORY = 'og';
     private const DEFAULT_OG_IMAGE = '/og-image.png';

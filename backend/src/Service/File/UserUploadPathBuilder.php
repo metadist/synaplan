@@ -17,7 +17,7 @@ namespace App\Service\File;
  * - 809     => 09/008/00809
  * - 1234567 => 67/345/1234567
  */
-final class UserUploadPathBuilder
+final readonly class UserUploadPathBuilder
 {
     public function buildUserBaseRelativePath(int $userId): string
     {

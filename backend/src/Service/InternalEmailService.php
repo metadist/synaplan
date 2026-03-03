@@ -16,7 +16,7 @@ use Twig\Environment;
  * Uses SMTP configuration from environment variables (MAILER_DSN).
  * Supports multilingual emails based on user locale.
  */
-class InternalEmailService
+final readonly class InternalEmailService
 {
     public function __construct(
         private MailerInterface $mailer,

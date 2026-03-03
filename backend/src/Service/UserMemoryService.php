@@ -19,7 +19,7 @@ use Psr\Log\LoggerInterface;
  *
  * Note: Not final to allow mocking in tests
  */
-readonly class UserMemoryService
+final readonly class UserMemoryService
 {
     private const MAX_MEMORIES_PER_USER = 500;
     private const HIDDEN_CATEGORIES = [

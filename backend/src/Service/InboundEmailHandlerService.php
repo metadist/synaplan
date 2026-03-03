@@ -16,7 +16,7 @@ use Symfony\Component\Mime\Email;
  * Handles IMAP/POP3 email fetching and AI-based routing to departments.
  * This is a TOOL that allows users to automatically sort incoming emails.
  */
-class InboundEmailHandlerService
+final readonly class InboundEmailHandlerService
 {
     public function __construct(
         private InboundEmailHandlerRepository $handlerRepository,
