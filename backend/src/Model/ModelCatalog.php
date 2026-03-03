@@ -883,6 +883,27 @@ class ModelCatalog
                 'meta' => ['supports_images' => true],
             ],
         ],
+        [
+            'id' => 164,
+            'service' => 'Anthropic',
+            'name' => 'Claude Opus 4.6 (Vision)',
+            'tag' => 'pic2text',
+            'selectable' => 1,
+            'active' => 1,
+            'providerId' => 'claude-opus-4-6',
+            'priceIn' => 5,
+            'inUnit' => 'per1M',
+            'priceOut' => 25,
+            'outUnit' => 'per1M',
+            'quality' => 10,
+            'rating' => 1,
+            'json' => [
+                'description' => 'Claude Opus 4.6 for image analysis and vision tasks. Most capable Anthropic vision model.',
+                'prompt' => 'Describe the image in detail. Extract any text you see.',
+                'params' => ['model' => 'claude-opus-4-6'],
+                'meta' => ['supports_images' => true],
+            ],
+        ],
         // ==================== THEHIVE MODELS (image generation) ====================
         [
             'id' => 130,
