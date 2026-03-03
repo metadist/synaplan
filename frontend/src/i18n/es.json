@@ -1010,7 +1010,15 @@
       "loading": "Cargando funciones...",
       "requiredConfig": "Configuración Requerida:",
       "set": "Configurado",
-      "notSet": "No Configurado"
+      "notSet": "No Configurado",
+      "allOperational": "Todos los sistemas operativos",
+      "issuesDetected": "Problemas detectados",
+      "ready": "Listo",
+      "healthSummary": "{healthy} de {total} servicios saludables",
+      "model": "modelo",
+      "models": "modelos",
+      "devOnlyTitle": "Solo Modo de Desarrollo",
+      "devOnlyMessage": "Esta página solo está disponible en entornos de desarrollo. El monitoreo del estado del sistema está restringido en producción."
     }
   },
   "storage": {

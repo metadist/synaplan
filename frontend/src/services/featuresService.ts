@@ -1,32 +1,47 @@
+import { z } from 'zod'
 import { api } from './apiService'
 
-export interface FeatureEnvVar {
-  required: boolean
-  set: boolean
-  hint: string
-}
+const FeatureEnvVarSchema = z.object({
+  required: z.boolean(),
+  set: z.boolean(),
+  hint: z.string(),
+})
 
-export interface Feature {
-  id: string
-  category: string
-  name: string
-  enabled: boolean
-  status: 'active' | 'disabled' | 'healthy' | 'unhealthy'
-  message: string
-  setup_required: boolean
-  env_vars?: Record<string, FeatureEnvVar>
-  models_available?: number
-  url?: string
-  version?: string
-}
+const FeatureSchema = z.object({
+  id: z.string(),
+  category: z.string(),
+  name: z.string(),
+  enabled: z.boolean(),
+  status: z.enum(['active', 'disabled', 'healthy', 'unhealthy']),
+  message: z.string(),
+  setup_required: z.boolean(),
+  env_vars: z
+    .union([z.record(z.string(), FeatureEnvVarSchema), z.array(z.unknown())])
+    .optional()
+    .transform((val) => (Array.isArray(val) ? undefined : val)),
+  models_available: z.number().optional(),
+  url: z.string().nullable().optional(),
+  version: z.string().nullable().optional(),
+})
 
-export interface FeaturesStatus {
-  features: Record<string, Feature>
-  summary: {
-    total: number
-    healthy: number
-    unhealthy: number
-    all_ready: boolean
+const FeaturesStatusSchema = z.object({
+  features: z.record(z.string(), FeatureSchema),
+  summary: z.object({
+    total: z.number(),
+    healthy: z.number(),
+    unhealthy: z.number(),
+    all_ready: z.boolean(),
+  }),
+})
+
+export type FeatureEnvVar = z.infer<typeof FeatureEnvVarSchema>
+export type Feature = z.infer<typeof FeatureSchema>
+export type FeaturesStatus = z.infer<typeof FeaturesStatusSchema>
+
+export class DevOnlyFeatureError extends Error {
+  constructor() {
+    super('Feature only available in development mode')
+    this.name = 'DevOnlyFeatureError'
   }
 }
 
@@ -34,8 +49,15 @@ export interface FeaturesStatus {
  * Get status of all optional features
  */
 export async function getFeaturesStatus(): Promise<FeaturesStatus> {
-  const response = await api.get<FeaturesStatus>('/api/v1/config/features')
-  return response.data // Extrahiere data aus der Response
+  try {
+    const response = await api.get<FeaturesStatus>('/api/v1/config/features')
+    return FeaturesStatusSchema.parse(response.data)
+  } catch (error) {
+    if (error instanceof Error && error.message.startsWith('API Error: 403')) {
+      throw new DevOnlyFeatureError()
+    }
+    throw error
+  }
 }
 
 /**

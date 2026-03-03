@@ -41,6 +41,7 @@ class KeycloakAuthControllerTest extends TestCase
     private function createController(
         string $oidcAdminRoles = 'admin,realm-admin,synaplan-admin,administrator',
         string $oidcRoleClaims = 'realm_access.roles,resource_access.{client_id}.roles,groups',
+        string $oidcScopes = 'openid email profile offline_access',
     ): KeycloakAuthController {
         return new KeycloakAuthController(
             $this->httpClient,
@@ -55,6 +56,7 @@ class KeycloakAuthControllerTest extends TestCase
             'https://keycloak.example.com/realms/test',
             $oidcAdminRoles,
             $oidcRoleClaims,
+            $oidcScopes,
             'https://app.example.com',
             'https://app.example.com',
         );
