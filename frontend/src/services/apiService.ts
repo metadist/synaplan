@@ -119,7 +119,7 @@ async function httpClient<T = unknown, S extends z.Schema | undefined = undefine
       if (refreshSuccess) {
         // Retry original request with new timeout
         const retryController = new AbortController()
-        const retryTimeoutId = setTimeout(() => retryController.abort(), API_TIMEOUT)
+        const retryTimeoutId = setTimeout(() => retryController.abort(), timeout)
 
         try {
           const retryResponse = await fetch(`${API_BASE_URL}${endpoint}`, {
@@ -154,7 +154,9 @@ async function httpClient<T = unknown, S extends z.Schema | undefined = undefine
             try {
               const errorData = JSON.parse(await retryResponse.text())
               retryErrorMessage = errorData.error || errorData.message || retryErrorMessage
-              if (errorData.debug) retryErrorMessage += `\n[Debug] ${errorData.debug}`
+              if (errorData.debug) {
+                console.error(`API Debug [${options.method || 'GET'} ${endpoint}]:`, errorData.debug)
+              }
             } catch {
               // response wasn't JSON
             }
@@ -174,17 +176,17 @@ async function httpClient<T = unknown, S extends z.Schema | undefined = undefine
 
     if (!response.ok) {
       let errorMessage = `${response.status} ${response.statusText}`
-      let debugInfo: string | undefined
       try {
         const errorData = JSON.parse(await response.text())
         errorMessage = errorData.error || errorData.message || errorMessage
-        debugInfo = errorData.debug
+        if (errorData.debug) {
+          console.error(`API Debug [${options.method || 'GET'} ${endpoint}]:`, errorData.debug)
+        }
       } catch {
         // response wasn't JSON
       }
-      const fullMessage = debugInfo ? `${errorMessage}\n[Debug] ${debugInfo}` : errorMessage
-      console.error(`API Error [${options.method || 'GET'} ${endpoint}]:`, fullMessage)
-      throw new Error(fullMessage)
+      console.error(`API Error [${options.method || 'GET'} ${endpoint}]:`, errorMessage)
+      throw new Error(errorMessage)
     }
 
     // Store new CSRF token if provided
