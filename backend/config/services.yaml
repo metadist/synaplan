@@ -257,6 +257,9 @@ services:
         arguments:
             $uploadDir: '%kernel.project_dir%/var/uploads'
 
+    App\Service\MediaGenerationServiceInterface:
+        alias: App\Service\MediaGenerationService
+
     # Model Configuration Service
     App\Service\ModelConfigService:
         arguments:
