@@ -518,7 +518,7 @@ class WidgetController extends AbstractController
             $uploadedFile->move($absoluteDir, $filename);
 
             // Public URL via file-serving API (works cross-origin for embedded widgets)
-            $baseUrl = $_ENV['SYNAPLAN_URL'] ?? $request->getSchemeAndHttpHost();
+            $baseUrl = $_ENV['APP_URL'] ?? $request->getSchemeAndHttpHost();
             $baseUrl = rtrim($baseUrl, '/');
             $iconUrl = $baseUrl.'/api/v1/files/uploads/'.$relativePath;
 

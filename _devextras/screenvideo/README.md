@@ -20,7 +20,7 @@ npm run install:browsers
 
 # 3. Configure
 cp .env.example .env
-# Edit .env — set SYNAPLAN_URL and demo credentials
+# Edit .env — set APP_URL and demo credentials
 ```
 
 Then record:

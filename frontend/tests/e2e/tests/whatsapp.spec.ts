@@ -4,9 +4,9 @@
  */
 
 import type { APIRequestContext } from '@playwright/test'
-import { test, expect } from '../e2e/test-setup'
-import { getApiUrl, isTestStack } from '../e2e/config/config'
-import { INTEGRATION } from '../e2e/config/integration-data'
+import { test, expect } from '../test-setup'
+import { getApiUrl } from '../config/config'
+import { INTEGRATION } from '../config/integration-data'
 import {
   getStubBaseUrl,
   getStubRequests,
@@ -18,13 +18,13 @@ import {
   awaitOutboundExactlyOnce,
   assertNoSecondOutboundWithinWindow,
   makeRunId,
-} from './helpers/whatsapp-stub'
+} from '../helpers/whatsapp-stub'
 import {
   metaPayloadText,
   metaPayloadImage,
   metaPayloadAudio,
   PHONE_NUMBER_ID,
-} from './helpers/whatsapp-payload'
+} from '../helpers/whatsapp-payload'
 
 const WEBHOOK_PATH = '/api/v1/webhooks/whatsapp'
 const EXPECTED_PATH_MESSAGES = `/v21.0/${PHONE_NUMBER_ID}/messages`
@@ -42,11 +42,10 @@ async function postWebhookAndAssert2xx(request: APIRequestContext, payload: obje
   expect(json.success).toBe(true)
 }
 
-test.describe('@ci WhatsApp smoke @smoke', () => {
+test.describe('@ci @whatsapp WhatsApp smoke @smoke', () => {
   test.describe.configure({ mode: 'serial' })
 
   test.beforeEach(async ({ request }, testInfo) => {
-    if (!isTestStack()) return
     await resetStub(request, getStubBaseUrl(), makeRunId(testInfo.testId))
   })
 

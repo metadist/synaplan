@@ -1,7 +1,7 @@
-import { test, expect } from '../e2e/test-setup'
-import { getApiUrl } from '../e2e/config/config'
-import { getAuthHeaders } from '../e2e/helpers/auth'
-import { CREDENTIALS } from '../e2e/config/credentials'
+import { test, expect } from '../test-setup'
+import { getApiUrl } from '../config/config'
+import { getAuthHeaders } from '../helpers/auth'
+import { CREDENTIALS } from '../config/credentials'
 
 const apiBase = () => getApiUrl()
 

@@ -1,7 +1,6 @@
 import { test as base } from '@playwright/test'
 import { cleanupUserData } from './helpers/auth'
 import { CREDENTIALS } from './config/credentials'
-import { isTestStack } from './config/config'
 
 export const test = base.extend<{ credentials: { user: string; pass: string } }>({
   // Credentials for the current worker (enables parallel E2E with isolated user per worker)
@@ -10,14 +9,6 @@ export const test = base.extend<{ credentials: { user: string; pass: string } }>
     const creds = CREDENTIALS.getCredentialsForWorker(testInfo.parallelIndex)
     await use(creds)
   },
-})
-
-// Integration tests require test stack (E2E_STACK=test). Skip from one place.
-// eslint-disable-next-line no-empty-pattern
-test.beforeEach(({}, testInfo) => {
-  if (testInfo.file?.includes('integration') && !isTestStack()) {
-    test.skip(true, 'Integration tests require test stack (E2E_STACK=test)')
-  }
 })
 
 // Cleanup only for E2E specs (e2e/tests/), not integration or other suites.

@@ -1,18 +1,18 @@
 /**
- * Smoke: Smart-Email flow (Inbound Webhook → AI Test-Provider → SMTP → MailHog).
+ * Smoke: Smart-Email flow (Inbound Webhook → AI → SMTP → MailHog).
  * Request-only. Backend: POST /api/v1/webhooks/email.
  */
 
-import { test, expect } from '../e2e/test-setup'
-import { clearMailHog, fetchMessages, getPlainTextBody, toMatches } from './helpers/email'
-import { getApiUrl, isTestStack } from '../e2e/config/config'
-import { INTEGRATION } from '../e2e/config/integration-data'
+import { test, expect } from '../test-setup'
+import { clearMailHog, fetchMessages, getPlainTextBody, toMatches } from '../helpers/email'
+import { getApiUrl } from '../config/config'
+import { INTEGRATION } from '../config/integration-data'
 
 const WEBHOOK_PATH = '/api/v1/webhooks/email'
 const MAILHOG_POLL_TIMEOUT_MS = 3000
 const MAILHOG_POLL_INTERVAL_MS = 200
 
-const { TEST_FROM, TEST_TO, TEST_PROVIDER_REPLY_MARKER } = INTEGRATION.EMAIL
+const { TEST_FROM, TEST_TO } = INTEGRATION.EMAIL
 
 function webhookUrl(): string {
   return `${getApiUrl()}${WEBHOOK_PATH}`
@@ -22,13 +22,10 @@ test.describe('@ci Smart-Email smoke @smoke', () => {
   test.describe.configure({ mode: 'serial' })
 
   test.beforeEach(async ({ request }) => {
-    if (!isTestStack()) return
     await clearMailHog(request)
   })
 
-  test('Inbound → Reply sent: webhook 2xx, exactly one reply in MailHog with TestProvider text', async ({
-    request,
-  }) => {
+  test('Inbound → Reply sent: webhook 2xx, exactly one reply in MailHog', async ({ request }) => {
     await test.step('Arrange: verify 0 messages', async () => {
       const messages = await fetchMessages(request)
       expect(messages.length, 'MailHog should be empty before trigger').toBe(0)
@@ -57,7 +54,7 @@ test.describe('@ci Smart-Email smoke @smoke', () => {
       expect(Number.isInteger(json.chat_id)).toBe(true)
     })
 
-    await test.step('Assert: bounded retry until exactly one mail with TestProvider reply', async () => {
+    await test.step('Assert: bounded retry until exactly one reply mail', async () => {
       let matching: Array<{ body: string }> = []
       await expect
         .poll(
@@ -76,7 +73,7 @@ test.describe('@ci Smart-Email smoke @smoke', () => {
         .not.toBeNull()
 
       expect(matching.length).toBe(1)
-      expect(matching[0].body).toContain(TEST_PROVIDER_REPLY_MARKER)
+      expect(matching[0].body.length).toBeGreaterThan(0)
     })
   })
 

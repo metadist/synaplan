@@ -1,12 +1,9 @@
-import './load-env'
 import { defineConfig, devices } from '@playwright/test'
 import { URLS } from './config/config'
 
-/** E2E + integration smoke config. testDir '..' = tests/; testMatch restricts to e2e and integration (excludes unit). */
 export default defineConfig({
-  testDir: '..',
-  testMatch: ['e2e/tests/**/*.spec.ts', 'integration/**/*.spec.ts'],
-  testIgnore: ['**/unit/**'],
+  testDir: 'tests',
+  testMatch: '**/*.spec.ts',
   retries: process.env.CI ? 1 : 0,
   timeout: 60_000,
 
@@ -31,16 +28,12 @@ export default defineConfig({
     {
       name: 'chromium',
       use: {
-        ...Object.fromEntries(
-          Object.entries(devices['Desktop Chrome']).filter(([key]) => key !== 'deviceScaleFactor')
-        ),
-        viewport: process.env.CI ? { width: 1920, height: 1080 } : null,
-        // Chrome 142+ Local Network Access: disable prompt so dev-stack (5173→8000) widget tests
-        // run without user interaction. Test stack (8001) is same-origin anyway.
+        ...devices['Desktop Chrome'],
+        // Chrome 142+ Local Network Access: disable prompt so dev-stack widget tests run without user interaction
         launchOptions: {
           args: [
-            ...(process.env.CI ? [] : ['--start-maximized']),
             '--disable-features=LocalNetworkAccessChecks',
+            ...(process.env.CI ? [] : ['--start-maximized']),
           ],
         },
       },
@@ -49,17 +42,8 @@ export default defineConfig({
     {
       name: 'firefox',
       use: {
-        ...Object.fromEntries(
-          Object.entries(devices['Desktop Firefox']).filter(([key]) => key !== 'deviceScaleFactor')
-        ),
-        viewport: process.env.CI ? { width: 1920, height: 1080 } : null,
-        ...(process.env.CI
-          ? {}
-          : {
-              launchOptions: {
-                args: ['--start-maximized'],
-              },
-            }),
+        ...devices['Desktop Firefox'],
+        ...(process.env.CI ? {} : { launchOptions: { args: ['--start-maximized'] } }),
       },
       grepInvert: /@oidc-redirect/,
     },

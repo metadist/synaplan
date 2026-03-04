@@ -1,6 +1,6 @@
 /**
  * Integration test data – single place for request-only (API/webhook) tests.
- * Used by tests under tests/integration/.
+ * Used by API smoke tests (email, WhatsApp).
  */
 
 export const INTEGRATION = {
@@ -13,7 +13,5 @@ export const INTEGRATION = {
     TEST_FROM: 'user@example.com',
     /** Recipient (smart inbox). */
     TEST_TO: 'smart@synaplan.net',
-    /** Expected substring in TestProvider reply body. */
-    TEST_PROVIDER_REPLY_MARKER: 'TestProvider response',
   },
 } as const

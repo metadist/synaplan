@@ -1,4 +1,4 @@
-/** E2E config. Priority: ENV > .env.local > defaults. */
+/** E2E config. Set env vars (e.g. BASE_URL=http://localhost:8001) to override defaults. */
 
 export const URLS = {
   BASE_URL: process.env.BASE_URL || 'http://localhost:5173',
@@ -16,11 +16,6 @@ export function getApiUrl(): string {
     return 'http://localhost:8000'
   }
   return baseUrl
-}
-
-/** True when running against test stack (port 8001, TestProvider). */
-export function isTestStack(): boolean {
-  return process.env.E2E_STACK === 'test'
 }
 
 export const TIMEOUTS = {
