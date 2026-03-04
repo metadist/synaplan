@@ -238,6 +238,13 @@ final readonly class MediaGenerationService implements MediaGenerationServiceInt
     private function downloadAndSave(string $url, int $userId, string $provider, string $type): ?string
     {
         $ch = curl_init($url);
+        if (false === $ch) {
+            $this->logger->error('Failed to initialize cURL', [
+                'url' => FileHelper::redactUrlForLogging($url),
+            ]);
+
+            return null;
+        }
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
         curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
         curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, true);
@@ -251,7 +258,10 @@ final readonly class MediaGenerationService implements MediaGenerationServiceInt
         curl_close($ch);
 
         if (false === $content || 200 !== $httpCode) {
-            $this->logger->error('Media download failed', ['url' => $url, 'http_code' => $httpCode]);
+            $this->logger->error('Media download failed', [
+                'url' => FileHelper::redactUrlForLogging($url),
+                'http_code' => $httpCode,
+            ]);
 
             return null;
         }
