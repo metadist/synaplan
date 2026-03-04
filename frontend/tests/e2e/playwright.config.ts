@@ -1,5 +1,6 @@
 import { defineConfig, devices } from '@playwright/test'
 import { URLS } from './config/config'
+import { WORKER_COUNT } from './config/worker-state'
 
 export default defineConfig({
   testDir: 'tests',
@@ -22,7 +23,7 @@ export default defineConfig({
   ],
 
   outputDir: 'test-results',
-  workers: 4,
+  workers: WORKER_COUNT,
 
   projects: [
     {

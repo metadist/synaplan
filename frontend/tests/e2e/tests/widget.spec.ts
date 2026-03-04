@@ -152,8 +152,9 @@ test('@014 @ci @smoke @widget Widget: applies settings and auto-open', async ({
 // Widget allows only example.com; page is localhost → backend returns 403 domain_not_whitelisted.
 test('@015 @ci @smoke @widget @security Widget: blocked on non-whitelisted domain', async ({
   page,
+  credentials,
 }) => {
-  await login(page)
+  await login(page, credentials)
 
   const widgetName = WIDGET_NAMES.unique(WIDGET_NAMES.NOT_WHITELISTED)
   const widgetInfo = await createTestWidget(page, widgetName, WIDGET_TEST_URLS.EXAMPLE_DOMAIN)
