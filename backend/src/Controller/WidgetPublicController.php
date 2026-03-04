@@ -8,6 +8,7 @@ use App\Entity\Message;
 use App\Repository\ChatRepository;
 use App\Repository\FileRepository;
 use App\Repository\MessageRepository;
+use App\Service\File\FileHelper;
 use App\Service\File\FileProcessor;
 use App\Service\File\FileStorageService;
 use App\Service\File\VectorizationService;
@@ -938,7 +939,7 @@ class WidgetPublicController extends AbstractController
                 $owner->getId(), // Store under owner for quota/usage
                 $file->getId(),
                 $groupKey,
-                $this->getFileTypeCode($fileExtension)
+                FileHelper::getFileTypeCode($fileExtension)
             );
 
             if ($vectorResult['success']) {
@@ -986,21 +987,6 @@ class WidgetPublicController extends AbstractController
         ];
 
         return $typeMap[$extension] ?? 'other';
-    }
-
-    /**
-     * Get file type code for RAG vectorization (matches FileController logic).
-     */
-    private function getFileTypeCode(string $extension): int
-    {
-        return match (strtolower($extension)) {
-            'txt', 'md', 'csv' => 0, // Plain text
-            'jpg', 'jpeg', 'png', 'gif', 'webp' => 1, // Image
-            'mp3', 'mp4', 'wav', 'ogg', 'm4a', 'webm' => 2, // Audio/Video
-            'pdf' => 3, // PDF
-            'docx', 'doc', 'xlsx', 'xls', 'pptx', 'ppt' => 4, // Office
-            default => 5, // Other
-        };
     }
 
     /**

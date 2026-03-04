@@ -143,7 +143,7 @@ const filteredFiles = computed(() => {
 const loadFiles = async () => {
   isLoading.value = true
   try {
-    const response = await filesService.listFiles(undefined, 1, 100)
+    const response = await filesService.listFiles({ limit: 100 })
     allFiles.value = response.files
   } catch (err) {
     console.error('Failed to load files for mentions:', err)

@@ -991,6 +991,54 @@ parameters:
 			path: tests/Unit/WhisperServiceTest.php
 
 		-
+			message: '#^Call to an undefined method App\\Service\\MediaGenerationServiceInterface\:\:method\(\)\.$#'
+			identifier: method.notFound
+			count: 6
+			path: tests/Unit/Controller/MediaControllerTest.php
+
+		-
+			message: '#^Call to an undefined method App\\AI\\Service\\AiFacade\:\:method\(\)\.$#'
+			identifier: method.notFound
+			count: 6
+			path: tests/Unit/Service/MediaGenerationServiceTest.php
+
+		-
+			message: '#^Call to an undefined method App\\AI\\Service\\AiFacade\:\:expects\(\)\.$#'
+			identifier: method.notFound
+			count: 1
+			path: tests/Unit/Service/MediaGenerationServiceTest.php
+
+		-
+			message: '#^Call to an undefined method App\\Service\\RateLimitService\:\:method\(\)\.$#'
+			identifier: method.notFound
+			count: 2
+			path: tests/Unit/Service/MediaGenerationServiceTest.php
+
+		-
+			message: '#^Call to an undefined method App\\Service\\RateLimitService\:\:expects\(\)\.$#'
+			identifier: method.notFound
+			count: 1
+			path: tests/Unit/Service/MediaGenerationServiceTest.php
+
+		-
+			message: '#^Call to an undefined method Doctrine\\ORM\\EntityManagerInterface\:\:method\(\)\.$#'
+			identifier: method.notFound
+			count: 1
+			path: tests/Unit/Service/MediaGenerationServiceTest.php
+
+		-
+			message: '#^Call to an undefined method App\\Service\\ModelConfigService\:\:method\(\)\.$#'
+			identifier: method.notFound
+			count: 1
+			path: tests/Unit/Service/MediaGenerationServiceTest.php
+
+		-
+			message: '#^Call to static method PHPUnit\\Framework\\Assert\:\:assertTrue\(\) with true will always evaluate to true\.$#'
+			identifier: staticMethod.alreadyNarrowedType
+			count: 4
+			path: tests/Unit/Service/MediaGenerationServiceTest.php
+
+		-
 			message: '#^Strict comparison using \=\=\= between null and ''test'' will always evaluate to false\.$#'
 			identifier: identical.alwaysFalse
 			count: 1

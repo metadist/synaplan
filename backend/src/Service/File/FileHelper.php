@@ -255,6 +255,21 @@ final class FileHelper
     }
 
     /**
+     * Map file extension to numeric type code for RAG vectorization.
+     */
+    public static function getFileTypeCode(string $extension): int
+    {
+        return match (strtolower($extension)) {
+            'txt', 'md', 'csv' => 0,
+            'jpg', 'jpeg', 'png', 'gif', 'webp' => 1,
+            'mp3', 'mp4', 'wav', 'ogg', 'm4a', 'webm' => 2,
+            'pdf' => 3,
+            'docx', 'doc', 'xlsx', 'xls', 'pptx', 'ppt' => 4,
+            default => 5,
+        };
+    }
+
+    /**
      * Normalize a path by resolving . and .. components.
      *
      * Unlike realpath(), this doesn't require the file to exist and doesn't

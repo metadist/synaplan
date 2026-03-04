@@ -31,7 +31,7 @@ class ModelCatalogTest extends TestCase
 
     public function testFindGroupedKeyReturnsAllVariants(): void
     {
-        $results = ModelCatalog::find('openai:gpt-4o');
+        $results = ModelCatalog::find('google:gemini-2.5-pro');
 
         $this->assertGreaterThan(1, count($results));
         $tags = array_column($results, 'tag');
@@ -41,7 +41,7 @@ class ModelCatalogTest extends TestCase
 
     public function testFindWithTagReturnsSpecificVariant(): void
     {
-        $chatOnly = ModelCatalog::find('openai:gpt-4o:chat');
+        $chatOnly = ModelCatalog::find('google:gemini-2.5-pro:chat');
 
         $this->assertCount(1, $chatOnly);
         $this->assertSame('chat', $chatOnly[0]['tag']);

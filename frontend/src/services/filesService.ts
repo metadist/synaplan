@@ -155,27 +155,30 @@ export const uploadFiles = async (options: UploadFileOptions): Promise<UploadRes
   })
 }
 
+export interface FileListOptions {
+  groupKey?: string
+  search?: string
+  fileType?: string
+  dateFrom?: number
+  dateTo?: number
+  page?: number
+  limit?: number
+}
+
 /**
- * List user's files with optional filtering
- *
- * @param groupKey Optional filter by group
- * @param page Page number (default: 1)
- * @param limit Items per page (default: 50)
- * @returns List of files with pagination
+ * List user's files with optional filtering and search
  */
-export const listFiles = async (
-  groupKey?: string,
-  page: number = 1,
-  limit: number = 50
-): Promise<FileListResponse> => {
+export const listFiles = async (options: FileListOptions = {}): Promise<FileListResponse> => {
   const params: Record<string, string | number> = {
-    page,
-    limit,
+    page: options.page ?? 1,
+    limit: options.limit ?? 50,
   }
 
-  if (groupKey) {
-    params.group_key = groupKey
-  }
+  if (options.groupKey) params.group_key = options.groupKey
+  if (options.search) params.search = options.search
+  if (options.fileType) params.file_type = options.fileType
+  if (options.dateFrom) params.date_from = options.dateFrom
+  if (options.dateTo) params.date_to = options.dateTo
 
   const response = await api.get<FileListResponse>('/api/v1/files', { params })
   return response.data
