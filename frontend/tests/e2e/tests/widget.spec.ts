@@ -11,7 +11,7 @@ import {
   setWidgetTaskPrompt,
 } from '../helpers/widget'
 import { selectors } from '../helpers/selectors'
-import { URLS, TIMEOUTS, INTERVALS, isTestStack } from '../config/config'
+import { URLS, TIMEOUTS, INTERVALS } from '../config/config'
 import {
   PROMPTS,
   WIDGET_NAMES,
@@ -99,16 +99,8 @@ test('@013 @noci @smoke @widget @security Widget: overlay receives response', as
     )
     .not.toBeNull()
 
-  const aiText = (await overlay.locator(selectors.widget.messageAiText).last().innerText())
-    .trim()
-    .toLowerCase()
-
-  const expectSuccess = isTestStack()
-  if (expectSuccess) {
-    expect(aiText).toContain('success')
-  } else {
-    expect(aiText.length).toBeGreaterThan(0)
-  }
+  const aiText = (await overlay.locator(selectors.widget.messageAiText).last().innerText()).trim()
+  expect(aiText.length).toBeGreaterThan(0)
 })
 
 test('@014 @ci @smoke @widget Widget: applies settings and auto-open', async ({

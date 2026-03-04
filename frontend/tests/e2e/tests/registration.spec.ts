@@ -8,17 +8,6 @@ test.beforeEach(async ({ request }) => {
   await clearMailHog(request)
 })
 
-/** Dismiss cookie banner if visible; idempotent, fast (short timeout). Only tolerates banner not present/hidden; if visible but click fails, test fails. */
-async function acceptCookiesIfShown(page: import('@playwright/test').Page) {
-  const button = page.locator('[data-testid="btn-cookie-accept"]')
-  try {
-    await button.waitFor({ state: 'visible', timeout: 2_000 })
-  } catch {
-    return
-  }
-  await button.click()
-}
-
 test('@ci @password @auth @smoke registration flow with email verification id=006', async ({
   page,
   request,
@@ -34,7 +23,6 @@ test('@ci @password @auth @smoke registration flow with email verification id=00
       await page
         .locator(selectors.login.email)
         .waitFor({ state: 'visible', timeout: TIMEOUTS.STANDARD })
-      await acceptCookiesIfShown(page)
 
       await page.locator(selectors.login.signUpLink).click()
       await expect(page).toHaveURL(/\/register/)

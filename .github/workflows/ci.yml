@@ -395,7 +395,6 @@ jobs:
         env:
           BASE_URL: http://localhost:8001
           MAILHOG_URL: http://localhost:8025
-          E2E_STACK: test
         run: |
           echo "============================================"
           echo "Running E2E tests with ${{ matrix.browser }} (${{ matrix.auth_method }})"

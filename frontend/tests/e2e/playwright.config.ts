@@ -1,12 +1,9 @@
-import './load-env'
 import { defineConfig, devices } from '@playwright/test'
 import { URLS } from './config/config'
 
-/** E2E + integration smoke config. testDir '..' = tests/; testMatch restricts to e2e and integration (excludes unit). */
 export default defineConfig({
-  testDir: '..',
-  testMatch: ['e2e/tests/**/*.spec.ts', 'integration/**/*.spec.ts'],
-  testIgnore: ['**/unit/**'],
+  testDir: 'tests',
+  testMatch: '**/*.spec.ts',
   retries: process.env.CI ? 1 : 0,
   timeout: 60_000,
 
