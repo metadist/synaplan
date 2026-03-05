@@ -72,11 +72,13 @@ class WidgetEventsController extends AbstractController
 
         // For SSE, return a streamed response
         $response = new StreamedResponse(function () use ($widgetId, $sessionId, $lastEventId, $eventCache) {
-            // Flush and disable all PHP output buffering layers so echo+flush()
+            // Clear and disable all PHP output buffering layers so echo+flush()
             // delivers bytes to the client immediately (critical for SSE).
             while (ob_get_level() > 0) {
-                ob_end_flush();
+                ob_end_clean();
             }
+            ob_implicit_flush(true);
+            set_time_limit(0);
 
             $currentLastEventId = $lastEventId;
             $lastTypingTimestamp = 0;

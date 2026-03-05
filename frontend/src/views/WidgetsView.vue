@@ -87,7 +87,11 @@
               :key="widget.id"
               class="surface-card widget-card p-4 lg:p-5 cursor-pointer group"
               data-testid="item-widget"
-              @click="viewWidget(widget)"
+              role="button"
+              tabindex="0"
+              @click="viewSessions(widget)"
+              @keydown.enter.prevent="viewSessions(widget)"
+              @keydown.space.prevent="viewSessions(widget)"
             >
               <div class="flex items-start justify-between mb-4">
                 <div class="flex-1 min-w-0 pr-2">
@@ -453,13 +457,6 @@ const handleAdvancedSaved = async () => {
 }
 
 /**
- * View widget details
- */
-const viewWidget = (widget: widgetsApi.Widget) => {
-  viewSessions(widget)
-}
-
-/**
  * Open test chat
  */
 const openTestChat = (widget: widgetsApi.Widget) => {
@@ -580,9 +577,9 @@ onMounted(() => {
 
 .widget-card:hover {
   transform: scale(1.02);
-  border-color: rgba(0, 63, 199, 0.3);
+  border-color: color-mix(in srgb, var(--brand) 30%, transparent);
   box-shadow:
-    0 4px 24px rgba(0, 63, 199, 0.08),
-    inset 0 0 0 1px rgba(0, 63, 199, 0.15);
+    0 4px 24px color-mix(in srgb, var(--brand) 8%, transparent),
+    inset 0 0 0 1px color-mix(in srgb, var(--brand) 15%, transparent);
 }
 </style>
