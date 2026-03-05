@@ -180,12 +180,6 @@
               class="w-full px-4 py-3 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)] disabled:opacity-50 disabled:cursor-not-allowed"
               data-testid="input-ai-model"
             >
-              <option
-                value="AUTOMATED - Tries to define the best model for the task on SYNAPLAN [System Model]"
-              >
-                ✨ {{ $t('config.taskPrompts.automated') }}
-              </option>
-
               <!-- Grouped Models by Capability -->
               <template v-if="!loadingModels && groupedModels.length > 0">
                 <optgroup
@@ -213,8 +207,8 @@
             </p>
           </div>
 
-          <!-- Available Tools -->
-          <div>
+          <!-- Available Tools (hidden for default prompts unless admin) -->
+          <div v-if="!currentPrompt.isDefault">
             <label class="block text-sm font-semibold txt-primary mb-3 flex items-center gap-2">
               <Icon icon="heroicons:wrench-screwdriver" class="w-4 h-4" />
               {{ $t('config.taskPrompts.availableTools') }}
@@ -230,8 +224,7 @@
                   v-model="formData.availableTools"
                   type="checkbox"
                   :value="tool.value"
-                  :disabled="currentPrompt.isDefault && !isAdmin"
-                  class="w-5 h-5 rounded border-light-border/30 dark:border-dark-border/20 text-[var(--brand)] focus:ring-2 focus:ring-[var(--brand)] disabled:opacity-50 disabled:cursor-not-allowed"
+                  class="w-5 h-5 rounded border-light-border/30 dark:border-dark-border/20 text-[var(--brand)] focus:ring-2 focus:ring-[var(--brand)]"
                 />
                 <Icon :icon="tool.icon" class="w-5 h-5 txt-secondary" />
                 <span class="text-sm txt-primary">{{ tool.label }}</span>
@@ -820,6 +813,8 @@ When responding:
 
 Remember to always [IMPORTANT_REMINDER].`
 
+const DEFAULT_AI_MODEL = 'gpt-oss-120b (Groq)'
+
 // Extended TaskPrompt interface with UI fields
 interface TaskPrompt extends ApiTaskPrompt {
   rules?: string
@@ -1005,6 +1000,16 @@ const loadAIModels = async () => {
   }
 }
 
+const findModelIdByString = (modelString: string): number => {
+  for (const models of Object.values(allModels.value)) {
+    if (models) {
+      const found = models.find((m: AIModel) => `${m.name} (${m.service})` === modelString)
+      if (found) return found.id
+    }
+  }
+  return -1
+}
+
 /**
  * Load all prompts from API
  */
@@ -1014,15 +1019,12 @@ const loadPrompts = async () => {
 
   try {
     const data = await promptsApi.getPrompts(locale.value || 'en')
-    prompts.value = data.map((p) => {
-      // Parse metadata from backend
+    const nonWidgetPrompts = data.filter((p) => !p.topic.startsWith('w_'))
+    prompts.value = nonWidgetPrompts.map((p) => {
       const metadata = p.metadata || {}
 
-      // Determine AI Model string from metadata.aiModel (ID)
-      let aiModelString =
-        'AUTOMATED - Tries to define the best model for the task on SYNAPLAN [System Model]'
+      let aiModelString = DEFAULT_AI_MODEL
       if (metadata.aiModel && metadata.aiModel > 0) {
-        // Find model by ID in all capabilities
         let foundModel = null
         for (const models of Object.values(allModels.value)) {
           if (models) {
@@ -1035,7 +1037,6 @@ const loadPrompts = async () => {
         }
       }
 
-      // Parse available tools from metadata (tool_* keys)
       const availableTools: string[] = []
       if (metadata.tool_internet_search) availableTools.push('internet-search')
       if (metadata.tool_files_search) availableTools.push('files-search')
@@ -1133,26 +1134,7 @@ const handleSave = saveChanges(async () => {
     // Build metadata object
     const metadata: Record<string, any> = {}
 
-    // Parse AI Model from dropdown string back to ID (for SAVE)
-    if (
-      formData.value.aiModel !==
-      'AUTOMATED - Tries to define the best model for the task on SYNAPLAN [System Model]'
-    ) {
-      const selectedModelString = formData.value.aiModel
-      // Find model by ID in all capabilities
-      let foundModel = null
-      for (const models of Object.values(allModels.value)) {
-        if (models) {
-          foundModel = models.find((m: any) => `${m.name} (${m.service})` === selectedModelString)
-          if (foundModel) break
-        }
-      }
-      if (foundModel) {
-        metadata.aiModel = foundModel.id
-      }
-    } else {
-      metadata.aiModel = -1 // AUTOMATED
-    }
+    metadata.aiModel = findModelIdByString(formData.value.aiModel || DEFAULT_AI_MODEL)
 
     // Set tool flags (for SAVE)
     metadata.tool_internet_search = (formData.value.availableTools || []).includes(
@@ -1190,8 +1172,6 @@ const handleSave = saveChanges(async () => {
         selectedPromptId.value = newPrompt.id
         originalData.value = { ...formData.value }
       }
-
-      success('User override created successfully!')
     } else {
       // Update existing user prompt (or system prompt for admins)
       // For system prompts: do NOT send language (backend will preserve original)
@@ -1221,8 +1201,6 @@ const handleSave = saveChanges(async () => {
         currentPrompt.value = { ...prompts.value[index] }
         originalData.value = { ...formData.value }
       }
-
-      success('Prompt updated successfully!')
     }
   } catch (err: unknown) {
     let errorMessage = err instanceof Error ? err.message : 'Failed to save prompt'
@@ -1321,9 +1299,7 @@ const handleCreateNew = async () => {
     // Build metadata object
     const metadata: Record<string, any> = {}
 
-    // For new prompts created via modal, we use defaults since AI Model/Tools are not in the modal
-    // User can edit these after creation
-    metadata.aiModel = -1 // AUTOMATED by default
+    metadata.aiModel = findModelIdByString(DEFAULT_AI_MODEL)
     metadata.tool_internet_search = true // Enable by default
     metadata.tool_files_search = true // Enable by default
     metadata.tool_url_screenshot = false // Disable by default
@@ -1346,9 +1322,7 @@ const handleCreateNew = async () => {
       ...newPrompt,
       content: newPrompt.prompt,
       rules: newPrompt.selectionRules || newPrompt.shortDescription || '',
-      aiModel:
-        formData.value.aiModel ||
-        'AUTOMATED - Tries to define the best model for the task on SYNAPLAN [System Model]',
+      aiModel: formData.value.aiModel || DEFAULT_AI_MODEL,
       availableTools: formData.value.availableTools || [],
     }
 

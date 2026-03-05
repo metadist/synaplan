@@ -6,6 +6,9 @@ import { useNotification } from '@/composables/useNotification'
 import { useDialog } from '@/composables/useDialog'
 import type { AIModel, Capability } from '@/types/ai-models'
 
+const DEFAULT_AI_MODEL_NAME = 'gpt-oss-120b'
+const DEFAULT_AI_MODEL_SERVICE = 'Groq'
+
 interface Props {
   icon: string
   titleKey: string
@@ -59,14 +62,27 @@ const groupedModels = computed(() => {
   return groups
 })
 
+const findDefaultModelId = (): number => {
+  for (const models of Object.values(props.models)) {
+    if (models) {
+      const found = models.find(
+        (m) => m.name === DEFAULT_AI_MODEL_NAME && m.service === DEFAULT_AI_MODEL_SERVICE
+      )
+      if (found) return found.id
+    }
+  }
+  return -1
+}
+
 const load = async () => {
   loading.value = true
   try {
     const data = await props.loadFn()
     promptText.value = data.prompt
     originalText.value = data.prompt
-    modelId.value = data.modelId
-    originalModelId.value = data.modelId
+    const resolvedModelId = data.modelId <= 0 ? findDefaultModelId() : data.modelId
+    modelId.value = resolvedModelId
+    originalModelId.value = resolvedModelId
     isDefault.value = data.isDefault
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : String(err)
@@ -169,9 +185,6 @@ onMounted(load)
             v-model="modelId"
             class="w-full px-4 py-2.5 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
           >
-            <option :value="-1">
-              ✨ {{ $t('widgets.advancedConfig.aiPrompts.modelAutomatic') }}
-            </option>
             <template v-if="!loadingModels && groupedModels.length > 0">
               <optgroup v-for="group in groupedModels" :key="group.capability" :label="group.label">
                 <option v-for="model in group.models" :key="model.id" :value="model.id">

@@ -83,28 +83,19 @@ class WidgetSessionRepository extends ServiceEntityRepository
     }
 
     /**
-     * Count sessions by mode for a widget.
-     * Only counts non-expired sessions (expires > now).
+     * Count all sessions by mode for a widget.
      * Test sessions are excluded.
      *
      * @return array{ai: int, human: int, waiting: int}
      */
     public function countSessionsByMode(string $widgetId): array
     {
-        $now = time();
-
-        // Count active (non-expired) sessions + any expired sessions still in human/waiting mode.
-        // Expired human/waiting sessions are still relevant because an operator is responsible for them
-        // and must be able to hand them back to AI.
         $results = $this->createQueryBuilder('ws')
             ->select('ws.mode, COUNT(ws.id) as cnt')
             ->where('ws.widgetId = :widgetId')
             ->andWhere('ws.sessionId NOT LIKE :testPrefix')
-            ->andWhere('(ws.expires > :now OR ws.mode IN (:activeModes))')
             ->setParameter('widgetId', $widgetId)
-            ->setParameter('now', $now)
             ->setParameter('testPrefix', 'test_%')
-            ->setParameter('activeModes', ['human', 'waiting'])
             ->groupBy('ws.mode')
             ->getQuery()
             ->getArrayResult();

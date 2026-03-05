@@ -223,7 +223,7 @@ const emit = defineEmits<{
 }>()
 
 const { t, locale } = useI18n()
-const { success, error: showError } = useNotification()
+const { error: showError } = useNotification()
 const { render: renderMarkdown } = useMarkdown()
 
 interface Message {
@@ -364,7 +364,6 @@ const saveGeneratedPrompt = async () => {
       conversationHistory.value
     )
 
-    success(t('widgets.setupChat.saveSuccess'))
     emit('completed', result.promptTopic)
   } catch (err: any) {
     console.error('Failed to save prompt:', err)

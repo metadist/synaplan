@@ -63,7 +63,7 @@ class PromptService
         $metaEntries = $this->promptMetaRepository->findBy(['promptId' => $promptId]);
 
         $metadata = [
-            'aiModel' => -1, // -1 = AUTOMATED
+            'aiModel' => -1, // -1 = no specific model set, frontend defaults to gpt-oss-120b
             'tool_internet' => false,
             'tool_files' => false,
             'tool_url_screenshot' => false,

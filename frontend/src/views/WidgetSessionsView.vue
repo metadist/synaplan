@@ -23,6 +23,10 @@
 
           <!-- Stats (inline on desktop) -->
           <div class="hidden md:flex items-center gap-3 text-xs txt-secondary flex-shrink-0">
+            <span class="flex items-center gap-1.5 font-medium txt-primary">
+              {{ totalSessions }} {{ $t('widgetSessions.totalShort') }}
+            </span>
+            <span class="txt-secondary">|</span>
             <span class="flex items-center gap-1.5">
               <span class="w-2 h-2 rounded-full bg-blue-500 shadow-sm shadow-blue-500/50"></span>
               {{ stats.ai }} {{ $t('widgetSessions.aiShort') }}
@@ -105,6 +109,10 @@
         <div class="flex lg:hidden items-center gap-2 flex-wrap">
           <!-- Stats (mobile) -->
           <div class="flex md:hidden items-center gap-2 text-[11px] txt-secondary mr-auto">
+            <span class="font-medium txt-primary">
+              {{ totalSessions }} {{ $t('widgetSessions.totalShort') }}
+            </span>
+            <span>|</span>
             <span class="flex items-center gap-1">
               <span class="w-1.5 h-1.5 rounded-full bg-blue-500"></span>
               {{ stats.ai }} AI
@@ -1021,6 +1029,8 @@ const stats = ref({
   human: 0,
   waiting: 0,
 })
+
+const totalSessions = computed(() => stats.value.ai + stats.value.human + stats.value.waiting)
 
 const goBack = () => {
   router.push({ name: 'tools-chat-widget' })

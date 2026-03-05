@@ -60,7 +60,7 @@
                 <div class="relative">
                   <Icon
                     icon="heroicons:globe-alt"
-                    class="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 txt-secondary"
+                    class="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-500 dark:text-gray-400 z-10"
                   />
                   <input
                     v-model="formData.websiteUrl"
