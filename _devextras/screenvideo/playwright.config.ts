@@ -3,7 +3,7 @@ import * as dotenv from 'dotenv'
 
 dotenv.config()
 
-const BASE_URL = process.env.SYNAPLAN_URL || 'https://demo.synaplan.com'
+const BASE_URL = process.env.APP_URL || 'https://demo.synaplan.com'
 const STEP_DELAY = parseInt(process.env.STEP_DELAY || '1500', 10)
 
 export default defineConfig({

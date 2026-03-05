@@ -2,7 +2,6 @@ import { test, expect } from '../test-setup'
 import { login } from '../helpers/auth'
 import { selectors } from '../helpers/selectors'
 import { FIXTURE_PATHS } from '../config/test-data'
-import { isTestStack } from '../config/config'
 import { TIMEOUTS } from '../config/config'
 import { readFileSync } from 'fs'
 import path from 'path'
@@ -16,10 +15,9 @@ const RAG_SEARCH_PHRASE = readFileSync(ragFixturePath, 'utf-8').trim()
 
 /**
  * Full semantic search E2E: upload fixture file, search for same phrase, assert at least one result.
- * Requires real AI (embeddings); excluded from CI via @noci. Skip on test stack (TestProvider may return 0).
+ * Requires real AI (embeddings); excluded from CI via @noci.
  */
 test('@007 @noci @smoke semantic search finds uploaded content (real AI)', async ({ page }) => {
-  test.skip(isTestStack(), 'Real-AI RAG test requires embedding API; run without E2E_STACK=test')
   await login(page)
 
   await test.step('Arrange: navigate to Files page', async () => {

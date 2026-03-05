@@ -17,6 +17,7 @@ export interface DefaultModelConfig {
 // Base configuration
 const API_BASE_URL = getApiBaseUrl()
 const API_TIMEOUT = import.meta.env.VITE_API_TIMEOUT || 30000
+const API_UPLOAD_TIMEOUT = import.meta.env.VITE_API_UPLOAD_TIMEOUT || 120000
 const CSRF_HEADER = import.meta.env.VITE_CSRF_HEADER_NAME || 'X-CSRF-Token'
 
 // Token refresh stampede protection
@@ -96,8 +97,10 @@ async function httpClient<T = unknown, S extends z.Schema | undefined = undefine
     headers[CSRF_HEADER] = csrfToken
   }
 
+  const isUpload = options.body instanceof FormData
+  const timeout = isUpload ? API_UPLOAD_TIMEOUT : API_TIMEOUT
   const controller = new AbortController()
-  const timeoutId = setTimeout(() => controller.abort(), API_TIMEOUT)
+  const timeoutId = setTimeout(() => controller.abort(), timeout)
 
   try {
     const response = await fetch(`${API_BASE_URL}${endpoint}`, {
@@ -116,7 +119,7 @@ async function httpClient<T = unknown, S extends z.Schema | undefined = undefine
       if (refreshSuccess) {
         // Retry original request with new timeout
         const retryController = new AbortController()
-        const retryTimeoutId = setTimeout(() => retryController.abort(), API_TIMEOUT)
+        const retryTimeoutId = setTimeout(() => retryController.abort(), timeout)
 
         try {
           const retryResponse = await fetch(`${API_BASE_URL}${endpoint}`, {
@@ -147,10 +150,21 @@ async function httpClient<T = unknown, S extends z.Schema | undefined = undefine
             window.location.href = '/login?reason=session_expired'
             throw new Error('Session expired')
           } else {
-            // Other error - fall through to normal error handling
-            const errorText = await retryResponse.text()
-            console.error('API Error Details:', errorText)
-            throw new Error(`API Error: ${retryResponse.status} ${retryResponse.statusText}`)
+            let retryErrorMessage = `${retryResponse.status} ${retryResponse.statusText}`
+            try {
+              const errorData = JSON.parse(await retryResponse.text())
+              retryErrorMessage = errorData.error || errorData.message || retryErrorMessage
+              if (errorData.debug) {
+                console.error(
+                  `API Debug [${options.method || 'GET'} ${endpoint}]:`,
+                  errorData.debug
+                )
+              }
+            } catch {
+              // response wasn't JSON
+            }
+            console.error(`API Error [${options.method || 'GET'} ${endpoint}]:`, retryErrorMessage)
+            throw new Error(retryErrorMessage)
           }
         } catch (error) {
           clearTimeout(retryTimeoutId)
@@ -164,9 +178,18 @@ async function httpClient<T = unknown, S extends z.Schema | undefined = undefine
     }
 
     if (!response.ok) {
-      const errorText = await response.text()
-      console.error('API Error Details:', errorText)
-      throw new Error(`API Error: ${response.status} ${response.statusText}`)
+      let errorMessage = `${response.status} ${response.statusText}`
+      try {
+        const errorData = JSON.parse(await response.text())
+        errorMessage = errorData.error || errorData.message || errorMessage
+        if (errorData.debug) {
+          console.error(`API Debug [${options.method || 'GET'} ${endpoint}]:`, errorData.debug)
+        }
+      } catch {
+        // response wasn't JSON
+      }
+      console.error(`API Error [${options.method || 'GET'} ${endpoint}]:`, errorMessage)
+      throw new Error(errorMessage)
     }
 
     // Store new CSRF token if provided
@@ -190,7 +213,11 @@ async function httpClient<T = unknown, S extends z.Schema | undefined = undefine
     return data as T
   } catch (error: any) {
     if (error.name === 'AbortError') {
-      throw new Error('Request timeout')
+      const seconds = Math.round(timeout / 1000)
+      throw new Error(
+        `Request timeout after ${seconds}s on ${options.method || 'GET'} ${endpoint}. ` +
+          'The AI provider may be slow or unreachable. Check backend logs for details.'
+      )
     }
     throw error
   }

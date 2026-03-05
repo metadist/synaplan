@@ -124,15 +124,15 @@ services:
     networks:
       - synaplan-test-network
 
-  # WhatsApp Graph API stub (only for jobs that run WhatsApp integration tests; not needed for OIDC-only).
+  # WhatsApp Graph API stub (starts by default for all E2E jobs).
   whatsapp-stub:
-    profiles: [whatsapp]
     build:
       context: frontend/tests/e2e/stub-servers/whatsapp
       dockerfile: Dockerfile
     container_name: synaplan-whatsapp-stub
     ports:
       - "3999:3999"
+    init: true
     restart: "no"
     networks:
       - synaplan-test-network

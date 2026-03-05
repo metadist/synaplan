@@ -173,7 +173,7 @@ The System Config page will have **6 main tabs**, organized by functional area:
    - `RECAPTCHA_MIN_SCORE` - Slider (0.0-1.0)
 
 **UI Features:**
-- OAuth callback URL auto-generated from SYNAPLAN_URL
+- OAuth callback URL auto-generated from APP_URL
 - "Test OAuth Flow" button (opens popup)
 - Provider enable/disable toggles
 
@@ -282,7 +282,7 @@ SETTING_KEY=default_value  # Inline description
 ```
 1. APPLICATION CORE
    - APP_ENV, APP_SECRET, APP_URL, LOG_FORMAT
-   - FRONTEND_URL, SYNAPLAN_URL
+   - FRONTEND_URL, APP_URL
    - TOKEN_SECRET
    - LOCK_DSN
 

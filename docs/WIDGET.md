@@ -185,7 +185,7 @@ cd frontend
 npm run build:widget    # Outputs to dist-widget/
 ```
 
-Test locally: open `/widget-test.html` on the dev server (Vite serves it from `frontend/tests/e2e/fixtures/widget-test.html`).
+To test locally: run E2E widget tests (`npm run test:e2e -- --grep @widget`). The fixture is at `frontend/tests/e2e/fixtures/widget-test.html`.
 
 ---
 
@@ -199,7 +199,7 @@ Test locally: open `/widget-test.html` on the dev server (Vite serves it from `f
 
 ### CORS errors
 
-1. Ensure `SYNAPLAN_URL` is set correctly in backend
+1. Ensure `APP_URL` is set correctly in backend
 2. Check domain whitelist includes your site
 
 ### Styling conflicts

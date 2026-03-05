@@ -9,7 +9,7 @@ All configuration is done via environment variables in `backend/.env`.
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `APP_ENV` | `dev` | Environment: `dev`, `prod`, `test` |
-| `SYNAPLAN_URL` | `http://localhost:8000` | Public URL for widgets/embeds |
+| `APP_URL` | `http://localhost:8000` | Public URL for widgets/embeds/OAuth |
 | `FRONTEND_URL` | `http://localhost:5173` | Frontend URL for email links |
 
 ---
@@ -136,7 +136,7 @@ APP_ENV=prod
 APP_SECRET=generate_a_random_32_char_string
 
 # Public URLs (replace with your domain)
-SYNAPLAN_URL=https://your-domain.com
+APP_URL=https://your-domain.com
 FRONTEND_URL=https://your-domain.com
 
 # Security
