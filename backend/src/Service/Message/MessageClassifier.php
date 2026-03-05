@@ -21,7 +21,7 @@ use Psr\Log\LoggerInterface;
  * - If message starts with "/" → tool command
  * - Otherwise → use AI sorting
  */
-class MessageClassifier
+final readonly class MessageClassifier
 {
     private const TOOL_COMMANDS = [
         '/pic' => 'tools:pic',

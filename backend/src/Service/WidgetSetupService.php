@@ -18,7 +18,7 @@ use Psr\Log\LoggerInterface;
  * Conducts a conversation with the user to gather information about their
  * business and generates a custom task prompt for their widget.
  */
-final class WidgetSetupService
+final readonly class WidgetSetupService
 {
     public const SETUP_INTERVIEW_TOPIC = 'tools:widget-setup-interview';
     public const SETUP_TOPIC_PREFIX = 'wsetup_';

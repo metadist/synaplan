@@ -11,7 +11,7 @@ use Symfony\Component\Process\Process;
  *
  * Uses whisper.cpp binary installed in Docker container
  */
-class WhisperService
+final readonly class WhisperService
 {
     private const SUPPORTED_FORMATS = ['ogg', 'mp3', 'wav', 'm4a', 'opus', 'flac', 'webm', 'aac', 'wma', 'amr', 'mp4', 'avi', 'mov', 'mkv', 'mpeg', 'mpg'];
 

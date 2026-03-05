@@ -20,7 +20,7 @@ use Symfony\Component\Process\Process;
  *
  * Strategy from legacy: Native -> Tika -> Rasterize+Vision fallback
  */
-class FileProcessor
+final readonly class FileProcessor
 {
     private const PLAIN_TEXT_MIMES = [
         'text/plain',

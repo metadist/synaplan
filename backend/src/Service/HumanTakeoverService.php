@@ -19,7 +19,7 @@ use Psr\Log\LoggerInterface;
  * Allows widget owners to take over conversations from the AI
  * and communicate directly with visitors in real-time via SSE.
  */
-final class HumanTakeoverService
+final readonly class HumanTakeoverService
 {
     public function __construct(
         private EntityManagerInterface $em,

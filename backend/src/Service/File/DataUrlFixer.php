@@ -14,7 +14,7 @@ use Psr\Log\LoggerInterface;
  * Call ensureFileOnDisk() after loading a Message entity. If the path
  * is a data URL, it will be saved to disk and the entity updated.
  */
-final class DataUrlFixer
+final readonly class DataUrlFixer
 {
     public function __construct(
         private EntityManagerInterface $em,

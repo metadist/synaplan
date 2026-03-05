@@ -12,7 +12,7 @@ use Psr\Log\LoggerInterface;
  *
  * Provides detailed usage statistics for users across all channels
  */
-class UsageStatsService
+final readonly class UsageStatsService
 {
     private const ACTION_TYPES = [
         'MESSAGES',

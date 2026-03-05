@@ -18,7 +18,7 @@ use Symfony\Contracts\HttpClient\HttpClientInterface;
  * - File Parsing (Tika, Whisper, Vision AI)
  * - Message Metadata extraction
  */
-class MessagePreProcessor
+final readonly class MessagePreProcessor
 {
     // Supported file types for preprocessing
     public const DOCUMENT_EXTENSIONS = ['pdf', 'docx', 'doc', 'xlsx', 'xls', 'pptx', 'txt'];

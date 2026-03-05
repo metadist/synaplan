@@ -11,7 +11,7 @@ use Psr\Log\LoggerInterface;
 /**
  * Service for loading prompts with their metadata (AI model, tools, etc.).
  */
-class PromptService
+final readonly class PromptService
 {
     public function __construct(
         private PromptRepository $promptRepository,

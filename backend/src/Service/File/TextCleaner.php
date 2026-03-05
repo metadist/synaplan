@@ -7,7 +7,7 @@ namespace App\Service\File;
  *
  * Cleans and normalizes extracted text from documents.
  */
-class TextCleaner
+final readonly class TextCleaner
 {
     /**
      * Clean and normalize text.

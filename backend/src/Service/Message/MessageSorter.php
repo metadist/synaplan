@@ -22,7 +22,7 @@ use Psr\Log\LoggerInterface;
  * 4. Call AI with user message + conversation history
  * 5. Parse AI response (JSON) for BTOPIC and BLANG
  */
-class MessageSorter
+final readonly class MessageSorter
 {
     /**
      * Supported languages for message classification.

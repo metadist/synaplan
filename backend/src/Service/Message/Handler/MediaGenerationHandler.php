@@ -23,7 +23,7 @@ use Symfony\Component\DependencyInjection\Attribute\AutoconfigureTag;
  * User prompts are used directly - frontend has "Enhance Prompt" button for improvements.
  */
 #[AutoconfigureTag('app.message.handler')]
-class MediaGenerationHandler implements MessageHandlerInterface
+final readonly class MediaGenerationHandler implements MessageHandlerInterface
 {
     public function __construct(
         private AiFacade $aiFacade,

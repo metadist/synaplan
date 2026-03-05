@@ -10,7 +10,7 @@ use Symfony\Contracts\HttpClient\HttpClientInterface;
  * Service for interacting with Brave Search API
  * Documentation: https://api-dashboard.search.brave.com/app/documentation/web-search/get-started.
  */
-class BraveSearchService
+final readonly class BraveSearchService
 {
     private string $apiKey;
     private string $apiUrl;

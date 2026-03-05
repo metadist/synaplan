@@ -13,7 +13,7 @@ namespace App\Service\Admin;
  * - Disallow multi-statement separators other than ";" line ends
  * - Disallow other tables, DDL, SELECT, UNION, comments
  */
-final class ModelSqlValidator
+final readonly class ModelSqlValidator
 {
     private const int MAX_STATEMENTS = 200;
     private const int MAX_SQL_LENGTH = 200000;

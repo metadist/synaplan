@@ -10,7 +10,7 @@ use Psr\Log\LoggerInterface;
  * Simple encryption/decryption for sensitive data like IMAP passwords.
  * Uses APP_SECRET as encryption key.
  */
-class EncryptionService
+final class EncryptionService
 {
     private const CIPHER = 'AES-256-CBC';
     private const IV_LENGTH = 16;
