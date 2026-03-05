@@ -24,7 +24,7 @@ export const mockTaskPrompts: TaskPrompt[] = [
       'The user asks for generation of images, videos or sounds (or just one). Not for any other file types. The user wants an image, video or an audio file. Direct the request here. This handles the connection to media generation AIs.',
     rules:
       'The user asks for generation of images, videos or sounds (or just one). Not for any other file types. The user wants an image, video or an audio file. Direct the request here. This handles the connection to media generation AIs.',
-    aiModel: 'AUTOMATED - Tries to define the best model for the task on SYNAPLAN [System Model]',
+    aiModel: 'gpt-oss-120b (Groq)',
     availableTools: ['internet-search'],
     content: `# Media generation
 You receive a media generation request in a JSON object. The user has requested to generation of an image, video or an audio file.
@@ -45,7 +45,7 @@ The incoming object does look like:
     name: '(default) general - All requests by users go here by...',
     description: 'General chat prompt for all standard user requests',
     rules: 'All requests by users go here by default unless specific conditions are met',
-    aiModel: 'AUTOMATED - Tries to define the best model for the task on SYNAPLAN [System Model]',
+    aiModel: 'gpt-oss-120b (Groq)',
     availableTools: ['internet-search', 'files-search', 'url-screenshot'],
     content: `# General Assistant
 You are a helpful AI assistant. Respond to user queries professionally and accurately.`,
@@ -67,7 +67,7 @@ Analyze the provided file and give detailed insights.`,
     name: '(default) officemaker - The user asks for the generation...',
     description: 'Office document generation',
     rules: 'The user asks for the generation of office documents',
-    aiModel: 'AUTOMATED - Tries to define the best model for the task on SYNAPLAN [System Model]',
+    aiModel: 'gpt-oss-120b (Groq)',
     availableTools: [],
     content: `# Office Document Generation
 Generate professional office documents based on user requirements.`,

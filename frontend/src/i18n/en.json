@@ -1355,6 +1355,7 @@
     "aiShort": "AI",
     "humanShort": "Human",
     "waitingShort": "Waiting",
+    "totalShort": "Total",
     "selectSession": "Select a conversation",
     "selectSessionDescription": "Choose a session from the list to view the conversation",
     "noMessages": "No messages yet",
