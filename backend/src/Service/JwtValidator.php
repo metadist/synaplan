@@ -26,7 +26,7 @@ use Symfony\Contracts\HttpClient\HttpClientInterface;
  *
  * Note: Not marked as 'final' to allow mocking in tests.
  */
-class JwtValidator
+final readonly class JwtValidator
 {
     private JWSVerifier $jwsVerifier;
     private CompactSerializer $serializer;

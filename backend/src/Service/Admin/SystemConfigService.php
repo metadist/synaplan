@@ -15,7 +15,7 @@ use Psr\Log\LoggerInterface;
  * Supports database-backed fields (source=database) that take effect immediately.
  * SECURITY: Sensitive fields are NEVER returned in plain text via API.
  */
-final class SystemConfigService
+final readonly class SystemConfigService
 {
     private const MASK = '••••••••';
     private const DB_GROUP = 'QDRANT_SEARCH';
@@ -35,7 +35,7 @@ final class SystemConfigService
     /**
      * Get the configuration schema with field definitions.
      *
-     * @return array{tabs: array<string, array{label: string, sections: array<string, array{label: string, fields: array<string>}>}>, fields: array<string, array{tab: string, section: string, type: string, sensitive: bool, description: string, default: string, options?: array<string>}>}
+     * @return array{tabs: array<string, array{label: string, sections: array<string, array{label: string, fields: array<string>}>}>, fields: array<string, array{tab: string, section: string, type: string, sensitive: bool, description: string, default: string, source?: string, options?: array<string>}>}
      */
     public function getSchema(): array
     {
@@ -577,7 +577,7 @@ final class SystemConfigService
     /**
      * Build the configuration schema.
      *
-     * @return array<string, array{tab: string, section: string, type: string, sensitive: bool, description: string, default: string, options?: array<string>}>
+     * @return array<string, array{tab: string, section: string, type: string, sensitive: bool, description: string, default: string, source?: string, options?: array<string>}>
      */
     private function buildSchema(): array
     {

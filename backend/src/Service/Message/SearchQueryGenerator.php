@@ -18,7 +18,7 @@ use Psr\Log\LoggerInterface;
  * 2. Call AI with user question
  * 3. Parse AI response (optimized search query)
  */
-class SearchQueryGenerator
+final readonly class SearchQueryGenerator
 {
     public function __construct(
         private AiFacade $aiFacade,

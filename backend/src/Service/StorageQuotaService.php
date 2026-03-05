@@ -15,7 +15,7 @@ use Psr\Log\LoggerInterface;
  *
  * Manages user storage limits based on subscription level
  */
-class StorageQuotaService
+final readonly class StorageQuotaService
 {
     public function __construct(
         private FileRepository $fileRepository,

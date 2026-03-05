@@ -27,7 +27,7 @@ use Symfony\Contracts\HttpClient\HttpClientInterface;
  * - IMAGE: Vision AI analysis, brief text comment
  * - VIDEO: Audio extracted via FFmpeg, transcribed, text response
  */
-class WhatsAppService
+final class WhatsAppService
 {
     private const MAX_FILE_SIZE = 128 * 1024 * 1024; // 128 MB (same as FileStorageService)
 

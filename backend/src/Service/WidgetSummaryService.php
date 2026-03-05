@@ -25,7 +25,7 @@ use Psr\Log\LoggerInterface;
  * - FAQ identification
  * - Prompt improvement suggestions
  */
-final class WidgetSummaryService
+final readonly class WidgetSummaryService
 {
     public const SUMMARY_TOPIC_PREFIX = 'ws_';
     public const DEFAULT_SUMMARY_TOPIC = 'tools:widget-summary-default';

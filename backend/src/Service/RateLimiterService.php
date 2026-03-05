@@ -11,7 +11,7 @@ use Psr\Log\LoggerInterface;
  *
  * Verwendet Filesystem Cache und RateLimitConfig für Limits
  */
-class RateLimiterService
+final readonly class RateLimiterService
 {
     public function __construct(
         private RateLimitConfigRepository $rateLimitConfigRepository,

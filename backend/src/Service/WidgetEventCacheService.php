@@ -19,7 +19,7 @@ use Psr\Cache\CacheItemPoolInterface;
  * - typing: Operator is typing (short TTL)
  * - notification: Admin notification
  */
-final class WidgetEventCacheService
+final readonly class WidgetEventCacheService
 {
     private const EVENT_TTL = 600; // 10 minutes for regular events
     private const TYPING_TTL = 5;  // 5 seconds for typing indicators

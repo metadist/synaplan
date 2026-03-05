@@ -19,7 +19,7 @@ use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
  *
  * Supports: Excel (primary), CSV, JSON
  */
-final class WidgetExportService
+final readonly class WidgetExportService
 {
     public function __construct(
         private WidgetSessionRepository $sessionRepository,
