@@ -312,13 +312,13 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
 
         return isset($sub['status'])
             && 'active' === $sub['status']
-            && isset($sub['ends'])
-            && $sub['ends'] > time();
+            && isset($sub['subscription_end'])
+            && $sub['subscription_end'] > time();
     }
 
     public function getSubscriptionEnds(): ?int
     {
-        return $this->getSubscriptionData()['ends'] ?? null;
+        return $this->getSubscriptionData()['subscription_end'] ?? null;
     }
 
     public function getStripeCustomerId(): ?string
