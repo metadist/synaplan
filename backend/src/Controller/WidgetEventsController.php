@@ -72,15 +72,18 @@ class WidgetEventsController extends AbstractController
 
         // For SSE, return a streamed response
         $response = new StreamedResponse(function () use ($widgetId, $sessionId, $lastEventId, $eventCache) {
+            // Flush and disable all PHP output buffering layers so echo+flush()
+            // delivers bytes to the client immediately (critical for SSE).
+            while (ob_get_level() > 0) {
+                ob_end_flush();
+            }
+
             $currentLastEventId = $lastEventId;
             $lastTypingTimestamp = 0;
 
             // Send initial connection event
             echo "event: connected\n";
             echo "data: {\"status\":\"connected\"}\n\n";
-            if (ob_get_level() > 0) {
-                ob_flush();
-            }
             flush();
 
             // Keep connection open for 5 minutes max
@@ -107,9 +110,6 @@ class WidgetEventsController extends AbstractController
                     echo 'id: '.$event['id']."\n";
                     echo 'event: '.$event['type']."\n";
                     echo 'data: '.json_encode($data, JSON_UNESCAPED_UNICODE)."\n\n";
-                    if (ob_get_level() > 0) {
-                        ob_flush();
-                    }
                     flush();
 
                     $currentLastEventId = $event['id'];
@@ -129,9 +129,6 @@ class WidgetEventsController extends AbstractController
                             'timestamp' => $typingTimestamp,
                             'operatorId' => $typingData['operatorId'],
                         ], JSON_UNESCAPED_UNICODE)."\n\n";
-                        if (ob_get_level() > 0) {
-                            ob_flush();
-                        }
                         flush();
                     }
                 }
@@ -139,9 +136,6 @@ class WidgetEventsController extends AbstractController
                 // Heartbeat
                 if (time() - $lastHeartbeat >= $heartbeatInterval) {
                     echo ": heartbeat\n\n";
-                    if (ob_get_level() > 0) {
-                        ob_flush();
-                    }
                     flush();
                     $lastHeartbeat = time();
                 }
@@ -152,9 +146,6 @@ class WidgetEventsController extends AbstractController
             // Reconnect hint
             echo "event: reconnect\n";
             echo "data: {\"lastEventId\":$currentLastEventId}\n\n";
-            if (ob_get_level() > 0) {
-                ob_flush();
-            }
             flush();
         });
 

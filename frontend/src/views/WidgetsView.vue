@@ -85,7 +85,7 @@
             <div
               v-for="widget in widgets"
               :key="widget.id"
-              class="surface-card p-4 lg:p-5 hover:shadow-lg transition-shadow cursor-pointer group"
+              class="surface-card widget-card p-4 lg:p-5 cursor-pointer group"
               data-testid="item-widget"
               @click="viewWidget(widget)"
             >
@@ -456,7 +456,7 @@ const handleAdvancedSaved = async () => {
  * View widget details
  */
 const viewWidget = (widget: widgetsApi.Widget) => {
-  showEmbed(widget)
+  viewSessions(widget)
 }
 
 /**
@@ -568,3 +568,21 @@ onMounted(() => {
   loadWidgets()
 })
 </script>
+
+<style scoped>
+.widget-card {
+  border: 1px solid transparent;
+  transition:
+    transform 0.2s ease,
+    box-shadow 0.2s ease,
+    border-color 0.2s ease;
+}
+
+.widget-card:hover {
+  transform: scale(1.02);
+  border-color: rgba(0, 63, 199, 0.3);
+  box-shadow:
+    0 4px 24px rgba(0, 63, 199, 0.08),
+    inset 0 0 0 1px rgba(0, 63, 199, 0.15);
+}
+</style>
