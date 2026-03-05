@@ -3,7 +3,7 @@
     <template #header> </template>
 
     <div
-      class="flex flex-col h-full relative"
+      class="flex flex-col h-full min-h-0 overflow-hidden relative"
       data-testid="page-chat"
       @dragenter.prevent="handleDragEnter"
       @dragover.prevent="handleDragOver"
