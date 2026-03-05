@@ -221,10 +221,16 @@ class AiFacade
 
     /**
      * Batch Embedding.
+     *
+     * @param string[]    $texts        Texts to embed
+     * @param int|null    $userId       User ID for config lookup
+     * @param string|null $providerName Explicit provider name
+     * @param array       $options      Additional options (model, etc.) forwarded to the provider
+     *
+     * @return array[] Array of embedding vectors
      */
-    public function embedBatch(array $texts, ?int $userId = null, ?string $providerName = null): array
+    public function embedBatch(array $texts, ?int $userId = null, ?string $providerName = null, array $options = []): array
     {
-        // Wenn kein Provider explizit angegeben, nutze User-Konfiguration
         if (!$providerName && $userId > 0) {
             $providerName = $this->modelConfig->getDefaultProvider($userId, 'vectorize');
         }
@@ -237,7 +243,7 @@ class AiFacade
             'count' => count($texts),
         ]);
 
-        return $provider->embedBatch($texts);
+        return $provider->embedBatch($texts, $options);
     }
 
     /**

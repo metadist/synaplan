@@ -312,7 +312,22 @@ class OllamaProvider implements ChatProviderInterface, EmbeddingProviderInterfac
             throw new ProviderException('Embedding model must be specified in options', 'ollama');
         }
 
-        return array_map(fn ($text) => $this->embed($text, $options), $texts);
+        if (empty($texts)) {
+            return [];
+        }
+
+        try {
+            $response = $this->client->embed()->create([
+                'model' => $options['model'],
+                'input' => $texts,
+            ]);
+
+            $arrRes = method_exists($response, 'toArray') ? $response->toArray() : (array) $response;
+
+            return $arrRes['embeddings'] ?? [];
+        } catch (\Exception $e) {
+            throw new ProviderException('Ollama batch embedding error: '.$e->getMessage(), 'ollama');
+        }
     }
 
     public function getDimensions(string $model): int

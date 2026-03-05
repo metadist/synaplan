@@ -11,9 +11,9 @@ namespace App\Service\File;
 class TextChunker
 {
     public function __construct(
-        private int $maxChunkSize = 500,        // Max characters per chunk
-        private int $overlapSize = 50,          // Overlap between chunks
-        private int $minChunkSize = 100,         // Min chunk size (avoid tiny chunks)
+        private int $maxChunkSize = 1500,       // Max characters per chunk
+        private int $overlapSize = 150,         // Overlap between chunks
+        private int $minChunkSize = 200,        // Min chunk size (avoid tiny chunks)
     ) {
     }
 
