@@ -117,63 +117,55 @@ final readonly class VectorizationService
                 ];
             }
 
+            $chunkTexts = array_map(fn (array $c): string => $c['content'], $chunks);
+
+            $embeddings = $this->aiFacade->embedBatch($chunkTexts, $userId, $provider, [
+                'model' => $modelName,
+                'provider' => $provider,
+            ]);
+
             $vectorChunks = [];
             $chunksCreated = 0;
 
             foreach ($chunks as $index => $chunk) {
-                try {
-                    // Get embedding vector for this chunk with correct model
-                    $embedding = $this->aiFacade->embed($chunk['content'], $userId, [
+                $embedding = $embeddings[$index] ?? [];
+
+                if (empty($embedding)) {
+                    $this->logger->warning('VectorizationService: Empty embedding returned', [
+                        'chunk_start' => $chunk['start_line'],
+                    ]);
+                    continue;
+                }
+
+                $embeddingLength = count($embedding);
+                if (self::VECTOR_DIMENSION !== $embeddingLength) {
+                    $this->logger->warning('VectorizationService: Embedding dimension mismatch', [
+                        'expected' => self::VECTOR_DIMENSION,
+                        'actual' => $embeddingLength,
                         'model' => $modelName,
                         'provider' => $provider,
                     ]);
 
-                    if (empty($embedding)) {
-                        $this->logger->warning('VectorizationService: Empty embedding returned', [
-                            'chunk_start' => $chunk['start_line'],
-                        ]);
-                        continue;
+                    if ($embeddingLength > self::VECTOR_DIMENSION) {
+                        $embedding = array_slice($embedding, 0, self::VECTOR_DIMENSION);
+                    } else {
+                        $embedding = array_pad($embedding, self::VECTOR_DIMENSION, 0.0);
                     }
-
-                    $embeddingLength = count($embedding);
-                    if (self::VECTOR_DIMENSION !== $embeddingLength) {
-                        $this->logger->warning('VectorizationService: Embedding dimension mismatch', [
-                            'expected' => self::VECTOR_DIMENSION,
-                            'actual' => $embeddingLength,
-                            'model' => $modelName,
-                            'provider' => $provider,
-                        ]);
-
-                        if ($embeddingLength > self::VECTOR_DIMENSION) {
-                            $embedding = array_slice($embedding, 0, self::VECTOR_DIMENSION);
-                        } else {
-                            $embedding = array_pad($embedding, self::VECTOR_DIMENSION, 0.0);
-                        }
-                    }
-
-                    $vectorChunks[] = new VectorChunk(
-                        userId: $userId,
-                        fileId: $messageId,
-                        groupKey: $groupKey,
-                        fileType: $fileType,
-                        chunkIndex: $index,
-                        startLine: $chunk['start_line'],
-                        endLine: $chunk['end_line'],
-                        text: $chunk['content'],
-                        vector: array_map('floatval', $embedding),
-                    );
-
-                    ++$chunksCreated;
-                } catch (\Throwable $e) {
-                    $errorMsg = sprintf(
-                        'Chunk %d-%d failed: %s',
-                        $chunk['start_line'],
-                        $chunk['end_line'],
-                        $e->getMessage()
-                    );
-                    $this->logger->error('VectorizationService: '.$errorMsg);
-                    // Continue with next chunk
                 }
+
+                $vectorChunks[] = new VectorChunk(
+                    userId: $userId,
+                    fileId: $messageId,
+                    groupKey: $groupKey,
+                    fileType: $fileType,
+                    chunkIndex: $index,
+                    startLine: $chunk['start_line'],
+                    endLine: $chunk['end_line'],
+                    text: $chunk['content'],
+                    vector: array_map('floatval', $embedding),
+                );
+
+                ++$chunksCreated;
             }
 
             // Batch store chunks via facade

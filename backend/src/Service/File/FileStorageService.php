@@ -17,6 +17,7 @@ final readonly class FileStorageService
     private const MAX_FILE_SIZE = 128 * 1024 * 1024; // 128 MB
     private const ALLOWED_EXTENSIONS = [
         'pdf', 'docx', 'doc', 'xlsx', 'xls', 'pptx', 'ppt', 'txt', 'md', 'csv',
+        'odt', 'ods', 'odp', 'odg', 'odf',
         'jpg', 'jpeg', 'png', 'gif', 'webp',
         'mp3', 'mp4', 'wav', 'ogg', 'm4a', 'webm',
     ];
