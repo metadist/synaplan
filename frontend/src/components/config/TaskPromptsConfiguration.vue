@@ -788,6 +788,7 @@ import {
 } from '@/services/api/promptsApi'
 import { configApi } from '@/services/api/configApi'
 import type { AIModel, Capability } from '@/types/ai-models'
+import { DEFAULT_AI_MODEL, findModelIdByString } from '@/utils/aiModelDefaults'
 import { useNotification } from '@/composables/useNotification'
 import { useUnsavedChanges } from '@/composables/useUnsavedChanges'
 import { useDialog } from '@/composables/useDialog'
@@ -812,8 +813,6 @@ When responding:
 3. [INSTRUCTION_3]
 
 Remember to always [IMPORTANT_REMINDER].`
-
-const DEFAULT_AI_MODEL = 'gpt-oss-120b (Groq)'
 
 // Extended TaskPrompt interface with UI fields
 interface TaskPrompt extends ApiTaskPrompt {
@@ -1000,16 +999,6 @@ const loadAIModels = async () => {
   }
 }
 
-const findModelIdByString = (modelString: string): number => {
-  for (const models of Object.values(allModels.value)) {
-    if (models) {
-      const found = models.find((m: AIModel) => `${m.name} (${m.service})` === modelString)
-      if (found) return found.id
-    }
-  }
-  return -1
-}
-
 /**
  * Load all prompts from API
  */
@@ -1134,7 +1123,10 @@ const handleSave = saveChanges(async () => {
     // Build metadata object
     const metadata: Record<string, any> = {}
 
-    metadata.aiModel = findModelIdByString(formData.value.aiModel || DEFAULT_AI_MODEL)
+    metadata.aiModel = findModelIdByString(
+      allModels.value,
+      formData.value.aiModel || DEFAULT_AI_MODEL
+    )
 
     // Set tool flags (for SAVE)
     metadata.tool_internet_search = (formData.value.availableTools || []).includes(
@@ -1299,7 +1291,7 @@ const handleCreateNew = async () => {
     // Build metadata object
     const metadata: Record<string, any> = {}
 
-    metadata.aiModel = findModelIdByString(DEFAULT_AI_MODEL)
+    metadata.aiModel = findModelIdByString(allModels.value, DEFAULT_AI_MODEL)
     metadata.tool_internet_search = true // Enable by default
     metadata.tool_files_search = true // Enable by default
     metadata.tool_url_screenshot = false // Disable by default

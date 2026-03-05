@@ -5,9 +5,7 @@ import { Icon } from '@iconify/vue'
 import { useNotification } from '@/composables/useNotification'
 import { useDialog } from '@/composables/useDialog'
 import type { AIModel, Capability } from '@/types/ai-models'
-
-const DEFAULT_AI_MODEL_NAME = 'gpt-oss-120b'
-const DEFAULT_AI_MODEL_SERVICE = 'Groq'
+import { findDefaultModelId } from '@/utils/aiModelDefaults'
 
 interface Props {
   icon: string
@@ -62,25 +60,13 @@ const groupedModels = computed(() => {
   return groups
 })
 
-const findDefaultModelId = (): number => {
-  for (const models of Object.values(props.models)) {
-    if (models) {
-      const found = models.find(
-        (m) => m.name === DEFAULT_AI_MODEL_NAME && m.service === DEFAULT_AI_MODEL_SERVICE
-      )
-      if (found) return found.id
-    }
-  }
-  return -1
-}
-
 const load = async () => {
   loading.value = true
   try {
     const data = await props.loadFn()
     promptText.value = data.prompt
     originalText.value = data.prompt
-    const resolvedModelId = data.modelId <= 0 ? findDefaultModelId() : data.modelId
+    const resolvedModelId = data.modelId <= 0 ? findDefaultModelId(props.models) : data.modelId
     modelId.value = resolvedModelId
     originalModelId.value = resolvedModelId
     isDefault.value = data.isDefault

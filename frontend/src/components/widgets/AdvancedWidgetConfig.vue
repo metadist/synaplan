@@ -968,10 +968,9 @@ import * as widgetsApi from '@/services/api/widgetsApi'
 import { promptsApi, type AvailableFile } from '@/services/api/promptsApi'
 import { configApi } from '@/services/api/configApi'
 import type { AIModel, Capability } from '@/types/ai-models'
+import { DEFAULT_AI_MODEL, findModelIdByString } from '@/utils/aiModelDefaults'
 import FilePicker from './FilePicker.vue'
 import WidgetSummaryPromptTab from './WidgetSummaryPromptTab.vue'
-
-const DEFAULT_AI_MODEL = 'gpt-oss-120b (Groq)'
 
 // Disable attribute inheritance since we use Teleport as root
 defineOptions({
@@ -1399,16 +1398,6 @@ const loadAIModels = async () => {
   }
 }
 
-const findModelIdByString = (modelString: string): number => {
-  for (const models of Object.values(allModels.value)) {
-    if (models) {
-      const found = models.find((m: AIModel) => `${m.name} (${m.service})` === modelString)
-      if (found) return found.id
-    }
-  }
-  return -1
-}
-
 const loadPromptData = async () => {
   if (!hasCustomPrompt.value) return
 
@@ -1682,7 +1671,7 @@ const savePromptData = async () => {
   const metadata: Record<string, any> = {}
 
   // Parse AI Model from dropdown string back to ID
-  metadata.aiModel = findModelIdByString(promptData.aiModel)
+  metadata.aiModel = findModelIdByString(allModels.value, promptData.aiModel)
 
   // Build final prompt content with Knowledge Base section
   let finalContent = removeKnowledgeBaseSection(promptData.content)
