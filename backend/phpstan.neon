@@ -15,6 +15,12 @@ parameters:
         -
             identifier: varTag.misplaced
             path: lib/grpc/*
+        -
+            identifiers:
+                - property.unresolvableNativeType
+                - property.unresolvableType
+            path: tests/*
+            reportUnmatched: false
     reportUnmatchedIgnoredErrors: false
     doctrine:
         objectManagerLoader: tests/object-manager.php

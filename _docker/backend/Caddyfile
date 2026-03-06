@@ -9,7 +9,7 @@
 	# Caddy's encode directive buffers output for gzip/zstd, which breaks
 	# real-time Server-Sent Events delivery.
 	@not_sse {
-		not path /api/v1/messages/stream /api/v1/widget/*/message
+		not path /api/v1/messages/stream /api/v1/widget/*/message /api/v1/widgets/*/sessions/*/events
 	}
 	encode @not_sse zstd gzip
 

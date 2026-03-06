@@ -22,7 +22,7 @@ use Psr\Log\LoggerInterface;
  *
  * Provides status callbacks for frontend feedback
  */
-class MessageProcessor
+final readonly class MessageProcessor
 {
     public function __construct(
         private MessageRepository $messageRepository,

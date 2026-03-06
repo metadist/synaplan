@@ -19,7 +19,7 @@ use Psr\Log\LoggerInterface;
  *
  * This is a TOOL that allows users to chat via email.
  */
-class EmailChatService
+final readonly class EmailChatService
 {
     private const MAX_ANONYMOUS_EMAILS_PER_HOUR = 10;
 

@@ -491,6 +491,7 @@
     "aiShort": "KI",
     "humanShort": "Mensch",
     "waitingShort": "Wartend",
+    "totalShort": "Gesamt",
     "selectSession": "Konversation auswählen",
     "selectSessionDescription": "Wähle eine Sitzung aus der Liste, um die Konversation anzuzeigen",
     "noMessages": "Noch keine Nachrichten",

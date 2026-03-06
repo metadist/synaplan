@@ -15,7 +15,7 @@ use Symfony\Contracts\HttpClient\HttpClientInterface;
  *
  * Connects to Rust-based Qdrant service via REST API.
  */
-final class QdrantClientHttp implements QdrantClientInterface
+final readonly class QdrantClientHttp implements QdrantClientInterface
 {
     private const HEALTH_CHECK_CACHE_TTL_SUCCESS = 30; // Cache successful health check for 30 seconds
     private const HEALTH_CHECK_CACHE_TTL_FAILURE = 60; // Cache failure for 1 minute (reasonable, not too long)

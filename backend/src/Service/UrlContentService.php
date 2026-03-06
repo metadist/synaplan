@@ -20,7 +20,7 @@ final readonly class UrlContentResult
     }
 }
 
-readonly class UrlContentService
+final readonly class UrlContentService
 {
     private const MAX_URLS_PER_MESSAGE = 3;
     private const TIMEOUT_SECONDS = 5;

@@ -690,11 +690,6 @@
                     ]"
                     data-testid="input-ai-model"
                   >
-                    <option
-                      value="AUTOMATED - Tries to define the best model for the task on SYNAPLAN [System Model]"
-                    >
-                      ✨ {{ $t('widgets.advancedConfig.automated') }}
-                    </option>
                     <template v-if="!loadingModels && groupedModels.length > 0">
                       <optgroup
                         v-for="group in groupedModels"
@@ -973,6 +968,7 @@ import * as widgetsApi from '@/services/api/widgetsApi'
 import { promptsApi, type AvailableFile } from '@/services/api/promptsApi'
 import { configApi } from '@/services/api/configApi'
 import type { AIModel, Capability } from '@/types/ai-models'
+import { DEFAULT_AI_MODEL, findModelIdByString } from '@/utils/aiModelDefaults'
 import FilePicker from './FilePicker.vue'
 import WidgetSummaryPromptTab from './WidgetSummaryPromptTab.vue'
 
@@ -1210,9 +1206,9 @@ const promptData = reactive({
   topic: '',
   name: '',
   rules: '',
-  aiModel: 'AUTOMATED - Tries to define the best model for the task on SYNAPLAN [System Model]',
+  aiModel: DEFAULT_AI_MODEL,
   content: '',
-  isDefault: false, // true = system prompt (read-only), false = user-specific (editable)
+  isDefault: false,
 })
 const promptLoading = ref(false)
 const promptError = ref<string | null>(null)
@@ -1309,8 +1305,7 @@ Be friendly, professional, and concise in your responses.`
     promptData.id = result.promptId
     promptData.name = `${widgetName} Assistant`
     promptData.rules = ''
-    promptData.aiModel =
-      'AUTOMATED - Tries to define the best model for the task on SYNAPLAN [System Model]'
+    promptData.aiModel = DEFAULT_AI_MODEL
     promptData.content = defaultPromptContent
 
     // Set flag to show the form (without closing modal)
@@ -1422,8 +1417,7 @@ const loadPromptData = async () => {
       promptLanguage.value = prompt.language || 'en'
 
       // Determine AI Model string from metadata.aiModel (ID)
-      let aiModelString =
-        'AUTOMATED - Tries to define the best model for the task on SYNAPLAN [System Model]'
+      let aiModelString = DEFAULT_AI_MODEL
       if (metadata.aiModel && metadata.aiModel > 0) {
         for (const models of Object.values(allModels.value)) {
           if (models) {
@@ -1677,24 +1671,7 @@ const savePromptData = async () => {
   const metadata: Record<string, any> = {}
 
   // Parse AI Model from dropdown string back to ID
-  if (
-    promptData.aiModel !==
-    'AUTOMATED - Tries to define the best model for the task on SYNAPLAN [System Model]'
-  ) {
-    for (const models of Object.values(allModels.value)) {
-      if (models) {
-        const foundModel = models.find(
-          (m: AIModel) => `${m.name} (${m.service})` === promptData.aiModel
-        )
-        if (foundModel) {
-          metadata.aiModel = foundModel.id
-          break
-        }
-      }
-    }
-  } else {
-    metadata.aiModel = -1
-  }
+  metadata.aiModel = findModelIdByString(allModels.value, promptData.aiModel)
 
   // Build final prompt content with Knowledge Base section
   let finalContent = removeKnowledgeBaseSection(promptData.content)

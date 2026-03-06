@@ -21,7 +21,7 @@ use Symfony\Component\DependencyInjection\Attribute\AutoconfigureTag;
  * Note: File type extensions are defined in MessagePreProcessor to avoid duplication.
  */
 #[AutoconfigureTag('app.message.handler')]
-class FileAnalysisHandler implements MessageHandlerInterface
+final readonly class FileAnalysisHandler implements MessageHandlerInterface
 {
     public function __construct(
         private AiFacade $aiFacade,

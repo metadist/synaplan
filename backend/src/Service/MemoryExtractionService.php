@@ -15,7 +15,7 @@ use Psr\Log\LoggerInterface;
  *
  * Uses AI-based extraction with prompts from database.
  */
-readonly class MemoryExtractionService
+final readonly class MemoryExtractionService
 {
     public function __construct(
         private AiFacade $aiFacade,

@@ -16,7 +16,7 @@ namespace App\Service\Email;
  * @todo Make the accepted domain(s) configurable for self-hosted installations.
  *       See: https://github.com/metadist/synaplan/issues/177
  */
-final class SmartEmailHelper
+final readonly class SmartEmailHelper
 {
     /**
      * Accepted email domains for smart addresses.

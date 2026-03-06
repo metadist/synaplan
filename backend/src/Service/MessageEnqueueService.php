@@ -12,7 +12,7 @@ use Symfony\Component\Messenger\MessageBusInterface;
 /**
  * Service zum Enqueuen von Messages für async Processing.
  */
-class MessageEnqueueService
+final readonly class MessageEnqueueService
 {
     public function __construct(
         private EntityManagerInterface $em,
