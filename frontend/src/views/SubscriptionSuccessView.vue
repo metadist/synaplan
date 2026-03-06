@@ -1,10 +1,11 @@
 <template>
-  <MainLayout>
+  <MainLayout data-testid="page-subscription-success">
     <div class="min-h-screen bg-chat flex items-center justify-center p-4">
       <div class="max-w-lg w-full surface-card rounded-xl p-8 text-center">
         <!-- Loading State -->
         <template v-if="syncing">
           <div
+            data-testid="state-syncing"
             class="w-16 h-16 mx-auto mb-6 rounded-full bg-blue-500/10 flex items-center justify-center"
           >
             <Icon icon="mdi:loading" class="w-10 h-10 text-blue-500 animate-spin" />
@@ -18,6 +19,7 @@
         <!-- Success State -->
         <template v-else-if="syncSuccess">
           <div
+            data-testid="state-sync-success"
             class="w-16 h-16 mx-auto mb-6 rounded-full bg-green-500/10 flex items-center justify-center"
           >
             <Icon icon="mdi:check-circle" class="w-10 h-10 text-green-500" />
@@ -28,6 +30,7 @@
           <p class="txt-secondary mb-4">{{ $t('subscription.success.description') }}</p>
           <p
             v-if="newLevel && newLevel !== 'NEW'"
+            data-testid="text-new-level"
             class="text-lg font-semibold text-green-500 mb-8"
           >
             {{ $t('subscription.success.newPlan') }}: {{ newLevel }}
@@ -40,6 +43,7 @@
         <!-- Error State -->
         <template v-else>
           <div
+            data-testid="state-sync-error"
             class="w-16 h-16 mx-auto mb-6 rounded-full bg-amber-500/10 flex items-center justify-center"
           >
             <Icon icon="mdi:alert" class="w-10 h-10 text-amber-500" />
