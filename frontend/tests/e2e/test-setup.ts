@@ -3,7 +3,20 @@ import { deleteUser } from './helpers/auth'
 import { CREDENTIALS } from './config/credentials'
 import { getApiUrl, URLS, TIMEOUTS, INTERVALS } from './config/config'
 import { waitForVerificationHref } from './helpers/email'
-import { workerEmail, WORKER_PASSWORD } from './config/worker-state'
+import { WORKER_COUNT } from './playwright.config'
+
+const WORKER_PASSWORD = 'E2eTest1234!'
+
+function workerEmail(workerIndex: number): string {
+  if (workerIndex < 0 || workerIndex >= WORKER_COUNT) {
+    throw new Error(
+      `Worker index ${workerIndex} out of range (max ${WORKER_COUNT - 1}). ` +
+        `Increase WORKER_COUNT or reduce playwright workers.`
+    )
+  }
+  const runId = process.env.E2E_RUN_ID ?? Date.now().toString()
+  return `e2e-w${workerIndex}-${runId}@test.synaplan.com`
+}
 
 type WorkerCredentials = { user: string; pass: string }
 
