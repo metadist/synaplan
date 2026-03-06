@@ -22,7 +22,11 @@
           </div>
 
           <!-- Current Subscription Info (if active) -->
-          <div v-if="hasActivePlan" class="surface-card rounded-xl p-6 max-w-2xl mx-auto mb-8">
+          <div
+            v-if="hasActivePlan"
+            data-testid="section-current-plan"
+            class="surface-card rounded-xl p-6 max-w-2xl mx-auto mb-8"
+          >
             <div class="flex items-center justify-between flex-wrap gap-4">
               <div class="flex items-center gap-4">
                 <Icon icon="mdi:crown" class="w-10 h-10 text-yellow-500" />
@@ -31,11 +35,14 @@
                     <span class="text-lg font-bold txt-primary">{{
                       $t('subscription.manage.currentPlanLabel')
                     }}</span>
-                    <span :class="getLevelBadgeClass(currentLevel || 'NEW')">{{
-                      currentLevel
-                    }}</span>
+                    <span
+                      data-testid="badge-current-level"
+                      :class="getLevelBadgeClass(currentLevel || 'NEW')"
+                      >{{ currentLevel }}</span
+                    >
                     <span
                       v-if="subscriptionStatus?.hasSubscription"
+                      data-testid="badge-subscription-status"
                       :class="getStatusBadgeClass(subscriptionStatus.status || 'active')"
                     >
                       {{ getStatusText(subscriptionStatus.status || 'active') }}
