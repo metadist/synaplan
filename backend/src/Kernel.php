@@ -11,6 +11,9 @@ class Kernel extends BaseKernel
 {
     use MicroKernelTrait;
 
+    /** @var list<array{dir: string, namespace: string}>|null */
+    private ?array $discoveredPlugins = null;
+
     protected function configureContainer(ContainerConfigurator $container): void
     {
         $container->import('../config/{packages}/*.yaml');
@@ -42,17 +45,10 @@ class Kernel extends BaseKernel
 
     private function loadPluginServices(ContainerConfigurator $container): void
     {
-        $pluginsDir = $this->resolvePluginsDir();
-        if (null === $pluginsDir) {
-            return;
-        }
-
-        $plugins = $this->discoverPlugins($pluginsDir);
+        $plugins = $this->getPlugins();
         if ([] === $plugins) {
             return;
         }
-
-        $this->registerPluginAutoloadPaths($plugins);
 
         $services = $container->services();
         $services->defaults()
@@ -67,21 +63,41 @@ class Kernel extends BaseKernel
         }
     }
 
+    private function loadPluginRoutes(RoutingConfigurator $routes): void
+    {
+        foreach ($this->getPlugins() as $plugin) {
+            $controllerDir = $plugin['dir'].'/backend/Controller';
+            if (is_dir($controllerDir)) {
+                $routes->import($controllerDir, 'attribute');
+            }
+        }
+    }
+
     /**
+     * Discovers plugins and registers their autoload paths (once).
+     *
      * @return list<array{dir: string, namespace: string}>
      */
-    private function discoverPlugins(string $pluginsDir): array
+    private function getPlugins(): array
     {
+        if (null !== $this->discoveredPlugins) {
+            return $this->discoveredPlugins;
+        }
+
+        $pluginsDir = $this->resolvePluginsDir();
+        if (null === $pluginsDir) {
+            return $this->discoveredPlugins = [];
+        }
+
         $manifests = glob($pluginsDir.'/*/manifest.json');
         if (!$manifests) {
-            return [];
+            return $this->discoveredPlugins = [];
         }
 
         $plugins = [];
         foreach ($manifests as $manifestPath) {
             $pluginDir = \dirname($manifestPath);
-            $backendDir = $pluginDir.'/backend';
-            if (!is_dir($backendDir)) {
+            if (!is_dir($pluginDir.'/backend')) {
                 continue;
             }
 
@@ -102,33 +118,16 @@ class Kernel extends BaseKernel
             $plugins[] = ['dir' => $pluginDir, 'namespace' => $namespace];
         }
 
-        return $plugins;
-    }
+        $this->discoveredPlugins = $plugins;
 
-    private function loadPluginRoutes(RoutingConfigurator $routes): void
-    {
-        $pluginsDir = $this->resolvePluginsDir();
-        if (null === $pluginsDir) {
-            return;
-        }
-
-        foreach ($this->discoverPlugins($pluginsDir) as $plugin) {
-            $controllerDir = $plugin['dir'].'/backend/Controller';
-            if (is_dir($controllerDir)) {
-                $routes->import($controllerDir, 'attribute');
+        if ([] !== $plugins) {
+            $loader = require $this->getProjectDir().'/vendor/autoload.php';
+            foreach ($plugins as $plugin) {
+                $loader->addPsr4($plugin['namespace'].'\\', $plugin['dir'].'/backend/');
             }
         }
-    }
 
-    /**
-     * @param list<array{dir: string, namespace: string}> $plugins
-     */
-    private function registerPluginAutoloadPaths(array $plugins): void
-    {
-        $loader = require $this->getProjectDir().'/vendor/autoload.php';
-        foreach ($plugins as $plugin) {
-            $loader->addPsr4($plugin['namespace'].'\\', $plugin['dir'].'/backend/');
-        }
+        return $plugins;
     }
 
     private function resolvePluginsDir(): ?string
