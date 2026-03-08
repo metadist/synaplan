@@ -1,6 +1,7 @@
 {
   "id": "sortx",
   "name": "sortx",
+  "namespace": "Plugin\\SortX",
   "version": "4.0.0",
   "displayName": "SortX Document Classifier",
   "description": "AI-powered document classification with multi-label support and metadata extraction",

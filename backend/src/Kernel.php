@@ -52,6 +52,8 @@ class Kernel extends BaseKernel
             return;
         }
 
+        $this->registerPluginAutoloadPaths($plugins);
+
         $services = $container->services();
         $services->defaults()
             ->autowire()
@@ -91,7 +93,7 @@ class Kernel extends BaseKernel
             $namespace = $data['namespace'] ?? null;
             if (null === $namespace) {
                 $id = $data['id'] ?? basename($pluginDir);
-                if (!preg_match('/^[a-z]+$/', $id)) {
+                if (!preg_match('/^[a-z][a-z0-9_]*$/', $id)) {
                     continue;
                 }
                 $namespace = 'Plugin\\'.ucfirst($id);
@@ -115,6 +117,17 @@ class Kernel extends BaseKernel
             if (is_dir($controllerDir)) {
                 $routes->import($controllerDir, 'attribute');
             }
+        }
+    }
+
+    /**
+     * @param list<array{dir: string, namespace: string}> $plugins
+     */
+    private function registerPluginAutoloadPaths(array $plugins): void
+    {
+        $loader = require $this->getProjectDir().'/vendor/autoload.php';
+        foreach ($plugins as $plugin) {
+            $loader->addPsr4($plugin['namespace'].'\\', $plugin['dir'].'/backend/');
         }
     }
 

@@ -1,5 +1,7 @@
 {
+    "id": "hello_world",
     "name": "hello_world",
+    "namespace": "Plugin\\HelloWorld",
     "version": "1.0.0",
     "description": "A simple hello world plugin running natively",
     "capabilities": ["chat", "ui_extension"],
