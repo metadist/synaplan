@@ -22,6 +22,8 @@ class Kernel extends BaseKernel
         } elseif (is_file($path = \dirname(__DIR__).'/config/services.php')) {
             (require $path)($container->withPath($path), $this);
         }
+
+        $this->loadPluginServices($container);
     }
 
     protected function configureRoutes(RoutingConfigurator $routes): void
@@ -35,15 +37,98 @@ class Kernel extends BaseKernel
             (require $path)($routes->withPath($path), $this);
         }
 
-        // Dynamic Plugin Route Loading (disabled - plugins need proper autoload setup)
-        // $pluginsDir = '/plugins';
-        // if (is_dir($pluginsDir)) {
-        //     $dirs = glob($pluginsDir.'/*/backend/Controller', GLOB_ONLYDIR);
-        //     if ($dirs) {
-        //         foreach ($dirs as $dir) {
-        //             $routes->import($dir, 'attribute');
-        //         }
-        //     }
-        // }
+        $this->loadPluginRoutes($routes);
+    }
+
+    private function loadPluginServices(ContainerConfigurator $container): void
+    {
+        $pluginsDir = $this->resolvePluginsDir();
+        if (null === $pluginsDir) {
+            return;
+        }
+
+        $plugins = $this->discoverPlugins($pluginsDir);
+        if ([] === $plugins) {
+            return;
+        }
+
+        $services = $container->services();
+        $services->defaults()
+            ->autowire()
+            ->autoconfigure()
+            ->bind('$uploadDir', '%kernel.project_dir%/var/uploads');
+
+        foreach ($plugins as $plugin) {
+            $services
+                ->load($plugin['namespace'].'\\', $plugin['dir'].'/backend/')
+                ->exclude($plugin['dir'].'/backend/{Entity,migrations,tests}');
+        }
+    }
+
+    /**
+     * @return list<array{dir: string, namespace: string}>
+     */
+    private function discoverPlugins(string $pluginsDir): array
+    {
+        $manifests = glob($pluginsDir.'/*/manifest.json');
+        if (!$manifests) {
+            return [];
+        }
+
+        $plugins = [];
+        foreach ($manifests as $manifestPath) {
+            $pluginDir = \dirname($manifestPath);
+            $backendDir = $pluginDir.'/backend';
+            if (!is_dir($backendDir)) {
+                continue;
+            }
+
+            $data = json_decode(file_get_contents($manifestPath), true);
+            if (!$data) {
+                continue;
+            }
+
+            $namespace = $data['namespace'] ?? null;
+            if (null === $namespace) {
+                $id = $data['id'] ?? basename($pluginDir);
+                if (!preg_match('/^[a-z]+$/', $id)) {
+                    continue;
+                }
+                $namespace = 'Plugin\\'.ucfirst($id);
+            }
+
+            $plugins[] = ['dir' => $pluginDir, 'namespace' => $namespace];
+        }
+
+        return $plugins;
+    }
+
+    private function loadPluginRoutes(RoutingConfigurator $routes): void
+    {
+        $pluginsDir = $this->resolvePluginsDir();
+        if (null === $pluginsDir) {
+            return;
+        }
+
+        foreach ($this->discoverPlugins($pluginsDir) as $plugin) {
+            $controllerDir = $plugin['dir'].'/backend/Controller';
+            if (is_dir($controllerDir)) {
+                $routes->import($controllerDir, 'attribute');
+            }
+        }
+    }
+
+    private function resolvePluginsDir(): ?string
+    {
+        if (is_dir('/plugins')) {
+            return '/plugins';
+        }
+
+        $local = \dirname(__DIR__).'/plugins';
+        if (is_dir($local)) {
+            return $local;
+        }
+
+        return null;
     }
 }
