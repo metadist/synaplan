@@ -16,14 +16,24 @@ spl_autoload_register(function (string $class): void {
 
     $parts = explode('\\', $class);
     array_shift($parts);
-    $pluginName = strtolower(array_shift($parts));
+    $rawName = array_shift($parts);
 
     $pluginsDir = '/plugins';
     if (!is_dir($pluginsDir)) {
         $pluginsDir = dirname(__DIR__).'/plugins';
     }
 
-    $file = $pluginsDir.'/'.$pluginName.'/backend/'.implode('/', $parts).'.php';
+    // Try lowercase first (SortX → sortx, CastingData → castingdata),
+    // then snake_case (HelloWorld → hello_world) for underscore directories.
+    $dirName = strtolower($rawName);
+    if (!is_dir($pluginsDir.'/'.$dirName)) {
+        $snakeName = strtolower((string) preg_replace('/(?<!^)[A-Z]/', '_$0', $rawName));
+        if ($snakeName !== $dirName && is_dir($pluginsDir.'/'.$snakeName)) {
+            $dirName = $snakeName;
+        }
+    }
+
+    $file = $pluginsDir.'/'.$dirName.'/backend/'.implode('/', $parts).'.php';
     if (file_exists($file)) {
         require_once $file;
     }
