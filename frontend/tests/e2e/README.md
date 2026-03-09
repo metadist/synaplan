@@ -49,16 +49,16 @@ Permission error on `frontend/dist/` (container creates it as root): `sudo rm -r
 
 ## Test stack details
 
-|               | Dev stack                       | Test stack                                     |
-| ------------- | ------------------------------- | ---------------------------------------------- |
-| **Start**     | `docker compose up -d`          | `make test-stack-build`                        |
-| **Backend**   | http://localhost:8000           | http://localhost:8001                          |
-| **Frontend**  | http://localhost:5173 (Vite)    | Served by backend (:8001)                      |
-| **APP_ENV**   | `dev`                           | `test`                                         |
+|               | Dev stack                       | Test stack                                            |
+| ------------- | ------------------------------- | ----------------------------------------------------- |
+| **Start**     | `docker compose up -d`          | `make test-stack-build`                               |
+| **Backend**   | http://localhost:8000           | http://localhost:8001                                 |
+| **Frontend**  | http://localhost:5173 (Vite)    | Served by backend (:8001)                             |
+| **APP_ENV**   | `dev`                           | `test`                                                |
 | **AI models** | Real providers (needs API keys) | **TestProvider** (models 9000-9007, all capabilities) |
-| **DB**        | Persistent volume               | **tmpfs** (fresh on every `up`)                |
-| **MailHog**   | :8025 / :1025                   | :8025 / :1025 (shared ports!)                  |
-| **Login**     | admin@synaplan.com / admin123   | admin@synaplan.com / admin123                  |
+| **DB**        | Persistent volume               | **tmpfs** (fresh on every `up`)                       |
+| **MailHog**   | :8025 / :1025                   | :8025 / :1025 (shared ports!)                         |
+| **Login**     | admin@synaplan.com / admin123   | admin@synaplan.com / admin123                         |
 
 Widget E2E tests use the page at `/widget-test.html`. Tests use `page.route()` to serve the fixture from disk.
 
