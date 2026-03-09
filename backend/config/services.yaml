@@ -494,21 +494,8 @@ services:
         class: Monolog\Formatter\FormatterInterface
         factory: ['@App\Service\MonologFormatterFactory', 'createFormatter']
 
-    # Plugin discovery
-    # Note: Specific path mapping needed because plugin directory structure
-    # (sortx/backend/) doesn't follow PSR-4 convention (SortX/)
-    Plugin\SortX\:
-        resource: '%plugins_dir%/sortx/backend/'
-        exclude: '%plugins_dir%/sortx/backend/{Entity,migrations,tests}'
-
-    Plugin\SortX\Controller\SortXController:
-        arguments:
-            $uploadDir: '%kernel.project_dir%/var/uploads'
-
-    # Plugin discovery - Casting Data Connector
-    Plugin\CastingData\:
-        resource: '%plugins_dir%/castingdata/backend/'
-        exclude: '%plugins_dir%/castingdata/backend/{Entity,migrations,tests}'
+    # Plugin services are loaded dynamically by Kernel::loadPluginServices()
+    # No manual plugin entries needed — drop plugin into /plugins/ and restart.
 
     # System Configuration Service (Admin .env editor)
     App\Service\Admin\SystemConfigService:

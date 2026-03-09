@@ -61,7 +61,7 @@ async function loadPlugin() {
   pluginContainer.value.innerHTML = ''
 
   const pluginBaseUrl = `${configStore.apiBaseUrl}/api/v1/user/${authStore.user.id}/plugins/${pluginName.value}/assets`
-  const entryUrl = `${pluginBaseUrl}/index.js`
+  const entryUrl = `${pluginBaseUrl}/index.js?v=${Date.now()}`
 
   try {
     // 1. Fetch index.html if it exists to support "webpage" style plugins

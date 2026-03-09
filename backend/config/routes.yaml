@@ -4,16 +4,5 @@ controllers:
         namespace: App\Controller
     type: attribute
 
-# Plugin routes - SortX
-plugin_sortx:
-    resource:
-        path: /plugins/sortx/backend/Controller/
-        namespace: Plugin\SortX\Controller
-    type: attribute
-
-# Plugin routes - Casting Data Connector
-plugin_castingdata:
-    resource:
-        path: /plugins/castingdata/backend/Controller/
-        namespace: Plugin\CastingData\Controller
-    type: attribute
+# Plugin routes are loaded dynamically by Kernel::loadPluginRoutes()
+# No manual plugin entries needed — drop plugin into /plugins/ and restart.

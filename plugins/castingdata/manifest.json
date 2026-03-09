@@ -1,6 +1,7 @@
 {
   "id": "castingdata",
   "name": "castingdata",
+  "namespace": "Plugin\\CastingData",
   "version": "1.0.0",
   "displayName": "Casting Data Connector",
   "description": "Connect external casting platforms to provide production, audition, and role data in chat",
