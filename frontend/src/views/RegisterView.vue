@@ -321,13 +321,23 @@
 
           <p class="mt-6 text-center text-xs txt-secondary leading-relaxed">
             {{ $t('auth.termsAgree') }}
-            <a href="#" class="transition-colors" style="color: var(--brand)">{{
-              $t('auth.termsOfService')
-            }}</a>
+            <a
+              href="https://www.synaplan.com/de/imprint"
+              target="_blank"
+              rel="noopener noreferrer"
+              class="transition-colors hover:underline"
+              style="color: var(--brand)"
+              >{{ $t('auth.termsOfService') }}</a
+            >
             {{ $t('auth.and') }}
-            <a href="#" class="transition-colors" style="color: var(--brand)">{{
-              $t('auth.privacyPolicy')
-            }}</a>
+            <a
+              href="https://www.synaplan.com/de/privacy-policy"
+              target="_blank"
+              rel="noopener noreferrer"
+              class="transition-colors hover:underline"
+              style="color: var(--brand)"
+              >{{ $t('auth.privacyPolicy') }}</a
+            >
           </p>
 
           <!-- Hosting platform terms note -->
