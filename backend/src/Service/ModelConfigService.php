@@ -272,7 +272,6 @@ final readonly class ModelConfigService
      */
     public function getDefaultModel(string $capability, ?int $userId = null): ?int
     {
-
         // Try user-specific config first
         if ($userId) {
             $config = $this->configRepository->findOneBy([
@@ -443,5 +442,4 @@ final readonly class ModelConfigService
         // For web/other channels: always use user-specific models
         return $userId;
     }
-
 }
