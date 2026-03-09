@@ -527,6 +527,18 @@ services:
     App\Service\RAG\VectorStorage\VectorStorageInterface:
         alias: App\Service\RAG\VectorStorage\VectorStorageFacade
 
+when@dev:
+    services:
+        App\AI\Provider\TestProvider:
+            tags:
+                - { name: 'app.ai.chat' }
+                - { name: 'app.ai.embedding' }
+                - { name: 'app.ai.vision' }
+                - { name: 'app.ai.image_generation' }
+                - { name: 'app.ai.speech_to_text' }
+                - { name: 'app.ai.text_to_speech' }
+                - { name: 'app.ai.file_analysis' }
+
 when@test:
     services:
         App\AI\Provider\TestProvider:
