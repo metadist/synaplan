@@ -49,7 +49,7 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
 
     // Subscription wird via BUSERLEVEL + BPAYMENTDETAILS JSON gesteuert
     // BUSERLEVEL: NEW, PRO, TEAM, BUSINESS, ADMIN
-    // BPAYMENTDETAILS: {subscription_id, status, starts, ends, period, stripe_customer_id, stripe_subscription_id}
+    // BPAYMENTDETAILS: {stripe_customer_id?, subscription?: {stripe_subscription_id, status, subscription_start, subscription_end, plan, cancel_at_period_end?, cancel_at?}}
 
     public function getId(): ?int
     {
@@ -312,13 +312,13 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
 
         return isset($sub['status'])
             && 'active' === $sub['status']
-            && isset($sub['ends'])
-            && $sub['ends'] > time();
+            && isset($sub['subscription_end'])
+            && $sub['subscription_end'] > time();
     }
 
     public function getSubscriptionEnds(): ?int
     {
-        return $this->getSubscriptionData()['ends'] ?? null;
+        return $this->getSubscriptionData()['subscription_end'] ?? null;
     }
 
     public function getStripeCustomerId(): ?string

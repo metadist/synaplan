@@ -151,6 +151,7 @@ export const selectors = {
   },
   userMenu: {
     button: '[data-testid="btn-sidebar-v2-user"]',
+    subscriptionBtn: '[data-testid="btn-sidebar-v2-subscription"]',
     logoutBtn: '[data-testid="btn-sidebar-v2-logout"]',
   },
   oidc: {
@@ -241,6 +242,24 @@ export const selectors = {
     errorFileUploadLimit: '[data-testid="error-file-upload-limit"]',
     errorFileSize: '[data-testid="error-file-size"]',
     removeFileButton: (index: number) => `[data-testid="btn-remove-file-${index}"]`,
+  },
+  subscription: {
+    page: '[data-testid="page-subscription"]',
+    sectionCurrentPlan: '[data-testid="section-current-plan"]',
+    badgeCurrentLevel: '[data-testid="badge-current-level"]',
+    badgeStatus: '[data-testid="badge-subscription-status"]',
+    btnOpenPortal: '[data-testid="btn-open-portal"]',
+    cardPlan: '[data-testid="card-plan"]',
+    btnSelectPro: '[data-testid="btn-select-pro"]',
+    btnSelectTeam: '[data-testid="btn-select-team"]',
+    btnSelectBusiness: '[data-testid="btn-select-business"]',
+  },
+  subscriptionSuccess: {
+    page: '[data-testid="page-subscription-success"]',
+    stateSyncing: '[data-testid="state-syncing"]',
+    stateSyncSuccess: '[data-testid="state-sync-success"]',
+    stateSyncError: '[data-testid="state-sync-error"]',
+    textNewLevel: '[data-testid="text-new-level"]',
   },
   toast: {},
 } as const
