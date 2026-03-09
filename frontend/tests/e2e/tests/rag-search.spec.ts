@@ -17,8 +17,11 @@ const RAG_SEARCH_PHRASE = readFileSync(ragFixturePath, 'utf-8').trim()
  * Full semantic search E2E: upload fixture file, search for same phrase, assert at least one result.
  * Requires real AI (embeddings); excluded from CI via @noci.
  */
-test('@007 @noci @smoke semantic search finds uploaded content (real AI)', async ({ page }) => {
-  await login(page)
+test('@007 @noci @smoke semantic search finds uploaded content (real AI)', async ({
+  page,
+  credentials,
+}) => {
+  await login(page, credentials)
 
   await test.step('Arrange: navigate to Files page', async () => {
     const filesBtn = page.locator('[data-testid="btn-sidebar-v2--files"]')

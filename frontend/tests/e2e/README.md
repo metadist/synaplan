@@ -85,7 +85,7 @@ You can e.g. run smoke tests (id=003) locally against the test provider.
 
 ## Multi-worker (parallel tests)
 
-Tests run with multiple workers. Each worker has a dedicated user (worker 0: admin, workers 1–3: `e2e-worker-1@synaplan.com` …); after each test we clean only that user’s data so parallel runs don’t share state. UserFixtures include these E2E users. **Keep `workers` ≤ number of defined users (currently 4), or add more users in `credentials.ts` and UserFixtures.**
+Tests run with 4 parallel workers by default. Each worker dynamically creates a unique test user via the register API + MailHog email verification at startup, and deletes it on teardown. No fixed E2E users in the database — only the admin fixture user remains (used for setup/teardown API calls). Worker count: `WORKER_COUNT` in `playwright.config.ts`; override with `E2E_WORKERS` (e.g. CI).
 
 ## Test commands
 
@@ -207,6 +207,7 @@ Tests use tags in their names for filtering:
 | Variable      | Default                 | Description                                                              |
 | ------------- | ----------------------- | ------------------------------------------------------------------------ |
 | `BASE_URL`    | `http://localhost:5173` | App URL to test against                                                  |
+| `E2E_WORKERS` | —                       | Override worker count (e.g. `2` in CI); default from config (4)          |
 | `AUTH_METHOD` | `password`              | `password` or `oidc` — switches the generic `login()` helper to use OIDC |
 | `AUTH_USER`   | `admin@synaplan.com`    | Password-auth email                                                      |
 | `AUTH_PASS`   | `admin123`              | Password-auth password                                                   |

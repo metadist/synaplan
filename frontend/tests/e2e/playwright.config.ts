@@ -1,6 +1,9 @@
 import { defineConfig, devices } from '@playwright/test'
 import { URLS } from './config/config'
 
+const n = process.env.E2E_WORKERS ? parseInt(process.env.E2E_WORKERS, 10) : 4
+export const WORKER_COUNT = Number.isInteger(n) && n >= 1 ? n : 4
+
 export default defineConfig({
   testDir: 'tests',
   testMatch: '**/*.spec.ts',
@@ -22,7 +25,7 @@ export default defineConfig({
   ],
 
   outputDir: 'test-results',
-  workers: 4,
+  workers: WORKER_COUNT,
 
   projects: [
     {
