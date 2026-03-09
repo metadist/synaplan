@@ -94,11 +94,6 @@ class ProviderRegistry
      */
     private function isCapabilityEnabled(string $providerName, string $capability): bool
     {
-        // EXCEPTION: TestProvider is always enabled (for unit tests & development)
-        if ('test' === strtolower($providerName)) {
-            return true;
-        }
-
         $dbCaps = $this->loadDbCapabilities();
 
         // Normalize provider name (case-insensitive)
