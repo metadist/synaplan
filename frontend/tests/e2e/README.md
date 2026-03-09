@@ -49,25 +49,24 @@ Permission error on `frontend/dist/` (container creates it as root): `sudo rm -r
 
 ## Test stack details
 
-|               | Dev stack                                 | Test stack                                     |
-| ------------- | ----------------------------------------- | ---------------------------------------------- |
-| **Start**     | `docker compose up -d`                    | `make test-stack-build`                        |
-| **Backend**   | http://localhost:8000                     | http://localhost:8001                          |
-| **Frontend**  | http://localhost:5173 (Vite)              | Served by backend (:8001)                      |
-| **APP_ENV**   | `dev`                                     | `test`                                         |
-| **AI models** | Real providers + TestProvider (9000-9007) | **TestProvider** as default (models 9000-9007) |
-| **DB**        | Persistent volume                         | **tmpfs** (fresh on every `up`)                |
-| **MailHog**   | :8025 / :1025                             | :8025 / :1025 (shared ports!)                  |
-| **Login**     | admin@synaplan.com / admin123             | admin@synaplan.com / admin123                  |
+|               | Dev stack                                 | Test stack                                |
+| ------------- | ----------------------------------------- | ----------------------------------------- |
+| **Start**     | `docker compose up -d`                    | `make test-stack-build`                   |
+| **Backend**   | http://localhost:8000                     | http://localhost:8001                     |
+| **Frontend**  | http://localhost:5173 (Vite)              | Served by backend (:8001)                 |
+| **APP_ENV**   | `dev`                                     | `test`                                    |
+| **AI models** | Real providers + TestProvider (9000-9007) | Real providers + TestProvider (9000-9007) |
+| **DB**        | Persistent volume                         | **tmpfs** (fresh on every `up`)           |
+| **MailHog**   | :8025 / :1025                             | :8025 / :1025 (shared ports!)             |
+| **Login**     | admin@synaplan.com / admin123             | admin@synaplan.com / admin123             |
 
 Widget E2E tests use the page at `/widget-test.html`. Tests use `page.route()` to serve the fixture from disk.
 
 ### TestProvider availability
 
-The TestProvider is available in **dev and test** environments (not in prod). Fixtures seed test models (IDs 9000-9007) for all capability tags in both stacks.
+The TestProvider is available in **dev and test** environments (not in prod). Fixtures seed test models (IDs 9000-9007) for all capability tags in both stacks. Default models are always the real providers (Groq etc.) — identical to prod.
 
-- **Test stack**: TestProvider is the global default (ConfigFixtures sets DEFAULTMODEL to 9000+).
-- **Dev stack**: Real providers (Groq etc.) are the default. Tests that need AI should explicitly set the TestProvider model via `POST /api/v1/config/models/defaults`.
+Tests that need AI must explicitly set the TestProvider model via `POST /api/v1/config/models/defaults` before the test and restore the original defaults in cleanup.
 
 ### TestProvider: CI-like environment (test stack)
 
