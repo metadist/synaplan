@@ -55,28 +55,18 @@ Permission error on `frontend/dist/` (container creates it as root): `sudo rm -r
 | **Backend**   | http://localhost:8000           | http://localhost:8001                          |
 | **Frontend**  | http://localhost:5173 (Vite)    | Served by backend (:8001)                      |
 | **APP_ENV**   | `dev`                           | `test`                                         |
-| **AI models** | Real providers (needs API keys) | **TestProvider** (model 900, all capabilities) |
+| **AI models** | Real providers (needs API keys) | **TestProvider** (models 9000-9007, all capabilities) |
 | **DB**        | Persistent volume               | **tmpfs** (fresh on every `up`)                |
 | **MailHog**   | :8025 / :1025                   | :8025 / :1025 (shared ports!)                  |
 | **Login**     | admin@synaplan.com / admin123   | admin@synaplan.com / admin123                  |
 
 Widget E2E tests use the page at `/widget-test.html`. Tests use `page.route()` to serve the fixture from disk.
 
-### Selecting TestProvider in the dev stack
+### TestProvider availability
 
-In the **dev stack** (localhost:5173 + 8000) the TestProvider is shown in **Settings → AI Models** when `APP_ENV=dev` (default in docker-compose). The test model (id 900) must exist in the database; load only the model fixtures once if you don’t see it (avoids duplicate-key errors from other fixtures when using `--append`):
+The TestProvider is **only available in `APP_ENV=test`** (test stack). It is not registered in the dev or prod DI container. In the test stack, fixtures automatically seed test models (IDs 9000-9007) for all capability tags and set them as global defaults.
 
-```bash
-docker compose exec backend php bin/console doctrine:fixtures:load --append --group=ModelFixtures
-```
-
-Then:
-
-1. Open the app → **Settings** (sidebar) → **AI Models**.
-2. For the chat model, select **"test-model" (Test Provider)** and save.
-3. Run E2E tests with `npm run test:e2e` (no API keys needed; deterministic responses).
-
-You can e.g. run smoke tests (id=003) locally against the test provider.
+Tests that need AI should explicitly set the TestProvider model via `POST /api/v1/config/models/defaults`.
 
 ### TestProvider: CI-like environment (test stack)
 
