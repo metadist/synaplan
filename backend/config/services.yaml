@@ -1,4 +1,7 @@
 parameters:
+    # Shared upload directory for core and plugins
+    app.upload_dir: '%kernel.project_dir%/var/uploads'
+
     # reCAPTCHA defaults (disabled by default)
     recaptcha_enabled_default: false
     recaptcha_min_score_default: 0.5

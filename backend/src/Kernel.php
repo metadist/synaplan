@@ -53,8 +53,7 @@ class Kernel extends BaseKernel
         $services = $container->services();
         $services->defaults()
             ->autowire()
-            ->autoconfigure()
-            ->bind('$uploadDir', '%kernel.project_dir%/var/uploads');
+            ->autoconfigure();
 
         foreach ($plugins as $plugin) {
             $services
