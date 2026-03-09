@@ -9,8 +9,9 @@ use Doctrine\Persistence\ObjectManager;
 /**
  * Loads all AI models from the built-in catalog into the database.
  *
- * In APP_ENV=test, also seeds TestProvider models (IDs 9000-9007) for all capability tags
- * so E2E/CI tests can select them explicitly via the models/defaults API.
+ * Also seeds TestProvider models (IDs 9000-9007) for all capability tags.
+ * Fixtures only run in dev/test (docker-entrypoint.sh guards this), never in prod.
+ * E2E tests select TestProvider explicitly via POST /api/v1/config/models/defaults.
  */
 class ModelFixtures extends Fixture
 {
@@ -29,20 +30,18 @@ class ModelFixtures extends Fixture
     {
         $connection = $manager->getConnection();
 
-        if ('test' === (getenv('APP_ENV') ?: '')) {
-            foreach (self::TEST_MODELS as $base) {
-                ModelCatalog::upsert($connection, array_merge($base, [
-                    'selectable' => 1,
-                    'active' => 1,
-                    'priceIn' => 0,
-                    'inUnit' => '-',
-                    'priceOut' => 0,
-                    'outUnit' => '-',
-                    'quality' => 1,
-                    'rating' => 0,
-                    'json' => ['description' => 'Mock model for E2E/CI (TestProvider). No API key required.'],
-                ]));
-            }
+        foreach (self::TEST_MODELS as $base) {
+            ModelCatalog::upsert($connection, array_merge($base, [
+                'selectable' => 1,
+                'active' => 1,
+                'priceIn' => 0,
+                'inUnit' => '-',
+                'priceOut' => 0,
+                'outUnit' => '-',
+                'quality' => 1,
+                'rating' => 0,
+                'json' => ['description' => 'Mock model for E2E/CI (TestProvider). No API key required.'],
+            ]));
         }
 
         foreach (ModelCatalog::all() as $data) {
