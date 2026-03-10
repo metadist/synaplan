@@ -1272,6 +1272,7 @@
     "sessions": "Sessions",
     "messages": "Messages",
     "visitorMessages": "Visitor Messages",
+    "aiModel": "AI Model",
     "sentiment": "Sentiment",
     "positive": "Positive",
     "negative": "Negative",

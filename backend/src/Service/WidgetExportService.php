@@ -80,6 +80,7 @@ final readonly class WidgetExportService
             'Last Activity',
             'Message Count',
             'Mode',
+            'Channel',
             'Timestamp',
             'Sender',
             'Message',
@@ -104,6 +105,7 @@ final readonly class WidgetExportService
                     date('Y-m-d H:i:s', $session->getLastMessage()),
                     $messageCount,
                     $session->getMode(),
+                    'Chat Widget',
                     date('Y-m-d H:i:s', $message['timestamp']),
                     $message['sender'],
                     $message['text'],
@@ -181,6 +183,7 @@ final readonly class WidgetExportService
 
             $exportData['sessions'][] = [
                 'session_id' => $session->getSessionId(),
+                'channel' => 'Chat Widget',
                 'created' => date('c', $session->getCreated()),
                 'last_activity' => date('c', $session->getLastMessage()),
                 'message_count' => $messageCount,
@@ -249,14 +252,21 @@ final readonly class WidgetExportService
         $sheet->setCellValue('A9', 'Statistics');
         $sheet->getStyle('A9')->getFont()->setBold(true)->setSize(12);
 
+        $totalMessages = 0;
+        foreach ($result['sessions'] as $session) {
+            $totalMessages += count($this->getSessionMessages($session));
+        }
+
         $sheet->setCellValue('A10', 'Total Sessions:');
         $sheet->setCellValue('B10', $result['total']);
-        $sheet->setCellValue('A11', 'AI Sessions:');
-        $sheet->setCellValue('B11', $modeStats['ai']);
-        $sheet->setCellValue('A12', 'Human Sessions:');
-        $sheet->setCellValue('B12', $modeStats['human']);
-        $sheet->setCellValue('A13', 'Waiting Sessions:');
-        $sheet->setCellValue('B13', $modeStats['waiting']);
+        $sheet->setCellValue('A11', 'Total Messages:');
+        $sheet->setCellValue('B11', $totalMessages);
+        $sheet->setCellValue('A12', 'AI Sessions:');
+        $sheet->setCellValue('B12', $modeStats['ai']);
+        $sheet->setCellValue('A13', 'Human Sessions:');
+        $sheet->setCellValue('B13', $modeStats['human']);
+        $sheet->setCellValue('A14', 'Waiting Sessions:');
+        $sheet->setCellValue('B14', $modeStats['waiting']);
 
         // Auto-size columns
         $sheet->getColumnDimension('A')->setWidth(20);
@@ -266,7 +276,7 @@ final readonly class WidgetExportService
     private function createConversationsSheet($sheet, Widget $widget, array $filters): void
     {
         // Header
-        $headers = ['Session', 'Time', 'From', 'Message'];
+        $headers = ['Session', 'Channel', 'Time', 'From', 'Message'];
         $col = 'A';
         foreach ($headers as $header) {
             $sheet->setCellValue($col.'1', $header);
@@ -294,19 +304,21 @@ final readonly class WidgetExportService
                     $sheet->setCellValue('B'.$row, '---');
                     $sheet->setCellValue('C'.$row, '---');
                     $sheet->setCellValue('D'.$row, '---');
-                    $sheet->getStyle('A'.$row.':D'.$row)->getFont()->setColor(new \PhpOffice\PhpSpreadsheet\Style\Color('999999'));
+                    $sheet->setCellValue('E'.$row, '---');
+                    $sheet->getStyle('A'.$row.':E'.$row)->getFont()->setColor(new \PhpOffice\PhpSpreadsheet\Style\Color('999999'));
                     ++$row;
                     ++$sessionNum;
                 }
 
                 $sheet->setCellValue('A'.$row, '#'.$sessionNum);
-                $sheet->setCellValue('B'.$row, date('H:i:s', $message['timestamp']));
-                $sheet->setCellValue('C'.$row, $message['sender']);
-                $sheet->setCellValue('D'.$row, $message['text']);
+                $sheet->setCellValue('B'.$row, 'Chat Widget');
+                $sheet->setCellValue('C'.$row, date('H:i:s', $message['timestamp']));
+                $sheet->setCellValue('D'.$row, $message['sender']);
+                $sheet->setCellValue('E'.$row, $message['text']);
 
                 // Color coding for sender
                 if ('IN' === $message['direction']) {
-                    $sheet->getStyle('A'.$row.':D'.$row)->getFill()
+                    $sheet->getStyle('A'.$row.':E'.$row)->getFill()
                         ->setFillType(Fill::FILL_SOLID)
                         ->getStartColor()->setRGB('F0FDF4');
                 }
@@ -318,18 +330,19 @@ final readonly class WidgetExportService
 
         // Auto-size columns
         $sheet->getColumnDimension('A')->setWidth(10);
-        $sheet->getColumnDimension('B')->setWidth(12);
+        $sheet->getColumnDimension('B')->setWidth(14);
         $sheet->getColumnDimension('C')->setWidth(12);
-        $sheet->getColumnDimension('D')->setWidth(80);
+        $sheet->getColumnDimension('D')->setWidth(12);
+        $sheet->getColumnDimension('E')->setWidth(80);
 
         // Wrap text in message column
-        $sheet->getStyle('D:D')->getAlignment()->setWrapText(true);
+        $sheet->getStyle('E:E')->getAlignment()->setWrapText(true);
     }
 
     private function createSessionsSheet($sheet, Widget $widget, array $filters): void
     {
         // Header
-        $headers = ['Session ID', 'Created', 'Last Activity', 'Messages', 'Files', 'Mode', 'Duration'];
+        $headers = ['Session ID', 'Channel', 'Created', 'Last Activity', 'Messages', 'Files', 'Mode', 'Duration'];
         $col = 'A';
         foreach ($headers as $header) {
             $sheet->setCellValue($col.'1', $header);
@@ -352,18 +365,19 @@ final readonly class WidgetExportService
             $fileCount = $this->countFilesInMessages($messages);
 
             $sheet->setCellValue('A'.$row, substr($session->getSessionId(), 0, 12).'...');
-            $sheet->setCellValue('B'.$row, date('Y-m-d H:i', $session->getCreated()));
-            $sheet->setCellValue('C'.$row, date('Y-m-d H:i', $session->getLastMessage()));
-            $sheet->setCellValue('D'.$row, $messageCount);
-            $sheet->setCellValue('E'.$row, $fileCount);
-            $sheet->setCellValue('F'.$row, ucfirst($session->getMode()));
-            $sheet->setCellValue('G'.$row, $durationStr);
+            $sheet->setCellValue('B'.$row, 'Chat Widget');
+            $sheet->setCellValue('C'.$row, date('Y-m-d H:i', $session->getCreated()));
+            $sheet->setCellValue('D'.$row, date('Y-m-d H:i', $session->getLastMessage()));
+            $sheet->setCellValue('E'.$row, $messageCount);
+            $sheet->setCellValue('F'.$row, $fileCount);
+            $sheet->setCellValue('G'.$row, ucfirst($session->getMode()));
+            $sheet->setCellValue('H'.$row, $durationStr);
 
             ++$row;
         }
 
         // Auto-size columns
-        foreach (range('A', 'G') as $col) {
+        foreach (range('A', 'H') as $col) {
             $sheet->getColumnDimension($col)->setAutoSize(true);
         }
     }
@@ -393,11 +407,15 @@ final readonly class WidgetExportService
         );
 
         return array_map(function ($message) {
-            $sender = 'AI';
+            $providerIndex = $message->getProviderIndex();
             if ('IN' === $message->getDirection()) {
                 $sender = 'Visitor';
-            } elseif ('HUMAN_OPERATOR' === $message->getProviderIndex()) {
-                $sender = 'Support';
+            } elseif ('SYSTEM' === $providerIndex) {
+                $sender = 'System';
+            } elseif ('HUMAN_OPERATOR' === $providerIndex) {
+                $sender = 'Support Agent';
+            } else {
+                $sender = 'AI Assistant';
             }
 
             // Extract files from message
