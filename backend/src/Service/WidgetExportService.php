@@ -83,6 +83,7 @@ final readonly class WidgetExportService
             'Channel',
             'Timestamp',
             'Sender',
+            'Language',
             'Message',
         ]);
 
@@ -108,6 +109,7 @@ final readonly class WidgetExportService
                     'Chat Widget',
                     date('Y-m-d H:i:s', $message['timestamp']),
                     $message['sender'],
+                    $message['language'],
                     $message['text'],
                 ]);
             }
@@ -194,6 +196,7 @@ final readonly class WidgetExportService
                     'text' => $m['text'],
                     'timestamp' => date('c', $m['timestamp']),
                     'sender' => $m['sender'],
+                    'language' => $m['language'],
                     'files' => array_map(fn ($f) => [
                         ...$f,
                         'download_url' => $baseUrl.$f['download_url'],
@@ -276,7 +279,7 @@ final readonly class WidgetExportService
     private function createConversationsSheet($sheet, Widget $widget, array $filters): void
     {
         // Header
-        $headers = ['Session', 'Channel', 'Time', 'From', 'Message'];
+        $headers = ['Session', 'Channel', 'Time', 'From', 'Language', 'Message'];
         $col = 'A';
         foreach ($headers as $header) {
             $sheet->setCellValue($col.'1', $header);
@@ -305,7 +308,8 @@ final readonly class WidgetExportService
                     $sheet->setCellValue('C'.$row, '---');
                     $sheet->setCellValue('D'.$row, '---');
                     $sheet->setCellValue('E'.$row, '---');
-                    $sheet->getStyle('A'.$row.':E'.$row)->getFont()->setColor(new \PhpOffice\PhpSpreadsheet\Style\Color('999999'));
+                    $sheet->setCellValue('F'.$row, '---');
+                    $sheet->getStyle('A'.$row.':F'.$row)->getFont()->setColor(new \PhpOffice\PhpSpreadsheet\Style\Color('999999'));
                     ++$row;
                     ++$sessionNum;
                 }
@@ -314,11 +318,12 @@ final readonly class WidgetExportService
                 $sheet->setCellValue('B'.$row, 'Chat Widget');
                 $sheet->setCellValue('C'.$row, date('H:i:s', $message['timestamp']));
                 $sheet->setCellValue('D'.$row, $message['sender']);
-                $sheet->setCellValue('E'.$row, $message['text']);
+                $sheet->setCellValue('E'.$row, $message['language']);
+                $sheet->setCellValue('F'.$row, $message['text']);
 
                 // Color coding for sender
                 if ('IN' === $message['direction']) {
-                    $sheet->getStyle('A'.$row.':E'.$row)->getFill()
+                    $sheet->getStyle('A'.$row.':F'.$row)->getFill()
                         ->setFillType(Fill::FILL_SOLID)
                         ->getStartColor()->setRGB('F0FDF4');
                 }
@@ -333,10 +338,11 @@ final readonly class WidgetExportService
         $sheet->getColumnDimension('B')->setWidth(14);
         $sheet->getColumnDimension('C')->setWidth(12);
         $sheet->getColumnDimension('D')->setWidth(12);
-        $sheet->getColumnDimension('E')->setWidth(80);
+        $sheet->getColumnDimension('E')->setWidth(10);
+        $sheet->getColumnDimension('F')->setWidth(80);
 
         // Wrap text in message column
-        $sheet->getStyle('E:E')->getAlignment()->setWrapText(true);
+        $sheet->getStyle('F:F')->getAlignment()->setWrapText(true);
     }
 
     private function createSessionsSheet($sheet, Widget $widget, array $filters): void
@@ -385,7 +391,7 @@ final readonly class WidgetExportService
     /**
      * Get messages for a session.
      *
-     * @return array<array{direction: string, text: string, timestamp: int, sender: string, files: array}>
+     * @return array<array{direction: string, text: string, timestamp: int, sender: string, language: string, files: array}>
      */
     private function getSessionMessages(WidgetSession $session): array
     {
@@ -433,9 +439,10 @@ final readonly class WidgetExportService
 
             return [
                 'direction' => $message->getDirection(),
-                'text' => $message->getText(),
+                'text' => $this->sanitizeCellValue($message->getText()),
                 'timestamp' => $message->getUnixTimestamp(),
                 'sender' => $sender,
+                'language' => strtoupper($message->getLanguage()),
                 'files' => $files,
             ];
         }, $messages);
@@ -464,5 +471,24 @@ final readonly class WidgetExportService
         }
 
         return floor($seconds / 3600).'h '.floor(($seconds % 3600) / 60).'m';
+    }
+
+    /**
+     * Prevent CSV/formula injection by escaping leading characters
+     * that spreadsheet applications interpret as formulas.
+     */
+    private function sanitizeCellValue(string $value): string
+    {
+        if ('' !== $value && str_starts_with($value, '=')
+            || str_starts_with($value, '+')
+            || str_starts_with($value, '-')
+            || str_starts_with($value, '@')
+            || str_starts_with($value, "\t")
+            || str_starts_with($value, "\r")
+        ) {
+            return "'".$value;
+        }
+
+        return $value;
     }
 }
