@@ -439,7 +439,7 @@ final readonly class WidgetExportService
 
             return [
                 'direction' => $message->getDirection(),
-                'text' => $message->getText(),
+                'text' => $this->sanitizeCellValue($message->getText()),
                 'timestamp' => $message->getUnixTimestamp(),
                 'sender' => $sender,
                 'language' => strtoupper($message->getLanguage()),
@@ -471,5 +471,24 @@ final readonly class WidgetExportService
         }
 
         return floor($seconds / 3600).'h '.floor(($seconds % 3600) / 60).'m';
+    }
+
+    /**
+     * Prevent CSV/formula injection by escaping leading characters
+     * that spreadsheet applications interpret as formulas.
+     */
+    private function sanitizeCellValue(string $value): string
+    {
+        if ('' !== $value && str_starts_with($value, '=')
+            || str_starts_with($value, '+')
+            || str_starts_with($value, '-')
+            || str_starts_with($value, '@')
+            || str_starts_with($value, "\t")
+            || str_starts_with($value, "\r")
+        ) {
+            return "'".$value;
+        }
+
+        return $value;
     }
 }
