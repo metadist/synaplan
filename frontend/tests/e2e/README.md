@@ -64,9 +64,11 @@ Widget E2E tests use the page at `/widget-test.html`. Tests use `page.route()` t
 
 ### TestProvider availability
 
-The TestProvider is available in **dev and test** environments (not in prod). Fixtures seed test models (IDs 9000-9007) for all capability tags in both stacks. Default models are always the real providers (Groq etc.) — identical to prod.
+The TestProvider is available in **dev and test** environments (not in prod). Fixtures seed test models (IDs 9000-9007) for all capability tags in both stacks.
 
-Tests that need AI must explicitly set the TestProvider model via `POST /api/v1/config/models/defaults` before the test and restore the original defaults in cleanup.
+**Global defaults are set automatically** by `global-setup.ts` (Playwright `globalSetup`). Before any test runs, the setup logs in as admin and sets the system-wide default models (ownerId=0) to TestProvider via `POST /api/v1/config/models/defaults` with `global: true`. This covers all channels — chat, widget, email, and WhatsApp — without per-test setup.
+
+Individual tests do **not** need to call any TestProvider helper. The global defaults apply to every user and every channel fallback automatically.
 
 ### TestProvider: CI-like environment (test stack)
 
