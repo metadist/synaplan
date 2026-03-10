@@ -1522,27 +1522,59 @@
       "responsesLabel": "Responses",
       "addTrigger": "Add question...",
       "addResponse": "Add response...",
-      "defaultTriggers": {
-        "location": "Location question",
-        "general": "General question"
+      "triggersEmptyHint": "Click a template to get started, or type your own below.",
+      "responsesEmptyHint": "Pick a source type to define how the AI responds.",
+      "triggerTemplates": {
+        "location": "Location questions",
+        "product": "Product questions",
+        "pricing": "Pricing & offers",
+        "support": "Support & help",
+        "general": "General questions"
       },
-      "defaultResponses": {
-        "locationLink": "Include location link",
-        "locationImage": "Include location image",
-        "concise": "Answer concisely",
-        "cta": "End with call-to-action"
+      "triggerTemplateHints": {
+        "location": "Address, opening hours, directions",
+        "product": "Features, availability, details",
+        "pricing": "Prices, discounts, plans",
+        "support": "Troubleshooting, contact, FAQ",
+        "general": "Everything else"
+      },
+      "responseTemplates": {
+        "link": "Website / URL",
+        "api": "API",
+        "text": "Text",
+        "list": "List",
+        "pdf": "PDF / File",
+        "custom": "Custom"
+      },
+      "wizard": {
+        "label": "Name",
+        "details": "Details",
+        "url": "URL",
+        "endpoint": "API Endpoint",
+        "method": "Method",
+        "create": "Create",
+        "cancel": "Cancel",
+        "aiEnhance": "Improve with AI",
+        "aiEnhancing": "Improving...",
+        "files": "Files",
+        "noFilesYet": "No files attached yet.",
+        "uploadFile": "Upload file",
+        "uploading": "Uploading...",
+        "fromFileManager": "File manager",
+        "uploadError": "Failed to upload file.",
+        "detailsPlaceholder": {
+          "location": "e.g. Where are you located? What are the opening hours?",
+          "product": "e.g. What features does your product have? Is it available?",
+          "pricing": "e.g. What are your prices? Any current discounts?",
+          "support": "e.g. How can I reach support? Common issues?",
+          "general": "e.g. Who are you? What do you do?",
+          "text": "Enter your text content here...",
+          "list": "One item per line...",
+          "custom": "Describe this source..."
+        }
       },
       "filesTitle": "Connected Files",
-      "expertPrompt": "Expert: Edit system prompt",
-      "sources": {
-        "title": "Sources",
-        "addUrl": "https://example.com",
-        "empty": "No sources yet — add a URL or file.",
-        "hourly": "Every hour",
-        "daily": "Daily",
-        "weekly": "Weekly",
-        "monthly": "Monthly"
-      }
+      "expertPrompt": "Expert: Edit system prompt"
     },
     "advancedConfig": {
       "title": "Advanced Configuration",

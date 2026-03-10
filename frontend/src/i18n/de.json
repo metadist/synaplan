@@ -1541,27 +1541,59 @@
       "responsesLabel": "Antworten",
       "addTrigger": "Frage hinzufügen...",
       "addResponse": "Antwort hinzufügen...",
-      "defaultTriggers": {
-        "location": "Standortfrage",
-        "general": "Allgemeine Frage"
+      "triggersEmptyHint": "Klicke auf eine Vorlage oder tippe unten eine eigene Frage ein.",
+      "responsesEmptyHint": "Wähle einen Quelltyp, um festzulegen, wie die KI antwortet.",
+      "triggerTemplates": {
+        "location": "Standort-Fragen",
+        "product": "Produkt-Fragen",
+        "pricing": "Preise & Angebote",
+        "support": "Support & Hilfe",
+        "general": "Allgemeine Fragen"
       },
-      "defaultResponses": {
-        "locationLink": "Standort-Link einfügen",
-        "locationImage": "Standort-Bild einfügen",
-        "concise": "Kurz und knapp antworten",
-        "cta": "Mit Call-to-Action enden"
+      "triggerTemplateHints": {
+        "location": "Adresse, Öffnungszeiten, Anfahrt",
+        "product": "Funktionen, Verfügbarkeit, Details",
+        "pricing": "Preise, Rabatte, Tarife",
+        "support": "Problemlösung, Kontakt, FAQ",
+        "general": "Alles Weitere"
+      },
+      "responseTemplates": {
+        "link": "Website / URL",
+        "api": "API",
+        "text": "Text",
+        "list": "Liste",
+        "pdf": "PDF / Datei",
+        "custom": "Individuell"
+      },
+      "wizard": {
+        "label": "Name",
+        "details": "Details",
+        "url": "URL",
+        "endpoint": "API-Endpunkt",
+        "method": "Methode",
+        "create": "Erstellen",
+        "cancel": "Abbrechen",
+        "aiEnhance": "Mit KI verbessern",
+        "aiEnhancing": "Wird verbessert...",
+        "files": "Dateien",
+        "noFilesYet": "Noch keine Dateien angehängt.",
+        "uploadFile": "Datei hochladen",
+        "uploading": "Wird hochgeladen...",
+        "fromFileManager": "Dateimanager",
+        "uploadError": "Datei konnte nicht hochgeladen werden.",
+        "detailsPlaceholder": {
+          "location": "z.B. Wo seid ihr? Wann habt ihr geöffnet?",
+          "product": "z.B. Was bietet euer Produkt? Ist es verfügbar?",
+          "pricing": "z.B. Was kostet es? Gibt es Rabatte?",
+          "support": "z.B. Wie erreiche ich den Support? Häufige Probleme?",
+          "general": "z.B. Wer seid ihr? Was macht ihr?",
+          "text": "Textinhalt hier eingeben...",
+          "list": "Ein Eintrag pro Zeile...",
+          "custom": "Beschreibe diese Quelle..."
+        }
       },
       "filesTitle": "Verbundene Dateien",
-      "expertPrompt": "Experte: System-Prompt bearbeiten",
-      "sources": {
-        "title": "Quellen",
-        "addUrl": "https://beispiel.de",
-        "empty": "Noch keine Quellen — füge eine URL oder Datei hinzu.",
-        "hourly": "Stündlich",
-        "daily": "Täglich",
-        "weekly": "Wöchentlich",
-        "monthly": "Monatlich"
-      }
+      "expertPrompt": "Experte: System-Prompt bearbeiten"
     },
     "advancedConfig": {
       "title": "Erweiterte Konfiguration",

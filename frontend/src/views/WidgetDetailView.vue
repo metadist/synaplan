@@ -133,14 +133,14 @@
 
                 <!-- Two-column layout -->
                 <div class="flex gap-8 sm:gap-14 lg:gap-24">
-                  <!-- LEFT: Triggers -->
+                  <!-- LEFT: Triggers (criteria only) -->
                   <div class="flex-1 space-y-3">
                     <p class="text-[11px] font-bold uppercase tracking-widest txt-secondary mb-1">
                       {{ $t('widgets.detail.triggersLabel') }}
                     </p>
 
+                    <!-- Existing trigger cards -->
                     <template v-for="trigger in triggers" :key="trigger.id">
-                      <!-- Trigger card -->
                       <div
                         :ref="(el) => setRef('trigger', trigger.id, el)"
                         :class="[
@@ -168,23 +168,6 @@
                             <span v-else class="text-sm font-medium txt-primary truncate block">
                               {{ trigger.label }}
                             </span>
-                            <!-- Source badges -->
-                            <div v-if="trigger.sources?.length" class="flex gap-1 mt-1.5">
-                              <span
-                                v-for="s in trigger.sources"
-                                :key="s.id"
-                                :class="[
-                                  'w-5 h-5 rounded-md flex items-center justify-center',
-                                  s.type === 'website' ? 'bg-blue-500/10' : 'bg-amber-500/10',
-                                ]"
-                              >
-                                <Icon
-                                  :icon="sourceIcon(s.type)"
-                                  class="w-3 h-3"
-                                  :class="s.type === 'website' ? 'text-blue-500' : 'text-amber-500'"
-                                />
-                              </span>
-                            </div>
                           </div>
                           <div class="flex items-center gap-0.5 flex-shrink-0">
                             <button
@@ -201,7 +184,6 @@
                             </button>
                           </div>
                         </div>
-                        <!-- Connection dot (right edge) -->
                         <span
                           :class="[
                             'absolute right-0 top-1/2 translate-x-1/2 -translate-y-1/2 w-3 h-3 rounded-full border-2 z-20 transition-all',
@@ -213,110 +195,159 @@
                           ]"
                         />
                       </div>
-
-                      <!-- Source editor (appears below selected trigger) -->
-                      <Transition
-                        enter-active-class="transition-all duration-300 ease-out"
-                        enter-from-class="opacity-0 -translate-y-1"
-                        enter-to-class="opacity-100 translate-y-0"
-                        leave-active-class="transition-all duration-200 ease-in"
-                        leave-from-class="opacity-100 translate-y-0"
-                        leave-to-class="opacity-0 -translate-y-1"
-                      >
-                        <div
-                          v-if="selectedTriggerId === trigger.id"
-                          class="rounded-xl border border-[var(--brand)]/20 bg-white/60 dark:bg-black/20 p-4 space-y-3"
-                          @click.stop
-                        >
-                          <p class="text-[10px] font-bold uppercase tracking-widest txt-secondary">
-                            {{ $t('widgets.detail.sources.title') }}
-                          </p>
-
-                          <!-- Existing sources -->
-                          <div
-                            v-for="source in trigger.sources || []"
-                            :key="source.id"
-                            class="flex items-center gap-3 p-3 rounded-xl bg-gray-50 dark:bg-white/5 border border-light-border/15 dark:border-dark-border/10"
-                          >
-                            <div
-                              :class="[
-                                'w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0',
-                                source.type === 'website' ? 'bg-blue-500/10' : 'bg-amber-500/10',
-                              ]"
-                            >
-                              <Icon
-                                :icon="sourceIcon(source.type)"
-                                class="w-4 h-4"
-                                :class="
-                                  source.type === 'website' ? 'text-blue-500' : 'text-amber-500'
-                                "
-                              />
-                            </div>
-                            <div class="flex-1 min-w-0">
-                              <p class="text-sm font-medium txt-primary truncate">
-                                {{ source.url }}
-                              </p>
-                            </div>
-                            <select
-                              :value="source.crawlInterval"
-                              class="text-xs px-2 py-1.5 rounded-lg border border-light-border/30 dark:border-dark-border/20 surface-card txt-primary focus:outline-none focus:ring-1 focus:ring-[var(--brand)]"
-                              @change="
-                                updateSourceInterval(
-                                  trigger.id,
-                                  source.id,
-                                  ($event.target as HTMLSelectElement).value
-                                )
-                              "
-                            >
-                              <option value="hourly">
-                                {{ $t('widgets.detail.sources.hourly') }}
-                              </option>
-                              <option value="daily">
-                                {{ $t('widgets.detail.sources.daily') }}
-                              </option>
-                              <option value="weekly">
-                                {{ $t('widgets.detail.sources.weekly') }}
-                              </option>
-                              <option value="monthly">
-                                {{ $t('widgets.detail.sources.monthly') }}
-                              </option>
-                            </select>
-                            <button
-                              class="p-1 txt-secondary hover:text-red-500 transition-colors"
-                              @click="removeSource(trigger.id, source.id)"
-                            >
-                              <Icon icon="heroicons:trash" class="w-4 h-4" />
-                            </button>
-                          </div>
-
-                          <!-- Empty state -->
-                          <p v-if="!trigger.sources?.length" class="text-xs txt-secondary py-2">
-                            {{ $t('widgets.detail.sources.empty') }}
-                          </p>
-
-                          <!-- Add source form -->
-                          <form
-                            class="flex gap-2 items-center"
-                            @submit.prevent="addSource(trigger.id)"
-                          >
-                            <input
-                              v-model="newSourceUrl"
-                              :placeholder="$t('widgets.detail.sources.addUrl')"
-                              class="flex-1 min-w-0 px-3 py-2 rounded-lg text-sm border border-light-border/30 dark:border-dark-border/20 surface-card txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)]/40"
-                            />
-                            <button
-                              type="submit"
-                              :disabled="!newSourceUrl.trim()"
-                              class="px-3 py-2 rounded-lg bg-[var(--brand)] text-white text-sm font-medium disabled:opacity-30 disabled:cursor-not-allowed hover:opacity-90 transition-opacity"
-                            >
-                              <Icon icon="heroicons:plus" class="w-4 h-4" />
-                            </button>
-                          </form>
-                        </div>
-                      </Transition>
                     </template>
 
-                    <!-- Add trigger -->
+                    <!-- Trigger wizard form -->
+                    <Transition
+                      enter-active-class="transition-all duration-300 ease-out"
+                      enter-from-class="opacity-0 -translate-y-2 scale-95"
+                      enter-to-class="opacity-100 translate-y-0 scale-100"
+                      leave-active-class="transition-all duration-200 ease-in"
+                      leave-from-class="opacity-100 translate-y-0 scale-100"
+                      leave-to-class="opacity-0 -translate-y-2 scale-95"
+                    >
+                      <div
+                        v-if="activeWizard?.side === 'trigger'"
+                        class="rounded-xl border-2 border-[var(--brand)]/30 bg-[var(--brand)]/[0.03] p-4 space-y-3"
+                      >
+                        <div class="relative">
+                          <label
+                            class="block text-[10px] font-bold uppercase tracking-widest txt-secondary mb-1"
+                          >
+                            {{ $t('widgets.detail.wizard.label') }}
+                          </label>
+                          <div class="flex gap-1.5">
+                            <input
+                              v-model="wizardLabel"
+                              class="flex-1 px-3 py-2 rounded-lg text-sm border border-light-border/30 dark:border-dark-border/20 surface-card txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)]/40"
+                            />
+                            <button
+                              type="button"
+                              :disabled="!wizardLabel.trim() || enhancingField === 'label'"
+                              class="px-2.5 py-2 rounded-lg border border-light-border/30 dark:border-dark-border/20 hover:border-[var(--brand)]/40 hover:bg-[var(--brand)]/5 transition-all disabled:opacity-30"
+                              :title="$t('widgets.detail.wizard.aiEnhance')"
+                              @click="enhanceField('label')"
+                            >
+                              <Icon
+                                :icon="
+                                  enhancingField === 'label'
+                                    ? 'heroicons:arrow-path'
+                                    : 'heroicons:sparkles'
+                                "
+                                :class="[
+                                  'w-4 h-4 txt-brand',
+                                  enhancingField === 'label' && 'animate-spin',
+                                ]"
+                              />
+                            </button>
+                          </div>
+                        </div>
+                        <div class="relative">
+                          <label
+                            class="block text-[10px] font-bold uppercase tracking-widest txt-secondary mb-1"
+                          >
+                            {{ $t('widgets.detail.wizard.details') }}
+                          </label>
+                          <div class="flex gap-1.5">
+                            <textarea
+                              v-model="wizardDetails"
+                              rows="2"
+                              :placeholder="
+                                $t(`widgets.detail.wizard.detailsPlaceholder.${activeWizard.key}`)
+                              "
+                              class="flex-1 px-3 py-2 rounded-lg text-sm border border-light-border/30 dark:border-dark-border/20 surface-card txt-primary resize-none focus:outline-none focus:ring-2 focus:ring-[var(--brand)]/40"
+                            />
+                            <button
+                              type="button"
+                              :disabled="!wizardDetails.trim() || enhancingField === 'details'"
+                              class="self-start px-2.5 py-2 rounded-lg border border-light-border/30 dark:border-dark-border/20 hover:border-[var(--brand)]/40 hover:bg-[var(--brand)]/5 transition-all disabled:opacity-30"
+                              :title="$t('widgets.detail.wizard.aiEnhance')"
+                              @click="enhanceField('details')"
+                            >
+                              <Icon
+                                :icon="
+                                  enhancingField === 'details'
+                                    ? 'heroicons:arrow-path'
+                                    : 'heroicons:sparkles'
+                                "
+                                :class="[
+                                  'w-4 h-4 txt-brand',
+                                  enhancingField === 'details' && 'animate-spin',
+                                ]"
+                              />
+                            </button>
+                          </div>
+                        </div>
+                        <div class="flex justify-end gap-2">
+                          <button
+                            class="px-3 py-1.5 rounded-lg text-xs font-medium txt-secondary hover:txt-primary transition-colors"
+                            @click="cancelWizard"
+                          >
+                            {{ $t('widgets.detail.wizard.cancel') }}
+                          </button>
+                          <button
+                            :disabled="!wizardLabel.trim()"
+                            class="px-4 py-1.5 rounded-lg text-xs font-medium bg-[var(--brand)] text-white hover:opacity-90 transition-opacity disabled:opacity-30"
+                            @click="confirmWizard"
+                          >
+                            {{ $t('widgets.detail.wizard.create') }}
+                          </button>
+                        </div>
+                      </div>
+                    </Transition>
+
+                    <!-- Template quick-add buttons (always visible) -->
+                    <div :class="['space-y-1.5', triggers.length > 0 && 'pt-1']">
+                      <p v-if="triggers.length === 0" class="text-xs txt-secondary opacity-70 mb-2">
+                        {{ $t('widgets.detail.triggersEmptyHint') }}
+                      </p>
+                      <button
+                        v-for="tpl in triggerTemplates"
+                        :key="tpl.key"
+                        :class="[
+                          'w-full flex items-center gap-3 rounded-xl border transition-all duration-200 group/tpl text-left',
+                          triggers.length > 0
+                            ? 'p-2 border-transparent hover:border-light-border/20 dark:hover:border-dark-border/15 hover:bg-[var(--brand)]/5'
+                            : 'p-3 border-light-border/20 dark:border-dark-border/15 hover:border-[var(--brand)]/40 hover:bg-[var(--brand)]/5',
+                        ]"
+                        @click="openWizard('trigger', tpl.key)"
+                      >
+                        <span
+                          :class="[
+                            'rounded-lg flex items-center justify-center flex-shrink-0',
+                            triggers.length > 0 ? 'w-6 h-6' : 'w-8 h-8',
+                            tpl.bg,
+                          ]"
+                        >
+                          <Icon
+                            :icon="tpl.icon"
+                            :class="[triggers.length > 0 ? 'w-3 h-3' : 'w-4 h-4', tpl.color]"
+                          />
+                        </span>
+                        <div class="flex-1 min-w-0">
+                          <p
+                            :class="[
+                              'font-medium txt-primary truncate',
+                              triggers.length > 0 ? 'text-xs' : 'text-sm',
+                            ]"
+                          >
+                            {{ $t(`widgets.detail.triggerTemplates.${tpl.key}`) }}
+                          </p>
+                          <p
+                            v-if="triggers.length === 0"
+                            class="text-[11px] txt-secondary truncate"
+                          >
+                            {{ $t(`widgets.detail.triggerTemplateHints.${tpl.key}`) }}
+                          </p>
+                        </div>
+                        <Icon
+                          icon="heroicons:plus-circle"
+                          class="w-4 h-4 txt-secondary opacity-0 group-hover/tpl:opacity-100 transition-opacity flex-shrink-0"
+                        />
+                      </button>
+                    </div>
+
+                    <!-- Manual add -->
                     <form class="flex gap-2" @submit.prevent="addTrigger">
                       <input
                         v-model="newTriggerText"
@@ -333,12 +364,13 @@
                     </form>
                   </div>
 
-                  <!-- RIGHT: Responses -->
+                  <!-- RIGHT: Responses / Sources -->
                   <div class="flex-1 space-y-3">
                     <p class="text-[11px] font-bold uppercase tracking-widest txt-secondary mb-1">
                       {{ $t('widgets.detail.responsesLabel') }}
                     </p>
 
+                    <!-- Existing response cards -->
                     <div
                       v-for="response in responses"
                       :key="response.id"
@@ -355,7 +387,6 @@
                       ]"
                       @click="handleResponseClick(response.id)"
                     >
-                      <!-- Connection dot (left edge) -->
                       <span
                         :class="[
                           'absolute left-0 top-1/2 -translate-x-1/2 -translate-y-1/2 w-3 h-3 rounded-full border-2 z-20 transition-all',
@@ -401,7 +432,286 @@
                       </div>
                     </div>
 
-                    <!-- Add response -->
+                    <!-- Response wizard form -->
+                    <Transition
+                      enter-active-class="transition-all duration-300 ease-out"
+                      enter-from-class="opacity-0 -translate-y-2 scale-95"
+                      enter-to-class="opacity-100 translate-y-0 scale-100"
+                      leave-active-class="transition-all duration-200 ease-in"
+                      leave-from-class="opacity-100 translate-y-0 scale-100"
+                      leave-to-class="opacity-0 -translate-y-2 scale-95"
+                    >
+                      <div
+                        v-if="activeWizard?.side === 'response'"
+                        class="rounded-xl border-2 border-[var(--brand)]/30 bg-[var(--brand)]/[0.03] p-4 space-y-3"
+                      >
+                        <div class="relative">
+                          <label
+                            class="block text-[10px] font-bold uppercase tracking-widest txt-secondary mb-1"
+                          >
+                            {{ $t('widgets.detail.wizard.label') }}
+                          </label>
+                          <div class="flex gap-1.5">
+                            <input
+                              v-model="wizardLabel"
+                              class="flex-1 px-3 py-2 rounded-lg text-sm border border-light-border/30 dark:border-dark-border/20 surface-card txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)]/40"
+                            />
+                            <button
+                              type="button"
+                              :disabled="!wizardLabel.trim() || enhancingField === 'label'"
+                              class="px-2.5 py-2 rounded-lg border border-light-border/30 dark:border-dark-border/20 hover:border-[var(--brand)]/40 hover:bg-[var(--brand)]/5 transition-all disabled:opacity-30"
+                              :title="$t('widgets.detail.wizard.aiEnhance')"
+                              @click="enhanceField('label')"
+                            >
+                              <Icon
+                                :icon="
+                                  enhancingField === 'label'
+                                    ? 'heroicons:arrow-path'
+                                    : 'heroicons:sparkles'
+                                "
+                                :class="[
+                                  'w-4 h-4 txt-brand',
+                                  enhancingField === 'label' && 'animate-spin',
+                                ]"
+                              />
+                            </button>
+                          </div>
+                        </div>
+
+                        <!-- Type-specific fields -->
+                        <div v-if="activeWizard.key === 'link'" class="relative">
+                          <label
+                            class="block text-[10px] font-bold uppercase tracking-widest txt-secondary mb-1"
+                          >
+                            {{ $t('widgets.detail.wizard.url') }}
+                          </label>
+                          <input
+                            v-model="wizardUrl"
+                            placeholder="https://..."
+                            class="w-full px-3 py-2 rounded-lg text-sm border border-light-border/30 dark:border-dark-border/20 surface-card txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)]/40"
+                          />
+                        </div>
+
+                        <template v-if="activeWizard.key === 'api'">
+                          <div class="relative">
+                            <label
+                              class="block text-[10px] font-bold uppercase tracking-widest txt-secondary mb-1"
+                            >
+                              {{ $t('widgets.detail.wizard.endpoint') }}
+                            </label>
+                            <input
+                              v-model="wizardUrl"
+                              placeholder="https://api.example.com/v1/..."
+                              class="w-full px-3 py-2 rounded-lg text-sm border border-light-border/30 dark:border-dark-border/20 surface-card txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)]/40"
+                            />
+                          </div>
+                          <div class="relative">
+                            <label
+                              class="block text-[10px] font-bold uppercase tracking-widest txt-secondary mb-1"
+                            >
+                              {{ $t('widgets.detail.wizard.method') }}
+                            </label>
+                            <select
+                              v-model="wizardMethod"
+                              class="w-full px-3 py-2 rounded-lg text-sm border border-light-border/30 dark:border-dark-border/20 surface-card txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)]/40"
+                            >
+                              <option value="GET">GET</option>
+                              <option value="POST">POST</option>
+                              <option value="PUT">PUT</option>
+                            </select>
+                          </div>
+                        </template>
+
+                        <div
+                          v-if="
+                            activeWizard.key === 'text' ||
+                            activeWizard.key === 'list' ||
+                            activeWizard.key === 'custom'
+                          "
+                          class="relative"
+                        >
+                          <label
+                            class="block text-[10px] font-bold uppercase tracking-widest txt-secondary mb-1"
+                          >
+                            {{ $t('widgets.detail.wizard.details') }}
+                          </label>
+                          <div class="flex gap-1.5">
+                            <textarea
+                              v-model="wizardDetails"
+                              rows="3"
+                              :placeholder="
+                                $t(`widgets.detail.wizard.detailsPlaceholder.${activeWizard.key}`)
+                              "
+                              class="flex-1 px-3 py-2 rounded-lg text-sm border border-light-border/30 dark:border-dark-border/20 surface-card txt-primary resize-none focus:outline-none focus:ring-2 focus:ring-[var(--brand)]/40"
+                            />
+                            <button
+                              type="button"
+                              :disabled="!wizardDetails.trim() || enhancingField === 'details'"
+                              class="self-start px-2.5 py-2 rounded-lg border border-light-border/30 dark:border-dark-border/20 hover:border-[var(--brand)]/40 hover:bg-[var(--brand)]/5 transition-all disabled:opacity-30"
+                              :title="$t('widgets.detail.wizard.aiEnhance')"
+                              @click="enhanceField('details')"
+                            >
+                              <Icon
+                                :icon="
+                                  enhancingField === 'details'
+                                    ? 'heroicons:arrow-path'
+                                    : 'heroicons:sparkles'
+                                "
+                                :class="[
+                                  'w-4 h-4 txt-brand',
+                                  enhancingField === 'details' && 'animate-spin',
+                                ]"
+                              />
+                            </button>
+                          </div>
+                        </div>
+
+                        <div v-if="activeWizard.key === 'pdf'" class="space-y-2">
+                          <label
+                            class="block text-[10px] font-bold uppercase tracking-widest txt-secondary mb-1"
+                          >
+                            {{ $t('widgets.detail.wizard.files') }}
+                          </label>
+
+                          <!-- Attached files list -->
+                          <div
+                            v-for="wf in wizardFiles"
+                            :key="wf.messageId"
+                            class="flex items-center gap-2 p-2 rounded-lg bg-gray-50 dark:bg-white/5 border border-light-border/15 dark:border-dark-border/10"
+                          >
+                            <Icon
+                              icon="heroicons:document"
+                              class="w-4 h-4 txt-brand flex-shrink-0"
+                            />
+                            <span class="flex-1 text-xs txt-primary truncate">{{
+                              wf.fileName
+                            }}</span>
+                            <button
+                              type="button"
+                              class="p-0.5 txt-secondary hover:text-red-500 transition-colors"
+                              @click="removeWizardFile(wf.messageId)"
+                            >
+                              <Icon icon="heroicons:x-mark" class="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+
+                          <p
+                            v-if="wizardFiles.length === 0"
+                            class="text-xs txt-secondary opacity-60 py-1"
+                          >
+                            {{ $t('widgets.detail.wizard.noFilesYet') }}
+                          </p>
+
+                          <!-- Upload + File manager buttons -->
+                          <div class="flex gap-2">
+                            <label
+                              :class="[
+                                'flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium border border-light-border/30 dark:border-dark-border/20 cursor-pointer hover:border-[var(--brand)]/40 hover:bg-[var(--brand)]/5 transition-all',
+                                wizardUploadingFile && 'opacity-50 pointer-events-none',
+                              ]"
+                            >
+                              <Icon
+                                :icon="
+                                  wizardUploadingFile
+                                    ? 'heroicons:arrow-path'
+                                    : 'heroicons:arrow-up-tray'
+                                "
+                                :class="[
+                                  'w-3.5 h-3.5 txt-brand',
+                                  wizardUploadingFile && 'animate-spin',
+                                ]"
+                              />
+                              {{
+                                wizardUploadingFile
+                                  ? $t('widgets.detail.wizard.uploading')
+                                  : $t('widgets.detail.wizard.uploadFile')
+                              }}
+                              <input
+                                type="file"
+                                class="hidden"
+                                accept=".pdf,.doc,.docx,.txt,.md,.csv,.xlsx"
+                                @change="handleWizardFileUpload"
+                              />
+                            </label>
+                            <button
+                              type="button"
+                              class="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium border border-light-border/30 dark:border-dark-border/20 hover:border-[var(--brand)]/40 hover:bg-[var(--brand)]/5 transition-all"
+                              @click="showWizardFilePicker = true"
+                            >
+                              <Icon icon="heroicons:folder-open" class="w-3.5 h-3.5 txt-brand" />
+                              {{ $t('widgets.detail.wizard.fromFileManager') }}
+                            </button>
+                          </div>
+                        </div>
+
+                        <div class="flex justify-end gap-2">
+                          <button
+                            class="px-3 py-1.5 rounded-lg text-xs font-medium txt-secondary hover:txt-primary transition-colors"
+                            @click="cancelWizard"
+                          >
+                            {{ $t('widgets.detail.wizard.cancel') }}
+                          </button>
+                          <button
+                            :disabled="!wizardLabel.trim()"
+                            class="px-4 py-1.5 rounded-lg text-xs font-medium bg-[var(--brand)] text-white hover:opacity-90 transition-opacity disabled:opacity-30"
+                            @click="confirmWizard"
+                          >
+                            {{ $t('widgets.detail.wizard.create') }}
+                          </button>
+                        </div>
+                      </div>
+                    </Transition>
+
+                    <!-- Source type templates (always visible) -->
+                    <div :class="['pt-1', responses.length === 0 && 'pt-0']">
+                      <p
+                        v-if="responses.length === 0"
+                        class="text-xs txt-secondary opacity-70 mb-2"
+                      >
+                        {{ $t('widgets.detail.responsesEmptyHint') }}
+                      </p>
+                      <div
+                        :class="[
+                          'grid gap-2',
+                          responses.length > 0 ? 'grid-cols-3' : 'grid-cols-2',
+                        ]"
+                      >
+                        <button
+                          v-for="tpl in responseTemplates"
+                          :key="tpl.key"
+                          :class="[
+                            'flex flex-col items-center gap-1.5 rounded-xl border transition-all duration-200 group/tpl',
+                            responses.length > 0
+                              ? 'p-2 border-transparent hover:border-light-border/20 dark:hover:border-dark-border/15 hover:bg-[var(--brand)]/5'
+                              : 'p-4 border-light-border/20 dark:border-dark-border/15 hover:border-[var(--brand)]/40 hover:bg-[var(--brand)]/5 hover:scale-[1.03]',
+                          ]"
+                          @click="openWizard('response', tpl.key)"
+                        >
+                          <span
+                            :class="[
+                              'rounded-xl flex items-center justify-center',
+                              responses.length > 0 ? 'w-7 h-7' : 'w-10 h-10',
+                              tpl.bg,
+                            ]"
+                          >
+                            <Icon
+                              :icon="tpl.icon"
+                              :class="[responses.length > 0 ? 'w-3.5 h-3.5' : 'w-5 h-5', tpl.color]"
+                            />
+                          </span>
+                          <span
+                            :class="[
+                              'font-medium txt-primary',
+                              responses.length > 0 ? 'text-[10px]' : 'text-xs',
+                            ]"
+                          >
+                            {{ $t(`widgets.detail.responseTemplates.${tpl.key}`) }}
+                          </span>
+                        </button>
+                      </div>
+                    </div>
+
+                    <!-- Manual add -->
                     <form class="flex gap-2" @submit.prevent="addResponse">
                       <input
                         v-model="newResponseText"
@@ -490,37 +800,46 @@
       @saved="handleAdvancedSaved"
       @start-ai-setup="openAiSetup"
     />
+
+    <FilePicker
+      :is-open="showWizardFilePicker"
+      :exclude-message-ids="wizardFilePickerExcludeIds"
+      @close="showWizardFilePicker = false"
+      @select="handleWizardFilePickerSelect"
+    />
   </MainLayout>
 </template>
 
 <script setup lang="ts">
-import { nextTick, onBeforeUnmount, onMounted, ref, watch, type ComponentPublicInstance } from 'vue'
+import {
+  computed,
+  nextTick,
+  onBeforeUnmount,
+  onMounted,
+  ref,
+  watch,
+  type ComponentPublicInstance,
+} from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { Icon } from '@iconify/vue'
 import MainLayout from '@/components/MainLayout.vue'
 import SetupChatModal from '@/components/widgets/SetupChatModal.vue'
 import AdvancedWidgetConfig from '@/components/widgets/AdvancedWidgetConfig.vue'
+import FilePicker from '@/components/widgets/FilePicker.vue'
 import * as widgetsApi from '@/services/api/widgetsApi'
 import { promptsApi, type PromptMetadata } from '@/services/api/promptsApi'
+import { chatApi } from '@/services/api/chatApi'
 import { useNotification } from '@/composables/useNotification'
 import {
   WIDGET_RULES_BLOCK_START,
   WIDGET_RULES_BLOCK_END,
   parsePromptAndRulesBlock,
-  parseWidgetBehaviorRulesMetadata,
 } from '@/utils/widgetBehaviorRules'
 import { useI18n } from 'vue-i18n'
 
-interface FlowSource {
-  id: string
-  type: 'website' | 'file' | 'custom'
-  url: string
-  crawlInterval: 'hourly' | 'daily' | 'weekly' | 'monthly'
-}
 interface FlowNode {
   id: string
   label: string
-  sources?: FlowSource[]
 }
 interface FlowConnection {
   from: string
@@ -564,8 +883,17 @@ const editingNodeId = ref<string | null>(null)
 const editingLabel = ref('')
 const editInputRef = ref<HTMLInputElement[] | null>(null)
 
-// Source state
-const newSourceUrl = ref('')
+// Wizard state
+const activeWizard = ref<{ side: 'trigger' | 'response'; key: string } | null>(null)
+const wizardLabel = ref('')
+const wizardDetails = ref('')
+const wizardUrl = ref('')
+const wizardMethod = ref('GET')
+const enhancingField = ref<string | null>(null)
+const wizardFiles = ref<Array<{ messageId: number; fileName: string }>>([])
+const wizardUploadingFile = ref(false)
+const showWizardFilePicker = ref(false)
+const wizardFilePickerExcludeIds = computed(() => wizardFiles.value.map((f) => f.messageId))
 
 // SVG state
 const flowRef = ref<HTMLElement | null>(null)
@@ -641,14 +969,150 @@ const isConnected = (triggerId: string, responseId: string) =>
 const hasConnectionFrom = (triggerId: string) => connections.value.some((c) => c.from === triggerId)
 const hasConnectionTo = (responseId: string) => connections.value.some((c) => c.to === responseId)
 
-const sourceIcon = (type: FlowSource['type']): string => {
-  switch (type) {
-    case 'website':
-      return 'heroicons:globe-alt'
-    case 'file':
-      return 'heroicons:document'
-    default:
-      return 'heroicons:light-bulb'
+// Template definitions
+const triggerTemplates = [
+  { key: 'location', icon: 'heroicons:map-pin', bg: 'bg-blue-500/10', color: 'text-blue-500' },
+  {
+    key: 'product',
+    icon: 'heroicons:shopping-bag',
+    bg: 'bg-purple-500/10',
+    color: 'text-purple-500',
+  },
+  {
+    key: 'pricing',
+    icon: 'heroicons:currency-euro',
+    bg: 'bg-emerald-500/10',
+    color: 'text-emerald-500',
+  },
+  { key: 'support', icon: 'heroicons:lifebuoy', bg: 'bg-orange-500/10', color: 'text-orange-500' },
+  {
+    key: 'general',
+    icon: 'heroicons:chat-bubble-left-right',
+    bg: 'bg-gray-500/10',
+    color: 'text-gray-500',
+  },
+]
+
+const responseTemplates = [
+  { key: 'link', icon: 'heroicons:globe-alt', bg: 'bg-blue-500/10', color: 'text-blue-500' },
+  { key: 'api', icon: 'heroicons:server-stack', bg: 'bg-violet-500/10', color: 'text-violet-500' },
+  {
+    key: 'text',
+    icon: 'heroicons:document-text',
+    bg: 'bg-emerald-500/10',
+    color: 'text-emerald-500',
+  },
+  { key: 'list', icon: 'heroicons:list-bullet', bg: 'bg-amber-500/10', color: 'text-amber-500' },
+  { key: 'pdf', icon: 'heroicons:document-arrow-down', bg: 'bg-red-500/10', color: 'text-red-500' },
+  { key: 'custom', icon: 'heroicons:sparkles', bg: 'bg-pink-500/10', color: 'text-pink-500' },
+]
+
+const openWizard = (side: 'trigger' | 'response', key: string) => {
+  activeWizard.value = { side, key }
+  wizardLabel.value = t(
+    `widgets.detail.${side === 'trigger' ? 'triggerTemplates' : 'responseTemplates'}.${key}`
+  )
+  wizardDetails.value = ''
+  wizardUrl.value = ''
+  wizardMethod.value = 'GET'
+  wizardFiles.value = []
+}
+
+const cancelWizard = () => {
+  activeWizard.value = null
+  wizardFiles.value = []
+}
+
+const handleWizardFileUpload = async (event: Event) => {
+  const input = event.target as HTMLInputElement
+  const file = input.files?.[0]
+  if (!file || !widget.value?.taskPromptTopic) return
+  wizardUploadingFile.value = true
+  try {
+    await promptsApi.uploadPromptFile(widget.value.taskPromptTopic, file)
+    const availableFiles = await promptsApi.getAvailableFiles(file.name)
+    const match = availableFiles.find((f) => f.fileName === file.name)
+    if (match) {
+      wizardFiles.value.push({ messageId: match.messageId, fileName: match.fileName })
+    }
+  } catch {
+    showError(t('widgets.detail.wizard.uploadError'))
+  } finally {
+    wizardUploadingFile.value = false
+    input.value = ''
+  }
+}
+
+const handleWizardFilePickerSelect = (files: Array<{ messageId: number; fileName: string }>) => {
+  for (const f of files) {
+    if (!wizardFiles.value.some((wf) => wf.messageId === f.messageId)) {
+      wizardFiles.value.push({ messageId: f.messageId, fileName: f.fileName })
+    }
+  }
+  showWizardFilePicker.value = false
+}
+
+const removeWizardFile = (messageId: number) => {
+  wizardFiles.value = wizardFiles.value.filter((f) => f.messageId !== messageId)
+}
+
+const autoConnectResponse = (responseId: string) => {
+  if (connections.value.length > 0) return
+  for (const trig of triggers.value) {
+    connections.value.push({ from: trig.id, to: responseId })
+  }
+}
+
+const confirmWizard = async () => {
+  const wiz = activeWizard.value
+  if (!wiz) return
+  const label = wizardLabel.value.trim()
+  if (!label) return
+
+  const details = wizardDetails.value.trim()
+  const fullLabel = details ? `${label}: ${details}` : label
+
+  if (wiz.side === 'trigger') {
+    triggers.value.push({ id: `t-${Date.now()}`, label: fullLabel })
+  } else {
+    const id = `r-${Date.now()}`
+    const url = wizardUrl.value.trim()
+    const fileNames = wizardFiles.value.map((f) => f.fileName)
+    const parts = [fullLabel, url, ...fileNames].filter(Boolean)
+    const responseLabel =
+      parts.length > 1 ? `${fullLabel} (${parts.slice(1).join(', ')})` : fullLabel
+    responses.value.push({ id, label: responseLabel })
+    autoConnectResponse(id)
+
+    if (wizardFiles.value.length > 0 && widget.value?.taskPromptTopic) {
+      for (const f of wizardFiles.value) {
+        try {
+          await promptsApi.linkFileToPrompt(widget.value.taskPromptTopic, f.messageId)
+          if (!promptFiles.value.some((pf) => pf.id === f.messageId)) {
+            promptFiles.value.push({ id: f.messageId, fileName: f.fileName, chunks: 0 })
+          }
+        } catch {
+          /* file may already be linked */
+        }
+      }
+    }
+  }
+  activeWizard.value = null
+  wizardFiles.value = []
+}
+
+const enhanceField = async (field: 'label' | 'details') => {
+  const current = field === 'label' ? wizardLabel.value : wizardDetails.value
+  if (!current.trim()) return
+  enhancingField.value = field
+  try {
+    const result = await chatApi.enhanceMessage(current)
+    if (field === 'label') wizardLabel.value = result.enhanced
+    else wizardDetails.value = result.enhanced
+  } catch {
+    /* silently ignore */
+  } finally {
+    enhancingField.value = null
   }
 }
 
@@ -656,7 +1120,6 @@ const sourceIcon = (type: FlowSource['type']): string => {
 const selectTrigger = (id: string) => {
   if (editingNodeId.value === id) return
   selectedTriggerId.value = selectedTriggerId.value === id ? null : id
-  newSourceUrl.value = ''
 }
 
 const handleResponseClick = (responseId: string) => {
@@ -676,7 +1139,9 @@ const addTrigger = () => {
 const addResponse = () => {
   const label = newResponseText.value.trim()
   if (!label) return
-  responses.value.push({ id: `r-${Date.now()}`, label })
+  const id = `r-${Date.now()}`
+  responses.value.push({ id, label })
+  autoConnectResponse(id)
   newResponseText.value = ''
 }
 const removeTrigger = (id: string) => {
@@ -710,60 +1175,14 @@ const cancelEditing = () => {
   editingNodeId.value = null
 }
 
-// Sources
-const addSource = (triggerId: string) => {
-  const url = newSourceUrl.value.trim()
-  if (!url) return
-  const trigger = triggers.value.find((n) => n.id === triggerId)
-  if (!trigger) return
-  if (!trigger.sources) trigger.sources = []
-  trigger.sources.push({
-    id: `s-${Date.now()}`,
-    type: url.startsWith('http') ? 'website' : 'custom',
-    url,
-    crawlInterval: 'daily',
-  })
-  newSourceUrl.value = ''
-}
-const removeSource = (triggerId: string, sourceId: string) => {
-  const trigger = triggers.value.find((n) => n.id === triggerId)
-  if (!trigger?.sources) return
-  trigger.sources = trigger.sources.filter((s) => s.id !== sourceId)
-}
-const updateSourceInterval = (triggerId: string, sourceId: string, interval: string) => {
-  const trigger = triggers.value.find((n) => n.id === triggerId)
-  const source = trigger?.sources?.find((s) => s.id === sourceId)
-  if (source) source.crawlInterval = interval as FlowSource['crawlInterval']
-}
+// Defaults (empty — user adds their own)
+const defaultTriggers = (): FlowNode[] => []
+const defaultResponses = (): FlowNode[] => []
 
-// Defaults
-const defaultTriggers = (): FlowNode[] => [
-  { id: 'location', label: t('widgets.detail.defaultTriggers.location') },
-  { id: 'general', label: t('widgets.detail.defaultTriggers.general') },
-]
-const defaultResponses = (): FlowNode[] => [
-  { id: 'location-link', label: t('widgets.detail.defaultResponses.locationLink') },
-  { id: 'location-image', label: t('widgets.detail.defaultResponses.locationImage') },
-  { id: 'concise', label: t('widgets.detail.defaultResponses.concise') },
-  { id: 'cta', label: t('widgets.detail.defaultResponses.cta') },
-]
-
-const migrateFromBehaviorRules = (raw: unknown) => {
-  const rules = parseWidgetBehaviorRulesMetadata(raw)
-  triggers.value = defaultTriggers()
-  responses.value = defaultResponses()
-  const conns: FlowConnection[] = []
-  if (rules.locationLinkRequired) conns.push({ from: 'location', to: 'location-link' })
-  if (rules.locationImageLink) conns.push({ from: 'location', to: 'location-image' })
-  if (rules.conciseReplies) {
-    conns.push({ from: 'location', to: 'concise' })
-    conns.push({ from: 'general', to: 'concise' })
-  }
-  if (rules.ctaRequired) {
-    conns.push({ from: 'location', to: 'cta' })
-    conns.push({ from: 'general', to: 'cta' })
-  }
-  connections.value = conns
+const migrateFromBehaviorRules = () => {
+  triggers.value = []
+  responses.value = []
+  connections.value = []
 }
 
 // Build prompt from flow
@@ -816,14 +1235,24 @@ const loadData = async () => {
         if (typeof flowRaw === 'string' && flowRaw.length > 0) {
           try {
             const flow = JSON.parse(flowRaw) as FlowData
-            triggers.value = flow.triggers
-            responses.value = flow.responses
-            connections.value = flow.connections
+            const legacyIds = new Set([
+              'location',
+              'general',
+              'location-link',
+              'location-image',
+              'concise',
+              'cta',
+            ])
+            triggers.value = (flow.triggers || []).filter((n) => !legacyIds.has(n.id))
+            responses.value = (flow.responses || []).filter((n) => !legacyIds.has(n.id))
+            connections.value = (flow.connections || []).filter(
+              (c) => !legacyIds.has(c.from) && !legacyIds.has(c.to)
+            )
           } catch {
-            migrateFromBehaviorRules(prompt.metadata?.widgetBehaviorRules)
+            migrateFromBehaviorRules()
           }
         } else {
-          migrateFromBehaviorRules(prompt.metadata?.widgetBehaviorRules)
+          migrateFromBehaviorRules()
         }
       } else {
         triggers.value = defaultTriggers()
