@@ -10,6 +10,7 @@ use App\Entity\Widget;
 use App\Entity\WidgetSummary;
 use App\Repository\ChatRepository;
 use App\Repository\MessageRepository;
+use App\Repository\ModelRepository;
 use App\Repository\PromptRepository;
 use App\Repository\WidgetSessionRepository;
 use App\Repository\WidgetSummaryRepository;
@@ -38,10 +39,36 @@ final readonly class WidgetSummaryService
         private ChatRepository $chatRepository,
         private MessageRepository $messageRepository,
         private PromptRepository $promptRepository,
+        private ModelRepository $modelRepository,
         private AiFacade $aiFacade,
         private ModelConfigService $modelConfigService,
         private LoggerInterface $logger,
     ) {
+    }
+
+    /**
+     * Resolve the AI model name used for summary analysis of this widget.
+     */
+    private function getSummaryModelName(Widget $widget): ?string
+    {
+        $modelId = self::DEFAULT_SUMMARY_MODEL_ID;
+
+        $customTopic = self::getSummaryTopicForWidget($widget);
+        $customPrompt = $this->promptRepository->findOneBy([
+            'topic' => $customTopic,
+            'ownerId' => $widget->getOwnerId(),
+        ]);
+
+        if ($customPrompt) {
+            $storedModelId = (int) $customPrompt->getShortDescription();
+            if ($storedModelId > 0) {
+                $modelId = $storedModelId;
+            }
+        }
+
+        $model = $this->modelRepository->find($modelId);
+
+        return $model ? $model->getName() : null;
     }
 
     /**
@@ -151,12 +178,12 @@ PROMPT;
         $sessions = $result['sessions'];
 
         if (empty($sessions)) {
-            // Create empty summary
             $summary = new WidgetSummary();
             $summary->setWidgetId($widgetId);
             $summary->setDate($date);
             $summary->setSessionCount(0);
             $summary->setMessageCount(0);
+            $summary->setAiModel($this->getSummaryModelName($widget));
             $summary->setSummaryText('No conversations on this day.');
             $this->summaryRepository->save($summary, true);
 
@@ -196,12 +223,12 @@ PROMPT;
             }
         }
 
-        // Create summary entity with statistics
         $summary = new WidgetSummary();
         $summary->setWidgetId($widgetId);
         $summary->setDate($date);
         $summary->setSessionCount(count($sessions));
         $summary->setMessageCount($totalMessages);
+        $summary->setAiModel($this->getSummaryModelName($widget));
         $summary->setTopics([]);
         $summary->setFaqs([]);
         $summary->setSentiment(['positive' => 0, 'neutral' => 100, 'negative' => 0]);
@@ -264,6 +291,7 @@ PROMPT;
     ): array {
         $widgetId = $widget->getWidgetId();
         $ownerId = $widget->getOwnerId();
+        $chatModelName = $this->getSummaryModelName($widget);
 
         // Collect sessions
         $sessions = [];
@@ -293,6 +321,7 @@ PROMPT;
             return [
                 'sessionCount' => 0,
                 'messageCount' => 0,
+                'aiModel' => $chatModelName,
                 'topics' => [],
                 'faqs' => [],
                 'sentiment' => ['positive' => 0, 'neutral' => 100, 'negative' => 0],
@@ -377,6 +406,7 @@ PROMPT;
             return [
                 'sessionCount' => 0,
                 'messageCount' => 0,
+                'aiModel' => $chatModelName,
                 'topics' => [],
                 'faqs' => [],
                 'sentiment' => ['positive' => 0, 'neutral' => 100, 'negative' => 0],
@@ -418,6 +448,7 @@ PROMPT;
         $summary->setDate((int) date('Ymd'));
         $summary->setSessionCount($filteredSessionCount);
         $summary->setMessageCount($userMessages);
+        $summary->setAiModel($chatModelName);
         $summary->setTopics($aiSummary['topics'] ?? []);
         $summary->setFaqs($aiSummary['faqs'] ?? []);
         $summary->setSentiment($aiSummary['sentiment'] ?? ['positive' => 0, 'neutral' => 100, 'negative' => 0]);
@@ -441,6 +472,7 @@ PROMPT;
             'messageCount' => $userMessages,
             'userMessages' => $userMessages,
             'assistantMessages' => $assistantMessages,
+            'aiModel' => $summary->getAiModel(),
             'topics' => $aiSummary['topics'] ?? [],
             'faqs' => $aiSummary['faqs'] ?? [],
             'sentiment' => $aiSummary['sentiment'] ?? ['positive' => 0, 'neutral' => 100, 'negative' => 0],

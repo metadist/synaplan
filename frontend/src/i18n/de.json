@@ -358,6 +358,7 @@
     "sessions": "Sitzungen",
     "messages": "Nachrichten",
     "visitorMessages": "Besucher-Nachrichten",
+    "aiModel": "KI-Modell",
     "sentiment": "Stimmung",
     "positive": "Positiv",
     "negative": "Negativ",

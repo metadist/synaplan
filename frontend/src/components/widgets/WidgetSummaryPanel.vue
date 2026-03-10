@@ -233,6 +233,16 @@
           </div>
         </div>
 
+        <!-- AI Model Info -->
+        <div
+          v-if="summary.aiModel"
+          class="mb-4 flex items-center gap-2 px-3 py-2 rounded-lg surface-chip"
+        >
+          <Icon icon="heroicons:cpu-chip" class="w-4 h-4 txt-brand flex-shrink-0" />
+          <span class="text-xs txt-secondary">{{ $t('summary.aiModel') }}:</span>
+          <span class="text-xs font-medium txt-primary">{{ summary.aiModel }}</span>
+        </div>
+
         <!-- Sentiment Bar -->
         <div :class="compact ? 'mb-4' : 'mb-6'">
           <h4 class="text-sm font-medium txt-primary mb-2">

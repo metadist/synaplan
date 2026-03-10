@@ -308,6 +308,7 @@ export interface WidgetSummary {
   messageCount: number
   userMessages?: number
   assistantMessages?: number
+  aiModel?: string | null
   topics: string[]
   faqs: Array<{ question: string; frequency: number }>
   sentiment: { positive: number; neutral: number; negative: number }
