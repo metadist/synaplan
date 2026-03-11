@@ -88,22 +88,23 @@ From the **frontend** directory:
 | **Dev stack**: E2E tests           | `npm run test:e2e`                                                         |
 | **Dev stack**: single test         | `npm run test:e2e -- -g "id=013"`                                          |
 | **Test stack**: E2E tests          | `BASE_URL=http://localhost:8001 npm run test:e2e`                          |
+| **Test stack**: full CI-like       | `make test-e2e-full` (builds test stack + runs all E2E)                    |
 | **Test stack**: CI-like (no @noci) | `BASE_URL=http://localhost:8001 npm run test:e2e -- --grep-invert "@noci"` |
 | **Test stack**: single test        | `BASE_URL=http://localhost:8001 npm run test:e2e -- -g "id=020"`           |
-| **WhatsApp tests**                 | `BASE_URL=http://localhost:8001 npm run test:e2e:whatsapp`                 |
+| **WhatsApp only**                  | `BASE_URL=http://localhost:8001 npm run test:e2e:whatsapp`                 |
 | **Playwright UI**                  | `npm run test:e2e:ui`                                                      |
 
 Everything after `--` is passed through to Playwright.
 
 ### WhatsApp tests (`@whatsapp`)
 
-WhatsApp API smoke tests use the `@whatsapp` tag and are **excluded from the default `test:e2e` script** (like `@oidc` and `@plugin`). Run them explicitly:
+WhatsApp API smoke tests use the `@whatsapp` tag and are **included in the default `test:e2e` run**. They require the WhatsApp stub server on `:3999` and the backend configured with `WHATSAPP_ENABLED=true` and `WHATSAPP_GRAPH_API_BASE_URL=http://whatsapp-stub:3999`. The stub starts automatically in `docker-compose.test.yml`.
+
+To run only WhatsApp tests:
 
 ```bash
 BASE_URL=http://localhost:8001 npm run test:e2e:whatsapp
 ```
-
-They require the WhatsApp stub server on `:3999` and the backend configured with `WHATSAPP_ENABLED=true` and `WHATSAPP_GRAPH_API_BASE_URL=http://whatsapp-stub:3999`. The stub starts automatically in `docker-compose.test.yml`.
 
 ### Email tests
 
@@ -168,9 +169,9 @@ docker compose -f docker-compose.test.yml up -d app_test
 
 | Script                           | Description                                           |
 | -------------------------------- | ----------------------------------------------------- |
-| `npm run test:e2e`               | E2E tests (Chromium, excludes OIDC, plugin, whatsapp) |
+| `npm run test:e2e`               | E2E tests (Chromium, excludes OIDC and plugin)        |
 | `npm run test:e2e:whatsapp`      | WhatsApp API smoke tests (requires stub server)       |
-| `npm run test:e2e:firefox`       | E2E tests (Firefox, excludes OIDC, plugin, whatsapp)  |
+| `npm run test:e2e:firefox`       | E2E tests (Firefox, excludes OIDC and plugin)         |
 | `npm run test:e2e:oidc`          | Full suite with OIDC button login (skips `@password`) |
 | `npm run test:e2e:oidc-button`   | OIDC button login/logout tests only                   |
 | `npm run test:e2e:oidc-redirect` | OIDC auto-redirect tests (separate project)           |
@@ -186,7 +187,7 @@ Tests use tags in their names for filtering:
 | Tag              | Description                                             |
 | ---------------- | ------------------------------------------------------- |
 | `@ci`            | Runs in CI                                              |
-| `@whatsapp`      | WhatsApp stub tests; excluded from default runs         |
+| `@whatsapp`      | WhatsApp stub tests; included in default runs           |
 | `@oidc`          | Requires Keycloak (`--profile oidc`)                    |
 | `@oidc-button`   | OIDC login via button click                             |
 | `@oidc-redirect` | OIDC auto-redirect (requires `OIDC_AUTO_REDIRECT=true`) |

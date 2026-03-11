@@ -34,11 +34,16 @@ export default async function globalSetup(): Promise<void> {
       data: { defaults: TEST_PROVIDER_DEFAULTS, global: true },
     })
     if (!res.ok()) {
-      throw new Error(`globalSetup: set TestProvider defaults failed: ${res.status()} ${await res.text()}`)
+      throw new Error(
+        `globalSetup: set TestProvider defaults failed: ${res.status()} ${await res.text()}`
+      )
     }
   } catch (err) {
     // Do not throw: allow UI mode to open when backend is not running (e.g. local dev).
-    console.warn('[globalSetup] Skipped setting TestProvider defaults:', err instanceof Error ? err.message : String(err))
+    console.warn(
+      '[globalSetup] Skipped setting TestProvider defaults:',
+      err instanceof Error ? err.message : String(err)
+    )
   } finally {
     await ctx.dispose()
   }
