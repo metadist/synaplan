@@ -9,7 +9,7 @@ use Doctrine\Persistence\ObjectManager;
 /**
  * Loads all AI models from the built-in catalog into the database.
  *
- * Also seeds TestProvider models (IDs 9000-9007) for all capability tags.
+ * Also seeds TestProvider models (IDs 9000-9006) for all capability tags.
  * Fixtures only run in dev/test (docker-entrypoint.sh guards this), never in prod.
  * E2E tests select TestProvider explicitly via POST /api/v1/config/models/defaults.
  */
@@ -23,7 +23,6 @@ class ModelFixtures extends Fixture
         ['id' => 9004, 'service' => 'test', 'name' => 'test-text2vid',   'tag' => 'text2vid',   'providerId' => 'test-text2vid'],
         ['id' => 9005, 'service' => 'test', 'name' => 'test-sound2text', 'tag' => 'sound2text', 'providerId' => 'test-sound2text'],
         ['id' => 9006, 'service' => 'test', 'name' => 'test-text2sound', 'tag' => 'text2sound', 'providerId' => 'test-text2sound'],
-        ['id' => 9007, 'service' => 'test', 'name' => 'test-analyze',    'tag' => 'analyze',    'providerId' => 'test-analyze'],
     ];
 
     public function load(ObjectManager $manager): void

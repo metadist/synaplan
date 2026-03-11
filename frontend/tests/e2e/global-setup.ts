@@ -22,7 +22,7 @@ const TEST_PROVIDER_DEFAULTS: Record<string, number> = {
   TEXT2VID: 9004,
   SOUND2TEXT: 9005,
   TEXT2SOUND: 9006,
-  ANALYZE: 9007,
+  ANALYZE: 9000,
 }
 
 export default async function globalSetup(): Promise<void> {
