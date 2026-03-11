@@ -69,6 +69,8 @@ parameters:
 
     # Plugins - mounted at /plugins in Docker, relative path for CI
     plugins_dir: '/plugins'
+    default_user_plugins:
+        - 'marketeer'
 
 services:
     _defaults:

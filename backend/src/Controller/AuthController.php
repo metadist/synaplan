@@ -10,6 +10,7 @@ use App\Repository\UserRepository;
 use App\Repository\VerificationTokenRepository;
 use App\Service\InternalEmailService;
 use App\Service\OidcTokenService;
+use App\Service\Plugin\DefaultUserPluginProvisioner;
 use App\Service\RecaptchaService;
 use App\Service\TokenService;
 use Doctrine\ORM\EntityManagerInterface;
@@ -41,6 +42,7 @@ class AuthController extends AbstractController
         private TokenService $tokenService,
         private OidcTokenService $oidcTokenService,
         private InternalEmailService $internalEmailService,
+        private DefaultUserPluginProvisioner $defaultUserPluginProvisioner,
         private RecaptchaService $recaptchaService,
         private ValidatorInterface $validator,
         private LoggerInterface $logger,
@@ -118,6 +120,7 @@ class AuthController extends AbstractController
 
         $this->em->persist($user);
         $this->em->flush();
+        $this->defaultUserPluginProvisioner->provisionNewUser($user);
 
         // Generate verification token
         $token = $this->tokenRepository->createToken($user, 'email_verification', 86400); // 24h

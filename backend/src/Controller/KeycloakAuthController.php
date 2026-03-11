@@ -6,6 +6,7 @@ use App\Entity\User;
 use App\Repository\UserRepository;
 use App\Service\OAuthStateService;
 use App\Service\OidcTokenService;
+use App\Service\Plugin\DefaultUserPluginProvisioner;
 use App\Service\TokenService;
 use Doctrine\ORM\EntityManagerInterface;
 use OpenApi\Attributes as OA;
@@ -47,6 +48,7 @@ class KeycloakAuthController extends AbstractController
         private EntityManagerInterface $em,
         private TokenService $tokenService,
         private OidcTokenService $oidcTokenService,
+        private DefaultUserPluginProvisioner $defaultUserPluginProvisioner,
         private OAuthStateService $oauthStateService,
         private LoggerInterface $logger,
         private string $oidcClientId,
@@ -365,6 +367,7 @@ class KeycloakAuthController extends AbstractController
         $sub = $userInfo['sub'] ?? null;
         $email = $userInfo['email'] ?? null;
         $username = $userInfo['preferred_username'] ?? null;
+        $isNewUser = false;
 
         if (!$sub) {
             throw new \Exception('User subject (sub) not provided by Keycloak');
@@ -412,6 +415,7 @@ class KeycloakAuthController extends AbstractController
                 'email' => $email,
                 'sub' => $sub,
             ]);
+            $isNewUser = true;
         }
 
         // Update user details
@@ -467,6 +471,10 @@ class KeycloakAuthController extends AbstractController
 
         $this->em->persist($user);
         $this->em->flush();
+
+        if ($isNewUser) {
+            $this->defaultUserPluginProvisioner->provisionNewUser($user);
+        }
 
         return $user;
     }

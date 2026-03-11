@@ -5,6 +5,7 @@ namespace App\Controller;
 use App\Entity\User;
 use App\Repository\UserRepository;
 use App\Service\OAuthStateService;
+use App\Service\Plugin\DefaultUserPluginProvisioner;
 use App\Service\TokenService;
 use Doctrine\ORM\EntityManagerInterface;
 use OpenApi\Attributes as OA;
@@ -28,6 +29,7 @@ class GoogleAuthController extends AbstractController
         private UserRepository $userRepository,
         private EntityManagerInterface $em,
         private TokenService $tokenService,
+        private DefaultUserPluginProvisioner $defaultUserPluginProvisioner,
         private OAuthStateService $oauthStateService,
         private LoggerInterface $logger,
         private string $googleClientId,
@@ -188,6 +190,7 @@ class GoogleAuthController extends AbstractController
     {
         $email = $userInfo['email'] ?? null;
         $googleId = $userInfo['id'] ?? null;
+        $isNewUser = false;
 
         if (!$email) {
             throw new \Exception('Email not provided by Google');
@@ -222,6 +225,7 @@ class GoogleAuthController extends AbstractController
                 'email' => $email,
                 'google_id' => $googleId,
             ]);
+            $isNewUser = true;
         }
 
         // Update user details with Google data
@@ -250,6 +254,10 @@ class GoogleAuthController extends AbstractController
 
         $this->em->persist($user);
         $this->em->flush();
+
+        if ($isNewUser) {
+            $this->defaultUserPluginProvisioner->provisionNewUser($user);
+        }
 
         return $user;
     }
