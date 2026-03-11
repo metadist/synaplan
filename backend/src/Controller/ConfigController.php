@@ -447,9 +447,6 @@ class ConfigController extends AbstractController
                 case 'TEXT2SOUND':
                     $grouped['TEXT2SOUND'][] = $model;
                     break;
-                case 'ANALYZE':
-                    $grouped['ANALYZE'][] = $model;
-                    break;
                 default:
                     // If no specific tag, add to all capabilities (flexible)
                     foreach (array_keys($grouped) as $cap) {
