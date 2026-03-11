@@ -100,7 +100,7 @@ security:
         - { path: ^/api/v1/widgets/[^/]+/sessions/[^/]+/poll, roles: PUBLIC_ACCESS }
 
         # Public marketeer published pages (anonymous slug URLs)
-        - { path: ^/api/v1/marketeer/public/, roles: PUBLIC_ACCESS }
+        - { path: ^/api/v1/marketeer/public/, methods: [GET, HEAD], roles: PUBLIC_ACCESS }
 
         # Legacy widget.php endpoint (compatibility layer)
         - { path: ^/widget\.php, roles: PUBLIC_ACCESS }
