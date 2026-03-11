@@ -14,15 +14,15 @@ import { CREDENTIALS } from './config/credentials'
 const DEFAULTS_PATH = '/api/v1/config/models/defaults'
 
 const TEST_PROVIDER_DEFAULTS: Record<string, number> = {
-  CHAT: 9000,
-  SORT: 9000,
-  VECTORIZE: 9001,
-  PIC2TEXT: 9002,
-  TEXT2PIC: 9003,
-  TEXT2VID: 9004,
-  SOUND2TEXT: 9005,
-  TEXT2SOUND: 9006,
-  ANALYZE: 9000,
+  CHAT: -1,
+  SORT: -1,
+  VECTORIZE: -2,
+  PIC2TEXT: -3,
+  TEXT2PIC: -4,
+  TEXT2VID: -5,
+  SOUND2TEXT: -6,
+  TEXT2SOUND: -7,
+  ANALYZE: -1,
 }
 
 export default async function globalSetup(): Promise<void> {

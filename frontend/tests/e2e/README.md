@@ -55,7 +55,7 @@ Permission error on `frontend/dist/` (container creates it as root): `sudo rm -r
 | **Backend**   | http://localhost:8000                     | http://localhost:8001                     |
 | **Frontend**  | http://localhost:5173 (Vite)              | Served by backend (:8001)                 |
 | **APP_ENV**   | `dev`                                     | `test`                                    |
-| **AI models** | Real providers + TestProvider (9000-9006) | Real providers + TestProvider (9000-9006) |
+| **AI models** | Real providers + TestProvider (IDs -1…-7) | Real providers + TestProvider (IDs -1…-7) |
 | **DB**        | Persistent volume                         | **tmpfs** (fresh on every `up`)           |
 | **MailHog**   | :8025 / :1025                             | :8025 / :1025 (shared ports!)             |
 | **Login**     | admin@synaplan.com / admin123             | admin@synaplan.com / admin123             |
@@ -64,7 +64,7 @@ Widget E2E tests use the page at `/widget-test.html`. Tests use `page.route()` t
 
 ### TestProvider availability
 
-The TestProvider is available in **dev and test** environments (not in prod). Fixtures seed test models (IDs 9000-9006) for all capability tags in both stacks. ANALYZE uses the chat model (9000) since `CAPABILITY_TAGS` maps ANALYZE to the `chat` tag.
+The TestProvider is available in **dev and test** environments (not in prod). Fixtures seed test models (negative IDs -1…-7, one per capability tag) in both stacks. Negative IDs never collide with auto-increment. `selectable=0` keeps them out of user-facing dropdowns. ANALYZE uses the chat model (ID -1) since `CAPABILITY_TAGS` maps ANALYZE to the `chat` tag.
 
 **Global defaults are set automatically** by `global-setup.ts` (Playwright `globalSetup`). Before any test runs, the setup logs in as admin and sets the system-wide default models (ownerId=0) to TestProvider via `POST /api/v1/config/models/defaults` with `global: true`. This covers all channels — chat, widget, email, and WhatsApp — without per-test setup.
 
