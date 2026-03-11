@@ -1717,9 +1717,12 @@ onMounted(async () => {
     allowedDomains: widgetConfig.allowedDomains || props.widget.allowedDomains || [],
   })
 
-  // Load AI models and prompt data if has custom prompt
+  // Always load AI models — the "AI Prompts" tab needs them
+  // regardless of whether the AI Assistant has been configured
+  await loadAIModels()
+
+  // Load prompt data only if has custom prompt
   if (hasCustomPrompt.value) {
-    await loadAIModels()
     await loadPromptData()
   }
 })
