@@ -525,6 +525,8 @@ services:
     App\Service\RAG\VectorStorage\VectorStorageInterface:
         alias: App\Service\RAG\VectorStorage\VectorStorageFacade
 
+# TestProvider: mock AI for dev/test only. Not registered in prod.
+# Duplicated because Symfony when@ blocks don't support when@dev,test.
 when@dev:
     services:
         App\AI\Provider\TestProvider:
