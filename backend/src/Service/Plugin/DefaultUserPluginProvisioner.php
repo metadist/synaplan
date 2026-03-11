@@ -37,7 +37,17 @@ final readonly class DefaultUserPluginProvisioner
         }
 
         foreach (array_unique($this->defaultPlugins) as $pluginName) {
+            $pluginName = trim($pluginName);
             if ('' === $pluginName) {
+                continue;
+            }
+
+            if (!PluginManager::isValidPluginName($pluginName)) {
+                $this->logger->warning('Skipping default plugin provisioning because plugin name is invalid', [
+                    'user_id' => $userId,
+                    'plugin' => $pluginName,
+                ]);
+
                 continue;
             }
 

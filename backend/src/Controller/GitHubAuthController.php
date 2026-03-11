@@ -5,7 +5,6 @@ namespace App\Controller;
 use App\Entity\User;
 use App\Repository\UserRepository;
 use App\Service\OAuthStateService;
-use App\Service\Plugin\DefaultUserPluginProvisioner;
 use App\Service\TokenService;
 use Doctrine\ORM\EntityManagerInterface;
 use OpenApi\Attributes as OA;
@@ -30,7 +29,6 @@ class GitHubAuthController extends AbstractController
         private UserRepository $userRepository,
         private EntityManagerInterface $em,
         private TokenService $tokenService,
-        private DefaultUserPluginProvisioner $defaultUserPluginProvisioner,
         private OAuthStateService $oauthStateService,
         private LoggerInterface $logger,
         private string $githubClientId,
@@ -215,7 +213,6 @@ class GitHubAuthController extends AbstractController
     {
         $githubId = $userInfo['id'] ?? null;
         $githubLogin = $userInfo['login'] ?? null;
-        $isNewUser = false;
 
         if (!$githubId) {
             throw new \Exception('GitHub user ID not provided');
@@ -266,7 +263,6 @@ class GitHubAuthController extends AbstractController
                 'github_id' => $githubId,
                 'github_login' => $githubLogin,
             ]);
-            $isNewUser = true;
         }
 
         // Update user details with GitHub data
@@ -306,10 +302,6 @@ class GitHubAuthController extends AbstractController
 
         $this->em->persist($user);
         $this->em->flush();
-
-        if ($isNewUser) {
-            $this->defaultUserPluginProvisioner->provisionNewUser($user);
-        }
 
         return $user;
     }

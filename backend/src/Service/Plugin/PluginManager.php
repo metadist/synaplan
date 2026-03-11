@@ -15,6 +15,8 @@ use Symfony\Component\Filesystem\Filesystem;
  */
 final readonly class PluginManager
 {
+    public const PLUGIN_NAME_PATTERN = '/^[a-z0-9_-]+$/';
+
     private Filesystem $fs;
 
     public function __construct(
@@ -101,6 +103,7 @@ final readonly class PluginManager
      */
     public function installPlugin(int $userId, string $pluginName): void
     {
+        $pluginName = $this->requireValidPluginName($pluginName);
         $pluginPath = $this->pluginsDir.'/'.$pluginName;
         if (!is_dir($pluginPath)) {
             throw new \InvalidArgumentException("Plugin '$pluginName' not found in central repository.");
@@ -158,6 +161,7 @@ final readonly class PluginManager
      */
     public function uninstallPlugin(int $userId, string $pluginName): void
     {
+        $pluginName = $this->requireValidPluginName($pluginName);
         $userBaseDir = $this->fileStorageService->getUserBaseAbsolutePath($userId);
         $targetDir = $userBaseDir.'/plugins/'.$pluginName;
 
@@ -222,5 +226,21 @@ final readonly class PluginManager
         $text = strtolower($text);
 
         return $text ?: 'n_a';
+    }
+
+    public static function isValidPluginName(string $pluginName): bool
+    {
+        return 1 === preg_match(self::PLUGIN_NAME_PATTERN, $pluginName);
+    }
+
+    private function requireValidPluginName(string $pluginName): string
+    {
+        $pluginName = trim($pluginName);
+
+        if ('' === $pluginName || !self::isValidPluginName($pluginName)) {
+            throw new \InvalidArgumentException("Invalid plugin name '$pluginName'.");
+        }
+
+        return $pluginName;
     }
 }

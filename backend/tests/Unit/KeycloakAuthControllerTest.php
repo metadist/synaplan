@@ -9,7 +9,6 @@ use App\Entity\User;
 use App\Repository\UserRepository;
 use App\Service\OAuthStateService;
 use App\Service\OidcTokenService;
-use App\Service\Plugin\DefaultUserPluginProvisioner;
 use App\Service\TokenService;
 use Doctrine\ORM\EntityManagerInterface;
 use PHPUnit\Framework\MockObject\MockObject;
@@ -24,7 +23,6 @@ class KeycloakAuthControllerTest extends TestCase
     private EntityManagerInterface&MockObject $em;
     private TokenService&MockObject $tokenService;
     private OidcTokenService&MockObject $oidcTokenService;
-    private DefaultUserPluginProvisioner&MockObject $defaultUserPluginProvisioner;
     private OAuthStateService $oauthStateService;
     private NullLogger $logger;
 
@@ -35,7 +33,6 @@ class KeycloakAuthControllerTest extends TestCase
         $this->em = $this->createMock(EntityManagerInterface::class);
         $this->tokenService = $this->createMock(TokenService::class);
         $this->oidcTokenService = $this->createMock(OidcTokenService::class);
-        $this->defaultUserPluginProvisioner = $this->createMock(DefaultUserPluginProvisioner::class);
         $this->logger = new NullLogger();
         // OAuthStateService is final — use a real instance with a dummy secret
         $this->oauthStateService = new OAuthStateService($this->logger, 'test-secret');
@@ -52,7 +49,6 @@ class KeycloakAuthControllerTest extends TestCase
             $this->em,
             $this->tokenService,
             $this->oidcTokenService,
-            $this->defaultUserPluginProvisioner,
             $this->oauthStateService,
             $this->logger,
             'test-client-id',

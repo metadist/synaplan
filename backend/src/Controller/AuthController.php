@@ -10,7 +10,6 @@ use App\Repository\UserRepository;
 use App\Repository\VerificationTokenRepository;
 use App\Service\InternalEmailService;
 use App\Service\OidcTokenService;
-use App\Service\Plugin\DefaultUserPluginProvisioner;
 use App\Service\RecaptchaService;
 use App\Service\TokenService;
 use Doctrine\ORM\EntityManagerInterface;
@@ -42,7 +41,6 @@ class AuthController extends AbstractController
         private TokenService $tokenService,
         private OidcTokenService $oidcTokenService,
         private InternalEmailService $internalEmailService,
-        private DefaultUserPluginProvisioner $defaultUserPluginProvisioner,
         private RecaptchaService $recaptchaService,
         private ValidatorInterface $validator,
         private LoggerInterface $logger,
@@ -507,7 +505,6 @@ class AuthController extends AbstractController
         $user->setEmailVerified(true);
         $this->tokenRepository->markAsUsed($token);
         $this->em->flush();
-        $this->defaultUserPluginProvisioner->provisionNewUser($user);
 
         // Send welcome email
         try {

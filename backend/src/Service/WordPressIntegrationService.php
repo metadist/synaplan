@@ -13,7 +13,6 @@ use App\Repository\UserRepository;
 use App\Service\File\FileProcessor;
 use App\Service\File\FileStorageService;
 use App\Service\File\VectorizationService;
-use App\Service\Plugin\DefaultUserPluginProvisioner;
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\HttpFoundation\File\UploadedFile;
@@ -36,7 +35,6 @@ final readonly class WordPressIntegrationService
         private readonly FileStorageService $fileStorageService,
         private readonly FileProcessor $fileProcessor,
         private readonly VectorizationService $vectorizationService,
-        private readonly DefaultUserPluginProvisioner $defaultUserPluginProvisioner,
         private readonly WidgetService $widgetService,
         private readonly LoggerInterface $logger,
     ) {
@@ -110,7 +108,6 @@ final readonly class WordPressIntegrationService
 
         $this->em->persist($user);
         $this->em->flush();
-        $this->defaultUserPluginProvisioner->provisionNewUser($user);
 
         return [
             'success' => true,

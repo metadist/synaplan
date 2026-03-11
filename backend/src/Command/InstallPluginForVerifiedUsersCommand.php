@@ -36,7 +36,13 @@ final class InstallPluginForVerifiedUsersCommand extends Command
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
         $io = new SymfonyStyle($input, $output);
-        $pluginName = (string) $input->getArgument('pluginName');
+        $pluginName = trim((string) $input->getArgument('pluginName'));
+
+        if ('' === $pluginName || !PluginManager::isValidPluginName($pluginName)) {
+            $io->error("Invalid plugin name '{$pluginName}'.");
+
+            return Command::FAILURE;
+        }
 
         $availablePlugins = array_map(
             static fn ($plugin) => $plugin->name,
