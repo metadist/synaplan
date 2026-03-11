@@ -120,7 +120,6 @@ class AuthController extends AbstractController
 
         $this->em->persist($user);
         $this->em->flush();
-        $this->defaultUserPluginProvisioner->provisionNewUser($user);
 
         // Generate verification token
         $token = $this->tokenRepository->createToken($user, 'email_verification', 86400); // 24h
@@ -508,6 +507,7 @@ class AuthController extends AbstractController
         $user->setEmailVerified(true);
         $this->tokenRepository->markAsUsed($token);
         $this->em->flush();
+        $this->defaultUserPluginProvisioner->provisionNewUser($user);
 
         // Send welcome email
         try {
