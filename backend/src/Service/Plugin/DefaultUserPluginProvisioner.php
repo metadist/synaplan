@@ -27,7 +27,7 @@ final readonly class DefaultUserPluginProvisioner
     public function provisionNewUser(User $user): void
     {
         $userId = $user->getId();
-        if ($userId === null || empty($this->defaultPlugins)) {
+        if (null === $userId || empty($this->defaultPlugins)) {
             return;
         }
 
@@ -37,7 +37,7 @@ final readonly class DefaultUserPluginProvisioner
         }
 
         foreach (array_unique($this->defaultPlugins) as $pluginName) {
-            if (!is_string($pluginName) || $pluginName === '') {
+            if ('' === $pluginName) {
                 continue;
             }
 

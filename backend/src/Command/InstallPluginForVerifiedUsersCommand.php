@@ -59,7 +59,7 @@ final class InstallPluginForVerifiedUsersCommand extends Command
             ['levels' => \Doctrine\DBAL\ArrayParameterType::STRING]
         );
 
-        if ($userIds === []) {
+        if ([] === $userIds) {
             $io->warning('No active verified users found.');
 
             return Command::SUCCESS;
