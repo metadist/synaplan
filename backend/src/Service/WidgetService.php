@@ -380,10 +380,8 @@ HTML;
             $config['allowedDomains'] = [];
         }
 
-        // Validate custom fields definitions
-        if (isset($config['customFields'])) {
-            $config['customFields'] = $this->sanitizeCustomFields($config['customFields']);
-        }
+        // Validate custom fields definitions (always sanitize to enforce limits)
+        $config['customFields'] = $this->sanitizeCustomFields($config['customFields'] ?? []);
 
         // Validate AI model ID (integer, -1 = use default)
         if (isset($config['aiModelId'])) {

@@ -1534,14 +1534,16 @@ class WidgetPublicController extends AbstractController
      */
     private function resolveSessionWithMode(Request $request, \App\Entity\Widget $widget, string $sessionId): WidgetSession
     {
-        $isTestMode = $this->isValidatedTestMode($request, $widget->getOwnerId());
-        $isInternalMode = !$isTestMode && $this->isValidatedInternalMode($request, $widget->getOwnerId());
+        $user = $this->getUser();
+        $ownerMatch = $user instanceof \App\Entity\User && $user->getId() === $widget->getOwnerId();
+
+        $isTestMode = $ownerMatch && 'true' === $request->headers->get('X-Widget-Test-Mode');
+        $isInternalMode = !$isTestMode && $ownerMatch && 'true' === $request->headers->get('X-Widget-Internal-Mode');
 
         $session = $this->sessionService->getOrCreateSession($widget->getWidgetId(), $sessionId, $isTestMode);
 
         if ($isInternalMode && $session->isAiMode()) {
             $session->setMode(WidgetSession::MODE_INTERNAL);
-            $this->em->flush();
         }
 
         return $session;

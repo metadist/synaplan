@@ -793,10 +793,15 @@ class WidgetSessionController extends AbstractController
 
         try {
             $data = json_decode($request->getContent(), true);
+
+            if (!is_array($data)) {
+                return $this->json(['error' => 'Invalid JSON body'], Response::HTTP_BAD_REQUEST);
+            }
+
             $values = $data['values'] ?? null;
 
             if (!is_array($values)) {
-                return $this->json(['error' => 'Invalid values format'], Response::HTTP_BAD_REQUEST);
+                return $this->json(['error' => 'Missing or invalid "values" field'], Response::HTTP_BAD_REQUEST);
             }
 
             $fieldDefs = $widget->getConfig()['customFields'] ?? [];
@@ -812,7 +817,9 @@ class WidgetSessionController extends AbstractController
                 'success' => true,
                 'values' => $sanitizedValues,
             ]);
-        } catch (\Exception $e) {
+        } catch (\InvalidArgumentException $e) {
+            return $this->json(['error' => $e->getMessage()], Response::HTTP_BAD_REQUEST);
+        } catch (\RuntimeException $e) {
             $this->logger->error('Failed to update custom field values', [
                 'widget_id' => $widgetId,
                 'session_id' => $sessionId,
