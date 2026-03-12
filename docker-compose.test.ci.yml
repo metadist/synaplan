@@ -1,7 +1,9 @@
 # CI overrides for docker-compose.test.yml
 # This file configures the setup for CI by:
 #   1. Using a pre-built Docker image (via APP_IMAGE env var)
-#   2. Removing volume mounts to use the baked image content
+#   2. Removing volume mounts: no backend/plugins mounts (baked into image)
+#
+# app_test reaches whatsapp-stub at http://whatsapp-stub:3999 via backend/.env.test (WHATSAPP_GRAPH_API_BASE_URL).
 #
 # Usage in CI:
 #   docker compose -f docker-compose.test.yml -f docker-compose.test.ci.yml up

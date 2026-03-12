@@ -15,7 +15,7 @@ use Psr\Cache\CacheItemPoolInterface;
  *
  * Ermöglicht User-spezifische Default-Modelle aus BCONFIG + BMODELS Tabellen
  */
-class ModelConfigService
+final readonly class ModelConfigService
 {
     public function __construct(
         private ConfigRepository $configRepository,
@@ -32,7 +32,7 @@ class ModelConfigService
      * Reihenfolge:
      * 1. User-spezifische Config (BCONFIG: BOWNERID=userId, BGROUP='ai', BSETTING='default_chat_provider')
      * 2. Global Default Config (BOWNERID=0)
-     * 3. Fallback: 'test'
+     * 3. Smart Fallback from DB
      */
     public function getDefaultProvider(?int $userId, string $capability = 'chat'): string
     {
@@ -89,7 +89,6 @@ class ModelConfigService
     /**
      * Find a fallback provider for a capability from the database.
      *
-     * This prevents using 'test' provider when real providers are available.
      * Looks for the first active, selectable model with matching tag,
      * but only if the provider is actually available (API key configured).
      *
@@ -99,7 +98,6 @@ class ModelConfigService
      */
     private function findFallbackProvider(string $capability): string
     {
-        // Map capability to DB tag
         $tagMap = [
             'chat' => 'chat',
             'embedding' => 'vectorize',
@@ -113,30 +111,25 @@ class ModelConfigService
 
         $tag = $tagMap[$capability] ?? $capability;
 
-        // Get actually available providers (with API keys configured)
         $availableProviders = array_map(
             'strtolower',
             $this->providerRegistry->getAvailableProviders($capability, false)
         );
 
-        // If no real providers are available, fall back to test
         if (empty($availableProviders)) {
             return 'test';
         }
 
-        // Find first active model with this tag where provider is available
         $models = $this->modelRepository->findByTag($tag, true);
 
         foreach ($models as $model) {
             $provider = strtolower($model->getService());
 
-            // Only return providers that are actually available
-            if ('test' !== $provider && in_array($provider, $availableProviders, true)) {
+            if (in_array($provider, $availableProviders, true)) {
                 return $provider;
             }
         }
 
-        // Last resort fallback
         return 'test';
     }
 
@@ -281,6 +274,11 @@ class ModelConfigService
         // Normalize capability key
         $configKey = 'DEFAULTMODEL/'.strtoupper($capability);
 
+     * Priority: User Config > Global Config > null.
+     * In test env, ConfigFixtures seeds global defaults pointing to TestProvider models.
+     */
+    public function getDefaultModel(string $capability, ?int $userId = null): ?int
+    {
         // Try user-specific config first
         if ($userId) {
             $config = $this->configRepository->findOneBy([

@@ -83,33 +83,24 @@ class WidgetSessionRepository extends ServiceEntityRepository
     }
 
     /**
-     * Count sessions by mode for a widget.
-     * Only counts non-expired sessions (expires > now).
+     * Count all sessions by mode for a widget.
      * Test sessions are excluded.
      *
-     * @return array{ai: int, human: int, waiting: int}
+     * @return array{ai: int, human: int, waiting: int, internal: int}
      */
     public function countSessionsByMode(string $widgetId): array
     {
-        $now = time();
-
-        // Count active (non-expired) sessions + any expired sessions still in human/waiting mode.
-        // Expired human/waiting sessions are still relevant because an operator is responsible for them
-        // and must be able to hand them back to AI.
         $results = $this->createQueryBuilder('ws')
             ->select('ws.mode, COUNT(ws.id) as cnt')
             ->where('ws.widgetId = :widgetId')
             ->andWhere('ws.sessionId NOT LIKE :testPrefix')
-            ->andWhere('(ws.expires > :now OR ws.mode IN (:activeModes))')
             ->setParameter('widgetId', $widgetId)
-            ->setParameter('now', $now)
             ->setParameter('testPrefix', 'test_%')
-            ->setParameter('activeModes', ['human', 'waiting'])
             ->groupBy('ws.mode')
             ->getQuery()
             ->getArrayResult();
 
-        $counts = ['ai' => 0, 'human' => 0, 'waiting' => 0];
+        $counts = ['ai' => 0, 'human' => 0, 'waiting' => 0, 'internal' => 0];
         foreach ($results as $row) {
             $mode = $row['mode'] ?? 'ai'; // null mode defaults to 'ai'
             if (isset($counts[$mode])) {
@@ -215,8 +206,8 @@ class WidgetSessionRepository extends ServiceEntityRepository
             }
         }
 
-        // Filter by mode (ai/human/waiting)
-        if (isset($filters['mode']) && in_array($filters['mode'], ['ai', 'human', 'waiting'], true)) {
+        // Filter by mode (ai/human/waiting/internal)
+        if (isset($filters['mode']) && in_array($filters['mode'], ['ai', 'human', 'waiting', 'internal'], true)) {
             $qb->andWhere('ws.mode = :mode')
                 ->setParameter('mode', $filters['mode']);
         }

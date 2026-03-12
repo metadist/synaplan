@@ -5,6 +5,7 @@ import { Icon } from '@iconify/vue'
 import { useNotification } from '@/composables/useNotification'
 import { useDialog } from '@/composables/useDialog'
 import type { AIModel, Capability } from '@/types/ai-models'
+import { findDefaultModelId } from '@/utils/aiModelDefaults'
 
 interface Props {
   icon: string
@@ -65,8 +66,9 @@ const load = async () => {
     const data = await props.loadFn()
     promptText.value = data.prompt
     originalText.value = data.prompt
-    modelId.value = data.modelId
-    originalModelId.value = data.modelId
+    const resolvedModelId = data.modelId <= 0 ? findDefaultModelId(props.models) : data.modelId
+    modelId.value = resolvedModelId
+    originalModelId.value = resolvedModelId
     isDefault.value = data.isDefault
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : String(err)
@@ -169,9 +171,6 @@ onMounted(load)
             v-model="modelId"
             class="w-full px-4 py-2.5 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
           >
-            <option :value="-1">
-              ✨ {{ $t('widgets.advancedConfig.aiPrompts.modelAutomatic') }}
-            </option>
             <template v-if="!loadingModels && groupedModels.length > 0">
               <optgroup v-for="group in groupedModels" :key="group.capability" :label="group.label">
                 <option v-for="model in group.models" :key="model.id" :value="model.id">

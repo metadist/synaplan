@@ -13,6 +13,7 @@
     "test:ui": "vitest --ui",
     "test:coverage": "vitest --coverage",
     "test:e2e": "playwright test --config=tests/e2e/playwright.config.ts --project=chromium --grep-invert '@plugin|@oidc'",
+    "test:e2e:whatsapp": "playwright test --config=tests/e2e/playwright.config.ts --project=chromium --grep @whatsapp",
     "test:e2e:plugin:castingdata": "playwright test --config=tests/e2e/playwright.config.ts --project=chromium --grep @plugin tests/e2e/tests/castingdata-plugin.spec.ts",
     "test:e2e:firefox": "playwright test --config=tests/e2e/playwright.config.ts --project=firefox --grep-invert '@plugin|@oidc'",
     "test:e2e:oidc": "AUTH_METHOD=oidc playwright test --config=tests/e2e/playwright.config.ts --project=chromium",

@@ -1,6 +1,6 @@
 <?php
 
-namespace Plugin\hello_world\backend\Controller;
+namespace Plugin\HelloWorld\Controller;
 
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;

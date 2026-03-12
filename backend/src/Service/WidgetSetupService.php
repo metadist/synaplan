@@ -18,7 +18,7 @@ use Psr\Log\LoggerInterface;
  * Conducts a conversation with the user to gather information about their
  * business and generates a custom task prompt for their widget.
  */
-final class WidgetSetupService
+final readonly class WidgetSetupService
 {
     public const SETUP_INTERVIEW_TOPIC = 'tools:widget-setup-interview';
     public const SETUP_TOPIC_PREFIX = 'wsetup_';
@@ -181,12 +181,22 @@ final class WidgetSetupService
 
         $this->em->flush();
 
+        // Save the user's current default chat model as the prompt's AI model
+        // so the widget uses a valid chat model from the start
+        $defaultChatModelId = $this->modelConfigService->getDefaultModel('CHAT', $user->getId());
+        if ($defaultChatModelId && $defaultChatModelId > 0) {
+            $this->promptService->saveMetadataForPrompt($prompt, [
+                'aiModel' => $defaultChatModelId,
+            ]);
+        }
+
         $this->logger->info('Widget prompt generated', [
             'widget_id' => $widget->getWidgetId(),
             'prompt_id' => $prompt->getId(),
             'prompt_topic' => $promptTopic,
             'title' => $metadata['title'],
             'history_length' => count($history),
+            'default_chat_model_id' => $defaultChatModelId,
         ]);
 
         return [

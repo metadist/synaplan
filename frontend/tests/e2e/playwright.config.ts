@@ -20,6 +20,14 @@ export default defineConfig({
 
   // Retries and timeout
   retries: 0,
+const n = process.env.E2E_WORKERS ? parseInt(process.env.E2E_WORKERS, 10) : 4
+export const WORKER_COUNT = Number.isInteger(n) && n >= 1 ? n : 4
+
+export default defineConfig({
+  globalSetup: './global-setup.ts',
+  testDir: 'tests',
+  testMatch: '**/*.spec.ts',
+  retries: process.env.CI ? 1 : 0,
   timeout: 60_000,
 
   // BaseURL from ENV or default
@@ -40,6 +48,7 @@ export default defineConfig({
 
   // Output directory for traces, screenshots, etc.
   outputDir: 'test-results',
+  workers: WORKER_COUNT,
 
   // Worker configuration
   workers: 1,

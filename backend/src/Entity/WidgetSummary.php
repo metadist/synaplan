@@ -103,6 +103,12 @@ class WidgetSummary
     private ?int $toDate = null;
 
     /**
+     * AI model name used to generate this summary.
+     */
+    #[ORM\Column(name: 'BAI_MODEL', length: 64, nullable: true)]
+    private ?string $aiModel = null;
+
+    /**
      * When the summary was generated (Unix timestamp).
      */
     #[ORM\Column(name: 'BCREATED', type: 'bigint')]
@@ -347,6 +353,18 @@ class WidgetSummary
         };
 
         return $formatDate($this->fromDate).' - '.$formatDate($this->toDate);
+    }
+
+    public function getAiModel(): ?string
+    {
+        return $this->aiModel;
+    }
+
+    public function setAiModel(?string $aiModel): self
+    {
+        $this->aiModel = $aiModel;
+
+        return $this;
     }
 
     public function getCreated(): int

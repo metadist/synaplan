@@ -19,7 +19,7 @@ use Symfony\Contracts\HttpClient\HttpClientInterface;
  * 2. On token expiry: Refresh token sent to Keycloak → new Access token
  * 3. If Keycloak rejects refresh (user logged out) → session ends
  */
-class OidcTokenService
+final class OidcTokenService
 {
     // Cookie names for OIDC tokens
     public const OIDC_ACCESS_COOKIE = 'oidc_access_token';

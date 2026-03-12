@@ -15,7 +15,7 @@ use Psr\Log\LoggerInterface;
  *
  * Handles anonymous user sessions for chat widgets
  */
-class WidgetSessionService
+final class WidgetSessionService
 {
     // Session limits (from BCONFIG table, but with defaults)
     public const DEFAULT_MAX_MESSAGES = 50;         // Total messages per session
@@ -391,6 +391,7 @@ PROMPT;
             'ai_sessions' => $modeCounts['ai'],
             'human_sessions' => $modeCounts['human'],
             'waiting_sessions' => $modeCounts['waiting'],
+            'internal_sessions' => $modeCounts['internal'],
         ];
     }
 }

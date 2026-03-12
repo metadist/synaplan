@@ -94,11 +94,6 @@ class ProviderRegistry
      */
     private function isCapabilityEnabled(string $providerName, string $capability): bool
     {
-        // EXCEPTION: TestProvider is always enabled (for unit tests & development)
-        if ('test' === strtolower($providerName)) {
-            return true;
-        }
-
         $dbCaps = $this->loadDbCapabilities();
 
         // Normalize provider name (case-insensitive)
@@ -107,7 +102,7 @@ class ProviderRegistry
         // Normalize DB keys to lowercase
         $dbCaps = array_change_key_case($dbCaps, CASE_LOWER);
 
-        $this->logger->error('🔍 CAPABILITY CHECK: provider='.$providerName.' | capability='.$capability.' | dbCaps_keys='.json_encode(array_keys($dbCaps)).' | provider_in_db='.(isset($dbCaps[$providerName]) ? 'YES' : 'NO'));
+        $this->logger->debug('🔍 CAPABILITY CHECK: provider='.$providerName.' | capability='.$capability.' | dbCaps_keys='.json_encode(array_keys($dbCaps)).' | provider_in_db='.(isset($dbCaps[$providerName]) ? 'YES' : 'NO'));
 
         // Map capability names: chat -> chat, embedding -> vectorize, vision -> pic2text
         $capabilityMap = [

@@ -14,7 +14,7 @@ use Psr\Log\LoggerInterface;
  * - OPEN: Too many failures, all requests fail fast
  * - HALF_OPEN: Testing if service recovered, limited requests
  */
-class CircuitBreaker
+final readonly class CircuitBreaker
 {
     private const STATE_CLOSED = 'closed';
     private const STATE_OPEN = 'open';

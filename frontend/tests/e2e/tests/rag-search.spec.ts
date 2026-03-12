@@ -2,8 +2,21 @@ import { test, expect } from '@playwright/test'
 import { login } from '../helpers/auth'
 import { selectors } from '../helpers/selectors'
 
-test('@smoke semantic search completes and shows results summary id=007', async ({ page }) => {
-  await login(page)
+const __filename = fileURLToPath(import.meta.url)
+const __dirname = path.dirname(__filename)
+const e2eDir = path.join(__dirname, '..')
+const ragFixturePath = path.join(e2eDir, FIXTURE_PATHS.RAG_MOST_IMPORTANT)
+const RAG_SEARCH_PHRASE = readFileSync(ragFixturePath, 'utf-8').trim()
+
+/**
+ * Full semantic search E2E: upload fixture file, search for same phrase, assert at least one result.
+ * Requires real AI (embeddings); excluded from CI via @noci.
+ */
+test('@007 @noci @smoke semantic search finds uploaded content (real AI)', async ({
+  page,
+  credentials,
+}) => {
+  await login(page, credentials)
 
   const modeToggle = page.locator(selectors.header.modeToggle)
   await modeToggle.waitFor({ state: 'visible' })

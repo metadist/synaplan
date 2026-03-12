@@ -11,8 +11,9 @@ use Doctrine\Persistence\ObjectManager;
 use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
 
 /**
- * Loads demo users for development with fixed IDs (1, 2, 3).
+ * Loads demo/admin users for development with fixed IDs.
  *
+ * E2E test users are created dynamically by Playwright (register API + MailHog verify).
  * Uses raw SQL INSERT to ensure consistent IDs regardless of auto-increment state.
  * The table is empty at this point because the purger has already run.
  */

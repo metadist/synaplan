@@ -66,3 +66,11 @@ _devextras/screenvideo/node_modules/
 _devextras/screenvideo/test-results/
 _devextras/screenvideo/playwright-report/
 _devextras/screenvideo/.narration-tmp/
+
+# Plugins (developed externally, copied to server manually)
+plugins/brogent/
+plugins/sortx/
+plugins/marketeer/
+
+#local development stuff
+_devextras/local-ignore/

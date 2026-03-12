@@ -19,7 +19,7 @@ use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
  *
  * Supports: Excel (primary), CSV, JSON
  */
-final class WidgetExportService
+final readonly class WidgetExportService
 {
     public function __construct(
         private WidgetSessionRepository $sessionRepository,
@@ -73,8 +73,10 @@ final class WidgetExportService
         // UTF-8 BOM for Excel compatibility
         fwrite($handle, "\xEF\xBB\xBF");
 
+        $customFields = $widget->getConfig()['customFields'] ?? [];
+
         // Header
-        fputcsv($handle, [
+        $headers = [
             'Session ID',
             'Created',
             'Last Activity',
@@ -83,7 +85,11 @@ final class WidgetExportService
             'Timestamp',
             'Sender',
             'Message',
-        ]);
+        ];
+        foreach ($customFields as $field) {
+            $headers[] = $this->sanitizeCellValue($field['name']);
+        }
+        fputcsv($handle, $headers);
 
         // Get sessions
         $result = $this->sessionRepository->findSessionsByWidget(
@@ -96,9 +102,10 @@ final class WidgetExportService
         foreach ($result['sessions'] as $session) {
             $messages = $this->getSessionMessages($session);
             $messageCount = count($messages);
+            $cfValues = $session->getCustomFieldValues() ?? [];
 
             foreach ($messages as $message) {
-                fputcsv($handle, [
+                $row = [
                     $session->getSessionId(),
                     date('Y-m-d H:i:s', $session->getCreated()),
                     date('Y-m-d H:i:s', $session->getLastMessage()),
@@ -107,7 +114,12 @@ final class WidgetExportService
                     date('Y-m-d H:i:s', $message['timestamp']),
                     $message['sender'],
                     $message['text'],
-                ]);
+                ];
+                foreach ($customFields as $field) {
+                    $val = $cfValues[$field['id']] ?? ('boolean' === $field['type'] ? false : '');
+                    $row[] = is_bool($val) ? ($val ? 'Yes' : 'No') : $this->sanitizeCellValue((string) $val);
+                }
+                fputcsv($handle, $row);
             }
         }
 
@@ -130,12 +142,19 @@ final class WidgetExportService
             $filters
         );
 
+        $customFields = $widget->getConfig()['customFields'] ?? [];
+
+        $widgetData = [
+            'id' => $widget->getWidgetId(),
+            'name' => $widget->getName(),
+            'exported_at' => date('c'),
+        ];
+        if (!empty($customFields)) {
+            $widgetData['custom_fields'] = $customFields;
+        }
+
         $exportData = [
-            'widget' => [
-                'id' => $widget->getWidgetId(),
-                'name' => $widget->getName(),
-                'exported_at' => date('c'),
-            ],
+            'widget' => $widgetData,
             'export_range' => [
                 'from' => null,
                 'to' => null,
@@ -152,7 +171,7 @@ final class WidgetExportService
         $totalFiles = 0;
         $earliestCreated = null;
         $latestActivity = null;
-        $modeCounts = ['ai' => 0, 'human' => 0, 'waiting' => 0];
+        $modeCounts = ['ai' => 0, 'human' => 0, 'waiting' => 0, 'internal' => 0];
 
         foreach ($result['sessions'] as $session) {
             $messages = $this->getSessionMessages($session);
@@ -179,7 +198,7 @@ final class WidgetExportService
                 $latestActivity = $lastMessage;
             }
 
-            $exportData['sessions'][] = [
+            $sessionData = [
                 'session_id' => $session->getSessionId(),
                 'created' => date('c', $session->getCreated()),
                 'last_activity' => date('c', $session->getLastMessage()),
@@ -197,6 +216,13 @@ final class WidgetExportService
                     ], $m['files']),
                 ], $messages),
             ];
+
+            $cfValues = $session->getCustomFieldValues();
+            if (null !== $cfValues && !empty($cfValues)) {
+                $sessionData['custom_field_values'] = $cfValues;
+            }
+
+            $exportData['sessions'][] = $sessionData;
         }
 
         // Set actual date range from exported sessions
@@ -213,6 +239,7 @@ final class WidgetExportService
         $exportData['statistics']['ai_sessions'] = $modeCounts['ai'];
         $exportData['statistics']['human_sessions'] = $modeCounts['human'];
         $exportData['statistics']['waiting_sessions'] = $modeCounts['waiting'];
+        $exportData['statistics']['internal_sessions'] = $modeCounts['internal'];
 
         $tempFile = tempnam(sys_get_temp_dir(), 'widget_export_').'.json';
         file_put_contents($tempFile, json_encode($exportData, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
@@ -249,14 +276,21 @@ final class WidgetExportService
         $sheet->setCellValue('A9', 'Statistics');
         $sheet->getStyle('A9')->getFont()->setBold(true)->setSize(12);
 
+        $totalMessages = 0;
+        foreach ($result['sessions'] as $session) {
+            $totalMessages += count($this->getSessionMessages($session));
+        }
+
         $sheet->setCellValue('A10', 'Total Sessions:');
         $sheet->setCellValue('B10', $result['total']);
-        $sheet->setCellValue('A11', 'AI Sessions:');
-        $sheet->setCellValue('B11', $modeStats['ai']);
-        $sheet->setCellValue('A12', 'Human Sessions:');
-        $sheet->setCellValue('B12', $modeStats['human']);
-        $sheet->setCellValue('A13', 'Waiting Sessions:');
-        $sheet->setCellValue('B13', $modeStats['waiting']);
+        $sheet->setCellValue('A11', 'Total Messages:');
+        $sheet->setCellValue('B11', $totalMessages);
+        $sheet->setCellValue('A12', 'AI Sessions:');
+        $sheet->setCellValue('B12', $modeStats['ai']);
+        $sheet->setCellValue('A13', 'Human Sessions:');
+        $sheet->setCellValue('B13', $modeStats['human']);
+        $sheet->setCellValue('A14', 'Waiting Sessions:');
+        $sheet->setCellValue('B14', $modeStats['waiting']);
 
         // Auto-size columns
         $sheet->getColumnDimension('A')->setWidth(20);
@@ -265,8 +299,14 @@ final class WidgetExportService
 
     private function createConversationsSheet($sheet, Widget $widget, array $filters): void
     {
+        $customFields = $widget->getConfig()['customFields'] ?? [];
+
         // Header
         $headers = ['Session', 'Time', 'From', 'Message'];
+        foreach ($customFields as $field) {
+            $headers[] = $field['name'];
+        }
+
         $col = 'A';
         foreach ($headers as $header) {
             $sheet->setCellValue($col.'1', $header);
@@ -277,6 +317,8 @@ final class WidgetExportService
             ++$col;
         }
 
+        $lastCol = chr(ord('D') + count($customFields));
+
         // Get sessions and messages
         $result = $this->sessionRepository->findSessionsByWidget($widget->getWidgetId(), 500, 0, $filters);
 
@@ -286,15 +328,15 @@ final class WidgetExportService
 
         foreach ($result['sessions'] as $session) {
             $messages = $this->getSessionMessages($session);
+            $cfValues = $session->getCustomFieldValues() ?? [];
 
             foreach ($messages as $message) {
                 // Add separator between sessions
                 if (null !== $lastSessionId && $lastSessionId !== $session->getSessionId()) {
-                    $sheet->setCellValue('A'.$row, '---');
-                    $sheet->setCellValue('B'.$row, '---');
-                    $sheet->setCellValue('C'.$row, '---');
-                    $sheet->setCellValue('D'.$row, '---');
-                    $sheet->getStyle('A'.$row.':D'.$row)->getFont()->setColor(new \PhpOffice\PhpSpreadsheet\Style\Color('999999'));
+                    foreach (range('A', $lastCol) as $sepCol) {
+                        $sheet->setCellValue($sepCol.$row, '---');
+                    }
+                    $sheet->getStyle('A'.$row.':'.$lastCol.$row)->getFont()->setColor(new \PhpOffice\PhpSpreadsheet\Style\Color('999999'));
                     ++$row;
                     ++$sessionNum;
                 }
@@ -304,9 +346,19 @@ final class WidgetExportService
                 $sheet->setCellValue('C'.$row, $message['sender']);
                 $sheet->setCellValue('D'.$row, $message['text']);
 
+                if (!empty($customFields)) {
+                    $cfCol = chr(ord('D') + 1);
+                    foreach ($customFields as $field) {
+                        $val = $cfValues[$field['id']] ?? ('boolean' === $field['type'] ? false : '');
+                        $displayVal = is_bool($val) ? ($val ? 'Yes' : 'No') : $this->sanitizeCellValue((string) $val);
+                        $sheet->setCellValue($cfCol.$row, $displayVal);
+                        ++$cfCol;
+                    }
+                }
+
                 // Color coding for sender
                 if ('IN' === $message['direction']) {
-                    $sheet->getStyle('A'.$row.':D'.$row)->getFill()
+                    $sheet->getStyle('A'.$row.':'.$lastCol.$row)->getFill()
                         ->setFillType(Fill::FILL_SOLID)
                         ->getStartColor()->setRGB('F0FDF4');
                 }
@@ -319,8 +371,13 @@ final class WidgetExportService
         // Auto-size columns
         $sheet->getColumnDimension('A')->setWidth(10);
         $sheet->getColumnDimension('B')->setWidth(12);
-        $sheet->getColumnDimension('C')->setWidth(12);
+        $sheet->getColumnDimension('C')->setWidth(14);
         $sheet->getColumnDimension('D')->setWidth(80);
+        $cfCol = chr(ord('D') + 1);
+        foreach ($customFields as $field) {
+            $sheet->getColumnDimension($cfCol)->setAutoSize(true);
+            ++$cfCol;
+        }
 
         // Wrap text in message column
         $sheet->getStyle('D:D')->getAlignment()->setWrapText(true);
@@ -330,6 +387,7 @@ final class WidgetExportService
     {
         // Header
         $headers = ['Session ID', 'Created', 'Last Activity', 'Messages', 'Files', 'Mode', 'Duration'];
+
         $col = 'A';
         foreach ($headers as $header) {
             $sheet->setCellValue($col.'1', $header);
@@ -371,7 +429,7 @@ final class WidgetExportService
     /**
      * Get messages for a session.
      *
-     * @return array<array{direction: string, text: string, timestamp: int, sender: string, files: array}>
+     * @return array<array{direction: string, text: string, timestamp: int, sender: string, language: string, files: array}>
      */
     private function getSessionMessages(WidgetSession $session): array
     {
@@ -393,11 +451,15 @@ final class WidgetExportService
         );
 
         return array_map(function ($message) {
-            $sender = 'AI';
+            $providerIndex = $message->getProviderIndex();
             if ('IN' === $message->getDirection()) {
                 $sender = 'Visitor';
-            } elseif ('HUMAN_OPERATOR' === $message->getProviderIndex()) {
-                $sender = 'Support';
+            } elseif ('SYSTEM' === $providerIndex) {
+                $sender = 'System';
+            } elseif ('HUMAN_OPERATOR' === $providerIndex) {
+                $sender = 'Support Agent';
+            } else {
+                $sender = 'AI Assistant';
             }
 
             // Extract files from message
@@ -415,9 +477,10 @@ final class WidgetExportService
 
             return [
                 'direction' => $message->getDirection(),
-                'text' => $message->getText(),
+                'text' => $this->sanitizeCellValue($message->getText()),
                 'timestamp' => $message->getUnixTimestamp(),
                 'sender' => $sender,
+                'language' => strtoupper($message->getLanguage()),
                 'files' => $files,
             ];
         }, $messages);
@@ -446,5 +509,24 @@ final class WidgetExportService
         }
 
         return floor($seconds / 3600).'h '.floor(($seconds % 3600) / 60).'m';
+    }
+
+    /**
+     * Prevent CSV/formula injection by escaping leading characters
+     * that spreadsheet applications interpret as formulas.
+     */
+    private function sanitizeCellValue(string $value): string
+    {
+        if ('' !== $value && str_starts_with($value, '=')
+            || str_starts_with($value, '+')
+            || str_starts_with($value, '-')
+            || str_starts_with($value, '@')
+            || str_starts_with($value, "\t")
+            || str_starts_with($value, "\r")
+        ) {
+            return "'".$value;
+        }
+
+        return $value;
     }
 }

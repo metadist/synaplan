@@ -16,7 +16,7 @@ use Symfony\Component\HttpFoundation\Response;
  * Access Token: Short-lived (5 min), stored in HttpOnly cookie
  * Refresh Token: Long-lived (7 days), stored in HttpOnly cookie + DB
  */
-class TokenService
+final readonly class TokenService
 {
     // Token lifetimes
     public const ACCESS_TOKEN_TTL = 300;        // 5 minutes

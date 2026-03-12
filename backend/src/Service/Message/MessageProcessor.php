@@ -22,7 +22,7 @@ use Psr\Log\LoggerInterface;
  *
  * Provides status callbacks for frontend feedback
  */
-class MessageProcessor
+final readonly class MessageProcessor
 {
     public function __construct(
         private MessageRepository $messageRepository,
@@ -89,24 +89,37 @@ class MessageProcessor
                     'source' => $source,
                 ]);
 
-                // Run classification to detect language via AI
-                $classification = $this->classifier->classify($message, $conversationHistory);
+                // Skip AI classification for fixed prompt mode -- we already know the topic
+                // and don't need an expensive AI call that depends on the user's SORT model.
+                // Set language to 'auto' so the AI responds in whatever language the user writes.
+                $detectedLanguage = $message->getLanguage();
+                if (!$detectedLanguage || 'NN' === $detectedLanguage) {
+                    $detectedLanguage = 'auto';
+                }
 
-                // Override topic with the fixed task prompt (skip routing result)
-                $classification['topic'] = $options['fixed_task_prompt'];
-                $classification['source'] = $source;
-                $classification['is_widget_mode'] = $isWidget;
+                $classification = [
+                    'topic' => $options['fixed_task_prompt'],
+                    'language' => $detectedLanguage,
+                    'source' => $source,
+                    'intent' => 'chat',
+                    'is_widget_mode' => $isWidget,
+                ];
 
-                $this->logger->info('MessageProcessor: Classification complete with fixed prompt', [
-                    'detected_language' => $classification['language'] ?? 'en',
+                // Pass widget's configured model as override so ChatHandler uses it
+                if (!empty($options['widget_model_id'])) {
+                    $classification['override_model_id'] = (int) $options['widget_model_id'];
+                }
+
+                $this->logger->info('MessageProcessor: Using fixed prompt (skipped AI classification)', [
+                    'language' => $detectedLanguage,
                     'fixed_topic' => $options['fixed_task_prompt'],
                     'source' => $source,
+                    'widget_model_id' => $options['widget_model_id'] ?? null,
                 ]);
 
                 $this->notify($statusCallback, 'classified', sprintf(
-                    '%s: Language %s detected, using fixed prompt',
-                    ucfirst($source),
-                    $classification['language'] ?? 'en'
+                    '%s: Using fixed prompt',
+                    ucfirst($source)
                 ));
 
                 if (!empty($options['rag_group_key'])) {
@@ -516,7 +529,12 @@ class MessageProcessor
                     'language' => $languageOverride ?? 'en',
                     'source' => $source,
                     'intent' => 'chat',
+                    'is_widget_mode' => $isWidget,
                 ];
+
+                if (!empty($options['widget_model_id'])) {
+                    $classification['override_model_id'] = (int) $options['widget_model_id'];
+                }
 
                 $this->notify($statusCallback, 'classified', sprintf('Using %s task prompt (skipped classification)', $source), [
                     'topic' => $classification['topic'],

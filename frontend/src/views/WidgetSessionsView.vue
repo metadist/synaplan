@@ -23,6 +23,10 @@
 
           <!-- Stats (inline on desktop) -->
           <div class="hidden md:flex items-center gap-3 text-xs txt-secondary flex-shrink-0">
+            <span class="flex items-center gap-1.5 font-medium txt-primary">
+              {{ totalSessions }} {{ $t('widgetSessions.totalShort') }}
+            </span>
+            <span class="txt-secondary">|</span>
             <span class="flex items-center gap-1.5">
               <span class="w-2 h-2 rounded-full bg-blue-500 shadow-sm shadow-blue-500/50"></span>
               {{ stats.ai }} {{ $t('widgetSessions.aiShort') }}
@@ -36,6 +40,12 @@
             <span class="flex items-center gap-1.5">
               <span class="w-2 h-2 rounded-full bg-amber-500 shadow-sm shadow-amber-500/50"></span>
               {{ stats.waiting }} {{ $t('widgetSessions.waitingShort') }}
+            </span>
+            <span class="flex items-center gap-1.5">
+              <span
+                class="w-2 h-2 rounded-full bg-purple-500 shadow-sm shadow-purple-500/50"
+              ></span>
+              {{ stats.internal }} {{ $t('widgetSessions.internalShort') }}
             </span>
           </div>
 
@@ -105,17 +115,25 @@
         <div class="flex lg:hidden items-center gap-2 flex-wrap">
           <!-- Stats (mobile) -->
           <div class="flex md:hidden items-center gap-2 text-[11px] txt-secondary mr-auto">
+            <span class="font-medium txt-primary">
+              {{ totalSessions }} {{ $t('widgetSessions.totalShort') }}
+            </span>
+            <span>|</span>
             <span class="flex items-center gap-1">
               <span class="w-1.5 h-1.5 rounded-full bg-blue-500"></span>
-              {{ stats.ai }} AI
+              {{ stats.ai }} {{ $t('widgetSessions.aiShort') }}
             </span>
             <span class="flex items-center gap-1">
               <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
-              {{ stats.human }} Human
+              {{ stats.human }} {{ $t('widgetSessions.humanShort') }}
             </span>
             <span class="flex items-center gap-1">
               <span class="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
-              {{ stats.waiting }} Waiting
+              {{ stats.waiting }} {{ $t('widgetSessions.waitingShort') }}
+            </span>
+            <span class="flex items-center gap-1">
+              <span class="w-1.5 h-1.5 rounded-full bg-purple-500"></span>
+              {{ stats.internal }} {{ $t('widgetSessions.internalShort') }}
             </span>
           </div>
 
@@ -237,6 +255,7 @@
               <option value="ai">{{ $t('widgetSessions.modeAi') }}</option>
               <option value="human">{{ $t('widgetSessions.modeHuman') }}</option>
               <option value="waiting">{{ $t('widgetSessions.modeWaiting') }}</option>
+              <option value="internal">{{ $t('widgetSessions.modeInternal') }}</option>
             </select>
             <select
               v-model="filters.status"
@@ -618,12 +637,102 @@
                     {{ $t('widgetSessions.typing') }}...
                   </p>
                 </div>
+
+                <!-- AI Typing Indicator (Internal Mode) -->
+                <div v-if="internalAiTyping" class="max-w-[80%] ml-auto">
+                  <div
+                    class="px-4 py-3 shadow-sm bg-gradient-to-br from-blue-600 to-blue-500 text-white rounded-2xl rounded-br-md"
+                  >
+                    <div class="flex items-center gap-1.5">
+                      <span
+                        class="w-2 h-2 bg-white/60 rounded-full animate-bounce"
+                        style="animation-delay: 0ms"
+                      ></span>
+                      <span
+                        class="w-2 h-2 bg-white/60 rounded-full animate-bounce"
+                        style="animation-delay: 150ms"
+                      ></span>
+                      <span
+                        class="w-2 h-2 bg-white/60 rounded-full animate-bounce"
+                        style="animation-delay: 300ms"
+                      ></span>
+                    </div>
+                  </div>
+                  <p class="text-[10px] mt-1.5 px-1 txt-secondary opacity-50 text-right">
+                    AI {{ $t('widgetSessions.typing') }}...
+                  </p>
+                </div>
               </div>
             </div>
 
-            <!-- Message Input (Human/Waiting Mode) -->
+            <!-- Custom Fields (Internal Mode) -->
             <div
-              v-if="selectedSession.mode === 'human' || selectedSession.mode === 'waiting'"
+              v-if="selectedSession.mode === 'internal' && widgetCustomFields.length > 0"
+              class="flex-shrink-0 border-t border-white/5 dark:border-white/5"
+            >
+              <button
+                class="w-full px-4 py-2.5 flex items-center justify-between text-xs font-medium txt-secondary hover:bg-white/5 transition-colors"
+                @click="showInternalCustomFields = !showInternalCustomFields"
+              >
+                <span class="flex items-center gap-1.5">
+                  <Icon icon="heroicons:rectangle-stack" class="w-3.5 h-3.5 txt-brand" />
+                  {{ $t('widgets.customFields.panelTitle') }}
+                  <Icon
+                    v-if="savingCustomFields"
+                    icon="heroicons:arrow-path"
+                    class="w-3 h-3 txt-secondary animate-spin"
+                  />
+                </span>
+                <Icon
+                  :icon="
+                    showInternalCustomFields ? 'heroicons:chevron-up' : 'heroicons:chevron-down'
+                  "
+                  class="w-3.5 h-3.5"
+                />
+              </button>
+              <div v-if="showInternalCustomFields" class="px-4 pb-3 space-y-3">
+                <div v-for="field in widgetCustomFields" :key="field.id">
+                  <label class="block text-xs font-medium txt-secondary mb-1">
+                    {{ field.name }}
+                  </label>
+                  <input
+                    v-if="field.type === 'text'"
+                    v-model="internalFieldValues[field.id]"
+                    type="text"
+                    class="w-full px-3 py-1.5 text-sm rounded-lg surface-chip border border-light-border/30 dark:border-dark-border/20 txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)] transition-colors"
+                    maxlength="256"
+                  />
+                  <button
+                    v-else
+                    class="flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm transition-colors w-full"
+                    :class="
+                      internalFieldValues[field.id]
+                        ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300'
+                        : 'surface-chip txt-secondary'
+                    "
+                    @click="internalFieldValues[field.id] = !internalFieldValues[field.id]"
+                  >
+                    <Icon
+                      :icon="
+                        internalFieldValues[field.id]
+                          ? 'heroicons:check-circle-solid'
+                          : 'heroicons:x-circle'
+                      "
+                      class="w-4 h-4"
+                    />
+                    {{ internalFieldValues[field.id] ? $t('common.yes') : $t('common.no') }}
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <!-- Message Input (Human/Waiting/Internal Mode) -->
+            <div
+              v-if="
+                selectedSession.mode === 'human' ||
+                selectedSession.mode === 'waiting' ||
+                selectedSession.mode === 'internal'
+              "
               class="p-4 flex-shrink-0 border-t border-white/5 dark:border-white/5 shadow-[0_-1px_3px_rgba(0,0,0,0.08)]"
             >
               <!-- File Preview -->
@@ -1005,7 +1114,7 @@ function stopResize() {
 
 const filters = ref({
   status: '' as '' | 'active' | 'expired',
-  mode: '' as '' | 'ai' | 'human' | 'waiting',
+  mode: '' as '' | 'ai' | 'human' | 'waiting' | 'internal',
   favorite: false,
 })
 
@@ -1020,7 +1129,12 @@ const stats = ref({
   ai: 0,
   human: 0,
   waiting: 0,
+  internal: 0,
 })
+
+const totalSessions = computed(
+  () => stats.value.ai + stats.value.human + stats.value.waiting + stats.value.internal
+)
 
 const goBack = () => {
   router.push({ name: 'tools-chat-widget' })
@@ -1182,6 +1296,11 @@ const viewSession = async (session: widgetSessionsApi.WidgetSession) => {
     selectedSession.value = response.session
     sessionMessages.value = response.messages
 
+    // Load custom field values for internal mode sessions
+    if (response.session.mode === 'internal') {
+      initInternalFieldValues()
+    }
+
     // Update session in list with fresh data from server
     const sessionIndex = sessions.value.findIndex((s) => s.id === response.session.id)
     if (sessionIndex !== -1) {
@@ -1190,7 +1309,12 @@ const viewSession = async (session: widgetSessionsApi.WidgetSession) => {
       sessions.value[sessionIndex].lastMessagePreview = response.session.lastMessagePreview
     }
 
-    // Subscribe to SSE for this specific session
+    // Subscribe to SSE for this specific session (skip for internal mode --
+    // messages are added locally by sendInternalMessage, SSE would duplicate them)
+    if (response.session.mode === 'internal') {
+      return
+    }
+
     // Use latestEventId to skip historical events and only receive new ones.
     // This prevents replay of old takeover/handback events that would incorrectly
     // change the session mode (e.g. 'waiting' → 'human' from a stale takeover event).
@@ -1534,7 +1658,60 @@ const uploadFiles = async (): Promise<number[]> => {
   }
 }
 
+const internalAiTyping = ref(false)
+const showInternalCustomFields = ref(false)
+const internalFieldValues = ref<Record<string, string | boolean>>({})
+const savingCustomFields = ref(false)
+
+const widgetCustomFields = computed(
+  () => (widget.value?.config?.customFields ?? []) as widgetsApi.CustomFieldDef[]
+)
+
+let cfWatchSuppressed = false
+
+const initInternalFieldValues = () => {
+  cfWatchSuppressed = true
+  const v: Record<string, string | boolean> = {}
+  const existing = selectedSession.value?.customFieldValues ?? {}
+  for (const field of widgetCustomFields.value) {
+    v[field.id] = existing[field.id] ?? (field.type === 'boolean' ? false : '')
+  }
+  internalFieldValues.value = v
+  nextTick(() => {
+    cfWatchSuppressed = false
+  })
+}
+
+let cfSaveTimer: ReturnType<typeof setTimeout> | null = null
+
+const debouncedSaveCustomFields = () => {
+  if (cfWatchSuppressed) return
+  if (!selectedSession.value || selectedSession.value.mode !== 'internal') return
+
+  const targetSessionId = selectedSession.value.sessionId
+  const valuesToSave = { ...internalFieldValues.value }
+
+  if (cfSaveTimer) clearTimeout(cfSaveTimer)
+  cfSaveTimer = setTimeout(async () => {
+    savingCustomFields.value = true
+    try {
+      await widgetSessionsApi.saveCustomFieldValues(widgetId.value, targetSessionId, valuesToSave)
+      if (selectedSession.value?.sessionId === targetSessionId) {
+        selectedSession.value.customFieldValues = { ...valuesToSave }
+      }
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : t('widgets.customFields.saveFailed')
+      error(message)
+    } finally {
+      savingCustomFields.value = false
+    }
+  }, 800)
+}
+
+watch(internalFieldValues, debouncedSaveCustomFields, { deep: true })
+
 const sendMessage = async () => {
+  if (sendingMessage.value) return
   if (!selectedSession.value || (!messageText.value.trim() && selectedFiles.value.length === 0))
     return
 
@@ -1546,35 +1723,88 @@ const sendMessage = async () => {
       fileIds = await uploadFiles()
     }
 
-    // Send message with file IDs
-    await widgetSessionsApi.sendHumanMessage(
-      widgetId.value,
-      selectedSession.value.sessionId,
-      messageText.value.trim() || t('widgetSessions.fileAttached'),
-      fileIds
-    )
+    if (selectedSession.value.mode === 'internal') {
+      await sendInternalMessage(messageText.value.trim(), fileIds)
+    } else {
+      await widgetSessionsApi.sendHumanMessage(
+        widgetId.value,
+        selectedSession.value.sessionId,
+        messageText.value.trim() || t('widgetSessions.fileAttached'),
+        fileIds
+      )
 
-    // Update mode: operator replied, so mode goes back to 'human' (was 'waiting')
-    if (selectedSession.value.mode === 'waiting') {
-      selectedSession.value.mode = 'human'
-      const sessionIndex = sessions.value.findIndex((s) => s.id === selectedSession.value?.id)
-      if (sessionIndex !== -1) {
-        sessions.value[sessionIndex].mode = 'human'
+      if (selectedSession.value.mode === 'waiting') {
+        selectedSession.value.mode = 'human'
+        const sessionIndex = sessions.value.findIndex((s) => s.id === selectedSession.value?.id)
+        if (sessionIndex !== -1) {
+          sessions.value[sessionIndex].mode = 'human'
+        }
+        stats.value.waiting = Math.max(0, stats.value.waiting - 1)
+        stats.value.human++
       }
-      // Update stats
-      stats.value.waiting = Math.max(0, stats.value.waiting - 1)
-      stats.value.human++
     }
 
     // Clear state
     messageText.value = ''
     selectedFiles.value = []
     uploadedFileIds.value = []
-  } catch (err: any) {
-    error(err.message || 'Failed to send message')
+  } catch (err: unknown) {
+    error(err instanceof Error ? err.message : t('widgetSessions.sendFailed'))
   } finally {
     sendingMessage.value = false
   }
+}
+
+const sendInternalMessage = async (text: string, fileIds: number[]) => {
+  if (!selectedSession.value) return
+
+  const userMsg = {
+    id: Date.now(),
+    direction: 'IN' as const,
+    text,
+    timestamp: Math.floor(Date.now() / 1000),
+    sender: 'user' as const,
+  }
+  sessionMessages.value.push(userMsg)
+  scrollToBottomOfMessages()
+
+  internalAiTyping.value = true
+  try {
+    let aiText = ''
+    const result = await widgetsApi.sendWidgetMessage(
+      widgetId.value,
+      text,
+      selectedSession.value.sessionId,
+      {
+        fileIds: fileIds.length > 0 ? fileIds : undefined,
+        headers: { 'X-Widget-Internal-Mode': 'true' },
+        onChunk: (chunk: string) => {
+          aiText += chunk
+        },
+      }
+    )
+
+    const aiMsg = {
+      id: result.messageId ?? Date.now() + 1,
+      direction: 'OUT' as const,
+      text: aiText || result.text || '',
+      timestamp: Math.floor(Date.now() / 1000),
+      sender: 'ai' as const,
+    }
+    sessionMessages.value.push(aiMsg)
+    scrollToBottomOfMessages()
+  } finally {
+    internalAiTyping.value = false
+  }
+}
+
+const scrollToBottomOfMessages = () => {
+  nextTick(() => {
+    const container = messagesContainer.value
+    if (container) {
+      container.scrollTop = container.scrollHeight
+    }
+  })
 }
 
 // Operator typing indicator - send to widget user
@@ -1737,6 +1967,8 @@ const getModeIcon = (mode: string) => {
       return 'heroicons:user'
     case 'waiting':
       return 'heroicons:clock'
+    case 'internal':
+      return 'heroicons:building-office'
     default:
       return 'heroicons:question-mark-circle'
   }
@@ -1750,6 +1982,8 @@ const getModeGradient = (mode: string) => {
       return 'bg-gradient-to-br from-emerald-500 to-emerald-600'
     case 'waiting':
       return 'bg-gradient-to-br from-amber-500 to-amber-600'
+    case 'internal':
+      return 'bg-gradient-to-br from-purple-500 to-purple-600'
     default:
       return 'bg-gradient-to-br from-gray-500 to-gray-600'
   }
@@ -1763,6 +1997,8 @@ const getModeLabel = (mode: string) => {
       return t('widgetSessions.modeHuman')
     case 'waiting':
       return t('widgetSessions.modeWaiting')
+    case 'internal':
+      return t('widgetSessions.modeInternal')
     default:
       return mode
   }
@@ -1879,12 +2115,12 @@ onMounted(() => {
 onUnmounted(() => {
   window.removeEventListener('beforeunload', handleBeforeUnload)
   window.removeEventListener('resize', handleScreenResize)
-  // Clean up resize listeners in case component unmounts during resize
   document.removeEventListener('mousemove', onResize)
   document.removeEventListener('mouseup', stopResize)
   if (eventSubscription.value) {
     eventSubscription.value.unsubscribe()
   }
+  if (cfSaveTimer) clearTimeout(cfSaveTimer)
 })
 </script>
 

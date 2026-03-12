@@ -12,7 +12,7 @@ use Symfony\Contracts\HttpClient\HttpClientInterface;
  * Handles fetching emails from Mailhog (development) or Gmail IMAP (production)
  * and forwarding them to the email webhook for smart@synaplan.net processing.
  */
-class InboundEmailService
+final readonly class InboundEmailService
 {
     public function __construct(
         private HttpClientInterface $httpClient,

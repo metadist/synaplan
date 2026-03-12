@@ -28,7 +28,7 @@ use Symfony\Component\DependencyInjection\Attribute\AutoconfigureTag;
  * Uses user-defined model from BCONFIG or falls back to global default
  */
 #[AutoconfigureTag('app.message.handler')]
-class ChatHandler implements MessageHandlerInterface
+final readonly class ChatHandler implements MessageHandlerInterface
 {
     /** @var iterable<PluginContextProviderInterface> */
     private iterable $pluginContextProviders;
@@ -81,7 +81,7 @@ class ChatHandler implements MessageHandlerInterface
         $ragMinScore = isset($classification['rag_min_score']) ? max(0.0, min(1.0, (float) $classification['rag_min_score'])) : 0.3;
         $ragContext = $this->loadRagContext($message, $topic, $ragGroupKey, $ragLimit, $ragMinScore);
 
-        // Determine model: Again override > prompt metadata > classification override > DB default
+        // Determine model: Again > Widget config override > Prompt Metadata > DB default
         $modelId = null;
         $provider = null;
         $modelName = null;
@@ -92,17 +92,17 @@ class ChatHandler implements MessageHandlerInterface
                 'model_id' => $modelId,
                 'user_id' => $message->getUserId(),
             ]);
+        } elseif (isset($classification['override_model_id']) && (int) $classification['override_model_id'] > 0) {
+            $modelId = (int) $classification['override_model_id'];
+            $this->logger->info('ChatHandler: Using widget config model override', [
+                'model_id' => $modelId,
+                'user_id' => $message->getUserId(),
+            ]);
         } elseif (isset($promptMetadata['aiModel']) && (int) $promptMetadata['aiModel'] > 0) {
             $modelId = (int) $promptMetadata['aiModel'];
             $this->logger->info('ChatHandler: Using prompt metadata model', [
                 'model_id' => $modelId,
                 'topic' => $topic,
-                'user_id' => $message->getUserId(),
-            ]);
-        } elseif (isset($classification['override_model_id']) && $classification['override_model_id']) {
-            $modelId = (int) $classification['override_model_id'];
-            $this->logger->info('ChatHandler: Using classification override model', [
-                'model_id' => $modelId,
                 'user_id' => $message->getUserId(),
             ]);
         } else {
@@ -192,16 +192,20 @@ class ChatHandler implements MessageHandlerInterface
         }
 
         // Append explicit language directive based on detected language from classification.
-        $languageNames = [
-            'en' => 'English', 'de' => 'German', 'fr' => 'French', 'es' => 'Spanish',
-            'it' => 'Italian', 'pt' => 'Portuguese', 'nl' => 'Dutch', 'pl' => 'Polish',
-            'ru' => 'Russian', 'ja' => 'Japanese', 'ko' => 'Korean', 'zh' => 'Chinese',
-            'ar' => 'Arabic', 'tr' => 'Turkish', 'sv' => 'Swedish', 'da' => 'Danish',
-            'no' => 'Norwegian', 'fi' => 'Finnish', 'cs' => 'Czech', 'ro' => 'Romanian',
-            'hu' => 'Hungarian', 'uk' => 'Ukrainian', 'hi' => 'Hindi', 'th' => 'Thai',
-        ];
-        $languageName = $languageNames[$language] ?? $language;
-        $systemPrompt .= "\n\n**IMPORTANT: The user's current message is in {$languageName}. You MUST respond in {$languageName}.**";
+        if ('auto' === $language) {
+            $systemPrompt .= "\n\n**IMPORTANT: You MUST respond in the SAME language the user writes in. Detect their language from the message and match it exactly.**";
+        } else {
+            $languageNames = [
+                'en' => 'English', 'de' => 'German', 'fr' => 'French', 'es' => 'Spanish',
+                'it' => 'Italian', 'pt' => 'Portuguese', 'nl' => 'Dutch', 'pl' => 'Polish',
+                'ru' => 'Russian', 'ja' => 'Japanese', 'ko' => 'Korean', 'zh' => 'Chinese',
+                'ar' => 'Arabic', 'tr' => 'Turkish', 'sv' => 'Swedish', 'da' => 'Danish',
+                'no' => 'Norwegian', 'fi' => 'Finnish', 'cs' => 'Czech', 'ro' => 'Romanian',
+                'hu' => 'Hungarian', 'uk' => 'Ukrainian', 'hi' => 'Hindi', 'th' => 'Thai',
+            ];
+            $languageName = $languageNames[$language] ?? $language;
+            $systemPrompt .= "\n\n**IMPORTANT: The user's current message is in {$languageName}. You MUST respond in {$languageName}.**";
+        }
 
         if ($modelId) {
             $model = $this->modelRepository->find($modelId);
@@ -605,7 +609,7 @@ class ChatHandler implements MessageHandlerInterface
             }
         }
 
-        // Get model - Priority: User-selected (Again) > Prompt Metadata > Classification override > DB default
+        // Get model - Priority: Again > Widget config override > Prompt Metadata > DB default
         $modelId = null;
         $provider = null;
         $modelName = null;
@@ -618,20 +622,20 @@ class ChatHandler implements MessageHandlerInterface
                 'user_id' => $message->getUserId(),
             ]);
         }
-        // 2. Check if prompt metadata defines a model (and it's not AUTOMATED = -1)
+        // 2. Check if widget config provides a specific model (from widget.config.aiModelId)
+        elseif (isset($classification['override_model_id']) && $classification['override_model_id'] > 0) {
+            $modelId = (int) $classification['override_model_id'];
+            $this->logger->info('ChatHandler: Using widget config model override', [
+                'model_id' => $modelId,
+                'user_id' => $message->getUserId(),
+            ]);
+        }
+        // 3. Check if prompt metadata defines a model (and it's not AUTOMATED = -1)
         elseif (isset($promptMetadata['aiModel']) && $promptMetadata['aiModel'] > 0) {
             $modelId = $promptMetadata['aiModel'];
             $this->logger->info('ChatHandler: Using prompt metadata model', [
                 'model_id' => $modelId,
                 'topic' => $topic,
-                'user_id' => $message->getUserId(),
-            ]);
-        }
-        // 3. Check if classification provides a model override
-        elseif (isset($classification['override_model_id']) && $classification['override_model_id']) {
-            $modelId = $classification['override_model_id'];
-            $this->logger->info('ChatHandler: Using classification override model', [
-                'model_id' => $modelId,
                 'user_id' => $message->getUserId(),
             ]);
         }
@@ -725,16 +729,20 @@ class ChatHandler implements MessageHandlerInterface
         // "answer in the user's language" without specifying WHICH language was detected.
         // When conversation history contains mixed languages, the AI may default to the wrong one.
         $detectedLanguage = $classification['language'] ?? 'en';
-        $languageNames = [
-            'en' => 'English', 'de' => 'German', 'fr' => 'French', 'es' => 'Spanish',
-            'it' => 'Italian', 'pt' => 'Portuguese', 'nl' => 'Dutch', 'pl' => 'Polish',
-            'ru' => 'Russian', 'ja' => 'Japanese', 'ko' => 'Korean', 'zh' => 'Chinese',
-            'ar' => 'Arabic', 'tr' => 'Turkish', 'sv' => 'Swedish', 'da' => 'Danish',
-            'no' => 'Norwegian', 'fi' => 'Finnish', 'cs' => 'Czech', 'ro' => 'Romanian',
-            'hu' => 'Hungarian', 'uk' => 'Ukrainian', 'hi' => 'Hindi', 'th' => 'Thai',
-        ];
-        $languageName = $languageNames[$detectedLanguage] ?? $detectedLanguage;
-        $systemPrompt .= "\n\n**IMPORTANT: The user's current message is in {$languageName}. You MUST respond in {$languageName}.**";
+        if ('auto' === $detectedLanguage) {
+            $systemPrompt .= "\n\n**IMPORTANT: You MUST respond in the SAME language the user writes in. Detect their language from the message and match it exactly.**";
+        } else {
+            $languageNames = [
+                'en' => 'English', 'de' => 'German', 'fr' => 'French', 'es' => 'Spanish',
+                'it' => 'Italian', 'pt' => 'Portuguese', 'nl' => 'Dutch', 'pl' => 'Polish',
+                'ru' => 'Russian', 'ja' => 'Japanese', 'ko' => 'Korean', 'zh' => 'Chinese',
+                'ar' => 'Arabic', 'tr' => 'Turkish', 'sv' => 'Swedish', 'da' => 'Danish',
+                'no' => 'Norwegian', 'fi' => 'Finnish', 'cs' => 'Czech', 'ro' => 'Romanian',
+                'hu' => 'Hungarian', 'uk' => 'Ukrainian', 'hi' => 'Hindi', 'th' => 'Thai',
+            ];
+            $languageName = $languageNames[$detectedLanguage] ?? $detectedLanguage;
+            $systemPrompt .= "\n\n**IMPORTANT: The user's current message is in {$languageName}. You MUST respond in {$languageName}.**";
+        }
 
         // Voice reply mode: enforce concise answers for TTS (spoken responses should be brief)
         if (!empty($options['voice_reply'])) {

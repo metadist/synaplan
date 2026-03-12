@@ -19,7 +19,7 @@ use Symfony\Component\DependencyInjection\Attribute\TaggedIterator;
  * - ToolHandler (Email, Calendar, etc.)
  * - Other handlers...
  */
-class InferenceRouter
+final class InferenceRouter
 {
     private array $handlers = [];
 

@@ -1,6 +1,16 @@
 import { httpClient } from './httpClient'
 import { useConfigStore } from '@/stores/config'
 
+export class WidgetUnavailableError extends Error {
+  constructor(
+    public readonly status: number,
+    message?: string
+  ) {
+    super(message ?? (status === 404 ? 'Widget not found' : 'Widget unavailable'))
+    this.name = 'WidgetUnavailableError'
+  }
+}
+
 // Widget Interface
 export interface Widget {
   id: number
@@ -18,8 +28,15 @@ export interface Widget {
     ai_sessions: number
     human_sessions: number
     waiting_sessions: number
+    internal_sessions: number
   }
   allowedDomains?: string[]
+}
+
+export interface CustomFieldDef {
+  id: string
+  name: string
+  type: 'text' | 'boolean'
 }
 
 export interface WidgetConfig {
@@ -34,8 +51,9 @@ export interface WidgetConfig {
   messageLimit?: number
   maxFileSize?: number
   allowedDomains?: string[]
-  allowFileUpload?: boolean // NEW: Enable/disable file upload
+  allowFileUpload?: boolean
   fileUploadLimit?: number
+  customFields?: CustomFieldDef[]
 }
 
 export interface CreateWidgetRequest {
@@ -117,12 +135,6 @@ export async function getWidget(widgetId: string): Promise<Widget> {
  * Update widget
  */
 export async function updateWidget(widgetId: string, request: UpdateWidgetRequest): Promise<void> {
-  console.log('🔧 widgetsApi.updateWidget called:', {
-    widgetId,
-    request,
-    allowedDomains: request.config?.allowedDomains,
-  })
-
   await httpClient<{ success: boolean }>(`/api/v1/widgets/${widgetId}`, {
     method: 'PUT',
     body: JSON.stringify(request),
@@ -218,17 +230,22 @@ export async function sendWidgetMessage(
     payload.files = fileIds
   }
 
-  // Include credentials when in test mode (X-Widget-Test-Mode header is present)
-  const isTestMode = extraHeaders?.['X-Widget-Test-Mode'] === 'true'
+  // Include credentials when in test/internal mode (dashboard context)
+  const isDashboardMode =
+    extraHeaders?.['X-Widget-Test-Mode'] === 'true' ||
+    extraHeaders?.['X-Widget-Internal-Mode'] === 'true'
 
   const response = await fetch(`${apiUrl}/api/v1/widget/${widgetId}/message`, {
     method: 'POST',
     headers,
     body: JSON.stringify(payload),
-    credentials: isTestMode ? 'include' : 'omit',
+    credentials: isDashboardMode ? 'include' : 'omit',
   })
 
   if (!response.ok) {
+    if (response.status === 404 || response.status === 503) {
+      throw new WidgetUnavailableError(response.status)
+    }
     const error = await response.json().catch(() => ({ error: 'Unknown error' }))
     throw new Error(error.error || `HTTP ${response.status}`)
   }
@@ -405,31 +422,22 @@ export async function uploadWidgetFile(
     headers['X-Widget-Host'] = window.location.host
   }
 
-  // Include credentials when in test mode (X-Widget-Test-Mode header is present)
-  const isTestMode = options?.headers?.['X-Widget-Test-Mode'] === 'true'
-
-  console.log('🌐 Widget file upload request:', {
-    url: `${baseUrl}/api/v1/widget/${widgetId}/upload`,
-    method: 'POST',
-    bodyPreview: 'FormData with file',
-    isTestMode,
-  })
+  // Include credentials when in test/internal mode (dashboard context)
+  const isDashboardMode =
+    options?.headers?.['X-Widget-Test-Mode'] === 'true' ||
+    options?.headers?.['X-Widget-Internal-Mode'] === 'true'
 
   const response = await fetch(`${baseUrl}/api/v1/widget/${widgetId}/upload`, {
     method: 'POST',
     headers,
     body: formData,
-    credentials: isTestMode ? 'include' : 'omit',
-  })
-
-  console.log('🌐 Widget file upload response:', {
-    url: `/api/v1/widget/${widgetId}/upload`,
-    status: response.status,
-    statusText: response.statusText,
-    ok: response.ok,
+    credentials: isDashboardMode ? 'include' : 'omit',
   })
 
   if (!response.ok) {
+    if (response.status === 404 || response.status === 503) {
+      throw new WidgetUnavailableError(response.status)
+    }
     const error = await response.json().catch(() => ({ error: 'Upload failed' }))
     throw new Error(error.error || `HTTP ${response.status}: ${response.statusText}`)
   }

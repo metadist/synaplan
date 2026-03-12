@@ -225,7 +225,7 @@ const emit = defineEmits<{
 }>()
 
 const { t, locale } = useI18n()
-const { success, error: showError } = useNotification()
+const { error: showError } = useNotification()
 const { render: renderMarkdown } = useMarkdown()
 
 interface Message {

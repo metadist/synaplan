@@ -11,7 +11,7 @@ use Psr\Log\LoggerInterface;
 /**
  * Service for loading prompts with their metadata (AI model, tools, etc.).
  */
-class PromptService
+final readonly class PromptService
 {
     public function __construct(
         private PromptRepository $promptRepository,
@@ -63,7 +63,7 @@ class PromptService
         $metaEntries = $this->promptMetaRepository->findBy(['promptId' => $promptId]);
 
         $metadata = [
-            'aiModel' => -1, // -1 = AUTOMATED
+            'aiModel' => -1, // -1 = no specific model set, frontend defaults to gpt-oss-120b
             'tool_internet' => false,
             'tool_files' => false,
             'tool_url_screenshot' => false,

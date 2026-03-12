@@ -9,7 +9,7 @@
           <slot name="header" />
         </template>
       </Header>
-      <main class="flex-1 overflow-y-auto" data-testid="section-primary-content">
+      <main class="flex-1 min-h-0 overflow-y-auto" data-testid="section-primary-content">
         <slot />
       </main>
     </div>

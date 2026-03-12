@@ -85,9 +85,13 @@
             <div
               v-for="widget in widgets"
               :key="widget.id"
-              class="surface-card p-4 lg:p-5 hover:shadow-lg transition-shadow cursor-pointer group"
+              class="surface-card widget-card p-4 lg:p-5 cursor-pointer group"
               data-testid="item-widget"
-              @click="viewWidget(widget)"
+              role="button"
+              tabindex="0"
+              @click="viewSessions(widget)"
+              @keydown.enter.prevent="viewSessions(widget)"
+              @keydown.space.prevent="viewSessions(widget)"
             >
               <div class="flex items-start justify-between mb-4">
                 <div class="flex-1 min-w-0 pr-2">
@@ -154,6 +158,13 @@
                   >
                     <Icon icon="heroicons:clock" class="w-3 h-3" />
                     {{ widget.stats?.waiting_sessions ?? 0 }} {{ $t('widgets.modeWaiting') }}
+                  </span>
+                  <span
+                    class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-purple-500/10 text-purple-600 dark:text-purple-400 text-xs font-medium whitespace-nowrap"
+                  >
+                    <Icon icon="heroicons:building-office" class="w-3 h-3 flex-shrink-0" />
+                    {{ widget.stats?.internal_sessions ?? 0 }}
+                    {{ $t('widgets.modeInternal') }}
                   </span>
                 </div>
               </div>
@@ -271,35 +282,121 @@
       @close="showEmbedModal = false"
     />
 
-    <!-- Test Chat Overlay -->
+    <!-- Test / Internal Chat Overlay -->
     <Teleport to="#app">
       <div
         v-if="testWidget"
-        class="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4"
+        class="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-2 md:p-4"
         data-testid="test-chat-overlay"
         @click.self="closeTestChat"
       >
-        <div class="w-full max-w-md h-[600px] max-h-[80vh] rounded-2xl overflow-hidden shadow-2xl">
-          <ChatWidget
-            :widget-id="testWidget.widgetId"
-            :api-url="apiUrl"
-            :primary-color="testWidget.config?.primaryColor || '#007bff'"
-            :icon-color="testWidget.config?.iconColor || '#ffffff'"
-            :button-icon="testWidget.config?.buttonIcon || 'chat'"
-            :button-icon-url="testWidget.config?.buttonIconUrl ?? undefined"
-            :auto-message="testWidget.config?.autoMessage || ''"
-            :message-limit="testWidget.config?.messageLimit || 50"
-            :max-file-size="testWidget.config?.maxFileSize || 10"
-            :default-theme="testWidget.config?.defaultTheme || 'light'"
-            :widget-title="testWidget.name"
-            :allow-file-upload="testWidget.config?.allowFileUpload || false"
-            :file-upload-limit="testWidget.config?.fileUploadLimit ?? 3"
-            :open-immediately="true"
-            is-preview
-            hide-button
-            test-mode
-            @close="closeTestChat"
-          />
+        <div
+          class="flex flex-col items-center gap-2 md:gap-3 w-full max-w-[420px] md:max-w-none max-h-full overflow-y-auto"
+          @click.stop
+        >
+          <!-- Top bar: Mode Toggle + Close Button -->
+          <div class="flex items-center gap-2">
+            <div class="flex gap-1 p-1 rounded-xl surface-card shadow-lg">
+              <button
+                :class="[
+                  'px-3 md:px-4 py-1.5 rounded-lg text-xs md:text-sm font-medium transition-all',
+                  overlayMode === 'internal'
+                    ? 'bg-[var(--brand)] text-white shadow-sm'
+                    : 'txt-secondary hover:txt-primary',
+                ]"
+                @click="switchOverlayMode('internal')"
+              >
+                {{ $t('widgets.overlay.internalChat') }}
+              </button>
+              <button
+                :class="[
+                  'px-3 md:px-4 py-1.5 rounded-lg text-xs md:text-sm font-medium transition-all',
+                  overlayMode === 'test'
+                    ? 'bg-[var(--brand)] text-white shadow-sm'
+                    : 'txt-secondary hover:txt-primary',
+                ]"
+                @click="switchOverlayMode('test')"
+              >
+                {{ $t('widgets.overlay.testWidget') }}
+              </button>
+            </div>
+            <button
+              class="w-8 h-8 rounded-lg surface-card shadow-lg flex items-center justify-center hover-surface transition-colors"
+              :aria-label="$t('common.close')"
+              @click="closeTestChat"
+            >
+              <Icon icon="heroicons:x-mark" class="w-5 h-5 txt-secondary" />
+            </button>
+          </div>
+
+          <!-- Mode description -->
+          <p
+            class="text-xs text-center txt-secondary max-w-md px-3 py-2 leading-relaxed rounded-xl bg-white/80 dark:bg-white/10 backdrop-blur-sm shadow-sm"
+          >
+            <Icon
+              :icon="overlayMode === 'internal' ? 'heroicons:information-circle' : 'heroicons:eye'"
+              class="w-3.5 h-3.5 inline-block align-text-bottom mr-0.5"
+            />
+            {{
+              overlayMode === 'internal'
+                ? $t('widgets.overlay.internalChatHint')
+                : $t('widgets.overlay.testWidgetHint')
+            }}
+          </p>
+
+          <!-- Chat Layout -->
+          <div
+            :class="[
+              'w-full',
+              showCustomFieldsPanel
+                ? 'flex flex-col-reverse overflow-y-auto max-h-[88vh] md:overflow-visible md:flex-row gap-2 md:gap-4 md:w-auto md:h-[600px] md:max-h-[80vh]'
+                : 'h-[600px] max-h-[80vh] md:w-[420px]',
+            ]"
+          >
+            <!-- Custom Fields Panel (only in internal mode with defined fields) -->
+            <div v-if="showCustomFieldsPanel" class="h-[260px] flex-shrink-0 md:h-full md:w-72">
+              <WidgetCustomFieldsPanel
+                :custom-fields="testWidgetCustomFields"
+                :widget-id="testWidget.widgetId"
+                :session-id="internalSessionId"
+              />
+            </div>
+
+            <!-- Chat Widget -->
+            <div
+              class="rounded-2xl overflow-hidden shadow-2xl md:w-[420px] md:flex-shrink-0"
+              :class="
+                showCustomFieldsPanel
+                  ? 'h-[clamp(400px,70vh,600px)] flex-shrink-0 md:h-full'
+                  : 'h-full'
+              "
+            >
+              <ChatWidget
+                :key="chatWidgetKey"
+                ref="chatWidgetRef"
+                :widget-id="testWidget.widgetId"
+                :api-url="apiUrl"
+                :primary-color="testWidget.config?.primaryColor || '#007bff'"
+                :icon-color="testWidget.config?.iconColor || '#ffffff'"
+                :button-icon="testWidget.config?.buttonIcon || 'chat'"
+                :button-icon-url="testWidget.config?.buttonIconUrl ?? undefined"
+                :auto-message="testWidget.config?.autoMessage || ''"
+                :message-limit="testWidget.config?.messageLimit || 50"
+                :max-file-size="testWidget.config?.maxFileSize || 10"
+                :default-theme="testWidget.config?.defaultTheme || 'light'"
+                :widget-title="testWidget.name"
+                :allow-file-upload="testWidget.config?.allowFileUpload || false"
+                :file-upload-limit="testWidget.config?.fileUploadLimit ?? 3"
+                :open-immediately="true"
+                :is-preview="overlayMode === 'test'"
+                hide-button
+                :test-mode="overlayMode === 'test'"
+                :internal-mode="overlayMode === 'internal'"
+                @close="closeTestChat"
+                @session-created="onSessionCreated"
+              />
+            </div>
+          </div>
         </div>
       </div>
     </Teleport>
@@ -321,6 +418,7 @@ import AdvancedWidgetConfig from '@/components/widgets/AdvancedWidgetConfig.vue'
 import WidgetEditorModal from '@/components/widgets/WidgetEditorModal.vue'
 import EmbedCodeDialog from '@/components/widgets/EmbedCodeDialog.vue'
 import ChatWidget from '@/components/widgets/ChatWidget.vue'
+import WidgetCustomFieldsPanel from '@/components/widgets/WidgetCustomFieldsPanel.vue'
 import { useI18n } from 'vue-i18n'
 import { useConfigStore } from '@/stores/config'
 
@@ -345,6 +443,16 @@ const embedCode = ref('')
 const legacyEmbedCode = ref('')
 const wordpressShortcode = ref('')
 const testWidget = ref<widgetsApi.Widget | null>(null)
+const overlayMode = ref<'test' | 'internal'>('internal')
+const internalSessionId = ref('')
+const chatWidgetKey = ref(0)
+const chatWidgetRef = ref<InstanceType<typeof ChatWidget> | null>(null)
+
+const testWidgetCustomFields = computed(() => testWidget.value?.config?.customFields ?? [])
+
+const showCustomFieldsPanel = computed(
+  () => overlayMode.value === 'internal' && testWidgetCustomFields.value.length > 0
+)
 
 const apiUrl = computed(() => configStore.apiBaseUrl || window.location.origin)
 
@@ -469,6 +577,27 @@ const viewWidget = (widget: widgetsApi.Widget) => {
  */
 const openTestChat = (widget: widgetsApi.Widget) => {
   testWidget.value = widget
+  overlayMode.value = 'internal'
+  internalSessionId.value = ''
+}
+
+/**
+ * Switch overlay mode (test/internal) and reset chat
+ */
+const switchOverlayMode = (mode: 'test' | 'internal') => {
+  if (mode === overlayMode.value) return
+  overlayMode.value = mode
+  internalSessionId.value = ''
+  chatWidgetKey.value++
+}
+
+/**
+ * Handle session created event from ChatWidget
+ */
+const onSessionCreated = (sessionId: string) => {
+  if (overlayMode.value === 'internal') {
+    internalSessionId.value = sessionId
+  }
 }
 
 /**
@@ -476,6 +605,7 @@ const openTestChat = (widget: widgetsApi.Widget) => {
  */
 const closeTestChat = () => {
   testWidget.value = null
+  internalSessionId.value = ''
 }
 
 /**
@@ -573,3 +703,21 @@ onMounted(() => {
   loadWidgets()
 })
 </script>
+
+<style scoped>
+.widget-card {
+  border: 1px solid transparent;
+  transition:
+    transform 0.2s ease,
+    box-shadow 0.2s ease,
+    border-color 0.2s ease;
+}
+
+.widget-card:hover {
+  transform: scale(1.02);
+  border-color: color-mix(in srgb, var(--brand) 30%, transparent);
+  box-shadow:
+    0 4px 24px color-mix(in srgb, var(--brand) 8%, transparent),
+    inset 0 0 0 1px color-mix(in srgb, var(--brand) 15%, transparent);
+}
+</style>

@@ -10,7 +10,7 @@ use Symfony\Contracts\HttpClient\HttpClientInterface;
  *
  * Sends notifications to Discord via webhook for monitoring WhatsApp interactions.
  */
-class DiscordNotificationService
+final readonly class DiscordNotificationService
 {
     // Discord embed colors
     private const COLOR_SUCCESS = 0x00FF00; // Green

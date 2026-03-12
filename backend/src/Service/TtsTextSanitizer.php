@@ -12,7 +12,7 @@ namespace App\Service;
  *
  * Call TtsTextSanitizer::sanitize($text) BEFORE passing text to AiFacade::synthesize().
  */
-final class TtsTextSanitizer
+final readonly class TtsTextSanitizer
 {
     /**
      * Strip non-speakable artifacts from AI response text.

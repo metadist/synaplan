@@ -3,7 +3,7 @@
     <template #header> </template>
 
     <div
-      class="flex flex-col h-full relative"
+      class="flex flex-col h-full min-h-0 overflow-hidden relative"
       data-testid="page-chat"
       @dragenter.prevent="handleDragEnter"
       @dragover.prevent="handleDragOver"
@@ -282,6 +282,7 @@ let stopStreamingFn: (() => void) | null = null // Store EventSource close funct
 let currentTrackId: number | undefined = undefined // Store current trackId for stop request
 let currentStreamingChatId: number | undefined = undefined // Store chatId where stream was started
 let currentAudioStreamer: AudioStreamer | null = null
+const isAudioStreaming = ref(false)
 
 // Processing status for real-time feedback
 const processingStatus = ref<string>('')
@@ -341,7 +342,7 @@ interface MessageGroup {
 }
 
 const isStreaming = computed(() => {
-  return historyStore.messages.some((m) => m.isStreaming === true)
+  return historyStore.messages.some((m) => m.isStreaming === true) || isAudioStreaming.value
 })
 
 // Init on mount
@@ -414,6 +415,7 @@ onBeforeUnmount(() => {
     currentAudioStreamer.stop()
     currentAudioStreamer = null
   }
+  isAudioStreaming.value = false
   window.removeEventListener('open-memory-dialog', handleOpenMemoryDialogEvent)
   window.removeEventListener('open-feedback-dialog', handleOpenFeedbackDialogEvent)
   clearDeleteDialogTimer()
@@ -769,6 +771,11 @@ const streamAIResponse = async (
 
       if (options?.voiceReply) {
         currentAudioStreamer = new AudioStreamer()
+        isAudioStreaming.value = true
+        currentAudioStreamer.setOnFinished(() => {
+          isAudioStreaming.value = false
+          currentAudioStreamer = null
+        })
       }
 
       const stopStreaming = chatApi.streamMessage(
@@ -1164,13 +1171,13 @@ const streamAIResponse = async (
               memoriesStore.memories = memoriesStore.memories.filter((m) => m.id !== memoryId)
             }
           } else if (data.status === 'complete') {
-            // Speak remaining text
+            // Speak remaining text then signal no more sentences coming
             if (currentAudioStreamer) {
               const remaining = fullContent.slice(spokenLength)
               if (remaining.trim()) {
                 currentAudioStreamer.streamText(remaining, undefined, detectedLanguage)
               }
-              // Don't stop streamer immediately, it has a queue
+              currentAudioStreamer.markComplete()
             }
 
             // Clear processing status
@@ -1501,6 +1508,7 @@ const handleStopStreaming = async () => {
     currentAudioStreamer.stop()
     currentAudioStreamer = null
   }
+  isAudioStreaming.value = false
 
   // Clear processing status
   processingStatus.value = ''

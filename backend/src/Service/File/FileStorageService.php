@@ -12,11 +12,12 @@ use Symfony\Component\HttpFoundation\File\UploadedFile;
  * Creates organized directory structure (under var/uploads):
  * {last2}/{prev3}/{paddedUserId}/{year}/{month}/
  */
-class FileStorageService
+final readonly class FileStorageService
 {
     private const MAX_FILE_SIZE = 128 * 1024 * 1024; // 128 MB
     private const ALLOWED_EXTENSIONS = [
         'pdf', 'docx', 'doc', 'xlsx', 'xls', 'pptx', 'ppt', 'txt', 'md', 'csv',
+        'odt', 'ods', 'odp', 'odg', 'odf',
         'jpg', 'jpeg', 'png', 'gif', 'webp',
         'mp3', 'mp4', 'wav', 'ogg', 'm4a', 'webm',
     ];

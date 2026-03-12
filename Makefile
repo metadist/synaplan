@@ -20,11 +20,22 @@ test: ## Run all tests (backend + frontend unit tests)
 	$(MAKE) -C backend test
 	$(MAKE) -C frontend test
 
-test-e2e: ## Run e2e tests
+test-e2e: ## Run e2e tests (against dev stack :5173 or BASE_URL)
 	$(MAKE) -C frontend test-e2e
+
+test-e2e-full: ## Build test stack + run all E2E tests (CI-like, port 8001)
+	$(MAKE) test-stack-build
+	cd frontend && BASE_URL=http://localhost:8001 npm run test:e2e
 
 test-e2e-plugin-castingdata: ## Run Casting Data plugin e2e tests (CastApp + Synaplan must be running)
 	$(MAKE) -C frontend test-e2e-plugin-castingdata
+
+test-stack-build: ## Build frontend + widget + test Docker image + start test stack on port 8001
+	docker compose -f docker-compose.test.yml down 2>/dev/null || true
+	sudo rm -rf frontend/dist frontend/dist-widget
+	cd frontend && npm run build && npm run build:widget
+	docker compose -f docker-compose.test.yml build
+	docker compose -f docker-compose.test.yml up -d
 
 audit: ## Run security audit (backend)
 	$(MAKE) -C backend audit

@@ -46,7 +46,120 @@ cd frontend
 BASE_URL=http://localhost:8001 npm run test:e2e
 ```
 
-### OIDC prerequisites
+## Switching between dev stack and test stack
+
+The test stack gives you a **CI-like environment**: TestProvider, port 8001, tmpfs DB.
+
+Both stacks share **MailHog ports** (8025/1025) — always stop one before starting the other.
+
+### Dev → Test stack
+
+```bash
+docker compose down                                     # Stop dev stack
+sudo rm -rf frontend/dist frontend/dist-widget          # Remove root-owned build artifacts (if permission error)
+make test-stack-build                                   # Build + start test stack, waits until healthy (~30-60s)
+```
+
+Then run tests from the **frontend** directory with `BASE_URL=http://localhost:8001` (see [Test commands](#test-commands) below).
+
+### Test → Dev stack
+
+```bash
+docker compose -f docker-compose.test.yml down          # Stop test stack (DB is tmpfs, always fresh)
+docker compose up -d                                    # Start dev stack
+```
+
+### When do I need `make test-stack-build`?
+
+| What changed               | Rebuild needed?                                              |
+| -------------------------- | ------------------------------------------------------------ |
+| Backend PHP code           | **No** — volume-mounted, live changes                        |
+| Frontend / Widget code     | **Yes** — image COPYs `dist/` and `dist-widget/`             |
+| Docker / Compose config    | **Yes** — image needs rebuild                                |
+| Database schema / fixtures | **No** — just `down` + `up` (test DB is tmpfs, always fresh) |
+
+Permission error on `frontend/dist/` (container creates it as root): `sudo rm -rf frontend/dist frontend/dist-widget` then re-run `make test-stack-build`.
+
+## Test stack details
+
+|               | Dev stack                                 | Test stack                                |
+| ------------- | ----------------------------------------- | ----------------------------------------- |
+| **Start**     | `docker compose up -d`                    | `make test-stack-build`                   |
+| **Backend**   | http://localhost:8000                     | http://localhost:8001                     |
+| **Frontend**  | http://localhost:5173 (Vite)              | Served by backend (:8001)                 |
+| **APP_ENV**   | `dev`                                     | `test`                                    |
+| **AI models** | Real providers + TestProvider (IDs -1…-7) | Real providers + TestProvider (IDs -1…-7) |
+| **DB**        | Persistent volume                         | **tmpfs** (fresh on every `up`)           |
+| **MailHog**   | :8025 / :1025                             | :8025 / :1025 (shared ports!)             |
+| **Login**     | admin@synaplan.com / admin123             | admin@synaplan.com / admin123             |
+
+Widget E2E tests use the page at `/widget-test.html`. Tests use `page.route()` to serve the fixture from disk.
+
+### TestProvider availability
+
+The TestProvider is available in **dev and test** environments (not in prod). Fixtures seed test models (negative IDs -1…-7, one per capability tag) in both stacks. Negative IDs never collide with auto-increment. `selectable=0` keeps them out of user-facing dropdowns. ANALYZE uses the chat model (ID -1) since `CAPABILITY_TAGS` maps ANALYZE to the `chat` tag.
+
+**Global defaults are set automatically** by `global-setup.ts` (Playwright `globalSetup`). Before any test runs, the setup logs in as admin and sets the system-wide default models (ownerId=0) to TestProvider via `POST /api/v1/config/models/defaults` with `global: true`. This covers all channels — chat, widget, email, and WhatsApp — without per-test setup.
+
+Individual tests do **not** need to call any TestProvider helper. The global defaults apply to every user and every channel fallback automatically.
+
+### TestProvider: CI-like environment (test stack)
+
+- **Same as CI:** Start the test stack (`make test-stack-build`), then run tests with `BASE_URL=http://localhost:8001 npm run test:e2e`. Matches the CI environment (port 8001, TestProvider, tmpfs DB).
+- **Switching stacks:** See [Switching between dev stack and test stack](#switching-between-dev-stack-and-test-stack) above.
+
+## Multi-worker (parallel tests)
+
+Tests run with 4 parallel workers by default. Each worker dynamically creates a unique test user via the register API + MailHog email verification at startup, and deletes it on teardown. No fixed E2E users in the database — only the admin fixture user remains (used for setup/teardown API calls). Worker count: `WORKER_COUNT` in `playwright.config.ts`; override with `E2E_WORKERS` (e.g. CI).
+
+## Test commands
+
+From the **frontend** directory:
+
+| What                               | Command                                                                    |
+| ---------------------------------- | -------------------------------------------------------------------------- |
+| **Dev stack**: E2E tests           | `npm run test:e2e`                                                         |
+| **Dev stack**: single test         | `npm run test:e2e -- -g "id=013"`                                          |
+| **Test stack**: E2E tests          | `BASE_URL=http://localhost:8001 npm run test:e2e`                          |
+| **Test stack**: full CI-like       | `make test-e2e-full` (builds test stack + runs all E2E)                    |
+| **Test stack**: CI-like (no @noci) | `BASE_URL=http://localhost:8001 npm run test:e2e -- --grep-invert "@noci"` |
+| **Test stack**: single test        | `BASE_URL=http://localhost:8001 npm run test:e2e -- -g "id=020"`           |
+| **WhatsApp only**                  | `BASE_URL=http://localhost:8001 npm run test:e2e:whatsapp`                 |
+| **Playwright UI**                  | `npm run test:e2e:ui`                                                      |
+
+Everything after `--` is passed through to Playwright.
+
+### WhatsApp tests (`@whatsapp`)
+
+WhatsApp API smoke tests use the `@whatsapp` tag and are **included in the default `test:e2e` run**. They require the WhatsApp stub server on `:3999` and the backend configured with `WHATSAPP_ENABLED=true` and `WHATSAPP_GRAPH_API_BASE_URL=http://whatsapp-stub:3999`. The stub starts automatically in `docker-compose.test.yml`.
+
+To run only WhatsApp tests:
+
+```bash
+BASE_URL=http://localhost:8001 npm run test:e2e:whatsapp
+```
+
+### Email tests
+
+Email smoke tests (`email.spec.ts`) run in the default `test:e2e` suite. They only need MailHog, which is included in both dev and test stacks.
+
+## Reload fixtures (test stack)
+
+Test DB is tmpfs — `down` + `up` gives a fresh DB with fixtures.  
+If the stack is still running:
+
+```bash
+docker compose -f docker-compose.test.yml exec app_test rm -f /var/www/backend/var/.fixtures_loaded
+docker compose -f docker-compose.test.yml restart app_test
+```
+
+## Overriding URLs
+
+Pass environment variables directly, e.g. `BASE_URL=http://localhost:8001 npm run test:e2e`.
+
+---
+
+## OIDC prerequisites
 
 The backend container reaches Keycloak via `host.docker.internal`. On Linux, add this to `/etc/hosts` (macOS/Windows have it by default):
 
@@ -89,8 +202,9 @@ docker compose -f docker-compose.test.yml up -d app_test
 
 | Script                           | Description                                           |
 | -------------------------------- | ----------------------------------------------------- |
-| `npm run test:e2e`               | Password auth tests (Chromium, excludes OIDC)         |
-| `npm run test:e2e:firefox`       | Password auth tests (Firefox, excludes OIDC)          |
+| `npm run test:e2e`               | E2E tests (Chromium, excludes OIDC and plugin)        |
+| `npm run test:e2e:whatsapp`      | WhatsApp API smoke tests (requires stub server)       |
+| `npm run test:e2e:firefox`       | E2E tests (Firefox, excludes OIDC and plugin)         |
 | `npm run test:e2e:oidc`          | Full suite with OIDC button login (skips `@password`) |
 | `npm run test:e2e:oidc-button`   | OIDC button login/logout tests only                   |
 | `npm run test:e2e:oidc-redirect` | OIDC auto-redirect tests (separate project)           |
@@ -106,6 +220,7 @@ Tests use tags in their names for filtering:
 | Tag              | Description                                             |
 | ---------------- | ------------------------------------------------------- |
 | `@ci`            | Runs in CI                                              |
+| `@whatsapp`      | WhatsApp stub tests; included in default runs           |
 | `@oidc`          | Requires Keycloak (`--profile oidc`)                    |
 | `@oidc-button`   | OIDC login via button click                             |
 | `@oidc-redirect` | OIDC auto-redirect (requires `OIDC_AUTO_REDIRECT=true`) |
@@ -118,6 +233,7 @@ Tests use tags in their names for filtering:
 | Variable      | Default                 | Description                                                              |
 | ------------- | ----------------------- | ------------------------------------------------------------------------ |
 | `BASE_URL`    | `http://localhost:5173` | App URL to test against                                                  |
+| `E2E_WORKERS` | —                       | Override worker count (e.g. `2` in CI); default from config (4)          |
 | `AUTH_METHOD` | `password`              | `password` or `oidc` — switches the generic `login()` helper to use OIDC |
 | `AUTH_USER`   | `admin@synaplan.com`    | Password-auth email                                                      |
 | `AUTH_PASS`   | `admin123`              | Password-auth password                                                   |

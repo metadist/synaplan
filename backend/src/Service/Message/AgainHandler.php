@@ -16,7 +16,7 @@ use Psr\Log\LoggerInterface;
  *
  * This keeps the MessageController clean and separates concerns.
  */
-class AgainHandler
+final readonly class AgainHandler
 {
     public function __construct(
         private EntityManagerInterface $em,

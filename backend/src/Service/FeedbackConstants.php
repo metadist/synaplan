@@ -11,7 +11,7 @@ namespace App\Service;
  * duplication and ensure consistency across FeedbackExampleService,
  * FeedbackContradictionService, and ChatHandler.
  */
-final class FeedbackConstants
+final readonly class FeedbackConstants
 {
     // --- Qdrant namespace identifiers ---
     public const NAMESPACE_FALSE_POSITIVE = 'feedback_false_positive';

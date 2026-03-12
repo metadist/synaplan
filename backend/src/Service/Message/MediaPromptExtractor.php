@@ -12,7 +12,7 @@ use Psr\Log\LoggerInterface;
  * Delegates all prompt understanding to the existing ChatHandler with the
  * configured "mediamaker" prompt so we never try to derive the text ourselves.
  */
-class MediaPromptExtractor
+final readonly class MediaPromptExtractor
 {
     private const AUDIO_EXTRACTION_TOPIC = 'tools:mediamaker_audio_extract';
 

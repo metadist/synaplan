@@ -65,6 +65,7 @@ export const selectors = {
   },
   userMenu: {
     button: '[data-testid="btn-sidebar-v2-user"]',
+    subscriptionBtn: '[data-testid="btn-sidebar-v2-subscription"]',
     logoutBtn: '[data-testid="btn-sidebar-v2-logout"]',
   },
   oidc: {
@@ -78,6 +79,101 @@ export const selectors = {
   loggedOut: {
     page: '[data-testid="page-logged-out"]',
     loginAgainBtn: '[data-testid="btn-login-again"]',
+  },
+  widgets: {
+    page: '[data-testid="page-widgets"]',
+    createButton: '[data-testid="btn-create-widget"]',
+    simpleForm: {
+      modal: '[data-testid="modal-simple-widget-form"]',
+      nameInput: '[data-testid="input-widget-name"]',
+      websiteInput: '[data-testid="input-website-url"]',
+      taskPromptInput: '[data-testid="input-task-prompt"]',
+      createButton: '[data-testid="btn-create"]',
+      cancelButton: '[data-testid="btn-cancel"]',
+    },
+    successModal: {
+      modal: '[data-testid="modal-widget-success"]',
+      embedCode: '[data-testid="section-embed-code"]',
+      testButton: '[data-testid="btn-test-widget"]',
+      closeButton: '[data-testid="btn-close"]',
+    },
+    widgetCard: {
+      item: '[data-testid="item-widget"]',
+      embedButton: '[data-testid="btn-widget-embed"]',
+      testButton: '[data-testid="btn-widget-test"]',
+      advancedButton: '[data-testid="btn-widget-advanced"]',
+    },
+    testChatOverlay: '[data-testid="test-chat-overlay"]',
+    advancedConfig: {
+      modal: '[data-testid="modal-advanced-config"]',
+      tabButton: '[data-testid="btn-tab"]',
+      tabButtonBranding: '[data-testid="btn-tab-branding"]',
+      tabButtonBehavior: '[data-testid="btn-tab-behavior"]',
+      tabButtonSecurity: '[data-testid="btn-tab-security"]',
+      tabButtonAssistant: '[data-testid="btn-tab-assistant"]',
+      behaviorTab: '[data-testid="section-behavior"]',
+      securityTab: '[data-testid="section-security"]',
+      assistantTab: '[data-testid="section-assistant"]',
+      allowFileUploadLabel: '[data-testid="label-allow-file-upload"]',
+      allowFileUploadCheckbox: '[data-testid="input-allow-file-upload"]',
+      autoMessageInput: '[data-testid="input-auto-message"]',
+      messageLimitInput: '[data-testid="input-message-limit"]',
+      maxFileSizeInput: '[data-testid="input-max-file-size"]',
+      promptContentInput: '[data-testid="input-prompt-content"]',
+      selectionRulesInput: '[data-testid="input-selection-rules"]',
+      domainInput: '[data-testid="input-domain"]',
+      addDomainButton: '[data-testid="btn-add-domain"]',
+      saveButton: '[data-testid="btn-save"]',
+      closeButton: '[data-testid="btn-close"]',
+    },
+  },
+  widget: {
+    // Shadow DOM Host: The widget creates a shadow root inside this element
+    // Use .locator() to access elements inside Shadow DOM
+    host: '[data-testid="widget-host"]',
+    // Button is attached directly to body (not in Shadow DOM) for easier styling/positioning
+    button: '#synaplan-widget-button',
+    // Elements inside Shadow DOM - must be accessed via host.locator()
+    chatWindow: '[data-testid="section-chat-window"]',
+    messagesContainer: '[data-testid="section-messages"]',
+    input: '[data-testid="input-message"]',
+    sendButton: '[data-testid="btn-send"]',
+    attachButton: '[data-testid="btn-attach"]',
+    fileInput: '[data-testid="input-file"]',
+    // Outer message containers (user + assistant) – use these for counting
+    messageContainers: '[data-testid="message-user"], [data-testid="message-assistant"]',
+    messageContainerByRole: (role: string) => `[data-testid="message-${role}"]`,
+    // Message text selectors
+    messageAiText: '[data-testid="message-ai-text"]',
+    messageAutoText: '[data-testid="message-auto-text"]',
+    messageUserText: '[data-testid="message-user-text"]',
+    /** E2E: present in assistant bubble when streaming finished */
+    messageDone: '[data-testid="message-done"]',
+    // Error and warning selectors
+    warningMessageLimit: '[data-testid="warning-message-limit"]',
+    errorMessageLimitReached: '[data-testid="error-message-limit-reached"]',
+    errorFileUpload: '[data-testid="error-file-upload"]',
+    errorFileUploadLimit: '[data-testid="error-file-upload-limit"]',
+    errorFileSize: '[data-testid="error-file-size"]',
+    removeFileButton: (index: number) => `[data-testid="btn-remove-file-${index}"]`,
+  },
+  subscription: {
+    page: '[data-testid="page-subscription"]',
+    sectionCurrentPlan: '[data-testid="section-current-plan"]',
+    badgeCurrentLevel: '[data-testid="badge-current-level"]',
+    badgeStatus: '[data-testid="badge-subscription-status"]',
+    btnOpenPortal: '[data-testid="btn-open-portal"]',
+    cardPlan: '[data-testid="card-plan"]',
+    btnSelectPro: '[data-testid="btn-select-pro"]',
+    btnSelectTeam: '[data-testid="btn-select-team"]',
+    btnSelectBusiness: '[data-testid="btn-select-business"]',
+  },
+  subscriptionSuccess: {
+    page: '[data-testid="page-subscription-success"]',
+    stateSyncing: '[data-testid="state-syncing"]',
+    stateSyncSuccess: '[data-testid="state-sync-success"]',
+    stateSyncError: '[data-testid="state-sync-error"]',
+    textNewLevel: '[data-testid="text-new-level"]',
   },
   toast: {},
 } as const

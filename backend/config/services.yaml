@@ -1,4 +1,7 @@
 parameters:
+    # Shared upload directory for core and plugins
+    app.upload_dir: '%kernel.project_dir%/var/uploads'
+
     # reCAPTCHA defaults (disabled by default)
     recaptcha_enabled_default: false
     recaptcha_min_score_default: 0.5
@@ -63,6 +66,8 @@ parameters:
 
     # Plugins - mounted at /plugins in Docker, relative path for CI
     plugins_dir: '/plugins'
+    env(DEFAULT_USER_PLUGINS): '[]'
+    default_user_plugins: '%env(json:DEFAULT_USER_PLUGINS)%'
 
 services:
     _defaults:
@@ -80,17 +85,6 @@ services:
             - '../src/DependencyInjection/'
             - '../src/Entity/'
             - '../src/Kernel.php'
-
-    # AI Providers - TestProvider supports all capabilities
-    App\AI\Provider\TestProvider:
-        tags:
-            - { name: 'app.ai.chat' }
-            - { name: 'app.ai.embedding' }
-            - { name: 'app.ai.vision' }
-            - { name: 'app.ai.image_generation' }
-            - { name: 'app.ai.speech_to_text' }
-            - { name: 'app.ai.text_to_speech' }
-            - { name: 'app.ai.file_analysis' }
 
     App\AI\Provider\AnthropicProvider:
         arguments:
@@ -474,21 +468,8 @@ services:
         class: Monolog\Formatter\FormatterInterface
         factory: ['@App\Service\MonologFormatterFactory', 'createFormatter']
 
-    # Plugin discovery
-    # Note: Specific path mapping needed because plugin directory structure
-    # (sortx/backend/) doesn't follow PSR-4 convention (SortX/)
-    Plugin\SortX\:
-        resource: '%plugins_dir%/sortx/backend/'
-        exclude: '%plugins_dir%/sortx/backend/{Entity,migrations,tests}'
-
-    Plugin\SortX\Controller\SortXController:
-        arguments:
-            $uploadDir: '%kernel.project_dir%/var/uploads'
-
-    # Plugin discovery - Casting Data Connector
-    Plugin\CastingData\:
-        resource: '%plugins_dir%/castingdata/backend/'
-        exclude: '%plugins_dir%/castingdata/backend/{Entity,migrations,tests}'
+    # Plugin services are loaded dynamically by Kernel::loadPluginServices()
+    # No manual plugin entries needed — drop plugin into /plugins/ and restart.
 
     # System Configuration Service (Admin .env editor)
     App\Service\Admin\SystemConfigService:
@@ -527,3 +508,30 @@ services:
     # Alias for injection
     App\Service\RAG\VectorStorage\VectorStorageInterface:
         alias: App\Service\RAG\VectorStorage\VectorStorageFacade
+
+# TestProvider: mock AI for dev/test only. Not registered in prod.
+# Duplicated because Symfony when@ blocks don't support when@dev,test.
+when@dev:
+    services:
+        App\AI\Provider\TestProvider:
+            tags:
+                - { name: 'app.ai.chat' }
+                - { name: 'app.ai.embedding' }
+                - { name: 'app.ai.vision' }
+                - { name: 'app.ai.image_generation' }
+                - { name: 'app.ai.speech_to_text' }
+                - { name: 'app.ai.text_to_speech' }
+                - { name: 'app.ai.file_analysis' }
+
+when@test:
+    services:
+        App\AI\Provider\TestProvider:
+            tags:
+                - { name: 'app.ai.chat' }
+                - { name: 'app.ai.embedding' }
+                - { name: 'app.ai.vision' }
+                - { name: 'app.ai.image_generation' }
+                - { name: 'app.ai.speech_to_text' }
+                - { name: 'app.ai.text_to_speech' }
+                - { name: 'app.ai.file_analysis' }
+

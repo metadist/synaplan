@@ -16,7 +16,7 @@ use Psr\Log\LoggerInterface;
  * - NEW: Lifetime totals (never reset)
  * - PRO/TEAM/BUSINESS: Hourly + Monthly limits
  */
-class RateLimitService
+final class RateLimitService
 {
     private const CACHE_TTL = 300; // 5 minutes cache
     private array $limitsCache = [];

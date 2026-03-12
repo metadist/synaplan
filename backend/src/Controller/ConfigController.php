@@ -378,8 +378,10 @@ class ConfigController extends AbstractController
             return $this->json(['error' => 'Not authenticated'], Response::HTTP_UNAUTHORIZED);
         }
 
-        // Get all active models sorted by quality
-        $models = $this->modelRepository->findBy(['active' => 1], ['quality' => 'DESC', 'rating' => 'DESC']);
+        $models = $this->modelRepository->findBy(
+            ['active' => 1, 'selectable' => 1],
+            ['quality' => 'DESC', 'rating' => 'DESC']
+        );
 
         // Build model list with tag information
         $modelList = [];
@@ -504,7 +506,10 @@ class ConfigController extends AbstractController
     }
 
     /**
-     * Save default model configuration for user.
+     * Save default model configuration.
+     *
+     * By default saves user-specific defaults (ownerId = current user).
+     * With `global: true` (admin-only), saves system-wide defaults (ownerId = 0).
      */
     #[Route('/models/defaults', name: 'models_defaults_save', methods: ['POST'])]
     public function saveDefaultModels(
@@ -521,7 +526,12 @@ class ConfigController extends AbstractController
             return $this->json(['error' => 'Invalid data'], Response::HTTP_BAD_REQUEST);
         }
 
-        $userId = $user->getId();
+        $global = !empty($data['global']);
+        if ($global && !$this->isGranted('ROLE_ADMIN')) {
+            return $this->json(['error' => 'Admin access required for global defaults'], Response::HTTP_FORBIDDEN);
+        }
+
+        $ownerId = $global ? 0 : $user->getId();
         $validCapabilities = ['SORT', 'CHAT', 'VECTORIZE', 'PIC2TEXT', 'TEXT2PIC', 'TEXT2VID', 'SOUND2TEXT', 'TEXT2SOUND', 'ANALYZE'];
 
         foreach ($data['defaults'] as $capability => $modelId) {
@@ -529,7 +539,6 @@ class ConfigController extends AbstractController
                 continue;
             }
 
-            // Validate model exists - allow any active model for any capability (cross-capability)
             $model = $this->modelRepository->find($modelId);
             if (!$model) {
                 return $this->json([
@@ -537,24 +546,21 @@ class ConfigController extends AbstractController
                 ], Response::HTTP_BAD_REQUEST);
             }
 
-            // Check if model is active
             if (1 !== $model->getActive()) {
                 return $this->json([
                     'error' => "Model {$modelId} is not active",
                 ], Response::HTTP_BAD_REQUEST);
             }
 
-            // Check if user-specific config exists
             $config = $this->configRepository->findOneBy([
-                'ownerId' => $userId,
+                'ownerId' => $ownerId,
                 'group' => 'DEFAULTMODEL',
                 'setting' => $capability,
             ]);
 
             if (!$config) {
-                // Create new user-specific config
                 $config = new Config();
-                $config->setOwnerId($userId);
+                $config->setOwnerId($ownerId);
                 $config->setGroup('DEFAULTMODEL');
                 $config->setSetting($capability);
             }
@@ -567,7 +573,7 @@ class ConfigController extends AbstractController
 
         return $this->json([
             'success' => true,
-            'message' => 'Default models saved successfully',
+            'message' => $global ? 'Global default models saved successfully' : 'Default models saved successfully',
         ]);
     }
 
