@@ -304,8 +304,14 @@ final readonly class WidgetExportService
 
     private function createConversationsSheet($sheet, Widget $widget, array $filters): void
     {
+        $customFields = $widget->getConfig()['customFields'] ?? [];
+
         // Header
         $headers = ['Session', 'Channel', 'Time', 'From', 'Language', 'Message'];
+        foreach ($customFields as $field) {
+            $headers[] = $field['name'];
+        }
+
         $col = 'A';
         foreach ($headers as $header) {
             $sheet->setCellValue($col.'1', $header);
@@ -316,6 +322,8 @@ final readonly class WidgetExportService
             ++$col;
         }
 
+        $lastCol = chr(ord('F') + count($customFields));
+
         // Get sessions and messages
         $result = $this->sessionRepository->findSessionsByWidget($widget->getWidgetId(), 500, 0, $filters);
 
@@ -325,19 +333,19 @@ final readonly class WidgetExportService
 
         foreach ($result['sessions'] as $session) {
             $messages = $this->getSessionMessages($session);
+            $cfValues = $session->getCustomFieldValues() ?? [];
+            $isFirstMessageInSession = true;
 
             foreach ($messages as $message) {
                 // Add separator between sessions
                 if (null !== $lastSessionId && $lastSessionId !== $session->getSessionId()) {
-                    $sheet->setCellValue('A'.$row, '---');
-                    $sheet->setCellValue('B'.$row, '---');
-                    $sheet->setCellValue('C'.$row, '---');
-                    $sheet->setCellValue('D'.$row, '---');
-                    $sheet->setCellValue('E'.$row, '---');
-                    $sheet->setCellValue('F'.$row, '---');
-                    $sheet->getStyle('A'.$row.':F'.$row)->getFont()->setColor(new \PhpOffice\PhpSpreadsheet\Style\Color('999999'));
+                    foreach (range('A', $lastCol) as $sepCol) {
+                        $sheet->setCellValue($sepCol.$row, '---');
+                    }
+                    $sheet->getStyle('A'.$row.':'.$lastCol.$row)->getFont()->setColor(new \PhpOffice\PhpSpreadsheet\Style\Color('999999'));
                     ++$row;
                     ++$sessionNum;
+                    $isFirstMessageInSession = true;
                 }
 
                 $sheet->setCellValue('A'.$row, '#'.$sessionNum);
@@ -347,9 +355,21 @@ final readonly class WidgetExportService
                 $sheet->setCellValue('E'.$row, $message['language']);
                 $sheet->setCellValue('F'.$row, $message['text']);
 
+                // Show custom field values on every message row
+                if (!empty($customFields)) {
+                    $cfCol = chr(ord('F') + 1);
+                    foreach ($customFields as $field) {
+                        $val = $cfValues[$field['id']] ?? ('boolean' === $field['type'] ? false : '');
+                        $displayVal = is_bool($val) ? ($val ? 'Yes' : 'No') : $this->sanitizeCellValue((string) $val);
+                        $sheet->setCellValue($cfCol.$row, $displayVal);
+                        ++$cfCol;
+                    }
+                }
+                $isFirstMessageInSession = false;
+
                 // Color coding for sender
                 if ('IN' === $message['direction']) {
-                    $sheet->getStyle('A'.$row.':F'.$row)->getFill()
+                    $sheet->getStyle('A'.$row.':'.$lastCol.$row)->getFill()
                         ->setFillType(Fill::FILL_SOLID)
                         ->getStartColor()->setRGB('F0FDF4');
                 }
@@ -366,6 +386,12 @@ final readonly class WidgetExportService
         $sheet->getColumnDimension('D')->setWidth(12);
         $sheet->getColumnDimension('E')->setWidth(10);
         $sheet->getColumnDimension('F')->setWidth(80);
+        // Auto-size custom field columns
+        $cfCol = chr(ord('F') + 1);
+        foreach ($customFields as $field) {
+            $sheet->getColumnDimension($cfCol)->setAutoSize(true);
+            ++$cfCol;
+        }
 
         // Wrap text in message column
         $sheet->getStyle('F:F')->getAlignment()->setWrapText(true);
@@ -373,13 +399,8 @@ final readonly class WidgetExportService
 
     private function createSessionsSheet($sheet, Widget $widget, array $filters): void
     {
-        $customFields = $widget->getConfig()['customFields'] ?? [];
-
         // Header
         $headers = ['Session ID', 'Channel', 'Created', 'Last Activity', 'Messages', 'Files', 'Mode', 'Duration'];
-        foreach ($customFields as $field) {
-            $headers[] = $field['name'];
-        }
 
         $col = 'A';
         foreach ($headers as $header) {
@@ -411,22 +432,11 @@ final readonly class WidgetExportService
             $sheet->setCellValue('G'.$row, ucfirst($session->getMode()));
             $sheet->setCellValue('H'.$row, $durationStr);
 
-            // Custom field values
-            $cfCol = 'I';
-            $cfValues = $session->getCustomFieldValues() ?? [];
-            foreach ($customFields as $field) {
-                $val = $cfValues[$field['id']] ?? ('boolean' === $field['type'] ? false : '');
-                $displayVal = is_bool($val) ? ($val ? 'Yes' : 'No') : $this->sanitizeCellValue((string) $val);
-                $sheet->setCellValue($cfCol.$row, $displayVal);
-                ++$cfCol;
-            }
-
             ++$row;
         }
 
         // Auto-size columns
-        $lastCol = chr(ord('H') + count($customFields));
-        foreach (range('A', $lastCol) as $col) {
+        foreach (range('A', 'H') as $col) {
             $sheet->getColumnDimension($col)->setAutoSize(true);
         }
     }
