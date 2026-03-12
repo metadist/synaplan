@@ -174,6 +174,34 @@ final readonly class UserMemoryService
     }
 
     /**
+     * Delete all memories for a user from Qdrant.
+     * Used during user deletion to prevent orphaned data.
+     */
+    public function deleteAllForUser(int $userId): void
+    {
+        if (!$this->qdrantClient->isAvailable()) {
+            $this->logger->warning('Memory service unavailable - skipping bulk delete', [
+                'user_id' => $userId,
+            ]);
+
+            return;
+        }
+
+        try {
+            $deleted = $this->qdrantClient->deleteAllMemoriesForUser($userId);
+            $this->logger->info('All memories deleted for user', [
+                'user_id' => $userId,
+                'deleted_count' => $deleted,
+            ]);
+        } catch (\Throwable $e) {
+            $this->logger->error('Failed to delete all memories for user', [
+                'user_id' => $userId,
+                'error' => $e->getMessage(),
+            ]);
+        }
+    }
+
+    /**
      * Delete memory from Qdrant.
      */
     public function deleteMemory(int $memoryId, User $user, ?string $namespace = null): void

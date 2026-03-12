@@ -305,6 +305,7 @@ class WebhookController extends AbstractController
             $responseText = $aiResponse['content'] ?? '';
             $metadata = $aiResponse['metadata'] ?? [];
             $attachmentPath = $this->resolveAttachmentPathFromAiMetadata($metadata);
+            $responseMediaType = $metadata['media_type'] ?? null;
 
             // Extract provider and model from metadata
             $provider = $metadata['provider'] ?? null;
@@ -351,7 +352,9 @@ class WebhookController extends AbstractController
                     $provider,
                     $model,
                     $processingTime,
-                    $attachmentPath
+                    $attachmentPath,
+                    $toEmail,
+                    $responseMediaType
                 );
 
                 $this->logger->info('Email response sent', [

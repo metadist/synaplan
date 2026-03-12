@@ -48,6 +48,7 @@ final readonly class UserDeletionService
         private WidgetSessionRepository $widgetSessionRepository,
         private FileStorageService $fileStorageService,
         private VectorStorageFacade $vectorStorageFacade,
+        private UserMemoryService $userMemoryService,
         private LoggerInterface $logger,
     ) {
     }
@@ -94,7 +95,8 @@ final readonly class UserDeletionService
 
             $this->em->getConnection()->commit();
 
-            // Cleanup empty user directories (best effort, outside transaction)
+            // Best-effort cleanup outside transaction (external services & filesystem)
+            $this->deleteMemories($userId);
             $this->cleanupUserDirectories($userId);
 
             $this->logger->info('User and all related data deleted successfully', [
@@ -156,7 +158,8 @@ final readonly class UserDeletionService
             $this->em->flush();
             $this->em->getConnection()->commit();
 
-            // Cleanup empty user directories (best effort, outside transaction)
+            // Best-effort cleanup outside transaction (external services & filesystem)
+            $this->deleteMemories($userId);
             $this->cleanupUserDirectories($userId);
 
             $this->logger->info('User data cleanup completed successfully', [
@@ -221,6 +224,11 @@ final readonly class UserDeletionService
     {
         // Delete all RAG documents via facade
         $this->vectorStorageFacade->deleteAllForUser($userId);
+    }
+
+    private function deleteMemories(int $userId): void
+    {
+        $this->userMemoryService->deleteAllForUser($userId);
     }
 
     private function deleteUseLogs(int $userId): void
