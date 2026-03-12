@@ -1133,7 +1133,7 @@ const stats = ref({
 })
 
 const totalSessions = computed(
-  () => stats.value.ai + stats.value.human + stats.value.waiting + stats.value.internal,
+  () => stats.value.ai + stats.value.human + stats.value.waiting + stats.value.internal
 )
 
 const goBack = () => {
