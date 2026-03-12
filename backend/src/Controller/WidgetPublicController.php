@@ -5,6 +5,7 @@ namespace App\Controller;
 use App\Entity\Chat;
 use App\Entity\File;
 use App\Entity\Message;
+use App\Entity\WidgetSession;
 use App\Repository\ChatRepository;
 use App\Repository\FileRepository;
 use App\Repository\MessageRepository;
@@ -190,6 +191,12 @@ class WidgetPublicController extends AbstractController
 
         // Get or create session (test mode adds test_ prefix, internal mode does not)
         $session = $this->sessionService->getOrCreateSession($widgetId, $data['sessionId'], $isValidatedTestMode);
+
+        // Mark new internal-mode sessions so they appear as "Internal" in the dashboard
+        if ($isValidatedInternalMode && $session->isAiMode()) {
+            $session->setMode(WidgetSession::MODE_INTERNAL);
+            $this->em->flush();
+        }
 
         // Capture country from Cloudflare geolocation header on first message
         if (null === $session->getCountry()) {
@@ -781,6 +788,11 @@ class WidgetPublicController extends AbstractController
 
         // Get or create widget session (test mode adds test_ prefix, internal mode does not)
         $widgetSession = $this->sessionService->getOrCreateSession($widgetId, $sessionId, $isValidatedTestMode);
+
+        if ($isValidatedInternalMode && $widgetSession->isAiMode()) {
+            $widgetSession->setMode(WidgetSession::MODE_INTERNAL);
+            $this->em->flush();
+        }
 
         $owner = $widget->getOwner();
         if (!$owner) {

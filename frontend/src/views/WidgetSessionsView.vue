@@ -41,6 +41,12 @@
               <span class="w-2 h-2 rounded-full bg-amber-500 shadow-sm shadow-amber-500/50"></span>
               {{ stats.waiting }} {{ $t('widgetSessions.waitingShort') }}
             </span>
+            <span class="flex items-center gap-1.5">
+              <span
+                class="w-2 h-2 rounded-full bg-purple-500 shadow-sm shadow-purple-500/50"
+              ></span>
+              {{ stats.internal }} {{ $t('widgetSessions.internalShort') }}
+            </span>
           </div>
 
           <!-- Spacer -->
@@ -124,6 +130,10 @@
             <span class="flex items-center gap-1">
               <span class="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
               {{ stats.waiting }} Waiting
+            </span>
+            <span class="flex items-center gap-1">
+              <span class="w-1.5 h-1.5 rounded-full bg-purple-500"></span>
+              {{ stats.internal }} Internal
             </span>
           </div>
 
@@ -245,6 +255,7 @@
               <option value="ai">{{ $t('widgetSessions.modeAi') }}</option>
               <option value="human">{{ $t('widgetSessions.modeHuman') }}</option>
               <option value="waiting">{{ $t('widgetSessions.modeWaiting') }}</option>
+              <option value="internal">{{ $t('widgetSessions.modeInternal') }}</option>
             </select>
             <select
               v-model="filters.status"
@@ -626,12 +637,41 @@
                     {{ $t('widgetSessions.typing') }}...
                   </p>
                 </div>
+
+                <!-- AI Typing Indicator (Internal Mode) -->
+                <div v-if="internalAiTyping" class="max-w-[80%] ml-auto">
+                  <div
+                    class="px-4 py-3 shadow-sm bg-gradient-to-br from-blue-600 to-blue-500 text-white rounded-2xl rounded-br-md"
+                  >
+                    <div class="flex items-center gap-1.5">
+                      <span
+                        class="w-2 h-2 bg-white/60 rounded-full animate-bounce"
+                        style="animation-delay: 0ms"
+                      ></span>
+                      <span
+                        class="w-2 h-2 bg-white/60 rounded-full animate-bounce"
+                        style="animation-delay: 150ms"
+                      ></span>
+                      <span
+                        class="w-2 h-2 bg-white/60 rounded-full animate-bounce"
+                        style="animation-delay: 300ms"
+                      ></span>
+                    </div>
+                  </div>
+                  <p class="text-[10px] mt-1.5 px-1 txt-secondary opacity-50 text-right">
+                    AI {{ $t('widgetSessions.typing') }}...
+                  </p>
+                </div>
               </div>
             </div>
 
-            <!-- Message Input (Human/Waiting Mode) -->
+            <!-- Message Input (Human/Waiting/Internal Mode) -->
             <div
-              v-if="selectedSession.mode === 'human' || selectedSession.mode === 'waiting'"
+              v-if="
+                selectedSession.mode === 'human' ||
+                selectedSession.mode === 'waiting' ||
+                selectedSession.mode === 'internal'
+              "
               class="p-4 flex-shrink-0 border-t border-white/5 dark:border-white/5 shadow-[0_-1px_3px_rgba(0,0,0,0.08)]"
             >
               <!-- File Preview -->
@@ -1013,7 +1053,7 @@ function stopResize() {
 
 const filters = ref({
   status: '' as '' | 'active' | 'expired',
-  mode: '' as '' | 'ai' | 'human' | 'waiting',
+  mode: '' as '' | 'ai' | 'human' | 'waiting' | 'internal',
   favorite: false,
 })
 
@@ -1028,6 +1068,7 @@ const stats = ref({
   ai: 0,
   human: 0,
   waiting: 0,
+  internal: 0,
 })
 
 const totalSessions = computed(() => stats.value.ai + stats.value.human + stats.value.waiting)
@@ -1200,7 +1241,12 @@ const viewSession = async (session: widgetSessionsApi.WidgetSession) => {
       sessions.value[sessionIndex].lastMessagePreview = response.session.lastMessagePreview
     }
 
-    // Subscribe to SSE for this specific session
+    // Subscribe to SSE for this specific session (skip for internal mode --
+    // messages are added locally by sendInternalMessage, SSE would duplicate them)
+    if (response.session.mode === 'internal') {
+      return
+    }
+
     // Use latestEventId to skip historical events and only receive new ones.
     // This prevents replay of old takeover/handback events that would incorrectly
     // change the session mode (e.g. 'waiting' → 'human' from a stale takeover event).
@@ -1544,7 +1590,10 @@ const uploadFiles = async (): Promise<number[]> => {
   }
 }
 
+const internalAiTyping = ref(false)
+
 const sendMessage = async () => {
+  if (sendingMessage.value) return
   if (!selectedSession.value || (!messageText.value.trim() && selectedFiles.value.length === 0))
     return
 
@@ -1556,24 +1605,25 @@ const sendMessage = async () => {
       fileIds = await uploadFiles()
     }
 
-    // Send message with file IDs
-    await widgetSessionsApi.sendHumanMessage(
-      widgetId.value,
-      selectedSession.value.sessionId,
-      messageText.value.trim() || t('widgetSessions.fileAttached'),
-      fileIds
-    )
+    if (selectedSession.value.mode === 'internal') {
+      await sendInternalMessage(messageText.value.trim(), fileIds)
+    } else {
+      await widgetSessionsApi.sendHumanMessage(
+        widgetId.value,
+        selectedSession.value.sessionId,
+        messageText.value.trim() || t('widgetSessions.fileAttached'),
+        fileIds
+      )
 
-    // Update mode: operator replied, so mode goes back to 'human' (was 'waiting')
-    if (selectedSession.value.mode === 'waiting') {
-      selectedSession.value.mode = 'human'
-      const sessionIndex = sessions.value.findIndex((s) => s.id === selectedSession.value?.id)
-      if (sessionIndex !== -1) {
-        sessions.value[sessionIndex].mode = 'human'
+      if (selectedSession.value.mode === 'waiting') {
+        selectedSession.value.mode = 'human'
+        const sessionIndex = sessions.value.findIndex((s) => s.id === selectedSession.value?.id)
+        if (sessionIndex !== -1) {
+          sessions.value[sessionIndex].mode = 'human'
+        }
+        stats.value.waiting = Math.max(0, stats.value.waiting - 1)
+        stats.value.human++
       }
-      // Update stats
-      stats.value.waiting = Math.max(0, stats.value.waiting - 1)
-      stats.value.human++
     }
 
     // Clear state
@@ -1585,6 +1635,58 @@ const sendMessage = async () => {
   } finally {
     sendingMessage.value = false
   }
+}
+
+const sendInternalMessage = async (text: string, fileIds: number[]) => {
+  if (!selectedSession.value) return
+
+  const userMsg = {
+    id: Date.now(),
+    direction: 'IN' as const,
+    text,
+    timestamp: Math.floor(Date.now() / 1000),
+    sender: 'user' as const,
+  }
+  sessionMessages.value.push(userMsg)
+  scrollToBottomOfMessages()
+
+  internalAiTyping.value = true
+  try {
+    let aiText = ''
+    const result = await widgetsApi.sendWidgetMessage(
+      widgetId.value,
+      text,
+      selectedSession.value.sessionId,
+      {
+        fileIds: fileIds.length > 0 ? fileIds : undefined,
+        headers: { 'X-Widget-Internal-Mode': 'true' },
+        onChunk: (chunk: string) => {
+          aiText += chunk
+        },
+      }
+    )
+
+    const aiMsg = {
+      id: result.messageId ?? Date.now() + 1,
+      direction: 'OUT' as const,
+      text: aiText || result.text || '',
+      timestamp: Math.floor(Date.now() / 1000),
+      sender: 'ai' as const,
+    }
+    sessionMessages.value.push(aiMsg)
+    scrollToBottomOfMessages()
+  } finally {
+    internalAiTyping.value = false
+  }
+}
+
+const scrollToBottomOfMessages = () => {
+  nextTick(() => {
+    const container = messagesContainer.value
+    if (container) {
+      container.scrollTop = container.scrollHeight
+    }
+  })
 }
 
 // Operator typing indicator - send to widget user
@@ -1747,6 +1849,8 @@ const getModeIcon = (mode: string) => {
       return 'heroicons:user'
     case 'waiting':
       return 'heroicons:clock'
+    case 'internal':
+      return 'heroicons:building-office'
     default:
       return 'heroicons:question-mark-circle'
   }
@@ -1760,6 +1864,8 @@ const getModeGradient = (mode: string) => {
       return 'bg-gradient-to-br from-emerald-500 to-emerald-600'
     case 'waiting':
       return 'bg-gradient-to-br from-amber-500 to-amber-600'
+    case 'internal':
+      return 'bg-gradient-to-br from-purple-500 to-purple-600'
     default:
       return 'bg-gradient-to-br from-gray-500 to-gray-600'
   }
@@ -1773,6 +1879,8 @@ const getModeLabel = (mode: string) => {
       return t('widgetSessions.modeHuman')
     case 'waiting':
       return t('widgetSessions.modeWaiting')
+    case 'internal':
+      return t('widgetSessions.modeInternal')
     default:
       return mode
   }

@@ -16,6 +16,7 @@ class WidgetSession
     public const MODE_AI = 'ai';
     public const MODE_HUMAN = 'human';
     public const MODE_WAITING = 'waiting';
+    public const MODE_INTERNAL = 'internal';
 
     #[ORM\Id]
     #[ORM\GeneratedValue]
@@ -258,7 +259,7 @@ class WidgetSession
 
     public function setMode(string $mode): self
     {
-        if (!in_array($mode, [self::MODE_AI, self::MODE_HUMAN, self::MODE_WAITING], true)) {
+        if (!in_array($mode, [self::MODE_AI, self::MODE_HUMAN, self::MODE_WAITING, self::MODE_INTERNAL], true)) {
             throw new \InvalidArgumentException(sprintf('Invalid mode: %s', $mode));
         }
         $this->mode = $mode;
@@ -279,6 +280,11 @@ class WidgetSession
     public function isWaitingForHuman(): bool
     {
         return self::MODE_WAITING === $this->getMode();
+    }
+
+    public function isInternalMode(): bool
+    {
+        return self::MODE_INTERNAL === $this->getMode();
     }
 
     public function getHumanOperatorId(): ?int

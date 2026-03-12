@@ -1347,6 +1347,7 @@
     "modeAi": "AI",
     "modeHuman": "Human",
     "modeWaiting": "Waiting",
+    "modeInternal": "Internal",
     "sortLastMessage": "Last Activity",
     "sortCreated": "Created Date",
     "sortMessageCount": "Message Count",
@@ -1356,6 +1357,7 @@
     "aiShort": "AI",
     "humanShort": "Human",
     "waitingShort": "Waiting",
+    "internalShort": "Internal",
     "totalShort": "Total",
     "selectSession": "Select a conversation",
     "selectSessionDescription": "Choose a session from the list to view the conversation",
@@ -1657,6 +1659,7 @@
     "modeAi": "AI",
     "modeHuman": "Human",
     "modeWaiting": "Waiting",
+    "modeInternal": "Internal",
     "getCode": "Get Code",
     "testChat": "Open Chat",
     "overlay": {

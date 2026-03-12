@@ -100,6 +100,8 @@ const modeIcon = computed(() => {
       return 'heroicons:user'
     case 'waiting':
       return 'heroicons:clock'
+    case 'internal':
+      return 'heroicons:building-office'
     default:
       return 'heroicons:question-mark-circle'
   }
@@ -113,6 +115,8 @@ const modeIconColor = computed(() => {
       return 'text-green-500'
     case 'waiting':
       return 'text-yellow-500'
+    case 'internal':
+      return 'text-purple-500'
     default:
       return 'txt-secondary'
   }
@@ -126,6 +130,8 @@ const modeClass = computed(() => {
       return 'bg-green-500/10 text-green-600 dark:text-green-400'
     case 'waiting':
       return 'bg-yellow-500/10 text-yellow-600 dark:text-yellow-400'
+    case 'internal':
+      return 'bg-purple-500/10 text-purple-600 dark:text-purple-400'
     default:
       return 'bg-gray-500/10 text-gray-600 dark:text-gray-400'
   }
@@ -139,6 +145,8 @@ const modeLabel = computed(() => {
       return t('widgetSessions.modeHuman')
     case 'waiting':
       return t('widgetSessions.modeWaiting')
+    case 'internal':
+      return t('widgetSessions.modeInternal')
     default:
       return props.session.mode
   }

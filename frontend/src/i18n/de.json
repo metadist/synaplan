@@ -483,6 +483,7 @@
     "modeAi": "KI",
     "modeHuman": "Mensch",
     "modeWaiting": "Wartend",
+    "modeInternal": "Intern",
     "sortLastMessage": "Letzte Aktivität",
     "sortCreated": "Erstellungsdatum",
     "sortMessageCount": "Nachrichtenanzahl",
@@ -492,6 +493,7 @@
     "aiShort": "KI",
     "humanShort": "Mensch",
     "waitingShort": "Wartend",
+    "internalShort": "Intern",
     "totalShort": "Gesamt",
     "selectSession": "Konversation auswählen",
     "selectSessionDescription": "Wähle eine Sitzung aus der Liste, um die Konversation anzuzeigen",
@@ -1684,6 +1686,7 @@
     "modeAi": "KI",
     "modeHuman": "Mensch",
     "modeWaiting": "Wartend",
+    "modeInternal": "Intern",
     "getCode": "Code abrufen",
     "testChat": "Chat öffnen",
     "overlay": {

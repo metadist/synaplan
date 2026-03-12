@@ -7,7 +7,7 @@ export interface WidgetSession {
   chatId: number | null
   messageCount: number
   fileCount: number
-  mode: 'ai' | 'human' | 'waiting'
+  mode: 'ai' | 'human' | 'waiting' | 'internal'
   humanOperatorId: number | null
   lastMessage: number
   lastMessagePreview: string | null
@@ -49,6 +49,7 @@ export interface WidgetSessionsResponse {
     ai: number
     human: number
     waiting: number
+    internal: number
   }
 }
 
@@ -63,7 +64,7 @@ export interface ListSessionsParams {
   limit?: number
   offset?: number
   status?: 'active' | 'expired'
-  mode?: 'ai' | 'human' | 'waiting'
+  mode?: 'ai' | 'human' | 'waiting' | 'internal'
   from?: number
   to?: number
   sort?: 'lastMessage' | 'created' | 'messageCount'
@@ -263,7 +264,7 @@ export interface ExportParams {
   format?: 'xlsx' | 'csv' | 'json'
   from?: number
   to?: number
-  mode?: 'ai' | 'human' | 'waiting'
+  mode?: 'ai' | 'human' | 'waiting' | 'internal'
   sessionIds?: string[]
 }
 

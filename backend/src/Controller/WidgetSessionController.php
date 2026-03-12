@@ -57,7 +57,7 @@ class WidgetSessionController extends AbstractController
     #[OA\Parameter(name: 'limit', in: 'query', schema: new OA\Schema(type: 'integer', default: 20, maximum: 100))]
     #[OA\Parameter(name: 'offset', in: 'query', schema: new OA\Schema(type: 'integer', default: 0))]
     #[OA\Parameter(name: 'status', in: 'query', schema: new OA\Schema(type: 'string', enum: ['active', 'expired']))]
-    #[OA\Parameter(name: 'mode', in: 'query', schema: new OA\Schema(type: 'string', enum: ['ai', 'human', 'waiting']))]
+    #[OA\Parameter(name: 'mode', in: 'query', schema: new OA\Schema(type: 'string', enum: ['ai', 'human', 'waiting', 'internal']))]
     #[OA\Parameter(name: 'from', in: 'query', description: 'Unix timestamp', schema: new OA\Schema(type: 'integer'))]
     #[OA\Parameter(name: 'to', in: 'query', description: 'Unix timestamp', schema: new OA\Schema(type: 'integer'))]
     #[OA\Parameter(name: 'sort', in: 'query', schema: new OA\Schema(type: 'string', enum: ['lastMessage', 'created', 'messageCount'], default: 'lastMessage'))]
@@ -79,7 +79,7 @@ class WidgetSessionController extends AbstractController
                             new OA\Property(property: 'chatId', type: 'integer', nullable: true),
                             new OA\Property(property: 'messageCount', type: 'integer'),
                             new OA\Property(property: 'fileCount', type: 'integer'),
-                            new OA\Property(property: 'mode', type: 'string', enum: ['ai', 'human', 'waiting']),
+                            new OA\Property(property: 'mode', type: 'string', enum: ['ai', 'human', 'waiting', 'internal']),
                             new OA\Property(property: 'lastMessage', type: 'integer'),
                             new OA\Property(property: 'lastMessagePreview', type: 'string', nullable: true),
                             new OA\Property(property: 'created', type: 'integer'),
