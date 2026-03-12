@@ -588,6 +588,10 @@ class WidgetPublicController extends AbstractController
                     $classification = $result['classification'] ?? [];
                     $topic = $classification['topic'] ?? 'WIDGET';
                     $language = $classification['language'] ?? 'en';
+                    // 'auto' is only used for the system prompt directive; store a valid ISO code in DB
+                    if ('auto' === $language) {
+                        $language = 'en';
+                    }
 
                     // Truncate topic to fit database column (max 64 chars)
                     $topic = mb_substr($topic, 0, 64);

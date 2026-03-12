@@ -1413,7 +1413,8 @@ const sendMessage = async () => {
     isTyping.value = false
 
     // Subscribe to SSE after first successful message (session now exists on server)
-    if (!eventSubscription && sessionId.value) {
+    // Skip SSE in dashboard mode (test/internal) -- not needed and causes 404s
+    if (!eventSubscription && sessionId.value && !isTestEnvironment.value) {
       console.debug('[Widget] First message sent, subscribing to SSE')
       subscribeToEvents()
     }
@@ -1692,8 +1693,8 @@ const loadConversationHistory = async (force = false) => {
         }
 
         // Only subscribe to SSE if the session has messages (exists on server)
-        // This prevents 404 errors for brand new sessions that aren't persisted yet
-        if (!eventSubscription && data.session.messageCount > 0) {
+        // Skip SSE in dashboard mode (test/internal) -- not needed and causes 404s
+        if (!eventSubscription && data.session.messageCount > 0 && !isTestEnvironment.value) {
           console.debug('[Widget] Subscribing to SSE for real-time events')
           subscribeToEvents()
         }
