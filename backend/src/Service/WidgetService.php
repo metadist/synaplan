@@ -407,11 +407,12 @@ HTML;
         }
 
         $validTypes = ['text', 'boolean'];
-        $maxFields = 20;
+        $maxPerType = ['text' => 3, 'boolean' => 3];
+        $typeCounts = ['text' => 0, 'boolean' => 0];
         $sanitized = [];
         $usedIds = [];
 
-        foreach (array_slice($fields, 0, $maxFields) as $field) {
+        foreach ($fields as $field) {
             if (!is_array($field)) {
                 continue;
             }
@@ -428,6 +429,11 @@ HTML;
             if (!in_array($type, $validTypes, true)) {
                 continue;
             }
+
+            if ($typeCounts[$type] >= $maxPerType[$type]) {
+                continue;
+            }
+            ++$typeCounts[$type];
 
             // Server-generated IDs: reuse existing valid IDs, generate new ones otherwise
             $id = isset($field['id']) && is_string($field['id']) && preg_match('/^cf_[a-f0-9]{12}$/', $field['id'])

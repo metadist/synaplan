@@ -1709,7 +1709,9 @@
       "empty": "Noch keine benutzerdefinierten Felder definiert.",
       "emptyHint": "Fügen Sie Felder hinzu, um zusätzliche Informationen bei internen Chats zu erfassen.",
       "removeConfirm": "Dieses Feld entfernen?",
-      "maxFieldsReached": "Maximal 20 Felder erreicht",
+      "maxFieldsReached": "Maximale Anzahl an Feldern erreicht (3 Text, 3 Ja/Nein)",
+      "maxTextReached": "Maximal 3 Textfelder erreicht",
+      "maxBooleanReached": "Maximal 3 Ja/Nein-Felder erreicht",
       "fieldNameRequired": "Feldname ist erforderlich",
       "panelTitle": "Zusätzliche Informationen",
       "noSession": "Starten Sie zuerst einen Chat, um benutzerdefinierte Felder auszufüllen."

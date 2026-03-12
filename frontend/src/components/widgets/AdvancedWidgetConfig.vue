@@ -584,7 +584,7 @@
             </div>
 
             <!-- Add field form -->
-            <div v-if="customFields.length < 20" class="flex items-end gap-3">
+            <div v-if="textFieldCount < 3 || booleanFieldCount < 3" class="flex items-end gap-3">
               <div class="flex-1">
                 <label class="block text-xs font-medium txt-secondary mb-1">
                   {{ $t('widgets.customFields.fieldName') }}
@@ -612,14 +612,27 @@
               </div>
               <button
                 class="btn-primary px-4 py-2 text-sm flex-shrink-0 rounded-lg"
-                :disabled="!newFieldName.trim()"
+                :disabled="!newFieldName.trim() || !canAddField"
                 @click="addCustomField"
               >
                 <Icon icon="heroicons:plus" class="w-4 h-4 mr-1 inline" />
                 {{ $t('widgets.customFields.addField') }}
               </button>
             </div>
-            <p v-else class="text-xs txt-secondary text-center">
+            <p
+              v-if="!canAddField && (textFieldCount < 3 || booleanFieldCount < 3)"
+              class="text-xs txt-secondary"
+            >
+              {{
+                newFieldType === 'text'
+                  ? $t('widgets.customFields.maxTextReached')
+                  : $t('widgets.customFields.maxBooleanReached')
+              }}
+            </p>
+            <p
+              v-else-if="textFieldCount >= 3 && booleanFieldCount >= 3"
+              class="text-xs txt-secondary text-center"
+            >
               {{ $t('widgets.customFields.maxFieldsReached') }}
             </p>
           </div>
@@ -1188,9 +1201,18 @@ const customFields = ref<CustomField[]>([])
 const newFieldName = ref('')
 const newFieldType = ref<'text' | 'boolean'>('text')
 
+const textFieldCount = computed(() => customFields.value.filter((f) => f.type === 'text').length)
+const booleanFieldCount = computed(
+  () => customFields.value.filter((f) => f.type === 'boolean').length
+)
+const canAddField = computed(() => {
+  if (newFieldType.value === 'text') return textFieldCount.value < 3
+  return booleanFieldCount.value < 3
+})
+
 const addCustomField = () => {
   const name = newFieldName.value.trim()
-  if (!name || customFields.value.length >= 20) return
+  if (!name || !canAddField.value) return
 
   customFields.value.push({
     id: 'cf_' + Math.random().toString(16).slice(2, 14).padEnd(12, '0'),

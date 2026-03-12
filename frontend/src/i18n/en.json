@@ -1682,7 +1682,9 @@
       "empty": "No custom fields defined yet.",
       "emptyHint": "Add fields to capture additional information during internal chats.",
       "removeConfirm": "Remove this field?",
-      "maxFieldsReached": "Maximum of 20 fields reached",
+      "maxFieldsReached": "Maximum number of fields reached (3 text, 3 yes/no)",
+      "maxTextReached": "Maximum of 3 text fields reached",
+      "maxBooleanReached": "Maximum of 3 yes/no fields reached",
       "fieldNameRequired": "Field name is required",
       "panelTitle": "Additional Information",
       "noSession": "Start a chat first to fill in custom fields."
