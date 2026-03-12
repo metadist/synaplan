@@ -3,23 +3,11 @@ import dotenv from 'dotenv'
 import path from 'path'
 import { fileURLToPath } from 'url'
 
-// Get __dirname equivalent in ES modules
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
 
-// Load .env file from e2e directory
 dotenv.config({ path: path.join(__dirname, '.env.local') })
 
-/**
- * Playwright E2E Test Configuration
- * BaseURL: http://localhost:5173 (overridable via BASE_URL ENV)
- */
-export default defineConfig({
-  // Test directory (relative to this config file)
-  testDir: './tests',
-
-  // Retries and timeout
-  retries: 0,
 const n = process.env.E2E_WORKERS ? parseInt(process.env.E2E_WORKERS, 10) : 4
 export const WORKER_COUNT = Number.isInteger(n) && n >= 1 ? n : 4
 
@@ -30,7 +18,6 @@ export default defineConfig({
   retries: process.env.CI ? 1 : 0,
   timeout: 60_000,
 
-  // BaseURL from ENV or default
   use: {
     baseURL: process.env.BASE_URL || 'http://localhost:5173',
     headless: process.env.CI ? true : false,
@@ -39,22 +26,15 @@ export default defineConfig({
     trace: 'retain-on-failure',
   },
 
-  // Reporters
   reporter: [
     ['list'],
     ['junit', { outputFile: 'reports/junit.xml' }],
     ['html', { outputFolder: 'reports/html', open: 'never' }],
   ],
 
-  // Output directory for traces, screenshots, etc.
   outputDir: 'test-results',
   workers: WORKER_COUNT,
 
-  // Worker configuration
-  workers: 1,
-
-  // Browser projects
-  // Both browsers defined for CI, but local dev uses --project=chromium for speed
   projects: [
     {
       name: 'chromium',
@@ -72,11 +52,4 @@ export default defineConfig({
       grep: /@oidc-redirect/,
     },
   ],
-
-  // Default filter: only run @smoke tests
-  // grep: /@smoke/,
-
-  // Plugin tests (@plugin) are excluded from standard runs via --grep-invert
-  // in the npm scripts. They require external services and must be run
-  // explicitly via: npm run test:e2e:plugin:castingdata
 })

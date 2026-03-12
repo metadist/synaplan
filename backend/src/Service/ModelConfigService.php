@@ -267,13 +267,6 @@ final readonly class ModelConfigService
     /**
      * Get default model ID for a specific capability.
      *
-     * Priority: User Config > Global Config > Fallback
-     */
-    public function getDefaultModel(string $capability, ?int $userId = null): ?int
-    {
-        // Normalize capability key
-        $configKey = 'DEFAULTMODEL/'.strtoupper($capability);
-
      * Priority: User Config > Global Config > null.
      * In test env, ConfigFixtures seeds global defaults pointing to TestProvider models.
      */
