@@ -38,8 +38,6 @@ class ConfigController extends AbstractController
         private UserMemoryService $memoryService,
         #[Autowire('%env(string:default::QDRANT_SERVICE_URL)%')]
         private readonly string $qdrantServiceUrl,
-        #[Autowire('%kernel.environment%')]
-        private readonly string $kernelEnvironment,
     ) {
     }
 
@@ -380,8 +378,10 @@ class ConfigController extends AbstractController
             return $this->json(['error' => 'Not authenticated'], Response::HTTP_UNAUTHORIZED);
         }
 
-        // Get all active models sorted by quality
-        $models = $this->modelRepository->findBy(['active' => 1], ['quality' => 'DESC', 'rating' => 'DESC']);
+        $models = $this->modelRepository->findBy(
+            ['active' => 1, 'selectable' => 1],
+            ['quality' => 'DESC', 'rating' => 'DESC']
+        );
 
         // Build model list with tag information
         $modelList = [];
@@ -458,37 +458,6 @@ class ConfigController extends AbstractController
             }
         }
 
-        // In test or dev: add TestProvider (900) to every capability so UI shows "test-model (test)" for all
-        if (in_array($this->kernelEnvironment, ['test', 'dev'], true)) {
-            $testModel = $this->modelRepository->find(900);
-            if ($testModel) {
-                $testModelEntry = [
-                    'id' => $testModel->getId(),
-                    'service' => $testModel->getService(),
-                    'name' => $testModel->getName(),
-                    'providerId' => $testModel->getProviderId(),
-                    'description' => $testModel->getDescription(),
-                    'quality' => $testModel->getQuality(),
-                    'rating' => $testModel->getRating(),
-                    'tag' => strtoupper($testModel->getTag()),
-                    'isSystemModel' => $testModel->isSystemModel(),
-                    'features' => $testModel->getFeatures(),
-                ];
-                foreach (array_keys($grouped) as $cap) {
-                    $hasTest = false;
-                    foreach ($grouped[$cap] as $m) {
-                        if (($m['id'] ?? null) === 900) {
-                            $hasTest = true;
-                            break;
-                        }
-                    }
-                    if (!$hasTest) {
-                        $grouped[$cap][] = $testModelEntry;
-                    }
-                }
-            }
-        }
-
         return $this->json([
             'success' => true,
             'models' => $grouped,
@@ -509,19 +478,6 @@ class ConfigController extends AbstractController
         $capabilities = ['SORT', 'CHAT', 'VECTORIZE', 'PIC2TEXT', 'TEXT2PIC', 'TEXT2VID', 'SOUND2TEXT', 'TEXT2SOUND', 'ANALYZE'];
 
         $defaults = [];
-
-        // In test environment: return TestProvider (900) for all capabilities
-        // so CI/E2E tests never accidentally use real AI providers with dummy keys
-        if ('test' === $this->kernelEnvironment) {
-            foreach ($capabilities as $capability) {
-                $defaults[$capability] = 900;
-            }
-
-            return $this->json([
-                'success' => true,
-                'defaults' => $defaults,
-            ]);
-        }
 
         foreach ($capabilities as $capability) {
             // Try user-specific config first
@@ -550,7 +506,10 @@ class ConfigController extends AbstractController
     }
 
     /**
-     * Save default model configuration for user.
+     * Save default model configuration.
+     *
+     * By default saves user-specific defaults (ownerId = current user).
+     * With `global: true` (admin-only), saves system-wide defaults (ownerId = 0).
      */
     #[Route('/models/defaults', name: 'models_defaults_save', methods: ['POST'])]
     public function saveDefaultModels(
@@ -567,7 +526,12 @@ class ConfigController extends AbstractController
             return $this->json(['error' => 'Invalid data'], Response::HTTP_BAD_REQUEST);
         }
 
-        $userId = $user->getId();
+        $global = !empty($data['global']);
+        if ($global && !$this->isGranted('ROLE_ADMIN')) {
+            return $this->json(['error' => 'Admin access required for global defaults'], Response::HTTP_FORBIDDEN);
+        }
+
+        $ownerId = $global ? 0 : $user->getId();
         $validCapabilities = ['SORT', 'CHAT', 'VECTORIZE', 'PIC2TEXT', 'TEXT2PIC', 'TEXT2VID', 'SOUND2TEXT', 'TEXT2SOUND', 'ANALYZE'];
 
         foreach ($data['defaults'] as $capability => $modelId) {
@@ -575,7 +539,6 @@ class ConfigController extends AbstractController
                 continue;
             }
 
-            // Validate model exists - allow any active model for any capability (cross-capability)
             $model = $this->modelRepository->find($modelId);
             if (!$model) {
                 return $this->json([
@@ -583,24 +546,21 @@ class ConfigController extends AbstractController
                 ], Response::HTTP_BAD_REQUEST);
             }
 
-            // Check if model is active
             if (1 !== $model->getActive()) {
                 return $this->json([
                     'error' => "Model {$modelId} is not active",
                 ], Response::HTTP_BAD_REQUEST);
             }
 
-            // Check if user-specific config exists
             $config = $this->configRepository->findOneBy([
-                'ownerId' => $userId,
+                'ownerId' => $ownerId,
                 'group' => 'DEFAULTMODEL',
                 'setting' => $capability,
             ]);
 
             if (!$config) {
-                // Create new user-specific config
                 $config = new Config();
-                $config->setOwnerId($userId);
+                $config->setOwnerId($ownerId);
                 $config->setGroup('DEFAULTMODEL');
                 $config->setSetting($capability);
             }
@@ -613,7 +573,7 @@ class ConfigController extends AbstractController
 
         return $this->json([
             'success' => true,
-            'message' => 'Default models saved successfully',
+            'message' => $global ? 'Global default models saved successfully' : 'Default models saved successfully',
         ]);
     }
 

@@ -23,7 +23,6 @@ final readonly class ModelConfigService
         private UserRepository $userRepository,
         private CacheItemPoolInterface $cache,
         private ProviderRegistry $providerRegistry,
-        private string $appEnv = '',
     ) {
     }
 
@@ -31,17 +30,12 @@ final readonly class ModelConfigService
      * Holt Default-Provider für einen User und Capability.
      *
      * Reihenfolge:
-     * 0. APP_ENV=test → 'test' (für E2E/CI ohne echte API-Keys)
      * 1. User-spezifische Config (BCONFIG: BOWNERID=userId, BGROUP='ai', BSETTING='default_chat_provider')
      * 2. Global Default Config (BOWNERID=0)
-     * 3. Fallback: 'test'
+     * 3. Smart Fallback from DB
      */
     public function getDefaultProvider(?int $userId, string $capability = 'chat'): string
     {
-        if ('test' === $this->getAppEnv()) {
-            return 'test';
-        }
-
         $cacheKey = "model_config.provider.{$userId}.{$capability}";
         $item = $this->cache->getItem($cacheKey);
 
@@ -95,7 +89,6 @@ final readonly class ModelConfigService
     /**
      * Find a fallback provider for a capability from the database.
      *
-     * This prevents using 'test' provider when real providers are available.
      * Looks for the first active, selectable model with matching tag,
      * but only if the provider is actually available (API key configured).
      *
@@ -105,7 +98,6 @@ final readonly class ModelConfigService
      */
     private function findFallbackProvider(string $capability): string
     {
-        // Map capability to DB tag
         $tagMap = [
             'chat' => 'chat',
             'embedding' => 'vectorize',
@@ -119,30 +111,25 @@ final readonly class ModelConfigService
 
         $tag = $tagMap[$capability] ?? $capability;
 
-        // Get actually available providers (with API keys configured)
         $availableProviders = array_map(
             'strtolower',
             $this->providerRegistry->getAvailableProviders($capability, false)
         );
 
-        // If no real providers are available, fall back to test
         if (empty($availableProviders)) {
             return 'test';
         }
 
-        // Find first active model with this tag where provider is available
         $models = $this->modelRepository->findByTag($tag, true);
 
         foreach ($models as $model) {
             $provider = strtolower($model->getService());
 
-            // Only return providers that are actually available
-            if ('test' !== $provider && in_array($provider, $availableProviders, true)) {
+            if (in_array($provider, $availableProviders, true)) {
                 return $provider;
             }
         }
 
-        // Last resort fallback
         return 'test';
     }
 
@@ -280,19 +267,11 @@ final readonly class ModelConfigService
     /**
      * Get default model ID for a specific capability.
      *
-     * Priority: APP_ENV=test → 900 (TestProvider) for all capabilities so CI/test stack use mocks by default.
-     * To use real AI in a test, change defaults via UI (AI Models config) or API (e.g. POST /api/v1/config/models/defaults, Swagger).
-     * Otherwise: User Config > Global Config > Fallback.
+     * Priority: User Config > Global Config > null.
+     * In test env, ConfigFixtures seeds global defaults pointing to TestProvider models.
      */
     public function getDefaultModel(string $capability, ?int $userId = null): ?int
     {
-        if ('test' === $this->getAppEnv()) {
-            return 900; // TestProvider (ModelFixtures) – all capabilities mocked in CI/test stack
-        }
-
-        // Normalize capability key
-        $configKey = 'DEFAULTMODEL/'.strtoupper($capability);
-
         // Try user-specific config first
         if ($userId) {
             $config = $this->configRepository->findOneBy([
@@ -462,10 +441,5 @@ final readonly class ModelConfigService
 
         // For web/other channels: always use user-specific models
         return $userId;
-    }
-
-    private function getAppEnv(): string
-    {
-        return $this->appEnv;
     }
 }

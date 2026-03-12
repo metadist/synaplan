@@ -14,27 +14,19 @@ class ConfigFixtures extends Fixture implements DependentFixtureInterface
 {
     public function load(ObjectManager $manager): void
     {
-        // Use TestProvider (model 900) in test env so tests don't call real APIs; Groq elsewhere.
-        $isTest = 'test' === (getenv('APP_ENV') ?: '');
-        $chatModel = $isTest ? '900' : '76';   // Groq gpt-oss-120b
-        $sortModel = $isTest ? '900' : '9';    // Groq Llama 3.3 70b
-        $defaultProvider = $isTest ? 'test' : 'groq';
-
         $configs = [
-            // DEFAULTMODEL: value = BMODELS BID. TestProvider (900) in test, Groq in dev/prod.
-            ['ownerId' => 0, 'group' => 'DEFAULTMODEL', 'setting' => 'CHAT', 'value' => $chatModel],
-            ['ownerId' => 0, 'group' => 'DEFAULTMODEL', 'setting' => 'TOOLS', 'value' => $chatModel],
-            ['ownerId' => 0, 'group' => 'DEFAULTMODEL', 'setting' => 'SORT', 'value' => $sortModel],
-            ['ownerId' => 0, 'group' => 'DEFAULTMODEL', 'setting' => 'SUMMARIZE', 'value' => $sortModel],
-            ['ownerId' => 0, 'group' => 'DEFAULTMODEL', 'setting' => 'TEXT2PIC', 'value' => '151'],  // gpt-image-1.5
-            ['ownerId' => 0, 'group' => 'DEFAULTMODEL', 'setting' => 'TEXT2VID', 'value' => '45'],   // Veo 3.1
-            ['ownerId' => 0, 'group' => 'DEFAULTMODEL', 'setting' => 'TEXT2SOUND', 'value' => '140'], // Piper (free)
-            ['ownerId' => 0, 'group' => 'DEFAULTMODEL', 'setting' => 'PIC2TEXT', 'value' => '17'],   // Groq Llama 4 Scout
-            ['ownerId' => 0, 'group' => 'DEFAULTMODEL', 'setting' => 'SOUND2TEXT', 'value' => '21'], // Groq whisper-large-v3
-            ['ownerId' => 0, 'group' => 'DEFAULTMODEL', 'setting' => 'VECTORIZE', 'value' => '13'],  // Ollama bge-m3
+            ['ownerId' => 0, 'group' => 'DEFAULTMODEL', 'setting' => 'CHAT',       'value' => '76'],   // Groq gpt-oss-120b
+            ['ownerId' => 0, 'group' => 'DEFAULTMODEL', 'setting' => 'TOOLS',      'value' => '76'],
+            ['ownerId' => 0, 'group' => 'DEFAULTMODEL', 'setting' => 'SORT',       'value' => '9'],    // Groq Llama 3.3 70b
+            ['ownerId' => 0, 'group' => 'DEFAULTMODEL', 'setting' => 'SUMMARIZE',  'value' => '9'],
+            ['ownerId' => 0, 'group' => 'DEFAULTMODEL', 'setting' => 'TEXT2PIC',   'value' => '151'],  // gpt-image-1.5
+            ['ownerId' => 0, 'group' => 'DEFAULTMODEL', 'setting' => 'TEXT2VID',   'value' => '45'],   // Veo 3.1
+            ['ownerId' => 0, 'group' => 'DEFAULTMODEL', 'setting' => 'TEXT2SOUND', 'value' => '140'],  // Piper (free)
+            ['ownerId' => 0, 'group' => 'DEFAULTMODEL', 'setting' => 'PIC2TEXT',   'value' => '17'],   // Groq Llama 4 Scout
+            ['ownerId' => 0, 'group' => 'DEFAULTMODEL', 'setting' => 'SOUND2TEXT', 'value' => '21'],   // Groq whisper-large-v3
+            ['ownerId' => 0, 'group' => 'DEFAULTMODEL', 'setting' => 'VECTORIZE',  'value' => '13'],   // Ollama bge-m3
 
-            // AI Provider Config
-            ['ownerId' => 0, 'group' => 'ai', 'setting' => 'default_chat_provider', 'value' => $defaultProvider],
+            ['ownerId' => 0, 'group' => 'ai', 'setting' => 'default_chat_provider', 'value' => 'groq'],
 
             // Example Widget Config (for user 2)
             ['ownerId' => 2, 'group' => 'widget_1', 'setting' => 'color', 'value' => '#007bff'],
