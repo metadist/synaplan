@@ -82,10 +82,8 @@ final readonly class WidgetExportService
             'Last Activity',
             'Message Count',
             'Mode',
-            'Channel',
             'Timestamp',
             'Sender',
-            'Language',
             'Message',
         ];
         foreach ($customFields as $field) {
@@ -113,10 +111,8 @@ final readonly class WidgetExportService
                     date('Y-m-d H:i:s', $session->getLastMessage()),
                     $messageCount,
                     $session->getMode(),
-                    'Chat Widget',
                     date('Y-m-d H:i:s', $message['timestamp']),
                     $message['sender'],
-                    $message['language'],
                     $message['text'],
                 ];
                 foreach ($customFields as $field) {
@@ -204,7 +200,6 @@ final readonly class WidgetExportService
 
             $sessionData = [
                 'session_id' => $session->getSessionId(),
-                'channel' => 'Chat Widget',
                 'created' => date('c', $session->getCreated()),
                 'last_activity' => date('c', $session->getLastMessage()),
                 'message_count' => $messageCount,
@@ -215,7 +210,6 @@ final readonly class WidgetExportService
                     'text' => $m['text'],
                     'timestamp' => date('c', $m['timestamp']),
                     'sender' => $m['sender'],
-                    'language' => $m['language'],
                     'files' => array_map(fn ($f) => [
                         ...$f,
                         'download_url' => $baseUrl.$f['download_url'],
@@ -308,7 +302,7 @@ final readonly class WidgetExportService
         $customFields = $widget->getConfig()['customFields'] ?? [];
 
         // Header
-        $headers = ['Session', 'Channel', 'Time', 'From', 'Language', 'Message'];
+        $headers = ['Session', 'Time', 'From', 'Message'];
         foreach ($customFields as $field) {
             $headers[] = $field['name'];
         }
@@ -323,7 +317,7 @@ final readonly class WidgetExportService
             ++$col;
         }
 
-        $lastCol = chr(ord('F') + count($customFields));
+        $lastCol = chr(ord('D') + count($customFields));
 
         // Get sessions and messages
         $result = $this->sessionRepository->findSessionsByWidget($widget->getWidgetId(), 500, 0, $filters);
@@ -348,15 +342,12 @@ final readonly class WidgetExportService
                 }
 
                 $sheet->setCellValue('A'.$row, '#'.$sessionNum);
-                $sheet->setCellValue('B'.$row, 'Chat Widget');
-                $sheet->setCellValue('C'.$row, date('H:i:s', $message['timestamp']));
-                $sheet->setCellValue('D'.$row, $message['sender']);
-                $sheet->setCellValue('E'.$row, $message['language']);
-                $sheet->setCellValue('F'.$row, $message['text']);
+                $sheet->setCellValue('B'.$row, date('H:i:s', $message['timestamp']));
+                $sheet->setCellValue('C'.$row, $message['sender']);
+                $sheet->setCellValue('D'.$row, $message['text']);
 
-                // Show custom field values on every message row
                 if (!empty($customFields)) {
-                    $cfCol = chr(ord('F') + 1);
+                    $cfCol = chr(ord('D') + 1);
                     foreach ($customFields as $field) {
                         $val = $cfValues[$field['id']] ?? ('boolean' === $field['type'] ? false : '');
                         $displayVal = is_bool($val) ? ($val ? 'Yes' : 'No') : $this->sanitizeCellValue((string) $val);
@@ -379,26 +370,23 @@ final readonly class WidgetExportService
 
         // Auto-size columns
         $sheet->getColumnDimension('A')->setWidth(10);
-        $sheet->getColumnDimension('B')->setWidth(14);
-        $sheet->getColumnDimension('C')->setWidth(12);
-        $sheet->getColumnDimension('D')->setWidth(12);
-        $sheet->getColumnDimension('E')->setWidth(10);
-        $sheet->getColumnDimension('F')->setWidth(80);
-        // Auto-size custom field columns
-        $cfCol = chr(ord('F') + 1);
+        $sheet->getColumnDimension('B')->setWidth(12);
+        $sheet->getColumnDimension('C')->setWidth(14);
+        $sheet->getColumnDimension('D')->setWidth(80);
+        $cfCol = chr(ord('D') + 1);
         foreach ($customFields as $field) {
             $sheet->getColumnDimension($cfCol)->setAutoSize(true);
             ++$cfCol;
         }
 
         // Wrap text in message column
-        $sheet->getStyle('F:F')->getAlignment()->setWrapText(true);
+        $sheet->getStyle('D:D')->getAlignment()->setWrapText(true);
     }
 
     private function createSessionsSheet($sheet, Widget $widget, array $filters): void
     {
         // Header
-        $headers = ['Session ID', 'Channel', 'Created', 'Last Activity', 'Messages', 'Files', 'Mode', 'Duration'];
+        $headers = ['Session ID', 'Created', 'Last Activity', 'Messages', 'Files', 'Mode', 'Duration'];
 
         $col = 'A';
         foreach ($headers as $header) {
@@ -422,19 +410,18 @@ final readonly class WidgetExportService
             $fileCount = $this->countFilesInMessages($messages);
 
             $sheet->setCellValue('A'.$row, substr($session->getSessionId(), 0, 12).'...');
-            $sheet->setCellValue('B'.$row, 'Chat Widget');
-            $sheet->setCellValue('C'.$row, date('Y-m-d H:i', $session->getCreated()));
-            $sheet->setCellValue('D'.$row, date('Y-m-d H:i', $session->getLastMessage()));
-            $sheet->setCellValue('E'.$row, $messageCount);
-            $sheet->setCellValue('F'.$row, $fileCount);
-            $sheet->setCellValue('G'.$row, ucfirst($session->getMode()));
-            $sheet->setCellValue('H'.$row, $durationStr);
+            $sheet->setCellValue('B'.$row, date('Y-m-d H:i', $session->getCreated()));
+            $sheet->setCellValue('C'.$row, date('Y-m-d H:i', $session->getLastMessage()));
+            $sheet->setCellValue('D'.$row, $messageCount);
+            $sheet->setCellValue('E'.$row, $fileCount);
+            $sheet->setCellValue('F'.$row, ucfirst($session->getMode()));
+            $sheet->setCellValue('G'.$row, $durationStr);
 
             ++$row;
         }
 
         // Auto-size columns
-        foreach (range('A', 'H') as $col) {
+        foreach (range('A', 'G') as $col) {
             $sheet->getColumnDimension($col)->setAutoSize(true);
         }
     }
