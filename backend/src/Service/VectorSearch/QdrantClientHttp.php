@@ -221,6 +221,7 @@ final readonly class QdrantClientHttp implements QdrantClientInterface
         try {
             $response = $this->httpClient->request('DELETE', "{$this->baseUrl}/memories/user/{$userId}", [
                 'headers' => $this->getHeaders(),
+                'timeout' => 10,
             ]);
 
             if (200 !== $response->getStatusCode()) {

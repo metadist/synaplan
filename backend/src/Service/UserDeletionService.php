@@ -78,7 +78,6 @@ final readonly class UserDeletionService
             $this->deleteApiKeys($userId);
             $this->deleteSessions($userId);
             $this->deleteRagDocuments($userId);
-            $this->deleteMemories($userId);
             $this->deleteUseLogs($userId);
             $this->deleteWidgets($userId);
             $this->deleteChats($userId);
@@ -96,7 +95,8 @@ final readonly class UserDeletionService
 
             $this->em->getConnection()->commit();
 
-            // Cleanup empty user directories (best effort, outside transaction)
+            // Best-effort cleanup outside transaction (external services & filesystem)
+            $this->deleteMemories($userId);
             $this->cleanupUserDirectories($userId);
 
             $this->logger->info('User and all related data deleted successfully', [
@@ -144,7 +144,6 @@ final readonly class UserDeletionService
             $this->deleteApiKeys($userId);
             $this->deleteSessions($userId);
             $this->deleteRagDocuments($userId);
-            $this->deleteMemories($userId);
             $this->deleteUseLogs($userId);
             $this->deleteWidgets($userId);
             $this->deleteChats($userId);
@@ -159,7 +158,8 @@ final readonly class UserDeletionService
             $this->em->flush();
             $this->em->getConnection()->commit();
 
-            // Cleanup empty user directories (best effort, outside transaction)
+            // Best-effort cleanup outside transaction (external services & filesystem)
+            $this->deleteMemories($userId);
             $this->cleanupUserDirectories($userId);
 
             $this->logger->info('User data cleanup completed successfully', [

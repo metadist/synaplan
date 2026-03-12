@@ -153,7 +153,10 @@ final readonly class InternalEmailService
         ?string $originalRecipient = null,
         ?string $mediaType = null,
     ): void {
-        $smartAddress = $originalRecipient ?? $_ENV['SMART_EMAIL_ADDRESS'] ?? \App\Service\Email\SmartEmailHelper::getBaseAddress();
+        $fallbackAddress = $_ENV['SMART_EMAIL_ADDRESS'] ?? \App\Service\Email\SmartEmailHelper::getBaseAddress();
+        $smartAddress = ($originalRecipient && \App\Service\Email\SmartEmailHelper::isValidSmartAddress($originalRecipient))
+            ? $originalRecipient
+            : $fallbackAddress;
         $fromEmail = $smartAddress;
         $fromName = $_ENV['APP_SENDER_NAME'] ?? 'Synaplan AI';
         $replyToEmail = $smartAddress;
@@ -165,15 +168,9 @@ final readonly class InternalEmailService
         $parsedown->setSafeMode(true); // Prevent XSS
         $htmlBody = $parsedown->text($bodyText);
 
-        // Embed images inline in the HTML body so they appear directly in the email
+        // Embed images inline via CID for broad email client compatibility (Outlook, Gmail, etc.)
         if ('image' === $mediaType && $attachmentPath && file_exists($attachmentPath)) {
-            $mimeType = mime_content_type($attachmentPath) ?: 'image/png';
-            $imageData = base64_encode(file_get_contents($attachmentPath));
-            $htmlBody .= sprintf(
-                '<br><br><img src="data:%s;base64,%s" alt="Generated image" style="max-width: 100%%; border-radius: 8px;">',
-                htmlspecialchars($mimeType),
-                $imageData
-            );
+            $htmlBody .= '<br><br><img src="cid:generated-image" alt="Generated image" style="max-width: 100%; border-radius: 8px;">';
             $hasInlineImage = true;
         }
 
@@ -232,9 +229,12 @@ final readonly class InternalEmailService
             $email->getHeaders()->addTextHeader('References', $inReplyTo);
         }
 
-        // Attach media files (skip images that are already embedded inline)
-        if ($attachmentPath && file_exists($attachmentPath) && !$hasInlineImage) {
-            $email->attachFromPath($attachmentPath);
+        if ($attachmentPath && file_exists($attachmentPath)) {
+            if ($hasInlineImage) {
+                $email->embedFromPath($attachmentPath, 'generated-image');
+            } else {
+                $email->attachFromPath($attachmentPath);
+            }
         }
 
         try {
