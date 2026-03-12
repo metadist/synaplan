@@ -1581,7 +1581,25 @@
         }
       },
       "filesTitle": "Connected Files",
-      "expertPrompt": "Expert: Edit system prompt"
+      "expertPrompt": "Expert: Edit system prompt",
+      "aiPanel": {
+        "title": "AI Setup Assistant",
+        "subtitle": "I'll help you create Q&A for your widget",
+        "placeholder": "Describe your business...",
+        "restart": "Start over",
+        "error": "Something went wrong. Please try again."
+      },
+      "memorySuggestions": {
+        "title": "Import from your Memories",
+        "subtitle": "We found stored information that could help configure your widget. Select what you'd like to use.",
+        "selectAll": "Select all",
+        "deselectAll": "Deselect all",
+        "skip": "Skip",
+        "apply": "Apply {count} | Apply {count} | Apply {count}",
+        "reject": "Exclude this",
+        "undo": "Undo",
+        "appliedMessage": "Imported {count} memory | Imported {count} memories | Imported {count} memories"
+      }
     },
     "advancedConfig": {
       "title": "Advanced Configuration",

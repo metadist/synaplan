@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Service;
 
 use App\AI\Service\AiFacade;
+use App\DTO\UserMemoryDTO;
 use App\Entity\Prompt;
 use App\Entity\User;
 use App\Entity\Widget;
@@ -24,6 +25,7 @@ final readonly class WidgetSetupService
     public const SETUP_TOPIC_PREFIX = 'wsetup_';
     public const DEFAULT_SETUP_MODEL_ID = 73;
     private const START_MARKER = '__START_INTERVIEW__';
+    private const FLOW_BUILDER_START_MARKER = '__START_FLOW_BUILDER__';
 
     public function __construct(
         private EntityManagerInterface $em,
@@ -60,8 +62,12 @@ final readonly class WidgetSetupService
      *
      * @return array{text: string, progress: int}
      */
-    public function sendSetupMessage(Widget $widget, User $user, string $text, array $history = [], string $language = 'en'): array
+    public function sendSetupMessage(Widget $widget, User $user, string $text, array $history = [], string $language = 'en', string $mode = 'interview'): array
     {
+        if ('flow-builder' === $mode) {
+            return $this->sendFlowBuilderMessage($widget, $user, $text, $history, $language);
+        }
+
         $setupConfig = $this->resolveSetupConfig($widget);
         $systemPrompt = $setupConfig['prompt'];
         $modelId = $setupConfig['modelId'];
@@ -141,6 +147,183 @@ final readonly class WidgetSetupService
             'text' => $aiResponse,
             'progress' => $progress,
         ];
+    }
+
+    /**
+     * Handle messages in flow-builder mode — generates Q&A pairs for the widget flow.
+     *
+     * @param array<array{role: string, content: string}> $history
+     *
+     * @return array{text: string, progress: int}
+     */
+    private function sendFlowBuilderMessage(Widget $widget, User $user, string $text, array $history, string $language): array
+    {
+        $systemPrompt = self::getFlowBuilderPromptText();
+        $modelId = self::DEFAULT_SETUP_MODEL_ID;
+
+        $provider = $this->modelConfigService->getProviderForModel($modelId);
+        $modelName = $this->modelConfigService->getModelName($modelId);
+
+        if (!$provider || !$modelName) {
+            $fallbackId = $this->modelConfigService->getDefaultModel('CHAT', $user->getId());
+            if ($fallbackId && $fallbackId > 0) {
+                $provider = $this->modelConfigService->getProviderForModel($fallbackId);
+                $modelName = $this->modelConfigService->getModelName($fallbackId);
+            }
+        }
+
+        $languageNames = [
+            'en' => 'English', 'de' => 'German', 'fr' => 'French',
+            'es' => 'Spanish', 'it' => 'Italian', 'pt' => 'Portuguese',
+            'nl' => 'Dutch', 'pl' => 'Polish', 'ru' => 'Russian',
+            'ja' => 'Japanese', 'zh' => 'Chinese', 'ko' => 'Korean',
+        ];
+        $languageName = $languageNames[$language] ?? 'English';
+        $languageInstruction = "**CRITICAL LANGUAGE RULE**: You MUST detect the language the user writes in and ALWAYS respond in that same language. The application language is {$languageName}, so start in {$languageName}. This rule overrides everything else.\n\n";
+        $fullPrompt = $languageInstruction.$systemPrompt;
+
+        $messages = [['role' => 'system', 'content' => $fullPrompt]];
+        foreach ($history as $msg) {
+            $messages[] = ['role' => $msg['role'], 'content' => $msg['content']];
+        }
+
+        $isStart = self::FLOW_BUILDER_START_MARKER === trim($text);
+        if (!$isStart) {
+            $messages[] = ['role' => 'user', 'content' => $text];
+        }
+
+        $aiOptions = ['temperature' => 0.7];
+        if ($provider) {
+            $aiOptions['provider'] = $provider;
+        }
+        if ($modelName) {
+            $aiOptions['model'] = $modelName;
+        }
+
+        $response = $this->aiFacade->chat($messages, $user->getId(), $aiOptions);
+        $aiResponse = $response['content'] ?? '';
+
+        $this->logger->info('Widget flow-builder message processed', [
+            'widget_id' => $widget->getWidgetId(),
+            'history_length' => \count($history),
+        ]);
+
+        return [
+            'text' => $aiResponse,
+            'progress' => 0,
+        ];
+    }
+
+    /**
+     * Evaluate user memories and suggest which ones are relevant for a chat widget.
+     *
+     * @param UserMemoryDTO[] $memories
+     *
+     * @return array<array{id: int, category: string, key: string, value: string, widgetField: string, responseType: string, meta: array<string, string>}>
+     */
+    public function suggestMemoriesForWidget(User $user, array $memories): array
+    {
+        if ([] === $memories) {
+            return [];
+        }
+
+        $memoryLines = [];
+        foreach ($memories as $m) {
+            $memoryLines[] = sprintf('[%d] %s | %s | %s', $m->id, $m->category, $m->key, $m->value);
+        }
+
+        $systemPrompt = <<<'PROMPT'
+You are a memory analyzer. Given a list of user memories, decide which ones are useful for configuring a chat widget (Q&A knowledge base).
+
+Relevant memories include: business info, location, contact details, personal info, websites, social media, products, services, opening hours, descriptions — anything a website visitor might ask about.
+
+Irrelevant memories include: internal preferences, UI settings, coding habits, tool preferences, private personal data unrelated to business.
+
+For each relevant memory, output a JSON array entry with:
+- "id": the memory ID
+- "widgetField": a short trigger label (e.g. "Location", "Website", "About", "Contact", "Opening Hours")
+- "responseType": one of "text", "link", "list"
+- "meta": {} for text, {"url": "..."} for links (extract URL from value if present)
+
+Output ONLY a raw JSON array. No markdown, no explanation.
+Example: [{"id": 42, "widgetField": "Website", "responseType": "link", "meta": {"url": "https://example.com"}}, {"id": 7, "widgetField": "Location", "responseType": "text", "meta": {}}]
+
+If no memories are relevant, output: []
+PROMPT;
+
+        $userMessage = "User memories:\n".implode("\n", $memoryLines);
+
+        $modelId = self::DEFAULT_SETUP_MODEL_ID;
+        $provider = $this->modelConfigService->getProviderForModel($modelId);
+        $modelName = $this->modelConfigService->getModelName($modelId);
+
+        if (!$provider || !$modelName) {
+            $fallbackId = $this->modelConfigService->getDefaultModel('CHAT', $user->getId());
+            if ($fallbackId && $fallbackId > 0) {
+                $provider = $this->modelConfigService->getProviderForModel($fallbackId);
+                $modelName = $this->modelConfigService->getModelName($fallbackId);
+            }
+        }
+
+        $aiOptions = ['temperature' => 0.1];
+        if ($provider) {
+            $aiOptions['provider'] = $provider;
+        }
+        if ($modelName) {
+            $aiOptions['model'] = $modelName;
+        }
+
+        try {
+            $response = $this->aiFacade->chat([
+                ['role' => 'system', 'content' => $systemPrompt],
+                ['role' => 'user', 'content' => $userMessage],
+            ], $user->getId(), $aiOptions);
+
+            $content = trim($response['content'] ?? '');
+            if (preg_match('/\[.*\]/s', $content, $matches)) {
+                $content = $matches[0];
+            }
+
+            $suggestions = json_decode($content, true);
+            if (!\is_array($suggestions)) {
+                return [];
+            }
+
+            $memoryMap = [];
+            foreach ($memories as $m) {
+                $memoryMap[$m->id] = $m;
+            }
+
+            $result = [];
+            /** @var mixed $s */
+            foreach ($suggestions as $s) {
+                if (!\is_array($s)) {
+                    continue;
+                }
+                $id = (int) ($s['id'] ?? 0);
+                if (!isset($memoryMap[$id])) {
+                    continue;
+                }
+                $m = $memoryMap[$id];
+                $result[] = [
+                    'id' => $m->id,
+                    'category' => $m->category,
+                    'key' => $m->key,
+                    'value' => $m->value,
+                    'widgetField' => (string) ($s['widgetField'] ?? $m->key),
+                    'responseType' => (string) ($s['responseType'] ?? 'text'),
+                    'meta' => \is_array($s['meta'] ?? null) ? $s['meta'] : [],
+                ];
+            }
+
+            return $result;
+        } catch (\Exception $e) {
+            $this->logger->warning('Memory suggestion for widget failed', [
+                'error' => $e->getMessage(),
+            ]);
+
+            return [];
+        }
     }
 
     /**
@@ -506,6 +689,128 @@ PROMPT;
         ]);
 
         return ['prompt' => self::getDefaultPromptText(), 'modelId' => $modelId];
+    }
+
+    /**
+     * Return the flow-builder system prompt that generates structured Q&A pairs.
+     */
+    public static function getFlowBuilderPromptText(): string
+    {
+        return <<<'PROMPT'
+# Widget Q&A Flow Builder
+
+You are a widget configurator. Your job is to help the user build a set of Questions (triggers) and Answers (responses) for their chat widget through a natural conversation.
+
+## YOUR APPROACH
+
+1. Start by asking what kind of business/website the widget is for
+2. After each user answer, IMMEDIATELY generate relevant Q&A pairs — NO EXCEPTIONS
+3. Ask follow-up questions to cover more areas (products, services, pricing, contact, support, etc.)
+4. Keep the conversation flowing naturally — be helpful, concise, and proactive
+
+## GENERATING Q&A PAIRS — MANDATORY!
+
+**CRITICAL: You MUST include a <<<FLOW_UPDATE>>> block in EVERY response after the very first greeting.**
+**If the user shares ANY information — a URL, a name, a fact, a preference — you MUST create Q&A pairs from it.**
+**NEVER just acknowledge information without creating Q&A pairs. NEVER say "I'll remember that" without a FLOW_UPDATE block.**
+
+Generate Q&A pairs using this EXACT format:
+
+<<<FLOW_UPDATE>>>
+{
+  "widgetName": "Mario's Pizza",
+  "triggers": [
+    {"id": "t-1", "label": "Opening Hours"},
+    {"id": "t-2", "label": "About Us"}
+  ],
+  "responses": [
+    {"id": "r-1", "type": "text", "label": "Opening Hours: Mon-Fri 9am-5pm, Sat 10am-2pm"},
+    {"id": "r-2", "type": "link", "label": "About Us", "meta": {"url": "https://marios-pizza.com/about"}}
+  ],
+  "connections": [
+    {"from": "t-1", "to": "r-1"},
+    {"from": "t-2", "to": "r-2"}
+  ]
+}
+<<<END_FLOW_UPDATE>>>
+
+## RESPONSE TYPES
+
+Each response MUST have a "type" field. Choose the correct type:
+
+- **"link"** — When the answer is best served by a URL/webpage. Use for: "about us" pages, social media, external resources, personal websites, product pages. Include "meta": {"url": "https://..."}.
+- **"text"** — When the answer is a direct text explanation. Use for: opening hours, descriptions, policies, FAQs. The label contains the full answer.
+- **"api"** — When the answer comes from a live API endpoint. Include "meta": {"url": "https://api...", "method": "GET"}.
+- **"list"** — When the answer is a list of items (products, services, team members). Label contains semicolon-separated items.
+- **"custom"** — For anything that doesn't fit the above.
+
+IMPORTANT: When the user mentions a website, URL, or link — ALWAYS use type "link" with the URL in meta, NOT type "text"!
+
+## CRITICAL RULES FOR IDs
+
+- Use incrementing IDs across the ENTIRE conversation: t-1, t-2, t-3... and r-1, r-2, r-3...
+- NEVER reuse an ID from a previous message
+- Keep track of the highest ID you've used and continue from there
+- Each trigger should connect to exactly one response
+
+## WIDGET NAME
+
+- Include "widgetName" in your FIRST flow update only (when you learn the business name)
+- Use the actual business name (e.g. "Mario's Pizza", "TechStore Berlin")
+- Omit "widgetName" in subsequent updates
+
+## LABEL FORMAT
+
+- Trigger labels should be SHORT category names (e.g. "Opening Hours", "Location", "Pricing", "About Us")
+- For type "text": Label = "Category: details" (e.g. "Opening Hours: Mon-Fri 9-17, Sat 10-14")
+- For type "link": Label = short description (e.g. "About Us"), the URL goes in meta.url
+- For type "list": Label = "Category: item1; item2; item3"
+
+## EXAMPLES
+
+User: "Infos über mich findest du auf https://yusufsenel.de"
+You MUST generate:
+<<<FLOW_UPDATE>>>
+{"triggers": [{"id": "t-X", "label": "About"}], "responses": [{"id": "r-X", "type": "link", "label": "About", "meta": {"url": "https://yusufsenel.de"}}], "connections": [{"from": "t-X", "to": "r-X"}]}
+<<<END_FLOW_UPDATE>>>
+
+User: "Wir haben Mo-Fr 9-17 Uhr offen"
+You MUST generate:
+<<<FLOW_UPDATE>>>
+{"triggers": [{"id": "t-X", "label": "Opening Hours"}], "responses": [{"id": "r-X", "type": "text", "label": "Opening Hours: Mon-Fri 9am-5pm"}], "connections": [{"from": "t-X", "to": "r-X"}]}
+<<<END_FLOW_UPDATE>>>
+
+User: "Our products are on https://shop.example.com"
+You MUST generate a "link" type response pointing to that URL.
+
+## YOUR STYLE
+
+- Be casual, friendly, and efficient
+- After generating Q&A pairs, briefly explain what you created
+- Then ask about the NEXT topic area to cover
+- Keep responses concise — the Q&A pairs speak for themselves
+- Suggest areas the user might not have thought of
+
+## TOPIC AREAS TO COVER
+
+Work through these systematically, one at a time:
+1. Business basics (what they do, type of business)
+2. Location & contact (address, phone, email, opening hours)
+3. Products & services (what they offer, pricing)
+4. Support & FAQ (common questions, troubleshooting)
+5. Policies (shipping, returns, payment methods)
+6. Special features (appointments, reservations, etc.)
+
+Don't ask about ALL of these — adapt based on the business type.
+
+## START
+
+When the conversation begins, greet the user warmly and ask what kind of business or website the widget is for. Don't generate any Q&A pairs yet — wait for the first real answer.
+
+## REMINDER
+
+After the first greeting, EVERY single response you give MUST contain a <<<FLOW_UPDATE>>> block. No exceptions. Even if the user gives partial info, create what you can and ask for more.
+PROMPT;
     }
 
     /**

@@ -458,7 +458,8 @@ export async function sendSetupMessage(
   widgetId: string,
   text: string,
   history: SetupMessage[],
-  language?: string
+  language?: string,
+  mode?: 'interview' | 'flow-builder'
 ): Promise<{
   success: boolean
   text: string
@@ -470,7 +471,7 @@ export async function sendSetupMessage(
     progress: number
   }>(`/api/v1/widgets/${widgetId}/setup-chat`, {
     method: 'POST',
-    body: JSON.stringify({ text, history, language }),
+    body: JSON.stringify({ text, history, language, mode }),
   })
   return data
 }
@@ -601,4 +602,22 @@ export async function resetSetupPrompt(widgetId: string): Promise<{ success: boo
   return await httpClient<{ success: boolean }>(`/api/v1/widgets/${widgetId}/setup/prompt`, {
     method: 'DELETE',
   })
+}
+
+export interface MemorySuggestion {
+  id: number
+  category: string
+  key: string
+  value: string
+  widgetField: string
+  responseType: 'text' | 'link' | 'list' | 'api' | 'custom'
+  meta: Record<string, string>
+}
+
+export async function suggestMemories(widgetId: string): Promise<MemorySuggestion[]> {
+  const res = await httpClient<{ suggestions: MemorySuggestion[] }>(
+    `/api/v1/widgets/${widgetId}/suggest-memories`,
+    { method: 'POST' }
+  )
+  return res.suggestions
 }

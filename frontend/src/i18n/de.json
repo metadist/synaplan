@@ -1598,7 +1598,25 @@
         }
       },
       "filesTitle": "Verbundene Dateien",
-      "expertPrompt": "Experte: System-Prompt bearbeiten"
+      "expertPrompt": "Experte: System-Prompt bearbeiten",
+      "aiPanel": {
+        "title": "KI-Einrichtungsassistent",
+        "subtitle": "Ich helfe dir, Q&A für dein Widget zu erstellen",
+        "placeholder": "Beschreibe dein Unternehmen...",
+        "restart": "Neu starten",
+        "error": "Etwas ist schiefgelaufen. Bitte versuche es erneut."
+      },
+      "memorySuggestions": {
+        "title": "Aus deinen Erinnerungen importieren",
+        "subtitle": "Wir haben gespeicherte Informationen gefunden, die bei der Konfiguration deines Widgets helfen könnten. Wähle aus, was du verwenden möchtest.",
+        "selectAll": "Alle auswählen",
+        "deselectAll": "Alle abwählen",
+        "skip": "Überspringen",
+        "apply": "{count} übernehmen | {count} übernehmen | {count} übernehmen",
+        "reject": "Ausschließen",
+        "undo": "Rückgängig",
+        "appliedMessage": "{count} Erinnerung importiert | {count} Erinnerungen importiert | {count} Erinnerungen importiert"
+      }
     },
     "advancedConfig": {
       "title": "Erweiterte Konfiguration",

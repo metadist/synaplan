@@ -8,6 +8,7 @@ use App\Entity\Widget;
 use App\Repository\PromptRepository;
 use App\Repository\WidgetRepository;
 use App\Service\File\UserUploadPathBuilder;
+use App\Service\UserMemoryService;
 use App\Service\WidgetService;
 use App\Service\WidgetSessionService;
 use App\Service\WidgetSetupService;
@@ -34,6 +35,7 @@ class WidgetController extends AbstractController
         private WidgetService $widgetService,
         private WidgetSessionService $sessionService,
         private WidgetSetupService $setupService,
+        private UserMemoryService $memoryService,
         private WidgetRepository $widgetRepository,
         private PromptRepository $promptRepository,
         private UserUploadPathBuilder $userUploadPathBuilder,
@@ -582,6 +584,7 @@ class WidgetController extends AbstractController
                     )
                 ),
                 new OA\Property(property: 'language', type: 'string', description: 'Language code (en, de, etc.)'),
+                new OA\Property(property: 'mode', type: 'string', enum: ['interview', 'flow-builder'], description: 'Setup mode: interview (default) or flow-builder for Q&A generation'),
             ]
         )
     )]
@@ -624,7 +627,8 @@ class WidgetController extends AbstractController
                 $user,
                 $data['text'],
                 $data['history'] ?? [],
-                $data['language'] ?? 'en'
+                $data['language'] ?? 'en',
+                $data['mode'] ?? 'interview'
             );
 
             return $this->json([
@@ -642,6 +646,70 @@ class WidgetController extends AbstractController
                 'error' => 'Failed to process message',
             ], Response::HTTP_INTERNAL_SERVER_ERROR);
         }
+    }
+
+    /**
+     * Suggest user memories relevant for widget configuration.
+     */
+    #[Route('/{widgetId}/suggest-memories', name: 'suggest_memories', methods: ['POST'])]
+    #[OA\Post(
+        path: '/api/v1/widgets/{widgetId}/suggest-memories',
+        summary: 'Suggest relevant user memories for widget Q&A setup',
+        security: [['Bearer' => []]],
+        tags: ['Widgets']
+    )]
+    #[OA\Parameter(
+        name: 'widgetId',
+        in: 'path',
+        required: true,
+        schema: new OA\Schema(type: 'string')
+    )]
+    #[OA\Response(
+        response: 200,
+        description: 'Suggested memories',
+        content: new OA\JsonContent(
+            properties: [
+                new OA\Property(
+                    property: 'suggestions',
+                    type: 'array',
+                    items: new OA\Items(properties: [
+                        new OA\Property(property: 'id', type: 'integer'),
+                        new OA\Property(property: 'category', type: 'string'),
+                        new OA\Property(property: 'key', type: 'string'),
+                        new OA\Property(property: 'value', type: 'string'),
+                        new OA\Property(property: 'widgetField', type: 'string'),
+                        new OA\Property(property: 'responseType', type: 'string'),
+                        new OA\Property(property: 'meta', type: 'object'),
+                    ])
+                ),
+            ]
+        )
+    )]
+    public function suggestMemories(
+        string $widgetId,
+        #[CurrentUser] User $user,
+    ): JsonResponse {
+        $widget = $this->widgetRepository->findOneBy(['widgetId' => $widgetId]);
+        if (!$widget) {
+            return $this->json(['error' => 'Widget not found'], Response::HTTP_NOT_FOUND);
+        }
+
+        if ($widget->getOwnerId() !== $user->getId()) {
+            return $this->json(['error' => 'Access denied'], Response::HTTP_FORBIDDEN);
+        }
+
+        if (!$this->memoryService->isAvailable()) {
+            return $this->json(['suggestions' => []]);
+        }
+
+        $memories = $this->memoryService->getUserMemories($user->getId());
+        if ([] === $memories) {
+            return $this->json(['suggestions' => []]);
+        }
+
+        $suggestions = $this->setupService->suggestMemoriesForWidget($user, $memories);
+
+        return $this->json(['suggestions' => $suggestions]);
     }
 
     /**

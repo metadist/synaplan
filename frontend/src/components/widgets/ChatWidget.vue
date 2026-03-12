@@ -170,6 +170,7 @@
             v-for="message in sortedMessages"
             :key="message.id"
             :class="['flex', message.role === 'user' ? 'justify-end' : 'justify-start']"
+            :data-testid="'message-' + message.role"
           >
             <div
               :class="['max-w-[80%] rounded-2xl px-4 py-2', message.role === 'user' ? '' : '']"

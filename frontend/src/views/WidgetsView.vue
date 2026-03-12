@@ -566,13 +566,6 @@ const handleAdvancedSaved = async () => {
 }
 
 /**
- * View widget details
- */
-const viewWidget = (widget: widgetsApi.Widget) => {
-  router.push({ name: 'widget-detail', params: { widgetId: widget.widgetId } })
-}
-
-/**
  * Open test chat
  */
 const openTestChat = (widget: widgetsApi.Widget) => {
