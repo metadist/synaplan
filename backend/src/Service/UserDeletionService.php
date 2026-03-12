@@ -48,6 +48,7 @@ final readonly class UserDeletionService
         private WidgetSessionRepository $widgetSessionRepository,
         private FileStorageService $fileStorageService,
         private VectorStorageFacade $vectorStorageFacade,
+        private UserMemoryService $userMemoryService,
         private LoggerInterface $logger,
     ) {
     }
@@ -77,6 +78,7 @@ final readonly class UserDeletionService
             $this->deleteApiKeys($userId);
             $this->deleteSessions($userId);
             $this->deleteRagDocuments($userId);
+            $this->deleteMemories($userId);
             $this->deleteUseLogs($userId);
             $this->deleteWidgets($userId);
             $this->deleteChats($userId);
@@ -142,6 +144,7 @@ final readonly class UserDeletionService
             $this->deleteApiKeys($userId);
             $this->deleteSessions($userId);
             $this->deleteRagDocuments($userId);
+            $this->deleteMemories($userId);
             $this->deleteUseLogs($userId);
             $this->deleteWidgets($userId);
             $this->deleteChats($userId);
@@ -221,6 +224,11 @@ final readonly class UserDeletionService
     {
         // Delete all RAG documents via facade
         $this->vectorStorageFacade->deleteAllForUser($userId);
+    }
+
+    private function deleteMemories(int $userId): void
+    {
+        $this->userMemoryService->deleteAllForUser($userId);
     }
 
     private function deleteUseLogs(int $userId): void
