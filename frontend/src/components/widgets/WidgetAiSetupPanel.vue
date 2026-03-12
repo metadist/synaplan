@@ -332,10 +332,11 @@ async function fetchMemorySuggestions() {
       memorySuggestions.value = suggestions
       showMemoryModal.value = true
       memoryModalShown.value = true
+      saveToSession()
       nextTick(() => memoryModalRef.value?.initSelection(suggestions))
     }
-  } catch {
-    /* memories unavailable — silently skip */
+  } catch (err) {
+    console.warn('[WidgetAiSetup] Memory suggestions unavailable:', err)
   }
 }
 
@@ -480,6 +481,9 @@ async function send() {
 async function startChat() {
   if (restoreFromSession()) {
     scrollToBottom()
+    if (!memoryModalShown.value) {
+      fetchMemorySuggestions()
+    }
     return
   }
 
@@ -527,6 +531,8 @@ function restartChat() {
   messages.value = []
   conversationHistory.value = []
   hasEmittedFirstFlow.value = false
+  memoryModalShown.value = false
+  showMemoryModal.value = false
   clearSession()
   startChat()
 }
