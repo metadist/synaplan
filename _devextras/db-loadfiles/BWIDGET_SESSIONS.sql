@@ -33,10 +33,19 @@ CREATE TABLE `BWIDGET_SESSIONS` (
   `BCHATID` bigint(20) DEFAULT NULL,
   `BCREATED` bigint(20) NOT NULL,
   `BEXPIRES` bigint(20) NOT NULL,
+  `BMODE` varchar(16) DEFAULT 'ai',
+  `BHUMAN_OPERATOR_ID` bigint(20) DEFAULT NULL,
+  `BLAST_HUMAN_ACTIVITY` bigint(20) DEFAULT NULL,
+  `BLAST_MESSAGE_PREVIEW` varchar(255) DEFAULT NULL,
+  `BIS_FAVORITE` tinyint(1) DEFAULT 0,
+  `BCOUNTRY` varchar(2) DEFAULT NULL,
+  `BTITLE` varchar(100) DEFAULT NULL,
+  `BCUSTOM_FIELD_VALUES` longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_bin DEFAULT NULL CHECK (json_valid(`BCUSTOM_FIELD_VALUES`)),
   PRIMARY KEY (`BID`),
   UNIQUE KEY `uk_widget_session` (`BWIDGETID`,`BSESSIONID`),
   KEY `idx_session_widget` (`BWIDGETID`),
-  KEY `idx_session_expires` (`BEXPIRES`)
+  KEY `idx_session_expires` (`BEXPIRES`),
+  KEY `idx_session_mode` (`BMODE`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 

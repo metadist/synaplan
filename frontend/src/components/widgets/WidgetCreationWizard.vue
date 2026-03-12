@@ -745,6 +745,7 @@ const formData = ref<WidgetFormData>({
     allowFileUpload: false,
     fileUploadLimit: 3,
     allowedDomains: [],
+    customFields: [],
   },
 })
 

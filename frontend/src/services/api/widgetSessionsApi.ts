@@ -235,6 +235,23 @@ export async function sendOperatorTyping(
   )
 }
 
+/**
+ * Save custom field values for a session
+ */
+export async function saveCustomFieldValues(
+  widgetId: string,
+  sessionId: string,
+  values: Record<string, string | boolean>
+): Promise<{ success: boolean; values: Record<string, string | boolean> }> {
+  return await httpClient<{ success: boolean; values: Record<string, string | boolean> }>(
+    `/api/v1/widgets/${widgetId}/sessions/${sessionId}/custom-fields`,
+    {
+      method: 'PUT',
+      body: JSON.stringify({ values }),
+    }
+  )
+}
+
 export interface ExportFormat {
   id: 'xlsx' | 'csv' | 'json'
   name: string

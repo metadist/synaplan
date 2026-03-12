@@ -184,10 +184,11 @@ class WidgetPublicController extends AbstractController
             return $domainError;
         }
 
-        // Validate test mode: only allow if authenticated user is widget owner
+        // Validate test mode or internal mode
         $isValidatedTestMode = $this->isValidatedTestMode($request, $widget->getOwnerId());
+        $isValidatedInternalMode = !$isValidatedTestMode && $this->isValidatedInternalMode($request, $widget->getOwnerId());
 
-        // Get or create session
+        // Get or create session (test mode adds test_ prefix, internal mode does not)
         $session = $this->sessionService->getOrCreateSession($widgetId, $data['sessionId'], $isValidatedTestMode);
 
         // Capture country from Cloudflare geolocation header on first message
@@ -758,10 +759,11 @@ class WidgetPublicController extends AbstractController
             ], Response::HTTP_FORBIDDEN);
         }
 
-        // Validate test mode: only allow if authenticated user is widget owner
+        // Validate test mode or internal mode
         $isValidatedTestMode = $this->isValidatedTestMode($request, $widget->getOwnerId());
+        $isValidatedInternalMode = !$isValidatedTestMode && $this->isValidatedInternalMode($request, $widget->getOwnerId());
 
-        // Get or create widget session
+        // Get or create widget session (test mode adds test_ prefix, internal mode does not)
         $widgetSession = $this->sessionService->getOrCreateSession($widgetId, $sessionId, $isValidatedTestMode);
 
         $owner = $widget->getOwner();
@@ -1245,17 +1247,20 @@ class WidgetPublicController extends AbstractController
 
     private function ensureDomainAllowed(array $config, Request $request, ?int $widgetOwnerId = null): ?JsonResponse
     {
-        // Check for test mode: if X-Widget-Test-Mode header is set
+        // Check for test mode or internal mode: if either header is set
         // and the authenticated user is the widget owner, skip domain check
-        if ('true' === $request->headers->get('X-Widget-Test-Mode') && $widgetOwnerId) {
+        $isTestOrInternal = 'true' === $request->headers->get('X-Widget-Test-Mode')
+            || 'true' === $request->headers->get('X-Widget-Internal-Mode');
+
+        if ($isTestOrInternal && $widgetOwnerId) {
             $user = $this->getUser();
             if ($user && method_exists($user, 'getId') && $user->getId() === $widgetOwnerId) {
-                $this->logger->info('Widget domain check bypassed for owner in test mode', [
+                $this->logger->info('Widget domain check bypassed for owner in test/internal mode', [
                     'user_id' => $user->getId(),
                     'widget_owner_id' => $widgetOwnerId,
                 ]);
 
-                return null; // Allow - owner is testing their own widget
+                return null;
             }
         }
 
@@ -1471,6 +1476,42 @@ class WidgetPublicController extends AbstractController
         }
 
         $this->logger->debug('Test mode validated for widget owner', [
+            'user_id' => $user->getId(),
+        ]);
+
+        return true;
+    }
+
+    /**
+     * Check if the request is a validated internal mode request.
+     *
+     * Internal mode is similar to test mode (bypasses domain checks)
+     * but creates normal sessions (no test_ prefix) that appear in the dashboard.
+     */
+    private function isValidatedInternalMode(Request $request, int $widgetOwnerId): bool
+    {
+        if ('true' !== $request->headers->get('X-Widget-Internal-Mode')) {
+            return false;
+        }
+
+        $user = $this->getUser();
+
+        if (!$user instanceof \App\Entity\User) {
+            $this->logger->debug('Internal mode rejected: no authenticated user');
+
+            return false;
+        }
+
+        if ($user->getId() !== $widgetOwnerId) {
+            $this->logger->debug('Internal mode rejected: user is not widget owner', [
+                'user_id' => $user->getId(),
+                'widget_owner_id' => $widgetOwnerId,
+            ]);
+
+            return false;
+        }
+
+        $this->logger->debug('Internal mode validated for widget owner', [
             'user_id' => $user->getId(),
         ]);
 

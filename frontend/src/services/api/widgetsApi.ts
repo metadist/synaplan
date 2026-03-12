@@ -22,6 +22,12 @@ export interface Widget {
   allowedDomains?: string[]
 }
 
+export interface CustomFieldDef {
+  id: string
+  name: string
+  type: 'text' | 'boolean'
+}
+
 export interface WidgetConfig {
   position?: 'bottom-left' | 'bottom-right' | 'top-left' | 'top-right'
   primaryColor?: string
@@ -34,8 +40,9 @@ export interface WidgetConfig {
   messageLimit?: number
   maxFileSize?: number
   allowedDomains?: string[]
-  allowFileUpload?: boolean // NEW: Enable/disable file upload
+  allowFileUpload?: boolean
   fileUploadLimit?: number
+  customFields?: CustomFieldDef[]
 }
 
 export interface CreateWidgetRequest {

@@ -1568,7 +1568,8 @@
         "behavior": "Verhalten",
         "security": "Sicherheit",
         "assistant": "KI-Assistent",
-        "aiPrompts": "KI-Prompts"
+        "aiPrompts": "KI-Prompts",
+        "customFields": "Benutzerdefinierte Felder"
       },
       "aiPrompts": {
         "modelLabel": "KI-Modell",
@@ -1684,7 +1685,30 @@
     "modeHuman": "Mensch",
     "modeWaiting": "Wartend",
     "getCode": "Code abrufen",
-    "testChat": "Chat testen",
+    "testChat": "Chat öffnen",
+    "overlay": {
+      "testWidget": "Test Widget",
+      "internalChat": "Interner Chat"
+    },
+    "customFields": {
+      "title": "Benutzerdefinierte Felder",
+      "description": "Definieren Sie zusätzliche Felder, die bei internen Chats ausgefüllt werden können. Diese Felder werden in Exporten berücksichtigt.",
+      "addField": "Feld hinzufügen",
+      "fieldName": "Feldname",
+      "fieldType": "Typ",
+      "typeText": "Text",
+      "typeBoolean": "Ja/Nein",
+      "save": "Speichern",
+      "saved": "Benutzerdefinierte Felder gespeichert",
+      "saveFailed": "Speichern der benutzerdefinierten Felder fehlgeschlagen",
+      "empty": "Noch keine benutzerdefinierten Felder definiert.",
+      "emptyHint": "Fügen Sie Felder hinzu, um zusätzliche Informationen bei internen Chats zu erfassen.",
+      "removeConfirm": "Dieses Feld entfernen?",
+      "maxFieldsReached": "Maximal 20 Felder erreicht",
+      "fieldNameRequired": "Feldname ist erforderlich",
+      "panelTitle": "Zusätzliche Informationen",
+      "noSession": "Starten Sie zuerst einen Chat, um benutzerdefinierte Felder auszufüllen."
+    },
     "edit": "Bearbeiten",
     "delete": "Löschen",
     "basicSettings": "Grundeinstellungen",

@@ -92,6 +92,13 @@ class WidgetSession
     #[ORM\Column(name: 'BTITLE', type: 'string', length: 100, nullable: true)]
     private ?string $title = null;
 
+    /**
+     * Admin-defined custom field values for internal chat sessions.
+     * Keys are field IDs (e.g. "cf_abc123"), values are strings or booleans.
+     */
+    #[ORM\Column(name: 'BCUSTOM_FIELD_VALUES', type: 'json', nullable: true)]
+    private ?array $customFieldValues = null;
+
     public function __construct()
     {
         $this->created = time();
@@ -430,6 +437,18 @@ class WidgetSession
     public function setTitle(?string $title): self
     {
         $this->title = null !== $title ? mb_substr($title, 0, 100) : null;
+
+        return $this;
+    }
+
+    public function getCustomFieldValues(): ?array
+    {
+        return $this->customFieldValues;
+    }
+
+    public function setCustomFieldValues(?array $customFieldValues): self
+    {
+        $this->customFieldValues = $customFieldValues;
 
         return $this;
     }
