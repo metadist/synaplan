@@ -791,6 +791,10 @@ class WidgetSessionController extends AbstractController
             return $this->json(['error' => 'Session not found'], Response::HTTP_NOT_FOUND);
         }
 
+        if (!$session->isInternalMode()) {
+            return $this->json(['error' => 'Custom fields can only be set on internal sessions'], Response::HTTP_BAD_REQUEST);
+        }
+
         try {
             $data = json_decode($request->getContent(), true);
 

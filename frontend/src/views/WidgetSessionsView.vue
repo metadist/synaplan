@@ -1667,31 +1667,37 @@ const widgetCustomFields = computed(
   () => (widget.value?.config?.customFields ?? []) as widgetsApi.CustomFieldDef[]
 )
 
+let cfWatchSuppressed = false
+
 const initInternalFieldValues = () => {
+  cfWatchSuppressed = true
   const v: Record<string, string | boolean> = {}
   const existing = selectedSession.value?.customFieldValues ?? {}
   for (const field of widgetCustomFields.value) {
     v[field.id] = existing[field.id] ?? (field.type === 'boolean' ? false : '')
   }
   internalFieldValues.value = v
+  nextTick(() => {
+    cfWatchSuppressed = false
+  })
 }
 
 let cfSaveTimer: ReturnType<typeof setTimeout> | null = null
 
 const debouncedSaveCustomFields = () => {
+  if (cfWatchSuppressed) return
   if (!selectedSession.value || selectedSession.value.mode !== 'internal') return
+
+  const targetSessionId = selectedSession.value.sessionId
+  const valuesToSave = { ...internalFieldValues.value }
+
   if (cfSaveTimer) clearTimeout(cfSaveTimer)
   cfSaveTimer = setTimeout(async () => {
-    if (!selectedSession.value) return
     savingCustomFields.value = true
     try {
-      await widgetSessionsApi.saveCustomFieldValues(
-        widgetId.value,
-        selectedSession.value.sessionId,
-        internalFieldValues.value
-      )
-      if (selectedSession.value) {
-        selectedSession.value.customFieldValues = { ...internalFieldValues.value }
+      await widgetSessionsApi.saveCustomFieldValues(widgetId.value, targetSessionId, valuesToSave)
+      if (selectedSession.value?.sessionId === targetSessionId) {
+        selectedSession.value.customFieldValues = { ...valuesToSave }
       }
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : t('widgets.customFields.saveFailed')
