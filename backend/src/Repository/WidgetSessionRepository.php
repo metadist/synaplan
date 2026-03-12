@@ -86,7 +86,7 @@ class WidgetSessionRepository extends ServiceEntityRepository
      * Count all sessions by mode for a widget.
      * Test sessions are excluded.
      *
-     * @return array{ai: int, human: int, waiting: int}
+     * @return array{ai: int, human: int, waiting: int, internal: int}
      */
     public function countSessionsByMode(string $widgetId): array
     {

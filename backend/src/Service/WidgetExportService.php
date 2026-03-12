@@ -175,7 +175,7 @@ final readonly class WidgetExportService
         $totalFiles = 0;
         $earliestCreated = null;
         $latestActivity = null;
-        $modeCounts = ['ai' => 0, 'human' => 0, 'waiting' => 0];
+        $modeCounts = ['ai' => 0, 'human' => 0, 'waiting' => 0, 'internal' => 0];
 
         foreach ($result['sessions'] as $session) {
             $messages = $this->getSessionMessages($session);
