@@ -29,7 +29,8 @@ class ModelFixtures extends Fixture
     {
         $connection = $manager->getConnection();
 
-        $env = getenv('APP_ENV') ?: 'prod';
+        // Use $_ENV (set by Symfony Dotenv when kernel boots); fallback to getenv for CLI
+        $env = $_ENV['APP_ENV'] ?? getenv('APP_ENV') ?: 'prod';
         if (in_array($env, ['dev', 'test'], true)) {
             foreach (self::TEST_MODELS as $base) {
                 ModelCatalog::upsert($connection, array_merge($base, [
