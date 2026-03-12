@@ -185,18 +185,8 @@ class WidgetPublicController extends AbstractController
             return $domainError;
         }
 
-        // Validate test mode or internal mode
-        $isValidatedTestMode = $this->isValidatedTestMode($request, $widget->getOwnerId());
-        $isValidatedInternalMode = !$isValidatedTestMode && $this->isValidatedInternalMode($request, $widget->getOwnerId());
-
-        // Get or create session (test mode adds test_ prefix, internal mode does not)
-        $session = $this->sessionService->getOrCreateSession($widgetId, $data['sessionId'], $isValidatedTestMode);
-
-        // Mark new internal-mode sessions so they appear as "Internal" in the dashboard
-        if ($isValidatedInternalMode && $session->isAiMode()) {
-            $session->setMode(WidgetSession::MODE_INTERNAL);
-            $this->em->flush();
-        }
+        // Resolve session with test/internal mode handling
+        $session = $this->resolveSessionWithMode($request, $widget, $data['sessionId']);
 
         // Capture country from Cloudflare geolocation header on first message
         if (null === $session->getCountry()) {
@@ -403,11 +393,10 @@ class WidgetPublicController extends AbstractController
                 ? (int) $config['aiModelId']
                 : null;
 
-            if ($widgetModelId) {
-                error_log(sprintf('🎯 Widget %s using configured AI model ID: %d', $widgetId, $widgetModelId));
-            } else {
-                error_log(sprintf('⚠️ Widget %s has no configured AI model, will use default', $widgetId));
-            }
+            $this->logger->debug('Widget AI model resolution', [
+                'widget_id' => $widgetId,
+                'configured_model_id' => $widgetModelId,
+            ]);
 
             $processingOptions = [
                 'fixed_task_prompt' => $widget->getTaskPromptTopic(),
@@ -782,17 +771,8 @@ class WidgetPublicController extends AbstractController
             ], Response::HTTP_FORBIDDEN);
         }
 
-        // Validate test mode or internal mode
-        $isValidatedTestMode = $this->isValidatedTestMode($request, $widget->getOwnerId());
-        $isValidatedInternalMode = !$isValidatedTestMode && $this->isValidatedInternalMode($request, $widget->getOwnerId());
-
-        // Get or create widget session (test mode adds test_ prefix, internal mode does not)
-        $widgetSession = $this->sessionService->getOrCreateSession($widgetId, $sessionId, $isValidatedTestMode);
-
-        if ($isValidatedInternalMode && $widgetSession->isAiMode()) {
-            $widgetSession->setMode(WidgetSession::MODE_INTERNAL);
-            $this->em->flush();
-        }
+        // Resolve session with test/internal mode handling
+        $widgetSession = $this->resolveSessionWithMode($request, $widget, $sessionId);
 
         $owner = $widget->getOwner();
         if (!$owner) {
@@ -1544,6 +1524,27 @@ class WidgetPublicController extends AbstractController
         ]);
 
         return true;
+    }
+
+    /**
+     * Resolve a widget session, applying test/internal mode logic.
+     *
+     * Test mode adds a test_ prefix to the session ID.
+     * Internal mode creates a normal session but sets the mode to MODE_INTERNAL.
+     */
+    private function resolveSessionWithMode(Request $request, \App\Entity\Widget $widget, string $sessionId): WidgetSession
+    {
+        $isTestMode = $this->isValidatedTestMode($request, $widget->getOwnerId());
+        $isInternalMode = !$isTestMode && $this->isValidatedInternalMode($request, $widget->getOwnerId());
+
+        $session = $this->sessionService->getOrCreateSession($widget->getWidgetId(), $sessionId, $isTestMode);
+
+        if ($isInternalMode && $session->isAiMode()) {
+            $session->setMode(WidgetSession::MODE_INTERNAL);
+            $this->em->flush();
+        }
+
+        return $session;
     }
 
     /**

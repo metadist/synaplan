@@ -1,15 +1,10 @@
 <script setup lang="ts">
-import { ref, watch } from 'vue'
+import { ref, watch, onUnmounted } from 'vue'
 import { Icon } from '@iconify/vue'
 import { useI18n } from 'vue-i18n'
 import { useNotification } from '@/composables/useNotification'
 import { saveCustomFieldValues } from '@/services/api/widgetSessionsApi'
-
-interface CustomFieldDef {
-  id: string
-  name: string
-  type: 'text' | 'boolean'
-}
+import type { CustomFieldDef } from '@/services/api/widgetsApi'
 
 interface Props {
   customFields: CustomFieldDef[]
@@ -52,23 +47,28 @@ const persistValues = async () => {
   }
 }
 
-const debouncedSave = () => {
+const scheduleSave = () => {
   dirty.value = true
   if (!props.sessionId) return
   if (saveTimer) clearTimeout(saveTimer)
   saveTimer = setTimeout(persistValues, 800)
 }
 
-watch(values, debouncedSave, { deep: true })
+watch(values, scheduleSave, { deep: true })
 
 watch(
   () => props.sessionId,
   (newId) => {
     if (newId && dirty.value) {
+      if (saveTimer) clearTimeout(saveTimer)
       persistValues()
     }
   }
 )
+
+onUnmounted(() => {
+  if (saveTimer) clearTimeout(saveTimer)
+})
 </script>
 
 <template>

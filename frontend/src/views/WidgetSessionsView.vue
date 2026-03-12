@@ -121,19 +121,19 @@
             <span>|</span>
             <span class="flex items-center gap-1">
               <span class="w-1.5 h-1.5 rounded-full bg-blue-500"></span>
-              {{ stats.ai }} AI
+              {{ stats.ai }} {{ $t('widgetSessions.aiShort') }}
             </span>
             <span class="flex items-center gap-1">
               <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
-              {{ stats.human }} Human
+              {{ stats.human }} {{ $t('widgetSessions.humanShort') }}
             </span>
             <span class="flex items-center gap-1">
               <span class="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
-              {{ stats.waiting }} Waiting
+              {{ stats.waiting }} {{ $t('widgetSessions.waitingShort') }}
             </span>
             <span class="flex items-center gap-1">
               <span class="w-1.5 h-1.5 rounded-full bg-purple-500"></span>
-              {{ stats.internal }} Internal
+              {{ stats.internal }} {{ $t('widgetSessions.internalShort') }}
             </span>
           </div>
 
@@ -1663,13 +1663,9 @@ const showInternalCustomFields = ref(false)
 const internalFieldValues = ref<Record<string, string | boolean>>({})
 const savingCustomFields = ref(false)
 
-const widgetCustomFields = computed(() => {
-  return (widget.value?.config?.customFields ?? []) as Array<{
-    id: string
-    name: string
-    type: 'text' | 'boolean'
-  }>
-})
+const widgetCustomFields = computed(
+  () => (widget.value?.config?.customFields ?? []) as widgetsApi.CustomFieldDef[]
+)
 
 const initInternalFieldValues = () => {
   const v: Record<string, string | boolean> = {}
@@ -1746,8 +1742,8 @@ const sendMessage = async () => {
     messageText.value = ''
     selectedFiles.value = []
     uploadedFileIds.value = []
-  } catch (err: any) {
-    error(err.message || 'Failed to send message')
+  } catch (err: unknown) {
+    error(err instanceof Error ? err.message : t('widgetSessions.sendFailed'))
   } finally {
     sendingMessage.value = false
   }
@@ -2113,12 +2109,12 @@ onMounted(() => {
 onUnmounted(() => {
   window.removeEventListener('beforeunload', handleBeforeUnload)
   window.removeEventListener('resize', handleScreenResize)
-  // Clean up resize listeners in case component unmounts during resize
   document.removeEventListener('mousemove', onResize)
   document.removeEventListener('mouseup', stopResize)
   if (eventSubscription.value) {
     eventSubscription.value.unsubscribe()
   }
+  if (cfSaveTimer) clearTimeout(cfSaveTimer)
 })
 </script>
 

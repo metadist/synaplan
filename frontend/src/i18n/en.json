@@ -1389,6 +1389,7 @@
     "respond": "Respond",
     "typeMessage": "Type your message...",
     "messageSent": "Message sent",
+    "sendFailed": "Failed to send message. Please try again.",
     "typing": "Typing",
     "attachFile": "Attach file",
     "uploadingFiles": "Uploading files...",

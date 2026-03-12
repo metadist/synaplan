@@ -1191,13 +1191,7 @@ const config = reactive<widgetsApi.WidgetConfig>({
 })
 
 // Custom fields
-interface CustomField {
-  id: string
-  name: string
-  type: 'text' | 'boolean'
-}
-
-const customFields = ref<CustomField[]>([])
+const customFields = ref<widgetsApi.CustomFieldDef[]>([])
 const newFieldName = ref('')
 const newFieldType = ref<'text' | 'boolean'>('text')
 

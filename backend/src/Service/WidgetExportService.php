@@ -335,7 +335,6 @@ final readonly class WidgetExportService
         foreach ($result['sessions'] as $session) {
             $messages = $this->getSessionMessages($session);
             $cfValues = $session->getCustomFieldValues() ?? [];
-            $isFirstMessageInSession = true;
 
             foreach ($messages as $message) {
                 // Add separator between sessions
@@ -346,7 +345,6 @@ final readonly class WidgetExportService
                     $sheet->getStyle('A'.$row.':'.$lastCol.$row)->getFont()->setColor(new \PhpOffice\PhpSpreadsheet\Style\Color('999999'));
                     ++$row;
                     ++$sessionNum;
-                    $isFirstMessageInSession = true;
                 }
 
                 $sheet->setCellValue('A'.$row, '#'.$sessionNum);
@@ -366,7 +364,6 @@ final readonly class WidgetExportService
                         ++$cfCol;
                     }
                 }
-                $isFirstMessageInSession = false;
 
                 // Color coding for sender
                 if ('IN' === $message['direction']) {

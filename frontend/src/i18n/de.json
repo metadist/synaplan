@@ -525,6 +525,7 @@
     "respond": "Antworten",
     "typeMessage": "Nachricht eingeben...",
     "messageSent": "Nachricht gesendet",
+    "sendFailed": "Nachricht konnte nicht gesendet werden. Bitte versuchen Sie es erneut.",
     "typing": "Schreibt",
     "attachFile": "Datei anhängen",
     "uploadingFiles": "Dateien werden hochgeladen...",
