@@ -372,8 +372,11 @@ onMounted(async () => {
     await historyStore.loadMessages(chatsStore.activeChatId)
   }
 
-  // Auto-focus ChatInput after mounting with delay
+  // Scroll to newest message after initial load
   await nextTick()
+  scrollToBottom(true)
+
+  // Auto-focus ChatInput after mounting with delay
   setTimeout(() => {
     if (chatInputRef.value?.textareaRef) {
       chatInputRef.value.textareaRef.focus()
@@ -457,7 +460,7 @@ watch(
       // Calling clear() first causes empty chat if loadMessages() fails silently.
       await historyStore.loadMessages(newChatId)
       await nextTick()
-      scrollToBottom()
+      scrollToBottom(true)
 
       // Auto-focus input when switching chats
       setTimeout(() => {
@@ -527,11 +530,12 @@ const groupedMessages = computed(() => {
   return groups
 })
 
-const scrollToBottom = () => {
-  if (autoScroll.value && chatContainer.value) {
+const scrollToBottom = (force = false) => {
+  if ((force || autoScroll.value) && chatContainer.value) {
     nextTick(() => {
       if (chatContainer.value) {
         chatContainer.value.scrollTop = chatContainer.value.scrollHeight
+        autoScroll.value = true
       }
     })
   }
