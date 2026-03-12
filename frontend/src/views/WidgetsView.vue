@@ -322,6 +322,19 @@
             </button>
           </div>
 
+          <!-- Mode description -->
+          <p class="text-xs text-center txt-secondary max-w-md px-2 leading-relaxed">
+            <Icon
+              :icon="overlayMode === 'internal' ? 'heroicons:information-circle' : 'heroicons:eye'"
+              class="w-3.5 h-3.5 inline-block align-text-bottom mr-0.5"
+            />
+            {{
+              overlayMode === 'internal'
+                ? $t('widgets.overlay.internalChatHint')
+                : $t('widgets.overlay.testWidgetHint')
+            }}
+          </p>
+
           <!-- Chat Layout -->
           <div
             :class="[

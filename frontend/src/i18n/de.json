@@ -1691,7 +1691,9 @@
     "testChat": "Chat öffnen",
     "overlay": {
       "testWidget": "Test Widget",
-      "internalChat": "Interner Chat"
+      "testWidgetHint": "Vorschau des Chat-Widgets, wie es Besucher sehen werden. Nachrichten werden nicht gespeichert.",
+      "internalChat": "Interner Chat",
+      "internalChatHint": "Nutze den KI-Assistenten, um Antworten für eigene Zwecke nachzuschlagen. Gespräche werden gespeichert und können zusätzliche Informationsfelder enthalten."
     },
     "customFields": {
       "title": "Benutzerdefinierte Felder",

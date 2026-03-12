@@ -1664,7 +1664,9 @@
     "testChat": "Open Chat",
     "overlay": {
       "testWidget": "Test Widget",
-      "internalChat": "Internal Chat"
+      "testWidgetHint": "Preview your chat widget exactly as visitors will see it. Messages are not saved.",
+      "internalChat": "Internal Chat",
+      "internalChatHint": "Use the AI assistant to look up answers for your own needs. Conversations are saved and can include additional information fields."
     },
     "customFields": {
       "title": "Custom Fields",

@@ -478,7 +478,7 @@ HTML;
                 if (!is_string($value) && null !== $value) {
                     continue;
                 }
-                $sanitized[$fieldId] = null !== $value ? mb_substr(trim($value), 0, 1000) : '';
+                $sanitized[$fieldId] = null !== $value ? mb_substr(trim($value), 0, 256) : '';
             } elseif ('boolean' === $def['type']) {
                 $sanitized[$fieldId] = (bool) $value;
             }

@@ -700,7 +700,7 @@
                     v-model="internalFieldValues[field.id]"
                     type="text"
                     class="w-full px-3 py-1.5 text-sm rounded-lg surface-chip border border-light-border/30 dark:border-dark-border/20 txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)] transition-colors"
-                    maxlength="1000"
+                    maxlength="256"
                   />
                   <button
                     v-else
