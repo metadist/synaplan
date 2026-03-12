@@ -24,6 +24,7 @@ class ConfigFixtures extends Fixture implements DependentFixtureInterface
             ['ownerId' => 0, 'group' => 'DEFAULTMODEL', 'setting' => 'TEXT2SOUND', 'value' => '140'],  // Piper (free)
             ['ownerId' => 0, 'group' => 'DEFAULTMODEL', 'setting' => 'PIC2TEXT',   'value' => '17'],   // Groq Llama 4 Scout
             ['ownerId' => 0, 'group' => 'DEFAULTMODEL', 'setting' => 'SOUND2TEXT', 'value' => '21'],   // Groq whisper-large-v3
+            ['ownerId' => 0, 'group' => 'DEFAULTMODEL', 'setting' => 'ANALYZE',    'value' => '76'],   // Groq gpt-oss-120b (chat models can analyze)
             ['ownerId' => 0, 'group' => 'DEFAULTMODEL', 'setting' => 'VECTORIZE',  'value' => '13'],   // Ollama bge-m3
 
             ['ownerId' => 0, 'group' => 'ai', 'setting' => 'default_chat_provider', 'value' => 'groq'],
