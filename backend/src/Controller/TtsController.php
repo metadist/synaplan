@@ -4,7 +4,6 @@ namespace App\Controller;
 
 use App\AI\Service\AiFacade;
 use App\Entity\User;
-use App\Service\ModelConfigService;
 use App\Service\TtsTextSanitizer;
 use OpenApi\Attributes as OA;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -20,7 +19,6 @@ class TtsController extends AbstractController
 {
     public function __construct(
         private AiFacade $aiFacade,
-        private ModelConfigService $modelConfigService,
     ) {
     }
 
@@ -60,15 +58,11 @@ class TtsController extends AbstractController
         $speed = (float) $request->query->get('speed', '1.0');
         $speed = max(0.25, min(4.0, $speed));
 
-        $ttsModelId = $this->modelConfigService->getDefaultModel('TEXT2SOUND', $user->getId());
-        $ttsProvider = $ttsModelId ? $this->modelConfigService->getProviderForModel($ttsModelId) : null;
-
         $options = array_filter([
             'voice' => $voice,
             'language' => $language,
             'format' => $format,
             'speed' => $speed,
-            'provider' => $ttsProvider ? strtolower($ttsProvider) : null,
         ], fn ($v) => null !== $v);
 
         try {

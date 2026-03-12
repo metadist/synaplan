@@ -18,8 +18,8 @@ export class AudioStreamer {
   private onFinished?: () => void
 
   /**
-   * Register a callback invoked when all queued audio has finished playing.
-   * Only fires after {@link markComplete} has been called and the queue drains.
+   * Register a callback invoked once when all queued audio has finished playing
+   * or when {@link stop} is called. The callback is one-shot: it fires at most once.
    */
   public setOnFinished(cb: () => void): void {
     this.onFinished = cb
@@ -132,6 +132,9 @@ export class AudioStreamer {
       console.warn('AudioStreamer: Auto-play prevented', e)
       this.isPlaying = false
       this.currentAudio = null
+      this.playIndex++
+      this.tryPlayNext()
+      this.checkFinished()
     })
   }
 
@@ -147,12 +150,19 @@ export class AudioStreamer {
     this.prefetchedBlobs.clear()
     this.queue = []
     this.isPlaying = false
-    this.onFinished?.()
+    this.fireFinished()
+  }
+
+  /** One-shot: fires the callback at most once, then clears it. */
+  private fireFinished(): void {
+    const cb = this.onFinished
+    this.onFinished = undefined
+    cb?.()
   }
 
   private checkFinished(): void {
     if (this._allQueued && !this.isPlaying && this.playIndex >= this.queue.length) {
-      this.onFinished?.()
+      this.fireFinished()
     }
   }
 }

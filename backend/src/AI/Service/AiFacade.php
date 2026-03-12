@@ -596,6 +596,10 @@ class AiFacade
     /**
      * Stream TTS audio via the user's configured provider.
      *
+     * Resolves the provider from the user's DEFAULTMODEL/TEXT2SOUND config
+     * (same source the UI "Sprachsynthese" dropdown writes to) so streaming
+     * and MP3 generation always use the same voice.
+     *
      * @param string   $text    Text to synthesize
      * @param int|null $userId  User ID for config lookup
      * @param array    $options Additional options (provider, model, voice, speed, format, language, etc.)
@@ -605,6 +609,16 @@ class AiFacade
     public function synthesizeStream(string $text, ?int $userId = null, array $options = []): array
     {
         $providerName = $options['provider'] ?? null;
+
+        if (!$providerName && $userId > 0) {
+            $ttsModelId = $this->modelConfig->getDefaultModel('TEXT2SOUND', $userId);
+            if ($ttsModelId) {
+                $providerName = $this->modelConfig->getProviderForModel($ttsModelId);
+                if (!isset($options['model'])) {
+                    $options['model'] = $this->modelConfig->getModelName($ttsModelId);
+                }
+            }
+        }
 
         if (!$providerName && $userId > 0) {
             $providerName = $this->modelConfig->getDefaultProvider($userId, 'text_to_speech');
