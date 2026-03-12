@@ -670,6 +670,7 @@ const sessionId = ref<string>('')
 const isSending = ref(false)
 const chatId = ref<number | null>(null)
 const historyLoaded = ref(false)
+const sessionCreatedEmitted = ref(false)
 const isLoadingHistory = ref(false)
 
 // Human takeover state
@@ -1386,6 +1387,11 @@ const sendMessage = async () => {
       }
     }
 
+    if (!sessionCreatedEmitted.value && isTestEnvironment.value && sessionId.value) {
+      sessionCreatedEmitted.value = true
+      emit('session-created', sessionId.value)
+    }
+
     if (typeof result.remainingUploads === 'number') {
       const limit = fileUploadLimit.value
       // Only track count if there's an actual limit (0 = unlimited)
@@ -1857,10 +1863,7 @@ onMounted(() => {
   // In test/internal mode, create a temporary session without localStorage persistence
   if (isTestEnvironment.value) {
     sessionId.value = createSessionId()
-    emit('session-created', sessionId.value)
-    // Still call loadConversationHistory to trigger ensureAutoMessage (but it won't load actual history)
     loadConversationHistory()
-    // Don't subscribe to SSE in test mode - no real session exists
     return
   }
 

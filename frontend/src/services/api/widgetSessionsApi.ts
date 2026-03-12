@@ -18,6 +18,7 @@ export interface WidgetSession {
   isFavorite: boolean
   country: string | null
   title: string | null
+  customFieldValues: Record<string, string | boolean> | null
 }
 
 export interface SessionMessageFile {

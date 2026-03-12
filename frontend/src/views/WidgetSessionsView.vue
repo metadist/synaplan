@@ -665,6 +665,67 @@
               </div>
             </div>
 
+            <!-- Custom Fields (Internal Mode) -->
+            <div
+              v-if="selectedSession.mode === 'internal' && widgetCustomFields.length > 0"
+              class="flex-shrink-0 border-t border-white/5 dark:border-white/5"
+            >
+              <button
+                class="w-full px-4 py-2.5 flex items-center justify-between text-xs font-medium txt-secondary hover:bg-white/5 transition-colors"
+                @click="showInternalCustomFields = !showInternalCustomFields"
+              >
+                <span class="flex items-center gap-1.5">
+                  <Icon icon="heroicons:rectangle-stack" class="w-3.5 h-3.5 txt-brand" />
+                  {{ $t('widgets.customFields.panelTitle') }}
+                  <Icon
+                    v-if="savingCustomFields"
+                    icon="heroicons:arrow-path"
+                    class="w-3 h-3 txt-secondary animate-spin"
+                  />
+                </span>
+                <Icon
+                  :icon="
+                    showInternalCustomFields ? 'heroicons:chevron-up' : 'heroicons:chevron-down'
+                  "
+                  class="w-3.5 h-3.5"
+                />
+              </button>
+              <div v-if="showInternalCustomFields" class="px-4 pb-3 space-y-3">
+                <div v-for="field in widgetCustomFields" :key="field.id">
+                  <label class="block text-xs font-medium txt-secondary mb-1">
+                    {{ field.name }}
+                  </label>
+                  <input
+                    v-if="field.type === 'text'"
+                    v-model="internalFieldValues[field.id]"
+                    type="text"
+                    class="w-full px-3 py-1.5 text-sm rounded-lg surface-chip border border-light-border/30 dark:border-dark-border/20 txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)] transition-colors"
+                    maxlength="1000"
+                  />
+                  <button
+                    v-else
+                    class="flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm transition-colors w-full"
+                    :class="
+                      internalFieldValues[field.id]
+                        ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300'
+                        : 'surface-chip txt-secondary'
+                    "
+                    @click="internalFieldValues[field.id] = !internalFieldValues[field.id]"
+                  >
+                    <Icon
+                      :icon="
+                        internalFieldValues[field.id]
+                          ? 'heroicons:check-circle-solid'
+                          : 'heroicons:x-circle'
+                      "
+                      class="w-4 h-4"
+                    />
+                    {{ internalFieldValues[field.id] ? $t('common.yes') : $t('common.no') }}
+                  </button>
+                </div>
+              </div>
+            </div>
+
             <!-- Message Input (Human/Waiting/Internal Mode) -->
             <div
               v-if="
@@ -1233,6 +1294,11 @@ const viewSession = async (session: widgetSessionsApi.WidgetSession) => {
     selectedSession.value = response.session
     sessionMessages.value = response.messages
 
+    // Load custom field values for internal mode sessions
+    if (response.session.mode === 'internal') {
+      initInternalFieldValues()
+    }
+
     // Update session in list with fresh data from server
     const sessionIndex = sessions.value.findIndex((s) => s.id === response.session.id)
     if (sessionIndex !== -1) {
@@ -1591,6 +1657,54 @@ const uploadFiles = async (): Promise<number[]> => {
 }
 
 const internalAiTyping = ref(false)
+const showInternalCustomFields = ref(false)
+const internalFieldValues = ref<Record<string, string | boolean>>({})
+const savingCustomFields = ref(false)
+
+const widgetCustomFields = computed(() => {
+  return (widget.value?.config?.customFields ?? []) as Array<{
+    id: string
+    name: string
+    type: 'text' | 'boolean'
+  }>
+})
+
+const initInternalFieldValues = () => {
+  const v: Record<string, string | boolean> = {}
+  const existing = selectedSession.value?.customFieldValues ?? {}
+  for (const field of widgetCustomFields.value) {
+    v[field.id] = existing[field.id] ?? (field.type === 'boolean' ? false : '')
+  }
+  internalFieldValues.value = v
+}
+
+let cfSaveTimer: ReturnType<typeof setTimeout> | null = null
+
+const debouncedSaveCustomFields = () => {
+  if (!selectedSession.value || selectedSession.value.mode !== 'internal') return
+  if (cfSaveTimer) clearTimeout(cfSaveTimer)
+  cfSaveTimer = setTimeout(async () => {
+    if (!selectedSession.value) return
+    savingCustomFields.value = true
+    try {
+      await widgetSessionsApi.saveCustomFieldValues(
+        widgetId.value,
+        selectedSession.value.sessionId,
+        internalFieldValues.value
+      )
+      if (selectedSession.value) {
+        selectedSession.value.customFieldValues = { ...internalFieldValues.value }
+      }
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : t('widgets.customFields.saveFailed')
+      error(message)
+    } finally {
+      savingCustomFields.value = false
+    }
+  }, 800)
+}
+
+watch(internalFieldValues, debouncedSaveCustomFields, { deep: true })
 
 const sendMessage = async () => {
   if (sendingMessage.value) return

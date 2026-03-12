@@ -187,6 +187,7 @@ class WidgetSessionController extends AbstractController
                     'isFavorite' => $session->isFavorite(),
                     'country' => $session->getCountry(),
                     'title' => $session->getTitle(),
+                    'customFieldValues' => $session->getCustomFieldValues(),
                 ];
             }, $result['sessions']);
 
@@ -358,6 +359,7 @@ class WidgetSessionController extends AbstractController
                 'isFavorite' => $session->isFavorite(),
                 'country' => $session->getCountry(),
                 'title' => $session->getTitle(),
+                'customFieldValues' => $session->getCustomFieldValues(),
             ],
             'messages' => $messages,
             'latestEventId' => $latestEventId,
