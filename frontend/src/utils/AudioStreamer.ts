@@ -14,6 +14,29 @@ export class AudioStreamer {
   private currentAudio: HTMLAudioElement | null = null
   private prefetchedBlobs: Map<number, string> = new Map() // index → blob URL
   private playIndex = 0
+  private _allQueued = false
+  private onFinished?: () => void
+
+  /**
+   * Register a callback invoked when all queued audio has finished playing.
+   * Only fires after {@link markComplete} has been called and the queue drains.
+   */
+  public setOnFinished(cb: () => void): void {
+    this.onFinished = cb
+  }
+
+  /**
+   * Signal that no more sentences will be queued (text streaming is done).
+   * Once the remaining queue drains, the onFinished callback fires.
+   */
+  public markComplete(): void {
+    this._allQueued = true
+    this.checkFinished()
+  }
+
+  public get active(): boolean {
+    return !this.stopped && (this.isPlaying || this.queue.length > this.playIndex)
+  }
 
   /**
    * Queue a sentence for TTS playback.
@@ -92,6 +115,7 @@ export class AudioStreamer {
       this.currentAudio = null
       this.playIndex++
       this.tryPlayNext()
+      this.checkFinished()
     })
 
     audio.addEventListener('error', () => {
@@ -101,6 +125,7 @@ export class AudioStreamer {
       this.currentAudio = null
       this.playIndex++
       this.tryPlayNext()
+      this.checkFinished()
     })
 
     audio.play().catch((e) => {
@@ -116,12 +141,18 @@ export class AudioStreamer {
       this.currentAudio.pause()
       this.currentAudio = null
     }
-    // Clean up blob URLs
     for (const [, url] of this.prefetchedBlobs) {
       if (url) URL.revokeObjectURL(url)
     }
     this.prefetchedBlobs.clear()
     this.queue = []
     this.isPlaying = false
+    this.onFinished?.()
+  }
+
+  private checkFinished(): void {
+    if (this._allQueued && !this.isPlaying && this.playIndex >= this.queue.length) {
+      this.onFinished?.()
+    }
   }
 }
