@@ -97,7 +97,9 @@ INSERT INTO `BCONFIG` VALUES
 (51,2,'widget_1','color','#007bff'),
 (52,2,'widget_1','position','bottom-right'),
 (53,2,'widget_1','autoMessage','Hello! How can I help you today?'),
-(54,2,'widget_1','prompt','general');
+(54,2,'widget_1','prompt','general'),
+(55,0,'DEFAULTMODEL','ANALYZE','76'),
+(56,0,'DEFAULTMODEL','TOOLS','76');
 /*!40000 ALTER TABLE `BCONFIG` ENABLE KEYS */;
 UNLOCK TABLES;
 commit;
