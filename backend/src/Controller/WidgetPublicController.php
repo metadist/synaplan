@@ -391,6 +391,17 @@ class WidgetPublicController extends AbstractController
 
             \set_time_limit(0);
 
+            // Read AI model directly from widget config (most reliable source)
+            $widgetModelId = isset($config['aiModelId']) && (int) $config['aiModelId'] > 0
+                ? (int) $config['aiModelId']
+                : null;
+
+            if ($widgetModelId) {
+                error_log(sprintf('🎯 Widget %s using configured AI model ID: %d', $widgetId, $widgetModelId));
+            } else {
+                error_log(sprintf('⚠️ Widget %s has no configured AI model, will use default', $widgetId));
+            }
+
             $processingOptions = [
                 'fixed_task_prompt' => $widget->getTaskPromptTopic(),
                 'skipSorting' => true,
@@ -402,7 +413,8 @@ class WidgetPublicController extends AbstractController
                     : 0.3,
                 'widget_id' => $widget->getWidgetId(),
                 'disable_memories' => true,
-                'is_widget_mode' => true, // Disable memories for widget
+                'is_widget_mode' => true,
+                'widget_model_id' => $widgetModelId,
             ];
 
             $response = new StreamedResponse(function () use (

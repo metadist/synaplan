@@ -1475,10 +1475,16 @@ const removeDomain = (domain: string) => {
 const handleSave = async () => {
   saving.value = true
   try {
-    // Include custom fields in config for saving
+    // Resolve AI model ID from the selected model string
+    const resolvedModelId = hasCustomPrompt.value
+      ? findModelIdByString(allModels.value, promptData.aiModel)
+      : -1
+
+    // Include custom fields and AI model ID in config for saving
     const configWithCustomFields = {
       ...config,
       customFields: customFields.value,
+      aiModelId: resolvedModelId,
     }
 
     // Build update request with config, name, and status
@@ -1503,8 +1509,8 @@ const handleSave = async () => {
     // Save widget config (and name/status)
     await widgetsApi.updateWidget(props.widget.widgetId, updateRequest)
 
-    // Save prompt if on assistant tab and has custom prompt
-    if (activeTab.value === 'assistant' && hasCustomPrompt.value && promptData.id) {
+    // Save prompt data (including AI model) whenever widget has a custom prompt
+    if (hasCustomPrompt.value && promptData.id) {
       await savePromptData()
     }
 

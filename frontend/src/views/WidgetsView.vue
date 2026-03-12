@@ -292,8 +292,8 @@
             <div class="flex gap-1 p-1 rounded-xl surface-card shadow-lg">
               <button
                 :class="[
-                'px-3 md:px-4 py-1.5 rounded-lg text-xs md:text-sm font-medium transition-all',
-                overlayMode === 'internal'
+                  'px-3 md:px-4 py-1.5 rounded-lg text-xs md:text-sm font-medium transition-all',
+                  overlayMode === 'internal'
                     ? 'bg-[var(--brand)] text-white shadow-sm'
                     : 'txt-secondary hover:txt-primary',
                 ]"
@@ -303,8 +303,8 @@
               </button>
               <button
                 :class="[
-                'px-3 md:px-4 py-1.5 rounded-lg text-xs md:text-sm font-medium transition-all',
-                overlayMode === 'test'
+                  'px-3 md:px-4 py-1.5 rounded-lg text-xs md:text-sm font-medium transition-all',
+                  overlayMode === 'test'
                     ? 'bg-[var(--brand)] text-white shadow-sm'
                     : 'txt-secondary hover:txt-primary',
                 ]"
@@ -332,10 +332,7 @@
             ]"
           >
             <!-- Custom Fields Panel (only in internal mode with defined fields) -->
-            <div
-              v-if="showCustomFieldsPanel"
-              class="h-[260px] flex-shrink-0 md:h-full md:w-72"
-            >
+            <div v-if="showCustomFieldsPanel" class="h-[260px] flex-shrink-0 md:h-full md:w-72">
               <WidgetCustomFieldsPanel
                 :custom-fields="testWidgetCustomFields"
                 :widget-id="testWidget.widgetId"
@@ -346,7 +343,11 @@
             <!-- Chat Widget -->
             <div
               class="rounded-2xl overflow-hidden shadow-2xl md:w-[420px] md:flex-shrink-0"
-              :class="showCustomFieldsPanel ? 'h-[clamp(400px,70vh,600px)] flex-shrink-0 md:h-full' : 'h-full'"
+              :class="
+                showCustomFieldsPanel
+                  ? 'h-[clamp(400px,70vh,600px)] flex-shrink-0 md:h-full'
+                  : 'h-full'
+              "
             >
               <ChatWidget
                 :key="chatWidgetKey"

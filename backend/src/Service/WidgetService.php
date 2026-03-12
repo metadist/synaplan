@@ -385,6 +385,11 @@ HTML;
             $config['customFields'] = $this->sanitizeCustomFields($config['customFields']);
         }
 
+        // Validate AI model ID (integer, -1 = use default)
+        if (isset($config['aiModelId'])) {
+            $config['aiModelId'] = (int) $config['aiModelId'];
+        }
+
         return $config;
     }
 
