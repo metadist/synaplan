@@ -200,12 +200,15 @@
         <button
           type="button"
           :class="['pill flex-shrink-0', voiceReply && 'pill--active']"
-          aria-label="Voice Reply"
+          :aria-label="$t('chatInput.voiceReply')"
+          :title="$t('chatInput.voiceReplyTooltip')"
           data-testid="btn-chat-voice-reply"
           @click="toggleVoiceReply"
         >
           <Icon icon="mdi:volume-high" class="w-4 h-4 md:w-5 md:h-5" />
-          <span class="text-xs md:text-sm font-medium hidden sm:inline">Voice</span>
+          <span class="text-xs md:text-sm font-medium hidden sm:inline">{{
+            $t('chatInput.voiceReply')
+          }}</span>
         </button>
       </div>
     </div>
