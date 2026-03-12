@@ -86,7 +86,7 @@ class WidgetSessionRepository extends ServiceEntityRepository
      * Count all sessions by mode for a widget.
      * Test sessions are excluded.
      *
-     * @return array{ai: int, human: int, waiting: int}
+     * @return array{ai: int, human: int, waiting: int, internal: int}
      */
     public function countSessionsByMode(string $widgetId): array
     {
@@ -100,7 +100,7 @@ class WidgetSessionRepository extends ServiceEntityRepository
             ->getQuery()
             ->getArrayResult();
 
-        $counts = ['ai' => 0, 'human' => 0, 'waiting' => 0];
+        $counts = ['ai' => 0, 'human' => 0, 'waiting' => 0, 'internal' => 0];
         foreach ($results as $row) {
             $mode = $row['mode'] ?? 'ai'; // null mode defaults to 'ai'
             if (isset($counts[$mode])) {
@@ -206,8 +206,8 @@ class WidgetSessionRepository extends ServiceEntityRepository
             }
         }
 
-        // Filter by mode (ai/human/waiting)
-        if (isset($filters['mode']) && in_array($filters['mode'], ['ai', 'human', 'waiting'], true)) {
+        // Filter by mode (ai/human/waiting/internal)
+        if (isset($filters['mode']) && in_array($filters['mode'], ['ai', 'human', 'waiting', 'internal'], true)) {
             $qb->andWhere('ws.mode = :mode')
                 ->setParameter('mode', $filters['mode']);
         }

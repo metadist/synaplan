@@ -380,7 +380,115 @@ HTML;
             $config['allowedDomains'] = [];
         }
 
+        // Validate custom fields definitions (always sanitize to enforce limits)
+        $config['customFields'] = $this->sanitizeCustomFields($config['customFields'] ?? []);
+
+        // Validate AI model ID (integer, -1 = use default)
+        if (isset($config['aiModelId'])) {
+            $config['aiModelId'] = (int) $config['aiModelId'];
+        }
+
         return $config;
+    }
+
+    /**
+     * Sanitize and validate custom field definitions.
+     *
+     * @param mixed $fields Raw custom fields input
+     *
+     * @return array<array{id: string, name: string, type: string}> Validated field definitions
+     */
+    private function sanitizeCustomFields(mixed $fields): array
+    {
+        if (!is_array($fields)) {
+            return [];
+        }
+
+        $validTypes = ['text', 'boolean'];
+        $maxPerType = ['text' => 3, 'boolean' => 3];
+        $typeCounts = ['text' => 0, 'boolean' => 0];
+        $sanitized = [];
+        $usedIds = [];
+
+        foreach ($fields as $field) {
+            if (!is_array($field)) {
+                continue;
+            }
+
+            $name = isset($field['name']) && is_string($field['name'])
+                ? trim(strip_tags($field['name']))
+                : '';
+
+            if ('' === $name || mb_strlen($name) > 100) {
+                continue;
+            }
+
+            $type = $field['type'] ?? '';
+            if (!in_array($type, $validTypes, true)) {
+                continue;
+            }
+
+            if ($typeCounts[$type] >= $maxPerType[$type]) {
+                continue;
+            }
+            ++$typeCounts[$type];
+
+            // Server-generated IDs: reuse existing valid IDs, generate new ones otherwise
+            $id = isset($field['id']) && is_string($field['id']) && preg_match('/^cf_[a-f0-9]{12}$/', $field['id'])
+                ? $field['id']
+                : 'cf_'.bin2hex(random_bytes(6));
+
+            if (in_array($id, $usedIds, true)) {
+                $id = 'cf_'.bin2hex(random_bytes(6));
+            }
+
+            $usedIds[] = $id;
+            $sanitized[] = [
+                'id' => $id,
+                'name' => $name,
+                'type' => $type,
+            ];
+        }
+
+        return $sanitized;
+    }
+
+    /**
+     * Validate custom field values against widget field definitions.
+     *
+     * @param array $values    The submitted values (fieldId => value)
+     * @param array $fieldDefs The widget's custom field definitions
+     *
+     * @return array Sanitized values containing only valid field IDs with correct types
+     */
+    public function validateCustomFieldValues(array $values, array $fieldDefs): array
+    {
+        $defsById = [];
+        foreach ($fieldDefs as $def) {
+            if (isset($def['id'])) {
+                $defsById[$def['id']] = $def;
+            }
+        }
+
+        $sanitized = [];
+        foreach ($values as $fieldId => $value) {
+            if (!isset($defsById[$fieldId])) {
+                continue;
+            }
+
+            $def = $defsById[$fieldId];
+
+            if ('text' === $def['type']) {
+                if (!is_string($value) && null !== $value) {
+                    continue;
+                }
+                $sanitized[$fieldId] = null !== $value ? mb_substr(trim($value), 0, 256) : '';
+            } elseif ('boolean' === $def['type']) {
+                $sanitized[$fieldId] = (bool) $value;
+            }
+        }
+
+        return $sanitized;
     }
 
     /**

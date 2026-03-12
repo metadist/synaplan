@@ -16,6 +16,7 @@ class WidgetSession
     public const MODE_AI = 'ai';
     public const MODE_HUMAN = 'human';
     public const MODE_WAITING = 'waiting';
+    public const MODE_INTERNAL = 'internal';
 
     #[ORM\Id]
     #[ORM\GeneratedValue]
@@ -91,6 +92,13 @@ class WidgetSession
      */
     #[ORM\Column(name: 'BTITLE', type: 'string', length: 100, nullable: true)]
     private ?string $title = null;
+
+    /**
+     * Admin-defined custom field values for internal chat sessions.
+     * Keys are field IDs (e.g. "cf_abc123"), values are strings or booleans.
+     */
+    #[ORM\Column(name: 'BCUSTOM_FIELD_VALUES', type: 'json', nullable: true)]
+    private ?array $customFieldValues = null;
 
     public function __construct()
     {
@@ -251,7 +259,7 @@ class WidgetSession
 
     public function setMode(string $mode): self
     {
-        if (!in_array($mode, [self::MODE_AI, self::MODE_HUMAN, self::MODE_WAITING], true)) {
+        if (!in_array($mode, [self::MODE_AI, self::MODE_HUMAN, self::MODE_WAITING, self::MODE_INTERNAL], true)) {
             throw new \InvalidArgumentException(sprintf('Invalid mode: %s', $mode));
         }
         $this->mode = $mode;
@@ -272,6 +280,11 @@ class WidgetSession
     public function isWaitingForHuman(): bool
     {
         return self::MODE_WAITING === $this->getMode();
+    }
+
+    public function isInternalMode(): bool
+    {
+        return self::MODE_INTERNAL === $this->getMode();
     }
 
     public function getHumanOperatorId(): ?int
@@ -430,6 +443,18 @@ class WidgetSession
     public function setTitle(?string $title): self
     {
         $this->title = null !== $title ? mb_substr($title, 0, 100) : null;
+
+        return $this;
+    }
+
+    public function getCustomFieldValues(): ?array
+    {
+        return $this->customFieldValues;
+    }
+
+    public function setCustomFieldValues(?array $customFieldValues): self
+    {
+        $this->customFieldValues = $customFieldValues;
 
         return $this;
     }

@@ -7,7 +7,7 @@ export interface WidgetSession {
   chatId: number | null
   messageCount: number
   fileCount: number
-  mode: 'ai' | 'human' | 'waiting'
+  mode: 'ai' | 'human' | 'waiting' | 'internal'
   humanOperatorId: number | null
   lastMessage: number
   lastMessagePreview: string | null
@@ -18,6 +18,7 @@ export interface WidgetSession {
   isFavorite: boolean
   country: string | null
   title: string | null
+  customFieldValues: Record<string, string | boolean> | null
 }
 
 export interface SessionMessageFile {
@@ -49,6 +50,7 @@ export interface WidgetSessionsResponse {
     ai: number
     human: number
     waiting: number
+    internal: number
   }
 }
 
@@ -63,7 +65,7 @@ export interface ListSessionsParams {
   limit?: number
   offset?: number
   status?: 'active' | 'expired'
-  mode?: 'ai' | 'human' | 'waiting'
+  mode?: 'ai' | 'human' | 'waiting' | 'internal'
   from?: number
   to?: number
   sort?: 'lastMessage' | 'created' | 'messageCount'
@@ -235,6 +237,23 @@ export async function sendOperatorTyping(
   )
 }
 
+/**
+ * Save custom field values for a session
+ */
+export async function saveCustomFieldValues(
+  widgetId: string,
+  sessionId: string,
+  values: Record<string, string | boolean>
+): Promise<{ success: boolean; values: Record<string, string | boolean> }> {
+  return await httpClient<{ success: boolean; values: Record<string, string | boolean> }>(
+    `/api/v1/widgets/${widgetId}/sessions/${sessionId}/custom-fields`,
+    {
+      method: 'PUT',
+      body: JSON.stringify({ values }),
+    }
+  )
+}
+
 export interface ExportFormat {
   id: 'xlsx' | 'csv' | 'json'
   name: string
@@ -246,7 +265,7 @@ export interface ExportParams {
   format?: 'xlsx' | 'csv' | 'json'
   from?: number
   to?: number
-  mode?: 'ai' | 'human' | 'waiting'
+  mode?: 'ai' | 'human' | 'waiting' | 'internal'
   sessionIds?: string[]
 }
 

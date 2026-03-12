@@ -73,19 +73,23 @@ final readonly class WidgetExportService
         // UTF-8 BOM for Excel compatibility
         fwrite($handle, "\xEF\xBB\xBF");
 
+        $customFields = $widget->getConfig()['customFields'] ?? [];
+
         // Header
-        fputcsv($handle, [
+        $headers = [
             'Session ID',
             'Created',
             'Last Activity',
             'Message Count',
             'Mode',
-            'Channel',
             'Timestamp',
             'Sender',
-            'Language',
             'Message',
-        ]);
+        ];
+        foreach ($customFields as $field) {
+            $headers[] = $this->sanitizeCellValue($field['name']);
+        }
+        fputcsv($handle, $headers);
 
         // Get sessions
         $result = $this->sessionRepository->findSessionsByWidget(
@@ -98,20 +102,24 @@ final readonly class WidgetExportService
         foreach ($result['sessions'] as $session) {
             $messages = $this->getSessionMessages($session);
             $messageCount = count($messages);
+            $cfValues = $session->getCustomFieldValues() ?? [];
 
             foreach ($messages as $message) {
-                fputcsv($handle, [
+                $row = [
                     $session->getSessionId(),
                     date('Y-m-d H:i:s', $session->getCreated()),
                     date('Y-m-d H:i:s', $session->getLastMessage()),
                     $messageCount,
                     $session->getMode(),
-                    'Chat Widget',
                     date('Y-m-d H:i:s', $message['timestamp']),
                     $message['sender'],
-                    $message['language'],
                     $message['text'],
-                ]);
+                ];
+                foreach ($customFields as $field) {
+                    $val = $cfValues[$field['id']] ?? ('boolean' === $field['type'] ? false : '');
+                    $row[] = is_bool($val) ? ($val ? 'Yes' : 'No') : $this->sanitizeCellValue((string) $val);
+                }
+                fputcsv($handle, $row);
             }
         }
 
@@ -134,12 +142,19 @@ final readonly class WidgetExportService
             $filters
         );
 
+        $customFields = $widget->getConfig()['customFields'] ?? [];
+
+        $widgetData = [
+            'id' => $widget->getWidgetId(),
+            'name' => $widget->getName(),
+            'exported_at' => date('c'),
+        ];
+        if (!empty($customFields)) {
+            $widgetData['custom_fields'] = $customFields;
+        }
+
         $exportData = [
-            'widget' => [
-                'id' => $widget->getWidgetId(),
-                'name' => $widget->getName(),
-                'exported_at' => date('c'),
-            ],
+            'widget' => $widgetData,
             'export_range' => [
                 'from' => null,
                 'to' => null,
@@ -156,7 +171,7 @@ final readonly class WidgetExportService
         $totalFiles = 0;
         $earliestCreated = null;
         $latestActivity = null;
-        $modeCounts = ['ai' => 0, 'human' => 0, 'waiting' => 0];
+        $modeCounts = ['ai' => 0, 'human' => 0, 'waiting' => 0, 'internal' => 0];
 
         foreach ($result['sessions'] as $session) {
             $messages = $this->getSessionMessages($session);
@@ -183,9 +198,8 @@ final readonly class WidgetExportService
                 $latestActivity = $lastMessage;
             }
 
-            $exportData['sessions'][] = [
+            $sessionData = [
                 'session_id' => $session->getSessionId(),
-                'channel' => 'Chat Widget',
                 'created' => date('c', $session->getCreated()),
                 'last_activity' => date('c', $session->getLastMessage()),
                 'message_count' => $messageCount,
@@ -196,13 +210,19 @@ final readonly class WidgetExportService
                     'text' => $m['text'],
                     'timestamp' => date('c', $m['timestamp']),
                     'sender' => $m['sender'],
-                    'language' => $m['language'],
                     'files' => array_map(fn ($f) => [
                         ...$f,
                         'download_url' => $baseUrl.$f['download_url'],
                     ], $m['files']),
                 ], $messages),
             ];
+
+            $cfValues = $session->getCustomFieldValues();
+            if (null !== $cfValues && !empty($cfValues)) {
+                $sessionData['custom_field_values'] = $cfValues;
+            }
+
+            $exportData['sessions'][] = $sessionData;
         }
 
         // Set actual date range from exported sessions
@@ -219,6 +239,7 @@ final readonly class WidgetExportService
         $exportData['statistics']['ai_sessions'] = $modeCounts['ai'];
         $exportData['statistics']['human_sessions'] = $modeCounts['human'];
         $exportData['statistics']['waiting_sessions'] = $modeCounts['waiting'];
+        $exportData['statistics']['internal_sessions'] = $modeCounts['internal'];
 
         $tempFile = tempnam(sys_get_temp_dir(), 'widget_export_').'.json';
         file_put_contents($tempFile, json_encode($exportData, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
@@ -278,8 +299,14 @@ final readonly class WidgetExportService
 
     private function createConversationsSheet($sheet, Widget $widget, array $filters): void
     {
+        $customFields = $widget->getConfig()['customFields'] ?? [];
+
         // Header
-        $headers = ['Session', 'Channel', 'Time', 'From', 'Language', 'Message'];
+        $headers = ['Session', 'Time', 'From', 'Message'];
+        foreach ($customFields as $field) {
+            $headers[] = $field['name'];
+        }
+
         $col = 'A';
         foreach ($headers as $header) {
             $sheet->setCellValue($col.'1', $header);
@@ -290,6 +317,8 @@ final readonly class WidgetExportService
             ++$col;
         }
 
+        $lastCol = chr(ord('D') + count($customFields));
+
         // Get sessions and messages
         $result = $this->sessionRepository->findSessionsByWidget($widget->getWidgetId(), 500, 0, $filters);
 
@@ -299,31 +328,37 @@ final readonly class WidgetExportService
 
         foreach ($result['sessions'] as $session) {
             $messages = $this->getSessionMessages($session);
+            $cfValues = $session->getCustomFieldValues() ?? [];
 
             foreach ($messages as $message) {
                 // Add separator between sessions
                 if (null !== $lastSessionId && $lastSessionId !== $session->getSessionId()) {
-                    $sheet->setCellValue('A'.$row, '---');
-                    $sheet->setCellValue('B'.$row, '---');
-                    $sheet->setCellValue('C'.$row, '---');
-                    $sheet->setCellValue('D'.$row, '---');
-                    $sheet->setCellValue('E'.$row, '---');
-                    $sheet->setCellValue('F'.$row, '---');
-                    $sheet->getStyle('A'.$row.':F'.$row)->getFont()->setColor(new \PhpOffice\PhpSpreadsheet\Style\Color('999999'));
+                    foreach (range('A', $lastCol) as $sepCol) {
+                        $sheet->setCellValue($sepCol.$row, '---');
+                    }
+                    $sheet->getStyle('A'.$row.':'.$lastCol.$row)->getFont()->setColor(new \PhpOffice\PhpSpreadsheet\Style\Color('999999'));
                     ++$row;
                     ++$sessionNum;
                 }
 
                 $sheet->setCellValue('A'.$row, '#'.$sessionNum);
-                $sheet->setCellValue('B'.$row, 'Chat Widget');
-                $sheet->setCellValue('C'.$row, date('H:i:s', $message['timestamp']));
-                $sheet->setCellValue('D'.$row, $message['sender']);
-                $sheet->setCellValue('E'.$row, $message['language']);
-                $sheet->setCellValue('F'.$row, $message['text']);
+                $sheet->setCellValue('B'.$row, date('H:i:s', $message['timestamp']));
+                $sheet->setCellValue('C'.$row, $message['sender']);
+                $sheet->setCellValue('D'.$row, $message['text']);
+
+                if (!empty($customFields)) {
+                    $cfCol = chr(ord('D') + 1);
+                    foreach ($customFields as $field) {
+                        $val = $cfValues[$field['id']] ?? ('boolean' === $field['type'] ? false : '');
+                        $displayVal = is_bool($val) ? ($val ? 'Yes' : 'No') : $this->sanitizeCellValue((string) $val);
+                        $sheet->setCellValue($cfCol.$row, $displayVal);
+                        ++$cfCol;
+                    }
+                }
 
                 // Color coding for sender
                 if ('IN' === $message['direction']) {
-                    $sheet->getStyle('A'.$row.':F'.$row)->getFill()
+                    $sheet->getStyle('A'.$row.':'.$lastCol.$row)->getFill()
                         ->setFillType(Fill::FILL_SOLID)
                         ->getStartColor()->setRGB('F0FDF4');
                 }
@@ -335,20 +370,24 @@ final readonly class WidgetExportService
 
         // Auto-size columns
         $sheet->getColumnDimension('A')->setWidth(10);
-        $sheet->getColumnDimension('B')->setWidth(14);
-        $sheet->getColumnDimension('C')->setWidth(12);
-        $sheet->getColumnDimension('D')->setWidth(12);
-        $sheet->getColumnDimension('E')->setWidth(10);
-        $sheet->getColumnDimension('F')->setWidth(80);
+        $sheet->getColumnDimension('B')->setWidth(12);
+        $sheet->getColumnDimension('C')->setWidth(14);
+        $sheet->getColumnDimension('D')->setWidth(80);
+        $cfCol = chr(ord('D') + 1);
+        foreach ($customFields as $field) {
+            $sheet->getColumnDimension($cfCol)->setAutoSize(true);
+            ++$cfCol;
+        }
 
         // Wrap text in message column
-        $sheet->getStyle('F:F')->getAlignment()->setWrapText(true);
+        $sheet->getStyle('D:D')->getAlignment()->setWrapText(true);
     }
 
     private function createSessionsSheet($sheet, Widget $widget, array $filters): void
     {
         // Header
-        $headers = ['Session ID', 'Channel', 'Created', 'Last Activity', 'Messages', 'Files', 'Mode', 'Duration'];
+        $headers = ['Session ID', 'Created', 'Last Activity', 'Messages', 'Files', 'Mode', 'Duration'];
+
         $col = 'A';
         foreach ($headers as $header) {
             $sheet->setCellValue($col.'1', $header);
@@ -371,19 +410,18 @@ final readonly class WidgetExportService
             $fileCount = $this->countFilesInMessages($messages);
 
             $sheet->setCellValue('A'.$row, substr($session->getSessionId(), 0, 12).'...');
-            $sheet->setCellValue('B'.$row, 'Chat Widget');
-            $sheet->setCellValue('C'.$row, date('Y-m-d H:i', $session->getCreated()));
-            $sheet->setCellValue('D'.$row, date('Y-m-d H:i', $session->getLastMessage()));
-            $sheet->setCellValue('E'.$row, $messageCount);
-            $sheet->setCellValue('F'.$row, $fileCount);
-            $sheet->setCellValue('G'.$row, ucfirst($session->getMode()));
-            $sheet->setCellValue('H'.$row, $durationStr);
+            $sheet->setCellValue('B'.$row, date('Y-m-d H:i', $session->getCreated()));
+            $sheet->setCellValue('C'.$row, date('Y-m-d H:i', $session->getLastMessage()));
+            $sheet->setCellValue('D'.$row, $messageCount);
+            $sheet->setCellValue('E'.$row, $fileCount);
+            $sheet->setCellValue('F'.$row, ucfirst($session->getMode()));
+            $sheet->setCellValue('G'.$row, $durationStr);
 
             ++$row;
         }
 
         // Auto-size columns
-        foreach (range('A', 'H') as $col) {
+        foreach (range('A', 'G') as $col) {
             $sheet->getColumnDimension($col)->setAutoSize(true);
         }
     }

@@ -526,6 +526,117 @@
             </div>
           </div>
 
+          <!-- Custom Fields Tab -->
+          <div
+            v-else-if="!promptOnly && activeTab === 'custom-fields'"
+            class="space-y-6"
+            data-testid="section-custom-fields"
+          >
+            <div class="surface-chip p-4 rounded-lg">
+              <p class="text-sm txt-secondary">
+                {{ $t('widgets.customFields.description') }}
+              </p>
+            </div>
+
+            <!-- Existing fields list -->
+            <div v-if="customFields.length > 0" class="space-y-2">
+              <div
+                v-for="(field, index) in customFields"
+                :key="field.id"
+                class="flex items-center gap-3 surface-chip p-3 rounded-lg"
+              >
+                <Icon
+                  :icon="
+                    field.type === 'boolean' ? 'heroicons:check-circle' : 'heroicons:document-text'
+                  "
+                  class="w-4 h-4 txt-secondary flex-shrink-0"
+                />
+                <span class="flex-1 text-sm txt-primary truncate">{{ field.name }}</span>
+                <span
+                  class="text-xs px-2 py-0.5 rounded-full"
+                  :class="
+                    field.type === 'boolean'
+                      ? 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300'
+                      : 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300'
+                  "
+                >
+                  {{
+                    field.type === 'boolean'
+                      ? $t('widgets.customFields.typeBoolean')
+                      : $t('widgets.customFields.typeText')
+                  }}
+                </span>
+                <button
+                  class="p-1 rounded hover:bg-red-500/10 transition-colors"
+                  :title="$t('common.delete')"
+                  @click="removeCustomField(index)"
+                >
+                  <Icon icon="heroicons:trash" class="w-4 h-4 text-red-500" />
+                </button>
+              </div>
+            </div>
+
+            <!-- Empty state -->
+            <div v-else class="text-center py-8">
+              <Icon icon="heroicons:rectangle-stack" class="w-10 h-10 txt-secondary mx-auto mb-2" />
+              <p class="text-sm txt-secondary">{{ $t('widgets.customFields.empty') }}</p>
+              <p class="text-xs txt-secondary mt-1">{{ $t('widgets.customFields.emptyHint') }}</p>
+            </div>
+
+            <!-- Add field form -->
+            <div v-if="textFieldCount < 3 || booleanFieldCount < 3" class="flex items-end gap-3">
+              <div class="flex-1">
+                <label class="block text-xs font-medium txt-secondary mb-1">
+                  {{ $t('widgets.customFields.fieldName') }}
+                </label>
+                <input
+                  v-model="newFieldName"
+                  type="text"
+                  class="w-full px-3 py-2 text-sm rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
+                  :placeholder="$t('widgets.customFields.fieldName')"
+                  maxlength="100"
+                  @keydown.enter="addCustomField"
+                />
+              </div>
+              <div class="w-32">
+                <label class="block text-xs font-medium txt-secondary mb-1">
+                  {{ $t('widgets.customFields.fieldType') }}
+                </label>
+                <select
+                  v-model="newFieldType"
+                  class="w-full px-3 py-2 text-sm rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
+                >
+                  <option value="text">{{ $t('widgets.customFields.typeText') }}</option>
+                  <option value="boolean">{{ $t('widgets.customFields.typeBoolean') }}</option>
+                </select>
+              </div>
+              <button
+                class="btn-primary px-4 py-2 text-sm flex-shrink-0 rounded-lg"
+                :disabled="!newFieldName.trim() || !canAddField"
+                @click="addCustomField"
+              >
+                <Icon icon="heroicons:plus" class="w-4 h-4 mr-1 inline" />
+                {{ $t('widgets.customFields.addField') }}
+              </button>
+            </div>
+            <p
+              v-if="!canAddField && (textFieldCount < 3 || booleanFieldCount < 3)"
+              class="text-xs txt-secondary"
+            >
+              {{
+                newFieldType === 'text'
+                  ? $t('widgets.customFields.maxTextReached')
+                  : $t('widgets.customFields.maxBooleanReached')
+              }}
+            </p>
+            <p
+              v-else-if="textFieldCount >= 3 && booleanFieldCount >= 3"
+              class="text-xs txt-secondary text-center"
+            >
+              {{ $t('widgets.customFields.maxFieldsReached') }}
+            </p>
+          </div>
+
           <!-- AI Assistant Tab -->
           <div
             v-if="promptOnly || activeTab === 'assistant'"
@@ -1040,6 +1151,11 @@ const tabs = computed(() => {
       labelKey: 'widgets.advancedConfig.tabs.security',
     },
     {
+      id: 'custom-fields',
+      icon: 'heroicons:rectangle-stack',
+      labelKey: 'widgets.advancedConfig.tabs.customFields',
+    },
+    {
       id: 'assistant',
       icon: 'heroicons:sparkles',
       labelKey: 'widgets.advancedConfig.tabs.assistant',
@@ -1073,6 +1189,36 @@ const config = reactive<widgetsApi.WidgetConfig>({
   fileUploadLimit: 3,
   allowedDomains: [],
 })
+
+// Custom fields
+const customFields = ref<widgetsApi.CustomFieldDef[]>([])
+const newFieldName = ref('')
+const newFieldType = ref<'text' | 'boolean'>('text')
+
+const textFieldCount = computed(() => customFields.value.filter((f) => f.type === 'text').length)
+const booleanFieldCount = computed(
+  () => customFields.value.filter((f) => f.type === 'boolean').length
+)
+const canAddField = computed(() => {
+  if (newFieldType.value === 'text') return textFieldCount.value < 3
+  return booleanFieldCount.value < 3
+})
+
+const addCustomField = () => {
+  const name = newFieldName.value.trim()
+  if (!name || !canAddField.value) return
+
+  customFields.value.push({
+    id: 'cf_' + Math.random().toString(16).slice(2, 14).padEnd(12, '0'),
+    name,
+    type: newFieldType.value,
+  })
+  newFieldName.value = ''
+}
+
+const removeCustomField = (index: number) => {
+  customFields.value.splice(index, 1)
+}
 
 // Icon selection
 const iconUploadInput = ref<HTMLInputElement | null>(null)
@@ -1345,11 +1491,26 @@ const removeDomain = (domain: string) => {
 const handleSave = async () => {
   saving.value = true
   try {
+    // Resolve AI model ID from the selected model string
+    const resolvedModelId = hasCustomPrompt.value
+      ? findModelIdByString(allModels.value, promptData.aiModel)
+      : -1
+
+    // Include custom fields and AI model ID in config for saving
+    const configWithCustomFields = {
+      ...config,
+      customFields: customFields.value,
+      aiModelId: resolvedModelId,
+    }
+
     // Build update request with config, name, and status
-    const updateRequest: { config: typeof config; name?: string; status?: 'active' | 'inactive' } =
-      {
-        config,
-      }
+    const updateRequest: {
+      config: typeof configWithCustomFields
+      name?: string
+      status?: 'active' | 'inactive'
+    } = {
+      config: configWithCustomFields,
+    }
 
     // Include widget name if it was changed
     if (widgetName.value && widgetName.value !== props.widget.name) {
@@ -1364,8 +1525,8 @@ const handleSave = async () => {
     // Save widget config (and name/status)
     await widgetsApi.updateWidget(props.widget.widgetId, updateRequest)
 
-    // Save prompt if on assistant tab and has custom prompt
-    if (activeTab.value === 'assistant' && hasCustomPrompt.value && promptData.id) {
+    // Save prompt data (including AI model) whenever widget has a custom prompt
+    if (hasCustomPrompt.value && promptData.id) {
       await savePromptData()
     }
 
@@ -1716,6 +1877,11 @@ onMounted(async () => {
     fileUploadLimit: widgetConfig.fileUploadLimit ?? 3,
     allowedDomains: widgetConfig.allowedDomains || props.widget.allowedDomains || [],
   })
+
+  // Load custom fields
+  if (Array.isArray(widgetConfig.customFields)) {
+    customFields.value = widgetConfig.customFields
+  }
 
   // Always load AI models — the "AI Prompts" tab needs them
   // regardless of whether the AI Assistant has been configured

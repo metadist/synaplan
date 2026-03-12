@@ -11,6 +11,7 @@ use App\Repository\MessageRepository;
 use App\Repository\WidgetRepository;
 use App\Repository\WidgetSessionRepository;
 use App\Service\WidgetEventCacheService;
+use App\Service\WidgetService;
 use Doctrine\ORM\EntityManagerInterface;
 use OpenApi\Attributes as OA;
 use Psr\Log\LoggerInterface;
@@ -38,6 +39,7 @@ class WidgetSessionController extends AbstractController
         private LoggerInterface $logger,
         private WidgetEventCacheService $eventCache,
         private EntityManagerInterface $em,
+        private WidgetService $widgetService,
     ) {
     }
 
@@ -55,7 +57,7 @@ class WidgetSessionController extends AbstractController
     #[OA\Parameter(name: 'limit', in: 'query', schema: new OA\Schema(type: 'integer', default: 20, maximum: 100))]
     #[OA\Parameter(name: 'offset', in: 'query', schema: new OA\Schema(type: 'integer', default: 0))]
     #[OA\Parameter(name: 'status', in: 'query', schema: new OA\Schema(type: 'string', enum: ['active', 'expired']))]
-    #[OA\Parameter(name: 'mode', in: 'query', schema: new OA\Schema(type: 'string', enum: ['ai', 'human', 'waiting']))]
+    #[OA\Parameter(name: 'mode', in: 'query', schema: new OA\Schema(type: 'string', enum: ['ai', 'human', 'waiting', 'internal']))]
     #[OA\Parameter(name: 'from', in: 'query', description: 'Unix timestamp', schema: new OA\Schema(type: 'integer'))]
     #[OA\Parameter(name: 'to', in: 'query', description: 'Unix timestamp', schema: new OA\Schema(type: 'integer'))]
     #[OA\Parameter(name: 'sort', in: 'query', schema: new OA\Schema(type: 'string', enum: ['lastMessage', 'created', 'messageCount'], default: 'lastMessage'))]
@@ -77,7 +79,7 @@ class WidgetSessionController extends AbstractController
                             new OA\Property(property: 'chatId', type: 'integer', nullable: true),
                             new OA\Property(property: 'messageCount', type: 'integer'),
                             new OA\Property(property: 'fileCount', type: 'integer'),
-                            new OA\Property(property: 'mode', type: 'string', enum: ['ai', 'human', 'waiting']),
+                            new OA\Property(property: 'mode', type: 'string', enum: ['ai', 'human', 'waiting', 'internal']),
                             new OA\Property(property: 'lastMessage', type: 'integer'),
                             new OA\Property(property: 'lastMessagePreview', type: 'string', nullable: true),
                             new OA\Property(property: 'created', type: 'integer'),
@@ -185,6 +187,7 @@ class WidgetSessionController extends AbstractController
                     'isFavorite' => $session->isFavorite(),
                     'country' => $session->getCountry(),
                     'title' => $session->getTitle(),
+                    'customFieldValues' => $session->getCustomFieldValues(),
                 ];
             }, $result['sessions']);
 
@@ -356,6 +359,7 @@ class WidgetSessionController extends AbstractController
                 'isFavorite' => $session->isFavorite(),
                 'country' => $session->getCountry(),
                 'title' => $session->getTitle(),
+                'customFieldValues' => $session->getCustomFieldValues(),
             ],
             'messages' => $messages,
             'latestEventId' => $latestEventId,
@@ -718,6 +722,116 @@ class WidgetSessionController extends AbstractController
 
             return $this->json([
                 'error' => 'Failed to delete sessions',
+            ], Response::HTTP_INTERNAL_SERVER_ERROR);
+        }
+    }
+
+    /**
+     * Update custom field values for a session.
+     */
+    #[Route('/{sessionId}/custom-fields', name: 'update_custom_fields', methods: ['PUT'])]
+    #[OA\Put(
+        path: '/api/v1/widgets/{widgetId}/sessions/{sessionId}/custom-fields',
+        summary: 'Update custom field values for a session',
+        security: [['Bearer' => []]],
+        tags: ['Widget Sessions']
+    )]
+    #[OA\Parameter(name: 'widgetId', in: 'path', required: true, schema: new OA\Schema(type: 'string'))]
+    #[OA\Parameter(name: 'sessionId', in: 'path', required: true, schema: new OA\Schema(type: 'string'))]
+    #[OA\RequestBody(
+        required: true,
+        content: new OA\JsonContent(
+            required: ['values'],
+            properties: [
+                new OA\Property(
+                    property: 'values',
+                    type: 'object',
+                    description: 'Custom field values keyed by field ID',
+                    example: ['cf_abc123456789' => 'Max Mustermann', 'cf_def456789012' => true]
+                ),
+            ]
+        )
+    )]
+    #[OA\Response(
+        response: 200,
+        description: 'Custom field values updated',
+        content: new OA\JsonContent(
+            properties: [
+                new OA\Property(property: 'success', type: 'boolean'),
+                new OA\Property(property: 'values', type: 'object'),
+            ]
+        )
+    )]
+    #[OA\Response(response: 400, description: 'Invalid input')]
+    #[OA\Response(response: 403, description: 'Access denied')]
+    #[OA\Response(response: 404, description: 'Widget or session not found')]
+    public function updateCustomFields(
+        string $widgetId,
+        string $sessionId,
+        Request $request,
+        #[CurrentUser] ?User $user,
+    ): JsonResponse {
+        if (!$user) {
+            return $this->json(['error' => 'Not authenticated'], Response::HTTP_UNAUTHORIZED);
+        }
+
+        $widget = $this->widgetRepository->findByWidgetId($widgetId);
+
+        if (!$widget) {
+            return $this->json(['error' => 'Widget not found'], Response::HTTP_NOT_FOUND);
+        }
+
+        if ($widget->getOwnerId() !== $user->getId()) {
+            return $this->json(['error' => 'Access denied'], Response::HTTP_FORBIDDEN);
+        }
+
+        $session = $this->sessionRepository->findByWidgetAndSession($widgetId, $sessionId);
+
+        if (!$session) {
+            return $this->json(['error' => 'Session not found'], Response::HTTP_NOT_FOUND);
+        }
+
+        if (!$session->isInternalMode()) {
+            return $this->json(['error' => 'Custom fields can only be set on internal sessions'], Response::HTTP_BAD_REQUEST);
+        }
+
+        try {
+            $data = json_decode($request->getContent(), true);
+
+            if (!is_array($data)) {
+                return $this->json(['error' => 'Invalid JSON body'], Response::HTTP_BAD_REQUEST);
+            }
+
+            $values = $data['values'] ?? null;
+
+            if (!is_array($values)) {
+                return $this->json(['error' => 'Missing or invalid "values" field'], Response::HTTP_BAD_REQUEST);
+            }
+
+            $fieldDefs = $widget->getConfig()['customFields'] ?? [];
+            if (empty($fieldDefs)) {
+                return $this->json(['error' => 'No custom fields defined for this widget'], Response::HTTP_BAD_REQUEST);
+            }
+
+            $sanitizedValues = $this->widgetService->validateCustomFieldValues($values, $fieldDefs);
+            $session->setCustomFieldValues($sanitizedValues);
+            $this->sessionRepository->save($session, true);
+
+            return $this->json([
+                'success' => true,
+                'values' => $sanitizedValues,
+            ]);
+        } catch (\InvalidArgumentException $e) {
+            return $this->json(['error' => $e->getMessage()], Response::HTTP_BAD_REQUEST);
+        } catch (\RuntimeException $e) {
+            $this->logger->error('Failed to update custom field values', [
+                'widget_id' => $widgetId,
+                'session_id' => $sessionId,
+                'error' => $e->getMessage(),
+            ]);
+
+            return $this->json([
+                'error' => 'Failed to update custom field values',
             ], Response::HTTP_INTERNAL_SERVER_ERROR);
         }
     }

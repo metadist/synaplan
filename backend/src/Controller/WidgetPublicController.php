@@ -5,6 +5,7 @@ namespace App\Controller;
 use App\Entity\Chat;
 use App\Entity\File;
 use App\Entity\Message;
+use App\Entity\WidgetSession;
 use App\Repository\ChatRepository;
 use App\Repository\FileRepository;
 use App\Repository\MessageRepository;
@@ -184,11 +185,8 @@ class WidgetPublicController extends AbstractController
             return $domainError;
         }
 
-        // Validate test mode: only allow if authenticated user is widget owner
-        $isValidatedTestMode = $this->isValidatedTestMode($request, $widget->getOwnerId());
-
-        // Get or create session
-        $session = $this->sessionService->getOrCreateSession($widgetId, $data['sessionId'], $isValidatedTestMode);
+        // Resolve session with test/internal mode handling
+        $session = $this->resolveSessionWithMode($request, $widget, $data['sessionId']);
 
         // Capture country from Cloudflare geolocation header on first message
         if (null === $session->getCountry()) {
@@ -390,6 +388,16 @@ class WidgetPublicController extends AbstractController
 
             \set_time_limit(0);
 
+            // Read AI model directly from widget config (most reliable source)
+            $widgetModelId = isset($config['aiModelId']) && (int) $config['aiModelId'] > 0
+                ? (int) $config['aiModelId']
+                : null;
+
+            $this->logger->debug('Widget AI model resolution', [
+                'widget_id' => $widgetId,
+                'configured_model_id' => $widgetModelId,
+            ]);
+
             $processingOptions = [
                 'fixed_task_prompt' => $widget->getTaskPromptTopic(),
                 'skipSorting' => true,
@@ -401,7 +409,8 @@ class WidgetPublicController extends AbstractController
                     : 0.3,
                 'widget_id' => $widget->getWidgetId(),
                 'disable_memories' => true,
-                'is_widget_mode' => true, // Disable memories for widget
+                'is_widget_mode' => true,
+                'widget_model_id' => $widgetModelId,
             ];
 
             $response = new StreamedResponse(function () use (
@@ -575,6 +584,10 @@ class WidgetPublicController extends AbstractController
                     $classification = $result['classification'] ?? [];
                     $topic = $classification['topic'] ?? 'WIDGET';
                     $language = $classification['language'] ?? 'en';
+                    // 'auto' is only used for the system prompt directive; store a valid ISO code in DB
+                    if ('auto' === $language) {
+                        $language = 'en';
+                    }
 
                     // Truncate topic to fit database column (max 64 chars)
                     $topic = mb_substr($topic, 0, 64);
@@ -758,11 +771,8 @@ class WidgetPublicController extends AbstractController
             ], Response::HTTP_FORBIDDEN);
         }
 
-        // Validate test mode: only allow if authenticated user is widget owner
-        $isValidatedTestMode = $this->isValidatedTestMode($request, $widget->getOwnerId());
-
-        // Get or create widget session
-        $widgetSession = $this->sessionService->getOrCreateSession($widgetId, $sessionId, $isValidatedTestMode);
+        // Resolve session with test/internal mode handling
+        $widgetSession = $this->resolveSessionWithMode($request, $widget, $sessionId);
 
         $owner = $widget->getOwner();
         if (!$owner) {
@@ -1245,17 +1255,20 @@ class WidgetPublicController extends AbstractController
 
     private function ensureDomainAllowed(array $config, Request $request, ?int $widgetOwnerId = null): ?JsonResponse
     {
-        // Check for test mode: if X-Widget-Test-Mode header is set
+        // Check for test mode or internal mode: if either header is set
         // and the authenticated user is the widget owner, skip domain check
-        if ('true' === $request->headers->get('X-Widget-Test-Mode') && $widgetOwnerId) {
+        $isTestOrInternal = 'true' === $request->headers->get('X-Widget-Test-Mode')
+            || 'true' === $request->headers->get('X-Widget-Internal-Mode');
+
+        if ($isTestOrInternal && $widgetOwnerId) {
             $user = $this->getUser();
             if ($user && method_exists($user, 'getId') && $user->getId() === $widgetOwnerId) {
-                $this->logger->info('Widget domain check bypassed for owner in test mode', [
+                $this->logger->info('Widget domain check bypassed for owner in test/internal mode', [
                     'user_id' => $user->getId(),
                     'widget_owner_id' => $widgetOwnerId,
                 ]);
 
-                return null; // Allow - owner is testing their own widget
+                return null;
             }
         }
 
@@ -1428,53 +1441,26 @@ class WidgetPublicController extends AbstractController
     }
 
     /**
-     * Validate test mode request.
+     * Resolve a widget session, applying test/internal mode logic.
      *
-     * Test mode is only valid if:
-     * 1. X-Widget-Test-Mode header is set to 'true'
-     * 2. User is authenticated (has valid session/token)
-     * 3. Authenticated user is the widget owner
-     *
-     * This prevents malicious users from marking their sessions as test
-     * to avoid being counted in statistics.
-     *
-     * @param Request $request       The HTTP request
-     * @param int     $widgetOwnerId The widget owner's user ID
-     *
-     * @return bool True if test mode is validated, false otherwise
+     * Test mode adds a test_ prefix to the session ID.
+     * Internal mode creates a normal session but sets the mode to MODE_INTERNAL.
      */
-    private function isValidatedTestMode(Request $request, int $widgetOwnerId): bool
+    private function resolveSessionWithMode(Request $request, \App\Entity\Widget $widget, string $sessionId): WidgetSession
     {
-        // Check if test mode is requested
-        if ('true' !== $request->headers->get('X-Widget-Test-Mode')) {
-            return false;
-        }
-
-        // Try to get authenticated user from security context
         $user = $this->getUser();
+        $ownerMatch = $user instanceof \App\Entity\User && $user->getId() === $widget->getOwnerId();
 
-        // No authenticated user - test mode not allowed
-        if (!$user instanceof \App\Entity\User) {
-            $this->logger->debug('Test mode rejected: no authenticated user');
+        $isTestMode = $ownerMatch && 'true' === $request->headers->get('X-Widget-Test-Mode');
+        $isInternalMode = !$isTestMode && $ownerMatch && 'true' === $request->headers->get('X-Widget-Internal-Mode');
 
-            return false;
+        $session = $this->sessionService->getOrCreateSession($widget->getWidgetId(), $sessionId, $isTestMode);
+
+        if ($isInternalMode && $session->isAiMode()) {
+            $session->setMode(WidgetSession::MODE_INTERNAL);
         }
 
-        // Check if authenticated user is the widget owner
-        if ($user->getId() !== $widgetOwnerId) {
-            $this->logger->debug('Test mode rejected: user is not widget owner', [
-                'user_id' => $user->getId(),
-                'widget_owner_id' => $widgetOwnerId,
-            ]);
-
-            return false;
-        }
-
-        $this->logger->debug('Test mode validated for widget owner', [
-            'user_id' => $user->getId(),
-        ]);
-
-        return true;
+        return $session;
     }
 
     /**

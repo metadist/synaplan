@@ -18,8 +18,15 @@ export interface Widget {
     ai_sessions: number
     human_sessions: number
     waiting_sessions: number
+    internal_sessions: number
   }
   allowedDomains?: string[]
+}
+
+export interface CustomFieldDef {
+  id: string
+  name: string
+  type: 'text' | 'boolean'
 }
 
 export interface WidgetConfig {
@@ -34,8 +41,9 @@ export interface WidgetConfig {
   messageLimit?: number
   maxFileSize?: number
   allowedDomains?: string[]
-  allowFileUpload?: boolean // NEW: Enable/disable file upload
+  allowFileUpload?: boolean
   fileUploadLimit?: number
+  customFields?: CustomFieldDef[]
 }
 
 export interface CreateWidgetRequest {
@@ -218,14 +226,16 @@ export async function sendWidgetMessage(
     payload.files = fileIds
   }
 
-  // Include credentials when in test mode (X-Widget-Test-Mode header is present)
-  const isTestMode = extraHeaders?.['X-Widget-Test-Mode'] === 'true'
+  // Include credentials when in test/internal mode (dashboard context)
+  const isDashboardMode =
+    extraHeaders?.['X-Widget-Test-Mode'] === 'true' ||
+    extraHeaders?.['X-Widget-Internal-Mode'] === 'true'
 
   const response = await fetch(`${apiUrl}/api/v1/widget/${widgetId}/message`, {
     method: 'POST',
     headers,
     body: JSON.stringify(payload),
-    credentials: isTestMode ? 'include' : 'omit',
+    credentials: isDashboardMode ? 'include' : 'omit',
   })
 
   if (!response.ok) {
@@ -405,21 +415,23 @@ export async function uploadWidgetFile(
     headers['X-Widget-Host'] = window.location.host
   }
 
-  // Include credentials when in test mode (X-Widget-Test-Mode header is present)
-  const isTestMode = options?.headers?.['X-Widget-Test-Mode'] === 'true'
+  // Include credentials when in test/internal mode (dashboard context)
+  const isDashboardMode =
+    options?.headers?.['X-Widget-Test-Mode'] === 'true' ||
+    options?.headers?.['X-Widget-Internal-Mode'] === 'true'
 
   console.log('🌐 Widget file upload request:', {
     url: `${baseUrl}/api/v1/widget/${widgetId}/upload`,
     method: 'POST',
     bodyPreview: 'FormData with file',
-    isTestMode,
+    isDashboardMode,
   })
 
   const response = await fetch(`${baseUrl}/api/v1/widget/${widgetId}/upload`, {
     method: 'POST',
     headers,
     body: formData,
-    credentials: isTestMode ? 'include' : 'omit',
+    credentials: isDashboardMode ? 'include' : 'omit',
   })
 
   console.log('🌐 Widget file upload response:', {

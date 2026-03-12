@@ -3,9 +3,9 @@
     :class="[
       'synaplan-widget',
       widgetTheme === 'dark' ? 'dark' : '',
-      testMode ? 'relative w-full h-full' : isPreview ? 'absolute' : 'fixed',
-      testMode ? '' : 'z-[9999]',
-      testMode
+      testMode || internalMode ? 'relative w-full h-full' : isPreview ? 'absolute' : 'fixed',
+      testMode || internalMode ? '' : 'z-[9999]',
+      testMode || internalMode
         ? ''
         : isFullscreen && isOpen
           ? 'inset-0 flex items-center justify-center'
@@ -592,6 +592,7 @@ interface Props {
   fullscreenMode?: boolean
   allowFullscreen?: boolean
   testMode?: boolean
+  internalMode?: boolean
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -612,10 +613,12 @@ const props = withDefaults(defineProps<Props>(), {
   fullscreenMode: false,
   allowFullscreen: false,
   testMode: false,
+  internalMode: false,
 })
 
 const emit = defineEmits<{
   (e: 'close'): void
+  (e: 'session-created', sessionId: string): void
 }>()
 
 interface MessageFile {
@@ -667,6 +670,7 @@ const sessionId = ref<string>('')
 const isSending = ref(false)
 const chatId = ref<number | null>(null)
 const historyLoaded = ref(false)
+const sessionCreatedEmitted = ref(false)
 const isLoadingHistory = ref(false)
 
 // Human takeover state
@@ -679,13 +683,15 @@ const isMobile = ref(false)
 const { t } = useI18n()
 
 const allowFileUploads = computed(
-  () => !!props.allowFileUpload && (!props.isPreview || props.testMode)
+  () => !!props.allowFileUpload && (!props.isPreview || props.testMode || props.internalMode)
 )
 const fileUploadLimit = computed(() => props.fileUploadLimit ?? 0)
-const isTestEnvironment = computed(() => props.testMode || props.isPreview)
-const testModeHeaders = computed(
-  (): Record<string, string> => (isTestEnvironment.value ? { 'X-Widget-Test-Mode': 'true' } : {})
-)
+const isTestEnvironment = computed(() => props.testMode || props.isPreview || props.internalMode)
+const testModeHeaders = computed((): Record<string, string> => {
+  if (props.internalMode) return { 'X-Widget-Internal-Mode': 'true' }
+  if (isTestEnvironment.value) return { 'X-Widget-Test-Mode': 'true' }
+  return {}
+})
 
 // Always display messages sorted by timestamp
 const sortedMessages = computed(() => {
@@ -722,11 +728,13 @@ const updateIsMobile = () => {
   isMobile.value = window.matchMedia('(max-width: 768px)').matches
 }
 
+const isEmbeddedMode = computed(() => props.testMode || props.internalMode)
+
 const chatWindowClasses = computed(() => {
-  if (isMobile.value && !props.isPreview) {
+  if (isMobile.value && !props.isPreview && !isEmbeddedMode.value) {
     return ['fixed inset-0 rounded-none w-screen h-screen']
   }
-  if (props.testMode) {
+  if (isEmbeddedMode.value) {
     return ['rounded-2xl w-full h-full']
   }
   if (isFullscreen.value) {
@@ -736,14 +744,14 @@ const chatWindowClasses = computed(() => {
 })
 
 const chatWindowStyle = computed(() => {
-  if (isMobile.value && !props.isPreview) {
+  if (isMobile.value && !props.isPreview && !isEmbeddedMode.value) {
     return {
       width: '100vw',
       height: '100vh',
     }
   }
 
-  if (props.testMode) {
+  if (isEmbeddedMode.value) {
     return {
       width: '100%',
       height: '100%',
@@ -1379,6 +1387,11 @@ const sendMessage = async () => {
       }
     }
 
+    if (!sessionCreatedEmitted.value && isTestEnvironment.value && sessionId.value) {
+      sessionCreatedEmitted.value = true
+      emit('session-created', sessionId.value)
+    }
+
     if (typeof result.remainingUploads === 'number') {
       const limit = fileUploadLimit.value
       // Only track count if there's an actual limit (0 = unlimited)
@@ -1406,7 +1419,8 @@ const sendMessage = async () => {
     isTyping.value = false
 
     // Subscribe to SSE after first successful message (session now exists on server)
-    if (!eventSubscription && sessionId.value) {
+    // Skip SSE in dashboard mode (test/internal) -- not needed and causes 404s
+    if (!eventSubscription && sessionId.value && !isTestEnvironment.value) {
       console.debug('[Widget] First message sent, subscribing to SSE')
       subscribeToEvents()
     }
@@ -1685,8 +1699,8 @@ const loadConversationHistory = async (force = false) => {
         }
 
         // Only subscribe to SSE if the session has messages (exists on server)
-        // This prevents 404 errors for brand new sessions that aren't persisted yet
-        if (!eventSubscription && data.session.messageCount > 0) {
+        // Skip SSE in dashboard mode (test/internal) -- not needed and causes 404s
+        if (!eventSubscription && data.session.messageCount > 0 && !isTestEnvironment.value) {
           console.debug('[Widget] Subscribing to SSE for real-time events')
           subscribeToEvents()
         }
@@ -1846,12 +1860,10 @@ onMounted(() => {
   window.addEventListener('synaplan-widget-close', handleCloseEvent)
   window.addEventListener('synaplan-widget-theme-sync', handleThemeSyncEvent)
 
-  // In test mode, create a temporary session without localStorage persistence
+  // In test/internal mode, create a temporary session without localStorage persistence
   if (isTestEnvironment.value) {
     sessionId.value = createSessionId()
-    // Still call loadConversationHistory to trigger ensureAutoMessage (but it won't load actual history)
     loadConversationHistory()
-    // Don't subscribe to SSE in test mode - no real session exists
     return
   }
 

@@ -391,6 +391,7 @@ PROMPT;
             'ai_sessions' => $modeCounts['ai'],
             'human_sessions' => $modeCounts['human'],
             'waiting_sessions' => $modeCounts['waiting'],
+            'internal_sessions' => $modeCounts['internal'],
         ];
     }
 }
