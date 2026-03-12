@@ -1424,6 +1424,8 @@
     "fileUploadFailed": "File upload failed. Please try again.",
     "fileUploadDefaultMessage": "Please review the attached file.",
     "sendFailed": "Sorry, I encountered an error. Please try again.",
+    "chatUnavailable": "Chat is currently unavailable.",
+    "chatUnavailablePlaceholder": "Chat unavailable",
     "defaultAssistantReply": "Thanks for your message! I'll get right back to you.",
     "exportChat": "Export Chat",
     "exportChatId": "Chat ID",

@@ -108,7 +108,6 @@ class SynaplanWidget {
   private async startLazy() {
     const configLoaded = await this.loadRemoteConfig()
     if (!configLoaded) {
-      console.warn('Synaplan Widget: Widget is not active or unavailable')
       return
     }
 
@@ -131,7 +130,6 @@ class SynaplanWidget {
   private async startEager() {
     const configLoaded = await this.loadRemoteConfig()
     if (!configLoaded) {
-      console.warn('Synaplan Widget: Widget is not active or unavailable')
       return
     }
 
@@ -150,14 +148,12 @@ class SynaplanWidget {
       })
 
       if (!response.ok) {
-        if (response.status === 503) {
-          console.warn('Synaplan Widget: Widget is not active (503 Service Unavailable)')
-        } else if (response.status === 404) {
-          console.error('Synaplan Widget: Widget not found (404)')
+        if (response.status === 404 || response.status === 503) {
+          console.debug(`Synaplan Widget: Widget unavailable (${response.status})`)
         } else if (response.status === 403) {
-          console.warn('Synaplan Widget: Domain not allowed (403 Forbidden)')
+          console.debug('Synaplan Widget: Domain not allowed (403)')
         } else {
-          console.error(`Synaplan Widget: Failed to load config (${response.status})`)
+          console.warn(`Synaplan Widget: Failed to load config (${response.status})`)
         }
         return false
       }
@@ -175,7 +171,7 @@ class SynaplanWidget {
 
       return false
     } catch (error) {
-      console.error('Synaplan Widget: Failed to load remote config', error)
+      console.debug('Synaplan Widget: Failed to load config', error)
       return false
     }
   }
@@ -446,7 +442,6 @@ class SynaplanWidget {
       }
 
       this.chatLoaded = true
-      console.log('✅ Synaplan Widget loaded successfully')
     } catch (error) {
       console.error('Failed to load Synaplan Widget:', error)
 
