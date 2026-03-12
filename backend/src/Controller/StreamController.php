@@ -750,13 +750,14 @@ class StreamController extends AbstractController
                     $chat->updateTimestamp();
                     $this->em->flush();
 
-                    // Send complete event
+                    // Send complete event (preserve original topic so frontend can show correct Again models)
+                    $originalTopic = $result['classification']['topic'] ?? 'ERROR';
                     $this->sendSSE('complete', [
                         'messageId' => $outgoingMessage->getId(),
                         'trackId' => $trackId,
                         'provider' => $result['provider'] ?? 'system',
                         'model' => 'error',
-                        'topic' => 'ERROR',
+                        'topic' => $originalTopic,
                         'language' => 'en',
                     ]);
 

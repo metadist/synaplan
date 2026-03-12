@@ -18,7 +18,8 @@ export interface ModelOption {
  * Provides unified model selection for Again functionality
  *
  * Now generates againData in frontend based on message files and available models:
- * - For images: Uses TEXT2PIC models
+ * - For vision (image analysis): Uses PIC2TEXT models
+ * - For image generation: Uses TEXT2PIC models
  * - For videos: Uses TEXT2VID models
  * - For audio: Uses TEXT2SOUND models
  * - Otherwise: Uses CHAT models
@@ -30,7 +31,7 @@ export function useModelSelection(
   files?: ComputedRef<any[] | undefined>,
   currentProvider?: ComputedRef<string | undefined>,
   currentModelName?: ComputedRef<string | undefined>,
-  mediaHint?: ComputedRef<'image' | 'video' | 'audio' | 'chat' | null | undefined>
+  mediaHint?: ComputedRef<'image' | 'video' | 'audio' | 'chat' | 'vision' | null | undefined>
 ) {
   const aiConfigStore = useAiConfigStore()
 
@@ -57,9 +58,10 @@ export function useModelSelection(
   /**
    * Detect media type from message files
    */
-  const mediaType = computed((): 'image' | 'video' | 'audio' | 'chat' => {
+  const mediaType = computed((): 'image' | 'video' | 'audio' | 'chat' | 'vision' => {
     const tag = preferredTag.value
     if (tag) {
+      if (tag === 'PIC2TEXT' || tag === 'VISION') return 'vision'
       if (tag === 'TEXT2PIC' || tag === 'IMAGE' || tag === 'TEXT_TO_IMAGE') return 'image'
       if (tag === 'TEXT2VID' || tag === 'VIDEO' || tag === 'TEXT_TO_VIDEO') return 'video'
       if (tag === 'TEXT2SOUND' || tag === 'AUDIO' || tag === 'TEXT_TO_AUDIO') return 'audio'
@@ -67,7 +69,13 @@ export function useModelSelection(
     }
 
     const hint = mediaHint?.value
-    if (hint === 'image' || hint === 'video' || hint === 'audio' || hint === 'chat') {
+    if (
+      hint === 'image' ||
+      hint === 'video' ||
+      hint === 'audio' ||
+      hint === 'chat' ||
+      hint === 'vision'
+    ) {
       return hint
     }
 
@@ -88,6 +96,8 @@ export function useModelSelection(
    */
   const modelTag = computed((): Capability => {
     switch (mediaType.value) {
+      case 'vision':
+        return 'PIC2TEXT'
       case 'image':
         return 'TEXT2PIC'
       case 'video':
