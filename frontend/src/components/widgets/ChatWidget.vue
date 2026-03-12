@@ -1440,7 +1440,9 @@ const sendMessage = async () => {
       subscribeToEvents()
     }
   } catch (error) {
-    messageCount.value = Math.max(0, messageCount.value - 1)
+    if (chatMode.value === 'ai') {
+      messageCount.value = Math.max(0, messageCount.value - 1)
+    }
 
     if (error instanceof WidgetUnavailableError) {
       const idx = messages.value.findIndex((m) => m.id === assistantMessageId)

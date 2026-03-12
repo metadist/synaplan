@@ -170,8 +170,8 @@ class SynaplanWidget {
       }
 
       return false
-    } catch {
-      console.debug('Synaplan Widget: Could not reach server')
+    } catch (error) {
+      console.debug('Synaplan Widget: Failed to load config', error)
       return false
     }
   }
