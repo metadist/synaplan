@@ -245,6 +245,7 @@ final readonly class WidgetExportService
         $exportData['statistics']['ai_sessions'] = $modeCounts['ai'];
         $exportData['statistics']['human_sessions'] = $modeCounts['human'];
         $exportData['statistics']['waiting_sessions'] = $modeCounts['waiting'];
+        $exportData['statistics']['internal_sessions'] = $modeCounts['internal'];
 
         $tempFile = tempnam(sys_get_temp_dir(), 'widget_export_').'.json';
         file_put_contents($tempFile, json_encode($exportData, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));

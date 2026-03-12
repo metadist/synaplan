@@ -1132,7 +1132,9 @@ const stats = ref({
   internal: 0,
 })
 
-const totalSessions = computed(() => stats.value.ai + stats.value.human + stats.value.waiting)
+const totalSessions = computed(
+  () => stats.value.ai + stats.value.human + stats.value.waiting + stats.value.internal,
+)
 
 const goBack = () => {
   router.push({ name: 'tools-chat-widget' })

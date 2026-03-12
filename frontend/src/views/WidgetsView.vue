@@ -159,6 +159,13 @@
                     <Icon icon="heroicons:clock" class="w-3 h-3" />
                     {{ widget.stats?.waiting_sessions ?? 0 }} {{ $t('widgets.modeWaiting') }}
                   </span>
+                  <span
+                    class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-purple-500/10 text-purple-600 dark:text-purple-400 text-xs font-medium whitespace-nowrap"
+                  >
+                    <Icon icon="heroicons:building-office" class="w-3 h-3 flex-shrink-0" />
+                    {{ widget.stats?.internal_sessions ?? 0 }}
+                    {{ $t('widgets.modeInternal') }}
+                  </span>
                 </div>
               </div>
 
@@ -284,7 +291,7 @@
         @click.self="closeTestChat"
       >
         <div
-          class="flex flex-col items-center gap-2 md:gap-3 w-full max-w-[420px] md:max-w-none"
+          class="flex flex-col items-center gap-2 md:gap-3 w-full max-w-[420px] md:max-w-none max-h-full overflow-y-auto"
           @click.stop
         >
           <!-- Top bar: Mode Toggle + Close Button -->
@@ -323,7 +330,9 @@
           </div>
 
           <!-- Mode description -->
-          <p class="text-xs text-center txt-secondary max-w-md px-2 leading-relaxed">
+          <p
+            class="text-xs text-center txt-secondary max-w-md px-3 py-2 leading-relaxed rounded-xl bg-white/80 dark:bg-white/10 backdrop-blur-sm shadow-sm"
+          >
             <Icon
               :icon="overlayMode === 'internal' ? 'heroicons:information-circle' : 'heroicons:eye'"
               class="w-3.5 h-3.5 inline-block align-text-bottom mr-0.5"
