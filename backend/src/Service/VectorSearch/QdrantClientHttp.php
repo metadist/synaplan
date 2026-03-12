@@ -216,6 +216,36 @@ final readonly class QdrantClientHttp implements QdrantClientInterface
         }
     }
 
+    public function deleteAllMemoriesForUser(int $userId): int
+    {
+        try {
+            $response = $this->httpClient->request('DELETE', "{$this->baseUrl}/memories/user/{$userId}", [
+                'headers' => $this->getHeaders(),
+                'timeout' => 10,
+            ]);
+
+            if (200 !== $response->getStatusCode()) {
+                throw new \RuntimeException("Qdrant delete all memories for user failed: {$response->getContent(false)}");
+            }
+
+            $deleted = (int) json_decode($response->getContent(), true);
+
+            $this->logger->info('All memories deleted from Qdrant for user', [
+                'user_id' => $userId,
+                'deleted_count' => $deleted,
+            ]);
+
+            return $deleted;
+        } catch (\Throwable $e) {
+            $this->logger->error('Failed to delete all memories for user from Qdrant', [
+                'user_id' => $userId,
+                'error' => $e->getMessage(),
+            ]);
+
+            return 0;
+        }
+    }
+
     public function healthCheck(): bool
     {
         // If base URL is not configured, service is not available

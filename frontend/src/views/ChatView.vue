@@ -1640,7 +1640,6 @@ async function saveCancelledMessageToBackend(
 
 // Handle "Again" with specific model from backend
 const handleAgain = async (backendMessageId: number, modelId?: number) => {
-  // Check authentication before attempting to resend
   if (!authStore.isAuthenticated) {
     console.error('❌ Not authenticated - redirecting to login')
     const { error } = useNotification()
@@ -1649,7 +1648,6 @@ const handleAgain = async (backendMessageId: number, modelId?: number) => {
     return
   }
 
-  // Find the original user message for this assistant response
   const assistantMessage = historyStore.messages.find(
     (m) => m.backendMessageId === backendMessageId && m.role === 'assistant'
   )
@@ -1659,10 +1657,6 @@ const handleAgain = async (backendMessageId: number, modelId?: number) => {
     return
   }
 
-  // Mark previous response as superseded
-  historyStore.markSuperseded(assistantMessage.id)
-
-  // Find the user message (should be right before the assistant message)
   const messageIndex = historyStore.messages.indexOf(assistantMessage)
   const userMessage = messageIndex > 0 ? historyStore.messages[messageIndex - 1] : null
 
@@ -1671,7 +1665,6 @@ const handleAgain = async (backendMessageId: number, modelId?: number) => {
     return
   }
 
-  // Extract user text from parts
   const userText = userMessage.parts
     .filter((p) => p.type === 'text')
     .map((p) => p.content)
@@ -1682,33 +1675,44 @@ const handleAgain = async (backendMessageId: number, modelId?: number) => {
     return
   }
 
-  // Re-send the user message with the selected model
-  // This will trigger normal streaming flow
-  await handleSendMessage(userText, { modelId })
+  // Stop any active audio playback before retrying
+  if (currentAudioStreamer) {
+    currentAudioStreamer.stop()
+    currentAudioStreamer = null
+  }
+  isAudioStreaming.value = false
+
+  historyStore.markSuperseded(assistantMessage.id)
+
+  // Stream new response directly without creating a duplicate user message
+  await streamAIResponse(userText, { modelId })
 }
 
 const handleRegenerate = async (message: Message, modelOption: ModelOption) => {
-  streamingAbortController = new AbortController()
+  const messageIndex = historyStore.messages.findIndex((m) => m.id === message.id)
+  if (messageIndex <= 0) return
 
-  // Mark the current message as superseded
+  const previousMessage = historyStore.messages[messageIndex - 1]
+  if (previousMessage.role !== 'user') return
+
+  const content = previousMessage.parts
+    .filter((part) => part.type === 'text')
+    .map((part) => part.content || '')
+    .join('\n')
+
+  if (!content) return
+
+  // Stop any active audio playback before regenerating
+  if (currentAudioStreamer) {
+    currentAudioStreamer.stop()
+    currentAudioStreamer = null
+  }
+  isAudioStreaming.value = false
+
   historyStore.markSuperseded(message.id)
 
-  // Find the original user message that triggered this assistant response
-  const messageIndex = historyStore.messages.findIndex((m) => m.id === message.id)
-  if (messageIndex > 0) {
-    const previousMessage = historyStore.messages[messageIndex - 1]
-    if (previousMessage.role === 'user') {
-      // Extract text content from user message
-      const content = previousMessage.parts
-        .filter((part) => part.type === 'text')
-        .map((part) => part.content || '')
-        .join('\n')
-
-      // Re-send the user message with the selected model
-      // This will trigger normal streaming flow
-      await handleSendMessage(content, { modelId: modelOption.id })
-    }
-  }
+  // Stream new response directly without creating a duplicate user message
+  await streamAIResponse(content, { modelId: modelOption.id })
 }
 
 // Handle retry for rate-limited messages
