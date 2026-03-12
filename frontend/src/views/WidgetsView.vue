@@ -279,51 +279,63 @@
     <Teleport to="#app">
       <div
         v-if="testWidget"
-        class="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-2 sm:p-4"
+        class="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-2 md:p-4"
         data-testid="test-chat-overlay"
         @click.self="closeTestChat"
       >
         <div
-          class="flex flex-col items-center gap-2 sm:gap-3 w-full max-w-[420px] sm:max-w-none"
+          class="flex flex-col items-center gap-2 md:gap-3 w-full max-w-[420px] md:max-w-none"
           @click.stop
         >
-          <!-- Mode Toggle -->
-          <div class="flex gap-1 p-1 rounded-xl surface-card shadow-lg">
-            <button
-              :class="[
-                'px-3 sm:px-4 py-1.5 rounded-lg text-xs sm:text-sm font-medium transition-all',
+          <!-- Top bar: Mode Toggle + Close Button -->
+          <div class="flex items-center gap-2">
+            <div class="flex gap-1 p-1 rounded-xl surface-card shadow-lg">
+              <button
+                :class="[
+                'px-3 md:px-4 py-1.5 rounded-lg text-xs md:text-sm font-medium transition-all',
                 overlayMode === 'internal'
-                  ? 'bg-[var(--brand)] text-white shadow-sm'
-                  : 'txt-secondary hover:txt-primary',
-              ]"
-              @click="switchOverlayMode('internal')"
-            >
-              {{ $t('widgets.overlay.internalChat') }}
-            </button>
-            <button
-              :class="[
-                'px-3 sm:px-4 py-1.5 rounded-lg text-xs sm:text-sm font-medium transition-all',
+                    ? 'bg-[var(--brand)] text-white shadow-sm'
+                    : 'txt-secondary hover:txt-primary',
+                ]"
+                @click="switchOverlayMode('internal')"
+              >
+                {{ $t('widgets.overlay.internalChat') }}
+              </button>
+              <button
+                :class="[
+                'px-3 md:px-4 py-1.5 rounded-lg text-xs md:text-sm font-medium transition-all',
                 overlayMode === 'test'
-                  ? 'bg-[var(--brand)] text-white shadow-sm'
-                  : 'txt-secondary hover:txt-primary',
-              ]"
-              @click="switchOverlayMode('test')"
+                    ? 'bg-[var(--brand)] text-white shadow-sm'
+                    : 'txt-secondary hover:txt-primary',
+                ]"
+                @click="switchOverlayMode('test')"
+              >
+                {{ $t('widgets.overlay.testWidget') }}
+              </button>
+            </div>
+            <button
+              class="w-8 h-8 rounded-lg surface-card shadow-lg flex items-center justify-center hover-surface transition-colors"
+              :aria-label="$t('common.close')"
+              @click="closeTestChat"
             >
-              {{ $t('widgets.overlay.testWidget') }}
+              <Icon icon="heroicons:x-mark" class="w-5 h-5 txt-secondary" />
             </button>
           </div>
 
           <!-- Chat Layout -->
           <div
             :class="[
-              'w-full h-[600px] max-h-[80vh]',
+              'w-full',
               showCustomFieldsPanel
-                ? 'flex flex-col sm:flex-row gap-3 sm:gap-4 sm:w-auto'
-                : 'sm:w-[420px]',
+                ? 'flex flex-col-reverse overflow-y-auto max-h-[88vh] md:overflow-visible md:flex-row gap-2 md:gap-4 md:w-auto md:h-[600px] md:max-h-[80vh]'
+                : 'h-[600px] max-h-[80vh] md:w-[420px]',
             ]"
           >
             <!-- Custom Fields Panel (only in internal mode with defined fields) -->
-            <div v-if="showCustomFieldsPanel" class="h-48 sm:h-full sm:w-72 flex-shrink-0">
+            <div
+              v-if="showCustomFieldsPanel"
+              class="h-[260px] flex-shrink-0 md:h-full md:w-72"
+            >
               <WidgetCustomFieldsPanel
                 :custom-fields="testWidgetCustomFields"
                 :widget-id="testWidget.widgetId"
@@ -333,8 +345,8 @@
 
             <!-- Chat Widget -->
             <div
-              class="rounded-2xl overflow-hidden shadow-2xl sm:w-[420px] sm:flex-shrink-0"
-              :class="showCustomFieldsPanel ? 'flex-1 min-h-0' : 'h-full'"
+              class="rounded-2xl overflow-hidden shadow-2xl md:w-[420px] md:flex-shrink-0"
+              :class="showCustomFieldsPanel ? 'h-[clamp(400px,70vh,600px)] flex-shrink-0 md:h-full' : 'h-full'"
             >
               <ChatWidget
                 :key="chatWidgetKey"
