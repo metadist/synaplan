@@ -18,6 +18,7 @@ export interface Widget {
     ai_sessions: number
     human_sessions: number
     waiting_sessions: number
+    internal_sessions: number
   }
   allowedDomains?: string[]
 }
