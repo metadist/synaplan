@@ -378,9 +378,9 @@ class ConfigController extends AbstractController
             return $this->json(['error' => 'Not authenticated'], Response::HTTP_UNAUTHORIZED);
         }
 
-        $models = $this->modelRepository->findBy(
-            ['active' => 1, 'selectable' => 1],
-            ['quality' => 'DESC', 'rating' => 'DESC']
+        $models = array_filter(
+            $this->modelRepository->findBy(['active' => 1], ['quality' => 'DESC', 'rating' => 'DESC']),
+            static fn ($m) => $m->getId() > 0,
         );
 
         // Build model list with tag information
