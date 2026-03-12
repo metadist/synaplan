@@ -1,6 +1,16 @@
 import { httpClient } from './httpClient'
 import { useConfigStore } from '@/stores/config'
 
+export class WidgetUnavailableError extends Error {
+  constructor(
+    public readonly status: number,
+    message?: string
+  ) {
+    super(message ?? (status === 404 ? 'Widget not found' : 'Widget unavailable'))
+    this.name = 'WidgetUnavailableError'
+  }
+}
+
 // Widget Interface
 export interface Widget {
   id: number
@@ -125,12 +135,6 @@ export async function getWidget(widgetId: string): Promise<Widget> {
  * Update widget
  */
 export async function updateWidget(widgetId: string, request: UpdateWidgetRequest): Promise<void> {
-  console.log('🔧 widgetsApi.updateWidget called:', {
-    widgetId,
-    request,
-    allowedDomains: request.config?.allowedDomains,
-  })
-
   await httpClient<{ success: boolean }>(`/api/v1/widgets/${widgetId}`, {
     method: 'PUT',
     body: JSON.stringify(request),
@@ -239,6 +243,9 @@ export async function sendWidgetMessage(
   })
 
   if (!response.ok) {
+    if (response.status === 404 || response.status === 503) {
+      throw new WidgetUnavailableError(response.status)
+    }
     const error = await response.json().catch(() => ({ error: 'Unknown error' }))
     throw new Error(error.error || `HTTP ${response.status}`)
   }
@@ -420,13 +427,6 @@ export async function uploadWidgetFile(
     options?.headers?.['X-Widget-Test-Mode'] === 'true' ||
     options?.headers?.['X-Widget-Internal-Mode'] === 'true'
 
-  console.log('🌐 Widget file upload request:', {
-    url: `${baseUrl}/api/v1/widget/${widgetId}/upload`,
-    method: 'POST',
-    bodyPreview: 'FormData with file',
-    isDashboardMode,
-  })
-
   const response = await fetch(`${baseUrl}/api/v1/widget/${widgetId}/upload`, {
     method: 'POST',
     headers,
@@ -434,14 +434,10 @@ export async function uploadWidgetFile(
     credentials: isDashboardMode ? 'include' : 'omit',
   })
 
-  console.log('🌐 Widget file upload response:', {
-    url: `/api/v1/widget/${widgetId}/upload`,
-    status: response.status,
-    statusText: response.statusText,
-    ok: response.ok,
-  })
-
   if (!response.ok) {
+    if (response.status === 404 || response.status === 503) {
+      throw new WidgetUnavailableError(response.status)
+    }
     const error = await response.json().catch(() => ({ error: 'Upload failed' }))
     throw new Error(error.error || `HTTP ${response.status}: ${response.statusText}`)
   }

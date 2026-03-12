@@ -443,7 +443,7 @@
                 @change="handleFileSelect"
               />
               <button
-                :disabled="limitReached || !canAddMoreFiles"
+                :disabled="inputDisabled || !canAddMoreFiles"
                 class="w-10 h-10 rounded-lg hover:bg-black/5 dark:hover:bg-white/5 transition-colors flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed"
                 :aria-label="$t('widget.attachFile')"
                 data-testid="btn-attach"
@@ -457,9 +457,13 @@
             </template>
             <textarea
               v-model="inputMessage"
-              :disabled="limitReached"
+              :disabled="inputDisabled"
               :placeholder="
-                limitReached ? $t('widget.limitReachedPlaceholder') : $t('widget.placeholder')
+                widgetUnavailable
+                  ? $t('widget.chatUnavailablePlaceholder')
+                  : limitReached
+                    ? $t('widget.limitReachedPlaceholder')
+                    : $t('widget.placeholder')
               "
               rows="1"
               class="flex-1 px-4 py-2 rounded-lg resize-none focus:outline-none focus:ring-2 disabled:opacity-50 disabled:cursor-not-allowed"
@@ -563,7 +567,11 @@ import {
   ArrowsPointingInIcon,
 } from '@heroicons/vue/24/outline'
 
-import { uploadWidgetFile, sendWidgetMessage } from '@/services/api/widgetsApi'
+import {
+  uploadWidgetFile,
+  sendWidgetMessage,
+  WidgetUnavailableError,
+} from '@/services/api/widgetsApi'
 import { useI18n } from 'vue-i18n'
 import { parseAIResponse } from '@/utils/responseParser'
 import { getMarkdownRenderer } from '@/composables/useMarkdown'
@@ -672,6 +680,7 @@ const chatId = ref<number | null>(null)
 const historyLoaded = ref(false)
 const sessionCreatedEmitted = ref(false)
 const isLoadingHistory = ref(false)
+const widgetUnavailable = ref(false)
 
 // Human takeover state
 const chatMode = ref<'ai' | 'human' | 'waiting'>('ai')
@@ -781,6 +790,8 @@ const positionClass = computed(() => {
   return positions[props.position]
 })
 
+const inputDisabled = computed(() => limitReached.value || widgetUnavailable.value)
+
 const canSend = computed(() => {
   const hasText = inputMessage.value.trim() !== ''
   const hasFiles = allowFileUploads.value && selectedFiles.value.length > 0
@@ -790,7 +801,7 @@ const canSend = computed(() => {
   if (uploadingFile.value) {
     return false
   }
-  return !limitReached.value && !isSending.value
+  return !inputDisabled.value && !isSending.value
 })
 
 const showLimitWarning = computed(() => {
@@ -1297,6 +1308,10 @@ const sendMessage = async () => {
         fileInput.value.value = ''
       }
     } catch (error: any) {
+      if (error instanceof WidgetUnavailableError) {
+        handleWidgetUnavailable()
+        return
+      }
       console.error('Widget file upload failed:', error)
       fileUploadError.value = error?.message || t('widget.fileUploadFailed')
       return
@@ -1425,45 +1440,66 @@ const sendMessage = async () => {
       subscribeToEvents()
     }
   } catch (error) {
-    console.error('Failed to send message:', error)
-    // Decrement message count on failure so user can retry
     messageCount.value = Math.max(0, messageCount.value - 1)
 
-    const lastMessage = messages.value.find((m) => m.id === assistantMessageId)
-    let recovered = false
-
-    if (!props.isPreview) {
-      try {
-        await loadConversationHistory(true)
-        const latestMessage = messages.value[messages.value.length - 1]
-        if (
-          latestMessage &&
-          latestMessage.role === 'assistant' &&
-          latestMessage.content.trim().length > 0
-        ) {
-          recovered = true
-        }
-      } catch (historyError) {
-        console.error('Failed to recover conversation history:', historyError)
+    if (error instanceof WidgetUnavailableError) {
+      const idx = messages.value.findIndex((m) => m.id === assistantMessageId)
+      if (idx !== -1) {
+        messages.value.splice(idx, 1)
       }
-    }
-
-    if (!recovered) {
-      if (lastMessage && lastMessage.content.trim().length > 0) {
-        isTyping.value = false
-      } else {
-        const lastMessageIndex = messages.value.findIndex((m) => m.id === assistantMessageId)
-        if (lastMessageIndex !== -1) {
-          messages.value.splice(lastMessageIndex, 1)
-        }
-        addBotMessage(t('widget.sendFailed'))
-      }
+      handleWidgetUnavailable()
     } else {
-      await scrollToBottom()
+      console.error('Failed to send message:', error)
+
+      const lastMessage = messages.value.find((m) => m.id === assistantMessageId)
+      let recovered = false
+
+      if (!props.isPreview) {
+        try {
+          await loadConversationHistory(true)
+          const latestMessage = messages.value[messages.value.length - 1]
+          if (
+            latestMessage &&
+            latestMessage.role === 'assistant' &&
+            latestMessage.content.trim().length > 0
+          ) {
+            recovered = true
+          }
+        } catch (historyError) {
+          if (!(historyError instanceof WidgetUnavailableError)) {
+            console.error('Failed to recover conversation history:', historyError)
+          }
+        }
+      }
+
+      if (!recovered) {
+        if (lastMessage && lastMessage.content.trim().length > 0) {
+          isTyping.value = false
+        } else {
+          const idx = messages.value.findIndex((m) => m.id === assistantMessageId)
+          if (idx !== -1) {
+            messages.value.splice(idx, 1)
+          }
+          addBotMessage(t('widget.sendFailed'))
+        }
+      } else {
+        await scrollToBottom()
+      }
     }
   } finally {
     isTyping.value = false
     isSending.value = false
+  }
+}
+
+function handleWidgetUnavailable() {
+  if (widgetUnavailable.value) return
+  widgetUnavailable.value = true
+  addBotMessage(t('widget.chatUnavailable'))
+
+  if (eventSubscription) {
+    eventSubscription.unsubscribe()
+    eventSubscription = null
   }
 }
 
@@ -1670,6 +1706,10 @@ const loadConversationHistory = async (force = false) => {
     )
 
     if (!response.ok) {
+      if (response.status === 404 || response.status === 503) {
+        handleWidgetUnavailable()
+        return
+      }
       throw new Error(`History request failed with status ${response.status}`)
     }
 
@@ -1710,13 +1750,16 @@ const loadConversationHistory = async (force = false) => {
       }
     }
   } catch (error) {
-    console.error('Failed to load widget history:', error)
+    if (!widgetUnavailable.value) {
+      console.error('Failed to load widget history:', error)
+    }
   } finally {
     historyLoaded.value = true
     isLoadingHistory.value = false
     if (isOpen.value) {
-      ensureAutoMessage()
-      // Scroll to bottom after history is loaded
+      if (!widgetUnavailable.value) {
+        ensureAutoMessage()
+      }
       await scrollToBottom()
     }
   }
@@ -2032,7 +2075,9 @@ function subscribeToEvents() {
     sessionId.value,
     handleWidgetEvent,
     (error) => {
-      console.error('[Widget] SSE connection error:', error)
+      if (!widgetUnavailable.value) {
+        console.debug('[Widget] SSE connection error:', error)
+      }
     },
     { apiUrl: props.apiUrl }
   )

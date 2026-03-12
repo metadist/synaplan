@@ -1835,6 +1835,8 @@
     "fileUploadFailed": "Datei-Upload fehlgeschlagen. Bitte versuchen Sie es erneut.",
     "fileUploadDefaultMessage": "Bitte prüfen Sie die angehängte Datei.",
     "sendFailed": "Entschuldigung, es ist ein Fehler aufgetreten. Bitte versuchen Sie es erneut.",
+    "chatUnavailable": "Der Chat ist derzeit nicht verfügbar.",
+    "chatUnavailablePlaceholder": "Chat nicht verfügbar",
     "defaultAssistantReply": "Vielen Dank für Ihre Nachricht! Ich melde mich gleich bei Ihnen zurück.",
     "exportChat": "Chat exportieren",
     "exportChatId": "Chat-ID",
