@@ -91,6 +91,7 @@
               :provider="message.provider"
               :model-label="message.modelLabel"
               :topic="message.topic"
+              :original-topic="message.originalTopic"
               :again-data="message.againData"
               :backend-message-id="message.backendMessageId"
               :processing-status="message.isStreaming ? processingStatus : undefined"

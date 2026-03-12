@@ -231,7 +231,7 @@
         </div>
 
         <!-- Bubble content (only non-thinking parts) -->
-        <div class="px-4 py-3 overflow-hidden space-y-3">
+        <div class="px-4 py-3 overflow-x-clip overflow-y-visible space-y-3">
           <!-- Combined Badges: Files + Web Search + Tool (NEW) -->
           <div v-if="(files && files.length > 0) || webSearch || tool" class="space-y-2">
             <!-- Show badges with smart collapsing -->
@@ -751,6 +751,7 @@ interface Props {
   provider?: string
   modelLabel?: string
   topic?: string // Topic from message classification
+  originalTopic?: string | null // Original classification topic preserved on error messages
   againData?: AgainData
   backendMessageId?: number
   processingStatus?: string
@@ -969,8 +970,13 @@ const hasImageContent = computed(() => props.parts.some((p) => p.type === 'image
 const hasVideoContent = computed(() => props.parts.some((p) => p.type === 'video'))
 const hasAudioContent = computed(() => props.parts.some((p) => p.type === 'audio'))
 
+const effectiveTopic = computed(() => {
+  if (props.topic === 'ERROR' && props.originalTopic) return props.originalTopic
+  return props.topic
+})
+
 const isVisionResponse = computed(() => {
-  const topic = props.topic?.toLowerCase()
+  const topic = effectiveTopic.value?.toLowerCase()
   return topic === 'analyzefile' || topic === 'pic2text'
 })
 
