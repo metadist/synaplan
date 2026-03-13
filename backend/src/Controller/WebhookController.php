@@ -211,6 +211,21 @@ class WebhookController extends AbstractController
                 );
             }
 
+            try {
+                $this->internalEmailService->sendAiResponseEmail(
+                    $fromEmail,
+                    $subject,
+                    $userResult['error'],
+                    $messageId,
+                    originalRecipient: $toEmail,
+                );
+            } catch (\Exception $e) {
+                $this->logger->error('Failed to send rejection notification email', [
+                    'to' => $fromEmail,
+                    'error' => $e->getMessage(),
+                ]);
+            }
+
             return $this->json([
                 'success' => false,
                 'error' => $userResult['error'],
@@ -230,6 +245,26 @@ class WebhookController extends AbstractController
                     $subject,
                     "Limit: {$rateLimitCheck['limit']}, Used: {$rateLimitCheck['used']}",
                 );
+            }
+
+            $rateLimitMessage = 'Rate limit exceeded. Please try again later.';
+            if (!empty($rateLimitCheck['reset_at'])) {
+                $rateLimitMessage .= "\n\nYour limit will reset at: ".$rateLimitCheck['reset_at'];
+            }
+
+            try {
+                $this->internalEmailService->sendAiResponseEmail(
+                    $fromEmail,
+                    $subject,
+                    $rateLimitMessage,
+                    $messageId,
+                    originalRecipient: $toEmail,
+                );
+            } catch (\Exception $e) {
+                $this->logger->error('Failed to send rate limit notification email', [
+                    'to' => $fromEmail,
+                    'error' => $e->getMessage(),
+                ]);
             }
 
             return $this->json([

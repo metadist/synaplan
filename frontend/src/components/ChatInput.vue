@@ -51,7 +51,6 @@
         data-testid="comp-chat-input-shell"
         @dragover.prevent="handleDragOver"
         @dragleave.prevent="handleDragLeave"
-        @drop.prevent="handleDrop"
       >
         <!-- Command Palette (outside overflow container) -->
         <CommandPalette
@@ -657,14 +656,6 @@ const handleDragLeave = () => {
   isDragging.value = false
 }
 
-const handleDrop = async (event: DragEvent) => {
-  isDragging.value = false
-  const files = event.dataTransfer?.files
-  if (files && files.length > 0) {
-    await uploadFiles(Array.from(files))
-  }
-}
-
 // Clipboard paste handler for images and files
 const handlePaste = async (event: ClipboardEvent) => {
   const items = event.clipboardData?.items
@@ -709,6 +700,7 @@ const handlePaste = async (event: ClipboardEvent) => {
 }
 
 const uploadFiles = async (files: File[]) => {
+  isDragging.value = false
   uploading.value = true
 
   for (const file of files) {

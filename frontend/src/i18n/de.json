@@ -99,7 +99,8 @@
       "chatDeleted": "Chat erfolgreich gelöscht",
       "share": "Chat teilen",
       "public": "Öffentlich"
-    }
+    },
+    "fileOnlyDefaultMessage": "Bitte prüfe die angehängte Datei."
   },
   "admin": {
     "title": "Admin-Panel",
