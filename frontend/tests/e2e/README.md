@@ -9,7 +9,7 @@ cd frontend
 npm install
 npx playwright install --with-deps
 npm run test:e2e                        # E2E tests
-npm run test:e2e -- -g "id=013"         # Single test
+npm run test:e2e -- -g "standard model"  # Single test (grep by name)
 npm run test:e2e:ui                     # Playwright UI
 ```
 
@@ -86,11 +86,11 @@ From the **frontend** directory:
 | What                               | Command                                                                    |
 | ---------------------------------- | -------------------------------------------------------------------------- |
 | **Dev stack**: E2E tests           | `npm run test:e2e`                                                         |
-| **Dev stack**: single test         | `npm run test:e2e -- -g "id=013"`                                          |
+| **Dev stack**: single test         | `npm run test:e2e -- -g "standard model"`                                  |
 | **Test stack**: E2E tests          | `BASE_URL=http://localhost:8001 npm run test:e2e`                          |
 | **Test stack**: full CI-like       | `make test-e2e-full` (builds test stack + runs all E2E)                    |
 | **Test stack**: CI-like (no @noci) | `BASE_URL=http://localhost:8001 npm run test:e2e -- --grep-invert "@noci"` |
-| **Test stack**: single test        | `BASE_URL=http://localhost:8001 npm run test:e2e -- -g "id=020"`           |
+| **Test stack**: single test        | `BASE_URL=http://localhost:8001 npm run test:e2e -- -g "embedded chat"`    |
 | **WhatsApp only**                  | `BASE_URL=http://localhost:8001 npm run test:e2e:whatsapp`                 |
 | **Playwright UI**                  | `npm run test:e2e:ui`                                                      |
 

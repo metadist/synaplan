@@ -7,14 +7,14 @@ import { TIMEOUTS } from '../config/config'
 const PAGE = '/config/task-prompts'
 const SEL = selectors.taskPrompts
 
-test.describe('Task Prompts: model editing on system prompts', () => {
-  test('@021 @ci Admin can edit AI model, rules and content on system prompt', async ({
+test.describe('@ci Task Prompts', () => {
+  test('admin can edit AI model, rules and content on system prompt', async ({
     page,
     credentials,
   }) => {
     void credentials
 
-    await test.step('Arrange: login and select a prompt', async () => {
+    await test.step('Arrange: login as admin and select a prompt', async () => {
       await login(page, CREDENTIALS.getAdminCredentials())
       await page.goto(PAGE)
       const select = page.locator(SEL.promptSelect)
@@ -30,7 +30,7 @@ test.describe('Task Prompts: model editing on system prompts', () => {
     })
   })
 
-  test('@022 @ci Non-admin can edit AI model, rules and content on system prompt', async ({
+  test('non-admin can edit AI model, rules and content on system prompt', async ({
     page,
     credentials,
   }) => {

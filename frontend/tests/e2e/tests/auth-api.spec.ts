@@ -5,31 +5,29 @@ import { CREDENTIALS } from '../config/credentials'
 
 const apiBase = () => getApiUrl()
 
-test('@noci @api @smoke health endpoint returns 200 id=api-001', async ({ request }) => {
-  const res = await request.get(`${apiBase()}/api/health`)
-  expect(res.status()).toBe(200)
-})
-
-test('@noci @api @smoke login returns 200 and sets auth cookies id=api-002', async ({
-  request,
-}) => {
-  const res = await request.post(`${apiBase()}/api/v1/auth/login`, {
-    data: {
-      email: CREDENTIALS.DEFAULT_USER,
-      password: CREDENTIALS.DEFAULT_PASSWORD,
-    },
+test.describe('@noci @api @smoke Auth API', () => {
+  test('health endpoint returns 200', async ({ request }) => {
+    const res = await request.get(`${apiBase()}/api/health`)
+    expect(res.status()).toBe(200)
   })
-  expect(res.status()).toBe(200)
-  const setCookie = res.headers()['set-cookie']
-  expect(setCookie).toBeDefined()
-  const cookieStr = Array.isArray(setCookie) ? setCookie.join(' ') : setCookie
-  expect(cookieStr).toMatch(/access_token|refresh_token|SESSION/)
-})
 
-test('@noci @api authenticated request with getAuthHeaders succeeds id=api-003', async ({
-  request,
-}) => {
-  const headers = await getAuthHeaders(request)
-  const res = await request.get(`${apiBase()}/api/v1/chats`, { headers })
-  expect(res.status()).toBe(200)
+  test('login returns 200 and sets auth cookies', async ({ request }) => {
+    const res = await request.post(`${apiBase()}/api/v1/auth/login`, {
+      data: {
+        email: CREDENTIALS.DEFAULT_USER,
+        password: CREDENTIALS.DEFAULT_PASSWORD,
+      },
+    })
+    expect(res.status()).toBe(200)
+    const setCookie = res.headers()['set-cookie']
+    expect(setCookie).toBeDefined()
+    const cookieStr = Array.isArray(setCookie) ? setCookie.join(' ') : setCookie
+    expect(cookieStr).toMatch(/access_token|refresh_token|SESSION/)
+  })
+
+  test('authenticated request with getAuthHeaders succeeds', async ({ request }) => {
+    const headers = await getAuthHeaders(request)
+    const res = await request.get(`${apiBase()}/api/v1/chats`, { headers })
+    expect(res.status()).toBe(200)
+  })
 })

@@ -18,14 +18,14 @@ function webhookUrl(): string {
   return `${getApiUrl()}${WEBHOOK_PATH}`
 }
 
-test.describe('@ci Smart-Email smoke @smoke', () => {
+test.describe('@ci @smoke Smart-Email', () => {
   test.describe.configure({ mode: 'serial' })
 
   test.beforeEach(async ({ request }) => {
     await clearMailHog(request)
   })
 
-  test('Inbound → Reply sent: webhook 2xx, exactly one reply in MailHog', async ({ request }) => {
+  test('inbound webhook triggers exactly one reply in MailHog', async ({ request }) => {
     await test.step('Arrange: verify 0 messages', async () => {
       const messages = await fetchMessages(request)
       expect(messages.length, 'MailHog should be empty before trigger').toBe(0)
@@ -77,7 +77,7 @@ test.describe('@ci Smart-Email smoke @smoke', () => {
     })
   })
 
-  test('Invalid payload → 400, error body, no reply in MailHog', async ({ request }) => {
+  test('invalid payload returns 400 and sends no reply', async ({ request }) => {
     await test.step('Arrange: empty MailHog', async () => {
       const messages = await fetchMessages(request)
       expect(messages.length).toBe(0)
@@ -89,7 +89,6 @@ test.describe('@ci Smart-Email smoke @smoke', () => {
           from: TEST_FROM,
           to: TEST_TO,
           subject: 'No body',
-          // body missing
         },
       })
       expect(res.status()).toBe(400)
