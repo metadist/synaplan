@@ -4,11 +4,8 @@ import { login } from '../helpers/auth'
 import { ChatHelper } from '../helpers/chat'
 import { TIMEOUTS } from '../config/config'
 
-test.describe('Chat Share', () => {
-  test('@001 @ci @smoke User can share chat and open shared link in incognito', async ({
-    page,
-    credentials,
-  }) => {
+test.describe('@ci @smoke Chat Share', () => {
+  test('user can share chat and open shared link in incognito', async ({ page, credentials }) => {
     const uniqueMessage = `Chat share E2E ${Date.now()} – please reply briefly.`
 
     await test.step('Arrange: login via UI', async () => {
@@ -46,7 +43,6 @@ test.describe('Chat Share', () => {
         await modal
           .locator(selectors.nav.chatManagerListRows)
           .waitFor({ state: 'visible', timeout: TIMEOUTS.STANDARD })
-        // Last chat = first row (newest first); prefer data-testid per E2E rules
         const lastChatRow = modal.locator(selectors.nav.chatV2Row).first()
         await lastChatRow.scrollIntoViewIfNeeded()
         await lastChatRow.hover()

@@ -42,14 +42,14 @@ async function postWebhookAndAssert2xx(request: APIRequestContext, payload: obje
   expect(json.success).toBe(true)
 }
 
-test.describe('@ci @whatsapp WhatsApp smoke @smoke', () => {
+test.describe('@ci @whatsapp @smoke WhatsApp', () => {
   test.describe.configure({ mode: 'serial' })
 
   test.beforeEach(async ({ request }, testInfo) => {
     await resetStub(request, getStubBaseUrl(), makeRunId(testInfo.testId))
   })
 
-  test('Text: webhook 2xx, exactly one outbound text, contract, idempotency', async ({
+  test('text: webhook 2xx, exactly one outbound, contract, idempotency', async ({
     request,
   }, testInfo) => {
     const baseUrl = getStubBaseUrl()
@@ -83,7 +83,7 @@ test.describe('@ci @whatsapp WhatsApp smoke @smoke', () => {
     })
   })
 
-  test('Negative: stub 500 → backend reports failed, exactly one attempt', async ({
+  test('negative: stub 500 → backend reports failed, exactly one attempt', async ({
     request,
   }, testInfo) => {
     const baseUrl = getStubBaseUrl()
@@ -116,7 +116,7 @@ test.describe('@ci @whatsapp WhatsApp smoke @smoke', () => {
     })
   })
 
-  test('Image: webhook 2xx, exactly one outbound message (text or image)', async ({
+  test('image: webhook 2xx, exactly one outbound message (text or image)', async ({
     request,
   }, testInfo) => {
     const baseUrl = getStubBaseUrl()
@@ -151,9 +151,7 @@ test.describe('@ci @whatsapp WhatsApp smoke @smoke', () => {
     })
   })
 
-  test('Audio: webhook 2xx, exactly one outbound message (text; stub audio is invalid so no TTS)', async ({
-    request,
-  }, testInfo) => {
+  test('audio: webhook 2xx, exactly one outbound text message', async ({ request }, testInfo) => {
     const baseUrl = getStubBaseUrl()
     const runId = makeRunId(testInfo.testId)
     const messageId = `smoke-audio-${Date.now()}-${Math.random().toString(36).slice(2)}`
