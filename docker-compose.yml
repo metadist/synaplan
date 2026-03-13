@@ -47,9 +47,9 @@ services:
     command: sh -c "npm ci && npm run build:widget -- --watch"
     environment:
       NODE_ENV: development
-      NODE_OPTIONS: '--max-old-space-size=768'
-    mem_limit: 1g
-    memswap_limit: 1g
+      NODE_OPTIONS: '--max-old-space-size=3072'
+    mem_limit: 4g
+    memswap_limit: 4g
     volumes:
       - ./frontend:/app
       # Anonymous volume to prevent host node_modules from being mounted
