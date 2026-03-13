@@ -311,7 +311,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, onUnmounted } from 'vue'
+import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import { Icon } from '@iconify/vue'
 import * as widgetsApi from '@/services/api/widgetsApi'
 import { useNotification } from '@/composables/useNotification'
@@ -383,8 +383,9 @@ watch(
   }
 )
 
-// Cleanup timers on unmount
+// Cleanup timers and listeners on unmount
 onUnmounted(() => {
+  document.removeEventListener('keydown', handleEscape)
   if (debounceTimer) {
     clearTimeout(debounceTimer)
   }
@@ -456,6 +457,12 @@ const handleIframeError = () => {
 const handleClose = () => {
   emit('close')
 }
+
+const handleEscape = (e: KeyboardEvent) => {
+  if (e.key === 'Escape') handleClose()
+}
+
+onMounted(() => document.addEventListener('keydown', handleEscape))
 
 const handleSubmit = async () => {
   if (!isValid.value || creating.value) return

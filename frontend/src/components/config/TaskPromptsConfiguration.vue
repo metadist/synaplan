@@ -777,7 +777,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
+import { ref, computed, onMounted, onUnmounted, watch, watchEffect } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { Icon } from '@iconify/vue'
 import {
@@ -862,6 +862,18 @@ const newPromptLanguage = ref(locale.value || 'en')
 const newPromptSelectedFiles = ref<number[]>([])
 const newPromptFilesSearch = ref('')
 const showCreateModal = ref(false)
+
+const handleCreateModalEscape = (e: KeyboardEvent) => {
+  if (e.key === 'Escape') showCreateModal.value = false
+}
+
+watchEffect((onCleanup) => {
+  if (showCreateModal.value) {
+    document.addEventListener('keydown', handleCreateModalEscape)
+    onCleanup(() => document.removeEventListener('keydown', handleCreateModalEscape))
+  }
+})
+
 const contentTextarea = ref<HTMLTextAreaElement | null>(null)
 const loading = ref(false)
 const error = ref<string | null>(null)

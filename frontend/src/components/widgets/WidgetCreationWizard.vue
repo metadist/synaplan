@@ -3,6 +3,7 @@
   <div
     class="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-2 lg:p-4"
     data-testid="modal-widget-creation"
+    @click.self="handleClose"
   >
     <div
       class="surface-card rounded-xl lg:rounded-2xl w-full max-w-6xl max-h-[95vh] lg:max-h-[90vh] overflow-hidden flex flex-col shadow-2xl"
@@ -982,6 +983,10 @@ const handleClose = async () => {
   emit('close')
 }
 
+const handleEscape = (e: KeyboardEvent) => {
+  if (e.key === 'Escape') handleClose()
+}
+
 const loadTaskPrompts = async () => {
   try {
     taskPrompts.value = await promptsApi.listPrompts(locale.value || 'en')
@@ -992,9 +997,11 @@ const loadTaskPrompts = async () => {
 
 onMounted(() => {
   loadTaskPrompts()
+  document.addEventListener('keydown', handleEscape)
 })
 
 onBeforeUnmount(() => {
+  document.removeEventListener('keydown', handleEscape)
   cleanupPreview()
 })
 </script>

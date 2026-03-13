@@ -637,7 +637,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, watch } from 'vue'
+import { ref, computed, onMounted, watch, watchEffect } from 'vue'
 import { Icon } from '@iconify/vue'
 import MainLayout from '@/components/MainLayout.vue'
 import RegistrationChart from '@/components/admin/RegistrationChart.vue'
@@ -859,6 +859,17 @@ function closeDeleteModal() {
   userToDelete.value = null
   deleteConfirmed.value = false
 }
+
+const handleDeleteModalEscape = (e: KeyboardEvent) => {
+  if (e.key === 'Escape') closeDeleteModal()
+}
+
+watchEffect((onCleanup) => {
+  if (showDeleteModal.value) {
+    document.addEventListener('keydown', handleDeleteModalEscape)
+    onCleanup(() => document.removeEventListener('keydown', handleDeleteModalEscape))
+  }
+})
 
 async function deleteUser() {
   if (!userToDelete.value) return

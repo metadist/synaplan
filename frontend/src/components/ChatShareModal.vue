@@ -226,7 +226,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch } from 'vue'
+import { ref, computed, watch, onMounted, onBeforeUnmount } from 'vue'
 import { useChatsStore } from '@/stores/chats'
 import { useNotification } from '@/composables/useNotification'
 
@@ -351,6 +351,13 @@ const copyLink = async () => {
 const close = () => {
   emit('close')
 }
+
+const handleEscape = (e: KeyboardEvent) => {
+  if (e.key === 'Escape') close()
+}
+
+onMounted(() => document.addEventListener('keydown', handleEscape))
+onBeforeUnmount(() => document.removeEventListener('keydown', handleEscape))
 </script>
 
 <style scoped>

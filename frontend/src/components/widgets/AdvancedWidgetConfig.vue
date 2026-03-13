@@ -1071,7 +1071,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, computed, onMounted } from 'vue'
+import { ref, reactive, computed, onMounted, onBeforeUnmount } from 'vue'
 import { Icon } from '@iconify/vue'
 import { useI18n } from 'vue-i18n'
 import { useNotification } from '@/composables/useNotification'
@@ -1427,6 +1427,13 @@ const groupedModels = computed(() => {
 const handleClose = () => {
   emit('close')
 }
+
+const handleEscape = (e: KeyboardEvent) => {
+  if (e.key === 'Escape') handleClose()
+}
+
+onMounted(() => document.addEventListener('keydown', handleEscape))
+onBeforeUnmount(() => document.removeEventListener('keydown', handleEscape))
 
 // Handle manual prompt creation
 const handleManualCreate = async () => {
