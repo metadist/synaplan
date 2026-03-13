@@ -680,6 +680,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onBeforeUnmount, watch } from 'vue'
 import { Icon } from '@iconify/vue'
+import { useEscapeKey } from '@/composables/useEscapeKey'
 import { useConfigStore } from '@/stores/config'
 import ChatWidget from '@/components/widgets/ChatWidget.vue'
 import * as widgetsApi from '@/services/api/widgetsApi'
@@ -983,9 +984,7 @@ const handleClose = async () => {
   emit('close')
 }
 
-const handleEscape = (e: KeyboardEvent) => {
-  if (e.key === 'Escape') handleClose()
-}
+useEscapeKey(handleClose)
 
 const loadTaskPrompts = async () => {
   try {
@@ -997,11 +996,9 @@ const loadTaskPrompts = async () => {
 
 onMounted(() => {
   loadTaskPrompts()
-  document.addEventListener('keydown', handleEscape)
 })
 
 onBeforeUnmount(() => {
-  document.removeEventListener('keydown', handleEscape)
   cleanupPreview()
 })
 </script>

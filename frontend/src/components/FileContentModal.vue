@@ -159,8 +159,9 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, onMounted, onBeforeUnmount } from 'vue'
+import { ref, computed, watch } from 'vue'
 import { getFileContent } from '@/services/filesService'
+import { useEscapeKey } from '@/composables/useEscapeKey'
 import { useNotification } from '@/composables/useNotification'
 
 interface Props {
@@ -237,12 +238,7 @@ const close = () => {
   }, 300)
 }
 
-const handleEscape = (e: KeyboardEvent) => {
-  if (e.key === 'Escape') close()
-}
-
-onMounted(() => document.addEventListener('keydown', handleEscape))
-onBeforeUnmount(() => document.removeEventListener('keydown', handleEscape))
+useEscapeKey(close)
 
 const copyToClipboard = async () => {
   if (!fileData.value?.extracted_text) return

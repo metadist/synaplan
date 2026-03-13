@@ -294,7 +294,7 @@ const fileSelectionModalVisible = ref(false)
 const voiceReply = ref(false)
 const discardNextRecording = ref(false)
 
-const SILENCE_TIMEOUT_MS = 2000
+const SILENCE_TIMEOUT_MS = 4000
 const silenceTimer = ref<ReturnType<typeof setTimeout> | null>(null)
 const autoSendPending = ref(false)
 
@@ -957,8 +957,7 @@ const transcribeAudio = async (audioBlob: Blob) => {
 
     if (result.text) {
       message.value += (message.value ? ' ' : '') + result.text
-
-      nextTick(() => sendMessage())
+      nextTick(() => textareaRef.value?.focus())
     } else {
       warning(t('chatInput.noSpeechDetected'))
     }

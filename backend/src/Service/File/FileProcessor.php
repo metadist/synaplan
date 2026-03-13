@@ -42,7 +42,7 @@ final readonly class FileProcessor
         'image/webp',
     ];
 
-    private const AUDIO_EXTENSIONS = [
+    private const TRANSCRIBABLE_MEDIA_EXTENSIONS = [
         'ogg', 'mp3', 'wav', 'm4a', 'opus', 'flac', 'webm', 'aac', 'wma', 'amr',
         'mp4', 'avi', 'mov', 'mkv', 'mpeg', 'mpg',
     ];
@@ -127,8 +127,8 @@ final readonly class FileProcessor
             return $this->extractFromImage($relativePath, $userId, $meta);
         }
 
-        // Strategy 3: Audio/Video files -> Whisper.cpp
-        if ($this->isAudioExtension($ext)) {
+        // Strategy 3: Audio/Video files -> Whisper transcription
+        if ($this->isTranscribableMedia($ext)) {
             return $this->extractFromAudio($absolutePath, $meta, $userId);
         }
 
@@ -366,11 +366,11 @@ final readonly class FileProcessor
     }
 
     /**
-     * Check if file extension is audio/video.
+     * Check if the file extension is a media type from which audio can be extracted for transcription.
      */
-    private function isAudioExtension(string $ext): bool
+    private function isTranscribableMedia(string $ext): bool
     {
-        return in_array($ext, self::AUDIO_EXTENSIONS, true);
+        return in_array($ext, self::TRANSCRIBABLE_MEDIA_EXTENSIONS, true);
     }
 
     /**

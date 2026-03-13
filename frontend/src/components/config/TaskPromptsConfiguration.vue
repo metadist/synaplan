@@ -768,7 +768,8 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted, watch, watchEffect } from 'vue'
+import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
+import { useEscapeKey } from '@/composables/useEscapeKey'
 import { useI18n } from 'vue-i18n'
 import { Icon } from '@iconify/vue'
 import {
@@ -854,16 +855,7 @@ const newPromptSelectedFiles = ref<number[]>([])
 const newPromptFilesSearch = ref('')
 const showCreateModal = ref(false)
 
-const handleCreateModalEscape = (e: KeyboardEvent) => {
-  if (e.key === 'Escape') showCreateModal.value = false
-}
-
-watchEffect((onCleanup) => {
-  if (showCreateModal.value) {
-    document.addEventListener('keydown', handleCreateModalEscape)
-    onCleanup(() => document.removeEventListener('keydown', handleCreateModalEscape))
-  }
-})
+useEscapeKey(() => (showCreateModal.value = false), showCreateModal)
 
 const contentTextarea = ref<HTMLTextAreaElement | null>(null)
 const loading = ref(false)

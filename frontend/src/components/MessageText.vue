@@ -470,8 +470,8 @@ function normalizeInlineReferences(text: string): string {
   // does not wrap them in separate <p> blocks.
   // Handles both numeric IDs ([Memory:12345]) and named keys ([Memory:hobby]).
   return text
-    .replace(/\n+(\[(?:Feedback|Memory)\s*:\s*[^\]]+\])/gi, ' $1')
-    .replace(/(\[(?:Feedback|Memory)\s*:\s*[^\]]+\])\n+/gi, '$1 ')
+    .replace(/\n+(\[(?:Feedback|Memory)\s*:\s*[\w.\-]+\])/gi, ' $1')
+    .replace(/(\[(?:Feedback|Memory)\s*:\s*[\w.\-]+\])\n+/gi, '$1 ')
 }
 
 // Process content - sync for regular markdown, async for math formulas

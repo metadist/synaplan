@@ -311,8 +311,9 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
+import { ref, computed, watch, onUnmounted } from 'vue'
 import { Icon } from '@iconify/vue'
+import { useEscapeKey } from '@/composables/useEscapeKey'
 import * as widgetsApi from '@/services/api/widgetsApi'
 import { useNotification } from '@/composables/useNotification'
 import { useI18n } from 'vue-i18n'
@@ -383,9 +384,8 @@ watch(
   }
 )
 
-// Cleanup timers and listeners on unmount
+// Cleanup timers on unmount
 onUnmounted(() => {
-  document.removeEventListener('keydown', handleEscape)
   if (debounceTimer) {
     clearTimeout(debounceTimer)
   }
@@ -458,11 +458,7 @@ const handleClose = () => {
   emit('close')
 }
 
-const handleEscape = (e: KeyboardEvent) => {
-  if (e.key === 'Escape') handleClose()
-}
-
-onMounted(() => document.addEventListener('keydown', handleEscape))
+useEscapeKey(handleClose)
 
 const handleSubmit = async () => {
   if (!isValid.value || creating.value) return
