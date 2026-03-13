@@ -222,7 +222,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, nextTick, type Ref } from 'vue'
+import { ref, computed, watch, nextTick, onUnmounted, type Ref } from 'vue'
 import {
   PaperAirplaneIcon,
   XMarkIcon,
@@ -293,6 +293,10 @@ const speechFinalTranscript = ref('') // Accumulated final transcripts during re
 const fileSelectionModalVisible = ref(false)
 const voiceReply = ref(false)
 const discardNextRecording = ref(false)
+
+const SILENCE_TIMEOUT_MS = 2000
+const silenceTimer = ref<ReturnType<typeof setTimeout> | null>(null)
+const autoSendPending = ref(false)
 
 const aiConfigStore = useAiConfigStore()
 const chatsStore = useChatsStore()
@@ -753,6 +757,17 @@ const uploadFiles = async (files: File[]) => {
   uploading.value = false
 }
 
+const clearSilenceTimer = () => {
+  if (silenceTimer.value) {
+    clearTimeout(silenceTimer.value)
+    silenceTimer.value = null
+  }
+}
+
+onUnmounted(() => {
+  clearSilenceTimer()
+})
+
 /**
  * Toggle speech recording using hybrid approach.
  * Uses Web Speech API for real-time transcription when available and whisperEnabled=false.
@@ -760,9 +775,11 @@ const uploadFiles = async (files: File[]) => {
  */
 const toggleRecording = async () => {
   if (isRecording.value) {
-    // Stop recording (either Web Speech or AudioRecorder)
+    // Manual stop — clear auto-send so user can review the transcription
+    clearSilenceTimer()
+    autoSendPending.value = false
+
     if (webSpeechService.value) {
-      // Stop triggers onEnd callback which finalizes the message
       webSpeechService.value.stop()
       webSpeechService.value = null
     }
@@ -811,17 +828,24 @@ const startWebSpeechRecording = async () => {
       },
       onEnd: () => {
         isRecording.value = false
-        // Finalize: set message to base + finals + any remaining interim
+        clearSilenceTimer()
+
         const base = speechBaseMessage.value
         const finals = speechFinalTranscript.value
         const interim = interimTranscript.value
         const separator = base && (finals || interim) ? ' ' : ''
         message.value = base + separator + finals + (finals && interim ? ' ' : '') + interim
 
-        // Reset speech tracking
+        const shouldAutoSend = autoSendPending.value
+        autoSendPending.value = false
+
         speechBaseMessage.value = ''
         speechFinalTranscript.value = ''
         interimTranscript.value = ''
+
+        if (shouldAutoSend && message.value.trim()) {
+          nextTick(() => sendMessage())
+        }
       },
       onResult: (text: string, isFinal: boolean) => {
         const base = speechBaseMessage.value
@@ -833,6 +857,15 @@ const startWebSpeechRecording = async () => {
           interimTranscript.value = ''
 
           message.value = base + separator + speechFinalTranscript.value
+
+          clearSilenceTimer()
+          silenceTimer.value = setTimeout(() => {
+            if (speechFinalTranscript.value.trim()) {
+              autoSendPending.value = true
+              webSpeechService.value?.stop()
+              webSpeechService.value = null
+            }
+          }, SILENCE_TIMEOUT_MS)
         } else {
           interimTranscript.value = text
           const finals = speechFinalTranscript.value
@@ -922,26 +955,10 @@ const transcribeAudio = async (audioBlob: Blob) => {
     // Upload for transcription (WhisperCPP on backend)
     const result = await chatApi.transcribeAudio(audioBlob)
 
-    // CRITICAL: Add transcribed text directly to message input!
     if (result.text) {
-      // Insert text with space separator if there's existing text
       message.value += (message.value ? ' ' : '') + result.text
 
-      // Show success notification with preview
-      const preview = result.text.substring(0, 50) + (result.text.length > 50 ? '...' : '')
-      const languageInfo = result.language ? ` (${result.language})` : ''
-      success(t('chatInput.transcribed', { language: languageInfo, preview }))
-
-      console.log('✅ Audio transcribed:', {
-        text_length: result.text.length,
-        language: result.language,
-        duration: result.duration,
-      })
-
-      // Focus textarea for immediate editing
-      nextTick(() => {
-        textareaRef.value?.focus()
-      })
+      nextTick(() => sendMessage())
     } else {
       warning(t('chatInput.noSpeechDetected'))
     }
