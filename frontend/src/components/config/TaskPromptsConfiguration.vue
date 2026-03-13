@@ -50,11 +50,7 @@
           </select>
           <p class="text-xs txt-secondary mt-1.5 flex items-center gap-1">
             <Icon icon="heroicons:information-circle" class="w-3.5 h-3.5" />
-            {{
-              isAdmin
-                ? $t('config.taskPrompts.selectPromptHelpAdmin')
-                : $t('config.taskPrompts.selectPromptHelp')
-            }}
+            {{ $t('config.taskPrompts.selectPromptHelp') }}
           </p>
         </div>
 
