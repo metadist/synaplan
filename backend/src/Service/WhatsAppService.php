@@ -1768,7 +1768,8 @@ final class WhatsAppService
         }, $text);
 
         // 6. Convert *italic* → _italic_ (remaining single * pairs are italic in MD, bold in WA)
-        $text = preg_replace('/(?<!\w)\*([^*\n]+?)\*(?!\w)/', '_$1_', $text);
+        // Require asterisks to be tight around text (no spaces) to avoid matching math like "2 * 3 * 4"
+        $text = preg_replace('/(?<!\w)\*(?!\s)([^*\n]+?)(?<!\s)\*(?!\w)/', '_$1_', $text);
 
         // 7. Restore bold placeholders
         foreach ($boldParts as $placeholder => $bold) {

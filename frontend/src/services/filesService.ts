@@ -75,30 +75,22 @@ export interface FileListResponse {
  * @returns Upload response with file details
  */
 export const uploadFiles = async (options: UploadFileOptions): Promise<UploadResponse> => {
-  const formData = new FormData()
-
-  // Add files
-  options.files.forEach((file) => {
-    formData.append('files[]', file)
-  })
-
-  // Add optional parameters
-  if (options.groupKey) {
-    formData.append('group_key', options.groupKey)
-  }
-
-  if (options.processLevel) {
-    formData.append('process_level', options.processLevel)
+  const buildFormData = (): FormData => {
+    const fd = new FormData()
+    options.files.forEach((file) => fd.append('files[]', file))
+    if (options.groupKey) fd.append('group_key', options.groupKey)
+    if (options.processLevel) fd.append('process_level', options.processLevel)
+    return fd
   }
 
   // If no progress callback, use simple fetch
   if (!options.onProgress) {
-    const response = await api.post<UploadResponse>('/api/v1/files/upload', formData)
+    const response = await api.post<UploadResponse>('/api/v1/files/upload', buildFormData())
     return response.data
   }
 
   // Use XMLHttpRequest for progress tracking with automatic token refresh on 401
-  const sendXhr = (data: FormData, isRetry = false): Promise<UploadResponse> =>
+  const sendXhr = (isRetry = false): Promise<UploadResponse> =>
     new Promise<UploadResponse>((resolve, reject) => {
       const xhr = new XMLHttpRequest()
       const baseUrl = getApiBaseUrl()
@@ -125,7 +117,7 @@ export const uploadFiles = async (options: UploadFileOptions): Promise<UploadRes
           try {
             const refreshResult = await refreshAccessToken()
             if (refreshResult.success) {
-              resolve(await sendXhr(data, true))
+              resolve(await sendXhr(true))
             } else {
               window.location.href = '/login?reason=session_expired'
               reject(new Error('Session expired'))
@@ -163,10 +155,10 @@ export const uploadFiles = async (options: UploadFileOptions): Promise<UploadRes
         xhr.setRequestHeader('X-CSRF-Token', csrfToken)
       }
 
-      xhr.send(data)
+      xhr.send(buildFormData())
     })
 
-  return sendXhr(formData)
+  return sendXhr()
 }
 
 export interface FileListOptions {

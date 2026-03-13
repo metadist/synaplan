@@ -615,10 +615,10 @@ class WidgetPublicController extends AbstractController
 
                     // Increment message count only AFTER successful AI response
                     // (prevents consuming a message slot when processing fails)
-                    $currentSession = $this->sessionService->getOrCreateSession($widgetId, $session->getSessionId());
-                    $this->sessionService->incrementMessageCount($currentSession);
-                    $currentSession->setLastMessage(time());
-                    $currentSession->setLastMessagePreview($responseText);
+                    $this->em->refresh($session);
+                    $this->sessionService->incrementMessageCount($session);
+                    $session->setLastMessage(time());
+                    $session->setLastMessagePreview($responseText);
                     $this->em->flush();
 
                     // Publish event for AI response (so admin panel receives it in real-time)
@@ -631,7 +631,7 @@ class WidgetPublicController extends AbstractController
                     ]);
 
                     // Generate AI title after 5 user messages (async, non-blocking)
-                    $this->sessionService->generateTitleIfNeeded($currentSession, $owner->getId());
+                    $this->sessionService->generateTitleIfNeeded($session, $owner->getId());
 
                     $this->rateLimitService->recordUsage($owner, 'MESSAGES', [
                         'provider' => $responseMetadata['provider'] ?? null,
@@ -646,7 +646,7 @@ class WidgetPublicController extends AbstractController
                     $this->sendSse('complete', [
                         'messageId' => $incomingMessage->getId(),
                         'chatId' => $chat->getId(),
-                        'messageCount' => $currentSession->getMessageCount(),
+                        'messageCount' => $session->getMessageCount(),
                         'metadata' => [
                             'response' => $responseMetadata,
                             'classification' => $result['classification'] ?? null,
@@ -675,12 +675,7 @@ class WidgetPublicController extends AbstractController
                     }
 
                     $this->sendSse('error', [
-                        'error' => 'Failed to process message',
-                        'details' => [
-                            'message' => $e->getMessage(),
-                            'file' => $e->getFile(),
-                            'line' => $e->getLine(),
-                        ],
+                        'error' => 'Sorry, something went wrong. Please try again.',
                     ]);
                 }
             });

@@ -1255,6 +1255,15 @@ class WhatsAppServiceTest extends TestCase
         $this->assertEquals('_italic text_', $method->invoke($this->service, '*italic text*'));
     }
 
+    public function testItalicDoesNotMatchMathExpressions(): void
+    {
+        $method = (new \ReflectionClass($this->service))->getMethod('convertToWhatsAppMarkdown');
+        $method->setAccessible(true);
+
+        $this->assertEquals('2 * 3 * 4 = 24', $method->invoke($this->service, '2 * 3 * 4 = 24'));
+        $this->assertEquals('a * b', $method->invoke($this->service, 'a * b'));
+    }
+
     public function testConvertBoldAndItalicTogether(): void
     {
         $method = (new \ReflectionClass($this->service))->getMethod('convertToWhatsAppMarkdown');

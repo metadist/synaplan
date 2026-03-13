@@ -651,9 +651,7 @@ const handleSendMessage = async (
 
   // File-only submission: provide a default message when no text but files are attached
   const hasFiles = options?.fileIds && options.fileIds.length > 0
-  if (!content.trim() && hasFiles) {
-    content = t('chat.fileOnlyDefaultMessage')
-  }
+  const messageToSend = !content.trim() && hasFiles ? t('chat.fileOnlyDefaultMessage') : content
 
   // Prepare webSearch metadata for user message
   const webSearchData = options?.webSearch ? { enabled: true } : null
@@ -661,11 +659,11 @@ const handleSendMessage = async (
   // Prepare tool metadata based on command in message
   // Also extract the clean content without command prefix for display
   let toolData: { command: string; label: string; icon: string } | null = null
-  let displayContent = content
-  let backendContent = content // Content to send to backend
+  let displayContent = messageToSend
+  let backendContent = messageToSend
 
-  if (content.startsWith('/')) {
-    const commandMatch = content.match(/^\/(\w+)\s+(.*)$/)
+  if (messageToSend.startsWith('/')) {
+    const commandMatch = messageToSend.match(/^\/(\w+)\s+(.*)$/)
     if (commandMatch) {
       const cmd = commandMatch[1]
       const args = commandMatch[2] || ''
