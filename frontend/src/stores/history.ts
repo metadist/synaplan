@@ -71,6 +71,7 @@ export interface Message {
   provider?: string
   modelLabel?: string
   topic?: string // Topic from message classification (e.g., 'general', 'mediamaker')
+  originalTopic?: string | null // Original classification topic preserved on error messages
   againData?: AgainData
   originalMessageId?: number
   backendMessageId?: number
@@ -444,7 +445,8 @@ export const useHistoryStore = defineStore('history', () => {
             timestamp: new Date(m.timestamp * 1000),
             provider: m.provider,
             modelLabel: m.provider || 'AI',
-            topic: m.topic, // Topic from message classification
+            topic: m.topic,
+            originalTopic: m.originalTopic || null,
             backendMessageId: m.id,
             files: files.length > 0 ? files : undefined,
             aiModels: m.aiModels || null, // Parse AI model metadata from backend
