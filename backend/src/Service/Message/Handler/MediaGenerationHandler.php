@@ -467,7 +467,7 @@ final readonly class MediaGenerationHandler implements MessageHandlerInterface
                 'provider' => $provider,
                 'model' => $modelName,
                 'media_type' => $mediaType,
-                'trace' => $e->getTraceAsString(),
+                'exception' => $e,
             ]);
 
             $userMessage = match ($mediaType) {

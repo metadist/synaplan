@@ -616,10 +616,8 @@ class WidgetPublicController extends AbstractController
                     // Increment message count only AFTER successful AI response
                     // (prevents consuming a message slot when processing fails)
                     $this->em->refresh($session);
-                    $this->sessionService->incrementMessageCount($session);
-                    $session->setLastMessage(time());
                     $session->setLastMessagePreview($responseText);
-                    $this->em->flush();
+                    $this->sessionService->incrementMessageCount($session);
 
                     // Publish event for AI response (so admin panel receives it in real-time)
                     $this->eventCache->publish($widgetId, $session->getSessionId(), 'message', [

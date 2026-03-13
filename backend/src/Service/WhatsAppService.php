@@ -1716,7 +1716,7 @@ final class WhatsAppService
     {
         // 1. Protect code blocks and strip language identifiers (```python → ```)
         $codeBlocks = [];
-        $text = preg_replace_callback('/```\w*\n?([\s\S]*?)```/', function ($match) use (&$codeBlocks) {
+        $text = preg_replace_callback('/```[^\n`]*\n?([\s\S]*?)```/', function ($match) use (&$codeBlocks) {
             $placeholder = '{{CODE_BLOCK_'.count($codeBlocks).'}}';
             $codeBlocks[$placeholder] = '```'.$match[1].'```';
 

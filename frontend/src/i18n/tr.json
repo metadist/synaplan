@@ -98,7 +98,8 @@
       "chatDeleted": "Sohbet başarıyla silindi",
       "share": "Sohbeti paylaş",
       "public": "Herkese Açık"
-    }
+    },
+    "fileOnlyDefaultMessage": "Lütfen ekteki dosyayı inceleyin."
   },
   "admin": {
     "title": "Yönetici Paneli",
