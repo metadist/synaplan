@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "a939ea539b955145a3bc1f06f9cfbb34",
+    "content-hash": "f3b2cdd6cb5bf8203cb310e52c3b43fd",
     "packages": [
         {
             "name": "api-platform/doctrine-common",
@@ -98,16 +98,16 @@
         },
         {
             "name": "api-platform/doctrine-orm",
-            "version": "v4.2.12",
+            "version": "v4.2.20",
             "source": {
                 "type": "git",
                 "url": "https://github.com/api-platform/doctrine-orm.git",
-                "reference": "6dd409d7e90b031cc9bddaa397f049da9da0799f"
+                "reference": "a7d4c255519ac0438f9293b3e97d2b3bd9ca43d7"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/api-platform/doctrine-orm/zipball/6dd409d7e90b031cc9bddaa397f049da9da0799f",
-                "reference": "6dd409d7e90b031cc9bddaa397f049da9da0799f",
+                "url": "https://api.github.com/repos/api-platform/doctrine-orm/zipball/a7d4c255519ac0438f9293b3e97d2b3bd9ca43d7",
+                "reference": "a7d4c255519ac0438f9293b3e97d2b3bd9ca43d7",
                 "shasum": ""
             },
             "require": {
@@ -179,9 +179,9 @@
                 "rest"
             ],
             "support": {
-                "source": "https://github.com/api-platform/doctrine-orm/tree/v4.2.12"
+                "source": "https://github.com/api-platform/doctrine-orm/tree/v4.2.20"
             },
-            "time": "2026-01-08T14:27:10+00:00"
+            "time": "2026-02-25T15:52:40+00:00"
         },
         {
             "name": "api-platform/documentation",
@@ -954,29 +954,29 @@
         },
         {
             "name": "api-platform/symfony",
-            "version": "v4.2.12",
+            "version": "v4.2.20",
             "source": {
                 "type": "git",
                 "url": "https://github.com/api-platform/symfony.git",
-                "reference": "6d919776f7784bb5dc50b2226375d15e0ac3875b"
+                "reference": "8e47b4429a2c41dd9a8865b1f42f93f9beac99c2"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/api-platform/symfony/zipball/6d919776f7784bb5dc50b2226375d15e0ac3875b",
-                "reference": "6d919776f7784bb5dc50b2226375d15e0ac3875b",
+                "url": "https://api.github.com/repos/api-platform/symfony/zipball/8e47b4429a2c41dd9a8865b1f42f93f9beac99c2",
+                "reference": "8e47b4429a2c41dd9a8865b1f42f93f9beac99c2",
                 "shasum": ""
             },
             "require": {
-                "api-platform/documentation": "^4.2.3",
-                "api-platform/http-cache": "^4.2.3",
-                "api-platform/hydra": "^4.2.3",
-                "api-platform/json-schema": "^4.2.3",
-                "api-platform/jsonld": "^4.2.3",
-                "api-platform/metadata": "^4.2.3",
-                "api-platform/openapi": "^4.2.3",
-                "api-platform/serializer": "^4.2.4",
-                "api-platform/state": "^4.2.4",
-                "api-platform/validator": "^4.2.3",
+                "api-platform/documentation": "^4.2.12",
+                "api-platform/http-cache": "^4.2.12",
+                "api-platform/hydra": "^4.2.12",
+                "api-platform/json-schema": "^4.2.12",
+                "api-platform/jsonld": "^4.2.12",
+                "api-platform/metadata": "^4.2.12",
+                "api-platform/openapi": "^4.2.12",
+                "api-platform/serializer": "^4.2.12",
+                "api-platform/state": "^4.2.12",
+                "api-platform/validator": "^4.2.12",
                 "php": ">=8.2",
                 "symfony/asset": "^6.4 || ^7.0 || ^8.0",
                 "symfony/finder": "^6.4 || ^7.0 || ^8.0",
@@ -987,12 +987,12 @@
                 "willdurand/negotiation": "^3.1"
             },
             "require-dev": {
-                "api-platform/doctrine-common": "^4.2.3",
-                "api-platform/doctrine-odm": "^4.2.3",
-                "api-platform/doctrine-orm": "^4.2.3",
-                "api-platform/elasticsearch": "^4.2.3",
-                "api-platform/graphql": "^4.2.3",
-                "api-platform/hal": "^4.2.3",
+                "api-platform/doctrine-common": "^4.2.12",
+                "api-platform/doctrine-odm": "^4.2.12",
+                "api-platform/doctrine-orm": "^4.2.12",
+                "api-platform/elasticsearch": "^4.2.12",
+                "api-platform/graphql": "^4.2.12",
+                "api-platform/hal": "^4.2.12",
                 "phpspec/prophecy-phpunit": "^2.2",
                 "phpunit/phpunit": "^12.2",
                 "symfony/expression-language": "^6.4 || ^7.0 || ^8.0",
@@ -1076,9 +1076,9 @@
                 "symfony"
             ],
             "support": {
-                "source": "https://github.com/api-platform/symfony/tree/v4.2.12"
+                "source": "https://github.com/api-platform/symfony/tree/v4.2.20"
             },
-            "time": "2025-12-31T09:26:07+00:00"
+            "time": "2026-03-03T08:06:46+00:00"
         },
         {
             "name": "api-platform/validator",
