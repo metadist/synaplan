@@ -158,5 +158,6 @@ For comprehensive guides, see:
 - `docs/PHP_CONVENTIONS.md` - PHP code style, examples, patterns
 - `docs/FRONTEND_CONVENTIONS.md` - TypeScript, Vue, styling, i18n
 - `docs/API_PATTERNS.md` - Zod schemas, OpenAPI, httpClient usage
+- `docs/E2E_TESTING.md` - Playwright E2E test guidelines
 - `docs/DEVELOPMENT.md` - Development setup
 - `backend/.env.example` - Environment variables
