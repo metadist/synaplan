@@ -477,8 +477,6 @@ final readonly class MediaGenerationHandler implements MessageHandlerInterface
             };
             $streamCallback($userMessage);
 
-            $this->notify($progressCallback, 'error', ucfirst($mediaType).' generation failed.');
-
             return [
                 'metadata' => [
                     'provider' => $provider,

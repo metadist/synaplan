@@ -14,8 +14,8 @@ parameters:
     ignoreErrors:
         -
             identifiers:
-                - varTag.misplaced
                 - if.alwaysFalse
+                - varTag.misplaced
             path: lib/grpc/*
         -
             identifiers:

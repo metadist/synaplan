@@ -129,6 +129,7 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { useI18n } from 'vue-i18n'
 import {
   DevicePhoneMobileIcon,
   EnvelopeIcon,
@@ -139,20 +140,22 @@ import UnsavedChangesBar from '@/components/UnsavedChangesBar.vue'
 import PhoneVerification from '@/components/config/PhoneVerification.vue'
 import {
   mockWhatsAppChannels,
-  mockEmailChannels,
   mockAPIConfig,
   emailKeywordBase,
   emailKeywordDomain,
 } from '@/mocks/config'
+import type { EmailChannel } from '@/mocks/config'
 import { useUnsavedChanges } from '@/composables/useUnsavedChanges'
 import { useNotification } from '@/composables/useNotification'
 import { profileApi } from '@/services/api/profileApi'
 
+const { t } = useI18n()
 const { success, error } = useNotification()
+
+const baseEmailAddress = `smart${emailKeywordDomain}`
 
 const formData = ref({
   whatsappChannels: mockWhatsAppChannels,
-  emailChannels: mockEmailChannels,
   apiConfig: mockAPIConfig,
   emailKeyword: '',
   personalEmailAddress: '',
@@ -160,7 +163,6 @@ const formData = ref({
 
 const originalData = ref({
   whatsappChannels: mockWhatsAppChannels,
-  emailChannels: mockEmailChannels,
   apiConfig: mockAPIConfig,
   emailKeyword: '',
   personalEmailAddress: '',
@@ -168,7 +170,22 @@ const originalData = ref({
 
 // Computed refs for template access
 const whatsappChannels = computed(() => formData.value.whatsappChannels)
-const emailChannels = computed(() => formData.value.emailChannels)
+const emailChannels = computed<EmailChannel[]>(() => {
+  const channels: EmailChannel[] = [
+    { id: 'base', email: baseEmailAddress, handling: t('config.inbound.defaultHandling') },
+  ]
+  if (
+    formData.value.personalEmailAddress &&
+    formData.value.personalEmailAddress !== baseEmailAddress
+  ) {
+    channels.push({
+      id: 'personal',
+      email: formData.value.personalEmailAddress,
+      handling: t('config.inbound.personalKeyword'),
+    })
+  }
+  return channels
+})
 const emailKeyword = computed({
   get: () => formData.value.emailKeyword,
   set: (val: string) => (formData.value.emailKeyword = val),
@@ -217,7 +234,7 @@ const handleSave = saveChanges(async () => {
       formData.value.personalEmailAddress = response.emailAddress
       originalData.value.emailKeyword = response.keyword || ''
       originalData.value.personalEmailAddress = response.emailAddress
-      success('Email keyword saved successfully')
+      success(t('config.inbound.keywordSaved'))
     }
   } catch (err: any) {
     const errorMessage =

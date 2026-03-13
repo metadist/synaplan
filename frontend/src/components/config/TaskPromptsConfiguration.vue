@@ -769,6 +769,7 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
+import { useEscapeKey } from '@/composables/useEscapeKey'
 import { useI18n } from 'vue-i18n'
 import { Icon } from '@iconify/vue'
 import {
@@ -853,6 +854,9 @@ const newPromptLanguage = ref(locale.value || 'en')
 const newPromptSelectedFiles = ref<number[]>([])
 const newPromptFilesSearch = ref('')
 const showCreateModal = ref(false)
+
+useEscapeKey(() => (showCreateModal.value = false), showCreateModal)
+
 const contentTextarea = ref<HTMLTextAreaElement | null>(null)
 const loading = ref(false)
 const error = ref<string | null>(null)

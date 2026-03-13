@@ -1073,6 +1073,7 @@
 <script setup lang="ts">
 import { ref, reactive, computed, onMounted } from 'vue'
 import { Icon } from '@iconify/vue'
+import { useEscapeKey } from '@/composables/useEscapeKey'
 import { useI18n } from 'vue-i18n'
 import { useNotification } from '@/composables/useNotification'
 import * as widgetsApi from '@/services/api/widgetsApi'
@@ -1427,6 +1428,8 @@ const groupedModels = computed(() => {
 const handleClose = () => {
   emit('close')
 }
+
+useEscapeKey(handleClose)
 
 // Handle manual prompt creation
 const handleManualCreate = async () => {
