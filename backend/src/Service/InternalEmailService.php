@@ -157,7 +157,7 @@ final readonly class InternalEmailService
         $smartAddress = ($originalRecipient && \App\Service\Email\SmartEmailHelper::isValidSmartAddress($originalRecipient))
             ? $originalRecipient
             : $fallbackAddress;
-        $fromEmail = $smartAddress;
+        $fromEmail = $_ENV['APP_SENDER_EMAIL'] ?? 'smart@synaplan.net';
         $fromName = $_ENV['APP_SENDER_NAME'] ?? 'Synaplan AI';
         $replyToEmail = $smartAddress;
 
