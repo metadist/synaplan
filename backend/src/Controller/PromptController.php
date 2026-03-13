@@ -37,6 +37,11 @@ class PromptController extends AbstractController
      */
     private const SUPPORTED_LANGUAGES = ['de', 'en', 'it', 'es', 'fr', 'nl', 'pt', 'ru', 'sv', 'tr'];
 
+    /**
+     * UI languages for which user prompt overrides are created when allLanguages=true.
+     */
+    private const PROMPT_UI_LANGUAGES = ['en', 'de', 'es', 'tr'];
+
     public function __construct(
         private PromptRepository $promptRepository,
         private PromptMetaRepository $promptMetaRepository,
@@ -628,6 +633,7 @@ class PromptController extends AbstractController
                     new OA\Property(property: 'shortDescription', type: 'string', example: 'Custom file analyzer', description: 'Short description for the prompt'),
                     new OA\Property(property: 'prompt', type: 'string', example: 'You are a specialized file analyzer...', description: 'The actual prompt content'),
                     new OA\Property(property: 'language', type: 'string', example: 'en', description: 'Language code (default: en)'),
+                    new OA\Property(property: 'allLanguages', type: 'boolean', example: false, description: 'If true, create/update prompt entries for all UI languages (en, de, es, tr). Existing entries are updated, missing ones created.'),
                 ]
             )
         ),
@@ -690,65 +696,92 @@ class PromptController extends AbstractController
                 ], Response::HTTP_BAD_REQUEST);
             }
 
-            // Check if user already has a prompt with this topic
-            $existingPrompt = $this->promptRepository->findByTopic($topic, $user->getId());
-            if ($existingPrompt) {
+            $allLanguages = !empty($data['allLanguages']);
+            $existingPrompts = $this->promptRepository->findAllByTopicAndOwner($topic, $user->getId());
+
+            if (!empty($existingPrompts) && !$allLanguages) {
                 return $this->json([
                     'error' => 'You already have a prompt with this topic. Use PUT /api/v1/prompts/{id} to update it.',
                 ], Response::HTTP_CONFLICT);
             }
 
-            // Create new prompt
-            $prompt = new Prompt();
-            $prompt->setOwnerId($user->getId());
-            $prompt->setTopic($topic);
-            $prompt->setShortDescription($shortDescription);
-            $prompt->setPrompt($promptContent);
-            $prompt->setLanguage($language);
-            $prompt->setSelectionRules($selectionRules);
-
-            $this->em->persist($prompt);
-            $this->em->flush();
-
-            // Refresh to ensure ID is populated
-            $this->em->refresh($prompt);
-
-            $this->logger->info('🟢 PROMPT CREATED', [
-                'prompt_id' => $prompt->getId(),
-                'topic' => $topic,
-                'has_metadata' => !empty($metadata),
-            ]);
-
-            // Save metadata (AI model, tools)
-            if (!empty($metadata)) {
-                if (!$prompt->getId()) {
-                    throw new \RuntimeException('Prompt ID is null after flush and refresh!');
-                }
-
-                $this->logger->info('🔵 SAVING METADATA', [
-                    'prompt_id' => $prompt->getId(),
-                    'metadata' => $metadata,
-                ]);
-                $this->promptService->saveMetadataForPrompt($prompt, $metadata);
-                $this->logger->info('🟢 METADATA SAVED');
+            $languages = $allLanguages ? self::PROMPT_UI_LANGUAGES : [$language];
+            $existingByLang = [];
+            foreach ($existingPrompts as $ep) {
+                $existingByLang[$ep->getLanguage()] = $ep;
             }
 
-            $this->logger->info('User created custom prompt', [
-                'user_id' => $user->getId(),
-                'prompt_id' => $prompt->getId(),
+            $primaryPrompt = null;
+
+            foreach ($languages as $lang) {
+                if (isset($existingByLang[$lang])) {
+                    $prompt = $existingByLang[$lang];
+                    $prompt->setShortDescription($shortDescription);
+                    $prompt->setPrompt($promptContent);
+                    $prompt->setSelectionRules($selectionRules);
+                } else {
+                    $prompt = new Prompt();
+                    $prompt->setOwnerId($user->getId());
+                    $prompt->setTopic($topic);
+                    $prompt->setShortDescription($shortDescription);
+                    $prompt->setPrompt($promptContent);
+                    $prompt->setLanguage($lang);
+                    $prompt->setSelectionRules($selectionRules);
+                    $this->em->persist($prompt);
+                }
+
+                if ($lang === $language || null === $primaryPrompt) {
+                    $primaryPrompt = $prompt;
+                }
+            }
+
+            $this->em->flush();
+
+            // Ensure all prompts have IDs after flush
+            foreach ($languages as $lang) {
+                $prompt = $existingByLang[$lang] ?? null;
+                if ($prompt && !$prompt->getId()) {
+                    $this->em->refresh($prompt);
+                }
+            }
+
+            // Re-fetch all prompts for this topic to get fresh IDs for newly created ones
+            $allUserPrompts = $this->promptRepository->findAllByTopicAndOwner($topic, $user->getId());
+
+            $this->logger->info('Prompt(s) created/updated', [
                 'topic' => $topic,
+                'languages' => $languages,
+                'total_prompts' => count($allUserPrompts),
             ]);
+
+            // Save metadata for all prompt entries
+            if (!empty($metadata)) {
+                foreach ($allUserPrompts as $p) {
+                    $this->promptService->saveMetadataForPrompt($p, $metadata);
+                }
+            }
+
+            // Return the primary prompt (matching requested language)
+            $returnPrompt = $primaryPrompt;
+            foreach ($allUserPrompts as $p) {
+                if ($p->getLanguage() === $language) {
+                    $returnPrompt = $p;
+                    break;
+                }
+            }
 
             return $this->json([
                 'success' => true,
-                'message' => 'Prompt created successfully',
+                'message' => $allLanguages
+                    ? sprintf('Prompt created/updated for %d languages', count($languages))
+                    : 'Prompt created successfully',
                 'prompt' => [
-                    'id' => $prompt->getId(),
-                    'topic' => $prompt->getTopic(),
+                    'id' => $returnPrompt->getId(),
+                    'topic' => $returnPrompt->getTopic(),
                     'name' => $this->formatPromptName($topic, $shortDescription, false),
-                    'shortDescription' => $prompt->getShortDescription(),
-                    'prompt' => $prompt->getPrompt(),
-                    'language' => $prompt->getLanguage(),
+                    'shortDescription' => $returnPrompt->getShortDescription(),
+                    'prompt' => $returnPrompt->getPrompt(),
+                    'language' => $returnPrompt->getLanguage(),
                     'isDefault' => false,
                 ],
             ], Response::HTTP_CREATED);

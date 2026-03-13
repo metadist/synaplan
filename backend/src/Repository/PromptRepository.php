@@ -36,6 +36,26 @@ class PromptRepository extends ServiceEntityRepository
     }
 
     /**
+     * Get all prompts for a topic+owner combination (any language).
+     *
+     * @param string $topic   Topic identifier
+     * @param int    $ownerId Owner ID
+     *
+     * @return Prompt[]
+     */
+    public function findAllByTopicAndOwner(string $topic, int $ownerId): array
+    {
+        return $this->createQueryBuilder('p')
+            ->where('p.topic = :topic')
+            ->andWhere('p.ownerId = :ownerId')
+            ->setParameter('topic', $topic)
+            ->setParameter('ownerId', $ownerId)
+            ->orderBy('p.id', 'ASC')
+            ->getQuery()
+            ->getResult();
+    }
+
+    /**
      * Get all available topics for sorting
      * Includes both system (ownerId=0) AND user-specific prompts.
      *

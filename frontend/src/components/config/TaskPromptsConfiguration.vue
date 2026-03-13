@@ -1135,7 +1135,7 @@ const handleSave = saveChanges(async () => {
     // - Admins: update the system prompt directly
     // - Regular users: create a user override instead of updating
     if (currentPrompt.value.isDefault && !currentPrompt.value.isUserOverride && !isAdmin.value) {
-      // Create user override (non-admin flow)
+      // Create user override for ALL languages so the override applies regardless of UI language
       const newPrompt = await promptsApi.createPrompt({
         topic: currentPrompt.value.topic,
         shortDescription: currentPrompt.value.shortDescription,
@@ -1143,6 +1143,7 @@ const handleSave = saveChanges(async () => {
         language: formData.value.language || locale.value || 'en',
         selectionRules: formData.value.rules || null,
         metadata,
+        allLanguages: true,
       })
 
       // Update local state - replace system prompt with user override
