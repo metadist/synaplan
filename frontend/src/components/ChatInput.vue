@@ -479,7 +479,7 @@ watch(
 
 const sendMessage = () => {
   if (isStreaming.value) {
-    warning(t('chat.waitForStreaming'))
+    warning(t('chatInput.waitForStreaming'))
     return
   }
 
