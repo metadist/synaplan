@@ -232,8 +232,8 @@ class StreamController extends AbstractController
             $fileIdArray = array_map('intval', array_filter(explode(',', $fileIds)));
         }
 
-        if (empty($messageText)) {
-            return $this->json(['error' => 'Message is required'], Response::HTTP_BAD_REQUEST);
+        if (empty($messageText) && empty($fileIdArray)) {
+            return $this->json(['error' => 'Message or file attachment is required'], Response::HTTP_BAD_REQUEST);
         }
 
         if (!$chatId) {

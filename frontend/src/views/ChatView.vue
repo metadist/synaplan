@@ -649,6 +649,12 @@ const handleSendMessage = async (
     }
   }
 
+  // File-only submission: provide a default message when no text but files are attached
+  const hasFiles = options?.fileIds && options.fileIds.length > 0
+  if (!content.trim() && hasFiles) {
+    content = t('chat.fileOnlyDefaultMessage')
+  }
+
   // Prepare webSearch metadata for user message
   const webSearchData = options?.webSearch ? { enabled: true } : null
 

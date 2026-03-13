@@ -104,7 +104,8 @@
       "chatDeleted": "Chat deleted successfully",
       "share": "Share chat",
       "public": "Public"
-    }
+    },
+    "fileOnlyDefaultMessage": "Please review the attached file."
   },
   "admin": {
     "title": "Admin Panel",
