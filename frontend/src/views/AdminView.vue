@@ -952,15 +952,17 @@ function getLevelBadgeClass(level: string): string {
 }
 
 function formatDate(dateStr: string): string {
+  if (!dateStr) return '—'
   try {
     const date = new Date(dateStr)
+    if (isNaN(date.getTime())) return '—'
     return (
       date.toLocaleDateString() +
       ' ' +
       date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
     )
   } catch {
-    return dateStr
+    return '—'
   }
 }
 
