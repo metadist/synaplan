@@ -159,7 +159,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch } from 'vue'
+import { ref, computed, watch, toRef } from 'vue'
 import { getFileContent } from '@/services/filesService'
 import { useEscapeKey } from '@/composables/useEscapeKey'
 import { useNotification } from '@/composables/useNotification'
@@ -238,7 +238,7 @@ const close = () => {
   }, 300)
 }
 
-useEscapeKey(close)
+useEscapeKey(close, toRef(props, 'isOpen'))
 
 const copyToClipboard = async () => {
   if (!fileData.value?.extracted_text) return

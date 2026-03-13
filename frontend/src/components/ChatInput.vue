@@ -851,14 +851,23 @@ const startWebSpeechRecording = async () => {
         const base = speechBaseMessage.value
         const separator = base ? ' ' : ''
 
+        clearSilenceTimer()
+
         if (isFinal) {
           const finalSeparator = speechFinalTranscript.value ? ' ' : ''
           speechFinalTranscript.value += finalSeparator + text
           interimTranscript.value = ''
 
           message.value = base + separator + speechFinalTranscript.value
+        } else {
+          interimTranscript.value = text
+          const finals = speechFinalTranscript.value
+          const interimSeparator = finals ? ' ' : ''
 
-          clearSilenceTimer()
+          message.value = base + separator + finals + interimSeparator + text
+        }
+
+        if (speechFinalTranscript.value.trim()) {
           silenceTimer.value = setTimeout(() => {
             if (speechFinalTranscript.value.trim()) {
               autoSendPending.value = true
@@ -866,12 +875,6 @@ const startWebSpeechRecording = async () => {
               webSpeechService.value = null
             }
           }, SILENCE_TIMEOUT_MS)
-        } else {
-          interimTranscript.value = text
-          const finals = speechFinalTranscript.value
-          const interimSeparator = finals ? ' ' : ''
-
-          message.value = base + separator + finals + interimSeparator + text
         }
       },
       onError: (error) => {

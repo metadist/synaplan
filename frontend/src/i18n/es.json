@@ -1105,6 +1105,8 @@
       "apiChannel": "Canal API",
       "webWidget": "Widget Web",
       "defaultHandling": "manejo predeterminado",
+      "personalKeyword": "palabra clave personal",
+      "keywordSaved": "Palabra clave de correo guardada correctamente",
       "addKeyword": "Revisa una palabra clave libre para agregar tu propio manejo:",
       "keywordPlaceholder": "palabra clave",
       "yourEmailAddress": "Tu dirección de correo: {email}",
