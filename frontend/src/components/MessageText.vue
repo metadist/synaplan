@@ -467,10 +467,11 @@ function processFeedbackBadges(html: string): string {
 // Normalize reference markers so they stay inline (prevent markdown paragraph breaks)
 function normalizeInlineReferences(text: string): string {
   // Remove newlines directly before/after [Feedback:ID] and [Memory:ID] so markdown
-  // does not wrap them in separate <p> blocks
+  // does not wrap them in separate <p> blocks.
+  // Handles both numeric IDs ([Memory:12345]) and named keys ([Memory:hobby]).
   return text
-    .replace(/\n+(\[(?:Feedback|Memory)\s*:\s*\d+\.{0,3}\])/gi, ' $1')
-    .replace(/(\[(?:Feedback|Memory)\s*:\s*\d+\.{0,3}\])\n+/gi, '$1 ')
+    .replace(/\n+(\[(?:Feedback|Memory)\s*:\s*[^\]]+\])/gi, ' $1')
+    .replace(/(\[(?:Feedback|Memory)\s*:\s*[^\]]+\])\n+/gi, '$1 ')
 }
 
 // Process content - sync for regular markdown, async for math formulas
