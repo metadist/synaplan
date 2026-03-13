@@ -13,6 +13,9 @@ parameters:
         - tests/Unit/CookieTokenAuthenticatorTest.php
     ignoreErrors:
         -
+            identifier: if.alwaysFalse
+            path: lib/grpc/*
+        -
             identifier: varTag.misplaced
             path: lib/grpc/*
         -
