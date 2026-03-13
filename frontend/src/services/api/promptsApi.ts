@@ -21,7 +21,6 @@ export interface CreatePromptRequest {
   language?: string
   selectionRules?: string | null
   metadata?: Record<string, any>
-  allLanguages?: boolean
 }
 
 export interface UpdatePromptRequest {
