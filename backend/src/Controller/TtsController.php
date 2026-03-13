@@ -82,7 +82,7 @@ class TtsController extends AbstractController
                 'X-TTS-Provider' => $result['provider'],
             ]);
         } catch (\Throwable $e) {
-            return $this->json(['error' => 'TTS stream failed: '.$e->getMessage()], Response::HTTP_INTERNAL_SERVER_ERROR);
+            return $this->json(['error' => 'Audio generation failed. Please try again or use a different model.'], Response::HTTP_INTERNAL_SERVER_ERROR);
         }
     }
 }
