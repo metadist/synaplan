@@ -38,25 +38,13 @@
           <label class="flex flex-wrap items-center gap-2 text-sm font-semibold txt-primary">
             <CpuChipIcon class="w-4 h-4 text-[var(--brand)]" />
             <span class="flex-1 min-w-0">{{ purposeLabels[capability as Capability] }}</span>
-            <div
-              v-if="isSystemModel(capability)"
-              class="flex items-center gap-1 px-2 py-0.5 rounded-full bg-yellow-500/10 border border-yellow-500/30"
-            >
-              <LockClosedIcon class="w-3 h-3 text-yellow-500" />
-              <span class="text-xs font-medium text-yellow-500">{{
-                $t('config.aiModels.system')
-              }}</span>
-            </div>
           </label>
           <div class="relative">
             <button
               type="button"
-              :disabled="isSystemModel(capability)"
               :class="[
                 'w-full px-4 py-3 pl-10 pr-10 rounded-lg surface-card border txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)] transition-all text-left',
-                isSystemModel(capability)
-                  ? 'border-yellow-500/30 bg-yellow-500/5 cursor-not-allowed opacity-75'
-                  : 'border-light-border/30 dark:border-dark-border/20 hover:border-[var(--brand)]/50',
+                'border-light-border/30 dark:border-dark-border/20 hover:border-[var(--brand)]/50',
                 openDropdown === capability && 'ring-2 ring-[var(--brand)]',
               ]"
               data-testid="btn-model-dropdown"
@@ -127,13 +115,6 @@
             </div>
           </div>
         </div>
-      </div>
-
-      <div
-        class="mt-4 flex items-start gap-2 p-3 rounded-lg bg-blue-500/5 border border-blue-500/20"
-      >
-        <InformationCircleIcon class="w-5 h-5 text-blue-500 flex-shrink-0 mt-0.5" />
-        <span class="text-sm txt-primary">{{ $t('config.aiModels.systemModelsInfo') }}</span>
       </div>
     </div>
 
@@ -342,14 +323,7 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
-import {
-  ChevronDownIcon,
-  CpuChipIcon,
-  FunnelIcon,
-  InformationCircleIcon,
-  ListBulletIcon,
-  LockClosedIcon,
-} from '@heroicons/vue/24/outline'
+import { ChevronDownIcon, CpuChipIcon, FunnelIcon, ListBulletIcon } from '@heroicons/vue/24/outline'
 import { Icon } from '@iconify/vue'
 import AIModelsAdminPanel from '@/components/config/AIModelsAdminPanel.vue'
 import SortIndicator from '@/components/config/SortIndicator.vue'
@@ -550,13 +524,6 @@ const getModelsByPurpose = (purpose: Capability): AIModel[] => {
   return models.sort((a, b) => a.name.localeCompare(b.name))
 }
 
-const isSystemModel = (purpose: string): boolean => {
-  const models = getModelsByPurpose(purpose as Capability)
-  const selectedModelId = defaultConfig.value[purpose as Capability]
-  const selectedModel = models.find((m) => m.id === selectedModelId)
-  return selectedModel?.isSystemModel || false
-}
-
 const getSelectedModelService = (purpose: Capability): string => {
   const models = getModelsByPurpose(purpose)
   const selectedModelId = defaultConfig.value[purpose]
@@ -574,7 +541,6 @@ const getSelectedModelLabel = (purpose: Capability): string => {
 }
 
 const toggleDropdown = (capability: Capability) => {
-  if (isSystemModel(capability)) return
   openDropdown.value = openDropdown.value === capability ? null : capability
 }
 
