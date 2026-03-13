@@ -1526,6 +1526,9 @@ const handleStopStreaming = async () => {
   // Finish any streaming message and add cancellation notice
   const streamingMessage = historyStore.messages.find((m) => m.isStreaming)
   if (streamingMessage) {
+    // Remove any TTS loading indicators (voice reply was in progress when cancelled)
+    streamingMessage.parts = streamingMessage.parts.filter((p) => p.type !== 'tts_loading')
+
     const cancelMessage = t('message.cancelledByUser')
 
     // Collect the current content for saving to backend
