@@ -525,7 +525,16 @@ class MessageController extends AbstractController
                 );
 
                 $messageFile->setFileText($extractedText);
-                $messageFile->setStatus('extracted');
+
+                $audioExtensions = ['ogg', 'mp3', 'wav', 'm4a', 'opus', 'flac', 'webm', 'aac', 'wma', 'amr', 'mp4', 'avi', 'mov', 'mkv', 'mpeg', 'mpg'];
+                $isAudio = in_array($fileExtension, $audioExtensions, true);
+
+                if ($isAudio && empty(trim($extractedText))) {
+                    $messageFile->setStatus('error');
+                } else {
+                    $messageFile->setStatus('extracted');
+                }
+
                 $this->em->flush();
 
                 $this->logger->info('Chat file extracted', [

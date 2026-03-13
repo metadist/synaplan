@@ -1302,6 +1302,8 @@
     "status_uploaded": "Hochgeladen",
     "status_extracted": "Wird verarbeitet",
     "status_vectorized": "Bereit",
+    "status_processed": "Verarbeitet",
+    "status_error": "Fehler",
     "attached": "Angehängt",
     "standalone": "Eigenständig",
     "attachedToMessage": "Diese Datei ist an eine Nachricht angehängt",

@@ -1064,6 +1064,8 @@
     "status_uploaded": "Yüklendi",
     "status_extracted": "Çıkarıldı",
     "status_vectorized": "Vektörleştirildi",
+    "status_processed": "İşlendi",
+    "status_error": "Hata",
     "attached": "Ekli",
     "standalone": "Bağımsız",
     "attachedToMessage": "Bu dosya bir mesaja ekli",

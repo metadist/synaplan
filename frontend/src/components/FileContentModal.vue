@@ -24,7 +24,9 @@
                 <span class="pill px-2 py-0.5">{{
                   fileData?.file_type?.toUpperCase() || 'N/A'
                 }}</span>
-                <span class="pill px-2 py-0.5">{{ fileData?.status }}</span>
+                <span class="pill px-2 py-0.5">{{
+                  fileData?.status ? $t(`files.status_${fileData.status}`) : ''
+                }}</span>
                 <span>{{ fileData?.uploaded_date }}</span>
               </div>
             </div>

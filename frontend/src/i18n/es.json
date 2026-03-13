@@ -1063,6 +1063,8 @@
     "status_uploaded": "Subido",
     "status_extracted": "Extraído",
     "status_vectorized": "Vectorizado",
+    "status_processed": "Procesado",
+    "status_error": "Error",
     "attached": "Adjunto",
     "standalone": "Independiente",
     "attachedToMessage": "Este archivo está adjunto a un mensaje",

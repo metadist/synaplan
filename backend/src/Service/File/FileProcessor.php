@@ -396,24 +396,27 @@ final readonly class FileProcessor
                 $text = $result['text'] ?? '';
                 $text = $this->textCleaner->clean($text);
 
-                $this->logger->info('FileProcessor: Local Whisper transcription success', [
-                    'strategy' => 'whisper_local',
-                    'bytes' => strlen($text),
-                    'language' => $result['language'] ?? 'unknown',
-                    'duration' => $result['duration'] ?? 0,
-                ]);
+                if (!empty(trim($text))) {
+                    $this->logger->info('FileProcessor: Local Whisper transcription success', [
+                        'strategy' => 'whisper_local',
+                        'bytes' => strlen($text),
+                        'language' => $result['language'] ?? 'unknown',
+                        'duration' => $result['duration'] ?? 0,
+                    ]);
 
-                return [$text, [
-                    'strategy' => 'whisper_local',
-                    'language' => $result['language'] ?? 'unknown',
-                    'duration' => $result['duration'] ?? 0,
-                    'model' => $result['model'] ?? 'base',
-                ] + $baseMeta];
+                    return [$text, [
+                        'strategy' => 'whisper_local',
+                        'language' => $result['language'] ?? 'unknown',
+                        'duration' => $result['duration'] ?? 0,
+                        'model' => $result['model'] ?? 'base',
+                    ] + $baseMeta];
+                }
+
+                $this->logger->warning('FileProcessor: Local Whisper returned empty text, trying external API', $baseMeta);
             } catch (\Throwable $e) {
                 $this->logger->warning('FileProcessor: Local Whisper failed, trying external API', [
                     'error' => $e->getMessage(),
                 ] + $baseMeta);
-                // Fall through to external API
             }
         }
 

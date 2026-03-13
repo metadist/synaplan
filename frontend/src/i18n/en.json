@@ -544,6 +544,8 @@
     "status_uploaded": "Uploaded",
     "status_extracted": "Processing",
     "status_vectorized": "Ready",
+    "status_processed": "Processed",
+    "status_error": "Error",
     "attached": "Attached",
     "standalone": "Standalone",
     "attachedToMessage": "This file is attached to a message",
