@@ -156,7 +156,11 @@
       </div>
 
       <!-- Main controls - always visible below input in advanced mode -->
-      <div v-if="!appModeStore.isEasyMode" class="mt-3 flex items-center gap-2" data-testid="section-chat-secondary-actions">
+      <div
+        v-if="!appModeStore.isEasyMode"
+        class="mt-3 flex items-center gap-2"
+        data-testid="section-chat-secondary-actions"
+      >
         <ModelDropdown v-model="selectedModelId" class="flex-shrink-0" />
         <ToolsDropdown
           :active-command="activeCommand"
