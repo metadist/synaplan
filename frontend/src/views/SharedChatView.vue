@@ -305,9 +305,6 @@
           </p>
         </div>
       </footer>
-
-      <!-- GDPR Cookie Consent Banner -->
-      <CookieConsent @consent="handleCookieConsent" />
     </div>
   </div>
 </template>
@@ -320,9 +317,6 @@ import MessageImage from '../components/MessageImage.vue'
 import MessageVideo from '../components/MessageVideo.vue'
 import MessageCode from '../components/MessageCode.vue'
 import MessageText from '../components/MessageText.vue'
-import CookieConsent from '../components/CookieConsent.vue'
-import { type CookieConsent as CookieConsentType } from '../composables/useCookieConsent'
-import { useGoogleTag } from '../composables/useGoogleTag'
 import { useConfigStore } from '@/stores/config'
 import { httpClient } from '@/services/api/httpClient'
 import { supportedLanguages, type SupportedLanguage } from '@/i18n'
@@ -332,7 +326,6 @@ const config = useConfigStore()
 const route = useRoute()
 const router = useRouter()
 const { locale, t } = useI18n()
-const { injectGoogleTag } = useGoogleTag()
 
 const loading = ref(true)
 const error = ref(false)
@@ -389,13 +382,6 @@ const switchLanguage = () => {
 
   // Update meta tags
   updateMetaTags()
-}
-
-// Handle cookie consent - inject Google Tag only after user accepts
-const handleCookieConsent = (consent: CookieConsentType) => {
-  if (consent.analytics) {
-    injectGoogleTag()
-  }
 }
 
 const pageTitle = computed(() => {
