@@ -157,6 +157,7 @@
 
       <!-- Main controls - always visible below input -->
       <div class="mt-3 flex items-center gap-2" data-testid="section-chat-secondary-actions">
+        <ModelDropdown v-model="selectedModelId" class="flex-shrink-0" />
         <ToolsDropdown
           :active-command="activeCommand"
           class="flex-shrink-0"
@@ -235,6 +236,7 @@ import Textarea from './Textarea.vue'
 import CommandPalette from './CommandPalette.vue'
 import FileMentionPalette from './FileMentionPalette.vue'
 import ToolsDropdown from './ToolsDropdown.vue'
+import ModelDropdown from './ModelDropdown.vue'
 import FileSelectionModal from './FileSelectionModal.vue'
 import { parseCommand } from '../commands/parse'
 import { useCommandsStore, type Command } from '@/stores/commands'
@@ -293,6 +295,7 @@ const speechFinalTranscript = ref('') // Accumulated final transcripts during re
 const fileSelectionModalVisible = ref(false)
 const voiceReply = ref(false)
 const discardNextRecording = ref(false)
+const selectedModelId = ref<number | null>(null)
 
 const SILENCE_TIMEOUT_MS = 4000
 const silenceTimer = ref<ReturnType<typeof setTimeout> | null>(null)
@@ -369,6 +372,7 @@ const emit = defineEmits<{
       webSearch?: boolean
       fileIds?: number[]
       voiceReply?: boolean
+      modelId?: number
     },
   ]
   stop: []
@@ -511,6 +515,7 @@ const sendMessage = () => {
       webSearch: hasWebSearch,
       fileIds: uploadedFiles.value.filter((f) => !f.processing).map((f) => f.file_id),
       voiceReply: voiceReply.value,
+      modelId: selectedModelId.value || undefined,
     }
     emit('send', messageToSend, options)
     message.value = ''

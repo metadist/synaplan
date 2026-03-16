@@ -267,6 +267,9 @@
       "videoGen": "Generación de Video",
       "videoGenDesc": "Generar videos desde texto"
     },
+    "modelDropdown": {
+      "default": "Estándar"
+    },
     "removeTool": "Quitar herramienta"
   },
   "chatMessage": {

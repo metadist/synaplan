@@ -718,6 +718,7 @@ const streamAIResponse = async (
     modelId?: number
     fileIds?: number[]
     voiceReply?: boolean
+    isAgain?: boolean
   }
 ) => {
   streamingAbortController = new AbortController()
@@ -1463,7 +1464,8 @@ const streamAIResponse = async (
         webSearch,
         finalModelId,
         fileIds, // Pass array of fileIds
-        options?.voiceReply // Pass voice reply flag
+        options?.voiceReply, // Pass voice reply flag
+        options?.isAgain // Pass isAgain flag
       )
 
       // Store EventSource cleanup function globally
@@ -1697,7 +1699,7 @@ const handleAgain = async (backendMessageId: number, modelId?: number) => {
   historyStore.markSuperseded(assistantMessage.id)
 
   // Stream new response directly without creating a duplicate user message
-  await streamAIResponse(userText, { modelId })
+  await streamAIResponse(userText, { modelId, isAgain: true })
 }
 
 const handleRegenerate = async (message: Message, modelOption: ModelOption) => {
@@ -1724,7 +1726,7 @@ const handleRegenerate = async (message: Message, modelOption: ModelOption) => {
   historyStore.markSuperseded(message.id)
 
   // Stream new response directly without creating a duplicate user message
-  await streamAIResponse(content, { modelId: modelOption.id })
+  await streamAIResponse(content, { modelId: modelOption.id, isAgain: true })
 }
 
 // Handle retry for rate-limited messages

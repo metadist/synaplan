@@ -50,7 +50,7 @@ final readonly class MessageClassifier
      *
      * @return array ['topic' => string, 'language' => string, 'source' => string, 'skip_sorting' => bool]
      */
-    public function classify(Message $message, array $conversationHistory = []): array
+    public function classify(Message $message, array $conversationHistory = [], ?int $overrideModelId = null): array
     {
         $userId = $message->getUserId();
         $messageId = $message->getId();
@@ -60,6 +60,7 @@ final readonly class MessageClassifier
             'message_id' => $messageId,
             'user_id' => $userId,
             'has_text' => !empty($text),
+            'override_model_id' => $overrideModelId,
         ]);
 
         // 1. Check for "Again" function - user-selected AI/prompt
@@ -171,6 +172,11 @@ final readonly class MessageClassifier
             'skip_sorting' => false,
             'intent' => $this->mapTopicToIntent($result['topic']), // Map topic to intent for routing
         ];
+
+        // If a specific model was requested via the UI dropdown, pass it through
+        if ($overrideModelId) {
+            $classification['model_id'] = $overrideModelId;
+        }
 
         // Pass through media_type if detected (for mediamaker topic)
         $mediaType = $result['media_type'] ?? null;

@@ -133,7 +133,7 @@ final readonly class MessageProcessor
                 }
             } elseif (!empty($options['is_widget_mode'])) {
                 // Widget Mode without fixed prompt: still disable memories
-                $classification = $this->classifier->classify($message, $conversationHistory);
+                $classification = $this->classifier->classify($message, $conversationHistory, $options['model_id'] ?? null);
                 $classification['is_widget_mode'] = true;
             } elseif ($isAgainRequest) {
                 // Skip sorting but preserve/override topic & language for routing
@@ -221,7 +221,7 @@ final readonly class MessageProcessor
                     $this->logger->info('MessageProcessor: Forcing image description mode');
                 } else {
                     // Run classification
-                    $classification = $this->classifier->classify($message, $conversationHistory);
+                    $classification = $this->classifier->classify($message, $conversationHistory, $options['model_id'] ?? null);
                 }
 
                 // IMPORTANT: Save sorting model info separately (don't pass to ChatHandler!)
@@ -594,7 +594,7 @@ final readonly class MessageProcessor
                     'model_id' => $classification['model_id'],
                 ]);
             } else {
-                $classification = $this->classifier->classify($message, $conversationHistory);
+                $classification = $this->classifier->classify($message, $conversationHistory, $options['model_id'] ?? null);
 
                 $this->notify($statusCallback, 'classified', sprintf(
                     'Topic: %s, Language: %s, Source: %s',

@@ -182,7 +182,8 @@ export const chatApi = {
     webSearch: boolean = false,
     modelId?: number,
     fileIds?: number[],
-    voiceReply?: boolean
+    voiceReply?: boolean,
+    isAgain: boolean = false
   ): () => void {
     // Build params object
     const paramsObj: Record<string, string> = {
@@ -196,6 +197,7 @@ export const chatApi = {
     if (webSearch) paramsObj.webSearch = '1'
     if (modelId) paramsObj.modelId = modelId.toString()
     if (voiceReply) paramsObj.voiceReply = '1'
+    if (isAgain) paramsObj.isAgain = '1'
 
     // Multiple fileIds as comma-separated list
     if (fileIds && fileIds.length > 0) {
