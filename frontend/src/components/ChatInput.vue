@@ -155,8 +155,8 @@
         </div>
       </div>
 
-      <!-- Main controls - always visible below input -->
-      <div class="mt-3 flex items-center gap-2" data-testid="section-chat-secondary-actions">
+      <!-- Main controls - always visible below input in advanced mode -->
+      <div v-if="!appModeStore.isEasyMode" class="mt-3 flex items-center gap-2" data-testid="section-chat-secondary-actions">
         <ModelDropdown v-model="selectedModelId" class="flex-shrink-0" />
         <ToolsDropdown
           :active-command="activeCommand"
@@ -250,6 +250,7 @@ import { useConfigStore } from '@/stores/config'
 import { useI18n } from 'vue-i18n'
 import { useAutoPersist } from '@/composables/useInputPersistence'
 import { useChatsStore } from '@/stores/chats'
+import { useAppModeStore } from '@/stores/appMode'
 
 interface UploadedFile {
   file_id: number
@@ -304,6 +305,7 @@ const autoSendPending = ref(false)
 const aiConfigStore = useAiConfigStore()
 const chatsStore = useChatsStore()
 const configStore = useConfigStore()
+const appModeStore = useAppModeStore()
 const { warning, error: showError, success } = useNotification()
 const { t, locale } = useI18n()
 
