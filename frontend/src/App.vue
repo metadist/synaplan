@@ -12,6 +12,7 @@
     </ErrorBoundary>
     <NotificationContainer />
     <Dialog />
+    <CookieConsent @consent="handleCookieConsent" />
   </div>
 </template>
 
@@ -27,8 +28,23 @@ import NotificationContainer from '@/components/NotificationContainer.vue'
 import Dialog from '@/components/Dialog.vue'
 import ErrorBoundary from '@/components/ErrorBoundary.vue'
 import LoadingView from '@/views/LoadingView.vue'
+import CookieConsent from '@/components/CookieConsent.vue'
+import { useGoogleTag } from '@/composables/useGoogleTag'
+import type { CookieConsent as CookieConsentType } from '@/composables/useCookieConsent'
 
 useTheme()
+
+const { injectGoogleTag, trackPageView } = useGoogleTag()
+
+const handleCookieConsent = (consent: CookieConsentType) => {
+  if (consent.analytics) {
+    injectGoogleTag()
+    // Track initial page view if just consented
+    setTimeout(() => {
+      trackPageView(route.path)
+    }, 500)
+  }
+}
 
 // Build info for debugging (visible in HTML source as comment)
 const configStore = useConfigStore()
@@ -62,6 +78,18 @@ watch(locale, () => {
     document.title = `${pageTitle} | ${APP_NAME}`
   }
 })
+
+// Track page views when route changes
+watch(
+  () => route.path,
+  (newPath) => {
+    // Use setTimeout to ensure document.title has been updated by the router
+    setTimeout(() => {
+      trackPageView(newPath)
+    }, 100)
+  },
+  { immediate: true }
+)
 
 // Google reCAPTCHA v3 Badge visibility control
 // Only show badge on auth-related pages (login, register)
