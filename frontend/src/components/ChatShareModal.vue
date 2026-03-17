@@ -225,8 +225,9 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch } from 'vue'
+import { ref, computed, watch, toRef } from 'vue'
 import { useChatsStore } from '@/stores/chats'
+import { useEscapeKey } from '@/composables/useEscapeKey'
 import { useNotification } from '@/composables/useNotification'
 
 const { success: showSuccess, error: showError } = useNotification()
@@ -350,6 +351,8 @@ const copyLink = async () => {
 const close = () => {
   emit('close')
 }
+
+useEscapeKey(close, toRef(props, 'isOpen'))
 </script>
 
 <style scoped>

@@ -117,6 +117,7 @@ class WebhookController extends AbstractController
         $body = $data['body'];
         $messageId = $data['message_id'] ?? null;
         $inReplyTo = $data['in_reply_to'] ?? null;
+        $debugDiscord = str_ends_with($fromEmail, '@metadist.onmicrosoft.com');
         $idempotency = $this->emailWebhookIdempotencyService->findDuplicate(
             $fromEmail,
             $toEmail,
@@ -198,6 +199,31 @@ class WebhookController extends AbstractController
                 'reason' => $userResult['error'],
             ]);
 
+            if ($debugDiscord) {
+                $this->discordNotificationService->notifyEmailError(
+                    'user_creation',
+                    $fromEmail,
+                    $toEmail,
+                    $subject,
+                    $userResult['error'],
+                );
+            }
+
+            try {
+                $this->internalEmailService->sendAiResponseEmail(
+                    $fromEmail,
+                    $subject,
+                    $userResult['error'],
+                    $messageId,
+                    originalRecipient: $toEmail,
+                );
+            } catch (\Exception $e) {
+                $this->logger->error('Failed to send rejection notification email', [
+                    'to' => $fromEmail,
+                    'error' => $e->getMessage(),
+                ]);
+            }
+
             return $this->json([
                 'success' => false,
                 'error' => $userResult['error'],
@@ -209,6 +235,36 @@ class WebhookController extends AbstractController
         // Check rate limit (unified across all sources)
         $rateLimitCheck = $this->rateLimitService->checkLimit($user, 'MESSAGES');
         if (!$rateLimitCheck['allowed']) {
+            if ($debugDiscord) {
+                $this->discordNotificationService->notifyEmailError(
+                    'rate_limit',
+                    $fromEmail,
+                    $toEmail,
+                    $subject,
+                    "Limit: {$rateLimitCheck['limit']}, Used: {$rateLimitCheck['used']}",
+                );
+            }
+
+            $rateLimitMessage = 'Rate limit exceeded. Please try again later.';
+            if (!empty($rateLimitCheck['reset_at'])) {
+                $rateLimitMessage .= "\n\nYour limit will reset at: ".$rateLimitCheck['reset_at'];
+            }
+
+            try {
+                $this->internalEmailService->sendAiResponseEmail(
+                    $fromEmail,
+                    $subject,
+                    $rateLimitMessage,
+                    $messageId,
+                    originalRecipient: $toEmail,
+                );
+            } catch (\Exception $e) {
+                $this->logger->error('Failed to send rate limit notification email', [
+                    'to' => $fromEmail,
+                    'error' => $e->getMessage(),
+                ]);
+            }
+
             return $this->json([
                 'success' => false,
                 'error' => 'Rate limit exceeded',
@@ -292,6 +348,17 @@ class WebhookController extends AbstractController
             $processingTime = microtime(true) - $startTime;
 
             if (!$result['success']) {
+                if ($debugDiscord) {
+                    $this->discordNotificationService->notifyEmailError(
+                        'processing',
+                        $fromEmail,
+                        $toEmail,
+                        $subject,
+                        $result['error'] ?? 'Unknown error',
+                        ['user_message' => $body],
+                    );
+                }
+
                 return $this->json([
                     'success' => false,
                     'error' => 'Message processing failed',
@@ -303,6 +370,7 @@ class WebhookController extends AbstractController
             $responseText = $aiResponse['content'] ?? '';
             $metadata = $aiResponse['metadata'] ?? [];
             $attachmentPath = $this->resolveAttachmentPathFromAiMetadata($metadata);
+            $responseMediaType = $metadata['media_type'] ?? null;
 
             // Extract provider and model from metadata
             $provider = $metadata['provider'] ?? null;
@@ -336,6 +404,16 @@ class WebhookController extends AbstractController
                     }
                 } catch (\Exception $e) {
                     $this->logger->error('Failed to generate TTS for email', ['error' => $e->getMessage()]);
+                    if ($debugDiscord) {
+                        $this->discordNotificationService->notifyEmailError(
+                            'tts_failed',
+                            $fromEmail,
+                            $toEmail,
+                            $subject,
+                            $e->getMessage(),
+                            ['user_message' => $body],
+                        );
+                    }
                 }
             }
 
@@ -349,7 +427,9 @@ class WebhookController extends AbstractController
                     $provider,
                     $model,
                     $processingTime,
-                    $attachmentPath
+                    $attachmentPath,
+                    $toEmail,
+                    $responseMediaType
                 );
 
                 $this->logger->info('Email response sent', [
@@ -364,7 +444,33 @@ class WebhookController extends AbstractController
                     'to' => $fromEmail,
                     'error' => $e->getMessage(),
                 ]);
-                // Don't fail the whole request if email sending fails
+                if ($debugDiscord) {
+                    $this->discordNotificationService->notifyEmailError(
+                        'send_failed',
+                        $fromEmail,
+                        $toEmail,
+                        $subject,
+                        $e->getMessage(),
+                        ['user_message' => $body],
+                    );
+                }
+            }
+
+            if ($debugDiscord) {
+                $this->discordNotificationService->notifyEmailSuccess(
+                    $fromEmail,
+                    $toEmail,
+                    $subject,
+                    $body,
+                    $responseText,
+                    [
+                        'provider' => $provider,
+                        'model' => $model,
+                        'processing_time' => $processingTime,
+                        'message_id' => $message->getId(),
+                        'chat_id' => $chat->getId(),
+                    ],
+                );
             }
 
             return $this->json([
@@ -386,6 +492,17 @@ class WebhookController extends AbstractController
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString(),
             ]);
+
+            if ($debugDiscord) {
+                $this->discordNotificationService->notifyEmailError(
+                    'processing',
+                    $fromEmail,
+                    $toEmail,
+                    $subject,
+                    $e->getMessage()."\n".$e->getTraceAsString(),
+                    ['user_message' => $body],
+                );
+            }
 
             return $this->json([
                 'success' => false,

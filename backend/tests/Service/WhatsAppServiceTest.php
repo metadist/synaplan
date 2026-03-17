@@ -1234,6 +1234,159 @@ class WhatsAppServiceTest extends TestCase
         $this->assertEquals('wamid.duplicate123', $result['message_id']);
     }
 
+    // ============================================
+    // Tests for Markdown to WhatsApp Conversion
+    // ============================================
+
+    public function testConvertBoldMarkdown(): void
+    {
+        $method = (new \ReflectionClass($this->service))->getMethod('convertToWhatsAppMarkdown');
+        $method->setAccessible(true);
+
+        $this->assertEquals('*bold text*', $method->invoke($this->service, '**bold text**'));
+        $this->assertEquals('*bold text*', $method->invoke($this->service, '__bold text__'));
+    }
+
+    public function testConvertItalicMarkdown(): void
+    {
+        $method = (new \ReflectionClass($this->service))->getMethod('convertToWhatsAppMarkdown');
+        $method->setAccessible(true);
+
+        $this->assertEquals('_italic text_', $method->invoke($this->service, '*italic text*'));
+    }
+
+    public function testItalicDoesNotMatchMathExpressions(): void
+    {
+        $method = (new \ReflectionClass($this->service))->getMethod('convertToWhatsAppMarkdown');
+        $method->setAccessible(true);
+
+        $this->assertEquals('2 * 3 * 4 = 24', $method->invoke($this->service, '2 * 3 * 4 = 24'));
+        $this->assertEquals('a * b', $method->invoke($this->service, 'a * b'));
+    }
+
+    public function testConvertBoldAndItalicTogether(): void
+    {
+        $method = (new \ReflectionClass($this->service))->getMethod('convertToWhatsAppMarkdown');
+        $method->setAccessible(true);
+
+        $result = $method->invoke($this->service, '**bold** and *italic*');
+        $this->assertEquals('*bold* and _italic_', $result);
+    }
+
+    public function testConvertStrikethrough(): void
+    {
+        $method = (new \ReflectionClass($this->service))->getMethod('convertToWhatsAppMarkdown');
+        $method->setAccessible(true);
+
+        $this->assertEquals('~strikethrough~', $method->invoke($this->service, '~~strikethrough~~'));
+    }
+
+    public function testConvertLinks(): void
+    {
+        $method = (new \ReflectionClass($this->service))->getMethod('convertToWhatsAppMarkdown');
+        $method->setAccessible(true);
+
+        $this->assertEquals(
+            'Click here (https://example.com)',
+            $method->invoke($this->service, '[Click here](https://example.com)')
+        );
+    }
+
+    public function testConvertLinkWhenTextMatchesUrl(): void
+    {
+        $method = (new \ReflectionClass($this->service))->getMethod('convertToWhatsAppMarkdown');
+        $method->setAccessible(true);
+
+        $this->assertEquals(
+            'https://example.com',
+            $method->invoke($this->service, '[https://example.com](https://example.com)')
+        );
+    }
+
+    public function testConvertImageLinks(): void
+    {
+        $method = (new \ReflectionClass($this->service))->getMethod('convertToWhatsAppMarkdown');
+        $method->setAccessible(true);
+
+        $this->assertEquals(
+            'https://example.com/img.png',
+            $method->invoke($this->service, '![alt text](https://example.com/img.png)')
+        );
+    }
+
+    public function testConvertHeaders(): void
+    {
+        $method = (new \ReflectionClass($this->service))->getMethod('convertToWhatsAppMarkdown');
+        $method->setAccessible(true);
+
+        $this->assertEquals('*Title*', $method->invoke($this->service, '# Title'));
+        $this->assertEquals('*Subtitle*', $method->invoke($this->service, '## Subtitle'));
+        $this->assertEquals('*Deep*', $method->invoke($this->service, '### Deep'));
+    }
+
+    public function testConvertBulletPoints(): void
+    {
+        $method = (new \ReflectionClass($this->service))->getMethod('convertToWhatsAppMarkdown');
+        $method->setAccessible(true);
+
+        $input = "- Item 1\n- Item 2\n- Item 3";
+        $expected = "• Item 1\n• Item 2\n• Item 3";
+        $this->assertEquals($expected, $method->invoke($this->service, $input));
+    }
+
+    public function testConvertHorizontalRule(): void
+    {
+        $method = (new \ReflectionClass($this->service))->getMethod('convertToWhatsAppMarkdown');
+        $method->setAccessible(true);
+
+        $this->assertEquals('─────', $method->invoke($this->service, '---'));
+        $this->assertEquals('─────', $method->invoke($this->service, '***'));
+        $this->assertEquals('─────', $method->invoke($this->service, '___'));
+    }
+
+    public function testCodeBlocksPreserved(): void
+    {
+        $method = (new \ReflectionClass($this->service))->getMethod('convertToWhatsAppMarkdown');
+        $method->setAccessible(true);
+
+        $input = "```\ncode here\n```";
+        $this->assertStringContainsString('code here', $method->invoke($this->service, $input));
+    }
+
+    public function testCodeBlockLanguageTagStripped(): void
+    {
+        $method = (new \ReflectionClass($this->service))->getMethod('convertToWhatsAppMarkdown');
+        $method->setAccessible(true);
+
+        $input = "```python\nprint('hello')\n```";
+        $result = $method->invoke($this->service, $input);
+        $this->assertStringNotContainsString('python', $result);
+        $this->assertStringContainsString("print('hello')", $result);
+    }
+
+    public function testInlineCodePreserved(): void
+    {
+        $method = (new \ReflectionClass($this->service))->getMethod('convertToWhatsAppMarkdown');
+        $method->setAccessible(true);
+
+        $this->assertEquals('Use `git status` here', $method->invoke($this->service, 'Use `git status` here'));
+    }
+
+    public function testComplexMarkdownConversion(): void
+    {
+        $method = (new \ReflectionClass($this->service))->getMethod('convertToWhatsAppMarkdown');
+        $method->setAccessible(true);
+
+        $input = "# Welcome\n\nHere is **important** and *emphasized* text.\n\n- First\n- Second\n\n[Learn more](https://example.com)";
+        $result = $method->invoke($this->service, $input);
+
+        $this->assertStringContainsString('*Welcome*', $result);
+        $this->assertStringContainsString('*important*', $result);
+        $this->assertStringContainsString('_emphasized_', $result);
+        $this->assertStringContainsString('• First', $result);
+        $this->assertStringContainsString('Learn more (https://example.com)', $result);
+    }
+
     public function testDuplicateDetectionWhenLockNotAcquired(): void
     {
         // Create lock that cannot be acquired (another process holds it)

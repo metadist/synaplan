@@ -175,5 +175,13 @@ export const selectors = {
     stateSyncError: '[data-testid="state-sync-error"]',
     textNewLevel: '[data-testid="text-new-level"]',
   },
+  taskPrompts: {
+    page: '[data-testid="page-config-task-prompts"]',
+    promptSelect: '[data-testid="input-prompt-select"]',
+    promptDetails: '[data-testid="section-prompt-details"]',
+    aiModel: '[data-testid="input-ai-model"]',
+    rules: '[data-testid="input-rules"]',
+    content: '[data-testid="input-content"]',
+  },
   toast: {},
 } as const

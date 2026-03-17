@@ -407,6 +407,7 @@ final readonly class MessageProcessor
                 'success' => false,
                 'error' => $e->getMessage(),
                 'provider' => $e->getProviderName(),
+                'classification' => $classification ?? null,
             ];
 
             // Include context data (install_command, suggested_models) if available
@@ -424,6 +425,7 @@ final readonly class MessageProcessor
             return [
                 'success' => false,
                 'error' => $e->getMessage(),
+                'classification' => $classification ?? null,
             ];
         }
     }
@@ -773,6 +775,7 @@ final readonly class MessageProcessor
                 'success' => false,
                 'error' => $e->getMessage(),
                 'provider' => $e->getProviderName(),
+                'classification' => $classification ?? null,
             ];
 
             // Include context data (install_command, suggested_models) if available
@@ -802,6 +805,7 @@ final readonly class MessageProcessor
                 'success' => false,
                 'error' => $e->getMessage(),
                 'details' => $errorDetails,
+                'classification' => $classification ?? null,
             ];
         }
     }

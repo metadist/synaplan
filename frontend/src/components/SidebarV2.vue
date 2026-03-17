@@ -961,7 +961,7 @@ const handleNewChat = async () => {
 }
 
 const handleChatSelect = (chatId: number) => {
-  chatsStore.activeChatId = chatId
+  chatsStore.setActiveChat(chatId)
   if (route.path !== '/') router.push('/')
   chatModalOpen.value = false
   chatMenuOpenId.value = null

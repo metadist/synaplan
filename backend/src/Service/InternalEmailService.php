@@ -130,13 +130,16 @@ final readonly class InternalEmailService
     /**
      * Send AI response email (for smart@synaplan.net chat).
      *
-     * @param string      $to             Recipient email address
-     * @param string      $subject        Original email subject
-     * @param string      $bodyText       AI response text (markdown format)
-     * @param string|null $inReplyTo      Message ID for email threading
-     * @param string|null $provider       AI provider name (e.g., 'ollama', 'openai')
-     * @param string|null $model          AI model name (e.g., 'llama3.2')
-     * @param float|null  $processingTime Processing time in seconds
+     * @param string      $to                Recipient email address
+     * @param string      $subject           Original email subject
+     * @param string      $bodyText          AI response text (markdown format)
+     * @param string|null $inReplyTo         Message ID for email threading
+     * @param string|null $provider          AI provider name (e.g., 'ollama', 'openai')
+     * @param string|null $model             AI model name (e.g., 'llama3.2')
+     * @param float|null  $processingTime    Processing time in seconds
+     * @param string|null $attachmentPath    Path to attachment file
+     * @param string|null $originalRecipient The address the user originally wrote to (used as From/Reply-To)
+     * @param string|null $mediaType         Type of media attachment ('image', 'video', 'audio') for inline embedding
      */
     public function sendAiResponseEmail(
         string $to,
@@ -147,16 +150,29 @@ final readonly class InternalEmailService
         ?string $model = null,
         ?float $processingTime = null,
         ?string $attachmentPath = null,
+        ?string $originalRecipient = null,
+        ?string $mediaType = null,
     ): void {
+        $fallbackAddress = $_ENV['SMART_EMAIL_ADDRESS'] ?? \App\Service\Email\SmartEmailHelper::getBaseAddress();
+        $smartAddress = ($originalRecipient && \App\Service\Email\SmartEmailHelper::isValidSmartAddress($originalRecipient))
+            ? $originalRecipient
+            : $fallbackAddress;
         $fromEmail = $_ENV['APP_SENDER_EMAIL'] ?? 'smart@synaplan.net';
         $fromName = $_ENV['APP_SENDER_NAME'] ?? 'Synaplan AI';
-        // Reply-To must be the smart address so users can reply and continue the dialog
-        $replyToEmail = $_ENV['SMART_EMAIL_ADDRESS'] ?? \App\Service\Email\SmartEmailHelper::getBaseAddress();
+        $replyToEmail = $smartAddress;
+
+        $hasInlineImage = false;
 
         // Convert markdown to HTML using Parsedown
         $parsedown = new \Parsedown();
         $parsedown->setSafeMode(true); // Prevent XSS
         $htmlBody = $parsedown->text($bodyText);
+
+        // Embed images inline via CID for broad email client compatibility (Outlook, Gmail, etc.)
+        if ('image' === $mediaType && $attachmentPath && file_exists($attachmentPath)) {
+            $htmlBody .= '<br><br><img src="cid:generated-image" alt="Generated image" style="max-width: 100%; border-radius: 8px;">';
+            $hasInlineImage = true;
+        }
 
         // Add metadata footer if available
         if ($provider || $model || null !== $processingTime) {
@@ -213,9 +229,12 @@ final readonly class InternalEmailService
             $email->getHeaders()->addTextHeader('References', $inReplyTo);
         }
 
-        // Add attachment if provided
         if ($attachmentPath && file_exists($attachmentPath)) {
-            $email->attachFromPath($attachmentPath);
+            if ($hasInlineImage) {
+                $email->embedFromPath($attachmentPath, 'generated-image');
+            } else {
+                $email->attachFromPath($attachmentPath);
+            }
         }
 
         try {

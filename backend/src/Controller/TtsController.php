@@ -6,6 +6,7 @@ use App\AI\Service\AiFacade;
 use App\Entity\User;
 use App\Service\TtsTextSanitizer;
 use OpenApi\Attributes as OA;
+use Psr\Log\LoggerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -19,6 +20,7 @@ class TtsController extends AbstractController
 {
     public function __construct(
         private AiFacade $aiFacade,
+        private LoggerInterface $logger,
     ) {
     }
 
@@ -82,7 +84,11 @@ class TtsController extends AbstractController
                 'X-TTS-Provider' => $result['provider'],
             ]);
         } catch (\Throwable $e) {
-            return $this->json(['error' => 'TTS stream failed: '.$e->getMessage()], Response::HTTP_INTERNAL_SERVER_ERROR);
+            $this->logger->error('TTS audio streaming failed', [
+                'exception' => $e,
+            ]);
+
+            return $this->json(['error' => 'Audio generation failed. Please try again or use a different model.'], Response::HTTP_INTERNAL_SERVER_ERROR);
         }
     }
 }

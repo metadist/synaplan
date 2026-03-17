@@ -1,49 +1,16 @@
 # Playwright E2E Tests
 
-## Quick Start
-
-1. **Start the test stack**:
-
-   ```bash
-   docker compose -f docker-compose.test.yml up -d
-   ```
-
-2. **Install Node.js 20+** (if not installed):
-
-   ```bash
-   curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
-   sudo apt-get install -y nodejs
-   ```
-
-3. **Setup Playwright**:
-
-   ```bash
-   cd frontend
-   npm install
-   npx playwright install --with-deps
-   ```
-
-4. **Run tests**:
-   ```bash
-   cd frontend
-   npm run test:e2e
-   ```
-
-**Note:** Locally runs Chromium only. CI tests both Chromium and Firefox.
-
-## Test Stack
-
-All e2e tests run against `docker-compose.test.yml` (port 8001), not the dev stack.
-
-### Password auth (default)
+## Quick Start (dev stack)
 
 ```bash
-# Start test stack
-docker compose -f docker-compose.test.yml up -d
-
-# Run password-auth tests
+docker compose up -d   # Backend :8000, Frontend :5173, MailHog :8025/:1025
+make build             # Build frontend + widget (needed for widget tests)
 cd frontend
-BASE_URL=http://localhost:8001 npm run test:e2e
+npm install
+npx playwright install --with-deps
+npm run test:e2e                        # E2E tests
+npm run test:e2e -- -g "standard model"  # Single test (grep by name)
+npm run test:e2e:ui                     # Playwright UI
 ```
 
 ## Switching between dev stack and test stack
@@ -119,11 +86,11 @@ From the **frontend** directory:
 | What                               | Command                                                                    |
 | ---------------------------------- | -------------------------------------------------------------------------- |
 | **Dev stack**: E2E tests           | `npm run test:e2e`                                                         |
-| **Dev stack**: single test         | `npm run test:e2e -- -g "id=013"`                                          |
+| **Dev stack**: single test         | `npm run test:e2e -- -g "standard model"`                                  |
 | **Test stack**: E2E tests          | `BASE_URL=http://localhost:8001 npm run test:e2e`                          |
 | **Test stack**: full CI-like       | `make test-e2e-full` (builds test stack + runs all E2E)                    |
 | **Test stack**: CI-like (no @noci) | `BASE_URL=http://localhost:8001 npm run test:e2e -- --grep-invert "@noci"` |
-| **Test stack**: single test        | `BASE_URL=http://localhost:8001 npm run test:e2e -- -g "id=020"`           |
+| **Test stack**: single test        | `BASE_URL=http://localhost:8001 npm run test:e2e -- -g "embedded chat"`    |
 | **WhatsApp only**                  | `BASE_URL=http://localhost:8001 npm run test:e2e:whatsapp`                 |
 | **Playwright UI**                  | `npm run test:e2e:ui`                                                      |
 
@@ -239,7 +206,7 @@ Tests use tags in their names for filtering:
 | `AUTH_PASS`   | `admin123`              | Password-auth password                                                   |
 | `OIDC_USER`   | `testuser@synaplan.com` | Keycloak test user email                                                 |
 | `OIDC_PASS`   | `testpass123`           | Keycloak test user password                                              |
-| `MAILHOG_URL` | `http://localhost:8025` | MailHog API (for registration tests)                                     |
+| `MAILHOG_URL` | `http://localhost:8025` | MailHog API (registration + email smoke tests)                           |
 
 ## CI Matrix
 
@@ -254,12 +221,11 @@ CI runs 4 parallel e2e jobs:
 
 ## Configuration
 
-Optional: Create `frontend/tests/e2e/.env.local` to override defaults:
+Override defaults via environment variables:
 
 ```bash
-BASE_URL=http://localhost:8001
-AUTH_USER=admin@synaplan.com
-AUTH_PASS=admin123
+BASE_URL=http://localhost:8001 npm run test:e2e
+AUTH_USER=custom@example.com AUTH_PASS=secret npm run test:e2e
 ```
 
 ## Troubleshooting

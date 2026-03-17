@@ -10,6 +10,7 @@ use App\Service\File\FileProcessor;
 use App\Service\File\FileStorageService;
 use App\Service\File\VectorizationService;
 use App\Service\Message\AgainHandler;
+use App\Service\Message\MessagePreProcessor;
 use App\Service\MessageEnqueueService;
 use App\Service\ModelConfigService;
 use App\Service\PromptService;
@@ -525,7 +526,15 @@ class MessageController extends AbstractController
                 );
 
                 $messageFile->setFileText($extractedText);
-                $messageFile->setStatus('extracted');
+
+                $isAudio = in_array($fileExtension, MessagePreProcessor::AUDIO_EXTENSIONS, true);
+
+                if ($isAudio && empty(trim($extractedText))) {
+                    $messageFile->setStatus('error');
+                } else {
+                    $messageFile->setStatus('extracted');
+                }
+
                 $this->em->flush();
 
                 $this->logger->info('Chat file extracted', [

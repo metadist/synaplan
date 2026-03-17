@@ -465,13 +465,17 @@ final readonly class MediaGenerationHandler implements MessageHandlerInterface
             $this->logger->error('MediaGenerationHandler: Generation failed', [
                 'error' => $e->getMessage(),
                 'provider' => $provider,
+                'model' => $modelName,
+                'media_type' => $mediaType,
+                'exception' => $e,
             ]);
 
-            // Stream error message
-            $errorMessage = "Sorry, {$mediaType} generation failed: ".$e->getMessage();
-            $streamCallback($errorMessage);
-
-            $this->notify($progressCallback, 'error', ucfirst($mediaType).' generation failed.');
+            $userMessage = match ($mediaType) {
+                'audio' => 'Sorry, the audio could not be generated right now. Please try again or use a different model. Tip: For audio, try a clear prompt like "Read this text aloud: …".',
+                'video' => 'Sorry, the video could not be generated right now. Please try again or use a different model.',
+                default => 'Sorry, the image could not be generated right now. Please try again or use a different model.',
+            };
+            $streamCallback($userMessage);
 
             return [
                 'metadata' => [

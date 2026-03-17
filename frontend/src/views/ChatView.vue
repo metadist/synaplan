@@ -91,6 +91,7 @@
               :provider="message.provider"
               :model-label="message.modelLabel"
               :topic="message.topic"
+              :original-topic="message.originalTopic"
               :again-data="message.againData"
               :backend-message-id="message.backendMessageId"
               :processing-status="message.isStreaming ? processingStatus : undefined"
@@ -372,8 +373,11 @@ onMounted(async () => {
     await historyStore.loadMessages(chatsStore.activeChatId)
   }
 
-  // Auto-focus ChatInput after mounting with delay
+  // Scroll to newest message after initial load
   await nextTick()
+  scrollToBottom(true)
+
+  // Auto-focus ChatInput after mounting with delay
   setTimeout(() => {
     if (chatInputRef.value?.textareaRef) {
       chatInputRef.value.textareaRef.focus()
@@ -457,7 +461,7 @@ watch(
       // Calling clear() first causes empty chat if loadMessages() fails silently.
       await historyStore.loadMessages(newChatId)
       await nextTick()
-      scrollToBottom()
+      scrollToBottom(true)
 
       // Auto-focus input when switching chats
       setTimeout(() => {
@@ -527,11 +531,12 @@ const groupedMessages = computed(() => {
   return groups
 })
 
-const scrollToBottom = () => {
-  if (autoScroll.value && chatContainer.value) {
+const scrollToBottom = (force = false) => {
+  if ((force || autoScroll.value) && chatContainer.value) {
     nextTick(() => {
       if (chatContainer.value) {
         chatContainer.value.scrollTop = chatContainer.value.scrollHeight
+        autoScroll.value = true
       }
     })
   }
@@ -644,17 +649,21 @@ const handleSendMessage = async (
     }
   }
 
+  // File-only submission: provide a default message when no text but files are attached
+  const hasFiles = options?.fileIds && options.fileIds.length > 0
+  const messageToSend = !content.trim() && hasFiles ? t('chat.fileOnlyDefaultMessage') : content
+
   // Prepare webSearch metadata for user message
   const webSearchData = options?.webSearch ? { enabled: true } : null
 
   // Prepare tool metadata based on command in message
   // Also extract the clean content without command prefix for display
   let toolData: { command: string; label: string; icon: string } | null = null
-  let displayContent = content
-  let backendContent = content // Content to send to backend
+  let displayContent = messageToSend
+  let backendContent = messageToSend
 
-  if (content.startsWith('/')) {
-    const commandMatch = content.match(/^\/(\w+)\s+(.*)$/)
+  if (messageToSend.startsWith('/')) {
+    const commandMatch = messageToSend.match(/^\/(\w+)\s+(.*)$/)
     if (commandMatch) {
       const cmd = commandMatch[1]
       const args = commandMatch[2] || ''
@@ -1517,6 +1526,9 @@ const handleStopStreaming = async () => {
   // Finish any streaming message and add cancellation notice
   const streamingMessage = historyStore.messages.find((m) => m.isStreaming)
   if (streamingMessage) {
+    // Remove any TTS loading indicators (voice reply was in progress when cancelled)
+    streamingMessage.parts = streamingMessage.parts.filter((p) => p.type !== 'tts_loading')
+
     const cancelMessage = t('message.cancelledByUser')
 
     // Collect the current content for saving to backend
@@ -1640,7 +1652,6 @@ async function saveCancelledMessageToBackend(
 
 // Handle "Again" with specific model from backend
 const handleAgain = async (backendMessageId: number, modelId?: number) => {
-  // Check authentication before attempting to resend
   if (!authStore.isAuthenticated) {
     console.error('❌ Not authenticated - redirecting to login')
     const { error } = useNotification()
@@ -1649,7 +1660,6 @@ const handleAgain = async (backendMessageId: number, modelId?: number) => {
     return
   }
 
-  // Find the original user message for this assistant response
   const assistantMessage = historyStore.messages.find(
     (m) => m.backendMessageId === backendMessageId && m.role === 'assistant'
   )
@@ -1659,10 +1669,6 @@ const handleAgain = async (backendMessageId: number, modelId?: number) => {
     return
   }
 
-  // Mark previous response as superseded
-  historyStore.markSuperseded(assistantMessage.id)
-
-  // Find the user message (should be right before the assistant message)
   const messageIndex = historyStore.messages.indexOf(assistantMessage)
   const userMessage = messageIndex > 0 ? historyStore.messages[messageIndex - 1] : null
 
@@ -1671,7 +1677,6 @@ const handleAgain = async (backendMessageId: number, modelId?: number) => {
     return
   }
 
-  // Extract user text from parts
   const userText = userMessage.parts
     .filter((p) => p.type === 'text')
     .map((p) => p.content)
@@ -1682,33 +1687,44 @@ const handleAgain = async (backendMessageId: number, modelId?: number) => {
     return
   }
 
-  // Re-send the user message with the selected model
-  // This will trigger normal streaming flow
-  await handleSendMessage(userText, { modelId })
+  // Stop any active audio playback before retrying
+  if (currentAudioStreamer) {
+    currentAudioStreamer.stop()
+    currentAudioStreamer = null
+  }
+  isAudioStreaming.value = false
+
+  historyStore.markSuperseded(assistantMessage.id)
+
+  // Stream new response directly without creating a duplicate user message
+  await streamAIResponse(userText, { modelId })
 }
 
 const handleRegenerate = async (message: Message, modelOption: ModelOption) => {
-  streamingAbortController = new AbortController()
+  const messageIndex = historyStore.messages.findIndex((m) => m.id === message.id)
+  if (messageIndex <= 0) return
 
-  // Mark the current message as superseded
+  const previousMessage = historyStore.messages[messageIndex - 1]
+  if (previousMessage.role !== 'user') return
+
+  const content = previousMessage.parts
+    .filter((part) => part.type === 'text')
+    .map((part) => part.content || '')
+    .join('\n')
+
+  if (!content) return
+
+  // Stop any active audio playback before regenerating
+  if (currentAudioStreamer) {
+    currentAudioStreamer.stop()
+    currentAudioStreamer = null
+  }
+  isAudioStreaming.value = false
+
   historyStore.markSuperseded(message.id)
 
-  // Find the original user message that triggered this assistant response
-  const messageIndex = historyStore.messages.findIndex((m) => m.id === message.id)
-  if (messageIndex > 0) {
-    const previousMessage = historyStore.messages[messageIndex - 1]
-    if (previousMessage.role === 'user') {
-      // Extract text content from user message
-      const content = previousMessage.parts
-        .filter((part) => part.type === 'text')
-        .map((part) => part.content || '')
-        .join('\n')
-
-      // Re-send the user message with the selected model
-      // This will trigger normal streaming flow
-      await handleSendMessage(content, { modelId: modelOption.id })
-    }
-  }
+  // Stream new response directly without creating a duplicate user message
+  await streamAIResponse(content, { modelId: modelOption.id })
 }
 
 // Handle retry for rate-limited messages

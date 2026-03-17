@@ -50,11 +50,7 @@
           </select>
           <p class="text-xs txt-secondary mt-1.5 flex items-center gap-1">
             <Icon icon="heroicons:information-circle" class="w-3.5 h-3.5" />
-            {{
-              isAdmin
-                ? $t('config.taskPrompts.selectPromptHelpAdmin')
-                : $t('config.taskPrompts.selectPromptHelp')
-            }}
+            {{ $t('config.taskPrompts.selectPromptHelp') }}
           </p>
         </div>
 
@@ -84,18 +80,19 @@
         <div class="space-y-5">
           <!-- System Prompt Badge (if default) -->
           <div
-            v-if="currentPrompt.isDefault && !isAdmin"
+            v-if="currentPrompt.isDefault && !currentPrompt.isUserOverride && !isAdmin"
             class="p-3 bg-blue-500/10 border border-blue-500/30 rounded-lg"
           >
             <div class="flex items-center gap-2">
-              <Icon icon="heroicons:lock-closed" class="w-5 h-5 text-blue-600 dark:text-blue-400" />
+              <Icon
+                icon="heroicons:information-circle"
+                class="w-5 h-5 text-blue-600 dark:text-blue-400"
+              />
               <div>
-                <p class="text-sm font-medium text-blue-600 dark:text-blue-400">
-                  System Prompt (Read-Only)
-                </p>
+                <p class="text-sm font-medium text-blue-600 dark:text-blue-400">System Prompt</p>
                 <p class="text-xs text-blue-600/70 dark:text-blue-400/70">
-                  This is a default system prompt and cannot be edited. Create a custom prompt to
-                  override it.
+                  This is a default system prompt. Any changes you make will be saved as your own
+                  custom override.
                 </p>
               </div>
             </div>
@@ -131,7 +128,6 @@
             </label>
             <textarea
               v-model="formData.rules"
-              :disabled="currentPrompt.isDefault && !isAdmin"
               rows="3"
               class="w-full px-4 py-3 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)] resize-none disabled:opacity-50 disabled:cursor-not-allowed"
               :placeholder="$t('config.taskPrompts.rulesHelp')"
@@ -147,7 +143,6 @@
             </label>
             <select
               v-model="formData.language"
-              :disabled="currentPrompt.isDefault"
               class="w-full px-4 py-3 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)] disabled:opacity-50 disabled:cursor-not-allowed"
               data-testid="input-language"
             >
@@ -156,7 +151,7 @@
               </option>
             </select>
             <p
-              v-if="currentPrompt.isDefault"
+              v-if="currentPrompt.isDefault && isAdmin"
               class="text-xs text-amber-600 dark:text-amber-400 mt-1.5 flex items-center gap-1"
             >
               <Icon icon="heroicons:lock-closed" class="w-3.5 h-3.5" />
@@ -176,12 +171,12 @@
             </label>
             <select
               v-model="formData.aiModel"
-              :disabled="currentPrompt.isDefault && !isAdmin"
               class="w-full px-4 py-3 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)] disabled:opacity-50 disabled:cursor-not-allowed"
               data-testid="input-ai-model"
             >
               <!-- Grouped Models by Capability -->
               <template v-if="!loadingModels && groupedModels.length > 0">
+                <option value="default">Default Model (Auto-selected based on capability)</option>
                 <optgroup
                   v-for="group in groupedModels"
                   :key="group.capability"
@@ -207,8 +202,8 @@
             </p>
           </div>
 
-          <!-- Available Tools (hidden for default prompts unless admin) -->
-          <div v-if="!currentPrompt.isDefault">
+          <!-- Available Tools -->
+          <div>
             <label class="block text-sm font-semibold txt-primary mb-3 flex items-center gap-2">
               <Icon icon="heroicons:wrench-screwdriver" class="w-4 h-4" />
               {{ $t('config.taskPrompts.availableTools') }}
@@ -243,10 +238,7 @@
           </h3>
 
           <!-- Markdown Toolbar -->
-          <div
-            v-if="!currentPrompt.isDefault || isAdmin"
-            class="flex items-center gap-1 p-1 surface-chip rounded-lg"
-          >
+          <div class="flex items-center gap-1 p-1 surface-chip rounded-lg">
             <button
               v-for="tool in markdownTools"
               :key="tool.label"
@@ -263,7 +255,6 @@
         <textarea
           ref="contentTextarea"
           v-model="formData.content"
-          :disabled="currentPrompt.isDefault && !isAdmin"
           rows="16"
           class="w-full px-4 py-3 surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)] resize-none font-mono disabled:opacity-50 disabled:cursor-not-allowed"
           :placeholder="$t('config.taskPrompts.contentPlaceholder')"
@@ -778,6 +769,7 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
+import { useEscapeKey } from '@/composables/useEscapeKey'
 import { useI18n } from 'vue-i18n'
 import { Icon } from '@iconify/vue'
 import {
@@ -788,7 +780,7 @@ import {
 } from '@/services/api/promptsApi'
 import { configApi } from '@/services/api/configApi'
 import type { AIModel, Capability } from '@/types/ai-models'
-import { DEFAULT_AI_MODEL, findModelIdByString } from '@/utils/aiModelDefaults'
+import { findModelIdByString } from '@/utils/aiModelDefaults'
 import { useNotification } from '@/composables/useNotification'
 import { useUnsavedChanges } from '@/composables/useUnsavedChanges'
 import { useDialog } from '@/composables/useDialog'
@@ -862,6 +854,9 @@ const newPromptLanguage = ref(locale.value || 'en')
 const newPromptSelectedFiles = ref<number[]>([])
 const newPromptFilesSearch = ref('')
 const showCreateModal = ref(false)
+
+useEscapeKey(() => (showCreateModal.value = false), showCreateModal)
+
 const contentTextarea = ref<HTMLTextAreaElement | null>(null)
 const loading = ref(false)
 const error = ref<string | null>(null)
@@ -1012,7 +1007,7 @@ const loadPrompts = async () => {
     prompts.value = nonWidgetPrompts.map((p) => {
       const metadata = p.metadata || {}
 
-      let aiModelString = DEFAULT_AI_MODEL
+      let aiModelString = 'default'
       if (metadata.aiModel && metadata.aiModel > 0) {
         let foundModel = null
         for (const models of Object.values(allModels.value)) {
@@ -1123,10 +1118,11 @@ const handleSave = saveChanges(async () => {
     // Build metadata object
     const metadata: Record<string, any> = {}
 
-    metadata.aiModel = findModelIdByString(
-      allModels.value,
-      formData.value.aiModel || DEFAULT_AI_MODEL
-    )
+    if (formData.value.aiModel === 'default' || !formData.value.aiModel) {
+      metadata.aiModel = 0
+    } else {
+      metadata.aiModel = findModelIdByString(allModels.value, formData.value.aiModel)
+    }
 
     // Set tool flags (for SAVE)
     metadata.tool_internet_search = (formData.value.availableTools || []).includes(
@@ -1291,7 +1287,7 @@ const handleCreateNew = async () => {
     // Build metadata object
     const metadata: Record<string, any> = {}
 
-    metadata.aiModel = findModelIdByString(allModels.value, DEFAULT_AI_MODEL)
+    metadata.aiModel = 0 // Default to 0 for new prompts
     metadata.tool_internet_search = true // Enable by default
     metadata.tool_files_search = true // Enable by default
     metadata.tool_url_screenshot = false // Disable by default
@@ -1314,7 +1310,7 @@ const handleCreateNew = async () => {
       ...newPrompt,
       content: newPrompt.prompt,
       rules: newPrompt.selectionRules || newPrompt.shortDescription || '',
-      aiModel: formData.value.aiModel || DEFAULT_AI_MODEL,
+      aiModel: 'default',
       availableTools: formData.value.availableTools || [],
     }
 

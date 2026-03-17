@@ -108,7 +108,7 @@ services:
 
   # Apache Tika Test (Optional - Integration Profile)
   tika_test:
-    image: apache/tika:2.9.2.0
+    image: apache/tika:2.9.2.1
     container_name: synaplan-tika-test
     command: -h 0.0.0.0 -p 9998
     ports:

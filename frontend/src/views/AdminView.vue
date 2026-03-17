@@ -640,6 +640,7 @@
 import { ref, computed, onMounted, watch } from 'vue'
 import { Icon } from '@iconify/vue'
 import MainLayout from '@/components/MainLayout.vue'
+import { useEscapeKey } from '@/composables/useEscapeKey'
 import RegistrationChart from '@/components/admin/RegistrationChart.vue'
 import UsageChart from '@/components/admin/UsageChart.vue'
 import {
@@ -860,6 +861,8 @@ function closeDeleteModal() {
   deleteConfirmed.value = false
 }
 
+useEscapeKey(closeDeleteModal, showDeleteModal)
+
 async function deleteUser() {
   if (!userToDelete.value) return
 
@@ -941,15 +944,17 @@ function getLevelBadgeClass(level: string): string {
 }
 
 function formatDate(dateStr: string): string {
+  if (!dateStr) return '—'
   try {
     const date = new Date(dateStr)
+    if (isNaN(date.getTime())) return '—'
     return (
       date.toLocaleDateString() +
       ' ' +
       date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
     )
   } catch {
-    return dateStr
+    return '—'
   }
 }
 

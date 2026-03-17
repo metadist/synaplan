@@ -299,6 +299,7 @@ import { useDialog } from '@/composables/useDialog'
 import { useI18n } from 'vue-i18n'
 import { DevicePhoneMobileIcon } from '@heroicons/vue/24/outline'
 import { useConfigStore } from '@/stores/config'
+import { refreshAccessToken } from '@/services/api/httpClient'
 
 const { success, error: showError } = useNotification()
 const dialog = useDialog()
@@ -377,9 +378,20 @@ const buildHeaders = (withJson = false) => {
   return headers
 }
 
-const requestWithFallback = async (path: string, options: RequestInit = {}) => {
+const requestWithFallback = async (
+  path: string,
+  options: RequestInit = {},
+  isRetry = false
+): Promise<{ response: Response; payload: unknown }> => {
   const url = `${API_BASE}${path}`
   const response = await fetch(url, { ...options, credentials: 'include' })
+
+  if (response.status === 401 && !isRetry) {
+    const result = await refreshAccessToken()
+    if (result.success) {
+      return requestWithFallback(path, options, true)
+    }
+  }
 
   const contentType = response.headers.get('content-type') ?? ''
   const isJson = contentType.includes('application/json')
@@ -434,12 +446,6 @@ const loadStatus = async () => {
     })
 
     if (!response.ok) {
-      // Handle 401 specifically - likely authentication issue
-      if (response.status === 401) {
-        error.value = 'Authentication required. Please log in again.'
-        loading.value = false
-        return
-      }
       throw new Error(getErrorMessage(payload, 'Failed to load status'))
     }
 

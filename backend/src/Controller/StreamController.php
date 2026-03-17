@@ -232,8 +232,8 @@ class StreamController extends AbstractController
             $fileIdArray = array_map('intval', array_filter(explode(',', $fileIds)));
         }
 
-        if (empty($messageText)) {
-            return $this->json(['error' => 'Message is required'], Response::HTTP_BAD_REQUEST);
+        if (empty($messageText) && empty($fileIdArray)) {
+            return $this->json(['error' => 'Message or file attachment is required'], Response::HTTP_BAD_REQUEST);
         }
 
         if (!$chatId) {
@@ -719,6 +719,12 @@ class StreamController extends AbstractController
                     // Stream the error message as data chunks (like normal AI response)
                     $this->sendSSE('data', ['chunk' => $errorMessage]);
 
+                    // Recover original classification topic for correct frontend model selection
+                    $classification = $result['classification'] ?? null;
+                    $originalTopic = (is_array($classification) && isset($classification['topic']))
+                        ? $classification['topic']
+                        : null;
+
                     // Save error message to database
                     $outgoingMessage = new Message();
                     $outgoingMessage->setUserId($user->getId());
@@ -742,6 +748,9 @@ class StreamController extends AbstractController
                     $outgoingMessage->setMeta('ai_provider', $result['provider'] ?? 'system');
                     $outgoingMessage->setMeta('ai_model', 'error');
                     $outgoingMessage->setMeta('error_type', $result['error'] ?? 'unknown');
+                    if ($originalTopic) {
+                        $outgoingMessage->setMeta('original_topic', $originalTopic);
+                    }
 
                     // Update incoming message
                     $incomingMessage->setTopic('ERROR');
@@ -749,14 +758,13 @@ class StreamController extends AbstractController
 
                     $chat->updateTimestamp();
                     $this->em->flush();
-
-                    // Send complete event
+                    // Send original topic so frontend can show correct "Again" models in real-time
                     $this->sendSSE('complete', [
                         'messageId' => $outgoingMessage->getId(),
                         'trackId' => $trackId,
                         'provider' => $result['provider'] ?? 'system',
                         'model' => 'error',
-                        'topic' => 'ERROR',
+                        'topic' => $originalTopic ?? 'ERROR',
                         'language' => 'en',
                     ]);
 

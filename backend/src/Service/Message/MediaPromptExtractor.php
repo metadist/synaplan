@@ -223,11 +223,23 @@ final readonly class MediaPromptExtractor
 
     private function inferMediaTypeFromMessageText(string $text): ?string
     {
+        if ($this->isVideoIntentText($text)) {
+            return 'video';
+        }
+
         if ($this->isAudioIntentText($text)) {
             return 'audio';
         }
 
         return null;
+    }
+
+    private function isVideoIntentText(string $text): bool
+    {
+        return (bool) preg_match(
+            '/\b(video|vid|film|clip|animation|animat(?:e|ed|ion)|movie|bewegte?\s*bild(?:er)?|bewegt\w*|kurzfilm|short\s*film|reel|motion|gif)\b/i',
+            $text
+        );
     }
 
     private function isAudioIntentText(string $text): bool

@@ -1387,6 +1387,10 @@ const sendMessage = async () => {
       emit('session-created', sessionId.value)
     }
 
+    if (typeof result.messageCount === 'number') {
+      messageCount.value = result.messageCount
+    }
+
     if (typeof result.remainingUploads === 'number') {
       const limit = fileUploadLimit.value
       // Only track count if there's an actual limit (0 = unlimited)
