@@ -1,4 +1,11 @@
+/** Global notification toasts (useNotification / showError) */
+const notificationError = '[data-testid="comp-notification-item"][data-notification-type="error"]'
+
 export const selectors = {
+  notification: {
+    /** Error toast – use for fail-fast when racing with success state */
+    error: notificationError,
+  },
   login: {
     email: '#email',
     password: '#password',
@@ -12,6 +19,8 @@ export const selectors = {
     confirmPassword: '[data-testid="input-confirm-password"]',
     submit: '[data-testid="btn-register"]',
     successSection: '[data-testid="section-registration-success"]',
+    /** Shown when backend/register returns error (use with race(success, error) for fail-fast) */
+    errorAlert: '[data-testid="alert-register-error"]',
     backToLoginBtn: '[data-testid="btn-goto-login"]',
   },
   verifyEmail: {
@@ -24,6 +33,22 @@ export const selectors = {
   nav: {
     sidebar: '[data-testid="comp-sidebar-v2"]',
     navDropdown: '[data-testid="dropdown-sidebar-v2-nav"]',
+    /** Expand sidebar when collapsed (so chat dropdown is visible) */
+    sidebarExpand: '[data-testid="btn-sidebar-expand"]',
+    /** V2 sidebar: single plus button to start new chat (no toggle/dropdown) */
+    sidebarV2NewChat: '[data-testid="btn-sidebar-v2-new-chat"]',
+    /** V2 sidebar: chat nav icon opens chat list modal (path "/" → testid "btn-sidebar-v2--") */
+    sidebarV2ChatNav: '[data-testid="btn-sidebar-v2--"]',
+    /** V2 chat list modal */
+    modalChatManager: '[data-testid="modal-chat-manager"]',
+    /** V2 chat list: container visible when at least one chat exists; use to wait before targeting rows */
+    chatManagerListRows: '[data-testid="list-chat-manager-rows"]',
+    /** V2 chat list: one row per chat; scope menu to this */
+    chatV2Row: '[data-testid="row-chat-v2"]',
+    /** V2 chat row: 3-dots menu button */
+    chatV2RowMenu: '[data-testid="btn-chat-v2-row-menu"]',
+    /** V2 chat context menu: Share button */
+    chatV2Share: '[data-testid="btn-chat-v2-share"]',
   },
   models: {
     page: '[data-testid="page-config-ai-models"]',
@@ -48,10 +73,66 @@ export const selectors = {
     fileInput: '[data-testid="input-chat-file"]',
     messageContainer: '[data-testid="message-container"]',
     aiAnswerBubble: '[data-testid="assistant-message-bubble"]',
+    /** Terminal: present when streaming finished */
+    chatDone: '[data-testid="message-done"]',
+    /** Terminal: present when message ended in error */
+    chatError: '[data-testid="message-topic-error"]',
+    messageUser: '[data-testid="message-user"]',
+    messageAssistant: '[data-testid="message-assistant"]',
+    /** Present inside assistant bubble when streaming finished (prefer over loader hidden) */
+    messageDone: '[data-testid="message-done"]',
     loadIndicator: '[data-testid="loading-typing-indicator"]',
+    /** Wrapper that contains only the generated answer body (no timestamp, no footer). Use this for asserting reply text. */
+    assistantAnswerBody: '[data-testid="section-message-text"]',
     messageText: '[data-testid="message-text"]',
+    /** Present when message topic is ERROR (backend error path); use to assert no error in bubble */
+    messageTopicError: '[data-testid="message-topic-error"]',
     againDropdown: '[data-testid="btn-message-model-toggle"]',
     againDropdownItem: 'button.dropdown-item',
+  },
+  share: {
+    shareButton: '[data-testid="btn-chat-share"]',
+    shareModal: '[data-testid="modal-chat-share"]',
+    modalRoot: '[data-testid="modal-chat-share-root"]',
+    shareCreate: '[data-testid="btn-chat-share-make-public"]',
+    shareLinkInput: '[data-testid="share-link-input"]',
+    shareDone: '[data-testid="share-done"]',
+    makePublicBtn: '[data-testid="btn-chat-share-make-public"]',
+    copyBtn: '[data-testid="btn-chat-share-copy"]',
+    closeBtn: '[data-testid="btn-chat-share-close"]',
+    revokeBtn: '[data-testid="btn-chat-share-revoke"]',
+    /** Sidebar: menu toggle per chat entry (open first, then click share) */
+    sidebarEntryMenu: '[data-testid="btn-chat-entry-menu"]',
+    /** Sidebar: share action inside dropdown */
+    sidebarShareBtn: '[data-testid="btn-chat-entry-share"]',
+    /** Chat dropdown (nav left): section visible when chat toggle is open */
+    chatDropdownSection: '[data-testid="section-chat-dropdown"]',
+    /** Chat dropdown: one row per chat; scope menu/share to this row */
+    chatDropdownRow: '[data-testid="row-chat-item"]',
+    /** Scoped to chatDropdownRow: menu (three dots), share, rename, delete buttons */
+    chatMenuButton: '[data-testid="btn-chat-menu"]',
+    chatShareButton: '[data-testid="btn-chat-share"]',
+    chatRenameButton: '[data-testid="btn-chat-rename"]',
+    chatDeleteButton: '[data-testid="btn-chat-delete"]',
+    /** Chat dropdown: item button (title) – scope by chatDropdownRow */
+    chatDropdownFirstItem: '[data-testid="btn-chat-item"]',
+    /** Chat browser: share button on chat card (no dropdown) */
+    browserShareBtn: '[data-testid="btn-chat-share"]',
+    /** Share link URL (read-only text in modal) */
+    shareLink: '[data-testid="share-link-input"]',
+  },
+  sharedChat: {
+    sharedChatRoot: '[data-testid="shared-chat-root"]',
+    sharedMessageList: '[data-testid="shared-message-list"]',
+    /** Shared page root (read-only view) */
+    page: '[data-testid="page-shared-chat"]',
+    loading: '[data-testid="state-loading"]',
+    error: '[data-testid="state-error"]',
+    content: '[data-testid="section-chat-content"]',
+    messagesSection: '[data-testid="shared-message-list"]',
+    messageItem: '[data-testid="item-message"]',
+    /** Optional: add data-testid="badge-read-only" in app for explicit read-only indicator */
+    badgeReadOnly: '[data-testid="badge-read-only"]',
   },
   files: {
     page: '[data-testid="page-files-upload"]',
@@ -62,6 +143,11 @@ export const selectors = {
     table: '[data-testid="section-table"]',
     fileRow: '[data-testid="item-file"]',
     emptyState: '[data-testid="state-empty"]',
+  },
+  fileSelection: {
+    modal: '[data-testid="modal-file-selection"]',
+    uploadButton: '[data-testid="btn-file-selection-upload"]',
+    attachButton: '[data-testid="btn-file-selection-attach"]',
   },
   userMenu: {
     button: '[data-testid="btn-sidebar-v2-user"]',
@@ -174,6 +260,14 @@ export const selectors = {
     stateSyncSuccess: '[data-testid="state-sync-success"]',
     stateSyncError: '[data-testid="state-sync-error"]',
     textNewLevel: '[data-testid="text-new-level"]',
+  },
+  taskPrompts: {
+    page: '[data-testid="page-config-task-prompts"]',
+    promptSelect: '[data-testid="input-prompt-select"]',
+    promptDetails: '[data-testid="section-prompt-details"]',
+    aiModel: '[data-testid="input-ai-model"]',
+    rules: '[data-testid="input-rules"]',
+    content: '[data-testid="input-content"]',
   },
   toast: {},
 } as const

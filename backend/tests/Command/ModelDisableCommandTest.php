@@ -44,7 +44,7 @@ class ModelDisableCommandTest extends TestCase
         // @phpstan-ignore-next-line
         $this->connection->expects($this->exactly(2))->method('executeStatement');
 
-        $this->commandTester->execute(['models' => ['openai:gpt-4o']]);
+        $this->commandTester->execute(['models' => ['google:gemini-2.5-pro']]);
 
         $this->assertSame(Command::SUCCESS, $this->commandTester->getStatusCode());
         $this->assertStringContainsString('Disabled 2 model(s)', $this->commandTester->getDisplay());

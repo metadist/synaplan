@@ -1,4 +1,4 @@
-.PHONY: help lint format test build deps audit
+.PHONY: help lint format test build deps audit test-stack-build
 
 help: ## Show this help
 	@echo "Common commands (runs in backend and/or frontend as appropriate):"

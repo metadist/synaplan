@@ -2,6 +2,8 @@
 
 namespace App\Service;
 
+use App\Entity\User;
+use App\Repository\UserRepository;
 use Psr\Log\LoggerInterface;
 use Symfony\Contracts\HttpClient\HttpClientInterface;
 
@@ -9,6 +11,7 @@ use Symfony\Contracts\HttpClient\HttpClientInterface;
  * Discord Webhook Notification Service.
  *
  * Sends notifications to Discord via webhook for monitoring WhatsApp interactions.
+ * Notifications are restricted to admin users only — non-admin activity is silently skipped.
  */
 final readonly class DiscordNotificationService
 {
@@ -25,6 +28,7 @@ final readonly class DiscordNotificationService
     public function __construct(
         private HttpClientInterface $httpClient,
         private LoggerInterface $logger,
+        private UserRepository $userRepository,
         private ?string $webhookUrl = null,
     ) {
     }
@@ -39,6 +43,25 @@ final readonly class DiscordNotificationService
     }
 
     /**
+     * Determine whether a notification should be sent.
+     * Requires both an active webhook and an admin user.
+     */
+    private function shouldNotify(?int $userId): bool
+    {
+        if (!$this->isEnabled()) {
+            return false;
+        }
+
+        if (null === $userId) {
+            return false;
+        }
+
+        $user = $this->userRepository->find($userId);
+
+        return $user instanceof User && $user->isAdmin();
+    }
+
+    /**
      * Notify successful WhatsApp message processing.
      */
     public function notifyWhatsAppSuccess(
@@ -47,8 +70,9 @@ final readonly class DiscordNotificationService
         string $userMessage,
         string $responseText,
         array $metadata = [],
+        ?int $userId = null,
     ): void {
-        if (!$this->isEnabled()) {
+        if (!$this->shouldNotify($userId)) {
             return;
         }
 
@@ -138,8 +162,9 @@ final readonly class DiscordNotificationService
         string $userMessage,
         string $error,
         array $metadata = [],
+        ?int $userId = null,
     ): void {
-        if (!$this->isEnabled()) {
+        if (!$this->shouldNotify($userId)) {
             return;
         }
 
@@ -265,7 +290,7 @@ final readonly class DiscordNotificationService
         array $classificationResult,
         ?int $userId = null,
     ): void {
-        if (!$this->isEnabled()) {
+        if (!$this->shouldNotify($userId)) {
             return;
         }
 
@@ -347,8 +372,9 @@ final readonly class DiscordNotificationService
         ?int $chatId = null,
         ?string $externalMessageId = null,
         string $detectionMethod = 'external_id',
+        ?int $userId = null,
     ): void {
-        if (!$this->isEnabled()) {
+        if (!$this->shouldNotify($userId)) {
             return;
         }
 
@@ -401,6 +427,161 @@ final readonly class DiscordNotificationService
             color: 0xFFA500,
             fields: $fields,
             footer: 'Synaplan Email Webhook'
+        );
+    }
+
+    /**
+     * Notify successful email processing (debug logging for specific senders).
+     */
+    public function notifyEmailSuccess(
+        string $fromEmail,
+        string $toEmail,
+        string $subject,
+        string $userMessage,
+        string $responseText,
+        array $metadata = [],
+    ): void {
+        if (!$this->isEnabled()) {
+            return;
+        }
+
+        $fields = [
+            [
+                'name' => '📧 From',
+                'value' => $fromEmail,
+                'inline' => true,
+            ],
+            [
+                'name' => '📬 To',
+                'value' => $toEmail,
+                'inline' => true,
+            ],
+            [
+                'name' => '🧾 Subject',
+                'value' => $this->truncate($subject, self::MAX_USER_MESSAGE),
+                'inline' => false,
+            ],
+            [
+                'name' => '📥 User Message',
+                'value' => $this->truncate($userMessage, self::MAX_USER_MESSAGE),
+                'inline' => false,
+            ],
+            [
+                'name' => '📤 AI Response',
+                'value' => $this->truncate($responseText, self::MAX_RESPONSE),
+                'inline' => false,
+            ],
+        ];
+
+        if (!empty($metadata['provider'])) {
+            $fields[] = [
+                'name' => '🤖 Provider',
+                'value' => $metadata['provider'],
+                'inline' => true,
+            ];
+        }
+
+        if (!empty($metadata['model'])) {
+            $fields[] = [
+                'name' => '🧠 Model',
+                'value' => $metadata['model'],
+                'inline' => true,
+            ];
+        }
+
+        if (!empty($metadata['processing_time'])) {
+            $fields[] = [
+                'name' => '⏱️ Processing Time',
+                'value' => round((float) $metadata['processing_time'], 2).'s',
+                'inline' => true,
+            ];
+        }
+
+        if (!empty($metadata['message_id'])) {
+            $fields[] = [
+                'name' => '🆔 Message ID',
+                'value' => (string) $metadata['message_id'],
+                'inline' => true,
+            ];
+        }
+
+        if (!empty($metadata['chat_id'])) {
+            $fields[] = [
+                'name' => '💬 Chat ID',
+                'value' => (string) $metadata['chat_id'],
+                'inline' => true,
+            ];
+        }
+
+        $this->sendEmbed(
+            title: '📧 Email: Successfully Processed',
+            color: self::COLOR_SUCCESS,
+            fields: $fields,
+            footer: 'Synaplan Email Channel'
+        );
+    }
+
+    /**
+     * Notify email processing error (debug logging for specific senders).
+     */
+    public function notifyEmailError(
+        string $errorType,
+        string $fromEmail,
+        string $toEmail,
+        string $subject,
+        string $error,
+        array $metadata = [],
+    ): void {
+        if (!$this->isEnabled()) {
+            return;
+        }
+
+        $title = match ($errorType) {
+            'processing' => 'AI Processing Failed',
+            'send_failed' => 'Response Email Send Failed',
+            'tts_failed' => 'TTS Generation Failed',
+            'user_creation' => 'User Creation Failed',
+            'rate_limit' => 'Rate Limit Exceeded',
+            'validation' => 'Validation Failed',
+            default => 'Error Occurred',
+        };
+
+        $fields = [
+            [
+                'name' => '📧 From',
+                'value' => $fromEmail,
+                'inline' => true,
+            ],
+            [
+                'name' => '📬 To',
+                'value' => $toEmail,
+                'inline' => true,
+            ],
+            [
+                'name' => '🧾 Subject',
+                'value' => $this->truncate($subject, self::MAX_USER_MESSAGE),
+                'inline' => false,
+            ],
+            [
+                'name' => '⚠️ Error',
+                'value' => "```\n{$this->truncate($error, self::MAX_ERROR)}\n```",
+                'inline' => false,
+            ],
+        ];
+
+        if (!empty($metadata['user_message'])) {
+            $fields[] = [
+                'name' => '📥 User Message',
+                'value' => $this->truncate($metadata['user_message'], self::MAX_USER_MESSAGE),
+                'inline' => false,
+            ];
+        }
+
+        $this->sendEmbed(
+            title: "❌ Email: {$title}",
+            color: self::COLOR_ERROR,
+            fields: $fields,
+            footer: 'Synaplan Email Channel'
         );
     }
 

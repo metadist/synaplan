@@ -450,4 +450,4 @@ async function httpClient<T = unknown, S extends z.Schema | undefined = undefine
   return data as T
 }
 
-export { httpClient, getApiBaseUrl }
+export { httpClient, getApiBaseUrl, refreshAccessToken }

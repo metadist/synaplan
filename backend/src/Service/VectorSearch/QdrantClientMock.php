@@ -89,6 +89,15 @@ final readonly class QdrantClientMock implements QdrantClientInterface
         // TODO: Will delete from Qdrant
     }
 
+    public function deleteAllMemoriesForUser(int $userId): int
+    {
+        $this->logger->info('QdrantClientMock: deleteAllMemoriesForUser called', [
+            'user_id' => $userId,
+        ]);
+
+        return 0;
+    }
+
     public function healthCheck(): bool
     {
         $this->logger->debug('QdrantClientMock: healthCheck called');

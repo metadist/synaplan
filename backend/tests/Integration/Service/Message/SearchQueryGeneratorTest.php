@@ -92,7 +92,7 @@ class SearchQueryGeneratorTest extends KernelTestCase
      */
     public function testFallbackExtraction(): void
     {
-        // Use null userId to potentially trigger fallback
+        // TestProvider detects tools:search context and returns mockSearchQueryExtraction (same as fallback)
         $userQuestion = '/search test query';
 
         $searchQuery = $this->generator->generate($userQuestion, null);
@@ -125,6 +125,7 @@ class SearchQueryGeneratorTest extends KernelTestCase
      */
     public function testRemovesQuotes(): void
     {
+        // TestProvider detects tools:search context and returns mockSearchQueryExtraction (strips quotes)
         $userQuestion = '"was kostet ein döner"';
 
         $searchQuery = $this->generator->generate($userQuestion);

@@ -168,7 +168,7 @@ environment:
   APP_ENV: prod
   APP_URL: https://web.synaplan.com
   FRONTEND_URL: https://web.synaplan.com
-  SYNAPLAN_URL: https://web.synaplan.com
+  APP_URL: https://web.synaplan.com
   DATABASE_WRITE_URL: mysql://...@host.docker.internal:3306/synaplan
   OLLAMA_BASE_URL: http://10.0.1.10:11434        # Shared Ollama server
   TIKA_URL: http://tika.synaplan.com             # External Tika
@@ -286,7 +286,7 @@ DATABASE_WRITE_URL=mysql://user:pass@db:3306/synaplan
 DATABASE_READ_URL=mysql://user:pass@db:3306/synaplan
 
 # URLs
-SYNAPLAN_URL=http://localhost:8000    # Public backend URL (widget embeds)
+APP_URL=http://localhost:8000    # Public backend URL (widget embeds)
 FRONTEND_URL=http://localhost:5173    # Public frontend URL (email links)
 ```
 
@@ -380,7 +380,7 @@ All checks must pass before merge:
 
 ## URL Configuration
 
-- **SYNAPLAN_URL**: Public URL where backend + widgets are served
+- **APP_URL**: Public URL where backend + widgets are served
 - **FRONTEND_URL**: Public URL for generated links in emails
 - In production, these are usually the same domain
 - In development, FRONTEND_URL points to Vite dev server (port 5173)

@@ -103,35 +103,22 @@ class OllamaProvider implements ChatProviderInterface, EmbeddingProviderInterfac
                 'message_count' => count($messages),
             ]);
 
-            // Build prompt from messages (Ollama Completions API style)
-            $prompt = '';
-            foreach ($messages as $message) {
-                $role = $message['role'] ?? 'user';
-                $content = $message['content'] ?? '';
+            $ollamaMessages = $this->convertMessages($messages);
 
-                if ('system' === $role) {
-                    $prompt .= $content."\n\n";
-                } elseif ('user' === $role) {
-                    $prompt .= 'User: '.$content."\n";
-                } elseif ('assistant' === $role) {
-                    $prompt .= 'Assistant: '.$content."\n";
-                }
-            }
-
-            // Use completions API (non-streaming)
-            $response = $this->client->completions()->create([
+            $response = $this->client->chat()->create([
                 'model' => $model,
-                'prompt' => $prompt,
+                'messages' => $ollamaMessages,
             ]);
 
-            return $response->response ?? '';
+            return $response->message->content ?? '';
+        } catch (ProviderException $e) {
+            throw $e;
         } catch (\Exception $e) {
             $this->logger->error('Ollama chat error', [
                 'error' => $e->getMessage(),
                 'model' => $options['model'] ?? 'unknown',
             ]);
 
-            // Check if error is about model not found
             $errorMsg = $e->getMessage();
             if (false !== stripos($errorMsg, '404')
                 || false !== stripos($errorMsg, 'not found')
@@ -178,27 +165,11 @@ class OllamaProvider implements ChatProviderInterface, EmbeddingProviderInterfac
                 'supportsReasoning' => $supportsReasoning,
             ]);
 
-            // Build prompt from messages (Ollama Completions API style)
-            $prompt = '';
-            foreach ($messages as $message) {
-                $role = $message['role'] ?? 'user';
-                $content = $message['content'] ?? '';
+            $ollamaMessages = $this->convertMessages($messages);
 
-                if ('system' === $role) {
-                    $prompt .= $content."\n\n";
-                } elseif ('user' === $role) {
-                    $prompt .= 'User: '.$content."\n";
-                } elseif ('assistant' === $role) {
-                    $prompt .= 'Assistant: '.$content."\n";
-                }
-            }
-
-            $this->logger->info('🟡 Ollama: Prompt built', ['length' => strlen($prompt)]);
-
-            // Use completions API with streaming
-            $stream = $this->client->completions()->createStreamed([
+            $stream = $this->client->chat()->createStreamed([
                 'model' => $model,
-                'prompt' => $prompt,
+                'messages' => $ollamaMessages,
             ]);
 
             $this->logger->info('🟡 Ollama: Stream created, iterating...');
@@ -206,23 +177,17 @@ class OllamaProvider implements ChatProviderInterface, EmbeddingProviderInterfac
             $chunkCount = 0;
             $fullResponse = '';
 
-            foreach ($stream as $completion) {
-                // Extract response content
-                $textChunk = $completion->response ?? '';
+            foreach ($stream as $chunk) {
+                $textChunk = $chunk->message->content ?? '';
 
                 // Sanitize UTF-8 to prevent "Malformed UTF-8 characters" errors
                 if (!empty($textChunk)) {
-                    // Remove invalid UTF-8 characters
                     $textChunk = mb_convert_encoding($textChunk, 'UTF-8', 'UTF-8');
-                    // Alternative: use iconv for more aggressive cleaning
-                    // $textChunk = iconv('UTF-8', 'UTF-8//IGNORE', $textChunk);
                 }
 
                 if (!empty($textChunk)) {
                     $fullResponse .= $textChunk;
 
-                    // Send chunk as-is (including <think> tags if present)
-                    // Frontend will parse <think> tags from the accumulated content
                     $callback($textChunk);
                     ++$chunkCount;
 
@@ -235,7 +200,7 @@ class OllamaProvider implements ChatProviderInterface, EmbeddingProviderInterfac
                 }
 
                 // Check if done
-                if (isset($completion->done) && $completion->done) {
+                if (isset($chunk->done) && $chunk->done) {
                     $this->logger->info('🔵 Ollama: Stream done signal received');
                     break;
                 }
@@ -264,6 +229,61 @@ class OllamaProvider implements ChatProviderInterface, EmbeddingProviderInterfac
 
             throw new ProviderException('Ollama streaming error: '.$e->getMessage(), 'ollama', null, 0, $e);
         }
+    }
+
+    /**
+     * Convert OpenAI-style messages to Ollama Chat API format.
+     *
+     * Handles multimodal content (images) by extracting base64 data from
+     * OpenAI's content array format into Ollama's `images` field.
+     *
+     * @return array<array{role: string, content: string, images?: list<string>}>
+     */
+    private function convertMessages(array $messages): array
+    {
+        $ollamaMessages = [];
+
+        foreach ($messages as $message) {
+            $role = $message['role'] ?? 'user';
+            $content = $message['content'] ?? '';
+
+            $ollamaMessage = ['role' => $role];
+
+            if (is_array($content)) {
+                $textParts = [];
+                $images = [];
+
+                foreach ($content as $part) {
+                    if (is_string($part)) {
+                        $textParts[] = $part;
+                    } elseif (is_array($part)) {
+                        $type = $part['type'] ?? '';
+                        if ('text' === $type) {
+                            $textParts[] = $part['text'] ?? '';
+                        } elseif ('image_url' === $type) {
+                            $url = $part['image_url']['url'] ?? '';
+                            if (str_starts_with($url, 'data:')) {
+                                $base64 = preg_replace('/^data:[^;]+;base64,/', '', $url);
+                                if ($base64) {
+                                    $images[] = $base64;
+                                }
+                            }
+                        }
+                    }
+                }
+
+                $ollamaMessage['content'] = implode("\n", $textParts);
+                if (!empty($images)) {
+                    $ollamaMessage['images'] = $images;
+                }
+            } else {
+                $ollamaMessage['content'] = $content;
+            }
+
+            $ollamaMessages[] = $ollamaMessage;
+        }
+
+        return $ollamaMessages;
     }
 
     /**

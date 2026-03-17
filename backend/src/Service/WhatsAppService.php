@@ -45,9 +45,12 @@ final class WhatsAppService
      */
     private const DUPLICATE_CACHE_TTL = 300;
 
+    private const DEFAULT_GRAPH_BASE = 'https://graph.facebook.com';
+
     private string $accessToken;
     private bool $enabled;
     private string $apiVersion = 'v21.0';
+    private string $graphBaseUrl;
 
     public function __construct(
         private HttpClientInterface $httpClient,
@@ -66,9 +69,13 @@ final class WhatsAppService
         private string $uploadsDir,
         private int $whatsappUserId,
         private string $appUrl = '',
+        ?string $whatsappGraphApiBaseUrl = null,
     ) {
         $this->accessToken = $whatsappAccessToken;
         $this->enabled = $whatsappEnabled;
+        $this->graphBaseUrl = (null !== $whatsappGraphApiBaseUrl && '' !== $whatsappGraphApiBaseUrl)
+            ? rtrim($whatsappGraphApiBaseUrl, '/')
+            : self::DEFAULT_GRAPH_BASE;
     }
 
     /**
@@ -222,7 +229,8 @@ final class WhatsAppService
     private function sendSingleMessage(string $to, string $formattedMessage, string $phoneNumberId): array
     {
         $url = sprintf(
-            'https://graph.facebook.com/%s/%s/messages',
+            '%s/%s/%s/messages',
+            $this->graphBaseUrl,
             $this->apiVersion,
             $phoneNumberId
         );
@@ -337,7 +345,8 @@ final class WhatsAppService
         }
 
         $url = sprintf(
-            'https://graph.facebook.com/%s/%s/messages',
+            '%s/%s/%s/messages',
+            $this->graphBaseUrl,
             $this->apiVersion,
             $phoneNumberId
         );
@@ -419,7 +428,8 @@ final class WhatsAppService
         }
 
         $url = sprintf(
-            'https://graph.facebook.com/%s/%s/messages',
+            '%s/%s/%s/messages',
+            $this->graphBaseUrl,
             $this->apiVersion,
             $phoneNumberId
         );
@@ -493,7 +503,8 @@ final class WhatsAppService
         }
 
         $url = sprintf(
-            'https://graph.facebook.com/%s/%s/messages',
+            '%s/%s/%s/messages',
+            $this->graphBaseUrl,
             $this->apiVersion,
             $phoneNumberId
         );
@@ -643,7 +654,8 @@ final class WhatsAppService
                 [
                     'message_type' => $dto->type,
                     'file_type' => $dto->incomingMsg[$dto->type]['mime_type'] ?? 'unknown',
-                ]
+                ],
+                $user->getId(),
             );
 
             return [
@@ -695,7 +707,8 @@ final class WhatsAppService
                 $dto->from,
                 $message->getText(),
                 $errorMessage,
-                ['message_type' => $dto->type]
+                ['message_type' => $dto->type],
+                $user->getId(),
             );
 
             return [
@@ -761,7 +774,8 @@ final class WhatsAppService
                             'provider' => $metadata['provider'] ?? null,
                             'model' => $metadata['model'] ?? null,
                             'media_type' => $generatedMediaType,
-                        ]
+                        ],
+                        $user->getId(),
                     );
                 } else {
                     $this->logger->warning('WhatsApp: Failed to send AI media, falling back', [
@@ -775,7 +789,8 @@ final class WhatsAppService
                         $dto->from,
                         $message->getText(),
                         $sendResult['error'] ?? 'Unknown error',
-                        ['media_type' => $generatedMediaType]
+                        ['media_type' => $generatedMediaType],
+                        $user->getId(),
                     );
                 }
             }
@@ -810,7 +825,8 @@ final class WhatsAppService
                             'provider' => $ttsResult['provider'] ?? null,
                             'model' => $ttsResult['model'] ?? null,
                             'media_type' => 'audio',
-                        ]
+                        ],
+                        $user->getId(),
                     );
                 } else {
                     $this->logger->warning('WhatsApp: TTS send failed, falling back to text', [
@@ -823,7 +839,8 @@ final class WhatsAppService
                         $dto->from,
                         $message->getText(),
                         $sendResult['error'] ?? 'Unknown error',
-                        ['media_type' => 'audio']
+                        ['media_type' => 'audio'],
+                        $user->getId(),
                     );
                 }
             } else {
@@ -835,7 +852,8 @@ final class WhatsAppService
                     $dto->from,
                     $message->getText(),
                     'TTS generation failed',
-                    ['message_type' => $dto->type]
+                    ['message_type' => $dto->type],
+                    $user->getId(),
                 );
             }
         }
@@ -856,7 +874,8 @@ final class WhatsAppService
                     [
                         'provider' => $metadata['provider'] ?? null,
                         'model' => $metadata['model'] ?? null,
-                    ]
+                    ],
+                    $user->getId(),
                 );
             } else {
                 $this->logger->error('WhatsApp: Failed to send text response', [
@@ -869,7 +888,8 @@ final class WhatsAppService
                     $dto->from,
                     $message->getText(),
                     $sendResult['error'] ?? 'Unknown error',
-                    ['message_type' => 'text']
+                    ['message_type' => 'text'],
+                    $user->getId(),
                 );
             }
         }
@@ -888,7 +908,8 @@ final class WhatsAppService
                 $dto->from,
                 $message->getText(),
                 'No response could be sent to user',
-                ['message_type' => $dto->type]
+                ['message_type' => $dto->type],
+                $user->getId(),
             );
         }
 
@@ -1484,7 +1505,8 @@ final class WhatsAppService
         }
 
         $url = sprintf(
-            'https://graph.facebook.com/%s/%s',
+            '%s/%s/%s',
+            $this->graphBaseUrl,
             $this->apiVersion,
             $mediaId
         );
@@ -1679,26 +1701,29 @@ final class WhatsAppService
     /**
      * Convert standard Markdown formatting to WhatsApp-compatible formatting.
      *
-     * WhatsApp uses different syntax than standard Markdown:
-     * - Bold: *text* (not **text**)
-     * - Italic: _text_ (not *text*)
-     * - Strikethrough: ~text~ (not ~~text~~)
+     * WhatsApp formatting reference:
+     * - Bold: *text* (MD uses **text** or __text__)
+     * - Italic: _text_ (MD uses *text*)
+     * - Strikethrough: ~text~ (MD uses ~~text~~)
      * - Monospace: ```text``` or `text` (same as MD)
+     * - Lists: - item or * item (same as MD, but we use • for safety)
+     * - Quotes: > text (same as MD)
+     * - No support for [text](url) links or ![alt](url) images
      *
      * @see https://faq.whatsapp.com/539178204879377
      */
     private function convertToWhatsAppMarkdown(string $text): string
     {
-        // Protect code blocks from conversion (they work the same in WhatsApp)
+        // 1. Protect code blocks and strip language identifiers (```python → ```)
         $codeBlocks = [];
-        $text = preg_replace_callback('/```[\s\S]*?```/', function ($match) use (&$codeBlocks) {
+        $text = preg_replace_callback('/```[^\n`]*\n?([\s\S]*?)```/', function ($match) use (&$codeBlocks) {
             $placeholder = '{{CODE_BLOCK_'.count($codeBlocks).'}}';
-            $codeBlocks[$placeholder] = $match[0];
+            $codeBlocks[$placeholder] = '```'.$match[1].'```';
 
             return $placeholder;
         }, $text);
 
-        // Protect inline code from conversion
+        // 2. Protect inline code
         $inlineCode = [];
         $text = preg_replace_callback('/`[^`]+`/', function ($match) use (&$inlineCode) {
             $placeholder = '{{INLINE_CODE_'.count($inlineCode).'}}';
@@ -1707,24 +1732,66 @@ final class WhatsAppService
             return $placeholder;
         }, $text);
 
-        // Convert headers to bold (# Header → *Header*)
-        $text = preg_replace('/^#{1,6}\s+(.+)$/m', '*$1*', $text);
+        // 3. Convert image links ![alt](url) → alt text or URL
+        $text = preg_replace('/!\[([^\]]*)\]\(([^)]+)\)/', '$2', $text);
 
-        // Convert **bold** to *bold* (must be done before italic conversion)
-        $text = preg_replace('/\*\*(.+?)\*\*/', '*$1*', $text);
+        // 4. Convert [text](url) links → "text (url)" or just URL if text matches
+        $text = preg_replace_callback('/\[([^\]]+)\]\(([^)]+)\)/', function ($match) {
+            $linkText = trim($match[1]);
+            $url = trim($match[2]);
+            if ($linkText === $url || empty($linkText)) {
+                return $url;
+            }
 
-        // Convert ~~strikethrough~~ to ~strikethrough~
+            return $linkText.' ('.$url.')';
+        }, $text);
+
+        // 5. Convert bold: **text**, __text__, and headers → placeholder (protect from italic conversion)
+        $boldParts = [];
+        $text = preg_replace_callback('/\*\*(.+?)\*\*/', function ($match) use (&$boldParts) {
+            $placeholder = '{{BOLD_'.count($boldParts).'}}';
+            $boldParts[$placeholder] = '*'.$match[1].'*';
+
+            return $placeholder;
+        }, $text);
+        $text = preg_replace_callback('/__(.+?)__/', function ($match) use (&$boldParts) {
+            $placeholder = '{{BOLD_'.count($boldParts).'}}';
+            $boldParts[$placeholder] = '*'.$match[1].'*';
+
+            return $placeholder;
+        }, $text);
+        $text = preg_replace_callback('/^#{1,6}\s+(.+)$/m', function ($match) use (&$boldParts) {
+            $placeholder = '{{BOLD_'.count($boldParts).'}}';
+            $boldParts[$placeholder] = '*'.$match[1].'*';
+
+            return $placeholder;
+        }, $text);
+
+        // 6. Convert *italic* → _italic_ (remaining single * pairs are italic in MD, bold in WA)
+        // Require asterisks to be tight around text (no spaces) to avoid matching math like "2 * 3 * 4"
+        $text = preg_replace('/(?<!\w)\*(?!\s)([^*\n]+?)(?<!\s)\*(?!\w)/', '_$1_', $text);
+
+        // 7. Restore bold placeholders
+        foreach ($boldParts as $placeholder => $bold) {
+            $text = str_replace($placeholder, $bold, $text);
+        }
+
+        // 8. Convert ~~strikethrough~~ to ~strikethrough~
         $text = preg_replace('/~~(.+?)~~/', '~$1~', $text);
 
-        // Convert bullet points to Unicode bullets for cleaner display
+        // 9. Convert bullet points to Unicode bullets
         $text = preg_replace('/^[\-\*]\s+/m', '• ', $text);
 
-        // Restore code blocks
+        // 10. Convert horizontal rules to a clean separator
+        $text = preg_replace('/^[\-\*_]{3,}\s*$/m', '─────', $text);
+
+        // 11. Clean up blockquotes (WhatsApp supports > natively, but strip nested levels)
+        $text = preg_replace('/^>{2,}\s?/m', '> ', $text);
+
+        // 12. Restore code blocks and inline code
         foreach ($codeBlocks as $placeholder => $code) {
             $text = str_replace($placeholder, $code, $text);
         }
-
-        // Restore inline code
         foreach ($inlineCode as $placeholder => $code) {
             $text = str_replace($placeholder, $code, $text);
         }

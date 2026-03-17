@@ -1622,9 +1622,7 @@ const save = async () => {
     }
     success(t('widgets.advancedConfig.saveSuccess'))
 
-    const hasLinkResponses = responses.value.some(
-      (r) => r.type === 'link' && r.meta?.url?.trim()
-    )
+    const hasLinkResponses = responses.value.some((r) => r.type === 'link' && r.meta?.url?.trim())
     if (hasLinkResponses && auth.isPro) {
       try {
         const crawlResult = await widgetsApi.triggerCrawl(widget.value.widgetId)

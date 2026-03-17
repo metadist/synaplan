@@ -98,7 +98,8 @@
       "chatDeleted": "Chat eliminado exitosamente",
       "share": "Compartir chat",
       "public": "Público"
-    }
+    },
+    "fileOnlyDefaultMessage": "Por favor, revisa el archivo adjunto."
   },
   "admin": {
     "title": "Panel de Administración",
@@ -1010,7 +1011,15 @@
       "loading": "Cargando funciones...",
       "requiredConfig": "Configuración Requerida:",
       "set": "Configurado",
-      "notSet": "No Configurado"
+      "notSet": "No Configurado",
+      "allOperational": "Todos los sistemas operativos",
+      "issuesDetected": "Problemas detectados",
+      "ready": "Listo",
+      "healthSummary": "{healthy} de {total} servicios saludables",
+      "model": "modelo",
+      "models": "modelos",
+      "devOnlyTitle": "Solo Modo de Desarrollo",
+      "devOnlyMessage": "Esta página solo está disponible en entornos de desarrollo. El monitoreo del estado del sistema está restringido en producción."
     }
   },
   "storage": {
@@ -1054,6 +1063,8 @@
     "status_uploaded": "Subido",
     "status_extracted": "Extraído",
     "status_vectorized": "Vectorizado",
+    "status_processed": "Procesado",
+    "status_error": "Error",
     "attached": "Adjunto",
     "standalone": "Independiente",
     "attachedToMessage": "Este archivo está adjunto a un mensaje",
@@ -1094,6 +1105,8 @@
       "apiChannel": "Canal API",
       "webWidget": "Widget Web",
       "defaultHandling": "manejo predeterminado",
+      "personalKeyword": "palabra clave personal",
+      "keywordSaved": "Palabra clave de correo guardada correctamente",
       "addKeyword": "Revisa una palabra clave libre para agregar tu propio manejo:",
       "keywordPlaceholder": "palabra clave",
       "yourEmailAddress": "Tu dirección de correo: {email}",

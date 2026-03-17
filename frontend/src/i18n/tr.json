@@ -98,7 +98,8 @@
       "chatDeleted": "Sohbet başarıyla silindi",
       "share": "Sohbeti paylaş",
       "public": "Herkese Açık"
-    }
+    },
+    "fileOnlyDefaultMessage": "Lütfen ekteki dosyayı inceleyin."
   },
   "admin": {
     "title": "Yönetici Paneli",
@@ -1011,7 +1012,15 @@
       "loading": "Özellikler yükleniyor...",
       "requiredConfig": "Gerekli Yapılandırma:",
       "set": "Ayarlandı",
-      "notSet": "Ayarlanmadı"
+      "notSet": "Ayarlanmadı",
+      "allOperational": "Tüm Sistemler Çalışıyor",
+      "issuesDetected": "Sorunlar Tespit Edildi",
+      "ready": "Hazır",
+      "healthSummary": "{total} servisten {healthy} tanesi sağlıklı",
+      "model": "model",
+      "models": "model",
+      "devOnlyTitle": "Yalnızca Geliştirme Modu",
+      "devOnlyMessage": "Bu sayfa yalnızca geliştirme ortamlarında kullanılabilir. Sistem durumu izleme üretimde kısıtlanmıştır."
     }
   },
   "storage": {
@@ -1055,6 +1064,8 @@
     "status_uploaded": "Yüklendi",
     "status_extracted": "Çıkarıldı",
     "status_vectorized": "Vektörleştirildi",
+    "status_processed": "İşlendi",
+    "status_error": "Hata",
     "attached": "Ekli",
     "standalone": "Bağımsız",
     "attachedToMessage": "Bu dosya bir mesaja ekli",
@@ -1095,6 +1106,8 @@
       "apiChannel": "API Kanalı",
       "webWidget": "Web Widget",
       "defaultHandling": "varsayılan işlem",
+      "personalKeyword": "kişisel anahtar kelime",
+      "keywordSaved": "E-posta anahtar kelimesi başarıyla kaydedildi",
       "addKeyword": "Kendi işleminizi eklemek için boş bir anahtar kelime kontrol edin:",
       "keywordPlaceholder": "anahtar kelime",
       "yourEmailAddress": "E-posta adresiniz: {email}",

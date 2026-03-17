@@ -313,6 +313,7 @@
 <script setup lang="ts">
 import { ref, computed, watch, onUnmounted } from 'vue'
 import { Icon } from '@iconify/vue'
+import { useEscapeKey } from '@/composables/useEscapeKey'
 import * as widgetsApi from '@/services/api/widgetsApi'
 import { useNotification } from '@/composables/useNotification'
 import { useI18n } from 'vue-i18n'
@@ -456,6 +457,8 @@ const handleIframeError = () => {
 const handleClose = () => {
   emit('close')
 }
+
+useEscapeKey(handleClose)
 
 const handleSubmit = async () => {
   if (!isValid.value || creating.value) return

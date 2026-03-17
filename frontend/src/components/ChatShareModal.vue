@@ -138,8 +138,8 @@
               </button>
             </div>
 
-            <!-- Already Public -->
-            <div v-else class="space-y-4">
+            <!-- Already Public (E2E: share-done) -->
+            <div v-else class="space-y-4" data-testid="share-done">
               <div class="flex items-center gap-2 text-green-600 dark:text-green-400">
                 <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path
@@ -175,6 +175,7 @@
                   </button>
                 </div>
                 <div
+                  data-testid="share-link-input"
                   class="p-3 rounded bg-white dark:bg-black/20 font-mono text-sm break-all txt-primary"
                 >
                   {{ fullShareUrl }}
@@ -225,8 +226,9 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch } from 'vue'
+import { ref, computed, watch, toRef } from 'vue'
 import { useChatsStore } from '@/stores/chats'
+import { useEscapeKey } from '@/composables/useEscapeKey'
 import { useNotification } from '@/composables/useNotification'
 
 const { success: showSuccess, error: showError } = useNotification()
@@ -350,6 +352,8 @@ const copyLink = async () => {
 const close = () => {
   emit('close')
 }
+
+useEscapeKey(close, toRef(props, 'isOpen'))
 </script>
 
 <style scoped>

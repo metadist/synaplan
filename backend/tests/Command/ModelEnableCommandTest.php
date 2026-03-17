@@ -51,11 +51,11 @@ class ModelEnableCommandTest extends TestCase
 
     public function testEnableGroupedKeyEnablesAllVariants(): void
     {
-        // openai:gpt-4o resolves to chat + pic2text
+        // google:gemini-2.5-pro resolves to chat + pic2text
         // @phpstan-ignore-next-line
         $this->connection->expects($this->exactly(2))->method('executeStatement');
 
-        $this->commandTester->execute(['models' => ['openai:gpt-4o']]);
+        $this->commandTester->execute(['models' => ['google:gemini-2.5-pro']]);
 
         $this->assertSame(Command::SUCCESS, $this->commandTester->getStatusCode());
         $this->assertStringContainsString('Enabled 2 model(s)', $this->commandTester->getDisplay());

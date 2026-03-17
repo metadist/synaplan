@@ -91,12 +91,14 @@
               <span>·</span>
               <span
                 :class="{
-                  'text-green-600 dark:text-green-400': file.status === 'vectorized',
+                  'text-green-600 dark:text-green-400':
+                    file.status === 'vectorized' || file.status === 'processed',
                   'text-yellow-600 dark:text-yellow-400': file.status === 'extracted',
                   'text-gray-500 dark:text-gray-400': file.status === 'uploaded',
+                  'text-red-600 dark:text-red-400': file.status === 'error',
                 }"
               >
-                {{ file.status }}
+                {{ $t(`files.status_${file.status}`) }}
               </span>
             </div>
           </div>
@@ -143,7 +145,7 @@ const filteredFiles = computed(() => {
 const loadFiles = async () => {
   isLoading.value = true
   try {
-    const response = await filesService.listFiles(undefined, 1, 100)
+    const response = await filesService.listFiles({ limit: 100 })
     allFiles.value = response.files
   } catch (err) {
     console.error('Failed to load files for mentions:', err)

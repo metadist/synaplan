@@ -5,8 +5,6 @@
 }
 
 :80 {
-	# Enable compression
-	encode zstd gzip
 	# Enable compression — but NOT for SSE streaming endpoints.
 	# Caddy's encode directive buffers output for gzip/zstd, which breaks
 	# real-time Server-Sent Events delivery.
@@ -76,7 +74,7 @@
 		file_server
 	}
 
-	# Backend static files third (bundles, uploads, etc.)
+	# Backend static files third (bundles, uploads)
 	@backend_file {
 		path /bundles/* /uploads/*
 		file {

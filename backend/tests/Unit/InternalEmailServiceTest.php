@@ -43,4 +43,43 @@ class InternalEmailServiceTest extends TestCase
 
         $this->assertTrue(true, 'Password reset email method called successfully');
     }
+
+    public function testAiResponseEmailWithMinimalParams(): void
+    {
+        $mailer = $this->createMock(MailerInterface::class);
+        $twig = $this->createMock(Environment::class);
+        $translator = $this->createMock(TranslatorInterface::class);
+        $logger = $this->createMock(LoggerInterface::class);
+
+        $mailer->expects($this->once())
+            ->method('send');
+
+        $service = new InternalEmailService($mailer, $twig, $translator, $logger);
+        $service->sendAiResponseEmail(
+            'user@example.com',
+            'Test Subject',
+            'Rate limit exceeded. Please try again later.',
+            '<msg-123@mail.example.com>',
+            originalRecipient: 'smart@synaplan.net',
+        );
+    }
+
+    public function testAiResponseEmailWithResetTime(): void
+    {
+        $mailer = $this->createMock(MailerInterface::class);
+        $twig = $this->createMock(Environment::class);
+        $translator = $this->createMock(TranslatorInterface::class);
+        $logger = $this->createMock(LoggerInterface::class);
+
+        $mailer->expects($this->once())
+            ->method('send');
+
+        $service = new InternalEmailService($mailer, $twig, $translator, $logger);
+        $service->sendAiResponseEmail(
+            'user@example.com',
+            'Test Subject',
+            "Rate limit exceeded. Please try again later.\n\nYour limit will reset at: 2026-03-13 15:00:00",
+            originalRecipient: 'smart@synaplan.net',
+        );
+    }
 }
