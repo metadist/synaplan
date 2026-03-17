@@ -82,7 +82,6 @@
               class="flex-1"
               data-testid="input-chat-message"
               @keydown="handleKeyDown"
-              @keydown.enter.exact.prevent="sendMessage"
               @focus="isFocused = true"
               @blur="isFocused = false"
             />
@@ -612,6 +611,7 @@ const handleKeyDown = (e: KeyboardEvent) => {
       e.preventDefault()
       e.stopPropagation()
       paletteRef.value.handleKeyDown(e)
+      return
     }
   } else if (mentionPaletteVisible.value && mentionPaletteRef.value) {
     const handled = ['ArrowUp', 'ArrowDown', 'Enter', 'Escape', 'Tab']
@@ -619,7 +619,13 @@ const handleKeyDown = (e: KeyboardEvent) => {
       e.preventDefault()
       e.stopPropagation()
       mentionPaletteRef.value.handleKeyDown(e)
+      return
     }
+  }
+
+  if (e.key === 'Enter' && !e.shiftKey && !e.ctrlKey && !e.altKey && !e.metaKey) {
+    e.preventDefault()
+    sendMessage()
   }
 }
 
