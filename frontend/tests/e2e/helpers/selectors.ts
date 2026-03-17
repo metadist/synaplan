@@ -49,10 +49,6 @@ export const selectors = {
     sidebarV2Settings: '[data-testid="btn-sidebar-v2--settings"]',
     /** V2 sidebar: admin nav icon (admin only) */
     sidebarV2Admin: '[data-testid="btn-sidebar-v2--admin"]',
-    /** V2 sidebar: user avatar button (opens user menu) */
-    sidebarV2User: '[data-testid="btn-sidebar-v2-user"]',
-    /** V2 user menu dropdown */
-    userDropdown: '[data-testid="dropdown-sidebar-v2-user"]',
     /** V2 chat list modal */
     modalChatManager: '[data-testid="modal-chat-manager"]',
     /** V2 chat list: container visible when at least one chat exists; use to wait before targeting rows */
@@ -165,6 +161,9 @@ export const selectors = {
   },
   userMenu: {
     button: '[data-testid="btn-sidebar-v2-user"]',
+    dropdown: '[data-testid="dropdown-sidebar-v2-user"]',
+    profileBtn: '[data-testid="btn-sidebar-v2-profile"]',
+    statisticsBtn: '[data-testid="btn-sidebar-v2-statistics"]',
     subscriptionBtn: '[data-testid="btn-sidebar-v2-subscription"]',
     logoutBtn: '[data-testid="btn-sidebar-v2-logout"]',
   },
@@ -287,9 +286,7 @@ export const selectors = {
     chat: '[data-testid="page-chat"]',
     profile: '[data-testid="page-profile"]',
     statistics: '[data-testid="page-statistics"]',
-    settings: '[data-testid="page-settings"]',
     admin: '[data-testid="view-admin"]',
-    config: '[data-testid="page-config"]',
   },
   toast: {},
 } as const
