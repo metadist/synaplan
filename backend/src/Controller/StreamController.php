@@ -110,6 +110,13 @@ class StreamController extends AbstractController
         schema: new OA\Schema(type: 'string', enum: ['0', '1'], example: '0')
     )]
     #[OA\Parameter(
+        name: 'isAgain',
+        in: 'query',
+        required: false,
+        description: 'Whether this is an "Again" request (retry with specific model, skip classification). Required when modelId is set to distinguish model override from retry.',
+        schema: new OA\Schema(type: 'string', enum: ['0', '1'], example: '0')
+    )]
+    #[OA\Parameter(
         name: 'promptTopic',
         in: 'query',
         required: false,
@@ -222,6 +229,7 @@ class StreamController extends AbstractController
         $modelId = $request->query->get('modelId', null);
 
         $voiceReply = '1' === $request->query->get('voiceReply', '0');
+        $isAgain = '1' === $request->query->get('isAgain', '0');
         $fileIds = $request->query->get('fileIds', ''); // NEW: comma-separated list or single ID
         $promptTopic = $request->query->get('promptTopic');
         $promptId = $request->query->get('promptId');
@@ -263,6 +271,7 @@ class StreamController extends AbstractController
             'chat_id' => $chatId,
             'has_model_id' => null !== $modelId,
             'model_id' => $modelId,
+            'is_again' => $isAgain,
             'file_ids' => $fileIdArray,
             'file_count' => count($fileIdArray),
         ]);
@@ -295,7 +304,7 @@ class StreamController extends AbstractController
         $response->headers->set('X-Accel-Buffering', 'no');
         $response->headers->set('Connection', 'keep-alive');
 
-        $response->setCallback(function () use ($user, $messageText, $trackId, $chatId, $includeReasoning, $webSearch, $modelId, $fileIdArray, $isWidgetMode, $fixedTaskPromptTopic, $widgetSession, $rateLimitError, $voiceReply) {
+        $response->setCallback(function () use ($user, $messageText, $trackId, $chatId, $includeReasoning, $webSearch, $modelId, $isAgain, $fileIdArray, $isWidgetMode, $fixedTaskPromptTopic, $widgetSession, $rateLimitError, $voiceReply) {
             // Disable output buffering
             while (ob_get_level()) {
                 ob_end_clean();
@@ -470,11 +479,16 @@ class StreamController extends AbstractController
                     $processingOptions['disable_memories'] = true;
                 }
 
-                // Add model_id if specified (for "Again" functionality)
                 if ($modelId) {
-                    $processingOptions['model_id'] = (int) $modelId;
-                    $this->logger->info('StreamController: Using specified model', [
+                    if ($isAgain) {
+                        $processingOptions['model_id'] = (int) $modelId;
+                        $processingOptions['is_again'] = true;
+                    } else {
+                        $processingOptions['override_model_id'] = (int) $modelId;
+                    }
+                    $this->logger->info('StreamController: Model specified', [
                         'model_id' => $modelId,
+                        'is_again' => $isAgain,
                     ]);
                 }
 

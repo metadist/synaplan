@@ -64,9 +64,7 @@ final readonly class MessageProcessor
                 $this->notify($statusCallback, 'preprocessing', 'File processed and text extracted');
             }
 
-            // Check if this is "Again" functionality (model explicitly specified)
-            // If so, skip classification to save time and API calls
-            $isAgainRequest = isset($options['model_id']) && $options['model_id'];
+            $isAgainRequest = !empty($options['is_again']);
 
             // Check if this is a Widget request with fixed task prompt
             // If so, skip classification entirely and use the fixed prompt
@@ -220,7 +218,8 @@ final readonly class MessageProcessor
                     ];
                     $this->logger->info('MessageProcessor: Forcing image description mode');
                 } else {
-                    // Run classification
+                    // Run classification (override_model_id is NOT passed to classifier;
+                    // it's added to classification below so ChatHandler can use it)
                     $classification = $this->classifier->classify($message, $conversationHistory);
                 }
 
@@ -233,6 +232,11 @@ final readonly class MessageProcessor
                 unset($classification['model_id']);
                 unset($classification['provider']);
                 unset($classification['model_name']);
+
+                // User-selected model from dropdown → pass through as override_model_id
+                if (!empty($options['override_model_id'])) {
+                    $classification['override_model_id'] = (int) $options['override_model_id'];
+                }
 
                 $this->notify($statusCallback, 'classified', sprintf(
                     'Topic: %s, Language: %s, Source: %s',
@@ -472,7 +476,7 @@ final readonly class MessageProcessor
             $sortingModelId = null;
             $sortingProvider = null;
             $sortingModelName = null;
-            $isAgainRequest = isset($options['model_id']) && $options['model_id'];
+            $isAgainRequest = !empty($options['is_again']);
             $hasFixedPrompt = isset($options['fixed_task_prompt']) && !empty($options['fixed_task_prompt']);
             $languageOverride = $options['language'] ?? null;
 
@@ -595,6 +599,11 @@ final readonly class MessageProcessor
                 ]);
             } else {
                 $classification = $this->classifier->classify($message, $conversationHistory);
+
+                // User-selected model from dropdown → pass through as override_model_id
+                if (!empty($options['override_model_id'])) {
+                    $classification['override_model_id'] = (int) $options['override_model_id'];
+                }
 
                 $this->notify($statusCallback, 'classified', sprintf(
                     'Topic: %s, Language: %s, Source: %s',

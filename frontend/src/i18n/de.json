@@ -277,6 +277,9 @@
       "videoGen": "Videoerzeugung",
       "videoGenDesc": "Videos aus Text erstellen"
     },
+    "modelDropdown": {
+      "default": "Standard"
+    },
     "removeTool": "Werkzeug entfernen"
   },
   "chatMessage": {

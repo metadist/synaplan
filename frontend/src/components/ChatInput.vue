@@ -155,8 +155,13 @@
         </div>
       </div>
 
-      <!-- Main controls - always visible below input -->
-      <div class="mt-3 flex items-center gap-2" data-testid="section-chat-secondary-actions">
+      <!-- Main controls - always visible below input in advanced mode -->
+      <div
+        v-if="!appModeStore.isEasyMode"
+        class="mt-3 flex items-center gap-2"
+        data-testid="section-chat-secondary-actions"
+      >
+        <ModelDropdown v-model="selectedModelId" class="flex-shrink-0" />
         <ToolsDropdown
           :active-command="activeCommand"
           class="flex-shrink-0"
@@ -235,6 +240,7 @@ import Textarea from './Textarea.vue'
 import CommandPalette from './CommandPalette.vue'
 import FileMentionPalette from './FileMentionPalette.vue'
 import ToolsDropdown from './ToolsDropdown.vue'
+import ModelDropdown from './ModelDropdown.vue'
 import FileSelectionModal from './FileSelectionModal.vue'
 import { parseCommand } from '../commands/parse'
 import { useCommandsStore, type Command } from '@/stores/commands'
@@ -248,6 +254,7 @@ import { useConfigStore } from '@/stores/config'
 import { useI18n } from 'vue-i18n'
 import { useAutoPersist } from '@/composables/useInputPersistence'
 import { useChatsStore } from '@/stores/chats'
+import { useAppModeStore } from '@/stores/appMode'
 
 interface UploadedFile {
   file_id: number
@@ -293,6 +300,7 @@ const speechFinalTranscript = ref('') // Accumulated final transcripts during re
 const fileSelectionModalVisible = ref(false)
 const voiceReply = ref(false)
 const discardNextRecording = ref(false)
+const selectedModelId = ref<number | null>(null)
 
 const SILENCE_TIMEOUT_MS = 4000
 const silenceTimer = ref<ReturnType<typeof setTimeout> | null>(null)
@@ -301,6 +309,7 @@ const autoSendPending = ref(false)
 const aiConfigStore = useAiConfigStore()
 const chatsStore = useChatsStore()
 const configStore = useConfigStore()
+const appModeStore = useAppModeStore()
 const { warning, error: showError, success } = useNotification()
 const { t, locale } = useI18n()
 
@@ -369,6 +378,7 @@ const emit = defineEmits<{
       webSearch?: boolean
       fileIds?: number[]
       voiceReply?: boolean
+      modelId?: number
     },
   ]
   stop: []
@@ -402,17 +412,23 @@ const canSend = computed(() => {
   return (hasMessage || hasFiles) && filesReady && !uploading.value
 })
 
-const supportsReasoning = computed(() => {
-  // Get the configured default model
-  const currentModel = aiConfigStore.getCurrentModel('CHAT')
+const currentChatModel = computed(() => {
+  const chatModels = aiConfigStore.models.CHAT || []
+  const resolvedModelId = selectedModelId.value ?? aiConfigStore.defaults.CHAT ?? null
 
-  // If no model yet (store still loading), return false (button will be disabled)
-  if (!currentModel) {
+  if (!resolvedModelId) {
+    return null
+  }
+
+  return chatModels.find((model) => model.id === resolvedModelId) ?? null
+})
+
+const supportsReasoning = computed(() => {
+  if (!currentChatModel.value) {
     return false
   }
 
-  // Check if model has reasoning capability
-  return currentModel.features?.includes('reasoning') ?? false
+  return currentChatModel.value.features?.includes('reasoning') ?? false
 })
 
 // Auto-enable thinking when switching to a reasoning-capable model
@@ -426,6 +442,14 @@ watch(
     }
   },
   { immediate: true }
+)
+
+// Reset model dropdown when switching chats
+watch(
+  () => chatsStore.activeChatId,
+  () => {
+    selectedModelId.value = null
+  }
 )
 
 watch(
@@ -511,6 +535,7 @@ const sendMessage = () => {
       webSearch: hasWebSearch,
       fileIds: uploadedFiles.value.filter((f) => !f.processing).map((f) => f.file_id),
       voiceReply: voiceReply.value,
+      modelId: selectedModelId.value || undefined,
     }
     emit('send', messageToSend, options)
     message.value = ''

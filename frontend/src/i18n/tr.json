@@ -267,6 +267,9 @@
       "videoGen": "Video Oluşturma",
       "videoGenDesc": "Metinden video oluştur"
     },
+    "modelDropdown": {
+      "default": "Standart"
+    },
     "removeTool": "Aracı kaldır"
   },
   "chatMessage": {
