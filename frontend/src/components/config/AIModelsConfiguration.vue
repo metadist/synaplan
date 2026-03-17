@@ -413,6 +413,7 @@ const normalizeHighlight = (highlight: string): Capability | 'ALL' | null => {
 onMounted(async () => {
   await loadData()
   document.addEventListener('click', handleClickOutside)
+  document.addEventListener('keydown', handleKeydown)
 
   // Check for highlight query parameter
   const highlightParam = route.query.highlight as string | undefined
@@ -446,6 +447,7 @@ onMounted(async () => {
 
 onBeforeUnmount(() => {
   document.removeEventListener('click', handleClickOutside)
+  document.removeEventListener('keydown', handleKeydown)
 })
 
 // Watch for route changes to handle highlight parameter
@@ -570,8 +572,16 @@ const selectModel = async (capability: Capability, modelId: number | null) => {
 }
 
 const handleClickOutside = (event: MouseEvent) => {
+  if (!openDropdown.value) return
   const target = event.target as HTMLElement
-  if (!target.closest('.relative')) {
+  const openRef = capabilityRefs.value[openDropdown.value]
+  if (openRef && !openRef.contains(target)) {
+    openDropdown.value = null
+  }
+}
+
+const handleKeydown = (event: KeyboardEvent) => {
+  if (event.key === 'Escape' && openDropdown.value) {
     openDropdown.value = null
   }
 }
