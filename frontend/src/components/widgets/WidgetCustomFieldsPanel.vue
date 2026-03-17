@@ -110,7 +110,7 @@ onUnmounted(() => {
           class="w-full px-3 py-2 text-sm rounded-lg surface-chip border border-light-border/30 dark:border-dark-border/20 txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)] transition-colors"
         >
           <option value="">{{ $t('widgets.customFields.dropdownPlaceholder') }}</option>
-          <option v-for="opt in field.options" :key="opt" :value="opt">{{ opt }}</option>
+          <option v-for="opt in field.options ?? []" :key="opt" :value="opt">{{ opt }}</option>
         </select>
         <button
           v-else

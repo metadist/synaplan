@@ -1,3 +1,4 @@
+import { z } from 'zod'
 import { httpClient } from './httpClient'
 import { useConfigStore } from '@/stores/config'
 
@@ -33,12 +34,28 @@ export interface Widget {
   allowedDomains?: string[]
 }
 
-export interface CustomFieldDef {
-  id: string
-  name: string
-  type: 'text' | 'boolean' | 'dropdown'
-  options?: string[]
-}
+export const CustomFieldDefSchema = z.discriminatedUnion('type', [
+  z.object({
+    id: z.string(),
+    name: z.string(),
+    type: z.literal('text'),
+    options: z.undefined().optional(),
+  }),
+  z.object({
+    id: z.string(),
+    name: z.string(),
+    type: z.literal('boolean'),
+    options: z.undefined().optional(),
+  }),
+  z.object({
+    id: z.string(),
+    name: z.string(),
+    type: z.literal('dropdown'),
+    options: z.array(z.string()).min(1),
+  }),
+])
+
+export type CustomFieldDef = z.infer<typeof CustomFieldDefSchema>
 
 export interface WidgetConfig {
   position?: 'bottom-left' | 'bottom-right' | 'top-left' | 'top-right'

@@ -570,7 +570,7 @@
                   class="mt-2 ml-7 flex flex-wrap gap-1.5"
                 >
                   <span
-                    v-for="opt in field.options"
+                    v-for="opt in field.options ?? []"
                     :key="opt"
                     class="text-xs px-2 py-0.5 rounded-full surface-card border border-light-border/20 dark:border-dark-border/15 txt-secondary"
                   >
@@ -636,12 +636,12 @@
                   {{ $t('widgets.customFields.dropdownOptions') }}
                 </label>
                 <div
-                  v-for="(_, idx) in newDropdownOptions"
-                  :key="idx"
+                  v-for="(opt, idx) in newDropdownOptions"
+                  :key="opt.id"
                   class="flex items-center gap-2"
                 >
                   <input
-                    v-model="newDropdownOptions[idx]"
+                    v-model="opt.value"
                     type="text"
                     class="flex-1 px-3 py-1.5 text-sm rounded-lg surface-chip border border-light-border/30 dark:border-dark-border/20 txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
                     :placeholder="
@@ -653,7 +653,7 @@
                   <button
                     v-if="newDropdownOptions.length > 1"
                     class="p-1 rounded hover:bg-red-500/10 transition-colors"
-                    @click="newDropdownOptions.splice(idx, 1)"
+                    @click="removeDropdownOption(opt.id)"
                   >
                     <Icon icon="heroicons:x-mark" class="w-4 h-4 text-red-500" />
                   </button>
@@ -662,7 +662,7 @@
                   <button
                     v-if="newDropdownOptions.length < 5"
                     class="text-xs txt-brand hover:underline flex items-center gap-1"
-                    @click="newDropdownOptions.push('')"
+                    @click="newDropdownOptions.push(createOptionEntry())"
                   >
                     <Icon icon="heroicons:plus" class="w-3 h-3" />
                     {{ $t('widgets.customFields.addOption') }}
@@ -1249,7 +1249,14 @@ const config = reactive<widgetsApi.WidgetConfig>({
 const customFields = ref<widgetsApi.CustomFieldDef[]>([])
 const newFieldName = ref('')
 const newFieldType = ref<'text' | 'boolean' | 'dropdown'>('text')
-const newDropdownOptions = ref<string[]>(['', ''])
+
+interface DropdownOptionEntry {
+  id: number
+  value: string
+}
+let nextOptionId = 0
+const createOptionEntry = (value = ''): DropdownOptionEntry => ({ id: nextOptionId++, value })
+const newDropdownOptions = ref<DropdownOptionEntry[]>([createOptionEntry(), createOptionEntry()])
 
 const fieldCountByType = (type: string) => customFields.value.filter((f) => f.type === type).length
 const textFieldCount = computed(() => fieldCountByType('text'))
@@ -1268,7 +1275,7 @@ const canAddAnyField = computed(
 )
 
 const validDropdownOptions = computed(() =>
-  newDropdownOptions.value.map((o) => o.trim()).filter(Boolean)
+  newDropdownOptions.value.map((o) => o.value.trim()).filter(Boolean)
 )
 
 const maxReachedMessage = computed(() => {
@@ -1298,25 +1305,28 @@ const customFieldTypeLabel = (type: string): string => {
   return t('widgets.customFields.typeText')
 }
 
+const removeDropdownOption = (id: number) => {
+  newDropdownOptions.value = newDropdownOptions.value.filter((o) => o.id !== id)
+}
+
 const addCustomField = () => {
   const name = newFieldName.value.trim()
   if (!name || !canAddField.value) return
 
-  const field: widgetsApi.CustomFieldDef = {
-    id: 'cf_' + Math.random().toString(16).slice(2, 14).padEnd(12, '0'),
-    name,
-    type: newFieldType.value,
-  }
+  const id = 'cf_' + Math.random().toString(16).slice(2, 14).padEnd(12, '0')
+  let field: widgetsApi.CustomFieldDef
 
   if (newFieldType.value === 'dropdown') {
     const opts = validDropdownOptions.value
     if (opts.length === 0) return
-    field.options = opts
+    field = { id, name, type: 'dropdown', options: opts }
+  } else {
+    field = { id, name, type: newFieldType.value }
   }
 
   customFields.value.push(field)
   newFieldName.value = ''
-  newDropdownOptions.value = ['', '']
+  newDropdownOptions.value = [createOptionEntry(), createOptionEntry()]
 }
 
 const removeCustomField = (index: number) => {
