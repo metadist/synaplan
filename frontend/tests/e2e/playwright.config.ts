@@ -41,7 +41,7 @@ export default defineConfig({
           ],
         },
       },
-      grepInvert: /@oidc-redirect/,
+      grepInvert: /@oidc-redirect|@noci/,
     },
     {
       name: 'firefox',
@@ -49,7 +49,7 @@ export default defineConfig({
         ...devices['Desktop Firefox'],
         ...(process.env.CI ? {} : { launchOptions: { args: ['--start-maximized'] } }),
       },
-      grepInvert: /@oidc-redirect/,
+      grepInvert: /@oidc-redirect|@noci/,
     },
     {
       name: 'chromium-oidc-redirect',
