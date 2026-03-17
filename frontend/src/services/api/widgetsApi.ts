@@ -36,7 +36,8 @@ export interface Widget {
 export interface CustomFieldDef {
   id: string
   name: string
-  type: 'text' | 'boolean'
+  type: 'text' | 'boolean' | 'dropdown'
+  options?: string[]
 }
 
 export interface WidgetConfig {
