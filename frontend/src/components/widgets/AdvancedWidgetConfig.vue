@@ -543,36 +543,40 @@
               <div
                 v-for="(field, index) in customFields"
                 :key="field.id"
-                class="flex items-center gap-3 surface-chip p-3 rounded-lg"
+                class="surface-chip p-3 rounded-lg"
               >
-                <Icon
-                  :icon="
-                    field.type === 'boolean' ? 'heroicons:check-circle' : 'heroicons:document-text'
-                  "
-                  class="w-4 h-4 txt-secondary flex-shrink-0"
-                />
-                <span class="flex-1 text-sm txt-primary truncate">{{ field.name }}</span>
-                <span
-                  class="text-xs px-2 py-0.5 rounded-full"
-                  :class="
-                    field.type === 'boolean'
-                      ? 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300'
-                      : 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300'
-                  "
+                <div class="flex items-center gap-3">
+                  <Icon
+                    :icon="customFieldIcon(field.type)"
+                    class="w-4 h-4 txt-secondary flex-shrink-0"
+                  />
+                  <span class="flex-1 text-sm txt-primary truncate">{{ field.name }}</span>
+                  <span
+                    class="text-xs px-2 py-0.5 rounded-full"
+                    :class="customFieldBadgeClass(field.type)"
+                  >
+                    {{ customFieldTypeLabel(field.type) }}
+                  </span>
+                  <button
+                    class="p-1 rounded hover:bg-red-500/10 transition-colors"
+                    :title="$t('common.delete')"
+                    @click="removeCustomField(index)"
+                  >
+                    <Icon icon="heroicons:trash" class="w-4 h-4 text-red-500" />
+                  </button>
+                </div>
+                <div
+                  v-if="field.type === 'dropdown' && field.options?.length"
+                  class="mt-2 ml-7 flex flex-wrap gap-1.5"
                 >
-                  {{
-                    field.type === 'boolean'
-                      ? $t('widgets.customFields.typeBoolean')
-                      : $t('widgets.customFields.typeText')
-                  }}
-                </span>
-                <button
-                  class="p-1 rounded hover:bg-red-500/10 transition-colors"
-                  :title="$t('common.delete')"
-                  @click="removeCustomField(index)"
-                >
-                  <Icon icon="heroicons:trash" class="w-4 h-4 text-red-500" />
-                </button>
+                  <span
+                    v-for="opt in field.options ?? []"
+                    :key="opt"
+                    class="text-xs px-2 py-0.5 rounded-full surface-card border border-light-border/20 dark:border-dark-border/15 txt-secondary"
+                  >
+                    {{ opt }}
+                  </span>
+                </div>
               </div>
             </div>
 
@@ -584,55 +588,105 @@
             </div>
 
             <!-- Add field form -->
-            <div v-if="textFieldCount < 3 || booleanFieldCount < 3" class="flex items-end gap-3">
-              <div class="flex-1">
-                <label class="block text-xs font-medium txt-secondary mb-1">
-                  {{ $t('widgets.customFields.fieldName') }}
-                </label>
-                <input
-                  v-model="newFieldName"
-                  type="text"
-                  class="w-full px-3 py-2 text-sm rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
-                  :placeholder="$t('widgets.customFields.fieldName')"
-                  maxlength="100"
-                  @keydown.enter="addCustomField"
-                />
-              </div>
-              <div class="w-32">
-                <label class="block text-xs font-medium txt-secondary mb-1">
-                  {{ $t('widgets.customFields.fieldType') }}
-                </label>
-                <select
-                  v-model="newFieldType"
-                  class="w-full px-3 py-2 text-sm rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
+            <div v-if="canAddAnyField" class="space-y-3">
+              <div class="flex items-end gap-3">
+                <div class="flex-1">
+                  <label class="block text-xs font-medium txt-secondary mb-1">
+                    {{ $t('widgets.customFields.fieldName') }}
+                  </label>
+                  <input
+                    v-model="newFieldName"
+                    type="text"
+                    class="w-full px-3 py-2 text-sm rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
+                    :placeholder="$t('widgets.customFields.fieldName')"
+                    maxlength="100"
+                    @keydown.enter="newFieldType !== 'dropdown' && addCustomField()"
+                  />
+                </div>
+                <div class="w-36">
+                  <label class="block text-xs font-medium txt-secondary mb-1">
+                    {{ $t('widgets.customFields.fieldType') }}
+                  </label>
+                  <select
+                    v-model="newFieldType"
+                    class="w-full px-3 py-2 text-sm rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
+                  >
+                    <option value="text">{{ $t('widgets.customFields.typeText') }}</option>
+                    <option value="boolean">{{ $t('widgets.customFields.typeBoolean') }}</option>
+                    <option value="dropdown">{{ $t('widgets.customFields.typeDropdown') }}</option>
+                  </select>
+                </div>
+                <button
+                  v-if="newFieldType !== 'dropdown'"
+                  class="btn-primary px-4 py-2 text-sm flex-shrink-0 rounded-lg"
+                  :disabled="!newFieldName.trim() || !canAddField"
+                  @click="addCustomField"
                 >
-                  <option value="text">{{ $t('widgets.customFields.typeText') }}</option>
-                  <option value="boolean">{{ $t('widgets.customFields.typeBoolean') }}</option>
-                </select>
+                  <Icon icon="heroicons:plus" class="w-4 h-4 mr-1 inline" />
+                  {{ $t('widgets.customFields.addField') }}
+                </button>
               </div>
-              <button
-                class="btn-primary px-4 py-2 text-sm flex-shrink-0 rounded-lg"
-                :disabled="!newFieldName.trim() || !canAddField"
-                @click="addCustomField"
+
+              <!-- Dropdown options builder -->
+              <div
+                v-if="newFieldType === 'dropdown'"
+                class="ml-0 p-3 rounded-lg surface-card border border-light-border/20 dark:border-dark-border/15 space-y-2"
               >
-                <Icon icon="heroicons:plus" class="w-4 h-4 mr-1 inline" />
-                {{ $t('widgets.customFields.addField') }}
-              </button>
+                <label class="block text-xs font-medium txt-secondary">
+                  {{ $t('widgets.customFields.dropdownOptions') }}
+                </label>
+                <div
+                  v-for="(opt, idx) in newDropdownOptions"
+                  :key="opt.id"
+                  class="flex items-center gap-2"
+                >
+                  <input
+                    v-model="opt.value"
+                    type="text"
+                    class="flex-1 px-3 py-1.5 text-sm rounded-lg surface-chip border border-light-border/30 dark:border-dark-border/20 txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
+                    :placeholder="
+                      $t('widgets.customFields.dropdownOptionPlaceholder', { n: idx + 1 })
+                    "
+                    maxlength="100"
+                    @keydown.enter="addCustomField"
+                  />
+                  <button
+                    v-if="newDropdownOptions.length > 1"
+                    class="p-1 rounded hover:bg-red-500/10 transition-colors"
+                    @click="removeDropdownOption(opt.id)"
+                  >
+                    <Icon icon="heroicons:x-mark" class="w-4 h-4 text-red-500" />
+                  </button>
+                </div>
+                <div class="flex items-center gap-2">
+                  <button
+                    v-if="newDropdownOptions.length < 5"
+                    class="text-xs txt-brand hover:underline flex items-center gap-1"
+                    @click="newDropdownOptions.push(createOptionEntry())"
+                  >
+                    <Icon icon="heroicons:plus" class="w-3 h-3" />
+                    {{ $t('widgets.customFields.addOption') }}
+                  </button>
+                  <span v-else class="text-xs txt-secondary">
+                    {{ $t('widgets.customFields.maxOptionsReached') }}
+                  </span>
+                </div>
+                <button
+                  class="btn-primary px-4 py-2 text-sm rounded-lg w-full"
+                  :disabled="
+                    !newFieldName.trim() || !canAddField || validDropdownOptions.length === 0
+                  "
+                  @click="addCustomField"
+                >
+                  <Icon icon="heroicons:plus" class="w-4 h-4 mr-1 inline" />
+                  {{ $t('widgets.customFields.addField') }}
+                </button>
+              </div>
             </div>
-            <p
-              v-if="!canAddField && (textFieldCount < 3 || booleanFieldCount < 3)"
-              class="text-xs txt-secondary"
-            >
-              {{
-                newFieldType === 'text'
-                  ? $t('widgets.customFields.maxTextReached')
-                  : $t('widgets.customFields.maxBooleanReached')
-              }}
+            <p v-if="!canAddField && canAddAnyField" class="text-xs txt-secondary">
+              {{ maxReachedMessage }}
             </p>
-            <p
-              v-else-if="textFieldCount >= 3 && booleanFieldCount >= 3"
-              class="text-xs txt-secondary text-center"
-            >
+            <p v-else-if="!canAddAnyField" class="text-xs txt-secondary text-center">
               {{ $t('widgets.customFields.maxFieldsReached') }}
             </p>
           </div>
@@ -1194,27 +1248,85 @@ const config = reactive<widgetsApi.WidgetConfig>({
 // Custom fields
 const customFields = ref<widgetsApi.CustomFieldDef[]>([])
 const newFieldName = ref('')
-const newFieldType = ref<'text' | 'boolean'>('text')
+const newFieldType = ref<'text' | 'boolean' | 'dropdown'>('text')
 
-const textFieldCount = computed(() => customFields.value.filter((f) => f.type === 'text').length)
-const booleanFieldCount = computed(
-  () => customFields.value.filter((f) => f.type === 'boolean').length
-)
+interface DropdownOptionEntry {
+  id: number
+  value: string
+}
+let nextOptionId = 0
+const createOptionEntry = (value = ''): DropdownOptionEntry => ({ id: nextOptionId++, value })
+const newDropdownOptions = ref<DropdownOptionEntry[]>([createOptionEntry(), createOptionEntry()])
+
+const fieldCountByType = (type: string) => customFields.value.filter((f) => f.type === type).length
+const textFieldCount = computed(() => fieldCountByType('text'))
+const booleanFieldCount = computed(() => fieldCountByType('boolean'))
+const dropdownFieldCount = computed(() => fieldCountByType('dropdown'))
+
 const canAddField = computed(() => {
-  if (newFieldType.value === 'text') return textFieldCount.value < 3
-  return booleanFieldCount.value < 3
+  const t = newFieldType.value
+  if (t === 'text') return textFieldCount.value < 3
+  if (t === 'boolean') return booleanFieldCount.value < 3
+  return dropdownFieldCount.value < 3
 })
+
+const canAddAnyField = computed(
+  () => textFieldCount.value < 3 || booleanFieldCount.value < 3 || dropdownFieldCount.value < 3
+)
+
+const validDropdownOptions = computed(() =>
+  newDropdownOptions.value.map((o) => o.value.trim()).filter(Boolean)
+)
+
+const maxReachedMessage = computed(() => {
+  const type = newFieldType.value
+  if (type === 'text') return t('widgets.customFields.maxTextReached')
+  if (type === 'boolean') return t('widgets.customFields.maxBooleanReached')
+  return t('widgets.customFields.maxDropdownReached')
+})
+
+const customFieldIcon = (type: string): string => {
+  if (type === 'boolean') return 'heroicons:check-circle'
+  if (type === 'dropdown') return 'heroicons:chevron-up-down'
+  return 'heroicons:document-text'
+}
+
+const customFieldBadgeClass = (type: string): string => {
+  if (type === 'boolean')
+    return 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300'
+  if (type === 'dropdown')
+    return 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300'
+  return 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300'
+}
+
+const customFieldTypeLabel = (type: string): string => {
+  if (type === 'boolean') return t('widgets.customFields.typeBoolean')
+  if (type === 'dropdown') return t('widgets.customFields.typeDropdown')
+  return t('widgets.customFields.typeText')
+}
+
+const removeDropdownOption = (id: number) => {
+  newDropdownOptions.value = newDropdownOptions.value.filter((o) => o.id !== id)
+}
 
 const addCustomField = () => {
   const name = newFieldName.value.trim()
   if (!name || !canAddField.value) return
 
-  customFields.value.push({
-    id: 'cf_' + Math.random().toString(16).slice(2, 14).padEnd(12, '0'),
-    name,
-    type: newFieldType.value,
-  })
+  const id = 'cf_' + Math.random().toString(16).slice(2, 14).padEnd(12, '0')
+  let field: widgetsApi.CustomFieldDef
+
+  if (newFieldType.value === 'dropdown') {
+    const opts = validDropdownOptions.value
+    if (opts.length === 0) return
+    field = { id, name, type: 'dropdown', options: opts }
+  } else {
+    field = { id, name, type: newFieldType.value }
+  }
+
+  customFields.value.push(field)
   newFieldName.value = ''
+  newDropdownOptions.value = [createOptionEntry(), createOptionEntry()]
 }
 
 const removeCustomField = (index: number) => {
