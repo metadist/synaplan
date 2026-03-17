@@ -1,5 +1,5 @@
 <template>
-  <div class="my-3">
+  <div class="my-3" data-testid="section-message-audio">
     <div
       class="relative w-full surface-card overflow-hidden rounded-lg border border-light-border/30 dark:border-dark-border/20 p-4"
     >
