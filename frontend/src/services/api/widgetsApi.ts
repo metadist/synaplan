@@ -459,7 +459,12 @@ export async function sendSetupMessage(
   text: string,
   history: SetupMessage[],
   language?: string,
-  mode?: 'interview' | 'flow-builder'
+  mode?: 'interview' | 'flow-builder',
+  currentFlow?: {
+    triggers: Array<{ id: string; label: string; type?: string }>
+    responses: Array<{ id: string; label: string; type?: string; meta?: Record<string, string> }>
+    connections: Array<{ from: string; to: string }>
+  }
 ): Promise<{
   success: boolean
   text: string
@@ -471,7 +476,7 @@ export async function sendSetupMessage(
     progress: number
   }>(`/api/v1/widgets/${widgetId}/setup-chat`, {
     method: 'POST',
-    body: JSON.stringify({ text, history, language, mode }),
+    body: JSON.stringify({ text, history, language, mode, currentFlow }),
   })
   return data
 }
@@ -620,4 +625,17 @@ export async function suggestMemories(widgetId: string): Promise<MemorySuggestio
     { method: 'POST' }
   )
   return res.suggestions
+}
+
+/**
+ * Trigger crawling of all link-type response URLs for a widget.
+ * The backend fetches each URL, extracts text, chunks and vectorizes it for RAG.
+ */
+export async function triggerCrawl(
+  widgetId: string
+): Promise<{ success: boolean; urls_queued: number }> {
+  return await httpClient<{ success: boolean; urls_queued: number }>(
+    `/api/v1/widgets/${widgetId}/crawl`,
+    { method: 'POST' }
+  )
 }

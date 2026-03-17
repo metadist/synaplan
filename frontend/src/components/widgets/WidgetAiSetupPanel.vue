@@ -200,8 +200,9 @@ const props = withDefaults(
   defineProps<{
     widgetId: string
     fullscreen?: boolean
+    currentFlow?: { triggers: FlowNode[]; responses: FlowNode[]; connections: FlowConnection[] }
   }>(),
-  { fullscreen: false }
+  { fullscreen: false, currentFlow: undefined }
 )
 
 const emit = defineEmits<{
@@ -378,7 +379,8 @@ async function handleMemoryApply(accepted: MemorySuggestion[]) {
       contextMessage,
       conversationHistory.value,
       locale.value,
-      'flow-builder'
+      'flow-builder',
+      props.currentFlow
     )
 
     const { displayText, flowData, flowItems } = parseFlowUpdate(result.text)
@@ -447,7 +449,8 @@ async function send() {
       text,
       conversationHistory.value,
       locale.value,
-      'flow-builder'
+      'flow-builder',
+      props.currentFlow
     )
 
     const { displayText, flowData, flowItems } = parseFlowUpdate(result.text)
@@ -494,7 +497,8 @@ async function startChat() {
       '__START_FLOW_BUILDER__',
       [],
       locale.value,
-      'flow-builder'
+      'flow-builder',
+      props.currentFlow
     )
 
     const { displayText, flowData, flowItems } = parseFlowUpdate(result.text)

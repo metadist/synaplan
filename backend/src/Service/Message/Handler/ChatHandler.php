@@ -721,6 +721,15 @@ final readonly class ChatHandler implements MessageHandlerInterface
             ]);
         }
 
+        // Append live API data from widget flow api-type responses
+        $apiContext = $options['api_context'] ?? '';
+        if ('' !== $apiContext) {
+            $systemPrompt .= "\n\n".$apiContext;
+            $this->logger->info('ChatHandler: API context appended to system prompt', [
+                'api_context_length' => \strlen($apiContext),
+            ]);
+        }
+
         // Append plugin context (external data sources like casting platforms)
         $systemPrompt = $this->appendPluginContext($systemPrompt, $message, $classification, $options);
 

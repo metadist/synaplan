@@ -1580,6 +1580,25 @@
           "custom": "Describe this source..."
         }
       },
+      "nodeEditor": {
+        "type": "Type",
+        "name": "Name",
+        "content": "Content",
+        "endpoint": "API Endpoint",
+        "method": "Method",
+        "crawlInterval": "Crawl interval",
+        "crawlNever": "Never (static content)",
+        "crawlDaily": "Daily",
+        "crawlWeekly": "Weekly",
+        "crawlMonthly": "Monthly",
+        "save": "Save",
+        "triggerContentPlaceholder": "e.g. keywords, variations, details...",
+        "textPlaceholder": "Enter text content...",
+        "listPlaceholder": "One item per line...",
+        "upgradeRequired": "Upgrade to Pro to use external sources",
+        "crawlSuccess": "Content crawled and indexed successfully",
+        "crawlError": "Failed to crawl content"
+      },
       "filesTitle": "Connected Files",
       "expertPrompt": "Expert: Edit system prompt",
       "aiPanel": {

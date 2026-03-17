@@ -60,6 +60,7 @@
                 v-if="widget"
                 :widget-id="widget.widgetId"
                 :fullscreen="true"
+                :current-flow="currentFlowSnapshot"
                 @update-flow="handleAiFlowUpdate"
                 @first-flow-received="transitionToSplitView"
                 @update-widget-name="handleWidgetNameUpdate"
@@ -174,7 +175,17 @@
 
                         <!-- Existing trigger cards -->
                         <template v-for="trigger in triggers" :key="trigger.id">
+                          <!-- Edit mode -->
+                          <FlowNodeEditor
+                            v-if="editingNodeId === trigger.id"
+                            :node="trigger"
+                            node-type="trigger"
+                            @save="handleNodeSave($event, 'trigger')"
+                            @cancel="cancelEditing"
+                          />
+                          <!-- Display mode -->
                           <div
+                            v-else
                             :ref="(el) => setRef('trigger', trigger.id, el)"
                             :class="[
                               'group relative rounded-xl border-2 cursor-pointer transition-all duration-200',
@@ -188,39 +199,25 @@
                           >
                             <div class="flex items-center justify-between gap-2 px-3 py-2.5">
                               <div class="flex-1 min-w-0">
-                                <input
-                                  v-if="editingNodeId === trigger.id"
-                                  ref="editInputRef"
-                                  v-model="editingLabel"
-                                  class="w-full text-sm font-medium txt-primary bg-transparent border-b-2 border-[var(--brand)] focus:outline-none py-0.5"
-                                  @click.stop
-                                  @blur="finishEditing(trigger.id, 'trigger')"
-                                  @keydown.enter.prevent="finishEditing(trigger.id, 'trigger')"
-                                  @keydown.escape="cancelEditing"
-                                />
-                                <template v-else>
-                                  <span class="text-xs font-semibold txt-primary block truncate">
-                                    {{ splitLabel(trigger.label).title }}
-                                  </span>
-                                  <span
-                                    v-if="
-                                      splitLabel(trigger.label).preview &&
-                                      expandedNodeId !== trigger.id
-                                    "
-                                    class="text-[11px] txt-secondary truncate block mt-0.5"
-                                    @click.stop="toggleExpand(trigger.id)"
-                                  >
-                                    {{ splitLabel(trigger.label).preview.substring(0, 50)
-                                    }}{{
-                                      splitLabel(trigger.label).preview.length > 50 ? '...' : ''
-                                    }}
-                                  </span>
-                                </template>
+                                <span class="text-xs font-semibold txt-primary block truncate">
+                                  {{ splitLabel(trigger.label).title }}
+                                </span>
+                                <span
+                                  v-if="
+                                    splitLabel(trigger.label).preview &&
+                                    expandedNodeId !== trigger.id
+                                  "
+                                  class="text-[11px] txt-secondary truncate block mt-0.5"
+                                  @click.stop="toggleExpand(trigger.id)"
+                                >
+                                  {{ splitLabel(trigger.label).preview.substring(0, 50)
+                                  }}{{ splitLabel(trigger.label).preview.length > 50 ? '...' : '' }}
+                                </span>
                               </div>
                               <div class="flex items-center gap-0.5 flex-shrink-0">
                                 <button
                                   class="p-1 rounded opacity-0 group-hover:opacity-100 transition-opacity txt-secondary hover:txt-primary"
-                                  @click.stop="startEditing(trigger.id, trigger.label)"
+                                  @click.stop="startEditing(trigger.id)"
                                 >
                                   <Icon icon="heroicons:pencil-square" class="w-3.5 h-3.5" />
                                 </button>
@@ -440,59 +437,57 @@
                         </p>
 
                         <!-- Existing response cards -->
-                        <div
-                          v-for="response in responses"
-                          :key="response.id"
-                          :ref="(el) => setRef('response', response.id, el)"
-                          :class="[
-                            'group relative pl-5 rounded-xl border-2 transition-all duration-200',
-                            selectedTriggerId
-                              ? isConnected(selectedTriggerId, response.id)
-                                ? 'border-[var(--brand)] bg-[var(--brand)]/5 shadow-lg shadow-[var(--brand)]/10 cursor-pointer'
-                                : 'border-light-border/30 dark:border-dark-border/20 hover:border-[var(--brand)]/40 cursor-pointer hover:scale-[1.01]'
-                              : hasConnectionTo(response.id)
-                                ? 'border-[var(--brand)]/30 bg-[var(--brand)]/[0.02]'
-                                : 'border-light-border/30 dark:border-dark-border/20',
-                          ]"
-                          @click="handleResponseClick(response.id)"
-                        >
-                          <span
-                            :class="[
-                              'absolute left-0 top-1/2 -translate-x-1/2 -translate-y-1/2 w-3 h-3 rounded-full border-2 z-20 transition-all',
-                              selectedTriggerId && isConnected(selectedTriggerId, response.id)
-                                ? 'border-[var(--brand)] bg-[var(--brand)] scale-125'
-                                : selectedTriggerId
-                                  ? 'border-[var(--brand)]/40 bg-white dark:bg-gray-800 animate-pulse'
-                                  : hasConnectionTo(response.id)
-                                    ? 'border-[var(--brand)] bg-[var(--brand)]/50'
-                                    : 'border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800',
-                            ]"
+                        <template v-for="response in responses" :key="response.id">
+                          <!-- Edit mode -->
+                          <FlowNodeEditor
+                            v-if="editingNodeId === response.id"
+                            :node="response"
+                            node-type="response"
+                            @save="handleNodeSave($event, 'response')"
+                            @cancel="cancelEditing"
                           />
-                          <div class="flex items-center justify-between gap-2 px-3 py-2.5">
-                            <div class="flex items-center gap-2 flex-1 min-w-0">
-                              <span
-                                :class="[
-                                  'w-6 h-6 rounded-md flex items-center justify-center flex-shrink-0',
-                                  getResponseTypeInfo(response).bg,
-                                ]"
-                              >
-                                <Icon
-                                  :icon="getResponseTypeInfo(response).icon"
-                                  :class="['w-3.5 h-3.5', getResponseTypeInfo(response).color]"
-                                />
-                              </span>
-                              <div class="flex-1 min-w-0">
-                                <input
-                                  v-if="editingNodeId === response.id"
-                                  ref="editInputRef"
-                                  v-model="editingLabel"
-                                  class="w-full text-sm font-medium txt-primary bg-transparent border-b-2 border-[var(--brand)] focus:outline-none py-0.5"
-                                  @click.stop
-                                  @blur="finishEditing(response.id, 'response')"
-                                  @keydown.enter.prevent="finishEditing(response.id, 'response')"
-                                  @keydown.escape="cancelEditing"
-                                />
-                                <template v-else>
+                          <!-- Display mode -->
+                          <div
+                            v-else
+                            :ref="(el) => setRef('response', response.id, el)"
+                            :class="[
+                              'group relative pl-5 rounded-xl border-2 transition-all duration-200',
+                              selectedTriggerId
+                                ? isConnected(selectedTriggerId, response.id)
+                                  ? 'border-[var(--brand)] bg-[var(--brand)]/5 shadow-lg shadow-[var(--brand)]/10 cursor-pointer'
+                                  : 'border-light-border/30 dark:border-dark-border/20 hover:border-[var(--brand)]/40 cursor-pointer hover:scale-[1.01]'
+                                : hasConnectionTo(response.id)
+                                  ? 'border-[var(--brand)]/30 bg-[var(--brand)]/[0.02]'
+                                  : 'border-light-border/30 dark:border-dark-border/20',
+                            ]"
+                            @click="handleResponseClick(response.id)"
+                          >
+                            <span
+                              :class="[
+                                'absolute left-0 top-1/2 -translate-x-1/2 -translate-y-1/2 w-3 h-3 rounded-full border-2 z-20 transition-all',
+                                selectedTriggerId && isConnected(selectedTriggerId, response.id)
+                                  ? 'border-[var(--brand)] bg-[var(--brand)] scale-125'
+                                  : selectedTriggerId
+                                    ? 'border-[var(--brand)]/40 bg-white dark:bg-gray-800 animate-pulse'
+                                    : hasConnectionTo(response.id)
+                                      ? 'border-[var(--brand)] bg-[var(--brand)]/50'
+                                      : 'border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800',
+                              ]"
+                            />
+                            <div class="flex items-center justify-between gap-2 px-3 py-2.5">
+                              <div class="flex items-center gap-2 flex-1 min-w-0">
+                                <span
+                                  :class="[
+                                    'w-6 h-6 rounded-md flex items-center justify-center flex-shrink-0',
+                                    getResponseTypeInfo(response).bg,
+                                  ]"
+                                >
+                                  <Icon
+                                    :icon="getResponseTypeInfo(response).icon"
+                                    :class="['w-3.5 h-3.5', getResponseTypeInfo(response).color]"
+                                  />
+                                </span>
+                                <div class="flex-1 min-w-0">
                                   <span class="text-xs font-semibold txt-primary block truncate">
                                     {{ splitLabel(response.label).title }}
                                   </span>
@@ -516,48 +511,48 @@
                                       splitLabel(response.label).preview.length > 50 ? '...' : ''
                                     }}
                                   </span>
-                                </template>
+                                </div>
+                              </div>
+                              <div class="flex items-center gap-0.5 flex-shrink-0">
+                                <button
+                                  class="p-1 rounded opacity-0 group-hover:opacity-100 transition-opacity txt-secondary hover:txt-primary"
+                                  @click.stop="startEditing(response.id)"
+                                >
+                                  <Icon icon="heroicons:pencil-square" class="w-3.5 h-3.5" />
+                                </button>
+                                <button
+                                  class="p-1 rounded opacity-0 group-hover:opacity-100 transition-opacity txt-secondary hover:text-red-500"
+                                  @click.stop="removeResponse(response.id)"
+                                >
+                                  <Icon icon="heroicons:x-mark" class="w-3.5 h-3.5" />
+                                </button>
                               </div>
                             </div>
-                            <div class="flex items-center gap-0.5 flex-shrink-0">
-                              <button
-                                class="p-1 rounded opacity-0 group-hover:opacity-100 transition-opacity txt-secondary hover:txt-primary"
-                                @click.stop="startEditing(response.id, response.label)"
-                              >
-                                <Icon icon="heroicons:pencil-square" class="w-3.5 h-3.5" />
-                              </button>
-                              <button
-                                class="p-1 rounded opacity-0 group-hover:opacity-100 transition-opacity txt-secondary hover:text-red-500"
-                                @click.stop="removeResponse(response.id)"
-                              >
-                                <Icon icon="heroicons:x-mark" class="w-3.5 h-3.5" />
-                              </button>
-                            </div>
-                          </div>
-                          <!-- Expanded content -->
-                          <div
-                            v-if="expandedNodeId === response.id"
-                            class="px-3 pb-2.5 border-t border-light-border/20 dark:border-dark-border/10"
-                            @click.stop
-                          >
-                            <p
-                              class="text-[11px] txt-secondary pt-2 whitespace-pre-wrap break-words"
-                            >
-                              {{ response.label }}
-                            </p>
-                            <a
-                              v-if="response.meta?.url"
-                              :href="response.meta.url"
-                              target="_blank"
-                              rel="noopener"
-                              class="inline-flex items-center gap-1 text-[11px] text-blue-500 hover:underline mt-1"
+                            <!-- Expanded content -->
+                            <div
+                              v-if="expandedNodeId === response.id"
+                              class="px-3 pb-2.5 border-t border-light-border/20 dark:border-dark-border/10"
                               @click.stop
                             >
-                              <Icon icon="heroicons:arrow-top-right-on-square" class="w-3 h-3" />
-                              {{ response.meta.url }}
-                            </a>
+                              <p
+                                class="text-[11px] txt-secondary pt-2 whitespace-pre-wrap break-words"
+                              >
+                                {{ response.label }}
+                              </p>
+                              <a
+                                v-if="response.meta?.url"
+                                :href="response.meta.url"
+                                target="_blank"
+                                rel="noopener"
+                                class="inline-flex items-center gap-1 text-[11px] text-blue-500 hover:underline mt-1"
+                                @click.stop
+                              >
+                                <Icon icon="heroicons:arrow-top-right-on-square" class="w-3 h-3" />
+                                {{ response.meta.url }}
+                              </a>
+                            </div>
                           </div>
-                        </div>
+                        </template>
 
                         <!-- Response wizard form -->
                         <Transition
@@ -930,6 +925,7 @@
               <WidgetAiSetupPanel
                 v-if="widget"
                 :widget-id="widget.widgetId"
+                :current-flow="currentFlowSnapshot"
                 @update-flow="handleAiFlowUpdate"
                 @first-flow-received="transitionToSplitView"
                 @update-widget-name="handleWidgetNameUpdate"
@@ -962,6 +958,7 @@
                 >
                   <WidgetAiSetupPanel
                     :widget-id="widget.widgetId"
+                    :current-flow="currentFlowSnapshot"
                     @update-flow="handleAiFlowUpdate"
                     @first-flow-received="transitionToSplitView"
                     @update-widget-name="handleWidgetNameUpdate"
@@ -1014,6 +1011,7 @@ import MainLayout from '@/components/MainLayout.vue'
 import SetupChatModal from '@/components/widgets/SetupChatModal.vue'
 import AdvancedWidgetConfig from '@/components/widgets/AdvancedWidgetConfig.vue'
 import WidgetAiSetupPanel from '@/components/widgets/WidgetAiSetupPanel.vue'
+import FlowNodeEditor from '@/components/widgets/FlowNodeEditor.vue'
 import FilePicker from '@/components/widgets/FilePicker.vue'
 import * as widgetsApi from '@/services/api/widgetsApi'
 import { promptsApi, type PromptMetadata } from '@/services/api/promptsApi'
@@ -1025,6 +1023,7 @@ import {
   parsePromptAndRulesBlock,
 } from '@/utils/widgetBehaviorRules'
 import { useI18n } from 'vue-i18n'
+import { useAuthStore } from '@/stores/auth'
 
 type ResponseType = 'link' | 'api' | 'text' | 'list' | 'pdf' | 'custom'
 
@@ -1032,7 +1031,7 @@ interface FlowNode {
   id: string
   label: string
   type?: ResponseType
-  meta?: { url?: string; method?: string }
+  meta?: { url?: string; method?: string; crawlInterval?: string }
 }
 interface FlowConnection {
   from: string
@@ -1050,6 +1049,7 @@ interface SvgLine {
 
 const router = useRouter()
 const route = useRoute()
+const auth = useAuthStore()
 const { error: showError, success } = useNotification()
 const { t } = useI18n()
 
@@ -1080,8 +1080,6 @@ const expandedNodeId = ref<string | null>(null)
 
 // Editing state
 const editingNodeId = ref<string | null>(null)
-const editingLabel = ref('')
-const editInputRef = ref<HTMLInputElement[] | null>(null)
 
 // Wizard state
 const activeWizard = ref<{ side: 'trigger' | 'response'; key: string } | null>(null)
@@ -1094,6 +1092,12 @@ const wizardFiles = ref<Array<{ messageId: number; fileName: string }>>([])
 const wizardUploadingFile = ref(false)
 const showWizardFilePicker = ref(false)
 const wizardFilePickerExcludeIds = computed(() => wizardFiles.value.map((f) => f.messageId))
+
+const currentFlowSnapshot = computed(() => ({
+  triggers: triggers.value,
+  responses: responses.value,
+  connections: connections.value,
+}))
 
 // SVG state
 const flowRef = ref<HTMLElement | null>(null)
@@ -1408,21 +1412,9 @@ const handleWidgetNameUpdate = async (name: string) => {
 }
 
 const handleAiFlowUpdate = (data: FlowData) => {
-  for (const t of data.triggers) {
-    if (!triggers.value.some((n) => n.id === t.id)) {
-      triggers.value.push(t)
-    }
-  }
-  for (const r of data.responses) {
-    if (!responses.value.some((n) => n.id === r.id)) {
-      responses.value.push(r)
-    }
-  }
-  for (const c of data.connections) {
-    if (!connections.value.some((x) => x.from === c.from && x.to === c.to)) {
-      connections.value.push(c)
-    }
-  }
+  triggers.value = data.triggers
+  responses.value = data.responses
+  connections.value = data.connections
   autoSaveFlow()
 }
 
@@ -1465,22 +1457,18 @@ const persistFlowData = async () => {
   }
 }
 
-// Inline editing
-const startEditing = (nodeId: string, label: string) => {
+// Node editing
+const startEditing = (nodeId: string) => {
   editingNodeId.value = nodeId
-  editingLabel.value = label
-  nextTick(() => {
-    if (editInputRef.value?.length) editInputRef.value[0].focus()
-  })
 }
-const finishEditing = (nodeId: string, type: 'trigger' | 'response') => {
-  const label = editingLabel.value.trim()
-  if (label) {
-    const list = type === 'trigger' ? triggers.value : responses.value
-    const node = list.find((n) => n.id === nodeId)
-    if (node) node.label = label
+const handleNodeSave = (updated: FlowNode, nodeType: 'trigger' | 'response') => {
+  const list = nodeType === 'trigger' ? triggers.value : responses.value
+  const idx = list.findIndex((n) => n.id === updated.id)
+  if (idx >= 0) {
+    list[idx] = updated
   }
   editingNodeId.value = null
+  autoSaveFlow()
 }
 const cancelEditing = () => {
   editingNodeId.value = null
@@ -1512,9 +1500,13 @@ const buildFlowRulesBlock = (): string => {
     lines.push(`When user asks about "${trigger}":`)
     for (const r of resps) {
       if (r.type === 'link' && r.meta?.url) {
-        lines.push(`- Respond with link: ${r.label} → ${r.meta.url}`)
+        lines.push(
+          `- Respond using knowledge crawled from: ${r.label} (${r.meta.url}). Also include the link for the user.`
+        )
       } else if (r.type === 'api' && r.meta?.url) {
-        lines.push(`- Fetch from API: ${r.meta.method ?? 'GET'} ${r.meta.url}`)
+        lines.push(
+          `- Use the live API data provided in "## Live API Data" section from: ${r.meta.method ?? 'GET'} ${r.meta.url}`
+        )
       } else {
         lines.push(`- ${r.label}`)
       }
@@ -1629,6 +1621,20 @@ const save = async () => {
       widget.value = await widgetsApi.getWidget(widget.value.widgetId)
     }
     success(t('widgets.advancedConfig.saveSuccess'))
+
+    const hasLinkResponses = responses.value.some(
+      (r) => r.type === 'link' && r.meta?.url?.trim()
+    )
+    if (hasLinkResponses && auth.isPro) {
+      try {
+        const crawlResult = await widgetsApi.triggerCrawl(widget.value.widgetId)
+        if (crawlResult.urls_queued > 0) {
+          success(t('widgets.detail.nodeEditor.crawlSuccess'))
+        }
+      } catch {
+        // Non-critical: crawl failure should not block save
+      }
+    }
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : String(err)
     showError(message || t('widgets.advancedConfig.saveError'))

@@ -1597,6 +1597,25 @@
           "custom": "Beschreibe diese Quelle..."
         }
       },
+      "nodeEditor": {
+        "type": "Typ",
+        "name": "Name",
+        "content": "Inhalt",
+        "endpoint": "API-Endpunkt",
+        "method": "Methode",
+        "crawlInterval": "Crawl-Intervall",
+        "crawlNever": "Nie (statischer Inhalt)",
+        "crawlDaily": "Täglich",
+        "crawlWeekly": "Wöchentlich",
+        "crawlMonthly": "Monatlich",
+        "save": "Speichern",
+        "triggerContentPlaceholder": "z.B. Schlüsselwörter, Varianten, Details...",
+        "textPlaceholder": "Textinhalt eingeben...",
+        "listPlaceholder": "Ein Eintrag pro Zeile...",
+        "upgradeRequired": "Upgrade auf Pro für externe Quellen erforderlich",
+        "crawlSuccess": "Inhalt erfolgreich gecrawlt und indexiert",
+        "crawlError": "Inhalt konnte nicht gecrawlt werden"
+      },
       "filesTitle": "Verbundene Dateien",
       "expertPrompt": "Experte: System-Prompt bearbeiten",
       "aiPanel": {

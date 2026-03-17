@@ -199,6 +199,39 @@ final readonly class UserMemoryService
     }
 
     /**
+     * Delete all memories for a given user (used during account deletion).
+     */
+    public function deleteAllForUser(int $userId): void
+    {
+        if (!$this->qdrantClient->isAvailable()) {
+            $this->logger->warning('Memory service unavailable - skipping deleteAllForUser', [
+                'user_id' => $userId,
+            ]);
+
+            return;
+        }
+
+        try {
+            $memories = $this->qdrantClient->scrollMemories($userId, null, 10000, null);
+
+            foreach ($memories as $memory) {
+                $pointId = "mem_{$userId}_{$memory['id']}";
+                $this->qdrantClient->deleteMemory($pointId);
+            }
+
+            $this->logger->info('All memories deleted for user', [
+                'user_id' => $userId,
+                'count' => \count($memories),
+            ]);
+        } catch (\Throwable $e) {
+            $this->logger->error('Failed to delete all memories for user', [
+                'user_id' => $userId,
+                'error' => $e->getMessage(),
+            ]);
+        }
+    }
+
+    /**
      * Scroll through all memories for a user with optional category and namespace filters.
      *
      * @return array<array{id: int, key: string, value: string, category: string, messageId: ?int, created: int, updated: int}>

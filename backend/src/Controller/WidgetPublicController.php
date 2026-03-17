@@ -9,11 +9,14 @@ use App\Entity\WidgetSession;
 use App\Repository\ChatRepository;
 use App\Repository\FileRepository;
 use App\Repository\MessageRepository;
+use App\Service\BillingService;
 use App\Service\File\FileProcessor;
 use App\Service\File\FileStorageService;
 use App\Service\File\VectorizationService;
 use App\Service\Message\MessageProcessor;
+use App\Service\PromptService;
 use App\Service\RateLimitService;
+use App\Service\UrlContentService;
 use App\Service\WidgetEventCacheService;
 use App\Service\WidgetService;
 use App\Service\WidgetSessionService;
@@ -44,6 +47,9 @@ class WidgetPublicController extends AbstractController
         private FileStorageService $storageService,
         private FileProcessor $fileProcessor,
         private VectorizationService $vectorizationService,
+        private UrlContentService $urlContentService,
+        private PromptService $promptService,
+        private BillingService $billingService,
         private ChatRepository $chatRepository,
         private MessageRepository $messageRepository,
         private FileRepository $fileRepository,
@@ -397,6 +403,8 @@ class WidgetPublicController extends AbstractController
                 'configured_model_id' => $widgetModelId,
             ]);
 
+            $apiContext = $this->fetchApiContext($widget, $owner);
+
             $processingOptions = [
                 'fixed_task_prompt' => $widget->getTaskPromptTopic(),
                 'skipSorting' => true,
@@ -410,6 +418,7 @@ class WidgetPublicController extends AbstractController
                 'disable_memories' => true,
                 'is_widget_mode' => true,
                 'widget_model_id' => $widgetModelId,
+                'api_context' => $apiContext,
             ];
 
             $response = new StreamedResponse(function () use (
@@ -1524,5 +1533,97 @@ class WidgetPublicController extends AbstractController
         ]);
 
         return $this->json(['success' => true]);
+    }
+
+    /**
+     * Fetch live data from API-type flow responses and format as prompt context.
+     * Skipped for free users when billing is enabled.
+     *
+     * @param \App\Entity\Widget $widget
+     * @param \App\Entity\User   $owner
+     */
+    private function fetchApiContext($widget, $owner): string
+    {
+        if ($this->billingService->isEnabled() && \in_array($owner->getUserLevel(), ['NEW', 'ANONYMOUS'], true)) {
+            return '';
+        }
+
+        $topic = $widget->getTaskPromptTopic();
+        if (!$topic) {
+            return '';
+        }
+
+        $promptData = $this->promptService->getPromptWithMetadata($topic, $owner->getId());
+        if (!$promptData) {
+            return '';
+        }
+
+        $flowRulesRaw = $promptData['metadata']['widgetFlowRules'] ?? null;
+        if (!\is_string($flowRulesRaw) || '' === $flowRulesRaw) {
+            return '';
+        }
+
+        try {
+            $flow = json_decode($flowRulesRaw, true, 512, JSON_THROW_ON_ERROR);
+        } catch (\JsonException) {
+            return '';
+        }
+
+        $apiUrls = [];
+        foreach ($flow['responses'] ?? [] as $response) {
+            $type = $response['type'] ?? null;
+            $url = $response['meta']['url'] ?? null;
+            $method = $response['meta']['method'] ?? 'GET';
+            if ('api' === $type && \is_string($url) && '' !== trim($url)) {
+                $apiUrls[] = ['url' => trim($url), 'method' => $method, 'label' => $response['label'] ?? ''];
+            }
+        }
+
+        if (empty($apiUrls)) {
+            return '';
+        }
+
+        $maxTotalLength = 16000;
+        $sections = [];
+        $totalLength = 0;
+
+        foreach ($apiUrls as $api) {
+            if ($totalLength >= $maxTotalLength) {
+                break;
+            }
+
+            try {
+                $result = $this->urlContentService->fetchApi($api['url'], $api['method']);
+                if ($result->success && '' !== $result->extractedText) {
+                    $section = sprintf(
+                        "[%s %s] %s:\n%s",
+                        $api['method'],
+                        $api['url'],
+                        $api['label'],
+                        $result->extractedText,
+                    );
+
+                    $remaining = $maxTotalLength - $totalLength;
+                    if (\strlen($section) > $remaining) {
+                        $section = mb_substr($section, 0, $remaining).'... [truncated]';
+                    }
+
+                    $sections[] = $section;
+                    $totalLength += \strlen($section);
+                }
+            } catch (\Throwable $e) {
+                $this->logger->warning('Widget API fetch failed', [
+                    'url' => $api['url'],
+                    'error' => $e->getMessage(),
+                ]);
+            }
+        }
+
+        if (empty($sections)) {
+            return '';
+        }
+
+        return "## Live API Data\nThe following data was fetched from configured API endpoints. Use this data to answer the user's question:\n\n"
+            .implode("\n\n", $sections);
     }
 }
