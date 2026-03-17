@@ -91,14 +91,12 @@
               <span>·</span>
               <span
                 :class="{
-                  'text-green-600 dark:text-green-400':
-                    file.status === 'vectorized' || file.status === 'processed',
+                  'text-green-600 dark:text-green-400': file.status === 'vectorized',
                   'text-yellow-600 dark:text-yellow-400': file.status === 'extracted',
                   'text-gray-500 dark:text-gray-400': file.status === 'uploaded',
-                  'text-red-600 dark:text-red-400': file.status === 'error',
                 }"
               >
-                {{ $t(`files.status_${file.status}`) }}
+                {{ file.status }}
               </span>
             </div>
           </div>

@@ -345,7 +345,11 @@ class WidgetPublicController extends AbstractController
                 }
             }
 
+            // Increment session message count and update last message preview
+            // Only increment message count for AI mode (human messages don't count against limits)
             if (!$isHumanMode) {
+                $this->sessionService->incrementMessageCount($session);
+                // Save user message as last message preview
                 $session->setLastMessagePreview($data['text']);
                 $this->em->flush();
             }
@@ -612,11 +616,12 @@ class WidgetPublicController extends AbstractController
                     $this->em->persist($outgoingMessage);
                     $this->em->flush();
 
-                    // Increment message count only AFTER successful AI response
-                    // (prevents consuming a message slot when processing fails)
-                    $this->em->refresh($session);
-                    $session->setLastMessagePreview($responseText);
-                    $this->sessionService->incrementMessageCount($session);
+                    // Update session's last message time and preview with AI response
+                    // Re-fetch session to ensure it's managed by the EntityManager
+                    $currentSession = $this->sessionService->getOrCreateSession($widgetId, $session->getSessionId());
+                    $currentSession->setLastMessage(time());
+                    $currentSession->setLastMessagePreview($responseText);
+                    $this->em->flush();
 
                     // Publish event for AI response (so admin panel receives it in real-time)
                     $this->eventCache->publish($widgetId, $session->getSessionId(), 'message', [
@@ -628,7 +633,7 @@ class WidgetPublicController extends AbstractController
                     ]);
 
                     // Generate AI title after 5 user messages (async, non-blocking)
-                    $this->sessionService->generateTitleIfNeeded($session, $owner->getId());
+                    $this->sessionService->generateTitleIfNeeded($currentSession, $owner->getId());
 
                     $this->rateLimitService->recordUsage($owner, 'MESSAGES', [
                         'provider' => $responseMetadata['provider'] ?? null,
@@ -643,7 +648,6 @@ class WidgetPublicController extends AbstractController
                     $this->sendSse('complete', [
                         'messageId' => $incomingMessage->getId(),
                         'chatId' => $chat->getId(),
-                        'messageCount' => $session->getMessageCount(),
                         'metadata' => [
                             'response' => $responseMetadata,
                             'classification' => $result['classification'] ?? null,
@@ -664,6 +668,9 @@ class WidgetPublicController extends AbstractController
                     try {
                         $incomingMessage->setStatus('failed');
                         $this->em->flush();
+
+                        // Decrement session message count on failure so user can retry
+                        $this->sessionService->decrementMessageCount($session);
                     } catch (\Throwable $flushException) {
                         // EntityManager might be closed after database error
                         $this->logger->warning('Could not update message status after error', [
@@ -672,7 +679,12 @@ class WidgetPublicController extends AbstractController
                     }
 
                     $this->sendSse('error', [
-                        'error' => 'Sorry, something went wrong. Please try again.',
+                        'error' => 'Failed to process message',
+                        'details' => [
+                            'message' => $e->getMessage(),
+                            'file' => $e->getFile(),
+                            'line' => $e->getLine(),
+                        ],
                     ]);
                 }
             });
@@ -684,6 +696,9 @@ class WidgetPublicController extends AbstractController
 
             return $response;
         } catch (\Exception $e) {
+            // Decrement session message count on failure so user can retry
+            $this->sessionService->decrementMessageCount($session);
+
             $this->logger->error('Widget message failed', [
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString(),

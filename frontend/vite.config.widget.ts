@@ -86,13 +86,14 @@ export default defineConfig(({ mode }) => ({
         ? {
             include: 'src/**',
             exclude: ['node_modules/**', 'dist-widget/**'],
-            // Debounce rebuilds when multiple files change at once (ms)
-            buildDelay: 500,
-            // Chokidar options for file system polling in Docker bind mounts.
-            // Keep config minimal to limit memory growth (see #515).
+            // Chokidar options for file system polling in Docker
             chokidar: {
               usePolling: true,
-              interval: 2000,
+              interval: 1000,
+              awaitWriteFinish: {
+                stabilityThreshold: 100,
+                pollInterval: 100,
+              },
             },
           }
         : null,

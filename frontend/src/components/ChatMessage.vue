@@ -222,7 +222,7 @@
         </div>
 
         <!-- Bubble content (only non-thinking parts) -->
-        <div class="px-4 py-3 overflow-x-clip overflow-y-visible space-y-3">
+        <div class="px-4 py-3 overflow-hidden space-y-3">
           <!-- Combined Badges: Files + Web Search + Tool (NEW) -->
           <div v-if="(files && files.length > 0) || webSearch || tool" class="space-y-2">
             <!-- Show badges with smart collapsing -->
@@ -741,7 +741,6 @@ interface Props {
   provider?: string
   modelLabel?: string
   topic?: string // Topic from message classification
-  originalTopic?: string | null // Original classification topic preserved on error messages
   againData?: AgainData
   backendMessageId?: number
   processingStatus?: string
@@ -955,23 +954,12 @@ const displayProvider = computed(() => {
   return props.provider || 'OpenAI'
 })
 
-// Determine model type based on message topic and content
+// Determine model type based on message content
 const hasImageContent = computed(() => props.parts.some((p) => p.type === 'image'))
 const hasVideoContent = computed(() => props.parts.some((p) => p.type === 'video'))
 const hasAudioContent = computed(() => props.parts.some((p) => p.type === 'audio'))
 
-const effectiveTopic = computed(() => {
-  if (props.topic === 'ERROR' && props.originalTopic) return props.originalTopic
-  return props.topic
-})
-
-const isVisionResponse = computed(() => {
-  const topic = effectiveTopic.value?.toLowerCase()
-  return topic === 'analyzefile' || topic === 'pic2text'
-})
-
 const mediaHint = computed(() => {
-  if (isVisionResponse.value) return 'vision' as const
   if (hasImageContent.value) return 'image' as const
   if (hasVideoContent.value) return 'video' as const
   if (hasAudioContent.value) return 'audio' as const
@@ -980,7 +968,6 @@ const mediaHint = computed(() => {
 
 // Dynamic label for model badge based on content type
 const getModelTypeLabel = computed(() => {
-  if (isVisionResponse.value) return 'Vision Model'
   if (hasImageContent.value) return 'Image Model'
   if (hasVideoContent.value) return 'Video Model'
   if (hasAudioContent.value) return 'Audio Model'
@@ -989,7 +976,6 @@ const getModelTypeLabel = computed(() => {
 
 // Dynamic icon for model badge
 const getModelTypeIcon = computed(() => {
-  if (isVisionResponse.value) return 'mdi:eye'
   if (hasImageContent.value) return 'mdi:image'
   if (hasVideoContent.value) return 'mdi:video'
   if (hasAudioContent.value) return 'mdi:music'
@@ -998,7 +984,6 @@ const getModelTypeIcon = computed(() => {
 
 // Dynamic title for model badge
 const getModelTypeTitle = computed(() => {
-  if (isVisionResponse.value) return 'Vision (Image → Text)'
   if (hasImageContent.value) return 'Image Generation (Text → Image)'
   if (hasVideoContent.value) return 'Video Generation (Text → Video)'
   if (hasAudioContent.value) return 'Audio Generation (Text → Audio)'
@@ -1063,13 +1048,17 @@ const selectedModel = computed(() => predictedModel.value)
 // Navigate to AI models configuration with highlight
 const showModelDetails = (modelType?: 'chat' | 'sorting') => {
   if (modelType === 'chat') {
-    const capabilityMap: Record<string, string> = {
-      vision: 'PIC2TEXT',
-      image: 'TEXT2PIC',
-      video: 'TEXT2VID',
-      audio: 'TEXT2SOUND',
+    // Determine the correct capability based on content type
+    let capability = 'CHAT'
+
+    if (hasImageContent.value) {
+      capability = 'TEXT2PIC'
+    } else if (hasVideoContent.value) {
+      capability = 'TEXT2VID'
+    } else if (hasAudioContent.value) {
+      capability = 'TEXT2SOUND'
     }
-    const capability = capabilityMap[mediaHint.value ?? ''] ?? 'CHAT'
+
     router.push({ path: '/config/ai-models', query: { highlight: capability } })
   } else if (modelType === 'sorting') {
     router.push({ path: '/config/ai-models', query: { highlight: 'SORT' } })

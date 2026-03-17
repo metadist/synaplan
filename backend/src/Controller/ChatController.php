@@ -581,8 +581,6 @@ class ChatController extends AbstractController
                 $filePath = $this->dataUrlFixer->ensureFileOnDisk($m);
             }
 
-            $originalTopic = $m->getMeta('original_topic');
-
             return [
                 'id' => $m->getId(),
                 'text' => $m->getText(),
@@ -590,7 +588,6 @@ class ChatController extends AbstractController
                 'timestamp' => $m->getUnixTimestamp(),
                 'provider' => $m->getProviderIndex(),
                 'topic' => $m->getTopic(),
-                'originalTopic' => $originalTopic,
                 'language' => $m->getLanguage(),
                 'createdAt' => $m->getDateTime(),
                 'files' => $filesData, // Attached files (user uploads)
@@ -676,7 +673,6 @@ class ChatController extends AbstractController
                 'timestamp' => $m->getUnixTimestamp(),
                 'provider' => $m->getProviderIndex(),
                 'topic' => $m->getTopic(),
-                'originalTopic' => $m->getMeta('original_topic'),
                 'language' => $m->getLanguage(),
             ];
 

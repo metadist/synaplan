@@ -72,11 +72,11 @@ class PromptRepository extends ServiceEntityRepository
 
     /**
      * Get all topics with their descriptions for sorting prompt.
-     * Neither system nor user prompts are filtered by language.
-     * The $lang parameter is kept for backward compatibility but ignored.
+     * System prompts (ownerId=0) are NOT filtered by language -- always included.
+     * User prompts are filtered by language.
      *
      * @param int      $ownerId      Owner ID (0 for system)
-     * @param string   $lang         Language code (kept for API compat, not used)
+     * @param string   $lang         Language code (applied to user prompts only)
      * @param int|null $userId       User ID for including user-specific prompts
      * @param bool     $excludeTools Exclude tool topics (tools:*) from result
      *
@@ -84,6 +84,7 @@ class PromptRepository extends ServiceEntityRepository
      */
     public function getTopicsWithDescriptions(int $ownerId = 0, string $lang = 'en', ?int $userId = null, bool $excludeTools = true): array
     {
+        // System/owner prompts: always included regardless of language
         $sysQb = $this->createQueryBuilder('p')
             ->select('p.topic', 'p.shortDescription', 'p.ownerId')
             ->where('p.ownerId = :ownerId')
@@ -96,12 +97,18 @@ class PromptRepository extends ServiceEntityRepository
 
         $systemPrompts = $sysQb->getQuery()->getResult();
 
+        // User prompts: filtered by language (unless $lang is empty, then include all)
         $userPrompts = [];
         if (null !== $userId && $userId > 0) {
             $userQb = $this->createQueryBuilder('p')
                 ->select('p.topic', 'p.shortDescription', 'p.ownerId')
                 ->where('p.ownerId = :userId')
                 ->setParameter('userId', $userId);
+
+            if ('' !== $lang) {
+                $userQb->andWhere('p.language = :lang')
+                    ->setParameter('lang', $lang);
+            }
 
             if ($excludeTools) {
                 $userQb->andWhere('p.topic NOT LIKE :toolsPrefix')
@@ -115,6 +122,7 @@ class PromptRepository extends ServiceEntityRepository
         $seen = [];
         $result = [];
 
+        // Add user prompts first (they take priority)
         foreach ($userPrompts as $p) {
             if (!isset($seen[$p['topic']])) {
                 $result[] = [
@@ -125,6 +133,7 @@ class PromptRepository extends ServiceEntityRepository
             }
         }
 
+        // Then add system prompts (only if not already overridden)
         foreach ($systemPrompts as $p) {
             if (!isset($seen[$p['topic']])) {
                 $result[] = [
@@ -162,17 +171,17 @@ class PromptRepository extends ServiceEntityRepository
 
     /**
      * Get all user-accessible prompts (global + user-specific).
-     * System prompts (ownerId=0) are always included.
-     * User prompts are NOT filtered by language -- an override applies regardless of UI language.
-     * The $lang parameter is kept for backward compatibility but ignored.
+     * System prompts (ownerId=0) are NOT filtered by language -- they are always included.
+     * User prompts are filtered by language so only the user's current-language prompts appear.
      *
      * @param int    $userId User ID
-     * @param string $lang   Language code (kept for API compat, not used for filtering)
+     * @param string $lang   Language code (applied to user prompts only)
      *
      * @return Prompt[]
      */
     public function findAllForUser(int $userId, string $lang = 'en'): array
     {
+        // System prompts: always included regardless of language
         $systemPrompts = $this->createQueryBuilder('p')
             ->where('p.ownerId = 0')
             ->andWhere('p.topic NOT LIKE :toolsPrefix')
@@ -181,10 +190,13 @@ class PromptRepository extends ServiceEntityRepository
             ->getQuery()
             ->getResult();
 
+        // User prompts: filtered by language
         $userPrompts = $this->createQueryBuilder('p')
             ->where('p.ownerId = :userId')
+            ->andWhere('p.language = :lang')
             ->andWhere('p.topic NOT LIKE :toolsPrefix')
             ->setParameter('userId', $userId)
+            ->setParameter('lang', $lang)
             ->setParameter('toolsPrefix', 'tools:%')
             ->orderBy('p.topic', 'ASC')
             ->getQuery()
@@ -204,16 +216,17 @@ class PromptRepository extends ServiceEntityRepository
 
     /**
      * Get prompts with selection rules for automatic routing during sorting.
-     * Neither system nor user prompts are filtered by language.
-     * The $lang parameter is kept for backward compatibility but ignored.
+     * System prompts (ownerId=0) are NOT filtered by language -- always included.
+     * User prompts are filtered by language.
      *
      * @param int    $userId User ID
-     * @param string $lang   Language code (kept for API compat, not used)
+     * @param string $lang   Language code (applied to user prompts only)
      *
      * @return Prompt[]
      */
     public function findPromptsWithSelectionRules(int $userId, string $lang = 'en'): array
     {
+        // System prompts: always included regardless of language
         $systemPrompts = $this->createQueryBuilder('p')
             ->where('p.ownerId = 0')
             ->andWhere('p.topic NOT LIKE :toolsPrefix')
@@ -224,14 +237,22 @@ class PromptRepository extends ServiceEntityRepository
             ->getQuery()
             ->getResult();
 
-        $userPrompts = $this->createQueryBuilder('p')
+        // User prompts: filtered by language (unless $lang is empty, then include all)
+        $userQb = $this->createQueryBuilder('p')
             ->where('p.ownerId = :userId')
             ->andWhere('p.topic NOT LIKE :toolsPrefix')
             ->andWhere('p.selectionRules IS NOT NULL')
             ->andWhere('p.selectionRules != :empty')
             ->setParameter('userId', $userId)
             ->setParameter('toolsPrefix', 'tools:%')
-            ->setParameter('empty', '')
+            ->setParameter('empty', '');
+
+        if ('' !== $lang) {
+            $userQb->andWhere('p.language = :lang')
+                ->setParameter('lang', $lang);
+        }
+
+        $userPrompts = $userQb
             ->getQuery()
             ->getResult();
 

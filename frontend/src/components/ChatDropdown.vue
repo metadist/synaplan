@@ -317,7 +317,7 @@ const hasMoreChats = computed(() => {
 })
 
 const handleChatItemClick = (chatId: number) => {
-  chatsStore.setActiveChat(chatId)
+  chatsStore.activeChatId = chatId
   if (route.path !== '/') {
     router.push('/')
   }

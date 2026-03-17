@@ -2,28 +2,27 @@ import { test, expect } from '@playwright/test'
 import { loginViaOidcRedirect } from '../helpers/auth'
 import { selectors } from '../helpers/selectors'
 
-test.describe('@ci @oidc @oidc-redirect OIDC Auto-Redirect', () => {
-  test('@auth should auto-redirect to Keycloak on login page', async ({ page }) => {
-    await test.step('Act: trigger OIDC auto-redirect login', async () => {
-      await loginViaOidcRedirect(page)
-    })
-
-    await test.step('Assert: chat input is visible after redirect', async () => {
-      await expect(page.locator(selectors.chat.textInput)).toBeVisible({ timeout: 10_000 })
-    })
+test.describe('@oidc @oidc-redirect auto-redirect', () => {
+  test('@ci @oidc @oidc-redirect @auth should auto-redirect to Keycloak on login page', async ({
+    page,
+  }) => {
+    await loginViaOidcRedirect(page)
+    await expect(page.locator(selectors.chat.textInput)).toBeVisible({ timeout: 10_000 })
   })
 
-  test('@auth should not redirect on session_expired', async ({ page }) => {
-    await test.step('Act: navigate to login with session_expired reason', async () => {
-      await page.goto('/login?reason=session_expired')
-    })
+  test('@ci @oidc @oidc-redirect @auth should not redirect on session_expired', async ({
+    page,
+  }) => {
+    await page.goto('/login?reason=session_expired')
 
-    await test.step('Assert: session expired section shown with manual SSO button', async () => {
-      const sessionExpiredSection = page.locator(selectors.oidc.sessionExpiredSection)
-      await expect(sessionExpiredSection).toBeVisible({ timeout: 10_000 })
+    // Should show session expired section with manual SSO button, not auto-redirect
+    const sessionExpiredSection = page.locator(selectors.oidc.sessionExpiredSection)
+    await expect(sessionExpiredSection).toBeVisible({ timeout: 10_000 })
 
-      await expect(page.locator(selectors.login.email)).not.toBeVisible()
-      await expect(page.locator(selectors.oidc.keycloakButton)).toBeVisible()
-    })
+    // Password form should still be hidden
+    await expect(page.locator(selectors.login.email)).not.toBeVisible()
+
+    // Manual SSO button should be available
+    await expect(page.locator(selectors.oidc.keycloakButton)).toBeVisible()
   })
 })

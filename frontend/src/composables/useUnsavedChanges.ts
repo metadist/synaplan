@@ -12,10 +12,11 @@ export function useUnsavedChanges<T>(formData: Ref<T>, originalData: Ref<T>) {
 
   const hasUnsavedChanges = ref(false)
 
+  // Watch for changes in form data
   watch(
-    [formData, originalData],
-    ([newForm, newOriginal]) => {
-      hasUnsavedChanges.value = JSON.stringify(newForm) !== JSON.stringify(newOriginal)
+    formData,
+    (newVal) => {
+      hasUnsavedChanges.value = JSON.stringify(newVal) !== JSON.stringify(originalData.value)
     },
     { deep: true }
   )

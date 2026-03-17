@@ -3,7 +3,6 @@
   <div
     class="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-2 lg:p-4"
     data-testid="modal-widget-creation"
-    @click.self="handleClose"
   >
     <div
       class="surface-card rounded-xl lg:rounded-2xl w-full max-w-6xl max-h-[95vh] lg:max-h-[90vh] overflow-hidden flex flex-col shadow-2xl"
@@ -680,7 +679,6 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onBeforeUnmount, watch } from 'vue'
 import { Icon } from '@iconify/vue'
-import { useEscapeKey } from '@/composables/useEscapeKey'
 import { useConfigStore } from '@/stores/config'
 import ChatWidget from '@/components/widgets/ChatWidget.vue'
 import * as widgetsApi from '@/services/api/widgetsApi'
@@ -983,8 +981,6 @@ const handleClose = async () => {
   await cleanupPreview()
   emit('close')
 }
-
-useEscapeKey(handleClose)
 
 const loadTaskPrompts = async () => {
   try {

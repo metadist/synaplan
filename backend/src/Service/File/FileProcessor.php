@@ -42,7 +42,7 @@ final readonly class FileProcessor
         'image/webp',
     ];
 
-    private const TRANSCRIBABLE_MEDIA_EXTENSIONS = [
+    private const AUDIO_EXTENSIONS = [
         'ogg', 'mp3', 'wav', 'm4a', 'opus', 'flac', 'webm', 'aac', 'wma', 'amr',
         'mp4', 'avi', 'mov', 'mkv', 'mpeg', 'mpg',
     ];
@@ -127,8 +127,8 @@ final readonly class FileProcessor
             return $this->extractFromImage($relativePath, $userId, $meta);
         }
 
-        // Strategy 3: Audio/Video files -> Whisper transcription
-        if ($this->isTranscribableMedia($ext)) {
+        // Strategy 3: Audio/Video files -> Whisper.cpp
+        if ($this->isAudioExtension($ext)) {
             return $this->extractFromAudio($absolutePath, $meta, $userId);
         }
 
@@ -366,11 +366,11 @@ final readonly class FileProcessor
     }
 
     /**
-     * Check if the file extension is a media type from which audio can be extracted for transcription.
+     * Check if file extension is audio/video.
      */
-    private function isTranscribableMedia(string $ext): bool
+    private function isAudioExtension(string $ext): bool
     {
-        return in_array($ext, self::TRANSCRIBABLE_MEDIA_EXTENSIONS, true);
+        return in_array($ext, self::AUDIO_EXTENSIONS, true);
     }
 
     /**
@@ -396,27 +396,24 @@ final readonly class FileProcessor
                 $text = $result['text'] ?? '';
                 $text = $this->textCleaner->clean($text);
 
-                if (!empty(trim($text))) {
-                    $this->logger->info('FileProcessor: Local Whisper transcription success', [
-                        'strategy' => 'whisper_local',
-                        'bytes' => strlen($text),
-                        'language' => $result['language'] ?? 'unknown',
-                        'duration' => $result['duration'] ?? 0,
-                    ]);
+                $this->logger->info('FileProcessor: Local Whisper transcription success', [
+                    'strategy' => 'whisper_local',
+                    'bytes' => strlen($text),
+                    'language' => $result['language'] ?? 'unknown',
+                    'duration' => $result['duration'] ?? 0,
+                ]);
 
-                    return [$text, [
-                        'strategy' => 'whisper_local',
-                        'language' => $result['language'] ?? 'unknown',
-                        'duration' => $result['duration'] ?? 0,
-                        'model' => $result['model'] ?? 'base',
-                    ] + $baseMeta];
-                }
-
-                $this->logger->warning('FileProcessor: Local Whisper returned empty text, trying external API', $baseMeta);
+                return [$text, [
+                    'strategy' => 'whisper_local',
+                    'language' => $result['language'] ?? 'unknown',
+                    'duration' => $result['duration'] ?? 0,
+                    'model' => $result['model'] ?? 'base',
+                ] + $baseMeta];
             } catch (\Throwable $e) {
                 $this->logger->warning('FileProcessor: Local Whisper failed, trying external API', [
                     'error' => $e->getMessage(),
                 ] + $baseMeta);
+                // Fall through to external API
             }
         }
 

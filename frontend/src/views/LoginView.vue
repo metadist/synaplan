@@ -275,6 +275,9 @@
         </a>
       </p>
     </div>
+
+    <!-- GDPR Cookie Consent Banner -->
+    <CookieConsent @consent="handleCookieConsent" />
   </div>
 </template>
 
@@ -287,7 +290,10 @@ import { useTheme } from '../composables/useTheme'
 import { useAuth } from '../composables/useAuth'
 import { useRecaptcha } from '../composables/useRecaptcha'
 import { validateEmail } from '../composables/usePasswordValidation'
+import { useGoogleTag } from '../composables/useGoogleTag'
 import Button from '../components/Button.vue'
+import CookieConsent from '../components/CookieConsent.vue'
+import { type CookieConsent as CookieConsentType } from '../composables/useCookieConsent'
 import { useConfigStore } from '@/stores/config'
 
 const router = useRouter()
@@ -332,6 +338,16 @@ const toggleTheme = () => {
 const { login, error: authError, loading, clearError } = useAuth()
 const emailError = ref('')
 const sessionExpiredMessage = ref('')
+
+// Google Tag tracking (only injects if enabled, configured, AND user consented - GDPR)
+const { injectGoogleTag } = useGoogleTag()
+
+// Handle cookie consent - inject Google Tag only after user accepts
+const handleCookieConsent = (consent: CookieConsentType) => {
+  if (consent.analytics) {
+    injectGoogleTag()
+  }
+}
 
 // Computed error to show either auth error or session expired message
 const error = computed(() => sessionExpiredMessage.value || authError.value)

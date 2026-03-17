@@ -190,7 +190,6 @@ export interface SendWidgetMessageResult {
   chatId: number
   metadata?: unknown
   remainingUploads?: number | null
-  messageCount?: number | null
   text: string
 }
 
@@ -257,7 +256,6 @@ export async function sendWidgetMessage(
   let finalChatId: number | null = null
   let metadata: unknown = null
   let remainingUploads: number | null = null
-  let serverMessageCount: number | null = null
   let completed = false
   let aggregatedText = ''
 
@@ -304,9 +302,6 @@ export async function sendWidgetMessage(
       metadata = data.metadata ?? metadata
       if (typeof data.remainingUploads === 'number') {
         remainingUploads = data.remainingUploads
-      }
-      if (typeof data.messageCount === 'number') {
-        serverMessageCount = data.messageCount
       }
       if (onStatus) {
         onStatus(data)
@@ -389,7 +384,6 @@ export async function sendWidgetMessage(
     chatId: finalChatId,
     metadata,
     remainingUploads,
-    messageCount: serverMessageCount,
     text: aggregatedText,
   }
 }

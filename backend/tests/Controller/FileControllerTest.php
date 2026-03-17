@@ -4,6 +4,7 @@ namespace App\Tests\Controller;
 
 use App\Entity\User;
 use App\Repository\UserRepository;
+use App\Service\TokenService;
 use App\Tests\Trait\AuthenticatedTestTrait;
 use Symfony\Bundle\FrameworkBundle\Test\WebTestCase;
 use Symfony\Component\HttpFoundation\File\UploadedFile;
@@ -13,7 +14,6 @@ class FileControllerTest extends WebTestCase
     use AuthenticatedTestTrait;
 
     private $client;
-    private $em;
     private User $testUser;
     private string $authToken;
 
@@ -21,8 +21,8 @@ class FileControllerTest extends WebTestCase
     {
         self::ensureKernelShutdown();
         $this->client = static::createClient();
-        $this->em = $this->client->getContainer()->get('doctrine')->getManager();
 
+        // Get test user and authenticate
         $userRepository = $this->client->getContainer()->get(UserRepository::class);
         $this->testUser = $userRepository->findOneBy(['mail' => 'admin@synaplan.com']);
 
@@ -30,31 +30,13 @@ class FileControllerTest extends WebTestCase
             $this->markTestSkipped('Test user not found. Run fixtures first.');
         }
 
+        // Generate access token using TokenService
         $this->authToken = $this->authenticateClient($this->client, $this->testUser);
-    }
-
-    protected function tearDown(): void
-    {
-        if (isset($this->testUser)) {
-            if (!$this->em || !$this->em->isOpen()) {
-                self::bootKernel();
-                $this->em = self::getContainer()->get('doctrine')->getManager();
-            }
-
-            $files = $this->em->getRepository(\App\Entity\File::class)
-                ->findBy(['userId' => $this->testUser->getId()]);
-            foreach ($files as $file) {
-                $this->em->remove($file);
-            }
-            $this->em->flush();
-        }
-
-        static::ensureKernelShutdown();
-        parent::tearDown();
     }
 
     public function testUploadSingleTextFile(): void
     {
+        // Create test file
         $testFile = $this->createTestFile('test.txt', 'This is a test file with some content for extraction.');
 
         $uploadedFile = new UploadedFile(
@@ -62,7 +44,7 @@ class FileControllerTest extends WebTestCase
             'test.txt',
             'text/plain',
             null,
-            true
+            true // test mode
         );
 
         $this->client->request('POST', '/api/v1/files/upload', [
@@ -153,7 +135,6 @@ class FileControllerTest extends WebTestCase
         $this->assertEquals(200, $response->getStatusCode());
 
         $data = json_decode($response->getContent(), true);
-
         $this->assertTrue($data['success']);
         $this->assertArrayHasKey('extracted_text_length', $data['files'][0]);
         $this->assertEquals('vectorize', $data['process_level'], 'Invalid process level should default to vectorize');
@@ -194,6 +175,7 @@ class FileControllerTest extends WebTestCase
 
     public function testListFiles(): void
     {
+        // First upload a file
         $testFile = $this->createTestFile('list_test.txt', 'Content for listing test');
         $uploadedFile = new UploadedFile($testFile, 'list_test.txt', 'text/plain', null, true);
 
@@ -205,6 +187,7 @@ class FileControllerTest extends WebTestCase
             'HTTP_AUTHORIZATION' => 'Bearer '.$this->authToken,
         ]);
 
+        // Now list files
         $this->client->request('GET', '/api/v1/files', [], [], [
             'HTTP_AUTHORIZATION' => 'Bearer '.$this->authToken,
         ]);
@@ -222,6 +205,7 @@ class FileControllerTest extends WebTestCase
 
     public function testListFilesWithGroupFilter(): void
     {
+        // Upload file with specific group
         $testFile = $this->createTestFile('filtered.txt', 'Filtered content');
         $uploadedFile = new UploadedFile($testFile, 'filtered.txt', 'text/plain', null, true);
 
@@ -233,6 +217,7 @@ class FileControllerTest extends WebTestCase
             'HTTP_AUTHORIZATION' => 'Bearer '.$this->authToken,
         ]);
 
+        // List files with group filter
         $this->client->request('GET', '/api/v1/files?group_key=FILTER_TEST_UNIQUE', [], [], [
             'HTTP_AUTHORIZATION' => 'Bearer '.$this->authToken,
         ]);
@@ -246,6 +231,7 @@ class FileControllerTest extends WebTestCase
 
     public function testDeleteFile(): void
     {
+        // First upload a file
         $testFile = $this->createTestFile('delete_test.txt', 'To be deleted');
         $uploadedFile = new UploadedFile($testFile, 'delete_test.txt', 'text/plain', null, true);
 
@@ -260,6 +246,7 @@ class FileControllerTest extends WebTestCase
         $uploadResponse = json_decode($this->client->getResponse()->getContent(), true);
         $fileId = $uploadResponse['files'][0]['id'];
 
+        // Now delete it
         $this->client->request('DELETE', '/api/v1/files/'.$fileId, [], [], [
             'HTTP_AUTHORIZATION' => 'Bearer '.$this->authToken,
         ]);
@@ -280,6 +267,8 @@ class FileControllerTest extends WebTestCase
         $response = $this->client->getResponse();
         $this->assertEquals(404, $response->getStatusCode());
     }
+
+    // Helper methods
 
     private function createTestFile(string $filename, string $content): string
     {

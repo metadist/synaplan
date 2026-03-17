@@ -379,7 +379,7 @@ class ConfigController extends AbstractController
         }
 
         $models = $this->modelRepository->findBy(
-            ['active' => 1],
+            ['active' => 1, 'selectable' => 1],
             ['quality' => 'DESC', 'rating' => 'DESC']
         );
 

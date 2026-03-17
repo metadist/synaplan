@@ -554,19 +554,7 @@ class AiFacade
     {
         $providerName = $options['provider'] ?? null;
 
-        // Resolve provider and model from user's TEXT2SOUND config (same as synthesizeStream)
-        if ($userId > 0) {
-            $ttsModelId = $this->modelConfig->getDefaultModel('TEXT2SOUND', $userId);
-            if ($ttsModelId) {
-                if (!$providerName) {
-                    $providerName = $this->modelConfig->getProviderForModel($ttsModelId);
-                }
-                if (!isset($options['model'])) {
-                    $options['model'] = $this->modelConfig->getModelName($ttsModelId);
-                }
-            }
-        }
-
+        // Wenn kein Provider explizit angegeben, nutze User-Konfiguration
         if (!$providerName && $userId > 0) {
             $providerName = $this->modelConfig->getDefaultProvider($userId, 'text_to_speech');
         }

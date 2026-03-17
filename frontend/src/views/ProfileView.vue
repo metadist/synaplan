@@ -7,12 +7,7 @@
           <p class="txt-secondary">{{ $t('profile.subtitle') }}</p>
         </div>
 
-        <form
-          class="space-y-6"
-          autocomplete="off"
-          data-testid="comp-profile-form"
-          @submit.prevent="handleSave"
-        >
+        <form class="space-y-6" data-testid="comp-profile-form" @submit.prevent="handleSave">
           <section class="surface-card rounded-lg p-6" data-testid="section-personal">
             <h2 class="text-xl font-semibold txt-primary mb-6 flex items-center gap-2">
               <Icon icon="mdi:account" class="w-5 h-5" />
@@ -322,7 +317,6 @@
                 <input
                   v-model="passwordData.current"
                   type="password"
-                  autocomplete="current-password"
                   class="w-full px-4 py-2.5 rounded-lg bg-chat border border-light-border/30 dark:border-dark-border/20 txt-primary focus:ring-2 focus:ring-[var(--brand)] focus:outline-none"
                   :placeholder="$t('profile.changePassword.currentPasswordPlaceholder')"
                   data-testid="input-current-password"
@@ -336,7 +330,6 @@
                 <input
                   v-model="passwordData.new"
                   type="password"
-                  autocomplete="new-password"
                   class="w-full px-4 py-2.5 rounded-lg bg-chat border border-light-border/30 dark:border-dark-border/20 txt-primary focus:ring-2 focus:ring-[var(--brand)] focus:outline-none"
                   :placeholder="$t('profile.changePassword.newPasswordPlaceholder')"
                   data-testid="input-new-password"
@@ -353,7 +346,6 @@
                 <input
                   v-model="passwordData.confirm"
                   type="password"
-                  autocomplete="new-password"
                   class="w-full px-4 py-2.5 rounded-lg bg-chat border border-light-border/30 dark:border-dark-border/20 txt-primary focus:ring-2 focus:ring-[var(--brand)] focus:outline-none"
                   :placeholder="$t('profile.changePassword.confirmPasswordPlaceholder')"
                   data-testid="input-confirm-password"

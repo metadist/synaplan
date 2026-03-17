@@ -24,9 +24,7 @@
                 <span class="pill px-2 py-0.5">{{
                   fileData?.file_type?.toUpperCase() || 'N/A'
                 }}</span>
-                <span class="pill px-2 py-0.5">{{
-                  fileData?.status ? $t(`files.status_${fileData.status}`) : ''
-                }}</span>
+                <span class="pill px-2 py-0.5">{{ fileData?.status }}</span>
                 <span>{{ fileData?.uploaded_date }}</span>
               </div>
             </div>
@@ -159,9 +157,8 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, toRef } from 'vue'
+import { ref, computed, watch } from 'vue'
 import { getFileContent } from '@/services/filesService'
-import { useEscapeKey } from '@/composables/useEscapeKey'
 import { useNotification } from '@/composables/useNotification'
 
 interface Props {
@@ -237,8 +234,6 @@ const close = () => {
     error.value = null
   }, 300)
 }
-
-useEscapeKey(close, toRef(props, 'isOpen'))
 
 const copyToClipboard = async () => {
   if (!fileData.value?.extracted_text) return

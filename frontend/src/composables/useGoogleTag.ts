@@ -166,41 +166,10 @@ export const useGoogleTag = () => {
     }
   }
 
-  /**
-   * Track a page view
-   */
-  const trackPageView = (path: string, title?: string) => {
-    if (!config.googleTag.enabled || !config.googleTag.tagId || !hasAnalyticsConsent()) {
-      return
-    }
-
-    if (typeof window !== 'undefined') {
-      if (typeof (window as unknown as { gtag?: unknown }).gtag === 'function') {
-        // Google Analytics 4
-        ;(
-          window as unknown as {
-            gtag: (command: string, targetId: string, config?: Record<string, unknown>) => void
-          }
-        ).gtag('event', 'page_view', {
-          page_path: path,
-          page_title: title || document.title,
-        })
-      } else if (Array.isArray((window as unknown as { dataLayer?: unknown[] }).dataLayer)) {
-        // Google Tag Manager
-        ;(window as unknown as { dataLayer: unknown[] }).dataLayer.push({
-          event: 'page_view',
-          page_path: path,
-          page_title: title || document.title,
-        })
-      }
-    }
-  }
-
   return {
     injectGoogleTag,
     removeGoogleTag,
     trackEvent,
-    trackPageView,
   }
 }
 

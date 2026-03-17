@@ -12,17 +12,6 @@ use Symfony\Contracts\HttpClient\HttpClientInterface;
 
 class PiperProvider implements TextToSpeechProviderInterface
 {
-    private const LANGUAGE_VOICE_MAP = [
-        'en' => 'en_US-lessac-medium',
-        'de' => 'de_DE-thorsten-medium',
-        'es' => 'es_ES-davefx-medium',
-        'tr' => 'tr_TR-dfki-medium',
-        'ru' => 'ru_RU-irina-medium',
-        'fa' => 'fa_IR-reza_ibrahim-medium',
-    ];
-
-    private const DEFAULT_VOICE = 'en_US-lessac-medium';
-
     public function __construct(
         private HttpClientInterface $httpClient,
         private string $ttsUrl,
@@ -32,9 +21,11 @@ class PiperProvider implements TextToSpeechProviderInterface
         private string $tempDir,
         private string $uploadDir,
     ) {
+        // Ensure temp dir exists
         if (!$this->filesystem->exists($this->tempDir)) {
             $this->filesystem->mkdir($this->tempDir);
         }
+        // Ensure upload dir exists
         if (!$this->filesystem->exists($this->uploadDir)) {
             $this->filesystem->mkdir($this->uploadDir);
         }
@@ -116,12 +107,12 @@ class PiperProvider implements TextToSpeechProviderInterface
 
     public function synthesize(string $text, array $options = []): string
     {
-        $voice = $this->resolveVoice($options);
-
+        // 1. Request WAV from Piper
         $response = $this->httpClient->request('POST', $this->ttsUrl.'/api/tts', [
             'json' => [
                 'text' => $text,
-                'voice' => $voice,
+                'voice' => $options['voice'] ?? null,
+                'language' => $options['language'] ?? null,
                 'length_scale' => $options['speed'] ?? 1.0,
             ],
         ]);
@@ -164,12 +155,11 @@ class PiperProvider implements TextToSpeechProviderInterface
 
     public function synthesizeStream(string $text, array $options = []): \Generator
     {
-        $voice = $this->resolveVoice($options);
-
         $response = $this->httpClient->request('GET', $this->ttsUrl.'/api/tts', [
             'query' => [
                 'text' => $text,
-                'voice' => $voice,
+                'voice' => $options['voice'] ?? null,
+                'language' => $options['language'] ?? null,
                 'stream' => 'true',
             ],
             'buffer' => false,
@@ -195,27 +185,5 @@ class PiperProvider implements TextToSpeechProviderInterface
     public function supportsStreaming(): bool
     {
         return true;
-    }
-
-    /**
-     * Resolve the Piper voice name from explicit voice or language code.
-     *
-     * Priority: explicit voice → language-based lookup → default (English).
-     * Handles both short ("de") and locale ("de_DE") language codes.
-     *
-     * @param array<string, mixed> $options
-     */
-    private function resolveVoice(array $options): string
-    {
-        if (!empty($options['voice'])) {
-            return $options['voice'];
-        }
-
-        $language = $options['language'] ?? 'en';
-
-        // Normalize locale codes (e.g. "de_DE" or "de-DE") to short form
-        $shortLang = strtolower(substr($language, 0, 2));
-
-        return self::LANGUAGE_VOICE_MAP[$shortLang] ?? self::DEFAULT_VOICE;
     }
 }

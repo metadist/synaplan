@@ -7,8 +7,7 @@ import LoadingView from '@/views/LoadingView.vue'
 
 const guardSubscription = (_to: any, _from: any, next: any) => {
   const configStore = useConfigStore()
-  const { isAdmin } = useAuth()
-  if (!configStore.billing.enabled || isAdmin.value) {
+  if (!configStore.billing.enabled) {
     next({ name: 'chat' })
   } else {
     next()

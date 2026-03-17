@@ -93,7 +93,6 @@ final readonly class EmailChatService
         $anonymousUser->setType('MAIL'); // EMAIL-based anonymous user
         $anonymousUser->setProviderId('email'); // Identify as email-based
         $anonymousUser->setUserLevel('ANONYMOUS'); // Anonymous users get ANONYMOUS rate limits
-        $anonymousUser->setCreated(date('Y-m-d\TH:i:s'));
 
         $details = [
             'anonymous_email' => $fromEmail,
@@ -188,7 +187,6 @@ final readonly class EmailChatService
         $anonymousUser->setType('WHATSAPP'); // WhatsApp-based anonymous user
         $anonymousUser->setProviderId('whatsapp'); // Identify as WhatsApp-based
         $anonymousUser->setUserLevel('ANONYMOUS'); // Anonymous users get ANONYMOUS rate limits
-        $anonymousUser->setCreated(date('Y-m-d\TH:i:s'));
 
         $details = [
             'anonymous_phone' => $phoneNumber,

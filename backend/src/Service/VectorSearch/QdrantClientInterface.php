@@ -75,15 +75,6 @@ interface QdrantClientInterface
     public function deleteMemory(string $pointId, ?string $namespace = null): void;
 
     /**
-     * Delete all memory points for a user from Qdrant collection.
-     *
-     * @param int $userId User ID whose memories should be deleted
-     *
-     * @return int Number of deleted points
-     */
-    public function deleteAllMemoriesForUser(int $userId): int;
-
-    /**
      * Check if Qdrant service is available.
      */
     public function healthCheck(): bool;

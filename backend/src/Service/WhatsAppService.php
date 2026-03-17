@@ -1679,29 +1679,26 @@ final class WhatsAppService
     /**
      * Convert standard Markdown formatting to WhatsApp-compatible formatting.
      *
-     * WhatsApp formatting reference:
-     * - Bold: *text* (MD uses **text** or __text__)
-     * - Italic: _text_ (MD uses *text*)
-     * - Strikethrough: ~text~ (MD uses ~~text~~)
+     * WhatsApp uses different syntax than standard Markdown:
+     * - Bold: *text* (not **text**)
+     * - Italic: _text_ (not *text*)
+     * - Strikethrough: ~text~ (not ~~text~~)
      * - Monospace: ```text``` or `text` (same as MD)
-     * - Lists: - item or * item (same as MD, but we use • for safety)
-     * - Quotes: > text (same as MD)
-     * - No support for [text](url) links or ![alt](url) images
      *
      * @see https://faq.whatsapp.com/539178204879377
      */
     private function convertToWhatsAppMarkdown(string $text): string
     {
-        // 1. Protect code blocks and strip language identifiers (```python → ```)
+        // Protect code blocks from conversion (they work the same in WhatsApp)
         $codeBlocks = [];
-        $text = preg_replace_callback('/```[^\n`]*\n?([\s\S]*?)```/', function ($match) use (&$codeBlocks) {
+        $text = preg_replace_callback('/```[\s\S]*?```/', function ($match) use (&$codeBlocks) {
             $placeholder = '{{CODE_BLOCK_'.count($codeBlocks).'}}';
-            $codeBlocks[$placeholder] = '```'.$match[1].'```';
+            $codeBlocks[$placeholder] = $match[0];
 
             return $placeholder;
         }, $text);
 
-        // 2. Protect inline code
+        // Protect inline code from conversion
         $inlineCode = [];
         $text = preg_replace_callback('/`[^`]+`/', function ($match) use (&$inlineCode) {
             $placeholder = '{{INLINE_CODE_'.count($inlineCode).'}}';
@@ -1710,66 +1707,24 @@ final class WhatsAppService
             return $placeholder;
         }, $text);
 
-        // 3. Convert image links ![alt](url) → alt text or URL
-        $text = preg_replace('/!\[([^\]]*)\]\(([^)]+)\)/', '$2', $text);
+        // Convert headers to bold (# Header → *Header*)
+        $text = preg_replace('/^#{1,6}\s+(.+)$/m', '*$1*', $text);
 
-        // 4. Convert [text](url) links → "text (url)" or just URL if text matches
-        $text = preg_replace_callback('/\[([^\]]+)\]\(([^)]+)\)/', function ($match) {
-            $linkText = trim($match[1]);
-            $url = trim($match[2]);
-            if ($linkText === $url || empty($linkText)) {
-                return $url;
-            }
+        // Convert **bold** to *bold* (must be done before italic conversion)
+        $text = preg_replace('/\*\*(.+?)\*\*/', '*$1*', $text);
 
-            return $linkText.' ('.$url.')';
-        }, $text);
-
-        // 5. Convert bold: **text**, __text__, and headers → placeholder (protect from italic conversion)
-        $boldParts = [];
-        $text = preg_replace_callback('/\*\*(.+?)\*\*/', function ($match) use (&$boldParts) {
-            $placeholder = '{{BOLD_'.count($boldParts).'}}';
-            $boldParts[$placeholder] = '*'.$match[1].'*';
-
-            return $placeholder;
-        }, $text);
-        $text = preg_replace_callback('/__(.+?)__/', function ($match) use (&$boldParts) {
-            $placeholder = '{{BOLD_'.count($boldParts).'}}';
-            $boldParts[$placeholder] = '*'.$match[1].'*';
-
-            return $placeholder;
-        }, $text);
-        $text = preg_replace_callback('/^#{1,6}\s+(.+)$/m', function ($match) use (&$boldParts) {
-            $placeholder = '{{BOLD_'.count($boldParts).'}}';
-            $boldParts[$placeholder] = '*'.$match[1].'*';
-
-            return $placeholder;
-        }, $text);
-
-        // 6. Convert *italic* → _italic_ (remaining single * pairs are italic in MD, bold in WA)
-        // Require asterisks to be tight around text (no spaces) to avoid matching math like "2 * 3 * 4"
-        $text = preg_replace('/(?<!\w)\*(?!\s)([^*\n]+?)(?<!\s)\*(?!\w)/', '_$1_', $text);
-
-        // 7. Restore bold placeholders
-        foreach ($boldParts as $placeholder => $bold) {
-            $text = str_replace($placeholder, $bold, $text);
-        }
-
-        // 8. Convert ~~strikethrough~~ to ~strikethrough~
+        // Convert ~~strikethrough~~ to ~strikethrough~
         $text = preg_replace('/~~(.+?)~~/', '~$1~', $text);
 
-        // 9. Convert bullet points to Unicode bullets
+        // Convert bullet points to Unicode bullets for cleaner display
         $text = preg_replace('/^[\-\*]\s+/m', '• ', $text);
 
-        // 10. Convert horizontal rules to a clean separator
-        $text = preg_replace('/^[\-\*_]{3,}\s*$/m', '─────', $text);
-
-        // 11. Clean up blockquotes (WhatsApp supports > natively, but strip nested levels)
-        $text = preg_replace('/^>{2,}\s?/m', '> ', $text);
-
-        // 12. Restore code blocks and inline code
+        // Restore code blocks
         foreach ($codeBlocks as $placeholder => $code) {
             $text = str_replace($placeholder, $code, $text);
         }
+
+        // Restore inline code
         foreach ($inlineCode as $placeholder => $code) {
             $text = str_replace($placeholder, $code, $text);
         }

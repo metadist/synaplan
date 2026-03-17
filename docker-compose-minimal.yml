@@ -38,8 +38,6 @@ services:
       - synaplan-network
 
   # Widget Build Watcher (dev only)
-  # Memory-limited to prevent unbounded growth from Chokidar polling (#515).
-  # Container auto-restarts on OOM thanks to restart policy.
   frontend-widgets:
     image: node:22
     container_name: synaplan-frontend-widgets
@@ -47,9 +45,6 @@ services:
     command: sh -c "npm ci && npm run build:widget -- --watch"
     environment:
       NODE_ENV: development
-      NODE_OPTIONS: '--max-old-space-size=3072'
-    mem_limit: 4g
-    memswap_limit: 4g
     volumes:
       - ./frontend:/app
       # Anonymous volume to prevent host node_modules from being mounted
@@ -160,7 +155,7 @@ services:
 
   # Apache Tika - Document Text Extraction
   tika:
-    image: apache/tika:2.9.2.1
+    image: apache/tika:2.9.2.0
     container_name: synaplan-tika
     command: -h 0.0.0.0 -p 9998
     ports:

@@ -122,14 +122,22 @@ class PromptController extends AbstractController
             ->getQuery()
             ->getResult();
 
-        // Get all user-specific prompts (no language filter).
-        // User overrides must always be visible regardless of the current UI language,
-        // otherwise switching languages hides the override and causes 409 on re-creation.
-        $userPrompts = $this->promptRepository->createQueryBuilder('p')
+        // Get all user-specific prompts
+        // When language is empty: return ALL user prompts (no language filter)
+        // When language is set: filter by language but always include widget prompts (w_*)
+        $userQb = $this->promptRepository->createQueryBuilder('p')
             ->where('p.ownerId = :userId')
             ->andWhere('p.topic NOT LIKE :toolsPrefix')
             ->setParameter('userId', $user->getId())
-            ->setParameter('toolsPrefix', 'tools:%')
+            ->setParameter('toolsPrefix', 'tools:%');
+
+        if ('' !== $language) {
+            $userQb->andWhere('(p.language = :lang OR p.topic LIKE :widgetPrefix)')
+                ->setParameter('lang', $language)
+                ->setParameter('widgetPrefix', 'w\\_%');
+        }
+
+        $userPrompts = $userQb
             ->orderBy('p.topic', 'ASC')
             ->getQuery()
             ->getResult();
@@ -705,12 +713,24 @@ class PromptController extends AbstractController
             // Refresh to ensure ID is populated
             $this->em->refresh($prompt);
 
+            $this->logger->info('🟢 PROMPT CREATED', [
+                'prompt_id' => $prompt->getId(),
+                'topic' => $topic,
+                'has_metadata' => !empty($metadata),
+            ]);
+
             // Save metadata (AI model, tools)
             if (!empty($metadata)) {
                 if (!$prompt->getId()) {
                     throw new \RuntimeException('Prompt ID is null after flush and refresh!');
                 }
+
+                $this->logger->info('🔵 SAVING METADATA', [
+                    'prompt_id' => $prompt->getId(),
+                    'metadata' => $metadata,
+                ]);
                 $this->promptService->saveMetadataForPrompt($prompt, $metadata);
+                $this->logger->info('🟢 METADATA SAVED');
             }
 
             $this->logger->info('User created custom prompt', [
