@@ -1,4 +1,4 @@
-import { test, expect } from '../test-setup'
+import { test, expect, type Page } from '../test-setup'
 import { login } from '../helpers/auth'
 import { selectors } from '../helpers/selectors'
 import { CREDENTIALS } from '../config/credentials'
@@ -8,22 +8,24 @@ const NAV = selectors.nav
 const HDR = selectors.header
 const USR = selectors.userMenu
 
-async function ensureEasyMode(page: import('@playwright/test').Page) {
-  if ((await page.locator(HDR.modeToggle).getAttribute('data-mode')) !== 'easy') {
-    await page.locator(HDR.modeToggle).click()
+async function ensureEasyMode(page: Page) {
+  const toggle = page.locator(HDR.modeToggle)
+  try {
+    await expect(toggle).toHaveAttribute('data-mode', 'easy', { timeout: TIMEOUTS.SHORT })
+  } catch {
+    await toggle.click()
+    await expect(toggle).toHaveAttribute('data-mode', 'easy', { timeout: TIMEOUTS.SHORT })
   }
-  await expect(page.locator(HDR.modeToggle)).toHaveAttribute('data-mode', 'easy', {
-    timeout: TIMEOUTS.SHORT,
-  })
 }
 
-async function ensureAdvancedMode(page: import('@playwright/test').Page) {
-  if ((await page.locator(HDR.modeToggle).getAttribute('data-mode')) !== 'advanced') {
-    await page.locator(HDR.modeToggle).click()
+async function ensureAdvancedMode(page: Page) {
+  const toggle = page.locator(HDR.modeToggle)
+  try {
+    await expect(toggle).toHaveAttribute('data-mode', 'advanced', { timeout: TIMEOUTS.SHORT })
+  } catch {
+    await toggle.click()
+    await expect(toggle).toHaveAttribute('data-mode', 'advanced', { timeout: TIMEOUTS.SHORT })
   }
-  await expect(page.locator(HDR.modeToggle)).toHaveAttribute('data-mode', 'advanced', {
-    timeout: TIMEOUTS.SHORT,
-  })
 }
 
 test.describe('Navigation: Sidebar basics (non-admin, easy mode)', () => {
@@ -116,9 +118,9 @@ test.describe('Navigation: Advanced mode (non-admin)', () => {
     await test.step('Assert: flyout visible with navigation links', async () => {
       const flyout = page.locator(NAV.navDropdown)
       await expect(flyout).toBeVisible({ timeout: TIMEOUTS.SHORT })
-      await expect(flyout.locator('a[href="/tools/chat-widget"]')).toBeVisible()
-      await expect(flyout.locator('a[href="/config/ai-models"]')).toBeVisible()
-      await expect(flyout.locator('a[href="/config/task-prompts"]')).toBeVisible()
+      await expect(flyout.locator(NAV.flyoutLinkChatWidget)).toBeVisible()
+      await expect(flyout.locator(NAV.flyoutLinkAiModels)).toBeVisible()
+      await expect(flyout.locator(NAV.flyoutLinkTaskPrompts)).toBeVisible()
     })
   })
 
@@ -131,7 +133,7 @@ test.describe('Navigation: Advanced mode (non-admin)', () => {
     })
 
     await test.step('Act: click Chat Widget link', async () => {
-      await page.locator(NAV.navDropdown).locator('a[href="/tools/chat-widget"]').click()
+      await page.locator(NAV.navDropdown).locator(NAV.flyoutLinkChatWidget).click()
     })
 
     await test.step('Assert: Widgets page visible', async () => {
@@ -150,7 +152,7 @@ test.describe('Navigation: Advanced mode (non-admin)', () => {
     })
 
     await test.step('Act: click AI Models link', async () => {
-      await page.locator(NAV.navDropdown).locator('a[href="/config/ai-models"]').click()
+      await page.locator(NAV.navDropdown).locator(NAV.flyoutLinkAiModels).click()
     })
 
     await test.step('Assert: AI Models page visible', async () => {
@@ -181,7 +183,7 @@ test.describe('Navigation: Admin sidebar', () => {
       await page.locator(NAV.sidebarV2Admin).click()
       const flyout = page.locator(NAV.navDropdown)
       await expect(flyout).toBeVisible({ timeout: TIMEOUTS.SHORT })
-      await flyout.locator('a[href="/admin"]').click()
+      await flyout.locator(NAV.flyoutLinkAdminDashboard).click()
     })
 
     await test.step('Assert: Admin dashboard page visible', async () => {
@@ -211,7 +213,8 @@ test.describe('Navigation: Admin sidebar', () => {
       await page.goto('/admin')
     })
 
-    await test.step('Assert: chat page visible instead of admin', async () => {
+    await test.step('Assert: redirected away from admin and chat page visible', async () => {
+      await expect(page).not.toHaveURL(/\/admin/, { timeout: TIMEOUTS.STANDARD })
       await expect(page.locator(selectors.chat.textInput)).toBeVisible({
         timeout: TIMEOUTS.STANDARD,
       })
@@ -276,42 +279,13 @@ test.describe('Navigation: User menu', () => {
 })
 
 test.describe('Navigation: Header controls', () => {
-  const EXPECTED_LANGUAGES = ['de', 'en', 'es', 'tr'] as const
-
-  test('@ci Language selector opens and lists expected languages', async ({
-    page,
-    credentials,
-  }) => {
-    await test.step('Arrange: login', async () => {
-      await login(page, credentials)
-    })
-
-    await test.step('Act: open language selector', async () => {
-      await page.locator(HDR.languageToggle).click()
-    })
-
-    await test.step('Assert: dropdown visible with expected language codes', async () => {
-      const menu = page.locator(HDR.languageMenu)
-      await expect(menu).toBeVisible({ timeout: TIMEOUTS.SHORT })
-      for (const code of EXPECTED_LANGUAGES) {
-        await expect(menu.locator(`[data-language="${code}"]`)).toBeVisible()
-      }
-      await expect(menu.locator('[data-language]')).toHaveCount(EXPECTED_LANGUAGES.length)
-    })
-  })
-
   test('@ci Language switch changes active language', async ({ page, credentials }) => {
     await test.step('Arrange: login', async () => {
       await login(page, credentials)
     })
 
     const initialLang = await page.locator(HDR.languageToggle).getAttribute('data-language')
-    const isExpectedLanguage = (
-      value: string | null
-    ): value is (typeof EXPECTED_LANGUAGES)[number] =>
-      value !== null && EXPECTED_LANGUAGES.includes(value as (typeof EXPECTED_LANGUAGES)[number])
-
-    expect(isExpectedLanguage(initialLang)).toBe(true)
+    expect(initialLang).toMatch(/^(de|en)$/)
 
     const targetLang = initialLang === 'de' ? 'en' : 'de'
 

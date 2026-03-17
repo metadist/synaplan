@@ -49,6 +49,11 @@ export const selectors = {
     sidebarV2Settings: '[data-testid="btn-sidebar-v2--settings"]',
     /** V2 sidebar: admin nav icon (admin only) */
     sidebarV2Admin: '[data-testid="btn-sidebar-v2--admin"]',
+    /** V2 flyout: child links (generated from route path) */
+    flyoutLinkChatWidget: '[data-testid="link-sidebar-v2-tools-chat-widget"]',
+    flyoutLinkAiModels: '[data-testid="link-sidebar-v2-config-ai-models"]',
+    flyoutLinkTaskPrompts: '[data-testid="link-sidebar-v2-config-task-prompts"]',
+    flyoutLinkAdminDashboard: '[data-testid="link-sidebar-v2-admin"]',
     /** V2 chat list modal */
     modalChatManager: '[data-testid="modal-chat-manager"]',
     /** V2 chat list: container visible when at least one chat exists; use to wait before targeting rows */
