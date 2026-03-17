@@ -281,7 +281,12 @@ test.describe('Navigation: User menu', () => {
 })
 
 test.describe('Navigation: Header controls', () => {
-  test('@ci Language selector opens with language options', async ({ page, credentials }) => {
+  const EXPECTED_LANGUAGES = ['de', 'en', 'es', 'tr'] as const
+
+  test('@ci Language selector opens and lists expected languages', async ({
+    page,
+    credentials,
+  }) => {
     await test.step('Arrange: login', async () => {
       await login(page, credentials)
     })
@@ -290,10 +295,43 @@ test.describe('Navigation: Header controls', () => {
       await page.locator(HDR.languageToggle).click()
     })
 
-    await test.step('Assert: dropdown visible with language options', async () => {
+    await test.step('Assert: dropdown visible with expected language codes', async () => {
       const menu = page.locator(HDR.languageMenu)
       await expect(menu).toBeVisible({ timeout: TIMEOUTS.SHORT })
-      await expect(menu.getByRole('menuitem')).toHaveCount(4)
+      for (const code of EXPECTED_LANGUAGES) {
+        await expect(menu.locator(`[data-language="${code}"]`)).toBeVisible()
+      }
+      await expect(menu.locator('[data-language]')).toHaveCount(EXPECTED_LANGUAGES.length)
+    })
+  })
+
+  test('@ci Language switch changes active language', async ({ page, credentials }) => {
+    await test.step('Arrange: login', async () => {
+      await login(page, credentials)
+    })
+
+    const toggle = page.locator(HDR.languageToggle)
+    const initialLang = await toggle.getAttribute('data-language')
+    const isExpectedLanguage = (
+      value: string | null
+    ): value is (typeof EXPECTED_LANGUAGES)[number] =>
+      value !== null && EXPECTED_LANGUAGES.includes(value as any)
+
+    expect(isExpectedLanguage(initialLang)).toBe(true)
+
+    const targetLang = initialLang === 'de' ? 'en' : 'de'
+
+    await test.step('Act: open menu and select a different language', async () => {
+      await toggle.click()
+      const menu = page.locator(HDR.languageMenu)
+      await expect(menu).toBeVisible({ timeout: TIMEOUTS.SHORT })
+      await menu.locator(`[data-language="${targetLang}"]`).click()
+    })
+
+    await test.step('Assert: toggle reflects the new language', async () => {
+      await expect(toggle).toHaveAttribute('data-language', targetLang, {
+        timeout: TIMEOUTS.SHORT,
+      })
     })
   })
 })
