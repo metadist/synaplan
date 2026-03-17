@@ -9,19 +9,21 @@ const HDR = selectors.header
 const USR = selectors.userMenu
 
 async function ensureEasyMode(page: import('@playwright/test').Page) {
-  const toggle = page.locator(HDR.modeToggle)
-  if ((await toggle.getAttribute('data-mode')) !== 'easy') {
-    await toggle.click()
+  if ((await page.locator(HDR.modeToggle).getAttribute('data-mode')) !== 'easy') {
+    await page.locator(HDR.modeToggle).click()
   }
-  await expect(toggle).toHaveAttribute('data-mode', 'easy', { timeout: TIMEOUTS.SHORT })
+  await expect(page.locator(HDR.modeToggle)).toHaveAttribute('data-mode', 'easy', {
+    timeout: TIMEOUTS.SHORT,
+  })
 }
 
 async function ensureAdvancedMode(page: import('@playwright/test').Page) {
-  const toggle = page.locator(HDR.modeToggle)
-  if ((await toggle.getAttribute('data-mode')) !== 'advanced') {
-    await toggle.click()
+  if ((await page.locator(HDR.modeToggle).getAttribute('data-mode')) !== 'advanced') {
+    await page.locator(HDR.modeToggle).click()
   }
-  await expect(toggle).toHaveAttribute('data-mode', 'advanced', { timeout: TIMEOUTS.SHORT })
+  await expect(page.locator(HDR.modeToggle)).toHaveAttribute('data-mode', 'advanced', {
+    timeout: TIMEOUTS.SHORT,
+  })
 }
 
 test.describe('Navigation: Sidebar basics (non-admin, easy mode)', () => {
@@ -160,9 +162,7 @@ test.describe('Navigation: Advanced mode (non-admin)', () => {
 })
 
 test.describe('Navigation: Admin sidebar', () => {
-  test('@ci Admin sees Admin button in sidebar', async ({ page, credentials }) => {
-    void credentials
-
+  test('@ci Admin sees Admin button in sidebar', async ({ page }) => {
     await test.step('Arrange: login as admin', async () => {
       await login(page, CREDENTIALS.getAdminCredentials())
     })
@@ -172,9 +172,7 @@ test.describe('Navigation: Admin sidebar', () => {
     })
   })
 
-  test('@ci Admin flyout navigates to admin dashboard', async ({ page, credentials }) => {
-    void credentials
-
+  test('@ci Admin flyout navigates to admin dashboard', async ({ page }) => {
     await test.step('Arrange: login as admin', async () => {
       await login(page, CREDENTIALS.getAdminCredentials())
     })
@@ -232,11 +230,11 @@ test.describe('Navigation: User menu', () => {
     })
 
     await test.step('Assert: dropdown visible with menu items', async () => {
-      const dropdown = page.locator(NAV.userDropdown)
+      const dropdown = page.locator(USR.dropdown)
       await expect(dropdown).toBeVisible({ timeout: TIMEOUTS.SHORT })
-      await expect(dropdown.locator('[data-testid="btn-sidebar-v2-profile"]')).toBeVisible()
-      await expect(dropdown.locator('[data-testid="btn-sidebar-v2-statistics"]')).toBeVisible()
-      await expect(dropdown.locator('[data-testid="btn-sidebar-v2-logout"]')).toBeVisible()
+      await expect(dropdown.locator(USR.profileBtn)).toBeVisible()
+      await expect(dropdown.locator(USR.statisticsBtn)).toBeVisible()
+      await expect(dropdown.locator(USR.logoutBtn)).toBeVisible()
     })
   })
 
@@ -244,11 +242,11 @@ test.describe('Navigation: User menu', () => {
     await test.step('Arrange: login and open user menu', async () => {
       await login(page, credentials)
       await page.locator(USR.button).click()
-      await expect(page.locator(NAV.userDropdown)).toBeVisible({ timeout: TIMEOUTS.SHORT })
+      await expect(page.locator(USR.dropdown)).toBeVisible({ timeout: TIMEOUTS.SHORT })
     })
 
     await test.step('Act: click Profile', async () => {
-      await page.locator(NAV.userDropdown).locator('[data-testid="btn-sidebar-v2-profile"]').click()
+      await page.locator(USR.dropdown).locator(USR.profileBtn).click()
     })
 
     await test.step('Assert: Profile page visible', async () => {
@@ -262,14 +260,11 @@ test.describe('Navigation: User menu', () => {
     await test.step('Arrange: login and open user menu', async () => {
       await login(page, credentials)
       await page.locator(USR.button).click()
-      await expect(page.locator(NAV.userDropdown)).toBeVisible({ timeout: TIMEOUTS.SHORT })
+      await expect(page.locator(USR.dropdown)).toBeVisible({ timeout: TIMEOUTS.SHORT })
     })
 
     await test.step('Act: click Statistics', async () => {
-      await page
-        .locator(NAV.userDropdown)
-        .locator('[data-testid="btn-sidebar-v2-statistics"]')
-        .click()
+      await page.locator(USR.dropdown).locator(USR.statisticsBtn).click()
     })
 
     await test.step('Assert: Statistics page visible', async () => {
@@ -310,26 +305,25 @@ test.describe('Navigation: Header controls', () => {
       await login(page, credentials)
     })
 
-    const toggle = page.locator(HDR.languageToggle)
-    const initialLang = await toggle.getAttribute('data-language')
+    const initialLang = await page.locator(HDR.languageToggle).getAttribute('data-language')
     const isExpectedLanguage = (
       value: string | null
     ): value is (typeof EXPECTED_LANGUAGES)[number] =>
-      value !== null && EXPECTED_LANGUAGES.includes(value as any)
+      value !== null && EXPECTED_LANGUAGES.includes(value as (typeof EXPECTED_LANGUAGES)[number])
 
     expect(isExpectedLanguage(initialLang)).toBe(true)
 
     const targetLang = initialLang === 'de' ? 'en' : 'de'
 
     await test.step('Act: open menu and select a different language', async () => {
-      await toggle.click()
+      await page.locator(HDR.languageToggle).click()
       const menu = page.locator(HDR.languageMenu)
       await expect(menu).toBeVisible({ timeout: TIMEOUTS.SHORT })
       await menu.locator(`[data-language="${targetLang}"]`).click()
     })
 
     await test.step('Assert: toggle reflects the new language', async () => {
-      await expect(toggle).toHaveAttribute('data-language', targetLang, {
+      await expect(page.locator(HDR.languageToggle)).toHaveAttribute('data-language', targetLang, {
         timeout: TIMEOUTS.SHORT,
       })
     })
