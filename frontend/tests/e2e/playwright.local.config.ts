@@ -16,7 +16,7 @@ import { URLS } from './config/config'
 
 export default defineConfig({
   testDir: 'tests',
-  testMatch: '**/real-ai.spec.ts',
+  testMatch: '**/real-ai*.spec.ts',
   retries: 0,
   timeout: 600_000,
 
