@@ -237,6 +237,7 @@
                 v-for="child in section.items"
                 :key="child.path"
                 :to="child.path"
+                :data-testid="`link-sidebar-v2${child.path.replace(/\//g, '-')}`"
                 class="flex items-center gap-2.5 px-3 py-2 text-sm transition-colors"
                 :class="
                   route.path === child.path
