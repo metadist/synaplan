@@ -723,8 +723,9 @@ const streamAIResponse = async (
 ) => {
   streamingAbortController = new AbortController()
 
-  // Get current selected model from aiConfig store (DB model with ID)
-  const currentModel = aiConfigStore.getCurrentModel('CHAT')
+  const currentModel =
+    aiConfigStore.models.CHAT?.find((model) => model.id === options?.modelId) ??
+    aiConfigStore.getCurrentModel('CHAT')
   const provider = currentModel?.service || modelsStore.selectedProvider
   const modelLabel = currentModel?.name || modelsStore.selectedModel
 
@@ -788,12 +789,18 @@ const streamAIResponse = async (
         })
       }
 
-      const stopStreaming = chatApi.streamMessage(
+      const stopStreaming = chatApi.streamMessage({
         userId,
-        userMessage,
+        message: userMessage,
         trackId,
         chatId,
-        (data) => {
+        includeReasoning,
+        webSearch,
+        modelId: finalModelId,
+        fileIds,
+        voiceReply: options?.voiceReply,
+        isAgain: options?.isAgain,
+        onUpdate: (data) => {
           // CRITICAL: Check abort signal at the very beginning
           if (streamingAbortController?.signal.aborted) {
             return
@@ -1460,13 +1467,7 @@ const streamAIResponse = async (
             console.warn('⚠️ Unknown status:', data.status, data)
           }
         },
-        includeReasoning,
-        webSearch,
-        finalModelId,
-        fileIds, // Pass array of fileIds
-        options?.voiceReply, // Pass voice reply flag
-        options?.isAgain // Pass isAgain flag
-      )
+      })
 
       // Store EventSource cleanup function globally
       stopStreamingFn = stopStreaming

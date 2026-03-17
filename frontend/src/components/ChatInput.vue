@@ -412,17 +412,23 @@ const canSend = computed(() => {
   return (hasMessage || hasFiles) && filesReady && !uploading.value
 })
 
-const supportsReasoning = computed(() => {
-  // Get the configured default model
-  const currentModel = aiConfigStore.getCurrentModel('CHAT')
+const currentChatModel = computed(() => {
+  const chatModels = aiConfigStore.models.CHAT || []
+  const resolvedModelId = selectedModelId.value ?? aiConfigStore.defaults.CHAT ?? null
 
-  // If no model yet (store still loading), return false (button will be disabled)
-  if (!currentModel) {
+  if (!resolvedModelId) {
+    return null
+  }
+
+  return chatModels.find((model) => model.id === resolvedModelId) ?? null
+})
+
+const supportsReasoning = computed(() => {
+  if (!currentChatModel.value) {
     return false
   }
 
-  // Check if model has reasoning capability
-  return currentModel.features?.includes('reasoning') ?? false
+  return currentChatModel.value.features?.includes('reasoning') ?? false
 })
 
 // Auto-enable thinking when switching to a reasoning-capable model
@@ -436,6 +442,14 @@ watch(
     }
   },
   { immediate: true }
+)
+
+// Reset model dropdown when switching chats
+watch(
+  () => chatsStore.activeChatId,
+  () => {
+    selectedModelId.value = null
+  }
 )
 
 watch(

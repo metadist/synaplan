@@ -173,9 +173,8 @@ final readonly class MessageClassifier
             'intent' => $this->mapTopicToIntent($result['topic']), // Map topic to intent for routing
         ];
 
-        // If a specific model was requested via the UI dropdown, pass it through
         if ($overrideModelId) {
-            $classification['model_id'] = $overrideModelId;
+            $classification['override_model_id'] = $overrideModelId;
         }
 
         // Pass through media_type if detected (for mediamaker topic)
