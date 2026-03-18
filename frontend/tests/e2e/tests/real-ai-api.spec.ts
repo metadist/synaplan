@@ -18,6 +18,9 @@ import { getApiUrl } from '../config/config'
 import {
   loginAndGetCookie,
   fetchModelsByCapability,
+  getDefaultModels,
+  setDefaultModel,
+  restoreDefaults,
   isOllama,
   type ModelInfo,
 } from '../helpers/api'
@@ -50,6 +53,8 @@ interface ModelResult {
   status: 'PASS' | 'FAIL' | 'SKIP'
   durationMs: number
   error?: string
+  actualProvider?: string
+  actualModel?: string
 }
 
 function printSummary(results: ModelResult[], capability: string): void {
@@ -63,10 +68,12 @@ function printSummary(results: ModelResult[], capability: string): void {
   console.log('----------------------------------------')
   for (const r of results) {
     const dur = (r.durationMs / 1000).toFixed(1).padStart(6)
+    const actual =
+      r.actualProvider && r.actualModel ? ` [via ${r.actualProvider}/${r.actualModel}]` : ''
     if (r.status === 'PASS') {
-      console.log(`  PASS  ${r.model.padEnd(40)} ${dur}s`)
+      console.log(`  PASS  ${r.model.padEnd(40)} ${dur}s${actual}`)
     } else if (r.status === 'FAIL') {
-      console.log(`  FAIL  ${r.model.padEnd(40)} ${dur}s`)
+      console.log(`  FAIL  ${r.model.padEnd(40)} ${dur}s${actual}`)
       console.log(`        -> ${r.error}`)
     } else {
       console.log(`  SKIP  ${r.model.padEnd(40)} (ollama)`)
@@ -135,8 +142,10 @@ interface StreamResult {
   chunks: string[]
   hasFile: boolean
   fileType?: string
+  fileUrl?: string
   provider?: string
   model?: string
+  topic?: string
 }
 
 async function streamMessage(
@@ -146,6 +155,7 @@ async function streamMessage(
     chatId: number
     message: string
     modelId?: number
+    isAgain?: boolean
     fileIds?: number[]
     timeoutMs?: number
   }
@@ -155,6 +165,7 @@ async function streamMessage(
     chatId: String(opts.chatId),
   })
   if (opts.modelId) params.set('modelId', String(opts.modelId))
+  if (opts.isAgain) params.set('isAgain', '1')
   if (opts.fileIds?.length) params.set('fileIds', opts.fileIds.join(','))
 
   const url = `${api()}/api/v1/messages/stream?${params}`
@@ -180,11 +191,13 @@ async function streamMessage(
         result.completed = true
         result.provider = data.provider
         result.model = data.model
+        result.topic = data.topic
       } else if (data.status === 'error') {
         result.error = data.error || 'Unknown error'
       } else if (data.status === 'file') {
         result.hasFile = true
         result.fileType = data.type
+        result.fileUrl = data.url
       }
     } catch {
       // non-JSON line, skip
@@ -224,8 +237,7 @@ interface CapabilityConfig {
   capability: string
   message: string
   needsFile?: { path: string; name: string; mime: string }
-  expectFile?: boolean
-  expectText?: boolean
+  requireFile?: boolean
 }
 
 async function runCapability(
@@ -236,80 +248,121 @@ async function runCapability(
   const allModels = await fetchModelsByCapability(request, cookie)
   const models = allModels[config.capability] ?? []
   const results: ModelResult[] = []
+  const originalDefaults = await getDefaultModels(request, cookie)
 
   expect(models.length, `At least one ${config.capability} model`).toBeGreaterThan(0)
 
-  for (const model of models) {
-    if (isOllama(model)) {
-      results.push({
-        model: label(model),
-        capability: config.capability,
-        status: 'SKIP',
-        durationMs: 0,
-      })
-      continue
-    }
-
-    const start = Date.now()
-    let chatId: number | undefined
-    try {
-      chatId = await createChat(request, cookie)
-
-      let fileIds: number[] | undefined
-      if (config.needsFile) {
-        const fileId = await uploadFile(
-          request,
-          cookie,
-          config.needsFile.path,
-          config.needsFile.name,
-          config.needsFile.mime
-        )
-        fileIds = [fileId]
+  try {
+    for (const model of models) {
+      if (isOllama(model)) {
+        results.push({
+          model: label(model),
+          capability: config.capability,
+          status: 'SKIP',
+          durationMs: 0,
+        })
+        continue
       }
 
-      const stream = await streamMessage(request, cookie, {
-        chatId,
-        message: config.message,
-        modelId: model.id,
-        fileIds,
-        timeoutMs: STREAM_TIMEOUT[config.capability],
-      })
+      const start = Date.now()
+      let chatId: number | undefined
+      try {
+        await setDefaultModel(request, cookie, config.capability, model.id)
+        chatId = await createChat(request, cookie)
 
-      if (stream.error) {
-        throw new Error(`Stream error: ${stream.error}`)
-      }
-      if (!stream.completed) {
-        throw new Error('Stream did not complete (no complete event)')
-      }
-      if (config.expectText !== false) {
-        const fullText = stream.chunks.join('')
-        if (fullText.trim().length === 0) {
-          throw new Error('Response text is empty')
+        let fileIds: number[] | undefined
+        if (config.needsFile) {
+          const fileId = await uploadFile(
+            request,
+            cookie,
+            config.needsFile.path,
+            config.needsFile.name,
+            config.needsFile.mime
+          )
+          fileIds = [fileId]
+        }
+
+        const stream = await streamMessage(request, cookie, {
+          chatId,
+          message: config.message,
+          fileIds,
+          timeoutMs: STREAM_TIMEOUT[config.capability],
+        })
+
+        if (stream.error) {
+          throw new Error(`Stream error: ${stream.error}`)
+        }
+        if (!stream.completed) {
+          throw new Error('Stream did not complete (no complete event)')
+        }
+
+        const actualProvider = stream.provider ?? 'unknown'
+        const actualModel = stream.model ?? 'unknown'
+
+        if (actualModel === 'error') {
+          const errorText = stream.chunks.join('').trim().slice(0, 200)
+          throw new Error(
+            `Provider error (${actualProvider}): response has model="error". Text: "${errorText}"`
+          )
+        }
+
+        const expectedService = model.service.toLowerCase()
+        if (
+          actualProvider !== 'unknown' &&
+          expectedService !== 'test' &&
+          actualProvider.toLowerCase() !== expectedService
+        ) {
+          throw new Error(
+            `Model mismatch: expected provider "${model.service}" but got "${actualProvider}/${actualModel}"`
+          )
+        }
+
+        if (config.requireFile && !stream.hasFile) {
+          const fullText = stream.chunks.join('').trim()
+          const hint =
+            fullText.length > 0 ? ` (got text instead: "${fullText.slice(0, 120)}...")` : ''
+          throw new Error(`Expected file event for ${config.capability} but none received${hint}`)
+        }
+
+        if (!config.requireFile) {
+          const fullText = stream.chunks.join('')
+          if (fullText.trim().length === 0 && !stream.hasFile) {
+            throw new Error('Response has no text and no file — empty result')
+          }
+        }
+
+        const elapsed = Date.now() - start
+        const isTestProvider = expectedService === 'test'
+        if (config.requireFile && !isTestProvider && elapsed < 1000) {
+          console.warn(
+            `  WARN  ${label(model).padEnd(40)} completed in ${elapsed}ms — suspiciously fast for media generation`
+          )
+        }
+
+        results.push({
+          model: label(model),
+          capability: config.capability,
+          status: 'PASS',
+          durationMs: elapsed,
+          actualProvider,
+          actualModel,
+        })
+      } catch (error) {
+        results.push({
+          model: label(model),
+          capability: config.capability,
+          status: 'FAIL',
+          durationMs: Date.now() - start,
+          error: error instanceof Error ? error.message : String(error),
+        })
+      } finally {
+        if (chatId) {
+          await deleteChat(request, cookie, chatId).catch(() => {})
         }
       }
-      if (config.expectFile && !stream.hasFile) {
-        throw new Error(`Expected file event (${config.capability}) but none received`)
-      }
-
-      results.push({
-        model: label(model),
-        capability: config.capability,
-        status: 'PASS',
-        durationMs: Date.now() - start,
-      })
-    } catch (error) {
-      results.push({
-        model: label(model),
-        capability: config.capability,
-        status: 'FAIL',
-        durationMs: Date.now() - start,
-        error: error instanceof Error ? error.message : String(error),
-      })
-    } finally {
-      if (chatId) {
-        await deleteChat(request, cookie, chatId).catch(() => {})
-      }
     }
+  } finally {
+    await restoreDefaults(request, cookie, originalDefaults)
   }
 
   return results
@@ -345,8 +398,7 @@ test.describe('@noci @local @api Image Generation — all models', () => {
       {
         capability: 'TEXT2PIC',
         message: '/pic a small blue square on white background',
-        expectFile: true,
-        expectText: false,
+        requireFile: true,
       },
       request
     )
@@ -367,8 +419,7 @@ test.describe('@noci @local @api Video Generation — all models', () => {
       {
         capability: 'TEXT2VID',
         message: '/vid short clip of a robot waving hello',
-        expectFile: true,
-        expectText: false,
+        requireFile: true,
       },
       request
     )
@@ -410,8 +461,7 @@ test.describe('@noci @local @api TTS — all models', () => {
       {
         capability: 'TEXT2SOUND',
         message: 'Read this aloud: Hello, this is a test of text to speech.',
-        expectFile: true,
-        expectText: false,
+        requireFile: true,
       },
       request
     )
