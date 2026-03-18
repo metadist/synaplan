@@ -1572,7 +1572,20 @@ class WidgetPublicController extends AbstractController
             return '';
         }
 
+        $widgetConfig = $widget->getConfig();
+        $externalApiToken = \is_string($widgetConfig['externalApiToken'] ?? null)
+            ? $widgetConfig['externalApiToken']
+            : '';
+
         $apiUrls = [];
+
+        $configApiUrl = \is_string($widgetConfig['externalApiUrl'] ?? null)
+            ? trim($widgetConfig['externalApiUrl'])
+            : '';
+        if ('' !== $configApiUrl) {
+            $apiUrls[] = ['url' => $configApiUrl, 'method' => 'GET', 'label' => 'User Profile'];
+        }
+
         foreach ($flow['responses'] ?? [] as $response) {
             $type = $response['type'] ?? null;
             $url = $response['meta']['url'] ?? null;
@@ -1589,11 +1602,6 @@ class WidgetPublicController extends AbstractController
         $maxTotalLength = 16000;
         $sections = [];
         $totalLength = 0;
-
-        $widgetConfig = $widget->getConfig();
-        $externalApiToken = \is_string($widgetConfig['externalApiToken'] ?? null)
-            ? $widgetConfig['externalApiToken']
-            : '';
 
         foreach ($apiUrls as $api) {
             if ($totalLength >= $maxTotalLength) {

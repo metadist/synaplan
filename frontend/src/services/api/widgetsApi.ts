@@ -55,6 +55,7 @@ export interface WidgetConfig {
   fileUploadLimit?: number
   customFields?: CustomFieldDef[]
   externalApiToken?: string
+  externalApiUrl?: string
   privacyPolicyUrl?: string
   dataProcessingAccepted?: boolean
 }

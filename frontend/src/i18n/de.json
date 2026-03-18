@@ -1538,6 +1538,18 @@
       "back": "Zurück zu Widgets",
       "notFound": "Widget nicht gefunden",
       "aiButton": "Mit KI konfigurieren",
+      "userData": {
+        "title": "Userdaten-Integration",
+        "notConfigured": "Verbinde deine Backend-API für personalisierte KI-Antworten",
+        "upgradeHint": "Upgrade auf PRO, um deine Backend-API für personalisierte Antworten zu verbinden",
+        "setup": "Einrichten",
+        "active": "Aktiv",
+        "edit": "Einstellungen bearbeiten",
+        "remove": "Integration entfernen",
+        "removed": "Userdaten-Integration entfernt",
+        "autoFetch": "Auto-Abruf",
+        "aiContext": "KI-gestützt"
+      },
       "flowTitle": "Widget-Flow",
       "flowSubtitle": "Verbinde Fragen mit Antworten. Dein Widget folgt diesen Regeln.",
       "flowHintStart": "Klicke eine Frage, um eine Verbindung zu starten.",
@@ -1627,7 +1639,13 @@
         "subtitle": "Ich helfe dir, Q&A für dein Widget zu erstellen",
         "placeholder": "Beschreibe dein Unternehmen...",
         "restart": "Neu starten",
-        "error": "Etwas ist schiefgelaufen. Bitte versuche es erneut."
+        "error": "Etwas ist schiefgelaufen. Bitte versuche es erneut.",
+        "chips": {
+          "website": "Von Website importieren",
+          "userApi": "Userdaten-API verbinden",
+          "websitePrefill": "Recherchiere diese Website: ",
+          "apiPrefill": "Ich möchte eine Userdaten-API verbinden, um personalisierte Nutzerdaten von meinem Backend abzurufen. Wie richte ich das ein?"
+        }
       },
       "memorySuggestions": {
         "title": "Aus deinen Erinnerungen importieren",
@@ -1785,6 +1803,20 @@
       "externalApiToken": "Externer API-Token",
       "externalApiTokenHelp": "Bearer-Token für die Authentifizierung bei externen API-Diensten. Wird sicher serverseitig gespeichert.",
       "externalApiTokenPlaceholder": "API-Token eingeben...",
+      "userDataIntegration": {
+        "title": "Userdaten-Integration",
+        "description": "Verbinde deine Backend-API, damit die KI personalisierten Kontext über jeden eingeloggten User hat.",
+        "step1Title": "API-Endpoint URL",
+        "step1Help": "Gib die URL deines API-Endpoints ein. Verwende {externalUserId} als Platzhalter — er wird automatisch durch die User-ID ersetzt.",
+        "step2Title": "API Bearer-Token",
+        "step2Help": "Der Token wird als Bearer-Token im Authorization-Header an deine API gesendet.",
+        "step3Title": "In deinen Embed-Code einfügen",
+        "step3Help": "Übergib die User-ID des eingeloggten Nutzers beim Initialisieren des Widgets auf deiner Website.",
+        "howItWorks": "So funktioniert es",
+        "howStep1": "Ein User besucht deine Seite — das Widget erhält seine ID über den Embed-Code",
+        "howStep2": "Das System ruft deine API mit der User-ID auf und holt das Profil ab",
+        "howStep3": "Die KI nutzt die Profildaten für personalisierte, kontextbezogene Antworten"
+      },
       "proRequired": "PRO-Abo erforderlich",
       "saveSuccess": "Einstellungen erfolgreich gespeichert!",
       "saveError": "Einstellungen konnten nicht gespeichert werden",

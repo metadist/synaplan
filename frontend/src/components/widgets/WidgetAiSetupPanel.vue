@@ -67,7 +67,14 @@
               : 'bg-gray-100 dark:bg-white/5 txt-primary rounded-bl-md',
           ]"
         >
-          <p class="whitespace-pre-wrap break-words">{{ msg.displayText || msg.content }}</p>
+          <div
+            v-if="msg.role === 'assistant'"
+            class="break-words markdown-content"
+            v-html="renderMarkdown(msg.displayText || msg.content)"
+          ></div>
+          <p v-else class="whitespace-pre-wrap break-words">
+            {{ msg.displayText || msg.content }}
+          </p>
 
           <div v-if="msg.flowItems && msg.flowItems.length > 0" class="mt-2.5 space-y-1.5">
             <div
@@ -111,6 +118,25 @@
           </div>
         </div>
       </div>
+    </div>
+
+    <!-- Quick Actions -->
+    <div
+      v-if="messages.length <= 2 && !isTyping"
+      :class="[
+        'flex flex-wrap gap-1.5 border-t border-light-border/20 dark:border-dark-border/10',
+        fullscreen ? 'px-6 pt-3 pb-0' : 'px-4 pt-2 pb-0',
+      ]"
+    >
+      <button
+        v-for="chip in quickChips"
+        :key="chip.key"
+        class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium border border-[var(--brand)]/20 bg-[var(--brand)]/5 txt-primary hover:bg-[var(--brand)]/15 transition-colors"
+        @click="applyChip(chip)"
+      >
+        <Icon :icon="chip.icon" class="w-3.5 h-3.5 txt-brand" />
+        {{ $t(chip.labelKey) }}
+      </button>
     </div>
 
     <!-- Input -->
@@ -165,6 +191,7 @@ import * as widgetsApi from '@/services/api/widgetsApi'
 import type { MemorySuggestion } from '@/services/api/widgetsApi'
 import WidgetMemorySuggestionsModal from './WidgetMemorySuggestionsModal.vue'
 import { useI18n } from 'vue-i18n'
+import { getMarkdownRenderer } from '@/composables/useMarkdown'
 
 interface FlowNode {
   id: string
@@ -209,9 +236,15 @@ const emit = defineEmits<{
   'update-flow': [data: FlowData]
   'first-flow-received': []
   'update-widget-name': [name: string]
+  'open-settings': [tab: string]
 }>()
 
 const { t, locale } = useI18n()
+const md = getMarkdownRenderer()
+
+function renderMarkdown(text: string): string {
+  return md.render(text)
+}
 
 const messages = ref<ChatMessage[]>([])
 const inputText = ref('')
@@ -232,6 +265,40 @@ const memoryModalShown = ref(false)
 const memoryModalRef = ref<InstanceType<typeof WidgetMemorySuggestionsModal> | null>(null)
 
 const visibleMessages = computed(() => messages.value)
+
+interface QuickChip {
+  key: string
+  icon: string
+  labelKey: string
+  prefill: string
+}
+
+const quickChips: QuickChip[] = [
+  {
+    key: 'website',
+    icon: 'heroicons:globe-alt',
+    labelKey: 'widgets.detail.aiPanel.chips.website',
+    prefill: '',
+  },
+  {
+    key: 'api',
+    icon: 'heroicons:server-stack',
+    labelKey: 'widgets.detail.aiPanel.chips.userApi',
+    prefill: '',
+  },
+]
+
+function applyChip(chip: QuickChip) {
+  if (chip.key === 'website') {
+    inputText.value = t('widgets.detail.aiPanel.chips.websitePrefill')
+    nextTick(() => {
+      inputRef.value?.focus()
+      inputRef.value?.setSelectionRange(inputText.value.length, inputText.value.length)
+    })
+  } else if (chip.key === 'api') {
+    emit('open-settings', 'security')
+  }
+}
 
 function saveToSession() {
   try {

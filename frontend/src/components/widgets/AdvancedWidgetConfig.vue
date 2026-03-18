@@ -519,32 +519,135 @@
               </div>
             </div>
 
-            <!-- External API Token (PRO only) -->
-            <div class="surface-chip p-4 rounded-lg space-y-3">
+            <!-- User Data Integration (PRO only) -->
+            <div class="surface-chip p-4 rounded-lg space-y-4">
               <div class="flex items-start justify-between gap-3">
                 <div>
-                  <p class="font-medium txt-primary">
-                    {{ $t('widgets.advancedConfig.externalApiToken') }}
+                  <p class="font-medium txt-primary flex items-center gap-2">
+                    <Icon icon="heroicons:user-circle" class="w-5 h-5 txt-brand" />
+                    {{ $t('widgets.advancedConfig.userDataIntegration.title') }}
                   </p>
                   <p class="text-xs txt-secondary mt-1">
-                    {{ $t('widgets.advancedConfig.externalApiTokenHelp') }}
+                    {{ $t('widgets.advancedConfig.userDataIntegration.description') }}
                   </p>
                 </div>
-                <Icon icon="heroicons:key" class="w-8 h-8 txt-secondary opacity-60" />
+                <span
+                  v-if="!auth.isPro"
+                  class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-600 dark:text-amber-400 flex-shrink-0"
+                >
+                  PRO
+                </span>
               </div>
-              <input
-                v-model="config.externalApiToken"
-                type="password"
-                autocomplete="new-password"
-                :disabled="!auth.isPro"
-                :placeholder="
-                  auth.isPro
-                    ? $t('widgets.advancedConfig.externalApiTokenPlaceholder')
-                    : $t('widgets.advancedConfig.proRequired')
-                "
-                class="w-full px-4 py-2.5 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)] disabled:opacity-50 disabled:cursor-not-allowed"
-                data-testid="input-external-api-token"
-              />
+
+              <!-- Step-by-step Guide -->
+              <div class="space-y-3">
+                <!-- Step 1: API URL -->
+                <div class="flex items-start gap-3">
+                  <span
+                    class="w-6 h-6 rounded-full bg-[var(--brand)]/10 text-[var(--brand)] text-xs font-bold flex items-center justify-center flex-shrink-0 mt-0.5"
+                  >
+                    1
+                  </span>
+                  <div class="flex-1 min-w-0">
+                    <p class="text-sm font-medium txt-primary">
+                      {{ $t('widgets.advancedConfig.userDataIntegration.step1Title') }}
+                    </p>
+                    <p class="text-xs txt-secondary mt-0.5 mb-2">
+                      {{ $t('widgets.advancedConfig.userDataIntegration.step1Help') }}
+                    </p>
+                    <input
+                      v-model="config.externalApiUrl"
+                      type="url"
+                      :disabled="!auth.isPro"
+                      placeholder="https://api.example.com/users/{externalUserId}/profile"
+                      class="w-full px-3 py-2 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)] disabled:opacity-50 disabled:cursor-not-allowed font-mono"
+                      data-testid="input-external-api-url"
+                    />
+                  </div>
+                </div>
+
+                <!-- Step 2: API Token -->
+                <div class="flex items-start gap-3">
+                  <span
+                    class="w-6 h-6 rounded-full bg-[var(--brand)]/10 text-[var(--brand)] text-xs font-bold flex items-center justify-center flex-shrink-0 mt-0.5"
+                  >
+                    2
+                  </span>
+                  <div class="flex-1 min-w-0">
+                    <p class="text-sm font-medium txt-primary">
+                      {{ $t('widgets.advancedConfig.userDataIntegration.step2Title') }}
+                    </p>
+                    <p class="text-xs txt-secondary mt-0.5 mb-2">
+                      {{ $t('widgets.advancedConfig.userDataIntegration.step2Help') }}
+                    </p>
+                    <input
+                      v-model="config.externalApiToken"
+                      type="password"
+                      autocomplete="new-password"
+                      :disabled="!auth.isPro"
+                      :placeholder="$t('widgets.advancedConfig.externalApiTokenPlaceholder')"
+                      class="w-full px-3 py-2 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)] disabled:opacity-50 disabled:cursor-not-allowed"
+                      data-testid="input-external-api-token"
+                    />
+                  </div>
+                </div>
+
+                <!-- Step 3: Embed Code -->
+                <div class="flex items-start gap-3">
+                  <span
+                    class="w-6 h-6 rounded-full bg-[var(--brand)]/10 text-[var(--brand)] text-xs font-bold flex items-center justify-center flex-shrink-0 mt-0.5"
+                  >
+                    3
+                  </span>
+                  <div class="flex-1 min-w-0">
+                    <p class="text-sm font-medium txt-primary">
+                      {{ $t('widgets.advancedConfig.userDataIntegration.step3Title') }}
+                    </p>
+                    <p class="text-xs txt-secondary mt-0.5 mb-2">
+                      {{ $t('widgets.advancedConfig.userDataIntegration.step3Help') }}
+                    </p>
+                    <pre
+                      class="px-3 py-2 rounded-lg bg-gray-900 text-green-400 text-xs font-mono whitespace-pre overflow-x-auto"
+                    >
+SynaplanWidget.init({
+  widgetId: '{{ widget.widgetId }}',
+  externalUserId: '&lt;YOUR_USER_ID&gt;'
+})</pre
+                    >
+                  </div>
+                </div>
+              </div>
+
+              <!-- How it works -->
+              <div class="mt-2 p-3 rounded-lg bg-[var(--brand)]/5 border border-[var(--brand)]/15">
+                <p class="text-xs font-medium txt-primary mb-1.5">
+                  {{ $t('widgets.advancedConfig.userDataIntegration.howItWorks') }}
+                </p>
+                <ul class="text-xs txt-secondary space-y-1">
+                  <li class="flex items-start gap-1.5">
+                    <Icon
+                      icon="heroicons:check"
+                      class="w-3.5 h-3.5 txt-brand flex-shrink-0 mt-0.5"
+                    />
+                    {{ $t('widgets.advancedConfig.userDataIntegration.howStep1') }}
+                  </li>
+                  <li class="flex items-start gap-1.5">
+                    <Icon
+                      icon="heroicons:check"
+                      class="w-3.5 h-3.5 txt-brand flex-shrink-0 mt-0.5"
+                    />
+                    {{ $t('widgets.advancedConfig.userDataIntegration.howStep2') }}
+                  </li>
+                  <li class="flex items-start gap-1.5">
+                    <Icon
+                      icon="heroicons:check"
+                      class="w-3.5 h-3.5 txt-brand flex-shrink-0 mt-0.5"
+                    />
+                    {{ $t('widgets.advancedConfig.userDataIntegration.howStep3') }}
+                  </li>
+                </ul>
+              </div>
+
               <p v-if="!auth.isPro" class="text-xs text-amber-600 dark:text-amber-400">
                 {{ $t('widgets.advancedConfig.proRequired') }}
               </p>
@@ -1368,6 +1471,7 @@ const config = reactive<widgetsApi.WidgetConfig>({
   fileUploadLimit: 3,
   allowedDomains: [],
   externalApiToken: '',
+  externalApiUrl: '',
   privacyPolicyUrl: '',
   dataProcessingAccepted: false,
 })
@@ -2111,6 +2215,7 @@ onMounted(async () => {
     fileUploadLimit: widgetConfig.fileUploadLimit ?? 3,
     allowedDomains: widgetConfig.allowedDomains || props.widget.allowedDomains || [],
     externalApiToken: widgetConfig.externalApiToken || '',
+    externalApiUrl: widgetConfig.externalApiUrl || '',
     privacyPolicyUrl: widgetConfig.privacyPolicyUrl || '',
     dataProcessingAccepted: widgetConfig.dataProcessingAccepted || false,
   })

@@ -749,6 +749,7 @@ const formData = ref<WidgetFormData>({
     allowedDomains: [],
     customFields: [],
     externalApiToken: '',
+    externalApiUrl: '',
     privacyPolicyUrl: '',
     dataProcessingAccepted: false,
   },

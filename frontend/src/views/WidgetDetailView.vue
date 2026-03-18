@@ -91,6 +91,7 @@
                 @update-flow="handleAiFlowUpdate"
                 @first-flow-received="transitionToSplitView"
                 @update-widget-name="handleWidgetNameUpdate"
+                @open-settings="openAdvancedModal"
               />
             </div>
           </Transition>
@@ -118,6 +119,118 @@
                   <p class="text-sm txt-secondary mb-4">
                     {{ $t('widgets.detail.flowSubtitle') }}
                   </p>
+
+                  <!-- User Data Integration Card -->
+                  <div
+                    class="rounded-xl border-2 transition-all duration-300 mb-5 overflow-hidden"
+                    :class="
+                      isUserDataConfigured
+                        ? 'border-emerald-500/30 bg-emerald-500/5'
+                        : auth.isPro
+                          ? 'border-dashed border-light-border/30 dark:border-dark-border/20 hover:border-[var(--brand)]/40 hover:bg-[var(--brand)]/[0.02]'
+                          : 'border-dashed border-light-border/20 dark:border-dark-border/10 opacity-75'
+                    "
+                  >
+                    <!-- Free user: upgrade hint -->
+                    <button
+                      v-if="!auth.isPro"
+                      class="w-full text-left px-4 py-3 flex items-center gap-3"
+                      @click="router.push({ name: 'subscription' })"
+                    >
+                      <div
+                        class="w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0 bg-amber-500/10"
+                      >
+                        <Icon icon="heroicons:lock-closed" class="w-5 h-5 text-amber-500" />
+                      </div>
+                      <div class="flex-1 min-w-0">
+                        <p class="text-sm font-medium txt-primary">
+                          {{ $t('widgets.detail.userData.title') }}
+                        </p>
+                        <p class="text-xs txt-secondary">
+                          {{ $t('widgets.detail.userData.upgradeHint') }}
+                        </p>
+                      </div>
+                      <span
+                        class="px-2.5 py-1 rounded-full text-[10px] font-bold bg-gradient-to-r from-amber-500 to-orange-500 text-white flex-shrink-0"
+                      >
+                        PRO
+                      </span>
+                    </button>
+
+                    <!-- PRO user: not configured -->
+                    <button
+                      v-else-if="!isUserDataConfigured"
+                      class="w-full text-left px-4 py-3 flex items-center gap-3"
+                      @click="openAdvancedModal('security')"
+                    >
+                      <div
+                        class="w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0 bg-violet-500/10"
+                      >
+                        <Icon icon="heroicons:user-circle" class="w-5 h-5 text-violet-500" />
+                      </div>
+                      <div class="flex-1 min-w-0">
+                        <p class="text-sm font-medium txt-primary">
+                          {{ $t('widgets.detail.userData.title') }}
+                        </p>
+                        <p class="text-xs txt-secondary">
+                          {{ $t('widgets.detail.userData.notConfigured') }}
+                        </p>
+                      </div>
+                      <span class="text-xs font-medium txt-brand flex items-center gap-1">
+                        {{ $t('widgets.detail.userData.setup') }}
+                        <Icon icon="heroicons:arrow-right" class="w-4 h-4" />
+                      </span>
+                    </button>
+
+                    <!-- PRO user: configured & active -->
+                    <template v-else>
+                      <div class="px-4 py-3 flex items-center gap-3">
+                        <div
+                          class="w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0 bg-emerald-500/15"
+                        >
+                          <Icon icon="heroicons:check-badge" class="w-5 h-5 text-emerald-500" />
+                        </div>
+                        <div class="flex-1 min-w-0">
+                          <p class="text-sm font-medium txt-primary">
+                            {{ $t('widgets.detail.userData.title') }}
+                          </p>
+                          <p class="text-xs txt-secondary truncate font-mono">
+                            {{ widget?.config?.externalApiUrl }}
+                          </p>
+                        </div>
+                        <div class="flex items-center gap-1 flex-shrink-0">
+                          <button
+                            class="p-1.5 rounded-lg txt-secondary hover:txt-primary hover:bg-gray-100 dark:hover:bg-white/5 transition-colors"
+                            :title="$t('widgets.detail.userData.edit')"
+                            @click="openAdvancedModal('security')"
+                          >
+                            <Icon icon="heroicons:pencil-square" class="w-4 h-4" />
+                          </button>
+                          <button
+                            class="p-1.5 rounded-lg text-red-400 hover:text-red-500 hover:bg-red-500/10 transition-colors"
+                            :title="$t('widgets.detail.userData.remove')"
+                            @click="removeUserDataIntegration"
+                          >
+                            <Icon icon="heroicons:trash" class="w-4 h-4" />
+                          </button>
+                        </div>
+                      </div>
+                      <div class="px-4 pb-3 flex items-center gap-6 text-xs txt-secondary">
+                        <span class="flex items-center gap-1.5">
+                          <Icon icon="heroicons:server-stack" class="w-3.5 h-3.5" />
+                          API
+                        </span>
+                        <span class="flex items-center gap-1.5">
+                          <Icon icon="heroicons:arrow-path" class="w-3.5 h-3.5" />
+                          {{ $t('widgets.detail.userData.autoFetch') }}
+                        </span>
+                        <span class="flex items-center gap-1.5">
+                          <Icon icon="heroicons:sparkles" class="w-3.5 h-3.5" />
+                          {{ $t('widgets.detail.userData.aiContext') }}
+                        </span>
+                      </div>
+                    </template>
+                  </div>
 
                   <!-- Contextual hint -->
                   <div
@@ -956,6 +1069,7 @@
                 @update-flow="handleAiFlowUpdate"
                 @first-flow-received="transitionToSplitView"
                 @update-widget-name="handleWidgetNameUpdate"
+                @open-settings="openAdvancedModal"
               />
             </div>
 
@@ -989,6 +1103,7 @@
                     @update-flow="handleAiFlowUpdate"
                     @first-flow-received="transitionToSplitView"
                     @update-widget-name="handleWidgetNameUpdate"
+                    @open-settings="openAdvancedModal"
                   />
                 </div>
               </Transition>
@@ -1120,6 +1235,24 @@ const wizardFiles = ref<Array<{ messageId: number; fileName: string }>>([])
 const wizardUploadingFile = ref(false)
 const showWizardFilePicker = ref(false)
 const wizardFilePickerExcludeIds = computed(() => wizardFiles.value.map((f) => f.messageId))
+
+const isUserDataConfigured = computed(() => {
+  const url = widget.value?.config?.externalApiUrl
+  return !!url && url.trim().length > 0
+})
+
+async function removeUserDataIntegration() {
+  if (!widget.value) return
+  try {
+    await widgetsApi.updateWidget(widget.value.widgetId, {
+      config: { ...widget.value.config, externalApiUrl: '', externalApiToken: '' },
+    })
+    await loadData()
+    success(t('widgets.detail.userData.removed'))
+  } catch {
+    showError(t('widgets.advancedConfig.saveError'))
+  }
+}
 
 const currentFlowSnapshot = computed(() => ({
   triggers: triggers.value,

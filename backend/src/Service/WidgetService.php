@@ -220,6 +220,14 @@ final readonly class WidgetService
             ? "buttonIconUrl: '{$buttonIconUrl}',"
             : "buttonIcon: '{$buttonIcon}',";
 
+        $externalApiUrl = \array_key_exists('externalApiUrl', $config) && \is_string($config['externalApiUrl'])
+            ? trim($config['externalApiUrl'])
+            : '';
+        $hasUserDataApi = '' !== $externalApiUrl;
+        $externalUserIdLine = $hasUserDataApi
+            ? "\n    externalUserId: 'YOUR_USER_ID',  // Required: pass the logged-in user's ID for personalized AI responses"
+            : '';
+
         return <<<HTML
 <!-- Synaplan Chat Widget (ES Module with Auto Code-Splitting) -->
 <script type="module">
@@ -238,8 +246,7 @@ final readonly class WidgetService
     maxFileSize: {$maxFileSize},
     allowFileUpload: {$allowFileUploadStr},
     fileUploadLimit: {$fileUploadLimit},
-    lazy: true  // Load chat on button click (set to false for immediate load)
-    // externalUserId: 'USER_ID'  // Optional: pass logged-in user ID for personalized AI responses
+    lazy: true,{$externalUserIdLine}
   })
 </script>
 HTML;

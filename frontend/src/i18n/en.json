@@ -1525,6 +1525,18 @@
       "back": "Back to widgets",
       "notFound": "Widget not found",
       "aiButton": "Configure with AI",
+      "userData": {
+        "title": "User Data Integration",
+        "notConfigured": "Connect your backend API for personalized AI responses",
+        "upgradeHint": "Upgrade to PRO to connect your backend API for personalized responses",
+        "setup": "Set up",
+        "active": "Active",
+        "edit": "Edit settings",
+        "remove": "Remove integration",
+        "removed": "User data integration removed",
+        "autoFetch": "Auto-fetch",
+        "aiContext": "AI-powered"
+      },
       "flowTitle": "Widget Flow",
       "flowSubtitle": "Connect questions to responses. Your widget follows these rules.",
       "flowHintStart": "Click a question to start connecting.",
@@ -1614,7 +1626,13 @@
         "subtitle": "I'll help you create Q&A for your widget",
         "placeholder": "Describe your business...",
         "restart": "Start over",
-        "error": "Something went wrong. Please try again."
+        "error": "Something went wrong. Please try again.",
+        "chips": {
+          "website": "Import from Website",
+          "userApi": "Connect User Data API",
+          "websitePrefill": "Research this website: ",
+          "apiPrefill": "I want to connect a User Data API to fetch personalized user data from my backend. How do I set that up?"
+        }
       },
       "memorySuggestions": {
         "title": "Import from your Memories",
@@ -1772,6 +1790,20 @@
       "externalApiToken": "External API Token",
       "externalApiTokenHelp": "Bearer token sent with API requests to authenticate with external services. Stored securely server-side.",
       "externalApiTokenPlaceholder": "Enter API token...",
+      "userDataIntegration": {
+        "title": "User Data Integration",
+        "description": "Connect your backend API to give the AI personalized context about each logged-in user.",
+        "step1Title": "API Endpoint URL",
+        "step1Help": "Enter the URL of your API endpoint. Use {externalUserId} as a placeholder — it will be replaced with the user's ID automatically.",
+        "step2Title": "API Bearer Token",
+        "step2Help": "The token is sent as a Bearer token in the Authorization header to your API.",
+        "step3Title": "Add to your Embed Code",
+        "step3Help": "Pass the logged-in user's ID when initializing the widget on your website.",
+        "howItWorks": "How it works",
+        "howStep1": "A user visits your site — the widget receives their ID via the embed code",
+        "howStep2": "The system calls your API with the user's ID to fetch their profile",
+        "howStep3": "The AI uses the profile data to give personalized, context-aware answers"
+      },
       "proRequired": "PRO subscription required",
       "saveSuccess": "Settings saved successfully!",
       "saveError": "Failed to save settings",
