@@ -79,6 +79,21 @@
       </button>
     </nav>
 
+    <!-- Upgrade Button -->
+    <div
+      v-if="!authStore.isAdmin && configStore.billing.enabled && !authStore.isPro"
+      class="flex items-center justify-center py-2 flex-shrink-0"
+    >
+      <button
+        class="v2-upgrade-btn w-10 h-10 flex items-center justify-center rounded-xl"
+        :title="$t('nav.upgrade')"
+        data-testid="btn-sidebar-v2-upgrade"
+        @click="handleNavigate('/subscription')"
+      >
+        <Icon icon="mdi:auto-fix" class="w-6 h-6" />
+      </button>
+    </div>
+
     <!-- User Avatar -->
     <div class="flex items-center justify-center py-4 flex-shrink-0">
       <button
