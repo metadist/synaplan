@@ -34,6 +34,7 @@ final readonly class WidgetSetupService
         private PromptRepository $promptRepository,
         private WidgetService $widgetService,
         private ModelConfigService $modelConfigService,
+        private UrlContentService $urlContentService,
         private LoggerInterface $logger,
     ) {
     }
@@ -108,8 +109,8 @@ final readonly class WidgetSetupService
         $languageInstruction = "**CRITICAL LANGUAGE RULE**: You MUST detect the language the user writes in and ALWAYS respond in that same language. If the user writes in German, respond in German. If the user writes in French, respond in French. The application language is {$languageName}, so start in {$languageName}, but IMMEDIATELY switch to whatever language the user uses. This rule overrides everything else.\n\n";
         $systemPromptWithLanguage = $languageInstruction.$systemPrompt;
 
-        // Build conversation history from passed messages
-        $messages = $this->buildConversationMessagesFromHistory($history, $systemPromptWithLanguage, $text);
+        $enrichedText = $this->enrichWithWebsiteContent($text);
+        $messages = $this->buildConversationMessagesFromHistory($history, $systemPromptWithLanguage, $enrichedText);
 
         // Build AI options
         $aiOptions = [
@@ -164,7 +165,7 @@ final readonly class WidgetSetupService
      */
     private function sendFlowBuilderMessage(Widget $widget, User $user, string $text, array $history, string $language, ?array $currentFlow = null): array
     {
-        $systemPrompt = self::getFlowBuilderPromptText();
+        $systemPrompt = self::getFlowBuilderPromptText($widget->getName());
         $modelId = self::DEFAULT_SETUP_MODEL_ID;
 
         $provider = $this->modelConfigService->getProviderForModel($modelId);
@@ -201,7 +202,8 @@ final readonly class WidgetSetupService
 
         $isStart = self::FLOW_BUILDER_START_MARKER === trim($text);
         if (!$isStart) {
-            $messages[] = ['role' => 'user', 'content' => $text];
+            $enrichedText = $this->enrichWithWebsiteContent($text);
+            $messages[] = ['role' => 'user', 'content' => $enrichedText];
         }
 
         $aiOptions = ['temperature' => 0.7];
@@ -706,12 +708,17 @@ PROMPT;
     /**
      * Return the flow-builder system prompt that generates structured Q&A pairs.
      */
-    public static function getFlowBuilderPromptText(): string
+    public static function getFlowBuilderPromptText(string $widgetName = ''): string
     {
-        return <<<'PROMPT'
+        $widgetContext = '';
+        if ('' !== $widgetName) {
+            $widgetContext = "\n\n## WIDGET CONTEXT\nThe widget is named \"{$widgetName}\". Use this as the business/website name. Do NOT ask what the business is — you already know it. Jump straight into building Q&A entries.\n";
+        }
+
+        return <<<PROMPT
 # Widget Q&A Flow Builder
 
-You are a widget configurator that ACTS, not talks. Your job: build and maintain a complete set of Q&A pairs for a chat widget. Every response you give (after the greeting) MUST contain a <<<FLOW_UPDATE>>> block with the COMPLETE flow state.
+You are a widget configurator that ACTS, not talks. Your job: build and maintain a complete set of Q&A pairs for a chat widget. Every response you give (after the greeting) MUST contain a <<<FLOW_UPDATE>>> block with the COMPLETE flow state.{$widgetContext}
 
 ## CORE PRINCIPLE: ACT, DON'T CHAT
 
@@ -754,7 +761,7 @@ Format:
 
 - **"text"** — Direct text answer (opening hours, descriptions, policies, FAQs)
 - **"link"** — URL/webpage. MUST include `"meta": {"url": "https://..."}`. Use for websites, social media, product pages.
-- **"api"** — Live API endpoint. Include `"meta": {"url": "...", "method": "GET"}`.
+- **"api"** — Live API endpoint. Include `"meta": {"url": "...", "method": "GET"}`. URLs can contain `{externalUserId}` placeholder which gets replaced with the logged-in user's ID from the host site (e.g. `https://api.example.com/users/{externalUserId}/profile`).
 - **"list"** — List of items. Label contains semicolon-separated items.
 - **"pdf"** — Document/file reference.
 - **"custom"** — Anything else.
@@ -794,6 +801,14 @@ You are NOT limited to predefined categories. Create whatever Q&A pairs fit the 
 - After acting, ask ONE short follow-up question about the next area to cover
 - Be proactive: suggest areas the user hasn't covered yet
 
+## WEBSITE RESEARCH
+
+When the user mentions a URL (e.g. "it's about example.com"), the system automatically crawls the website and appends the content to their message. When you receive crawled content:
+1. **Summarize** what you found on the website in 2-3 sentences
+2. **Create Q&A entries** based on the extracted content (about, services, contact, etc.)
+3. **Ask the user to confirm** if the information is correct before finalizing
+4. Use the crawled data to fill in response labels with REAL data from the website
+
 ## TOPIC AREAS (adapt to business type)
 
 1. Business basics (what they do)
@@ -805,7 +820,9 @@ You are NOT limited to predefined categories. Create whatever Q&A pairs fit the 
 
 ## START
 
-Greet briefly and ask what kind of business/website the widget is for. No FLOW_UPDATE yet.
+If the WIDGET CONTEXT section above provides a business name, greet briefly and immediately ask what kind of Q&A entries they need (e.g. opening hours, contact, products). Do NOT ask what the business is.
+If no widget context is given, greet briefly and ask what kind of business/website the widget is for.
+No FLOW_UPDATE in the greeting.
 
 ## REMOVAL EXAMPLES
 
@@ -847,6 +864,14 @@ You are a friendly assistant helping the user configure their chat widget. Have 
 - Keep responses short (2-3 sentences), don't ramble
 - Briefly acknowledge answers before moving to the next question
 - If the user switches to a different language, follow their lead
+
+## WEBSITE RESEARCH
+
+When the user mentions a URL or domain name, the system automatically crawls the website and appends the extracted content to their message. When you receive crawled content (marked with "--- WEBSITE CONTENT ---"):
+- Use the information to answer your own questions (business type, products, target audience, etc.)
+- Summarize what you found in 2-3 sentences so the user can confirm
+- Count answered questions based on what the website reveals (e.g., business description, services → that's question 1 answered!)
+- Ask follow-up questions only for information NOT found on the website
 
 ## IMPORTANT RULES
 
@@ -917,5 +942,61 @@ Example: "Hey! Great to have you here. Tell me a bit about what you do – what'
 
 [QUESTION:1]
 PROMPT;
+    }
+
+    /**
+     * Detect URLs in user text, crawl them, and append extracted content.
+     */
+    private function enrichWithWebsiteContent(string $text): string
+    {
+        $urls = [];
+
+        if (preg_match_all('#https?://[^\s<>"\')]+#i', $text, $matches)) {
+            $urls = array_merge($urls, $matches[0]);
+        }
+
+        if (preg_match_all('#(?<![/:])\b([a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.(?:com|de|org|net|io|co|eu|at|ch|info|biz|app|dev|me|tech|ai|shop)(?:/[^\s<>"\')]*)?)\b#i', $text, $bareMatches)) {
+            foreach ($bareMatches[1] as $bare) {
+                $urls[] = 'https://'.$bare;
+            }
+        }
+
+        $urls = array_unique($urls);
+        if ([] === $urls) {
+            return $text;
+        }
+        $crawledSections = [];
+        $maxTotalLength = 6000;
+        $totalLength = 0;
+
+        foreach ($urls as $url) {
+            if ($totalLength >= $maxTotalLength) {
+                break;
+            }
+
+            try {
+                $result = $this->urlContentService->fetchForCrawling($url);
+                if ($result->success && '' !== $result->extractedText) {
+                    $content = $result->extractedText;
+                    $remaining = $maxTotalLength - $totalLength;
+                    if (\strlen($content) > $remaining) {
+                        $content = mb_substr($content, 0, $remaining).'... [truncated]';
+                    }
+                    $crawledSections[] = sprintf("[Crawled: %s]\n%s", $url, $content);
+                    $totalLength += \strlen($content);
+                }
+            } catch (\Throwable $e) {
+                $this->logger->warning('Failed to crawl URL for widget setup', [
+                    'url' => $url,
+                    'error' => $e->getMessage(),
+                ]);
+            }
+        }
+
+        if ([] === $crawledSections) {
+            return $text;
+        }
+
+        return $text."\n\n--- WEBSITE CONTENT (crawled automatically, use this to create Q&A entries) ---\n".implode("\n\n", $crawledSections);
     }
 }

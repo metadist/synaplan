@@ -54,6 +54,9 @@ export interface WidgetConfig {
   allowFileUpload?: boolean
   fileUploadLimit?: number
   customFields?: CustomFieldDef[]
+  externalApiToken?: string
+  privacyPolicyUrl?: string
+  dataProcessingAccepted?: boolean
 }
 
 export interface CreateWidgetRequest {
@@ -178,6 +181,7 @@ export async function getWidgetStats(widgetId: string): Promise<{
 export interface SendWidgetMessageOptions {
   chatId?: number
   fileIds?: number[]
+  externalUserId?: string
   apiUrl?: string
   headers?: Record<string, string>
   onChunk?: (chunk: string) => void | Promise<void>
@@ -202,7 +206,14 @@ export async function sendWidgetMessage(
   sessionId: string,
   options: SendWidgetMessageOptions = {}
 ): Promise<SendWidgetMessageResult> {
-  const { chatId, fileIds, apiUrl: apiUrlOverride, headers: extraHeaders, onStatus } = options
+  const {
+    chatId,
+    fileIds,
+    externalUserId,
+    apiUrl: apiUrlOverride,
+    headers: extraHeaders,
+    onStatus,
+  } = options
 
   const config = useConfigStore()
   const apiUrl = apiUrlOverride ?? config.apiBaseUrl
@@ -228,6 +239,10 @@ export async function sendWidgetMessage(
 
   if (fileIds && fileIds.length > 0) {
     payload.files = fileIds
+  }
+
+  if (externalUserId) {
+    payload.externalUserId = externalUserId
   }
 
   // Include credentials when in test/internal mode (dashboard context)

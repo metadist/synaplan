@@ -43,6 +43,8 @@ interface WidgetConfig {
   allowFullscreen?: boolean
   hideButton?: boolean
   detectTheme?: boolean
+  externalUserId?: string
+  privacyPolicyUrl?: string
 }
 
 const DEFAULT_VUE_CDN = 'https://cdn.jsdelivr.net/npm/vue@3/dist/vue.global.prod.js'
@@ -419,6 +421,8 @@ class SynaplanWidget {
         hideButton: this.config!.lazy || this.config!.hideButton,
         fullscreenMode: this.config!.fullscreenMode,
         allowFullscreen: this.config!.allowFullscreen,
+        externalUserId: this.config!.externalUserId,
+        privacyPolicyUrl: this.config!.privacyPolicyUrl,
         isPreview: false,
       })
 

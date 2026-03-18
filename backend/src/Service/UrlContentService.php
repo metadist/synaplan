@@ -340,7 +340,10 @@ final readonly class UrlContentService
      * Fetch an API endpoint with a tighter response limit to control token usage.
      * Does NOT check robots.txt (APIs are intended to be consumed programmatically).
      */
-    public function fetchApi(string $url, string $method = 'GET'): UrlContentResult
+    /**
+     * @param array<string, string> $headers
+     */
+    public function fetchApi(string $url, string $method = 'GET', array $headers = []): UrlContentResult
     {
         $hostname = $this->getHostname($url);
 
@@ -359,10 +362,10 @@ final readonly class UrlContentService
             $response = $this->httpClient->request($method, $url, [
                 'timeout' => self::TIMEOUT_SECONDS,
                 'max_redirects' => 3,
-                'headers' => [
+                'headers' => array_merge([
                     'User-Agent' => self::USER_AGENT,
                     'Accept' => 'application/json,text/plain',
-                ],
+                ], $headers),
             ]);
 
             $statusCode = $response->getStatusCode();

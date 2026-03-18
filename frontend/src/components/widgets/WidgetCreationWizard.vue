@@ -748,6 +748,9 @@ const formData = ref<WidgetFormData>({
     fileUploadLimit: 3,
     allowedDomains: [],
     customFields: [],
+    externalApiToken: '',
+    privacyPolicyUrl: '',
+    dataProcessingAccepted: false,
   },
 })
 

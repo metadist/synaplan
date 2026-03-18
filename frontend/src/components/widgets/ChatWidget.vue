@@ -166,6 +166,66 @@
           data-testid="section-messages"
           @click="handleMessagesClick"
         >
+          <!-- Privacy Notice -->
+          <div
+            v-if="!privacyDismissed"
+            class="text-[11px] leading-relaxed px-3 py-2 rounded-xl"
+            :style="{
+              backgroundColor: widgetTheme === 'dark' ? '#2a2a2a' : '#f9fafb',
+              color: widgetTheme === 'dark' ? '#9ca3af' : '#6b7280',
+              border: `1px solid ${widgetTheme === 'dark' ? '#374151' : '#e5e7eb'}`,
+            }"
+            data-testid="privacy-notice"
+          >
+            <div class="flex items-start gap-2">
+              <svg
+                class="w-3.5 h-3.5 flex-shrink-0 mt-0.5 opacity-60"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                stroke-width="2"
+              >
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  d="M9 12.75L11.25 15 15 9.75m-3-7.036A11.959 11.959 0 013.598 6 11.99 11.99 0 003 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285z"
+                />
+              </svg>
+              <div class="flex-1">
+                <span>
+                  {{
+                    externalUserId
+                      ? $t('widget.privacyNoticePersonalized')
+                      : $t('widget.privacyNotice')
+                  }}
+                </span>
+                <a
+                  v-if="privacyPolicyUrl"
+                  :href="privacyPolicyUrl"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  class="underline hover:opacity-80 ml-1"
+                  :style="{ color: primaryColor }"
+                  >{{ $t('widget.privacyPolicyLink') }}</a
+                >
+                <button
+                  class="ml-2 opacity-50 hover:opacity-100 transition-opacity"
+                  :aria-label="$t('widget.dismissPrivacy')"
+                  @click.stop="privacyDismissed = true"
+                >
+                  <svg class="w-3 h-3 inline" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                      stroke-width="2"
+                      d="M6 18L18 6M6 6l12 12"
+                    />
+                  </svg>
+                </button>
+              </div>
+            </div>
+          </div>
+
           <div
             v-for="message in sortedMessages"
             :key="message.id"
@@ -579,6 +639,8 @@ interface Props {
   hideButton?: boolean
   fullscreenMode?: boolean
   allowFullscreen?: boolean
+  externalUserId?: string
+  privacyPolicyUrl?: string
   testMode?: boolean
   internalMode?: boolean
 }
@@ -634,6 +696,7 @@ const isOpen = ref(false)
 const isFullscreen = ref(props.fullscreenMode)
 const widgetTheme = ref<'light' | 'dark'>(props.defaultTheme)
 const inputMessage = ref('')
+const privacyDismissed = ref(false)
 
 // Get button icon component based on buttonIcon prop
 const getButtonIconComponent = computed(() => {
@@ -1353,6 +1416,7 @@ const sendMessage = async () => {
     const result = await sendWidgetMessage(props.widgetId, userMessage, sessionId.value, {
       chatId: chatId.value ?? undefined,
       fileIds,
+      externalUserId: props.externalUserId,
       apiUrl: props.apiUrl,
       headers: testModeHeaders.value,
       onChunk: async (chunk: string) => {

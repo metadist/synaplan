@@ -518,6 +518,37 @@
                 </div>
               </div>
             </div>
+
+            <!-- External API Token (PRO only) -->
+            <div class="surface-chip p-4 rounded-lg space-y-3">
+              <div class="flex items-start justify-between gap-3">
+                <div>
+                  <p class="font-medium txt-primary">
+                    {{ $t('widgets.advancedConfig.externalApiToken') }}
+                  </p>
+                  <p class="text-xs txt-secondary mt-1">
+                    {{ $t('widgets.advancedConfig.externalApiTokenHelp') }}
+                  </p>
+                </div>
+                <Icon icon="heroicons:key" class="w-8 h-8 txt-secondary opacity-60" />
+              </div>
+              <input
+                v-model="config.externalApiToken"
+                type="password"
+                autocomplete="new-password"
+                :disabled="!auth.isPro"
+                :placeholder="
+                  auth.isPro
+                    ? $t('widgets.advancedConfig.externalApiTokenPlaceholder')
+                    : $t('widgets.advancedConfig.proRequired')
+                "
+                class="w-full px-4 py-2.5 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)] disabled:opacity-50 disabled:cursor-not-allowed"
+                data-testid="input-external-api-token"
+              />
+              <p v-if="!auth.isPro" class="text-xs text-amber-600 dark:text-amber-400">
+                {{ $t('widgets.advancedConfig.proRequired') }}
+              </p>
+            </div>
           </div>
 
           <!-- Custom Fields Tab -->
@@ -629,6 +660,100 @@
             >
               {{ $t('widgets.customFields.maxFieldsReached') }}
             </p>
+          </div>
+
+          <!-- Privacy & Data Processing Tab -->
+          <div
+            v-else-if="!promptOnly && activeTab === 'privacy'"
+            class="space-y-6"
+            data-testid="section-privacy"
+          >
+            <!-- Data Processing Agreement -->
+            <div class="surface-chip p-4 rounded-lg space-y-4">
+              <div class="flex items-start justify-between gap-3">
+                <div>
+                  <p class="font-medium txt-primary">
+                    {{ $t('widgets.advancedConfig.dataProcessing') }}
+                  </p>
+                  <p class="text-xs txt-secondary mt-1">
+                    {{ $t('widgets.advancedConfig.dataProcessingHelp') }}
+                  </p>
+                </div>
+                <Icon
+                  icon="heroicons:document-check"
+                  class="w-8 h-8 txt-secondary opacity-60 flex-shrink-0"
+                />
+              </div>
+
+              <label
+                class="flex items-start gap-3 p-3 rounded-lg border border-light-border/30 dark:border-dark-border/20 cursor-pointer hover:border-[var(--brand)]/40 transition-colors"
+              >
+                <input
+                  v-model="config.dataProcessingAccepted"
+                  type="checkbox"
+                  class="mt-0.5 w-4 h-4 rounded border-light-border/30 dark:border-dark-border/20 text-[var(--brand)] focus:ring-[var(--brand)]"
+                  data-testid="checkbox-avv"
+                />
+                <div>
+                  <p class="text-sm txt-primary font-medium">
+                    {{ $t('widgets.advancedConfig.avvAcceptLabel') }}
+                  </p>
+                  <p class="text-xs txt-secondary mt-1">
+                    {{ $t('widgets.advancedConfig.avvAcceptDescription') }}
+                  </p>
+                </div>
+              </label>
+            </div>
+
+            <!-- Privacy Policy URL -->
+            <div class="surface-chip p-4 rounded-lg space-y-3">
+              <div class="flex items-start justify-between gap-3">
+                <div>
+                  <p class="font-medium txt-primary">
+                    {{ $t('widgets.advancedConfig.privacyPolicyUrl') }}
+                  </p>
+                  <p class="text-xs txt-secondary mt-1">
+                    {{ $t('widgets.advancedConfig.privacyPolicyUrlHelp') }}
+                  </p>
+                </div>
+                <Icon
+                  icon="heroicons:link"
+                  class="w-8 h-8 txt-secondary opacity-60 flex-shrink-0"
+                />
+              </div>
+              <input
+                v-model="config.privacyPolicyUrl"
+                type="url"
+                :placeholder="$t('widgets.advancedConfig.privacyPolicyUrlPlaceholder')"
+                class="w-full px-4 py-2.5 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
+                data-testid="input-privacy-url"
+              />
+            </div>
+
+            <!-- Info about what data is processed -->
+            <div
+              class="p-4 rounded-lg border border-light-border/30 dark:border-dark-border/20 space-y-3"
+            >
+              <div class="flex items-start gap-2">
+                <Icon
+                  icon="heroicons:information-circle"
+                  class="w-5 h-5 txt-brand flex-shrink-0 mt-0.5"
+                />
+                <div>
+                  <p class="text-sm font-medium txt-primary">
+                    {{ $t('widgets.advancedConfig.dataProcessedTitle') }}
+                  </p>
+                  <ul class="text-xs txt-secondary mt-2 space-y-1.5 list-disc list-inside">
+                    <li>{{ $t('widgets.advancedConfig.dataProcessedChat') }}</li>
+                    <li>{{ $t('widgets.advancedConfig.dataProcessedSession') }}</li>
+                    <li>{{ $t('widgets.advancedConfig.dataProcessedFiles') }}</li>
+                    <li v-if="hasApiResponses">
+                      {{ $t('widgets.advancedConfig.dataProcessedApi') }}
+                    </li>
+                  </ul>
+                </div>
+              </div>
+            </div>
           </div>
 
           <!-- AI Assistant Tab -->
@@ -1105,6 +1230,7 @@ import { ref, reactive, computed, onMounted, watch } from 'vue'
 import { Icon } from '@iconify/vue'
 import { useI18n } from 'vue-i18n'
 import { useNotification } from '@/composables/useNotification'
+import { useAuthStore } from '@/stores/auth'
 import * as widgetsApi from '@/services/api/widgetsApi'
 import { promptsApi, type AvailableFile } from '@/services/api/promptsApi'
 import { configApi } from '@/services/api/configApi'
@@ -1149,6 +1275,7 @@ const emit = defineEmits<{
 }>()
 
 const { t } = useI18n()
+const auth = useAuthStore()
 const { success, error: showError } = useNotification()
 
 // Check if widget has a custom/configured prompt (not the default)
@@ -1165,6 +1292,10 @@ const hasCustomPrompt = computed(() => {
 })
 
 // Check if localhost addresses are in allowed domains
+const hasApiResponses = computed(() => {
+  return !!config.externalApiToken
+})
+
 const hasLocalhostInDomains = computed(() => {
   if (!config.allowedDomains?.length) return false
   return config.allowedDomains.some(
@@ -1199,6 +1330,11 @@ const tabs = computed(() => {
       labelKey: 'widgets.advancedConfig.tabs.customFields',
     },
     {
+      id: 'privacy',
+      icon: 'heroicons:shield-exclamation',
+      labelKey: 'widgets.advancedConfig.tabs.privacy',
+    },
+    {
       id: 'assistant',
       icon: 'heroicons:sparkles',
       labelKey: 'widgets.advancedConfig.tabs.assistant',
@@ -1231,6 +1367,9 @@ const config = reactive<widgetsApi.WidgetConfig>({
   allowFileUpload: false,
   fileUploadLimit: 3,
   allowedDomains: [],
+  externalApiToken: '',
+  privacyPolicyUrl: '',
+  dataProcessingAccepted: false,
 })
 
 // Custom fields
@@ -1971,6 +2110,9 @@ onMounted(async () => {
     allowFileUpload: widgetConfig.allowFileUpload || false,
     fileUploadLimit: widgetConfig.fileUploadLimit ?? 3,
     allowedDomains: widgetConfig.allowedDomains || props.widget.allowedDomains || [],
+    externalApiToken: widgetConfig.externalApiToken || '',
+    privacyPolicyUrl: widgetConfig.privacyPolicyUrl || '',
+    dataProcessingAccepted: widgetConfig.dataProcessingAccepted || false,
   })
 
   // Load custom fields

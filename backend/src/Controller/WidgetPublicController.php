@@ -403,7 +403,10 @@ class WidgetPublicController extends AbstractController
                 'configured_model_id' => $widgetModelId,
             ]);
 
-            $apiContext = $this->fetchApiContext($widget, $owner);
+            $externalUserId = isset($data['externalUserId']) && \is_string($data['externalUserId'])
+                ? trim($data['externalUserId'])
+                : '';
+            $apiContext = $this->fetchApiContext($widget, $owner, $externalUserId);
 
             $processingOptions = [
                 'fixed_task_prompt' => $widget->getTaskPromptTopic(),
@@ -1542,7 +1545,7 @@ class WidgetPublicController extends AbstractController
      * @param \App\Entity\Widget $widget
      * @param \App\Entity\User   $owner
      */
-    private function fetchApiContext($widget, $owner): string
+    private function fetchApiContext($widget, $owner, string $externalUserId = ''): string
     {
         if ($this->billingService->isEnabled() && \in_array($owner->getUserLevel(), ['NEW', 'ANONYMOUS'], true)) {
             return '';
@@ -1587,13 +1590,29 @@ class WidgetPublicController extends AbstractController
         $sections = [];
         $totalLength = 0;
 
+        $widgetConfig = $widget->getConfig();
+        $externalApiToken = \is_string($widgetConfig['externalApiToken'] ?? null)
+            ? $widgetConfig['externalApiToken']
+            : '';
+
         foreach ($apiUrls as $api) {
             if ($totalLength >= $maxTotalLength) {
                 break;
             }
 
+            $url = str_replace('{externalUserId}', $externalUserId, $api['url']);
+
+            if (str_contains($url, '{externalUserId}')) {
+                continue;
+            }
+
+            $apiHeaders = [];
+            if ('' !== $externalApiToken) {
+                $apiHeaders['Authorization'] = 'Bearer '.$externalApiToken;
+            }
+
             try {
-                $result = $this->urlContentService->fetchApi($api['url'], $api['method']);
+                $result = $this->urlContentService->fetchApi($url, $api['method'], $apiHeaders);
                 if ($result->success && '' !== $result->extractedText) {
                     $section = sprintf(
                         "[%s %s] %s:\n%s",

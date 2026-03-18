@@ -239,6 +239,7 @@ final readonly class WidgetService
     allowFileUpload: {$allowFileUploadStr},
     fileUploadLimit: {$fileUploadLimit},
     lazy: true  // Load chat on button click (set to false for immediate load)
+    // externalUserId: 'USER_ID'  // Optional: pass logged-in user ID for personalized AI responses
   })
 </script>
 HTML;

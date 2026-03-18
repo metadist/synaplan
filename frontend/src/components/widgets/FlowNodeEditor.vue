@@ -76,9 +76,20 @@
       </label>
       <input
         v-model="form.url"
-        :placeholder="form.type === 'api' ? 'https://api.example.com/v1/...' : 'https://...'"
+        :placeholder="
+          form.type === 'api'
+            ? 'https://api.example.com/v1/users/{externalUserId}/profile'
+            : 'https://...'
+        "
         class="w-full px-3 py-2 rounded-lg text-sm border border-light-border/30 dark:border-dark-border/20 surface-card txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)]/40"
       />
+      <p v-if="form.type === 'api'" class="text-[10px] txt-secondary mt-1">
+        {{
+          $t('widgets.detail.nodeEditor.externalUserIdHint', {
+            placeholder: '{externalUserId}',
+          })
+        }}
+      </p>
     </div>
 
     <!-- Method (api only) -->

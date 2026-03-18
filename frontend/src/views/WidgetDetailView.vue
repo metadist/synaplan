@@ -17,11 +17,38 @@
           <div class="flex gap-2">
             <button
               class="px-4 py-2.5 rounded-xl border border-light-border/30 dark:border-dark-border/20 txt-secondary text-sm hover:txt-primary transition-colors"
-              @click="openAdvancedModal"
+              @click="openAdvancedModal()"
             >
               <Icon icon="heroicons:cog-6-tooth" class="w-4 h-4" />
             </button>
           </div>
+        </div>
+      </div>
+
+      <!-- Data Processing Notice -->
+      <div
+        v-if="widget && !widget.config?.dataProcessingAccepted"
+        class="mx-4 lg:mx-6 mt-3 p-3 rounded-xl bg-amber-500/10 border border-amber-500/30"
+      >
+        <div class="flex items-start gap-3">
+          <Icon
+            icon="heroicons:shield-exclamation"
+            class="w-5 h-5 text-amber-600 dark:text-amber-400 flex-shrink-0 mt-0.5"
+          />
+          <div class="flex-1 min-w-0">
+            <p class="text-sm font-medium text-amber-700 dark:text-amber-300">
+              {{ $t('widgets.detail.avvNoticeTitle') }}
+            </p>
+            <p class="text-xs text-amber-600 dark:text-amber-400 mt-1">
+              {{ $t('widgets.detail.avvNoticeDescription') }}
+            </p>
+          </div>
+          <button
+            class="px-3 py-1.5 rounded-lg text-xs font-medium bg-amber-500/20 text-amber-700 dark:text-amber-300 hover:bg-amber-500/30 transition-colors flex-shrink-0"
+            @click="openAdvancedModal('privacy')"
+          >
+            {{ $t('widgets.detail.avvNoticeCta') }}
+          </button>
         </div>
       </div>
 
@@ -981,6 +1008,7 @@
     <AdvancedWidgetConfig
       v-if="advancedWidget"
       :widget="advancedWidget"
+      :initial-tab="advancedInitialTab"
       @close="advancedWidget = null"
       @saved="handleAdvancedSaved"
       @start-ai-setup="openAiSetup"
@@ -1645,8 +1673,12 @@ const save = async () => {
 const openAiSetup = () => {
   if (widget.value) setupModalWidget.value = widget.value
 }
-const openAdvancedModal = () => {
-  if (widget.value) advancedWidget.value = widget.value
+const advancedInitialTab = ref<string | undefined>()
+const openAdvancedModal = (tab?: string) => {
+  if (widget.value) {
+    advancedInitialTab.value = tab
+    advancedWidget.value = widget.value
+  }
 }
 const handleSetupCompleted = async () => {
   setupModalWidget.value = null
