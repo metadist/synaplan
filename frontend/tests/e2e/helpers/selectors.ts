@@ -170,6 +170,7 @@ export const selectors = {
     profileBtn: '[data-testid="btn-sidebar-v2-profile"]',
     statisticsBtn: '[data-testid="btn-sidebar-v2-statistics"]',
     subscriptionBtn: '[data-testid="btn-sidebar-v2-subscription"]',
+    upgradeBtn: '[data-testid="btn-sidebar-v2-upgrade"]',
     logoutBtn: '[data-testid="btn-sidebar-v2-logout"]',
   },
   oidc: {

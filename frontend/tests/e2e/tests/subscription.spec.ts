@@ -13,8 +13,13 @@ import {
 const API_URL = getApiUrl()
 
 async function navigateToSubscriptionViaUI(page: import('@playwright/test').Page): Promise<void> {
-  await page.locator(selectors.userMenu.button).click()
-  await page.locator(selectors.userMenu.subscriptionBtn).click()
+  const upgradeBtn = page.locator(selectors.userMenu.upgradeBtn)
+  if (await upgradeBtn.isVisible({ timeout: 2000 }).catch(() => false)) {
+    await upgradeBtn.click()
+  } else {
+    await page.locator(selectors.userMenu.button).click()
+    await page.locator(selectors.userMenu.subscriptionBtn).click()
+  }
   await page.waitForSelector(selectors.subscription.page, { timeout: TIMEOUTS.STANDARD })
 }
 
