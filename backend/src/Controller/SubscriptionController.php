@@ -79,7 +79,7 @@ class SubscriptionController extends AbstractController
                 'id' => 'PRO',
                 'name' => 'Pro',
                 'stripePriceId' => $this->billingService->isEnabled() ? $this->stripePricePro : null,
-                'price' => 19.99,
+                'price' => 19.95,
                 'currency' => 'EUR',
                 'interval' => 'month',
                 'features' => [
@@ -94,7 +94,7 @@ class SubscriptionController extends AbstractController
                 'id' => 'TEAM',
                 'name' => 'Team',
                 'stripePriceId' => $this->billingService->isEnabled() ? $this->stripePriceTeam : null,
-                'price' => 49.99,
+                'price' => 49.95,
                 'currency' => 'EUR',
                 'interval' => 'month',
                 'features' => [
@@ -110,7 +110,7 @@ class SubscriptionController extends AbstractController
                 'id' => 'BUSINESS',
                 'name' => 'Business',
                 'stripePriceId' => $this->billingService->isEnabled() ? $this->stripePriceBusiness : null,
-                'price' => 99.99,
+                'price' => 99.95,
                 'currency' => 'EUR',
                 'interval' => 'month',
                 'features' => [
