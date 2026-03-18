@@ -1,14 +1,10 @@
 import { test, expect } from '../test-setup'
 import { selectors } from '../helpers/selectors'
 import { deleteUser } from '../helpers/auth'
-import { clearMailHog, waitForVerificationHref, normalizeVerificationUrl } from '../helpers/email'
+import { waitForVerificationHref, normalizeVerificationUrl } from '../helpers/email'
 import { TIMEOUTS, INTERVALS } from '../config/config'
 
 test.describe('@ci @password @auth Registration', () => {
-  test.beforeEach(async ({ request }) => {
-    await clearMailHog(request)
-  })
-
   test('@smoke registration flow with email verification', async ({ page, request }) => {
     test.skip(process.env.AUTH_METHOD === 'oidc', 'Registration tests only run with password auth')
     const uniqueSuffix = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`

@@ -1,7 +1,7 @@
 import { test, expect } from '../test-setup'
 import { deleteUser, login } from '../helpers/auth'
 import { selectors } from '../helpers/selectors'
-import { clearMailHog, waitForVerificationHref, normalizeVerificationUrl } from '../helpers/email'
+import { waitForVerificationHref, normalizeVerificationUrl } from '../helpers/email'
 import { URLS, TIMEOUTS, INTERVALS } from '../config/config'
 
 test.describe('@ci @auth Authentication', () => {
@@ -50,8 +50,6 @@ test.describe('@ci @auth Authentication', () => {
     const password = 'DeleteMe123!'
 
     await test.step('Arrange: register and verify a new user', async () => {
-      await clearMailHog(request)
-
       const register = await request.post(`${URLS.BASE_URL}/api/v1/auth/register`, {
         data: { email, password, recaptchaToken: '' },
       })
