@@ -8,9 +8,10 @@ use App\AI\Interface\FileAnalysisProviderInterface;
 use App\AI\Interface\ImageGenerationProviderInterface;
 use App\AI\Interface\SpeechToTextProviderInterface;
 use App\AI\Interface\TextToSpeechProviderInterface;
+use App\AI\Interface\VideoGenerationProviderInterface;
 use App\AI\Interface\VisionProviderInterface;
 
-class TestProvider implements ChatProviderInterface, EmbeddingProviderInterface, VisionProviderInterface, ImageGenerationProviderInterface, SpeechToTextProviderInterface, TextToSpeechProviderInterface, FileAnalysisProviderInterface
+class TestProvider implements ChatProviderInterface, EmbeddingProviderInterface, VisionProviderInterface, ImageGenerationProviderInterface, VideoGenerationProviderInterface, SpeechToTextProviderInterface, TextToSpeechProviderInterface, FileAnalysisProviderInterface
 {
     public function getName(): string
     {
@@ -29,7 +30,7 @@ class TestProvider implements ChatProviderInterface, EmbeddingProviderInterface,
 
     public function getCapabilities(): array
     {
-        return ['chat', 'embedding', 'vision', 'image_generation', 'speech_to_text', 'text_to_speech', 'file_analysis'];
+        return ['chat', 'embedding', 'vision', 'image_generation', 'video_generation', 'speech_to_text', 'text_to_speech', 'file_analysis'];
     }
 
     public function getDefaultModels(): array
@@ -179,6 +180,19 @@ class TestProvider implements ChatProviderInterface, EmbeddingProviderInterface,
     public function editImage(string $imageUrl, string $maskUrl, string $prompt): string
     {
         return 'https://via.placeholder.com/1024x1024?text=Edited';
+    }
+
+    // VideoGenerationProviderInterface
+    public function generateVideo(string $prompt, array $options = []): array
+    {
+        // Minimal valid MP4 container (144 bytes) — ftyp + moov with 4s duration
+        $mp4Base64 = 'AAAAGGZ0eXBtcDQyAAAAAG1wNDJpc29tAAAAeG1vb3YAAABwAAAAbG12aGQAAAAAAAAAAAAAAAAAAAPoAAAPoAABAAABAAAAAAAAAAAAAAAAAQAAAAAAAAAAAAAAAAAAAAEAAAAAAAAAAAAAAAAAAEAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAC';
+
+        return [[
+            'url' => 'data:video/mp4;base64,'.$mp4Base64,
+            'revised_prompt' => $prompt,
+            'duration' => 4,
+        ]];
     }
 
     // SpeechToTextProviderInterface
