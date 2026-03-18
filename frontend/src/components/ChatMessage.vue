@@ -616,6 +616,7 @@
                 <div
                   v-if="modelDropdownOpen && !isSuperseded"
                   v-click-outside="closeModelDropdown"
+                  data-testid="dropdown-again-models"
                   class="fixed sm:absolute bottom-[60px] sm:bottom-full right-2 sm:right-0 sm:mb-2 min-w-[14rem] max-w-[calc(100vw-1rem)] dropdown-panel z-[100] max-h-[16rem] overflow-y-auto scroll-thin"
                   @keydown.escape="closeModelDropdown"
                 >
