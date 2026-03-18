@@ -70,7 +70,7 @@ test.describe('@ci @smoke Smart-Email', () => {
         .not.toBeNull()
 
       expect(matching.length).toBe(baselineCount + 1)
-      expect(matching[matching.length - 1].body.length).toBeGreaterThan(0)
+      expect(matching[0].body.length).toBeGreaterThan(0)
     })
   })
 
