@@ -1167,6 +1167,7 @@
         "vectorize": "Gömme / Vektörleştirme",
         "pic2text": "Görü (Görsel → Metin)",
         "text2pic": "Görsel Oluşturma (Metin → Görsel)",
+        "pic2pic": "Görsel Düzenleme (Görsel → Görsel)",
         "text2vid": "Video Oluşturma (Metin → Video)",
         "sound2text": "Konuşmadan Metne",
         "text2sound": "Metinden Konuşmaya",

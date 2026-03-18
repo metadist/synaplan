@@ -351,7 +351,7 @@ final readonly class MessageSorter
                 }
             }
 
-            // Parse BINPUTMODE for mediamaker topic (text_only, reference_images)
+            // Parse BINPUTMODE (text_only or reference_images) when present
             $inputMode = null;
             if (isset($data['BINPUTMODE']) && is_string($data['BINPUTMODE'])) {
                 $inputMode = strtolower(trim($data['BINPUTMODE']));

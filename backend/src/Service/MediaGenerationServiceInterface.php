@@ -30,7 +30,7 @@ interface MediaGenerationServiceInterface
      * @param User     $user       Authenticated user
      * @param string   $prompt     Instruction (e.g. "Put the object from image 1 into the scene of image 2")
      * @param string[] $imagePaths Absolute paths to 1-2 uploaded images
-     * @param int|null $modelId    Specific model ID (uses user default TEXT2PIC if omitted)
+     * @param int|null $modelId    Specific model ID (uses user default PIC2PIC if omitted)
      *
      * @return array{success: true, file: array{url: string, type: string, mimeType: string}, provider: string, model: string}
      *

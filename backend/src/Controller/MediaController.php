@@ -93,7 +93,11 @@ final class MediaController extends AbstractController
         foreach (['image1', 'image2'] as $field) {
             $file = $request->files->get($field);
             if ($file instanceof \Symfony\Component\HttpFoundation\File\UploadedFile && $file->isValid()) {
-                $imagePaths[] = $file->getRealPath();
+                $realPath = $file->getRealPath();
+                if (false === $realPath) {
+                    return $this->json(['error' => "Failed to read uploaded file: {$field}"], 400);
+                }
+                $imagePaths[] = $realPath;
             }
         }
 
