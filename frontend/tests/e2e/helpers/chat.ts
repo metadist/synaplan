@@ -210,6 +210,8 @@ export class ChatHelper {
       .last()
       .locator(selectors.chat.againDropdownPanel)
       .waitFor({ state: 'hidden', timeout: TIMEOUTS.SHORT })
-      .catch(() => {})
+      .catch(() => {
+        // Dropdown may already be hidden or auto-closed — not critical
+      })
   }
 }

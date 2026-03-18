@@ -1653,7 +1653,20 @@ async function saveCancelledMessageToBackend(
   }
 }
 
-// Handle "Again" with specific model from backend
+function findPrecedingUserMessage(messages: Message[], fromIndex: number): Message | null {
+  for (let i = fromIndex - 1; i >= 0; i--) {
+    if (messages[i].role === 'user') return messages[i]
+  }
+  return null
+}
+
+function extractUserText(message: Message): string {
+  return message.parts
+    .filter((p) => p.type === 'text')
+    .map((p) => p.content || '')
+    .join('\n')
+}
+
 const handleAgain = async (backendMessageId: number, modelId?: number) => {
   if (!authStore.isAuthenticated) {
     console.error('❌ Not authenticated - redirecting to login')
@@ -1674,24 +1687,15 @@ const handleAgain = async (backendMessageId: number, modelId?: number) => {
 
   const messageIndex = historyStore.messages.indexOf(assistantMessage)
 
-  // Search backwards for the first user message (skip superseded assistant messages)
-  let userMessage: (typeof historyStore.messages)[number] | null = null
-  for (let i = messageIndex - 1; i >= 0; i--) {
-    if (historyStore.messages[i].role === 'user') {
-      userMessage = historyStore.messages[i]
-      break
-    }
-  }
+  // Search backwards for the nearest user message
+  const userMessage = findPrecedingUserMessage(historyStore.messages, messageIndex)
 
   if (!userMessage) {
     console.error('❌ Could not find user message before assistant message')
     return
   }
 
-  const userText = userMessage.parts
-    .filter((p) => p.type === 'text')
-    .map((p) => p.content)
-    .join('\n')
+  const userText = extractUserText(userMessage)
 
   if (!userText) {
     console.error('❌ No text found in user message')
@@ -1715,21 +1719,11 @@ const handleRegenerate = async (message: Message, modelOption: ModelOption) => {
   const messageIndex = historyStore.messages.findIndex((m) => m.id === message.id)
   if (messageIndex <= 0) return
 
-  // Search backwards for the first user message (skip superseded assistant messages)
-  let previousMessage: Message | null = null
-  for (let i = messageIndex - 1; i >= 0; i--) {
-    if (historyStore.messages[i].role === 'user') {
-      previousMessage = historyStore.messages[i]
-      break
-    }
-  }
+  // Search backwards for the nearest user message
+  const previousMessage = findPrecedingUserMessage(historyStore.messages, messageIndex)
   if (!previousMessage) return
 
-  const content = previousMessage.parts
-    .filter((part) => part.type === 'text')
-    .map((part) => part.content || '')
-    .join('\n')
-
+  const content = extractUserText(previousMessage)
   if (!content) return
 
   // Stop any active audio playback before regenerating

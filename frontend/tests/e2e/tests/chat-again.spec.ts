@@ -10,6 +10,7 @@ test.describe('@ci @smoke Chat Again', () => {
     page,
     credentials,
   }) => {
+    // 3 sequential AI responses require extended timeout
     test.setTimeout(90_000)
     const chat = new ChatHelper(page)
 
@@ -91,7 +92,9 @@ test.describe('@ci @smoke Chat Again', () => {
         }
         expect(clicked, 'At least one dropdown option should be visible and enabled').toBe(true)
 
-        await dropdown.waitFor({ state: 'hidden', timeout: TIMEOUTS.SHORT }).catch(() => {})
+        await dropdown.waitFor({ state: 'hidden', timeout: TIMEOUTS.SHORT }).catch(() => {
+          // Dropdown may auto-close after selection — not critical
+        })
       }
     )
 
