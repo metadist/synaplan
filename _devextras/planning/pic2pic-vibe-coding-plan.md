@@ -196,57 +196,27 @@ Target behavior:
 - `BCONFIG.sql` includes `(57,0,'DEFAULTMODEL','PIC2PIC','190')` (Nano Banana 2).
 - `synaplan-platform/scripts/pic2pic-models-update.sql` inserts this config for the live DB.
 
-### Step 3: Extend sorting metadata
-Teach `MessageSorter` to parse and return `BINPUTMODE`.
+### Step 3: Extend sorting metadata (✅ COMPLETED)
+Taught `MessageSorter` to parse and return `BINPUTMODE`. Tests added.
 
-Target behavior:
-- `reference_images` when image attachments are meant as inputs for generation
-- `text_only` for classic text-to-image
-
-Add unit tests for parsing and fallback behavior.
-
-### Step 4: Strengthen prompt extraction
-Upgrade `mediamaker` prompt to the JSON contract above and adapt `MediaPromptExtractor`.
-
-Target behavior:
-- reliable extraction of:
-  - prompt text
-  - media type
-  - mode
-  - reference count
-  - reference roles
-
-Add unit tests for:
-- one-image edit
-- two-image composition
-- multilingual prompts
-- plain-text fallback
-
-### Step 5: Wire routed chat flow to providers
-Update `MediaGenerationHandler` so it can collect attached image paths and pass them as `$options['images']`.
-
-Target behavior:
-- routed pic2pic uses the same provider plumbing as the direct API path
+### Step 4: Wire routed chat flow to providers (✅ COMPLETED)
+`MediaGenerationHandler` now:
+- collects attached image paths from the Message entity
+- detects pic2pic intent when images are attached
+- switches to `PIC2PIC` default model instead of `TEXT2PIC`
+- passes images as `$options['images']` to `AiFacade::generateImage()`
 - classic text-to-image remains unchanged
 
-Add handler tests before changing provider code again.
+### Step 5: Frontend config + backend API for PIC2PIC (✅ COMPLETED)
+- Added `PIC2PIC` capability to `Capability` type, all config UIs, i18n (en + de)
+- Backend `ConfigController` returns PIC2PIC models (filtered by `pic2pic` feature flag)
+- Backend accepts PIC2PIC in save/load defaults
 
-### Step 6: Tighten the English seed prompts
-Refine `PromptCatalog::all()` for the remaining prompt topics so the English prompts are explicitly language-aware. Remove `analyzefile`.
-
-Run:
-```bash
-docker compose exec -T backend php bin/console app:prompt:seed
-```
-
-Add tests so this language-aware contract cannot drift.
-
-### Step 7: Frontend integration & API Docs
-For the API customer and internal UX:
-- **Regenerate OpenAPI schemas**: `make -C frontend generate-schemas` (Crucial for the Swagger docs)
-- upload UI for 1-2 images
-- `FormData` request path
-- model capability label for `pic2pic`
+### Step 6: Remaining work
+- Tighten the English seed prompts for language-awareness
+- Regenerate OpenAPI schemas for API docs
+- Upload UI for 1-2 images in the chat (currently images go through normal file upload)
+- Strengthen `mediamaker` prompt contract for pic2pic-specific enhancement
 
 ## Automatic Test Plan
 

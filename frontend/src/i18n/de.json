@@ -812,6 +812,7 @@
         "vectorize": "Einbettung / Vektorisierung",
         "pic2text": "Bilderkennung (Bild → Text)",
         "text2pic": "Bildgenerierung (Text → Bild)",
+        "pic2pic": "Bildbearbeitung (Bild → Bild)",
         "text2vid": "Videogenerierung (Text → Video)",
         "sound2text": "Spracherkennung",
         "text2sound": "Sprachsynthese",

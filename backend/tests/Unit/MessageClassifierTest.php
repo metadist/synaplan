@@ -212,7 +212,7 @@ class MessageClassifierTest extends TestCase
         $message->method('getTopic')->willReturn('');
         $message->method('getFileText')->willReturn('');
         $message->method('getFile')->willReturn(0);
-        
+
         // Mock that the message has files (images)
         $file = $this->createMock(\App\Entity\File::class);
         $file->method('getFileMime')->willReturn('image/png');
@@ -220,7 +220,7 @@ class MessageClassifierTest extends TestCase
         $message->method('getFiles')->willReturn($files);
 
         $this->messageMetaRepository->method('findOneBy')->willReturn(null);
-        
+
         // The sorter should be called, it shouldn't be intercepted
         $this->messageSorter->expects($this->once())->method('classify')->willReturn([
             'topic' => 'mediamaker',

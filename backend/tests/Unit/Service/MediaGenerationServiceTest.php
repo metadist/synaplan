@@ -409,7 +409,7 @@ class MediaGenerationServiceTest extends TestCase
     public function testPic2picUsesPic2picCapabilityFallback(): void
     {
         $this->allowRateLimit();
-        
+
         // Mock the fallback to return Nano Banana 2 (190)
         $this->modelConfigService->expects(self::once())
             ->method('getDefaultModel')

@@ -30,6 +30,7 @@ class ModelCatalog
         'SUMMARIZE' => 'chat',
         'ANALYZE' => 'chat',
         'TEXT2PIC' => 'text2pic',
+        'PIC2PIC' => 'text2pic',
         'TEXT2VID' => 'text2vid',
         'TEXT2SOUND' => 'text2sound',
         'PIC2TEXT' => 'pic2text',

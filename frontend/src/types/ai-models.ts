@@ -8,6 +8,7 @@ export type Capability =
   | 'VECTORIZE'
   | 'PIC2TEXT'
   | 'TEXT2PIC'
+  | 'PIC2PIC'
   | 'TEXT2VID'
   | 'SOUND2TEXT'
   | 'TEXT2SOUND'
