@@ -4,7 +4,7 @@
  */
 
 import { test, expect } from '../test-setup'
-import { clearMailHog, fetchMessages, getPlainTextBody, toMatches } from '../helpers/email'
+import { fetchMessages, getPlainTextBody, toMatches } from '../helpers/email'
 import { getApiUrl } from '../config/config'
 import { INTEGRATION } from '../config/integration-data'
 
@@ -21,14 +21,11 @@ function webhookUrl(): string {
 test.describe('@ci @smoke Smart-Email', () => {
   test.describe.configure({ mode: 'serial' })
 
-  test.beforeEach(async ({ request }) => {
-    await clearMailHog(request)
-  })
-
   test('inbound webhook triggers exactly one reply in MailHog', async ({ request }) => {
-    await test.step('Arrange: verify 0 messages', async () => {
+    let baselineCount = 0
+    await test.step('Arrange: count existing messages to sender', async () => {
       const messages = await fetchMessages(request)
-      expect(messages.length, 'MailHog should be empty before trigger').toBe(0)
+      baselineCount = messages.filter((m) => toMatches(m, TEST_FROM)).length
     })
 
     const subject = `Smoke ${Date.now()}`
@@ -54,7 +51,7 @@ test.describe('@ci @smoke Smart-Email', () => {
       expect(Number.isInteger(json.chat_id)).toBe(true)
     })
 
-    await test.step('Assert: bounded retry until exactly one reply mail', async () => {
+    await test.step('Assert: bounded retry until exactly one new reply mail', async () => {
       let matching: Array<{ body: string }> = []
       await expect
         .poll(
@@ -63,7 +60,7 @@ test.describe('@ci @smoke Smart-Email', () => {
             matching = messages
               .filter((m) => toMatches(m, TEST_FROM))
               .map((m) => ({ body: getPlainTextBody(m) }))
-            return matching.length >= 1 ? matching : null
+            return matching.length >= baselineCount + 1 ? matching : null
           },
           {
             timeout: MAILHOG_POLL_TIMEOUT_MS,
@@ -72,15 +69,16 @@ test.describe('@ci @smoke Smart-Email', () => {
         )
         .not.toBeNull()
 
-      expect(matching.length).toBe(1)
-      expect(matching[0].body.length).toBeGreaterThan(0)
+      expect(matching.length).toBe(baselineCount + 1)
+      expect(matching[matching.length - 1].body.length).toBeGreaterThan(0)
     })
   })
 
   test('invalid payload returns 400 and sends no reply', async ({ request }) => {
-    await test.step('Arrange: empty MailHog', async () => {
+    let baselineCount = 0
+    await test.step('Arrange: count existing messages to sender', async () => {
       const messages = await fetchMessages(request)
-      expect(messages.length).toBe(0)
+      baselineCount = messages.filter((m) => toMatches(m, TEST_FROM)).length
     })
 
     await test.step('Act: POST with missing required body', async () => {
@@ -100,10 +98,10 @@ test.describe('@ci @smoke Smart-Email', () => {
       expect(String(json.error)).toContain('body')
     })
 
-    await test.step('Assert: no reply sent to sender', async () => {
+    await test.step('Assert: no new reply sent to sender', async () => {
       const messages = await fetchMessages(request)
       const toSender = messages.filter((m) => toMatches(m, TEST_FROM))
-      expect(toSender.length, 'Invalid request must not trigger reply').toBe(0)
+      expect(toSender.length, 'Invalid request must not trigger reply').toBe(baselineCount)
     })
   })
 })
