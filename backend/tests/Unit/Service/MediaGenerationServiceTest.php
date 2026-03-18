@@ -293,4 +293,176 @@ class MediaGenerationServiceTest extends TestCase
 
         $this->service->generate($this->createUser(), 'sunset', 'image', 42);
     }
+
+    // ==================== Pic2pic Tests ====================
+
+    public function testPic2picEmptyPromptThrowsInvalidArgument(): void
+    {
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessage('Prompt is required');
+
+        $this->service->generateFromImages($this->createUser(), '  ', ['/tmp/a.png']);
+    }
+
+    public function testPic2picNoImagesThrowsInvalidArgument(): void
+    {
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessage('1 or 2 images are required');
+
+        $this->service->generateFromImages($this->createUser(), 'combine these', []);
+    }
+
+    public function testPic2picTooManyImagesThrowsInvalidArgument(): void
+    {
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessage('1 or 2 images are required');
+
+        $this->service->generateFromImages($this->createUser(), 'combine these', ['/tmp/a.png', '/tmp/b.png', '/tmp/c.png']);
+    }
+
+    public function testPic2picMissingImageFileThrowsInvalidArgument(): void
+    {
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessage('Uploaded image not found');
+
+        $this->service->generateFromImages($this->createUser(), 'combine', ['/tmp/nonexistent_pic2pic_test.png']);
+    }
+
+    public function testPic2picPassesImagesToFacadeViaOptions(): void
+    {
+        $this->allowRateLimit();
+        $model = $this->createModel('OpenAI', 'gpt-image-1.5', 'GPT Image 1.5');
+        $this->setUpModelResolution(151, $model);
+
+        // Create real temp files
+        $tmpFile1 = tempnam(sys_get_temp_dir(), 'pic2pic_test_');
+        $tmpFile2 = tempnam(sys_get_temp_dir(), 'pic2pic_test_');
+        file_put_contents($tmpFile1, "\x89PNG\r\n\x1a\n".str_repeat("\0", 50));
+        file_put_contents($tmpFile2, "\x89PNG\r\n\x1a\n".str_repeat("\0", 50));
+
+        $pngData = "\x89PNG\r\n\x1a\n".str_repeat("\0", 100);
+        $this->aiFacade->expects(self::once())
+            ->method('generateImage')
+            ->with(
+                'put object from image 1 into scene of image 2',
+                self::anything(),
+                self::callback(fn (array $opts) => isset($opts['images']) && 2 === \count($opts['images'])),
+            )
+            ->willReturn([
+                'images' => ['data:image/png;base64,'.base64_encode($pngData)],
+                'provider' => 'openai',
+                'model' => 'gpt-image-1.5',
+            ]);
+
+        $result = $this->service->generateFromImages(
+            $this->createUser(),
+            'put object from image 1 into scene of image 2',
+            [$tmpFile1, $tmpFile2],
+            151,
+        );
+
+        self::assertTrue($result['success']);
+        self::assertSame('image', $result['file']['type']);
+        self::assertSame('image/png', $result['file']['mimeType']);
+        self::assertSame('openai', $result['provider']);
+
+        @unlink($tmpFile1);
+        @unlink($tmpFile2);
+    }
+
+    public function testPic2picWithSingleImage(): void
+    {
+        $this->allowRateLimit();
+        $model = $this->createModel('Google', 'gemini-3.1-flash-image-preview', 'Nano Banana 2');
+        $this->setUpModelResolution(173, $model);
+
+        $tmpFile = tempnam(sys_get_temp_dir(), 'pic2pic_test_');
+        file_put_contents($tmpFile, "\x89PNG\r\n\x1a\n".str_repeat("\0", 50));
+
+        $pngData = "\x89PNG\r\n\x1a\n".str_repeat("\0", 100);
+        $this->aiFacade->expects(self::once())
+            ->method('generateImage')
+            ->with(
+                'transform this into watercolor',
+                self::anything(),
+                self::callback(fn (array $opts) => isset($opts['images']) && 1 === \count($opts['images'])),
+            )
+            ->willReturn([
+                'images' => ['data:image/png;base64,'.base64_encode($pngData)],
+                'provider' => 'google',
+                'model' => 'gemini-3.1-flash-image-preview',
+            ]);
+
+        $result = $this->service->generateFromImages(
+            $this->createUser(),
+            'transform this into watercolor',
+            [$tmpFile],
+            173,
+        );
+
+        self::assertTrue($result['success']);
+        self::assertSame('google', $result['provider']);
+
+        @unlink($tmpFile);
+    }
+
+    public function testPic2picUsesPic2picCapabilityFallback(): void
+    {
+        $this->allowRateLimit();
+        
+        // Mock the fallback to return Nano Banana 2 (190)
+        $this->modelConfigService->expects(self::once())
+            ->method('getDefaultModel')
+            ->with('PIC2PIC', self::anything())
+            ->willReturn(190);
+
+        $model = $this->createModel('Google', 'gemini-3.1-flash-image-preview', 'Nano Banana 2');
+        $this->setUpModelResolution(190, $model);
+
+        $tmpFile = tempnam(sys_get_temp_dir(), 'pic2pic_test_');
+        file_put_contents($tmpFile, "\x89PNG\r\n\x1a\n".str_repeat("\0", 50));
+
+        $pngData = "\x89PNG\r\n\x1a\n".str_repeat("\0", 100);
+        $this->aiFacade->expects(self::once())
+            ->method('generateImage')
+            ->willReturn([
+                'images' => ['data:image/png;base64,'.base64_encode($pngData)],
+                'provider' => 'google',
+                'model' => 'gemini-3.1-flash-image-preview',
+            ]);
+
+        $result = $this->service->generateFromImages(
+            $this->createUser(),
+            'transform this into watercolor',
+            [$tmpFile],
+            null, // No model ID provided, should trigger fallback
+        );
+
+        self::assertTrue($result['success']);
+        self::assertSame('google', $result['provider']);
+
+        @unlink($tmpFile);
+    }
+
+    public function testPic2picProviderExceptionPropagates(): void
+    {
+        $this->allowRateLimit();
+        $model = $this->createModel();
+        $this->setUpModelResolution(42, $model);
+
+        $tmpFile = tempnam(sys_get_temp_dir(), 'pic2pic_test_');
+        file_put_contents($tmpFile, "\x89PNG\r\n\x1a\n".str_repeat("\0", 50));
+
+        $this->aiFacade->method('generateImage')
+            ->willThrowException(new ProviderException('Content policy violation', 'openai'));
+
+        $this->expectException(ProviderException::class);
+        $this->expectExceptionMessage('Content policy violation');
+
+        try {
+            $this->service->generateFromImages($this->createUser(), 'combine', [$tmpFile], 42);
+        } finally {
+            @unlink($tmpFile);
+        }
+    }
 }

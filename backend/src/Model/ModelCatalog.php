@@ -634,8 +634,10 @@ class ModelCatalog
             'quality' => 10,
             'rating' => 1,
             'json' => [
-                'description' => 'OpenAI GPT Image 1.5 - state-of-the-art image generation. 4x faster than DALL-E 3, superior text rendering, up to 4096x4096.',
+                'description' => 'OpenAI GPT Image 1.5 - state-of-the-art image generation and editing. Supports pic2pic via Responses API.',
                 'params' => ['model' => 'gpt-image-1.5'],
+                'features' => ['image', 'pic2pic'],
+                'meta' => ['api' => 'responses'],
             ],
         ],
         [
@@ -796,7 +798,28 @@ class ModelCatalog
             'json' => [
                 'description' => 'Google Nano Banana - native image generation and editing via Gemini 2.5 Flash.',
                 'params' => ['model' => 'gemini-2.5-flash-image'],
-                'features' => ['image'],
+                'features' => ['image', 'pic2pic'],
+            ],
+        ],
+        [
+            'id' => 190,
+            'service' => 'Google',
+            'name' => 'Nano Banana 2 (3.1 Flash Image)',
+            'tag' => 'text2pic',
+            'selectable' => 1,
+            'active' => 1,
+            'providerId' => 'gemini-3.1-flash-image-preview',
+            'priceIn' => 0.1,
+            'inUnit' => 'per1M',
+            'priceOut' => 0.4,
+            'outUnit' => 'per1M',
+            'quality' => 10,
+            'rating' => 1,
+            'json' => [
+                'description' => 'Google Nano Banana 2 - advanced image generation and editing. Up to 4K, 14 reference images, Google Search grounding.',
+                'params' => ['model' => 'gemini-3.1-flash-image-preview'],
+                'features' => ['image', 'pic2pic'],
+                'meta' => ['max_reference_images' => 14],
             ],
         ],
         [

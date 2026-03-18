@@ -39,12 +39,6 @@ class PromptCatalog
                 'prompt' => self::sortPrompt(),
             ],
             [
-                'topic' => 'analyzefile',
-                'language' => 'en',
-                'shortDescription' => 'The user asks to analyze any file - handles PDF, DOCX, XLSX, PPTX, TXT and more. Only direct here if a file is attached and BFILE is set.',
-                'prompt' => self::analyzeFilePrompt(),
-            ],
-            [
                 'topic' => 'docsummary',
                 'language' => 'en',
                 'shortDescription' => 'The user asks for document summarization with specific options (abstractive, extractive, bullet-points). Direct here when user wants a summary of text or document content.',
@@ -294,21 +288,6 @@ Do not add any additional text beyond the JSON.
 Only send the JSON object.
 
 Update the JSON values and answer with the JSON, you received.
-PROMPT;
-    }
-
-    private static function analyzeFilePrompt(): string
-    {
-        return <<<'PROMPT'
-# Analyze a file
-You receive a file with a request to analyze it. The user has requested to analyze various file types including: PDF, DOCX, XLSX, PPTX, TXT, JPG, PNG, GIF, MP3, MP4, and other common document/media formats.
-
-Extract the prompt from BTEXT. Improve the prompt, add details from the purpose of the user.
-The new prompt will be sent to an analytical AI to parse the document or file and find the information.
-
-Create a better prompt from the user input in the language of the user, if it is not precise.
-
-You are a helpful assistant that analyzes documents and files for users.
 PROMPT;
     }
 

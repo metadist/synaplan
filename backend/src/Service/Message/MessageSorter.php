@@ -189,6 +189,7 @@ final readonly class MessageSorter
                 'web_search' => $parsed['web_search'] ?? false,
                 'media_type' => $parsed['media_type'] ?? null,
                 'duration' => $parsed['duration'] ?? null,
+                'input_mode' => $parsed['input_mode'] ?? null,
                 'raw_ai_response' => $aiResponse,
             ]);
 
@@ -200,6 +201,7 @@ final readonly class MessageSorter
                     'language' => $parsed['language'],
                     'media_type' => $parsed['media_type'] ?? null,
                     'duration' => $parsed['duration'] ?? null,
+                    'input_mode' => $parsed['input_mode'] ?? null,
                     'raw_response' => $aiResponse,
                 ],
                 $userId
@@ -224,6 +226,7 @@ final readonly class MessageSorter
                 'web_search' => $webSearch ?? false,
                 'media_type' => $parsed['media_type'] ?? null,
                 'duration' => $parsed['duration'] ?? null,
+                'input_mode' => $parsed['input_mode'] ?? null,
                 'raw_response' => $aiResponse,
                 'prompt_metadata' => $promptMetadata,
                 // Don't return model_id/provider/model_name from sorting - they are for internal use only
@@ -348,12 +351,22 @@ final readonly class MessageSorter
                 }
             }
 
+            // Parse BINPUTMODE for mediamaker topic (text_only, reference_images)
+            $inputMode = null;
+            if (isset($data['BINPUTMODE']) && is_string($data['BINPUTMODE'])) {
+                $inputMode = strtolower(trim($data['BINPUTMODE']));
+                if (!in_array($inputMode, ['text_only', 'reference_images'], true)) {
+                    $inputMode = null;
+                }
+            }
+
             return [
                 'topic' => $data['BTOPIC'] ?? $originalData['BTOPIC'] ?? 'general',
                 'language' => $data['BLANG'] ?? $originalData['BLANG'] ?? 'en',
                 'web_search' => $webSearch,
                 'media_type' => $mediaType,
                 'duration' => $duration,
+                'input_mode' => $inputMode,
             ];
         } catch (\JsonException $e) {
             $this->logger->warning('MessageSorter: Failed to parse JSON response', [
@@ -368,6 +381,7 @@ final readonly class MessageSorter
                 'web_search' => false,
                 'media_type' => null,
                 'duration' => null,
+                'input_mode' => null,
             ];
         }
     }

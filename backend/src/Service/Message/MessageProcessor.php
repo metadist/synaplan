@@ -211,10 +211,10 @@ final readonly class MessageProcessor
                 if (!empty($options['force_image_description'])) {
                     // Force image description mode (used by WhatsApp for images)
                     $classification = [
-                        'topic' => 'analyzefile',
+                        'topic' => 'general', // Used to be analyzefile, but ChatHandler handles vision now
                         'language' => $message->getLanguage() ?: 'en',
                         'source' => 'forced_image_description',
-                        'intent' => 'file_analysis',
+                        'intent' => 'chat',
                     ];
                     $this->logger->info('MessageProcessor: Forcing image description mode');
                 } else {
@@ -550,10 +550,10 @@ final readonly class MessageProcessor
             } elseif (!empty($options['force_image_description'])) {
                 // Force image description mode (used by WhatsApp for images)
                 $classification = [
-                    'topic' => 'analyzefile',
+                    'topic' => 'general', // Used to be analyzefile, but ChatHandler handles vision now
                     'language' => $languageOverride ?? 'en',
                     'source' => 'forced_image_description',
-                    'intent' => 'file_analysis',
+                    'intent' => 'chat',
                 ];
                 $this->logger->info('MessageProcessor: Forcing image description mode (non-streaming)');
 
@@ -844,7 +844,7 @@ final readonly class MessageProcessor
     {
         return match ($topic) {
             'mediamaker', 'text2pic', 'text2vid', 'text2sound' => 'image_generation',
-            'analyzefile', 'pic2text', 'analyze' => 'file_analysis',
+            'pic2text', 'analyze' => 'file_analysis',
             'officemaker' => 'document_generation',
             default => 'chat',
         };
@@ -854,7 +854,7 @@ final readonly class MessageProcessor
     {
         return match (strtolower($modelTag)) {
             'text2pic', 'text2vid', 'text2sound' => 'mediamaker',
-            'pic2text', 'analyze', 'vision' => 'analyzefile',
+            'pic2text', 'analyze', 'vision' => 'general',
             'document', 'officemaker', 'text2doc' => 'officemaker',
             default => $fallback ?: 'chat',
         };

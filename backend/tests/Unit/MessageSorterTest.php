@@ -144,6 +144,7 @@ class MessageSorterTest extends TestCase
         $this->assertSame('mediamaker', $result['topic']);
         $this->assertSame('en', $result['language']);
         $this->assertSame('video', $result['media_type']);
+        $this->assertNull($result['input_mode']);
     }
 
     public function testParseResponseNormalizesBMediaVariations(): void
@@ -285,6 +286,7 @@ class MessageSorterTest extends TestCase
         $this->assertSame('de', $result['language']);
         $this->assertSame('video', $result['media_type']);
         $this->assertSame(8, $result['duration']);
+        $this->assertNull($result['input_mode']);
     }
 
     public function testParseResponseFallsBackToOriginalOnInvalidJson(): void
@@ -298,15 +300,40 @@ class MessageSorterTest extends TestCase
         $this->assertSame('de', $result['language']);
         $this->assertNull($result['media_type']);
         $this->assertNull($result['duration']);
+        $this->assertNull($result['input_mode']);
     }
 
     // ===========================================
-    // Combined media type and duration test
+    // parseResponse BINPUTMODE tests
     // ===========================================
 
-    public function testParseResponseHandlesCompleteVideoClassification(): void
+    public function testParseResponseExtractsBInputModeCorrectly(): void
     {
-        $response = '{"BTOPIC": "mediamaker", "BLANG": "de", "BWEBSEARCH": 0, "BMEDIA": "video", "BDURATION": 6}';
+        $response = '{"BTOPIC": "mediamaker", "BLANG": "en", "BINPUTMODE": "reference_images"}';
+        $originalData = ['BTOPIC' => 'general', 'BLANG' => 'en'];
+
+        $result = $this->parseResponseMethod->invoke($this->sorter, $response, $originalData);
+
+        $this->assertSame('reference_images', $result['input_mode']);
+    }
+
+    public function testParseResponseRejectsInvalidBInputMode(): void
+    {
+        $response = '{"BTOPIC": "mediamaker", "BLANG": "en", "BINPUTMODE": "invalid_mode"}';
+        $originalData = ['BTOPIC' => 'general', 'BLANG' => 'en'];
+
+        $result = $this->parseResponseMethod->invoke($this->sorter, $response, $originalData);
+
+        $this->assertNull($result['input_mode']);
+    }
+
+    // ===========================================
+    // Combined classification test
+    // ===========================================
+
+    public function testParseResponseHandlesCompleteClassification(): void
+    {
+        $response = '{"BTOPIC": "mediamaker", "BLANG": "de", "BWEBSEARCH": 0, "BMEDIA": "video", "BDURATION": 6, "BINPUTMODE": "text_only"}';
         $originalData = ['BTOPIC' => 'general', 'BLANG' => 'en'];
 
         $result = $this->parseResponseMethod->invoke($this->sorter, $response, $originalData);
@@ -316,5 +343,6 @@ class MessageSorterTest extends TestCase
         $this->assertFalse($result['web_search']);
         $this->assertSame('video', $result['media_type']);
         $this->assertSame(6, $result['duration']);
+        $this->assertSame('text_only', $result['input_mode']);
     }
 }

@@ -157,4 +157,102 @@ class MediaControllerTest extends TestCase
         self::assertSame('openai', $data['provider']);
         self::assertSame('image/png', $data['file']['mimeType']);
     }
+
+    // ==================== Pic2pic Tests ====================
+
+    private function makePic2picRequest(string $prompt, array $files = [], ?int $modelId = null): Request
+    {
+        $request = Request::create(
+            '/api/v1/media/generate-from-images',
+            'POST',
+        );
+        $request->request->set('prompt', $prompt);
+        if (null !== $modelId) {
+            $request->request->set('modelId', (string) $modelId);
+        }
+        foreach ($files as $key => $file) {
+            $request->files->set($key, $file);
+        }
+
+        return $request;
+    }
+
+    public function testPic2picUnauthenticatedReturns401(): void
+    {
+        $request = $this->makePic2picRequest('combine images');
+        $response = $this->controller->generateFromImages($request, null);
+
+        self::assertSame(401, $response->getStatusCode());
+    }
+
+    public function testPic2picInvalidInputReturns400(): void
+    {
+        $this->mediaService->method('generateFromImages')
+            ->willThrowException(new \InvalidArgumentException('Prompt is required'));
+
+        $request = $this->makePic2picRequest('');
+        $response = $this->controller->generateFromImages($request, $this->createUser());
+
+        self::assertSame(400, $response->getStatusCode());
+        $data = json_decode($response->getContent(), true);
+        self::assertSame('Prompt is required', $data['error']);
+    }
+
+    public function testPic2picRateLimitReturns429(): void
+    {
+        $this->mediaService->method('generateFromImages')
+            ->willThrowException(new RateLimitExceededException('IMAGES', 10, 10));
+
+        $request = $this->makePic2picRequest('combine');
+        $response = $this->controller->generateFromImages($request, $this->createUser());
+
+        self::assertSame(429, $response->getStatusCode());
+    }
+
+    public function testPic2picNoModelReturns422(): void
+    {
+        $this->mediaService->method('generateFromImages')
+            ->willThrowException(new NoModelAvailableException('No model available'));
+
+        $request = $this->makePic2picRequest('combine');
+        $response = $this->controller->generateFromImages($request, $this->createUser());
+
+        self::assertSame(422, $response->getStatusCode());
+    }
+
+    public function testPic2picSuccessReturns200(): void
+    {
+        $this->mediaService->method('generateFromImages')->willReturn([
+            'success' => true,
+            'file' => [
+                'url' => '/api/v1/files/uploads/01/000/00001/2026/03/media_1_openai_1709000000.png',
+                'type' => 'image',
+                'mimeType' => 'image/png',
+            ],
+            'provider' => 'openai',
+            'model' => 'gpt-image-1.5',
+        ]);
+
+        $request = $this->makePic2picRequest('put object from image 1 into scene');
+        $response = $this->controller->generateFromImages($request, $this->createUser());
+
+        self::assertSame(200, $response->getStatusCode());
+        $data = json_decode($response->getContent(), true);
+        self::assertTrue($data['success']);
+        self::assertSame('openai', $data['provider']);
+        self::assertSame('gpt-image-1.5', $data['model']);
+    }
+
+    public function testPic2picProviderErrorReturns500(): void
+    {
+        $this->mediaService->method('generateFromImages')
+            ->willThrowException(new ProviderException('Responses API error', 'openai'));
+
+        $request = $this->makePic2picRequest('combine');
+        $response = $this->controller->generateFromImages($request, $this->createUser());
+
+        self::assertSame(500, $response->getStatusCode());
+        $data = json_decode($response->getContent(), true);
+        self::assertSame('Responses API error', $data['error']);
+    }
 }

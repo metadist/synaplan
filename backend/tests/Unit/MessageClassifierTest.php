@@ -199,4 +199,36 @@ class MessageClassifierTest extends TestCase
 
         $this->service->classify($message);
     }
+
+    public function testClassifyPassesImagesToSorter(): void
+    {
+        $message = $this->createMock(Message::class);
+        $message->method('getId')->willReturn(7);
+        $message->method('getUserId')->willReturn(10);
+        $message->method('getText')->willReturn('Combine these two images');
+        $message->method('getLanguage')->willReturn('en');
+        $message->method('getDateTime')->willReturn('20250116120000');
+        $message->method('getFilePath')->willReturn('');
+        $message->method('getTopic')->willReturn('');
+        $message->method('getFileText')->willReturn('');
+        $message->method('getFile')->willReturn(0);
+        
+        // Mock that the message has files (images)
+        $file = $this->createMock(\App\Entity\File::class);
+        $file->method('getFileMime')->willReturn('image/png');
+        $files = new \Doctrine\Common\Collections\ArrayCollection([$file]);
+        $message->method('getFiles')->willReturn($files);
+
+        $this->messageMetaRepository->method('findOneBy')->willReturn(null);
+        
+        // The sorter should be called, it shouldn't be intercepted
+        $this->messageSorter->expects($this->once())->method('classify')->willReturn([
+            'topic' => 'mediamaker',
+            'language' => 'en',
+        ]);
+
+        $result = $this->service->classify($message);
+        $this->assertEquals('mediamaker', $result['topic']);
+        $this->assertEquals('ai_sorting', $result['source']);
+    }
 }
