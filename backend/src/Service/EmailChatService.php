@@ -273,6 +273,36 @@ final readonly class EmailChatService
     }
 
     /**
+     * Find or create a persistent chat context for a WhatsApp user.
+     * One chat per user, keyed by userId + source='whatsapp'.
+     */
+    public function findOrCreateWhatsAppChat(User $user, string $phoneNumber): Chat
+    {
+        $chat = $this->chatRepository->findOneBy([
+            'userId' => $user->getId(),
+            'source' => 'whatsapp',
+        ]);
+
+        if (!$chat) {
+            $chat = new Chat();
+            $chat->setUserId($user->getId());
+            $chat->setTitle('WhatsApp: '.$phoneNumber);
+            $chat->setSource('whatsapp');
+
+            $this->em->persist($chat);
+            $this->em->flush();
+
+            $this->logger->info('Created WhatsApp chat context', [
+                'user_id' => $user->getId(),
+                'phone' => $phoneNumber,
+                'chat_id' => $chat->getId(),
+            ]);
+        }
+
+        return $chat;
+    }
+
+    /**
      * Check if email address is spamming.
      */
     private function isSpamming(string $email): bool

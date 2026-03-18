@@ -9,6 +9,7 @@ use App\DTO\WhatsApp\IncomingMessageDto;
 use App\Entity\Message;
 use App\Entity\User;
 use App\Service\DiscordNotificationService;
+use App\Service\EmailChatService;
 use App\Service\File\FileProcessor;
 use App\Service\File\UserUploadPathBuilder;
 use App\Service\Message\MessageProcessor;
@@ -58,6 +59,8 @@ class WhatsAppServiceTest extends TestCase
     private $cache;
     /** @var LockFactory&\PHPUnit\Framework\MockObject\MockObject */
     private $lockFactory;
+    /** @var EmailChatService&\PHPUnit\Framework\MockObject\MockObject */
+    private $emailChatService;
     private string $testPhoneNumberId = '123456789'; // Test phone number ID
 
     protected function setUp(): void
@@ -89,6 +92,8 @@ class WhatsAppServiceTest extends TestCase
         // release() returns void, no need to configure return value
         $this->lockFactory->method('createLock')->willReturn($lock);
 
+        $this->emailChatService = $this->createMock(EmailChatService::class);
+
         // Create service with test configuration (dynamic multi-number support)
         $this->service = new WhatsAppService(
             $this->httpClient,
@@ -102,6 +107,7 @@ class WhatsAppServiceTest extends TestCase
             $this->discord,
             $this->cache,
             $this->lockFactory,
+            $this->emailChatService,
             'test_token',
             true,
             '/tmp/test_uploads',
@@ -129,6 +135,7 @@ class WhatsAppServiceTest extends TestCase
             $this->discord,
             $this->cache,
             $this->lockFactory,
+            $this->emailChatService,
             'test_token',
             false, // disabled
             '/tmp/test_uploads',
@@ -152,6 +159,7 @@ class WhatsAppServiceTest extends TestCase
             $this->discord,
             $this->cache,
             $this->lockFactory,
+            $this->emailChatService,
             'test_token',
             false,
             '/tmp/test_uploads',
@@ -366,6 +374,7 @@ class WhatsAppServiceTest extends TestCase
             $this->discord,
             $this->cache,
             $this->lockFactory,
+            $this->emailChatService,
             'test_token',
             false,
             '/tmp/test_uploads',
@@ -1190,6 +1199,7 @@ class WhatsAppServiceTest extends TestCase
             $this->discord,
             $cacheWithHit,
             $lockFactory,
+            $this->emailChatService,
             'test_token',
             true,
             '/tmp/test_uploads',
@@ -1408,6 +1418,7 @@ class WhatsAppServiceTest extends TestCase
             $this->discord,
             $this->cache,
             $lockFactory,
+            $this->emailChatService,
             'test_token',
             true,
             '/tmp/test_uploads',

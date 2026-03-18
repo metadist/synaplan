@@ -176,15 +176,14 @@
               <span>{{ $t('nav.statistics') }}</span>
             </button>
             <button
-              v-if="!authStore.isAdmin && configStore.billing.enabled"
+              v-if="!authStore.isAdmin && configStore.billing.enabled && authStore.isPro"
               role="menuitem"
               class="dropdown-item"
-              :class="{ 'text-amber-500 dark:text-amber-400': !authStore.isPro }"
               data-testid="btn-sidebar-v2-subscription"
               @click="handleNavigate('/subscription')"
             >
               <SparklesIcon class="w-4 h-4" />
-              <span>{{ authStore.isPro ? $t('nav.subscription') : $t('nav.upgrade') }}</span>
+              <span>{{ $t('nav.subscription') }}</span>
             </button>
           </div>
           <div class="border-t border-light-border/10 dark:border-dark-border/10">

@@ -11,7 +11,6 @@ export type Capability =
   | 'TEXT2VID'
   | 'SOUND2TEXT'
   | 'TEXT2SOUND'
-  | 'ANALYZE'
 
 export interface AIModel {
   id: number
