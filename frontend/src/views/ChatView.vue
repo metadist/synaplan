@@ -1673,9 +1673,17 @@ const handleAgain = async (backendMessageId: number, modelId?: number) => {
   }
 
   const messageIndex = historyStore.messages.indexOf(assistantMessage)
-  const userMessage = messageIndex > 0 ? historyStore.messages[messageIndex - 1] : null
 
-  if (!userMessage || userMessage.role !== 'user') {
+  // Search backwards for the first user message (skip superseded assistant messages)
+  let userMessage: (typeof historyStore.messages)[number] | null = null
+  for (let i = messageIndex - 1; i >= 0; i--) {
+    if (historyStore.messages[i].role === 'user') {
+      userMessage = historyStore.messages[i]
+      break
+    }
+  }
+
+  if (!userMessage) {
     console.error('❌ Could not find user message before assistant message')
     return
   }
@@ -1707,8 +1715,15 @@ const handleRegenerate = async (message: Message, modelOption: ModelOption) => {
   const messageIndex = historyStore.messages.findIndex((m) => m.id === message.id)
   if (messageIndex <= 0) return
 
-  const previousMessage = historyStore.messages[messageIndex - 1]
-  if (previousMessage.role !== 'user') return
+  // Search backwards for the first user message (skip superseded assistant messages)
+  let previousMessage: Message | null = null
+  for (let i = messageIndex - 1; i >= 0; i--) {
+    if (historyStore.messages[i].role === 'user') {
+      previousMessage = historyStore.messages[i]
+      break
+    }
+  }
+  if (!previousMessage) return
 
   const content = previousMessage.parts
     .filter((part) => part.type === 'text')

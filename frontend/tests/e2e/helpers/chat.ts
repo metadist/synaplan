@@ -101,7 +101,7 @@ export class ChatHelper {
     await expect(toggle).toBeVisible({ timeout: TIMEOUTS.STANDARD })
     await expect(toggle).toBeEnabled({ timeout: TIMEOUTS.STANDARD })
 
-    const dropdown = this.page.locator('.dropdown-panel').last()
+    const dropdown = latestBubble.locator(selectors.chat.againDropdownPanel)
     const isAlreadyOpen = await dropdown.isVisible().catch(() => false)
     if (!isAlreadyOpen) {
       await toggle.click()
@@ -125,11 +125,7 @@ export class ChatHelper {
     const initialDropdown = await this.openLatestAgainDropdown()
     const optionCount = initialDropdown.optionCount
     await initialDropdown.toggle.click()
-    await this.page
-      .locator('.dropdown-panel')
-      .last()
-      .waitFor({ state: 'hidden', timeout: TIMEOUTS.SHORT })
-      .catch(() => {})
+    await this.waitForDropdownHidden()
 
     if (optionCount === 0) {
       failures?.push(`No models available for ${purpose || 'unknown purpose'}`)
@@ -152,11 +148,7 @@ export class ChatHelper {
             `${purpose || 'purpose'} model ${i} (index out of range, found ${currentOptionCount})`
           )
           await rowToggle.click()
-          await this.page
-            .locator('.dropdown-panel')
-            .last()
-            .waitFor({ state: 'hidden', timeout: TIMEOUTS.SHORT })
-            .catch(() => {})
+          await this.waitForDropdownHidden()
           continue
         }
 
@@ -167,21 +159,13 @@ export class ChatHelper {
         labelText = (await option.innerText()).trim().toLowerCase()
         if (labelText.includes('ollama')) {
           await rowToggle.click()
-          await this.page
-            .locator('.dropdown-panel')
-            .last()
-            .waitFor({ state: 'hidden', timeout: TIMEOUTS.SHORT })
-            .catch(() => {})
+          await this.waitForDropdownHidden()
           continue
         }
 
         const currentCount = await this.conversationBubbles().count()
         await option.click()
-        await this.page
-          .locator('.dropdown-panel')
-          .last()
-          .waitFor({ state: 'hidden', timeout: TIMEOUTS.SHORT })
-          .catch(() => {})
+        await this.waitForDropdownHidden()
 
         const aiText = await this.waitForAnswer(currentCount, longTimeout)
 
@@ -207,16 +191,25 @@ export class ChatHelper {
           }`
         )
         try {
-          const dropdown = this.page.locator('.dropdown-panel').last()
+          const latestBubble = this.conversationBubbles().last()
+          const dropdown = latestBubble.locator(selectors.chat.againDropdownPanel)
           if (await dropdown.isVisible()) {
-            const toggle = this.conversationBubbles().last().locator(selectors.chat.againDropdown)
+            const toggle = latestBubble.locator(selectors.chat.againDropdown)
             await toggle.click()
-            await dropdown.waitFor({ state: 'hidden', timeout: TIMEOUTS.SHORT }).catch(() => {})
+            await this.waitForDropdownHidden()
           }
         } catch {
           // Dropdown closed or timeout – ignore
         }
       }
     }
+  }
+
+  private async waitForDropdownHidden(): Promise<void> {
+    await this.conversationBubbles()
+      .last()
+      .locator(selectors.chat.againDropdownPanel)
+      .waitFor({ state: 'hidden', timeout: TIMEOUTS.SHORT })
+      .catch(() => {})
   }
 }
