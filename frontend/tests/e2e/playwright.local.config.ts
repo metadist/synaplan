@@ -30,7 +30,7 @@ export default defineConfig({
 
   reporter: [['list'], ['html', { outputFolder: 'reports/html-local', open: 'never' }]],
 
-  outputDir: 'test-results-local',
+  outputDir: 'test-results',
   workers: 1,
 
   projects: [
