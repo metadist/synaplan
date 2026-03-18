@@ -1509,7 +1509,6 @@ const groupedModels = computed(() => {
     SOUND2TEXT: 'Speech-to-Text',
     PIC2TEXT: 'Vision (Image Analysis)',
     VECTORIZE: 'Embedding / RAG',
-    ANALYZE: 'File Analysis',
   }
 
   const orderedCapabilities: Capability[] = [
@@ -1519,7 +1518,6 @@ const groupedModels = computed(() => {
     'TEXT2SOUND',
     'SOUND2TEXT',
     'PIC2TEXT',
-    'ANALYZE',
     'VECTORIZE',
     'SORT',
   ]

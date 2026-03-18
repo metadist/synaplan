@@ -45,9 +45,8 @@ const groupedModels = computed(() => {
     SOUND2TEXT: 'Speech-to-Text',
     PIC2TEXT: 'Vision (Image Analysis)',
     VECTORIZE: 'Embedding / RAG',
-    ANALYZE: 'File Analysis',
   }
-  const ordered: Capability[] = ['CHAT', 'ANALYZE', 'PIC2TEXT']
+  const ordered: Capability[] = ['CHAT', 'PIC2TEXT']
   ordered.forEach((cap) => {
     if (props.models[cap]?.length) {
       groups.push({

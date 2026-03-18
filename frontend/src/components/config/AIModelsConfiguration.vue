@@ -356,7 +356,6 @@ const purposeLabels = computed<Record<Capability, string>>(() => ({
   TEXT2VID: t('config.aiModels.capabilities.text2vid'),
   SOUND2TEXT: t('config.aiModels.capabilities.sound2text'),
   TEXT2SOUND: t('config.aiModels.capabilities.text2sound'),
-  ANALYZE: t('config.aiModels.capabilities.analyze'),
 }))
 
 const loading = ref(false)
@@ -371,7 +370,6 @@ const defaultConfig = ref<Record<Capability, number | null>>({
   TEXT2VID: null,
   SOUND2TEXT: null,
   TEXT2SOUND: null,
-  ANALYZE: null,
 })
 const originalConfig = ref<Record<Capability, number | null>>({ ...defaultConfig.value })
 const selectedPurpose = ref<Capability | null>(null)
@@ -404,7 +402,6 @@ const normalizeHighlight = (highlight: string): Capability | 'ALL' | null => {
     TRANSCRIPTION: 'SOUND2TEXT',
     TTS: 'TEXT2SOUND',
     VOICE: 'TEXT2SOUND',
-    ANALYSIS: 'ANALYZE',
   }
 
   return aliasMap[highlight] || null
