@@ -1538,6 +1538,8 @@
       "back": "Zurück zu Widgets",
       "notFound": "Widget nicht gefunden",
       "aiButton": "Mit KI konfigurieren",
+      "autoSaved": "Alle Änderungen gespeichert",
+      "unsavedChanges": "Änderungen werden gespeichert…",
       "userData": {
         "title": "Userdaten-Integration",
         "notConfigured": "Verbinde deine Backend-API für personalisierte KI-Antworten",

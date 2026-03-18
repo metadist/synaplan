@@ -1039,14 +1039,45 @@
                   </div>
                 </details>
 
-                <!-- Save -->
-                <div class="flex justify-end pt-2 pb-8">
+                <!-- Auto-save indicator -->
+                <div class="flex items-center justify-between pt-2 pb-8">
+                  <div class="flex items-center gap-2 text-xs">
+                    <template v-if="autoSaveStatus === 'saving'">
+                      <Icon
+                        icon="heroicons:arrow-path"
+                        class="w-3.5 h-3.5 animate-spin txt-secondary"
+                      />
+                      <span class="txt-secondary">{{ $t('common.saving') }}…</span>
+                    </template>
+                    <template v-else-if="autoSaveStatus === 'saved'">
+                      <Icon
+                        icon="heroicons:check-circle"
+                        class="w-3.5 h-3.5 text-emerald-500"
+                      />
+                      <span class="text-emerald-600 dark:text-emerald-400">
+                        {{ $t('widgets.detail.autoSaved') }}
+                      </span>
+                    </template>
+                    <template v-else-if="autoSaveStatus === 'unsaved'">
+                      <Icon
+                        icon="heroicons:ellipsis-horizontal-circle"
+                        class="w-3.5 h-3.5 text-amber-500"
+                      />
+                      <span class="text-amber-600 dark:text-amber-400">
+                        {{ $t('widgets.detail.unsavedChanges') }}
+                      </span>
+                    </template>
+                  </div>
                   <button
-                    :disabled="saving"
-                    class="btn-primary px-8 py-3 rounded-xl text-sm font-medium disabled:opacity-60 inline-flex items-center gap-2"
+                    :disabled="saving || autoSaveStatus === 'saving'"
+                    class="btn-primary px-6 py-2.5 rounded-xl text-sm font-medium disabled:opacity-60 inline-flex items-center gap-2"
                     @click="save"
                   >
-                    <Icon v-if="saving" icon="heroicons:arrow-path" class="w-4 h-4 animate-spin" />
+                    <Icon
+                      v-if="saving"
+                      icon="heroicons:arrow-path"
+                      class="w-4 h-4 animate-spin"
+                    />
                     <Icon v-else icon="heroicons:check" class="w-4 h-4" />
                     {{ saving ? $t('common.saving') : $t('common.save') }}
                   </button>
@@ -1198,6 +1229,8 @@ const { t } = useI18n()
 
 const loading = ref(false)
 const saving = ref(false)
+const autoSaveStatus = ref<'idle' | 'unsaved' | 'saving' | 'saved'>('idle')
+const dataReady = ref(false)
 const widget = ref<widgetsApi.Widget | null>(null)
 const setupModalWidget = ref<widgetsApi.Widget | null>(null)
 const advancedWidget = ref<widgetsApi.Widget | null>(null)
@@ -1581,6 +1614,8 @@ const handleAiFlowUpdate = (data: FlowData) => {
 
 let autoSaveTimer: ReturnType<typeof setTimeout> | null = null
 const autoSaveFlow = () => {
+  if (!dataReady.value) return
+  autoSaveStatus.value = 'unsaved'
   if (autoSaveTimer) clearTimeout(autoSaveTimer)
   autoSaveTimer = setTimeout(() => {
     persistFlowData()
@@ -1589,6 +1624,7 @@ const autoSaveFlow = () => {
 
 const persistFlowData = async () => {
   if (!widget.value) return
+  autoSaveStatus.value = 'saving'
   const flowData: FlowData = {
     triggers: triggers.value,
     responses: responses.value,
@@ -1613,10 +1649,24 @@ const persistFlowData = async () => {
       await promptsApi.updatePrompt(gen.promptId, { prompt: composed, metadata })
       widget.value = await widgetsApi.getWidget(widget.value.widgetId)
     }
+    autoSaveStatus.value = 'saved'
+
+    const hasLinkResponses = responses.value.some((r) => r.type === 'link' && r.meta?.url?.trim())
+    if (hasLinkResponses && auth.isPro) {
+      try {
+        await widgetsApi.triggerCrawl(widget.value!.widgetId)
+      } catch {
+        /* crawl failure is non-critical */
+      }
+    }
   } catch {
-    /* auto-save failures are silent — user can still save manually */
+    autoSaveStatus.value = 'unsaved'
   }
 }
+
+watch(manualPromptContent, () => {
+  autoSaveFlow()
+})
 
 // Node editing
 const startEditing = (nodeId: string) => {
@@ -1746,54 +1796,23 @@ const loadData = async () => {
     showError(message || 'Failed to load widget')
   } finally {
     loading.value = false
+    nextTick(() => {
+      dataReady.value = true
+    })
     if (triggers.value.length > 0 || responses.value.length > 0) {
       aiSetupPhase.value = 'split'
     }
   }
 }
 
-// Save
+// Manual save (immediate, with user feedback)
 const save = async () => {
   if (!widget.value) return
+  if (autoSaveTimer) clearTimeout(autoSaveTimer)
   saving.value = true
   try {
-    const rulesBlock = buildFlowRulesBlock()
-    const base = manualPromptContent.value.trim()
-    const composed = [rulesBlock, base].filter(Boolean).join('\n\n')
-
-    const flowData: FlowData = {
-      triggers: triggers.value,
-      responses: responses.value,
-      connections: connections.value,
-    }
-    const metadata: PromptMetadata = {
-      ...promptMetadata.value,
-      aiModel: typeof promptMetadata.value.aiModel === 'number' ? promptMetadata.value.aiModel : -1,
-      widgetFlowRules: JSON.stringify(flowData),
-      widgetBehaviorVersion: '2',
-    }
-
-    if (promptId.value > 0) {
-      await promptsApi.updatePrompt(promptId.value, { prompt: composed, metadata })
-    } else {
-      const gen = await widgetsApi.generateWidgetPrompt(widget.value.widgetId, composed, [])
-      promptId.value = gen.promptId
-      await promptsApi.updatePrompt(gen.promptId, { prompt: composed, metadata })
-      widget.value = await widgetsApi.getWidget(widget.value.widgetId)
-    }
+    await persistFlowData()
     success(t('widgets.advancedConfig.saveSuccess'))
-
-    const hasLinkResponses = responses.value.some((r) => r.type === 'link' && r.meta?.url?.trim())
-    if (hasLinkResponses && auth.isPro) {
-      try {
-        const crawlResult = await widgetsApi.triggerCrawl(widget.value.widgetId)
-        if (crawlResult.urls_queued > 0) {
-          success(t('widgets.detail.nodeEditor.crawlSuccess'))
-        }
-      } catch {
-        // Non-critical: crawl failure should not block save
-      }
-    }
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : String(err)
     showError(message || t('widgets.advancedConfig.saveError'))

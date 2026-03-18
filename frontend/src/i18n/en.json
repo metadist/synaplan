@@ -1525,6 +1525,8 @@
       "back": "Back to widgets",
       "notFound": "Widget not found",
       "aiButton": "Configure with AI",
+      "autoSaved": "All changes saved",
+      "unsavedChanges": "Saving changes…",
       "userData": {
         "title": "User Data Integration",
         "notConfigured": "Connect your backend API for personalized AI responses",
