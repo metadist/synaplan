@@ -95,10 +95,14 @@ final class MediaController extends AbstractController
             if ($file instanceof \Symfony\Component\HttpFoundation\File\UploadedFile && $file->isValid()) {
                 $realPath = $file->getRealPath();
                 if (false === $realPath) {
-                    return $this->json(['error' => "Failed to read uploaded file: {$field}"], 400);
+                    return $this->json(['error' => "Failed to read uploaded file: {$field}"], Response::HTTP_BAD_REQUEST);
                 }
                 $imagePaths[] = $realPath;
             }
+        }
+
+        if (empty($imagePaths)) {
+            return $this->json(['error' => 'At least one input image (image1) is required'], Response::HTTP_BAD_REQUEST);
         }
 
         try {

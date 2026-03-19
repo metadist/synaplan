@@ -16,16 +16,17 @@ use App\Service\ModelConfigService;
 use App\Service\RateLimitService;
 use Doctrine\ORM\EntityManagerInterface;
 use Doctrine\ORM\EntityRepository;
+use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
 
 class MediaGenerationServiceTest extends TestCase
 {
-    private AiFacade $aiFacade;
-    private ModelConfigService $modelConfigService;
-    private RateLimitService $rateLimitService;
+    private AiFacade&MockObject $aiFacade;
+    private ModelConfigService&MockObject $modelConfigService;
+    private RateLimitService&MockObject $rateLimitService;
     private UserUploadPathBuilder $pathBuilder;
-    private EntityManagerInterface $em;
+    private EntityManagerInterface&MockObject $em;
     private MediaGenerationService $service;
     private string $uploadDir;
 
@@ -71,7 +72,7 @@ class MediaGenerationServiceTest extends TestCase
         rmdir($dir);
     }
 
-    private function createUser(int $id = 1): User
+    private function createUser(int $id = 1): User&MockObject
     {
         $user = $this->createMock(User::class);
         $user->method('getId')->willReturn($id);
@@ -79,7 +80,7 @@ class MediaGenerationServiceTest extends TestCase
         return $user;
     }
 
-    private function createModel(string $service = 'OpenAI', string $providerId = 'dall-e-3', string $name = 'DALL-E 3'): Model
+    private function createModel(string $service = 'OpenAI', string $providerId = 'dall-e-3', string $name = 'DALL-E 3'): Model&MockObject
     {
         $model = $this->createMock(Model::class);
         $model->method('getService')->willReturn($service);
@@ -323,7 +324,7 @@ class MediaGenerationServiceTest extends TestCase
     public function testPic2picMissingImageFileThrowsInvalidArgument(): void
     {
         $this->expectException(\InvalidArgumentException::class);
-        $this->expectExceptionMessage('Uploaded image not found');
+        $this->expectExceptionMessageMatches('/Uploaded image not found/i');
 
         $this->service->generateFromImages($this->createUser(), 'combine', ['/tmp/nonexistent_pic2pic_test.png']);
     }

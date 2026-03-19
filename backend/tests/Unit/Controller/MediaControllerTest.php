@@ -10,6 +10,7 @@ use App\Entity\User;
 use App\Service\Exception\NoModelAvailableException;
 use App\Service\Exception\RateLimitExceededException;
 use App\Service\MediaGenerationServiceInterface;
+use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
 use Symfony\Component\DependencyInjection\Container;
@@ -17,7 +18,7 @@ use Symfony\Component\HttpFoundation\Request;
 
 class MediaControllerTest extends TestCase
 {
-    private MediaGenerationServiceInterface $mediaService;
+    private MediaGenerationServiceInterface&MockObject $mediaService;
     private MediaController $controller;
 
     protected function setUp(): void
@@ -35,7 +36,7 @@ class MediaControllerTest extends TestCase
         $this->controller->setContainer($container);
     }
 
-    private function createUser(): User
+    private function createUser(): User&MockObject
     {
         $user = $this->createMock(User::class);
         $user->method('getId')->willReturn(1);
@@ -160,8 +161,28 @@ class MediaControllerTest extends TestCase
 
     // ==================== Pic2pic Tests ====================
 
+    private function createTempImage(): string
+    {
+        $path = sys_get_temp_dir().'/pic2pic_test_'.uniqid().'.png';
+        file_put_contents($path, 'fake-png-data');
+
+        return $path;
+    }
+
+    private function createMockUploadedFile(): \Symfony\Component\HttpFoundation\File\UploadedFile
+    {
+        $path = $this->createTempImage();
+        $this->tempFiles[] = $path;
+
+        return new \Symfony\Component\HttpFoundation\File\UploadedFile($path, 'test.png', 'image/png', null, true);
+    }
+
     private function makePic2picRequest(string $prompt, array $files = [], ?int $modelId = null): Request
     {
+        if (empty($files)) {
+            $files = ['image1' => $this->createMockUploadedFile()];
+        }
+
         $request = Request::create(
             '/api/v1/media/generate-from-images',
             'POST',
@@ -177,12 +198,35 @@ class MediaControllerTest extends TestCase
         return $request;
     }
 
+    /** @var string[] */
+    private array $tempFiles = [];
+
+    protected function tearDown(): void
+    {
+        foreach ($this->tempFiles as $f) {
+            if (file_exists($f)) {
+                unlink($f);
+            }
+        }
+    }
+
     public function testPic2picUnauthenticatedReturns401(): void
     {
         $request = $this->makePic2picRequest('combine images');
         $response = $this->controller->generateFromImages($request, null);
 
         self::assertSame(401, $response->getStatusCode());
+    }
+
+    public function testPic2picNoImagesReturns400(): void
+    {
+        $request = Request::create('/api/v1/media/generate-from-images', 'POST');
+        $request->request->set('prompt', 'combine');
+        $response = $this->controller->generateFromImages($request, $this->createUser());
+
+        self::assertSame(400, $response->getStatusCode());
+        $data = json_decode($response->getContent(), true);
+        self::assertStringContainsString('image', $data['error']);
     }
 
     public function testPic2picInvalidInputReturns400(): void
