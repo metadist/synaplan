@@ -410,7 +410,9 @@
     "uploadNew": "Subir Nuevos Archivos",
     "uploading": "Subiendo {current} de {total}...",
     "orDragDrop": "o arrastra y suelta archivos aquí",
-    "dropHere": "Suelta archivos aquí para subir"
+    "dropHere": "Suelta archivos aquí para subir",
+    "uploadSuccess": "{count} archivo(s) subido(s) correctamente",
+    "uploadCancelled": "Subida cancelada"
   },
   "aiProvider": {
     "error": {
@@ -1185,6 +1187,8 @@
       "modelsAndPurposes": "Modelos y Propósitos",
       "availableModels": "Modelos Disponibles",
       "noModels": "No hay modelos disponibles para este propósito",
+      "modelNotAvailable": "{model} no está disponible. Verifique la configuración del proveedor.",
+      "modelNotConfigured": "{model} requiere una clave API. Agregue {envVar} a su configuración.",
       "id": "ID",
       "purpose": "PROPÓSITO",
       "service": "SERVICIO",

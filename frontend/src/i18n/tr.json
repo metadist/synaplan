@@ -410,7 +410,9 @@
     "uploadNew": "Yeni Dosyalar Yükle",
     "uploading": "{total} dosyadan {current} yükleniyor...",
     "orDragDrop": "veya dosyaları buraya sürükleyip bırakın",
-    "dropHere": "Yüklemek için dosyaları buraya bırakın"
+    "dropHere": "Yüklemek için dosyaları buraya bırakın",
+    "uploadSuccess": "{count} dosya başarıyla yüklendi",
+    "uploadCancelled": "Yükleme iptal edildi"
   },
   "aiProvider": {
     "error": {
@@ -1186,6 +1188,8 @@
       "modelsAndPurposes": "Modeller ve Amaçlar",
       "availableModels": "Mevcut Modeller",
       "noModels": "Bu amaç için model yok",
+      "modelNotAvailable": "{model} kullanılamıyor. Lütfen sağlayıcı yapılandırmasını kontrol edin.",
+      "modelNotConfigured": "{model} bir API anahtarı gerektiriyor. Yapılandırmanıza {envVar} ekleyin.",
       "id": "ID",
       "purpose": "AMAÇ",
       "service": "HİZMET",
