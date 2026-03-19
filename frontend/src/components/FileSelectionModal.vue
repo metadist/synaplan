@@ -138,14 +138,22 @@
                     <span>{{ formatFileSize(file.file_size) }}</span>
                     <span>·</span>
                     <span
+                      class="inline-flex items-center gap-1"
                       :class="{
                         'text-green-600 dark:text-green-400':
                           file.status === 'vectorized' || file.status === 'processed',
                         'text-yellow-600 dark:text-yellow-400': file.status === 'extracted',
+                        'text-blue-500 dark:text-blue-400':
+                          file.status === 'extracting' || file.status === 'vectorizing',
                         'text-gray-600 dark:text-gray-400': file.status === 'uploaded',
                         'text-red-600 dark:text-red-400': file.status === 'error',
                       }"
                     >
+                      <Icon
+                        v-if="file.status === 'extracting' || file.status === 'vectorizing'"
+                        icon="mdi:loading"
+                        class="w-3.5 h-3.5 animate-spin"
+                      />
                       {{ $t(`files.status_${file.status}`) }}
                     </span>
                     <span v-if="file.is_attached">·</span>
@@ -161,7 +169,7 @@
                   @click.stop
                 >
                   <button
-                    v-if="file.status !== 'vectorized'"
+                    v-if="!['vectorized', 'extracting', 'vectorizing'].includes(file.status)"
                     class="p-1.5 rounded hover:bg-purple-500/10 text-purple-600 dark:text-purple-400 transition-colors"
                     :title="$t('fileSelection.reVectorize')"
                     data-testid="btn-file-revectorize"
@@ -259,7 +267,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch } from 'vue'
+import { ref, computed, watch, onUnmounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { XMarkIcon, ArrowDownTrayIcon, TrashIcon } from '@heroicons/vue/24/outline'
 import { Icon } from '@iconify/vue'
@@ -450,11 +458,16 @@ const handleFileUpload = async (event: Event) => {
   target.value = ''
 }
 
+const pendingProcessingIds = ref<Set<number>>(new Set())
+let pollingTimer: ReturnType<typeof setInterval> | null = null
+const isPolling = ref(false)
+
 const uploadFiles = async (filesToUpload: File[]) => {
   isUploading.value = true
 
   let successCount = 0
   let errorCount = 0
+  const newFileIds: number[] = []
 
   for (let i = 0; i < filesToUpload.length; i++) {
     uploadProgress.value = { current: i + 1, total: filesToUpload.length }
@@ -463,7 +476,7 @@ const uploadFiles = async (filesToUpload: File[]) => {
     try {
       const result = await filesService.uploadFiles({
         files: [file],
-        processLevel: 'vectorize',
+        processLevel: 'store',
       })
 
       if (result.success && result.files.length > 0) {
@@ -471,6 +484,7 @@ const uploadFiles = async (filesToUpload: File[]) => {
         result.files.forEach((f) => {
           if (f.id) {
             selectedFileIds.value.add(f.id)
+            newFileIds.push(f.id)
           }
         })
       }
@@ -492,10 +506,61 @@ const uploadFiles = async (filesToUpload: File[]) => {
   if (successCount > 0) {
     success(`${successCount} ${successCount === 1 ? 'file' : 'files'} uploaded successfully`)
     await loadFiles()
+
+    for (const fileId of newFileIds) {
+      pendingProcessingIds.value.add(fileId)
+      filesService.processFile(fileId).catch((err) => {
+        console.error('Background processing failed for file', fileId, err)
+        pendingProcessingIds.value.delete(fileId)
+        const msg = err instanceof Error ? err.message : 'Unknown error'
+        showError(`Background processing failed for file: ${msg}`)
+      })
+    }
+    startPolling()
   }
 
   isUploading.value = false
   uploadProgress.value = null
+}
+
+const startPolling = () => {
+  if (pollingTimer) return
+  pollingTimer = setInterval(async () => {
+    if (pendingProcessingIds.value.size === 0) {
+      stopPolling()
+      return
+    }
+    if (isPolling.value) return
+    isPolling.value = true
+    try {
+      const response = await filesService.listFiles({ limit: 100 })
+      files.value = response.files
+
+      const stillProcessing = new Set<number>()
+      for (const id of pendingProcessingIds.value) {
+        const file = response.files.find((f) => f.id === id)
+        if (file && !['vectorized', 'processed', 'error'].includes(file.status)) {
+          stillProcessing.add(id)
+        }
+      }
+      pendingProcessingIds.value = stillProcessing
+
+      if (stillProcessing.size === 0) {
+        stopPolling()
+      }
+    } catch (err) {
+      console.error('Polling failed:', err)
+    } finally {
+      isPolling.value = false
+    }
+  }, 2000)
+}
+
+const stopPolling = () => {
+  if (pollingTimer) {
+    clearInterval(pollingTimer)
+    pollingTimer = null
+  }
 }
 
 const formatFileSize = (bytes: number): string => {
@@ -524,12 +589,18 @@ watch(
     if (visible) {
       loadFiles()
     } else {
+      stopPolling()
+      pendingProcessingIds.value.clear()
       selectedFileIds.value.clear()
       contentModalOpen.value = false
       confirmDialogOpen.value = false
     }
   }
 )
+
+onUnmounted(() => {
+  stopPolling()
+})
 </script>
 
 <style scoped>

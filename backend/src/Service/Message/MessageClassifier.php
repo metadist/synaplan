@@ -231,7 +231,7 @@ final readonly class MessageClassifier
      */
     private function buildMessageData(Message $message): array
     {
-        return [
+        $data = [
             'BDATETIME' => $message->getDateTime(),
             'BFILEPATH' => $message->getFilePath(),
             'BTOPIC' => $message->getTopic() ?: '',
@@ -239,8 +239,25 @@ final readonly class MessageClassifier
             'BTEXT' => $message->getText(),
             'BFILETEXT' => $message->getFileText() ?: '',
             'BFILE' => $message->getFile(),
-            'BWEBSEARCH' => 0, // Initialize for AI to set
+            'BWEBSEARCH' => 0,
         ];
+
+        $fileType = $message->getFileType();
+        if ('' !== $fileType) {
+            $data['BFILETYPE'] = $fileType;
+        }
+
+        $attachedFiles = $message->getFiles();
+        if ($attachedFiles->count() > 0) {
+            $types = [];
+            foreach ($attachedFiles as $file) {
+                $types[] = $file->getFileType() ?: $file->getFileMime();
+            }
+            $data['BATTACHED_FILES'] = implode(', ', $types);
+            $data['BATTACHED_COUNT'] = $attachedFiles->count();
+        }
+
+        return $data;
     }
 
     /**

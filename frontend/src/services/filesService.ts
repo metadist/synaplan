@@ -4,7 +4,7 @@ import { httpClient, getApiBaseUrl, refreshAccessToken } from './api/httpClient'
 export interface UploadFileOptions {
   files: File[]
   groupKey?: string
-  processLevel?: 'extract' | 'vectorize' | 'full'
+  processLevel?: 'store' | 'extract' | 'vectorize' | 'full'
   onProgress?: (progress: UploadProgress) => void
 }
 
@@ -482,6 +482,19 @@ export async function reVectorizeFile(
   return response
 }
 
+/**
+ * Trigger extraction + vectorization for a stored file (fire-and-forget from UI)
+ */
+export async function processFile(
+  fileId: number
+): Promise<{ success: boolean; status: string; error?: string }> {
+  const response = await httpClient<{ success: boolean; status: string; error?: string }>(
+    `/api/v1/files/${fileId}/process`,
+    { method: 'POST' }
+  )
+  return response
+}
+
 export default {
   uploadFiles,
   listFiles,
@@ -498,4 +511,5 @@ export default {
   updateFileGroupKey,
   reVectorizeFile,
   migrateFileToQdrant,
+  processFile,
 }
