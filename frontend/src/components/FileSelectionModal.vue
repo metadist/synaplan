@@ -142,8 +142,7 @@
                       :class="{
                         'text-green-600 dark:text-green-400':
                           file.status === 'vectorized' || file.status === 'processed',
-                        'text-yellow-600 dark:text-yellow-400':
-                          file.status === 'extracted',
+                        'text-yellow-600 dark:text-yellow-400': file.status === 'extracted',
                         'text-blue-500 dark:text-blue-400':
                           file.status === 'extracting' || file.status === 'vectorizing',
                         'text-gray-600 dark:text-gray-400': file.status === 'uploaded',
