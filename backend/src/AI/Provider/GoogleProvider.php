@@ -331,19 +331,15 @@ class GoogleProvider implements ChatProviderInterface, ImageGenerationProviderIn
     }
 
     /**
-     * Generate image using Imagen via Vertex AI.
+     * Generate image using Imagen via Gemini API (API key) or Vertex AI (project ID + OAuth).
+     *
+     * Gemini API: available since Feb 2025 for imagen-3.0-generate-002
+     *
+     * @see https://ai.google.dev/gemini-api/docs/imagen
      */
     private function generateImageWithImagen(string $model, string $prompt, array $options): array
     {
         try {
-            if (!$this->projectId) {
-                throw new ProviderException('Google project ID required for Imagen image generation', 'google');
-            }
-
-            $url = str_replace('{region}', $this->region, self::VERTEX_BASE)
-                ."/projects/{$this->projectId}/locations/{$this->region}"
-                ."/publishers/google/models/{$model}:predict";
-
             $payload = [
                 'instances' => [
                     [
@@ -353,36 +349,85 @@ class GoogleProvider implements ChatProviderInterface, ImageGenerationProviderIn
                 'parameters' => [
                     'sampleCount' => $options['n'] ?? 1,
                     'aspectRatio' => $options['aspect_ratio'] ?? '1:1',
-                    'negativePrompt' => $options['negative_prompt'] ?? '',
-                    'personGeneration' => 'allow_all',
                 ],
             ];
 
-            $response = $this->httpClient->request('POST', $url, [
-                'headers' => [
-                    'Content-Type' => 'application/json',
-                    'Authorization' => 'Bearer '.$this->apiKey,
-                ],
-                'json' => $payload,
-                'timeout' => 60,
-            ]);
-
-            $data = $response->toArray();
-
-            $images = [];
-            foreach ($data['predictions'] ?? [] as $prediction) {
-                if (isset($prediction['bytesBase64Encoded'])) {
-                    $images[] = [
-                        'url' => 'data:image/png;base64,'.$prediction['bytesBase64Encoded'],
-                        'revised_prompt' => $prompt,
-                    ];
-                }
+            if ($this->projectId) {
+                return $this->generateImageWithImagenVertex($model, $payload);
             }
 
-            return $images;
+            return $this->generateImageWithImagenGemini($model, $payload);
+        } catch (ProviderException $e) {
+            throw $e;
         } catch (\Exception $e) {
             throw new ProviderException('Google Imagen generation error: '.$e->getMessage(), 'google');
         }
+    }
+
+    /**
+     * Imagen via Gemini API (API key auth, no GCP project required).
+     */
+    private function generateImageWithImagenGemini(string $model, array $payload): array
+    {
+        $url = self::API_BASE."/models/{$model}:predict";
+
+        $this->logger->info('Google Imagen: Using Gemini API', [
+            'model' => $model,
+            'url' => $url,
+        ]);
+
+        $response = $this->httpClient->request('POST', $url, [
+            'headers' => [
+                'Content-Type' => 'application/json',
+                'x-goog-api-key' => $this->apiKey,
+            ],
+            'json' => $payload,
+            'timeout' => 120,
+        ]);
+
+        return $this->parseImagenResponse($response->toArray());
+    }
+
+    /**
+     * Imagen via Vertex AI (requires GCP project ID and OAuth2 token).
+     */
+    private function generateImageWithImagenVertex(string $model, array $payload): array
+    {
+        $url = str_replace('{region}', $this->region, self::VERTEX_BASE)
+            ."/projects/{$this->projectId}/locations/{$this->region}"
+            ."/publishers/google/models/{$model}:predict";
+
+        $this->logger->info('Google Imagen: Using Vertex AI', [
+            'model' => $model,
+            'project' => $this->projectId,
+        ]);
+
+        $response = $this->httpClient->request('POST', $url, [
+            'headers' => [
+                'Content-Type' => 'application/json',
+                'Authorization' => 'Bearer '.$this->apiKey,
+            ],
+            'json' => $payload,
+            'timeout' => 120,
+        ]);
+
+        return $this->parseImagenResponse($response->toArray());
+    }
+
+    private function parseImagenResponse(array $data): array
+    {
+        $images = [];
+        foreach ($data['predictions'] ?? [] as $prediction) {
+            if (isset($prediction['bytesBase64Encoded'])) {
+                $mimeType = $prediction['mimeType'] ?? 'image/png';
+                $images[] = [
+                    'url' => 'data:'.$mimeType.';base64,'.$prediction['bytesBase64Encoded'],
+                    'revised_prompt' => null,
+                ];
+            }
+        }
+
+        return $images;
     }
 
     public function createVariations(string $imageUrl, int $count = 1): array
