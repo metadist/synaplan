@@ -710,6 +710,8 @@
       "modelsAndPurposes": "Models & Purposes",
       "availableModels": "Available Models",
       "noModels": "No models available for this purpose",
+      "modelNotAvailable": "{model} is not available. Please check provider configuration.",
+      "modelNotConfigured": "{model} requires an API key. Add {envVar} to your configuration.",
       "id": "ID",
       "purpose": "PURPOSE",
       "service": "SERVICE",

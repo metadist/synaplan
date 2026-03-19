@@ -823,6 +823,8 @@
       "chatGeneration": "Antwort-Generierung",
       "messageClassification": "Nachrichten-Klassifizierung",
       "clickToConfig": "Klicken zum Konfigurieren",
+      "modelNotAvailable": "{model} ist nicht verfügbar. Bitte prüfe die Provider-Konfiguration.",
+      "modelNotConfigured": "{model} benötigt einen API-Schlüssel. Füge {envVar} zu deiner Konfiguration hinzu.",
       "admin": {
         "addModels": "Modelle hinzufügen (Import)",
         "urlsLabel": "URLs (eine pro Zeile)",

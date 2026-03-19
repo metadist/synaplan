@@ -496,7 +496,14 @@ class ConfigController extends AbstractController
                 ]);
             }
 
-            $defaults[$capability] = $config ? (int) $config->getValue() : null;
+            if ($config) {
+                $modelId = (int) $config->getValue();
+                $model = $this->modelRepository->find($modelId);
+                // Only return model ID if the model still exists and is active
+                $defaults[$capability] = ($model && 1 === $model->getActive()) ? $modelId : null;
+            } else {
+                $defaults[$capability] = null;
+            }
         }
 
         return $this->json([
@@ -534,22 +541,17 @@ class ConfigController extends AbstractController
         $ownerId = $global ? 0 : $user->getId();
         $validCapabilities = ['SORT', 'CHAT', 'VECTORIZE', 'PIC2TEXT', 'TEXT2PIC', 'TEXT2VID', 'SOUND2TEXT', 'TEXT2SOUND', 'ANALYZE'];
 
+        $skipped = [];
+
         foreach ($data['defaults'] as $capability => $modelId) {
             if (!in_array($capability, $validCapabilities)) {
                 continue;
             }
 
             $model = $this->modelRepository->find($modelId);
-            if (!$model) {
-                return $this->json([
-                    'error' => "Model {$modelId} not found",
-                ], Response::HTTP_BAD_REQUEST);
-            }
-
-            if (1 !== $model->getActive()) {
-                return $this->json([
-                    'error' => "Model {$modelId} is not active",
-                ], Response::HTTP_BAD_REQUEST);
+            if (!$model || 1 !== $model->getActive()) {
+                $skipped[$capability] = $modelId;
+                continue;
             }
 
             $config = $this->configRepository->findOneBy([
@@ -571,10 +573,17 @@ class ConfigController extends AbstractController
 
         $this->em->flush();
 
-        return $this->json([
+        $response = [
             'success' => true,
             'message' => $global ? 'Global default models saved successfully' : 'Default models saved successfully',
-        ]);
+        ];
+
+        if (!empty($skipped)) {
+            $response['skipped'] = $skipped;
+            $response['message'] .= ' (some models were skipped because they are no longer available)';
+        }
+
+        return $this->json($response);
     }
 
     /**
@@ -634,7 +643,7 @@ class ConfigController extends AbstractController
             } catch (\Exception $e) {
                 $message = 'Ollama not available: '.$e->getMessage();
             }
-        } elseif (in_array($service, ['openai', 'anthropic', 'groq', 'gemini', 'google', 'mistral'])) {
+        } elseif (in_array($service, ['openai', 'anthropic', 'groq', 'gemini', 'google', 'mistral', 'huggingface'])) {
             $providerType = 'external';
 
             // Check if API key is configured
@@ -642,12 +651,13 @@ class ConfigController extends AbstractController
                 'openai' => ['OPENAI_API_KEY'],
                 'anthropic' => ['ANTHROPIC_API_KEY'],
                 'groq' => ['GROQ_API_KEY'],
-                'gemini' => ['GEMINI_API_KEY', 'GOOGLE_GEMINI_API_KEY', 'GOOGLE_API_KEY'], // Support multiple key names
-                'google' => ['GOOGLE_API_KEY', 'GOOGLE_GEMINI_API_KEY', 'GEMINI_API_KEY'], // Support multiple key names
+                'gemini' => ['GEMINI_API_KEY', 'GOOGLE_GEMINI_API_KEY', 'GOOGLE_API_KEY'],
+                'google' => ['GOOGLE_API_KEY', 'GOOGLE_GEMINI_API_KEY', 'GEMINI_API_KEY'],
                 'mistral' => ['MISTRAL_API_KEY'],
+                'huggingface' => ['HUGGINGFACE_API_KEY'],
             ];
 
-            $envVars = $envVarMap[$service] ?? [];
+            $envVars = $envVarMap[$service];
 
             // Check if any of the env vars is set and not empty
             $available = false;
@@ -661,7 +671,7 @@ class ConfigController extends AbstractController
 
             if (!$available) {
                 $message = "API key not configured for {$service}";
-                $envVar = $envVars[0] ?? null; // Use first one for setup instructions
+                $envVar = $envVars[0];
             }
         } else {
             // Unknown provider (e.g., test, custom)

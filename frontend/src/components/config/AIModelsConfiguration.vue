@@ -545,6 +545,7 @@ const toggleDropdown = (capability: Capability) => {
 
 const selectModel = async (capability: Capability, modelId: number | null) => {
   openDropdown.value = null
+  const previousModelId = defaultConfig.value[capability]
   defaultConfig.value[capability] = modelId
 
   // Check availability if a model was selected
@@ -553,13 +554,23 @@ const selectModel = async (capability: Capability, modelId: number | null) => {
       const check = await checkModelAvailability(modelId)
 
       if (!check.available) {
-        if (check.setup_required) {
-          warning(`Setup required: ${check.message}`)
+        // Revert selection — model cannot be used
+        defaultConfig.value[capability] = previousModelId
+        const modelName =
+          getModelsByPurpose(capability).find((m) => m.id === modelId)?.name || `ID ${modelId}`
+        if (check.env_var) {
+          warning(
+            t('config.aiModels.modelNotConfigured', {
+              model: modelName,
+              envVar: check.env_var,
+            })
+          )
         } else {
-          showError(`Model not available: ${check.message}`)
+          showError(t('config.aiModels.modelNotAvailable', { model: modelName }))
         }
+        return
       }
-    } catch (error: any) {
+    } catch (error) {
       console.error('Failed to check model availability:', error)
     }
   }
