@@ -102,7 +102,11 @@ class ProviderRegistry
         // Normalize DB keys to lowercase
         $dbCaps = array_change_key_case($dbCaps, CASE_LOWER);
 
-        $this->logger->debug('🔍 CAPABILITY CHECK: provider='.$providerName.' | capability='.$capability.' | dbCaps_keys='.json_encode(array_keys($dbCaps)).' | provider_in_db='.(isset($dbCaps[$providerName]) ? 'YES' : 'NO'));
+        $this->logger->debug('Capability check', [
+            'provider' => $providerName,
+            'capability' => $capability,
+            'in_db' => isset($dbCaps[$providerName]),
+        ]);
 
         // Map capability names: chat -> chat, embedding -> vectorize, vision -> pic2text
         $capabilityMap = [
@@ -141,7 +145,13 @@ class ProviderRegistry
             $providerLower = strtolower($provider->getName());
             $isAvailable = $provider->isAvailable();
 
-            $this->logger->error('🔍 PROVIDER LOOP: capability='.$capability.' | providerLower='.$providerLower.' | normalizedName='.$normalizedName.' | isAvailable='.($isAvailable ? 'YES' : 'NO').' | match='.($providerLower === $normalizedName ? 'YES' : 'NO'));
+            $this->logger->debug('Provider lookup', [
+                'capability' => $capability,
+                'provider' => $providerLower,
+                'requested' => $normalizedName,
+                'available' => $isAvailable,
+                'match' => $providerLower === $normalizedName,
+            ]);
 
             // Case-insensitive comparison
             if ($providerLower === $normalizedName && $isAvailable) {
@@ -202,10 +212,11 @@ class ProviderRegistry
         $allCaps = array_keys($this->providers);
         $dbGoogle = $dbCaps['google'] ?? 'NOT_FOUND';
 
-        $this->logger->error('🎬 VIDEO DEBUG: requested='.($name ?? 'DEFAULT')
-            .' | registered='.json_encode($registered)
-            .' | all_caps='.json_encode($allCaps)
-            .' | db_google='.json_encode($dbGoogle));
+        $this->logger->debug('Video provider lookup', [
+            'requested' => $name ?? 'DEFAULT',
+            'registered' => $registered,
+            'db_google' => $dbGoogle,
+        ]);
 
         return $this->getProvider('video_generation', $name);
     }

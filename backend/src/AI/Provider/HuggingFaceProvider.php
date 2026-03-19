@@ -641,60 +641,27 @@ class HuggingFaceProvider implements ChatProviderInterface, EmbeddingProviderInt
                 throw new ProviderException(sprintf('HuggingFace video generation requires prepaid credits. Add credits at %s', self::BILLING_URL), 'huggingface');
             }
 
-            // fal.ai returns JSON with video URL
             $data = $response->toArray();
 
             if (!isset($data['video']['url'])) {
                 throw new ProviderException('Invalid response from fal.ai: missing video URL', 'huggingface');
             }
 
-            // Download video from fal.ai CDN using HttpClient
             $videoUrl = $data['video']['url'];
-
-            try {
-                $videoResponse = $this->httpClient->request('GET', $videoUrl);
-
-                if (200 !== $videoResponse->getStatusCode()) {
-                    throw new ProviderException(sprintf('Failed to download video from fal.ai CDN (HTTP %d)', $videoResponse->getStatusCode()), 'huggingface');
-                }
-
-                $videoData = $videoResponse->getContent();
-            } catch (\Throwable $e) {
-                throw new ProviderException('Failed to download video from fal.ai CDN', 'huggingface', null, 0, $e);
-            }
-
-            // Save video to uploads
-            $filename = 'hf_video_'.uniqid().'.mp4';
-            $relativePath = 'generated/'.$filename;
-            $fullPath = $this->uploadDir.'/'.$relativePath;
-
-            // Ensure directory exists
-            $dir = dirname($fullPath);
-            if (!is_dir($dir) && !mkdir($dir, 0755, true) && !is_dir($dir)) {
-                throw new ProviderException('Failed to create directory for HuggingFace video output: '.$dir, 'huggingface');
-            }
-
-            $bytesWritten = file_put_contents($fullPath, $videoData);
-            if (false === $bytesWritten) {
-                throw new ProviderException('Failed to write generated video to '.$fullPath, 'huggingface');
-            }
-
-            $this->logger->info('HuggingFace video generated', [
-                'model' => $model,
-                'path' => $relativePath,
-                'size_bytes' => strlen($videoData),
-                'seed' => $data['seed'] ?? null,
-            ]);
-
-            // Calculate approximate duration (65 frames @ 24fps ≈ 2.7s)
             $numFrames = $options['num_frames'] ?? 65;
             $duration = round($numFrames / 24, 1);
 
+            $this->logger->info('HuggingFace video generated', [
+                'model' => $model,
+                'video_url' => $videoUrl,
+                'seed' => $data['seed'] ?? null,
+                'duration' => $duration,
+            ]);
+
             return [
                 [
-                    'url' => $relativePath,
+                    'url' => $videoUrl,
                     'duration' => $duration,
-                    'resolution' => '720p',
                     'seed' => $data['seed'] ?? null,
                 ],
             ];
