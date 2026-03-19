@@ -739,6 +739,9 @@ const uploadFiles = async (files: File[]) => {
   isDragging.value = false
   uploading.value = true
 
+  if (uploadAbortController.value) {
+    uploadAbortController.value.abort()
+  }
   const controller = new AbortController()
   uploadAbortController.value = controller
 
