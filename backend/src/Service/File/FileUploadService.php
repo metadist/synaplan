@@ -130,6 +130,10 @@ final readonly class FileUploadService
             'group_key' => $groupKey,
         ];
 
+        if ('store' === $processLevel) {
+            return $result;
+        }
+
         $result = $this->extractText($file, $storageResult['path'], $fileExtension, $user, $processLevel, $result);
         if (!$result['success'] || 'extract' === $processLevel) {
             return $result;
@@ -259,6 +263,91 @@ final readonly class FileUploadService
         }
 
         return $result;
+    }
+
+    /**
+     * Run extraction + vectorization for a stored file (used for async processing after fast upload).
+     *
+     * @return array{success: bool, status: string, error?: string, extracted_text_length?: int, chunks_created?: int}
+     */
+    public function processFile(File $file, User $user): array
+    {
+        $fileExtension = strtolower($file->getFileType() ?: (string) pathinfo($file->getFilePath(), PATHINFO_EXTENSION));
+
+        if ('uploaded' === $file->getStatus()) {
+            $file->setStatus('extracting');
+            $this->em->flush();
+
+            try {
+                [$extractedText, $extractMeta] = $this->fileProcessor->extractText(
+                    $file->getFilePath(),
+                    $fileExtension,
+                    $user->getId(),
+                );
+
+                $file->setFileText($extractedText);
+                $file->setStatus('extracted');
+                $this->em->flush();
+            } catch (\Throwable $e) {
+                $file->setStatus('error');
+                $this->em->flush();
+                $this->logger->error('FileUploadService: Async extraction failed', [
+                    'file_id' => $file->getId(),
+                    'error' => $e->getMessage(),
+                ]);
+
+                return ['success' => false, 'status' => 'error', 'error' => 'Text extraction failed: '.$e->getMessage()];
+            }
+        }
+
+        $extractedText = $file->getFileText();
+        if ('' === trim($extractedText)) {
+            $file->setStatus('vectorized');
+            $this->em->flush();
+
+            return ['success' => true, 'status' => 'vectorized', 'extracted_text_length' => 0, 'chunks_created' => 0];
+        }
+
+        $file->setStatus('vectorizing');
+        $this->em->flush();
+
+        $groupKey = $file->getGroupKey() ?? '';
+
+        try {
+            $vectorResult = $this->vectorizationService->vectorizeAndStore(
+                $extractedText,
+                $user->getId(),
+                $file->getId(),
+                $groupKey,
+                FileHelper::getFileTypeCode($fileExtension),
+            );
+
+            if ($vectorResult['success']) {
+                $file->setStatus('vectorized');
+                $this->em->flush();
+
+                return [
+                    'success' => true,
+                    'status' => 'vectorized',
+                    'extracted_text_length' => strlen($extractedText),
+                    'chunks_created' => $vectorResult['chunks_created'],
+                ];
+            }
+
+            $file->setStatus('extracted');
+            $this->em->flush();
+
+            return ['success' => false, 'status' => 'extracted', 'error' => $vectorResult['error'] ?? 'Vectorization failed'];
+        } catch (\Throwable $e) {
+            $file->setStatus('extracted');
+            $this->em->flush();
+            $this->logger->error('FileUploadService: Async vectorization failed', [
+                'file_id' => $file->getId(),
+                'error' => $e->getMessage(),
+            ]);
+
+            return ['success' => false, 'status' => 'extracted', 'error' => 'Vectorization failed: '.$e->getMessage()];
+        }
     }
 
     /**

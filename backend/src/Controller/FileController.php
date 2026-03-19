@@ -59,7 +59,7 @@ class FileController extends AbstractController
                     properties: [
                         new OA\Property(property: 'files[]', type: 'array', items: new OA\Items(type: 'string', format: 'binary')),
                         new OA\Property(property: 'group_key', type: 'string', example: 'customer-support'),
-                        new OA\Property(property: 'process_level', type: 'string', enum: ['extract', 'vectorize', 'full'], example: 'vectorize'),
+                        new OA\Property(property: 'process_level', type: 'string', enum: ['store', 'extract', 'vectorize', 'full'], example: 'vectorize'),
                     ]
                 )
             )
@@ -79,7 +79,7 @@ class FileController extends AbstractController
 
         $groupKey = $request->request->get('group_key') ?: null;
         $processLevel = $request->request->get('process_level', 'vectorize');
-        if (!in_array($processLevel, ['extract', 'vectorize', 'full'], true)) {
+        if (!in_array($processLevel, ['store', 'extract', 'vectorize', 'full'], true)) {
             $processLevel = 'vectorize';
         }
 
@@ -91,6 +91,38 @@ class FileController extends AbstractController
         $result = $this->uploadService->uploadBatch($uploadedFiles, $user, $groupKey, $processLevel);
 
         return $this->json($result, $result['success'] ? Response::HTTP_OK : Response::HTTP_PARTIAL_CONTENT);
+    }
+
+    #[Route('/{id}/process', name: 'process', methods: ['POST'])]
+    #[OA\Post(
+        path: '/api/v1/files/{id}/process',
+        summary: 'Trigger extraction and vectorization for a stored file',
+        tags: ['Files'],
+        parameters: [new OA\Parameter(name: 'id', in: 'path', required: true, schema: new OA\Schema(type: 'integer'))],
+        responses: [
+            new OA\Response(response: 200, description: 'Processing result'),
+            new OA\Response(response: 401, description: 'Not authenticated'),
+            new OA\Response(response: 404, description: 'File not found'),
+        ]
+    )]
+    public function processFile(int $id, #[CurrentUser] ?User $user): JsonResponse
+    {
+        if (!$user) {
+            return $this->json(['error' => 'Not authenticated'], Response::HTTP_UNAUTHORIZED);
+        }
+
+        $file = $this->fileRepository->find($id);
+        if (!$file || $file->getUserId() !== $user->getId()) {
+            return $this->json(['error' => 'File not found'], Response::HTTP_NOT_FOUND);
+        }
+
+        if (in_array($file->getStatus(), ['vectorized', 'processed'], true)) {
+            return $this->json(['success' => true, 'status' => $file->getStatus(), 'already_processed' => true]);
+        }
+
+        $result = $this->uploadService->processFile($file, $user);
+
+        return $this->json($result);
     }
 
     #[Route('/{id}/download', name: 'download', methods: ['GET'])]
