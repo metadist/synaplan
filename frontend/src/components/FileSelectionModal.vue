@@ -60,7 +60,7 @@
               <span v-if="uploadProgress" class="text-sm txt-secondary">
                 {{
                   $t('fileSelection.uploading', {
-                    count: uploadProgress.current,
+                    current: uploadProgress.current,
                     total: uploadProgress.total,
                   })
                 }}
@@ -452,39 +452,50 @@ const handleFileUpload = async (event: Event) => {
 
 const uploadFiles = async (filesToUpload: File[]) => {
   isUploading.value = true
-  uploadProgress.value = { current: 0, total: filesToUpload.length }
 
-  try {
-    const result = await filesService.uploadFiles({
-      files: filesToUpload,
-      processLevel: 'vectorize',
-    })
+  let successCount = 0
+  let errorCount = 0
 
-    if (result.success) {
-      success(
-        `${result.files.length} ${result.files.length === 1 ? 'file' : 'files'} uploaded successfully`
-      )
-      await loadFiles()
-      result.files.forEach((file) => {
-        if (file.id) {
-          selectedFileIds.value.add(file.id)
-        }
+  for (let i = 0; i < filesToUpload.length; i++) {
+    uploadProgress.value = { current: i + 1, total: filesToUpload.length }
+    const file = filesToUpload[i]
+
+    try {
+      const result = await filesService.uploadFiles({
+        files: [file],
+        processLevel: 'vectorize',
       })
-    }
 
-    if (result.errors && result.errors.length > 0) {
-      result.errors.forEach((err) => {
-        showError(`${err.filename}: ${err.error}`)
-      })
+      if (result.success && result.files.length > 0) {
+        successCount++
+        result.files.forEach((f) => {
+          if (f.id) {
+            selectedFileIds.value.add(f.id)
+          }
+        })
+      }
+
+      if (result.errors && result.errors.length > 0) {
+        errorCount++
+        result.errors.forEach((err) => {
+          showError(`${err.filename}: ${err.error}`)
+        })
+      }
+    } catch (err: unknown) {
+      errorCount++
+      console.error('Upload failed:', file.name, err)
+      const msg = err instanceof Error ? err.message : 'Unknown error'
+      showError(`${file.name}: ${msg}`)
     }
-  } catch (err: unknown) {
-    console.error('Upload failed:', err)
-    const msg = err instanceof Error ? err.message : 'Unknown error'
-    showError(`Upload failed: ${msg}`)
-  } finally {
-    isUploading.value = false
-    uploadProgress.value = null
   }
+
+  if (successCount > 0) {
+    success(`${successCount} ${successCount === 1 ? 'file' : 'files'} uploaded successfully`)
+    await loadFiles()
+  }
+
+  isUploading.value = false
+  uploadProgress.value = null
 }
 
 const formatFileSize = (bytes: number): string => {
