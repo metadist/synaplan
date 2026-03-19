@@ -61,6 +61,7 @@
                 {{
                   $t('fileSelection.uploading', {
                     current: uploadProgress.current,
+                    current: uploadProgress.current,
                     total: uploadProgress.total,
                   })
                 }}
