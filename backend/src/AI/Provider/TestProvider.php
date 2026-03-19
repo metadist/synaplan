@@ -13,6 +13,11 @@ use App\AI\Interface\VisionProviderInterface;
 
 class TestProvider implements ChatProviderInterface, EmbeddingProviderInterface, VisionProviderInterface, ImageGenerationProviderInterface, VideoGenerationProviderInterface, SpeechToTextProviderInterface, TextToSpeechProviderInterface, FileAnalysisProviderInterface
 {
+    public function __construct(
+        private readonly string $uploadDir = '/var/www/backend/var/uploads',
+    ) {
+    }
+
     public function getName(): string
     {
         return 'test';
@@ -166,20 +171,25 @@ class TestProvider implements ChatProviderInterface, EmbeddingProviderInterface,
     // ImageGenerationProviderInterface
     public function generateImage(string $prompt, array $options = []): array
     {
+        // 1x1 red PNG pixel as data URL (68 bytes decoded)
+        $pngBase64 = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8/5+hHgAHggJ/PchI7wAAAABJRU5ErkJggg==';
+
         return [[
-            'url' => 'https://via.placeholder.com/1024x1024?text=Test+Image',
+            'url' => 'data:image/png;base64,'.$pngBase64,
             'revised_prompt' => $prompt,
         ]];
     }
 
     public function createVariations(string $imageUrl, int $count = 1): array
     {
-        return array_fill(0, $count, 'https://via.placeholder.com/1024x1024');
+        $pngBase64 = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8/5+hHgAHggJ/PchI7wAAAABJRU5ErkJggg==';
+
+        return array_fill(0, $count, 'data:image/png;base64,'.$pngBase64);
     }
 
     public function editImage(string $imageUrl, string $maskUrl, string $prompt): string
     {
-        return 'https://via.placeholder.com/1024x1024?text=Edited';
+        return 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8/5+hHgAHggJ/PchI7wAAAABJRU5ErkJggg==';
     }
 
     // VideoGenerationProviderInterface
@@ -213,7 +223,19 @@ class TestProvider implements ChatProviderInterface, EmbeddingProviderInterface,
     // TextToSpeechProviderInterface
     public function synthesize(string $text, array $options = []): string
     {
-        return '/tmp/test_audio.mp3';
+        // Minimal valid MP3 frame (silence) written to uploadDir so AiFacade can move it
+        $filename = 'tts_test_'.uniqid().'.mp3';
+        $path = $this->uploadDir.'/'.$filename;
+
+        if (!is_dir($this->uploadDir)) {
+            mkdir($this->uploadDir, 0775, true);
+        }
+
+        // MPEG audio frame header (0xFFF3) + padding for a valid ~0.1s silent MP3
+        $mp3 = base64_decode('//uQxAAAAAANIAAAAAExBTUUzLjEwMFVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV');
+        file_put_contents($path, $mp3);
+
+        return $filename;
     }
 
     public function synthesizeStream(string $text, array $options = []): \Generator

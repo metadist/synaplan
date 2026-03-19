@@ -532,11 +532,14 @@ services:
 when@dev:
     services:
         App\AI\Provider\TestProvider:
+            arguments:
+                $uploadDir: '%kernel.project_dir%/var/uploads'
             tags:
                 - { name: 'app.ai.chat' }
                 - { name: 'app.ai.embedding' }
                 - { name: 'app.ai.vision' }
                 - { name: 'app.ai.image_generation' }
+                - { name: 'app.ai.video_generation' }
                 - { name: 'app.ai.speech_to_text' }
                 - { name: 'app.ai.text_to_speech' }
                 - { name: 'app.ai.file_analysis' }
@@ -544,11 +547,14 @@ when@dev:
 when@test:
     services:
         App\AI\Provider\TestProvider:
+            arguments:
+                $uploadDir: '%kernel.project_dir%/var/uploads'
             tags:
                 - { name: 'app.ai.chat' }
                 - { name: 'app.ai.embedding' }
                 - { name: 'app.ai.vision' }
                 - { name: 'app.ai.image_generation' }
+                - { name: 'app.ai.video_generation' }
                 - { name: 'app.ai.speech_to_text' }
                 - { name: 'app.ai.text_to_speech' }
                 - { name: 'app.ai.file_analysis' }
