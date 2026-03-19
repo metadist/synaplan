@@ -99,12 +99,19 @@ export const uploadFiles = async (options: UploadFileOptions): Promise<UploadRes
       const xhr = new XMLHttpRequest()
       const baseUrl = getApiBaseUrl()
 
+      const onAbort = () => xhr.abort()
+      const cleanup = () => {
+        if (options.signal) {
+          options.signal.removeEventListener('abort', onAbort)
+        }
+      }
+
       if (options.signal) {
         if (options.signal.aborted) {
           reject(new DOMException('Upload cancelled', 'AbortError'))
           return
         }
-        options.signal.addEventListener('abort', () => xhr.abort())
+        options.signal.addEventListener('abort', onAbort)
       }
 
       xhr.upload.addEventListener('progress', (event) => {
@@ -118,6 +125,7 @@ export const uploadFiles = async (options: UploadFileOptions): Promise<UploadRes
       })
 
       xhr.addEventListener('load', async () => {
+        cleanup()
         if (xhr.status >= 200 && xhr.status < 300) {
           try {
             const response = JSON.parse(xhr.responseText)
@@ -152,11 +160,13 @@ export const uploadFiles = async (options: UploadFileOptions): Promise<UploadRes
       })
 
       xhr.addEventListener('error', () => {
+        cleanup()
         reject(new Error('Network error during upload'))
       })
 
       xhr.addEventListener('abort', () => {
-        reject(new Error('Upload aborted'))
+        cleanup()
+        reject(new DOMException('Upload cancelled', 'AbortError'))
       })
 
       xhr.open('POST', `${baseUrl}/api/v1/files/upload`)
