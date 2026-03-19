@@ -272,6 +272,23 @@ final readonly class FileUploadService
      */
     public function processFile(File $file, User $user): array
     {
+        if (in_array($file->getStatus(), ['extracting', 'vectorizing'], true)) {
+            return ['success' => true, 'status' => $file->getStatus(), 'message' => 'File is already being processed'];
+        }
+
+        if ('error' === $file->getStatus()) {
+            return ['success' => false, 'status' => 'error', 'error' => 'File is in error state'];
+        }
+
+        $rateLimitCheck = $this->rateLimitService->checkLimit($user, 'FILE_ANALYSIS');
+        if (!$rateLimitCheck['allowed']) {
+            return [
+                'success' => false,
+                'status' => $file->getStatus(),
+                'error' => "Rate limit exceeded for FILE_ANALYSIS. Used: {$rateLimitCheck['used']}/{$rateLimitCheck['limit']}",
+            ];
+        }
+
         $fileExtension = strtolower($file->getFileType() ?: (string) pathinfo($file->getFilePath(), PATHINFO_EXTENSION));
 
         if ('uploaded' === $file->getStatus()) {
@@ -305,6 +322,12 @@ final readonly class FileUploadService
             $file->setStatus('vectorized');
             $this->em->flush();
 
+            $this->rateLimitService->recordUsage($user, 'FILE_ANALYSIS', [
+                'file_id' => $file->getId(),
+                'filename' => $file->getFileName(),
+                'source' => 'WEB_ASYNC',
+            ]);
+
             return ['success' => true, 'status' => 'vectorized', 'extracted_text_length' => 0, 'chunks_created' => 0];
         }
 
@@ -325,6 +348,12 @@ final readonly class FileUploadService
             if ($vectorResult['success']) {
                 $file->setStatus('vectorized');
                 $this->em->flush();
+
+                $this->rateLimitService->recordUsage($user, 'FILE_ANALYSIS', [
+                    'file_id' => $file->getId(),
+                    'filename' => $file->getFileName(),
+                    'source' => 'WEB_ASYNC',
+                ]);
 
                 return [
                     'success' => true,
