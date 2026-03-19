@@ -1573,6 +1573,7 @@ class WidgetPublicController extends AbstractController
         }
 
         $widgetConfig = $widget->getConfig();
+
         $externalApiToken = \is_string($widgetConfig['externalApiToken'] ?? null)
             ? $widgetConfig['externalApiToken']
             : '';

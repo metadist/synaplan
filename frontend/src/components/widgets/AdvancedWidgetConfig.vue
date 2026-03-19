@@ -771,7 +771,7 @@ SynaplanWidget.init({
             class="space-y-6"
             data-testid="section-privacy"
           >
-            <!-- Data Processing Agreement -->
+            <!-- Data Processing Agreement (Art. 28 DSGVO) -->
             <div class="surface-chip p-4 rounded-lg space-y-4">
               <div class="flex items-start justify-between gap-3">
                 <div>
@@ -789,7 +789,12 @@ SynaplanWidget.init({
               </div>
 
               <label
-                class="flex items-start gap-3 p-3 rounded-lg border border-light-border/30 dark:border-dark-border/20 cursor-pointer hover:border-[var(--brand)]/40 transition-colors"
+                class="flex items-start gap-3 p-3 rounded-lg border transition-colors cursor-pointer"
+                :class="
+                  config.dataProcessingAccepted
+                    ? 'border-emerald-500/30 bg-emerald-500/5'
+                    : 'border-light-border/30 dark:border-dark-border/20 hover:border-[var(--brand)]/40'
+                "
               >
                 <input
                   v-model="config.dataProcessingAccepted"
@@ -807,6 +812,118 @@ SynaplanWidget.init({
                 </div>
               </label>
             </div>
+
+            <!-- AVV Details (Art. 28 Abs. 3 DSGVO) -->
+            <details class="surface-chip rounded-lg overflow-hidden group">
+              <summary
+                class="p-4 flex items-center justify-between cursor-pointer hover:bg-gray-50 dark:hover:bg-white/5 transition-colors"
+              >
+                <div class="flex items-center gap-2">
+                  <Icon icon="heroicons:scale" class="w-5 h-5 txt-brand flex-shrink-0" />
+                  <p class="text-sm font-medium txt-primary">
+                    {{ $t('widgets.advancedConfig.avvDetails.title') }}
+                  </p>
+                </div>
+                <Icon
+                  icon="heroicons:chevron-down"
+                  class="w-4 h-4 txt-secondary transition-transform group-open:rotate-180"
+                />
+              </summary>
+              <div
+                class="px-4 pb-4 space-y-4 text-xs txt-secondary border-t border-light-border/20 dark:border-dark-border/10 pt-4"
+              >
+                <!-- Subject & Purpose -->
+                <div>
+                  <p class="font-semibold txt-primary text-sm mb-1">
+                    {{ $t('widgets.advancedConfig.avvDetails.subjectTitle') }}
+                  </p>
+                  <p>{{ $t('widgets.advancedConfig.avvDetails.subjectText') }}</p>
+                </div>
+                <!-- Duration -->
+                <div>
+                  <p class="font-semibold txt-primary text-sm mb-1">
+                    {{ $t('widgets.advancedConfig.avvDetails.durationTitle') }}
+                  </p>
+                  <p>{{ $t('widgets.advancedConfig.avvDetails.durationText') }}</p>
+                </div>
+                <!-- Data Categories -->
+                <div>
+                  <p class="font-semibold txt-primary text-sm mb-1">
+                    {{ $t('widgets.advancedConfig.avvDetails.dataCategoriesTitle') }}
+                  </p>
+                  <ul class="space-y-1 list-disc list-inside">
+                    <li>{{ $t('widgets.advancedConfig.avvDetails.dataCat1') }}</li>
+                    <li>{{ $t('widgets.advancedConfig.avvDetails.dataCat2') }}</li>
+                    <li>{{ $t('widgets.advancedConfig.avvDetails.dataCat3') }}</li>
+                    <li>{{ $t('widgets.advancedConfig.avvDetails.dataCat4') }}</li>
+                    <li v-if="hasApiResponses">
+                      {{ $t('widgets.advancedConfig.avvDetails.dataCat5') }}
+                    </li>
+                  </ul>
+                </div>
+                <!-- Data Subjects -->
+                <div>
+                  <p class="font-semibold txt-primary text-sm mb-1">
+                    {{ $t('widgets.advancedConfig.avvDetails.dataSubjectsTitle') }}
+                  </p>
+                  <p>{{ $t('widgets.advancedConfig.avvDetails.dataSubjectsText') }}</p>
+                </div>
+                <!-- Instructions -->
+                <div>
+                  <p class="font-semibold txt-primary text-sm mb-1">
+                    {{ $t('widgets.advancedConfig.avvDetails.instructionsTitle') }}
+                  </p>
+                  <p>{{ $t('widgets.advancedConfig.avvDetails.instructionsText') }}</p>
+                </div>
+                <!-- TOMs -->
+                <div>
+                  <p class="font-semibold txt-primary text-sm mb-1">
+                    {{ $t('widgets.advancedConfig.avvDetails.tomsTitle') }}
+                  </p>
+                  <ul class="space-y-1 list-disc list-inside">
+                    <li>{{ $t('widgets.advancedConfig.avvDetails.tom1') }}</li>
+                    <li>{{ $t('widgets.advancedConfig.avvDetails.tom2') }}</li>
+                    <li>{{ $t('widgets.advancedConfig.avvDetails.tom3') }}</li>
+                    <li>{{ $t('widgets.advancedConfig.avvDetails.tom4') }}</li>
+                  </ul>
+                </div>
+                <!-- Sub-processors -->
+                <div>
+                  <p class="font-semibold txt-primary text-sm mb-1">
+                    {{ $t('widgets.advancedConfig.avvDetails.subprocessorsTitle') }}
+                  </p>
+                  <p>{{ $t('widgets.advancedConfig.avvDetails.subprocessorsText') }}</p>
+                </div>
+                <!-- Data Subject Rights -->
+                <div>
+                  <p class="font-semibold txt-primary text-sm mb-1">
+                    {{ $t('widgets.advancedConfig.avvDetails.rightsTitle') }}
+                  </p>
+                  <p>{{ $t('widgets.advancedConfig.avvDetails.rightsText') }}</p>
+                </div>
+                <!-- Deletion -->
+                <div>
+                  <p class="font-semibold txt-primary text-sm mb-1">
+                    {{ $t('widgets.advancedConfig.avvDetails.deletionTitle') }}
+                  </p>
+                  <p>{{ $t('widgets.advancedConfig.avvDetails.deletionText') }}</p>
+                </div>
+                <!-- Breach Notification -->
+                <div>
+                  <p class="font-semibold txt-primary text-sm mb-1">
+                    {{ $t('widgets.advancedConfig.avvDetails.breachTitle') }}
+                  </p>
+                  <p>{{ $t('widgets.advancedConfig.avvDetails.breachText') }}</p>
+                </div>
+                <!-- Audit -->
+                <div>
+                  <p class="font-semibold txt-primary text-sm mb-1">
+                    {{ $t('widgets.advancedConfig.avvDetails.auditTitle') }}
+                  </p>
+                  <p>{{ $t('widgets.advancedConfig.avvDetails.auditText') }}</p>
+                </div>
+              </div>
+            </details>
 
             <!-- Privacy Policy URL -->
             <div class="surface-chip p-4 rounded-lg space-y-3">
@@ -833,7 +950,7 @@ SynaplanWidget.init({
               />
             </div>
 
-            <!-- Info about what data is processed -->
+            <!-- Data processed summary -->
             <div
               class="p-4 rounded-lg border border-light-border/30 dark:border-dark-border/20 space-y-3"
             >
@@ -850,6 +967,7 @@ SynaplanWidget.init({
                     <li>{{ $t('widgets.advancedConfig.dataProcessedChat') }}</li>
                     <li>{{ $t('widgets.advancedConfig.dataProcessedSession') }}</li>
                     <li>{{ $t('widgets.advancedConfig.dataProcessedFiles') }}</li>
+                    <li>{{ $t('widgets.advancedConfig.dataProcessedMeta') }}</li>
                     <li v-if="hasApiResponses">
                       {{ $t('widgets.advancedConfig.dataProcessedApi') }}
                     </li>
@@ -1396,7 +1514,7 @@ const hasCustomPrompt = computed(() => {
 
 // Check if localhost addresses are in allowed domains
 const hasApiResponses = computed(() => {
-  return !!config.externalApiToken
+  return !!config.externalApiToken || !!config.externalApiUrl
 })
 
 const hasLocalhostInDomains = computed(() => {

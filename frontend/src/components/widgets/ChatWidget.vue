@@ -211,7 +211,7 @@
                 <button
                   class="ml-2 opacity-50 hover:opacity-100 transition-opacity"
                   :aria-label="$t('widget.dismissPrivacy')"
-                  @click.stop="privacyDismissed = true"
+                  @click.stop="dismissPrivacy()"
                 >
                   <svg class="w-3 h-3 inline" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path
@@ -696,7 +696,19 @@ const isOpen = ref(false)
 const isFullscreen = ref(props.fullscreenMode)
 const widgetTheme = ref<'light' | 'dark'>(props.defaultTheme)
 const inputMessage = ref('')
-const privacyDismissed = ref(false)
+const privacyStorageKey = `synaplan_privacy_${props.widgetId}`
+const privacyDismissed = ref(
+  typeof window !== 'undefined' && window.localStorage.getItem(privacyStorageKey) === '1'
+)
+
+function dismissPrivacy() {
+  privacyDismissed.value = true
+  try {
+    window.localStorage.setItem(privacyStorageKey, '1')
+  } catch {
+    /* storage may be unavailable in some contexts */
+  }
+}
 
 // Get button icon component based on buttonIcon prop
 const getButtonIconComponent = computed(() => {

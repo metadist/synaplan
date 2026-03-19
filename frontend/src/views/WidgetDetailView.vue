@@ -1050,10 +1050,7 @@
                       <span class="txt-secondary">{{ $t('common.saving') }}…</span>
                     </template>
                     <template v-else-if="autoSaveStatus === 'saved'">
-                      <Icon
-                        icon="heroicons:check-circle"
-                        class="w-3.5 h-3.5 text-emerald-500"
-                      />
+                      <Icon icon="heroicons:check-circle" class="w-3.5 h-3.5 text-emerald-500" />
                       <span class="text-emerald-600 dark:text-emerald-400">
                         {{ $t('widgets.detail.autoSaved') }}
                       </span>
@@ -1073,11 +1070,7 @@
                     class="btn-primary px-6 py-2.5 rounded-xl text-sm font-medium disabled:opacity-60 inline-flex items-center gap-2"
                     @click="save"
                   >
-                    <Icon
-                      v-if="saving"
-                      icon="heroicons:arrow-path"
-                      class="w-4 h-4 animate-spin"
-                    />
+                    <Icon v-if="saving" icon="heroicons:arrow-path" class="w-4 h-4 animate-spin" />
                     <Icon v-else icon="heroicons:check" class="w-4 h-4" />
                     {{ saving ? $t('common.saving') : $t('common.save') }}
                   </button>
