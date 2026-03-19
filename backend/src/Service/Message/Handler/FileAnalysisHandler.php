@@ -256,10 +256,11 @@ final readonly class FileAnalysisHandler implements MessageHandlerInterface
 
         $finalPrompt = !empty($userPrompt) ? $userPrompt : 'What is in this document? Please summarize the content.';
 
-        // Get Chat model (not Vision model!)
-        // Use effectiveUserId for model selection (WhatsApp anonymous → User 2)
+        // Use ANALYZE model for file analysis, fall back to CHAT if not configured
         $effectiveUserId = $this->modelConfigService->getEffectiveUserIdForMessage($message);
-        $modelId = $classification['model_id'] ?? $this->modelConfigService->getDefaultModel('CHAT', $effectiveUserId);
+        $modelId = $classification['model_id']
+            ?? $this->modelConfigService->getDefaultModel('ANALYZE', $effectiveUserId)
+            ?? $this->modelConfigService->getDefaultModel('CHAT', $effectiveUserId);
         $provider = null;
         $modelName = null;
 
@@ -268,7 +269,7 @@ final readonly class FileAnalysisHandler implements MessageHandlerInterface
             $modelName = $this->modelConfigService->getModelName($modelId);
         }
 
-        $this->logger->info('FileAnalysisHandler: Using Chat model for document', [
+        $this->logger->info('FileAnalysisHandler: Using model for document analysis', [
             'model_id' => $modelId,
             'provider' => $provider,
             'model' => $modelName,
@@ -347,9 +348,11 @@ final readonly class FileAnalysisHandler implements MessageHandlerInterface
 
         $finalPrompt = !empty($userPrompt) ? $userPrompt : 'What is in this document? Please summarize the content.';
 
-        // Get Chat model (not Vision model!)
+        // Use ANALYZE model for file analysis, fall back to CHAT if not configured
         $effectiveUserId = $this->modelConfigService->getEffectiveUserIdForMessage($message);
-        $modelId = $classification['model_id'] ?? $this->modelConfigService->getDefaultModel('CHAT', $effectiveUserId);
+        $modelId = $classification['model_id']
+            ?? $this->modelConfigService->getDefaultModel('ANALYZE', $effectiveUserId)
+            ?? $this->modelConfigService->getDefaultModel('CHAT', $effectiveUserId);
         $provider = null;
         $modelName = null;
 
@@ -358,7 +361,7 @@ final readonly class FileAnalysisHandler implements MessageHandlerInterface
             $modelName = $this->modelConfigService->getModelName($modelId);
         }
 
-        $this->logger->info('FileAnalysisHandler: Using Chat model for document (streaming)', [
+        $this->logger->info('FileAnalysisHandler: Using model for document analysis (streaming)', [
             'model_id' => $modelId,
             'provider' => $provider,
             'model' => $modelName,
