@@ -1197,42 +1197,6 @@ SynaplanWidget.init({
 
                 <!-- Prompt Content -->
                 <div>
-                  <WidgetBehaviorRuleBuilder
-                    v-model="behaviorRules"
-                    :disabled="isSystemPrompt"
-                    class="mb-4"
-                  />
-
-                  <WidgetBehaviorPreviewCards :rules="behaviorRules" class="mb-4" />
-
-                  <div
-                    v-if="hasBehaviorRuleConflict"
-                    class="mb-4 p-4 rounded-lg bg-amber-500/10 border border-amber-500/30"
-                  >
-                    <div class="flex items-start gap-3">
-                      <Icon
-                        icon="heroicons:exclamation-triangle"
-                        class="w-5 h-5 text-amber-600 dark:text-amber-400 flex-shrink-0 mt-0.5"
-                      />
-                      <div class="flex-1">
-                        <p class="text-sm font-medium txt-primary">
-                          {{ $t('widgets.advancedConfig.behaviorRules.conflictTitle') }}
-                        </p>
-                        <p class="text-xs txt-secondary mt-1">
-                          {{ $t('widgets.advancedConfig.behaviorRules.conflictDescription') }}
-                        </p>
-                        <button
-                          type="button"
-                          class="mt-3 px-3 py-1.5 rounded-lg text-xs font-medium bg-[var(--brand)] text-white hover:bg-[var(--brand-hover)] transition-colors"
-                          :disabled="isSystemPrompt"
-                          @click="regenerateBehaviorRules"
-                        >
-                          {{ $t('widgets.advancedConfig.behaviorRules.regenerate') }}
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-
                   <label class="block text-sm font-medium txt-primary mb-2 flex items-center gap-2">
                     <Icon icon="heroicons:document-text" class="w-4 h-4" />
                     {{ $t('widgets.advancedConfig.promptContent') }}
@@ -1459,19 +1423,7 @@ import type { AIModel, Capability } from '@/types/ai-models'
 import { DEFAULT_AI_MODEL, findModelIdByString } from '@/utils/aiModelDefaults'
 import FilePicker from './FilePicker.vue'
 import WidgetSummaryPromptTab from './WidgetSummaryPromptTab.vue'
-import WidgetBehaviorRuleBuilder from './WidgetBehaviorRuleBuilder.vue'
-import WidgetBehaviorPreviewCards from './WidgetBehaviorPreviewCards.vue'
-import {
-  WIDGET_BEHAVIOR_RULES_VERSION,
-  composePromptWithWidgetRules,
-  hasWidgetRulesConflict,
-  inferWidgetBehaviorRulesFromPrompt,
-  normalizeWidgetBehaviorRules,
-  parsePromptAndRulesBlock,
-  parseWidgetBehaviorRulesMetadata,
-  removeWidgetRulesBlock,
-  type WidgetBehaviorRules,
-} from '@/utils/widgetBehaviorRules'
+import { parsePromptAndRulesBlock } from '@/utils/widgetBehaviorRules'
 
 // Disable attribute inheritance since we use Teleport as root
 defineOptions({
@@ -1766,8 +1718,7 @@ const promptLanguage = ref('en')
 const creatingManualPrompt = ref(false)
 const manualPromptCreated = ref(false) // Flag to show form after manual creation
 const manualPromptContent = ref('')
-const behaviorRules = ref<WidgetBehaviorRules>(normalizeWidgetBehaviorRules())
-const hasBehaviorRuleConflict = ref(false)
+const existingMetadata = ref<Record<string, unknown>>({})
 
 // Check if the current prompt is a system prompt (not editable by user)
 // System prompts are shared across all users and cannot be modified
@@ -1861,8 +1812,7 @@ Be friendly, professional, and concise in your responses.`
     promptData.aiModel = DEFAULT_AI_MODEL
     promptData.content = defaultPromptContent
     manualPromptContent.value = defaultPromptContent
-    behaviorRules.value = normalizeWidgetBehaviorRules()
-    hasBehaviorRuleConflict.value = false
+    existingMetadata.value = {}
 
     // Set flag to show the form (without closing modal)
     manualPromptCreated.value = true
@@ -2011,15 +1961,7 @@ const loadPromptData = async () => {
         isDefault: prompt.isDefault ?? false,
       })
 
-      const metadataRules = parseWidgetBehaviorRulesMetadata(metadata.widgetBehaviorRules)
-      const inferredRules = inferWidgetBehaviorRulesFromPrompt(prompt.prompt)
-      const hasAnyMetadataRules =
-        metadataRules.locationLinkRequired ||
-        metadataRules.locationImageLink ||
-        metadataRules.conciseReplies ||
-        metadataRules.ctaRequired
-
-      behaviorRules.value = hasAnyMetadataRules ? metadataRules : inferredRules
+      existingMetadata.value = { ...metadata }
 
       // Load files for this prompt
       await loadPromptFiles()
@@ -2027,7 +1969,6 @@ const loadPromptData = async () => {
       const parsedPrompt = parsePromptAndRulesBlock(prompt.prompt)
       manualPromptContent.value = removeKnowledgeBaseSection(parsedPrompt.manualPrompt)
       promptData.content = manualPromptContent.value
-      hasBehaviorRuleConflict.value = hasWidgetRulesConflict(prompt.prompt, behaviorRules.value)
     }
   } catch (err: any) {
     console.error('Failed to load prompt:', err)
@@ -2253,24 +2194,11 @@ const removeKnowledgeBaseSection = (content: string): string => {
 const savePromptData = async () => {
   if (!promptData.id) return
 
-  // Build metadata object
-  const metadata: Record<string, any> = {}
+  const metadata: Record<string, unknown> = { ...existingMetadata.value }
 
-  // Parse AI Model from dropdown string back to ID
   metadata.aiModel = findModelIdByString(allModels.value, promptData.aiModel)
 
-  metadata.widgetBehaviorRules = JSON.stringify(behaviorRules.value)
-  metadata.widgetBehaviorVersion = String(WIDGET_BEHAVIOR_RULES_VERSION)
-
-  // Build final prompt content with Knowledge Base section
-  const sanitizedManualPrompt = removeWidgetRulesBlock(manualPromptContent.value)
-  if (sanitizedManualPrompt !== manualPromptContent.value) {
-    hasBehaviorRuleConflict.value = true
-    manualPromptContent.value = sanitizedManualPrompt
-  }
-
-  let finalContent = removeKnowledgeBaseSection(sanitizedManualPrompt)
-  finalContent = composePromptWithWidgetRules(finalContent, behaviorRules.value)
+  let finalContent = removeKnowledgeBaseSection(manualPromptContent.value)
   finalContent += buildKnowledgeBaseSection()
 
   await promptsApi.updatePrompt(promptData.id, {
@@ -2281,29 +2209,12 @@ const savePromptData = async () => {
     metadata,
   })
 
-  // Update local state with final content
   promptData.content = finalContent
-  manualPromptContent.value = removeKnowledgeBaseSection(removeWidgetRulesBlock(finalContent))
-  hasBehaviorRuleConflict.value = false
-}
-
-const regenerateBehaviorRules = () => {
-  manualPromptContent.value = removeWidgetRulesBlock(manualPromptContent.value)
-  hasBehaviorRuleConflict.value = false
+  manualPromptContent.value = removeKnowledgeBaseSection(finalContent)
 }
 
 watch(manualPromptContent, (value) => {
   promptData.content = value
-  if (hasWidgetRulesConflict(value, behaviorRules.value)) {
-    hasBehaviorRuleConflict.value = true
-  }
-})
-
-watch(behaviorRules, () => {
-  hasBehaviorRuleConflict.value = hasWidgetRulesConflict(
-    manualPromptContent.value,
-    behaviorRules.value
-  )
 })
 
 onMounted(async () => {
