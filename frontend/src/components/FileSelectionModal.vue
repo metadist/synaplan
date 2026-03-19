@@ -460,6 +460,7 @@ const handleFileUpload = async (event: Event) => {
 
 const pendingProcessingIds = ref<Set<number>>(new Set())
 let pollingTimer: ReturnType<typeof setInterval> | null = null
+const isPolling = ref(false)
 
 const uploadFiles = async (filesToUpload: File[]) => {
   isUploading.value = true
@@ -510,6 +511,9 @@ const uploadFiles = async (filesToUpload: File[]) => {
       pendingProcessingIds.value.add(fileId)
       filesService.processFile(fileId).catch((err) => {
         console.error('Background processing failed for file', fileId, err)
+        pendingProcessingIds.value.delete(fileId)
+        const msg = err instanceof Error ? err.message : 'Unknown error'
+        showError(`Background processing failed for file: ${msg}`)
       })
     }
     startPolling()
@@ -526,6 +530,8 @@ const startPolling = () => {
       stopPolling()
       return
     }
+    if (isPolling.value) return
+    isPolling.value = true
     try {
       const response = await filesService.listFiles({ limit: 100 })
       files.value = response.files
@@ -544,6 +550,8 @@ const startPolling = () => {
       }
     } catch (err) {
       console.error('Polling failed:', err)
+    } finally {
+      isPolling.value = false
     }
   }, 2000)
 }
