@@ -662,6 +662,7 @@ class HuggingFaceProvider implements ChatProviderInterface, EmbeddingProviderInt
                 [
                     'url' => $videoUrl,
                     'duration' => $duration,
+                    'resolution' => $options['resolution'] ?? null,
                     'seed' => $data['seed'] ?? null,
                 ],
             ];
