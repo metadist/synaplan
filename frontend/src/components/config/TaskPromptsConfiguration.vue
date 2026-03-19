@@ -887,6 +887,7 @@ const groupedModels = computed(() => {
   const capabilityLabels: Record<Capability, string> = {
     CHAT: 'Chat & General AI',
     SORT: 'Message Sorting',
+    ANALYZE: 'File Analysis',
     TEXT2PIC: 'Image Generation',
     TEXT2VID: 'Video Generation',
     TEXT2SOUND: 'Text-to-Speech',

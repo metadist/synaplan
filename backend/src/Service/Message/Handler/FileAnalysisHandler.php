@@ -256,7 +256,7 @@ final readonly class FileAnalysisHandler implements MessageHandlerInterface
 
         $finalPrompt = !empty($userPrompt) ? $userPrompt : 'What is in this document? Please summarize the content.';
 
-        // Use ANALYZE model for file analysis, fall back to CHAT if not configured
+        // Use ANALYZE model if configured, fall back to CHAT
         $effectiveUserId = $this->modelConfigService->getEffectiveUserIdForMessage($message);
         $modelId = $classification['model_id']
             ?? $this->modelConfigService->getDefaultModel('ANALYZE', $effectiveUserId)
@@ -348,7 +348,7 @@ final readonly class FileAnalysisHandler implements MessageHandlerInterface
 
         $finalPrompt = !empty($userPrompt) ? $userPrompt : 'What is in this document? Please summarize the content.';
 
-        // Use ANALYZE model for file analysis, fall back to CHAT if not configured
+        // Use ANALYZE model if configured, fall back to CHAT
         $effectiveUserId = $this->modelConfigService->getEffectiveUserIdForMessage($message);
         $modelId = $classification['model_id']
             ?? $this->modelConfigService->getDefaultModel('ANALYZE', $effectiveUserId)
