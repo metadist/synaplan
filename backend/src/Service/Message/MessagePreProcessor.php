@@ -134,12 +134,12 @@ final readonly class MessagePreProcessor
             $text = $this->parseWithTika($fullPath);
             if ($text) {
                 $messageFile->setFileText($text);
-                $messageFile->setStatus('processed');
                 $this->logger->info('PreProcessor: Document parsed', [
                     'file_id' => $messageFile->getId(),
                     'text_length' => strlen($text),
                 ]);
             }
+            $messageFile->setStatus('processed');
         }
 
         // Audio mit Whisper
@@ -179,14 +179,12 @@ final readonly class MessagePreProcessor
                 // Use file owner as context for Vision AI
                 $userId = $messageFile->getUserId() ?? 0;
                 $text = $this->processImageWithVision($messageFile->getFilePath(), $userId);
-                if ($text) {
-                    $messageFile->setFileText($text);
-                    $messageFile->setStatus('processed');
-                    $this->logger->info('PreProcessor: Image processed with Vision AI', [
-                        'file_id' => $messageFile->getId(),
-                        'text_length' => strlen($text),
-                    ]);
-                }
+                $messageFile->setFileText($text ?? '');
+                $messageFile->setStatus('processed');
+                $this->logger->info('PreProcessor: Image processed with Vision AI', [
+                    'file_id' => $messageFile->getId(),
+                    'text_length' => strlen($text ?? ''),
+                ]);
             } catch (\Exception $e) {
                 $this->logger->error('PreProcessor: Vision AI failed', [
                     'file_id' => $messageFile->getId(),
@@ -298,12 +296,10 @@ final readonly class MessagePreProcessor
 
             try {
                 $text = $this->processImageWithVision($message->getFilePath(), $message->getUserId());
-                if ($text) {
-                    $message->setFileText($text);
-                    $this->logger->info('PreProcessor: Image processed successfully', [
-                        'text_length' => strlen($text),
-                    ]);
-                }
+                $message->setFileText($text ?? '');
+                $this->logger->info('PreProcessor: Image processed successfully', [
+                    'text_length' => strlen($text ?? ''),
+                ]);
             } catch (\Exception $e) {
                 $this->logger->error('PreProcessor: Vision AI failed', [
                     'file' => basename($fullPath),
