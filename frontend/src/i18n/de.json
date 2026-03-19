@@ -1381,7 +1381,9 @@
     "bulkDeletePartial": "{success} gelöscht, {failed} fehlgeschlagen",
     "reVectorize": "Neu verarbeiten",
     "reVectorizeSuccess": "Datei erfolgreich neu verarbeitet ({chunks} Teile indiziert)",
-    "reVectorizeFailed": "Neuverarbeitung fehlgeschlagen"
+    "reVectorizeFailed": "Neuverarbeitung fehlgeschlagen",
+    "uploadSuccess": "{count} Datei(en) erfolgreich hochgeladen",
+    "uploadCancelled": "Upload abgebrochen"
   },
   "fileMention": {
     "hint": "Tippen um Dateien zu suchen — Enter zum Anhängen",

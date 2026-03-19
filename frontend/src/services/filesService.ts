@@ -6,6 +6,7 @@ export interface UploadFileOptions {
   groupKey?: string
   processLevel?: 'extract' | 'vectorize' | 'full'
   onProgress?: (progress: UploadProgress) => void
+  signal?: AbortSignal
 }
 
 export interface UploadProgress {
@@ -83,10 +84,13 @@ export const uploadFiles = async (options: UploadFileOptions): Promise<UploadRes
     return fd
   }
 
-  // If no progress callback, use simple fetch
+  // If no progress callback, use simple fetch (with abort signal support)
   if (!options.onProgress) {
-    const response = await api.post<UploadResponse>('/api/v1/files/upload', buildFormData())
-    return response.data
+    return httpClient<UploadResponse>('/api/v1/files/upload', {
+      method: 'POST',
+      body: buildFormData(),
+      signal: options.signal,
+    })
   }
 
   // Use XMLHttpRequest for progress tracking with automatic token refresh on 401
@@ -94,6 +98,14 @@ export const uploadFiles = async (options: UploadFileOptions): Promise<UploadRes
     new Promise<UploadResponse>((resolve, reject) => {
       const xhr = new XMLHttpRequest()
       const baseUrl = getApiBaseUrl()
+
+      if (options.signal) {
+        if (options.signal.aborted) {
+          reject(new DOMException('Upload cancelled', 'AbortError'))
+          return
+        }
+        options.signal.addEventListener('abort', () => xhr.abort())
+      }
 
       xhr.upload.addEventListener('progress', (event) => {
         if (event.lengthComputable && options.onProgress) {

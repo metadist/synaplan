@@ -340,7 +340,10 @@ export const chatApi = {
    * Upload file for chat message (File wird sofort hochgeladen und extrahiert)
    * For audio files, response includes transcribed text
    */
-  async uploadChatFile(file: File): Promise<{
+  async uploadChatFile(
+    file: File,
+    signal?: AbortSignal
+  ): Promise<{
     success: boolean
     file_id: number
     filename: string
@@ -357,6 +360,7 @@ export const chatApi = {
     return httpClient<any>('/api/v1/messages/upload-file', {
       method: 'POST',
       body: formData,
+      signal,
     })
   },
 

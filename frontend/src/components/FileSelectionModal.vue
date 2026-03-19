@@ -259,7 +259,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch } from 'vue'
+import { ref, computed, watch, onUnmounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { XMarkIcon, ArrowDownTrayIcon, TrashIcon } from '@heroicons/vue/24/outline'
 import { Icon } from '@iconify/vue'
@@ -279,11 +279,12 @@ const emit = defineEmits<{
   select: [files: FileItem[]]
 }>()
 
-const { success, error: showError } = useNotification()
+const { success, error: showError, warning } = useNotification()
 
 // State
 const isLoading = ref(false)
 const isUploading = ref(false)
+const uploadAbortController = ref<AbortController | null>(null)
 const files = ref<FileItem[]>([])
 const selectedFileIds = ref<Set<number>>(new Set())
 const searchQuery = ref('')
@@ -450,20 +451,29 @@ const handleFileUpload = async (event: Event) => {
   target.value = ''
 }
 
+const abortUpload = () => {
+  if (uploadAbortController.value) {
+    uploadAbortController.value.abort()
+    uploadAbortController.value = null
+  }
+}
+
 const uploadFiles = async (filesToUpload: File[]) => {
   isUploading.value = true
   uploadProgress.value = { current: 0, total: filesToUpload.length }
+
+  const controller = new AbortController()
+  uploadAbortController.value = controller
 
   try {
     const result = await filesService.uploadFiles({
       files: filesToUpload,
       processLevel: 'vectorize',
+      signal: controller.signal,
     })
 
     if (result.success) {
-      success(
-        `${result.files.length} ${result.files.length === 1 ? 'file' : 'files'} uploaded successfully`
-      )
+      success(t('fileSelection.uploadSuccess', { count: result.files.length }))
       await loadFiles()
       result.files.forEach((file) => {
         if (file.id) {
@@ -478,12 +488,17 @@ const uploadFiles = async (filesToUpload: File[]) => {
       })
     }
   } catch (err: unknown) {
+    if (err instanceof DOMException && err.name === 'AbortError') {
+      warning(t('fileSelection.uploadCancelled'))
+      return
+    }
     console.error('Upload failed:', err)
     const msg = err instanceof Error ? err.message : 'Unknown error'
     showError(`Upload failed: ${msg}`)
   } finally {
     isUploading.value = false
     uploadProgress.value = null
+    uploadAbortController.value = null
   }
 }
 
@@ -513,12 +528,17 @@ watch(
     if (visible) {
       loadFiles()
     } else {
+      abortUpload()
       selectedFileIds.value.clear()
       contentModalOpen.value = false
       confirmDialogOpen.value = false
     }
   }
 )
+
+onUnmounted(() => {
+  abortUpload()
+})
 </script>
 
 <style scoped>

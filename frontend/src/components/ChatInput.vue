@@ -276,6 +276,7 @@ const originalMessage = ref('')
 const enhancedMessage = ref('')
 const uploadedFiles = ref<UploadedFile[]>([])
 const uploading = ref(false)
+const uploadAbortController = ref<AbortController | null>(null)
 const enhanceEnabled = ref(false)
 const enhanceLoading = ref(false)
 const thinkingEnabled = ref(false)
@@ -738,8 +739,12 @@ const uploadFiles = async (files: File[]) => {
   isDragging.value = false
   uploading.value = true
 
+  const controller = new AbortController()
+  uploadAbortController.value = controller
+
   for (const file of files) {
-    // Add to UI immediately as "processing"
+    if (controller.signal.aborted) break
+
     const tempFile: UploadedFile = {
       file_id: 0,
       filename: file.name,
@@ -750,10 +755,8 @@ const uploadFiles = async (files: File[]) => {
     uploadedFiles.value.push(tempFile)
 
     try {
-      // Upload to backend (PreProcessor extracts content automatically)
-      const result = await chatApi.uploadChatFile(file)
+      const result = await chatApi.uploadChatFile(file, controller.signal)
 
-      // Update with real file_id
       const index = uploadedFiles.value.findIndex((f) => f.name === file.name && f.processing)
       if (index !== -1) {
         uploadedFiles.value[index] = {
@@ -764,7 +767,6 @@ const uploadFiles = async (files: File[]) => {
         }
       }
 
-      // For audio files, show transcription info if available
       if (result.text) {
         const preview = result.text.substring(0, 50) + (result.text.length > 50 ? '...' : '')
         const languageInfo = result.language ? ` (${result.language})` : ''
@@ -773,11 +775,14 @@ const uploadFiles = async (files: File[]) => {
 
       console.log('✅ File uploaded and processed:', result)
     } catch (err) {
+      if (err instanceof DOMException && err.name === 'AbortError') {
+        uploadedFiles.value = uploadedFiles.value.filter((f) => !f.processing)
+        break
+      }
       console.error('❌ File upload failed:', err)
       const errorMessage = err instanceof Error ? err.message : 'Unknown error'
       showError(`File upload failed: ${errorMessage}`)
 
-      // Remove from list
       const index = uploadedFiles.value.findIndex((f) => f.name === file.name)
       if (index !== -1) {
         uploadedFiles.value.splice(index, 1)
@@ -786,6 +791,7 @@ const uploadFiles = async (files: File[]) => {
   }
 
   uploading.value = false
+  uploadAbortController.value = null
 }
 
 const clearSilenceTimer = () => {
@@ -797,6 +803,10 @@ const clearSilenceTimer = () => {
 
 onUnmounted(() => {
   clearSilenceTimer()
+  if (uploadAbortController.value) {
+    uploadAbortController.value.abort()
+    uploadAbortController.value = null
+  }
 })
 
 /**

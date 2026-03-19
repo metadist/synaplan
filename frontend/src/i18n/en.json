@@ -619,7 +619,9 @@
     "bulkDeletePartial": "{success} deleted, {failed} failed",
     "reVectorize": "Reprocess",
     "reVectorizeSuccess": "File reprocessed successfully ({chunks} parts indexed)",
-    "reVectorizeFailed": "Reprocessing failed"
+    "reVectorizeFailed": "Reprocessing failed",
+    "uploadSuccess": "{count} file(s) uploaded successfully",
+    "uploadCancelled": "Upload cancelled"
   },
   "fileMention": {
     "hint": "Type to search files — press Enter to attach",
