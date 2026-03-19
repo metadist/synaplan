@@ -1318,6 +1318,11 @@ const streamAIResponse = async (
                 message.topic = data.topic
               }
 
+              // Store original topic (preserved on error messages for correct "Again" model selection)
+              if (data.originalTopic !== undefined) {
+                message.originalTopic = data.originalTopic
+              }
+
               // Mark reasoning parts as complete (remove streaming flag)
               message.parts.forEach((part) => {
                 if (part.type === 'thinking' && part.isStreaming) {
@@ -1344,12 +1349,23 @@ const streamAIResponse = async (
             processingStatus.value = ''
             processingMetadata.value = {}
 
-            // If backend provided a messageId for the error message, link it
-            // This allows the "Again" button to work for failed messages
-            if (data.messageId) {
+            // Update message metadata from error event so status/provider/topic
+            // are visible in real-time without requiring a page refresh
+            {
               const message = historyStore.messages.find((m) => m.id === messageId)
               if (message) {
-                message.backendMessageId = data.messageId
+                if (data.messageId) {
+                  message.backendMessageId = data.messageId
+                }
+                if (data.provider) {
+                  message.provider = data.provider
+                }
+                if (data.model) {
+                  message.modelLabel = data.model
+                }
+                if (data.topic) {
+                  message.topic = data.topic
+                }
               }
             }
 

@@ -347,8 +347,8 @@ class StreamController extends AbstractController
                     $this->em->persist($outgoingMessage);
                     $this->em->flush();
 
-                    $outgoingMessage->setMeta('ai_provider', $provider);
-                    $outgoingMessage->setMeta('ai_model', 'error');
+                    $outgoingMessage->setMeta('ai_chat_provider', $provider);
+                    $outgoingMessage->setMeta('ai_chat_model', 'error');
                     $outgoingMessage->setMeta('error_type', $errorType);
 
                     $incomingMessage->setTopic('ERROR');
@@ -759,8 +759,8 @@ class StreamController extends AbstractController
                     $this->em->flush(); // Flush to get message ID for metadata
 
                     // Store error details in metadata
-                    $outgoingMessage->setMeta('ai_provider', $result['provider'] ?? 'system');
-                    $outgoingMessage->setMeta('ai_model', 'error');
+                    $outgoingMessage->setMeta('ai_chat_provider', $result['provider'] ?? 'system');
+                    $outgoingMessage->setMeta('ai_chat_model', 'error');
                     $outgoingMessage->setMeta('error_type', $result['error'] ?? 'unknown');
                     if ($originalTopic) {
                         $outgoingMessage->setMeta('original_topic', $originalTopic);
@@ -772,13 +772,13 @@ class StreamController extends AbstractController
 
                     $chat->updateTimestamp();
                     $this->em->flush();
-                    // Send original topic so frontend can show correct "Again" models in real-time
                     $this->sendSSE('complete', [
                         'messageId' => $outgoingMessage->getId(),
                         'trackId' => $trackId,
                         'provider' => $result['provider'] ?? 'system',
                         'model' => 'error',
-                        'topic' => $originalTopic ?? 'ERROR',
+                        'topic' => 'ERROR',
+                        'originalTopic' => $originalTopic,
                         'language' => 'en',
                     ]);
 
@@ -1223,6 +1223,9 @@ class StreamController extends AbstractController
                 $errorData = [
                     'error' => $e->getMessage(),
                     'provider' => $e->getProviderName(),
+                    'model' => 'error',
+                    'topic' => 'ERROR',
+                    'trackId' => $trackId,
                 ];
 
                 if ($messageId) {
@@ -1255,6 +1258,10 @@ class StreamController extends AbstractController
 
                 $errorData = [
                     'error' => 'Failed to process message: '.$e->getMessage(),
+                    'provider' => 'system',
+                    'model' => 'error',
+                    'topic' => 'ERROR',
+                    'trackId' => $trackId,
                 ];
 
                 if ($messageId) {
