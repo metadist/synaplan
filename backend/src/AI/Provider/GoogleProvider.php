@@ -214,9 +214,15 @@ class GoogleProvider implements ChatProviderInterface, ImageGenerationProviderIn
     public function generateImage(string $prompt, array $options = []): array
     {
         $model = $options['model'] ?? 'imagen-3.0-generate-002';
+        $inputImages = $options['images'] ?? [];
 
         if (!$this->apiKey) {
             throw ProviderException::missingApiKey('google', 'GOOGLE_GEMINI_API_KEY');
+        }
+
+        // Pic2pic: when input images are provided and model is a Gemini image model
+        if (!empty($inputImages) && $this->isGeminiNativeImageModel($model)) {
+            return $this->generateImageFromImagesWithGemini($model, $prompt, $inputImages, $options);
         }
 
         // Determine API type: explicit config > auto-detect from model name
@@ -327,6 +333,84 @@ class GoogleProvider implements ChatProviderInterface, ImageGenerationProviderIn
             return $images;
         } catch (\Exception $e) {
             throw new ProviderException('Google Gemini image generation error: '.$e->getMessage(), 'google');
+        }
+    }
+
+    /**
+     * Pic2pic: generate an image from input images + text using Gemini native API.
+     *
+     * @param string   $model      Gemini image model (e.g. gemini-3.1-flash-image-preview)
+     * @param string   $prompt     Text instruction
+     * @param string[] $imagePaths Absolute paths to input images
+     *
+     * @see https://ai.google.dev/gemini-api/docs/image-generation
+     */
+    private function generateImageFromImagesWithGemini(string $model, string $prompt, array $imagePaths, array $options): array
+    {
+        try {
+            $url = self::API_BASE."/models/{$model}:generateContent";
+
+            $parts = [['text' => $prompt]];
+            foreach ($imagePaths as $imgPath) {
+                $data = file_get_contents($imgPath);
+                if (false === $data) {
+                    throw new \Exception('Failed to read image: '.basename($imgPath));
+                }
+                $mimeType = mime_content_type($imgPath) ?: 'image/png';
+                $parts[] = [
+                    'inline_data' => [
+                        'mime_type' => $mimeType,
+                        'data' => base64_encode($data),
+                    ],
+                ];
+            }
+
+            $payload = [
+                'contents' => [['parts' => $parts]],
+                'generationConfig' => [
+                    'responseModalities' => ['TEXT', 'IMAGE'],
+                ],
+            ];
+
+            if (!empty($options['aspect_ratio'])) {
+                $payload['generationConfig']['imageConfig'] = [
+                    'aspectRatio' => $options['aspect_ratio'],
+                ];
+            }
+
+            $this->logger->info('Google: Pic2pic via Gemini native API', [
+                'model' => $model,
+                'image_count' => \count($imagePaths),
+                'prompt_length' => \strlen($prompt),
+            ]);
+
+            $response = $this->httpClient->request('POST', $url, [
+                'headers' => [
+                    'Content-Type' => 'application/json',
+                    'x-goog-api-key' => $this->apiKey,
+                ],
+                'json' => $payload,
+                'timeout' => 120,
+            ]);
+
+            $data = $response->toArray();
+            $responseParts = $data['candidates'][0]['content']['parts'] ?? [];
+
+            $images = [];
+            foreach ($responseParts as $part) {
+                $inlineData = $part['inline_data'] ?? $part['inlineData'] ?? null;
+                if ($inlineData && isset($inlineData['data'])) {
+                    $mime = $inlineData['mime_type'] ?? $inlineData['mimeType'] ?? 'image/png';
+                    $images[] = [
+                        'url' => 'data:'.$mime.';base64,'.$inlineData['data'],
+                        'revised_prompt' => $prompt,
+                    ];
+                }
+            }
+
+            return $images;
+        } catch (\Exception $e) {
+            throw new ProviderException('Google Gemini pic2pic error: '.$e->getMessage(), 'google');
         }
     }
 

@@ -103,6 +103,7 @@ final readonly class ModelConfigService
             'embedding' => 'vectorize',
             'vision' => 'pic2text',
             'image_generation' => 'text2pic',
+            'pic2pic' => 'text2pic',
             'video_generation' => 'text2vid',
             'speech_to_text' => 'sound2text',
             'text_to_speech' => 'text2sound',

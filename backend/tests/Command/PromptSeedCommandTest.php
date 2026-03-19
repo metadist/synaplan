@@ -79,12 +79,12 @@ class PromptSeedCommandTest extends TestCase
 
         $this->assertContains('general', $topics);
         $this->assertContains('tools:sort', $topics);
-        $this->assertContains('analyzefile', $topics);
         $this->assertContains('mediamaker', $topics);
         $this->assertContains('tools:enhance', $topics);
         $this->assertContains('tools:search', $topics);
         $this->assertContains('tools:memory_extraction', $topics);
-        $this->assertGreaterThanOrEqual(17, count($prompts));
+        $this->assertNotContains('analyzefile', $topics);
+        $this->assertGreaterThanOrEqual(16, count($prompts));
     }
 
     public function testCatalogPromptsHaveRequiredFields(): void
