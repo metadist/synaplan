@@ -1973,6 +1973,8 @@
     "noSocialProviders": "Keine Social Login Anbieter konfiguriert",
     "registrationSuccess": "Registrierung erfolgreich!",
     "registrationSuccessDesc": "Falls diese E-Mail-Adresse noch nicht registriert ist, haben wir dir eine Bestätigungs-E-Mail gesendet. Bitte überprüfe deinen Posteingang (auch den Spam-Ordner).",
+    "registrationCompleteTitle": "Überprüfe deine E-Mail",
+    "registrationCompleteDesc": "Wir haben dir einen Bestätigungslink gesendet. Bitte überprüfe deinen Posteingang und Spam-Ordner und klicke auf den Link, um dein Konto zu aktivieren.",
     "passwordResetSuccess": "Anfrage gesendet!",
     "passwordResetSuccessDesc": "Falls ein Konto mit dieser E-Mail-Adresse existiert, haben wir dir einen Link zum Zurücksetzen des Passworts gesendet. Bitte überprüfe deinen Posteingang.",
     "recaptchaError": "reCAPTCHA-Verifizierung fehlgeschlagen. Bitte versuche es erneut.",

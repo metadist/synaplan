@@ -86,6 +86,37 @@
 
         <!-- Standard password login form (hidden when OIDC auto-redirect is active) -->
         <template v-else>
+          <!-- Registration success banner -->
+          <div
+            v-if="justRegistered"
+            class="mb-5 p-4 rounded-lg bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800"
+            data-testid="section-registration-success"
+          >
+            <div class="flex gap-3">
+              <svg
+                class="w-5 h-5 text-green-600 dark:text-green-400 flex-shrink-0 mt-0.5"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                stroke-width="2"
+              >
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  d="M21.75 6.75v10.5a2.25 2.25 0 01-2.25 2.25h-15a2.25 2.25 0 01-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25m19.5 0v.243a2.25 2.25 0 01-1.07 1.916l-7.5 4.615a2.25 2.25 0 01-2.36 0L3.32 8.91a2.25 2.25 0 01-1.07-1.916V6.75"
+                />
+              </svg>
+              <div>
+                <p class="text-sm font-medium text-green-800 dark:text-green-200">
+                  {{ $t('auth.registrationCompleteTitle') }}
+                </p>
+                <p class="text-sm text-green-700 dark:text-green-300 mt-1">
+                  {{ $t('auth.registrationCompleteDesc') }}
+                </p>
+              </div>
+            </div>
+          </div>
+
           <form class="space-y-5" data-testid="comp-login-form" @submit.prevent="handleLogin">
             <div>
               <label for="email" class="block text-sm font-medium txt-primary mb-2">
@@ -348,6 +379,7 @@ interface SocialProvider {
 const socialProviders = ref<SocialProvider[]>([])
 const oidcAutoRedirect = ref(false)
 const sessionExpired = ref(false)
+const justRegistered = ref(false)
 
 // Load available social providers
 const loadSocialProviders = async () => {
@@ -367,7 +399,14 @@ onMounted(async () => {
   if (reason === 'session_expired') {
     sessionExpired.value = true
     sessionExpiredMessage.value = t('auth.sessionExpiredDesc')
-    // Remove query parameter from URL without reloading
+  }
+
+  if (route.query.registered === 'true') {
+    justRegistered.value = true
+  }
+
+  // Remove query parameters from URL without reloading
+  if (reason || route.query.registered) {
     router.replace({ query: {} })
   }
 

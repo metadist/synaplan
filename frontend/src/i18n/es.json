@@ -521,6 +521,8 @@
     "noSocialProviders": "No hay proveedores de inicio de sesión social configurados",
     "registrationSuccess": "¡Registro Exitoso!",
     "registrationSuccessDesc": "Si esta dirección de correo no está registrada, te hemos enviado un correo de verificación. Por favor revisa tu bandeja de entrada (incluyendo spam).",
+    "registrationCompleteTitle": "Revisa tu correo electrónico",
+    "registrationCompleteDesc": "Te enviamos un enlace de verificación. Revisa tu bandeja de entrada y la carpeta de spam, luego haz clic en el enlace para activar tu cuenta.",
     "passwordResetSuccess": "¡Solicitud Enviada!",
     "passwordResetSuccessDesc": "Si existe una cuenta con esta dirección de correo, te hemos enviado un enlace para restablecer tu contraseña. Por favor revisa tu bandeja de entrada.",
     "recaptchaError": "Error de verificación reCAPTCHA. Por favor intenta de nuevo.",

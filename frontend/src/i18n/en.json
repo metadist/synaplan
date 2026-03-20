@@ -1196,6 +1196,8 @@
     "noSocialProviders": "No social login providers configured",
     "registrationSuccess": "Registration Successful!",
     "registrationSuccessDesc": "If this email address is not already registered, we have sent you a verification email. Please check your inbox (including spam folder).",
+    "registrationCompleteTitle": "Check your email",
+    "registrationCompleteDesc": "We sent you a verification link. Please check your inbox and spam folder, then click the link to activate your account.",
     "passwordResetSuccess": "Request Sent!",
     "passwordResetSuccessDesc": "If an account with this email address exists, we have sent you a password reset link. Please check your inbox.",
     "recaptchaError": "reCAPTCHA verification failed. Please try again.",

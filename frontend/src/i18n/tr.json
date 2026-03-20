@@ -521,6 +521,8 @@
     "noSocialProviders": "Sosyal giriş sağlayıcısı yapılandırılmamış",
     "registrationSuccess": "Kayıt Başarılı!",
     "registrationSuccessDesc": "Bu e-posta adresi henüz kayıtlı değilse, size bir doğrulama e-postası gönderdik. Lütfen gelen kutunuzu (spam klasörü dahil) kontrol edin.",
+    "registrationCompleteTitle": "E-postanızı kontrol edin",
+    "registrationCompleteDesc": "Size bir doğrulama bağlantısı gönderdik. Lütfen gelen kutunuzu ve spam klasörünüzü kontrol edin, ardından hesabınızı etkinleştirmek için bağlantıya tıklayın.",
     "passwordResetSuccess": "İstek Gönderildi!",
     "passwordResetSuccessDesc": "Bu e-posta adresiyle bir hesap varsa, şifre sıfırlama bağlantısı gönderdik. Lütfen gelen kutunuzu kontrol edin.",
     "recaptchaError": "reCAPTCHA doğrulaması başarısız. Lütfen tekrar deneyin.",
