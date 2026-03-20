@@ -575,13 +575,12 @@ class HuggingFaceProvider implements ChatProviderInterface, EmbeddingProviderInt
      * @param string $prompt  Text description of the video to generate
      * @param array  $options Model options: model (required), num_frames, num_inference_steps, seed
      *
-     * @return array Array with video metadata including local path
-     */
-    /**
      * Generate video via fal.ai's async queue API (submit → poll → result).
      *
      * fal.ai video models require queue-based processing because generation
      * typically exceeds synchronous timeout limits (~2+ min).
+     *
+     * @return array Array with video metadata including CDN URL
      */
     public function generateVideo(string $prompt, array $options = []): array
     {

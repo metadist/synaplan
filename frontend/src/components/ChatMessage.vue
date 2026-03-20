@@ -997,7 +997,7 @@ const effectiveTopic = computed(() => {
   return props.topic
 })
 
-const imageExtensions = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg', 'bmp', 'tiff']
+const imageExtensions = ['jpg', 'jpeg', 'png', 'webp', 'gif']
 
 const isVisionResponse = computed(() => {
   const topic = effectiveTopic.value?.toLowerCase()

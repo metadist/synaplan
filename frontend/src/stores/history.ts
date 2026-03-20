@@ -444,7 +444,7 @@ export const useHistoryStore = defineStore('history', () => {
             parts,
             timestamp: new Date(m.timestamp * 1000),
             provider: m.aiModels?.chat?.provider ?? m.provider,
-            modelLabel: m.aiModels?.chat?.model,
+            modelLabel: m.aiModels?.chat?.model ?? m.provider ?? 'AI',
             topic: m.topic,
             originalTopic: m.originalTopic || null,
             backendMessageId: m.id,
