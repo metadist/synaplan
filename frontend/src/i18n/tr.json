@@ -409,10 +409,14 @@
     "attachFiles": "Dosyaları Ekle",
     "uploadNew": "Yeni Dosyalar Yükle",
     "uploading": "{total} dosyadan {current} yükleniyor...",
+    "uploadingFilePercent": "Dosya {current} / {total} — {percent}%",
+    "storingFile": "Sunucuya kaydediliyor…",
+    "processingOnServer": "{count} dosya arka planda işleniyor…",
     "orDragDrop": "veya dosyaları buraya sürükleyip bırakın",
     "dropHere": "Yüklemek için dosyaları buraya bırakın",
     "uploadSuccess": "{count} dosya başarıyla yüklendi",
-    "uploadCancelled": "Yükleme iptal edildi"
+    "uploadCancelled": "Yükleme iptal edildi",
+    "uploadInterrupted": "Aktarım kesildi. Liste yenilendi — sunucuya ulaşmış dosyalar görünmeye devam edebilir."
   },
   "aiProvider": {
     "error": {

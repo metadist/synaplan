@@ -1368,6 +1368,9 @@
     "attachFiles": "Dateien anhängen",
     "uploadNew": "Neue Dateien hochladen",
     "uploading": "Lade {current} von {total} hoch...",
+    "uploadingFilePercent": "Datei {current} von {total} — {percent} %",
+    "storingFile": "Wird auf dem Server gespeichert…",
+    "processingOnServer": "{count} Datei(en) werden im Hintergrund verarbeitet…",
     "orDragDrop": "oder Dateien hierher ziehen",
     "dropHere": "Dateien hier ablegen zum Hochladen",
     "viewContent": "Inhalt anzeigen",
@@ -1386,7 +1389,8 @@
     "reVectorizeSuccess": "Datei erfolgreich neu verarbeitet ({chunks} Teile indiziert)",
     "reVectorizeFailed": "Neuverarbeitung fehlgeschlagen",
     "uploadSuccess": "{count} Datei(en) erfolgreich hochgeladen",
-    "uploadCancelled": "Upload abgebrochen"
+    "uploadCancelled": "Upload abgebrochen",
+    "uploadInterrupted": "Übertragung unterbrochen. Die Liste wurde aktualisiert — Dateien, die den Server schon erreicht hatten, können weiterhin erscheinen."
   },
   "fileMention": {
     "hint": "Tippen um Dateien zu suchen — Enter zum Anhängen",

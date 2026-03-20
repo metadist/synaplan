@@ -44,7 +44,11 @@
                 data-testid="btn-file-selection-upload"
                 @click="triggerFileUpload"
               >
-                <Icon v-if="isUploading" icon="mdi:loading" class="w-5 h-5 animate-spin" />
+                <Icon
+                  v-if="isUploading || isBackgroundProcessing"
+                  icon="mdi:loading"
+                  class="w-5 h-5 animate-spin"
+                />
                 <Icon v-else icon="mdi:cloud-upload" class="w-5 h-5" />
                 <span>{{ $t('fileSelection.uploadNew') }}</span>
               </button>
@@ -57,11 +61,39 @@
                 data-testid="input-file-selection-upload"
                 @change="handleFileUpload"
               />
-              <span v-if="uploadProgress" class="text-sm txt-secondary">
+              <span
+                v-if="isUploading && uploadProgress"
+                class="text-sm txt-secondary flex items-center gap-2 min-w-0"
+              >
+                <template v-if="uploadBytePercent !== null && uploadBytePercent < 100">
+                  {{
+                    $t('fileSelection.uploadingFilePercent', {
+                      current: uploadProgress.current,
+                      total: uploadProgress.total,
+                      percent: uploadBytePercent,
+                    })
+                  }}
+                </template>
+                <template v-else-if="isFinishingUpload">
+                  {{ $t('fileSelection.storingFile') }}
+                </template>
+                <template v-else>
+                  {{
+                    $t('fileSelection.uploading', {
+                      current: uploadProgress.current,
+                      total: uploadProgress.total,
+                    })
+                  }}
+                </template>
+              </span>
+              <span
+                v-else-if="isBackgroundProcessing"
+                class="text-sm txt-secondary inline-flex items-center gap-2 min-w-0"
+              >
+                <Icon icon="mdi:loading" class="w-4 h-4 flex-shrink-0 animate-spin" />
                 {{
-                  $t('fileSelection.uploading', {
-                    current: uploadProgress.current,
-                    total: uploadProgress.total,
+                  $t('fileSelection.processingOnServer', {
+                    count: pendingProcessingIds.size,
                   })
                 }}
               </span>
@@ -299,6 +331,10 @@ const searchQuery = ref('')
 const filterStatus = ref('all')
 const fileInputRef = ref<HTMLInputElement | null>(null)
 const uploadProgress = ref<{ current: number; total: number } | null>(null)
+/** Byte upload progress (XHR); null when not active */
+const uploadBytePercent = ref<number | null>(null)
+/** Bytes finished; waiting for HTTP response body (store) */
+const isFinishingUpload = ref(false)
 const isDragging = ref(false)
 
 // Sub-dialog state
@@ -463,11 +499,21 @@ const pendingProcessingIds = ref<Set<number>>(new Set())
 let pollingTimer: ReturnType<typeof setInterval> | null = null
 const isPolling = ref(false)
 
+const isBackgroundProcessing = computed(
+  () => pendingProcessingIds.value.size > 0 && !isUploading.value
+)
+
 const abortUpload = () => {
   if (uploadAbortController.value) {
     uploadAbortController.value.abort()
     uploadAbortController.value = null
   }
+}
+
+/** Abort only closes the HTTP wait — server may already have stored the file (#589). */
+const notifyUploadInterrupted = async () => {
+  await loadFiles()
+  warning(t('fileSelection.uploadInterrupted'))
 }
 
 const uploadFiles = async (filesToUpload: File[]) => {
@@ -488,11 +534,21 @@ const uploadFiles = async (filesToUpload: File[]) => {
       uploadProgress.value = { current: i + 1, total: filesToUpload.length }
       const file = filesToUpload[i]
 
+      uploadBytePercent.value = 0
+      isFinishingUpload.value = false
+
       try {
+        // XHR + onProgress: real byte progress vs server "store" response (#589)
         const result = await filesService.uploadFiles({
           files: [file],
           processLevel: 'store',
           signal: controller.signal,
+          onProgress: (p) => {
+            uploadBytePercent.value = p.percentage
+            if (p.percentage >= 100) {
+              isFinishingUpload.value = true
+            }
+          },
         })
 
         if (result.success && result.files.length > 0) {
@@ -512,12 +568,15 @@ const uploadFiles = async (filesToUpload: File[]) => {
         }
       } catch (err: unknown) {
         if (err instanceof DOMException && err.name === 'AbortError') {
-          warning(t('fileSelection.uploadCancelled'))
+          await notifyUploadInterrupted()
           break
         }
         console.error('Upload failed:', file.name, err)
         const msg = err instanceof Error ? err.message : 'Unknown error'
         showError(`${file.name}: ${msg}`)
+      } finally {
+        uploadBytePercent.value = null
+        isFinishingUpload.value = false
       }
     }
 
@@ -538,7 +597,7 @@ const uploadFiles = async (filesToUpload: File[]) => {
     }
   } catch (err: unknown) {
     if (err instanceof DOMException && err.name === 'AbortError') {
-      warning(t('fileSelection.uploadCancelled'))
+      await notifyUploadInterrupted()
     } else {
       console.error('Upload failed:', err)
       const msg = err instanceof Error ? err.message : 'Unknown error'
@@ -547,6 +606,8 @@ const uploadFiles = async (filesToUpload: File[]) => {
   } finally {
     isUploading.value = false
     uploadProgress.value = null
+    uploadBytePercent.value = null
+    isFinishingUpload.value = false
     uploadAbortController.value = null
   }
 }
@@ -620,6 +681,8 @@ watch(
       abortUpload()
       stopPolling()
       pendingProcessingIds.value.clear()
+      uploadBytePercent.value = null
+      isFinishingUpload.value = false
       selectedFileIds.value.clear()
       contentModalOpen.value = false
       confirmDialogOpen.value = false

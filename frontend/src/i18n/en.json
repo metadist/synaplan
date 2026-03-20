@@ -605,6 +605,9 @@
     "attachFiles": "Attach Files",
     "uploadNew": "Upload New Files",
     "uploading": "Uploading {current} of {total}...",
+    "uploadingFilePercent": "File {current} of {total} — {percent}%",
+    "storingFile": "Saving on server…",
+    "processingOnServer": "Processing {count} file(s) in the background…",
     "orDragDrop": "or drag & drop files here",
     "dropHere": "Drop files here to upload",
     "viewContent": "View content",
@@ -623,7 +626,8 @@
     "reVectorizeSuccess": "File reprocessed successfully ({chunks} parts indexed)",
     "reVectorizeFailed": "Reprocessing failed",
     "uploadSuccess": "{count} file(s) uploaded successfully",
-    "uploadCancelled": "Upload cancelled"
+    "uploadCancelled": "Upload cancelled",
+    "uploadInterrupted": "Transfer interrupted. The file list was refreshed — anything that had already reached the server may still appear."
   },
   "fileMention": {
     "hint": "Type to search files — press Enter to attach",

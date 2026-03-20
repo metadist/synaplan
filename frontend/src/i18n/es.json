@@ -409,10 +409,14 @@
     "attachFiles": "Adjuntar Archivos",
     "uploadNew": "Subir Nuevos Archivos",
     "uploading": "Subiendo {current} de {total}...",
+    "uploadingFilePercent": "Archivo {current} de {total} — {percent} %",
+    "storingFile": "Guardando en el servidor…",
+    "processingOnServer": "Procesando {count} archivo(s) en segundo plano…",
     "orDragDrop": "o arrastra y suelta archivos aquí",
     "dropHere": "Suelta archivos aquí para subir",
     "uploadSuccess": "{count} archivo(s) subido(s) correctamente",
-    "uploadCancelled": "Subida cancelada"
+    "uploadCancelled": "Subida cancelada",
+    "uploadInterrupted": "Transferencia interrumpida. Se actualizó la lista: los archivos que ya llegaron al servidor pueden seguir apareciendo."
   },
   "aiProvider": {
     "error": {
