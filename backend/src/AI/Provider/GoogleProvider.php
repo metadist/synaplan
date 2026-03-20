@@ -17,7 +17,7 @@ use Symfony\Contracts\HttpClient\HttpClientInterface;
  *
  * Supports:
  * - Gemini 2.0 Flash, Gemini 2.5 Pro (Chat, Vision)
- * - Imagen 3.0, Gemini 2.5 Flash Image (Image Generation)
+ * - Imagen 4 (Gemini API), Gemini native image models, optional Vertex Imagen with OAuth token
  * - Veo 2.0 (Video Generation)
  * - Text-to-Speech with Gemini
  */
@@ -33,10 +33,14 @@ class GoogleProvider implements ChatProviderInterface, ImageGenerationProviderIn
         private ?string $projectId = null,
         private string $region = 'us-central1',
         private string $uploadDir = '/var/www/backend/var/uploads',
+        private ?string $vertexAccessToken = null,
     ) {
         // Ensure projectId is null if empty string
         if (empty($this->projectId)) {
             $this->projectId = null;
+        }
+        if (empty($this->vertexAccessToken)) {
+            $this->vertexAccessToken = null;
         }
     }
 
@@ -241,7 +245,7 @@ class GoogleProvider implements ChatProviderInterface, ImageGenerationProviderIn
         $apiType = $modelConfig['api'] ?? null;
 
         if (!$apiType) {
-            $apiType = $this->isGeminiNativeImageModel($model) ? 'gemini' : 'vertex';
+            $apiType = $this->isGeminiNativeImageModel($model) ? 'gemini_native' : 'imagen';
         }
 
         $this->logger->info('Google: Generating image', [
@@ -251,7 +255,7 @@ class GoogleProvider implements ChatProviderInterface, ImageGenerationProviderIn
         ]);
 
         return match ($apiType) {
-            'gemini' => $this->generateImageWithGemini($model, $prompt, $options),
+            'gemini', 'gemini_native' => $this->generateImageWithGemini($model, $prompt, $options),
             default => $this->generateImageWithImagen($model, $prompt, $options),
         };
     }
@@ -483,7 +487,9 @@ class GoogleProvider implements ChatProviderInterface, ImageGenerationProviderIn
                 ],
             ];
 
-            if ($this->projectId) {
+            // Imagen 4+ is supported on the Gemini API with GOOGLE_GEMINI_API_KEY (see Google docs).
+            // Vertex AI requires a separate OAuth access token — never send the API key as Bearer.
+            if ($this->projectId && $this->vertexAccessToken) {
                 return $this->generateImageWithImagenVertex($model, $payload);
             }
 
@@ -520,10 +526,14 @@ class GoogleProvider implements ChatProviderInterface, ImageGenerationProviderIn
     }
 
     /**
-     * Imagen via Vertex AI (requires GCP project ID and OAuth2 token).
+     * Imagen via Vertex AI (GCP project + OAuth2 access token from GOOGLE_VERTEX_ACCESS_TOKEN).
      */
     private function generateImageWithImagenVertex(string $model, array $payload): array
     {
+        if (!$this->vertexAccessToken) {
+            throw new ProviderException('Vertex Imagen requires GOOGLE_VERTEX_ACCESS_TOKEN (OAuth bearer), not the Gemini API key', 'google');
+        }
+
         $url = str_replace('{region}', $this->region, self::VERTEX_BASE)
             ."/projects/{$this->projectId}/locations/{$this->region}"
             ."/publishers/google/models/{$model}:predict";
@@ -536,7 +546,7 @@ class GoogleProvider implements ChatProviderInterface, ImageGenerationProviderIn
         $response = $this->httpClient->request('POST', $url, [
             'headers' => [
                 'Content-Type' => 'application/json',
-                'Authorization' => 'Bearer '.$this->apiKey,
+                'Authorization' => 'Bearer '.$this->vertexAccessToken,
             ],
             'json' => $payload,
             'timeout' => 120,

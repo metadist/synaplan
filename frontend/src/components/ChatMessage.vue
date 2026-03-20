@@ -759,6 +759,7 @@ import ExternalLinkWarning from '@/components/common/ExternalLinkWarning.vue'
 import { useExternalLink } from '@/composables/useExternalLink'
 import type { Part, MessageFile } from '@/stores/history'
 import type { AgainData } from '@/types/ai-models'
+import { mediaHintFromClassificationTopic } from '@/utils/mediaGenerationHint'
 
 const { t } = useI18n()
 const { error: showError } = useNotification()
@@ -774,6 +775,8 @@ interface Props {
   modelLabel?: string
   topic?: string // Topic from message classification
   originalTopic?: string | null // Original classification topic preserved on error messages
+  /** BMEDIA subtype when topic is mediamaker (failed generation without media parts) */
+  originalMediaType?: string | null
   againData?: AgainData
   backendMessageId?: number
   processingStatus?: string
@@ -1018,37 +1021,65 @@ const mediaHint = computed(() => {
   if (hasImageContent.value) return 'image' as const
   if (hasVideoContent.value) return 'video' as const
   if (hasAudioContent.value) return 'audio' as const
+  const fromTopic = mediaHintFromClassificationTopic(
+    effectiveTopic.value,
+    props.originalMediaType ?? null
+  )
+  if (fromTopic) {
+    return fromTopic
+  }
   return null
 })
 
 // Dynamic label for model badge based on content type
 const getModelTypeLabel = computed(() => {
-  if (isVisionResponse.value) return 'Vision Model'
   if (isFileAnalysisResponse.value) return 'Analyze Model'
-  if (hasImageContent.value) return 'Image Model'
-  if (hasVideoContent.value) return 'Video Model'
-  if (hasAudioContent.value) return 'Audio Model'
-  return 'Chat Model'
+  switch (mediaHint.value) {
+    case 'vision':
+      return 'Vision Model'
+    case 'image':
+      return 'Image Model'
+    case 'video':
+      return 'Video Model'
+    case 'audio':
+      return 'Audio Model'
+    default:
+      return 'Chat Model'
+  }
 })
 
 // Dynamic icon for model badge
 const getModelTypeIcon = computed(() => {
-  if (isVisionResponse.value) return 'mdi:eye'
   if (isFileAnalysisResponse.value) return 'mdi:file-search'
-  if (hasImageContent.value) return 'mdi:image'
-  if (hasVideoContent.value) return 'mdi:video'
-  if (hasAudioContent.value) return 'mdi:music'
-  return 'mdi:chat'
+  switch (mediaHint.value) {
+    case 'vision':
+      return 'mdi:eye'
+    case 'image':
+      return 'mdi:image'
+    case 'video':
+      return 'mdi:video'
+    case 'audio':
+      return 'mdi:music'
+    default:
+      return 'mdi:chat'
+  }
 })
 
 // Dynamic title for model badge
 const getModelTypeTitle = computed(() => {
-  if (isVisionResponse.value) return 'Vision (Image → Text)'
   if (isFileAnalysisResponse.value) return 'File Analysis (Document/Audio → Text)'
-  if (hasImageContent.value) return 'Image Generation (Text → Image)'
-  if (hasVideoContent.value) return 'Video Generation (Text → Video)'
-  if (hasAudioContent.value) return 'Audio Generation (Text → Audio)'
-  return 'Chat Generation'
+  switch (mediaHint.value) {
+    case 'vision':
+      return 'Vision (Image → Text)'
+    case 'image':
+      return 'Image Generation (Text → Image)'
+    case 'video':
+      return 'Video Generation (Text → Video)'
+    case 'audio':
+      return 'Audio Generation (Text → Audio)'
+    default:
+      return 'Chat Generation'
+  }
 })
 
 const formattedTime = computed(() => {

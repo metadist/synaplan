@@ -92,6 +92,7 @@
               :model-label="message.modelLabel"
               :topic="message.topic"
               :original-topic="message.originalTopic"
+              :original-media-type="message.originalMediaType"
               :again-data="message.againData"
               :backend-message-id="message.backendMessageId"
               :processing-status="message.isStreaming ? processingStatus : undefined"
@@ -1361,6 +1362,9 @@ const streamAIResponse = async (
               if (data.originalTopic !== undefined) {
                 message.originalTopic = data.originalTopic
               }
+              if (data.originalMediaType !== undefined) {
+                message.originalMediaType = data.originalMediaType
+              }
 
               // Mark reasoning parts as complete (remove streaming flag)
               message.parts.forEach((part) => {
@@ -1398,6 +1402,12 @@ const streamAIResponse = async (
                 }
                 if (data.topic) {
                   message.topic = data.topic
+                }
+                if (data.originalTopic !== undefined) {
+                  message.originalTopic = data.originalTopic
+                }
+                if (data.originalMediaType !== undefined) {
+                  message.originalMediaType = data.originalMediaType
                 }
                 applyAssistantChatModelFooter(
                   message,

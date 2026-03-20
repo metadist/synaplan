@@ -583,6 +583,7 @@ class ChatController extends AbstractController
             }
 
             $originalTopic = $m->getMeta('original_topic');
+            $originalMediaType = $m->getMeta('original_media_type');
 
             return [
                 'id' => $m->getId(),
@@ -592,6 +593,7 @@ class ChatController extends AbstractController
                 'provider' => $m->getProviderIndex(),
                 'topic' => $m->getTopic(),
                 'originalTopic' => $originalTopic,
+                'originalMediaType' => $originalMediaType,
                 'language' => $m->getLanguage(),
                 'createdAt' => $m->getDateTime(),
                 'files' => $filesData, // Attached files (user uploads)
@@ -678,6 +680,7 @@ class ChatController extends AbstractController
                 'provider' => $m->getProviderIndex(),
                 'topic' => $m->getTopic(),
                 'originalTopic' => $m->getMeta('original_topic'),
+                'originalMediaType' => $m->getMeta('original_media_type'),
                 'language' => $m->getLanguage(),
             ];
 
