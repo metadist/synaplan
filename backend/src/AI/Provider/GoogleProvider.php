@@ -214,7 +214,7 @@ class GoogleProvider implements ChatProviderInterface, ImageGenerationProviderIn
 
     public function generateImage(string $prompt, array $options = []): array
     {
-        $model = $options['model'] ?? 'imagen-3.0-generate-002';
+        $model = $options['model'] ?? 'imagen-4.0-generate-001';
         $inputImages = $options['images'] ?? [];
 
         if (!$this->apiKey) {
@@ -418,7 +418,7 @@ class GoogleProvider implements ChatProviderInterface, ImageGenerationProviderIn
     /**
      * Generate image using Imagen via Gemini API (API key) or Vertex AI (project ID + OAuth).
      *
-     * Gemini API: available since Feb 2025 for imagen-3.0-generate-002
+     * Gemini API: available for imagen-4.0-generate-001
      *
      * @see https://ai.google.dev/gemini-api/docs/imagen
      */
