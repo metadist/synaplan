@@ -586,12 +586,16 @@ const uploadFiles = async (filesToUpload: File[]) => {
 
       for (const fileId of newFileIds) {
         pendingProcessingIds.value.add(fileId)
-        filesService.processFile(fileId).catch((err) => {
-          console.error('Background processing failed for file', fileId, err)
-          pendingProcessingIds.value.delete(fileId)
-          const msg = err instanceof Error ? err.message : 'Unknown error'
-          showError(`Background processing failed for file: ${msg}`)
-        })
+        filesService
+          .processFile(fileId)
+          .catch((err) => {
+            console.error('Background processing failed for file', fileId, err)
+            const msg = err instanceof Error ? err.message : 'Unknown error'
+            showError(`Background processing failed for file: ${msg}`)
+          })
+          .finally(() => {
+            loadFiles()
+          })
       }
       startPolling()
     }
@@ -625,10 +629,11 @@ const startPolling = () => {
       const response = await filesService.listFiles({ limit: 100 })
       files.value = response.files
 
+      const terminalStates = ['vectorized', 'processed', 'extracted', 'error']
       const stillProcessing = new Set<number>()
       for (const id of pendingProcessingIds.value) {
         const file = response.files.find((f) => f.id === id)
-        if (file && !['vectorized', 'processed', 'error'].includes(file.status)) {
+        if (file && !terminalStates.includes(file.status)) {
           stillProcessing.add(id)
         }
       }
