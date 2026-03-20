@@ -31,9 +31,9 @@ class HuggingFaceProvider implements ChatProviderInterface, EmbeddingProviderInt
     private const CHAT_ENDPOINT = 'https://router.huggingface.co/v1/chat/completions';
     private const ROUTER_BASE = 'https://router.huggingface.co';
     private const BILLING_URL = 'https://huggingface.co/settings/billing';
-    private const DEFAULT_VIDEO_FRAMES = 65;
-    private const DEFAULT_VIDEO_INFERENCE_STEPS = 25;
-    private const VIDEO_TIMEOUT = 600;
+    private const DEFAULT_VIDEO_INFERENCE_STEPS = 30;
+    private const QUEUE_POLL_INTERVAL_SECONDS = 3;
+    private const QUEUE_MAX_POLL_ATTEMPTS = 180;
 
     public function __construct(
         private readonly HttpClientInterface $httpClient,
@@ -577,6 +577,12 @@ class HuggingFaceProvider implements ChatProviderInterface, EmbeddingProviderInt
      *
      * @return array Array with video metadata including local path
      */
+    /**
+     * Generate video via fal.ai's async queue API (submit → poll → result).
+     *
+     * fal.ai video models require queue-based processing because generation
+     * typically exceeds synchronous timeout limits (~2+ min).
+     */
     public function generateVideo(string $prompt, array $options = []): array
     {
         if (!isset($options['model'])) {
@@ -589,83 +595,91 @@ class HuggingFaceProvider implements ChatProviderInterface, EmbeddingProviderInt
 
         try {
             $model = $options['model'];
+            $falModelId = $this->buildFalModelId($model);
 
-            $this->logger->info('HuggingFace video generation request', [
+            $this->logger->info('HuggingFace video generation request (queue)', [
                 'model' => $model,
+                'fal_model_id' => $falModelId,
                 'prompt_length' => strlen($prompt),
             ]);
 
-            // fal.ai models use format: fal-ai/fal-ai/{model-name}
-            // The model ID in options should be like "ltx-video" or "hunyuan-video"
-            $url = self::ROUTER_BASE."/fal-ai/fal-ai/{$model}";
-
-            // fal.ai uses 'prompt' at root level, not 'inputs'
             $requestBody = [
                 'prompt' => $prompt,
+                'num_inference_steps' => (int) ($options['num_inference_steps'] ?? self::DEFAULT_VIDEO_INFERENCE_STEPS),
             ];
-
-            // Add optional parameters at root level (fal.ai format)
-            if (isset($options['num_frames'])) {
-                $requestBody['num_frames'] = (int) $options['num_frames'];
-            } else {
-                $requestBody['num_frames'] = self::DEFAULT_VIDEO_FRAMES; // Default ~2.5 seconds
-            }
-
-            if (isset($options['num_inference_steps'])) {
-                $requestBody['num_inference_steps'] = (int) $options['num_inference_steps'];
-            } else {
-                $requestBody['num_inference_steps'] = self::DEFAULT_VIDEO_INFERENCE_STEPS; // Balance quality/speed
-            }
 
             if (isset($options['seed'])) {
                 $requestBody['seed'] = (int) $options['seed'];
             }
-
             if (isset($options['negative_prompt'])) {
                 $requestBody['negative_prompt'] = $options['negative_prompt'];
             }
+            if (isset($options['guidance_scale'])) {
+                $requestBody['guidance_scale'] = (float) $options['guidance_scale'];
+            }
 
-            $response = $this->httpClient->request('POST', $url, [
-                'headers' => [
-                    'Authorization' => 'Bearer '.$this->apiKey,
-                    'Content-Type' => 'application/json',
-                ],
+            // 1. Submit via HuggingFace Router (proxies to fal.ai queue)
+            //    The ?_subdomain=queue parameter tells the router to use fal's queue endpoint
+            //    (same mechanism the official HuggingFace Python/JS SDKs use).
+            $submitUrl = self::ROUTER_BASE.'/fal-ai/'.$falModelId.'?_subdomain=queue';
+            $submitResponse = $this->httpClient->request('POST', $submitUrl, [
+                'headers' => $this->falAuthHeaders(),
                 'json' => $requestBody,
-                'timeout' => self::VIDEO_TIMEOUT, // Video generation can take several minutes
+                'timeout' => 30,
             ]);
 
-            $statusCode = $response->getStatusCode();
-
-            // Check for payment required error
+            $statusCode = $submitResponse->getStatusCode();
             if (402 === $statusCode) {
                 throw new ProviderException(sprintf('HuggingFace video generation requires prepaid credits. Add credits at %s', self::BILLING_URL), 'huggingface');
             }
 
-            $data = $response->toArray();
+            $submitData = $submitResponse->toArray();
+            $requestId = $submitData['request_id'] ?? null;
+            $statusUrl = $submitData['status_url'] ?? null;
+            $responseUrl = $submitData['response_url'] ?? null;
+
+            if (!$requestId || !$statusUrl || !$responseUrl) {
+                throw new ProviderException('fal.ai queue submit missing request_id or URLs: '.json_encode(array_keys($submitData)), 'huggingface');
+            }
+
+            $this->logger->info('HuggingFace video queued', [
+                'request_id' => $requestId,
+                'fal_model_id' => $falModelId,
+                'status' => $submitData['status'] ?? 'unknown',
+            ]);
+
+            // 2. Poll for completion (status URLs accept HF Bearer tokens)
+            $this->pollUntilComplete($statusUrl, $requestId, $falModelId);
+
+            // 3. Fetch result from the response URL returned by fal
+            $resultResponse = $this->httpClient->request('GET', $responseUrl, [
+                'headers' => $this->falAuthHeaders(),
+                'timeout' => 60,
+            ]);
+
+            $data = $resultResponse->toArray();
 
             if (!isset($data['video']['url'])) {
-                throw new ProviderException('Invalid response from fal.ai: missing video URL', 'huggingface');
+                throw new ProviderException('fal.ai response missing video URL: '.json_encode(array_keys($data)), 'huggingface');
             }
 
             $videoUrl = $data['video']['url'];
-            $numFrames = $options['num_frames'] ?? 65;
-            $duration = round($numFrames / 24, 1);
 
             $this->logger->info('HuggingFace video generated', [
                 'model' => $model,
                 'video_url' => $videoUrl,
                 'seed' => $data['seed'] ?? null,
-                'duration' => $duration,
             ]);
 
             return [
                 [
                     'url' => $videoUrl,
-                    'duration' => $duration,
-                    'resolution' => $options['resolution'] ?? null,
                     'seed' => $data['seed'] ?? null,
+                    'resolution' => $options['resolution'] ?? null,
                 ],
             ];
+        } catch (ProviderException $e) {
+            throw $e;
         } catch (\Exception $e) {
             $this->logger->error('HuggingFace video generation error', [
                 'error' => $e->getMessage(),
@@ -674,6 +688,75 @@ class HuggingFaceProvider implements ChatProviderInterface, EmbeddingProviderInt
 
             throw new ProviderException('HuggingFace video generation error: '.$e->getMessage(), 'huggingface', null, 0, $e);
         }
+    }
+
+    /**
+     * Poll fal.ai queue status until the request completes or fails.
+     */
+    private function pollUntilComplete(string $statusUrl, string $requestId, string $falModelId): void
+    {
+        for ($attempt = 0; $attempt < self::QUEUE_MAX_POLL_ATTEMPTS; ++$attempt) {
+            sleep(self::QUEUE_POLL_INTERVAL_SECONDS);
+
+            $statusResponse = $this->httpClient->request('GET', $statusUrl, [
+                'headers' => $this->falAuthHeaders(),
+                'timeout' => 15,
+            ]);
+
+            $statusData = $statusResponse->toArray();
+            $status = $statusData['status'] ?? 'UNKNOWN';
+
+            if ('COMPLETED' === $status) {
+                $this->logger->info('HuggingFace video queue completed', [
+                    'request_id' => $requestId,
+                    'attempt' => $attempt + 1,
+                ]);
+
+                return;
+            }
+
+            if ('FAILED' === $status) {
+                $error = $statusData['error'] ?? 'Unknown queue error';
+                throw new ProviderException("fal.ai video generation failed: {$error}", 'huggingface');
+            }
+
+            if (0 === $attempt % 10) {
+                $this->logger->debug('HuggingFace video queue polling', [
+                    'request_id' => $requestId,
+                    'status' => $status,
+                    'attempt' => $attempt + 1,
+                    'fal_model_id' => $falModelId,
+                ]);
+            }
+        }
+
+        throw new ProviderException(
+            sprintf('fal.ai video generation timed out after %d seconds', self::QUEUE_POLL_INTERVAL_SECONDS * self::QUEUE_MAX_POLL_ATTEMPTS),
+            'huggingface'
+        );
+    }
+
+    /**
+     * Build the fal.ai model identifier (e.g. "fal-ai/ltx-video").
+     */
+    private function buildFalModelId(string $model): string
+    {
+        if (str_contains($model, '/')) {
+            return $model;
+        }
+
+        return 'fal-ai/'.$model;
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    private function falAuthHeaders(): array
+    {
+        return [
+            'Authorization' => 'Bearer '.$this->apiKey,
+            'Content-Type' => 'application/json',
+        ];
     }
 
     // ==================== HELPERS ====================
