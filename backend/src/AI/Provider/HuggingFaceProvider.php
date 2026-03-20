@@ -730,10 +730,7 @@ class HuggingFaceProvider implements ChatProviderInterface, EmbeddingProviderInt
             }
         }
 
-        throw new ProviderException(
-            sprintf('fal.ai video generation timed out after %d seconds', self::QUEUE_POLL_INTERVAL_SECONDS * self::QUEUE_MAX_POLL_ATTEMPTS),
-            'huggingface'
-        );
+        throw new ProviderException(sprintf('fal.ai video generation timed out after %d seconds', self::QUEUE_POLL_INTERVAL_SECONDS * self::QUEUE_MAX_POLL_ATTEMPTS), 'huggingface');
     }
 
     /**
