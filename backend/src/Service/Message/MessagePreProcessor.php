@@ -144,6 +144,15 @@ final readonly class MessagePreProcessor
 
         // Audio mit Whisper
         elseif (in_array($fileType, self::AUDIO_EXTENSIONS)) {
+            if (!$this->whisperService->isAvailable()) {
+                $this->logger->warning('PreProcessor: Whisper not available, skipping audio transcription', [
+                    'file' => basename($fullPath),
+                ]);
+                $messageFile->setStatus('processed');
+
+                return;
+            }
+
             try {
                 $result = $this->transcribeWithWhisper($fullPath, null);
                 if ($result && !empty($result['text'])) {

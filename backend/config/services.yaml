@@ -179,6 +179,7 @@ services:
             $whisperModelsPath: '%env(WHISPER_MODELS_PATH)%'
             $defaultModel: '%env(WHISPER_DEFAULT_MODEL)%'
             $ffmpegBinary: '%env(FFMPEG_BINARY)%'
+            $whisperEnabled: '%env(bool:WHISPER_ENABLED)%'
 
     # Brave Search API Service
     App\Service\Search\BraveSearchService:
