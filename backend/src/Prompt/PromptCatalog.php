@@ -39,12 +39,6 @@ class PromptCatalog
                 'prompt' => self::sortPrompt(),
             ],
             [
-                'topic' => 'analyzefile',
-                'language' => 'en',
-                'shortDescription' => 'The user asks to analyze any file - handles PDF, DOCX, XLSX, PPTX, TXT and more. Only direct here if a file is attached and BFILE is set.',
-                'prompt' => self::analyzeFilePrompt(),
-            ],
-            [
                 'topic' => 'docsummary',
                 'language' => 'en',
                 'shortDescription' => 'The user asks for document summarization with specific options (abstractive, extractive, bullet-points). Direct here when user wants a summary of text or document content.',
@@ -219,6 +213,7 @@ If there is a signature in the BTEXT field, use it as a hint to classify
 the message and the sender.
 
 If there is an attachment, the description is in the BFILETEXT field.
+If there are attached files, their types are listed in BATTACHED_FILES and the count in BATTACHED_COUNT.
 
 You will respond only in valid JSON and with the same structure you receive.
 
@@ -245,19 +240,57 @@ This is the list, use only this:
    - Questions that explicitly require internet search
    Otherwise, set BWEBSEARCH to 0.
 
-7. **Detect media type (BMEDIA)**: If BTOPIC is "mediamaker", also set BMEDIA to specify the type of media the user wants:
+7. **Classify image attachments correctly**: When the message has image attachments (BATTACHED_FILES contains image types like jpg, jpeg, png, gif, webp, or BFILETYPE is an image type), you must distinguish between two intents:
+
+   **Route to "mediamaker"** (BTOPIC = "mediamaker", BMEDIA = "image") when the user wants to:
+   - Edit, modify, or transform the attached image(s)
+   - Combine, merge, composite, or blend two images together
+   - Put an object/person from one image into another image
+   - Apply a style, pattern, or texture from one image to another
+   - Replace the background of an image
+   - Generate a new image using the attached image(s) as reference
+   - Any creative image manipulation or generation involving the attachments
+
+   **Route to "general"** (BTOPIC = "general") when the user wants to:
+   - Describe, analyze, read, or explain what is in the image
+   - Extract text (OCR) from the image
+   - Summarize or inspect the image content
+   - Answer questions about what the image shows
+   - Compare images without creating a new one
+
+   Examples with image attachments:
+   - "Put the person from image 1 into the scene of image 2" → mediamaker
+   - "Combine these two images" → mediamaker
+   - "Apply this pattern to the room" → mediamaker
+   - "Integrate the guy from the coast next to the Android" → mediamaker
+   - "Make this photo look like a painting" → mediamaker
+   - "Replace the background with a beach" → mediamaker
+   - "What is in this image?" → general
+   - "Describe this photo" → general
+   - "Read the text from this document" → general
+   - "What differences do you see?" → general
+
+   If there are image attachments but no BTEXT, default to "general".
+
+8. **Detect media type (BMEDIA)**: If BTOPIC is "mediamaker", also set BMEDIA to specify the type of media the user wants:
    - "video" - if user wants a video, film, clip, animation, or moving images
    - "audio" - if user wants audio, sound, voice, speech, TTS, or text-to-speech
-   - "image" - if user wants an image, picture, photo, illustration (this is the default)
+   - "image" - if user wants an image, picture, photo, illustration, or any image editing/composition (this is the default)
    Examples:
    - "Create a video of a car" → BMEDIA: "video"
    - "Make a video of a dog running" → BMEDIA: "video"
    - "Generate an image of a cat" → BMEDIA: "image"
    - "Create a picture of a sunset" → BMEDIA: "image"
+   - "Combine these two photos" → BMEDIA: "image"
    - "Read this text aloud" → BMEDIA: "audio"
    - "Convert to speech" → BMEDIA: "audio"
 
-8. **Detect video duration (BDURATION)**: If BTOPIC is "mediamaker" AND BMEDIA is "video", extract the requested duration.
+9. **Detect input mode (BINPUTMODE)**: If BTOPIC is "mediamaker" AND BMEDIA is "image", set BINPUTMODE:
+   - "reference_images" - if the user attached image(s) to be used as input for editing, composition, or style transfer
+   - "text_only" - if the user wants to generate an image purely from text description (no reference images)
+   If unsure, omit BINPUTMODE.
+
+10. **Detect video duration (BDURATION)**: If BTOPIC is "mediamaker" AND BMEDIA is "video", extract the requested duration.
    - Supported durations: **4, 6, or 8 seconds only**
    - If user requests a duration, round to the nearest supported value (4, 6, or 8)
    - If no duration is mentioned, do NOT include BDURATION (system uses default of 4)
@@ -277,6 +310,7 @@ You must respond with the **same JSON object as received**, modifying only:
 * "BLANG": [LANGLIST]
 * "BWEBSEARCH": 0 | 1
 * "BMEDIA": "image" | "video" | "audio" (only when BTOPIC is "mediamaker")
+* "BINPUTMODE": "text_only" | "reference_images" (only when BTOPIC is "mediamaker" AND BMEDIA is "image")
 * "BDURATION": integer (only when BMEDIA is "video" AND user specified a duration)
 
 If you cannot define the language from the text, leave "BLANG" as "en".
@@ -288,27 +322,12 @@ If BTEXT is empty, but BFILETEXT is set, use BFILETEXT primarily to define the t
 If the user changes topics mid-conversation, update BTOPIC to match the new topic in your next response.
 
 Do not change any other fields.
-Do not add any new fields beyond BTOPIC, BLANG, BWEBSEARCH, BMEDIA, and BDURATION.
+Do not add any new fields beyond BTOPIC, BLANG, BWEBSEARCH, BMEDIA, BINPUTMODE, and BDURATION.
 Do not add any additional text beyond the JSON.
 **Do not answer the question of the user.**
 Only send the JSON object.
 
 Update the JSON values and answer with the JSON, you received.
-PROMPT;
-    }
-
-    private static function analyzeFilePrompt(): string
-    {
-        return <<<'PROMPT'
-# Analyze a file
-You receive a file with a request to analyze it. The user has requested to analyze various file types including: PDF, DOCX, XLSX, PPTX, TXT, JPG, PNG, GIF, MP3, MP4, and other common document/media formats.
-
-Extract the prompt from BTEXT. Improve the prompt, add details from the purpose of the user.
-The new prompt will be sent to an analytical AI to parse the document or file and find the information.
-
-Create a better prompt from the user input in the language of the user, if it is not precise.
-
-You are a helpful assistant that analyzes documents and files for users.
 PROMPT;
     }
 
@@ -381,17 +400,27 @@ You receive a media generation request. Your task is to improve and enhance the 
 2. **DO NOT override** user preferences with default values
 3. **DO NOT include duration** in the enhanced prompt - duration is handled separately by the system
 4. If user specifies a style or color, preserve it exactly
+5. **Respond in the user's language** - detect the language of the user's message and write the enhanced prompt in that same language
 
 ## Your Task
 Take the user's request and create an enhanced, detailed prompt that will produce better results. Focus on visual and cinematic details only.
 
 ## Guidelines
 
-### For IMAGE prompts:
+### For IMAGE prompts (text-to-image, no reference images):
 - Preserve any user-specified: size, colors, style, mood
 - Add visual details: lighting, composition, quality hints
 - Keep the user's core intent and specifications intact
 - Use the user's language
+
+### For IMAGE EDITING / COMPOSITION prompts (with reference images):
+When the user has attached image(s) and wants to edit, combine, or compose them:
+- **You CANNOT see the attached images.** Do NOT describe what is in them.
+- **Do NOT assign roles** to the images (e.g., "image 1 is the pattern, image 2 is the room").
+- **Preserve the user's instruction exactly** as they wrote it - they can see the images, you cannot.
+- Only lightly enhance clarity and add quality hints (e.g., "seamless blending, photorealistic, high resolution").
+- Keep the user's wording for object/scene references intact.
+- The downstream multimodal image model will see both the images and your enhanced text.
 
 ### For VIDEO prompts:
 - **DO NOT include duration** in the enhanced prompt (duration is extracted separately and passed as API parameter)
@@ -413,11 +442,23 @@ Respond with ONLY the enhanced prompt text. Do not include any JSON, explanation
 Input: "Generate an image of a cat"
 Output: A detailed image of a cat, photorealistic, soft natural lighting, high resolution, shallow depth of field
 
+Input (with 2 images attached): "Put the person from the coast next to the Android from the space ship"
+Output: Put the person from the coast next to the Android from the space ship. Seamless compositing, matching lighting and perspective, photorealistic blending, high resolution
+
+Input (with 2 images attached): "Apply this pattern to the walls of the room"
+Output: Apply this pattern to the walls of the room. Realistic texture mapping, natural perspective, consistent lighting, photorealistic result, high resolution
+
+Input (with 1 image attached): "Replace the background with a tropical beach"
+Output: Replace the background with a tropical beach. Seamless edge blending, matching lighting direction, natural shadows, photorealistic, high resolution
+
+Input: "Erstelle ein Bild von einem Sonnenuntergang am Meer"
+Output: Ein detailliertes Bild eines Sonnenuntergangs am Meer, warme Goldtöne, dramatische Wolkenformationen, Spiegelungen auf dem Wasser, fotorealistisch, hohe Auflösung
+
+Input (with 2 images attached): "Integriere den Typen von der Küste neben den Android vom Raumschiff"
+Output: Integriere den Typen von der Küste neben den Android vom Raumschiff. Nahtlose Komposition, passende Beleuchtung und Perspektive, fotorealistische Verschmelzung, hohe Auflösung
+
 Input: "Create a 3 second video of a man waving"
 Output: Cinematic video of a man waving, natural movement, friendly expression, soft daylight, shallow depth of field, 4K quality
-
-Input: "Make a 5 second video of a dog running in a park"
-Output: Dynamic video of a happy dog running through a lush green park, tracking shot, natural sunlight, playful movement, cinematic quality
 
 Input: "Create a video of a BMW car driving"
 Output: Cinematic video of a modern BMW sedan driving smoothly on an asphalt road, front three-quarter tracking shot, realistic motion blur, reflections on glossy paint, golden-hour lighting, urban background, 4K quality

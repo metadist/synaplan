@@ -1505,6 +1505,7 @@ const groupedModels = computed(() => {
     SORT: 'Message Sorting',
     ANALYZE: 'File Analysis',
     TEXT2PIC: 'Image Generation',
+    PIC2PIC: 'Image Editing (Image → Image)',
     TEXT2VID: 'Video Generation',
     TEXT2SOUND: 'Text-to-Speech',
     SOUND2TEXT: 'Speech-to-Text',

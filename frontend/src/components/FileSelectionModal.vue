@@ -60,7 +60,7 @@
               <span v-if="uploadProgress" class="text-sm txt-secondary">
                 {{
                   $t('fileSelection.uploading', {
-                    count: uploadProgress.current,
+                    current: uploadProgress.current,
                     total: uploadProgress.total,
                   })
                 }}
@@ -138,14 +138,22 @@
                     <span>{{ formatFileSize(file.file_size) }}</span>
                     <span>·</span>
                     <span
+                      class="inline-flex items-center gap-1"
                       :class="{
                         'text-green-600 dark:text-green-400':
                           file.status === 'vectorized' || file.status === 'processed',
                         'text-yellow-600 dark:text-yellow-400': file.status === 'extracted',
+                        'text-blue-500 dark:text-blue-400':
+                          file.status === 'extracting' || file.status === 'vectorizing',
                         'text-gray-600 dark:text-gray-400': file.status === 'uploaded',
                         'text-red-600 dark:text-red-400': file.status === 'error',
                       }"
                     >
+                      <Icon
+                        v-if="file.status === 'extracting' || file.status === 'vectorizing'"
+                        icon="mdi:loading"
+                        class="w-3.5 h-3.5 animate-spin"
+                      />
                       {{ $t(`files.status_${file.status}`) }}
                     </span>
                     <span v-if="file.is_attached">·</span>
@@ -161,7 +169,7 @@
                   @click.stop
                 >
                   <button
-                    v-if="file.status !== 'vectorized'"
+                    v-if="!['vectorized', 'extracting', 'vectorizing'].includes(file.status)"
                     class="p-1.5 rounded hover:bg-purple-500/10 text-purple-600 dark:text-purple-400 transition-colors"
                     :title="$t('fileSelection.reVectorize')"
                     data-testid="btn-file-revectorize"
@@ -451,6 +459,10 @@ const handleFileUpload = async (event: Event) => {
   target.value = ''
 }
 
+const pendingProcessingIds = ref<Set<number>>(new Set())
+let pollingTimer: ReturnType<typeof setInterval> | null = null
+const isPolling = ref(false)
+
 const abortUpload = () => {
   if (uploadAbortController.value) {
     uploadAbortController.value.abort()
@@ -460,45 +472,122 @@ const abortUpload = () => {
 
 const uploadFiles = async (filesToUpload: File[]) => {
   isUploading.value = true
-  uploadProgress.value = { current: 0, total: filesToUpload.length }
 
   const controller = new AbortController()
   uploadAbortController.value = controller
 
-  try {
-    const result = await filesService.uploadFiles({
-      files: filesToUpload,
-      processLevel: 'vectorize',
-      signal: controller.signal,
-    })
+  let successCount = 0
+  const newFileIds: number[] = []
 
-    if (result.success) {
-      success(t('fileSelection.uploadSuccess', { count: result.files.length }))
-      await loadFiles()
-      result.files.forEach((file) => {
-        if (file.id) {
-          selectedFileIds.value.add(file.id)
+  try {
+    for (let i = 0; i < filesToUpload.length; i++) {
+      if (controller.signal.aborted) {
+        break
+      }
+
+      uploadProgress.value = { current: i + 1, total: filesToUpload.length }
+      const file = filesToUpload[i]
+
+      try {
+        const result = await filesService.uploadFiles({
+          files: [file],
+          processLevel: 'store',
+          signal: controller.signal,
+        })
+
+        if (result.success && result.files.length > 0) {
+          successCount++
+          result.files.forEach((f) => {
+            if (f.id) {
+              selectedFileIds.value.add(f.id)
+              newFileIds.push(f.id)
+            }
+          })
         }
-      })
+
+        if (result.errors && result.errors.length > 0) {
+          result.errors.forEach((err) => {
+            showError(`${err.filename}: ${err.error}`)
+          })
+        }
+      } catch (err: unknown) {
+        if (err instanceof DOMException && err.name === 'AbortError') {
+          warning(t('fileSelection.uploadCancelled'))
+          break
+        }
+        console.error('Upload failed:', file.name, err)
+        const msg = err instanceof Error ? err.message : 'Unknown error'
+        showError(`${file.name}: ${msg}`)
+      }
     }
 
-    if (result.errors && result.errors.length > 0) {
-      result.errors.forEach((err) => {
-        showError(`${err.filename}: ${err.error}`)
-      })
+    if (successCount > 0) {
+      success(t('fileSelection.uploadSuccess', { count: successCount }))
+      await loadFiles()
+
+      for (const fileId of newFileIds) {
+        pendingProcessingIds.value.add(fileId)
+        filesService.processFile(fileId).catch((err) => {
+          console.error('Background processing failed for file', fileId, err)
+          pendingProcessingIds.value.delete(fileId)
+          const msg = err instanceof Error ? err.message : 'Unknown error'
+          showError(`Background processing failed for file: ${msg}`)
+        })
+      }
+      startPolling()
     }
   } catch (err: unknown) {
     if (err instanceof DOMException && err.name === 'AbortError') {
       warning(t('fileSelection.uploadCancelled'))
-      return
+    } else {
+      console.error('Upload failed:', err)
+      const msg = err instanceof Error ? err.message : 'Unknown error'
+      showError(`Upload failed: ${msg}`)
     }
-    console.error('Upload failed:', err)
-    const msg = err instanceof Error ? err.message : 'Unknown error'
-    showError(`Upload failed: ${msg}`)
   } finally {
     isUploading.value = false
     uploadProgress.value = null
     uploadAbortController.value = null
+  }
+}
+
+const startPolling = () => {
+  if (pollingTimer) return
+  pollingTimer = setInterval(async () => {
+    if (pendingProcessingIds.value.size === 0) {
+      stopPolling()
+      return
+    }
+    if (isPolling.value) return
+    isPolling.value = true
+    try {
+      const response = await filesService.listFiles({ limit: 100 })
+      files.value = response.files
+
+      const stillProcessing = new Set<number>()
+      for (const id of pendingProcessingIds.value) {
+        const file = response.files.find((f) => f.id === id)
+        if (file && !['vectorized', 'processed', 'error'].includes(file.status)) {
+          stillProcessing.add(id)
+        }
+      }
+      pendingProcessingIds.value = stillProcessing
+
+      if (stillProcessing.size === 0) {
+        stopPolling()
+      }
+    } catch (err) {
+      console.error('Polling failed:', err)
+    } finally {
+      isPolling.value = false
+    }
+  }, 2000)
+}
+
+const stopPolling = () => {
+  if (pollingTimer) {
+    clearInterval(pollingTimer)
+    pollingTimer = null
   }
 }
 
@@ -529,6 +618,8 @@ watch(
       loadFiles()
     } else {
       abortUpload()
+      stopPolling()
+      pendingProcessingIds.value.clear()
       selectedFileIds.value.clear()
       contentModalOpen.value = false
       confirmDialogOpen.value = false
@@ -538,6 +629,7 @@ watch(
 
 onUnmounted(() => {
   abortUpload()
+  stopPolling()
 })
 </script>
 

@@ -343,6 +343,12 @@ class OpenAIProvider implements ChatProviderInterface, EmbeddingProviderInterfac
 
         try {
             $model = $options['model'] ?? 'dall-e-3';
+            $inputImages = $options['images'] ?? [];
+
+            // Pic2pic: use Responses API when input images are provided
+            if (!empty($inputImages) && $this->supportsResponsesApi($model)) {
+                return $this->generateImageWithResponsesApi($prompt, $inputImages, $options);
+            }
 
             // GPT-Image-1 family uses Image Generations API with dedicated handling
             if (str_starts_with($model, 'gpt-image-1')) {
@@ -500,6 +506,132 @@ class OpenAIProvider implements ChatProviderInterface, EmbeddingProviderInterfac
         } catch (\Exception $e) {
             throw new ProviderException('OpenAI '.$model.' error: '.$e->getMessage(), 'openai');
         }
+    }
+
+    private function supportsResponsesApi(string $model): bool
+    {
+        $responsesModels = ['gpt-image-1', 'gpt-image-1.5', 'gpt-5', 'gpt-5-mini', 'gpt-5.2', 'gpt-4.1', 'gpt-4o'];
+
+        foreach ($responsesModels as $prefix) {
+            if (str_starts_with($model, $prefix)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * Generate image using OpenAI Responses API with input images (pic2pic).
+     *
+     * @param string   $prompt     Text instruction
+     * @param string[] $imagePaths Absolute paths to input images
+     *
+     * @see https://developers.openai.com/api/docs/guides/image-generation
+     */
+    private function generateImageWithResponsesApi(string $prompt, array $imagePaths, array $options = []): array
+    {
+        try {
+            $model = $options['model'] ?? 'gpt-image-1.5';
+            $responsesModel = $this->pickResponsesModel($model);
+
+            $this->logger->info('OpenAI: Pic2pic via Responses API', [
+                'model' => $responsesModel,
+                'image_model' => $model,
+                'image_count' => \count($imagePaths),
+                'prompt_length' => \strlen($prompt),
+            ]);
+
+            $contentParts = [['type' => 'input_text', 'text' => $prompt]];
+            foreach ($imagePaths as $imgPath) {
+                $data = file_get_contents($imgPath);
+                if (false === $data) {
+                    throw new \Exception('Failed to read image: '.basename($imgPath));
+                }
+                $mime = mime_content_type($imgPath) ?: 'image/png';
+                $contentParts[] = [
+                    'type' => 'input_image',
+                    'image_url' => 'data:'.$mime.';base64,'.base64_encode($data),
+                ];
+            }
+
+            $requestBody = [
+                'model' => $responsesModel,
+                'input' => [['role' => 'user', 'content' => $contentParts]],
+                'tools' => [['type' => 'image_generation']],
+            ];
+
+            $ch = curl_init('https://api.openai.com/v1/responses');
+            curl_setopt_array($ch, [
+                CURLOPT_RETURNTRANSFER => true,
+                CURLOPT_POST => true,
+                CURLOPT_HTTPHEADER => [
+                    'Content-Type: application/json',
+                    'Authorization: Bearer '.$this->apiKey,
+                ],
+                CURLOPT_POSTFIELDS => json_encode($requestBody),
+                CURLOPT_TIMEOUT => 180,
+            ]);
+
+            $responseBody = curl_exec($ch);
+            $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+            $curlError = curl_error($ch);
+            curl_close($ch);
+
+            if ($curlError) {
+                throw new \Exception('cURL error: '.$curlError);
+            }
+
+            if (200 !== $httpCode) {
+                $this->logger->error('OpenAI Responses API: HTTP error', [
+                    'http_code' => $httpCode,
+                    'response' => substr((string) $responseBody, 0, 500),
+                ]);
+                throw new \Exception('HTTP '.$httpCode.': '.$responseBody);
+            }
+
+            $response = json_decode((string) $responseBody, true);
+            if (!$response || !isset($response['output'])) {
+                throw new \Exception('Failed to parse Responses API response');
+            }
+
+            $images = [];
+            foreach ($response['output'] as $output) {
+                if ('image_generation_call' === ($output['type'] ?? null) && !empty($output['result'])) {
+                    $images[] = [
+                        'url' => 'data:image/png;base64,'.$output['result'],
+                        'b64_json' => $output['result'],
+                        'revised_prompt' => $output['revised_prompt'] ?? $prompt,
+                    ];
+                }
+            }
+
+            if (empty($images)) {
+                $this->logger->error('OpenAI Responses API: No images in output', [
+                    'output_types' => array_column($response['output'] ?? [], 'type'),
+                ]);
+                throw new ProviderException('Responses API returned no generated images', 'openai');
+            }
+
+            return $images;
+        } catch (ProviderException $e) {
+            throw $e;
+        } catch (\Exception $e) {
+            throw new ProviderException('OpenAI Responses API pic2pic error: '.$e->getMessage(), 'openai');
+        }
+    }
+
+    /**
+     * Pick the mainline model to use with the Responses API image generation tool.
+     * Image-specific models (gpt-image-*) need a mainline model wrapper.
+     */
+    private function pickResponsesModel(string $imageModel): string
+    {
+        if (str_starts_with($imageModel, 'gpt-image-')) {
+            return 'gpt-4.1';
+        }
+
+        return $imageModel;
     }
 
     public function createVariations(string $imageUrl, int $count = 1): array

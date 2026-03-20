@@ -516,42 +516,39 @@ class MessageController extends AbstractController
             $this->em->persist($messageFile);
             $this->em->flush();
 
-            // CRITICAL: Extract text immediately using FileProcessor!
+            // Extract text: audio files synchronously (user needs transcription in UI),
+            // other files deferred to MessagePreProcessor during stream to avoid timeouts
             $extractMeta = [];
-            try {
-                [$extractedText, $extractMeta] = $this->fileProcessor->extractText(
-                    $relativePath,
-                    $fileExtension,
-                    $user->getId()
-                );
+            $isAudio = in_array($fileExtension, MessagePreProcessor::AUDIO_EXTENSIONS, true);
 
-                $messageFile->setFileText($extractedText);
+            if ($isAudio) {
+                try {
+                    [$extractedText, $extractMeta] = $this->fileProcessor->extractText(
+                        $relativePath,
+                        $fileExtension,
+                        $user->getId()
+                    );
 
-                $isAudio = in_array($fileExtension, MessagePreProcessor::AUDIO_EXTENSIONS, true);
+                    $messageFile->setFileText($extractedText);
+                    $messageFile->setStatus(empty(trim($extractedText)) ? 'error' : 'extracted');
+                    $this->em->flush();
 
-                if ($isAudio && empty(trim($extractedText))) {
+                    $this->logger->info('Chat file extracted (audio)', [
+                        'user_id' => $user->getId(),
+                        'file_id' => $messageFile->getId(),
+                        'text_length' => strlen($extractedText),
+                        'strategy' => $extractMeta['strategy'] ?? 'unknown',
+                    ]);
+                } catch (\Throwable $e) {
+                    $this->logger->error('Chat file extraction failed', [
+                        'user_id' => $user->getId(),
+                        'file_id' => $messageFile->getId(),
+                        'error' => $e->getMessage(),
+                    ]);
+
                     $messageFile->setStatus('error');
-                } else {
-                    $messageFile->setStatus('extracted');
+                    $this->em->flush();
                 }
-
-                $this->em->flush();
-
-                $this->logger->info('Chat file extracted', [
-                    'user_id' => $user->getId(),
-                    'file_id' => $messageFile->getId(),
-                    'text_length' => strlen($extractedText),
-                    'strategy' => $extractMeta['strategy'] ?? 'unknown',
-                ]);
-            } catch (\Throwable $e) {
-                $this->logger->error('Chat file extraction failed', [
-                    'user_id' => $user->getId(),
-                    'file_id' => $messageFile->getId(),
-                    'error' => $e->getMessage(),
-                ]);
-
-                $messageFile->setStatus('error');
-                $this->em->flush();
             }
 
             $this->logger->info('Chat file uploaded', [

@@ -112,10 +112,16 @@ final readonly class MediaGenerationHandler implements MessageHandlerInterface
             throw new \RuntimeException('Unable to determine media prompt text');
         }
 
+        // Collect attached image paths for pic2pic
+        $attachedImagePaths = $this->collectAttachedImagePaths($message);
+        $isPic2Pic = !empty($attachedImagePaths);
+
         $this->logger->info('MediaGenerationHandler: Starting media generation', [
             'user_id' => $message->getUserId(),
             'prompt' => substr($prompt, 0, 100),
             'media_hint' => $promptMediaType,
+            'is_pic2pic' => $isPic2Pic,
+            'attached_images' => count($attachedImagePaths),
         ]);
 
         // Get media generation model - detect type from model tag if specified
@@ -159,7 +165,6 @@ final readonly class MediaGenerationHandler implements MessageHandlerInterface
                 }
             }
         } else {
-            // For slash commands, skip auto-detection and use the detected type
             $effectiveUserId = $this->modelConfigService->getEffectiveUserIdForMessage($message);
 
             if ($isSlashCommand) {
@@ -171,6 +176,13 @@ final readonly class MediaGenerationHandler implements MessageHandlerInterface
                 $this->logger->info('MediaGenerationHandler: Using default model for slash command', [
                     'media_type' => $mediaType,
                     'model_id' => $modelId,
+                ]);
+            } elseif ($isPic2Pic) {
+                $modelId = $this->modelConfigService->getDefaultModel('PIC2PIC', $effectiveUserId);
+                $mediaType = 'image';
+                $this->logger->info('MediaGenerationHandler: Pic2pic detected, using PIC2PIC default model', [
+                    'model_id' => $modelId,
+                    'image_count' => count($attachedImagePaths),
                 ]);
             } elseif ('video' === $promptMediaType) {
                 $modelId = $this->modelConfigService->getDefaultModel('TEXT2VID', $effectiveUserId);
@@ -185,9 +197,6 @@ final readonly class MediaGenerationHandler implements MessageHandlerInterface
                 $mediaType = 'image';
                 $this->logger->info('MediaGenerationHandler: Using media type hint from extractor (image)');
             } else {
-                // Default to image if media type cannot be determined
-                // The mediamaker prompt should return JSON with BMEDIA, but if it doesn't,
-                // we default to image (most common case)
                 $modelId = $this->modelConfigService->getDefaultModel('TEXT2PIC', $effectiveUserId);
                 $mediaType = 'image';
 
@@ -351,18 +360,29 @@ final readonly class MediaGenerationHandler implements MessageHandlerInterface
                     ],
                 ];
             } else {
-                // Generate image
+                // Generate image (with optional reference images for pic2pic)
+                $imageOptions = [
+                    'provider' => $provider,
+                    'model' => $modelName,
+                    'modelConfig' => $modelConfig,
+                    'quality' => $options['quality'] ?? ($isPic2Pic ? 'high' : 'standard'),
+                    'style' => $options['style'] ?? 'vivid',
+                    'size' => $options['size'] ?? '1024x1024',
+                ];
+
+                if ($isPic2Pic) {
+                    $imageOptions['images'] = $attachedImagePaths;
+                    $this->logger->info('MediaGenerationHandler: Passing reference images to provider', [
+                        'count' => count($attachedImagePaths),
+                        'provider' => $provider,
+                        'model' => $modelName,
+                    ]);
+                }
+
                 $result = $this->aiFacade->generateImage(
                     $prompt,
                     $message->getUserId(),
-                    [
-                        'provider' => $provider,
-                        'model' => $modelName,
-                        'modelConfig' => $modelConfig,
-                        'quality' => $options['quality'] ?? 'standard',
-                        'style' => $options['style'] ?? 'vivid',
-                        'size' => $options['size'] ?? '1024x1024',
-                    ]
+                    $imageOptions
                 );
 
                 $media = $result['images'] ?? [];
@@ -654,6 +674,42 @@ final readonly class MediaGenerationHandler implements MessageHandlerInterface
 
             return null;
         }
+    }
+
+    /**
+     * Collect absolute paths of image attachments from the message.
+     *
+     * @return string[] Absolute file paths to attached images
+     */
+    private function collectAttachedImagePaths(Message $message): array
+    {
+        $paths = [];
+        $imageExtensions = ['jpg', 'jpeg', 'png', 'gif', 'webp'];
+
+        foreach ($message->getFiles() as $file) {
+            $ext = strtolower(pathinfo($file->getFilePath(), PATHINFO_EXTENSION));
+            if (in_array($ext, $imageExtensions, true)) {
+                $absolutePath = $this->uploadDir.'/'.$file->getFilePath();
+                if (file_exists($absolutePath)) {
+                    $paths[] = $absolutePath;
+                }
+            }
+        }
+
+        if (empty($paths)) {
+            $legacyPath = $message->getFilePath();
+            if ($legacyPath) {
+                $ext = strtolower(pathinfo($legacyPath, PATHINFO_EXTENSION));
+                if (in_array($ext, $imageExtensions, true)) {
+                    $absolutePath = $this->uploadDir.'/'.$legacyPath;
+                    if (file_exists($absolutePath)) {
+                        $paths[] = $absolutePath;
+                    }
+                }
+            }
+        }
+
+        return $paths;
     }
 
     /**

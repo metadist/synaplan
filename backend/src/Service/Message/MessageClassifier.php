@@ -134,23 +134,7 @@ final readonly class MessageClassifier
             }
         }
 
-        // 3. Check for image attachments (force file analysis)
-        // This prevents images from being routed to text2pic or chat without vision
-        if ($this->hasImages($message)) {
-            $this->logger->info('MessageClassifier: Image detected, forcing file analysis', [
-                'message_id' => $messageId,
-            ]);
-
-            return [
-                'topic' => 'analyzefile',
-                'language' => $message->getLanguage() ?: 'en',
-                'intent' => 'file_analysis',
-                'source' => 'image_attachment',
-                'skip_sorting' => true,
-            ];
-        }
-
-        // 4. Use AI-based sorting
+        // 3. Use AI-based sorting
         $messageData = $this->buildMessageData($message);
         $result = $this->messageSorter->classify($messageData, $conversationHistory, $userId);
 
@@ -243,41 +227,11 @@ final readonly class MessageClassifier
     }
 
     /**
-     * Check if message has image attachments.
-     */
-    private function hasImages(Message $message): bool
-    {
-        // Check new-style file attachments
-        foreach ($message->getFiles() as $file) {
-            if (str_starts_with($file->getFileMime(), 'image/')) {
-                return true;
-            }
-        }
-
-        // Check legacy file type (stores extensions like 'jpg', 'png', not 'image')
-        $imageExtensions = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'image'];
-        if (in_array($message->getFileType(), $imageExtensions, true)) {
-            return true;
-        }
-
-        // Check file path extension as fallback
-        $filePath = $message->getFilePath();
-        if (!empty($filePath)) {
-            $ext = strtolower(pathinfo($filePath, PATHINFO_EXTENSION));
-            if (in_array($ext, $imageExtensions, true)) {
-                return true;
-            }
-        }
-
-        return false;
-    }
-
-    /**
      * Build message data array for sorter.
      */
     private function buildMessageData(Message $message): array
     {
-        return [
+        $data = [
             'BDATETIME' => $message->getDateTime(),
             'BFILEPATH' => $message->getFilePath(),
             'BTOPIC' => $message->getTopic() ?: '',
@@ -285,8 +239,25 @@ final readonly class MessageClassifier
             'BTEXT' => $message->getText(),
             'BFILETEXT' => $message->getFileText() ?: '',
             'BFILE' => $message->getFile(),
-            'BWEBSEARCH' => 0, // Initialize for AI to set
+            'BWEBSEARCH' => 0,
         ];
+
+        $fileType = $message->getFileType();
+        if ('' !== $fileType) {
+            $data['BFILETYPE'] = $fileType;
+        }
+
+        $attachedFiles = $message->getFiles();
+        if ($attachedFiles->count() > 0) {
+            $types = [];
+            foreach ($attachedFiles as $file) {
+                $types[] = $file->getFileType() ?: $file->getFileMime();
+            }
+            $data['BATTACHED_FILES'] = implode(', ', $types);
+            $data['BATTACHED_COUNT'] = $attachedFiles->count();
+        }
+
+        return $data;
     }
 
     /**
@@ -308,7 +279,6 @@ final readonly class MessageClassifier
             'officemaker' => 'document_generation',
 
             // Analysis
-            'analyzefile' => 'file_analysis',
             'pic2text' => 'file_analysis',
             'analyze' => 'file_analysis',
 
@@ -344,8 +314,8 @@ final readonly class MessageClassifier
             'text2pic' => 'mediamaker',
             'text2vid' => 'mediamaker',
             'text2sound' => 'mediamaker',
-            'pic2text' => 'analyzefile',
-            'analyze' => 'analyzefile',
+            'pic2text' => 'general', // Vision is handled by ChatHandler
+            'analyze' => 'general',
             'chat' => 'general',
             'vectorize' => 'general',
         ];
