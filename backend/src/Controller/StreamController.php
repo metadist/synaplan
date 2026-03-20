@@ -748,6 +748,13 @@ class StreamController extends AbstractController
                     $originalTopic = (is_array($classification) && isset($classification['topic']))
                         ? $classification['topic']
                         : null;
+                    $originalMediaType = null;
+                    if (is_array($classification) && isset($classification['media_type']) && is_string($classification['media_type'])) {
+                        $trimmedMedia = trim($classification['media_type']);
+                        if ('' !== $trimmedMedia) {
+                            $originalMediaType = $trimmedMedia;
+                        }
+                    }
 
                     // Save error message to database
                     $outgoingMessage = new Message();
@@ -781,6 +788,9 @@ class StreamController extends AbstractController
                     if ($originalTopic) {
                         $outgoingMessage->setMeta('original_topic', $originalTopic);
                     }
+                    if (null !== $originalMediaType) {
+                        $outgoingMessage->setMeta('original_media_type', $originalMediaType);
+                    }
 
                     // Update incoming message
                     $incomingMessage->setTopic('ERROR');
@@ -796,6 +806,7 @@ class StreamController extends AbstractController
                         'model_id' => $intendedChat['id'],
                         'topic' => 'ERROR',
                         'originalTopic' => $originalTopic,
+                        'originalMediaType' => $originalMediaType,
                         'language' => 'en',
                     ]);
 
@@ -1329,7 +1340,18 @@ class StreamController extends AbstractController
             $result = $this->messageProcessor->process($message, $options);
 
             if (!$result['success']) {
-                $this->sendSSE('error', ['error' => $result['error']]);
+                $errorPayload = ['error' => $result['error']];
+                $failedClassification = $result['classification'] ?? null;
+                if (is_array($failedClassification)) {
+                    if (isset($failedClassification['topic']) && is_string($failedClassification['topic'])) {
+                        $errorPayload['originalTopic'] = $failedClassification['topic'];
+                    }
+                    if (isset($failedClassification['media_type']) && is_string($failedClassification['media_type'])
+                        && '' !== trim($failedClassification['media_type'])) {
+                        $errorPayload['originalMediaType'] = trim($failedClassification['media_type']);
+                    }
+                }
+                $this->sendSSE('error', $errorPayload);
 
                 return;
             }
