@@ -141,7 +141,11 @@ class GoogleProvider implements ChatProviderInterface, ImageGenerationProviderIn
 
             $data = $response->toArray();
 
+            $this->checkGeminiFinishReason($data);
+
             return $data['candidates'][0]['content']['parts'][0]['text'] ?? '';
+        } catch (ProviderException $e) {
+            throw $e;
         } catch (\Exception $e) {
             throw new ProviderException('Google chat error: '.$e->getMessage(), 'google');
         }
@@ -199,11 +203,17 @@ class GoogleProvider implements ChatProviderInterface, ImageGenerationProviderIn
                     $jsonData = substr($content, 6);
                     $data = json_decode($jsonData, true);
 
+                    if ($data) {
+                        $this->checkGeminiFinishReason($data);
+                    }
+
                     if (isset($data['candidates'][0]['content']['parts'][0]['text'])) {
                         $callback($data['candidates'][0]['content']['parts'][0]['text']);
                     }
                 }
             }
+        } catch (ProviderException $e) {
+            throw $e;
         } catch (\Exception $e) {
             throw new ProviderException('Google streaming error: '.$e->getMessage(), 'google');
         }
@@ -639,7 +649,7 @@ class GoogleProvider implements ChatProviderInterface, ImageGenerationProviderIn
 
                         // Check for common error types
                         if (str_contains(strtolower($errorMessage), 'safety') || str_contains(strtolower($errorMessage), 'blocked')) {
-                            throw new \Exception('Video generation blocked by safety filters: '.$errorMessage);
+                            throw ProviderException::contentBlocked('google', 'SAFETY', $errorMessage);
                         }
 
                         throw new \Exception('Google video generation failed: '.$errorMessage.' (code: '.$errorCode.')');
