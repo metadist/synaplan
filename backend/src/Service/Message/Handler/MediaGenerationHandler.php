@@ -244,6 +244,7 @@ final readonly class MediaGenerationHandler implements MessageHandlerInterface
             'image' => 'IMAGES',
             'video' => 'VIDEOS',
             'audio' => 'AUDIOS',
+            default => 'IMAGES',
         };
 
         $userId = $message->getUserId();
