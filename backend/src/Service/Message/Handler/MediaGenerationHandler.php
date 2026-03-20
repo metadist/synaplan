@@ -34,6 +34,7 @@ final readonly class MediaGenerationHandler implements MessageHandlerInterface
         private UserUploadPathBuilder $userUploadPathBuilder,
         private ThumbnailService $thumbnailService,
         private RateLimitService $rateLimitService,
+        private MediaErrorMessageBuilder $errorMessageBuilder,
         private string $uploadDir = '/var/www/backend/var/uploads',
     ) {
     }
@@ -490,11 +491,8 @@ final readonly class MediaGenerationHandler implements MessageHandlerInterface
                 'exception' => $e,
             ]);
 
-            $userMessage = match ($mediaType) {
-                'audio' => 'Sorry, the audio could not be generated right now. Please try again or use a different model. Tip: For audio, try a clear prompt like "Read this text aloud: …".',
-                'video' => 'Sorry, the video could not be generated right now. Please try again or use a different model.',
-                default => 'Sorry, the image could not be generated right now. Please try again or use a different model.',
-            };
+            $lang = $classification['language'] ?? 'en';
+            $userMessage = $this->errorMessageBuilder->buildErrorMessage($e, $mediaType, $lang);
             $streamCallback($userMessage);
 
             return [
