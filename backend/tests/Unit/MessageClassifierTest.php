@@ -231,4 +231,54 @@ class MessageClassifierTest extends TestCase
         $this->assertEquals('mediamaker', $result['topic']);
         $this->assertEquals('ai_sorting', $result['source']);
     }
+
+    public function testDocumentAttachmentForcesAnalyzefileRoute(): void
+    {
+        $message = $this->createMock(Message::class);
+        $message->method('getId')->willReturn(8);
+        $message->method('getUserId')->willReturn(10);
+        $message->method('getText')->willReturn('Summarize this');
+        $message->method('getLanguage')->willReturn('en');
+
+        $file = $this->createMock(\App\Entity\File::class);
+        $file->method('getFileType')->willReturn('pdf');
+        $file->method('getFileName')->willReturn('report.pdf');
+        $files = new \Doctrine\Common\Collections\ArrayCollection([$file]);
+        $message->method('getFiles')->willReturn($files);
+
+        $this->messageMetaRepository->method('findOneBy')->willReturn(null);
+
+        $this->messageSorter->expects($this->never())->method('classify');
+
+        $result = $this->service->classify($message);
+
+        $this->assertSame('analyzefile', $result['topic']);
+        $this->assertSame('file_analysis', $result['intent']);
+        $this->assertSame('attachment_document_or_audio', $result['source']);
+        $this->assertTrue($result['skip_sorting']);
+    }
+
+    public function testAudioAttachmentForcesAnalyzefileRoute(): void
+    {
+        $message = $this->createMock(Message::class);
+        $message->method('getId')->willReturn(9);
+        $message->method('getUserId')->willReturn(10);
+        $message->method('getText')->willReturn('Transcribe');
+        $message->method('getLanguage')->willReturn('de');
+
+        $file = $this->createMock(\App\Entity\File::class);
+        $file->method('getFileType')->willReturn('mp3');
+        $file->method('getFileName')->willReturn('voice.mp3');
+        $files = new \Doctrine\Common\Collections\ArrayCollection([$file]);
+        $message->method('getFiles')->willReturn($files);
+
+        $this->messageMetaRepository->method('findOneBy')->willReturn(null);
+
+        $this->messageSorter->expects($this->never())->method('classify');
+
+        $result = $this->service->classify($message);
+
+        $this->assertSame('analyzefile', $result['topic']);
+        $this->assertSame('file_analysis', $result['intent']);
+    }
 }

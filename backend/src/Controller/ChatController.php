@@ -507,11 +507,12 @@ class ChatController extends AbstractController
                 // Chat model (used for generating the response)
                 $chatProvider = $m->getMeta('ai_chat_provider');
                 $chatModel = $m->getMeta('ai_chat_model');
+                $chatModelIdMeta = $m->getMeta('ai_chat_model_id');
                 if ($chatProvider || $chatModel) {
                     $aiModels['chat'] = [
                         'provider' => $chatProvider,
                         'model' => $chatModel,
-                        'model_id' => null, // Chat model ID is not stored (selected from config)
+                        'model_id' => $chatModelIdMeta ? (int) $chatModelIdMeta : null,
                     ];
                 }
 

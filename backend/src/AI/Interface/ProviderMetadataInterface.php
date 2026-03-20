@@ -42,7 +42,8 @@ interface ProviderMetadataInterface
 
     /**
      * Get environment variables required for this provider
-     * Returns: ['ENV_VAR_NAME' => ['required' => bool, 'hint' => string]].
+     * Returns: ['ENV_VAR_NAME' => ['required' => bool, 'hint' => string, 'any_of' => string[]]].
+     * Optional any_of: if set, at least one of these env names must be meaningfully set (OR semantics).
      */
     public function getRequiredEnvVars(): array;
 }

@@ -142,10 +142,24 @@ final readonly class MessagePreProcessor
             $messageFile->setStatus('processed');
         }
 
-        // Audio mit Whisper
+        // Audio mit Whisper (or external STT if user configured one)
         elseif (in_array($fileType, self::AUDIO_EXTENSIONS)) {
+            $userId = $messageFile->getUserId();
+            $useExternal = $this->aiFacade->hasConfiguredSttProvider($userId);
+
+            if (!$useExternal && !$this->whisperService->isAvailable()) {
+                $this->logger->warning('PreProcessor: Whisper not available and no external STT configured, skipping', [
+                    'file' => basename($fullPath),
+                ]);
+                $messageFile->setStatus('processed');
+
+                return;
+            }
+
             try {
-                $result = $this->transcribeWithWhisper($fullPath, null);
+                $result = $useExternal
+                    ? $this->aiFacade->transcribe($fullPath, $userId)
+                    : $this->transcribeWithWhisper($fullPath, null);
                 if ($result && !empty($result['text'])) {
                     $transcribedText = $result['text'];
                     $messageFile->setFileText($transcribedText);
@@ -239,23 +253,29 @@ final readonly class MessagePreProcessor
             }
         }
 
-        // Audio mit Whisper
+        // Audio mit Whisper (or external STT if user configured one)
         if (in_array($fileType, self::AUDIO_EXTENSIONS)) {
-            if (!$this->whisperService->isAvailable()) {
-                $this->logger->warning('PreProcessor: Whisper not available, skipping audio transcription', [
+            $userId = $message->getUserId();
+            $useExternal = $this->aiFacade->hasConfiguredSttProvider($userId);
+
+            if (!$useExternal && !$this->whisperService->isAvailable()) {
+                $this->logger->warning('PreProcessor: Whisper not available and no external STT configured, skipping', [
                     'file' => basename($fullPath),
                 ]);
 
                 return;
             }
 
-            $this->logger->info('PreProcessor: Transcribing audio with Whisper', [
+            $this->logger->info('PreProcessor: Transcribing audio', [
                 'file' => basename($fullPath),
                 'type' => $fileType,
+                'strategy' => $useExternal ? 'external_api' : 'whisper_local',
             ]);
 
             try {
-                $result = $this->transcribeWithWhisper($fullPath, $message->getLanguage());
+                $result = $useExternal
+                    ? $this->aiFacade->transcribe($fullPath, $userId)
+                    : $this->transcribeWithWhisper($fullPath, $message->getLanguage());
                 if ($result && !empty($result['text'])) {
                     $transcribedText = $result['text'];
                     $message->setFileText($transcribedText);

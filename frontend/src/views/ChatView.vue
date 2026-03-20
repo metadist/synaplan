@@ -710,6 +710,42 @@ const handleSendMessage = async (
   await streamAIResponse(backendContent, options)
 }
 
+/** Same clickable model footer live as after reload (sets aiModels.chat). */
+function applyAssistantChatModelFooter(
+  message: Message,
+  data: { provider?: string; model?: string; model_id?: number | null },
+  streamFallback: { provider?: string; model?: string; model_id?: number | null }
+) {
+  const isBadModelToken = (m: unknown) =>
+    m === undefined || m === null || String(m).toLowerCase() === 'error'
+  const isBadProviderToken = (p: unknown) =>
+    p === undefined || p === null || String(p).toLowerCase() === 'system'
+
+  const resolvedModel = !isBadModelToken(data.model)
+    ? String(data.model)
+    : streamFallback.model || message.modelLabel
+  const resolvedProvider = !isBadProviderToken(data.provider)
+    ? String(data.provider)
+    : streamFallback.provider || message.provider
+
+  const resolvedId =
+    data.model_id !== undefined && data.model_id !== null
+      ? data.model_id
+      : (streamFallback.model_id ?? null)
+
+  if (resolvedModel && resolvedProvider) {
+    message.modelLabel = resolvedModel
+    message.provider = resolvedProvider
+    message.aiModels = {
+      chat: {
+        provider: resolvedProvider,
+        model: resolvedModel,
+        model_id: resolvedId,
+      },
+    }
+  }
+}
+
 const streamAIResponse = async (
   userMessage: string,
   options?: {
@@ -1305,17 +1341,25 @@ const streamAIResponse = async (
                 message.feedbackIds = data.feedbackIds
               }
 
-              // Update provider and model from backend metadata
-              if (data.provider) {
-                message.provider = data.provider
-              }
-              if (data.model) {
-                message.modelLabel = data.model
-              }
+              // Provider/model + clickable footer (aiModels) — match persisted API shape
+              applyAssistantChatModelFooter(
+                message,
+                {
+                  provider: data.provider,
+                  model: data.model,
+                  model_id: data.model_id ?? null,
+                },
+                { provider, model: modelLabel, model_id: currentModel?.id ?? null }
+              )
 
               // Store topic from classification
               if (data.topic) {
                 message.topic = data.topic
+              }
+
+              // Store original topic (preserved on error messages for correct "Again" model selection)
+              if (data.originalTopic !== undefined) {
+                message.originalTopic = data.originalTopic
               }
 
               // Mark reasoning parts as complete (remove streaming flag)
@@ -1344,12 +1388,26 @@ const streamAIResponse = async (
             processingStatus.value = ''
             processingMetadata.value = {}
 
-            // If backend provided a messageId for the error message, link it
-            // This allows the "Again" button to work for failed messages
-            if (data.messageId) {
+            // Update message metadata from error event so status/provider/topic
+            // are visible in real-time without requiring a page refresh
+            {
               const message = historyStore.messages.find((m) => m.id === messageId)
               if (message) {
-                message.backendMessageId = data.messageId
+                if (data.messageId) {
+                  message.backendMessageId = data.messageId
+                }
+                if (data.topic) {
+                  message.topic = data.topic
+                }
+                applyAssistantChatModelFooter(
+                  message,
+                  {
+                    provider: data.provider,
+                    model: data.model,
+                    model_id: data.model_id ?? null,
+                  },
+                  { provider, model: modelLabel, model_id: currentModel?.id ?? null }
+                )
               }
             }
 

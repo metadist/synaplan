@@ -322,8 +322,13 @@ class StreamController extends AbstractController
                 return;
             }
 
+            $intendedChat = $this->resolveIntendedChatModelForStream(
+                null !== $modelId ? (int) $modelId : null,
+                $user
+            );
+
             // Helper to save error message
-            $saveError = function ($chat, $incomingMessage, string $errorMessage, string $provider = 'system', string $errorType = 'unknown') use ($user, $trackId) {
+            $saveError = function ($chat, $incomingMessage, string $errorMessage, string $provider = 'system', string $errorType = 'unknown') use ($user, $trackId, $intendedChat) {
                 if (!$chat || !$incomingMessage) {
                     return null;
                 }
@@ -347,8 +352,13 @@ class StreamController extends AbstractController
                     $this->em->persist($outgoingMessage);
                     $this->em->flush();
 
-                    $outgoingMessage->setMeta('ai_provider', $provider);
-                    $outgoingMessage->setMeta('ai_model', 'error');
+                    $displayProvider = $intendedChat['provider'] ?? $provider;
+                    $displayModel = $intendedChat['name'] ?? 'unknown';
+                    $outgoingMessage->setMeta('ai_chat_provider', $displayProvider);
+                    $outgoingMessage->setMeta('ai_chat_model', $displayModel);
+                    if (null !== ($intendedChat['id'] ?? null)) {
+                        $outgoingMessage->setMeta('ai_chat_model_id', (string) $intendedChat['id']);
+                    }
                     $outgoingMessage->setMeta('error_type', $errorType);
 
                     $incomingMessage->setTopic('ERROR');
@@ -758,9 +768,15 @@ class StreamController extends AbstractController
                     $this->em->persist($outgoingMessage);
                     $this->em->flush(); // Flush to get message ID for metadata
 
-                    // Store error details in metadata
-                    $outgoingMessage->setMeta('ai_provider', $result['provider'] ?? 'system');
-                    $outgoingMessage->setMeta('ai_model', 'error');
+                    // Store error details in metadata (show user's selected chat model, not literal "error")
+                    $outgoingMessage->setMeta(
+                        'ai_chat_provider',
+                        $intendedChat['provider'] ?? ($result['provider'] ?? 'system')
+                    );
+                    $outgoingMessage->setMeta('ai_chat_model', $intendedChat['name'] ?? 'unknown');
+                    if (null !== ($intendedChat['id'] ?? null)) {
+                        $outgoingMessage->setMeta('ai_chat_model_id', (string) $intendedChat['id']);
+                    }
                     $outgoingMessage->setMeta('error_type', $result['error'] ?? 'unknown');
                     if ($originalTopic) {
                         $outgoingMessage->setMeta('original_topic', $originalTopic);
@@ -772,13 +788,14 @@ class StreamController extends AbstractController
 
                     $chat->updateTimestamp();
                     $this->em->flush();
-                    // Send original topic so frontend can show correct "Again" models in real-time
                     $this->sendSSE('complete', [
                         'messageId' => $outgoingMessage->getId(),
                         'trackId' => $trackId,
-                        'provider' => $result['provider'] ?? 'system',
-                        'model' => 'error',
-                        'topic' => $originalTopic ?? 'ERROR',
+                        'provider' => $intendedChat['provider'] ?? ($result['provider'] ?? 'system'),
+                        'model' => $intendedChat['name'] ?? 'unknown',
+                        'model_id' => $intendedChat['id'],
+                        'topic' => 'ERROR',
+                        'originalTopic' => $originalTopic,
                         'language' => 'en',
                     ]);
 
@@ -1222,7 +1239,11 @@ class StreamController extends AbstractController
 
                 $errorData = [
                     'error' => $e->getMessage(),
-                    'provider' => $e->getProviderName(),
+                    'provider' => $intendedChat['provider'] ?? $e->getProviderName(),
+                    'model' => $intendedChat['name'] ?? 'unknown',
+                    'model_id' => $intendedChat['id'],
+                    'topic' => 'ERROR',
+                    'trackId' => $trackId,
                 ];
 
                 if ($messageId) {
@@ -1255,6 +1276,11 @@ class StreamController extends AbstractController
 
                 $errorData = [
                     'error' => 'Failed to process message: '.$e->getMessage(),
+                    'provider' => $intendedChat['provider'] ?? 'system',
+                    'model' => $intendedChat['name'] ?? 'unknown',
+                    'model_id' => $intendedChat['id'],
+                    'topic' => 'ERROR',
+                    'trackId' => $trackId,
                 ];
 
                 if ($messageId) {
@@ -1266,6 +1292,28 @@ class StreamController extends AbstractController
         });
 
         return $response;
+    }
+
+    /**
+     * Resolve the chat model the user intended for this stream (explicit modelId or default CHAT from config).
+     *
+     * @return array{id: ?int, name: ?string, provider: ?string}
+     */
+    private function resolveIntendedChatModelForStream(?int $modelId, User $user): array
+    {
+        $id = $modelId
+            ?? $this->modelConfigService->getDefaultModel('chat', $user->getId())
+            ?? $this->modelConfigService->getDefaultModel('chat', 0);
+
+        if (!$id) {
+            return ['id' => null, 'name' => null, 'provider' => null];
+        }
+
+        return [
+            'id' => $id,
+            'name' => $this->modelConfigService->getModelName($id),
+            'provider' => $this->modelConfigService->getProviderForModel($id),
+        ];
     }
 
     /**

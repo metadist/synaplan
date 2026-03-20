@@ -256,10 +256,12 @@ final readonly class FileAnalysisHandler implements MessageHandlerInterface
 
         $finalPrompt = !empty($userPrompt) ? $userPrompt : 'What is in this document? Please summarize the content.';
 
-        // Get Chat model (not Vision model!)
-        // Use effectiveUserId for model selection (WhatsApp anonymous → User 2)
+        // Model priority: Again model_id > Task-prompt aiModel > DB default (ANALYZE → CHAT)
         $effectiveUserId = $this->modelConfigService->getEffectiveUserIdForMessage($message);
-        $modelId = $classification['model_id'] ?? $this->modelConfigService->getDefaultModel('CHAT', $effectiveUserId);
+        $modelId = $classification['model_id']
+            ?? $this->resolvePromptAiModel($classification)
+            ?? $this->modelConfigService->getDefaultModel('ANALYZE', $effectiveUserId)
+            ?? $this->modelConfigService->getDefaultModel('CHAT', $effectiveUserId);
         $provider = null;
         $modelName = null;
 
@@ -268,7 +270,7 @@ final readonly class FileAnalysisHandler implements MessageHandlerInterface
             $modelName = $this->modelConfigService->getModelName($modelId);
         }
 
-        $this->logger->info('FileAnalysisHandler: Using Chat model for document', [
+        $this->logger->info('FileAnalysisHandler: Using model for document analysis', [
             'model_id' => $modelId,
             'provider' => $provider,
             'model' => $modelName,
@@ -347,9 +349,12 @@ final readonly class FileAnalysisHandler implements MessageHandlerInterface
 
         $finalPrompt = !empty($userPrompt) ? $userPrompt : 'What is in this document? Please summarize the content.';
 
-        // Get Chat model (not Vision model!)
+        // Model priority: Again model_id > Task-prompt aiModel > DB default (ANALYZE → CHAT)
         $effectiveUserId = $this->modelConfigService->getEffectiveUserIdForMessage($message);
-        $modelId = $classification['model_id'] ?? $this->modelConfigService->getDefaultModel('CHAT', $effectiveUserId);
+        $modelId = $classification['model_id']
+            ?? $this->resolvePromptAiModel($classification)
+            ?? $this->modelConfigService->getDefaultModel('ANALYZE', $effectiveUserId)
+            ?? $this->modelConfigService->getDefaultModel('CHAT', $effectiveUserId);
         $provider = null;
         $modelName = null;
 
@@ -358,7 +363,7 @@ final readonly class FileAnalysisHandler implements MessageHandlerInterface
             $modelName = $this->modelConfigService->getModelName($modelId);
         }
 
-        $this->logger->info('FileAnalysisHandler: Using Chat model for document (streaming)', [
+        $this->logger->info('FileAnalysisHandler: Using model for document analysis (streaming)', [
             'model_id' => $modelId,
             'provider' => $provider,
             'model' => $modelName,
@@ -441,9 +446,11 @@ final readonly class FileAnalysisHandler implements MessageHandlerInterface
             ];
         }
 
-        // Get Vision model (PIC2TEXT)
+        // Model priority: Again model_id > Task-prompt aiModel > DB default (PIC2TEXT)
         $effectiveUserId = $this->modelConfigService->getEffectiveUserIdForMessage($message);
-        $modelId = $classification['model_id'] ?? $this->modelConfigService->getDefaultModel('PIC2TEXT', $effectiveUserId);
+        $modelId = $classification['model_id']
+            ?? $this->resolvePromptAiModel($classification)
+            ?? $this->modelConfigService->getDefaultModel('PIC2TEXT', $effectiveUserId);
         $provider = null;
         $modelName = null;
 
@@ -616,6 +623,17 @@ final readonly class FileAnalysisHandler implements MessageHandlerInterface
         }
 
         return ltrim($path, '/');
+    }
+
+    /**
+     * Extract the task-prompt aiModel override from classification metadata.
+     */
+    private function resolvePromptAiModel(array $classification): ?int
+    {
+        $promptMetadata = $classification['prompt_metadata'] ?? [];
+        $aiModel = $promptMetadata['aiModel'] ?? null;
+
+        return (null !== $aiModel && (int) $aiModel > 0) ? (int) $aiModel : null;
     }
 
     /**

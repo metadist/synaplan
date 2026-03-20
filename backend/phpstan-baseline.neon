@@ -711,19 +711,19 @@ parameters:
 		-
 			message: '#^Call to an undefined method App\\Repository\\MessageMetaRepository\:\:method\(\)\.$#'
 			identifier: method.notFound
-			count: 6
+			count: 8
 			path: tests/Unit/MessageClassifierTest.php
 
 		-
 			message: '#^Call to an undefined method App\\Service\\Message\\MessageSorter\:\:expects\(\)\.$#'
 			identifier: method.notFound
-			count: 1
+			count: 3
 			path: tests/Unit/MessageClassifierTest.php
 
 		-
 			message: '#^Call to an undefined method App\\Service\\Message\\MessageSorter\:\:method\(\)\.$#'
 			identifier: method.notFound
-			count: 1
+			count: 4
 			path: tests/Unit/MessageClassifierTest.php
 
 		-

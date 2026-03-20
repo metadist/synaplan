@@ -293,16 +293,23 @@ async function handleAuthFailure(): Promise<never> {
 
   // Use Vue Router instead of window.location.href to avoid full page reload loops
   // Support subfolder deployments via BASE_URL (from vite.config base option)
-  const loginPath = `${import.meta.env.BASE_URL}login`.replace('//', '/')
+  const basePath = import.meta.env.BASE_URL.replace(/\/$/, '')
+  const publicAuthPaths = [
+    `${basePath}/login`,
+    `${basePath}/register`,
+    `${basePath}/verify-email`,
+    `${basePath}/forgot-password`,
+    `${basePath}/reset-password`,
+    `${basePath}/logged-out`,
+  ]
+  const isOnPublicAuthPage = publicAuthPaths.some((p) => window.location.pathname.startsWith(p))
 
-  try {
-    const { default: router } = await import('@/router')
-    if (!window.location.pathname.startsWith(loginPath)) {
+  if (!isOnPublicAuthPage) {
+    try {
+      const { default: router } = await import('@/router')
       router.push({ name: 'login', query: { reason: 'session_expired' } })
-    }
-  } catch {
-    if (!window.location.pathname.startsWith(loginPath)) {
-      window.location.href = `${loginPath}?reason=session_expired`
+    } catch {
+      window.location.href = `${basePath}/login?reason=session_expired`
     }
   }
 

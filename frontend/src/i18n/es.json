@@ -409,8 +409,14 @@
     "attachFiles": "Adjuntar Archivos",
     "uploadNew": "Subir Nuevos Archivos",
     "uploading": "Subiendo {current} de {total}...",
+    "uploadingFilePercent": "Archivo {current} de {total} — {percent} %",
+    "storingFile": "Guardando en el servidor…",
+    "processingOnServer": "Procesando {count} archivo(s) en segundo plano…",
     "orDragDrop": "o arrastra y suelta archivos aquí",
-    "dropHere": "Suelta archivos aquí para subir"
+    "dropHere": "Suelta archivos aquí para subir",
+    "uploadSuccess": "{count} archivo(s) subido(s) correctamente",
+    "uploadCancelled": "Subida cancelada",
+    "uploadInterrupted": "Transferencia interrumpida. Se actualizó la lista: los archivos que ya llegaron al servidor pueden seguir apareciendo."
   },
   "aiProvider": {
     "error": {
@@ -515,6 +521,8 @@
     "noSocialProviders": "No hay proveedores de inicio de sesión social configurados",
     "registrationSuccess": "¡Registro Exitoso!",
     "registrationSuccessDesc": "Si esta dirección de correo no está registrada, te hemos enviado un correo de verificación. Por favor revisa tu bandeja de entrada (incluyendo spam).",
+    "registrationCompleteTitle": "Revisa tu correo electrónico",
+    "registrationCompleteDesc": "Te enviamos un enlace de verificación. Revisa tu bandeja de entrada y la carpeta de spam, luego haz clic en el enlace para activar tu cuenta.",
     "passwordResetSuccess": "¡Solicitud Enviada!",
     "passwordResetSuccessDesc": "Si existe una cuenta con esta dirección de correo, te hemos enviado un enlace para restablecer tu contraseña. Por favor revisa tu bandeja de entrada.",
     "recaptchaError": "Error de verificación reCAPTCHA. Por favor intenta de nuevo.",
@@ -854,7 +862,8 @@
     "generatingFileDesc": "La IA está creando el archivo solicitado",
     "topic": "Tema",
     "language": "Idioma",
-    "modelId": "ID de Modelo"
+    "modelId": "ID de Modelo",
+    "longRunningHint": "Esta solicitud está tardando un poco más de lo habitual — por favor, ten paciencia."
   },
   "message": {
     "thinking": "Proceso de pensamiento",
@@ -1188,6 +1197,8 @@
       "modelsAndPurposes": "Modelos y Propósitos",
       "availableModels": "Modelos Disponibles",
       "noModels": "No hay modelos disponibles para este propósito",
+      "modelNotAvailable": "{model} no está disponible. Verifique la configuración del proveedor.",
+      "modelNotConfigured": "{model} no está listo: configure {envVar} en el entorno (p. ej. .env.local).",
       "id": "ID",
       "purpose": "PROPÓSITO",
       "service": "SERVICIO",

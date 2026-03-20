@@ -749,7 +749,8 @@
     "memoriesCompleteDesc": "Analyse abgeschlossen",
     "topic": "Thema",
     "language": "Sprache",
-    "modelId": "Model ID"
+    "modelId": "Model ID",
+    "longRunningHint": "Diese Anfrage dauert etwas länger als üblich — bitte habe einen Moment Geduld."
   },
   "message": {
     "thinking": "Denkprozess",
@@ -824,6 +825,8 @@
       "chatGeneration": "Antwort-Generierung",
       "messageClassification": "Nachrichten-Klassifizierung",
       "clickToConfig": "Klicken zum Konfigurieren",
+      "modelNotAvailable": "{model} ist nicht verfügbar. Bitte prüfe die Provider-Konfiguration.",
+      "modelNotConfigured": "{model} ist nicht bereit: Setze {envVar} in der Umgebung (z. B. .env.local).",
       "admin": {
         "addModels": "Modelle hinzufügen (Import)",
         "urlsLabel": "URLs (eine pro Zeile)",
@@ -1366,6 +1369,9 @@
     "attachFiles": "Dateien anhängen",
     "uploadNew": "Neue Dateien hochladen",
     "uploading": "Lade {current} von {total} hoch...",
+    "uploadingFilePercent": "Datei {current} von {total} — {percent} %",
+    "storingFile": "Wird auf dem Server gespeichert…",
+    "processingOnServer": "{count} Datei(en) werden im Hintergrund verarbeitet…",
     "orDragDrop": "oder Dateien hierher ziehen",
     "dropHere": "Dateien hier ablegen zum Hochladen",
     "viewContent": "Inhalt anzeigen",
@@ -1382,7 +1388,10 @@
     "bulkDeletePartial": "{success} gelöscht, {failed} fehlgeschlagen",
     "reVectorize": "Neu verarbeiten",
     "reVectorizeSuccess": "Datei erfolgreich neu verarbeitet ({chunks} Teile indiziert)",
-    "reVectorizeFailed": "Neuverarbeitung fehlgeschlagen"
+    "reVectorizeFailed": "Neuverarbeitung fehlgeschlagen",
+    "uploadSuccess": "{count} Datei(en) erfolgreich hochgeladen",
+    "uploadCancelled": "Upload abgebrochen",
+    "uploadInterrupted": "Übertragung unterbrochen. Die Liste wurde aktualisiert — Dateien, die den Server schon erreicht hatten, können weiterhin erscheinen."
   },
   "fileMention": {
     "hint": "Tippen um Dateien zu suchen — Enter zum Anhängen",
@@ -1964,6 +1973,8 @@
     "noSocialProviders": "Keine Social Login Anbieter konfiguriert",
     "registrationSuccess": "Registrierung erfolgreich!",
     "registrationSuccessDesc": "Falls diese E-Mail-Adresse noch nicht registriert ist, haben wir dir eine Bestätigungs-E-Mail gesendet. Bitte überprüfe deinen Posteingang (auch den Spam-Ordner).",
+    "registrationCompleteTitle": "Überprüfe deine E-Mail",
+    "registrationCompleteDesc": "Wir haben dir einen Bestätigungslink gesendet. Bitte überprüfe deinen Posteingang und Spam-Ordner und klicke auf den Link, um dein Konto zu aktivieren.",
     "passwordResetSuccess": "Anfrage gesendet!",
     "passwordResetSuccessDesc": "Falls ein Konto mit dieser E-Mail-Adresse existiert, haben wir dir einen Link zum Zurücksetzen des Passworts gesendet. Bitte überprüfe deinen Posteingang.",
     "recaptchaError": "reCAPTCHA-Verifizierung fehlgeschlagen. Bitte versuche es erneut.",

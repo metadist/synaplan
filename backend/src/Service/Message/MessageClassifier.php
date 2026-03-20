@@ -2,6 +2,7 @@
 
 namespace App\Service\Message;
 
+use App\Entity\File;
 use App\Entity\Message;
 use App\Repository\MessageMetaRepository;
 use App\Service\ModelConfigService;
@@ -14,11 +15,13 @@ use Psr\Log\LoggerInterface;
  * High-level classifier that handles:
  * 1. Check for "Again" function (user-selected AI/prompt via BMESSAGEMETA)
  * 2. Check for tool commands (e.g., /pic, /vid, /search)
- * 3. Use MessageSorter for AI-based classification
+ * 3. Document or audio attachment → analyzefile / file_analysis (skip sorting, #595)
+ * 4. Use MessageSorter for AI-based classification
  *
  * Workflow from legacy:
  * - If BMESSAGEMETA has PROMPTID set → use that directly (skip sorting)
  * - If message starts with "/" → tool command
+ * - If attached document/audio → analyzefile
  * - Otherwise → use AI sorting
  */
 final readonly class MessageClassifier
@@ -134,7 +137,22 @@ final readonly class MessageClassifier
             }
         }
 
-        // 3. Use AI-based sorting
+        // 3. Document / audio attachments → FileAnalysisHandler (ANALYZE model), before AI sorting (#595)
+        if ($this->messageHasDocumentOrAudioAttachment($message)) {
+            $this->logger->info('MessageClassifier: Forcing analyzefile route (document or audio attachment)', [
+                'message_id' => $messageId,
+            ]);
+
+            return [
+                'topic' => 'analyzefile',
+                'language' => $message->getLanguage() ?: 'en',
+                'intent' => 'file_analysis',
+                'source' => 'attachment_document_or_audio',
+                'skip_sorting' => true,
+            ];
+        }
+
+        // 4. Use AI-based sorting
         $messageData = $this->buildMessageData($message);
         $result = $this->messageSorter->classify($messageData, $conversationHistory, $userId);
 
@@ -281,6 +299,7 @@ final readonly class MessageClassifier
             // Analysis
             'pic2text' => 'file_analysis',
             'analyze' => 'file_analysis',
+            'analyzefile' => 'file_analysis',
 
             // Chat/General
             'general' => 'chat',
@@ -321,5 +340,46 @@ final readonly class MessageClassifier
         ];
 
         return $tagToTopicMap[$modelTag] ?? ($fallbackTopic ?: 'general');
+    }
+
+    /**
+     * True if the message has at least one attached document or audio file (not images only).
+     * Routes to FileAnalysisHandler so ANALYZE default model is used (#595).
+     */
+    private function messageHasDocumentOrAudioAttachment(Message $message): bool
+    {
+        $files = $message->getFiles();
+        if ($files->count() > 0) {
+            foreach ($files as $file) {
+                if ($this->attachedFileIsDocumentOrAudio($file)) {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        if ($message->getFile() > 0 && '' !== (string) $message->getFilePath()) {
+            $ext = strtolower(pathinfo($message->getFilePath(), PATHINFO_EXTENSION));
+
+            return in_array($ext, MessagePreProcessor::DOCUMENT_EXTENSIONS, true)
+                || in_array($ext, MessagePreProcessor::AUDIO_EXTENSIONS, true);
+        }
+
+        return false;
+    }
+
+    private function attachedFileIsDocumentOrAudio(File $file): bool
+    {
+        $fromType = strtolower($file->getFileType() ?: '');
+        $fromName = strtolower(pathinfo($file->getFileName(), PATHINFO_EXTENSION));
+        $ext = '' !== $fromType ? $fromType : $fromName;
+
+        if (in_array($ext, MessagePreProcessor::IMAGE_EXTENSIONS, true)) {
+            return false;
+        }
+
+        return in_array($ext, MessagePreProcessor::DOCUMENT_EXTENSIONS, true)
+            || in_array($ext, MessagePreProcessor::AUDIO_EXTENSIONS, true);
     }
 }

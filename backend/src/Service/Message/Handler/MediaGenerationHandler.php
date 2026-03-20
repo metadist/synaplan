@@ -144,27 +144,24 @@ final readonly class MediaGenerationHandler implements MessageHandlerInterface
             $this->logger->info('MediaGenerationHandler: Detected /vid command, forcing video generation');
         }
 
-        // Priority: Classification override > DB default
+        // Priority: Again model_id > Task-prompt aiModel > DB default
+        $promptMetadata = $classification['prompt_metadata'] ?? [];
+        $promptAiModel = (isset($promptMetadata['aiModel']) && (int) $promptMetadata['aiModel'] > 0)
+            ? (int) $promptMetadata['aiModel']
+            : null;
+
         if (isset($classification['model_id']) && $classification['model_id']) {
             $modelId = $classification['model_id'];
             $this->logger->info('MediaGenerationHandler: Using classification override model', [
                 'model_id' => $modelId,
             ]);
-
-            // Detect media type from model tag (only if not a slash command)
-            if (!$isSlashCommand) {
-                $model = $this->em->getRepository(\App\Entity\Model::class)->find($modelId);
-                if ($model) {
-                    $tag = $model->getTag();
-                    if ('text2vid' === $tag) {
-                        $mediaType = 'video';
-                    } elseif ('text2sound' === $tag) {
-                        $mediaType = 'audio';
-                    }
-                    $provider = $model->getService();
-                    $modelName = $model->getName();
-                }
-            }
+            [$mediaType, $provider, $modelName] = $this->resolveMediaTypeFromModelId($modelId, $isSlashCommand, $mediaType, $provider, $modelName);
+        } elseif ($promptAiModel) {
+            $modelId = $promptAiModel;
+            $this->logger->info('MediaGenerationHandler: Using task-prompt aiModel override', [
+                'model_id' => $modelId,
+            ]);
+            [$mediaType, $provider, $modelName] = $this->resolveMediaTypeFromModelId($modelId, $isSlashCommand, $mediaType, $provider, $modelName);
         } else {
             $effectiveUserId = $this->modelConfigService->getEffectiveUserIdForMessage($message);
 
@@ -248,6 +245,7 @@ final readonly class MediaGenerationHandler implements MessageHandlerInterface
             'image' => 'IMAGES',
             'video' => 'VIDEOS',
             'audio' => 'AUDIOS',
+            default => 'IMAGES',
         };
 
         $userId = $message->getUserId();
@@ -708,6 +706,32 @@ final readonly class MediaGenerationHandler implements MessageHandlerInterface
         }
 
         return $paths;
+    }
+
+    /**
+     * Resolve media type, provider, and model name from a model ID.
+     *
+     * @return array{string, ?string, ?string} [$mediaType, $provider, $modelName]
+     */
+    private function resolveMediaTypeFromModelId(int $modelId, bool $isSlashCommand, string $mediaType, ?string $provider, ?string $modelName): array
+    {
+        if ($isSlashCommand) {
+            return [$mediaType, $provider, $modelName];
+        }
+
+        $model = $this->em->getRepository(\App\Entity\Model::class)->find($modelId);
+        if ($model) {
+            $tag = $model->getTag();
+            if ('text2vid' === $tag) {
+                $mediaType = 'video';
+            } elseif ('text2sound' === $tag) {
+                $mediaType = 'audio';
+            }
+            $provider = $model->getService();
+            $modelName = $model->getName();
+        }
+
+        return [$mediaType, $provider, $modelName];
     }
 
     /**

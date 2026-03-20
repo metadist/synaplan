@@ -71,7 +71,7 @@
             <Button
               class="w-full btn-primary py-3 rounded-lg font-medium"
               data-testid="btn-goto-login"
-              @click="router.push('/login')"
+              @click="router.push({ name: 'login', query: { registered: 'true' } })"
             >
               {{ $t('auth.backToLogin') }}
             </Button>

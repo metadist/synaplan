@@ -387,7 +387,14 @@ final readonly class FileProcessor
      */
     private function extractFromAudio(string $absolutePath, array $baseMeta, ?int $userId = null): array
     {
-        // Try local Whisper.cpp first (preferred)
+        // If user has configured an external STT provider, use it directly
+        if ($this->aiFacade->hasConfiguredSttProvider($userId)) {
+            $this->logger->info('FileProcessor: User has external STT provider configured, using external API', $baseMeta);
+
+            return $this->extractFromAudioExternal($absolutePath, $baseMeta, $userId);
+        }
+
+        // No external provider configured — try local Whisper.cpp first (preferred)
         if ($this->whisperService->isAvailable()) {
             $this->logger->info('FileProcessor: Transcribing audio with local Whisper', $baseMeta);
 

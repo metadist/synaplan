@@ -350,6 +350,7 @@ const { t } = useI18n()
 const purposeLabels = computed<Record<Capability, string>>(() => ({
   SORT: t('config.aiModels.capabilities.sort'),
   CHAT: t('config.aiModels.capabilities.chat'),
+  ANALYZE: t('config.aiModels.capabilities.analyze'),
   VECTORIZE: t('config.aiModels.capabilities.vectorize'),
   PIC2TEXT: t('config.aiModels.capabilities.pic2text'),
   TEXT2PIC: t('config.aiModels.capabilities.text2pic'),
@@ -365,6 +366,7 @@ const availableModels = ref<ModelsData>({})
 const defaultConfig = ref<Record<Capability, number | null>>({
   SORT: null,
   CHAT: null,
+  ANALYZE: null,
   VECTORIZE: null,
   PIC2TEXT: null,
   TEXT2PIC: null,
@@ -406,6 +408,9 @@ const normalizeHighlight = (highlight: string): Capability | 'ALL' | null => {
     TRANSCRIPTION: 'SOUND2TEXT',
     TTS: 'TEXT2SOUND',
     VOICE: 'TEXT2SOUND',
+    ANALYZE: 'ANALYZE',
+    ANALYSIS: 'ANALYZE',
+    FILE_ANALYSIS: 'ANALYZE',
   }
 
   return aliasMap[highlight] || null
@@ -549,6 +554,7 @@ const toggleDropdown = (capability: Capability) => {
 
 const selectModel = async (capability: Capability, modelId: number | null) => {
   openDropdown.value = null
+  const previousModelId = defaultConfig.value[capability]
   defaultConfig.value[capability] = modelId
 
   // Check availability if a model was selected
@@ -557,13 +563,23 @@ const selectModel = async (capability: Capability, modelId: number | null) => {
       const check = await checkModelAvailability(modelId)
 
       if (!check.available) {
-        if (check.setup_required) {
-          warning(`Setup required: ${check.message}`)
+        // Revert selection — model cannot be used
+        defaultConfig.value[capability] = previousModelId
+        const modelName =
+          getModelsByPurpose(capability).find((m) => m.id === modelId)?.name || `ID ${modelId}`
+        if (check.env_var) {
+          warning(
+            t('config.aiModels.modelNotConfigured', {
+              model: modelName,
+              envVar: check.env_var,
+            })
+          )
         } else {
-          showError(`Model not available: ${check.message}`)
+          showError(t('config.aiModels.modelNotAvailable', { model: modelName }))
         }
+        return
       }
-    } catch (error: any) {
+    } catch (error) {
       console.error('Failed to check model availability:', error)
     }
   }

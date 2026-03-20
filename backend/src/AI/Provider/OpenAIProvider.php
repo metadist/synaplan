@@ -350,9 +350,9 @@ class OpenAIProvider implements ChatProviderInterface, EmbeddingProviderInterfac
                 return $this->generateImageWithResponsesApi($prompt, $inputImages, $options);
             }
 
-            // GPT-Image-1 uses Chat Completions API with special modalities
-            if ('gpt-image-1' === $model) {
-                return $this->generateImageWithGptImage1($prompt, $options);
+            // GPT-Image-1 family uses Image Generations API with dedicated handling
+            if (str_starts_with($model, 'gpt-image-1')) {
+                return $this->generateImageWithGptImage1($prompt, $options, $model);
             }
 
             // DALL-E models use Images API
@@ -398,19 +398,19 @@ class OpenAIProvider implements ChatProviderInterface, EmbeddingProviderInterfac
     }
 
     /**
-     * Generate image using gpt-image-1 via Image Generations API.
+     * Generate image using gpt-image-1 family via Image Generations API.
      *
      * @see https://platform.openai.com/docs/guides/image-generation?image-generation-model=gpt-image-1
      */
-    private function generateImageWithGptImage1(string $prompt, array $options = []): array
+    private function generateImageWithGptImage1(string $prompt, array $options, string $model): array
     {
         try {
-            $this->logger->info('OpenAI: Generating image with gpt-image-1', [
+            $this->logger->info('OpenAI: Generating image with '.$model, [
                 'prompt_length' => strlen($prompt),
             ]);
 
             $requestBody = [
-                'model' => 'gpt-image-1',
+                'model' => $model,
                 'prompt' => $prompt,
                 'n' => $options['n'] ?? 1,
                 'size' => $options['size'] ?? '1024x1024',
@@ -431,7 +431,7 @@ class OpenAIProvider implements ChatProviderInterface, EmbeddingProviderInterfac
                 $quality = strtolower((string) $quality);
                 $allowedQualities = ['low', 'medium', 'high', 'auto'];
                 if (!in_array($quality, $allowedQualities, true)) {
-                    $this->logger->warning('OpenAI gpt-image-1: Unsupported quality value, defaulting to high', [
+                    $this->logger->warning('OpenAI '.$model.': Unsupported quality value, defaulting to high', [
                         'provided' => $options['quality'],
                     ]);
                     $quality = 'high';
@@ -465,7 +465,7 @@ class OpenAIProvider implements ChatProviderInterface, EmbeddingProviderInterfac
             }
 
             if (200 !== $httpCode) {
-                $this->logger->error('OpenAI gpt-image-1: HTTP error', [
+                $this->logger->error('OpenAI '.$model.': HTTP error', [
                     'http_code' => $httpCode,
                     'response' => substr((string) $responseBody, 0, 500),
                 ]);
@@ -494,17 +494,17 @@ class OpenAIProvider implements ChatProviderInterface, EmbeddingProviderInterfac
             }
 
             if (empty($images)) {
-                $this->logger->error('OpenAI gpt-image-1: No images in response', [
+                $this->logger->error('OpenAI '.$model.': No images in response', [
                     'response' => $responseBody,
                 ]);
-                throw new ProviderException('gpt-image-1 returned no images. Response format may have changed.', 'openai');
+                throw new ProviderException($model.' returned no images. Response format may have changed.', 'openai');
             }
 
             return $images;
         } catch (ProviderException $e) {
             throw $e;
         } catch (\Exception $e) {
-            throw new ProviderException('OpenAI gpt-image-1 error: '.$e->getMessage(), 'openai');
+            throw new ProviderException('OpenAI '.$model.' error: '.$e->getMessage(), 'openai');
         }
     }
 
