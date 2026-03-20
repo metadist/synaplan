@@ -1974,7 +1974,8 @@
     "memoriesCompleteDesc": "Analysis complete",
     "topic": "Topic",
     "language": "Language",
-    "modelId": "Model ID"
+    "modelId": "Model ID",
+    "longRunningHint": "This request is taking a bit longer than usual — please hang tight."
   },
   "message": {
     "thinking": "Thinking process",

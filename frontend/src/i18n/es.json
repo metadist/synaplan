@@ -860,7 +860,8 @@
     "generatingFileDesc": "La IA está creando el archivo solicitado",
     "topic": "Tema",
     "language": "Idioma",
-    "modelId": "ID de Modelo"
+    "modelId": "ID de Modelo",
+    "longRunningHint": "Esta solicitud está tardando un poco más de lo habitual — por favor, ten paciencia."
   },
   "message": {
     "thinking": "Proceso de pensamiento",

@@ -749,7 +749,8 @@
     "memoriesCompleteDesc": "Analyse abgeschlossen",
     "topic": "Thema",
     "language": "Sprache",
-    "modelId": "Model ID"
+    "modelId": "Model ID",
+    "longRunningHint": "Diese Anfrage dauert etwas länger als üblich — bitte habe einen Moment Geduld."
   },
   "message": {
     "thinking": "Denkprozess",

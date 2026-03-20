@@ -860,7 +860,8 @@
     "generatingFileDesc": "AI istenen dosyayı oluşturuyor",
     "topic": "Konu",
     "language": "Dil",
-    "modelId": "Model ID"
+    "modelId": "Model ID",
+    "longRunningHint": "Bu istek normalden biraz daha uzun sürüyor — lütfen biraz bekleyin."
   },
   "message": {
     "thinking": "Düşünme süreci",

@@ -228,6 +228,27 @@
               </template>
             </div>
           </div>
+          <Transition name="long-running">
+            <div
+              v-if="longRunning"
+              class="text-xs txt-tertiary mt-2 flex items-center gap-1.5 pl-8"
+            >
+              <svg
+                class="w-3.5 h-3.5 flex-shrink-0"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                stroke-width="2"
+              >
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z"
+                />
+              </svg>
+              {{ $t('processing.longRunningHint') }}
+            </div>
+          </Transition>
         </div>
 
         <!-- Bubble content (only non-thinking parts) -->
@@ -712,7 +733,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import {
@@ -1038,6 +1059,33 @@ const isProcessing = computed(() => {
   return processingStates.some((state) => props.processingStatus?.startsWith(state))
 })
 
+const LONG_RUNNING_THRESHOLD_MS = 30_000
+const longRunning = ref(false)
+let longRunningTimer: ReturnType<typeof setTimeout> | null = null
+
+function clearLongRunningTimer() {
+  if (longRunningTimer) {
+    clearTimeout(longRunningTimer)
+    longRunningTimer = null
+  }
+  longRunning.value = false
+}
+
+watch(
+  () => props.isStreaming,
+  (streaming) => {
+    if (streaming && props.role === 'assistant') {
+      clearLongRunningTimer()
+      longRunningTimer = setTimeout(() => {
+        if (props.isStreaming) longRunning.value = true
+      }, LONG_RUNNING_THRESHOLD_MS)
+    } else {
+      clearLongRunningTimer()
+    }
+  },
+  { immediate: true }
+)
+
 const emit = defineEmits<{
   regenerate: [model: ModelOption]
   again: [backendMessageId: number, modelId?: number]
@@ -1256,6 +1304,7 @@ onMounted(() => {
 
 onUnmounted(() => {
   document.removeEventListener('click', handleReferenceClick)
+  clearLongRunningTimer()
 })
 </script>
 
@@ -1273,5 +1322,16 @@ onUnmounted(() => {
     opacity: 1;
     transform: translateY(0);
   }
+}
+
+.long-running-enter-active {
+  transition:
+    opacity 0.4s ease,
+    transform 0.4s ease;
+}
+
+.long-running-enter-from {
+  opacity: 0;
+  transform: translateY(-4px);
 }
 </style>
