@@ -2,6 +2,7 @@
 
 namespace App\Controller;
 
+use App\AI\Interface\ProviderMetadataInterface;
 use App\AI\Service\ProviderRegistry;
 use App\Entity\Config;
 use App\Entity\User;
@@ -647,36 +648,13 @@ class ConfigController extends AbstractController
             } catch (\Exception $e) {
                 $message = 'Ollama not available: '.$e->getMessage();
             }
-        } elseif (in_array($service, ['openai', 'anthropic', 'groq', 'gemini', 'google', 'mistral', 'huggingface'])) {
+        } elseif (null !== ($registeredProvider = $this->findProviderForModelService($service))) {
+            // Same rules for every registered provider: use getRequiredEnvVars() (API keys, URLs, etc.)
             $providerType = 'external';
-
-            // Check if API key is configured
-            $envVarMap = [
-                'openai' => ['OPENAI_API_KEY'],
-                'anthropic' => ['ANTHROPIC_API_KEY'],
-                'groq' => ['GROQ_API_KEY'],
-                'gemini' => ['GEMINI_API_KEY', 'GOOGLE_GEMINI_API_KEY', 'GOOGLE_API_KEY'],
-                'google' => ['GOOGLE_API_KEY', 'GOOGLE_GEMINI_API_KEY', 'GEMINI_API_KEY'],
-                'mistral' => ['MISTRAL_API_KEY'],
-                'huggingface' => ['HUGGINGFACE_API_KEY'],
-            ];
-
-            $envVars = $envVarMap[$service];
-
-            // Check if any of the env vars is set and not empty
-            $available = false;
-            foreach ($envVars as $envVar) {
-                $apiKey = $_ENV[$envVar] ?? '';
-                if (!empty($apiKey) && 'your-api-key-here' !== $apiKey) {
-                    $available = true;
-                    break;
-                }
-            }
-
-            if (!$available) {
-                $message = "API key not configured for {$service}";
-                $envVar = $envVars[0];
-            }
+            $secretCheck = $this->evaluateProviderRequiredConfiguration($registeredProvider, $service);
+            $available = $secretCheck['available'];
+            $message = $secretCheck['message'];
+            $envVar = $secretCheck['env_var'];
         } else {
             // Unknown provider (e.g., test, custom)
             $available = true; // Assume available
@@ -699,10 +677,80 @@ class ConfigController extends AbstractController
 
         if ($envVar) {
             $response['env_var'] = $envVar;
-            $response['setup_instructions'] = "Add {$envVar}=your-api-key to your .env.local file";
+            $response['setup_instructions'] = "Set {$envVar} in your environment (e.g. .env.local)";
         }
 
         return $this->json($response);
+    }
+
+    private function findProviderForModelService(string $serviceLower): ?ProviderMetadataInterface
+    {
+        foreach ($this->providerRegistry->getUniqueProviders() as $provider) {
+            if (strtolower($provider->getName()) === $serviceLower) {
+                return $provider;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * True if the env var is set to a non-placeholder non-empty string.
+     */
+    private function isMeaningfulEnvValueSet(string $envName): bool
+    {
+        $value = $_ENV[$envName] ?? getenv($envName);
+        if (!\is_string($value) || '' === $value) {
+            return false;
+        }
+
+        return 'your-api-key-here' !== $value;
+    }
+
+    /**
+     * @return array{available: bool, message: ?string, env_var: ?string}
+     */
+    private function evaluateProviderRequiredConfiguration(ProviderMetadataInterface $provider, string $serviceLabel): array
+    {
+        $requiredVars = $provider->getRequiredEnvVars();
+
+        if ([] === $requiredVars) {
+            return ['available' => true, 'message' => null, 'env_var' => null];
+        }
+
+        foreach ($requiredVars as $envName => $meta) {
+            if (false === ($meta['required'] ?? true)) {
+                continue;
+            }
+
+            $candidates = (isset($meta['any_of']) && \is_array($meta['any_of']))
+                ? array_values(array_filter($meta['any_of'], 'is_string'))
+                : [$envName];
+
+            if ([] === $candidates) {
+                $candidates = [$envName];
+            }
+
+            $satisfied = false;
+            foreach ($candidates as $candidate) {
+                if ('' !== $candidate && $this->isMeaningfulEnvValueSet($candidate)) {
+                    $satisfied = true;
+                    break;
+                }
+            }
+
+            if (!$satisfied) {
+                $first = $candidates[0];
+
+                return [
+                    'available' => false,
+                    'message' => "Configuration not complete for {$serviceLabel}",
+                    'env_var' => $first,
+                ];
+            }
+        }
+
+        return ['available' => true, 'message' => null, 'env_var' => null];
     }
 
     /**

@@ -1192,7 +1192,7 @@
       "availableModels": "Mevcut Modeller",
       "noModels": "Bu amaç için model yok",
       "modelNotAvailable": "{model} kullanılamıyor. Lütfen sağlayıcı yapılandırmasını kontrol edin.",
-      "modelNotConfigured": "{model} bir API anahtarı gerektiriyor. Yapılandırmanıza {envVar} ekleyin.",
+      "modelNotConfigured": "{model} hazır değil: Ortamınızda {envVar} ayarlayın (ör. .env.local).",
       "id": "ID",
       "purpose": "AMAÇ",
       "service": "HİZMET",

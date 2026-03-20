@@ -92,6 +92,7 @@ class GoogleProvider implements ChatProviderInterface, ImageGenerationProviderIn
         return [
             'GOOGLE_GEMINI_API_KEY' => [
                 'required' => true,
+                'any_of' => ['GOOGLE_GEMINI_API_KEY', 'GEMINI_API_KEY', 'GOOGLE_API_KEY'],
                 'hint' => 'Get your API key from https://aistudio.google.com/app/apikey',
             ],
         ];

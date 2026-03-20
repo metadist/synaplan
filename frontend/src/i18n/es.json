@@ -1191,7 +1191,7 @@
       "availableModels": "Modelos Disponibles",
       "noModels": "No hay modelos disponibles para este propósito",
       "modelNotAvailable": "{model} no está disponible. Verifique la configuración del proveedor.",
-      "modelNotConfigured": "{model} requiere una clave API. Agregue {envVar} a su configuración.",
+      "modelNotConfigured": "{model} no está listo: configure {envVar} en el entorno (p. ej. .env.local).",
       "id": "ID",
       "purpose": "PROPÓSITO",
       "service": "SERVICIO",

@@ -825,7 +825,7 @@
       "messageClassification": "Nachrichten-Klassifizierung",
       "clickToConfig": "Klicken zum Konfigurieren",
       "modelNotAvailable": "{model} ist nicht verfügbar. Bitte prüfe die Provider-Konfiguration.",
-      "modelNotConfigured": "{model} benötigt einen API-Schlüssel. Füge {envVar} zu deiner Konfiguration hinzu.",
+      "modelNotConfigured": "{model} ist nicht bereit: Setze {envVar} in der Umgebung (z. B. .env.local).",
       "admin": {
         "addModels": "Modelle hinzufügen (Import)",
         "urlsLabel": "URLs (eine pro Zeile)",
