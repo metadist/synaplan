@@ -7,6 +7,7 @@ use App\AI\Provider\GoogleProvider;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
 use Symfony\Contracts\HttpClient\HttpClientInterface;
+use Symfony\Contracts\HttpClient\ResponseInterface;
 
 /**
  * Tests for GoogleProvider's blocked content detection (checkGeminiFinishReason).
@@ -17,12 +18,15 @@ use Symfony\Contracts\HttpClient\HttpClientInterface;
  */
 class GoogleProviderBlockedContentTest extends TestCase
 {
-    private GoogleProvider $provider;
-
-    protected function setUp(): void
+    private function createProviderWithMockResponse(array $responseData): GoogleProvider
     {
+        $response = $this->createMock(ResponseInterface::class);
+        $response->method('toArray')->willReturn($responseData);
+
         $httpClient = $this->createMock(HttpClientInterface::class);
-        $this->provider = new GoogleProvider(
+        $httpClient->method('request')->willReturn($response);
+
+        return new GoogleProvider(
             new NullLogger(),
             $httpClient,
             'fake-api-key',
@@ -39,10 +43,12 @@ class GoogleProviderBlockedContentTest extends TestCase
             ]],
         ];
 
+        $provider = $this->createProviderWithMockResponse($data);
+
         $this->expectException(ProviderException::class);
         $this->expectExceptionMessage('Content blocked by google (SAFETY)');
 
-        $this->invokeCheckGeminiFinishReason($data);
+        $provider->chat([['role' => 'user', 'content' => 'test']], ['model' => 'gemini-1.5-flash']);
     }
 
     public function testRecitationFinishReasonThrowsContentBlocked(): void
@@ -54,8 +60,10 @@ class GoogleProviderBlockedContentTest extends TestCase
             ]],
         ];
 
+        $provider = $this->createProviderWithMockResponse($data);
+
         try {
-            $this->invokeCheckGeminiFinishReason($data);
+            $provider->chat([['role' => 'user', 'content' => 'test']], ['model' => 'gemini-1.5-flash']);
             $this->fail('Expected ProviderException was not thrown');
         } catch (ProviderException $e) {
             $this->assertSame('google', $e->getProviderName());
@@ -74,10 +82,12 @@ class GoogleProviderBlockedContentTest extends TestCase
             ]],
         ];
 
+        $provider = $this->createProviderWithMockResponse($data);
+
         $this->expectException(ProviderException::class);
         $this->expectExceptionMessage('PROHIBITED_CONTENT');
 
-        $this->invokeCheckGeminiFinishReason($data);
+        $provider->chat([['role' => 'user', 'content' => 'test']], ['model' => 'gemini-1.5-flash']);
     }
 
     public function testPromptFeedbackBlockReasonThrowsContentBlocked(): void
@@ -89,8 +99,10 @@ class GoogleProviderBlockedContentTest extends TestCase
             ],
         ];
 
+        $provider = $this->createProviderWithMockResponse($data);
+
         try {
-            $this->invokeCheckGeminiFinishReason($data);
+            $provider->chat([['role' => 'user', 'content' => 'test']], ['model' => 'gemini-1.5-flash']);
             $this->fail('Expected ProviderException was not thrown');
         } catch (ProviderException $e) {
             $this->assertSame('google', $e->getProviderName());
@@ -109,8 +121,10 @@ class GoogleProviderBlockedContentTest extends TestCase
             ]],
         ];
 
-        $this->invokeCheckGeminiFinishReason($data);
-        $this->addToAssertionCount(1);
+        $provider = $this->createProviderWithMockResponse($data);
+
+        $response = $provider->chat([['role' => 'user', 'content' => 'test']], ['model' => 'gemini-1.5-flash']);
+        $this->assertSame('Normal response', $response);
     }
 
     public function testMaxTokensFinishReasonDoesNotThrow(): void
@@ -122,16 +136,20 @@ class GoogleProviderBlockedContentTest extends TestCase
             ]],
         ];
 
-        $this->invokeCheckGeminiFinishReason($data);
-        $this->addToAssertionCount(1);
+        $provider = $this->createProviderWithMockResponse($data);
+
+        $response = $provider->chat([['role' => 'user', 'content' => 'test']], ['model' => 'gemini-1.5-flash']);
+        $this->assertSame('Truncated...', $response);
     }
 
     public function testNoCandidatesAndNoBlockReasonDoesNotThrow(): void
     {
         $data = [];
 
-        $this->invokeCheckGeminiFinishReason($data);
-        $this->addToAssertionCount(1);
+        $provider = $this->createProviderWithMockResponse($data);
+
+        $response = $provider->chat([['role' => 'user', 'content' => 'test']], ['model' => 'gemini-1.5-flash']);
+        $this->assertSame('', $response);
     }
 
     public function testNullFinishReasonDoesNotThrow(): void
@@ -142,8 +160,10 @@ class GoogleProviderBlockedContentTest extends TestCase
             ]],
         ];
 
-        $this->invokeCheckGeminiFinishReason($data);
-        $this->addToAssertionCount(1);
+        $provider = $this->createProviderWithMockResponse($data);
+
+        $response = $provider->chat([['role' => 'user', 'content' => 'test']], ['model' => 'gemini-1.5-flash']);
+        $this->assertSame('Normal response', $response);
     }
 
     public function testBlockedResponsePreservesTextResponse(): void
@@ -156,21 +176,14 @@ class GoogleProviderBlockedContentTest extends TestCase
             ]],
         ];
 
+        $provider = $this->createProviderWithMockResponse($data);
+
         try {
-            $this->invokeCheckGeminiFinishReason($data);
+            $provider->chat([['role' => 'user', 'content' => 'test']], ['model' => 'gemini-1.5-flash']);
             $this->fail('Expected ProviderException was not thrown');
         } catch (ProviderException $e) {
             $ctx = $e->getContext();
             $this->assertSame($longText, $ctx['text_response']);
         }
-    }
-
-    /**
-     * Invoke the private checkGeminiFinishReason method via reflection.
-     */
-    private function invokeCheckGeminiFinishReason(array $data): void
-    {
-        $reflection = new \ReflectionMethod(GoogleProvider::class, 'checkGeminiFinishReason');
-        $reflection->invoke($this->provider, $data);
     }
 }
