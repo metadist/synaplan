@@ -731,7 +731,7 @@ function applyAssistantChatModelFooter(
   const resolvedId =
     data.model_id !== undefined && data.model_id !== null
       ? data.model_id
-      : streamFallback.model_id ?? null
+      : (streamFallback.model_id ?? null)
 
   if (resolvedModel && resolvedProvider) {
     message.modelLabel = resolvedModel
