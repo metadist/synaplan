@@ -19,18 +19,22 @@ final class GoogleProviderImagenRoutingTest extends TestCase
         $capturedUrl = '';
 
         $response = $this->createMock(ResponseInterface::class);
-        $response->method('toArray')->willReturn([
-            'predictions' => [
-                ['bytesBase64Encoded' => 'ZmFrZQ==', 'mimeType' => 'image/png'],
-            ],
-        ]);
+        $response->expects($this->once())
+            ->method('toArray')
+            ->willReturn([
+                'predictions' => [
+                    ['bytesBase64Encoded' => 'ZmFrZQ==', 'mimeType' => 'image/png'],
+                ],
+            ]);
 
         $httpClient = $this->createMock(HttpClientInterface::class);
-        $httpClient->method('request')->willReturnCallback(function (string $method, string $url) use (&$capturedUrl, $response) {
-            $capturedUrl = $url;
+        $httpClient->expects($this->once())
+            ->method('request')
+            ->willReturnCallback(function (string $method, string $url) use (&$capturedUrl, $response) {
+                $capturedUrl = $url;
 
-            return $response;
-        });
+                return $response;
+            });
 
         $provider = new GoogleProvider(
             new NullLogger(),
@@ -55,18 +59,22 @@ final class GoogleProviderImagenRoutingTest extends TestCase
         $capturedUrl = '';
 
         $response = $this->createMock(ResponseInterface::class);
-        $response->method('toArray')->willReturn([
-            'predictions' => [
-                ['bytesBase64Encoded' => 'ZmFrZQ==', 'mimeType' => 'image/png'],
-            ],
-        ]);
+        $response->expects($this->once())
+            ->method('toArray')
+            ->willReturn([
+                'predictions' => [
+                    ['bytesBase64Encoded' => 'ZmFrZQ==', 'mimeType' => 'image/png'],
+                ],
+            ]);
 
         $httpClient = $this->createMock(HttpClientInterface::class);
-        $httpClient->method('request')->willReturnCallback(function (string $method, string $url) use (&$capturedUrl, $response) {
-            $capturedUrl = $url;
+        $httpClient->expects($this->once())
+            ->method('request')
+            ->willReturnCallback(function (string $method, string $url) use (&$capturedUrl, $response) {
+                $capturedUrl = $url;
 
-            return $response;
-        });
+                return $response;
+            });
 
         $provider = new GoogleProvider(
             new NullLogger(),
