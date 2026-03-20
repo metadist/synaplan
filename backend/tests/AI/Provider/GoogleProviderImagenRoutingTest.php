@@ -17,6 +17,7 @@ final class GoogleProviderImagenRoutingTest extends TestCase
     public function testImagenUsesGenerativelanguageWhenProjectIdWithoutVertexToken(): void
     {
         $capturedUrl = '';
+        $capturedOptions = [];
 
         $response = $this->createMock(ResponseInterface::class);
         $response->expects($this->once())
@@ -30,8 +31,9 @@ final class GoogleProviderImagenRoutingTest extends TestCase
         $httpClient = $this->createMock(HttpClientInterface::class);
         $httpClient->expects($this->once())
             ->method('request')
-            ->willReturnCallback(function (string $method, string $url) use (&$capturedUrl, $response) {
+            ->willReturnCallback(function (string $method, string $url, array $options = []) use (&$capturedUrl, &$capturedOptions, $response) {
                 $capturedUrl = $url;
+                $capturedOptions = $options;
 
                 return $response;
             });
@@ -50,6 +52,13 @@ final class GoogleProviderImagenRoutingTest extends TestCase
 
         $this->assertStringContainsString('generativelanguage.googleapis.com', $capturedUrl);
         $this->assertStringContainsString('imagen-4.0-generate-001:predict', $capturedUrl);
+        $headers = $capturedOptions['headers'] ?? [];
+        $this->assertSame('gemini-api-key', $headers['x-goog-api-key'] ?? null, 'Gemini API Imagen must use x-goog-api-key');
+        $this->assertStringNotContainsString(
+            'Bearer gemini-api-key',
+            $headers['Authorization'] ?? '',
+            'Gemini API key must not be sent as OAuth Bearer (Vertex-style)'
+        );
         $this->assertNotEmpty($images);
         $this->assertStringStartsWith('data:image/png;base64,', $images[0]['url']);
     }
@@ -57,6 +66,7 @@ final class GoogleProviderImagenRoutingTest extends TestCase
     public function testImagenUsesVertexWhenProjectAndVertexTokenSet(): void
     {
         $capturedUrl = '';
+        $capturedOptions = [];
 
         $response = $this->createMock(ResponseInterface::class);
         $response->expects($this->once())
@@ -70,8 +80,9 @@ final class GoogleProviderImagenRoutingTest extends TestCase
         $httpClient = $this->createMock(HttpClientInterface::class);
         $httpClient->expects($this->once())
             ->method('request')
-            ->willReturnCallback(function (string $method, string $url) use (&$capturedUrl, $response) {
+            ->willReturnCallback(function (string $method, string $url, array $options = []) use (&$capturedUrl, &$capturedOptions, $response) {
                 $capturedUrl = $url;
+                $capturedOptions = $options;
 
                 return $response;
             });
@@ -90,5 +101,16 @@ final class GoogleProviderImagenRoutingTest extends TestCase
 
         $this->assertStringContainsString('aiplatform.googleapis.com', $capturedUrl);
         $this->assertStringContainsString('/projects/my-gcp-project/locations/us-central1/', $capturedUrl);
+        $headers = $capturedOptions['headers'] ?? [];
+        $this->assertSame(
+            'Bearer oauth-access-token-value',
+            $headers['Authorization'] ?? null,
+            'Vertex Imagen must use OAuth access token as Bearer'
+        );
+        $this->assertArrayNotHasKey(
+            'x-goog-api-key',
+            $headers,
+            'Vertex must not use Gemini API key header'
+        );
     }
 }
