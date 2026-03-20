@@ -42,6 +42,27 @@ class ProviderException extends \RuntimeException
     }
 
     /**
+     * Create exception for content blocked by provider safety filters.
+     *
+     * @param string      $provider     Provider name (e.g. 'google')
+     * @param string      $blockReason  Provider's block reason code (e.g. 'SAFETY', 'RECITATION')
+     * @param string|null $textResponse Any text the provider returned alongside the block
+     */
+    public static function contentBlocked(string $provider, string $blockReason, ?string $textResponse = null): self
+    {
+        $context = [
+            'block_reason' => $blockReason,
+            'text_response' => $textResponse,
+        ];
+
+        return new self(
+            "Content blocked by {$provider} ({$blockReason})",
+            $provider,
+            $context,
+        );
+    }
+
+    /**
      * Create user-friendly exception with installation instructions.
      */
     public static function noModelAvailable(string $modelType, string $provider, ?string $requestedModel = null, ?\Throwable $previous = null): self

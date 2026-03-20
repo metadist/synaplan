@@ -295,31 +295,12 @@ class GoogleProvider implements ChatProviderInterface, ImageGenerationProviderIn
 
             $data = $response->toArray();
 
+            $this->checkGeminiFinishReason($data);
+
             $parts = $data['candidates'][0]['content']['parts'] ?? [];
-
-            // Log response structure for debugging
-            $partTypes = [];
-            $textContent = null;
-            foreach ($parts as $part) {
-                if (isset($part['text'])) {
-                    $partTypes[] = 'text';
-                    $textContent = substr($part['text'], 0, 200);
-                }
-                if (isset($part['inline_data']) || isset($part['inlineData'])) {
-                    $partTypes[] = 'image';
-                }
-            }
-
-            $this->logger->info('Google Gemini image response', [
-                'has_candidates' => isset($data['candidates']),
-                'parts_count' => count($parts),
-                'part_types' => $partTypes,
-                'text_preview' => $textContent,
-            ]);
 
             $images = [];
             foreach ($parts as $part) {
-                // Handle both snake_case and camelCase response formats
                 $inlineData = $part['inline_data'] ?? $part['inlineData'] ?? null;
                 if ($inlineData && isset($inlineData['data'])) {
                     $mimeType = $inlineData['mime_type'] ?? $inlineData['mimeType'] ?? 'image/png';
@@ -331,6 +312,8 @@ class GoogleProvider implements ChatProviderInterface, ImageGenerationProviderIn
             }
 
             return $images;
+        } catch (ProviderException $e) {
+            throw $e;
         } catch (\Exception $e) {
             throw new ProviderException('Google Gemini image generation error: '.$e->getMessage(), 'google');
         }
@@ -394,6 +377,9 @@ class GoogleProvider implements ChatProviderInterface, ImageGenerationProviderIn
             ]);
 
             $data = $response->toArray();
+
+            $this->checkGeminiFinishReason($data);
+
             $responseParts = $data['candidates'][0]['content']['parts'] ?? [];
 
             $images = [];
@@ -409,8 +395,58 @@ class GoogleProvider implements ChatProviderInterface, ImageGenerationProviderIn
             }
 
             return $images;
+        } catch (ProviderException $e) {
+            throw $e;
         } catch (\Exception $e) {
             throw new ProviderException('Google Gemini pic2pic error: '.$e->getMessage(), 'google');
+        }
+    }
+
+    /**
+     * Check Gemini generateContent response for blocked content.
+     *
+     * Gemini returns finishReason codes like SAFETY, RECITATION, PROHIBITED_CONTENT
+     * when it refuses to generate. The HTTP status is still 200, but the response
+     * contains no usable content parts.
+     *
+     * @throws ProviderException when content was blocked
+     */
+    private function checkGeminiFinishReason(array $data): void
+    {
+        $candidate = $data['candidates'][0] ?? null;
+
+        if (!$candidate) {
+            $blockReason = $data['promptFeedback']['blockReason'] ?? null;
+            if ($blockReason) {
+                $this->logger->warning('Google Gemini: Prompt blocked', [
+                    'block_reason' => $blockReason,
+                    'prompt_feedback' => $data['promptFeedback'] ?? null,
+                ]);
+                throw ProviderException::contentBlocked('google', $blockReason);
+            }
+
+            return;
+        }
+
+        $finishReason = $candidate['finishReason'] ?? null;
+
+        if ($finishReason && !\in_array($finishReason, ['STOP', 'MAX_TOKENS', 'END_TURN'], true)) {
+            $textResponse = null;
+            $parts = $candidate['content']['parts'] ?? [];
+            foreach ($parts as $part) {
+                if (isset($part['text'])) {
+                    $textResponse = $part['text'];
+                    break;
+                }
+            }
+
+            $this->logger->warning('Google Gemini: Content blocked', [
+                'finish_reason' => $finishReason,
+                'safety_ratings' => $candidate['safetyRatings'] ?? null,
+                'text_response' => $textResponse ? substr($textResponse, 0, 300) : null,
+            ]);
+
+            throw ProviderException::contentBlocked('google', $finishReason, $textResponse);
         }
     }
 
