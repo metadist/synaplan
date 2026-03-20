@@ -997,9 +997,20 @@ const effectiveTopic = computed(() => {
   return props.topic
 })
 
+const imageExtensions = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg', 'bmp', 'tiff']
+
 const isVisionResponse = computed(() => {
   const topic = effectiveTopic.value?.toLowerCase()
-  return topic === 'analyzefile' || topic === 'pic2text'
+  if (topic === 'pic2text') return true
+  if (topic === 'analyzefile' && props.files?.length) {
+    return props.files.some((f) => imageExtensions.includes(f.fileType?.toLowerCase()))
+  }
+  return false
+})
+
+const isFileAnalysisResponse = computed(() => {
+  const topic = effectiveTopic.value?.toLowerCase()
+  return (topic === 'analyzefile' || topic === 'analyze') && !isVisionResponse.value
 })
 
 const mediaHint = computed(() => {
@@ -1013,6 +1024,7 @@ const mediaHint = computed(() => {
 // Dynamic label for model badge based on content type
 const getModelTypeLabel = computed(() => {
   if (isVisionResponse.value) return 'Vision Model'
+  if (isFileAnalysisResponse.value) return 'Analyze Model'
   if (hasImageContent.value) return 'Image Model'
   if (hasVideoContent.value) return 'Video Model'
   if (hasAudioContent.value) return 'Audio Model'
@@ -1022,6 +1034,7 @@ const getModelTypeLabel = computed(() => {
 // Dynamic icon for model badge
 const getModelTypeIcon = computed(() => {
   if (isVisionResponse.value) return 'mdi:eye'
+  if (isFileAnalysisResponse.value) return 'mdi:file-search'
   if (hasImageContent.value) return 'mdi:image'
   if (hasVideoContent.value) return 'mdi:video'
   if (hasAudioContent.value) return 'mdi:music'
@@ -1031,6 +1044,7 @@ const getModelTypeIcon = computed(() => {
 // Dynamic title for model badge
 const getModelTypeTitle = computed(() => {
   if (isVisionResponse.value) return 'Vision (Image → Text)'
+  if (isFileAnalysisResponse.value) return 'File Analysis (Document/Audio → Text)'
   if (hasImageContent.value) return 'Image Generation (Text → Image)'
   if (hasVideoContent.value) return 'Video Generation (Text → Video)'
   if (hasAudioContent.value) return 'Audio Generation (Text → Audio)'
