@@ -717,11 +717,6 @@ class WidgetPublicController extends AbstractController
 
                     $this->sendSse('error', [
                         'error' => 'Failed to process message',
-                        'details' => [
-                            'message' => $e->getMessage(),
-                            'file' => $e->getFile(),
-                            'line' => $e->getLine(),
-                        ],
                     ]);
                 }
             });
@@ -1634,10 +1629,14 @@ class WidgetPublicController extends AbstractController
                 break;
             }
 
-            $url = str_replace('{externalUserId}', $externalUserId, $api['url']);
-
-            if (str_contains($url, '{externalUserId}')) {
-                continue;
+            $originalUrl = $api['url'];
+            if (str_contains($originalUrl, '{externalUserId}')) {
+                if ('' === $externalUserId) {
+                    continue;
+                }
+                $url = str_replace('{externalUserId}', rawurlencode($externalUserId), $originalUrl);
+            } else {
+                $url = $originalUrl;
             }
 
             $apiHeaders = [];

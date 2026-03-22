@@ -100,7 +100,8 @@
       "chatDeleted": "Chat erfolgreich gelöscht",
       "share": "Chat teilen",
       "public": "Öffentlich"
-    }
+    },
+    "fileOnlyDefaultMessage": "Bitte prüfe die angehängte Datei."
   },
   "admin": {
     "title": "Admin-Panel",
@@ -1333,7 +1334,16 @@
     "migrationSuccess": "{count} Chunks erfolgreich zu Qdrant migriert",
     "migrationPartial": "Migration teilweise abgeschlossen: {migrated} migriert, {errors} Fehler",
     "migrationFailed": "Migration fehlgeschlagen",
-    "reVectorize": "Datei neu verarbeiten"
+    "reVectorize": "Datei neu verarbeiten",
+    "searchResults": "Ergebnisse für \"{query}\"",
+    "noSearchResults": "Keine Dateien für \"{query}\" gefunden",
+    "noSearchResultsHint": "Versuche einen anderen Suchbegriff oder passe die Filter an.",
+    "filterToggle": "Filter",
+    "filterTypeAll": "Alle Typen",
+    "filterTypeImages": "Bilder",
+    "filterTypeAudio": "Audio/Video",
+    "filterDateFrom": "Von",
+    "filterDateTo": "Bis"
   },
   "fileSelection": {
     "title": "Dateien auswählen oder hochladen",

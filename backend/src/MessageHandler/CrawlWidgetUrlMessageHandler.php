@@ -7,6 +7,7 @@ namespace App\MessageHandler;
 use App\Entity\PromptMeta;
 use App\Message\CrawlWidgetUrlMessage;
 use App\Repository\PromptMetaRepository;
+use App\Service\File\FileHelper;
 use App\Service\File\VectorizationService;
 use App\Service\RAG\VectorStorage\VectorStorageFacade;
 use App\Service\UrlContentService;
@@ -41,9 +42,11 @@ final readonly class CrawlWidgetUrlMessageHandler
         $ownerId = $message->getOwnerId();
         $nodeId = $message->getResponseNodeId();
 
+        $safeUrl = FileHelper::redactUrlForLogging($url);
+
         $this->logger->info('CrawlWidgetUrl: Starting crawl', [
             'widget_id' => $widgetId,
-            'url' => $url,
+            'url' => $safeUrl,
             'owner_id' => $ownerId,
             'node_id' => $nodeId,
         ]);
@@ -53,7 +56,7 @@ final readonly class CrawlWidgetUrlMessageHandler
         if (!$result->success || '' === $result->extractedText) {
             $this->logger->warning('CrawlWidgetUrl: Fetch failed or empty', [
                 'widget_id' => $widgetId,
-                'url' => $url,
+                'url' => $safeUrl,
                 'error' => $result->error,
             ]);
 
@@ -83,7 +86,7 @@ final readonly class CrawlWidgetUrlMessageHandler
         if ($vectorResult['success']) {
             $this->logger->info('CrawlWidgetUrl: Vectorization complete', [
                 'widget_id' => $widgetId,
-                'url' => $url,
+                'url' => $safeUrl,
                 'chunks_created' => $vectorResult['chunks_created'],
             ]);
 
@@ -91,7 +94,7 @@ final readonly class CrawlWidgetUrlMessageHandler
         } else {
             $this->logger->error('CrawlWidgetUrl: Vectorization failed', [
                 'widget_id' => $widgetId,
-                'url' => $url,
+                'url' => $safeUrl,
                 'error' => $vectorResult['error'],
             ]);
         }

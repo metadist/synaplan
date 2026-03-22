@@ -363,7 +363,11 @@
           </div>
 
           <!-- Limit Warning -->
-          <div v-if="showLimitWarning" class="flex justify-center">
+          <div
+            v-if="showLimitWarning"
+            class="flex justify-center"
+            data-testid="warning-message-limit"
+          >
             <div
               class="bg-orange-500/10 border border-orange-500/30 rounded-xl px-4 py-3 max-w-[90%]"
             >
@@ -380,7 +384,11 @@
           </div>
 
           <!-- Limit Reached -->
-          <div v-if="limitReached" class="flex justify-center">
+          <div
+            v-if="limitReached"
+            class="flex justify-center"
+            data-testid="error-message-limit-reached"
+          >
             <div class="bg-red-500/10 border border-red-500/30 rounded-xl px-4 py-3 max-w-[90%]">
               <div class="flex items-start gap-2">
                 <XCircleIcon class="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5" />
@@ -402,6 +410,7 @@
           <div
             v-if="fileUploadError"
             class="mb-2 p-2 bg-red-500/10 border border-red-500/30 rounded-lg"
+            data-testid="error-file-upload"
           >
             <div class="flex items-start gap-2">
               <XCircleIcon class="w-4 h-4 text-red-500 flex-shrink-0 mt-0.5" />
@@ -412,6 +421,7 @@
           <div
             v-if="allowFileUploads && fileLimitReached && selectedFiles.length === 0"
             class="mb-2 p-2 bg-amber-500/10 border border-amber-500/30 rounded-lg"
+            data-testid="error-file-upload-limit"
           >
             <div class="flex items-start gap-2">
               <ExclamationTriangleIcon class="w-4 h-4 text-amber-500 flex-shrink-0 mt-0.5" />

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Service;
 
+use App\Service\File\FileHelper;
 use Psr\Log\LoggerInterface;
 use Symfony\Contracts\HttpClient\HttpClientInterface;
 
@@ -130,7 +131,7 @@ final readonly class UrlContentService
             }
 
             $this->logger->info('URL content fetched successfully', [
-                'url' => $url,
+                'url' => FileHelper::redactUrlForLogging($url),
                 'text_length' => strlen($text),
                 'title' => $title,
             ]);
@@ -144,7 +145,7 @@ final readonly class UrlContentService
             );
         } catch (\Throwable $e) {
             $this->logger->warning('Failed to fetch URL content', [
-                'url' => $url,
+                'url' => FileHelper::redactUrlForLogging($url),
                 'error' => $e->getMessage(),
             ]);
 
@@ -198,7 +199,7 @@ final readonly class UrlContentService
         }
 
         if (!$this->isAllowedByRobotsTxt($url)) {
-            $this->logger->info('Crawl blocked by robots.txt', ['url' => $url]);
+            $this->logger->info('Crawl blocked by robots.txt', ['url' => FileHelper::redactUrlForLogging($url)]);
 
             return new UrlContentResult(
                 url: $url,
@@ -235,7 +236,7 @@ final readonly class UrlContentService
             $headers = $response->getHeaders();
 
             if ($this->hasNoIndexHeader($headers)) {
-                $this->logger->info('Crawl skipped: X-Robots-Tag noindex', ['url' => $url]);
+                $this->logger->info('Crawl skipped: X-Robots-Tag noindex', ['url' => FileHelper::redactUrlForLogging($url)]);
 
                 return new UrlContentResult(
                     url: $url,
@@ -272,7 +273,7 @@ final readonly class UrlContentService
             }
 
             if ($this->hasNoIndexMeta($content)) {
-                $this->logger->info('Crawl skipped: page has noindex meta tag', ['url' => $url]);
+                $this->logger->info('Crawl skipped: page has noindex meta tag', ['url' => FileHelper::redactUrlForLogging($url)]);
 
                 return new UrlContentResult(
                     url: $url,
@@ -307,7 +308,7 @@ final readonly class UrlContentService
             }
 
             $this->logger->info('URL content crawled successfully', [
-                'url' => $url,
+                'url' => FileHelper::redactUrlForLogging($url),
                 'text_length' => strlen($text),
                 'title' => $title,
             ]);
@@ -321,7 +322,7 @@ final readonly class UrlContentService
             );
         } catch (\Throwable $e) {
             $this->logger->warning('Failed to crawl URL content', [
-                'url' => $url,
+                'url' => FileHelper::redactUrlForLogging($url),
                 'error' => $e->getMessage(),
             ]);
 
@@ -395,7 +396,7 @@ final readonly class UrlContentService
             );
         } catch (\Throwable $e) {
             $this->logger->warning('API fetch failed', [
-                'url' => $url,
+                'url' => FileHelper::redactUrlForLogging($url),
                 'method' => $method,
                 'error' => $e->getMessage(),
             ]);
