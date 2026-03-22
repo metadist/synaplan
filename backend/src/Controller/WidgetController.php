@@ -303,17 +303,12 @@ class WidgetController extends AbstractController
 
         $data = json_decode($request->getContent(), true);
 
-        error_log('🔧 Widget update request - widgetId: '.$widgetId);
-        error_log('🔧 Data received: '.json_encode($data));
-
         try {
             if (isset($data['name'])) {
                 $this->widgetService->updateWidgetName($widget, $data['name']);
             }
 
             if (isset($data['config'])) {
-                error_log('🔧 Config received: '.json_encode($data['config']));
-                error_log('🔧 allowedDomains in config: '.json_encode($data['config']['allowedDomains'] ?? []));
                 $this->widgetService->updateWidget($widget, $data['config']);
             }
 
@@ -321,19 +316,13 @@ class WidgetController extends AbstractController
                 $widget->setStatus($data['status']);
             }
 
-            // Always flush after updates
             $this->em->flush();
-
-            error_log('🔧 After flush - allowedDomains: '.json_encode($widget->getAllowedDomains()));
 
             return $this->json([
                 'success' => true,
                 'message' => 'Widget updated successfully',
             ]);
         } catch (\Exception $e) {
-            error_log('❌ Widget update error: '.$e->getMessage());
-            error_log('❌ Stack trace: '.$e->getTraceAsString());
-
             $this->logger->error('Failed to update widget', [
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString(),
@@ -1070,7 +1059,9 @@ class WidgetController extends AbstractController
             ], Response::HTTP_FORBIDDEN);
         }
 
-        $urls = $this->extractCrawlableUrls($widget);
+        $crawlData = $this->extractCrawlableUrls($widget);
+        $urls = $crawlData['urls'];
+        $promptId = $crawlData['promptId'];
 
         foreach ($urls as $entry) {
             $this->messageBus->dispatch(new CrawlWidgetUrlMessage(
@@ -1078,6 +1069,7 @@ class WidgetController extends AbstractController
                 $entry['url'],
                 $user->getId(),
                 $entry['nodeId'],
+                $promptId,
             ));
         }
 
@@ -1093,18 +1085,20 @@ class WidgetController extends AbstractController
     }
 
     /**
-     * @return array<array{nodeId: string, url: string}>
+     * @return array{urls: array<array{nodeId: string, url: string}>, promptId: int}
      */
     private function extractCrawlableUrls(Widget $widget): array
     {
+        $empty = ['urls' => [], 'promptId' => 0];
+
         $topic = $widget->getTaskPromptTopic();
         if (!$topic) {
-            return [];
+            return $empty;
         }
 
         $prompt = $this->promptRepository->findByTopicAndUser($topic, $widget->getOwnerId());
         if (!$prompt) {
-            return [];
+            return $empty;
         }
 
         $metadata = $this->em->getRepository(\App\Entity\PromptMeta::class)
@@ -1119,13 +1113,13 @@ class WidgetController extends AbstractController
         }
 
         if (!$flowRulesRaw) {
-            return [];
+            return $empty;
         }
 
         try {
             $flow = json_decode($flowRulesRaw, true, 512, JSON_THROW_ON_ERROR);
         } catch (\JsonException) {
-            return [];
+            return $empty;
         }
 
         $urls = [];
@@ -1140,6 +1134,6 @@ class WidgetController extends AbstractController
             }
         }
 
-        return $urls;
+        return ['urls' => $urls, 'promptId' => $prompt->getId()];
     }
 }

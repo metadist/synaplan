@@ -4,10 +4,13 @@ declare(strict_types=1);
 
 namespace App\MessageHandler;
 
+use App\Entity\PromptMeta;
 use App\Message\CrawlWidgetUrlMessage;
+use App\Repository\PromptMetaRepository;
 use App\Service\File\VectorizationService;
 use App\Service\RAG\VectorStorage\VectorStorageFacade;
 use App\Service\UrlContentService;
+use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\Messenger\Attribute\AsMessageHandler;
 
@@ -25,6 +28,8 @@ final readonly class CrawlWidgetUrlMessageHandler
         private UrlContentService $urlContentService,
         private VectorizationService $vectorizationService,
         private VectorStorageFacade $vectorStorage,
+        private PromptMetaRepository $promptMetaRepository,
+        private EntityManagerInterface $em,
         private LoggerInterface $logger,
     ) {
     }
@@ -81,6 +86,8 @@ final readonly class CrawlWidgetUrlMessageHandler
                 'url' => $url,
                 'chunks_created' => $vectorResult['chunks_created'],
             ]);
+
+            $this->updateCrawlStatus($message->getPromptId(), $nodeId);
         } else {
             $this->logger->error('CrawlWidgetUrl: Vectorization failed', [
                 'widget_id' => $widgetId,
@@ -96,5 +103,42 @@ final readonly class CrawlWidgetUrlMessageHandler
     public static function buildFileId(string $widgetId, string $nodeId): int
     {
         return abs(crc32("crawl:{$widgetId}:{$nodeId}")) % 2_000_000_000;
+    }
+
+    private function updateCrawlStatus(int $promptId, string $nodeId): void
+    {
+        if (0 === $promptId) {
+            return;
+        }
+
+        try {
+            $meta = $this->promptMetaRepository->findOneBy([
+                'promptId' => $promptId,
+                'metaKey' => 'widgetCrawlStatus',
+            ]);
+
+            $status = [];
+            if ($meta) {
+                $status = json_decode($meta->getMetaValue(), true, 512, JSON_THROW_ON_ERROR);
+                if (!\is_array($status)) {
+                    $status = [];
+                }
+            } else {
+                $meta = new PromptMeta();
+                $meta->setPromptId($promptId);
+                $meta->setMetaKey('widgetCrawlStatus');
+                $this->em->persist($meta);
+            }
+
+            $status[$nodeId] = time();
+            $meta->setMetaValue(json_encode($status, JSON_THROW_ON_ERROR));
+            $this->em->flush();
+        } catch (\Throwable $e) {
+            $this->logger->warning('Failed to update crawl status', [
+                'prompt_id' => $promptId,
+                'node_id' => $nodeId,
+                'error' => $e->getMessage(),
+            ]);
+        }
     }
 }

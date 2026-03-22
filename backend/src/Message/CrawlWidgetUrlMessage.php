@@ -17,6 +17,7 @@ final readonly class CrawlWidgetUrlMessage
         private string $url,
         private int $ownerId,
         private string $responseNodeId,
+        private int $promptId = 0,
     ) {
     }
 
@@ -38,5 +39,10 @@ final readonly class CrawlWidgetUrlMessage
     public function getResponseNodeId(): string
     {
         return $this->responseNodeId;
+    }
+
+    public function getPromptId(): int
+    {
+        return $this->promptId;
     }
 }

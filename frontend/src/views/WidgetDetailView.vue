@@ -17,6 +17,7 @@
           <div class="flex gap-2">
             <button
               class="px-4 py-2.5 rounded-xl border border-light-border/30 dark:border-dark-border/20 txt-secondary text-sm hover:txt-primary transition-colors"
+              data-testid="btn-widget-settings"
               @click="openAdvancedModal()"
             >
               <Icon icon="heroicons:cog-6-tooth" class="w-4 h-4" />

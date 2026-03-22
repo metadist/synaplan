@@ -159,7 +159,7 @@ export async function updateWidgetSettings(
     fileUploadLimit: settings.fileUploadLimit ?? WIDGET_DEFAULTS.FILE_UPLOAD_LIMIT,
   }
 
-  // Find widget by name and open advanced config
+  // Find widget by name – clicking the advanced button now navigates to the detail page
   const widgetCard = page
     .locator(selectors.widgets.widgetCard.item)
     .filter({ hasText: widgetName })
@@ -167,6 +167,10 @@ export async function updateWidgetSettings(
   await widgetCard.waitFor({ state: 'visible', timeout: TIMEOUTS.SHORT })
 
   await widgetCard.locator(selectors.widgets.widgetCard.advancedButton).click()
+  await page
+    .locator(selectors.widgets.detailPage.settingsButton)
+    .waitFor({ state: 'visible', timeout: TIMEOUTS.STANDARD })
+  await page.locator(selectors.widgets.detailPage.settingsButton).click()
   await page.waitForSelector(selectors.widgets.advancedConfig.modal, { timeout: TIMEOUTS.STANDARD })
 
   const behaviorSection = page.locator(selectors.widgets.advancedConfig.behaviorTab)
@@ -255,6 +259,10 @@ export async function setWidgetTaskPrompt(
   await widgetCard.waitFor({ state: 'visible', timeout: TIMEOUTS.SHORT })
 
   await widgetCard.locator(selectors.widgets.widgetCard.advancedButton).click()
+  await page
+    .locator(selectors.widgets.detailPage.settingsButton)
+    .waitFor({ state: 'visible', timeout: TIMEOUTS.STANDARD })
+  await page.locator(selectors.widgets.detailPage.settingsButton).click()
   await page.waitForSelector(selectors.widgets.advancedConfig.modal, { timeout: TIMEOUTS.STANDARD })
 
   const assistantTab = page.locator(selectors.widgets.advancedConfig.assistantTab)
@@ -269,7 +277,6 @@ export async function setWidgetTaskPrompt(
 
   if (isManualCreateVisible) {
     await manualCreateButton.click()
-    // Wait for prompt content to appear (skip spinner – just wait for the target element)
     await page
       .locator(selectors.widgets.advancedConfig.promptContentInput)
       .waitFor({ state: 'visible', timeout: TIMEOUTS.STANDARD })
@@ -290,7 +297,7 @@ export async function setWidgetTaskPrompt(
   if (needsSaveForFileUpload) {
     await saveAdvancedConfig(page)
 
-    await widgetCard.locator(selectors.widgets.widgetCard.advancedButton).click()
+    await page.locator(selectors.widgets.detailPage.settingsButton).click()
     await page.waitForSelector(selectors.widgets.advancedConfig.modal, {
       timeout: TIMEOUTS.STANDARD,
     })

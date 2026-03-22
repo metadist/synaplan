@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Command;
 
-use App\Entity\PromptMeta;
 use App\Message\CrawlWidgetUrlMessage;
 use App\Repository\PromptMetaRepository;
 use App\Repository\WidgetRepository;
@@ -125,14 +124,10 @@ final class CrawlWidgetUrlsCommand extends Command
                         trim($url),
                         $ownerId,
                         $nodeId,
+                        $prompt->getId(),
                     ));
 
-                    $crawlStatus[$nodeId] = time();
                     ++$dispatched;
-                }
-
-                if ($dispatched > 0) {
-                    $this->saveCrawlStatus($prompt->getId(), $crawlStatus);
                 }
             }
 
@@ -169,26 +164,5 @@ final class CrawlWidgetUrlsCommand extends Command
         } catch (\JsonException) {
             return [];
         }
-    }
-
-    /**
-     * @param array<string, int> $status
-     */
-    private function saveCrawlStatus(int $promptId, array $status): void
-    {
-        $meta = $this->promptMetaRepository->findOneBy([
-            'promptId' => $promptId,
-            'metaKey' => 'widgetCrawlStatus',
-        ]);
-
-        if (!$meta) {
-            $meta = new PromptMeta();
-            $meta->setPromptId($promptId);
-            $meta->setMetaKey('widgetCrawlStatus');
-            $this->em->persist($meta);
-        }
-
-        $meta->setMetaValue(json_encode($status, JSON_THROW_ON_ERROR));
-        $this->em->flush();
     }
 }

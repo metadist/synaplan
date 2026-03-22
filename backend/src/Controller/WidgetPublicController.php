@@ -118,9 +118,42 @@ class WidgetPublicController extends AbstractController
             'success' => true,
             'widgetId' => $widget->getWidgetId(),
             'name' => $widget->getName(),
-            'config' => $config,
+            'config' => self::buildPublicConfig($config),
             'isActive' => true,
         ]);
+    }
+
+    /**
+     * Return only runtime-safe config keys needed by the widget frontend.
+     * Sensitive fields (API tokens, internal flags) are excluded.
+     *
+     * @param array<string, mixed> $config
+     *
+     * @return array<string, mixed>
+     */
+    private static function buildPublicConfig(array $config): array
+    {
+        static $allowed = [
+            'position',
+            'primaryColor',
+            'iconColor',
+            'buttonIcon',
+            'buttonIconUrl',
+            'defaultTheme',
+            'autoOpen',
+            'autoMessage',
+            'messageLimit',
+            'maxFileSize',
+            'allowFileUpload',
+            'fileUploadLimit',
+            'fullscreenMode',
+            'allowFullscreen',
+            'hideButton',
+            'privacyPolicyUrl',
+            'detectTheme',
+        ];
+
+        return \array_intersect_key($config, \array_flip($allowed));
     }
 
     /**
@@ -157,11 +190,7 @@ class WidgetPublicController extends AbstractController
             ], Response::HTTP_BAD_REQUEST);
         }
 
-        error_log('📥 Widget message request: '.json_encode($data));
-
         if (empty($data['sessionId']) || empty($data['text'])) {
-            error_log('❌ Missing fields - sessionId: '.($data['sessionId'] ?? 'NULL').', text: '.($data['text'] ?? 'NULL'));
-
             return $this->json([
                 'error' => 'Missing required fields: sessionId, text',
             ], Response::HTTP_BAD_REQUEST);
@@ -170,12 +199,8 @@ class WidgetPublicController extends AbstractController
         // Get widget
         $widget = $this->widgetService->getWidgetById($widgetId);
         if (!$widget) {
-            error_log('❌ Widget not found: '.$widgetId);
-
             return $this->json(['error' => 'Widget not found'], Response::HTTP_NOT_FOUND);
         }
-
-        error_log('✅ Widget found: '.$widget->getName());
 
         // Check if widget is active
         if (!$this->widgetService->isWidgetActive($widget)) {
