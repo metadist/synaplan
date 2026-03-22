@@ -172,34 +172,34 @@ export const chatApi = {
     })
   },
 
-  streamMessage(
-    userId: number,
-    message: string,
-    trackId: number | undefined,
-    chatId: number,
-    onUpdate: (data: any) => void,
-    includeReasoning: boolean = false,
-    webSearch: boolean = false,
-    modelId?: number,
-    fileIds?: number[],
+  streamMessage(opts: {
+    userId: number
+    message: string
+    trackId?: number
+    chatId: number
+    onUpdate: (data: any) => void
+    includeReasoning?: boolean
+    webSearch?: boolean
+    modelId?: number
+    fileIds?: number[]
     voiceReply?: boolean
-  ): () => void {
-    // Build params object
+    isAgain?: boolean
+  }): () => void {
     const paramsObj: Record<string, string> = {
-      message,
-      chatId: chatId.toString(),
-      userId: userId.toString(),
+      message: opts.message,
+      chatId: opts.chatId.toString(),
+      userId: opts.userId.toString(),
     }
 
-    if (trackId) paramsObj.trackId = trackId.toString()
-    if (includeReasoning) paramsObj.reasoning = '1'
-    if (webSearch) paramsObj.webSearch = '1'
-    if (modelId) paramsObj.modelId = modelId.toString()
-    if (voiceReply) paramsObj.voiceReply = '1'
+    if (opts.trackId) paramsObj.trackId = opts.trackId.toString()
+    if (opts.includeReasoning) paramsObj.reasoning = '1'
+    if (opts.webSearch) paramsObj.webSearch = '1'
+    if (opts.modelId) paramsObj.modelId = opts.modelId.toString()
+    if (opts.voiceReply) paramsObj.voiceReply = '1'
+    if (opts.isAgain) paramsObj.isAgain = '1'
 
-    // Multiple fileIds as comma-separated list
-    if (fileIds && fileIds.length > 0) {
-      paramsObj.fileIds = fileIds.join(',')
+    if (opts.fileIds && opts.fileIds.length > 0) {
+      paramsObj.fileIds = opts.fileIds.join(',')
     }
 
     const params = new URLSearchParams(paramsObj)
@@ -217,7 +217,7 @@ export const chatApi = {
         const token = await getSseToken()
         if (!token) {
           console.error('🚫 No SSE token available - authentication required')
-          onUpdate({
+          opts.onUpdate({
             status: 'error',
             error: 'Authentication required. Please log in again to continue.',
             message: 'Your session has expired. Please refresh the page and log in again.',
@@ -249,7 +249,7 @@ export const chatApi = {
           try {
             const data = JSON.parse(event.data)
             completionReceived = data.status === 'complete'
-            onUpdate(data)
+            opts.onUpdate(data)
 
             // Close connection on completion
             if (data.status === 'complete') {
@@ -290,7 +290,7 @@ export const chatApi = {
           ) {
             console.log('⚠️ SSE connection closed by server (treating as completion)')
             eventSource?.close()
-            onUpdate({ status: 'complete', message: 'Response complete', metadata: {} })
+            opts.onUpdate({ status: 'complete', message: 'Response complete', metadata: {} })
             return
           }
 
@@ -298,12 +298,12 @@ export const chatApi = {
           if (eventSource?.readyState === EventSource.OPEN) {
             console.error('❌ SSE connection error during active stream')
             eventSource?.close()
-            onUpdate({ status: 'error', error: 'Connection interrupted' })
+            opts.onUpdate({ status: 'error', error: 'Connection interrupted' })
           }
         }
       } catch (error) {
         console.error('🚫 Stream setup error:', error)
-        onUpdate({ status: 'error', error: 'Failed to connect' })
+        opts.onUpdate({ status: 'error', error: 'Failed to connect' })
       }
     })()
 
@@ -340,7 +340,10 @@ export const chatApi = {
    * Upload file for chat message (File wird sofort hochgeladen und extrahiert)
    * For audio files, response includes transcribed text
    */
-  async uploadChatFile(file: File): Promise<{
+  async uploadChatFile(
+    file: File,
+    signal?: AbortSignal
+  ): Promise<{
     success: boolean
     file_id: number
     filename: string
@@ -357,6 +360,7 @@ export const chatApi = {
     return httpClient<any>('/api/v1/messages/upload-file', {
       method: 'POST',
       body: formData,
+      signal,
     })
   },
 

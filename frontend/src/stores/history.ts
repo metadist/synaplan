@@ -72,6 +72,8 @@ export interface Message {
   modelLabel?: string
   topic?: string // Topic from message classification (e.g., 'general', 'mediamaker')
   originalTopic?: string | null // Original classification topic preserved on error messages
+  /** BMEDIA subtype from sorting when topic is mediamaker (persisted on failed generation) */
+  originalMediaType?: string | null
   againData?: AgainData
   originalMessageId?: number
   backendMessageId?: number
@@ -443,10 +445,11 @@ export const useHistoryStore = defineStore('history', () => {
             role,
             parts,
             timestamp: new Date(m.timestamp * 1000),
-            provider: m.provider,
-            modelLabel: m.provider || 'AI',
+            provider: m.aiModels?.chat?.provider ?? m.provider,
+            modelLabel: m.aiModels?.chat?.model ?? m.provider ?? 'AI',
             topic: m.topic,
             originalTopic: m.originalTopic || null,
+            originalMediaType: m.originalMediaType ?? m.original_media_type ?? null,
             backendMessageId: m.id,
             files: files.length > 0 ? files : undefined,
             aiModels: m.aiModels || null, // Parse AI model metadata from backend

@@ -507,11 +507,12 @@ class ChatController extends AbstractController
                 // Chat model (used for generating the response)
                 $chatProvider = $m->getMeta('ai_chat_provider');
                 $chatModel = $m->getMeta('ai_chat_model');
+                $chatModelIdMeta = $m->getMeta('ai_chat_model_id');
                 if ($chatProvider || $chatModel) {
                     $aiModels['chat'] = [
                         'provider' => $chatProvider,
                         'model' => $chatModel,
-                        'model_id' => null, // Chat model ID is not stored (selected from config)
+                        'model_id' => $chatModelIdMeta ? (int) $chatModelIdMeta : null,
                     ];
                 }
 
@@ -582,6 +583,7 @@ class ChatController extends AbstractController
             }
 
             $originalTopic = $m->getMeta('original_topic');
+            $originalMediaType = $m->getMeta('original_media_type');
 
             return [
                 'id' => $m->getId(),
@@ -591,6 +593,7 @@ class ChatController extends AbstractController
                 'provider' => $m->getProviderIndex(),
                 'topic' => $m->getTopic(),
                 'originalTopic' => $originalTopic,
+                'originalMediaType' => $originalMediaType,
                 'language' => $m->getLanguage(),
                 'createdAt' => $m->getDateTime(),
                 'files' => $filesData, // Attached files (user uploads)
@@ -677,6 +680,7 @@ class ChatController extends AbstractController
                 'provider' => $m->getProviderIndex(),
                 'topic' => $m->getTopic(),
                 'originalTopic' => $m->getMeta('original_topic'),
+                'originalMediaType' => $m->getMeta('original_media_type'),
                 'language' => $m->getLanguage(),
             ];
 

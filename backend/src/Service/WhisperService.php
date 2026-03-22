@@ -25,6 +25,7 @@ final readonly class WhisperService
         private string $whisperModelsPath = '/var/www/backend/var/whisper',
         private string $defaultModel = 'base',
         private string $ffmpegBinary = '/usr/bin/ffmpeg',
+        private bool $whisperEnabled = true,
     ) {
     }
 
@@ -149,6 +150,12 @@ final readonly class WhisperService
      */
     public function isAvailable(): bool
     {
+        if (!$this->whisperEnabled) {
+            $this->logger->debug('WhisperService: Disabled via WHISPER_ENABLED=false');
+
+            return false;
+        }
+
         // Check if binary exists
         if (!file_exists($this->whisperBinary)) {
             $this->logger->debug('WhisperService: Binary not found', [

@@ -299,7 +299,7 @@ PROMPT;
                     continue;
                 }
 
-                if (mb_strlen($memory['key']) < 3 || mb_strlen($memory['value']) < 5) {
+                if (mb_strlen($memory['key']) < 3 || mb_strlen($memory['value']) < 3) {
                     continue;
                 }
 

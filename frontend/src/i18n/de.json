@@ -277,6 +277,9 @@
       "videoGen": "Videoerzeugung",
       "videoGenDesc": "Videos aus Text erstellen"
     },
+    "modelDropdown": {
+      "default": "Standard"
+    },
     "removeTool": "Werkzeug entfernen"
   },
   "chatMessage": {
@@ -746,7 +749,8 @@
     "memoriesCompleteDesc": "Analyse abgeschlossen",
     "topic": "Thema",
     "language": "Sprache",
-    "modelId": "Model ID"
+    "modelId": "Model ID",
+    "longRunningHint": "Diese Anfrage dauert etwas länger als üblich — bitte habe einen Moment Geduld."
   },
   "message": {
     "thinking": "Denkprozess",
@@ -807,6 +811,7 @@
         "vectorize": "Einbettung / Vektorisierung",
         "pic2text": "Bilderkennung (Bild → Text)",
         "text2pic": "Bildgenerierung (Text → Bild)",
+        "pic2pic": "Bildbearbeitung (Bild → Bild)",
         "text2vid": "Videogenerierung (Text → Video)",
         "sound2text": "Spracherkennung",
         "text2sound": "Sprachsynthese",
@@ -818,6 +823,8 @@
       "chatGeneration": "Antwort-Generierung",
       "messageClassification": "Nachrichten-Klassifizierung",
       "clickToConfig": "Klicken zum Konfigurieren",
+      "modelNotAvailable": "{model} ist nicht verfügbar. Bitte prüfe die Provider-Konfiguration.",
+      "modelNotConfigured": "{model} ist nicht bereit: Setze {envVar} in der Umgebung (z. B. .env.local).",
       "admin": {
         "addModels": "Modelle hinzufügen (Import)",
         "urlsLabel": "URLs (eine pro Zeile)",
@@ -1278,7 +1285,9 @@
     "uploaded": "HOCHGELADEN",
     "action": "AKTION",
     "status_uploaded": "Hochgeladen",
-    "status_extracted": "Wird verarbeitet",
+    "status_extracting": "Text wird extrahiert…",
+    "status_extracted": "Extrahiert",
+    "status_vectorizing": "Wird indexiert…",
     "status_vectorized": "Bereit",
     "attached": "Angehängt",
     "standalone": "Eigenständig",
@@ -1334,6 +1343,9 @@
     "attachFiles": "Dateien anhängen",
     "uploadNew": "Neue Dateien hochladen",
     "uploading": "Lade {current} von {total} hoch...",
+    "uploadingFilePercent": "Datei {current} von {total} — {percent} %",
+    "storingFile": "Wird auf dem Server gespeichert…",
+    "processingOnServer": "{count} Datei(en) werden im Hintergrund verarbeitet…",
     "orDragDrop": "oder Dateien hierher ziehen",
     "dropHere": "Dateien hier ablegen zum Hochladen",
     "viewContent": "Inhalt anzeigen",
@@ -1350,7 +1362,10 @@
     "bulkDeletePartial": "{success} gelöscht, {failed} fehlgeschlagen",
     "reVectorize": "Neu verarbeiten",
     "reVectorizeSuccess": "Datei erfolgreich neu verarbeitet ({chunks} Teile indiziert)",
-    "reVectorizeFailed": "Neuverarbeitung fehlgeschlagen"
+    "reVectorizeFailed": "Neuverarbeitung fehlgeschlagen",
+    "uploadSuccess": "{count} Datei(en) erfolgreich hochgeladen",
+    "uploadCancelled": "Upload abgebrochen",
+    "uploadInterrupted": "Übertragung unterbrochen. Die Liste wurde aktualisiert — Dateien, die den Server schon erreicht hatten, können weiterhin erscheinen."
   },
   "fileMention": {
     "hint": "Tippen um Dateien zu suchen — Enter zum Anhängen",
@@ -1936,18 +1951,27 @@
       "fieldType": "Typ",
       "typeText": "Text",
       "typeBoolean": "Ja/Nein",
+      "typeDropdown": "Dropdown",
       "save": "Speichern",
       "saved": "Benutzerdefinierte Felder gespeichert",
       "saveFailed": "Speichern der benutzerdefinierten Felder fehlgeschlagen",
       "empty": "Noch keine benutzerdefinierten Felder definiert.",
       "emptyHint": "Fügen Sie Felder hinzu, um zusätzliche Informationen bei internen Chats zu erfassen.",
       "removeConfirm": "Dieses Feld entfernen?",
-      "maxFieldsReached": "Maximale Anzahl an Feldern erreicht (3 Text, 3 Ja/Nein)",
+      "maxFieldsReached": "Maximale Anzahl an Feldern erreicht (3 pro Typ)",
       "maxTextReached": "Maximal 3 Textfelder erreicht",
       "maxBooleanReached": "Maximal 3 Ja/Nein-Felder erreicht",
+      "maxDropdownReached": "Maximal 3 Dropdown-Felder erreicht",
       "fieldNameRequired": "Feldname ist erforderlich",
       "panelTitle": "Zusätzliche Informationen",
-      "noSession": "Starten Sie zuerst einen Chat, um benutzerdefinierte Felder auszufüllen."
+      "noSession": "Starten Sie zuerst einen Chat, um benutzerdefinierte Felder auszufüllen.",
+      "dropdownOptions": "Optionen",
+      "dropdownOptionPlaceholder": "Option {n}",
+      "addOption": "Option hinzufügen",
+      "maxOptionsReached": "Maximal 5 Optionen",
+      "minOptionsRequired": "Mindestens 1 Option erforderlich",
+      "dropdownPlaceholder": "Auswählen...",
+      "optionsCount": "{count} Optionen"
     },
     "edit": "Bearbeiten",
     "delete": "Löschen",
@@ -2180,6 +2204,8 @@
     "noSocialProviders": "Keine Social Login Anbieter konfiguriert",
     "registrationSuccess": "Registrierung erfolgreich!",
     "registrationSuccessDesc": "Falls diese E-Mail-Adresse noch nicht registriert ist, haben wir dir eine Bestätigungs-E-Mail gesendet. Bitte überprüfe deinen Posteingang (auch den Spam-Ordner).",
+    "registrationCompleteTitle": "Überprüfe deine E-Mail",
+    "registrationCompleteDesc": "Wir haben dir einen Bestätigungslink gesendet. Bitte überprüfe deinen Posteingang und Spam-Ordner und klicke auf den Link, um dein Konto zu aktivieren.",
     "passwordResetSuccess": "Anfrage gesendet!",
     "passwordResetSuccessDesc": "Falls ein Konto mit dieser E-Mail-Adresse existiert, haben wir dir einen Link zum Zurücksetzen des Passworts gesendet. Bitte überprüfe deinen Posteingang.",
     "recaptchaError": "reCAPTCHA-Verifizierung fehlgeschlagen. Bitte versuche es erneut.",

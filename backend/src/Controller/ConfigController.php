@@ -2,6 +2,7 @@
 
 namespace App\Controller;
 
+use App\AI\Interface\ProviderMetadataInterface;
 use App\AI\Service\ProviderRegistry;
 use App\Entity\Config;
 use App\Entity\User;
@@ -408,6 +409,7 @@ class ConfigController extends AbstractController
             'VECTORIZE' => [],
             'PIC2TEXT' => [],
             'TEXT2PIC' => [],
+            'PIC2PIC' => [],
             'TEXT2VID' => [],
             'SOUND2TEXT' => [],
             'TEXT2SOUND' => [],
@@ -435,6 +437,9 @@ class ConfigController extends AbstractController
                 case 'IMAGE':
                 case 'TEXT2PIC':
                     $grouped['TEXT2PIC'][] = $model;
+                    if (!empty($model['features']) && in_array('pic2pic', $model['features'], true)) {
+                        $grouped['PIC2PIC'][] = $model;
+                    }
                     break;
                 case 'VIDEO':
                 case 'TEXT2VID':
@@ -475,7 +480,7 @@ class ConfigController extends AbstractController
         }
 
         $userId = $user->getId();
-        $capabilities = ['SORT', 'CHAT', 'VECTORIZE', 'PIC2TEXT', 'TEXT2PIC', 'TEXT2VID', 'SOUND2TEXT', 'TEXT2SOUND', 'ANALYZE'];
+        $capabilities = ['SORT', 'CHAT', 'VECTORIZE', 'PIC2TEXT', 'TEXT2PIC', 'PIC2PIC', 'TEXT2VID', 'SOUND2TEXT', 'TEXT2SOUND', 'ANALYZE'];
 
         $defaults = [];
 
@@ -496,7 +501,14 @@ class ConfigController extends AbstractController
                 ]);
             }
 
-            $defaults[$capability] = $config ? (int) $config->getValue() : null;
+            if ($config) {
+                $modelId = (int) $config->getValue();
+                $model = $this->modelRepository->find($modelId);
+                // Only return model ID if the model still exists and is active
+                $defaults[$capability] = ($model && 1 === $model->getActive()) ? $modelId : null;
+            } else {
+                $defaults[$capability] = null;
+            }
         }
 
         return $this->json([
@@ -532,7 +544,9 @@ class ConfigController extends AbstractController
         }
 
         $ownerId = $global ? 0 : $user->getId();
-        $validCapabilities = ['SORT', 'CHAT', 'VECTORIZE', 'PIC2TEXT', 'TEXT2PIC', 'TEXT2VID', 'SOUND2TEXT', 'TEXT2SOUND', 'ANALYZE'];
+        $validCapabilities = ['SORT', 'CHAT', 'VECTORIZE', 'PIC2TEXT', 'TEXT2PIC', 'PIC2PIC', 'TEXT2VID', 'SOUND2TEXT', 'TEXT2SOUND', 'ANALYZE'];
+
+        $skipped = [];
 
         foreach ($data['defaults'] as $capability => $modelId) {
             if (!in_array($capability, $validCapabilities)) {
@@ -540,16 +554,9 @@ class ConfigController extends AbstractController
             }
 
             $model = $this->modelRepository->find($modelId);
-            if (!$model) {
-                return $this->json([
-                    'error' => "Model {$modelId} not found",
-                ], Response::HTTP_BAD_REQUEST);
-            }
-
-            if (1 !== $model->getActive()) {
-                return $this->json([
-                    'error' => "Model {$modelId} is not active",
-                ], Response::HTTP_BAD_REQUEST);
+            if (!$model || 1 !== $model->getActive()) {
+                $skipped[$capability] = $modelId;
+                continue;
             }
 
             $config = $this->configRepository->findOneBy([
@@ -571,10 +578,17 @@ class ConfigController extends AbstractController
 
         $this->em->flush();
 
-        return $this->json([
+        $response = [
             'success' => true,
             'message' => $global ? 'Global default models saved successfully' : 'Default models saved successfully',
-        ]);
+        ];
+
+        if (!empty($skipped)) {
+            $response['skipped'] = $skipped;
+            $response['message'] .= ' (some models were skipped because they are no longer available)';
+        }
+
+        return $this->json($response);
     }
 
     /**
@@ -634,35 +648,13 @@ class ConfigController extends AbstractController
             } catch (\Exception $e) {
                 $message = 'Ollama not available: '.$e->getMessage();
             }
-        } elseif (in_array($service, ['openai', 'anthropic', 'groq', 'gemini', 'google', 'mistral'])) {
+        } elseif (null !== ($registeredProvider = $this->findProviderForModelService($service))) {
+            // Same rules for every registered provider: use getRequiredEnvVars() (API keys, URLs, etc.)
             $providerType = 'external';
-
-            // Check if API key is configured
-            $envVarMap = [
-                'openai' => ['OPENAI_API_KEY'],
-                'anthropic' => ['ANTHROPIC_API_KEY'],
-                'groq' => ['GROQ_API_KEY'],
-                'gemini' => ['GEMINI_API_KEY', 'GOOGLE_GEMINI_API_KEY', 'GOOGLE_API_KEY'], // Support multiple key names
-                'google' => ['GOOGLE_API_KEY', 'GOOGLE_GEMINI_API_KEY', 'GEMINI_API_KEY'], // Support multiple key names
-                'mistral' => ['MISTRAL_API_KEY'],
-            ];
-
-            $envVars = $envVarMap[$service] ?? [];
-
-            // Check if any of the env vars is set and not empty
-            $available = false;
-            foreach ($envVars as $envVar) {
-                $apiKey = $_ENV[$envVar] ?? '';
-                if (!empty($apiKey) && 'your-api-key-here' !== $apiKey) {
-                    $available = true;
-                    break;
-                }
-            }
-
-            if (!$available) {
-                $message = "API key not configured for {$service}";
-                $envVar = $envVars[0] ?? null; // Use first one for setup instructions
-            }
+            $secretCheck = $this->evaluateProviderRequiredConfiguration($registeredProvider, $service);
+            $available = $secretCheck['available'];
+            $message = $secretCheck['message'];
+            $envVar = $secretCheck['env_var'];
         } else {
             // Unknown provider (e.g., test, custom)
             $available = true; // Assume available
@@ -685,10 +677,80 @@ class ConfigController extends AbstractController
 
         if ($envVar) {
             $response['env_var'] = $envVar;
-            $response['setup_instructions'] = "Add {$envVar}=your-api-key to your .env.local file";
+            $response['setup_instructions'] = "Set {$envVar} in your environment (e.g. .env.local)";
         }
 
         return $this->json($response);
+    }
+
+    private function findProviderForModelService(string $serviceLower): ?ProviderMetadataInterface
+    {
+        foreach ($this->providerRegistry->getUniqueProviders() as $provider) {
+            if (strtolower($provider->getName()) === $serviceLower) {
+                return $provider;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * True if the env var is set to a non-placeholder non-empty string.
+     */
+    private function isMeaningfulEnvValueSet(string $envName): bool
+    {
+        $value = $_ENV[$envName] ?? getenv($envName);
+        if (!\is_string($value) || '' === $value) {
+            return false;
+        }
+
+        return 'your-api-key-here' !== $value;
+    }
+
+    /**
+     * @return array{available: bool, message: ?string, env_var: ?string}
+     */
+    private function evaluateProviderRequiredConfiguration(ProviderMetadataInterface $provider, string $serviceLabel): array
+    {
+        $requiredVars = $provider->getRequiredEnvVars();
+
+        if ([] === $requiredVars) {
+            return ['available' => true, 'message' => null, 'env_var' => null];
+        }
+
+        foreach ($requiredVars as $envName => $meta) {
+            if (false === ($meta['required'] ?? true)) {
+                continue;
+            }
+
+            $candidates = (isset($meta['any_of']) && \is_array($meta['any_of']))
+                ? array_values(array_filter($meta['any_of'], 'is_string'))
+                : [$envName];
+
+            if ([] === $candidates) {
+                $candidates = [$envName];
+            }
+
+            $satisfied = false;
+            foreach ($candidates as $candidate) {
+                if ('' !== $candidate && $this->isMeaningfulEnvValueSet($candidate)) {
+                    $satisfied = true;
+                    break;
+                }
+            }
+
+            if (!$satisfied) {
+                $first = $candidates[0];
+
+                return [
+                    'available' => false,
+                    'message' => "Configuration not complete for {$serviceLabel}",
+                    'env_var' => $first,
+                ];
+            }
+        }
+
+        return ['available' => true, 'message' => null, 'env_var' => null];
     }
 
     /**

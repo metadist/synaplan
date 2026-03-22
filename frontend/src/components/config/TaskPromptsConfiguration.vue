@@ -887,13 +887,14 @@ const groupedModels = computed(() => {
   const capabilityLabels: Record<Capability, string> = {
     CHAT: 'Chat & General AI',
     SORT: 'Message Sorting',
+    ANALYZE: 'File Analysis',
     TEXT2PIC: 'Image Generation',
+    PIC2PIC: 'Image Editing (Image → Image)',
     TEXT2VID: 'Video Generation',
     TEXT2SOUND: 'Text-to-Speech',
     SOUND2TEXT: 'Speech-to-Text',
     PIC2TEXT: 'Vision (Image Analysis)',
     VECTORIZE: 'Embedding / RAG',
-    ANALYZE: 'File Analysis',
   }
 
   // Order of capabilities in dropdown
@@ -904,7 +905,6 @@ const groupedModels = computed(() => {
     'TEXT2SOUND',
     'SOUND2TEXT',
     'PIC2TEXT',
-    'ANALYZE',
     'VECTORIZE',
     'SORT',
   ]

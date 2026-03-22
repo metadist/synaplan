@@ -568,6 +568,49 @@
   box-shadow: 0 0 20px rgba(0, 240, 211, 0.15);
 }
 
+.design-v2 .v2-upgrade-btn {
+  position: relative;
+  background: linear-gradient(135deg, #f59e0b 0%, #d97706 50%, #f59e0b 100%);
+  background-size: 200% 200%;
+  color: #fff;
+  transition: all 0.3s ease;
+  box-shadow:
+    0 2px 8px rgba(245, 158, 11, 0.3),
+    inset 0 1px 0 rgba(255, 255, 255, 0.2);
+  animation: golden-shimmer 3s ease-in-out infinite;
+  overflow: hidden;
+}
+.design-v2 .v2-upgrade-btn::before {
+  content: '';
+  position: absolute;
+  top: -50%;
+  left: -50%;
+  width: 200%;
+  height: 200%;
+  background: linear-gradient(
+    45deg,
+    transparent 30%,
+    rgba(255, 255, 255, 0.15) 50%,
+    transparent 70%
+  );
+  animation: golden-shine 2.5s ease-in-out infinite;
+}
+.design-v2 .v2-upgrade-btn:hover {
+  background: linear-gradient(135deg, #fbbf24 0%, #f59e0b 50%, #fbbf24 100%);
+  box-shadow: 0 4px 16px rgba(245, 158, 11, 0.5);
+  transform: scale(1.08);
+}
+.design-v2.dark .v2-upgrade-btn {
+  background: linear-gradient(135deg, #fbbf24 0%, #f59e0b 50%, #fbbf24 100%);
+  box-shadow:
+    0 2px 8px rgba(251, 191, 36, 0.4),
+    inset 0 1px 0 rgba(255, 255, 255, 0.2);
+}
+.design-v2.dark .v2-upgrade-btn:hover {
+  background: linear-gradient(135deg, #fcd34d 0%, #fbbf24 50%, #fcd34d 100%);
+  box-shadow: 0 4px 16px rgba(251, 191, 36, 0.6);
+}
+
 .design-v2 .v2-rail-icon {
   color: var(--txt-secondary);
   border-radius: 0.75rem;

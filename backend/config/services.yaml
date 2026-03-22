@@ -33,6 +33,7 @@ parameters:
     env(GROQ_API_KEY): ''
     env(GOOGLE_GEMINI_API_KEY): ''
     env(GOOGLE_CLOUD_PROJECT_ID): ''
+    env(GOOGLE_VERTEX_ACCESS_TOKEN): ''
     env(THEHIVE_API_KEY): ''
     env(HUGGINGFACE_API_KEY): ''
     env(BRAVE_SEARCH_API_KEY): ''
@@ -139,6 +140,7 @@ services:
             $projectId: '%env(GOOGLE_CLOUD_PROJECT_ID)%'
             $region: 'us-central1'
             $uploadDir: '%kernel.project_dir%/var/uploads'
+            $vertexAccessToken: '%env(GOOGLE_VERTEX_ACCESS_TOKEN)%'
         tags:
             - { name: 'app.ai.chat' }
             - { name: 'app.ai.vision' }
@@ -179,6 +181,7 @@ services:
             $whisperModelsPath: '%env(WHISPER_MODELS_PATH)%'
             $defaultModel: '%env(WHISPER_DEFAULT_MODEL)%'
             $ffmpegBinary: '%env(FFMPEG_BINARY)%'
+            $whisperEnabled: '%env(bool:WHISPER_ENABLED)%'
 
     # Brave Search API Service
     App\Service\Search\BraveSearchService:

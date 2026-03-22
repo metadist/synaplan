@@ -39,15 +39,16 @@ const groupedModels = computed(() => {
   const capabilityLabels: Record<Capability, string> = {
     CHAT: 'Chat & General AI',
     SORT: 'Message Sorting',
+    ANALYZE: 'File Analysis',
     TEXT2PIC: 'Image Generation',
+    PIC2PIC: 'Image Editing (Image → Image)',
     TEXT2VID: 'Video Generation',
     TEXT2SOUND: 'Text-to-Speech',
     SOUND2TEXT: 'Speech-to-Text',
     PIC2TEXT: 'Vision (Image Analysis)',
     VECTORIZE: 'Embedding / RAG',
-    ANALYZE: 'File Analysis',
   }
-  const ordered: Capability[] = ['CHAT', 'ANALYZE', 'PIC2TEXT']
+  const ordered: Capability[] = ['CHAT', 'PIC2TEXT']
   ordered.forEach((cap) => {
     if (props.models[cap]?.length) {
       groups.push({

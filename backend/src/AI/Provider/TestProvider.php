@@ -165,8 +165,10 @@ class TestProvider implements ChatProviderInterface, EmbeddingProviderInterface,
     // ImageGenerationProviderInterface
     public function generateImage(string $prompt, array $options = []): array
     {
+        $label = empty($options['images']) ? 'Test+Image' : 'Test+Pic2Pic';
+
         return [[
-            'url' => 'https://via.placeholder.com/1024x1024?text=Test+Image',
+            'url' => 'https://via.placeholder.com/1024x1024?text='.$label,
             'revised_prompt' => $prompt,
         ]];
     }

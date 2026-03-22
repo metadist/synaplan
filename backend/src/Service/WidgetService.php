@@ -404,7 +404,7 @@ HTML;
      *
      * @param mixed $fields Raw custom fields input
      *
-     * @return array<array{id: string, name: string, type: string}> Validated field definitions
+     * @return array<array{id: string, name: string, type: string, options?: list<string>}> Validated field definitions
      */
     private function sanitizeCustomFields(mixed $fields): array
     {
@@ -412,9 +412,9 @@ HTML;
             return [];
         }
 
-        $validTypes = ['text', 'boolean'];
-        $maxPerType = ['text' => 3, 'boolean' => 3];
-        $typeCounts = ['text' => 0, 'boolean' => 0];
+        $validTypes = ['text', 'boolean', 'dropdown'];
+        $maxPerType = ['text' => 3, 'boolean' => 3, 'dropdown' => 3];
+        $typeCounts = ['text' => 0, 'boolean' => 0, 'dropdown' => 0];
         $sanitized = [];
         $usedIds = [];
 
@@ -439,6 +439,15 @@ HTML;
             if ($typeCounts[$type] >= $maxPerType[$type]) {
                 continue;
             }
+
+            $options = [];
+            if ('dropdown' === $type) {
+                $options = $this->sanitizeDropdownOptions($field['options'] ?? []);
+                if ([] === $options) {
+                    continue;
+                }
+            }
+
             ++$typeCounts[$type];
 
             // Server-generated IDs: reuse existing valid IDs, generate new ones otherwise
@@ -451,11 +460,46 @@ HTML;
             }
 
             $usedIds[] = $id;
-            $sanitized[] = [
+            $entry = [
                 'id' => $id,
                 'name' => $name,
                 'type' => $type,
             ];
+
+            if ('dropdown' === $type) {
+                $entry['options'] = $options;
+            }
+
+            $sanitized[] = $entry;
+        }
+
+        return $sanitized;
+    }
+
+    /**
+     * Sanitize dropdown option values, enforcing max 5 non-empty unique options.
+     *
+     * @return list<string>
+     */
+    private function sanitizeDropdownOptions(mixed $options): array
+    {
+        if (!is_array($options)) {
+            return [];
+        }
+
+        $sanitized = [];
+        foreach ($options as $option) {
+            if (!is_string($option)) {
+                continue;
+            }
+            $option = mb_substr(trim(strip_tags($option)), 0, 100);
+            if ('' === $option || in_array($option, $sanitized, true)) {
+                continue;
+            }
+            $sanitized[] = $option;
+            if (count($sanitized) >= 5) {
+                break;
+            }
         }
 
         return $sanitized;
@@ -493,6 +537,13 @@ HTML;
                 $sanitized[$fieldId] = null !== $value ? mb_substr(trim($value), 0, 256) : '';
             } elseif ('boolean' === $def['type']) {
                 $sanitized[$fieldId] = (bool) $value;
+            } elseif ('dropdown' === $def['type']) {
+                $allowedOptions = $def['options'] ?? [];
+                if (!is_string($value) || !in_array($value, $allowedOptions, true)) {
+                    $sanitized[$fieldId] = '';
+                    continue;
+                }
+                $sanitized[$fieldId] = $value;
             }
         }
 

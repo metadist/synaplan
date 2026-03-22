@@ -23,6 +23,25 @@ const CSRF_HEADER = import.meta.env.VITE_CSRF_HEADER_NAME || 'X-CSRF-Token'
 // Token refresh stampede protection
 let tokenRefreshPromise: Promise<boolean> | null = null
 
+const publicAuthPaths = [
+  '/login',
+  '/register',
+  '/verify-email',
+  '/forgot-password',
+  '/reset-password',
+  '/logged-out',
+]
+
+function isOnPublicAuthPage(): boolean {
+  return publicAuthPaths.some((p) => window.location.pathname.startsWith(p))
+}
+
+function redirectToSessionExpired(): void {
+  if (!isOnPublicAuthPage()) {
+    window.location.href = '/login?reason=session_expired'
+  }
+}
+
 /**
  * Centralized token refresh - prevents concurrent refresh requests (stampede)
  */
@@ -147,7 +166,7 @@ async function httpClient<T = unknown, S extends z.Schema | undefined = undefine
             return data as T
           } else if (retryResponse.status === 401) {
             // Still 401 after refresh - redirect to login
-            window.location.href = '/login?reason=session_expired'
+            redirectToSessionExpired()
             throw new Error('Session expired')
           } else {
             let retryErrorMessage = `${retryResponse.status} ${retryResponse.statusText}`
@@ -172,7 +191,7 @@ async function httpClient<T = unknown, S extends z.Schema | undefined = undefine
         }
       } else {
         // Refresh failed - redirect to login
-        window.location.href = '/login?reason=session_expired'
+        redirectToSessionExpired()
         throw new Error('Session expired')
       }
     }

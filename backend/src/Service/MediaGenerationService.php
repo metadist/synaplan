@@ -92,6 +92,81 @@ final readonly class MediaGenerationService implements MediaGenerationServiceInt
         ];
     }
 
+    public function generateFromImages(User $user, string $prompt, array $imagePaths, ?int $modelId = null): array
+    {
+        if ('' === trim($prompt)) {
+            throw new \InvalidArgumentException('Prompt is required');
+        }
+
+        if (empty($imagePaths) || \count($imagePaths) > 2) {
+            throw new \InvalidArgumentException('1 or 2 images are required');
+        }
+
+        foreach ($imagePaths as $path) {
+            if (!file_exists($path)) {
+                throw new \InvalidArgumentException('Uploaded image not found: '.basename($path));
+            }
+        }
+
+        $this->checkRateLimit($user, 'image');
+
+        $resolved = $this->resolveModel($user, 'pic2pic', $modelId);
+        $provider = $resolved['provider'];
+        $modelName = $resolved['modelName'];
+        $modelConfig = $resolved['modelConfig'];
+
+        $this->logger->info('Pic2pic generation request', [
+            'user_id' => $user->getId(),
+            'provider' => $provider,
+            'model' => $modelName,
+            'image_count' => \count($imagePaths),
+            'prompt_length' => \strlen($prompt),
+        ]);
+
+        $result = $this->aiFacade->generateImage($prompt, $user->getId(), [
+            'provider' => $provider,
+            'model' => $modelName,
+            'modelConfig' => $modelConfig,
+            'images' => $imagePaths,
+            'quality' => 'high',
+            'size' => self::DEFAULT_IMAGE_SIZE,
+        ]);
+
+        $mediaUrl = $this->extractMediaUrl($result, 'image');
+
+        if (null === $mediaUrl) {
+            throw new \RuntimeException('Provider returned no media');
+        }
+
+        $localPath = $this->persistMedia($mediaUrl, $user->getId(), $provider, 'image');
+
+        if (null === $localPath) {
+            throw new \RuntimeException('Failed to save generated media to disk');
+        }
+
+        $mimeType = $this->guessMimeType($localPath, 'image');
+
+        $this->recordUsage($user, 'image', $provider, $modelName);
+
+        // Clean up temporary upload files
+        foreach ($imagePaths as $tmpPath) {
+            if (file_exists($tmpPath) && str_contains($tmpPath, sys_get_temp_dir())) {
+                @unlink($tmpPath);
+            }
+        }
+
+        return [
+            'success' => true,
+            'file' => [
+                'url' => '/api/v1/files/uploads/'.$localPath,
+                'type' => 'image',
+                'mimeType' => $mimeType,
+            ],
+            'provider' => $result['provider'] ?? $provider ?? 'unknown',
+            'model' => $result['model'] ?? $modelName ?? 'unknown',
+        ];
+    }
+
     private function validateInput(string $prompt, string $type): void
     {
         if ('' === trim($prompt)) {
@@ -119,7 +194,11 @@ final readonly class MediaGenerationService implements MediaGenerationServiceInt
     private function resolveModel(User $user, string $type, ?int $modelId): array
     {
         if (null === $modelId) {
-            $capability = 'image' === $type ? 'TEXT2PIC' : 'TEXT2VID';
+            $capability = match ($type) {
+                'pic2pic' => 'PIC2PIC',
+                'video' => 'TEXT2VID',
+                default => 'TEXT2PIC',
+            };
             $modelId = $this->modelConfigService->getDefaultModel($capability, $user->getId());
         }
 

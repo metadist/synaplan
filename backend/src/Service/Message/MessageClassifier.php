@@ -2,6 +2,7 @@
 
 namespace App\Service\Message;
 
+use App\Entity\File;
 use App\Entity\Message;
 use App\Repository\MessageMetaRepository;
 use App\Service\ModelConfigService;
@@ -14,11 +15,13 @@ use Psr\Log\LoggerInterface;
  * High-level classifier that handles:
  * 1. Check for "Again" function (user-selected AI/prompt via BMESSAGEMETA)
  * 2. Check for tool commands (e.g., /pic, /vid, /search)
- * 3. Use MessageSorter for AI-based classification
+ * 3. Document or audio attachment → analyzefile / file_analysis (skip sorting, #595)
+ * 4. Use MessageSorter for AI-based classification
  *
  * Workflow from legacy:
  * - If BMESSAGEMETA has PROMPTID set → use that directly (skip sorting)
  * - If message starts with "/" → tool command
+ * - If attached document/audio → analyzefile
  * - Otherwise → use AI sorting
  */
 final readonly class MessageClassifier
@@ -50,7 +53,7 @@ final readonly class MessageClassifier
      *
      * @return array ['topic' => string, 'language' => string, 'source' => string, 'skip_sorting' => bool]
      */
-    public function classify(Message $message, array $conversationHistory = []): array
+    public function classify(Message $message, array $conversationHistory = [], ?int $overrideModelId = null): array
     {
         $userId = $message->getUserId();
         $messageId = $message->getId();
@@ -60,6 +63,7 @@ final readonly class MessageClassifier
             'message_id' => $messageId,
             'user_id' => $userId,
             'has_text' => !empty($text),
+            'override_model_id' => $overrideModelId,
         ]);
 
         // 1. Check for "Again" function - user-selected AI/prompt
@@ -133,10 +137,9 @@ final readonly class MessageClassifier
             }
         }
 
-        // 3. Check for image attachments (force file analysis)
-        // This prevents images from being routed to text2pic or chat without vision
-        if ($this->hasImages($message)) {
-            $this->logger->info('MessageClassifier: Image detected, forcing file analysis', [
+        // 3. Document / audio attachments → FileAnalysisHandler (ANALYZE model), before AI sorting (#595)
+        if ($this->messageHasDocumentOrAudioAttachment($message)) {
+            $this->logger->info('MessageClassifier: Forcing analyzefile route (document or audio attachment)', [
                 'message_id' => $messageId,
             ]);
 
@@ -144,7 +147,7 @@ final readonly class MessageClassifier
                 'topic' => 'analyzefile',
                 'language' => $message->getLanguage() ?: 'en',
                 'intent' => 'file_analysis',
-                'source' => 'image_attachment',
+                'source' => 'attachment_document_or_audio',
                 'skip_sorting' => true,
             ];
         }
@@ -171,6 +174,10 @@ final readonly class MessageClassifier
             'skip_sorting' => false,
             'intent' => $this->mapTopicToIntent($result['topic']), // Map topic to intent for routing
         ];
+
+        if ($overrideModelId) {
+            $classification['override_model_id'] = $overrideModelId;
+        }
 
         // Pass through media_type if detected (for mediamaker topic)
         $mediaType = $result['media_type'] ?? null;
@@ -238,41 +245,11 @@ final readonly class MessageClassifier
     }
 
     /**
-     * Check if message has image attachments.
-     */
-    private function hasImages(Message $message): bool
-    {
-        // Check new-style file attachments
-        foreach ($message->getFiles() as $file) {
-            if (str_starts_with($file->getFileMime(), 'image/')) {
-                return true;
-            }
-        }
-
-        // Check legacy file type (stores extensions like 'jpg', 'png', not 'image')
-        $imageExtensions = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'image'];
-        if (in_array($message->getFileType(), $imageExtensions, true)) {
-            return true;
-        }
-
-        // Check file path extension as fallback
-        $filePath = $message->getFilePath();
-        if (!empty($filePath)) {
-            $ext = strtolower(pathinfo($filePath, PATHINFO_EXTENSION));
-            if (in_array($ext, $imageExtensions, true)) {
-                return true;
-            }
-        }
-
-        return false;
-    }
-
-    /**
      * Build message data array for sorter.
      */
     private function buildMessageData(Message $message): array
     {
-        return [
+        $data = [
             'BDATETIME' => $message->getDateTime(),
             'BFILEPATH' => $message->getFilePath(),
             'BTOPIC' => $message->getTopic() ?: '',
@@ -280,8 +257,25 @@ final readonly class MessageClassifier
             'BTEXT' => $message->getText(),
             'BFILETEXT' => $message->getFileText() ?: '',
             'BFILE' => $message->getFile(),
-            'BWEBSEARCH' => 0, // Initialize for AI to set
+            'BWEBSEARCH' => 0,
         ];
+
+        $fileType = $message->getFileType();
+        if ('' !== $fileType) {
+            $data['BFILETYPE'] = $fileType;
+        }
+
+        $attachedFiles = $message->getFiles();
+        if ($attachedFiles->count() > 0) {
+            $types = [];
+            foreach ($attachedFiles as $file) {
+                $types[] = $file->getFileType() ?: $file->getFileMime();
+            }
+            $data['BATTACHED_FILES'] = implode(', ', $types);
+            $data['BATTACHED_COUNT'] = $attachedFiles->count();
+        }
+
+        return $data;
     }
 
     /**
@@ -303,9 +297,9 @@ final readonly class MessageClassifier
             'officemaker' => 'document_generation',
 
             // Analysis
-            'analyzefile' => 'file_analysis',
             'pic2text' => 'file_analysis',
             'analyze' => 'file_analysis',
+            'analyzefile' => 'file_analysis',
 
             // Chat/General
             'general' => 'chat',
@@ -339,12 +333,53 @@ final readonly class MessageClassifier
             'text2pic' => 'mediamaker',
             'text2vid' => 'mediamaker',
             'text2sound' => 'mediamaker',
-            'pic2text' => 'analyzefile',
-            'analyze' => 'analyzefile',
+            'pic2text' => 'general', // Vision is handled by ChatHandler
+            'analyze' => 'general',
             'chat' => 'general',
             'vectorize' => 'general',
         ];
 
         return $tagToTopicMap[$modelTag] ?? ($fallbackTopic ?: 'general');
+    }
+
+    /**
+     * True if the message has at least one attached document or audio file (not images only).
+     * Routes to FileAnalysisHandler so ANALYZE default model is used (#595).
+     */
+    private function messageHasDocumentOrAudioAttachment(Message $message): bool
+    {
+        $files = $message->getFiles();
+        if ($files->count() > 0) {
+            foreach ($files as $file) {
+                if ($this->attachedFileIsDocumentOrAudio($file)) {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        if ($message->getFile() > 0 && '' !== (string) $message->getFilePath()) {
+            $ext = strtolower(pathinfo($message->getFilePath(), PATHINFO_EXTENSION));
+
+            return in_array($ext, MessagePreProcessor::DOCUMENT_EXTENSIONS, true)
+                || in_array($ext, MessagePreProcessor::AUDIO_EXTENSIONS, true);
+        }
+
+        return false;
+    }
+
+    private function attachedFileIsDocumentOrAudio(File $file): bool
+    {
+        $fromType = strtolower($file->getFileType() ?: '');
+        $fromName = strtolower(pathinfo($file->getFileName(), PATHINFO_EXTENSION));
+        $ext = '' !== $fromType ? $fromType : $fromName;
+
+        if (in_array($ext, MessagePreProcessor::IMAGE_EXTENSIONS, true)) {
+            return false;
+        }
+
+        return in_array($ext, MessagePreProcessor::DOCUMENT_EXTENSIONS, true)
+            || in_array($ext, MessagePreProcessor::AUDIO_EXTENSIONS, true);
     }
 }

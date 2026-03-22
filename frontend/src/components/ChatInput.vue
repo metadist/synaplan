@@ -82,7 +82,6 @@
               class="flex-1"
               data-testid="input-chat-message"
               @keydown="handleKeyDown"
-              @keydown.enter.exact.prevent="sendMessage"
               @focus="isFocused = true"
               @blur="isFocused = false"
             />
@@ -155,8 +154,13 @@
         </div>
       </div>
 
-      <!-- Main controls - always visible below input -->
-      <div class="mt-3 flex items-center gap-2" data-testid="section-chat-secondary-actions">
+      <!-- Main controls - always visible below input in advanced mode -->
+      <div
+        v-if="!appModeStore.isEasyMode"
+        class="mt-3 flex items-center gap-2"
+        data-testid="section-chat-secondary-actions"
+      >
+        <ModelDropdown v-model="selectedModelId" class="flex-shrink-0" />
         <ToolsDropdown
           :active-command="activeCommand"
           class="flex-shrink-0"
@@ -235,6 +239,7 @@ import Textarea from './Textarea.vue'
 import CommandPalette from './CommandPalette.vue'
 import FileMentionPalette from './FileMentionPalette.vue'
 import ToolsDropdown from './ToolsDropdown.vue'
+import ModelDropdown from './ModelDropdown.vue'
 import FileSelectionModal from './FileSelectionModal.vue'
 import { parseCommand } from '../commands/parse'
 import { useCommandsStore, type Command } from '@/stores/commands'
@@ -248,6 +253,7 @@ import { useConfigStore } from '@/stores/config'
 import { useI18n } from 'vue-i18n'
 import { useAutoPersist } from '@/composables/useInputPersistence'
 import { useChatsStore } from '@/stores/chats'
+import { useAppModeStore } from '@/stores/appMode'
 
 interface UploadedFile {
   file_id: number
@@ -270,6 +276,7 @@ const originalMessage = ref('')
 const enhancedMessage = ref('')
 const uploadedFiles = ref<UploadedFile[]>([])
 const uploading = ref(false)
+const uploadAbortController = ref<AbortController | null>(null)
 const enhanceEnabled = ref(false)
 const enhanceLoading = ref(false)
 const thinkingEnabled = ref(false)
@@ -293,6 +300,7 @@ const speechFinalTranscript = ref('') // Accumulated final transcripts during re
 const fileSelectionModalVisible = ref(false)
 const voiceReply = ref(false)
 const discardNextRecording = ref(false)
+const selectedModelId = ref<number | null>(null)
 
 const SILENCE_TIMEOUT_MS = 4000
 const silenceTimer = ref<ReturnType<typeof setTimeout> | null>(null)
@@ -301,6 +309,7 @@ const autoSendPending = ref(false)
 const aiConfigStore = useAiConfigStore()
 const chatsStore = useChatsStore()
 const configStore = useConfigStore()
+const appModeStore = useAppModeStore()
 const { warning, error: showError, success } = useNotification()
 const { t, locale } = useI18n()
 
@@ -369,6 +378,7 @@ const emit = defineEmits<{
       webSearch?: boolean
       fileIds?: number[]
       voiceReply?: boolean
+      modelId?: number
     },
   ]
   stop: []
@@ -402,17 +412,23 @@ const canSend = computed(() => {
   return (hasMessage || hasFiles) && filesReady && !uploading.value
 })
 
-const supportsReasoning = computed(() => {
-  // Get the configured default model
-  const currentModel = aiConfigStore.getCurrentModel('CHAT')
+const currentChatModel = computed(() => {
+  const chatModels = aiConfigStore.models.CHAT || []
+  const resolvedModelId = selectedModelId.value ?? aiConfigStore.defaults.CHAT ?? null
 
-  // If no model yet (store still loading), return false (button will be disabled)
-  if (!currentModel) {
+  if (!resolvedModelId) {
+    return null
+  }
+
+  return chatModels.find((model) => model.id === resolvedModelId) ?? null
+})
+
+const supportsReasoning = computed(() => {
+  if (!currentChatModel.value) {
     return false
   }
 
-  // Check if model has reasoning capability
-  return currentModel.features?.includes('reasoning') ?? false
+  return currentChatModel.value.features?.includes('reasoning') ?? false
 })
 
 // Auto-enable thinking when switching to a reasoning-capable model
@@ -426,6 +442,14 @@ watch(
     }
   },
   { immediate: true }
+)
+
+// Reset model dropdown when switching chats
+watch(
+  () => chatsStore.activeChatId,
+  () => {
+    selectedModelId.value = null
+  }
 )
 
 watch(
@@ -511,6 +535,7 @@ const sendMessage = () => {
       webSearch: hasWebSearch,
       fileIds: uploadedFiles.value.filter((f) => !f.processing).map((f) => f.file_id),
       voiceReply: voiceReply.value,
+      modelId: selectedModelId.value || undefined,
     }
     emit('send', messageToSend, options)
     message.value = ''
@@ -587,6 +612,7 @@ const handleKeyDown = (e: KeyboardEvent) => {
       e.preventDefault()
       e.stopPropagation()
       paletteRef.value.handleKeyDown(e)
+      return
     }
   } else if (mentionPaletteVisible.value && mentionPaletteRef.value) {
     const handled = ['ArrowUp', 'ArrowDown', 'Enter', 'Escape', 'Tab']
@@ -594,7 +620,13 @@ const handleKeyDown = (e: KeyboardEvent) => {
       e.preventDefault()
       e.stopPropagation()
       mentionPaletteRef.value.handleKeyDown(e)
+      return
     }
+  }
+
+  if (e.key === 'Enter' && !e.shiftKey && !e.ctrlKey && !e.altKey && !e.metaKey) {
+    e.preventDefault()
+    sendMessage()
   }
 }
 
@@ -707,8 +739,15 @@ const uploadFiles = async (files: File[]) => {
   isDragging.value = false
   uploading.value = true
 
+  if (uploadAbortController.value) {
+    uploadAbortController.value.abort()
+  }
+  const controller = new AbortController()
+  uploadAbortController.value = controller
+
   for (const file of files) {
-    // Add to UI immediately as "processing"
+    if (controller.signal.aborted) break
+
     const tempFile: UploadedFile = {
       file_id: 0,
       filename: file.name,
@@ -719,10 +758,8 @@ const uploadFiles = async (files: File[]) => {
     uploadedFiles.value.push(tempFile)
 
     try {
-      // Upload to backend (PreProcessor extracts content automatically)
-      const result = await chatApi.uploadChatFile(file)
+      const result = await chatApi.uploadChatFile(file, controller.signal)
 
-      // Update with real file_id
       const index = uploadedFiles.value.findIndex((f) => f.name === file.name && f.processing)
       if (index !== -1) {
         uploadedFiles.value[index] = {
@@ -733,7 +770,6 @@ const uploadFiles = async (files: File[]) => {
         }
       }
 
-      // For audio files, show transcription info if available
       if (result.text) {
         const preview = result.text.substring(0, 50) + (result.text.length > 50 ? '...' : '')
         const languageInfo = result.language ? ` (${result.language})` : ''
@@ -742,11 +778,14 @@ const uploadFiles = async (files: File[]) => {
 
       console.log('✅ File uploaded and processed:', result)
     } catch (err) {
+      if (err instanceof DOMException && err.name === 'AbortError') {
+        uploadedFiles.value = uploadedFiles.value.filter((f) => !f.processing)
+        break
+      }
       console.error('❌ File upload failed:', err)
       const errorMessage = err instanceof Error ? err.message : 'Unknown error'
       showError(`File upload failed: ${errorMessage}`)
 
-      // Remove from list
       const index = uploadedFiles.value.findIndex((f) => f.name === file.name)
       if (index !== -1) {
         uploadedFiles.value.splice(index, 1)
@@ -755,6 +794,7 @@ const uploadFiles = async (files: File[]) => {
   }
 
   uploading.value = false
+  uploadAbortController.value = null
 }
 
 const clearSilenceTimer = () => {
@@ -766,6 +806,10 @@ const clearSilenceTimer = () => {
 
 onUnmounted(() => {
   clearSilenceTimer()
+  if (uploadAbortController.value) {
+    uploadAbortController.value.abort()
+    uploadAbortController.value = null
+  }
 })
 
 /**

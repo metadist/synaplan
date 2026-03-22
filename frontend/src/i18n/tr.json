@@ -255,6 +255,8 @@
     "dropFiles": "Dosyaları buraya bırakın",
     "dropFilesHint": "Resimler, belgeler, ses dosyaları...",
     "filesPasted": "{count} dosya yapıştırıldı",
+    "voiceReply": "Seslendir",
+    "voiceReplyTooltip": "Yapay zeka yanıtı sesli okur",
     "send": "Mesaj gönder",
     "waitForStreaming": "Lütfen başka bir mesaj göndermeden önce mevcut yanıtın tamamlanmasını bekleyin.",
     "share": "Paylaş",
@@ -266,6 +268,9 @@
       "imageGenDesc": "Metinden görsel oluştur",
       "videoGen": "Video Oluşturma",
       "videoGenDesc": "Metinden video oluştur"
+    },
+    "modelDropdown": {
+      "default": "Standart"
     },
     "removeTool": "Aracı kaldır"
   },
@@ -404,8 +409,14 @@
     "attachFiles": "Dosyaları Ekle",
     "uploadNew": "Yeni Dosyalar Yükle",
     "uploading": "{total} dosyadan {current} yükleniyor...",
+    "uploadingFilePercent": "Dosya {current} / {total} — {percent}%",
+    "storingFile": "Sunucuya kaydediliyor…",
+    "processingOnServer": "{count} dosya arka planda işleniyor…",
     "orDragDrop": "veya dosyaları buraya sürükleyip bırakın",
-    "dropHere": "Yüklemek için dosyaları buraya bırakın"
+    "dropHere": "Yüklemek için dosyaları buraya bırakın",
+    "uploadSuccess": "{count} dosya başarıyla yüklendi",
+    "uploadCancelled": "Yükleme iptal edildi",
+    "uploadInterrupted": "Aktarım kesildi. Liste yenilendi — sunucuya ulaşmış dosyalar görünmeye devam edebilir."
   },
   "aiProvider": {
     "error": {
@@ -510,6 +521,8 @@
     "noSocialProviders": "Sosyal giriş sağlayıcısı yapılandırılmamış",
     "registrationSuccess": "Kayıt Başarılı!",
     "registrationSuccessDesc": "Bu e-posta adresi henüz kayıtlı değilse, size bir doğrulama e-postası gönderdik. Lütfen gelen kutunuzu (spam klasörü dahil) kontrol edin.",
+    "registrationCompleteTitle": "E-postanızı kontrol edin",
+    "registrationCompleteDesc": "Size bir doğrulama bağlantısı gönderdik. Lütfen gelen kutunuzu ve spam klasörünüzü kontrol edin, ardından hesabınızı etkinleştirmek için bağlantıya tıklayın.",
     "passwordResetSuccess": "İstek Gönderildi!",
     "passwordResetSuccessDesc": "Bu e-posta adresiyle bir hesap varsa, şifre sıfırlama bağlantısı gönderdik. Lütfen gelen kutunuzu kontrol edin.",
     "recaptchaError": "reCAPTCHA doğrulaması başarısız. Lütfen tekrar deneyin.",
@@ -849,7 +862,8 @@
     "generatingFileDesc": "AI istenen dosyayı oluşturuyor",
     "topic": "Konu",
     "language": "Dil",
-    "modelId": "Model ID"
+    "modelId": "Model ID",
+    "longRunningHint": "Bu istek normalden biraz daha uzun sürüyor — lütfen biraz bekleyin."
   },
   "message": {
     "thinking": "Düşünme süreci",
@@ -1062,7 +1076,9 @@
     "uploaded": "YÜKLENDİ",
     "action": "İŞLEM",
     "status_uploaded": "Yüklendi",
+    "status_extracting": "Metin çıkarılıyor…",
     "status_extracted": "Çıkarıldı",
+    "status_vectorizing": "İndeksleniyor…",
     "status_vectorized": "Vektörleştirildi",
     "status_processed": "İşlendi",
     "status_error": "Hata",
@@ -1162,6 +1178,7 @@
         "vectorize": "Gömme / Vektörleştirme",
         "pic2text": "Görü (Görsel → Metin)",
         "text2pic": "Görsel Oluşturma (Metin → Görsel)",
+        "pic2pic": "Görsel Düzenleme (Görsel → Görsel)",
         "text2vid": "Video Oluşturma (Metin → Video)",
         "sound2text": "Konuşmadan Metne",
         "text2sound": "Metinden Konuşmaya",
@@ -1181,6 +1198,8 @@
       "modelsAndPurposes": "Modeller ve Amaçlar",
       "availableModels": "Mevcut Modeller",
       "noModels": "Bu amaç için model yok",
+      "modelNotAvailable": "{model} kullanılamıyor. Lütfen sağlayıcı yapılandırmasını kontrol edin.",
+      "modelNotConfigured": "{model} hazır değil: Ortamınızda {envVar} ayarlayın (ör. .env.local).",
       "id": "ID",
       "purpose": "AMAÇ",
       "service": "HİZMET",

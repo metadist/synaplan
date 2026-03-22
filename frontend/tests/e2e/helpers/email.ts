@@ -73,14 +73,6 @@ export function toMatches(msg: MailHogMessage, recipientEmail: string): boolean 
   return false
 }
 
-/** Clear MailHog inbox. Throws on API error (fail-fast). */
-export async function clearMailHog(request: APIRequestContext): Promise<void> {
-  const res = await request.delete(`${URLS.MAILHOG_URL}/api/v1/messages`)
-  if (!res.ok()) {
-    throw new Error(`MailHog clear failed: ${res.status()}`)
-  }
-}
-
 /** Poll until verification email; return href. Fails by timeout if mail never arrives or API stays non-OK. */
 export async function waitForVerificationHref(
   request: APIRequestContext,

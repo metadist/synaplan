@@ -228,6 +228,27 @@
               </template>
             </div>
           </div>
+          <Transition name="long-running">
+            <div
+              v-if="longRunning"
+              class="text-xs txt-tertiary mt-2 flex items-center gap-1.5 pl-8"
+            >
+              <svg
+                class="w-3.5 h-3.5 flex-shrink-0"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                stroke-width="2"
+              >
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z"
+                />
+              </svg>
+              {{ $t('processing.longRunningHint') }}
+            </div>
+          </Transition>
         </div>
 
         <!-- Bubble content (only non-thinking parts) -->
@@ -616,6 +637,7 @@
                 <div
                   v-if="modelDropdownOpen && !isSuperseded"
                   v-click-outside="closeModelDropdown"
+                  data-testid="dropdown-again-models"
                   class="fixed sm:absolute bottom-[60px] sm:bottom-full right-2 sm:right-0 sm:mb-2 min-w-[14rem] max-w-[calc(100vw-1rem)] dropdown-panel z-[100] max-h-[16rem] overflow-y-auto scroll-thin"
                   @keydown.escape="closeModelDropdown"
                 >
@@ -711,7 +733,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import {
@@ -737,6 +759,7 @@ import ExternalLinkWarning from '@/components/common/ExternalLinkWarning.vue'
 import { useExternalLink } from '@/composables/useExternalLink'
 import type { Part, MessageFile } from '@/stores/history'
 import type { AgainData } from '@/types/ai-models'
+import { mediaHintFromClassificationTopic } from '@/utils/mediaGenerationHint'
 
 const { t } = useI18n()
 const { error: showError } = useNotification()
@@ -752,6 +775,8 @@ interface Props {
   modelLabel?: string
   topic?: string // Topic from message classification
   originalTopic?: string | null // Original classification topic preserved on error messages
+  /** BMEDIA subtype when topic is mediamaker (failed generation without media parts) */
+  originalMediaType?: string | null
   againData?: AgainData
   backendMessageId?: number
   processingStatus?: string
@@ -975,9 +1000,20 @@ const effectiveTopic = computed(() => {
   return props.topic
 })
 
+const imageExtensions = ['jpg', 'jpeg', 'png', 'webp', 'gif']
+
 const isVisionResponse = computed(() => {
   const topic = effectiveTopic.value?.toLowerCase()
-  return topic === 'analyzefile' || topic === 'pic2text'
+  if (topic === 'pic2text') return true
+  if (topic === 'analyzefile' && props.files?.length) {
+    return props.files.some((f) => imageExtensions.includes(f.fileType?.toLowerCase()))
+  }
+  return false
+})
+
+const isFileAnalysisResponse = computed(() => {
+  const topic = effectiveTopic.value?.toLowerCase()
+  return (topic === 'analyzefile' || topic === 'analyze') && !isVisionResponse.value
 })
 
 const mediaHint = computed(() => {
@@ -985,34 +1021,65 @@ const mediaHint = computed(() => {
   if (hasImageContent.value) return 'image' as const
   if (hasVideoContent.value) return 'video' as const
   if (hasAudioContent.value) return 'audio' as const
+  const fromTopic = mediaHintFromClassificationTopic(
+    effectiveTopic.value,
+    props.originalMediaType ?? null
+  )
+  if (fromTopic) {
+    return fromTopic
+  }
   return null
 })
 
 // Dynamic label for model badge based on content type
 const getModelTypeLabel = computed(() => {
-  if (isVisionResponse.value) return 'Vision Model'
-  if (hasImageContent.value) return 'Image Model'
-  if (hasVideoContent.value) return 'Video Model'
-  if (hasAudioContent.value) return 'Audio Model'
-  return 'Chat Model'
+  if (isFileAnalysisResponse.value) return 'Analyze Model'
+  switch (mediaHint.value) {
+    case 'vision':
+      return 'Vision Model'
+    case 'image':
+      return 'Image Model'
+    case 'video':
+      return 'Video Model'
+    case 'audio':
+      return 'Audio Model'
+    default:
+      return 'Chat Model'
+  }
 })
 
 // Dynamic icon for model badge
 const getModelTypeIcon = computed(() => {
-  if (isVisionResponse.value) return 'mdi:eye'
-  if (hasImageContent.value) return 'mdi:image'
-  if (hasVideoContent.value) return 'mdi:video'
-  if (hasAudioContent.value) return 'mdi:music'
-  return 'mdi:chat'
+  if (isFileAnalysisResponse.value) return 'mdi:file-search'
+  switch (mediaHint.value) {
+    case 'vision':
+      return 'mdi:eye'
+    case 'image':
+      return 'mdi:image'
+    case 'video':
+      return 'mdi:video'
+    case 'audio':
+      return 'mdi:music'
+    default:
+      return 'mdi:chat'
+  }
 })
 
 // Dynamic title for model badge
 const getModelTypeTitle = computed(() => {
-  if (isVisionResponse.value) return 'Vision (Image → Text)'
-  if (hasImageContent.value) return 'Image Generation (Text → Image)'
-  if (hasVideoContent.value) return 'Video Generation (Text → Video)'
-  if (hasAudioContent.value) return 'Audio Generation (Text → Audio)'
-  return 'Chat Generation'
+  if (isFileAnalysisResponse.value) return 'File Analysis (Document/Audio → Text)'
+  switch (mediaHint.value) {
+    case 'vision':
+      return 'Vision (Image → Text)'
+    case 'image':
+      return 'Image Generation (Text → Image)'
+    case 'video':
+      return 'Video Generation (Text → Video)'
+    case 'audio':
+      return 'Audio Generation (Text → Audio)'
+    default:
+      return 'Chat Generation'
+  }
 })
 
 const formattedTime = computed(() => {
@@ -1036,6 +1103,33 @@ const isProcessing = computed(() => {
   ]
   return processingStates.some((state) => props.processingStatus?.startsWith(state))
 })
+
+const LONG_RUNNING_THRESHOLD_MS = 30_000
+const longRunning = ref(false)
+let longRunningTimer: ReturnType<typeof setTimeout> | null = null
+
+function clearLongRunningTimer() {
+  if (longRunningTimer) {
+    clearTimeout(longRunningTimer)
+    longRunningTimer = null
+  }
+  longRunning.value = false
+}
+
+watch(
+  () => props.isStreaming,
+  (streaming) => {
+    if (streaming && props.role === 'assistant') {
+      clearLongRunningTimer()
+      longRunningTimer = setTimeout(() => {
+        if (props.isStreaming) longRunning.value = true
+      }, LONG_RUNNING_THRESHOLD_MS)
+    } else {
+      clearLongRunningTimer()
+    }
+  },
+  { immediate: true }
+)
 
 const emit = defineEmits<{
   regenerate: [model: ModelOption]
@@ -1255,6 +1349,7 @@ onMounted(() => {
 
 onUnmounted(() => {
   document.removeEventListener('click', handleReferenceClick)
+  clearLongRunningTimer()
 })
 </script>
 
@@ -1272,5 +1367,16 @@ onUnmounted(() => {
     opacity: 1;
     transform: translateY(0);
   }
+}
+
+.long-running-enter-active {
+  transition:
+    opacity 0.4s ease,
+    transform 0.4s ease;
+}
+
+.long-running-enter-from {
+  opacity: 0;
+  transform: translateY(-4px);
 }
 </style>

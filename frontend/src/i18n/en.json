@@ -282,6 +282,9 @@
       "videoGen": "Video Generation",
       "videoGenDesc": "Generate videos from text"
     },
+    "modelDropdown": {
+      "default": "Default"
+    },
     "removeTool": "Remove tool"
   },
   "chatMessage": {
@@ -520,7 +523,9 @@
     "uploaded": "UPLOADED",
     "action": "ACTION",
     "status_uploaded": "Uploaded",
-    "status_extracted": "Processing",
+    "status_extracting": "Extracting text…",
+    "status_extracted": "Extracted",
+    "status_vectorizing": "Indexing…",
     "status_vectorized": "Ready",
     "attached": "Attached",
     "standalone": "Standalone",
@@ -576,6 +581,9 @@
     "attachFiles": "Attach Files",
     "uploadNew": "Upload New Files",
     "uploading": "Uploading {current} of {total}...",
+    "uploadingFilePercent": "File {current} of {total} — {percent}%",
+    "storingFile": "Saving on server…",
+    "processingOnServer": "Processing {count} file(s) in the background…",
     "orDragDrop": "or drag & drop files here",
     "dropHere": "Drop files here to upload",
     "viewContent": "View content",
@@ -592,7 +600,10 @@
     "bulkDeletePartial": "{success} deleted, {failed} failed",
     "reVectorize": "Reprocess",
     "reVectorizeSuccess": "File reprocessed successfully ({chunks} parts indexed)",
-    "reVectorizeFailed": "Reprocessing failed"
+    "reVectorizeFailed": "Reprocessing failed",
+    "uploadSuccess": "{count} file(s) uploaded successfully",
+    "uploadCancelled": "Upload cancelled",
+    "uploadInterrupted": "Transfer interrupted. The file list was refreshed — anything that had already reached the server may still appear."
   },
   "fileMention": {
     "hint": "Type to search files — press Enter to attach",
@@ -662,6 +673,7 @@
         "vectorize": "Embedding / Vectorization",
         "pic2text": "Vision (Image → Text)",
         "text2pic": "Image Generation (Text → Image)",
+        "pic2pic": "Image Editing (Image → Image)",
         "text2vid": "Video Generation (Text → Video)",
         "sound2text": "Speech-to-Text",
         "text2sound": "Text-to-Speech",
@@ -681,6 +693,8 @@
       "modelsAndPurposes": "Models & Purposes",
       "availableModels": "Available Models",
       "noModels": "No models available for this purpose",
+      "modelNotAvailable": "{model} is not available. Please check provider configuration.",
+      "modelNotConfigured": "{model} is not ready: set {envVar} in your environment (e.g. .env.local).",
       "id": "ID",
       "purpose": "PURPOSE",
       "service": "SERVICE",
@@ -1156,6 +1170,8 @@
     "noSocialProviders": "No social login providers configured",
     "registrationSuccess": "Registration Successful!",
     "registrationSuccessDesc": "If this email address is not already registered, we have sent you a verification email. Please check your inbox (including spam folder).",
+    "registrationCompleteTitle": "Check your email",
+    "registrationCompleteDesc": "We sent you a verification link. Please check your inbox and spam folder, then click the link to activate your account.",
     "passwordResetSuccess": "Request Sent!",
     "passwordResetSuccessDesc": "If an account with this email address exists, we have sent you a password reset link. Please check your inbox.",
     "recaptchaError": "reCAPTCHA verification failed. Please try again.",
@@ -1923,18 +1939,27 @@
       "fieldType": "Type",
       "typeText": "Text",
       "typeBoolean": "Yes/No",
+      "typeDropdown": "Dropdown",
       "save": "Save",
       "saved": "Custom fields saved",
       "saveFailed": "Failed to save custom fields",
       "empty": "No custom fields defined yet.",
       "emptyHint": "Add fields to capture additional information during internal chats.",
       "removeConfirm": "Remove this field?",
-      "maxFieldsReached": "Maximum number of fields reached (3 text, 3 yes/no)",
+      "maxFieldsReached": "Maximum number of fields reached (3 per type)",
       "maxTextReached": "Maximum of 3 text fields reached",
       "maxBooleanReached": "Maximum of 3 yes/no fields reached",
+      "maxDropdownReached": "Maximum of 3 dropdown fields reached",
       "fieldNameRequired": "Field name is required",
       "panelTitle": "Additional Information",
-      "noSession": "Start a chat first to fill in custom fields."
+      "noSession": "Start a chat first to fill in custom fields.",
+      "dropdownOptions": "Options",
+      "dropdownOptionPlaceholder": "Option {n}",
+      "addOption": "Add option",
+      "maxOptionsReached": "Maximum of 5 options",
+      "minOptionsRequired": "At least 1 option is required",
+      "dropdownPlaceholder": "Select...",
+      "optionsCount": "{count} options"
     },
     "edit": "Edit",
     "delete": "Delete",
@@ -2190,7 +2215,8 @@
     "memoriesCompleteDesc": "Analysis complete",
     "topic": "Topic",
     "language": "Language",
-    "modelId": "Model ID"
+    "modelId": "Model ID",
+    "longRunningHint": "This request is taking a bit longer than usual — please hang tight."
   },
   "message": {
     "thinking": "Thinking process",

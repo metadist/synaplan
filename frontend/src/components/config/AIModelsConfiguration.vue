@@ -350,13 +350,14 @@ const { t } = useI18n()
 const purposeLabels = computed<Record<Capability, string>>(() => ({
   SORT: t('config.aiModels.capabilities.sort'),
   CHAT: t('config.aiModels.capabilities.chat'),
+  ANALYZE: t('config.aiModels.capabilities.analyze'),
   VECTORIZE: t('config.aiModels.capabilities.vectorize'),
   PIC2TEXT: t('config.aiModels.capabilities.pic2text'),
   TEXT2PIC: t('config.aiModels.capabilities.text2pic'),
+  PIC2PIC: t('config.aiModels.capabilities.pic2pic'),
   TEXT2VID: t('config.aiModels.capabilities.text2vid'),
   SOUND2TEXT: t('config.aiModels.capabilities.sound2text'),
   TEXT2SOUND: t('config.aiModels.capabilities.text2sound'),
-  ANALYZE: t('config.aiModels.capabilities.analyze'),
 }))
 
 const loading = ref(false)
@@ -365,13 +366,14 @@ const availableModels = ref<ModelsData>({})
 const defaultConfig = ref<Record<Capability, number | null>>({
   SORT: null,
   CHAT: null,
+  ANALYZE: null,
   VECTORIZE: null,
   PIC2TEXT: null,
   TEXT2PIC: null,
+  PIC2PIC: null,
   TEXT2VID: null,
   SOUND2TEXT: null,
   TEXT2SOUND: null,
-  ANALYZE: null,
 })
 const originalConfig = ref<Record<Capability, number | null>>({ ...defaultConfig.value })
 const selectedPurpose = ref<Capability | null>(null)
@@ -400,11 +402,15 @@ const normalizeHighlight = (highlight: string): Capability | 'ALL' | null => {
     VECTORIZATION: 'VECTORIZE',
     VISION: 'PIC2TEXT',
     IMAGE: 'TEXT2PIC',
+    PIC2PIC: 'PIC2PIC',
+    IMAGE2IMAGE: 'PIC2PIC',
     VIDEO: 'TEXT2VID',
     TRANSCRIPTION: 'SOUND2TEXT',
     TTS: 'TEXT2SOUND',
     VOICE: 'TEXT2SOUND',
+    ANALYZE: 'ANALYZE',
     ANALYSIS: 'ANALYZE',
+    FILE_ANALYSIS: 'ANALYZE',
   }
 
   return aliasMap[highlight] || null
@@ -413,6 +419,7 @@ const normalizeHighlight = (highlight: string): Capability | 'ALL' | null => {
 onMounted(async () => {
   await loadData()
   document.addEventListener('click', handleClickOutside)
+  document.addEventListener('keydown', handleKeydown)
 
   // Check for highlight query parameter
   const highlightParam = route.query.highlight as string | undefined
@@ -446,6 +453,7 @@ onMounted(async () => {
 
 onBeforeUnmount(() => {
   document.removeEventListener('click', handleClickOutside)
+  document.removeEventListener('keydown', handleKeydown)
 })
 
 // Watch for route changes to handle highlight parameter
@@ -546,6 +554,7 @@ const toggleDropdown = (capability: Capability) => {
 
 const selectModel = async (capability: Capability, modelId: number | null) => {
   openDropdown.value = null
+  const previousModelId = defaultConfig.value[capability]
   defaultConfig.value[capability] = modelId
 
   // Check availability if a model was selected
@@ -554,13 +563,23 @@ const selectModel = async (capability: Capability, modelId: number | null) => {
       const check = await checkModelAvailability(modelId)
 
       if (!check.available) {
-        if (check.setup_required) {
-          warning(`Setup required: ${check.message}`)
+        // Revert selection — model cannot be used
+        defaultConfig.value[capability] = previousModelId
+        const modelName =
+          getModelsByPurpose(capability).find((m) => m.id === modelId)?.name || `ID ${modelId}`
+        if (check.env_var) {
+          warning(
+            t('config.aiModels.modelNotConfigured', {
+              model: modelName,
+              envVar: check.env_var,
+            })
+          )
         } else {
-          showError(`Model not available: ${check.message}`)
+          showError(t('config.aiModels.modelNotAvailable', { model: modelName }))
         }
+        return
       }
-    } catch (error: any) {
+    } catch (error) {
       console.error('Failed to check model availability:', error)
     }
   }
@@ -570,8 +589,16 @@ const selectModel = async (capability: Capability, modelId: number | null) => {
 }
 
 const handleClickOutside = (event: MouseEvent) => {
+  if (!openDropdown.value) return
   const target = event.target as HTMLElement
-  if (!target.closest('.relative')) {
+  const openRef = capabilityRefs.value[openDropdown.value]
+  if (openRef && !openRef.contains(target)) {
+    openDropdown.value = null
+  }
+}
+
+const handleKeydown = (event: KeyboardEvent) => {
+  if (event.key === 'Escape' && openDropdown.value) {
     openDropdown.value = null
   }
 }

@@ -34,6 +34,7 @@ final readonly class MediaGenerationHandler implements MessageHandlerInterface
         private UserUploadPathBuilder $userUploadPathBuilder,
         private ThumbnailService $thumbnailService,
         private RateLimitService $rateLimitService,
+        private MediaErrorMessageBuilder $errorMessageBuilder,
         private string $uploadDir = '/var/www/backend/var/uploads',
     ) {
     }
@@ -112,10 +113,16 @@ final readonly class MediaGenerationHandler implements MessageHandlerInterface
             throw new \RuntimeException('Unable to determine media prompt text');
         }
 
+        // Collect attached image paths for pic2pic
+        $attachedImagePaths = $this->collectAttachedImagePaths($message);
+        $isPic2Pic = !empty($attachedImagePaths);
+
         $this->logger->info('MediaGenerationHandler: Starting media generation', [
             'user_id' => $message->getUserId(),
             'prompt' => substr($prompt, 0, 100),
             'media_hint' => $promptMediaType,
+            'is_pic2pic' => $isPic2Pic,
+            'attached_images' => count($attachedImagePaths),
         ]);
 
         // Get media generation model - detect type from model tag if specified
@@ -137,29 +144,25 @@ final readonly class MediaGenerationHandler implements MessageHandlerInterface
             $this->logger->info('MediaGenerationHandler: Detected /vid command, forcing video generation');
         }
 
-        // Priority: Classification override > DB default
+        // Priority: Again model_id > Task-prompt aiModel > DB default
+        $promptMetadata = $classification['prompt_metadata'] ?? [];
+        $promptAiModel = (isset($promptMetadata['aiModel']) && (int) $promptMetadata['aiModel'] > 0)
+            ? (int) $promptMetadata['aiModel']
+            : null;
+
         if (isset($classification['model_id']) && $classification['model_id']) {
             $modelId = $classification['model_id'];
             $this->logger->info('MediaGenerationHandler: Using classification override model', [
                 'model_id' => $modelId,
             ]);
-
-            // Detect media type from model tag (only if not a slash command)
-            if (!$isSlashCommand) {
-                $model = $this->em->getRepository(\App\Entity\Model::class)->find($modelId);
-                if ($model) {
-                    $tag = $model->getTag();
-                    if ('text2vid' === $tag) {
-                        $mediaType = 'video';
-                    } elseif ('text2sound' === $tag) {
-                        $mediaType = 'audio';
-                    }
-                    $provider = $model->getService();
-                    $modelName = $model->getName();
-                }
-            }
+            [$mediaType, $provider, $modelName] = $this->resolveMediaTypeFromModelId($modelId, $isSlashCommand, $mediaType, $provider, $modelName);
+        } elseif ($promptAiModel) {
+            $modelId = $promptAiModel;
+            $this->logger->info('MediaGenerationHandler: Using task-prompt aiModel override', [
+                'model_id' => $modelId,
+            ]);
+            [$mediaType, $provider, $modelName] = $this->resolveMediaTypeFromModelId($modelId, $isSlashCommand, $mediaType, $provider, $modelName);
         } else {
-            // For slash commands, skip auto-detection and use the detected type
             $effectiveUserId = $this->modelConfigService->getEffectiveUserIdForMessage($message);
 
             if ($isSlashCommand) {
@@ -171,6 +174,13 @@ final readonly class MediaGenerationHandler implements MessageHandlerInterface
                 $this->logger->info('MediaGenerationHandler: Using default model for slash command', [
                     'media_type' => $mediaType,
                     'model_id' => $modelId,
+                ]);
+            } elseif ($isPic2Pic) {
+                $modelId = $this->modelConfigService->getDefaultModel('PIC2PIC', $effectiveUserId);
+                $mediaType = 'image';
+                $this->logger->info('MediaGenerationHandler: Pic2pic detected, using PIC2PIC default model', [
+                    'model_id' => $modelId,
+                    'image_count' => count($attachedImagePaths),
                 ]);
             } elseif ('video' === $promptMediaType) {
                 $modelId = $this->modelConfigService->getDefaultModel('TEXT2VID', $effectiveUserId);
@@ -185,9 +195,6 @@ final readonly class MediaGenerationHandler implements MessageHandlerInterface
                 $mediaType = 'image';
                 $this->logger->info('MediaGenerationHandler: Using media type hint from extractor (image)');
             } else {
-                // Default to image if media type cannot be determined
-                // The mediamaker prompt should return JSON with BMEDIA, but if it doesn't,
-                // we default to image (most common case)
                 $modelId = $this->modelConfigService->getDefaultModel('TEXT2PIC', $effectiveUserId);
                 $mediaType = 'image';
 
@@ -238,6 +245,7 @@ final readonly class MediaGenerationHandler implements MessageHandlerInterface
             'image' => 'IMAGES',
             'video' => 'VIDEOS',
             'audio' => 'AUDIOS',
+            default => 'IMAGES',
         };
 
         $userId = $message->getUserId();
@@ -351,18 +359,29 @@ final readonly class MediaGenerationHandler implements MessageHandlerInterface
                     ],
                 ];
             } else {
-                // Generate image
+                // Generate image (with optional reference images for pic2pic)
+                $imageOptions = [
+                    'provider' => $provider,
+                    'model' => $modelName,
+                    'modelConfig' => $modelConfig,
+                    'quality' => $options['quality'] ?? ($isPic2Pic ? 'high' : 'standard'),
+                    'style' => $options['style'] ?? 'vivid',
+                    'size' => $options['size'] ?? '1024x1024',
+                ];
+
+                if ($isPic2Pic) {
+                    $imageOptions['images'] = $attachedImagePaths;
+                    $this->logger->info('MediaGenerationHandler: Passing reference images to provider', [
+                        'count' => count($attachedImagePaths),
+                        'provider' => $provider,
+                        'model' => $modelName,
+                    ]);
+                }
+
                 $result = $this->aiFacade->generateImage(
                     $prompt,
                     $message->getUserId(),
-                    [
-                        'provider' => $provider,
-                        'model' => $modelName,
-                        'modelConfig' => $modelConfig,
-                        'quality' => $options['quality'] ?? 'standard',
-                        'style' => $options['style'] ?? 'vivid',
-                        'size' => $options['size'] ?? '1024x1024',
-                    ]
+                    $imageOptions
                 );
 
                 $media = $result['images'] ?? [];
@@ -470,11 +489,8 @@ final readonly class MediaGenerationHandler implements MessageHandlerInterface
                 'exception' => $e,
             ]);
 
-            $userMessage = match ($mediaType) {
-                'audio' => 'Sorry, the audio could not be generated right now. Please try again or use a different model. Tip: For audio, try a clear prompt like "Read this text aloud: …".',
-                'video' => 'Sorry, the video could not be generated right now. Please try again or use a different model.',
-                default => 'Sorry, the image could not be generated right now. Please try again or use a different model.',
-            };
+            $lang = $classification['language'] ?? 'en';
+            $userMessage = $this->errorMessageBuilder->buildErrorMessage($e, $mediaType, $lang);
             $streamCallback($userMessage);
 
             return [
@@ -654,6 +670,68 @@ final readonly class MediaGenerationHandler implements MessageHandlerInterface
 
             return null;
         }
+    }
+
+    /**
+     * Collect absolute paths of image attachments from the message.
+     *
+     * @return string[] Absolute file paths to attached images
+     */
+    private function collectAttachedImagePaths(Message $message): array
+    {
+        $paths = [];
+        $imageExtensions = ['jpg', 'jpeg', 'png', 'gif', 'webp'];
+
+        foreach ($message->getFiles() as $file) {
+            $ext = strtolower(pathinfo($file->getFilePath(), PATHINFO_EXTENSION));
+            if (in_array($ext, $imageExtensions, true)) {
+                $absolutePath = $this->uploadDir.'/'.$file->getFilePath();
+                if (file_exists($absolutePath)) {
+                    $paths[] = $absolutePath;
+                }
+            }
+        }
+
+        if (empty($paths)) {
+            $legacyPath = $message->getFilePath();
+            if ($legacyPath) {
+                $ext = strtolower(pathinfo($legacyPath, PATHINFO_EXTENSION));
+                if (in_array($ext, $imageExtensions, true)) {
+                    $absolutePath = $this->uploadDir.'/'.$legacyPath;
+                    if (file_exists($absolutePath)) {
+                        $paths[] = $absolutePath;
+                    }
+                }
+            }
+        }
+
+        return $paths;
+    }
+
+    /**
+     * Resolve media type, provider, and model name from a model ID.
+     *
+     * @return array{string, ?string, ?string} [$mediaType, $provider, $modelName]
+     */
+    private function resolveMediaTypeFromModelId(int $modelId, bool $isSlashCommand, string $mediaType, ?string $provider, ?string $modelName): array
+    {
+        if ($isSlashCommand) {
+            return [$mediaType, $provider, $modelName];
+        }
+
+        $model = $this->em->getRepository(\App\Entity\Model::class)->find($modelId);
+        if ($model) {
+            $tag = $model->getTag();
+            if ('text2vid' === $tag) {
+                $mediaType = 'video';
+            } elseif ('text2sound' === $tag) {
+                $mediaType = 'audio';
+            }
+            $provider = $model->getService();
+            $modelName = $model->getName();
+        }
+
+        return [$mediaType, $provider, $modelName];
     }
 
     /**

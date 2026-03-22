@@ -25,6 +25,7 @@
           class="dropdown-trigger"
           :title="appModeStore.isEasyMode ? 'Switch to Advanced Mode' : 'Switch to Easy Mode'"
           data-testid="btn-mode-toggle"
+          :data-mode="appModeStore.isEasyMode ? 'easy' : 'advanced'"
           @click="appModeStore.toggleMode()"
         >
           <AdjustmentsHorizontalIcon class="w-5 h-5" />
@@ -38,6 +39,7 @@
             class="dropdown-trigger"
             aria-label="Select language"
             data-testid="btn-language-toggle"
+            :data-language="selectedLanguage"
             @click="isLangOpen = !isLangOpen"
           >
             <GlobeAltIcon class="w-5 h-5" />
@@ -56,6 +58,7 @@
               v-for="lang in languages"
               :key="lang.value"
               role="menuitem"
+              :data-language="lang.value"
               :class="[
                 'dropdown-item',
                 selectedLanguage === lang.value ? 'dropdown-item--active' : '',

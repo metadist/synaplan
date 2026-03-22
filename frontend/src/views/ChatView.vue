@@ -92,6 +92,7 @@
               :model-label="message.modelLabel"
               :topic="message.topic"
               :original-topic="message.originalTopic"
+              :original-media-type="message.originalMediaType"
               :again-data="message.againData"
               :backend-message-id="message.backendMessageId"
               :processing-status="message.isStreaming ? processingStatus : undefined"
@@ -710,6 +711,42 @@ const handleSendMessage = async (
   await streamAIResponse(backendContent, options)
 }
 
+/** Same clickable model footer live as after reload (sets aiModels.chat). */
+function applyAssistantChatModelFooter(
+  message: Message,
+  data: { provider?: string; model?: string; model_id?: number | null },
+  streamFallback: { provider?: string; model?: string; model_id?: number | null }
+) {
+  const isBadModelToken = (m: unknown) =>
+    m === undefined || m === null || String(m).toLowerCase() === 'error'
+  const isBadProviderToken = (p: unknown) =>
+    p === undefined || p === null || String(p).toLowerCase() === 'system'
+
+  const resolvedModel = !isBadModelToken(data.model)
+    ? String(data.model)
+    : streamFallback.model || message.modelLabel
+  const resolvedProvider = !isBadProviderToken(data.provider)
+    ? String(data.provider)
+    : streamFallback.provider || message.provider
+
+  const resolvedId =
+    data.model_id !== undefined && data.model_id !== null
+      ? data.model_id
+      : (streamFallback.model_id ?? null)
+
+  if (resolvedModel && resolvedProvider) {
+    message.modelLabel = resolvedModel
+    message.provider = resolvedProvider
+    message.aiModels = {
+      chat: {
+        provider: resolvedProvider,
+        model: resolvedModel,
+        model_id: resolvedId,
+      },
+    }
+  }
+}
+
 const streamAIResponse = async (
   userMessage: string,
   options?: {
@@ -718,12 +755,14 @@ const streamAIResponse = async (
     modelId?: number
     fileIds?: number[]
     voiceReply?: boolean
+    isAgain?: boolean
   }
 ) => {
   streamingAbortController = new AbortController()
 
-  // Get current selected model from aiConfig store (DB model with ID)
-  const currentModel = aiConfigStore.getCurrentModel('CHAT')
+  const currentModel =
+    aiConfigStore.models.CHAT?.find((model) => model.id === options?.modelId) ??
+    aiConfigStore.getCurrentModel('CHAT')
   const provider = currentModel?.service || modelsStore.selectedProvider
   const modelLabel = currentModel?.name || modelsStore.selectedModel
 
@@ -787,12 +826,18 @@ const streamAIResponse = async (
         })
       }
 
-      const stopStreaming = chatApi.streamMessage(
+      const stopStreaming = chatApi.streamMessage({
         userId,
-        userMessage,
+        message: userMessage,
         trackId,
         chatId,
-        (data) => {
+        includeReasoning,
+        webSearch,
+        modelId: finalModelId,
+        fileIds,
+        voiceReply: options?.voiceReply,
+        isAgain: options?.isAgain,
+        onUpdate: (data) => {
           // CRITICAL: Check abort signal at the very beginning
           if (streamingAbortController?.signal.aborted) {
             return
@@ -1297,17 +1342,28 @@ const streamAIResponse = async (
                 message.feedbackIds = data.feedbackIds
               }
 
-              // Update provider and model from backend metadata
-              if (data.provider) {
-                message.provider = data.provider
-              }
-              if (data.model) {
-                message.modelLabel = data.model
-              }
+              // Provider/model + clickable footer (aiModels) — match persisted API shape
+              applyAssistantChatModelFooter(
+                message,
+                {
+                  provider: data.provider,
+                  model: data.model,
+                  model_id: data.model_id ?? null,
+                },
+                { provider, model: modelLabel, model_id: currentModel?.id ?? null }
+              )
 
               // Store topic from classification
               if (data.topic) {
                 message.topic = data.topic
+              }
+
+              // Store original topic (preserved on error messages for correct "Again" model selection)
+              if (data.originalTopic !== undefined) {
+                message.originalTopic = data.originalTopic
+              }
+              if (data.originalMediaType !== undefined) {
+                message.originalMediaType = data.originalMediaType
               }
 
               // Mark reasoning parts as complete (remove streaming flag)
@@ -1336,12 +1392,32 @@ const streamAIResponse = async (
             processingStatus.value = ''
             processingMetadata.value = {}
 
-            // If backend provided a messageId for the error message, link it
-            // This allows the "Again" button to work for failed messages
-            if (data.messageId) {
+            // Update message metadata from error event so status/provider/topic
+            // are visible in real-time without requiring a page refresh
+            {
               const message = historyStore.messages.find((m) => m.id === messageId)
               if (message) {
-                message.backendMessageId = data.messageId
+                if (data.messageId) {
+                  message.backendMessageId = data.messageId
+                }
+                if (data.topic) {
+                  message.topic = data.topic
+                }
+                if (data.originalTopic !== undefined) {
+                  message.originalTopic = data.originalTopic
+                }
+                if (data.originalMediaType !== undefined) {
+                  message.originalMediaType = data.originalMediaType
+                }
+                applyAssistantChatModelFooter(
+                  message,
+                  {
+                    provider: data.provider,
+                    model: data.model,
+                    model_id: data.model_id ?? null,
+                  },
+                  { provider, model: modelLabel, model_id: currentModel?.id ?? null }
+                )
               }
             }
 
@@ -1459,12 +1535,7 @@ const streamAIResponse = async (
             console.warn('⚠️ Unknown status:', data.status, data)
           }
         },
-        includeReasoning,
-        webSearch,
-        finalModelId,
-        fileIds, // Pass array of fileIds
-        options?.voiceReply // Pass voice reply flag
-      )
+      })
 
       // Store EventSource cleanup function globally
       stopStreamingFn = stopStreaming
@@ -1650,7 +1721,20 @@ async function saveCancelledMessageToBackend(
   }
 }
 
-// Handle "Again" with specific model from backend
+function findPrecedingUserMessage(messages: Message[], fromIndex: number): Message | null {
+  for (let i = fromIndex - 1; i >= 0; i--) {
+    if (messages[i].role === 'user') return messages[i]
+  }
+  return null
+}
+
+function extractUserText(message: Message): string {
+  return message.parts
+    .filter((p) => p.type === 'text')
+    .map((p) => p.content || '')
+    .join('\n')
+}
+
 const handleAgain = async (backendMessageId: number, modelId?: number) => {
   if (!authStore.isAuthenticated) {
     console.error('❌ Not authenticated - redirecting to login')
@@ -1670,17 +1754,16 @@ const handleAgain = async (backendMessageId: number, modelId?: number) => {
   }
 
   const messageIndex = historyStore.messages.indexOf(assistantMessage)
-  const userMessage = messageIndex > 0 ? historyStore.messages[messageIndex - 1] : null
 
-  if (!userMessage || userMessage.role !== 'user') {
+  // Search backwards for the nearest user message
+  const userMessage = findPrecedingUserMessage(historyStore.messages, messageIndex)
+
+  if (!userMessage) {
     console.error('❌ Could not find user message before assistant message')
     return
   }
 
-  const userText = userMessage.parts
-    .filter((p) => p.type === 'text')
-    .map((p) => p.content)
-    .join('\n')
+  const userText = extractUserText(userMessage)
 
   if (!userText) {
     console.error('❌ No text found in user message')
@@ -1697,21 +1780,18 @@ const handleAgain = async (backendMessageId: number, modelId?: number) => {
   historyStore.markSuperseded(assistantMessage.id)
 
   // Stream new response directly without creating a duplicate user message
-  await streamAIResponse(userText, { modelId })
+  await streamAIResponse(userText, { modelId, isAgain: true })
 }
 
 const handleRegenerate = async (message: Message, modelOption: ModelOption) => {
   const messageIndex = historyStore.messages.findIndex((m) => m.id === message.id)
   if (messageIndex <= 0) return
 
-  const previousMessage = historyStore.messages[messageIndex - 1]
-  if (previousMessage.role !== 'user') return
+  // Search backwards for the nearest user message
+  const previousMessage = findPrecedingUserMessage(historyStore.messages, messageIndex)
+  if (!previousMessage) return
 
-  const content = previousMessage.parts
-    .filter((part) => part.type === 'text')
-    .map((part) => part.content || '')
-    .join('\n')
-
+  const content = extractUserText(previousMessage)
   if (!content) return
 
   // Stop any active audio playback before regenerating
@@ -1724,7 +1804,7 @@ const handleRegenerate = async (message: Message, modelOption: ModelOption) => {
   historyStore.markSuperseded(message.id)
 
   // Stream new response directly without creating a duplicate user message
-  await streamAIResponse(content, { modelId: modelOption.id })
+  await streamAIResponse(content, { modelId: modelOption.id, isAgain: true })
 }
 
 // Handle retry for rate-limited messages

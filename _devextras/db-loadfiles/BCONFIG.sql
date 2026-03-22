@@ -33,7 +33,7 @@ CREATE TABLE `BCONFIG` (
   KEY `idx_config_lookup` (`BOWNERID`,`BGROUP`,`BSETTING`),
   KEY `idx_group` (`BGROUP`),
   KEY `idx_setting` (`BSETTING`)
-) ENGINE=InnoDB AUTO_INCREMENT=55 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=58 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -99,7 +99,8 @@ INSERT INTO `BCONFIG` VALUES
 (53,2,'widget_1','autoMessage','Hello! How can I help you today?'),
 (54,2,'widget_1','prompt','general'),
 (55,0,'DEFAULTMODEL','ANALYZE','76'),
-(56,0,'DEFAULTMODEL','TOOLS','76');
+(56,0,'DEFAULTMODEL','TOOLS','76'),
+(57,0,'DEFAULTMODEL','PIC2PIC','190');
 /*!40000 ALTER TABLE `BCONFIG` ENABLE KEYS */;
 UNLOCK TABLES;
 commit;

@@ -110,6 +110,13 @@ class StreamController extends AbstractController
         schema: new OA\Schema(type: 'string', enum: ['0', '1'], example: '0')
     )]
     #[OA\Parameter(
+        name: 'isAgain',
+        in: 'query',
+        required: false,
+        description: 'Whether this is an "Again" request (retry with specific model, skip classification). Required when modelId is set to distinguish model override from retry.',
+        schema: new OA\Schema(type: 'string', enum: ['0', '1'], example: '0')
+    )]
+    #[OA\Parameter(
         name: 'promptTopic',
         in: 'query',
         required: false,
@@ -222,6 +229,7 @@ class StreamController extends AbstractController
         $modelId = $request->query->get('modelId', null);
 
         $voiceReply = '1' === $request->query->get('voiceReply', '0');
+        $isAgain = '1' === $request->query->get('isAgain', '0');
         $fileIds = $request->query->get('fileIds', ''); // NEW: comma-separated list or single ID
         $promptTopic = $request->query->get('promptTopic');
         $promptId = $request->query->get('promptId');
@@ -263,6 +271,7 @@ class StreamController extends AbstractController
             'chat_id' => $chatId,
             'has_model_id' => null !== $modelId,
             'model_id' => $modelId,
+            'is_again' => $isAgain,
             'file_ids' => $fileIdArray,
             'file_count' => count($fileIdArray),
         ]);
@@ -295,7 +304,7 @@ class StreamController extends AbstractController
         $response->headers->set('X-Accel-Buffering', 'no');
         $response->headers->set('Connection', 'keep-alive');
 
-        $response->setCallback(function () use ($user, $messageText, $trackId, $chatId, $includeReasoning, $webSearch, $modelId, $fileIdArray, $isWidgetMode, $fixedTaskPromptTopic, $widgetSession, $rateLimitError, $voiceReply) {
+        $response->setCallback(function () use ($user, $messageText, $trackId, $chatId, $includeReasoning, $webSearch, $modelId, $isAgain, $fileIdArray, $isWidgetMode, $fixedTaskPromptTopic, $widgetSession, $rateLimitError, $voiceReply) {
             // Disable output buffering
             while (ob_get_level()) {
                 ob_end_clean();
@@ -313,8 +322,13 @@ class StreamController extends AbstractController
                 return;
             }
 
+            $intendedChat = $this->resolveIntendedChatModelForStream(
+                null !== $modelId ? (int) $modelId : null,
+                $user
+            );
+
             // Helper to save error message
-            $saveError = function ($chat, $incomingMessage, string $errorMessage, string $provider = 'system', string $errorType = 'unknown') use ($user, $trackId) {
+            $saveError = function ($chat, $incomingMessage, string $errorMessage, string $provider = 'system', string $errorType = 'unknown') use ($user, $trackId, $intendedChat) {
                 if (!$chat || !$incomingMessage) {
                     return null;
                 }
@@ -338,8 +352,13 @@ class StreamController extends AbstractController
                     $this->em->persist($outgoingMessage);
                     $this->em->flush();
 
-                    $outgoingMessage->setMeta('ai_provider', $provider);
-                    $outgoingMessage->setMeta('ai_model', 'error');
+                    $displayProvider = $intendedChat['provider'] ?? $provider;
+                    $displayModel = $intendedChat['name'] ?? 'unknown';
+                    $outgoingMessage->setMeta('ai_chat_provider', $displayProvider);
+                    $outgoingMessage->setMeta('ai_chat_model', $displayModel);
+                    if (null !== ($intendedChat['id'] ?? null)) {
+                        $outgoingMessage->setMeta('ai_chat_model_id', (string) $intendedChat['id']);
+                    }
                     $outgoingMessage->setMeta('error_type', $errorType);
 
                     $incomingMessage->setTopic('ERROR');
@@ -470,11 +489,16 @@ class StreamController extends AbstractController
                     $processingOptions['disable_memories'] = true;
                 }
 
-                // Add model_id if specified (for "Again" functionality)
                 if ($modelId) {
-                    $processingOptions['model_id'] = (int) $modelId;
-                    $this->logger->info('StreamController: Using specified model', [
+                    if ($isAgain) {
+                        $processingOptions['model_id'] = (int) $modelId;
+                        $processingOptions['is_again'] = true;
+                    } else {
+                        $processingOptions['override_model_id'] = (int) $modelId;
+                    }
+                    $this->logger->info('StreamController: Model specified', [
                         'model_id' => $modelId,
+                        'is_again' => $isAgain,
                     ]);
                 }
 
@@ -724,6 +748,13 @@ class StreamController extends AbstractController
                     $originalTopic = (is_array($classification) && isset($classification['topic']))
                         ? $classification['topic']
                         : null;
+                    $originalMediaType = null;
+                    if (is_array($classification) && isset($classification['media_type']) && is_string($classification['media_type'])) {
+                        $trimmedMedia = trim($classification['media_type']);
+                        if ('' !== $trimmedMedia) {
+                            $originalMediaType = $trimmedMedia;
+                        }
+                    }
 
                     // Save error message to database
                     $outgoingMessage = new Message();
@@ -744,12 +775,21 @@ class StreamController extends AbstractController
                     $this->em->persist($outgoingMessage);
                     $this->em->flush(); // Flush to get message ID for metadata
 
-                    // Store error details in metadata
-                    $outgoingMessage->setMeta('ai_provider', $result['provider'] ?? 'system');
-                    $outgoingMessage->setMeta('ai_model', 'error');
+                    // Store error details in metadata (show user's selected chat model, not literal "error")
+                    $outgoingMessage->setMeta(
+                        'ai_chat_provider',
+                        $intendedChat['provider'] ?? ($result['provider'] ?? 'system')
+                    );
+                    $outgoingMessage->setMeta('ai_chat_model', $intendedChat['name'] ?? 'unknown');
+                    if (null !== ($intendedChat['id'] ?? null)) {
+                        $outgoingMessage->setMeta('ai_chat_model_id', (string) $intendedChat['id']);
+                    }
                     $outgoingMessage->setMeta('error_type', $result['error'] ?? 'unknown');
                     if ($originalTopic) {
                         $outgoingMessage->setMeta('original_topic', $originalTopic);
+                    }
+                    if (null !== $originalMediaType) {
+                        $outgoingMessage->setMeta('original_media_type', $originalMediaType);
                     }
 
                     // Update incoming message
@@ -758,13 +798,15 @@ class StreamController extends AbstractController
 
                     $chat->updateTimestamp();
                     $this->em->flush();
-                    // Send original topic so frontend can show correct "Again" models in real-time
                     $this->sendSSE('complete', [
                         'messageId' => $outgoingMessage->getId(),
                         'trackId' => $trackId,
-                        'provider' => $result['provider'] ?? 'system',
-                        'model' => 'error',
-                        'topic' => $originalTopic ?? 'ERROR',
+                        'provider' => $intendedChat['provider'] ?? ($result['provider'] ?? 'system'),
+                        'model' => $intendedChat['name'] ?? 'unknown',
+                        'model_id' => $intendedChat['id'],
+                        'topic' => 'ERROR',
+                        'originalTopic' => $originalTopic,
+                        'originalMediaType' => $originalMediaType,
                         'language' => 'en',
                     ]);
 
@@ -1208,7 +1250,11 @@ class StreamController extends AbstractController
 
                 $errorData = [
                     'error' => $e->getMessage(),
-                    'provider' => $e->getProviderName(),
+                    'provider' => $intendedChat['provider'] ?? $e->getProviderName(),
+                    'model' => $intendedChat['name'] ?? 'unknown',
+                    'model_id' => $intendedChat['id'],
+                    'topic' => 'ERROR',
+                    'trackId' => $trackId,
                 ];
 
                 if ($messageId) {
@@ -1241,6 +1287,11 @@ class StreamController extends AbstractController
 
                 $errorData = [
                     'error' => 'Failed to process message: '.$e->getMessage(),
+                    'provider' => $intendedChat['provider'] ?? 'system',
+                    'model' => $intendedChat['name'] ?? 'unknown',
+                    'model_id' => $intendedChat['id'],
+                    'topic' => 'ERROR',
+                    'trackId' => $trackId,
                 ];
 
                 if ($messageId) {
@@ -1252,6 +1303,28 @@ class StreamController extends AbstractController
         });
 
         return $response;
+    }
+
+    /**
+     * Resolve the chat model the user intended for this stream (explicit modelId or default CHAT from config).
+     *
+     * @return array{id: ?int, name: ?string, provider: ?string}
+     */
+    private function resolveIntendedChatModelForStream(?int $modelId, User $user): array
+    {
+        $id = $modelId
+            ?? $this->modelConfigService->getDefaultModel('chat', $user->getId())
+            ?? $this->modelConfigService->getDefaultModel('chat', 0);
+
+        if (!$id) {
+            return ['id' => null, 'name' => null, 'provider' => null];
+        }
+
+        return [
+            'id' => $id,
+            'name' => $this->modelConfigService->getModelName($id),
+            'provider' => $this->modelConfigService->getProviderForModel($id),
+        ];
     }
 
     /**
@@ -1267,7 +1340,18 @@ class StreamController extends AbstractController
             $result = $this->messageProcessor->process($message, $options);
 
             if (!$result['success']) {
-                $this->sendSSE('error', ['error' => $result['error']]);
+                $errorPayload = ['error' => $result['error']];
+                $failedClassification = $result['classification'] ?? null;
+                if (is_array($failedClassification)) {
+                    if (isset($failedClassification['topic']) && is_string($failedClassification['topic'])) {
+                        $errorPayload['originalTopic'] = $failedClassification['topic'];
+                    }
+                    if (isset($failedClassification['media_type']) && is_string($failedClassification['media_type'])
+                        && '' !== trim($failedClassification['media_type'])) {
+                        $errorPayload['originalMediaType'] = trim($failedClassification['media_type']);
+                    }
+                }
+                $this->sendSSE('error', $errorPayload);
 
                 return;
             }

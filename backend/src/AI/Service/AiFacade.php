@@ -542,6 +542,24 @@ class AiFacade
     }
 
     /**
+     * Check if the user has configured an external STT provider.
+     *
+     * Returns true when the user's SOUND2TEXT default model points to an external
+     * provider (OpenAI, Groq, etc.) — in that case, local Whisper.cpp should
+     * be skipped and the external API used directly.
+     */
+    public function hasConfiguredSttProvider(?int $userId): bool
+    {
+        if (!$userId || $userId <= 0) {
+            return false;
+        }
+
+        $modelId = $this->modelConfig->getDefaultModel('SOUND2TEXT', $userId);
+
+        return null !== $modelId && $modelId > 0;
+    }
+
+    /**
      * Synthesize Speech (TTS).
      *
      * @param string   $text    Text to synthesize

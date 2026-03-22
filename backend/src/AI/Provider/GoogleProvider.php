@@ -17,7 +17,7 @@ use Symfony\Contracts\HttpClient\HttpClientInterface;
  *
  * Supports:
  * - Gemini 2.0 Flash, Gemini 2.5 Pro (Chat, Vision)
- * - Imagen 3.0, Gemini 2.5 Flash Image (Image Generation)
+ * - Imagen 4 (Gemini API), Gemini native image models, optional Vertex Imagen with OAuth token
  * - Veo 2.0 (Video Generation)
  * - Text-to-Speech with Gemini
  */
@@ -33,10 +33,14 @@ class GoogleProvider implements ChatProviderInterface, ImageGenerationProviderIn
         private ?string $projectId = null,
         private string $region = 'us-central1',
         private string $uploadDir = '/var/www/backend/var/uploads',
+        private ?string $vertexAccessToken = null,
     ) {
         // Ensure projectId is null if empty string
         if (empty($this->projectId)) {
             $this->projectId = null;
+        }
+        if (empty($this->vertexAccessToken)) {
+            $this->vertexAccessToken = null;
         }
     }
 
@@ -92,6 +96,7 @@ class GoogleProvider implements ChatProviderInterface, ImageGenerationProviderIn
         return [
             'GOOGLE_GEMINI_API_KEY' => [
                 'required' => true,
+                'any_of' => ['GOOGLE_GEMINI_API_KEY', 'GEMINI_API_KEY', 'GOOGLE_API_KEY'],
                 'hint' => 'Get your API key from https://aistudio.google.com/app/apikey',
             ],
         ];
@@ -141,7 +146,11 @@ class GoogleProvider implements ChatProviderInterface, ImageGenerationProviderIn
 
             $data = $response->toArray();
 
+            $this->checkGeminiFinishReason($data);
+
             return $data['candidates'][0]['content']['parts'][0]['text'] ?? '';
+        } catch (ProviderException $e) {
+            throw $e;
         } catch (\Exception $e) {
             throw new ProviderException('Google chat error: '.$e->getMessage(), 'google');
         }
@@ -199,11 +208,17 @@ class GoogleProvider implements ChatProviderInterface, ImageGenerationProviderIn
                     $jsonData = substr($content, 6);
                     $data = json_decode($jsonData, true);
 
+                    if ($data) {
+                        $this->checkGeminiFinishReason($data);
+                    }
+
                     if (isset($data['candidates'][0]['content']['parts'][0]['text'])) {
                         $callback($data['candidates'][0]['content']['parts'][0]['text']);
                     }
                 }
             }
+        } catch (ProviderException $e) {
+            throw $e;
         } catch (\Exception $e) {
             throw new ProviderException('Google streaming error: '.$e->getMessage(), 'google');
         }
@@ -213,10 +228,16 @@ class GoogleProvider implements ChatProviderInterface, ImageGenerationProviderIn
 
     public function generateImage(string $prompt, array $options = []): array
     {
-        $model = $options['model'] ?? 'imagen-3.0-generate-002';
+        $model = $options['model'] ?? 'imagen-4.0-generate-001';
+        $inputImages = $options['images'] ?? [];
 
         if (!$this->apiKey) {
             throw ProviderException::missingApiKey('google', 'GOOGLE_GEMINI_API_KEY');
+        }
+
+        // Pic2pic: when input images are provided and model is a Gemini image model
+        if (!empty($inputImages) && $this->isGeminiNativeImageModel($model)) {
+            return $this->generateImageFromImagesWithGemini($model, $prompt, $inputImages, $options);
         }
 
         // Determine API type: explicit config > auto-detect from model name
@@ -224,7 +245,7 @@ class GoogleProvider implements ChatProviderInterface, ImageGenerationProviderIn
         $apiType = $modelConfig['api'] ?? null;
 
         if (!$apiType) {
-            $apiType = $this->isGeminiNativeImageModel($model) ? 'gemini' : 'vertex';
+            $apiType = $this->isGeminiNativeImageModel($model) ? 'gemini_native' : 'imagen';
         }
 
         $this->logger->info('Google: Generating image', [
@@ -234,7 +255,7 @@ class GoogleProvider implements ChatProviderInterface, ImageGenerationProviderIn
         ]);
 
         return match ($apiType) {
-            'gemini' => $this->generateImageWithGemini($model, $prompt, $options),
+            'gemini', 'gemini_native' => $this->generateImageWithGemini($model, $prompt, $options),
             default => $this->generateImageWithImagen($model, $prompt, $options),
         };
     }
@@ -289,31 +310,12 @@ class GoogleProvider implements ChatProviderInterface, ImageGenerationProviderIn
 
             $data = $response->toArray();
 
+            $this->checkGeminiFinishReason($data);
+
             $parts = $data['candidates'][0]['content']['parts'] ?? [];
-
-            // Log response structure for debugging
-            $partTypes = [];
-            $textContent = null;
-            foreach ($parts as $part) {
-                if (isset($part['text'])) {
-                    $partTypes[] = 'text';
-                    $textContent = substr($part['text'], 0, 200);
-                }
-                if (isset($part['inline_data']) || isset($part['inlineData'])) {
-                    $partTypes[] = 'image';
-                }
-            }
-
-            $this->logger->info('Google Gemini image response', [
-                'has_candidates' => isset($data['candidates']),
-                'parts_count' => count($parts),
-                'part_types' => $partTypes,
-                'text_preview' => $textContent,
-            ]);
 
             $images = [];
             foreach ($parts as $part) {
-                // Handle both snake_case and camelCase response formats
                 $inlineData = $part['inline_data'] ?? $part['inlineData'] ?? null;
                 if ($inlineData && isset($inlineData['data'])) {
                     $mimeType = $inlineData['mime_type'] ?? $inlineData['mimeType'] ?? 'image/png';
@@ -325,25 +327,154 @@ class GoogleProvider implements ChatProviderInterface, ImageGenerationProviderIn
             }
 
             return $images;
+        } catch (ProviderException $e) {
+            throw $e;
         } catch (\Exception $e) {
             throw new ProviderException('Google Gemini image generation error: '.$e->getMessage(), 'google');
         }
     }
 
     /**
-     * Generate image using Imagen via Vertex AI.
+     * Pic2pic: generate an image from input images + text using Gemini native API.
+     *
+     * @param string   $model      Gemini image model (e.g. gemini-3.1-flash-image-preview)
+     * @param string   $prompt     Text instruction
+     * @param string[] $imagePaths Absolute paths to input images
+     *
+     * @see https://ai.google.dev/gemini-api/docs/image-generation
+     */
+    private function generateImageFromImagesWithGemini(string $model, string $prompt, array $imagePaths, array $options): array
+    {
+        try {
+            $url = self::API_BASE."/models/{$model}:generateContent";
+
+            $parts = [['text' => $prompt]];
+            foreach ($imagePaths as $imgPath) {
+                $data = file_get_contents($imgPath);
+                if (false === $data) {
+                    throw new \Exception('Failed to read image: '.basename($imgPath));
+                }
+                $mimeType = mime_content_type($imgPath) ?: 'image/png';
+                $parts[] = [
+                    'inline_data' => [
+                        'mime_type' => $mimeType,
+                        'data' => base64_encode($data),
+                    ],
+                ];
+            }
+
+            $payload = [
+                'contents' => [['parts' => $parts]],
+                'generationConfig' => [
+                    'responseModalities' => ['TEXT', 'IMAGE'],
+                ],
+            ];
+
+            if (!empty($options['aspect_ratio'])) {
+                $payload['generationConfig']['imageConfig'] = [
+                    'aspectRatio' => $options['aspect_ratio'],
+                ];
+            }
+
+            $this->logger->info('Google: Pic2pic via Gemini native API', [
+                'model' => $model,
+                'image_count' => \count($imagePaths),
+                'prompt_length' => \strlen($prompt),
+            ]);
+
+            $response = $this->httpClient->request('POST', $url, [
+                'headers' => [
+                    'Content-Type' => 'application/json',
+                    'x-goog-api-key' => $this->apiKey,
+                ],
+                'json' => $payload,
+                'timeout' => 120,
+            ]);
+
+            $data = $response->toArray();
+
+            $this->checkGeminiFinishReason($data);
+
+            $responseParts = $data['candidates'][0]['content']['parts'] ?? [];
+
+            $images = [];
+            foreach ($responseParts as $part) {
+                $inlineData = $part['inline_data'] ?? $part['inlineData'] ?? null;
+                if ($inlineData && isset($inlineData['data'])) {
+                    $mime = $inlineData['mime_type'] ?? $inlineData['mimeType'] ?? 'image/png';
+                    $images[] = [
+                        'url' => 'data:'.$mime.';base64,'.$inlineData['data'],
+                        'revised_prompt' => $prompt,
+                    ];
+                }
+            }
+
+            return $images;
+        } catch (ProviderException $e) {
+            throw $e;
+        } catch (\Exception $e) {
+            throw new ProviderException('Google Gemini pic2pic error: '.$e->getMessage(), 'google');
+        }
+    }
+
+    /**
+     * Check Gemini generateContent response for blocked content.
+     *
+     * Gemini returns finishReason codes like SAFETY, RECITATION, PROHIBITED_CONTENT
+     * when it refuses to generate. The HTTP status is still 200, but the response
+     * contains no usable content parts.
+     *
+     * @throws ProviderException when content was blocked
+     */
+    private function checkGeminiFinishReason(array $data): void
+    {
+        $candidate = $data['candidates'][0] ?? null;
+
+        if (!$candidate) {
+            $blockReason = $data['promptFeedback']['blockReason'] ?? null;
+            if ($blockReason) {
+                $this->logger->warning('Google Gemini: Prompt blocked', [
+                    'block_reason' => $blockReason,
+                    'prompt_feedback' => $data['promptFeedback'] ?? null,
+                ]);
+                throw ProviderException::contentBlocked('google', $blockReason);
+            }
+
+            return;
+        }
+
+        $finishReason = $candidate['finishReason'] ?? null;
+
+        if ($finishReason && !\in_array($finishReason, ['STOP', 'MAX_TOKENS', 'END_TURN'], true)) {
+            $textResponse = null;
+            $parts = $candidate['content']['parts'] ?? [];
+            foreach ($parts as $part) {
+                if (isset($part['text'])) {
+                    $textResponse = $part['text'];
+                    break;
+                }
+            }
+
+            $this->logger->warning('Google Gemini: Content blocked', [
+                'finish_reason' => $finishReason,
+                'safety_ratings' => $candidate['safetyRatings'] ?? null,
+                'text_response' => $textResponse ? substr($textResponse, 0, 300) : null,
+            ]);
+
+            throw ProviderException::contentBlocked('google', $finishReason, $textResponse);
+        }
+    }
+
+    /**
+     * Generate image using Imagen via Gemini API (API key) or Vertex AI (project ID + OAuth).
+     *
+     * Gemini API: available for imagen-4.0-generate-001
+     *
+     * @see https://ai.google.dev/gemini-api/docs/imagen
      */
     private function generateImageWithImagen(string $model, string $prompt, array $options): array
     {
         try {
-            if (!$this->projectId) {
-                throw new ProviderException('Google project ID required for Imagen image generation', 'google');
-            }
-
-            $url = str_replace('{region}', $this->region, self::VERTEX_BASE)
-                ."/projects/{$this->projectId}/locations/{$this->region}"
-                ."/publishers/google/models/{$model}:predict";
-
             $payload = [
                 'instances' => [
                     [
@@ -353,36 +484,91 @@ class GoogleProvider implements ChatProviderInterface, ImageGenerationProviderIn
                 'parameters' => [
                     'sampleCount' => $options['n'] ?? 1,
                     'aspectRatio' => $options['aspect_ratio'] ?? '1:1',
-                    'negativePrompt' => $options['negative_prompt'] ?? '',
-                    'personGeneration' => 'allow_all',
                 ],
             ];
 
-            $response = $this->httpClient->request('POST', $url, [
-                'headers' => [
-                    'Content-Type' => 'application/json',
-                    'Authorization' => 'Bearer '.$this->apiKey,
-                ],
-                'json' => $payload,
-                'timeout' => 60,
-            ]);
-
-            $data = $response->toArray();
-
-            $images = [];
-            foreach ($data['predictions'] ?? [] as $prediction) {
-                if (isset($prediction['bytesBase64Encoded'])) {
-                    $images[] = [
-                        'url' => 'data:image/png;base64,'.$prediction['bytesBase64Encoded'],
-                        'revised_prompt' => $prompt,
-                    ];
-                }
+            // Imagen 4+ is supported on the Gemini API with GOOGLE_GEMINI_API_KEY (see Google docs).
+            // Vertex AI requires a separate OAuth access token — never send the API key as Bearer.
+            if ($this->projectId && $this->vertexAccessToken) {
+                return $this->generateImageWithImagenVertex($model, $payload);
             }
 
-            return $images;
+            return $this->generateImageWithImagenGemini($model, $payload);
+        } catch (ProviderException $e) {
+            throw $e;
         } catch (\Exception $e) {
             throw new ProviderException('Google Imagen generation error: '.$e->getMessage(), 'google');
         }
+    }
+
+    /**
+     * Imagen via Gemini API (API key auth, no GCP project required).
+     */
+    private function generateImageWithImagenGemini(string $model, array $payload): array
+    {
+        $url = self::API_BASE."/models/{$model}:predict";
+
+        $this->logger->info('Google Imagen: Using Gemini API', [
+            'model' => $model,
+            'url' => $url,
+        ]);
+
+        $response = $this->httpClient->request('POST', $url, [
+            'headers' => [
+                'Content-Type' => 'application/json',
+                'x-goog-api-key' => $this->apiKey,
+            ],
+            'json' => $payload,
+            'timeout' => 120,
+        ]);
+
+        return $this->parseImagenResponse($response->toArray());
+    }
+
+    /**
+     * Imagen via Vertex AI (GCP project + OAuth2 access token from GOOGLE_VERTEX_ACCESS_TOKEN).
+     */
+    private function generateImageWithImagenVertex(string $model, array $payload): array
+    {
+        if (!$this->vertexAccessToken) {
+            throw new ProviderException('Vertex Imagen requires GOOGLE_VERTEX_ACCESS_TOKEN (OAuth bearer), not the Gemini API key', 'google');
+        }
+
+        $url = str_replace('{region}', $this->region, self::VERTEX_BASE)
+            ."/projects/{$this->projectId}/locations/{$this->region}"
+            ."/publishers/google/models/{$model}:predict";
+
+        $this->logger->info('Google Imagen: Using Vertex AI', [
+            'model' => $model,
+            'project' => $this->projectId,
+        ]);
+
+        $response = $this->httpClient->request('POST', $url, [
+            'headers' => [
+                'Content-Type' => 'application/json',
+                'Authorization' => 'Bearer '.$this->vertexAccessToken,
+            ],
+            'json' => $payload,
+            'timeout' => 120,
+        ]);
+
+        return $this->parseImagenResponse($response->toArray());
+    }
+
+    private function parseImagenResponse(array $data): array
+    {
+        $images = [];
+        foreach ($data['predictions'] ?? [] as $prediction) {
+            if (isset($prediction['bytesBase64Encoded'])) {
+                $mimeType = $prediction['mimeType'] ?? 'image/png';
+                $images[] = [
+                    'url' => 'data:'.$mimeType.';base64,'.$prediction['bytesBase64Encoded'],
+                    'revised_prompt' => null,
+                ];
+            }
+        }
+
+        return $images;
     }
 
     public function createVariations(string $imageUrl, int $count = 1): array
@@ -519,7 +705,7 @@ class GoogleProvider implements ChatProviderInterface, ImageGenerationProviderIn
 
                         // Check for common error types
                         if (str_contains(strtolower($errorMessage), 'safety') || str_contains(strtolower($errorMessage), 'blocked')) {
-                            throw new \Exception('Video generation blocked by safety filters: '.$errorMessage);
+                            throw ProviderException::contentBlocked('google', 'SAFETY', $errorMessage);
                         }
 
                         throw new \Exception('Google video generation failed: '.$errorMessage.' (code: '.$errorCode.')');

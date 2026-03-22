@@ -79,6 +79,21 @@
       </button>
     </nav>
 
+    <!-- Upgrade Button -->
+    <div
+      v-if="!authStore.isAdmin && configStore.billing.enabled && !authStore.isPro"
+      class="flex items-center justify-center py-2 flex-shrink-0"
+    >
+      <button
+        class="v2-upgrade-btn w-10 h-10 flex items-center justify-center rounded-xl"
+        :title="$t('nav.upgrade')"
+        data-testid="btn-sidebar-v2-upgrade"
+        @click="handleNavigate('/subscription')"
+      >
+        <Icon icon="mdi:auto-fix" class="w-6 h-6" />
+      </button>
+    </div>
+
     <!-- User Avatar -->
     <div class="flex items-center justify-center py-4 flex-shrink-0">
       <button
@@ -161,15 +176,14 @@
               <span>{{ $t('nav.statistics') }}</span>
             </button>
             <button
-              v-if="!authStore.isAdmin && configStore.billing.enabled"
+              v-if="!authStore.isAdmin && configStore.billing.enabled && authStore.isPro"
               role="menuitem"
               class="dropdown-item"
-              :class="{ 'text-amber-500 dark:text-amber-400': !authStore.isPro }"
               data-testid="btn-sidebar-v2-subscription"
               @click="handleNavigate('/subscription')"
             >
               <SparklesIcon class="w-4 h-4" />
-              <span>{{ authStore.isPro ? $t('nav.subscription') : $t('nav.upgrade') }}</span>
+              <span>{{ $t('nav.subscription') }}</span>
             </button>
           </div>
           <div class="border-t border-light-border/10 dark:border-dark-border/10">
@@ -237,6 +251,7 @@
                 v-for="child in section.items"
                 :key="child.path"
                 :to="child.path"
+                :data-testid="`link-sidebar-v2${child.path.replace(/\//g, '-')}`"
                 class="flex items-center gap-2.5 px-3 py-2 text-sm transition-colors"
                 :class="
                   route.path === child.path

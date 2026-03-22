@@ -4,6 +4,7 @@ namespace App\Service;
 
 use App\AI\Service\AiFacade;
 use App\DTO\WhatsApp\IncomingMessageDto;
+use App\Entity\Chat;
 use App\Entity\Message;
 use App\Entity\User;
 use App\Service\File\FileProcessor;
@@ -64,6 +65,7 @@ final class WhatsAppService
         private DiscordNotificationService $discord,
         private CacheInterface $cache,
         private LockFactory $lockFactory,
+        private EmailChatService $emailChatService,
         string $whatsappAccessToken,
         bool $whatsappEnabled,
         private string $uploadsDir,
@@ -610,9 +612,13 @@ final class WhatsAppService
         $mediaId = $this->extractMediaId($dto);
         $mediaUrl = $dto->incomingMsg[$dto->type]['link'] ?? null;
 
-        // 4. Create database record
+        // 4. Resolve WhatsApp chat context (enables conversation history)
+        $chat = $this->emailChatService->findOrCreateWhatsAppChat($user, $dto->from);
+
+        // 5. Create database record
         $message = new Message();
         $message->setUserId($effectiveUserId);
+        $message->setChat($chat);
         $message->setTrackingId($dto->timestamp);
         $message->setProviderIndex('WHATSAPP');
         $message->setUnixTimestamp($dto->timestamp);
@@ -761,7 +767,7 @@ final class WhatsAppService
                         'video' => '[Video response]',
                         default => '[Audio response]', // audio is the remaining case
                     };
-                    $this->storeOutgoingMessage($user, $dto, $responseText ?: $placeholderText, $sendResult['message_id']);
+                    $this->storeOutgoingMessage($user, $dto, $responseText ?: $placeholderText, $sendResult['message_id'], $chat);
                     $responseSent = true;
 
                     // Discord notification: AI media generated and sent
@@ -812,7 +818,7 @@ final class WhatsAppService
 
                 $sendResult = $this->sendMedia($dto->from, 'audio', $audioUrl, $dto->phoneNumberId);
                 if ($sendResult['success']) {
-                    $this->storeOutgoingMessage($user, $dto, $responseText, $sendResult['message_id']);
+                    $this->storeOutgoingMessage($user, $dto, $responseText, $sendResult['message_id'], $chat);
                     $responseSent = true;
 
                     // Discord notification: TTS response sent
@@ -862,7 +868,7 @@ final class WhatsAppService
         if (!$responseSent && !empty($responseText)) {
             $sendResult = $this->sendMessage($dto->from, $responseText, $dto->phoneNumberId);
             if ($sendResult['success']) {
-                $this->storeOutgoingMessage($user, $dto, $responseText, $sendResult['message_id']);
+                $this->storeOutgoingMessage($user, $dto, $responseText, $sendResult['message_id'], $chat);
                 $responseSent = true;
 
                 // Discord notification: Text response sent
@@ -1361,10 +1367,13 @@ final class WhatsAppService
         }
     }
 
-    private function storeOutgoingMessage(User $user, IncomingMessageDto $dto, string $text, string $externalId): void
+    private function storeOutgoingMessage(User $user, IncomingMessageDto $dto, string $text, string $externalId, ?Chat $chat = null): void
     {
         $outgoingMessage = new Message();
         $outgoingMessage->setUserId($user->getId());
+        if ($chat) {
+            $outgoingMessage->setChat($chat);
+        }
         $outgoingMessage->setTrackingId(time());
         $outgoingMessage->setProviderIndex('WHATSAPP');
         $outgoingMessage->setUnixTimestamp(time());
