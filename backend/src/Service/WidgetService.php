@@ -229,7 +229,7 @@ final readonly class WidgetService
         }
 
         $jsonConfig = json_encode($initConfig, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR);
-        $jsonConfig = preg_replace('/^/m', '    ', $jsonConfig);
+        $jsonConfig = str_replace("\n", "\n  ", $jsonConfig);
         $safeBaseUrl = htmlspecialchars($baseUrl, ENT_QUOTES, 'UTF-8');
 
         return <<<HTML

@@ -117,7 +117,7 @@ export async function createTestWidget(
     .not.toBeNull()
 
   const embedCode = await embedCodeElement.textContent()
-  const widgetIdMatch = embedCode?.match(/widgetId:\s*['"]([^'"]+)['"]/)
+  const widgetIdMatch = embedCode?.match(/["']?widgetId["']?\s*:\s*["']([^"']+)["']/)
   if (!widgetIdMatch?.[1]) {
     throw new Error('Could not extract widgetId from embed code')
   }
