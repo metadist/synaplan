@@ -285,10 +285,11 @@ class WebhookController extends AbstractController
                 $inReplyTo
             );
 
-            // Create incoming message
+            // Create incoming message (use setChat(): BCHATID is mapped on both chatId and chat;
+            // setChatId() alone can leave the association unset so Doctrine persists NULL.)
             $message = new Message();
             $message->setUserId($user->getId());
-            $message->setChatId($chat->getId());
+            $message->setChat($chat);
             $message->setTrackingId(time());
             $message->setProviderIndex('EMAIL');
             $message->setUnixTimestamp(time());
@@ -418,6 +419,41 @@ class WebhookController extends AbstractController
                     }
                 }
             }
+
+            $classification = $result['classification'];
+            $message->setTopic($classification['topic'] ?? 'CHAT');
+            $message->setLanguage($classification['language'] ?? 'en');
+            $message->setStatus('complete');
+
+            $outgoingMessage = new Message();
+            $outgoingMessage->setUserId($user->getId());
+            $outgoingMessage->setChat($chat);
+            $outgoingMessage->setTrackingId($message->getTrackingId());
+            $outgoingMessage->setProviderIndex('EMAIL');
+            $outgoingMessage->setUnixTimestamp(time());
+            $outgoingMessage->setDateTime(date('YmdHis'));
+            $outgoingMessage->setMessageType('MAIL');
+            $outgoingMessage->setFile(0);
+            $outgoingMessage->setTopic($classification['topic'] ?? 'CHAT');
+            $outgoingMessage->setLanguage($classification['language'] ?? 'en');
+            $outgoingMessage->setText($responseText);
+            $outgoingMessage->setDirection('OUT');
+            $outgoingMessage->setStatus('complete');
+
+            $this->em->persist($outgoingMessage);
+            $this->em->flush();
+
+            $outgoingMessage->setMeta('ai_chat_provider', $provider ?? 'unknown');
+            $outgoingMessage->setMeta('ai_chat_model', $model ?? 'unknown');
+            if (!empty($metadata['usage'])) {
+                $outgoingMessage->setMeta('ai_chat_usage', json_encode($metadata['usage']));
+            }
+            if (!empty($metadata['model_id'])) {
+                $outgoingMessage->setMeta('ai_chat_model_id', (string) $metadata['model_id']);
+            }
+
+            $chat->updateTimestamp();
+            $this->em->flush();
 
             // Send email response back to user
             try {
