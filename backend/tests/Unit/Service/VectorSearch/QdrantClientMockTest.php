@@ -9,8 +9,8 @@ use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
 
 /**
- * Unit Tests für QdrantClientMock.
- * Der Mock ist eine echte Service-Implementierung (Fallback wenn Qdrant nicht verfügbar).
+ * Unit Tests for QdrantClientMock.
+ * Verifies the mock returns safe defaults for all interface methods.
  */
 final class QdrantClientMockTest extends TestCase
 {
@@ -23,7 +23,6 @@ final class QdrantClientMockTest extends TestCase
 
     public function testIsAvailableReturnsFalse(): void
     {
-        // Mock is never available (it's a placeholder)
         $this->assertFalse($this->client->isAvailable());
     }
 
@@ -38,7 +37,6 @@ final class QdrantClientMockTest extends TestCase
 
         $this->assertArrayHasKey('status', $details);
         $this->assertEquals('mock', $details['status']);
-        $this->assertArrayHasKey('metrics', $details);
         $this->assertArrayHasKey('qdrant', $details);
     }
 
@@ -60,45 +58,91 @@ final class QdrantClientMockTest extends TestCase
         $this->assertEquals(0, $info['points_count']);
     }
 
+    // --- Memory Operations ---
+
     public function testUpsertMemoryDoesNotThrow(): void
     {
         $this->expectNotToPerformAssertions();
-
-        $this->client->upsertMemory(
-            'test_point_id',
-            array_fill(0, 1024, 0.5),
-            ['test' => 'payload']
-        );
+        $this->client->upsertMemory('test_id', array_fill(0, 1024, 0.5), ['test' => 'payload']);
     }
 
     public function testGetMemoryReturnsNull(): void
     {
-        $result = $this->client->getMemory('test_point_id');
-
-        $this->assertNull($result);
+        $this->assertNull($this->client->getMemory('test_id'));
     }
 
     public function testSearchMemoriesReturnsEmptyArray(): void
     {
-        $result = $this->client->searchMemories(
-            array_fill(0, 1024, 0.5),
-            123
-        );
-
-        $this->assertEmpty($result);
+        $this->assertEmpty($this->client->searchMemories(array_fill(0, 1024, 0.5), 123));
     }
 
     public function testScrollMemoriesReturnsEmptyArray(): void
     {
-        $result = $this->client->scrollMemories(123);
-
-        $this->assertEmpty($result);
+        $this->assertEmpty($this->client->scrollMemories(123));
     }
 
     public function testDeleteMemoryDoesNotThrow(): void
     {
         $this->expectNotToPerformAssertions();
+        $this->client->deleteMemory('test_id');
+    }
 
-        $this->client->deleteMemory('test_point_id');
+    public function testDeleteAllMemoriesForUserReturnsZero(): void
+    {
+        $this->assertEquals(0, $this->client->deleteAllMemoriesForUser(1));
+    }
+
+    // --- Document Operations ---
+
+    public function testUpsertDocumentDoesNotThrow(): void
+    {
+        $this->expectNotToPerformAssertions();
+        $this->client->upsertDocument('doc_1', array_fill(0, 1024, 0.1), ['user_id' => 1]);
+    }
+
+    public function testBatchUpsertDocumentsReturnsZeros(): void
+    {
+        $result = $this->client->batchUpsertDocuments([]);
+        $this->assertEquals(0, $result['success_count']);
+    }
+
+    public function testSearchDocumentsReturnsEmptyArray(): void
+    {
+        $this->assertEmpty($this->client->searchDocuments(array_fill(0, 1024, 0.1), 1));
+    }
+
+    public function testGetDocumentReturnsNull(): void
+    {
+        $this->assertNull($this->client->getDocument('doc_1'));
+    }
+
+    public function testDeleteDocumentDoesNotThrow(): void
+    {
+        $this->expectNotToPerformAssertions();
+        $this->client->deleteDocument('doc_1');
+    }
+
+    public function testDeleteDocumentsByFileReturnsZero(): void
+    {
+        $this->assertEquals(0, $this->client->deleteDocumentsByFile(1, 42));
+    }
+
+    public function testGetDocumentStatsReturnsEmptyDefaults(): void
+    {
+        $stats = $this->client->getDocumentStats(1);
+        $this->assertEquals(0, $stats['total_chunks']);
+        $this->assertEmpty($stats['chunks_by_file']);
+    }
+
+    public function testGetDocumentFileInfoReturnsZero(): void
+    {
+        $info = $this->client->getDocumentFileInfo(1, 42);
+        $this->assertEquals(0, $info['chunks']);
+        $this->assertNull($info['groupKey']);
+    }
+
+    public function testGetFilesWithChunksReturnsEmptyArray(): void
+    {
+        $this->assertEmpty($this->client->getFilesWithChunks(1));
     }
 }

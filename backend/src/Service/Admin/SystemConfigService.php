@@ -83,7 +83,7 @@ final readonly class SystemConfigService
             'vectordb' => [
                 'label' => 'Vector DB',
                 'sections' => [
-                    'qdrant' => ['label' => 'Qdrant Service', 'fields' => ['QDRANT_SERVICE_URL', 'QDRANT_SERVICE_API_KEY']],
+                    'qdrant' => ['label' => 'Qdrant', 'fields' => ['QDRANT_URL', 'QDRANT_API_KEY']],
                     'qdrant_search' => ['label' => 'Search Thresholds', 'fields' => [
                         'MIN_CHAT_FEEDBACK_SCORE', 'MIN_CHAT_MEMORY_SCORE', 'MIN_CONTRADICTION_SCORE',
                         'MIN_RESEARCH_SCORE', 'MIN_MEMORY_RESEARCH_SCORE', 'MIN_EXTRACTION_SCORE',
@@ -485,28 +485,28 @@ final readonly class SystemConfigService
      */
     private function testQdrant(): array
     {
-        $url = $this->getEnvValue('QDRANT_SERVICE_URL');
+        $url = $this->getEnvValue('QDRANT_URL');
         if (!$url) {
-            return ['success' => false, 'message' => 'QDRANT_SERVICE_URL not configured'];
+            return ['success' => false, 'message' => 'QDRANT_URL not configured'];
         }
 
         try {
-            $ch = curl_init($url.'/health');
+            $ch = curl_init($url.'/healthz');
             curl_setopt_array($ch, [
                 CURLOPT_RETURNTRANSFER => true,
                 CURLOPT_TIMEOUT => 5,
                 CURLOPT_CONNECTTIMEOUT => 3,
             ]);
-            $apiKey = $this->getEnvValue('QDRANT_SERVICE_API_KEY');
+            $apiKey = $this->getEnvValue('QDRANT_API_KEY');
             if ($apiKey) {
-                curl_setopt($ch, CURLOPT_HTTPHEADER, ['X-API-Key: '.$apiKey]);
+                curl_setopt($ch, CURLOPT_HTTPHEADER, ['api-key: '.$apiKey]);
             }
             $response = curl_exec($ch);
             $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
             curl_close($ch);
 
             if (200 === $httpCode) {
-                return ['success' => true, 'message' => 'Connected to Qdrant service'];
+                return ['success' => true, 'message' => 'Connected to Qdrant'];
             }
 
             return ['success' => false, 'message' => 'Qdrant returned HTTP '.$httpCode];
@@ -805,14 +805,14 @@ final readonly class SystemConfigService
             ],
 
             // === Vector Database ===
-            'QDRANT_SERVICE_URL' => [
+            'QDRANT_URL' => [
                 'tab' => 'vectordb', 'section' => 'qdrant', 'type' => 'url',
-                'sensitive' => false, 'description' => 'Qdrant service URL',
-                'default' => 'http://qdrant-service:8090',
+                'sensitive' => false, 'description' => 'Qdrant REST API URL',
+                'default' => 'http://qdrant:6333',
             ],
-            'QDRANT_SERVICE_API_KEY' => [
+            'QDRANT_API_KEY' => [
                 'tab' => 'vectordb', 'section' => 'qdrant', 'type' => 'password',
-                'sensitive' => true, 'description' => 'Qdrant service API key',
+                'sensitive' => true, 'description' => 'Qdrant API key (optional in dev)',
                 'default' => '',
             ],
 

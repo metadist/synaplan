@@ -14,7 +14,7 @@ final readonly class VectorStorageConfig
     public function __construct(
         private ConfigRepository $configRepository,
         private ?string $envProvider = null,
-        private ?string $qdrantServiceUrl = null,
+        private ?string $qdrantUrl = null,
         private ?string $qdrantApiKey = null,
         private ?string $qdrantDocumentsCollection = null,
     ) {
@@ -47,9 +47,9 @@ final readonly class VectorStorageConfig
         return 'qdrant' === $this->getProvider();
     }
 
-    public function getQdrantServiceUrl(): string
+    public function getQdrantUrl(): string
     {
-        return $this->qdrantServiceUrl ?? '';
+        return $this->qdrantUrl ?? '';
     }
 
     public function getQdrantApiKey(): string

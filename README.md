@@ -59,34 +59,31 @@ echo "GROQ_API_KEY=your_key" >> backend/.env && docker compose restart backend
 ## Features
 
 - **AI Chat** — Ollama, OpenAI, Anthropic, Groq, Gemini
-- **RAG Search** — Semantic document search with MariaDB VECTOR (or [Qdrant](https://github.com/metadist/synaplan-memories) as alternative)
+- **RAG Search** — Semantic document search with MariaDB VECTOR or Qdrant
 - **Chat Widget** — Embed on any website
 - **WhatsApp** — Meta Business API integration
 - **Email** — AI-powered email responses
 - **Audio** — Whisper transcription
 - **Documents** — PDF, Word, Excel, images with OCR
-- **AI Memories** — Optional user profiling (see below)
+- **AI Memories** — User profiling with Qdrant vector search
+- **Feedback System** — False-positive detection and learning
 
 ---
 
-## Optional: AI Memories
+## Qdrant Vector Database
 
-> **Want the AI to remember user preferences and context across sessions?**
+Qdrant is included in `docker-compose.yml` and starts automatically. It powers:
+- **AI Memories** — remembers user preferences across sessions
+- **RAG Document Vectors** — semantic search over uploaded documents
+- **Feedback System** — false-positive detection and learning
 
-Install [**synaplan-memories**](https://github.com/metadist/synaplan-memories) — a separate Docker stack with a Rust microservice + Qdrant vector database.
-
+Configure in `backend/.env`:
 ```bash
-# Clone and start the memories service
-git clone https://github.com/metadist/synaplan-memories
-cd synaplan-memories
-docker compose up -d
-
-# Then connect Synaplan to it (in synaplan/backend/.env)
-QDRANT_SERVICE_URL=http://synaplan-qdrant-service:8090
-QDRANT_SERVICE_API_KEY=your_secret_key
+QDRANT_URL=http://qdrant:6333
+QDRANT_API_KEY=              # optional in dev, recommended in prod
 ```
 
-This is **completely optional** — Synaplan works fully without it. Licensed under [Apache-2.0](https://github.com/metadist/synaplan-memories/blob/main/LICENSE).
+Qdrant is **optional** — Synaplan works fully without it (memories and vector search will be disabled).
 
 ---
 

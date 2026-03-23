@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Service\RAG\VectorStorage;
 
 use App\Service\RAG\VectorStorage\DTO\VectorChunk;
-use App\Service\VectorSearch\QdrantClientHttp;
+use App\Service\VectorSearch\QdrantClientInterface;
 use Doctrine\DBAL\Connection;
 use Psr\Log\LoggerInterface;
 
@@ -21,7 +21,7 @@ final readonly class VectorMigrationService
     public function __construct(
         private Connection $connection,
         private QdrantVectorStorage $qdrantStorage,
-        private QdrantClientHttp $qdrantClient,
+        private QdrantClientInterface $qdrantClient,
         private MariaDBVectorStorage $mariaDbStorage,
         private VectorStorageConfig $config,
         private LoggerInterface $logger,
