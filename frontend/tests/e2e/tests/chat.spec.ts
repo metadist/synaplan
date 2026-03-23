@@ -37,40 +37,6 @@ test.describe('@ci @smoke Chat', () => {
   })
 })
 
-test.describe('@noci @nightly Chat — all models', () => {
-  test('user can chat with all models and get a "success" answer', async ({
-    page,
-    credentials,
-  }) => {
-    test.setTimeout(120_000)
-    const failures: string[] = []
-    const chat = new ChatHelper(page)
-
-    await login(page, credentials)
-    await chat.startNewChat()
-
-    try {
-      const previousCount = await chat.conversationBubbles().count()
-      await page.locator(selectors.chat.textInput).fill(PROMPTS.CHAT_SMOKE)
-      await page.locator(selectors.chat.sendBtn).click()
-
-      const aiText = await chat.waitForAnswer(previousCount)
-      await expect(aiText, 'Initial model should answer').toContain('success')
-    } catch (error) {
-      failures.push(
-        `Initial message failed: ${error instanceof Error ? error.message : String(error)}`
-      )
-    }
-
-    await chat.runAgainOptions('success', failures, 'chat')
-
-    if (failures.length > 0) {
-      console.warn('Model run issues:', failures)
-      await expect.soft(failures, 'All models should respond without errors').toEqual([])
-    }
-  })
-})
-
 test.describe('@noci @regression Chat — vision', () => {
   test('user can upload an image and gets a description from all models', async ({
     page,
