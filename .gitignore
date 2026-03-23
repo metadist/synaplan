@@ -70,6 +70,7 @@ _devextras/screenvideo/.narration-tmp/
 
 # Plugins (developed externally, copied to server manually)
 plugins/brogent/
+plugins/templatex/
 plugins/sortx/
 plugins/marketeer/
 
