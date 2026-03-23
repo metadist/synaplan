@@ -502,7 +502,10 @@ const startAiSetupFromSuccess = () => {
  */
 const openAdvancedFromSuccess = () => {
   if (successWidget.value) {
-    advancedWidget.value = successWidget.value
+    router.push({
+      name: 'widget-detail',
+      params: { widgetId: successWidget.value.widgetId },
+    })
     successWidget.value = null
   }
 }
@@ -531,8 +534,10 @@ const testWidgetFromSuccess = () => {
  * Open advanced config for existing widget
  */
 const openAdvancedConfig = (widget: widgetsApi.Widget) => {
-  advancedWidgetInitialTab.value = undefined
-  advancedWidget.value = widget
+  router.push({
+    name: 'widget-detail',
+    params: { widgetId: widget.widgetId },
+  })
 }
 
 /**

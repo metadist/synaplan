@@ -524,6 +524,140 @@
                 </div>
               </div>
             </div>
+
+            <!-- User Data Integration (PRO only) -->
+            <div class="surface-chip p-4 rounded-lg space-y-4">
+              <div class="flex items-start justify-between gap-3">
+                <div>
+                  <p class="font-medium txt-primary flex items-center gap-2">
+                    <Icon icon="heroicons:user-circle" class="w-5 h-5 txt-brand" />
+                    {{ $t('widgets.advancedConfig.userDataIntegration.title') }}
+                  </p>
+                  <p class="text-xs txt-secondary mt-1">
+                    {{ $t('widgets.advancedConfig.userDataIntegration.description') }}
+                  </p>
+                </div>
+                <span
+                  v-if="!auth.isPro"
+                  class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-600 dark:text-amber-400 flex-shrink-0"
+                >
+                  PRO
+                </span>
+              </div>
+
+              <!-- Step-by-step Guide -->
+              <div class="space-y-3">
+                <!-- Step 1: API URL -->
+                <div class="flex items-start gap-3">
+                  <span
+                    class="w-6 h-6 rounded-full bg-[var(--brand)]/10 text-[var(--brand)] text-xs font-bold flex items-center justify-center flex-shrink-0 mt-0.5"
+                  >
+                    1
+                  </span>
+                  <div class="flex-1 min-w-0">
+                    <p class="text-sm font-medium txt-primary">
+                      {{ $t('widgets.advancedConfig.userDataIntegration.step1Title') }}
+                    </p>
+                    <p class="text-xs txt-secondary mt-0.5 mb-2">
+                      {{ $t('widgets.advancedConfig.userDataIntegration.step1Help') }}
+                    </p>
+                    <input
+                      v-model="config.externalApiUrl"
+                      type="url"
+                      :disabled="!auth.isPro"
+                      placeholder="https://api.example.com/users/{externalUserId}/profile"
+                      class="w-full px-3 py-2 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)] disabled:opacity-50 disabled:cursor-not-allowed font-mono"
+                      data-testid="input-external-api-url"
+                    />
+                  </div>
+                </div>
+
+                <!-- Step 2: API Token -->
+                <div class="flex items-start gap-3">
+                  <span
+                    class="w-6 h-6 rounded-full bg-[var(--brand)]/10 text-[var(--brand)] text-xs font-bold flex items-center justify-center flex-shrink-0 mt-0.5"
+                  >
+                    2
+                  </span>
+                  <div class="flex-1 min-w-0">
+                    <p class="text-sm font-medium txt-primary">
+                      {{ $t('widgets.advancedConfig.userDataIntegration.step2Title') }}
+                    </p>
+                    <p class="text-xs txt-secondary mt-0.5 mb-2">
+                      {{ $t('widgets.advancedConfig.userDataIntegration.step2Help') }}
+                    </p>
+                    <input
+                      v-model="config.externalApiToken"
+                      type="password"
+                      autocomplete="new-password"
+                      :disabled="!auth.isPro"
+                      :placeholder="$t('widgets.advancedConfig.externalApiTokenPlaceholder')"
+                      class="w-full px-3 py-2 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)] disabled:opacity-50 disabled:cursor-not-allowed"
+                      data-testid="input-external-api-token"
+                    />
+                  </div>
+                </div>
+
+                <!-- Step 3: Embed Code -->
+                <div class="flex items-start gap-3">
+                  <span
+                    class="w-6 h-6 rounded-full bg-[var(--brand)]/10 text-[var(--brand)] text-xs font-bold flex items-center justify-center flex-shrink-0 mt-0.5"
+                  >
+                    3
+                  </span>
+                  <div class="flex-1 min-w-0">
+                    <p class="text-sm font-medium txt-primary">
+                      {{ $t('widgets.advancedConfig.userDataIntegration.step3Title') }}
+                    </p>
+                    <p class="text-xs txt-secondary mt-0.5 mb-2">
+                      {{ $t('widgets.advancedConfig.userDataIntegration.step3Help') }}
+                    </p>
+                    <pre
+                      class="px-3 py-2 rounded-lg bg-gray-900 text-green-400 text-xs font-mono whitespace-pre overflow-x-auto"
+                    >
+SynaplanWidget.init({
+  widgetId: '{{ widget.widgetId }}',
+  externalUserId: '&lt;YOUR_USER_ID&gt;'
+})</pre
+                    >
+                  </div>
+                </div>
+              </div>
+
+              <!-- How it works -->
+              <div class="mt-2 p-3 rounded-lg bg-[var(--brand)]/5 border border-[var(--brand)]/15">
+                <p class="text-xs font-medium txt-primary mb-1.5">
+                  {{ $t('widgets.advancedConfig.userDataIntegration.howItWorks') }}
+                </p>
+                <ul class="text-xs txt-secondary space-y-1">
+                  <li class="flex items-start gap-1.5">
+                    <Icon
+                      icon="heroicons:check"
+                      class="w-3.5 h-3.5 txt-brand flex-shrink-0 mt-0.5"
+                    />
+                    {{ $t('widgets.advancedConfig.userDataIntegration.howStep1') }}
+                  </li>
+                  <li class="flex items-start gap-1.5">
+                    <Icon
+                      icon="heroicons:check"
+                      class="w-3.5 h-3.5 txt-brand flex-shrink-0 mt-0.5"
+                    />
+                    {{ $t('widgets.advancedConfig.userDataIntegration.howStep2') }}
+                  </li>
+                  <li class="flex items-start gap-1.5">
+                    <Icon
+                      icon="heroicons:check"
+                      class="w-3.5 h-3.5 txt-brand flex-shrink-0 mt-0.5"
+                    />
+                    {{ $t('widgets.advancedConfig.userDataIntegration.howStep3') }}
+                  </li>
+                </ul>
+              </div>
+
+              <p v-if="!auth.isPro" class="text-xs text-amber-600 dark:text-amber-400">
+                {{ $t('widgets.advancedConfig.proRequired') }}
+              </p>
+            </div>
           </div>
 
           <!-- Custom Fields Tab -->
@@ -689,6 +823,218 @@
             <p v-else-if="!canAddAnyField" class="text-xs txt-secondary text-center">
               {{ $t('widgets.customFields.maxFieldsReached') }}
             </p>
+          </div>
+
+          <!-- Privacy & Data Processing Tab -->
+          <div
+            v-else-if="!promptOnly && activeTab === 'privacy'"
+            class="space-y-6"
+            data-testid="section-privacy"
+          >
+            <!-- Data Processing Agreement (Art. 28 DSGVO) -->
+            <div class="surface-chip p-4 rounded-lg space-y-4">
+              <div class="flex items-start justify-between gap-3">
+                <div>
+                  <p class="font-medium txt-primary">
+                    {{ $t('widgets.advancedConfig.dataProcessing') }}
+                  </p>
+                  <p class="text-xs txt-secondary mt-1">
+                    {{ $t('widgets.advancedConfig.dataProcessingHelp') }}
+                  </p>
+                </div>
+                <Icon
+                  icon="heroicons:document-check"
+                  class="w-8 h-8 txt-secondary opacity-60 flex-shrink-0"
+                />
+              </div>
+
+              <label
+                class="flex items-start gap-3 p-3 rounded-lg border transition-colors cursor-pointer"
+                :class="
+                  config.dataProcessingAccepted
+                    ? 'border-emerald-500/30 bg-emerald-500/5'
+                    : 'border-light-border/30 dark:border-dark-border/20 hover:border-[var(--brand)]/40'
+                "
+              >
+                <input
+                  v-model="config.dataProcessingAccepted"
+                  type="checkbox"
+                  class="mt-0.5 w-4 h-4 rounded border-light-border/30 dark:border-dark-border/20 text-[var(--brand)] focus:ring-[var(--brand)]"
+                  data-testid="checkbox-avv"
+                />
+                <div>
+                  <p class="text-sm txt-primary font-medium">
+                    {{ $t('widgets.advancedConfig.avvAcceptLabel') }}
+                  </p>
+                  <p class="text-xs txt-secondary mt-1">
+                    {{ $t('widgets.advancedConfig.avvAcceptDescription') }}
+                  </p>
+                </div>
+              </label>
+            </div>
+
+            <!-- AVV Details (Art. 28 Abs. 3 DSGVO) -->
+            <details class="surface-chip rounded-lg overflow-hidden group">
+              <summary
+                class="p-4 flex items-center justify-between cursor-pointer hover:bg-gray-50 dark:hover:bg-white/5 transition-colors"
+              >
+                <div class="flex items-center gap-2">
+                  <Icon icon="heroicons:scale" class="w-5 h-5 txt-brand flex-shrink-0" />
+                  <p class="text-sm font-medium txt-primary">
+                    {{ $t('widgets.advancedConfig.avvDetails.title') }}
+                  </p>
+                </div>
+                <Icon
+                  icon="heroicons:chevron-down"
+                  class="w-4 h-4 txt-secondary transition-transform group-open:rotate-180"
+                />
+              </summary>
+              <div
+                class="px-4 pb-4 space-y-4 text-xs txt-secondary border-t border-light-border/20 dark:border-dark-border/10 pt-4"
+              >
+                <!-- Subject & Purpose -->
+                <div>
+                  <p class="font-semibold txt-primary text-sm mb-1">
+                    {{ $t('widgets.advancedConfig.avvDetails.subjectTitle') }}
+                  </p>
+                  <p>{{ $t('widgets.advancedConfig.avvDetails.subjectText') }}</p>
+                </div>
+                <!-- Duration -->
+                <div>
+                  <p class="font-semibold txt-primary text-sm mb-1">
+                    {{ $t('widgets.advancedConfig.avvDetails.durationTitle') }}
+                  </p>
+                  <p>{{ $t('widgets.advancedConfig.avvDetails.durationText') }}</p>
+                </div>
+                <!-- Data Categories -->
+                <div>
+                  <p class="font-semibold txt-primary text-sm mb-1">
+                    {{ $t('widgets.advancedConfig.avvDetails.dataCategoriesTitle') }}
+                  </p>
+                  <ul class="space-y-1 list-disc list-inside">
+                    <li>{{ $t('widgets.advancedConfig.avvDetails.dataCat1') }}</li>
+                    <li>{{ $t('widgets.advancedConfig.avvDetails.dataCat2') }}</li>
+                    <li>{{ $t('widgets.advancedConfig.avvDetails.dataCat3') }}</li>
+                    <li>{{ $t('widgets.advancedConfig.avvDetails.dataCat4') }}</li>
+                    <li v-if="hasApiResponses">
+                      {{ $t('widgets.advancedConfig.avvDetails.dataCat5') }}
+                    </li>
+                  </ul>
+                </div>
+                <!-- Data Subjects -->
+                <div>
+                  <p class="font-semibold txt-primary text-sm mb-1">
+                    {{ $t('widgets.advancedConfig.avvDetails.dataSubjectsTitle') }}
+                  </p>
+                  <p>{{ $t('widgets.advancedConfig.avvDetails.dataSubjectsText') }}</p>
+                </div>
+                <!-- Instructions -->
+                <div>
+                  <p class="font-semibold txt-primary text-sm mb-1">
+                    {{ $t('widgets.advancedConfig.avvDetails.instructionsTitle') }}
+                  </p>
+                  <p>{{ $t('widgets.advancedConfig.avvDetails.instructionsText') }}</p>
+                </div>
+                <!-- TOMs -->
+                <div>
+                  <p class="font-semibold txt-primary text-sm mb-1">
+                    {{ $t('widgets.advancedConfig.avvDetails.tomsTitle') }}
+                  </p>
+                  <ul class="space-y-1 list-disc list-inside">
+                    <li>{{ $t('widgets.advancedConfig.avvDetails.tom1') }}</li>
+                    <li>{{ $t('widgets.advancedConfig.avvDetails.tom2') }}</li>
+                    <li>{{ $t('widgets.advancedConfig.avvDetails.tom3') }}</li>
+                    <li>{{ $t('widgets.advancedConfig.avvDetails.tom4') }}</li>
+                  </ul>
+                </div>
+                <!-- Sub-processors -->
+                <div>
+                  <p class="font-semibold txt-primary text-sm mb-1">
+                    {{ $t('widgets.advancedConfig.avvDetails.subprocessorsTitle') }}
+                  </p>
+                  <p>{{ $t('widgets.advancedConfig.avvDetails.subprocessorsText') }}</p>
+                </div>
+                <!-- Data Subject Rights -->
+                <div>
+                  <p class="font-semibold txt-primary text-sm mb-1">
+                    {{ $t('widgets.advancedConfig.avvDetails.rightsTitle') }}
+                  </p>
+                  <p>{{ $t('widgets.advancedConfig.avvDetails.rightsText') }}</p>
+                </div>
+                <!-- Deletion -->
+                <div>
+                  <p class="font-semibold txt-primary text-sm mb-1">
+                    {{ $t('widgets.advancedConfig.avvDetails.deletionTitle') }}
+                  </p>
+                  <p>{{ $t('widgets.advancedConfig.avvDetails.deletionText') }}</p>
+                </div>
+                <!-- Breach Notification -->
+                <div>
+                  <p class="font-semibold txt-primary text-sm mb-1">
+                    {{ $t('widgets.advancedConfig.avvDetails.breachTitle') }}
+                  </p>
+                  <p>{{ $t('widgets.advancedConfig.avvDetails.breachText') }}</p>
+                </div>
+                <!-- Audit -->
+                <div>
+                  <p class="font-semibold txt-primary text-sm mb-1">
+                    {{ $t('widgets.advancedConfig.avvDetails.auditTitle') }}
+                  </p>
+                  <p>{{ $t('widgets.advancedConfig.avvDetails.auditText') }}</p>
+                </div>
+              </div>
+            </details>
+
+            <!-- Privacy Policy URL -->
+            <div class="surface-chip p-4 rounded-lg space-y-3">
+              <div class="flex items-start justify-between gap-3">
+                <div>
+                  <p class="font-medium txt-primary">
+                    {{ $t('widgets.advancedConfig.privacyPolicyUrl') }}
+                  </p>
+                  <p class="text-xs txt-secondary mt-1">
+                    {{ $t('widgets.advancedConfig.privacyPolicyUrlHelp') }}
+                  </p>
+                </div>
+                <Icon
+                  icon="heroicons:link"
+                  class="w-8 h-8 txt-secondary opacity-60 flex-shrink-0"
+                />
+              </div>
+              <input
+                v-model="config.privacyPolicyUrl"
+                type="url"
+                :placeholder="$t('widgets.advancedConfig.privacyPolicyUrlPlaceholder')"
+                class="w-full px-4 py-2.5 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
+                data-testid="input-privacy-url"
+              />
+            </div>
+
+            <!-- Data processed summary -->
+            <div
+              class="p-4 rounded-lg border border-light-border/30 dark:border-dark-border/20 space-y-3"
+            >
+              <div class="flex items-start gap-2">
+                <Icon
+                  icon="heroicons:information-circle"
+                  class="w-5 h-5 txt-brand flex-shrink-0 mt-0.5"
+                />
+                <div>
+                  <p class="text-sm font-medium txt-primary">
+                    {{ $t('widgets.advancedConfig.dataProcessedTitle') }}
+                  </p>
+                  <ul class="text-xs txt-secondary mt-2 space-y-1.5 list-disc list-inside">
+                    <li>{{ $t('widgets.advancedConfig.dataProcessedChat') }}</li>
+                    <li>{{ $t('widgets.advancedConfig.dataProcessedSession') }}</li>
+                    <li>{{ $t('widgets.advancedConfig.dataProcessedFiles') }}</li>
+                    <li>{{ $t('widgets.advancedConfig.dataProcessedMeta') }}</li>
+                    <li v-if="hasApiResponses">
+                      {{ $t('widgets.advancedConfig.dataProcessedApi') }}
+                    </li>
+                  </ul>
+                </div>
+              </div>
+            </div>
           </div>
 
           <!-- AI Assistant Tab -->
@@ -916,7 +1262,7 @@
                     {{ $t('widgets.advancedConfig.promptContent') }}
                   </label>
                   <textarea
-                    v-model="promptData.content"
+                    v-model="manualPromptContent"
                     rows="12"
                     :readonly="isSystemPrompt"
                     :class="[
@@ -1125,11 +1471,11 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, computed, onMounted } from 'vue'
+import { ref, reactive, computed, onMounted, watch } from 'vue'
 import { Icon } from '@iconify/vue'
-import { useEscapeKey } from '@/composables/useEscapeKey'
 import { useI18n } from 'vue-i18n'
 import { useNotification } from '@/composables/useNotification'
+import { useAuthStore } from '@/stores/auth'
 import * as widgetsApi from '@/services/api/widgetsApi'
 import { promptsApi, type AvailableFile } from '@/services/api/promptsApi'
 import { configApi } from '@/services/api/configApi'
@@ -1137,6 +1483,7 @@ import type { AIModel, Capability } from '@/types/ai-models'
 import { DEFAULT_AI_MODEL, findModelIdByString } from '@/utils/aiModelDefaults'
 import FilePicker from './FilePicker.vue'
 import WidgetSummaryPromptTab from './WidgetSummaryPromptTab.vue'
+import { parsePromptAndRulesBlock } from '@/utils/widgetBehaviorRules'
 
 // Disable attribute inheritance since we use Teleport as root
 defineOptions({
@@ -1161,6 +1508,7 @@ const emit = defineEmits<{
 }>()
 
 const { t } = useI18n()
+const auth = useAuthStore()
 const { success, error: showError } = useNotification()
 
 // Check if widget has a custom/configured prompt (not the default)
@@ -1177,6 +1525,10 @@ const hasCustomPrompt = computed(() => {
 })
 
 // Check if localhost addresses are in allowed domains
+const hasApiResponses = computed(() => {
+  return !!config.externalApiToken || !!config.externalApiUrl
+})
+
 const hasLocalhostInDomains = computed(() => {
   if (!config.allowedDomains?.length) return false
   return config.allowedDomains.some(
@@ -1211,6 +1563,11 @@ const tabs = computed(() => {
       labelKey: 'widgets.advancedConfig.tabs.customFields',
     },
     {
+      id: 'privacy',
+      icon: 'heroicons:shield-exclamation',
+      labelKey: 'widgets.advancedConfig.tabs.privacy',
+    },
+    {
       id: 'assistant',
       icon: 'heroicons:sparkles',
       labelKey: 'widgets.advancedConfig.tabs.assistant',
@@ -1243,6 +1600,10 @@ const config = reactive<widgetsApi.WidgetConfig>({
   allowFileUpload: false,
   fileUploadLimit: 3,
   allowedDomains: [],
+  externalApiToken: '',
+  externalApiUrl: '',
+  privacyPolicyUrl: '',
+  dataProcessingAccepted: false,
 })
 
 // Custom fields
@@ -1474,6 +1835,8 @@ const promptError = ref<string | null>(null)
 const promptLanguage = ref('en')
 const creatingManualPrompt = ref(false)
 const manualPromptCreated = ref(false) // Flag to show form after manual creation
+const manualPromptContent = ref('')
+const existingMetadata = ref<Record<string, unknown>>({})
 
 // Check if the current prompt is a system prompt (not editable by user)
 // System prompts are shared across all users and cannot be modified
@@ -1541,8 +1904,6 @@ const handleClose = () => {
   emit('close')
 }
 
-useEscapeKey(handleClose)
-
 // Handle manual prompt creation
 const handleManualCreate = async () => {
   creatingManualPrompt.value = true
@@ -1568,6 +1929,8 @@ Be friendly, professional, and concise in your responses.`
     promptData.rules = ''
     promptData.aiModel = DEFAULT_AI_MODEL
     promptData.content = defaultPromptContent
+    manualPromptContent.value = defaultPromptContent
+    existingMetadata.value = {}
 
     // Set flag to show the form (without closing modal)
     manualPromptCreated.value = true
@@ -1716,8 +2079,14 @@ const loadPromptData = async () => {
         isDefault: prompt.isDefault ?? false,
       })
 
+      existingMetadata.value = { ...metadata }
+
       // Load files for this prompt
       await loadPromptFiles()
+
+      const parsedPrompt = parsePromptAndRulesBlock(prompt.prompt)
+      manualPromptContent.value = removeKnowledgeBaseSection(parsedPrompt.manualPrompt)
+      promptData.content = manualPromptContent.value
     }
   } catch (err: any) {
     console.error('Failed to load prompt:', err)
@@ -1920,7 +2289,7 @@ const buildKnowledgeBaseSection = (): string => {
 
 // Update the visible prompt content with the latest Knowledge Base section
 const refreshPromptContent = () => {
-  const base = removeKnowledgeBaseSection(promptData.content)
+  const base = removeKnowledgeBaseSection(manualPromptContent.value)
   promptData.content = base + buildKnowledgeBaseSection()
 }
 
@@ -1943,14 +2312,11 @@ const removeKnowledgeBaseSection = (content: string): string => {
 const savePromptData = async () => {
   if (!promptData.id) return
 
-  // Build metadata object
-  const metadata: Record<string, any> = {}
+  const metadata: Record<string, unknown> = { ...existingMetadata.value }
 
-  // Parse AI Model from dropdown string back to ID
   metadata.aiModel = findModelIdByString(allModels.value, promptData.aiModel)
 
-  // Build final prompt content with Knowledge Base section
-  let finalContent = removeKnowledgeBaseSection(promptData.content)
+  let finalContent = removeKnowledgeBaseSection(manualPromptContent.value)
   finalContent += buildKnowledgeBaseSection()
 
   await promptsApi.updatePrompt(promptData.id, {
@@ -1961,9 +2327,13 @@ const savePromptData = async () => {
     metadata,
   })
 
-  // Update local state with final content
   promptData.content = finalContent
+  manualPromptContent.value = removeKnowledgeBaseSection(finalContent)
 }
+
+watch(manualPromptContent, (value) => {
+  promptData.content = value
+})
 
 onMounted(async () => {
   // Set loading state immediately if we have a custom prompt to prevent flicker
@@ -1991,6 +2361,10 @@ onMounted(async () => {
     allowFileUpload: widgetConfig.allowFileUpload || false,
     fileUploadLimit: widgetConfig.fileUploadLimit ?? 3,
     allowedDomains: widgetConfig.allowedDomains || props.widget.allowedDomains || [],
+    externalApiToken: widgetConfig.externalApiToken || '',
+    externalApiUrl: widgetConfig.externalApiUrl || '',
+    privacyPolicyUrl: widgetConfig.privacyPolicyUrl || '',
+    dataProcessingAccepted: widgetConfig.dataProcessingAccepted || false,
   })
 
   // Load custom fields
