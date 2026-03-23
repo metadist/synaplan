@@ -2504,9 +2504,9 @@
     "viewAll": "View All",
     "serviceDisabled": {
       "title": "Memories Disabled",
-      "message": "The memory service is currently unavailable. Please contact the administrator.",
+      "message": "The Qdrant vector database is currently unavailable. Please contact the administrator.",
       "badge": "Service unavailable",
-      "tooltip": "The memory service is disabled or unreachable. This memory cannot be displayed."
+      "tooltip": "Qdrant is disabled or unreachable. This memory cannot be displayed."
     },
     "referenceMissing": {
       "badge": "Memory not found",

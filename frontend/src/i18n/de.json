@@ -2424,9 +2424,9 @@
     "viewAll": "Alle anzeigen",
     "serviceDisabled": {
       "title": "Erinnerungen deaktiviert",
-      "message": "Der Erinnerungs-Service ist derzeit nicht verfügbar. Bitte kontaktieren Sie den Administrator.",
+      "message": "Die Qdrant-Vektordatenbank ist derzeit nicht verfügbar. Bitte kontaktieren Sie den Administrator.",
       "badge": "Service nicht verfügbar",
-      "tooltip": "Der Erinnerungs-Service ist deaktiviert oder nicht erreichbar. Diese Erinnerung kann nicht angezeigt werden."
+      "tooltip": "Qdrant ist deaktiviert oder nicht erreichbar. Diese Erinnerung kann nicht angezeigt werden."
     },
     "referenceMissing": {
       "badge": "Erinnerung nicht gefunden",

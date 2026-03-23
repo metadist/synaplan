@@ -43,19 +43,19 @@ class ConfigController extends AbstractController
     }
 
     /**
-     * Quick memory service availability check (lightweight, no full status)
-     * Frontend calls this asynchronously after app load to check if memory service is reachable.
+     * Quick Qdrant availability check (lightweight, no full status)
+     * Frontend calls this asynchronously after app load to check if Qdrant is reachable.
      */
     #[Route('/memory-service/check', name: 'memory_service_check', methods: ['GET'])]
     #[OA\Get(
         path: '/api/v1/config/memory-service/check',
-        summary: 'Check memory service availability',
-        description: 'Quick check if memory microservice is reachable (called asynchronously)',
+        summary: 'Check Qdrant availability',
+        description: 'Quick check if Qdrant vector database is reachable (called asynchronously)',
         tags: ['Configuration']
     )]
     #[OA\Response(
         response: 200,
-        description: 'Memory service status',
+        description: 'Qdrant availability status',
         content: new OA\JsonContent(
             properties: [
                 new OA\Property(property: 'available', type: 'boolean', example: true),
@@ -111,7 +111,7 @@ class ConfigController extends AbstractController
                     type: 'object',
                     properties: [
                         new OA\Property(property: 'help', type: 'boolean', example: true, description: 'Enable help system'),
-                        new OA\Property(property: 'memoryService', type: 'boolean', example: true, description: 'Memory microservice availability'),
+                        new OA\Property(property: 'memoryService', type: 'boolean', example: true, description: 'Qdrant vector database availability'),
                     ]
                 ),
                 new OA\Property(
@@ -206,7 +206,7 @@ class ConfigController extends AbstractController
         ];
 
         // Feature flags
-        // IMPORTANT: memoryService check is SLOW (1s timeout), so we always report true here
+        // IMPORTANT: Qdrant check is SLOW (1s timeout), so we always report true here
         // Frontend will check availability asynchronously via /api/v1/config/features/status
         $features = [
             'help' => ($_ENV['FEATURE_HELP'] ?? 'false') === 'true',

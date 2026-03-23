@@ -21,9 +21,6 @@ Synaplan uses a multi-repository architecture:
 │  ├── startweb1.sh       Per-node startup scripts                         │
 │  └── .env               Production secrets                               │
 │                                                                          │
-│  synaplan-memories/     Optional vector storage                          │
-│  ├── qdrant-service/    Rust microservice                                │
-│  └── docker-compose.yml Qdrant + service                                 │
 │                                                                          │
 └─────────────────────────────────────────────────────────────────────────┘
 ```
@@ -37,7 +34,7 @@ Synaplan uses a multi-repository architecture:
 | Ollama | Local container | Shared server (10.0.1.10) |
 | Frontend | Vite dev server (5173) | Built assets in Docker image |
 | Dev tools | phpMyAdmin, MailHog | None |
-| Memories | Optional | Connected via docker-host:8090 |
+| Qdrant | Docker service (port 6333) | Docker service or external |
 
 ---
 
@@ -172,7 +169,7 @@ environment:
   DATABASE_WRITE_URL: mysql://...@host.docker.internal:3306/synaplan
   OLLAMA_BASE_URL: http://10.0.1.10:11434        # Shared Ollama server
   TIKA_URL: http://tika.synaplan.com             # External Tika
-  QDRANT_SERVICE_URL: http://docker-host:8090   # Memories service
+  QDRANT_URL: http://qdrant:6333                # Qdrant vector database
 ```
 
 ## NFS Shared Storage
@@ -188,88 +185,65 @@ The `actimeo=1` prevents stale file issues when multiple nodes access the same f
 
 ---
 
-# QDRANT MEMORIES SERVICE
+# QDRANT VECTOR DATABASE
 
-The optional memories service provides AI user profiling via vector search.
+Qdrant is included in `docker-compose.yml` and powers AI memories and RAG document search.
+PHP communicates directly with Qdrant's REST API (port 6333) — no external microservice needed.
 
 ## Architecture
 
 ```
 Synaplan Backend (PHP)
         │
-        │ HTTP (port 8090)
-        ▼
-synaplan-qdrant-service (Rust)
-        │
-        │ gRPC (port 6334)
+        │ HTTP REST (port 6333)
         ▼
 Qdrant Vector Database
 ```
 
-## Starting Memories Service
+## Local Development
+
+Qdrant starts automatically with `docker compose up -d`. No extra setup needed.
 
 ```bash
-cd synaplan-memories/
-
-# Start Qdrant + service
-docker compose up -d
-
-# Check health
-curl http://localhost:8090/health
-```
-
-## Connecting Synaplan to Memories
-
-### Local Development
-
-Add to `synaplan/backend/.env`:
-
-```bash
-QDRANT_SERVICE_URL=http://synaplan-qdrant-service:8090
-QDRANT_SERVICE_API_KEY=changeme-in-production
-```
-
-Then restart backend:
-```bash
-cd synaplan/
-docker compose restart backend
-```
-
-### Production
-
-Already configured in `synaplan-platform/docker-compose.yml`:
-```yaml
-QDRANT_SERVICE_URL: http://docker-host:8090
-```
-
-The `docker-host` alias resolves to the Docker host where qdrant-service runs.
-
-## Verifying Connection
-
-```bash
-# Check service directly
-curl http://localhost:8090/health
+# Check Qdrant health
+curl http://localhost:6333/healthz
 
 # Check Synaplan's connection
 curl http://localhost:8000/api/v1/config/memory-service/check
 # Should return: {"configured":true,"available":true}
 ```
 
-## Memories Service Configuration
+## Configuration
 
-Environment variables in `synaplan-memories/docker-compose.yml`:
+In `backend/.env`:
+
+```bash
+QDRANT_URL=http://qdrant:6333
+QDRANT_API_KEY=              # optional in dev, recommended in prod
+```
+
+### Production
+
+Configure in `synaplan-platform/docker-compose.yml`:
+```yaml
+QDRANT_URL: http://qdrant:6333
+QDRANT_API_KEY: your-secret-key
+```
+
+## Qdrant Environment
 
 | Variable | Purpose |
 |----------|---------|
-| `QDRANT_URL` | Qdrant connection (http://qdrant:6334) |
-| `QDRANT_COLLECTION_NAME` | Collection name (default: user_memories) |
-| `QDRANT_VECTOR_DIMENSION` | Vector size (default: 1024 for bge-m3) |
-| `SERVICE_API_KEY` | API key for authentication |
-| `WEBHOOK_URL` | Optional Discord/Slack alerts |
+| `QDRANT_URL` | Qdrant REST API URL (http://qdrant:6333) |
+| `QDRANT_API_KEY` | API key for authentication |
+| `QDRANT_MEMORIES_COLLECTION` | Collection name (default: user_memories) |
+| `QDRANT_DOCUMENTS_COLLECTION` | Collection name (default: user_documents) |
+
+Collections are auto-created on first use with appropriate vector config and payload indices.
 
 ## Cluster Mode
 
-For high availability, Qdrant supports clustering. See `synaplan-memories/CLUSTER.md`.
+For high availability, Qdrant supports clustering. See [Qdrant documentation](https://qdrant.tech/documentation/guides/distributed_deployment/).
 
 ---
 
@@ -299,8 +273,8 @@ FRONTEND_URL=http://localhost:5173    # Public frontend URL (email links)
 | `GROQ_API_KEY` | Groq integration |
 | `WHATSAPP_*` | WhatsApp Business API |
 | `STRIPE_*` | Payment processing |
-| `QDRANT_SERVICE_URL` | Memories service |
-| `QDRANT_SERVICE_API_KEY` | Memories auth |
+| `QDRANT_URL` | Qdrant vector database |
+| `QDRANT_API_KEY` | Qdrant auth |
 
 See `synaplan/backend/.env.example` for complete list.
 
@@ -339,17 +313,18 @@ docker compose ps              # Check health
 docker compose restart backend
 ```
 
-## Memories service unavailable
+## Qdrant unavailable
 
 ```bash
-# Check qdrant-service is running
-cd synaplan-memories/
-docker compose ps
-docker compose logs -f qdrant-service
+# Check Qdrant is running
+docker compose ps qdrant
+docker compose logs -f qdrant
 
-# Verify URL is correct
-# Local: http://synaplan-qdrant-service:8090 (same Docker network)
-# Prod:  http://docker-host:8090
+# Verify health
+curl http://localhost:6333/healthz
+
+# Verify Synaplan connection
+curl http://localhost:8000/api/v1/config/memory-service/check
 ```
 
 ## Clear everything and start fresh
