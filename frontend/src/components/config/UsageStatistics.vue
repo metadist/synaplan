@@ -63,6 +63,98 @@
 
     <!-- Stats Content -->
     <div v-if="!loading && stats" class="space-y-6" data-testid="section-stats">
+      <!-- Cost Budget -->
+      <div v-if="stats.cost_budget" class="surface-card p-6" data-testid="section-cost-budget">
+        <h3 class="text-lg font-semibold txt-primary mb-4">
+          {{ $t('config.usage.costBudget.title') }}
+        </h3>
+
+        <!-- With budget limit -->
+        <div v-if="stats.cost_budget.budget > 0" class="space-y-3">
+          <div class="flex items-center justify-between text-sm">
+            <span class="txt-primary font-medium">
+              {{ $t('config.usage.costBudget.consumption') }}:
+              {{ stats.cost_budget.percent.toFixed(1) }}%
+            </span>
+            <span class="txt-secondary">
+              {{ stats.cost_budget.used.toFixed(2) }} EUR /
+              {{ stats.cost_budget.budget.toFixed(2) }} EUR
+            </span>
+          </div>
+
+          <div class="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-4">
+            <div
+              class="h-4 rounded-full transition-all flex items-center justify-center text-xs text-white font-medium"
+              :class="getBudgetBarClass(stats.cost_budget.percent)"
+              :style="{ width: Math.min(Math.max(stats.cost_budget.percent, 2), 100) + '%' }"
+            >
+              <span v-if="stats.cost_budget.percent > 15">
+                {{ stats.cost_budget.percent.toFixed(0) }}%
+              </span>
+            </div>
+          </div>
+
+          <div class="flex items-center justify-between text-xs txt-secondary">
+            <span>
+              {{ $t('config.usage.costBudget.remaining') }}:
+              {{ stats.cost_budget.remaining.toFixed(2) }} EUR
+            </span>
+            <span>
+              {{ formatDate(stats.cost_budget.period_start) }} -
+              {{ formatDate(stats.cost_budget.period_end) }}
+            </span>
+          </div>
+        </div>
+
+        <!-- No budget limit (open source / unlimited) -->
+        <div v-else class="space-y-3">
+          <div class="flex items-center justify-between text-sm">
+            <span class="txt-primary font-medium">
+              {{ $t('config.usage.costBudget.thisMonth') }}
+            </span>
+            <span class="txt-secondary"> {{ stats.cost_budget.used.toFixed(4) }} EUR </span>
+          </div>
+
+          <div class="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-4">
+            <div
+              class="h-4 rounded-full transition-all bg-green-500 flex items-center justify-center text-xs text-white font-medium"
+              style="width: 100%"
+            >
+              {{ $t('config.usage.costBudget.unlimited') }}
+            </div>
+          </div>
+
+          <div class="text-xs txt-secondary">
+            {{ formatDate(stats.cost_budget.period_start) }} -
+            {{ formatDate(stats.cost_budget.period_end) }}
+          </div>
+        </div>
+      </div>
+
+      <!-- Cost Summary Cards -->
+      <div
+        v-if="stats.cost_summary"
+        class="grid grid-cols-1 sm:grid-cols-3 gap-4"
+        data-testid="section-cost-summary"
+      >
+        <div class="surface-card p-4 text-center">
+          <p class="text-xs txt-secondary mb-1">{{ $t('config.usage.costSummary.today') }}</p>
+          <p class="text-xl font-bold txt-primary">{{ stats.cost_summary.today.toFixed(4) }} EUR</p>
+        </div>
+        <div class="surface-card p-4 text-center">
+          <p class="text-xs txt-secondary mb-1">{{ $t('config.usage.costSummary.thisWeek') }}</p>
+          <p class="text-xl font-bold txt-primary">
+            {{ stats.cost_summary.this_week.toFixed(4) }} EUR
+          </p>
+        </div>
+        <div class="surface-card p-4 text-center">
+          <p class="text-xs txt-secondary mb-1">{{ $t('config.usage.costSummary.thisMonth') }}</p>
+          <p class="text-xl font-bold txt-primary">
+            {{ stats.cost_summary.this_month.toFixed(4) }} EUR
+          </p>
+        </div>
+      </div>
+
       <!-- Subscription Info -->
       <div class="surface-card p-6" data-testid="section-subscription">
         <div class="flex items-center justify-between mb-4">
@@ -105,50 +197,6 @@
             <p class="text-sm font-medium txt-primary">
               {{ stats.total_requests.toLocaleString() }}
             </p>
-          </div>
-        </div>
-      </div>
-
-      <!-- Usage per Action Type -->
-      <div class="surface-card p-6" data-testid="section-usage-types">
-        <h3 class="text-lg font-semibold txt-primary mb-4">
-          {{ $t('config.usage.usageByType') }}
-        </h3>
-
-        <div class="space-y-4">
-          <div
-            v-for="(usage, action) in stats.usage"
-            :key="action"
-            class="space-y-2"
-            data-testid="item-usage"
-          >
-            <div class="flex items-center justify-between text-sm">
-              <span class="txt-primary font-medium">{{ getActionLabel(action) }}</span>
-              <span class="txt-secondary">
-                {{ usage.used }} / {{ formatLimit(usage.limit) }}
-                <span v-if="usage.type === 'lifetime'" class="text-xs"
-                  >({{ $t('config.usage.lifetime') }})</span
-                >
-              </span>
-            </div>
-
-            <!-- Progress Bar -->
-            <div class="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
-              <div
-                class="h-2 rounded-full transition-all"
-                :class="getProgressBarClass(usage.used, usage.limit)"
-                :style="{ width: getProgressPercent(usage.used, usage.limit) + '%' }"
-              ></div>
-            </div>
-
-            <div class="flex items-center justify-between text-xs txt-secondary">
-              <span
-                >{{ $t('config.usage.remaining') }}: {{ usage.remaining.toLocaleString() }}</span
-              >
-              <span v-if="usage.resets_at">
-                {{ $t('config.usage.resetsAt') }}: {{ formatResetTime(usage.resets_at) }}
-              </span>
-            </div>
           </div>
         </div>
       </div>
@@ -219,50 +267,225 @@
         </div>
       </div>
 
-      <!-- Recent Usage -->
+      <!-- Recent Activity -->
       <div class="surface-card p-6" data-testid="section-recent">
         <h3 class="text-lg font-semibold txt-primary mb-4">
           {{ $t('config.usage.recentActivity') }}
         </h3>
 
-        <div class="overflow-x-auto">
+        <!-- Filters -->
+        <div class="flex flex-col sm:flex-row gap-3 mb-4">
+          <div class="flex-1">
+            <input
+              v-model="activitySearch"
+              type="text"
+              :placeholder="$t('config.usage.activity.searchPlaceholder')"
+              class="w-full px-3 py-2 rounded-lg border border-light-border bg-transparent txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-brand/50"
+              data-testid="input-activity-search"
+              @input="onSearchInput"
+            />
+          </div>
+
+          <select
+            v-model="activityAction"
+            class="px-3 py-2 rounded-lg border border-light-border bg-transparent txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-brand/50"
+            data-testid="select-activity-action"
+            @change="loadActivity(1)"
+          >
+            <option value="">{{ $t('config.usage.activity.allActions') }}</option>
+            <option value="MESSAGES">{{ $t('config.usage.actions.messages') }}</option>
+            <option value="IMAGES">{{ $t('config.usage.actions.images') }}</option>
+            <option value="VIDEOS">{{ $t('config.usage.actions.videos') }}</option>
+            <option value="AUDIOS">{{ $t('config.usage.actions.audios') }}</option>
+            <option value="FILE_ANALYSIS">{{ $t('config.usage.actions.file_analysis') }}</option>
+            <option value="SORTING">{{ $t('config.usage.actions.sorting') }}</option>
+            <option value="SEARCH_QUERY">{{ $t('config.usage.actions.search_query') }}</option>
+          </select>
+
+          <input
+            v-model="activityFrom"
+            type="date"
+            class="px-3 py-2 rounded-lg border border-light-border bg-transparent txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-brand/50"
+            :title="$t('config.usage.activity.dateFrom')"
+            data-testid="input-activity-from"
+            @change="loadActivity(1)"
+          />
+
+          <input
+            v-model="activityTo"
+            type="date"
+            class="px-3 py-2 rounded-lg border border-light-border bg-transparent txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-brand/50"
+            :title="$t('config.usage.activity.dateTo')"
+            data-testid="input-activity-to"
+            @change="loadActivity(1)"
+          />
+
+          <button
+            v-if="hasActiveFilters"
+            class="px-3 py-2 rounded-lg text-sm txt-secondary hover:txt-primary transition-colors"
+            :title="$t('config.usage.activity.clearFilters')"
+            data-testid="btn-clear-filters"
+            @click="clearFilters"
+          >
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                d="M6 18L18 6M6 6l12 12"
+              />
+            </svg>
+          </button>
+        </div>
+
+        <!-- Loading -->
+        <div v-if="activityLoading" class="flex items-center justify-center py-8">
+          <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-brand"></div>
+        </div>
+
+        <!-- Table -->
+        <div v-else class="overflow-x-auto">
           <table class="w-full text-sm">
             <thead class="text-xs txt-secondary uppercase border-b border-light-border">
               <tr>
-                <th class="px-4 py-3 text-left">{{ $t('config.usage.time') }}</th>
-                <th class="px-4 py-3 text-left">{{ $t('config.usage.action') }}</th>
-                <th class="px-4 py-3 text-left">{{ $t('config.usage.source') }}</th>
-                <th class="px-4 py-3 text-right">{{ $t('config.usage.tokens') }}</th>
-                <th class="px-4 py-3 text-right">{{ $t('config.usage.latency') }}</th>
+                <th class="px-3 py-3 text-left">{{ $t('config.usage.time') }}</th>
+                <th class="px-3 py-3 text-left">{{ $t('config.usage.action') }}</th>
+                <th class="px-3 py-3 text-left">{{ $t('config.usage.model') }}</th>
+                <th class="px-3 py-3 text-right">{{ $t('config.usage.promptTokens') }}</th>
+                <th class="px-3 py-3 text-right">{{ $t('config.usage.completionTokens') }}</th>
+                <th class="px-3 py-3 text-right">{{ $t('config.usage.cachedTokens') }}</th>
+                <th class="px-3 py-3 text-right">{{ $t('config.usage.cost') }}</th>
+                <th class="px-3 py-3 text-right">{{ $t('config.usage.latency') }}</th>
               </tr>
             </thead>
             <tbody class="divide-y divide-light-border">
               <tr
-                v-for="(entry, idx) in stats.recent_usage"
-                :key="idx"
+                v-for="entry in activityItems"
+                :key="entry.timestamp + entry.action + entry.model"
                 class="hover:bg-black/5 dark:hover:bg-white/5"
                 data-testid="item-activity"
               >
-                <td class="px-4 py-3 txt-secondary">{{ formatDateTime(entry.timestamp) }}</td>
-                <td class="px-4 py-3">
+                <td class="px-3 py-3 txt-secondary whitespace-nowrap">
+                  {{ formatDateTime(entry.timestamp) }}
+                </td>
+                <td class="px-3 py-3">
                   <span class="px-2 py-1 rounded-full text-xs font-medium surface-chip">
                     {{ getActionLabel(entry.action) }}
                   </span>
                 </td>
-                <td class="px-4 py-3 txt-primary">{{ getSourceLabel(entry.source) }}</td>
-                <td class="px-4 py-3 text-right txt-secondary">
-                  {{ entry.tokens.toLocaleString() }}
+                <td
+                  class="px-3 py-3 txt-primary text-xs truncate max-w-[120px]"
+                  :title="entry.model"
+                >
+                  {{ entry.model || '-' }}
                 </td>
-                <td class="px-4 py-3 text-right txt-secondary">{{ entry.latency.toFixed(2) }}s</td>
+                <td class="px-3 py-3 text-right txt-secondary">
+                  <span class="flex items-center justify-end gap-1">
+                    {{ entry.prompt_tokens.toLocaleString() }}
+                    <span
+                      v-if="entry.estimated"
+                      class="inline-block px-1 py-0.5 text-[10px] rounded bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400"
+                      :title="$t('config.usage.estimatedTooltip')"
+                      >~</span
+                    >
+                  </span>
+                </td>
+                <td class="px-3 py-3 text-right txt-secondary">
+                  {{ entry.completion_tokens.toLocaleString() }}
+                </td>
+                <td class="px-3 py-3 text-right">
+                  <span v-if="entry.cached_tokens > 0" class="text-green-600 dark:text-green-400">
+                    {{ entry.cached_tokens.toLocaleString() }}
+                  </span>
+                  <span v-else class="txt-secondary">-</span>
+                </td>
+                <td class="px-3 py-3 text-right txt-secondary whitespace-nowrap">
+                  {{ entry.cost > 0 ? entry.cost.toFixed(4) + ' EUR' : '-' }}
+                </td>
+                <td class="px-3 py-3 text-right txt-secondary">
+                  {{ entry.latency > 0 ? (entry.latency / 1000).toFixed(1) + 's' : '-' }}
+                </td>
               </tr>
 
-              <tr v-if="stats.recent_usage.length === 0" data-testid="row-empty">
-                <td colspan="5" class="px-4 py-8 text-center txt-secondary text-sm">
+              <tr v-if="activityItems.length === 0" data-testid="row-empty">
+                <td colspan="8" class="px-4 py-8 text-center txt-secondary text-sm">
                   {{ $t('config.usage.noRecentActivity') }}
                 </td>
               </tr>
             </tbody>
           </table>
+        </div>
+
+        <!-- Pagination -->
+        <div
+          v-if="activityTotalPages > 1"
+          class="flex flex-col sm:flex-row items-center justify-between gap-3 mt-4 pt-4 border-t border-light-border"
+        >
+          <span class="text-xs txt-secondary">
+            {{
+              $t('config.usage.activity.showing', {
+                from: (activityPage - 1) * activityPerPage + 1,
+                to: Math.min(activityPage * activityPerPage, activityTotal),
+                total: activityTotal,
+              })
+            }}
+          </span>
+
+          <div class="flex items-center gap-1">
+            <button
+              :disabled="activityPage <= 1"
+              class="px-3 py-1.5 rounded text-xs font-medium transition-colors disabled:opacity-40"
+              :class="
+                activityPage <= 1
+                  ? 'txt-secondary'
+                  : 'txt-primary hover:bg-black/5 dark:hover:bg-white/5'
+              "
+              @click="loadActivity(1)"
+            >
+              &laquo;
+            </button>
+            <button
+              :disabled="activityPage <= 1"
+              class="px-3 py-1.5 rounded text-xs font-medium transition-colors disabled:opacity-40"
+              :class="
+                activityPage <= 1
+                  ? 'txt-secondary'
+                  : 'txt-primary hover:bg-black/5 dark:hover:bg-white/5'
+              "
+              @click="loadActivity(activityPage - 1)"
+            >
+              &lsaquo;
+            </button>
+
+            <span class="px-3 py-1.5 text-xs txt-primary font-medium">
+              {{ activityPage }} / {{ activityTotalPages }}
+            </span>
+
+            <button
+              :disabled="activityPage >= activityTotalPages"
+              class="px-3 py-1.5 rounded text-xs font-medium transition-colors disabled:opacity-40"
+              :class="
+                activityPage >= activityTotalPages
+                  ? 'txt-secondary'
+                  : 'txt-primary hover:bg-black/5 dark:hover:bg-white/5'
+              "
+              @click="loadActivity(activityPage + 1)"
+            >
+              &rsaquo;
+            </button>
+            <button
+              :disabled="activityPage >= activityTotalPages"
+              class="px-3 py-1.5 rounded text-xs font-medium transition-colors disabled:opacity-40"
+              :class="
+                activityPage >= activityTotalPages
+                  ? 'txt-secondary'
+                  : 'txt-primary hover:bg-black/5 dark:hover:bg-white/5'
+              "
+              @click="loadActivity(activityTotalPages)"
+            >
+              &raquo;
+            </button>
+          </div>
         </div>
       </div>
     </div>
@@ -270,9 +493,15 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { Icon } from '@iconify/vue'
-import { getUsageStats, downloadUsageExport, type UsageStats } from '@/api/usageApi'
+import {
+  getUsageStats,
+  downloadUsageExport,
+  getActivityLog,
+  type UsageStats,
+  type ActivityEntry,
+} from '@/api/usageApi'
 import { useNotification } from '@/composables/useNotification'
 import { useI18n } from 'vue-i18n'
 import { authService } from '@/services/authService'
@@ -285,14 +514,77 @@ const exporting = ref(false)
 const error = ref<string | null>(null)
 const stats = ref<UsageStats | null>(null)
 
+const activityItems = ref<ActivityEntry[]>([])
+const activityLoading = ref(false)
+const activityPage = ref(1)
+const activityPerPage = 20
+const activityTotal = ref(0)
+const activityTotalPages = ref(1)
+const activitySearch = ref('')
+const activityAction = ref('')
+const activityFrom = ref('')
+const activityTo = ref('')
+let searchDebounce: ReturnType<typeof setTimeout> | null = null
+
+const hasActiveFilters = computed(
+  () =>
+    activitySearch.value !== '' ||
+    activityAction.value !== '' ||
+    activityFrom.value !== '' ||
+    activityTo.value !== ''
+)
+
+const loadActivity = async (page = 1) => {
+  try {
+    activityLoading.value = true
+    activityPage.value = page
+
+    const fromTs = activityFrom.value
+      ? Math.floor(new Date(activityFrom.value).getTime() / 1000)
+      : undefined
+    const toTs = activityTo.value
+      ? Math.floor(new Date(activityTo.value + 'T23:59:59').getTime() / 1000)
+      : undefined
+
+    const data = await getActivityLog({
+      page,
+      per_page: activityPerPage,
+      search: activitySearch.value || undefined,
+      action: activityAction.value || undefined,
+      from: fromTs,
+      to: toTs,
+    })
+
+    activityItems.value = data.items
+    activityTotal.value = data.total
+    activityTotalPages.value = data.total_pages
+  } catch (err: any) {
+    console.error('Failed to load activity:', err)
+  } finally {
+    activityLoading.value = false
+  }
+}
+
+const onSearchInput = () => {
+  if (searchDebounce) clearTimeout(searchDebounce)
+  searchDebounce = setTimeout(() => loadActivity(1), 350)
+}
+
+const clearFilters = () => {
+  activitySearch.value = ''
+  activityAction.value = ''
+  activityFrom.value = ''
+  activityTo.value = ''
+  loadActivity(1)
+}
+
 const loadStats = async () => {
   try {
     loading.value = true
     error.value = null
 
-    // Check if user is authenticated (user info in memory, not localStorage)
     if (!authService.isAuthenticated()) {
-      error.value = 'Not authenticated. Please log in to view statistics.'
+      error.value = t('config.usage.notAuthenticated')
       loading.value = false
       return
     }
@@ -387,45 +679,15 @@ const getTimePeriodLabel = (period: string) => {
   return t(`config.usage.periods.${period.toLowerCase()}`)
 }
 
-const formatLimit = (limit: number) => {
-  if (limit === 9223372036854775807 || limit >= 1000000) {
-    return '∞'
-  }
-  return limit.toLocaleString()
-}
-
-const getProgressPercent = (used: number, limit: number) => {
-  if (limit === 0 || limit >= 1000000) return 0
-  return Math.min(100, (used / limit) * 100)
-}
-
-const getProgressBarClass = (used: number, limit: number) => {
-  const percent = getProgressPercent(used, limit)
+const getBudgetBarClass = (percent: number) => {
   if (percent >= 90) return 'bg-red-500'
   if (percent >= 75) return 'bg-orange-500'
   if (percent >= 50) return 'bg-yellow-500'
   return 'bg-green-500'
 }
 
-const formatResetTime = (timestamp: number) => {
-  const date = new Date(timestamp * 1000)
-  const now = new Date()
-  const diff = date.getTime() - now.getTime()
-
-  if (diff < 0) return t('common.now')
-
-  const hours = Math.floor(diff / (1000 * 60 * 60))
-  const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60))
-
-  if (hours > 24) {
-    return date.toLocaleDateString()
-  }
-
-  if (hours > 0) {
-    return `${hours}h ${minutes}m`
-  }
-
-  return `${minutes}m`
+const formatDate = (timestamp: number) => {
+  return new Date(timestamp * 1000).toLocaleDateString()
 }
 
 const formatDateTime = (timestamp: number) => {
@@ -456,5 +718,10 @@ const formatDateTime = (timestamp: number) => {
 
 onMounted(() => {
   loadStats()
+  loadActivity(1)
+})
+
+onUnmounted(() => {
+  if (searchDebounce) clearTimeout(searchDebounce)
 })
 </script>

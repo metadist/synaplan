@@ -110,7 +110,7 @@ class AnthropicProvider implements ChatProviderInterface, VisionProviderInterfac
 
     // ==================== CHAT ====================
 
-    public function chat(array $messages, array $options = []): string
+    public function chat(array $messages, array $options = []): array
     {
         if (!isset($options['model'])) {
             throw new ProviderException('Model must be specified in options', 'anthropic');
@@ -197,9 +197,17 @@ class AnthropicProvider implements ChatProviderInterface, VisionProviderInterfac
                 }
             }
 
+            $inputTokens = $data['usage']['input_tokens'] ?? 0;
+            $outputTokens = $data['usage']['output_tokens'] ?? 0;
+            $cacheCreationTokens = $data['usage']['cache_creation_input_tokens'] ?? 0;
+            $cacheReadTokens = $data['usage']['cache_read_input_tokens'] ?? 0;
+
             $usage = [
-                'input_tokens' => $data['usage']['input_tokens'] ?? 0,
-                'output_tokens' => $data['usage']['output_tokens'] ?? 0,
+                'prompt_tokens' => $inputTokens + $cacheCreationTokens + $cacheReadTokens,
+                'completion_tokens' => $outputTokens,
+                'total_tokens' => $inputTokens + $outputTokens + $cacheCreationTokens + $cacheReadTokens,
+                'cached_tokens' => $cacheReadTokens,
+                'cache_creation_tokens' => $cacheCreationTokens,
             ];
 
             $this->logger->info('Anthropic: Chat completed', [
@@ -208,7 +216,10 @@ class AnthropicProvider implements ChatProviderInterface, VisionProviderInterfac
                 'has_thinking' => !empty($thinkingContent),
             ]);
 
-            return $textContent;
+            return [
+                'content' => $textContent,
+                'usage' => $usage,
+            ];
         } catch (\Exception $e) {
             $this->logger->error('Anthropic chat error', [
                 'error' => $e->getMessage(),
@@ -219,7 +230,7 @@ class AnthropicProvider implements ChatProviderInterface, VisionProviderInterfac
         }
     }
 
-    public function chatStream(array $messages, callable $callback, array $options = []): void
+    public function chatStream(array $messages, callable $callback, array $options = []): array
     {
         if (!isset($options['model'])) {
             throw new ProviderException('Model must be specified in options', 'anthropic');
@@ -299,10 +310,12 @@ class AnthropicProvider implements ChatProviderInterface, VisionProviderInterfac
                 'buffer' => false, // Don't buffer the response
             ]);
 
-            // Parse SSE stream
-            $this->parseSSEStream($response, $callback);
+            // Parse SSE stream and collect usage
+            $usage = $this->parseSSEStream($response, $callback);
 
-            $this->logger->info('🔵 Anthropic: Streaming completed');
+            $this->logger->info('🔵 Anthropic: Streaming completed', ['usage' => $usage]);
+
+            return ['usage' => $usage];
         } catch (\Exception $e) {
             $errorMessage = $e->getMessage();
 
@@ -539,10 +552,14 @@ class AnthropicProvider implements ChatProviderInterface, VisionProviderInterfac
      * - ping: Keep-alive
      * - error: Error occurred
      */
-    private function parseSSEStream(ResponseInterface $response, callable $callback): void
+    private function parseSSEStream(ResponseInterface $response, callable $callback): array
     {
         $buffer = '';
         $currentBlockType = null;
+        $inputTokens = 0;
+        $outputTokens = 0;
+        $cacheCreationTokens = 0;
+        $cacheReadTokens = 0;
 
         foreach ($this->httpClient->stream($response) as $chunk) {
             if ($chunk->isLast()) {
@@ -565,8 +582,14 @@ class AnthropicProvider implements ChatProviderInterface, VisionProviderInterfac
 
                 // Process different event types
                 switch ($event['type']) {
+                    case 'message_start':
+                        $msgUsage = $event['data']['message']['usage'] ?? [];
+                        $inputTokens = $msgUsage['input_tokens'] ?? 0;
+                        $cacheCreationTokens = $msgUsage['cache_creation_input_tokens'] ?? 0;
+                        $cacheReadTokens = $msgUsage['cache_read_input_tokens'] ?? 0;
+                        break;
+
                     case 'content_block_start':
-                        // Track the type of content block (text or thinking)
                         $currentBlockType = $event['data']['content_block']['type'] ?? null;
 
                         if ('thinking' === $currentBlockType) {
@@ -582,13 +605,11 @@ class AnthropicProvider implements ChatProviderInterface, VisionProviderInterfac
                             $text = $delta['text'] ?? '';
 
                             if ('thinking' === $currentBlockType) {
-                                // Send as reasoning chunk
                                 $callback([
                                     'type' => 'reasoning',
                                     'content' => $text,
                                 ]);
                             } else {
-                                // Send as regular content
                                 $callback([
                                     'type' => 'content',
                                     'content' => $text,
@@ -598,26 +619,36 @@ class AnthropicProvider implements ChatProviderInterface, VisionProviderInterfac
                         break;
 
                     case 'content_block_stop':
-                        // Block finished
                         if ('thinking' === $currentBlockType) {
                             $this->logger->info('🧠 Anthropic: Thinking block completed');
                         }
                         $currentBlockType = null;
                         break;
 
+                    case 'message_delta':
+                        $deltaUsage = $event['data']['usage'] ?? [];
+                        $outputTokens = $deltaUsage['output_tokens'] ?? $outputTokens;
+                        break;
+
                     case 'message_stop':
-                        // Stream complete
                         break;
 
                     case 'error':
                         $errorMessage = $event['data']['error']['message'] ?? 'Unknown error';
                         throw new \Exception($errorMessage);
                     case 'ping':
-                        // Keep-alive, ignore
                         break;
                 }
             }
         }
+
+        return [
+            'prompt_tokens' => $inputTokens + $cacheCreationTokens + $cacheReadTokens,
+            'completion_tokens' => $outputTokens,
+            'total_tokens' => $inputTokens + $outputTokens + $cacheCreationTokens + $cacheReadTokens,
+            'cached_tokens' => $cacheReadTokens,
+            'cache_creation_tokens' => $cacheCreationTokens,
+        ];
     }
 
     /**

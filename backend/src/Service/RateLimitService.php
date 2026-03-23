@@ -4,6 +4,7 @@ namespace App\Service;
 
 use App\Entity\User;
 use App\Repository\ConfigRepository;
+use App\Repository\SubscriptionRepository;
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;
 
@@ -26,6 +27,8 @@ final class RateLimitService
         private EntityManagerInterface $em,
         private LoggerInterface $logger,
         private BillingService $billingService,
+        private CostCalculationService $costCalculationService,
+        private SubscriptionRepository $subscriptionRepository,
     ) {
     }
 
@@ -117,52 +120,112 @@ final class RateLimitService
     /**
      * Record usage of an action.
      *
-     * If 'tokens' is 0 and 'response_text' or 'response_bytes' is provided,
-     * tokens are auto-estimated using the bytes/1.3 heuristic.
+     * Accepts granular token data from provider usage arrays.
+     * Falls back to byte-based heuristic estimation if no token data available.
      */
     public function recordUsage(User $user, string $action, array $metadata = []): void
     {
-        $tokens = $metadata['tokens'] ?? 0;
+        $usage = $metadata['usage'] ?? [];
+        $promptTokens = $usage['prompt_tokens'] ?? 0;
+        $completionTokens = $usage['completion_tokens'] ?? 0;
+        $cachedTokens = $usage['cached_tokens'] ?? 0;
+        $cacheCreationTokens = $usage['cache_creation_tokens'] ?? 0;
+        $totalTokens = $usage['total_tokens'] ?? ($promptTokens + $completionTokens);
 
-        // Auto-estimate tokens if provider didn't return real token counts
-        if (0 === $tokens || empty($tokens)) {
+        // Legacy support: if 'tokens' was passed directly (old API)
+        $legacyTokens = $metadata['tokens'] ?? 0;
+        $estimated = false;
+
+        if (0 === $totalTokens && $legacyTokens > 0) {
+            $totalTokens = $legacyTokens;
+            $estimated = true;
+        }
+
+        // Auto-estimate if no token data at all
+        if (0 === $totalTokens) {
             $totalBytes = 0;
 
-            // Count text response bytes
             if (!empty($metadata['response_text'])) {
                 $totalBytes += strlen($metadata['response_text']);
             }
-
-            // Count input prompt bytes (if provided)
             if (!empty($metadata['input_text'])) {
                 $totalBytes += strlen($metadata['input_text']);
             }
-
-            // Add explicit byte count for media (images, audio, video)
             if (!empty($metadata['response_bytes'])) {
                 $totalBytes += (int) $metadata['response_bytes'];
             }
 
             if ($totalBytes > 0) {
-                $tokens = self::estimateTokens($totalBytes);
+                $totalTokens = self::estimateTokens($totalBytes);
+                $estimated = true;
             }
         }
 
-        // Remove internal-only fields from stored metadata (keep it clean)
+        $modelId = $metadata['model_id'] ?? null;
+        $mediaUsage = $metadata['media_usage'] ?? [];
+        $pricingMode = $this->costCalculationService->getPricingMode($modelId);
+
+        if ('per_token' !== $pricingMode && !empty($mediaUsage)) {
+            $inputQty = match ($pricingMode) {
+                'per_character' => (float) ($mediaUsage['characters'] ?? 0),
+                'per_second' => (float) ($mediaUsage['duration_seconds'] ?? 0),
+                default => 0.0,
+            };
+            $outputQty = match ($pricingMode) {
+                'per_image' => (float) ($mediaUsage['images'] ?? 0),
+                'per_second' => (float) ($mediaUsage['duration_seconds'] ?? 0),
+                default => 0.0,
+            };
+
+            $costResult = $this->costCalculationService->calculateMediaCost(
+                $modelId,
+                $inputQty,
+                $outputQty,
+            );
+        } else {
+            $costResult = $this->costCalculationService->calculateCost(
+                $promptTokens,
+                $completionTokens,
+                $cachedTokens,
+                $cacheCreationTokens,
+                $modelId,
+            );
+        }
+
         $storedMetadata = $metadata;
-        unset($storedMetadata['response_text'], $storedMetadata['input_text'], $storedMetadata['response_bytes']);
+        unset(
+            $storedMetadata['response_text'],
+            $storedMetadata['input_text'],
+            $storedMetadata['response_bytes'],
+            $storedMetadata['usage'],
+            $storedMetadata['model_id'],
+            $storedMetadata['media_usage'],
+        );
 
         $this->em->getConnection()->executeStatement(
-            'INSERT INTO BUSELOG (BUSERID, BUNIXTIMES, BACTION, BPROVIDER, BMODEL, BTOKENS, BCOST, BLATENCY, BSTATUS, BERROR, BMETADATA) 
-             VALUES (:user_id, :timestamp, :action, :provider, :model, :tokens, :cost, :latency, :status, :error, :metadata)',
+            'INSERT INTO BUSELOG (BUSERID, BUNIXTIMES, BACTION, BPROVIDER, BMODEL, BTOKENS, 
+             BPROMPT_TOKENS, BCOMPLETION_TOKENS, BCACHED_TOKENS, BCACHE_CREATION_TOKENS,
+             BESTIMATED, BMODEL_ID, BPRICE_SNAPSHOT,
+             BCOST, BLATENCY, BSTATUS, BERROR, BMETADATA) 
+             VALUES (:user_id, :timestamp, :action, :provider, :model, :tokens,
+             :prompt_tokens, :completion_tokens, :cached_tokens, :cache_creation_tokens,
+             :estimated, :model_id, :price_snapshot,
+             :cost, :latency, :status, :error, :metadata)',
             [
                 'user_id' => $user->getId(),
                 'timestamp' => time(),
                 'action' => $action,
                 'provider' => $metadata['provider'] ?? '',
                 'model' => $metadata['model'] ?? '',
-                'tokens' => $tokens,
-                'cost' => $metadata['cost'] ?? 0,
+                'tokens' => $totalTokens,
+                'prompt_tokens' => $promptTokens,
+                'completion_tokens' => $completionTokens,
+                'cached_tokens' => $cachedTokens,
+                'cache_creation_tokens' => $cacheCreationTokens,
+                'estimated' => $estimated ? 1 : 0,
+                'model_id' => $modelId,
+                'price_snapshot' => !empty($costResult->priceSnapshot) ? json_encode($costResult->priceSnapshot) : null,
+                'cost' => $costResult->totalCost,
                 'latency' => $metadata['latency'] ?? 0,
                 'status' => 'success',
                 'error' => '',
@@ -173,9 +236,58 @@ final class RateLimitService
         $this->logger->info('Rate limit usage recorded', [
             'user_id' => $user->getId(),
             'action' => $action,
-            'tokens' => $tokens,
-            'estimated' => (0 === ($metadata['tokens'] ?? 0)),
+            'tokens' => $totalTokens,
+            'cost' => $costResult->totalCost,
+            'estimated' => $estimated,
         ]);
+    }
+
+    /**
+     * Check if user's monthly cost budget allows another request.
+     *
+     * @return array{allowed: bool, used_cost: string, budget: string, remaining: string, percent: float}
+     */
+    public function checkCostBudget(User $user): array
+    {
+        if (!$this->billingService->isEnabled()) {
+            return [
+                'allowed' => true,
+                'used_cost' => '0.00',
+                'budget' => '0.00',
+                'remaining' => '0.00',
+                'percent' => 0.0,
+            ];
+        }
+
+        $subscription = $this->subscriptionRepository->findOneBy(['level' => $user->getRateLimitLevel()]);
+        $budget = $subscription ? (float) $subscription->getCostBudgetMonthly() : 0.0;
+
+        if ($budget <= 0) {
+            return [
+                'allowed' => true,
+                'used_cost' => '0.00',
+                'budget' => '0.00',
+                'remaining' => '0.00',
+                'percent' => 0.0,
+            ];
+        }
+
+        $monthStart = (int) strtotime('first day of this month midnight');
+        $usedCost = (float) $this->em->getConnection()->fetchOne(
+            'SELECT COALESCE(SUM(BCOST), 0) FROM BUSELOG WHERE BUSERID = :user_id AND BUNIXTIMES >= :month_start',
+            ['user_id' => $user->getId(), 'month_start' => $monthStart]
+        );
+
+        $remaining = max(0.0, $budget - $usedCost);
+        $percent = $budget > 0 ? min(100.0, ($usedCost / $budget) * 100) : 0.0;
+
+        return [
+            'allowed' => $usedCost < $budget,
+            'used_cost' => number_format($usedCost, 2, '.', ''),
+            'budget' => number_format($budget, 2, '.', ''),
+            'remaining' => number_format($remaining, 2, '.', ''),
+            'percent' => round($percent, 1),
+        ];
     }
 
     /**

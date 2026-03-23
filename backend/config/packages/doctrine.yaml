@@ -20,6 +20,7 @@ doctrine:
                 server_version: '11.8'
                 charset: utf8mb4
                 profiling_collect_backtrace: '%kernel.debug%'
+                use_savepoints: true
                 mapping_types:
                     vector: vector
 

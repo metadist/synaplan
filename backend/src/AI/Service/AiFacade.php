@@ -104,7 +104,6 @@ class AiFacade
                 fallback: null // NO FALLBACK - let ProviderException bubble up
             );
         } catch (ProviderException $e) {
-            // Re-throw ProviderException with helpful message (no model installed, etc.)
             throw $e;
         } catch (\Exception $e) {
             $this->logger->error('AI chat failed', [
@@ -114,10 +113,10 @@ class AiFacade
         }
 
         return [
-            'content' => $response,
+            'content' => $response['content'] ?? '',
             'provider' => $provider->getName(),
             'model' => $options['model'] ?? $provider->getDefaultModels()['chat'] ?? 'unknown',
-            'usage' => [],
+            'usage' => $response['usage'] ?? [],
         ];
     }
 
@@ -158,20 +157,20 @@ class AiFacade
         ]);
 
         // Execute streaming with Circuit Breaker protection
+        $streamResult = null;
         try {
             $this->circuitBreaker->execute(
-                callback: function () use ($provider, $messages, $streamCallback, $options) {
+                callback: function () use ($provider, $messages, $streamCallback, $options, &$streamResult) {
                     $this->logger->info('🟢 AiFacade: Calling provider chatStream');
-                    $provider->chatStream($messages, $streamCallback, $options);
+                    $streamResult = $provider->chatStream($messages, $streamCallback, $options);
                     $this->logger->info('🔵 AiFacade: Provider chatStream completed');
 
-                    return null; // void return
+                    return null;
                 },
                 serviceName: 'ai_provider_'.$provider->getName(),
                 fallback: null // NO FALLBACK - let ProviderException bubble up
             );
         } catch (ProviderException $e) {
-            // Re-throw ProviderException with helpful message (no model installed, etc.)
             throw $e;
         } catch (\Exception $e) {
             $this->logger->error('🔴 AiFacade: Chat stream failed', [
@@ -184,7 +183,7 @@ class AiFacade
         return [
             'provider' => $provider->getName(),
             'model' => $options['model'] ?? $provider->getDefaultModels()['chat'] ?? 'unknown',
-            'usage' => [],
+            'usage' => $streamResult['usage'] ?? [],
         ];
     }
 
@@ -443,6 +442,7 @@ class AiFacade
             'images' => $images,
             'provider' => $provider->getName(),
             'model' => $options['model'] ?? 'unknown',
+            'image_count' => is_array($images) ? count($images) : 1,
         ];
     }
 
@@ -487,10 +487,16 @@ class AiFacade
             throw new ProviderException('Video generation failed', 'unknown', null, 0, $e);
         }
 
+        $durationSeconds = null;
+        if (is_array($videos) && !empty($videos)) {
+            $durationSeconds = $videos[0]['duration'] ?? $videos[0]['duration_seconds'] ?? null;
+        }
+
         return [
             'videos' => $videos,
             'provider' => $provider->getName(),
             'model' => $options['model'] ?? 'unknown',
+            'duration_seconds' => $durationSeconds,
         ];
     }
 
@@ -571,8 +577,8 @@ class AiFacade
     public function synthesize(string $text, ?int $userId = null, array $options = []): array
     {
         $providerName = $options['provider'] ?? null;
+        $ttsModelId = null;
 
-        // Resolve provider and model from user's TEXT2SOUND config (same as synthesizeStream)
         if ($userId > 0) {
             $ttsModelId = $this->modelConfig->getDefaultModel('TEXT2SOUND', $userId);
             if ($ttsModelId) {
@@ -612,7 +618,6 @@ class AiFacade
             throw new ProviderException('TTS failed', 'unknown', null, 0, $e);
         }
 
-        // Provider saves file to uploadDir root - move it to user-based path
         $relativePath = $this->moveToUserPath($filename, $userId, $provider->getName());
 
         return [
@@ -620,6 +625,8 @@ class AiFacade
             'relativePath' => $relativePath,
             'provider' => $provider->getName(),
             'model' => $options['model'] ?? 'unknown',
+            'model_id' => $ttsModelId ?? null,
+            'text_length' => mb_strlen($text),
         ];
     }
 

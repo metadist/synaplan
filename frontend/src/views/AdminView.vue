@@ -570,6 +570,11 @@
             </div>
           </div>
         </div>
+
+        <!-- Subscriptions Tab -->
+        <div v-if="activeTab === 'subscriptions'" data-testid="section-subscriptions">
+          <AdminSubscriptionsPanel />
+        </div>
       </div>
     </div>
 
@@ -637,7 +642,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, watch } from 'vue'
+import { defineAsyncComponent, ref, computed, onMounted, watch } from 'vue'
 import { Icon } from '@iconify/vue'
 import MainLayout from '@/components/MainLayout.vue'
 import { useEscapeKey } from '@/composables/useEscapeKey'
@@ -651,6 +656,10 @@ import {
   type SystemOverview,
   type RegistrationAnalytics,
 } from '@/services/api/adminApi'
+const AdminSubscriptionsPanel = defineAsyncComponent(
+  () => import('@/components/admin/AdminSubscriptionsPanel.vue')
+)
+
 import { useAuthStore } from '@/stores/auth'
 import { useConfigStore } from '@/stores/config'
 import { useI18n } from 'vue-i18n'
@@ -661,7 +670,7 @@ const authStore = useAuthStore()
 const config = useConfigStore()
 const { success, error: showError } = useNotification()
 
-type TabId = 'overview' | 'users' | 'prompts' | 'usage'
+type TabId = 'overview' | 'users' | 'prompts' | 'usage' | 'subscriptions'
 interface AdminTab {
   id: TabId
   label: string
@@ -675,6 +684,7 @@ const tabs = computed<AdminTab[]>(() => [
   { id: 'users', label: t('admin.tabs.users'), icon: 'mdi:account-multiple' },
   { id: 'prompts', label: t('admin.tabs.prompts'), icon: 'mdi:text-box-multiple' },
   { id: 'usage', label: t('admin.tabs.usage'), icon: 'mdi:chart-bar' },
+  { id: 'subscriptions', label: t('admin.tabs.subscriptions'), icon: 'mdi:credit-card-outline' },
 ])
 
 // Overview

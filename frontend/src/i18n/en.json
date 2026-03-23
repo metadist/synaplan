@@ -114,7 +114,8 @@
       "overview": "Overview",
       "users": "Users",
       "prompts": "Prompts",
-      "usage": "Usage"
+      "usage": "Usage",
+      "subscriptions": "Subscriptions"
     },
     "overview": {
       "totalUsers": "Total Users",
@@ -186,6 +187,26 @@
       "cost": "Cost",
       "activeSubscriptions": "Active Subscriptions",
       "subscriptionOverview": "Subscription Overview"
+    },
+    "subscriptions": {
+      "title": "Subscription Budget Management",
+      "description": "Manage cost budgets and active status for each subscription tier. Prices are read-only and managed via Stripe.",
+      "level": "Level",
+      "name": "Name",
+      "priceMonthly": "Price/Month",
+      "priceYearly": "Price/Year",
+      "budgetMonthly": "Budget/Month",
+      "budgetYearly": "Budget/Year",
+      "active": "Active",
+      "actions": "Actions",
+      "edit": "Edit",
+      "save": "Save",
+      "cancel": "Cancel",
+      "saveSuccess": "Budget updated successfully",
+      "saveError": "Failed to update budget",
+      "loadError": "Failed to load subscriptions",
+      "noSubscriptions": "No subscription plans found. Create subscription plans in the database first.",
+      "budgetHint": "Budget defines the maximum token cost (in EUR) allowed per billing period. Set to 0 for unlimited usage. Prices are display-only and managed via Stripe."
     },
     "config": {
       "title": "System Configuration",
@@ -688,6 +709,8 @@
       "sortPurpose": "Sort: Purpose",
       "qualityScore": "Quality score: {score}/10",
       "noModelsAvailable": "No models available for this purpose",
+      "saveSuccess": "Model configuration saved",
+      "saveError": "Failed to save model configuration",
       "tableName": "Name",
       "tableService": "Service",
       "tableRating": "Rating",
@@ -766,6 +789,7 @@
         "priceOut": "Price out",
         "unitOut": "Unit out",
         "actions": "Actions",
+        "edit": "Edit",
         "save": "Save",
         "saving": "Saving…",
         "delete": "Delete",
@@ -782,7 +806,11 @@
         "failedCreate": "Failed to create model",
         "failedSave": "Failed to save model",
         "failedDelete": "Failed to delete model",
-        "requiredFields": "All fields are required: Service, Tag, Provider ID, Name"
+        "requiredFields": "All fields are required: Service, Tag, Provider ID, Name",
+        "searchPlaceholder": "Search models..."
+      },
+      "pagination": {
+        "showing": "Showing {start}–{end} of {total}"
       }
     },
     "taskPrompts": {
@@ -933,6 +961,7 @@
       "exportSuccess": "Usage data exported successfully",
       "errorLoading": "Failed to load usage statistics",
       "errorExporting": "Failed to export usage data",
+      "notAuthenticated": "Not authenticated. Please log in to view statistics.",
       "subscription": "Subscription",
       "userLevel": "User Level",
       "phoneVerified": "Phone Verified",
@@ -952,13 +981,41 @@
       "source": "Source",
       "tokens": "Tokens",
       "latency": "Latency",
+      "model": "Model",
+      "promptTokens": "Prompt",
+      "completionTokens": "Completion",
+      "cachedTokens": "Cache",
+      "cost": "Cost",
+      "estimatedTooltip": "Token count estimated (no exact measurement from provider)",
       "noRecentActivity": "No recent activity",
+      "activity": {
+        "searchPlaceholder": "Search by model or provider...",
+        "allActions": "All actions",
+        "dateFrom": "From date",
+        "dateTo": "To date",
+        "clearFilters": "Clear filters",
+        "showing": "Showing {from}-{to} of {total}"
+      },
+      "costBudget": {
+        "title": "Cost Budget",
+        "consumption": "Consumption",
+        "remaining": "Remaining",
+        "thisMonth": "Cost this month",
+        "unlimited": "No limit"
+      },
+      "costSummary": {
+        "today": "Today",
+        "thisWeek": "This Week",
+        "thisMonth": "This Month"
+      },
       "actions": {
         "messages": "Messages",
         "images": "Images",
         "videos": "Videos",
         "audios": "Audio Files",
-        "file_analysis": "File Analysis"
+        "file_analysis": "File Analysis",
+        "sorting": "Classification",
+        "search_query": "Search Query"
       },
       "sources": {
         "whatsapp": "WhatsApp",

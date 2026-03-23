@@ -104,7 +104,7 @@ class GoogleProvider implements ChatProviderInterface, ImageGenerationProviderIn
 
     // ==================== CHAT ====================
 
-    public function chat(array $messages, array $options = []): string
+    public function chat(array $messages, array $options = []): array
     {
         if (!isset($options['model'])) {
             throw new ProviderException('Model must be specified in options', 'google');
@@ -148,7 +148,23 @@ class GoogleProvider implements ChatProviderInterface, ImageGenerationProviderIn
 
             $this->checkGeminiFinishReason($data);
 
-            return $data['candidates'][0]['content']['parts'][0]['text'] ?? '';
+            $usageMetadata = $data['usageMetadata'] ?? [];
+            $promptTokens = $usageMetadata['promptTokenCount'] ?? 0;
+            $completionTokens = $usageMetadata['candidatesTokenCount'] ?? 0;
+            $cachedTokens = $usageMetadata['cachedContentTokenCount'] ?? 0;
+
+            $usage = [
+                'prompt_tokens' => $promptTokens,
+                'completion_tokens' => $completionTokens,
+                'total_tokens' => $promptTokens + $completionTokens,
+                'cached_tokens' => $cachedTokens,
+                'cache_creation_tokens' => 0,
+            ];
+
+            return [
+                'content' => $data['candidates'][0]['content']['parts'][0]['text'] ?? '',
+                'usage' => $usage,
+            ];
         } catch (ProviderException $e) {
             throw $e;
         } catch (\Exception $e) {
@@ -156,7 +172,7 @@ class GoogleProvider implements ChatProviderInterface, ImageGenerationProviderIn
         }
     }
 
-    public function chatStream(array $messages, callable $callback, array $options = []): void
+    public function chatStream(array $messages, callable $callback, array $options = []): array
     {
         if (!isset($options['model'])) {
             throw new ProviderException('Model must be specified in options', 'google');
@@ -196,6 +212,14 @@ class GoogleProvider implements ChatProviderInterface, ImageGenerationProviderIn
                 'timeout' => 120,
             ]);
 
+            $usage = [
+                'prompt_tokens' => 0,
+                'completion_tokens' => 0,
+                'total_tokens' => 0,
+                'cached_tokens' => 0,
+                'cache_creation_tokens' => 0,
+            ];
+
             foreach ($this->httpClient->stream($response) as $chunk) {
                 if ($chunk->isLast()) {
                     break;
@@ -212,11 +236,28 @@ class GoogleProvider implements ChatProviderInterface, ImageGenerationProviderIn
                         $this->checkGeminiFinishReason($data);
                     }
 
+                    // Capture usage from each chunk (last chunk has final values)
+                    if (isset($data['usageMetadata'])) {
+                        $usageMetadata = $data['usageMetadata'];
+                        $promptTokens = $usageMetadata['promptTokenCount'] ?? 0;
+                        $completionTokens = $usageMetadata['candidatesTokenCount'] ?? 0;
+                        $cachedTokens = $usageMetadata['cachedContentTokenCount'] ?? 0;
+                        $usage = [
+                            'prompt_tokens' => $promptTokens,
+                            'completion_tokens' => $completionTokens,
+                            'total_tokens' => $promptTokens + $completionTokens,
+                            'cached_tokens' => $cachedTokens,
+                            'cache_creation_tokens' => 0,
+                        ];
+                    }
+
                     if (isset($data['candidates'][0]['content']['parts'][0]['text'])) {
                         $callback($data['candidates'][0]['content']['parts'][0]['text']);
                     }
                 }
             }
+
+            return ['usage' => $usage];
         } catch (ProviderException $e) {
             throw $e;
         } catch (\Exception $e) {

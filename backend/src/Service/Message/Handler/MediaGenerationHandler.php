@@ -351,7 +351,9 @@ final readonly class MediaGenerationHandler implements MessageHandlerInterface
                         'local_path' => $relativePath,
                         'media_prompt' => $prompt,
                         'media_type' => $mediaType,
-                        // StreamController expects this format for 'file' SSE event
+                        'media_usage' => [
+                            'characters' => $result['text_length'] ?? mb_strlen($prompt),
+                        ],
                         'file' => [
                             'path' => $displayUrl,
                             'type' => $mediaType,
@@ -463,6 +465,13 @@ final readonly class MediaGenerationHandler implements MessageHandlerInterface
 
             $this->notify($progressCallback, 'generating', ucfirst($mediaType).' generated successfully.');
 
+            $mediaUsage = [];
+            if ('image' === $mediaType) {
+                $mediaUsage['images'] = $result['image_count'] ?? 1;
+            } elseif ('video' === $mediaType) {
+                $mediaUsage['duration_seconds'] = $result['duration_seconds'] ?? null;
+            }
+
             return [
                 'metadata' => [
                     'provider' => $result['provider'] ?? $provider,
@@ -473,7 +482,7 @@ final readonly class MediaGenerationHandler implements MessageHandlerInterface
                     'thumbnail_path' => $thumbnailPath,
                     'media_prompt' => $prompt,
                     'media_type' => $mediaType,
-                    // StreamController expects this format for 'file' SSE event
+                    'media_usage' => $mediaUsage,
                     'file' => [
                         'path' => $displayUrl,
                         'type' => $mediaType,

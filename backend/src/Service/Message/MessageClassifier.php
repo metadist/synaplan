@@ -172,7 +172,10 @@ final readonly class MessageClassifier
             'web_search' => $result['web_search'] ?? false,
             'source' => 'ai_sorting',
             'skip_sorting' => false,
-            'intent' => $this->mapTopicToIntent($result['topic']), // Map topic to intent for routing
+            'intent' => $this->mapTopicToIntent($result['topic']),
+            'model_id' => $result['sorting_model_id'] ?? null,
+            'provider' => $result['sorting_provider'] ?? null,
+            'model_name' => $result['sorting_model_name'] ?? null,
         ];
 
         if ($overrideModelId) {

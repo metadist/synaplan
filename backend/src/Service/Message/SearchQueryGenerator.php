@@ -3,8 +3,11 @@
 namespace App\Service\Message;
 
 use App\AI\Service\AiFacade;
+use App\Entity\User;
 use App\Repository\PromptRepository;
 use App\Service\ModelConfigService;
+use App\Service\RateLimitService;
+use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;
 
 /**
@@ -24,6 +27,8 @@ final readonly class SearchQueryGenerator
         private AiFacade $aiFacade,
         private PromptRepository $promptRepository,
         private ModelConfigService $modelConfigService,
+        private RateLimitService $rateLimitService,
+        private EntityManagerInterface $em,
         private LoggerInterface $logger,
     ) {
     }
@@ -87,6 +92,8 @@ final readonly class SearchQueryGenerator
 
             $searchQuery = trim($response['content']);
 
+            $this->recordSearchUsage($userId, $modelId, $response, $userQuestion);
+
             $this->logger->info('SearchQueryGenerator: Query generated', [
                 'provider' => $response['provider'],
                 'original' => $userQuestion,
@@ -117,6 +124,37 @@ final readonly class SearchQueryGenerator
             ]);
 
             return $this->fallbackExtraction($userQuestion);
+        }
+    }
+
+    /**
+     * Record token usage for the search query generation AI call.
+     */
+    private function recordSearchUsage(?int $userId, ?int $modelId, array $response, string $userQuestion): void
+    {
+        if (!$userId) {
+            return;
+        }
+
+        try {
+            $user = $this->em->getRepository(User::class)->find($userId);
+            if (!$user) {
+                return;
+            }
+
+            $this->rateLimitService->recordUsage($user, 'SEARCH_QUERY', [
+                'usage' => $response['usage'] ?? [],
+                'model_id' => $modelId,
+                'provider' => $response['provider'] ?? '',
+                'model' => $response['model'] ?? '',
+                'input_text' => $userQuestion,
+                'response_text' => $response['content'] ?? '',
+            ]);
+        } catch (\Throwable $e) {
+            $this->logger->warning('SearchQueryGenerator: Failed to record search query usage', [
+                'error' => $e->getMessage(),
+                'user_id' => $userId,
+            ]);
         }
     }
 

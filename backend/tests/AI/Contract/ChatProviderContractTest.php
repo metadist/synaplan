@@ -18,9 +18,9 @@ abstract class ChatProviderContractTest extends TestCase
     abstract protected function getProvider(): ChatProviderInterface;
 
     /**
-     * Test: chat returns non-empty string.
+     * Test: chat returns array with content and usage.
      */
-    public function testChatReturnsString(): void
+    public function testChatReturnsArrayWithContentAndUsage(): void
     {
         $provider = $this->getProvider();
 
@@ -29,8 +29,10 @@ abstract class ChatProviderContractTest extends TestCase
             ['model' => 'test-model']
         );
 
-        $this->assertIsString($result);
-        $this->assertNotEmpty($result);
+        $this->assertArrayHasKey('content', $result);
+        $this->assertArrayHasKey('usage', $result);
+        $this->assertIsString($result['content']);
+        $this->assertNotEmpty($result['content']);
     }
 
     /**

@@ -1366,7 +1366,9 @@
         "images": "Görseller",
         "videos": "Videolar",
         "audios": "Ses Dosyaları",
-        "file_analysis": "Dosya Analizi"
+        "file_analysis": "Dosya Analizi",
+        "sorting": "Sınıflandırma",
+        "search_query": "Arama Sorgusu"
       },
       "sources": {
         "whatsapp": "WhatsApp",
