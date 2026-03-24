@@ -92,6 +92,8 @@ From the **frontend** directory:
 | **Test stack**: CI-like (no @noci) | `BASE_URL=http://localhost:8001 npm run test:e2e -- --grep-invert "@noci"` |
 | **Test stack**: single test        | `BASE_URL=http://localhost:8001 npm run test:e2e -- -g "embedded chat"`    |
 | **WhatsApp only**                  | `BASE_URL=http://localhost:8001 npm run test:e2e:whatsapp`                 |
+| **Real AI** (browser, local only)  | `npx playwright test --config tests/e2e/playwright.local.config.ts`        |
+| **Real AI** (API-only, local only) | `npx playwright test --config tests/e2e/playwright.local.config.ts --grep api` |
 | **Playwright UI**                  | `npm run test:e2e:ui`                                                      |
 
 Everything after `--` is passed through to Playwright.

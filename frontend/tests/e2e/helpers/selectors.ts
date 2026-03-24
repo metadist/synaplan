@@ -106,6 +106,7 @@ export const selectors = {
     messageVideo: '[data-testid="section-message-video"]',
     messageVideoPlayer: '[data-testid="media-video-player"]',
     messageAudio: '[data-testid="section-message-audio"]',
+    againBtn: '[data-testid="btn-message-again"]',
     againDropdown: '[data-testid="btn-message-model-toggle"]',
     againDropdownPanel: '[data-testid="dropdown-again-models"]',
     againDropdownItem: 'button.dropdown-item',
