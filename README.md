@@ -72,18 +72,9 @@ echo "GROQ_API_KEY=your_key" >> backend/.env && docker compose restart backend
 
 ## Qdrant Vector Database
 
-Qdrant is included in `docker-compose.yml` and starts automatically. It powers:
-- **AI Memories** — remembers user preferences across sessions
-- **RAG Document Vectors** — semantic search over uploaded documents
-- **Feedback System** — false-positive detection and learning
+Qdrant runs as an internal Docker service — no configuration needed. It powers AI memories, RAG document search, and the feedback system.
 
-Configure in `backend/.env`:
-```bash
-QDRANT_URL=http://qdrant:6333
-QDRANT_API_KEY=              # optional in dev, recommended in prod
-```
-
-Qdrant is **optional** — Synaplan works fully without it (memories and vector search will be disabled).
+Starts automatically with `docker compose up -d`. Synaplan works fully without it (memories and vector search will be disabled).
 
 ---
 

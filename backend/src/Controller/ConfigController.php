@@ -929,7 +929,6 @@ class ConfigController extends AbstractController
 
         // Qdrant - User memories with vector search
         $qdrantUrl = $_ENV['QDRANT_URL'] ?? '';
-        $qdrantApiKey = $_ENV['QDRANT_API_KEY'] ?? '';
         $memoryServiceAvailable = $this->memoryService->isAvailable();
 
         // Build status message and get service info
@@ -945,10 +944,6 @@ class ConfigController extends AbstractController
                 $memoryStats = $healthDetails['qdrant'] ?? [];
 
                 $memoryMessage = 'Qdrant is connected and ready';
-
-                if (empty($qdrantApiKey)) {
-                    $memoryWarnings[] = 'No API key configured — Qdrant is exposed without authentication';
-                }
             } catch (\Throwable $e) {
                 $memoryMessage = 'Qdrant available but health check failed';
                 $memoryWarnings[] = $e->getMessage();
@@ -977,14 +972,8 @@ class ConfigController extends AbstractController
                 'QDRANT_URL' => [
                     'required' => true,
                     'set' => !empty($qdrantUrl) && 'http://' !== $qdrantUrl && 'https://' !== $qdrantUrl,
-                    'hint' => 'Qdrant REST API URL (e.g., http://qdrant:6333)',
+                    'hint' => 'Internal Docker service URL',
                     'example' => 'http://qdrant:6333',
-                ],
-                'QDRANT_API_KEY' => [
-                    'required' => false,
-                    'set' => !empty($qdrantApiKey),
-                    'hint' => 'Optional API key for Qdrant (recommended in production)',
-                    'warning' => 'Production deployments should use an API key for security',
                 ],
             ],
         ];

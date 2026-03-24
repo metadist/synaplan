@@ -15,7 +15,6 @@ final readonly class VectorStorageConfig
         private ConfigRepository $configRepository,
         private ?string $envProvider = null,
         private ?string $qdrantUrl = null,
-        private ?string $qdrantApiKey = null,
         private ?string $qdrantDocumentsCollection = null,
     ) {
     }
@@ -50,11 +49,6 @@ final readonly class VectorStorageConfig
     public function getQdrantUrl(): string
     {
         return $this->qdrantUrl ?? '';
-    }
-
-    public function getQdrantApiKey(): string
-    {
-        return $this->qdrantApiKey ?? '';
     }
 
     public function getQdrantDocumentsCollection(): string

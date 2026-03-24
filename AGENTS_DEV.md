@@ -287,8 +287,7 @@ No external microservice — PHP communicates directly with Qdrant's REST API vi
 
 ### Environment Variables
 ```bash
-QDRANT_URL=http://qdrant:6333
-QDRANT_API_KEY=                          # optional in dev
+QDRANT_URL=http://qdrant:6333            # internal Docker service
 QDRANT_MEMORIES_COLLECTION=user_memories # default
 QDRANT_DOCUMENTS_COLLECTION=user_documents # default
 ```

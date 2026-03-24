@@ -33,7 +33,6 @@
         <env name="BRAVE_SEARCH_SEARCH_LANG" value="en" />
         <!-- Qdrant (defaults for testing — empty = disabled) -->
         <env name="QDRANT_URL" value="" />
-        <env name="QDRANT_API_KEY" value="" />
         <!-- Stripe / Billing (force valid-looking keys so BillingService::isEnabled()=true in tests) -->
         <env name="STRIPE_SECRET_KEY" value="sk_test_fakeKeyForTestSuite000000000000" force="true" />
         <env name="STRIPE_PRICE_PRO" value="price_1TestSuitePro" force="true" />

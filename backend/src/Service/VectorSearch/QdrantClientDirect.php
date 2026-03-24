@@ -38,7 +38,6 @@ final class QdrantClientDirect implements QdrantClientInterface
         private readonly LoggerInterface $logger,
         #[Autowire(service: 'cache.app')]
         private readonly ?CacheInterface $cache = null,
-        private readonly ?string $apiKey = null,
         ?string $memoriesCollection = null,
         ?string $documentsCollection = null,
         private readonly int $vectorDimension = self::DEFAULT_VECTOR_DIM,
@@ -601,7 +600,7 @@ final class QdrantClientDirect implements QdrantClientInterface
             return $this->doHealthCheck();
         }
 
-        $cacheKey = 'qdrant.health.'.sha1($this->qdrantUrl.'|'.($this->apiKey ?? ''));
+        $cacheKey = 'qdrant.health.'.sha1($this->qdrantUrl);
 
         try {
             return (bool) $this->cache->get($cacheKey, function (ItemInterface $item): bool {
@@ -918,13 +917,7 @@ final class QdrantClientDirect implements QdrantClientInterface
      */
     private function getHeaders(): array
     {
-        $headers = ['Content-Type' => 'application/json'];
-
-        if (null !== $this->apiKey && '' !== $this->apiKey) {
-            $headers['api-key'] = $this->apiKey;
-        }
-
-        return $headers;
+        return ['Content-Type' => 'application/json'];
     }
 
     /**

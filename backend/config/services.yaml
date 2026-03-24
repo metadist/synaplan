@@ -44,7 +44,6 @@ parameters:
     env(TIKA_HTTP_PASS): ''
     env(VECTOR_STORAGE_PROVIDER): ''
     env(QDRANT_URL): ''
-    env(QDRANT_API_KEY): ''
     env(QDRANT_MEMORIES_COLLECTION): ''
     env(QDRANT_DOCUMENTS_COLLECTION): ''
     env(TRITON_SERVER_URL): ''
@@ -473,7 +472,6 @@ services:
         arguments:
             $httpClient: '@Symfony\Contracts\HttpClient\HttpClientInterface'
             $qdrantUrl: '%env(QDRANT_URL)%'
-            $apiKey: '%env(QDRANT_API_KEY)%'
             $memoriesCollection: '%env(default::QDRANT_MEMORIES_COLLECTION)%'
             $documentsCollection: '%env(default::QDRANT_DOCUMENTS_COLLECTION)%'
 
@@ -504,7 +502,6 @@ services:
         arguments:
             $envProvider: '%env(VECTOR_STORAGE_PROVIDER)%'
             $qdrantUrl: '%env(QDRANT_URL)%'
-            $qdrantApiKey: '%env(QDRANT_API_KEY)%'
             $qdrantDocumentsCollection: '%env(default::QDRANT_DOCUMENTS_COLLECTION)%'
 
     # Vector Storage Implementations

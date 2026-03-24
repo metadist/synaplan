@@ -83,7 +83,7 @@ final readonly class SystemConfigService
             'vectordb' => [
                 'label' => 'Vector DB',
                 'sections' => [
-                    'qdrant' => ['label' => 'Qdrant', 'fields' => ['QDRANT_URL', 'QDRANT_API_KEY']],
+                    'qdrant' => ['label' => 'Qdrant', 'fields' => ['QDRANT_URL']],
                     'qdrant_search' => ['label' => 'Search Thresholds', 'fields' => [
                         'MIN_CHAT_FEEDBACK_SCORE', 'MIN_CHAT_MEMORY_SCORE', 'MIN_CONTRADICTION_SCORE',
                         'MIN_RESEARCH_SCORE', 'MIN_MEMORY_RESEARCH_SCORE', 'MIN_EXTRACTION_SCORE',
@@ -497,10 +497,6 @@ final readonly class SystemConfigService
                 CURLOPT_TIMEOUT => 5,
                 CURLOPT_CONNECTTIMEOUT => 3,
             ]);
-            $apiKey = $this->getEnvValue('QDRANT_API_KEY');
-            if ($apiKey) {
-                curl_setopt($ch, CURLOPT_HTTPHEADER, ['api-key: '.$apiKey]);
-            }
             $response = curl_exec($ch);
             $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
             curl_close($ch);
@@ -810,12 +806,6 @@ final readonly class SystemConfigService
                 'sensitive' => false, 'description' => 'Qdrant REST API URL',
                 'default' => 'http://qdrant:6333',
             ],
-            'QDRANT_API_KEY' => [
-                'tab' => 'vectordb', 'section' => 'qdrant', 'type' => 'password',
-                'sensitive' => true, 'description' => 'Qdrant API key (optional in dev)',
-                'default' => '',
-            ],
-
             // === Search Thresholds (database-backed, no restart required) ===
             'MIN_CHAT_FEEDBACK_SCORE' => [
                 'tab' => 'vectordb', 'section' => 'qdrant_search', 'type' => 'number',

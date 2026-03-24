@@ -25,7 +25,6 @@ final class QdrantClientDirectTest extends TestCase
             httpClient: $mockClient,
             qdrantUrl: 'http://localhost:6333',
             logger: new NullLogger(),
-            apiKey: 'test-api-key',
         );
     }
 
@@ -180,42 +179,6 @@ final class QdrantClientDirectTest extends TestCase
 
         $this->assertFalse($client->healthCheck());
         $this->assertFalse($client->isAvailable());
-    }
-
-    public function testApiKeyIsIncludedInRequests(): void
-    {
-        $requestHeaders = null;
-
-        $mockClient = new MockHttpClient(function ($method, $url, $options) use (&$requestHeaders) {
-            $requestHeaders = $options['headers'] ?? [];
-
-            return new MockResponse(json_encode(['result' => ['status' => 'green']]), ['http_code' => 200]);
-        });
-
-        $client = new QdrantClientDirect(
-            httpClient: $mockClient,
-            qdrantUrl: 'http://localhost:6333',
-            logger: new NullLogger(),
-            apiKey: 'secret-test-key',
-        );
-
-        // Trigger a health check to exercise the request path
-        $client->healthCheck();
-
-        $this->assertNotNull($requestHeaders);
-
-        $hasApiKey = false;
-        foreach ($requestHeaders as $key => $value) {
-            if (is_string($key) && 'api-key' === strtolower($key)) {
-                $hasApiKey = true;
-                $this->assertEquals('secret-test-key', is_array($value) ? $value[0] : $value);
-            } elseif (is_string($value) && str_starts_with(strtolower($value), 'api-key:')) {
-                $hasApiKey = true;
-                $this->assertStringContainsString('secret-test-key', $value);
-            }
-        }
-
-        $this->assertTrue($hasApiKey, 'API Key header not found in request');
     }
 
     public function testUpsertDocumentSuccess(): void

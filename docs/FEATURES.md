@@ -104,9 +104,6 @@ Qdrant is included in `docker-compose.yml` and powers:
 
 In `backend/.env`:
 
-```bash
-QDRANT_URL=http://qdrant:6333
-QDRANT_API_KEY=              # optional in dev, recommended in prod
-```
+Qdrant runs as an internal Docker service — no configuration needed beyond the default `QDRANT_URL=http://qdrant:6333` in `.env`.
 
 **This is optional** — Synaplan works fully without it (memories and vector search will be disabled).

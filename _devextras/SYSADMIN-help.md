@@ -217,17 +217,13 @@ curl http://localhost:8000/api/v1/config/memory-service/check
 
 In `backend/.env`:
 
-```bash
-QDRANT_URL=http://qdrant:6333
-QDRANT_API_KEY=              # optional in dev, recommended in prod
-```
+Qdrant runs as an internal Docker service — the default `QDRANT_URL=http://qdrant:6333` in `.env` works out of the box.
 
 ### Production
 
-Configure in `synaplan-platform/docker-compose.yml`:
+Already configured in `synaplan-platform/docker-compose.yml`:
 ```yaml
 QDRANT_URL: http://qdrant:6333
-QDRANT_API_KEY: your-secret-key
 ```
 
 ## Qdrant Environment
@@ -235,7 +231,6 @@ QDRANT_API_KEY: your-secret-key
 | Variable | Purpose |
 |----------|---------|
 | `QDRANT_URL` | Qdrant REST API URL (http://qdrant:6333) |
-| `QDRANT_API_KEY` | API key for authentication |
 | `QDRANT_MEMORIES_COLLECTION` | Collection name (default: user_memories) |
 | `QDRANT_DOCUMENTS_COLLECTION` | Collection name (default: user_documents) |
 
@@ -273,8 +268,7 @@ FRONTEND_URL=http://localhost:5173    # Public frontend URL (email links)
 | `GROQ_API_KEY` | Groq integration |
 | `WHATSAPP_*` | WhatsApp Business API |
 | `STRIPE_*` | Payment processing |
-| `QDRANT_URL` | Qdrant vector database |
-| `QDRANT_API_KEY` | Qdrant auth |
+| `QDRANT_URL` | Qdrant vector database (internal service) |
 
 See `synaplan/backend/.env.example` for complete list.
 
