@@ -207,7 +207,7 @@ final class QdrantClientDirect implements QdrantClientInterface
 
         try {
             $uuid = $this->generatePointUuid($pointId);
-            $this->qdrantRequest('POST', "/collections/{$collection}/points/delete", [
+            $this->qdrantRequest('POST', "/collections/{$collection}/points/delete?wait=true", [
                 'points' => [$uuid],
             ]);
 
@@ -225,17 +225,31 @@ final class QdrantClientDirect implements QdrantClientInterface
     public function deleteAllMemoriesForUser(int $userId): int
     {
         try {
-            $this->qdrantRequest('POST', "/collections/{$this->memoriesCollection}/points/delete", [
-                'filter' => [
-                    'must' => [
-                        ['key' => 'user_id', 'match' => ['value' => $userId]],
-                    ],
+            $filter = [
+                'must' => [
+                    ['key' => 'user_id', 'match' => ['value' => $userId]],
                 ],
+            ];
+
+            $countResponse = $this->qdrantRequest('POST', "/collections/{$this->memoriesCollection}/points/count", [
+                'filter' => $filter,
+            ]);
+            $deletedCount = (int) ($countResponse['result']['count'] ?? 0);
+
+            if (0 === $deletedCount) {
+                return 0;
+            }
+
+            $this->qdrantRequest('POST', "/collections/{$this->memoriesCollection}/points/delete?wait=true", [
+                'filter' => $filter,
             ]);
 
-            $this->logger->info('All memories deleted from Qdrant for user', ['user_id' => $userId]);
+            $this->logger->info('All memories deleted from Qdrant for user', [
+                'user_id' => $userId,
+                'deleted_count' => $deletedCount,
+            ]);
 
-            return 1;
+            return $deletedCount;
         } catch (\Throwable $e) {
             $this->logger->error('Failed to delete all memories for user from Qdrant', [
                 'user_id' => $userId,
@@ -393,7 +407,7 @@ final class QdrantClientDirect implements QdrantClientInterface
     {
         try {
             $uuid = $this->generatePointUuid($pointId);
-            $this->qdrantRequest('POST', "/collections/{$this->documentsCollection}/points/delete", [
+            $this->qdrantRequest('POST', "/collections/{$this->documentsCollection}/points/delete?wait=true", [
                 'points' => [$uuid],
             ]);
         } catch (\Throwable $e) {
@@ -427,22 +441,28 @@ final class QdrantClientDirect implements QdrantClientInterface
     public function updateDocumentGroupKey(int $userId, int $fileId, string $newGroupKey): int
     {
         try {
-            $points = $this->scrollAllDocumentPoints($userId, [
-                ['key' => 'file_id', 'match' => ['value' => $fileId]],
-            ]);
+            $filter = [
+                'must' => [
+                    ['key' => 'user_id', 'match' => ['value' => $userId]],
+                    ['key' => 'file_id', 'match' => ['value' => $fileId]],
+                ],
+            ];
 
-            if (empty($points)) {
+            $countResponse = $this->qdrantRequest('POST', "/collections/{$this->documentsCollection}/points/count", [
+                'filter' => $filter,
+            ]);
+            $count = (int) ($countResponse['result']['count'] ?? 0);
+
+            if (0 === $count) {
                 return 0;
             }
 
-            $pointIds = array_map(fn (array $p) => $p['id'], $points);
-
-            $this->qdrantRequest('POST', "/collections/{$this->documentsCollection}/points/payload", [
+            $this->qdrantRequest('POST', "/collections/{$this->documentsCollection}/points/payload?wait=true", [
                 'payload' => ['group_key' => $newGroupKey],
-                'points' => $pointIds,
+                'filter' => $filter,
             ]);
 
-            return count($pointIds);
+            return $count;
         } catch (\Throwable $e) {
             $this->logger->error('Failed to update document group key', [
                 'user_id' => $userId,
@@ -726,6 +746,10 @@ final class QdrantClientDirect implements QdrantClientInterface
 
         $sanitized = preg_replace('/[^a-z0-9_-]/', '', strtolower($namespace));
 
+        if ('' === $sanitized) {
+            return $this->memoriesCollection;
+        }
+
         return "{$this->memoriesCollection}_{$sanitized}";
     }
 
@@ -751,9 +775,14 @@ final class QdrantClientDirect implements QdrantClientInterface
                     'distance' => 'Cosine',
                 ],
             ]);
+
+            $this->createPayloadIndex($collection, 'user_id', 'integer');
+            $this->createPayloadIndex($collection, 'category', 'keyword');
+            $this->createPayloadIndex($collection, 'active', 'bool');
+
             $this->ensuredCollections[$collection] = true;
 
-            $this->logger->info('Created Qdrant memories collection', ['collection' => $collection]);
+            $this->logger->info('Created Qdrant memories collection with indices', ['collection' => $collection]);
         } catch (\Throwable $e) {
             $this->logger->error('Failed to create memories collection', [
                 'collection' => $collection,
@@ -835,12 +864,22 @@ final class QdrantClientDirect implements QdrantClientInterface
                 ['key' => 'user_id', 'match' => ['value' => $userId]],
                 ...$extraConditions,
             ];
+            $filter = ['must' => $must];
 
-            $this->qdrantRequest('POST', "/collections/{$this->documentsCollection}/points/delete", [
-                'filter' => ['must' => $must],
+            $countResponse = $this->qdrantRequest('POST', "/collections/{$this->documentsCollection}/points/count", [
+                'filter' => $filter,
+            ]);
+            $count = (int) ($countResponse['result']['count'] ?? 0);
+
+            if (0 === $count) {
+                return 0;
+            }
+
+            $this->qdrantRequest('POST', "/collections/{$this->documentsCollection}/points/delete?wait=true", [
+                'filter' => $filter,
             ]);
 
-            return 1;
+            return $count;
         } catch (\Throwable $e) {
             $this->logger->error('Failed to delete documents by filter', [
                 'user_id' => $userId,
@@ -882,7 +921,9 @@ final class QdrantClientDirect implements QdrantClientInterface
             $response = $this->qdrantRequest('POST', "/collections/{$this->documentsCollection}/points/scroll", $body);
 
             $points = $response['result']['points'] ?? [];
-            $allPoints = array_merge($allPoints, $points);
+            foreach ($points as $point) {
+                $allPoints[] = $point;
+            }
 
             $offset = $response['result']['next_page_offset'] ?? null;
         } while (null !== $offset && !empty($points));
