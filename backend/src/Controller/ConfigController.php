@@ -37,25 +37,25 @@ class ConfigController extends AbstractController
         private PluginManager $pluginManager,
         private BillingService $billingService,
         private UserMemoryService $memoryService,
-        #[Autowire('%env(string:default::QDRANT_SERVICE_URL)%')]
-        private readonly string $qdrantServiceUrl,
+        #[Autowire('%env(string:default::QDRANT_URL)%')]
+        private readonly string $qdrantUrl,
     ) {
     }
 
     /**
-     * Quick memory service availability check (lightweight, no full status)
-     * Frontend calls this asynchronously after app load to check if memory service is reachable.
+     * Quick Qdrant availability check (lightweight, no full status)
+     * Frontend calls this asynchronously after app load to check if Qdrant is reachable.
      */
     #[Route('/memory-service/check', name: 'memory_service_check', methods: ['GET'])]
     #[OA\Get(
         path: '/api/v1/config/memory-service/check',
-        summary: 'Check memory service availability',
-        description: 'Quick check if memory microservice is reachable (called asynchronously)',
+        summary: 'Check Qdrant availability',
+        description: 'Quick check if Qdrant vector database is reachable (called asynchronously)',
         tags: ['Configuration']
     )]
     #[OA\Response(
         response: 200,
-        description: 'Memory service status',
+        description: 'Qdrant availability status',
         content: new OA\JsonContent(
             properties: [
                 new OA\Property(property: 'available', type: 'boolean', example: true),
@@ -65,7 +65,7 @@ class ConfigController extends AbstractController
     )]
     public function checkMemoryService(): JsonResponse
     {
-        $configured = '' !== trim($this->qdrantServiceUrl);
+        $configured = '' !== trim($this->qdrantUrl);
         $available = $configured && $this->memoryService->isAvailable();
 
         return $this->json([
@@ -111,7 +111,7 @@ class ConfigController extends AbstractController
                     type: 'object',
                     properties: [
                         new OA\Property(property: 'help', type: 'boolean', example: true, description: 'Enable help system'),
-                        new OA\Property(property: 'memoryService', type: 'boolean', example: true, description: 'Memory microservice availability'),
+                        new OA\Property(property: 'memoryService', type: 'boolean', example: true, description: 'Qdrant vector database availability'),
                     ]
                 ),
                 new OA\Property(
@@ -206,11 +206,11 @@ class ConfigController extends AbstractController
         ];
 
         // Feature flags
-        // IMPORTANT: memoryService check is SLOW (1s timeout), so we always report true here
+        // IMPORTANT: Qdrant check is SLOW (1s timeout), so we always report true here
         // Frontend will check availability asynchronously via /api/v1/config/features/status
         $features = [
             'help' => ($_ENV['FEATURE_HELP'] ?? 'false') === 'true',
-            'memoryService' => !empty($_ENV['QDRANT_SERVICE_URL']), // Just check if configured, not if reachable
+            'memoryService' => !empty($_ENV['QDRANT_URL']), // Just check if configured, not if reachable
         ];
 
         // Speech-to-text configuration
@@ -927,9 +927,8 @@ class ConfigController extends AbstractController
             'version' => $tikaVersion,
         ];
 
-        // Memory Microservice (Qdrant) - User memories with vector search
-        $qdrantUrl = $_ENV['QDRANT_SERVICE_URL'] ?? '';
-        $qdrantApiKey = $_ENV['QDRANT_SERVICE_API_KEY'] ?? '';
+        // Qdrant - User memories with vector search
+        $qdrantUrl = $_ENV['QDRANT_URL'] ?? '';
         $memoryServiceAvailable = $this->memoryService->isAvailable();
 
         // Build status message and get service info
@@ -937,53 +936,30 @@ class ConfigController extends AbstractController
         $memoryWarnings = [];
         $memoryVersion = 'unknown';
         $memoryStats = [];
-        $memoryMetrics = [];
-        $memoryUptime = 0;
 
         if ($memoryServiceAvailable) {
             try {
-                // Get detailed health information from microservice
                 $healthDetails = $this->memoryService->getQdrantClient()->getHealthDetails();
                 $memoryVersion = $healthDetails['version'] ?? 'unknown';
                 $memoryStats = $healthDetails['qdrant'] ?? [];
-                $memoryMetrics = $healthDetails['metrics'] ?? [];
-                $memoryUptime = $healthDetails['uptime_seconds'] ?? 0;
 
-                $memoryMessage = sprintf(
-                    'Memory service is ready (uptime: %s)',
-                    $this->formatUptime($memoryUptime)
-                );
-
-                // Check if API key is set (optional but recommended)
-                if (empty($qdrantApiKey) || 'changeme-in-production' === $qdrantApiKey) {
-                    $memoryWarnings[] = 'No API key configured - service is exposed without authentication';
-                }
-
-                // Check metrics for potential issues
-                $requestsTotal = $memoryMetrics['requests_total'] ?? 0;
-                $requestsFailed = $memoryMetrics['requests_failed'] ?? 0;
-                if ($requestsTotal > 0 && $requestsFailed > 0) {
-                    $errorRate = ($requestsFailed / $requestsTotal) * 100;
-                    if ($errorRate > 5) {
-                        $memoryWarnings[] = sprintf('High error rate: %.2f%% of requests failing', $errorRate);
-                    }
-                }
+                $memoryMessage = 'Qdrant is connected and ready';
             } catch (\Throwable $e) {
-                $memoryMessage = 'Memory service available but health check failed';
+                $memoryMessage = 'Qdrant available but health check failed';
                 $memoryWarnings[] = $e->getMessage();
             }
         } else {
             if (empty($qdrantUrl) || 'http://' === $qdrantUrl || 'https://' === $qdrantUrl) {
-                $memoryMessage = 'Memory microservice URL not configured';
+                $memoryMessage = 'Qdrant URL not configured';
             } else {
-                $memoryMessage = 'Memory microservice not reachable at configured URL';
+                $memoryMessage = 'Qdrant not reachable at configured URL';
             }
         }
 
         $features['memory-service'] = [
             'id' => 'memory-service',
             'category' => 'Processing Services',
-            'name' => 'Memory Microservice (Qdrant)',
+            'name' => 'Qdrant Vector Database',
             'enabled' => $memoryServiceAvailable,
             'status' => $memoryServiceAvailable ? 'healthy' : 'unhealthy',
             'message' => $memoryMessage,
@@ -991,21 +967,13 @@ class ConfigController extends AbstractController
             'setup_required' => !$memoryServiceAvailable,
             'url' => $qdrantUrl ?: 'not configured',
             'version' => $memoryVersion,
-            'uptime_seconds' => $memoryUptime,
             'stats' => $memoryStats,
-            'metrics' => $memoryMetrics,
             'env_vars' => [
-                'QDRANT_SERVICE_URL' => [
+                'QDRANT_URL' => [
                     'required' => true,
                     'set' => !empty($qdrantUrl) && 'http://' !== $qdrantUrl && 'https://' !== $qdrantUrl,
-                    'hint' => 'URL to Qdrant microservice (e.g., http://qdrant-service:8090)',
-                    'example' => 'http://qdrant-service:8090',
-                ],
-                'QDRANT_SERVICE_API_KEY' => [
-                    'required' => false,
-                    'set' => !empty($qdrantApiKey) && 'changeme-in-production' !== $qdrantApiKey,
-                    'hint' => 'Optional API key for securing the Qdrant service (recommended in production)',
-                    'warning' => 'Production deployments should use an API key for security',
+                    'hint' => 'Internal Docker service URL',
+                    'example' => 'http://qdrant:6333',
                 ],
             ],
         ];
@@ -1088,33 +1056,5 @@ class ConfigController extends AbstractController
         } catch (\Exception $e) {
             return false;
         }
-    }
-
-    /**
-     * Format uptime in seconds to human-readable string.
-     */
-    private function formatUptime(int $seconds): string
-    {
-        if ($seconds < 60) {
-            return "{$seconds}s";
-        }
-
-        if ($seconds < 3600) {
-            $minutes = floor($seconds / 60);
-
-            return "{$minutes}m";
-        }
-
-        if ($seconds < 86400) {
-            $hours = floor($seconds / 3600);
-            $minutes = floor(($seconds % 3600) / 60);
-
-            return "{$hours}h {$minutes}m";
-        }
-
-        $days = floor($seconds / 86400);
-        $hours = floor(($seconds % 86400) / 3600);
-
-        return "{$days}d {$hours}h";
     }
 }

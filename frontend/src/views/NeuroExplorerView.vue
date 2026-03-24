@@ -1,5 +1,5 @@
 <template>
-  <div class="neuro-explorer" ref="containerRef" tabindex="0" @keydown="onKeyDown" @keyup="onKeyUp">
+  <div ref="containerRef" class="neuro-explorer" tabindex="0" @keydown="onKeyDown" @keyup="onKeyUp">
     <canvas ref="canvasRef" class="neuro-canvas" />
 
     <!-- HUD overlay -->
@@ -21,7 +21,7 @@
     </div>
 
     <!-- Controls hint -->
-    <div class="hud-controls" v-if="!activeNode">
+    <div v-if="!activeNode" class="hud-controls">
       <div class="control-rows">
         <div class="control-row">
           <div class="control-keys">
@@ -42,7 +42,7 @@
     </div>
 
     <!-- Stamina bar -->
-    <div class="hud-stamina" v-if="!activeNode">
+    <div v-if="!activeNode" class="hud-stamina">
       <div class="stamina-icon">
         <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
           <path d="M13 10V3L4 14h7v7l9-11h-7z" />
@@ -58,7 +58,7 @@
     </div>
 
     <!-- Score / Stats HUD -->
-    <div class="hud-stats" v-if="!activeNode">
+    <div v-if="!activeNode" class="hud-stats">
       <div class="stat-item">
         <span class="stat-label">{{ $t('neuroExplorer.nodesVisited') }}</span>
         <span class="stat-value">{{ visitedNodes.size }} / {{ categoryNodes.length }}</span>

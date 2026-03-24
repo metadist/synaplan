@@ -276,26 +276,36 @@ These categories are hidden from user memory list but used internally:
 
 ---
 
-## Qdrant Vector Database (Memory Microservice)
+## Qdrant Vector Database (Direct Integration)
 
 ### Architecture
 ```
-Backend (PHP) → HTTP → Qdrant Microservice (Port 8090) → Qdrant DB
+Backend (PHP) → HTTP REST → Qdrant DB (Port 6333)
 ```
+
+No external microservice — PHP communicates directly with Qdrant's REST API via `QdrantClientDirect`.
 
 ### Environment Variables
 ```bash
-QDRANT_SERVICE_URL=http://host.docker.internal:8090  # Docker
-QDRANT_SERVICE_API_KEY=changeme-in-production
+QDRANT_URL=http://qdrant:6333            # internal Docker service
+QDRANT_MEMORIES_COLLECTION=user_memories # default
+QDRANT_DOCUMENTS_COLLECTION=user_documents # default
 ```
+
+### Collections
+- `user_memories` — user profiling, preferences, context across sessions
+- `user_memories_{namespace}` — namespace-scoped memory collections
+- `user_documents` — RAG document vectors for semantic search
+
+Collections are auto-created on first use with appropriate vector config and payload indices.
 
 ### Memory Point ID Format
 ```
-mem_{userId}_{memoryId}
-# Example: mem_1_1769617296252930
+UUIDv5 generated from: mem_{userId}_{memoryId}
+# Deterministic — same input always produces same UUID
 ```
 
-### Key Endpoints (via QdrantClientHttp)
+### Key Endpoints (via QdrantClientInterface)
 ```php
 // Store memory
 $this->qdrantClient->upsertMemory($pointId, $vector, $payload);
@@ -308,12 +318,21 @@ $memories = $this->qdrantClient->scrollMemories($userId, category: null, limit: 
 
 // Delete memory
 $this->qdrantClient->deleteMemory($pointId);
+
+// Document operations (RAG)
+$this->qdrantClient->upsertDocument($pointId, $vector, $payload);
+$results = $this->qdrantClient->searchDocuments($queryVector, $userId, limit: 5);
+$this->qdrantClient->deleteDocumentsByFile($userId, $fileId);
 ```
+
+### Implementations
+- `QdrantClientDirect` — production client, talks to Qdrant REST API
+- `QdrantClientMock` — dev/test stub, logs calls and returns empty results
 
 ### Availability Check
 ```php
 if ($this->qdrantClient->isAvailable()) {
-    // Memory service is running
+    // Qdrant is reachable
 }
 ```
 

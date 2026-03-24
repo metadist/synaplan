@@ -91,29 +91,19 @@ Extract content from:
 - **Easy Mode**: Simplified interface for casual users
 - **Advanced Mode**: Full features for power users
 
-## Optional: AI Memories
+## AI Memories & Qdrant
 
-> **Requires separate installation**: [synaplan-memories](https://github.com/metadist/synaplan-memories) (Apache-2.0)
-
-Enable the AI to remember user preferences and context across sessions:
+Qdrant is included in `docker-compose.yml` and powers:
 
 - **User profiling** — Track preferences, interests, interaction patterns
 - **Conversation memory** — Persistent context across chat sessions
-- **Semantic search** — Vector-based memory retrieval via Qdrant
+- **Semantic search** — Vector-based memory and document retrieval
+- **Feedback system** — False-positive detection and learning
 
-### Quick Setup
+### Configuration
 
-```bash
-git clone https://github.com/metadist/synaplan-memories
-cd synaplan-memories
-docker compose up -d
-```
+In `backend/.env`:
 
-Then configure in `synaplan/backend/.env`:
+Qdrant runs as an internal Docker service — no configuration needed beyond the default `QDRANT_URL=http://qdrant:6333` in `.env`.
 
-```bash
-QDRANT_SERVICE_URL=http://synaplan-qdrant-service:8090
-QDRANT_SERVICE_API_KEY=your_secret_key
-```
-
-**This is completely optional** — Synaplan works fully without it.
+**This is optional** — Synaplan works fully without it (memories and vector search will be disabled).
