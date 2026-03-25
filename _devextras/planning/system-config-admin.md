@@ -249,10 +249,6 @@ The System Config page will have **6 main tabs**, organized by functional area:
 1. **Qdrant Vector Database**
    - `QDRANT_URL` - URL input (e.g. `http://qdrant:6333`)
 
-2. **Qdrant Advanced (Optional)**
-   - `QDRANT_URL` - URL input (from synaplan-memories)
-   - `QDRANT_API_KEY` - Password input
-
 **UI Features:**
 - "Test Connection" button
 - Collection health status display
