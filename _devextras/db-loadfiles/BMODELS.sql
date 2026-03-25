@@ -5,7 +5,10 @@
 -- Removed obsolete models: 25 (dall-e-3), 30 (gpt-4.1), 57 (o1-preview),
 --   59 (o3), 69 (Claude Opus 4.1), 72 (o3-pro), 80/81 (gpt-4o),
 --   86 (dall-e-2), 89 (o1-mini), 93 (Claude Opus 4.1 Vision),
---   121 (Claude Opus 4.5)
+--   121 (Claude Opus 4.5), 1/2/3/6 (old Ollama: deepseek-r1:14b/32b,
+--   Llama 3.3 70b, mistral)
+--
+-- Added: 193/194 (GPT-5.3 chat + vision)
 --
 -- NOTE: BID 172 changed from GPT-5.4 (live) to Qwen 3.5 35B (catalog).
 --   GPT-5.4 is now at BID 180. Users with GPT-5.4 selected may need
@@ -47,10 +50,6 @@ CREATE TABLE `BMODELS` (
 -- --------------------------------------------------------
 
 INSERT INTO `BMODELS` (`BID`, `BSERVICE`, `BNAME`, `BTAG`, `BSELECTABLE`, `BPROVID`, `BPRICEIN`, `BINUNIT`, `BPRICEOUT`, `BOUTUNIT`, `BQUALITY`, `BRATING`, `BISDEFAULT`, `BACTIVE`, `BDESCRIPTION`, `BJSON`) VALUES
-(1, 'Ollama', 'deepseek-r1:14b', 'chat', 1, 'deepseek-r1:14b', 0.092, 'per1M', 0.46, 'per1M', 7, 8, 0, 1, NULL, '{\"description\":\"Local model on synaplans company server in Germany. DeepSeek R1 is a Chinese Open Source LLM with reasoning capabilities.\",\"features\":[\"reasoning\"]}'),
-(2, 'Ollama', 'Llama 3.3 70b', 'chat', 1, 'llama3.3:70b', 0.54, 'per1M', 0.73, 'per1M', 9, 1, 0, 1, NULL, '{\"description\":\"Local model on synaplans company server in Germany. Meta\\u0027s Llama Model Version 3.3 with 70b parameters. Heavy load model and relatively slow, even on a dedicated NVIDIA card. Yet good quality!\"}'),
-(3, 'Ollama', 'deepseek-r1:32b', 'chat', 1, 'deepseek-r1:32b', 0.69, 'per1M', 0.91, '-', 8, 8, 0, 1, NULL, '{\"description\":\"Local model on synaplans company server in Germany. DeepSeek R1 is a Chinese Open Source LLM. This is the bigger version with 32b parameters. A bit slower, but more accurate!\",\"features\":[\"reasoning\"]}'),
-(6, 'Ollama', 'mistral', 'chat', 1, 'mistral:7b', 0.095, 'per1M', 0.475, '-', 5, 0, 0, 1, NULL, '{\"description\":\"Local model on synaplans company server in Germany. Mistral 8b model - internally used for RAG retrieval.\"}'),
 (13, 'Ollama', 'bge-m3', 'vectorize', 0, 'bge-m3', 0.19, 'per1M', 0, '-', 6, 1, 0, 1, NULL, '{\"description\":\"Vectorize text into synaplans MariaDB vector DB (local) for RAG\",\"params\":{\"model\":\"bge-m3\",\"input\":[]}}'),
 (78, 'Ollama', 'gpt-oss:20b', 'chat', 1, 'gpt-oss:20b', 0.12, 'per1M', 0.6, 'per1M', 9, 1, 0, 1, NULL, '{\"description\":\"Local model on synaplans company server in Germany. OpenAI\\u0027s open-weight GPT-OSS (20B). 128K context, Apache-2.0 license, MXFP4 quantization; supports tools\\/agentic use cases.\",\"params\":{\"model\":\"gpt-oss:20b\"},\"meta\":{\"context_window\":\"128k\",\"license\":\"Apache-2.0\",\"quantization\":\"MXFP4\"}}'),
 (79, 'Ollama', 'gpt-oss:120b', 'chat', 1, 'gpt-oss:120b', 0.05, 'per1M', 0.25, 'per1M', 9, 1, 0, 1, NULL, '{\"description\":\"Local model on synaplans company server in Germany. OpenAI\\u0027s open-weight GPT-OSS (120B). 128K context, Apache-2.0 license, MXFP4 quantization; supports tools\\/agentic use cases.\",\"params\":{\"model\":\"gpt-oss:120b\"},\"meta\":{\"context_window\":\"128k\",\"license\":\"Apache-2.0\",\"quantization\":\"MXFP4\"}}'),
@@ -84,6 +83,8 @@ INSERT INTO `BMODELS` (`BID`, `BSERVICE`, `BNAME`, `BTAG`, `BSELECTABLE`, `BPROV
 (88, 'OpenAI', 'text-embedding-3-large', 'vectorize', 1, 'text-embedding-3-large', 0.13, 'per1M', 0, '-', 9, 1, 0, 1, NULL, '{\"description\":\"OpenAI large text embedding model (3072 dimensions) for high-accuracy RAG.\",\"params\":{\"model\":\"text-embedding-3-large\"},\"meta\":{\"dimensions\":3072}}'),
 (106, 'OpenAI', 'GPT-5.2', 'chat', 1, 'gpt-5.2-2025-12-11', 1.75, 'per1M', 14, 'per1M', 10, 1, 0, 1, NULL, '{\"description\":\"OpenAI GPT-5.2 - the best model for coding and agentic tasks across industries.\",\"params\":{\"model\":\"gpt-5.2\"}}'),
 (150, 'OpenAI', 'GPT-5 mini', 'chat', 1, 'gpt-5-mini', 0.25, 'per1M', 2, 'per1M', 8, 1, 0, 1, NULL, '{\"description\":\"OpenAI GPT-5 mini - faster, cost-efficient version of GPT-5 for well-defined tasks.\",\"params\":{\"model\":\"gpt-5-mini\"}}'),
+(193, 'OpenAI', 'GPT-5.3', 'chat', 1, 'gpt-5.3', 1.75, 'per1M', 14, 'per1M', 10, 1, 0, 1, NULL, '{\"description\":\"OpenAI GPT-5.3 - complex multi-step problem solving where accuracy matters more than speed. 128K context, vision, function calling, web search.\",\"params\":{\"model\":\"gpt-5.3\"},\"features\":[\"reasoning\",\"vision\"],\"meta\":{\"context_window\":\"128000\",\"max_output\":\"16000\"}}'),
+(194, 'OpenAI', 'GPT-5.3 (Vision)', 'pic2text', 1, 'gpt-5.3', 1.75, 'per1M', 14, 'per1M', 10, 1, 0, 1, NULL, '{\"description\":\"OpenAI GPT-5.3 for image analysis and vision tasks.\",\"prompt\":\"Describe the image in detail. Extract any text you see.\",\"params\":{\"model\":\"gpt-5.3\"},\"meta\":{\"supports_images\":true}}'),
 (151, 'OpenAI', 'gpt-image-1.5', 'text2pic', 1, 'gpt-image-1.5', 5, 'per1M', 10, 'per1M', 10, 1, 0, 1, NULL, '{\"description\":\"OpenAI GPT Image 1.5 - state-of-the-art image generation and editing. Supports pic2pic via Responses API.\",\"params\":{\"model\":\"gpt-image-1.5\"},\"features\":[\"image\",\"pic2pic\"],\"meta\":{\"api\":\"responses\"}}'),
 (180, 'OpenAI', 'GPT-5.4', 'chat', 1, 'gpt-5.4', 2.5, 'per1M', 15, 'per1M', 10, 1, 0, 1, NULL, '{\"description\":\"OpenAI GPT-5.4 - frontier model for complex professional work. 1.05M context, reasoning effort none\\/low\\/medium\\/high\\/xhigh.\",\"params\":{\"model\":\"gpt-5.4\"},\"features\":[\"reasoning\",\"vision\"],\"meta\":{\"context_window\":\"1050000\",\"max_output\":\"128000\",\"knowledge_cutoff\":\"2025-08-31\"}}'),
 (181, 'OpenAI', 'GPT-5.4 (Vision)', 'pic2text', 1, 'gpt-5.4', 2.5, 'per1M', 15, 'per1M', 10, 1, 0, 1, NULL, '{\"description\":\"OpenAI GPT-5.4 for image analysis and vision tasks.\",\"prompt\":\"Describe the image in detail. Extract any text you see.\",\"params\":{\"model\":\"gpt-5.4\"},\"meta\":{\"supports_images\":true}}'),
@@ -160,7 +161,7 @@ ALTER TABLE `BMODELS`
   ADD KEY `idx_service` (`BSERVICE`);
 
 ALTER TABLE `BMODELS`
-  MODIFY `BID` bigint(20) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=193;
+  MODIFY `BID` bigint(20) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=195;
 COMMIT;
 
 /*!40101 SET CHARACTER_SET_CLIENT=@OLD_CHARACTER_SET_CLIENT */;
