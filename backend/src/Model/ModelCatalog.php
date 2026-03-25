@@ -957,6 +957,7 @@ class ModelCatalog
             'rating' => 1,
             'json' => [
                 'description' => 'Claude Sonnet 4.6 - best combination of speed and intelligence. 200K context, 64K output.',
+                'max_tokens' => 64000,
                 'params' => ['model' => 'claude-sonnet-4-6'],
                 'features' => ['vision', 'reasoning'],
                 'meta' => ['context_window' => '200000', 'max_output' => '64000'],
@@ -978,6 +979,7 @@ class ModelCatalog
             'rating' => 1,
             'json' => [
                 'description' => 'Claude Haiku 4.5 - fastest model with near-frontier intelligence. 200K context, 64K output.',
+                'max_tokens' => 64000,
                 'params' => ['model' => 'claude-haiku-4-5'],
                 'features' => ['vision', 'reasoning'],
                 'meta' => ['context_window' => '200000', 'max_output' => '64000'],
@@ -1222,6 +1224,7 @@ class ModelCatalog
             'rating' => 1,
             'json' => [
                 'description' => 'Google Gemini 3.1 Pro - most advanced reasoning model, 1M token context, tops 13 of 16 industry benchmarks. Excels at agentic workflows and software engineering.',
+                'max_tokens' => 65536,
                 'params' => ['model' => 'gemini-3.1-pro-preview'],
                 'features' => ['reasoning', 'vision', 'audio'],
                 'meta' => ['context_window' => '1048576', 'max_output' => '65536'],
@@ -1264,6 +1267,7 @@ class ModelCatalog
             'rating' => 1,
             'json' => [
                 'description' => 'Google Gemini 3.1 Flash-Lite - most cost-efficient model, optimized for high-volume agentic tasks, translation, and data processing. 1M token context, multimodal input.',
+                'max_tokens' => 65536,
                 'params' => ['model' => 'gemini-3.1-flash-lite-preview'],
                 'features' => ['vision', 'audio'],
                 'meta' => ['context_window' => '1048576', 'max_output' => '65536'],
@@ -1307,6 +1311,7 @@ class ModelCatalog
             'rating' => 1,
             'json' => [
                 'description' => 'Claude Opus 4.1 - Anthropic model with strong reasoning, bug detection, and precision tasks. Successor to Claude 3 Opus.',
+                'max_tokens' => 4096,
                 'params' => ['model' => 'claude-opus-4-1-20250805'],
                 'features' => ['vision'],
                 'meta' => ['context_window' => '200000', 'max_output' => '4096'],
@@ -1328,6 +1333,7 @@ class ModelCatalog
             'rating' => 2,
             'json' => [
                 'description' => 'Claude 3 Haiku - Fast and cost-effective model for everyday tasks. Great for quick responses and simple queries.',
+                'max_tokens' => 4096,
                 'params' => ['model' => 'claude-3-haiku-20240307'],
                 'features' => ['vision'],
                 'meta' => ['context_window' => '200000', 'max_output' => '4096'],
