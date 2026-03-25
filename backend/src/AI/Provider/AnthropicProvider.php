@@ -23,6 +23,7 @@ class AnthropicProvider implements ChatProviderInterface, VisionProviderInterfac
 {
     private const API_VERSION = '2023-06-01';
     private const BASE_URL = 'https://api.anthropic.com/v1';
+    private const DEFAULT_MAX_TOKENS = 16384;
 
     // Extended Thinking models (Claude 3.5 Sonnet and later with thinking support)
     // Note: Extended thinking is a feature that may require specific API access
@@ -141,7 +142,7 @@ class AnthropicProvider implements ChatProviderInterface, VisionProviderInterfac
 
             $requestBody = [
                 'model' => $model,
-                'max_tokens' => $options['max_tokens'] ?? 16384,
+                'max_tokens' => $options['max_tokens'] ?? self::DEFAULT_MAX_TOKENS,
                 'messages' => $conversationMessages,
             ];
 
@@ -250,7 +251,7 @@ class AnthropicProvider implements ChatProviderInterface, VisionProviderInterfac
 
             $requestBody = [
                 'model' => $model,
-                'max_tokens' => $options['max_tokens'] ?? 16384,
+                'max_tokens' => $options['max_tokens'] ?? self::DEFAULT_MAX_TOKENS,
                 'messages' => $conversationMessages,
                 'stream' => true,
             ];
@@ -543,6 +544,7 @@ class AnthropicProvider implements ChatProviderInterface, VisionProviderInterfac
     {
         $buffer = '';
         $currentBlockType = null;
+        $finishReason = null;
 
         foreach ($this->httpClient->stream($response) as $chunk) {
             if ($chunk->isLast()) {
@@ -582,13 +584,11 @@ class AnthropicProvider implements ChatProviderInterface, VisionProviderInterfac
                             $text = $delta['text'] ?? '';
 
                             if ('thinking' === $currentBlockType) {
-                                // Send as reasoning chunk
                                 $callback([
                                     'type' => 'reasoning',
                                     'content' => $text,
                                 ]);
                             } else {
-                                // Send as regular content
                                 $callback([
                                     'type' => 'content',
                                     'content' => $text,
@@ -598,25 +598,39 @@ class AnthropicProvider implements ChatProviderInterface, VisionProviderInterfac
                         break;
 
                     case 'content_block_stop':
-                        // Block finished
                         if ('thinking' === $currentBlockType) {
                             $this->logger->info('🧠 Anthropic: Thinking block completed');
                         }
                         $currentBlockType = null;
                         break;
 
+                    case 'message_delta':
+                        // Anthropic sends stop_reason in message_delta ("end_turn" or "max_tokens")
+                        $stopReason = $event['data']['delta']['stop_reason'] ?? null;
+                        if (null !== $stopReason) {
+                            // Normalise to OpenAI-style finish_reason for consistency
+                            $finishReason = match ($stopReason) {
+                                'max_tokens' => 'length',
+                                'end_turn' => 'stop',
+                                default => $stopReason,
+                            };
+                        }
+                        break;
+
                     case 'message_stop':
-                        // Stream complete
                         break;
 
                     case 'error':
                         $errorMessage = $event['data']['error']['message'] ?? 'Unknown error';
                         throw new \Exception($errorMessage);
                     case 'ping':
-                        // Keep-alive, ignore
                         break;
                 }
             }
+        }
+
+        if (null !== $finishReason) {
+            $callback(['type' => 'finish', 'finish_reason' => $finishReason]);
         }
     }
 

@@ -464,6 +464,7 @@ class WidgetPublicController extends AbstractController
                 $jsonBuffer = '';
                 $isBufferingJson = false;
                 $chunkCount = 0;
+                $finishReason = null;
 
                 try {
                     $result = $this->messageProcessor->processStream(
@@ -474,7 +475,8 @@ class WidgetPublicController extends AbstractController
                             &$hasReasoningStarted,
                             &$jsonBuffer,
                             &$isBufferingJson,
-                            &$chunkCount
+                            &$chunkCount,
+                            &$finishReason
                         ) {
                             if (connection_aborted()) {
                                 throw new \RuntimeException('Client disconnected');
@@ -492,6 +494,12 @@ class WidgetPublicController extends AbstractController
                             if (is_array($chunk)) {
                                 $type = $chunk['type'] ?? 'content';
                                 $content = $chunk['content'] ?? '';
+
+                                if ('finish' === $type) {
+                                    $finishReason = $chunk['finish_reason'] ?? null;
+
+                                    return;
+                                }
 
                                 if ('reasoning' === $type) {
                                     if (!$hasReasoningStarted) {
@@ -682,7 +690,7 @@ class WidgetPublicController extends AbstractController
                         'input_text' => $incomingMessage->getText(),
                     ]);
 
-                    $this->sendSse('complete', [
+                    $completePayload = [
                         'messageId' => $incomingMessage->getId(),
                         'chatId' => $chat->getId(),
                         'metadata' => [
@@ -692,7 +700,13 @@ class WidgetPublicController extends AbstractController
                             'search_results' => $result['search_results'] ?? null,
                             'files' => $fileIds,
                         ],
-                    ]);
+                    ];
+
+                    if ('length' === $finishReason) {
+                        $completePayload['truncated'] = true;
+                    }
+
+                    $this->sendSse('complete', $completePayload);
                 } catch (\Throwable $e) {
                     $this->logger->error('Widget message streaming failed', [
                         'error' => $e->getMessage(),

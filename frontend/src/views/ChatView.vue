@@ -628,7 +628,7 @@ function renderStreamingContent(content: string, msgId: string): void {
   if (looksLikeFileGeneration) {
     if (processingStatus.value !== 'generating_file') {
       processingStatus.value = 'generating_file'
-      processingMetadata.value = { customMessage: 'Erstelle Datei...' }
+      processingMetadata.value = { customMessage: t('processing.generatingFile') }
     }
     const message = historyStore.messages.find((m) => m.id === msgId)
     if (message) {
@@ -852,6 +852,9 @@ const streamAIResponse = async (
   // Create empty streaming message with provider info
   const messageId = historyStore.addStreamingMessage('assistant', provider, modelLabel)
 
+  let streamingRafId: number | null = null
+  let streamingDirty = false
+
   try {
     if (useMockData) {
       // Mock streaming for development (simple text streaming)
@@ -883,8 +886,6 @@ const streamAIResponse = async (
       currentTrackId = trackId // Store for stop functionality
       currentStreamingChatId = chatId // Store chatId for stop functionality
       let fullContent = ''
-      let streamingRafId: number | null = null
-      let streamingDirty = false
 
       const includeReasoning = options?.includeReasoning ?? false
       const webSearch = options?.webSearch ?? false
@@ -1578,9 +1579,16 @@ const streamAIResponse = async (
     }
   } catch (error) {
     console.error('❌ Streaming error:', error)
+
+    // Cancel any pending throttled render
+    if (streamingRafId !== null) {
+      cancelAnimationFrame(streamingRafId)
+      streamingRafId = null
+    }
+    streamingDirty = false
+
     historyStore.updateStreamingMessage(messageId, 'Sorry, an error occurred.')
     historyStore.finishStreamingMessage(messageId)
-    // Clean up on error
     streamingAbortController = null
     stopStreamingFn = null
     currentTrackId = undefined

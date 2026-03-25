@@ -16,6 +16,8 @@ use Symfony\Contracts\HttpClient\HttpClientInterface;
 
 class OpenAIProvider implements ChatProviderInterface, EmbeddingProviderInterface, ImageGenerationProviderInterface, VisionProviderInterface, SpeechToTextProviderInterface, TextToSpeechProviderInterface
 {
+    private const DEFAULT_MAX_TOKENS = 16384;
+
     private $client;
     private array $modelCapabilities = [];
 
@@ -164,9 +166,9 @@ class OpenAIProvider implements ChatProviderInterface, EmbeddingProviderInterfac
 
             // Use correct token parameter based on model capabilities
             if ($usesCompletionTokensParam) {
-                $requestOptions['max_completion_tokens'] = $options['max_tokens'] ?? 16384;
+                $requestOptions['max_completion_tokens'] = $options['max_tokens'] ?? self::DEFAULT_MAX_TOKENS;
             } else {
-                $requestOptions['max_tokens'] = $options['max_tokens'] ?? 16384;
+                $requestOptions['max_tokens'] = $options['max_tokens'] ?? self::DEFAULT_MAX_TOKENS;
             }
 
             // NOTE: Only o3 models support reasoning_effort parameter
@@ -220,9 +222,9 @@ class OpenAIProvider implements ChatProviderInterface, EmbeddingProviderInterfac
 
             // Use correct token parameter based on model capabilities
             if ($usesCompletionTokensParam) {
-                $requestOptions['max_completion_tokens'] = $options['max_tokens'] ?? 16384;
+                $requestOptions['max_completion_tokens'] = $options['max_tokens'] ?? self::DEFAULT_MAX_TOKENS;
             } else {
-                $requestOptions['max_tokens'] = $options['max_tokens'] ?? 16384;
+                $requestOptions['max_tokens'] = $options['max_tokens'] ?? self::DEFAULT_MAX_TOKENS;
             }
 
             // NOTE: Reasoning models handle reasoning automatically
