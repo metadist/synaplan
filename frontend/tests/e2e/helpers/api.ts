@@ -103,3 +103,10 @@ export async function restoreDefaults(
 export function isOllama(model: ModelInfo): boolean {
   return model.service.toLowerCase().includes('ollama')
 }
+
+/** Services that run locally / self-hosted — everything else is treated as cloud. */
+const LOCAL_SERVICES = new Set(['ollama', 'triton', 'piper', 'test'])
+
+export function isCloudProvider(model: ModelInfo): boolean {
+  return !LOCAL_SERVICES.has(model.service.toLowerCase())
+}

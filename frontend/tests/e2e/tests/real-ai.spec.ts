@@ -23,7 +23,7 @@ import {
   getDefaultModels,
   setDefaultModel,
   restoreDefaults,
-  isOllama,
+  isCloudProvider,
   type ModelInfo,
 } from '../helpers/api'
 import { readFileSync } from 'fs'
@@ -42,28 +42,49 @@ interface ModelResult {
   error?: string
 }
 
-function printSummary(results: ModelResult[], capability: string): void {
+function formatResultsTable(results: ModelResult[], capability: string): string {
   const pass = results.filter((r) => r.status === 'PASS').length
   const fail = results.filter((r) => r.status === 'FAIL').length
   const skip = results.filter((r) => r.status === 'SKIP').length
-
-  console.log('')
-  console.log('========================================')
-  console.log(`  ${capability}: ${pass} PASS | ${fail} FAIL | ${skip} SKIP`)
-  console.log('----------------------------------------')
+  const lines: string[] = [
+    `${capability}: ${pass} PASS | ${fail} FAIL | ${skip} SKIP`,
+    '----------------------------------------',
+  ]
   for (const r of results) {
     const dur = (r.durationMs / 1000).toFixed(1).padStart(6)
     if (r.status === 'PASS') {
-      console.log(`  PASS  ${r.model.padEnd(40)} ${dur}s`)
+      lines.push(`  PASS  ${r.model.padEnd(40)} ${dur}s`)
     } else if (r.status === 'FAIL') {
-      console.log(`  FAIL  ${r.model.padEnd(40)} ${dur}s`)
-      console.log(`        -> ${r.error}`)
+      lines.push(`  FAIL  ${r.model.padEnd(40)} ${dur}s`)
+      lines.push(`        -> ${r.error}`)
     } else {
-      console.log(`  SKIP  ${r.model.padEnd(40)} (ollama)`)
+      lines.push(`  SKIP  ${r.model.padEnd(40)} (not cloud)`)
     }
   }
+  return lines.join('\n')
+}
+
+function printSummary(results: ModelResult[], capability: string): void {
+  console.log('')
+  console.log('========================================')
+  console.log(`  ${formatResultsTable(results, capability)}`)
   console.log('========================================')
   console.log('')
+}
+
+async function attachReport(
+  testInfo: import('@playwright/test').TestInfo,
+  results: ModelResult[],
+  capability: string
+): Promise<void> {
+  await testInfo.attach(`${capability}-results.json`, {
+    body: JSON.stringify(results, null, 2),
+    contentType: 'application/json',
+  })
+  await testInfo.attach(`${capability}-summary.txt`, {
+    body: formatResultsTable(results, capability),
+    contentType: 'text/plain',
+  })
 }
 
 function modelLabel(m: ModelInfo): string {
@@ -134,7 +155,7 @@ async function runCapabilityTest(
     await chat.ensureAdvancedMode()
 
     for (const model of config.models) {
-      if (isOllama(model)) {
+      if (!isCloudProvider(model)) {
         results.push({
           model: modelLabel(model),
           capability: config.capability,
@@ -315,6 +336,7 @@ test.describe('@noci @local Chat — all models', () => {
 
     await ctx.dispose()
     printSummary(results, cap)
+    await attachReport(testInfo, results, cap)
 
     const failures = results.filter((r) => r.status === 'FAIL')
     expect(failures, 'All CHAT models should pass').toEqual([])
@@ -359,6 +381,7 @@ test.describe('@noci @local Image Generation — all models', () => {
 
     await ctx.dispose()
     printSummary(results, cap)
+    await attachReport(testInfo, results, cap)
 
     const failures = results.filter((r) => r.status === 'FAIL')
     expect(failures, 'All TEXT2PIC models should pass').toEqual([])
@@ -401,6 +424,7 @@ test.describe('@noci @local Video Generation — all models', () => {
 
     await ctx.dispose()
     printSummary(results, cap)
+    await attachReport(testInfo, results, cap)
 
     const failures = results.filter((r) => r.status === 'FAIL')
     expect(failures, 'All TEXT2VID models should pass').toEqual([])
@@ -452,6 +476,7 @@ test.describe('@noci @local Vision — all models', () => {
 
     await ctx.dispose()
     printSummary(results, cap)
+    await attachReport(testInfo, results, cap)
 
     const failures = results.filter((r) => r.status === 'FAIL')
     expect(failures, 'All PIC2TEXT models should pass').toEqual([])
@@ -496,6 +521,7 @@ test.describe('@noci @local TTS — all models', () => {
 
     await ctx.dispose()
     printSummary(results, cap)
+    await attachReport(testInfo, results, cap)
 
     const failures = results.filter((r) => r.status === 'FAIL')
     expect(failures, 'All TEXT2SOUND models should pass').toEqual([])
@@ -545,6 +571,7 @@ test.describe('@noci @local STT — all models', () => {
 
     await ctx.dispose()
     printSummary(results, cap)
+    await attachReport(testInfo, results, cap)
 
     const failures = results.filter((r) => r.status === 'FAIL')
     expect(failures, 'All SOUND2TEXT models should pass').toEqual([])
