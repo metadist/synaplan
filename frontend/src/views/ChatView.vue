@@ -852,6 +852,9 @@ const streamAIResponse = async (
   // Create empty streaming message with provider info
   const messageId = historyStore.addStreamingMessage('assistant', provider, modelLabel)
 
+  let streamingRafId: number | null = null
+  let streamingDirty = false
+
   try {
     if (useMockData) {
       // Mock streaming for development (simple text streaming)
@@ -883,8 +886,6 @@ const streamAIResponse = async (
       currentTrackId = trackId // Store for stop functionality
       currentStreamingChatId = chatId // Store chatId for stop functionality
       let fullContent = ''
-      let streamingRafId: number | null = null
-      let streamingDirty = false
 
       const includeReasoning = options?.includeReasoning ?? false
       const webSearch = options?.webSearch ?? false
