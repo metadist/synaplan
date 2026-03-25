@@ -99,6 +99,10 @@ class ProviderRegistry
         // Normalize provider name (case-insensitive)
         $providerName = strtolower($providerName);
 
+        if ($this->canUseInternalTestProvider($providerName)) {
+            return true;
+        }
+
         // Normalize DB keys to lowercase
         $dbCaps = array_change_key_case($dbCaps, CASE_LOWER);
 
@@ -123,6 +127,13 @@ class ProviderRegistry
         $dbCapability = $capabilityMap[$capability] ?? $capability;
 
         return isset($dbCaps[$providerName]) && in_array($dbCapability, $dbCaps[$providerName]);
+    }
+
+    private function canUseInternalTestProvider(string $providerName): bool
+    {
+        $appEnv = strtolower((string) ($_SERVER['APP_ENV'] ?? $_ENV['APP_ENV'] ?? 'prod'));
+
+        return 'test' === $providerName && 'prod' !== $appEnv;
     }
 
     /**

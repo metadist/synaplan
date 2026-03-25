@@ -200,6 +200,7 @@ final readonly class MediaGenerationService implements MediaGenerationServiceInt
         $item = $this->cache->getItem('video_job_'.$jobId);
         $item->set([
             'operationName' => $operationData['operationName'],
+            'status' => 'processing',
             'provider' => $operationData['provider'],
             'model' => $operationData['model'],
             'duration' => $operationData['duration'],
@@ -220,12 +221,16 @@ final readonly class MediaGenerationService implements MediaGenerationServiceInt
 
     public function checkVideoJob(User $user, string $jobId): array
     {
+        if (1 !== preg_match('/^[a-f0-9]{32}$/', $jobId)) {
+            throw new \InvalidArgumentException('Invalid job ID format');
+        }
+
         $item = $this->cache->getItem('video_job_'.$jobId);
         if (!$item->isHit()) {
             throw new \InvalidArgumentException('Video job not found or expired');
         }
 
-        /** @var array{operationName: string, provider: string, model: string, duration: int, userId: int, prompt: string, startedAt: int} $jobData */
+        /** @var array<string, mixed> $jobData */
         $jobData = $item->get();
 
         if ($jobData['userId'] !== $user->getId()) {
@@ -233,8 +238,36 @@ final readonly class MediaGenerationService implements MediaGenerationServiceInt
         }
 
         $elapsed = time() - $jobData['startedAt'];
+        $status = is_string($jobData['status'] ?? null) ? $jobData['status'] : 'processing';
 
-        $result = $this->aiFacade->pollVideoOperation($jobData['operationName'], $jobData['provider']);
+        if ('completed' === $status && isset($jobData['result']) && is_array($jobData['result'])) {
+            return $jobData['result'];
+        }
+
+        if ('failed' === $status && isset($jobData['error']) && is_string($jobData['error'])) {
+            return [
+                'status' => 'failed',
+                'error' => $jobData['error'],
+                'elapsed_seconds' => $elapsed,
+            ];
+        }
+
+        if ('finalizing' === $status) {
+            return [
+                'status' => 'processing',
+                'elapsed_seconds' => $elapsed,
+            ];
+        }
+
+        try {
+            $result = $this->aiFacade->pollVideoOperation($jobData['operationName'], $jobData['provider']);
+        } catch (ProviderException $e) {
+            $jobData['status'] = 'failed';
+            $jobData['error'] = $e->getMessage();
+            $this->storeVideoJobState($jobId, $jobData);
+
+            throw $e;
+        }
 
         if (!$result['done']) {
             return [
@@ -244,7 +277,9 @@ final readonly class MediaGenerationService implements MediaGenerationServiceInt
         }
 
         if ($result['error']) {
-            $this->cache->deleteItem('video_job_'.$jobId);
+            $jobData['status'] = 'failed';
+            $jobData['error'] = $result['error'];
+            $this->storeVideoJobState($jobId, $jobData);
 
             return [
                 'status' => 'failed',
@@ -253,28 +288,33 @@ final readonly class MediaGenerationService implements MediaGenerationServiceInt
             ];
         }
 
-        $videoDataUrl = $this->aiFacade->downloadVideoContent($result['videoUri'], $jobData['provider']);
-        $localPath = $this->persistMedia($videoDataUrl, $user->getId(), $jobData['provider'], 'video');
+        $jobData['status'] = 'finalizing';
+        $this->storeVideoJobState($jobId, $jobData);
+
+        try {
+            $videoBytes = $this->aiFacade->downloadVideoRaw($result['videoUri'], $jobData['provider']);
+            $localPath = $this->saveRawVideo($videoBytes, $user->getId(), $jobData['provider']);
+        } catch (\Throwable $e) {
+            $jobData['status'] = 'processing';
+            $this->storeVideoJobState($jobId, $jobData);
+
+            throw new \RuntimeException('Video download/save failed: '.$e->getMessage(), 0, $e);
+        }
 
         if (null === $localPath) {
-            $this->cache->deleteItem('video_job_'.$jobId);
+            $jobData['status'] = 'processing';
+            $this->storeVideoJobState($jobId, $jobData);
+
             throw new \RuntimeException('Failed to save generated video to disk');
         }
 
         $this->recordUsage($user, 'video', $jobData['provider'], $jobData['model']);
-        $this->cache->deleteItem('video_job_'.$jobId);
+        $completedResult = $this->buildCompletedVideoJobResult($jobData['provider'], $jobData['model'], $localPath, $elapsed);
+        $jobData['status'] = 'completed';
+        $jobData['result'] = $completedResult;
+        $this->storeVideoJobState($jobId, $jobData);
 
-        return [
-            'status' => 'completed',
-            'file' => [
-                'url' => '/api/v1/files/uploads/'.$localPath,
-                'type' => 'video',
-                'mimeType' => 'video/mp4',
-            ],
-            'provider' => $jobData['provider'],
-            'model' => $jobData['model'],
-            'elapsed_seconds' => $elapsed,
-        ];
+        return $completedResult;
     }
 
     private function validateInput(string $prompt, string $type): void
@@ -385,6 +425,52 @@ final readonly class MediaGenerationService implements MediaGenerationServiceInt
         }
 
         return $first['data'] ?? null;
+    }
+
+    private function saveRawVideo(string $content, int $userId, string $provider): ?string
+    {
+        $filename = $this->buildFilename($userId, $provider, 'mp4');
+        $relativePath = $this->buildRelativePath($userId, $filename);
+        $absolutePath = $this->uploadDir.'/'.$relativePath;
+
+        if (!FileHelper::ensureParentDirectory($absolutePath)) {
+            return null;
+        }
+
+        if (false === FileHelper::writeFile($absolutePath, $content)) {
+            return null;
+        }
+
+        return $relativePath;
+    }
+
+    /**
+     * @param array<string, mixed> $jobData
+     */
+    private function storeVideoJobState(string $jobId, array $jobData): void
+    {
+        $item = $this->cache->getItem('video_job_'.$jobId);
+        $item->set($jobData);
+        $item->expiresAfter(self::VIDEO_JOB_TTL_SECONDS);
+        $this->cache->save($item);
+    }
+
+    /**
+     * @return array{status: string, file: array{url: string, type: string, mimeType: string}, provider: string, model: string, elapsed_seconds: int}
+     */
+    private function buildCompletedVideoJobResult(string $provider, string $model, string $localPath, int $elapsed): array
+    {
+        return [
+            'status' => 'completed',
+            'file' => [
+                'url' => '/api/v1/files/uploads/'.$localPath,
+                'type' => 'video',
+                'mimeType' => 'video/mp4',
+            ],
+            'provider' => $provider,
+            'model' => $model,
+            'elapsed_seconds' => $elapsed,
+        ];
     }
 
     private function persistMedia(string $mediaUrl, int $userId, ?string $provider, string $type): ?string

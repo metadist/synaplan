@@ -544,7 +544,7 @@ class AiFacade
     }
 
     /**
-     * Download video content from a provider URI.
+     * Download video content from a provider URI (as data URL).
      */
     public function downloadVideoContent(string $videoUri, ?string $providerName = null): string
     {
@@ -555,6 +555,20 @@ class AiFacade
         }
 
         return $provider->downloadVideoContent($videoUri);
+    }
+
+    /**
+     * Download raw video bytes from a provider URI (avoids base64 overhead).
+     */
+    public function downloadVideoRaw(string $videoUri, ?string $providerName = null): string
+    {
+        $provider = $this->registry->getVideoGenerationProvider($providerName);
+
+        if (!$provider instanceof GoogleProvider) {
+            throw new ProviderException('Async video download is only supported by Google Veo', $provider->getName());
+        }
+
+        return $provider->downloadVideoRaw($videoUri);
     }
 
     /**

@@ -80,10 +80,10 @@ class GoogleProviderAsyncVideoTest extends TestCase
             'response' => [
                 'generateVideoResponse' => [
                     'generatedSamples' => [
-                        ['video' => ['uri' => 'https://example.com/video.mp4']]
-                    ]
-                ]
-            ]
+                        ['video' => ['uri' => 'https://example.com/video.mp4']],
+                    ],
+                ],
+            ],
         ];
         $provider = $this->createProviderWithMockResponse($data);
 
@@ -100,8 +100,8 @@ class GoogleProviderAsyncVideoTest extends TestCase
             'done' => true,
             'error' => [
                 'message' => 'Generation failed',
-                'code' => 500
-            ]
+                'code' => 500,
+            ],
         ];
         $provider = $this->createProviderWithMockResponse($data);
 
@@ -118,8 +118,8 @@ class GoogleProviderAsyncVideoTest extends TestCase
             'done' => true,
             'error' => [
                 'message' => 'Content blocked due to safety guidelines',
-                'code' => 400
-            ]
+                'code' => 400,
+            ],
         ];
         $provider = $this->createProviderWithMockResponse($data);
 

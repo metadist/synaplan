@@ -771,6 +771,16 @@ class GoogleProvider implements ChatProviderInterface, ImageGenerationProviderIn
      */
     public function downloadVideoContent(string $videoUri): string
     {
+        $raw = $this->downloadVideoRaw($videoUri);
+
+        return 'data:video/mp4;base64,'.base64_encode($raw);
+    }
+
+    /**
+     * Download raw video bytes from a Google-provided URI.
+     */
+    public function downloadVideoRaw(string $videoUri): string
+    {
         if (!$this->apiKey) {
             throw ProviderException::missingApiKey('google', 'GOOGLE_GEMINI_API_KEY');
         }
@@ -780,10 +790,7 @@ class GoogleProvider implements ChatProviderInterface, ImageGenerationProviderIn
             'timeout' => 120,
         ]);
 
-        $videoData = $videoResponse->getContent();
-        $base64Video = base64_encode($videoData);
-
-        return 'data:video/mp4;base64,'.$base64Video;
+        return $videoResponse->getContent();
     }
 
     /**

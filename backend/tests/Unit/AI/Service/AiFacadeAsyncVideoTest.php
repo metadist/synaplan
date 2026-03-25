@@ -2,7 +2,6 @@
 
 namespace App\Tests\Unit\AI\Service;
 
-use App\AI\Exception\ProviderException;
 use App\AI\Provider\GoogleProvider;
 use App\AI\Service\AiFacade;
 use App\AI\Service\ProviderRegistry;
@@ -48,7 +47,7 @@ class AiFacadeAsyncVideoTest extends TestCase
             ->willReturn([
                 'operationName' => 'ops/123',
                 'model' => 'veo-3.1',
-                'duration' => 8
+                'duration' => 8,
             ]);
 
         $this->registry->method('getVideoGenerationProvider')
@@ -73,7 +72,7 @@ class AiFacadeAsyncVideoTest extends TestCase
             ->willReturn([
                 'done' => true,
                 'videoUri' => 'https://example.com/video.mp4',
-                'error' => null
+                'error' => null,
             ]);
 
         $this->registry->method('getVideoGenerationProvider')
