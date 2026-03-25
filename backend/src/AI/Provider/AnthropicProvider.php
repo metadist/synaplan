@@ -23,7 +23,7 @@ class AnthropicProvider implements ChatProviderInterface, VisionProviderInterfac
 {
     private const API_VERSION = '2023-06-01';
     private const BASE_URL = 'https://api.anthropic.com/v1';
-    private const DEFAULT_MAX_TOKENS = 16384;
+    private const DEFAULT_MAX_TOKENS = 65536;
 
     // Extended Thinking models (Claude 3.5 Sonnet and later with thinking support)
     // Note: Extended thinking is a feature that may require specific API access

@@ -264,7 +264,12 @@
                     ? files
                     : files.slice(0, totalBadgesCount > 3 ? 2 : files.length)"
                   :key="file.id"
-                  class="flex items-center gap-2 px-3 py-2 rounded-lg bg-black/10 dark:bg-white/10 hover:bg-black/20 dark:hover:bg-white/20 transition-colors cursor-pointer text-sm"
+                  :class="[
+                    'flex items-center gap-2 px-3 py-2 rounded-lg transition-colors cursor-pointer text-sm',
+                    role === 'user'
+                      ? 'bg-black/25 hover:bg-black/35'
+                      : 'bg-black/10 dark:bg-white/10 hover:bg-black/20 dark:hover:bg-white/20',
+                  ]"
                   @click="downloadFile(file)"
                 >
                   <Icon :icon="getFileIcon(file.fileType)" class="w-4 h-4 flex-shrink-0" />
