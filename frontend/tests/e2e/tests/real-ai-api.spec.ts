@@ -7,8 +7,9 @@
  * Tagged @noci @local — never runs in CI.
  *
  * Run:
- *   npm run test:e2e:real-ai:api            (daily — without TEXT2VID)
- *   npm run test:e2e:real-ai:api:full       (with TEXT2VID — slow & expensive)
+ *   npm run test:e2e:real-ai                (all tests — API + UI)
+ *   npm run test:e2e:real-ai -- --grep api  (API-only)
+ *   INCLUDE_VIDEO=1 npm run test:e2e:real-ai -- --grep api  (with TEXT2VID)
  */
 import { test, expect } from '@playwright/test'
 import { getApiUrl } from '../config/config'

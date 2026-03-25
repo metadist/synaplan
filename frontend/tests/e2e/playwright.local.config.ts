@@ -28,7 +28,7 @@ export default defineConfig({
     trace: 'retain-on-failure',
   },
 
-  reporter: [['list'], ['html', { outputFolder: 'reports/html-local', open: 'never' }]],
+  reporter: [['list'], ['html', { outputFolder: 'reports/html-local', open: 'always' }]],
 
   outputDir: 'test-results',
   workers: 1,
