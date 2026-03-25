@@ -18,6 +18,7 @@ use Doctrine\ORM\EntityManagerInterface;
 use Doctrine\ORM\EntityRepository;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
+use Psr\Cache\CacheItemPoolInterface;
 use Psr\Log\NullLogger;
 
 class MediaGenerationServiceTest extends TestCase
@@ -47,6 +48,7 @@ class MediaGenerationServiceTest extends TestCase
             $this->pathBuilder,
             $this->em,
             new NullLogger(),
+            $this->createMock(CacheItemPoolInterface::class),
             $this->uploadDir,
         );
     }
@@ -99,6 +101,121 @@ class MediaGenerationServiceTest extends TestCase
             'used' => 0,
             'remaining' => 100,
         ]);
+    }
+
+    public function testStartVideoGenerationSuccess(): void
+    {
+        $user = $this->createUser(1);
+        $this->allowRateLimit();
+
+        $model = $this->createModel('Google', 'veo-3.1', 'Veo 3.1');
+        $this->setUpModelResolution(45, $model);
+        $this->modelConfigService->method('getDefaultModel')->with('TEXT2VID', 1)->willReturn(45);
+
+        $this->aiFacade->expects($this->once())
+            ->method('startVideoGeneration')
+            ->with('test prompt', 1, [
+                'provider' => 'google',
+                'model' => 'veo-3.1',
+                'duration' => 8,
+                'aspect_ratio' => '16:9',
+            ])
+            ->willReturn([
+                'operationName' => 'ops/123',
+                'provider' => 'google',
+                'model' => 'veo-3.1',
+                'duration' => 8,
+            ]);
+
+        $cacheItem = $this->createMock(\Psr\Cache\CacheItemInterface::class);
+        $cacheItem->expects($this->once())->method('set')->with($this->callback(function ($data) {
+            return $data['operationName'] === 'ops/123' && $data['userId'] === 1 && $data['prompt'] === 'test prompt';
+        }));
+        $cacheItem->expects($this->once())->method('expiresAfter')->with(600);
+
+        $this->cache->expects($this->once())
+            ->method('getItem')
+            ->with($this->stringStartsWith('video_job_'))
+            ->willReturn($cacheItem);
+
+        $this->cache->expects($this->once())->method('save')->with($cacheItem);
+
+        $result = $this->service->startVideoGeneration($user, 'test prompt');
+
+        $this->assertArrayHasKey('jobId', $result);
+        $this->assertSame('processing', $result['status']);
+        $this->assertSame('google', $result['provider']);
+        $this->assertSame('veo-3.1', $result['model']);
+    }
+
+    public function testCheckVideoJobProcessing(): void
+    {
+        $user = $this->createUser(1);
+
+        $cacheItem = $this->createMock(\Psr\Cache\CacheItemInterface::class);
+        $cacheItem->method('isHit')->willReturn(true);
+        $cacheItem->method('get')->willReturn([
+            'operationName' => 'ops/123',
+            'provider' => 'google',
+            'model' => 'veo-3.1',
+            'duration' => 8,
+            'userId' => 1,
+            'prompt' => 'test prompt',
+            'startedAt' => time() - 10,
+        ]);
+
+        $this->cache->method('getItem')->with('video_job_123')->willReturn($cacheItem);
+
+        $this->aiFacade->expects($this->once())
+            ->method('pollVideoOperation')
+            ->with('ops/123', 'google')
+            ->willReturn(['done' => false, 'videoUri' => null, 'error' => null]);
+
+        $result = $this->service->checkVideoJob($user, '123');
+
+        $this->assertSame('processing', $result['status']);
+        $this->assertGreaterThanOrEqual(10, $result['elapsed_seconds']);
+    }
+
+    public function testCheckVideoJobCompleted(): void
+    {
+        $user = $this->createUser(1);
+
+        $cacheItem = $this->createMock(\Psr\Cache\CacheItemInterface::class);
+        $cacheItem->method('isHit')->willReturn(true);
+        $cacheItem->method('get')->willReturn([
+            'operationName' => 'ops/123',
+            'provider' => 'google',
+            'model' => 'veo-3.1',
+            'duration' => 8,
+            'userId' => 1,
+            'prompt' => 'test prompt',
+            'startedAt' => time() - 20,
+        ]);
+
+        $this->cache->method('getItem')->with('video_job_123')->willReturn($cacheItem);
+
+        $this->aiFacade->expects($this->once())
+            ->method('pollVideoOperation')
+            ->with('ops/123', 'google')
+            ->willReturn(['done' => true, 'videoUri' => 'https://example.com/vid.mp4', 'error' => null]);
+
+        $this->aiFacade->expects($this->once())
+            ->method('downloadVideoContent')
+            ->with('https://example.com/vid.mp4', 'google')
+            ->willReturn('data:video/mp4;base64,dGVzdA==');
+
+        $this->cache->expects($this->once())->method('deleteItem')->with('video_job_123');
+
+        $this->rateLimitService->expects($this->once())->method('recordUsage');
+
+        $result = $this->service->checkVideoJob($user, '123');
+
+        $this->assertSame('completed', $result['status']);
+        $this->assertArrayHasKey('file', $result);
+        $this->assertSame('video', $result['file']['type']);
+        $this->assertStringContainsString('.mp4', $result['file']['url']);
+        $this->assertSame('google', $result['provider']);
     }
 
     private function setUpModelResolution(int $modelId, ?Model $model): void

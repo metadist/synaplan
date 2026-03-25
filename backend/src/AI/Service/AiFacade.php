@@ -3,6 +3,7 @@
 namespace App\AI\Service;
 
 use App\AI\Exception\ProviderException;
+use App\AI\Provider\GoogleProvider;
 use App\Service\CircuitBreaker;
 use App\Service\File\FileHelper;
 use App\Service\File\UserUploadPathBuilder;
@@ -492,6 +493,68 @@ class AiFacade
             'provider' => $provider->getName(),
             'model' => $options['model'] ?? 'unknown',
         ];
+    }
+
+    /**
+     * Start an async video generation operation (non-blocking).
+     *
+     * @return array{operationName: string, provider: string, model: string, duration: int}
+     */
+    public function startVideoGeneration(string $prompt, ?int $userId = null, array $options = []): array
+    {
+        $providerName = $options['provider'] ?? null;
+
+        if (!$providerName && $userId > 0) {
+            $providerName = $this->modelConfig->getDefaultProvider($userId, 'video_generation');
+        }
+
+        $provider = $this->registry->getVideoGenerationProvider($providerName);
+
+        if (!$provider instanceof GoogleProvider) {
+            throw new ProviderException('Async video generation is only supported by Google Veo', $provider->getName());
+        }
+
+        $this->logger->info('Starting async video generation', [
+            'provider' => $provider->getName(),
+            'user_id' => $userId,
+        ]);
+
+        $operationData = $provider->startVideoOperation($prompt, $options);
+
+        return [
+            ...$operationData,
+            'provider' => $provider->getName(),
+        ];
+    }
+
+    /**
+     * Poll an async video operation once.
+     *
+     * @return array{done: bool, videoUri: ?string, error: ?string}
+     */
+    public function pollVideoOperation(string $operationName, ?string $providerName = null): array
+    {
+        $provider = $this->registry->getVideoGenerationProvider($providerName);
+
+        if (!$provider instanceof GoogleProvider) {
+            throw new ProviderException('Async video polling is only supported by Google Veo', $provider->getName());
+        }
+
+        return $provider->pollVideoOperationOnce($operationName);
+    }
+
+    /**
+     * Download video content from a provider URI.
+     */
+    public function downloadVideoContent(string $videoUri, ?string $providerName = null): string
+    {
+        $provider = $this->registry->getVideoGenerationProvider($providerName);
+
+        if (!$provider instanceof GoogleProvider) {
+            throw new ProviderException('Async video download is only supported by Google Veo', $provider->getName());
+        }
+
+        return $provider->downloadVideoContent($videoUri);
     }
 
     /**

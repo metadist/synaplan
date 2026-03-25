@@ -596,180 +596,25 @@ class GoogleProvider implements ChatProviderInterface, ImageGenerationProviderIn
 
     public function generateVideo(string $prompt, array $options = []): array
     {
-        $model = $options['model'] ?? 'veo-3.1-generate-preview';
-
-        if (!$this->apiKey) {
-            throw ProviderException::missingApiKey('google', 'GOOGLE_GEMINI_API_KEY');
-        }
-
         try {
-            // Map requested duration to valid Veo values (4, 6, or 8 seconds)
-            $requestedDuration = isset($options['duration']) && is_numeric($options['duration'])
-                ? (int) $options['duration']
-                : 8;
-            $durationSeconds = $this->mapToValidVeoDuration($requestedDuration);
-            $aspectRatio = $options['aspect_ratio'] ?? '16:9';
+            $operationData = $this->startVideoOperation($prompt, $options);
+            $progressCallback = $options['progress_callback'] ?? null;
 
-            $this->logger->info('Google Veo: Starting video generation', [
-                'model' => $model,
-                'prompt_length' => strlen($prompt),
-                'requested_duration' => $requestedDuration,
-                'actual_duration' => $durationSeconds,
-                'aspect_ratio' => $aspectRatio,
-            ]);
+            $videoUri = $this->pollVideoUntilComplete(
+                $operationData['operationName'],
+                $progressCallback,
+            );
 
-            // Use Gemini API (not Vertex AI!) - predictLongRunning endpoint for async operation
-            $url = self::API_BASE."/models/{$model}:predictLongRunning";
+            $videoDataUrl = $this->downloadVideoContent($videoUri);
 
-            $payload = [
-                'instances' => [
-                    [
-                        'prompt' => $prompt,
-                    ],
-                ],
-                'parameters' => [
-                    'durationSeconds' => $durationSeconds,
-                    'aspectRatio' => $aspectRatio,
-                ],
-            ];
-
-            $this->logger->info('Google Veo: Sending video generation request', [
-                'url' => $url,
-                'model' => $model,
-            ]);
-
-            // Start the long-running operation
-            $response = $this->httpClient->request('POST', $url, [
-                'headers' => [
-                    'Content-Type' => 'application/json',
-                    'x-goog-api-key' => $this->apiKey, // Use x-goog-api-key header, NOT Authorization
-                ],
-                'json' => $payload,
-                'timeout' => 30,
-            ]);
-
-            // Check status code BEFORE calling toArray()
-            $statusCode = $response->getStatusCode();
-            if (200 !== $statusCode) {
-                $errorBody = $response->getContent(false); // false = don't throw on error
-                $this->logger->error('Google Veo: API returned error', [
-                    'status_code' => $statusCode,
-                    'error_body' => $errorBody,
-                    'url' => $url,
-                    'payload' => json_encode($payload),
-                ]);
-                throw new \Exception("Google Veo API error (HTTP $statusCode): $errorBody");
-            }
-
-            $data = $response->toArray();
-
-            $this->logger->info('Google Veo: Response received', [
-                'response' => json_encode($data),
-            ]);
-
-            // Get the operation name
-            $operationName = $data['name'] ?? null;
-            if (!$operationName) {
-                throw new \Exception('No operation name returned from Google Veo');
-            }
-
-            $this->logger->info('Google Veo: Operation started', [
-                'operation' => $operationName,
-            ]);
-
-            // Poll the operation until it's done (max 5 minutes polling)
-            $maxAttempts = 60; // 60 attempts * 5 seconds = 300 seconds (5 minutes)
-            $attempt = 0;
-            $operationUrl = self::API_BASE.'/'.$operationName;
-
-            while ($attempt < $maxAttempts) {
-                sleep(5); // Wait 5 seconds between polls
-                ++$attempt;
-
-                $this->logger->info('Google Veo: Polling operation', [
-                    'attempt' => $attempt,
-                    'max_attempts' => $maxAttempts,
-                ]);
-
-                $statusResponse = $this->httpClient->request('GET', $operationUrl, [
-                    'headers' => [
-                        'x-goog-api-key' => $this->apiKey,
-                    ],
-                    'timeout' => 30,
-                ]);
-
-                $statusData = $statusResponse->toArray();
-
-                if (isset($statusData['done']) && true === $statusData['done']) {
-                    // Operation completed - check for error first
-                    $this->logger->info('Google Veo: Operation completed', [
-                        'has_error' => isset($statusData['error']),
-                        'has_response' => isset($statusData['response']),
-                    ]);
-
-                    // Check for error response (content safety rejection, etc.)
-                    if (isset($statusData['error'])) {
-                        $errorCode = $statusData['error']['code'] ?? 'UNKNOWN';
-                        $errorMessage = $statusData['error']['message'] ?? 'Unknown error';
-                        $errorDetails = $statusData['error']['details'] ?? [];
-
-                        $this->logger->error('Google Veo: Operation failed with error', [
-                            'error_code' => $errorCode,
-                            'error_message' => $errorMessage,
-                            'error_details' => $errorDetails,
-                        ]);
-
-                        // Check for common error types
-                        if (str_contains(strtolower($errorMessage), 'safety') || str_contains(strtolower($errorMessage), 'blocked')) {
-                            throw ProviderException::contentBlocked('google', 'SAFETY', $errorMessage);
-                        }
-
-                        throw new \Exception('Google video generation failed: '.$errorMessage.' (code: '.$errorCode.')');
-                    }
-
-                    $this->logger->info('Google Veo: Video generation completed!');
-
-                    // Extract video URI - try multiple possible response formats
-                    $videoUri = $statusData['response']['generateVideoResponse']['generatedSamples'][0]['video']['uri'] ?? null;
-
-                    // Try alternative response format (generated_videos)
-                    if (!$videoUri) {
-                        $videoUri = $statusData['response']['generatedVideos'][0]['video']['uri'] ?? null;
-                    }
-
-                    if (!$videoUri) {
-                        // Log the full response for debugging
-                        $this->logger->error('Google Veo: No video URI found in response', [
-                            'response_keys' => array_keys($statusData['response'] ?? []),
-                            'full_response' => json_encode($statusData, JSON_PRETTY_PRINT),
-                        ]);
-                        throw new \Exception('No video URI in completed operation response - check logs for response structure');
-                    }
-
-                    // Download the video from the URI
-                    $videoResponse = $this->httpClient->request('GET', $videoUri, [
-                        'headers' => [
-                            'x-goog-api-key' => $this->apiKey,
-                        ],
-                        'timeout' => 120,
-                    ]);
-
-                    $videoData = $videoResponse->getContent();
-
-                    // Convert to base64 data URL
-                    $base64Video = base64_encode($videoData);
-
-                    return [[
-                        'url' => 'data:video/mp4;base64,'.$base64Video,
-                        'revised_prompt' => $prompt,
-                        'duration' => $durationSeconds,
-                    ]];
-                }
-            }
-
-            throw new \Exception('Video generation timed out after '.($maxAttempts * 5).' seconds');
+            return [[
+                'url' => $videoDataUrl,
+                'revised_prompt' => $prompt,
+                'duration' => $operationData['duration'],
+            ]];
+        } catch (ProviderException $e) {
+            throw $e;
         } catch (\Symfony\Contracts\HttpClient\Exception\HttpExceptionInterface $e) {
-            // Log the full error response
             $this->logger->error('Google Veo: HTTP Error', [
                 'status_code' => $e->getResponse()->getStatusCode(),
                 'response_body' => $e->getResponse()->getContent(false),
@@ -785,6 +630,206 @@ class GoogleProvider implements ChatProviderInterface, ImageGenerationProviderIn
 
             throw new ProviderException('Google video generation error: '.$e->getMessage(), 'google');
         }
+    }
+
+    /**
+     * Start a Veo video generation operation without blocking.
+     *
+     * @return array{operationName: string, model: string, duration: int}
+     */
+    public function startVideoOperation(string $prompt, array $options = []): array
+    {
+        $model = $options['model'] ?? 'veo-3.1-generate-preview';
+
+        if (!$this->apiKey) {
+            throw ProviderException::missingApiKey('google', 'GOOGLE_GEMINI_API_KEY');
+        }
+
+        $requestedDuration = isset($options['duration']) && is_numeric($options['duration'])
+            ? (int) $options['duration']
+            : 8;
+        $durationSeconds = $this->mapToValidVeoDuration($requestedDuration);
+        $aspectRatio = $options['aspect_ratio'] ?? '16:9';
+
+        $this->logger->info('Google Veo: Starting video generation', [
+            'model' => $model,
+            'prompt_length' => strlen($prompt),
+            'requested_duration' => $requestedDuration,
+            'actual_duration' => $durationSeconds,
+            'aspect_ratio' => $aspectRatio,
+        ]);
+
+        $url = self::API_BASE."/models/{$model}:predictLongRunning";
+
+        $payload = [
+            'instances' => [
+                ['prompt' => $prompt],
+            ],
+            'parameters' => [
+                'durationSeconds' => $durationSeconds,
+                'aspectRatio' => $aspectRatio,
+            ],
+        ];
+
+        $response = $this->httpClient->request('POST', $url, [
+            'headers' => [
+                'Content-Type' => 'application/json',
+                'x-goog-api-key' => $this->apiKey,
+            ],
+            'json' => $payload,
+            'timeout' => 30,
+        ]);
+
+        $statusCode = $response->getStatusCode();
+        if (200 !== $statusCode) {
+            $errorBody = $response->getContent(false);
+            $this->logger->error('Google Veo: API returned error', [
+                'status_code' => $statusCode,
+                'error_body' => $errorBody,
+                'url' => $url,
+            ]);
+            throw new ProviderException("Google Veo API error (HTTP $statusCode): $errorBody", 'google');
+        }
+
+        $data = $response->toArray();
+        $operationName = $data['name'] ?? null;
+        if (!$operationName) {
+            throw new ProviderException('No operation name returned from Google Veo', 'google');
+        }
+
+        $this->logger->info('Google Veo: Operation started', [
+            'operation' => $operationName,
+        ]);
+
+        return [
+            'operationName' => $operationName,
+            'model' => $model,
+            'duration' => $durationSeconds,
+        ];
+    }
+
+    /**
+     * Poll a Veo operation once and return its current status.
+     *
+     * @return array{done: bool, videoUri: ?string, error: ?string}
+     */
+    public function pollVideoOperationOnce(string $operationName): array
+    {
+        if (!$this->apiKey) {
+            throw ProviderException::missingApiKey('google', 'GOOGLE_GEMINI_API_KEY');
+        }
+
+        $operationUrl = self::API_BASE.'/'.$operationName;
+
+        $statusResponse = $this->httpClient->request('GET', $operationUrl, [
+            'headers' => ['x-goog-api-key' => $this->apiKey],
+            'timeout' => 30,
+        ]);
+
+        $statusData = $statusResponse->toArray();
+
+        if (!isset($statusData['done']) || true !== $statusData['done']) {
+            return ['done' => false, 'videoUri' => null, 'error' => null];
+        }
+
+        if (isset($statusData['error'])) {
+            $errorMessage = $statusData['error']['message'] ?? 'Unknown error';
+            $errorCode = $statusData['error']['code'] ?? 'UNKNOWN';
+
+            $this->logger->error('Google Veo: Operation failed', [
+                'error_code' => $errorCode,
+                'error_message' => $errorMessage,
+            ]);
+
+            if (str_contains(strtolower($errorMessage), 'safety') || str_contains(strtolower($errorMessage), 'blocked')) {
+                throw ProviderException::contentBlocked('google', 'SAFETY', $errorMessage);
+            }
+
+            return ['done' => true, 'videoUri' => null, 'error' => $errorMessage.' (code: '.$errorCode.')'];
+        }
+
+        $videoUri = $statusData['response']['generateVideoResponse']['generatedSamples'][0]['video']['uri']
+            ?? $statusData['response']['generatedVideos'][0]['video']['uri']
+            ?? null;
+
+        if (!$videoUri) {
+            $this->logger->error('Google Veo: No video URI found in response', [
+                'response_keys' => array_keys($statusData['response'] ?? []),
+                'full_response' => json_encode($statusData, JSON_PRETTY_PRINT),
+            ]);
+
+            return ['done' => true, 'videoUri' => null, 'error' => 'No video URI in completed operation response'];
+        }
+
+        $this->logger->info('Google Veo: Video generation completed!');
+
+        return ['done' => true, 'videoUri' => $videoUri, 'error' => null];
+    }
+
+    /**
+     * Download video from a Google-provided URI and return as data URL.
+     */
+    public function downloadVideoContent(string $videoUri): string
+    {
+        if (!$this->apiKey) {
+            throw ProviderException::missingApiKey('google', 'GOOGLE_GEMINI_API_KEY');
+        }
+
+        $videoResponse = $this->httpClient->request('GET', $videoUri, [
+            'headers' => ['x-goog-api-key' => $this->apiKey],
+            'timeout' => 120,
+        ]);
+
+        $videoData = $videoResponse->getContent();
+        $base64Video = base64_encode($videoData);
+
+        return 'data:video/mp4;base64,'.$base64Video;
+    }
+
+    /**
+     * Poll until the Veo operation completes, calling progressCallback each iteration.
+     *
+     * @return string The video URI to download
+     */
+    private function pollVideoUntilComplete(string $operationName, ?callable $progressCallback): string
+    {
+        $maxAttempts = 60;
+        $startTime = time();
+
+        for ($attempt = 1; $attempt <= $maxAttempts; ++$attempt) {
+            sleep(5);
+
+            $elapsed = time() - $startTime;
+
+            if ($progressCallback) {
+                $progressCallback([
+                    'status' => 'polling',
+                    'attempt' => $attempt,
+                    'max_attempts' => $maxAttempts,
+                    'elapsed_seconds' => $elapsed,
+                ]);
+            }
+
+            $this->logger->info('Google Veo: Polling operation', [
+                'attempt' => $attempt,
+                'max_attempts' => $maxAttempts,
+                'elapsed' => $elapsed,
+            ]);
+
+            $result = $this->pollVideoOperationOnce($operationName);
+
+            if (!$result['done']) {
+                continue;
+            }
+
+            if ($result['error']) {
+                throw new ProviderException('Google video generation failed: '.$result['error'], 'google');
+            }
+
+            return $result['videoUri'];
+        }
+
+        throw new ProviderException('Video generation timed out after '.($maxAttempts * 5).' seconds', 'google');
     }
 
     /**
