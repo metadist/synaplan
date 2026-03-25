@@ -2233,7 +2233,8 @@
     "reasoning": "AI Reasoning",
     "fileGenerated": "I've created the file '{filename}' for you. You can now download it.",
     "fileGenerationFailed": "There was a problem creating the file. Please try again.",
-    "cancelledByUser": "⚠️ Cancelled by user"
+    "cancelledByUser": "⚠️ Cancelled by user",
+    "truncated": "This response was cut short because the model reached its token limit. Try asking a more focused question or request the answer in parts."
   },
   "aiProvider": {
     "error": {

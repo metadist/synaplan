@@ -164,9 +164,9 @@ class OpenAIProvider implements ChatProviderInterface, EmbeddingProviderInterfac
 
             // Use correct token parameter based on model capabilities
             if ($usesCompletionTokensParam) {
-                $requestOptions['max_completion_tokens'] = $options['max_tokens'] ?? 4096;
+                $requestOptions['max_completion_tokens'] = $options['max_tokens'] ?? 16384;
             } else {
-                $requestOptions['max_tokens'] = $options['max_tokens'] ?? 4096;
+                $requestOptions['max_tokens'] = $options['max_tokens'] ?? 16384;
             }
 
             // NOTE: Only o3 models support reasoning_effort parameter
@@ -220,9 +220,9 @@ class OpenAIProvider implements ChatProviderInterface, EmbeddingProviderInterfac
 
             // Use correct token parameter based on model capabilities
             if ($usesCompletionTokensParam) {
-                $requestOptions['max_completion_tokens'] = $options['max_tokens'] ?? 4096;
+                $requestOptions['max_completion_tokens'] = $options['max_tokens'] ?? 16384;
             } else {
-                $requestOptions['max_tokens'] = $options['max_tokens'] ?? 4096;
+                $requestOptions['max_tokens'] = $options['max_tokens'] ?? 16384;
             }
 
             // NOTE: Reasoning models handle reasoning automatically
@@ -231,6 +231,7 @@ class OpenAIProvider implements ChatProviderInterface, EmbeddingProviderInterfac
             $stream = $this->client->chat()->createStreamed($requestOptions);
 
             $firstChunk = true;
+            $finishReason = null;
             foreach ($stream as $response) {
                 $responseArray = $response->toArray();
 
@@ -246,6 +247,12 @@ class OpenAIProvider implements ChatProviderInterface, EmbeddingProviderInterfac
                     $firstChunk = false;
                 }
 
+                // Capture finish_reason (set on the final chunk)
+                $chunkFinishReason = $responseArray['choices'][0]['finish_reason'] ?? null;
+                if (null !== $chunkFinishReason) {
+                    $finishReason = $chunkFinishReason;
+                }
+
                 // Handle reasoning content (o1, o3, gpt-5 models)
                 $reasoningContent = $responseArray['choices'][0]['delta']['reasoning_content'] ?? null;
                 if (null !== $reasoningContent) {
@@ -257,6 +264,11 @@ class OpenAIProvider implements ChatProviderInterface, EmbeddingProviderInterfac
                 if ($content) {
                     $callback(['type' => 'content', 'content' => $content]);
                 }
+            }
+
+            // Signal finish_reason so callers know if the response was truncated
+            if (null !== $finishReason) {
+                $callback(['type' => 'finish', 'finish_reason' => $finishReason]);
             }
         } catch (\Exception $e) {
             throw new ProviderException('OpenAI streaming error: '.$e->getMessage(), 'openai');

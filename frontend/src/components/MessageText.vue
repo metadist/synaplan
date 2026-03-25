@@ -508,19 +508,55 @@ async function processContent(content: string, version: number): Promise<string 
   return html
 }
 
-// Update rendered content when props change
+// Debounce timer for markdown rendering during streaming
+let renderDebounceTimer: ReturnType<typeof setTimeout> | null = null
+const RENDER_DEBOUNCE_MS = 80
+
+// Update rendered content when props change (debounced during streaming)
 watch(
   () => props.content,
   async (newContent) => {
-    // Increment version to invalidate any pending async renders
     const currentVersion = ++renderVersion
+
+    // During streaming, debounce to avoid re-rendering full markdown on every chunk
+    if (props.isStreaming) {
+      if (renderDebounceTimer !== null) {
+        clearTimeout(renderDebounceTimer)
+      }
+      renderDebounceTimer = setTimeout(async () => {
+        renderDebounceTimer = null
+        if (currentVersion !== renderVersion) return
+        const result = await processContent(newContent, currentVersion)
+        if (result !== null) {
+          renderedContent.value = result
+        }
+      }, RENDER_DEBOUNCE_MS)
+      return
+    }
+
+    // Not streaming — render immediately
     const result = await processContent(newContent, currentVersion)
-    // Only update if this is still the current render
     if (result !== null) {
       renderedContent.value = result
     }
   },
   { immediate: true }
+)
+
+// When streaming ends, flush any pending debounced render so final content is visible
+watch(
+  () => props.isStreaming,
+  async (streaming) => {
+    if (!streaming && renderDebounceTimer !== null) {
+      clearTimeout(renderDebounceTimer)
+      renderDebounceTimer = null
+      const currentVersion = ++renderVersion
+      const result = await processContent(props.content, currentVersion)
+      if (result !== null) {
+        renderedContent.value = result
+      }
+    }
+  }
 )
 
 // Resolve actual theme (system -> light/dark based on preference)
@@ -564,6 +600,9 @@ function scheduleMermaidProcessing(): void {
 
 // Cleanup timers and event listeners on unmount
 onBeforeUnmount(() => {
+  if (renderDebounceTimer) {
+    clearTimeout(renderDebounceTimer)
+  }
   if (mermaidDebounceTimer) {
     clearTimeout(mermaidDebounceTimer)
   }
