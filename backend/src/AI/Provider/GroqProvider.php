@@ -114,11 +114,8 @@ class GroqProvider implements ChatProviderInterface, VisionProviderInterface, Sp
             $requestOptions = [
                 'model' => $model,
                 'messages' => $messages,
+                'max_tokens' => $options['max_tokens'] ?? ChatProviderInterface::DEFAULT_MAX_COMPLETION_TOKENS,
             ];
-
-            if (isset($options['max_tokens'])) {
-                $requestOptions['max_tokens'] = $options['max_tokens'];
-            }
 
             if (isset($options['temperature'])) {
                 $requestOptions['temperature'] = $options['temperature'];

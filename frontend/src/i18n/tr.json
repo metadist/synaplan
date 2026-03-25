@@ -870,7 +870,8 @@
     "reasoning": "AI Akıl Yürütme",
     "fileGenerated": "Sizin için '{filename}' dosyasını oluşturdum. Şimdi indirebilirsiniz.",
     "fileGenerationFailed": "Dosya oluşturulurken bir sorun oluştu. Lütfen tekrar deneyin.",
-    "cancelledByUser": "⚠️ Kullanıcı tarafından iptal edildi"
+    "cancelledByUser": "⚠️ Kullanıcı tarafından iptal edildi",
+    "truncated": "Bu yanıt, model token sınırına ulaştığı için kesildi. Daha odaklı bir soru sormayı veya yanıtı parçalar halinde istemeyi deneyin."
   },
   "subscription": {
     "serviceNotAvailable": "Hizmet Kullanılamıyor",
