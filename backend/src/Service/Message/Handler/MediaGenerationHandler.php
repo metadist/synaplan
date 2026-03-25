@@ -416,7 +416,8 @@ final readonly class MediaGenerationHandler implements MessageHandlerInterface
                 throw new \Exception("Generated {$mediaType} has no URL. Check provider response format.");
             }
 
-            // CRITICAL: Always save to disk - never store data URLs in database
+            $this->notify($progressCallback, 'generating', 'Saving '.$mediaTypeLabel.'...');
+
             $localPath = null;
 
             if (str_starts_with($mediaUrl, 'data:')) {
