@@ -20,9 +20,9 @@ interface ChatProviderInterface extends ProviderMetadataInterface
     /**
      * Default max completion tokens when not specified via options.
      * Providers may override this with their own constant for
-     * provider-specific defaults (e.g. OpenAI/Anthropic use 16384).
+     * provider-specific defaults (e.g. OpenAI/Anthropic use 65536).
      */
-    public const DEFAULT_MAX_COMPLETION_TOKENS = 8192;
+    public const DEFAULT_MAX_COMPLETION_TOKENS = 65536;
 
     /**
      * Generate chat completion (non-streaming).
