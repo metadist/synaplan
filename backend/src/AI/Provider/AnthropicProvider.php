@@ -141,7 +141,7 @@ class AnthropicProvider implements ChatProviderInterface, VisionProviderInterfac
 
             $requestBody = [
                 'model' => $model,
-                'max_tokens' => $options['max_tokens'] ?? 4096,
+                'max_tokens' => $options['max_tokens'] ?? 16384,
                 'messages' => $conversationMessages,
             ];
 
@@ -250,7 +250,7 @@ class AnthropicProvider implements ChatProviderInterface, VisionProviderInterfac
 
             $requestBody = [
                 'model' => $model,
-                'max_tokens' => $options['max_tokens'] ?? 4096,
+                'max_tokens' => $options['max_tokens'] ?? 16384,
                 'messages' => $conversationMessages,
                 'stream' => true,
             ];

@@ -545,11 +545,12 @@ class StreamController extends AbstractController
                 // ✨ NEW: JSON detection and parsing
                 $jsonBuffer = '';
                 $isBufferingJson = false;
+                $finishReason = null;
 
                 $result = $this->messageProcessor->processStream(
                     $incomingMessage,
                     // Stream callback - AI streams TEXT directly or structured data (reasoning)
-                    function ($chunk) use (&$responseText, &$chunkCount, &$reasoningBuffer, &$hasReasoningStarted, &$jsonBuffer, &$isBufferingJson) {
+                    function ($chunk) use (&$responseText, &$chunkCount, &$reasoningBuffer, &$hasReasoningStarted, &$jsonBuffer, &$isBufferingJson, &$finishReason) {
                         if (connection_aborted()) {
                             throw new \RuntimeException('Client disconnected');
                         }
@@ -558,6 +559,13 @@ class StreamController extends AbstractController
                         if (is_array($chunk)) {
                             $type = $chunk['type'] ?? 'content';
                             $content = $chunk['content'] ?? '';
+
+                            // Capture finish signal from provider (e.g. "length" = token limit hit)
+                            if ('finish' === $type) {
+                                $finishReason = $chunk['finish_reason'] ?? null;
+
+                                return;
+                            }
 
                             if ('reasoning' === $type) {
                                 // Accumulate reasoning chunks
@@ -1106,8 +1114,12 @@ class StreamController extends AbstractController
                     'model' => $response['metadata']['model'] ?? 'unknown',
                     'topic' => $classification['topic'],
                     'language' => $classification['language'],
-                    'searchResults' => $searchResults, // Include search results
+                    'searchResults' => $searchResults,
                 ];
+
+                if ('length' === $finishReason) {
+                    $completeData['truncated'] = true;
+                }
 
                 // Include memories used for this response
                 // Send only memory IDs (frontend loads full memories from store)
