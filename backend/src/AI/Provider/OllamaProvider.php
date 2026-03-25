@@ -167,10 +167,18 @@ class OllamaProvider implements ChatProviderInterface, EmbeddingProviderInterfac
 
             $ollamaMessages = $this->convertMessages($messages);
 
-            $stream = $this->client->chat()->createStreamed([
+            $requestOptions = [
                 'model' => $model,
                 'messages' => $ollamaMessages,
-            ]);
+            ];
+
+            if (isset($options['max_tokens'])) {
+                $requestOptions['options'] = [
+                    'num_predict' => $options['max_tokens'],
+                ];
+            }
+
+            $stream = $this->client->chat()->createStreamed($requestOptions);
 
             $this->logger->info('🟡 Ollama: Stream created, iterating...');
 
@@ -199,12 +207,16 @@ class OllamaProvider implements ChatProviderInterface, EmbeddingProviderInterfac
                     }
                 }
 
-                // Check if done
                 if (isset($chunk->done) && $chunk->done) {
                     $this->logger->info('🔵 Ollama: Stream done signal received');
                     break;
                 }
             }
+
+            // Note: The Ollama PHP SDK (ardagnsrn/ollama-php) does not expose
+            // done_reason from the API response, so we cannot detect truncation
+            // (done_reason="length"). Once the SDK adds this field, we should
+            // emit callback(['type' => 'finish', 'finish_reason' => ...]) here.
 
             $this->logger->info('🔵 Ollama: Streaming complete', [
                 'chunks_sent' => $chunkCount,

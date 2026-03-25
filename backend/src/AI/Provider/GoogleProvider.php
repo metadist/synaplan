@@ -126,7 +126,7 @@ class GoogleProvider implements ChatProviderInterface, ImageGenerationProviderIn
                     'temperature' => $options['temperature'] ?? 0.7,
                     'topP' => $options['top_p'] ?? 0.95,
                     'topK' => $options['top_k'] ?? 40,
-                    'maxOutputTokens' => $options['max_tokens'] ?? 2048,
+                    'maxOutputTokens' => $options['max_tokens'] ?? ChatProviderInterface::DEFAULT_MAX_COMPLETION_TOKENS,
                 ],
             ];
 
@@ -178,7 +178,7 @@ class GoogleProvider implements ChatProviderInterface, ImageGenerationProviderIn
                     'temperature' => $options['temperature'] ?? 0.7,
                     'topP' => $options['top_p'] ?? 0.95,
                     'topK' => $options['top_k'] ?? 40,
-                    'maxOutputTokens' => $options['max_tokens'] ?? 2048,
+                    'maxOutputTokens' => $options['max_tokens'] ?? ChatProviderInterface::DEFAULT_MAX_COMPLETION_TOKENS,
                 ],
             ];
 
@@ -196,6 +196,8 @@ class GoogleProvider implements ChatProviderInterface, ImageGenerationProviderIn
                 'timeout' => 120,
             ]);
 
+            $finishReason = null;
+
             foreach ($this->httpClient->stream($response) as $chunk) {
                 if ($chunk->isLast()) {
                     break;
@@ -210,12 +212,26 @@ class GoogleProvider implements ChatProviderInterface, ImageGenerationProviderIn
 
                     if ($data) {
                         $this->checkGeminiFinishReason($data);
+
+                        // Capture finishReason from the last chunk (Gemini uses "MAX_TOKENS" or "STOP")
+                        $geminiFinishReason = $data['candidates'][0]['finishReason'] ?? null;
+                        if (null !== $geminiFinishReason) {
+                            $finishReason = match ($geminiFinishReason) {
+                                'MAX_TOKENS' => 'length',
+                                'STOP', 'END_TURN' => 'stop',
+                                default => $geminiFinishReason,
+                            };
+                        }
                     }
 
                     if (isset($data['candidates'][0]['content']['parts'][0]['text'])) {
                         $callback($data['candidates'][0]['content']['parts'][0]['text']);
                     }
                 }
+            }
+
+            if (null !== $finishReason) {
+                $callback(['type' => 'finish', 'finish_reason' => $finishReason]);
             }
         } catch (ProviderException $e) {
             throw $e;

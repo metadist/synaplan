@@ -274,4 +274,17 @@ class Model
     {
         return in_array($feature, $this->getFeatures(), true);
     }
+
+    /**
+     * Get max completion tokens from JSON config.
+     *
+     * Returns null when not configured — providers fall back to
+     * ChatProviderInterface::DEFAULT_MAX_COMPLETION_TOKENS in that case.
+     */
+    public function getMaxTokens(): ?int
+    {
+        $value = $this->json['max_tokens'] ?? null;
+
+        return null !== $value ? (int) $value : null;
+    }
 }

@@ -161,25 +161,28 @@ class GroqProvider implements ChatProviderInterface, VisionProviderInterface, Sp
                 'model' => $model,
                 'messages' => $messages,
                 'stream' => true,
+                'max_tokens' => $options['max_tokens'] ?? ChatProviderInterface::DEFAULT_MAX_COMPLETION_TOKENS,
             ];
-
-            if (isset($options['max_tokens'])) {
-                $requestOptions['max_tokens'] = $options['max_tokens'];
-            }
 
             if (isset($options['temperature'])) {
                 $requestOptions['temperature'] = $options['temperature'];
             }
 
-            // Note: Qwen3 models automatically include <think> tags in content
-            // We don't need to set reasoning_format for Groq
-
             $stream = $this->client->chat()->createStreamed($requestOptions);
 
             $chunkCount = 0;
+            $finishReason = null;
 
             foreach ($stream as $response) {
                 ++$chunkCount;
+
+                $responseArray = $response->toArray();
+
+                // Capture finish_reason (set on the final chunk)
+                $chunkFinishReason = $responseArray['choices'][0]['finish_reason'] ?? null;
+                if (null !== $chunkFinishReason) {
+                    $finishReason = $chunkFinishReason;
+                }
 
                 // Handle reasoning content (for models with structured reasoning like OpenAI o1)
                 if (isset($response->choices[0]->delta->reasoning_content)) {
@@ -195,9 +198,12 @@ class GroqProvider implements ChatProviderInterface, VisionProviderInterface, Sp
                 if (isset($response->choices[0]->delta->content)) {
                     $content = $response->choices[0]->delta->content;
 
-                    // Send as plain string (not structured) so <think> tags pass through
                     $callback($content);
                 }
+            }
+
+            if (null !== $finishReason) {
+                $callback(['type' => 'finish', 'finish_reason' => $finishReason]);
             }
 
             $this->logger->info('✅ Groq streaming COMPLETE', [
