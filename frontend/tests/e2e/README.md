@@ -83,18 +83,18 @@ Tests run with 4 parallel workers by default. Each worker dynamically creates a 
 
 From the **frontend** directory:
 
-| What                               | Command                                                                    |
-| ---------------------------------- | -------------------------------------------------------------------------- |
-| **Dev stack**: E2E tests           | `npm run test:e2e`                                                         |
-| **Dev stack**: single test         | `npm run test:e2e -- -g "standard model"`                                  |
-| **Test stack**: E2E tests          | `BASE_URL=http://localhost:8001 npm run test:e2e`                          |
-| **Test stack**: full CI-like       | `make test-e2e-full` (builds test stack + runs all E2E)                    |
-| **Test stack**: CI-like (no @noci) | `BASE_URL=http://localhost:8001 npm run test:e2e -- --grep-invert "@noci"` |
-| **Test stack**: single test        | `BASE_URL=http://localhost:8001 npm run test:e2e -- -g "embedded chat"`    |
-| **WhatsApp only**                  | `BASE_URL=http://localhost:8001 npm run test:e2e:whatsapp`                 |
-| **Real AI** (browser, local only)  | `npx playwright test --config tests/e2e/playwright.local.config.ts`        |
+| What                               | Command                                                                        |
+| ---------------------------------- | ------------------------------------------------------------------------------ |
+| **Dev stack**: E2E tests           | `npm run test:e2e`                                                             |
+| **Dev stack**: single test         | `npm run test:e2e -- -g "standard model"`                                      |
+| **Test stack**: E2E tests          | `BASE_URL=http://localhost:8001 npm run test:e2e`                              |
+| **Test stack**: full CI-like       | `make test-e2e-full` (builds test stack + runs all E2E)                        |
+| **Test stack**: CI-like (no @noci) | `BASE_URL=http://localhost:8001 npm run test:e2e -- --grep-invert "@noci"`     |
+| **Test stack**: single test        | `BASE_URL=http://localhost:8001 npm run test:e2e -- -g "embedded chat"`        |
+| **WhatsApp only**                  | `BASE_URL=http://localhost:8001 npm run test:e2e:whatsapp`                     |
+| **Real AI** (browser, local only)  | `npx playwright test --config tests/e2e/playwright.local.config.ts`            |
 | **Real AI** (API-only, local only) | `npx playwright test --config tests/e2e/playwright.local.config.ts --grep api` |
-| **Playwright UI**                  | `npm run test:e2e:ui`                                                      |
+| **Playwright UI**                  | `npm run test:e2e:ui`                                                          |
 
 Everything after `--` is passed through to Playwright.
 

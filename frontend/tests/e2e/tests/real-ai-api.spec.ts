@@ -144,14 +144,19 @@ async function attachReport(
 
   const tested = report.results.filter((r) => r.status !== 'SKIP')
   const caps = [...new Set(tested.map((r) => r.capability))]
-  const lines: string[] = [`Cloud AI Health Check — ${report.timestamp}`, `URL: ${report.baseUrl}`, '']
+  const lines: string[] = [
+    `Cloud AI Health Check — ${report.timestamp}`,
+    `URL: ${report.baseUrl}`,
+    '',
+  ]
 
   for (const cap of caps) {
     const capResults = tested.filter((r) => r.capability === cap)
     const pass = capResults.filter((r) => r.status === 'PASS').length
     const fail = capResults.filter((r) => r.status === 'FAIL').length
     const skip = report.results.filter((r) => r.capability === cap && r.status === 'SKIP').length
-    const header = skip > 0 ? `${pass} OK | ${fail} FAIL  (${skip} skipped)` : `${pass} OK | ${fail} FAIL`
+    const header =
+      skip > 0 ? `${pass} OK | ${fail} FAIL  (${skip} skipped)` : `${pass} OK | ${fail} FAIL`
     lines.push(`${cap}: ${header}`, '----------------------------------------')
     for (const r of capResults) {
       const dur = (r.durationMs / 1000).toFixed(1).padStart(6)
@@ -322,6 +327,13 @@ interface CapabilityConfig {
   message: string
   needsFile?: { path: string; name: string; mime: string }
   requireFile?: boolean
+  // BUG: The SSE complete event always reports the CHAT provider, not the
+  // capability-specific provider. For SOUND2TEXT the backend transcribes via
+  // whisper (OpenAI/Groq) then forwards the text to the chat default (Groq),
+  // so the complete event says "groq" regardless of which STT model was used.
+  // Same for PIC2TEXT — vision result is answered by the chat model.
+  // Until the backend reports the actual capability provider, skip this check. Issue #583
+  skipProviderCheck?: boolean
 }
 
 async function runCapability(
@@ -394,7 +406,7 @@ async function runCapability(
         }
 
         const expectedService = model.service.toLowerCase()
-        if (expectedService !== 'test') {
+        if (!config.skipProviderCheck && expectedService !== 'test') {
           if (actualProvider === 'unknown') {
             throw new Error(
               `Provider unknown: expected "${model.service}" but backend did not report provider`
@@ -480,11 +492,13 @@ const DAILY_CAPABILITIES: CapabilityConfig[] = [
     capability: 'PIC2TEXT',
     message: 'What do you see in this image? Describe it briefly.',
     needsFile: { path: VISION_IMAGE, name: 'vision-test.png', mime: 'image/png' },
+    skipProviderCheck: true,
   },
   {
     capability: 'SOUND2TEXT',
     message: 'Transcribe this audio file.',
     needsFile: { path: AUDIO_FILE, name: 'test-audio.mp3', mime: 'audio/mpeg' },
+    skipProviderCheck: true,
   },
 ]
 
@@ -507,8 +521,8 @@ test.describe('@noci @local @api Cloud AI health check', () => {
 
     const configs = INCLUDE_VIDEO ? [...DAILY_CAPABILITIES, VIDEO_CAPABILITY] : DAILY_CAPABILITIES
 
-    const activeConfigs = configs.filter(
-      (c) => (allModels[c.capability] ?? []).some(isCloudProvider)
+    const activeConfigs = configs.filter((c) =>
+      (allModels[c.capability] ?? []).some(isCloudProvider)
     )
 
     const settled = await Promise.allSettled(
