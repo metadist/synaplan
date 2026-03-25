@@ -142,10 +142,13 @@ function parseTextContent(text: string, parts: ParsedResponsePart[]) {
     }
   }
 
-  // If we have multiple links (web search results), group them
-  if (links.length >= 3) {
-    // Extract the text before links
-    const textBeforeLinks = links.length > 0 ? text.slice(0, links[0].position).trim() : text
+  // Only group links into cards when they look like a dedicated link list
+  // (e.g. web search results). If links are scattered across long prose,
+  // keep them inline and let the markdown renderer handle them.
+  const looksLikeLinkList = links.length >= 3 && isClusteredLinkList(text, links)
+
+  if (looksLikeLinkList) {
+    const textBeforeLinks = text.slice(0, links[0].position).trim()
     if (textBeforeLinks) {
       parts.push({
         type: 'text',
@@ -153,7 +156,6 @@ function parseTextContent(text: string, parts: ParsedResponsePart[]) {
       })
     }
 
-    // Group all links
     parts.push({
       type: 'links',
       content: '',
@@ -164,7 +166,6 @@ function parseTextContent(text: string, parts: ParsedResponsePart[]) {
       })),
     })
 
-    // Add remaining text after links
     const lastLink = links[links.length - 1]
     const textAfterLinks = text.slice(lastLink.position + lastLink.url.length).trim()
     if (textAfterLinks) {
@@ -173,21 +174,59 @@ function parseTextContent(text: string, parts: ParsedResponsePart[]) {
         content: textAfterLinks,
       })
     }
-  } else if (links.length > 0) {
-    // Few links, keep them inline
+  } else if (text.trim()) {
     parts.push({
       type: 'text',
-      content: text,
+      content: text.trim(),
     })
-  } else {
-    // No links, just text
-    if (text.trim()) {
-      parts.push({
-        type: 'text',
-        content: text.trim(),
-      })
+  }
+}
+
+/**
+ * Detect whether the links form a compact list (e.g. web search results)
+ * vs. being scattered across a long text (normal prose with inline URLs).
+ *
+ * Heuristic: links are "clustered" when the non-link text between the first
+ * and last link is short relative to the span they cover. If there are large
+ * blocks of prose between links, they are inline references, not a link list.
+ */
+function isClusteredLinkList(
+  text: string,
+  links: Array<{ url: string; title: string; position: number }>
+): boolean {
+  if (links.length < 3) return false
+
+  const sorted = [...links].sort((a, b) => a.position - b.position)
+  const first = sorted[0]
+  const last = sorted[sorted.length - 1]
+  const spanStart = first.position
+  const spanEnd = last.position + last.url.length
+
+  // Build a picture of the text between links
+  let totalGapText = 0
+  for (let i = 0; i < sorted.length - 1; i++) {
+    const gapStart = sorted[i].position + sorted[i].url.length
+    const gapEnd = sorted[i + 1].position
+    if (gapEnd > gapStart) {
+      totalGapText += gapEnd - gapStart
     }
   }
+
+  // If any single gap between consecutive links is > 200 chars, this is
+  // regular prose with inline URLs, not a dedicated link list.
+  for (let i = 0; i < sorted.length - 1; i++) {
+    const gapStart = sorted[i].position + sorted[i].url.length
+    const gapEnd = sorted[i + 1].position
+    const gap = text.slice(gapStart, gapEnd).trim()
+    if (gap.length > 200) return false
+  }
+
+  // If the link span covers less than 60% of the total text, the links
+  // are embedded in a larger body of prose.
+  const spanLength = spanEnd - spanStart
+  if (spanLength < text.length * 0.6 && text.length > 500) return false
+
+  return true
 }
 
 function extractLinkDescription(text: string, linkPosition: number): string | undefined {
