@@ -38,7 +38,8 @@ interface ChatProviderInterface extends ProviderMetadataInterface
      * Generate chat completion (streaming).
      *
      * @param array    $messages Messages array in OpenAI format
-     * @param callable $callback Callback for each chunk: fn(string $chunk)
+     * @param callable $callback Callback for each chunk: fn(string|array $chunk)
+     *                           See class-level docblock for the full callback contract.
      * @param array    $options  options: model (required), temperature, max_tokens, reasoning, etc
      *
      * @return void Chunks are sent via callback

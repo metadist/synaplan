@@ -809,8 +809,8 @@ final readonly class ChatHandler implements MessageHandlerInterface
             'modelFeatures' => $modelFeatures,
         ], $options);
 
-        // Apply model-specific max_tokens from DB config (if set)
-        if (null !== $modelMaxTokens && !isset($aiOptions['max_tokens'])) {
+        // Apply model-specific max_tokens from DB config (if set and valid)
+        if (null !== $modelMaxTokens && $modelMaxTokens > 0 && !isset($aiOptions['max_tokens'])) {
             $aiOptions['max_tokens'] = $modelMaxTokens;
         }
 

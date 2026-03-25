@@ -278,13 +278,19 @@ class Model
     /**
      * Get max completion tokens from JSON config.
      *
-     * Returns null when not configured — providers fall back to
+     * Returns null when not configured or invalid — providers fall back to
      * ChatProviderInterface::DEFAULT_MAX_COMPLETION_TOKENS in that case.
      */
     public function getMaxTokens(): ?int
     {
         $value = $this->json['max_tokens'] ?? null;
 
-        return null !== $value ? (int) $value : null;
+        if (null === $value || !is_numeric($value)) {
+            return null;
+        }
+
+        $intValue = (int) $value;
+
+        return $intValue > 0 ? $intValue : null;
     }
 }
