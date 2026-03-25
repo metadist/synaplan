@@ -690,7 +690,10 @@ function renderStreamingContent(content: string, msgId: string): void {
       }
     })
 
-    message.parts = newParts
+    const preservedMediaParts = message.parts.filter(
+      (p) => p.type === 'image' || p.type === 'video' || p.type === 'audio'
+    )
+    message.parts = [...newParts, ...preservedMediaParts]
   }
 }
 
