@@ -15,7 +15,6 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const publicDir = join(__dirname, '..', 'public');
 const svgPath = join(publicDir, 'single_bird.svg');
 
-// Read SVG and add white background for better visibility on iOS
 const svgContent = readFileSync(svgPath, 'utf-8');
 
 // Icon sizes needed
