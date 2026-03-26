@@ -30,9 +30,11 @@ import ErrorBoundary from '@/components/ErrorBoundary.vue'
 import LoadingView from '@/views/LoadingView.vue'
 import CookieConsent from '@/components/CookieConsent.vue'
 import { useGoogleTag } from '@/composables/useGoogleTag'
+import { usePwaUpdate } from '@/composables/usePwaUpdate'
 import type { CookieConsent as CookieConsentType } from '@/composables/useCookieConsent'
 
 useTheme()
+usePwaUpdate()
 
 const { injectGoogleTag, trackPageView } = useGoogleTag()
 

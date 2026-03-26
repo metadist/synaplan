@@ -21,10 +21,28 @@
 		Referrer-Policy "strict-origin-when-cross-origin"
 	}
 
+	# Service Worker must never be cached by browsers or proxies
+	@sw_files {
+		path /sw.js /workbox-*.js
+	}
+	header @sw_files {
+		Cache-Control "no-cache, no-store, must-revalidate"
+		Service-Worker-Allowed "/"
+	}
+
+	# Web App Manifest should always be revalidated
+	@manifest_file {
+		path /site.webmanifest
+	}
+	header @manifest_file {
+		Cache-Control "no-cache"
+		Content-Type "application/manifest+json"
+	}
+
 	# Cache static assets from frontend
 	@static_assets {
 		path *.css *.js *.jpg *.jpeg *.png *.gif *.ico *.svg *.woff *.woff2 *.ttf *.eot *.webp
-		not path /widget.js
+		not path /widget.js /sw.js /workbox-*.js
 	}
 	header @static_assets {
 		Cache-Control "public, max-age=31536000, immutable"

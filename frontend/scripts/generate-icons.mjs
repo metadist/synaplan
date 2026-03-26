@@ -18,6 +18,8 @@ const svgPath = join(publicDir, 'single_bird.svg');
 // Read SVG and add white background for better visibility on iOS
 const svgContent = readFileSync(svgPath, 'utf-8');
 
+const BRAND_COLOR = { r: 0, g: 3, b: 199 }; // #0003c7
+
 // Icon sizes needed
 const sizes = [
   { name: 'favicon-32.png', size: 32 },
@@ -25,6 +27,31 @@ const sizes = [
   { name: 'icon-192.png', size: 192 },
   { name: 'icon-512.png', size: 512 },
 ];
+
+async function generateMaskableIcon(size) {
+  const padding = Math.round(size * 0.1);
+  const innerSize = size - padding * 2;
+
+  const resized = await sharp(Buffer.from(svgContent))
+    .resize(innerSize, innerSize, {
+      fit: 'contain',
+      background: { r: 0, g: 0, b: 0, alpha: 0 },
+    })
+    .png()
+    .toBuffer();
+
+  return sharp({
+    create: {
+      width: size,
+      height: size,
+      channels: 4,
+      background: { ...BRAND_COLOR, alpha: 1 },
+    },
+  })
+    .composite([{ input: resized, gravity: 'centre' }])
+    .png()
+    .toFile(join(publicDir, 'icon-512-maskable.png'));
+}
 
 async function generateIcons() {
   console.log('Generating icons from single_bird.svg...\n');
@@ -35,13 +62,16 @@ async function generateIcons() {
     await sharp(Buffer.from(svgContent))
       .resize(size, size, {
         fit: 'contain',
-        background: { r: 255, g: 255, b: 255, alpha: 0 } // Transparent background
+        background: { r: 255, g: 255, b: 255, alpha: 0 },
       })
       .png()
       .toFile(outputPath);
     
     console.log(`✓ Created ${name} (${size}x${size})`);
   }
+
+  await generateMaskableIcon(512);
+  console.log('✓ Created icon-512-maskable.png (512x512, maskable)');
   
   console.log('\nDone! Icons generated in public/ folder.');
 }
