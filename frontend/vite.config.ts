@@ -49,7 +49,7 @@ export default defineConfig(({ mode }) => {
         workbox: {
           globPatterns: ['**/*.{js,css,html,svg,png,woff2}'],
           navigateFallback: 'index.html',
-          navigateFallbackDenylist: [/^\/api/, /^\/shared/, /^\/uploads/],
+          navigateFallbackDenylist: [/^\/api/, /^\/shared/, /^\/uploads/, /^\/widget/],
           runtimeCaching: [
             {
               urlPattern: /\.(?:png|jpg|jpeg|svg|gif|webp)$/,
