@@ -37,6 +37,7 @@ export const usePwaUpdate = () => {
       title: t('pwa.updateAvailable'),
       message: t('pwa.updateMessage'),
       confirmText: t('pwa.updateNow'),
+      cancelText: t('common.cancel'),
     })
 
     if (accepted) {
@@ -51,7 +52,7 @@ export const usePwaUpdate = () => {
 
   const onOffline = () => {
     isOnline.value = false
-    warning(t('pwa.offline'), 0)
+    warning(t('pwa.offline'))
   }
 
   onMounted(() => {

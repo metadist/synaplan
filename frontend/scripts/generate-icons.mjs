@@ -31,6 +31,7 @@ const sizes = [
 async function generateMaskableIcon(size) {
   const padding = Math.round(size * 0.1);
   const innerSize = size - padding * 2;
+  const outputName = `icon-${size}-maskable.png`;
 
   const resized = await sharp(Buffer.from(svgContent))
     .resize(innerSize, innerSize, {
@@ -40,7 +41,7 @@ async function generateMaskableIcon(size) {
     .png()
     .toBuffer();
 
-  return sharp({
+  await sharp({
     create: {
       width: size,
       height: size,
@@ -50,7 +51,9 @@ async function generateMaskableIcon(size) {
   })
     .composite([{ input: resized, gravity: 'centre' }])
     .png()
-    .toFile(join(publicDir, 'icon-512-maskable.png'));
+    .toFile(join(publicDir, outputName));
+
+  return outputName;
 }
 
 async function generateIcons() {
@@ -70,8 +73,8 @@ async function generateIcons() {
     console.log(`✓ Created ${name} (${size}x${size})`);
   }
 
-  await generateMaskableIcon(512);
-  console.log('✓ Created icon-512-maskable.png (512x512, maskable)');
+  const maskableName = await generateMaskableIcon(512);
+  console.log(`✓ Created ${maskableName} (512x512, maskable)`);
   
   console.log('\nDone! Icons generated in public/ folder.');
 }
