@@ -29,6 +29,7 @@ class RateLimitFixtures extends Fixture
         $this->createConfig($manager, 0, 'RATELIMITS_ANONYMOUS', 'FILE_ANALYSIS_TOTAL', '3'); // 3 file analyses
         $this->createConfig($manager, 0, 'RATELIMITS_ANONYMOUS', 'FILE_UPLOADS_TOTAL', '3'); // 3 file uploads total
         $this->createConfig($manager, 0, 'RATELIMITS_ANONYMOUS', 'STORAGE_MB', '10'); // 10 MB storage
+        $this->createConfig($manager, 0, 'RATELIMITS_ANONYMOUS', 'MAX_OUTPUT_TOKENS', '2048');
 
         // NEW User Limits (PHONE VERIFIED - LIFETIME TOTALS - NEVER RESET)
         $this->createConfig($manager, 0, 'RATELIMITS_NEW', 'MESSAGES_TOTAL', '50');
@@ -38,6 +39,7 @@ class RateLimitFixtures extends Fixture
         $this->createConfig($manager, 0, 'RATELIMITS_NEW', 'FILE_ANALYSIS_TOTAL', '10');
         $this->createConfig($manager, 0, 'RATELIMITS_NEW', 'FILE_UPLOADS_TOTAL', '10'); // 10 file uploads total
         $this->createConfig($manager, 0, 'RATELIMITS_NEW', 'STORAGE_MB', '100'); // 100 MB storage
+        $this->createConfig($manager, 0, 'RATELIMITS_NEW', 'MAX_OUTPUT_TOKENS', '4096');
 
         // Pro Level Limits (HOURLY + MONTHLY)
         $this->createConfig($manager, 0, 'RATELIMITS_PRO', 'MESSAGES_HOURLY', '100');
@@ -48,6 +50,7 @@ class RateLimitFixtures extends Fixture
         $this->createConfig($manager, 0, 'RATELIMITS_PRO', 'FILE_ANALYSIS_MONTHLY', '200');
         $this->createConfig($manager, 0, 'RATELIMITS_PRO', 'FILE_UPLOADS_MONTHLY', '200'); // 200 uploads per month
         $this->createConfig($manager, 0, 'RATELIMITS_PRO', 'STORAGE_GB', '5'); // 5 GB storage
+        $this->createConfig($manager, 0, 'RATELIMITS_PRO', 'MAX_OUTPUT_TOKENS', '16384');
 
         // Team Level Limits (HOURLY + MONTHLY)
         $this->createConfig($manager, 0, 'RATELIMITS_TEAM', 'MESSAGES_HOURLY', '300');
@@ -58,6 +61,7 @@ class RateLimitFixtures extends Fixture
         $this->createConfig($manager, 0, 'RATELIMITS_TEAM', 'FILE_ANALYSIS_MONTHLY', '1000');
         $this->createConfig($manager, 0, 'RATELIMITS_TEAM', 'FILE_UPLOADS_MONTHLY', '1000'); // 1000 uploads per month
         $this->createConfig($manager, 0, 'RATELIMITS_TEAM', 'STORAGE_GB', '20'); // 20 GB storage
+        $this->createConfig($manager, 0, 'RATELIMITS_TEAM', 'MAX_OUTPUT_TOKENS', '32768');
 
         // Business Level Limits (HOURLY + MONTHLY)
         $this->createConfig($manager, 0, 'RATELIMITS_BUSINESS', 'MESSAGES_HOURLY', '1000');
@@ -68,6 +72,7 @@ class RateLimitFixtures extends Fixture
         $this->createConfig($manager, 0, 'RATELIMITS_BUSINESS', 'FILE_ANALYSIS_MONTHLY', '5000');
         $this->createConfig($manager, 0, 'RATELIMITS_BUSINESS', 'FILE_UPLOADS_MONTHLY', '5000'); // 5000 uploads per month
         $this->createConfig($manager, 0, 'RATELIMITS_BUSINESS', 'STORAGE_GB', '100'); // 100 GB storage
+        $this->createConfig($manager, 0, 'RATELIMITS_BUSINESS', 'MAX_OUTPUT_TOKENS', '65536');
 
         $manager->flush();
     }
