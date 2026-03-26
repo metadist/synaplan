@@ -4,21 +4,23 @@ import { useI18n } from 'vue-i18n'
 import { useNotification } from './useNotification'
 import { useDialog } from './useDialog'
 
+const SW_UPDATE_INTERVAL_MS = 60 * 60 * 1000
+
 export const usePwaUpdate = () => {
   const { t } = useI18n()
   const { info, warning } = useNotification()
   const { confirm } = useDialog()
   const isOnline = ref(navigator.onLine)
+  let updateInterval: ReturnType<typeof setInterval> | undefined
 
   const { offlineReady, needRefresh, updateServiceWorker } = useRegisterSW({
     immediate: true,
     onRegisteredSW(_swUrl: string, registration: ServiceWorkerRegistration | undefined) {
       if (!registration) return
 
-      const intervalMs = 60 * 60 * 1000
-      setInterval(() => {
+      updateInterval = setInterval(() => {
         registration.update()
-      }, intervalMs)
+      }, SW_UPDATE_INTERVAL_MS)
     },
   })
 
@@ -60,6 +62,9 @@ export const usePwaUpdate = () => {
   onUnmounted(() => {
     window.removeEventListener('online', onOnline)
     window.removeEventListener('offline', onOffline)
+    if (updateInterval) {
+      clearInterval(updateInterval)
+    }
   })
 
   return {

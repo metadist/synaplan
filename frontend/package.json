@@ -40,7 +40,6 @@
     "mermaid": "^11.12.2",
     "pinia": "^3.0.3",
     "three": "^0.182.0",
-    "vite-plugin-pwa": "^1.2.0",
     "vue": "^3.4.38",
     "vue-chartjs": "^5.3.3",
     "vue-i18n": "^11.1.12",
@@ -77,6 +76,7 @@
     "terser": "^5.44.1",
     "typescript": "^5.5.3",
     "vite": "^5.4.2",
+    "vite-plugin-pwa": "^1.2.0",
     "vitest": "^1.6.0",
     "vue-tsc": "^2.1.4"
   }

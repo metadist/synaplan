@@ -15,7 +15,10 @@ function isHashedAsset(pathname: string): boolean {
 function isHtmlNavigation(request: Request, pathname: string): boolean {
   const accept = request.headers.get('Accept') || ''
   return (
-    accept.includes('text/html') && !pathname.startsWith('/api/') && !pathname.startsWith('/shared/')
+    accept.includes('text/html') &&
+    !pathname.startsWith('/api/') &&
+    !pathname.startsWith('/shared/') &&
+    !pathname.startsWith('/uploads/')
   )
 }
 
