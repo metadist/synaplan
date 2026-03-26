@@ -276,4 +276,138 @@ final class MediaController extends AbstractController
             return $this->json(['error' => $e->getMessage()], Response::HTTP_INTERNAL_SERVER_ERROR);
         }
     }
+
+    #[Route('/video/start', name: 'video_start', methods: ['POST'])]
+    #[OA\Post(
+        path: '/api/v1/media/video/start',
+        summary: 'Start async video generation (non-blocking)',
+        description: 'Starts a video generation job and returns a job ID immediately. Poll GET /api/v1/media/video/jobs/{jobId} for status.',
+        security: [['Bearer' => []]],
+        tags: ['Media']
+    )]
+    #[OA\RequestBody(
+        required: true,
+        content: new OA\JsonContent(
+            required: ['prompt'],
+            properties: [
+                new OA\Property(property: 'prompt', type: 'string', description: 'Text description of the video to generate'),
+                new OA\Property(property: 'modelId', type: 'integer', description: 'Specific model ID (uses default TEXT2VID if omitted)', nullable: true),
+            ]
+        )
+    )]
+    #[OA\Response(
+        response: 202,
+        description: 'Video generation started',
+        content: new OA\JsonContent(
+            properties: [
+                new OA\Property(property: 'jobId', type: 'string'),
+                new OA\Property(property: 'status', type: 'string', example: 'processing'),
+                new OA\Property(property: 'provider', type: 'string'),
+                new OA\Property(property: 'model', type: 'string'),
+            ]
+        )
+    )]
+    #[OA\Response(response: 400, description: 'Invalid request')]
+    #[OA\Response(response: 401, description: 'Not authenticated')]
+    #[OA\Response(response: 422, description: 'No video model available')]
+    #[OA\Response(response: 429, description: 'Rate limit exceeded')]
+    #[OA\Response(response: 500, description: 'Failed to start generation')]
+    public function startVideo(
+        Request $request,
+        #[CurrentUser] ?User $user,
+    ): JsonResponse {
+        if (!$user) {
+            return $this->json(['error' => 'Not authenticated'], Response::HTTP_UNAUTHORIZED);
+        }
+
+        $data = json_decode($request->getContent(), true);
+        $prompt = trim((string) ($data['prompt'] ?? ''));
+        $modelId = isset($data['modelId']) ? (int) $data['modelId'] : null;
+
+        try {
+            $result = $this->mediaService->startVideoGeneration($user, $prompt, $modelId);
+
+            return $this->json($result, Response::HTTP_ACCEPTED);
+        } catch (\InvalidArgumentException $e) {
+            return $this->json(['error' => $e->getMessage()], Response::HTTP_BAD_REQUEST);
+        } catch (RateLimitExceededException $e) {
+            return $this->json(['error' => $e->getMessage()], Response::HTTP_TOO_MANY_REQUESTS);
+        } catch (NoModelAvailableException $e) {
+            return $this->json(['error' => $e->getMessage()], Response::HTTP_UNPROCESSABLE_ENTITY);
+        } catch (ProviderException $e) {
+            $this->logger->error('Async video start failed', [
+                'user_id' => $user->getId(),
+                'provider' => $e->getProviderName(),
+                'error' => $e->getMessage(),
+            ]);
+
+            return $this->json(['error' => $e->getMessage()], Response::HTTP_INTERNAL_SERVER_ERROR);
+        }
+    }
+
+    #[Route('/video/jobs/{jobId}', name: 'video_status', methods: ['GET'])]
+    #[OA\Get(
+        path: '/api/v1/media/video/jobs/{jobId}',
+        summary: 'Poll async video generation status',
+        description: 'Check the status of a video generation job. Returns "processing" while generating, "completed" with file URL when done, or "failed" with error.',
+        security: [['Bearer' => []]],
+        tags: ['Media']
+    )]
+    #[OA\Parameter(name: 'jobId', in: 'path', required: true, schema: new OA\Schema(type: 'string'))]
+    #[OA\Response(
+        response: 200,
+        description: 'Job status',
+        content: new OA\JsonContent(
+            required: ['status'],
+            properties: [
+                new OA\Property(property: 'status', type: 'string', enum: ['processing', 'completed', 'failed']),
+                new OA\Property(
+                    property: 'file',
+                    type: 'object',
+                    nullable: true,
+                    properties: [
+                        new OA\Property(property: 'url', type: 'string'),
+                        new OA\Property(property: 'type', type: 'string', example: 'video'),
+                        new OA\Property(property: 'mimeType', type: 'string', example: 'video/mp4'),
+                    ]
+                ),
+                new OA\Property(property: 'elapsed_seconds', type: 'integer'),
+                new OA\Property(property: 'error', type: 'string', nullable: true),
+            ]
+        )
+    )]
+    #[OA\Response(response: 400, description: 'Job not found or expired')]
+    #[OA\Response(response: 401, description: 'Not authenticated')]
+    public function videoStatus(
+        string $jobId,
+        #[CurrentUser] ?User $user,
+    ): JsonResponse {
+        if (!$user) {
+            return $this->json(['error' => 'Not authenticated'], Response::HTTP_UNAUTHORIZED);
+        }
+
+        try {
+            $result = $this->mediaService->checkVideoJob($user, $jobId);
+
+            return $this->json($result);
+        } catch (\InvalidArgumentException $e) {
+            return $this->json(['error' => $e->getMessage()], Response::HTTP_BAD_REQUEST);
+        } catch (ProviderException $e) {
+            $this->logger->error('Video job poll failed', [
+                'user_id' => $user->getId(),
+                'job_id' => $jobId,
+                'error' => $e->getMessage(),
+            ]);
+
+            return $this->json(['error' => $e->getMessage()], Response::HTTP_INTERNAL_SERVER_ERROR);
+        } catch (\RuntimeException $e) {
+            $this->logger->error('Video job storage failed', [
+                'user_id' => $user->getId(),
+                'job_id' => $jobId,
+                'error' => $e->getMessage(),
+            ]);
+
+            return $this->json(['error' => $e->getMessage()], Response::HTTP_INTERNAL_SERVER_ERROR);
+        }
+    }
 }

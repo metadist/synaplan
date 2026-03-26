@@ -404,16 +404,28 @@ function processMemoryBadges(html: string): string {
     }
 
     const lines = content.split(/\r?\n/)
-    content = lines
-      .map((line) => {
-        if (line.includes('memory-badge-wrapper')) return line
-        const normalized = normalizeMemoryLine(line)
-        const normalizedKey = normalized.replace(/[·•.:,;!?]+$/g, '').trim()
-        const memory = keyMap.get(normalizedKey)
-        if (!memory) return line
-        return buildMemoryBadgeHtml(memory, String(memory.id))
-      })
-      .join('\n')
+    const result: string[] = []
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i]
+      if (line.includes('memory-badge-wrapper')) {
+        result.push(line)
+        continue
+      }
+      const normalized = normalizeMemoryLine(line)
+      const normalizedKey = normalized.replace(/[·•.:,;!?]+$/g, '').trim()
+      const memory = keyMap.get(normalizedKey)
+      if (!memory) {
+        result.push(line)
+        continue
+      }
+      const badge = buildMemoryBadgeHtml(memory, String(memory.id))
+      if (result.length > 0 && result[result.length - 1].trimEnd().endsWith('</p>')) {
+        result[result.length - 1] = result[result.length - 1].replace(/<\/p>\s*$/, ` ${badge}</p>`)
+      } else {
+        result.push(badge)
+      }
+    }
+    content = result.join('\n')
   }
 
   return content
