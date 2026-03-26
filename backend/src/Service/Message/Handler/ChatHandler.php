@@ -209,9 +209,11 @@ final readonly class ChatHandler implements MessageHandlerInterface
             $systemPrompt .= "\n\n**IMPORTANT: The user's current message is in {$languageName}. You MUST respond in {$languageName}.**";
         }
 
+        $modelMaxTokens = null;
         if ($modelId) {
             $model = $this->modelRepository->find($modelId);
             if ($model) {
+                $modelMaxTokens = $model->getMaxTokens();
                 $json = $model->getJson();
                 if (isset($json['supportsStreaming']) && false === $json['supportsStreaming']) {
                     $systemPrompt = null;
@@ -225,15 +227,31 @@ final readonly class ChatHandler implements MessageHandlerInterface
             'include_images' => $includeImagesInMessages,
         ]);
 
+        $aiOptions = [
+            'provider' => $provider,
+            'model' => $modelName,
+            'stream' => false,
+            'temperature' => 0.7,
+        ];
+
+        $user = $this->em->getRepository(User::class)->find($message->getUserId());
+        $planMaxTokens = null !== $user ? $this->rateLimitService->getMaxOutputTokens($user) : null;
+        $effectiveMax = $modelMaxTokens;
+
+        if (null !== $planMaxTokens && null !== $effectiveMax) {
+            $effectiveMax = min($planMaxTokens, $effectiveMax);
+        } elseif (null !== $planMaxTokens) {
+            $effectiveMax = $planMaxTokens;
+        }
+
+        if (null !== $effectiveMax && $effectiveMax > 0) {
+            $aiOptions['max_tokens'] = $effectiveMax;
+        }
+
         $response = $this->aiFacade->chat(
             $messages,
             $message->getUserId(),
-            [
-                'provider' => $provider,
-                'model' => $modelName,
-                'stream' => false, // Später: streaming über callback
-                'temperature' => 0.7,
-            ]
+            $aiOptions
         );
 
         $this->notify($progressCallback, 'generating', 'Response generated.');

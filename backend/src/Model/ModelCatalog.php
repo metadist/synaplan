@@ -177,8 +177,9 @@ class ModelCatalog
             'rating' => 1,
             'json' => [
                 'description' => 'Local model on synaplans company server in Germany. OpenAI\'s open-weight GPT-OSS (20B). 128K context, Apache-2.0 license, MXFP4 quantization; supports tools/agentic use cases.',
+                'max_tokens' => 16384,
                 'params' => ['model' => 'gpt-oss:20b'],
-                'meta' => ['context_window' => '128k', 'license' => 'Apache-2.0', 'quantization' => 'MXFP4'],
+                'meta' => ['context_window' => '128000', 'max_output' => '16384', 'license' => 'Apache-2.0', 'quantization' => 'MXFP4'],
             ],
         ],
         [
@@ -197,8 +198,9 @@ class ModelCatalog
             'rating' => 1,
             'json' => [
                 'description' => 'Local model on synaplans company server in Germany. OpenAI\'s open-weight GPT-OSS (120B). 128K context, Apache-2.0 license, MXFP4 quantization; supports tools/agentic use cases.',
+                'max_tokens' => 16384,
                 'params' => ['model' => 'gpt-oss:120b'],
-                'meta' => ['context_window' => '128k', 'license' => 'Apache-2.0', 'quantization' => 'MXFP4'],
+                'meta' => ['context_window' => '128000', 'max_output' => '16384', 'license' => 'Apache-2.0', 'quantization' => 'MXFP4'],
             ],
         ],
         [
@@ -217,7 +219,9 @@ class ModelCatalog
             'rating' => 8,
             'json' => [
                 'description' => 'NVIDIA Nemotron 3 nano',
+                'max_tokens' => 32768,
                 'features' => ['reasoning'],
+                'meta' => ['context_window' => '131072', 'max_output' => '32768'],
             ],
         ],
         [
@@ -236,8 +240,9 @@ class ModelCatalog
             'rating' => 1,
             'json' => [
                 'description' => 'Local model on GPU server. Alibaba Qwen 3.5 35B - strong reasoning and coding.',
+                'max_tokens' => 32768,
                 'params' => ['model' => 'qwen3.5:35b'],
-                'meta' => ['context_window' => '32768'],
+                'meta' => ['context_window' => '32768', 'max_output' => '32768'],
             ],
         ],
         // ==================== GROQ MODELS ====================
@@ -1245,6 +1250,7 @@ class ModelCatalog
             'rating' => 0.5,
             'json' => [
                 'description' => 'Triton Inference Server with vLLM backend',
+                'max_tokens' => 32768,
                 'features' => ['streaming', 'gpu'],
                 'supportsStreaming' => true,
             ],
@@ -1265,6 +1271,7 @@ class ModelCatalog
             'rating' => 0.7,
             'json' => [
                 'description' => 'Triton Inference Server with vLLM backend',
+                'max_tokens' => 16384,
                 'features' => ['streaming', 'gpu'],
                 'supportsStreaming' => true,
             ],
