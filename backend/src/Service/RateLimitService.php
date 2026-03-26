@@ -245,41 +245,37 @@ final class RateLimitService
     /**
      * Check if user's monthly cost budget allows another request.
      *
-     * @return array{allowed: bool, used_cost: string, budget: string, remaining: string, percent: float}
+     * Budget is read from BSUBSCRIPTIONS regardless of Stripe being configured,
+     * since token budgets are an application concern independent of payment processing.
+     *
+     * @return array{allowed: bool, used_cost: string, budget: string, remaining: string, percent: float, period_start: int, period_end: int}
      */
     public function checkCostBudget(User $user): array
     {
-        if (!$this->billingService->isEnabled()) {
-            return [
-                'allowed' => true,
-                'used_cost' => '0.00',
-                'budget' => '0.00',
-                'remaining' => '0.00',
-                'percent' => 0.0,
-            ];
-        }
-
         $subscription = $this->subscriptionRepository->findOneBy(['level' => $user->getRateLimitLevel()]);
         $budget = $subscription ? (float) $subscription->getCostBudgetMonthly() : 0.0;
+
+        [$periodStart, $periodEnd] = $this->getBillingPeriod($user);
+
+        $usedCost = (float) $this->em->getConnection()->fetchOne(
+            'SELECT COALESCE(SUM(BCOST), 0) FROM BUSELOG WHERE BUSERID = :user_id AND BUNIXTIMES >= :period_start AND BUNIXTIMES <= :period_end',
+            ['user_id' => $user->getId(), 'period_start' => $periodStart, 'period_end' => $periodEnd]
+        );
 
         if ($budget <= 0) {
             return [
                 'allowed' => true,
-                'used_cost' => '0.00',
+                'used_cost' => number_format($usedCost, 2, '.', ''),
                 'budget' => '0.00',
                 'remaining' => '0.00',
                 'percent' => 0.0,
+                'period_start' => $periodStart,
+                'period_end' => $periodEnd,
             ];
         }
 
-        $monthStart = (int) strtotime('first day of this month midnight');
-        $usedCost = (float) $this->em->getConnection()->fetchOne(
-            'SELECT COALESCE(SUM(BCOST), 0) FROM BUSELOG WHERE BUSERID = :user_id AND BUNIXTIMES >= :month_start',
-            ['user_id' => $user->getId(), 'month_start' => $monthStart]
-        );
-
         $remaining = max(0.0, $budget - $usedCost);
-        $percent = $budget > 0 ? min(100.0, ($usedCost / $budget) * 100) : 0.0;
+        $percent = min(100.0, ($usedCost / $budget) * 100);
 
         return [
             'allowed' => $usedCost < $budget,
@@ -287,7 +283,63 @@ final class RateLimitService
             'budget' => number_format($budget, 2, '.', ''),
             'remaining' => number_format($remaining, 2, '.', ''),
             'percent' => round($percent, 1),
+            'period_start' => $periodStart,
+            'period_end' => $periodEnd,
         ];
+    }
+
+    /**
+     * Calculate the current billing period based on the user's subscription start date.
+     *
+     * If the user has a subscription_start timestamp, the billing cycle anchors
+     * to that day-of-month. Otherwise falls back to calendar month.
+     *
+     * @return array{0: int, 1: int} [period_start, period_end] as unix timestamps
+     */
+    public function getBillingPeriod(User $user): array
+    {
+        $subData = $user->getSubscriptionData();
+        $subscriptionStart = $subData['subscription_start'] ?? null;
+
+        if (!$subscriptionStart || !is_numeric($subscriptionStart)) {
+            return [
+                (int) strtotime('first day of this month midnight'),
+                (int) strtotime('last day of this month 23:59:59'),
+            ];
+        }
+
+        $anchorDay = (int) date('j', (int) $subscriptionStart);
+        $now = time();
+        $currentDay = (int) date('j', $now);
+        $currentMonth = (int) date('n', $now);
+        $currentYear = (int) date('Y', $now);
+
+        $daysInCurrentMonth = (int) date('t', $now);
+        $effectiveAnchor = min($anchorDay, $daysInCurrentMonth);
+
+        if ($currentDay >= $effectiveAnchor) {
+            $periodStart = mktime(0, 0, 0, $currentMonth, $effectiveAnchor, $currentYear);
+            $nextMonth = $currentMonth + 1;
+            $nextYear = $currentYear;
+            if ($nextMonth > 12) {
+                $nextMonth = 1;
+                ++$nextYear;
+            }
+            $daysInNextMonth = (int) date('t', mktime(0, 0, 0, $nextMonth, 1, $nextYear));
+            $periodEnd = mktime(23, 59, 59, $nextMonth, min($anchorDay, $daysInNextMonth) - 1, $nextYear);
+        } else {
+            $prevMonth = $currentMonth - 1;
+            $prevYear = $currentYear;
+            if ($prevMonth < 1) {
+                $prevMonth = 12;
+                --$prevYear;
+            }
+            $daysInPrevMonth = (int) date('t', mktime(0, 0, 0, $prevMonth, 1, $prevYear));
+            $periodStart = mktime(0, 0, 0, $prevMonth, min($anchorDay, $daysInPrevMonth), $prevYear);
+            $periodEnd = mktime(23, 59, 59, $currentMonth, $effectiveAnchor - 1, $currentYear);
+        }
+
+        return [(int) $periodStart, (int) $periodEnd];
     }
 
     /**

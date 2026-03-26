@@ -121,8 +121,8 @@ final readonly class UsageStatsService
                 'budget' => (float) $costBudget['budget'],
                 'remaining' => (float) $costBudget['remaining'],
                 'percent' => $costBudget['percent'],
-                'period_start' => (int) strtotime('first day of this month midnight'),
-                'period_end' => (int) strtotime('last day of this month 23:59:59'),
+                'period_start' => $costBudget['period_start'],
+                'period_end' => $costBudget['period_end'],
             ],
             'cost_summary' => $costSummary,
         ];

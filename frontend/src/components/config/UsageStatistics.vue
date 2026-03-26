@@ -76,10 +76,6 @@
               {{ $t('config.usage.costBudget.consumption') }}:
               {{ stats.cost_budget.percent.toFixed(1) }}%
             </span>
-            <span class="txt-secondary">
-              {{ stats.cost_budget.used.toFixed(2) }} EUR /
-              {{ stats.cost_budget.budget.toFixed(2) }} EUR
-            </span>
           </div>
 
           <div class="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-4">
@@ -94,15 +90,9 @@
             </div>
           </div>
 
-          <div class="flex items-center justify-between text-xs txt-secondary">
-            <span>
-              {{ $t('config.usage.costBudget.remaining') }}:
-              {{ stats.cost_budget.remaining.toFixed(2) }} EUR
-            </span>
-            <span>
-              {{ formatDate(stats.cost_budget.period_start) }} -
-              {{ formatDate(stats.cost_budget.period_end) }}
-            </span>
+          <div class="text-xs txt-secondary text-right">
+            {{ formatDate(stats.cost_budget.period_start) }} -
+            {{ formatDate(stats.cost_budget.period_end) }}
           </div>
         </div>
 
