@@ -177,8 +177,9 @@ class ModelCatalog
             'rating' => 1,
             'json' => [
                 'description' => 'Local model on synaplans company server in Germany. OpenAI\'s open-weight GPT-OSS (20B). 128K context, Apache-2.0 license, MXFP4 quantization; supports tools/agentic use cases.',
+                'max_tokens' => 16384,
                 'params' => ['model' => 'gpt-oss:20b'],
-                'meta' => ['context_window' => '128k', 'license' => 'Apache-2.0', 'quantization' => 'MXFP4'],
+                'meta' => ['context_window' => '128000', 'max_output' => '16384', 'license' => 'Apache-2.0', 'quantization' => 'MXFP4'],
             ],
         ],
         [
@@ -197,8 +198,9 @@ class ModelCatalog
             'rating' => 1,
             'json' => [
                 'description' => 'Local model on synaplans company server in Germany. OpenAI\'s open-weight GPT-OSS (120B). 128K context, Apache-2.0 license, MXFP4 quantization; supports tools/agentic use cases.',
+                'max_tokens' => 16384,
                 'params' => ['model' => 'gpt-oss:120b'],
-                'meta' => ['context_window' => '128k', 'license' => 'Apache-2.0', 'quantization' => 'MXFP4'],
+                'meta' => ['context_window' => '128000', 'max_output' => '16384', 'license' => 'Apache-2.0', 'quantization' => 'MXFP4'],
             ],
         ],
         [
@@ -217,7 +219,9 @@ class ModelCatalog
             'rating' => 8,
             'json' => [
                 'description' => 'NVIDIA Nemotron 3 nano',
+                'max_tokens' => 32768,
                 'features' => ['reasoning'],
+                'meta' => ['context_window' => '131072', 'max_output' => '32768'],
             ],
         ],
         [
@@ -236,8 +240,9 @@ class ModelCatalog
             'rating' => 1,
             'json' => [
                 'description' => 'Local model on GPU server. Alibaba Qwen 3.5 35B - strong reasoning and coding.',
+                'max_tokens' => 32768,
                 'params' => ['model' => 'qwen3.5:35b'],
-                'meta' => ['context_window' => '32768'],
+                'meta' => ['context_window' => '32768', 'max_output' => '32768'],
             ],
         ],
         // ==================== GROQ MODELS ====================
@@ -257,11 +262,13 @@ class ModelCatalog
             'rating' => 1,
             'json' => [
                 'description' => 'Fast API service via groq',
+                'max_tokens' => 32768,
                 'params' => [
                     'model' => 'llama-3.3-70b-versatile',
                     'reasoning_format' => 'hidden',
                     'messages' => [],
                 ],
+                'meta' => ['context_window' => '131072', 'max_output' => '32768'],
             ],
         ],
         [
@@ -348,7 +355,9 @@ class ModelCatalog
             'rating' => 0,
             'json' => [
                 'description' => 'Groq Llama4 128e processing and text extraction',
+                'max_tokens' => 32768,
                 'params' => ['model' => 'meta-llama/llama-4-maverick-17b-128e-instruct'],
+                'meta' => ['context_window' => '131072', 'max_output' => '32768'],
             ],
         ],
         [
@@ -367,9 +376,10 @@ class ModelCatalog
             'rating' => 5,
             'json' => [
                 'description' => 'Groq Qwen3 32B mit Reasoning - 32B-Parameter Reasoning-Modell von Qwen. Zeigt Denkprozess mit <think> Tags. Optimiert für logisches Denken und Problemlösung. Sehr schnell durch Groq Hardware.',
+                'max_tokens' => 32768,
                 'params' => ['model' => 'qwen/qwen3-32b'],
                 'features' => ['reasoning'],
-                'meta' => ['context_window' => '32768', 'reasoning_format' => 'raw'],
+                'meta' => ['context_window' => '131072', 'max_output' => '32768', 'reasoning_format' => 'raw'],
             ],
         ],
         [
@@ -388,8 +398,9 @@ class ModelCatalog
             'rating' => 3,
             'json' => [
                 'description' => 'Groq GPT-OSS 20B - 21B-Parameter MoE-Modell. Optimiert für niedrige Latenz und schnelle Inferenz. Sehr schnell durch Groq Hardware.',
+                'max_tokens' => 16384,
                 'params' => ['model' => 'openai/gpt-oss-20b'],
-                'meta' => ['context_window' => '131072', 'license' => 'Apache-2.0', 'quantization' => 'TruePoint Numerics'],
+                'meta' => ['context_window' => '131072', 'max_output' => '16384', 'license' => 'Apache-2.0', 'quantization' => 'TruePoint Numerics'],
             ],
         ],
         [
@@ -408,8 +419,9 @@ class ModelCatalog
             'rating' => 4,
             'json' => [
                 'description' => 'Groq GPT-OSS 120B - 120B-Parameter MoE-Modell. Für anspruchsvolle agentische Anwendungen. Schnelle Inferenz dank Groq Hardware.',
+                'max_tokens' => 16384,
                 'params' => ['model' => 'openai/gpt-oss-120b'],
-                'meta' => ['context_window' => '131072', 'license' => 'Apache-2.0', 'quantization' => 'TruePoint Numerics'],
+                'meta' => ['context_window' => '131072', 'max_output' => '16384', 'license' => 'Apache-2.0', 'quantization' => 'TruePoint Numerics'],
             ],
         ],
         // ==================== OPENAI MODELS ====================
@@ -467,7 +479,9 @@ class ModelCatalog
             'rating' => 1,
             'json' => [
                 'description' => 'OpenAI lightweight GPT-4o-mini model for fast and cost-efficient chat tasks. Optimized for lower latency and cheaper throughput.',
+                'max_tokens' => 16384,
                 'params' => ['model' => 'gpt-4o-mini'],
+                'meta' => ['context_window' => '128000', 'max_output' => '16384'],
             ],
         ],
         [
@@ -565,9 +579,10 @@ class ModelCatalog
             'rating' => 1,
             'json' => [
                 'description' => 'OpenAI GPT-5.4 - latest flagship model with improved reasoning, document workflows, agentic search, and coding. Configurable reasoning effort.',
+                'max_tokens' => 16384,
                 'params' => ['model' => 'gpt-5.4'],
                 'features' => ['reasoning', 'vision'],
-                'meta' => ['context_window' => '270000'],
+                'meta' => ['context_window' => '270000', 'max_output' => '16384'],
             ],
         ],
         [
@@ -607,6 +622,7 @@ class ModelCatalog
             'rating' => 1,
             'json' => [
                 'description' => 'OpenAI GPT-5.3 - complex multi-step problem solving where accuracy matters more than speed. 128K context, vision, function calling, web search.',
+                'max_tokens' => 16000,
                 'params' => ['model' => 'gpt-5.3'],
                 'features' => ['reasoning', 'vision'],
                 'meta' => ['context_window' => '128000', 'max_output' => '16000'],
@@ -670,10 +686,11 @@ class ModelCatalog
             'quality' => 10,
             'rating' => 1,
             'json' => [
-                'description' => 'Claude Opus 4.6 - Anthropic\'s most intelligent model for agents and coding. 200K context, 128K output.',
+                'description' => 'Claude Opus 4.6 - Anthropic\'s most intelligent model for agents and coding. 200K context, 64K default output (128K max).',
+                'max_tokens' => 65536,
                 'params' => ['model' => 'claude-opus-4-6'],
                 'features' => ['vision', 'reasoning'],
-                'meta' => ['context_window' => '200000', 'max_output' => '128000'],
+                'meta' => ['context_window' => '200000', 'max_output' => '65536'],
             ],
         ],
         [
@@ -818,7 +835,9 @@ class ModelCatalog
             'rating' => 1,
             'json' => [
                 'description' => 'Google\'s Answer to the other LLM models',
+                'max_tokens' => 65536,
                 'params' => ['model' => 'gemini-2.5-pro'],
+                'meta' => ['context_window' => '1048576', 'max_output' => '65536'],
             ],
         ],
         [
@@ -918,9 +937,10 @@ class ModelCatalog
             'rating' => 1,
             'json' => [
                 'description' => 'Google Gemini 2.5 Flash - best price-performance model, 1M token context, reasoning, vision, audio.',
+                'max_tokens' => 65536,
                 'params' => ['model' => 'gemini-2.5-flash'],
                 'features' => ['reasoning', 'vision', 'audio'],
-                'meta' => ['context_window' => '1000000'],
+                'meta' => ['context_window' => '1000000', 'max_output' => '65536'],
             ],
         ],
         [
@@ -1089,8 +1109,9 @@ class ModelCatalog
             'rating' => 1,
             'json' => [
                 'description' => 'Claude 4.5 Sonnet - a smart model for complex agents and coding',
+                'max_tokens' => 8192,
                 'params' => ['model' => 'claude-sonnet-4-5-20250929'],
-                'meta' => ['supports_images' => true],
+                'meta' => ['context_window' => '200000', 'max_output' => '8192'],
             ],
         ],
         // ==================== THEHIVE MODELS ====================
@@ -1229,6 +1250,7 @@ class ModelCatalog
             'rating' => 0.5,
             'json' => [
                 'description' => 'Triton Inference Server with vLLM backend',
+                'max_tokens' => 32768,
                 'features' => ['streaming', 'gpu'],
                 'supportsStreaming' => true,
             ],
@@ -1249,6 +1271,7 @@ class ModelCatalog
             'rating' => 0.7,
             'json' => [
                 'description' => 'Triton Inference Server with vLLM backend',
+                'max_tokens' => 16384,
                 'features' => ['streaming', 'gpu'],
                 'supportsStreaming' => true,
             ],

@@ -17,6 +17,7 @@ use App\Service\ModelConfigService;
 use App\Service\Plugin\PluginContextProviderInterface;
 use App\Service\PromptService;
 use App\Service\RAG\VectorSearchService;
+use App\Service\RateLimitService;
 use App\Service\UserMemoryService;
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;
@@ -47,6 +48,7 @@ final readonly class ChatHandler implements MessageHandlerInterface
         private UserMemoryService $memoryService,
         private MemoryExtractionService $memoryExtractionService,
         private FeedbackConfigService $feedbackConfig,
+        private RateLimitService $rateLimitService,
         iterable $pluginContextProviders = [],
     ) {
         $this->pluginContextProviders = $pluginContextProviders;
@@ -207,9 +209,11 @@ final readonly class ChatHandler implements MessageHandlerInterface
             $systemPrompt .= "\n\n**IMPORTANT: The user's current message is in {$languageName}. You MUST respond in {$languageName}.**";
         }
 
+        $modelMaxTokens = null;
         if ($modelId) {
             $model = $this->modelRepository->find($modelId);
             if ($model) {
+                $modelMaxTokens = $model->getMaxTokens();
                 $json = $model->getJson();
                 if (isset($json['supportsStreaming']) && false === $json['supportsStreaming']) {
                     $systemPrompt = null;
@@ -223,15 +227,29 @@ final readonly class ChatHandler implements MessageHandlerInterface
             'include_images' => $includeImagesInMessages,
         ]);
 
+        $aiOptions = [
+            'provider' => $provider,
+            'model' => $modelName,
+            'stream' => false,
+            'temperature' => 0.7,
+        ];
+
+        // Clamp max_tokens to min(plan_limit, model_max)
+        $user = $this->em->getRepository(User::class)->find($message->getUserId());
+        $planMaxTokens = null !== $user ? $this->rateLimitService->getMaxOutputTokens($user) : null;
+        $tokenLimits = array_filter(
+            [$planMaxTokens, $modelMaxTokens],
+            static fn ($v) => is_int($v) && $v > 0,
+        );
+
+        if (!empty($tokenLimits)) {
+            $aiOptions['max_tokens'] = min($tokenLimits);
+        }
+
         $response = $this->aiFacade->chat(
             $messages,
             $message->getUserId(),
-            [
-                'provider' => $provider,
-                'model' => $modelName,
-                'stream' => false, // Später: streaming über callback
-                'temperature' => 0.7,
-            ]
+            $aiOptions
         );
 
         $this->notify($progressCallback, 'generating', 'Response generated.');
@@ -809,9 +827,15 @@ final readonly class ChatHandler implements MessageHandlerInterface
             'modelFeatures' => $modelFeatures,
         ], $options);
 
-        // Apply model-specific max_tokens from DB config (if set and valid)
-        if (null !== $modelMaxTokens && $modelMaxTokens > 0 && !isset($aiOptions['max_tokens'])) {
-            $aiOptions['max_tokens'] = $modelMaxTokens;
+        // Clamp max_tokens to min(requested, plan_limit, model_max)
+        $planMaxTokens = null !== $user ? $this->rateLimitService->getMaxOutputTokens($user) : null;
+        $tokenLimits = array_filter(
+            [$aiOptions['max_tokens'] ?? null, $planMaxTokens, $modelMaxTokens],
+            static fn ($v) => is_int($v) && $v > 0,
+        );
+
+        if (!empty($tokenLimits)) {
+            $aiOptions['max_tokens'] = min($tokenLimits);
         }
 
         // Log reasoning option
