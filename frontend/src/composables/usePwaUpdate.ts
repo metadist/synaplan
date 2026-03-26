@@ -33,6 +33,11 @@ export const usePwaUpdate = () => {
   watch(needRefresh, async (refresh) => {
     if (!refresh) return
 
+    if (navigator.webdriver) {
+      await updateServiceWorker(true)
+      return
+    }
+
     const accepted = await confirm({
       title: t('pwa.updateAvailable'),
       message: t('pwa.updateMessage'),
