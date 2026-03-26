@@ -687,7 +687,7 @@
         "text2vid": "Video Generation (Text → Video)",
         "sound2text": "Speech-to-Text",
         "text2sound": "Text-to-Speech",
-        "analyze": "File Analysis"
+        "analyze": "Text Analytics"
       },
       "chat": "Chat Model",
       "sorting": "Sorting Model",
@@ -942,7 +942,7 @@
         "images": "Images",
         "videos": "Videos",
         "audios": "Audio Files",
-        "file_analysis": "File Analysis"
+        "file_analysis": "Text Analytics"
       },
       "sources": {
         "whatsapp": "WhatsApp",

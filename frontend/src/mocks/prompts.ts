@@ -58,7 +58,7 @@ You are a helpful AI assistant. Respond to user queries professionally and accur
     rules: 'The user asks to analyze any type of file',
     aiModel: 'Claude Sonnet 4 (Anthropic)',
     availableTools: ['files-search'],
-    content: `# File Analysis
+    content: `# Text Analytics
 Analyze the provided file and give detailed insights.`,
     isDefault: false,
   },
