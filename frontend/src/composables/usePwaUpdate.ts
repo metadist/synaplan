@@ -12,10 +12,7 @@ export const usePwaUpdate = () => {
 
   const { offlineReady, needRefresh, updateServiceWorker } = useRegisterSW({
     immediate: true,
-    onRegisteredSW(
-      _swUrl: string,
-      registration: ServiceWorkerRegistration | undefined,
-    ) {
+    onRegisteredSW(_swUrl: string, registration: ServiceWorkerRegistration | undefined) {
       if (!registration) return
 
       const intervalMs = 60 * 60 * 1000
