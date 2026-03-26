@@ -293,7 +293,6 @@ final readonly class MediaGenerationHandler implements MessageHandlerInterface
                     'source' => isset($options['duration']) ? 'options' : (isset($classification['duration']) ? 'ai_classification' : 'default'),
                 ]);
 
-                // Use video generation API
                 $result = $this->aiFacade->generateVideo(
                     $prompt,
                     $message->getUserId(),
@@ -302,6 +301,10 @@ final readonly class MediaGenerationHandler implements MessageHandlerInterface
                         'model' => $modelName,
                         'duration' => $duration,
                         'aspect_ratio' => $options['aspect_ratio'] ?? '16:9',
+                        'progress_callback' => function (array $progress) use ($progressCallback): void {
+                            $elapsed = $progress['elapsed_seconds'] ?? 0;
+                            $this->notify($progressCallback, 'generating', "Generating video... ({$elapsed}s)");
+                        },
                     ]
                 );
 
@@ -415,7 +418,8 @@ final readonly class MediaGenerationHandler implements MessageHandlerInterface
                 throw new \Exception("Generated {$mediaType} has no URL. Check provider response format.");
             }
 
-            // CRITICAL: Always save to disk - never store data URLs in database
+            $this->notify($progressCallback, 'generating', 'Saving '.$mediaTypeLabel.'...');
+
             $localPath = null;
 
             if (str_starts_with($mediaUrl, 'data:')) {

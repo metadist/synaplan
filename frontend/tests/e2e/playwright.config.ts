@@ -38,13 +38,24 @@ export default defineConfig({
   projects: [
     {
       name: 'chromium',
-      use: { ...devices['Desktop Chrome'] },
-      grepInvert: /@oidc-redirect/,
+      use: {
+        ...devices['Desktop Chrome'],
+        launchOptions: {
+          args: [
+            '--disable-features=LocalNetworkAccessChecks',
+            ...(process.env.CI ? [] : ['--start-maximized']),
+          ],
+        },
+      },
+      grepInvert: /@oidc-redirect|@noci/,
     },
     {
       name: 'firefox',
-      use: { ...devices['Desktop Firefox'] },
-      grepInvert: /@oidc-redirect/,
+      use: {
+        ...devices['Desktop Firefox'],
+        ...(process.env.CI ? {} : { launchOptions: { args: ['--start-maximized'] } }),
+      },
+      grepInvert: /@oidc-redirect|@noci/,
     },
     {
       name: 'chromium-oidc-redirect',

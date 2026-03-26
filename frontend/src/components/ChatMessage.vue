@@ -1072,7 +1072,7 @@ const getModelTypeIcon = computed(() => {
 
 // Dynamic title for model badge
 const getModelTypeTitle = computed(() => {
-  if (isFileAnalysisResponse.value) return 'File Analysis (Document/Audio → Text)'
+  if (isFileAnalysisResponse.value) return 'Text Analytics (Document/Audio → Text)'
   switch (mediaHint.value) {
     case 'vision':
       return 'Vision (Image → Text)'

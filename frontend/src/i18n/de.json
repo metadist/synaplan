@@ -840,7 +840,7 @@
         "text2vid": "Videogenerierung (Text → Video)",
         "sound2text": "Spracherkennung",
         "text2sound": "Sprachsynthese",
-        "analyze": "Dateianalyse"
+        "analyze": "Textanalyse"
       },
       "chat": "Chat-Modell",
       "sorting": "Sortier-Modell",
