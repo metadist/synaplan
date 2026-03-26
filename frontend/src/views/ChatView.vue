@@ -220,7 +220,7 @@ import MainLayout from '@/components/MainLayout.vue'
 import ChatInput from '@/components/ChatInput.vue'
 import ChatMessage from '@/components/ChatMessage.vue'
 import LimitReachedModal from '@/components/common/LimitReachedModal.vue'
-import { useHistoryStore, type Message } from '@/stores/history'
+import { useHistoryStore, type Message, type Part } from '@/stores/history'
 import { useChatsStore, isDefaultChatTitle } from '@/stores/chats'
 import { useModelsStore } from '@/stores/models'
 import { useAiConfigStore } from '@/stores/aiConfig'
@@ -611,6 +611,89 @@ watch(
   { deep: true }
 )
 
+/**
+ * Parse accumulated streaming content and update message parts.
+ * Extracted so it can be called from the rAF throttle and the flush on 'complete'.
+ */
+function renderStreamingContent(content: string, msgId: string): void {
+  const trimmedContent = content.trim()
+
+  // Detect file generation JSON — hide content during generation
+  const looksLikeFileGeneration =
+    (trimmedContent.startsWith('{') ||
+      trimmedContent.startsWith('```json\n{') ||
+      trimmedContent.startsWith('```\n{')) &&
+    (trimmedContent.includes('BFILEPATH') || trimmedContent.includes('"BFILEPATH"'))
+
+  if (looksLikeFileGeneration) {
+    if (processingStatus.value !== 'generating_file') {
+      processingStatus.value = 'generating_file'
+      processingMetadata.value = { customMessage: t('processing.generatingFile') }
+    }
+    const message = historyStore.messages.find((m) => m.id === msgId)
+    if (message) {
+      message.parts = []
+    }
+    return
+  }
+
+  // Extract thinking blocks
+  const thinkingMatches = content.match(/<think>([\s\S]*?)(<\/think>|$)/g)
+  const thinkingParts: Part[] = []
+
+  if (thinkingMatches) {
+    thinkingMatches.forEach((match) => {
+      const inner = match.replace(/<think>|<\/think>/g, '').trim()
+      if (inner) {
+        thinkingParts.push({ type: 'thinking', content: inner })
+      }
+    })
+  }
+
+  const displayContent = content.replace(/<think>[\s\S]*?<\/think>/g, '').trim()
+  const parsed = parseAIResponse(displayContent)
+
+  const message = historyStore.messages.find((m) => m.id === msgId)
+  if (message) {
+    const newParts: Part[] = [...thinkingParts]
+
+    parsed.parts.forEach((part) => {
+      if (part.type === 'text') {
+        newParts.push({ type: 'text', content: part.content })
+      } else if (part.type === 'code' || part.type === 'json') {
+        newParts.push({
+          type: 'code',
+          content: part.content,
+          language: part.language,
+        })
+      } else if (part.type === 'links' && part.links) {
+        newParts.push({
+          type: 'links',
+          items: part.links.map((l) => {
+            try {
+              return {
+                title: l.title,
+                url: l.url,
+                desc: l.description,
+                host: new URL(l.url).hostname,
+              }
+            } catch {
+              return {
+                title: l.title,
+                url: l.url,
+                desc: l.description,
+                host: l.url,
+              }
+            }
+          }),
+        })
+      }
+    })
+
+    message.parts = newParts
+  }
+}
+
 const handleSendMessage = async (
   content: string,
   options?: {
@@ -768,6 +851,9 @@ const streamAIResponse = async (
 
   // Create empty streaming message with provider info
   const messageId = historyStore.addStreamingMessage('assistant', provider, modelLabel)
+
+  let streamingRafId: number | null = null
+  let streamingDirty = false
 
   try {
     if (useMockData) {
@@ -934,15 +1020,12 @@ const streamAIResponse = async (
               processingMetadata.value = {}
             }
 
-            // AI gibt nur TEXT zurück (keine JSON!)
             fullContent += data.chunk
 
-            // Stream audio if enabled
+            // Stream audio if enabled (cheap — keep on every chunk)
             if (currentAudioStreamer) {
               while (true) {
                 const currentUnprocessed = fullContent.slice(spokenLength)
-                // Match sentence ending punctuation followed by space or end of string
-                // Also handle newlines as boundaries
                 const boundaryMatch = currentUnprocessed.match(/([.?!]+)(\s+|$)|(\n+)/)
 
                 if (!boundaryMatch || boundaryMatch.index === undefined) break
@@ -958,94 +1041,18 @@ const streamAIResponse = async (
               }
             }
 
-            // Don't parse JSON during streaming - it's incomplete!
-            // We'll parse it at the end in the 'complete' event
+            // Mark dirty and schedule a throttled render via rAF.
+            // This avoids re-parsing the full markdown on every single SSE chunk,
+            // which causes O(n²) rendering for long responses.
+            streamingDirty = true
 
-            // NEW: Detect if this looks like file generation JSON (OfficeM aker)
-            // If it starts with { and contains BFILEPATH, don't display it yet
-            const trimmedContent = fullContent.trim()
-            const looksLikeFileGeneration =
-              (trimmedContent.startsWith('{') ||
-                trimmedContent.startsWith('```json\n{') ||
-                trimmedContent.startsWith('```\n{')) &&
-              (trimmedContent.includes('BFILEPATH') || trimmedContent.includes('"BFILEPATH"'))
-
-            if (looksLikeFileGeneration) {
-              // Set generating_file status but don't display the JSON content yet
-              if (processingStatus.value !== 'generating_file') {
-                processingStatus.value = 'generating_file'
-                processingMetadata.value = { customMessage: 'Erstelle Datei...' }
-              }
-
-              // Don't update message parts yet - wait for backend to process
-
-              // Set message parts to EMPTY to hide JSON during generation
-              const message = historyStore.messages.find((m) => m.id === messageId)
-              if (message) {
-                message.parts = [] // Clear parts completely during file generation
-              }
-
-              return // Skip normal parsing
-            }
-
-            // Extrahiere thinking blocks und content separat
-            const thinkingMatches = fullContent.match(/<think>([\s\S]*?)(<\/think>|$)/g)
-            const thinkingParts: any[] = []
-
-            if (thinkingMatches) {
-              thinkingMatches.forEach((match) => {
-                const content = match.replace(/<think>|<\/think>/g, '').trim()
-                if (content) {
-                  thinkingParts.push({ type: 'thinking', content })
-                }
+            if (streamingRafId === null) {
+              streamingRafId = requestAnimationFrame(() => {
+                streamingRafId = null
+                if (!streamingDirty) return
+                streamingDirty = false
+                renderStreamingContent(fullContent, messageId)
               })
-            }
-
-            // Display content OHNE <think> blocks (RAW - will be parsed on complete)
-            const displayContent = fullContent.replace(/<think>[\s\S]*?<\/think>/g, '').trim()
-
-            // Parse für code blocks, etc.
-            const parsed = parseAIResponse(displayContent)
-
-            // Update message
-            const message = historyStore.messages.find((m) => m.id === messageId)
-            if (message) {
-              const newParts = [...thinkingParts]
-
-              parsed.parts.forEach((part) => {
-                if (part.type === 'text') {
-                  newParts.push({ type: 'text', content: part.content })
-                } else if (part.type === 'code' || part.type === 'json') {
-                  newParts.push({
-                    type: 'code',
-                    content: part.content,
-                    language: part.language,
-                  })
-                } else if (part.type === 'links' && part.links) {
-                  newParts.push({
-                    type: 'links',
-                    items: part.links.map((l) => {
-                      try {
-                        return {
-                          title: l.title,
-                          url: l.url,
-                          desc: l.description,
-                          host: new URL(l.url).hostname,
-                        }
-                      } catch {
-                        return {
-                          title: l.title,
-                          url: l.url,
-                          desc: l.description,
-                          host: l.url,
-                        }
-                      }
-                    }),
-                  })
-                }
-              })
-
-              message.parts = newParts
             }
           } else if (data.status === 'reasoning' && data.chunk) {
             // Reasoning chunks from OpenAI o-series / GPT-5 models
@@ -1225,6 +1232,23 @@ const streamAIResponse = async (
               memoriesStore.memories = memoriesStore.memories.filter((m) => m.id !== memoryId)
             }
           } else if (data.status === 'complete') {
+            // Cancel any pending throttled render and always do a final
+            // synchronous render so no trailing content is lost.
+            if (streamingRafId !== null) {
+              cancelAnimationFrame(streamingRafId)
+              streamingRafId = null
+            }
+            streamingDirty = false
+
+            // If the response was truncated by token limit, append a notice
+            if (data.truncated) {
+              fullContent += '\n\n---\n\n⚠️ *' + t('message.truncated') + '*'
+            }
+
+            if (fullContent) {
+              renderStreamingContent(fullContent, messageId)
+            }
+
             // Speak remaining text then signal no more sentences coming
             if (currentAudioStreamer) {
               const remaining = fullContent.slice(spokenLength)
@@ -1387,6 +1411,13 @@ const streamAIResponse = async (
             currentTrackId = undefined
             currentStreamingChatId = undefined
           } else if (data.status === 'error') {
+            // Cancel any pending throttled render
+            if (streamingRafId !== null) {
+              cancelAnimationFrame(streamingRafId)
+              streamingRafId = null
+            }
+            streamingDirty = false
+
             const errorMsg = data.error || data.message || 'Unknown error'
             console.error('Error:', errorMsg, data)
             processingStatus.value = ''
@@ -1548,9 +1579,16 @@ const streamAIResponse = async (
     }
   } catch (error) {
     console.error('❌ Streaming error:', error)
+
+    // Cancel any pending throttled render
+    if (streamingRafId !== null) {
+      cancelAnimationFrame(streamingRafId)
+      streamingRafId = null
+    }
+    streamingDirty = false
+
     historyStore.updateStreamingMessage(messageId, 'Sorry, an error occurred.')
     historyStore.finishStreamingMessage(messageId)
-    // Clean up on error
     streamingAbortController = null
     stopStreamingFn = null
     currentTrackId = undefined

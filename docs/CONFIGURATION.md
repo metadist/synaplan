@@ -103,27 +103,16 @@ See [Email Integration Guide](EMAIL.md) for full setup.
 
 ---
 
-## Optional: AI Memories (Qdrant)
+## Qdrant Vector Database
 
-> **Requires separate installation**: [synaplan-memories](https://github.com/metadist/synaplan-memories) (Apache-2.0)
+Qdrant is included in `docker-compose.yml` and starts automatically with Synaplan.
+It powers AI memories (user profiling) and RAG document vector search.
 
-Enable user profiling and persistent AI memory:
+Configure in `backend/.env`:
 
-```bash
-# Install the memories service first
-git clone https://github.com/metadist/synaplan-memories
-cd synaplan-memories
-docker compose up -d
-```
+Qdrant runs as an internal Docker service — no configuration needed beyond the default `QDRANT_URL=http://qdrant:6333` in `.env`.
 
-Then configure connection:
-
-```bash
-QDRANT_SERVICE_URL=http://synaplan-qdrant-service:8090
-QDRANT_SERVICE_API_KEY=your_secret_key
-```
-
-**This is completely optional** — Synaplan works fully without it.
+**This is optional** — Synaplan works fully without it (memories and vector search will be disabled).
 
 ---
 

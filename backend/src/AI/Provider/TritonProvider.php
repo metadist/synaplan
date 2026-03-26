@@ -182,7 +182,7 @@ class TritonProvider implements ChatProviderInterface, EmbeddingProviderInterfac
         }
 
         $model = $options['model'];
-        $maxTokens = $options['max_tokens'] ?? 4096;
+        $maxTokens = $options['max_tokens'] ?? ChatProviderInterface::DEFAULT_MAX_COMPLETION_TOKENS;
 
         try {
             $this->logger->info('Triton chat request', [
@@ -226,7 +226,7 @@ class TritonProvider implements ChatProviderInterface, EmbeddingProviderInterfac
         }
 
         $model = $options['model'];
-        $maxTokens = $options['max_tokens'] ?? 4096;
+        $maxTokens = $options['max_tokens'] ?? ChatProviderInterface::DEFAULT_MAX_COMPLETION_TOKENS;
 
         try {
             $this->logger->info('Triton streaming chat START', [

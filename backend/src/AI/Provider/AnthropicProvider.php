@@ -23,6 +23,7 @@ class AnthropicProvider implements ChatProviderInterface, VisionProviderInterfac
 {
     private const API_VERSION = '2023-06-01';
     private const BASE_URL = 'https://api.anthropic.com/v1';
+    private const DEFAULT_MAX_TOKENS = 65536;
 
     // Extended Thinking models (Claude 3.5 Sonnet and later with thinking support)
     // Note: Extended thinking is a feature that may require specific API access
@@ -141,7 +142,7 @@ class AnthropicProvider implements ChatProviderInterface, VisionProviderInterfac
 
             $requestBody = [
                 'model' => $model,
-                'max_tokens' => $options['max_tokens'] ?? 4096,
+                'max_tokens' => $options['max_tokens'] ?? self::DEFAULT_MAX_TOKENS,
                 'messages' => $conversationMessages,
             ];
 
@@ -261,7 +262,7 @@ class AnthropicProvider implements ChatProviderInterface, VisionProviderInterfac
 
             $requestBody = [
                 'model' => $model,
-                'max_tokens' => $options['max_tokens'] ?? 4096,
+                'max_tokens' => $options['max_tokens'] ?? self::DEFAULT_MAX_TOKENS,
                 'messages' => $conversationMessages,
                 'stream' => true,
             ];
@@ -560,6 +561,7 @@ class AnthropicProvider implements ChatProviderInterface, VisionProviderInterfac
         $outputTokens = 0;
         $cacheCreationTokens = 0;
         $cacheReadTokens = 0;
+        $finishReason = null;
 
         foreach ($this->httpClient->stream($response) as $chunk) {
             if ($chunk->isLast()) {
@@ -628,6 +630,16 @@ class AnthropicProvider implements ChatProviderInterface, VisionProviderInterfac
                     case 'message_delta':
                         $deltaUsage = $event['data']['usage'] ?? [];
                         $outputTokens = $deltaUsage['output_tokens'] ?? $outputTokens;
+
+                        // Anthropic sends stop_reason in message_delta ("end_turn" or "max_tokens")
+                        $stopReason = $event['data']['delta']['stop_reason'] ?? null;
+                        if (null !== $stopReason) {
+                            $finishReason = match ($stopReason) {
+                                'max_tokens' => 'length',
+                                'end_turn' => 'stop',
+                                default => $stopReason,
+                            };
+                        }
                         break;
 
                     case 'message_stop':
@@ -640,6 +652,10 @@ class AnthropicProvider implements ChatProviderInterface, VisionProviderInterfac
                         break;
                 }
             }
+        }
+
+        if (null !== $finishReason) {
+            $callback(['type' => 'finish', 'finish_reason' => $finishReason]);
         }
 
         return [

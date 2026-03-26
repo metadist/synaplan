@@ -8,12 +8,12 @@ use App\Service\RAG\VectorStorage\DTO\SearchQuery;
 use App\Service\RAG\VectorStorage\DTO\SearchResult;
 use App\Service\RAG\VectorStorage\DTO\StorageStats;
 use App\Service\RAG\VectorStorage\DTO\VectorChunk;
-use App\Service\VectorSearch\QdrantClientHttp;
+use App\Service\VectorSearch\QdrantClientInterface;
 
 final readonly class QdrantVectorStorage implements VectorStorageInterface
 {
     public function __construct(
-        private QdrantClientHttp $qdrantClient,
+        private QdrantClientInterface $qdrantClient,
     ) {
     }
 

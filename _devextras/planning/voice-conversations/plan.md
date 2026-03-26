@@ -195,7 +195,7 @@ Phase 1 is prerequisite (need a working free TTS provider). Phases 4 and 5 can s
 |----------|-------------|------------|-------|
 | `SYNAPLAN_TTS_URL` | `http://host.docker.internal:10200` | `http://10.0.1.10:10200` | `docker-compose.yml` (dev default), `backend/.env` (prod override), Admin UI |
 
-Named after the service (`synaplan-tts`), not the engine (Piper). Follows the same pattern as `OLLAMA_BASE_URL`, `TIKA_BASE_URL`, `QDRANT_SERVICE_URL`. See `piper-provider.md` §5 for all 4 config layers.
+Named after the service (`synaplan-tts`), not the engine (Piper). Follows the same pattern as `OLLAMA_BASE_URL`, `TIKA_BASE_URL`, `QDRANT_URL`. See `piper-provider.md` §5 for all 4 config layers.
 
 ## Memory Integration
 

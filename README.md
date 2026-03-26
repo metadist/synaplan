@@ -59,34 +59,22 @@ echo "GROQ_API_KEY=your_key" >> backend/.env && docker compose restart backend
 ## Features
 
 - **AI Chat** — Ollama, OpenAI, Anthropic, Groq, Gemini
-- **RAG Search** — Semantic document search with MariaDB VECTOR (or [Qdrant](https://github.com/metadist/synaplan-memories) as alternative)
+- **RAG Search** — Semantic document search with MariaDB VECTOR or Qdrant
 - **Chat Widget** — Embed on any website
 - **WhatsApp** — Meta Business API integration
 - **Email** — AI-powered email responses
 - **Audio** — Whisper transcription
 - **Documents** — PDF, Word, Excel, images with OCR
-- **AI Memories** — Optional user profiling (see below)
+- **AI Memories** — User profiling with Qdrant vector search
+- **Feedback System** — False-positive detection and learning
 
 ---
 
-## Optional: AI Memories
+## Qdrant Vector Database
 
-> **Want the AI to remember user preferences and context across sessions?**
+Qdrant runs as an internal Docker service — no configuration needed. It powers AI memories, RAG document search, and the feedback system.
 
-Install [**synaplan-memories**](https://github.com/metadist/synaplan-memories) — a separate Docker stack with a Rust microservice + Qdrant vector database.
-
-```bash
-# Clone and start the memories service
-git clone https://github.com/metadist/synaplan-memories
-cd synaplan-memories
-docker compose up -d
-
-# Then connect Synaplan to it (in synaplan/backend/.env)
-QDRANT_SERVICE_URL=http://synaplan-qdrant-service:8090
-QDRANT_SERVICE_API_KEY=your_secret_key
-```
-
-This is **completely optional** — Synaplan works fully without it. Licensed under [Apache-2.0](https://github.com/metadist/synaplan-memories/blob/main/LICENSE).
+Starts automatically with `docker compose up -d`. Synaplan works fully without it (memories and vector search will be disabled).
 
 ---
 

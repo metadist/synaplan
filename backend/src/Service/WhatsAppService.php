@@ -677,14 +677,18 @@ final class WhatsAppService
         // 7. AI Pipeline Processing (use streaming mode to support TTS/media generation)
         $collectedResponse = '';
         $streamCallback = function (string|array $chunk, array $metadata = []) use (&$collectedResponse): void {
-            // Handle both string chunks (old providers) and array chunks (new providers with type/content)
             if (is_array($chunk)) {
-                // Extract content from array format: ['type' => 'content', 'content' => '...']
-                if (isset($chunk['type']) && 'content' === $chunk['type'] && isset($chunk['content'])) {
+                $type = $chunk['type'] ?? 'content';
+
+                // Skip finish signal (WhatsApp doesn't need truncation UI)
+                if ('finish' === $type) {
+                    return;
+                }
+
+                if ('content' === $type && isset($chunk['content'])) {
                     $collectedResponse .= $chunk['content'];
                 }
             } else {
-                // Old format: simple string
                 $collectedResponse .= $chunk;
             }
         };

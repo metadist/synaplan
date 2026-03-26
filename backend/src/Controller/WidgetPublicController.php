@@ -9,12 +9,14 @@ use App\Entity\WidgetSession;
 use App\Repository\ChatRepository;
 use App\Repository\FileRepository;
 use App\Repository\MessageRepository;
-use App\Service\File\FileHelper;
+use App\Service\BillingService;
 use App\Service\File\FileProcessor;
 use App\Service\File\FileStorageService;
 use App\Service\File\VectorizationService;
 use App\Service\Message\MessageProcessor;
+use App\Service\PromptService;
 use App\Service\RateLimitService;
+use App\Service\UrlContentService;
 use App\Service\WidgetEventCacheService;
 use App\Service\WidgetService;
 use App\Service\WidgetSessionService;
@@ -45,6 +47,9 @@ class WidgetPublicController extends AbstractController
         private FileStorageService $storageService,
         private FileProcessor $fileProcessor,
         private VectorizationService $vectorizationService,
+        private UrlContentService $urlContentService,
+        private PromptService $promptService,
+        private BillingService $billingService,
         private ChatRepository $chatRepository,
         private MessageRepository $messageRepository,
         private FileRepository $fileRepository,
@@ -113,9 +118,42 @@ class WidgetPublicController extends AbstractController
             'success' => true,
             'widgetId' => $widget->getWidgetId(),
             'name' => $widget->getName(),
-            'config' => $config,
+            'config' => self::buildPublicConfig($config),
             'isActive' => true,
         ]);
+    }
+
+    /**
+     * Return only runtime-safe config keys needed by the widget frontend.
+     * Sensitive fields (API tokens, internal flags) are excluded.
+     *
+     * @param array<string, mixed> $config
+     *
+     * @return array<string, mixed>
+     */
+    private static function buildPublicConfig(array $config): array
+    {
+        static $allowed = [
+            'position',
+            'primaryColor',
+            'iconColor',
+            'buttonIcon',
+            'buttonIconUrl',
+            'defaultTheme',
+            'autoOpen',
+            'autoMessage',
+            'messageLimit',
+            'maxFileSize',
+            'allowFileUpload',
+            'fileUploadLimit',
+            'fullscreenMode',
+            'allowFullscreen',
+            'hideButton',
+            'privacyPolicyUrl',
+            'detectTheme',
+        ];
+
+        return \array_intersect_key($config, \array_flip($allowed));
     }
 
     /**
@@ -152,11 +190,7 @@ class WidgetPublicController extends AbstractController
             ], Response::HTTP_BAD_REQUEST);
         }
 
-        error_log('📥 Widget message request: '.json_encode($data));
-
         if (empty($data['sessionId']) || empty($data['text'])) {
-            error_log('❌ Missing fields - sessionId: '.($data['sessionId'] ?? 'NULL').', text: '.($data['text'] ?? 'NULL'));
-
             return $this->json([
                 'error' => 'Missing required fields: sessionId, text',
             ], Response::HTTP_BAD_REQUEST);
@@ -165,12 +199,8 @@ class WidgetPublicController extends AbstractController
         // Get widget
         $widget = $this->widgetService->getWidgetById($widgetId);
         if (!$widget) {
-            error_log('❌ Widget not found: '.$widgetId);
-
             return $this->json(['error' => 'Widget not found'], Response::HTTP_NOT_FOUND);
         }
-
-        error_log('✅ Widget found: '.$widget->getName());
 
         // Check if widget is active
         if (!$this->widgetService->isWidgetActive($widget)) {
@@ -346,7 +376,11 @@ class WidgetPublicController extends AbstractController
                 }
             }
 
+            // Increment session message count and update last message preview
+            // Only increment message count for AI mode (human messages don't count against limits)
             if (!$isHumanMode) {
+                $this->sessionService->incrementMessageCount($session);
+                // Save user message as last message preview
                 $session->setLastMessagePreview($data['text']);
                 $this->em->flush();
             }
@@ -394,6 +428,11 @@ class WidgetPublicController extends AbstractController
                 'configured_model_id' => $widgetModelId,
             ]);
 
+            $externalUserId = isset($data['externalUserId']) && \is_string($data['externalUserId'])
+                ? trim($data['externalUserId'])
+                : '';
+            $apiContext = $this->fetchApiContext($widget, $owner, $externalUserId);
+
             $processingOptions = [
                 'fixed_task_prompt' => $widget->getTaskPromptTopic(),
                 'skipSorting' => true,
@@ -407,6 +446,7 @@ class WidgetPublicController extends AbstractController
                 'disable_memories' => true,
                 'is_widget_mode' => true,
                 'widget_model_id' => $widgetModelId,
+                'api_context' => $apiContext,
             ];
 
             $response = new StreamedResponse(function () use (
@@ -424,6 +464,7 @@ class WidgetPublicController extends AbstractController
                 $jsonBuffer = '';
                 $isBufferingJson = false;
                 $chunkCount = 0;
+                $finishReason = null;
 
                 try {
                     $result = $this->messageProcessor->processStream(
@@ -434,7 +475,8 @@ class WidgetPublicController extends AbstractController
                             &$hasReasoningStarted,
                             &$jsonBuffer,
                             &$isBufferingJson,
-                            &$chunkCount
+                            &$chunkCount,
+                            &$finishReason
                         ) {
                             if (connection_aborted()) {
                                 throw new \RuntimeException('Client disconnected');
@@ -452,6 +494,12 @@ class WidgetPublicController extends AbstractController
                             if (is_array($chunk)) {
                                 $type = $chunk['type'] ?? 'content';
                                 $content = $chunk['content'] ?? '';
+
+                                if ('finish' === $type) {
+                                    $finishReason = $chunk['finish_reason'] ?? null;
+
+                                    return;
+                                }
 
                                 if ('reasoning' === $type) {
                                     if (!$hasReasoningStarted) {
@@ -613,11 +661,12 @@ class WidgetPublicController extends AbstractController
                     $this->em->persist($outgoingMessage);
                     $this->em->flush();
 
-                    // Increment message count only AFTER successful AI response
-                    // (prevents consuming a message slot when processing fails)
-                    $this->em->refresh($session);
-                    $session->setLastMessagePreview($responseText);
-                    $this->sessionService->incrementMessageCount($session);
+                    // Update session's last message time and preview with AI response
+                    // Re-fetch session to ensure it's managed by the EntityManager
+                    $currentSession = $this->sessionService->getOrCreateSession($widgetId, $session->getSessionId());
+                    $currentSession->setLastMessage(time());
+                    $currentSession->setLastMessagePreview($responseText);
+                    $this->em->flush();
 
                     // Publish event for AI response (so admin panel receives it in real-time)
                     $this->eventCache->publish($widgetId, $session->getSessionId(), 'message', [
@@ -629,7 +678,7 @@ class WidgetPublicController extends AbstractController
                     ]);
 
                     // Generate AI title after 5 user messages (async, non-blocking)
-                    $this->sessionService->generateTitleIfNeeded($session, $owner->getId());
+                    $this->sessionService->generateTitleIfNeeded($currentSession, $owner->getId());
 
                     $this->rateLimitService->recordUsage($owner, 'MESSAGES', [
                         'provider' => $responseMetadata['provider'] ?? null,
@@ -642,10 +691,9 @@ class WidgetPublicController extends AbstractController
                         'input_text' => $incomingMessage->getText(),
                     ]);
 
-                    $this->sendSse('complete', [
+                    $completePayload = [
                         'messageId' => $incomingMessage->getId(),
                         'chatId' => $chat->getId(),
-                        'messageCount' => $session->getMessageCount(),
                         'metadata' => [
                             'response' => $responseMetadata,
                             'classification' => $result['classification'] ?? null,
@@ -653,7 +701,13 @@ class WidgetPublicController extends AbstractController
                             'search_results' => $result['search_results'] ?? null,
                             'files' => $fileIds,
                         ],
-                    ]);
+                    ];
+
+                    if ('length' === $finishReason) {
+                        $completePayload['truncated'] = true;
+                    }
+
+                    $this->sendSse('complete', $completePayload);
                 } catch (\Throwable $e) {
                     $this->logger->error('Widget message streaming failed', [
                         'error' => $e->getMessage(),
@@ -666,6 +720,9 @@ class WidgetPublicController extends AbstractController
                     try {
                         $incomingMessage->setStatus('failed');
                         $this->em->flush();
+
+                        // Decrement session message count on failure so user can retry
+                        $this->sessionService->decrementMessageCount($session);
                     } catch (\Throwable $flushException) {
                         // EntityManager might be closed after database error
                         $this->logger->warning('Could not update message status after error', [
@@ -674,7 +731,7 @@ class WidgetPublicController extends AbstractController
                     }
 
                     $this->sendSse('error', [
-                        'error' => 'Sorry, something went wrong. Please try again.',
+                        'error' => 'Failed to process message',
                     ]);
                 }
             });
@@ -686,6 +743,9 @@ class WidgetPublicController extends AbstractController
 
             return $response;
         } catch (\Exception $e) {
+            // Decrement session message count on failure so user can retry
+            $this->sessionService->decrementMessageCount($session);
+
             $this->logger->error('Widget message failed', [
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString(),
@@ -935,7 +995,7 @@ class WidgetPublicController extends AbstractController
                 $owner->getId(), // Store under owner for quota/usage
                 $file->getId(),
                 $groupKey,
-                FileHelper::getFileTypeCode($fileExtension)
+                $this->getFileTypeCode($fileExtension)
             );
 
             if ($vectorResult['success']) {
@@ -983,6 +1043,21 @@ class WidgetPublicController extends AbstractController
         ];
 
         return $typeMap[$extension] ?? 'other';
+    }
+
+    /**
+     * Get file type code for RAG vectorization (matches FileController logic).
+     */
+    private function getFileTypeCode(string $extension): int
+    {
+        return match (strtolower($extension)) {
+            'txt', 'md', 'csv' => 0, // Plain text
+            'jpg', 'jpeg', 'png', 'gif', 'webp' => 1, // Image
+            'mp3', 'mp4', 'wav', 'ogg', 'm4a', 'webm' => 2, // Audio/Video
+            'pdf' => 3, // PDF
+            'docx', 'doc', 'xlsx', 'xls', 'pptx', 'ppt' => 4, // Office
+            default => 5, // Other
+        };
     }
 
     /**
@@ -1496,5 +1571,126 @@ class WidgetPublicController extends AbstractController
         ]);
 
         return $this->json(['success' => true]);
+    }
+
+    /**
+     * Fetch live data from API-type flow responses and format as prompt context.
+     * Skipped for free users when billing is enabled.
+     *
+     * @param \App\Entity\Widget $widget
+     * @param \App\Entity\User   $owner
+     */
+    private function fetchApiContext($widget, $owner, string $externalUserId = ''): string
+    {
+        if ($this->billingService->isEnabled() && \in_array($owner->getUserLevel(), ['NEW', 'ANONYMOUS'], true)) {
+            return '';
+        }
+
+        $topic = $widget->getTaskPromptTopic();
+        if (!$topic) {
+            return '';
+        }
+
+        $promptData = $this->promptService->getPromptWithMetadata($topic, $owner->getId());
+        if (!$promptData) {
+            return '';
+        }
+
+        $flowRulesRaw = $promptData['metadata']['widgetFlowRules'] ?? null;
+        if (!\is_string($flowRulesRaw) || '' === $flowRulesRaw) {
+            return '';
+        }
+
+        try {
+            $flow = json_decode($flowRulesRaw, true, 512, JSON_THROW_ON_ERROR);
+        } catch (\JsonException) {
+            return '';
+        }
+
+        $widgetConfig = $widget->getConfig();
+
+        $externalApiToken = \is_string($widgetConfig['externalApiToken'] ?? null)
+            ? $widgetConfig['externalApiToken']
+            : '';
+
+        $apiUrls = [];
+
+        $configApiUrl = \is_string($widgetConfig['externalApiUrl'] ?? null)
+            ? trim($widgetConfig['externalApiUrl'])
+            : '';
+        if ('' !== $configApiUrl) {
+            $apiUrls[] = ['url' => $configApiUrl, 'method' => 'GET', 'label' => 'User Profile'];
+        }
+
+        foreach ($flow['responses'] ?? [] as $response) {
+            $type = $response['type'] ?? null;
+            $url = $response['meta']['url'] ?? null;
+            $method = $response['meta']['method'] ?? 'GET';
+            if ('api' === $type && \is_string($url) && '' !== trim($url)) {
+                $apiUrls[] = ['url' => trim($url), 'method' => $method, 'label' => $response['label'] ?? ''];
+            }
+        }
+
+        if (empty($apiUrls)) {
+            return '';
+        }
+
+        $maxTotalLength = 16000;
+        $sections = [];
+        $totalLength = 0;
+
+        foreach ($apiUrls as $api) {
+            if ($totalLength >= $maxTotalLength) {
+                break;
+            }
+
+            $originalUrl = $api['url'];
+            if (str_contains($originalUrl, '{externalUserId}')) {
+                if ('' === $externalUserId) {
+                    continue;
+                }
+                $url = str_replace('{externalUserId}', rawurlencode($externalUserId), $originalUrl);
+            } else {
+                $url = $originalUrl;
+            }
+
+            $apiHeaders = [];
+            if ('' !== $externalApiToken) {
+                $apiHeaders['Authorization'] = 'Bearer '.$externalApiToken;
+            }
+
+            try {
+                $result = $this->urlContentService->fetchApi($url, $api['method'], $apiHeaders);
+                if ($result->success && '' !== $result->extractedText) {
+                    $section = sprintf(
+                        "[%s %s] %s:\n%s",
+                        $api['method'],
+                        $api['url'],
+                        $api['label'],
+                        $result->extractedText,
+                    );
+
+                    $remaining = $maxTotalLength - $totalLength;
+                    if (\strlen($section) > $remaining) {
+                        $section = mb_substr($section, 0, $remaining).'... [truncated]';
+                    }
+
+                    $sections[] = $section;
+                    $totalLength += \strlen($section);
+                }
+            } catch (\Throwable $e) {
+                $this->logger->warning('Widget API fetch failed', [
+                    'url' => $api['url'],
+                    'error' => $e->getMessage(),
+                ]);
+            }
+        }
+
+        if (empty($sections)) {
+            return '';
+        }
+
+        return "## Live API Data\nThe following data was fetched from configured API endpoints. Use this data to answer the user's question:\n\n"
+            .implode("\n\n", $sections);
     }
 }

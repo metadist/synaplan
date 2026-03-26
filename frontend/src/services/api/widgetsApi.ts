@@ -72,6 +72,10 @@ export interface WidgetConfig {
   allowFileUpload?: boolean
   fileUploadLimit?: number
   customFields?: CustomFieldDef[]
+  externalApiToken?: string
+  externalApiUrl?: string
+  privacyPolicyUrl?: string
+  dataProcessingAccepted?: boolean
 }
 
 export interface CreateWidgetRequest {
@@ -196,6 +200,7 @@ export async function getWidgetStats(widgetId: string): Promise<{
 export interface SendWidgetMessageOptions {
   chatId?: number
   fileIds?: number[]
+  externalUserId?: string
   apiUrl?: string
   headers?: Record<string, string>
   onChunk?: (chunk: string) => void | Promise<void>
@@ -208,7 +213,6 @@ export interface SendWidgetMessageResult {
   chatId: number
   metadata?: unknown
   remainingUploads?: number | null
-  messageCount?: number | null
   text: string
 }
 
@@ -221,7 +225,14 @@ export async function sendWidgetMessage(
   sessionId: string,
   options: SendWidgetMessageOptions = {}
 ): Promise<SendWidgetMessageResult> {
-  const { chatId, fileIds, apiUrl: apiUrlOverride, headers: extraHeaders, onStatus } = options
+  const {
+    chatId,
+    fileIds,
+    externalUserId,
+    apiUrl: apiUrlOverride,
+    headers: extraHeaders,
+    onStatus,
+  } = options
 
   const config = useConfigStore()
   const apiUrl = apiUrlOverride ?? config.apiBaseUrl
@@ -247,6 +258,10 @@ export async function sendWidgetMessage(
 
   if (fileIds && fileIds.length > 0) {
     payload.files = fileIds
+  }
+
+  if (externalUserId) {
+    payload.externalUserId = externalUserId
   }
 
   // Include credentials when in test/internal mode (dashboard context)
@@ -275,7 +290,6 @@ export async function sendWidgetMessage(
   let finalChatId: number | null = null
   let metadata: unknown = null
   let remainingUploads: number | null = null
-  let serverMessageCount: number | null = null
   let completed = false
   let aggregatedText = ''
 
@@ -322,9 +336,6 @@ export async function sendWidgetMessage(
       metadata = data.metadata ?? metadata
       if (typeof data.remainingUploads === 'number') {
         remainingUploads = data.remainingUploads
-      }
-      if (typeof data.messageCount === 'number') {
-        serverMessageCount = data.messageCount
       }
       if (onStatus) {
         onStatus(data)
@@ -407,7 +418,6 @@ export async function sendWidgetMessage(
     chatId: finalChatId,
     metadata,
     remainingUploads,
-    messageCount: serverMessageCount,
     text: aggregatedText,
   }
 }
@@ -482,7 +492,13 @@ export async function sendSetupMessage(
   widgetId: string,
   text: string,
   history: SetupMessage[],
-  language?: string
+  language?: string,
+  mode?: 'interview' | 'flow-builder',
+  currentFlow?: {
+    triggers: Array<{ id: string; label: string; type?: string }>
+    responses: Array<{ id: string; label: string; type?: string; meta?: Record<string, string> }>
+    connections: Array<{ from: string; to: string }>
+  }
 ): Promise<{
   success: boolean
   text: string
@@ -494,7 +510,7 @@ export async function sendSetupMessage(
     progress: number
   }>(`/api/v1/widgets/${widgetId}/setup-chat`, {
     method: 'POST',
-    body: JSON.stringify({ text, history, language }),
+    body: JSON.stringify({ text, history, language, mode, currentFlow }),
   })
   return data
 }
@@ -625,4 +641,35 @@ export async function resetSetupPrompt(widgetId: string): Promise<{ success: boo
   return await httpClient<{ success: boolean }>(`/api/v1/widgets/${widgetId}/setup/prompt`, {
     method: 'DELETE',
   })
+}
+
+export interface MemorySuggestion {
+  id: number
+  category: string
+  key: string
+  value: string
+  widgetField: string
+  responseType: 'text' | 'link' | 'list' | 'api' | 'custom'
+  meta: Record<string, string>
+}
+
+export async function suggestMemories(widgetId: string): Promise<MemorySuggestion[]> {
+  const res = await httpClient<{ suggestions: MemorySuggestion[] }>(
+    `/api/v1/widgets/${widgetId}/suggest-memories`,
+    { method: 'POST' }
+  )
+  return res.suggestions
+}
+
+/**
+ * Trigger crawling of all link-type response URLs for a widget.
+ * The backend fetches each URL, extracts text, chunks and vectorizes it for RAG.
+ */
+export async function triggerCrawl(
+  widgetId: string
+): Promise<{ success: boolean; urls_queued: number }> {
+  return await httpClient<{ success: boolean; urls_queued: number }>(
+    `/api/v1/widgets/${widgetId}/crawl`,
+    { method: 'POST' }
+  )
 }

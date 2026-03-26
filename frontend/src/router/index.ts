@@ -7,8 +7,7 @@ import LoadingView from '@/views/LoadingView.vue'
 
 const guardSubscription = (_to: any, _from: any, next: any) => {
   const configStore = useConfigStore()
-  const { isAdmin } = useAuth()
-  if (!configStore.billing.enabled || isAdmin.value) {
+  if (!configStore.billing.enabled) {
     next({ name: 'chat' })
   } else {
     next()
@@ -130,6 +129,12 @@ const router = createRouter({
       name: 'widget-chats',
       component: () => import('../views/WidgetSessionsView.vue'),
       meta: { requiresAuth: true, titleKey: 'pageTitles.widgetChats' },
+    },
+    {
+      path: '/tools/chat-widget/:widgetId',
+      name: 'widget-detail',
+      component: () => import('@/views/WidgetDetailView.vue'),
+      meta: { requiresAuth: true, titleKey: 'pageTitles.widgetDetail' },
     },
     {
       path: '/tools/chat-widget/live-support',

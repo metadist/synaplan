@@ -48,7 +48,7 @@ final class ConfigControllerMemoryServiceIntegrationTest extends WebTestCase
 
         $data = json_decode($client->getResponse()->getContent(), true);
 
-        $qdrantUrl = $_ENV['QDRANT_SERVICE_URL'] ?? '';
+        $qdrantUrl = $_ENV['QDRANT_URL'] ?? '';
         $expectedConfigured = !empty($qdrantUrl);
 
         $this->assertEquals($expectedConfigured, $data['configured']);

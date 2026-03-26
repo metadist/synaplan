@@ -16,6 +16,8 @@ use Symfony\Contracts\HttpClient\HttpClientInterface;
 
 class OpenAIProvider implements ChatProviderInterface, EmbeddingProviderInterface, ImageGenerationProviderInterface, VisionProviderInterface, SpeechToTextProviderInterface, TextToSpeechProviderInterface
 {
+    private const DEFAULT_MAX_TOKENS = 65536;
+
     private $client;
     private array $modelCapabilities = [];
 
@@ -164,9 +166,9 @@ class OpenAIProvider implements ChatProviderInterface, EmbeddingProviderInterfac
 
             // Use correct token parameter based on model capabilities
             if ($usesCompletionTokensParam) {
-                $requestOptions['max_completion_tokens'] = $options['max_tokens'] ?? 4096;
+                $requestOptions['max_completion_tokens'] = $options['max_tokens'] ?? self::DEFAULT_MAX_TOKENS;
             } else {
-                $requestOptions['max_tokens'] = $options['max_tokens'] ?? 4096;
+                $requestOptions['max_tokens'] = $options['max_tokens'] ?? self::DEFAULT_MAX_TOKENS;
             }
 
             $response = $this->client->chat()->create($requestOptions);
@@ -223,9 +225,9 @@ class OpenAIProvider implements ChatProviderInterface, EmbeddingProviderInterfac
 
             // Use correct token parameter based on model capabilities
             if ($usesCompletionTokensParam) {
-                $requestOptions['max_completion_tokens'] = $options['max_tokens'] ?? 4096;
+                $requestOptions['max_completion_tokens'] = $options['max_tokens'] ?? self::DEFAULT_MAX_TOKENS;
             } else {
-                $requestOptions['max_tokens'] = $options['max_tokens'] ?? 4096;
+                $requestOptions['max_tokens'] = $options['max_tokens'] ?? self::DEFAULT_MAX_TOKENS;
             }
 
             $stream = $this->client->chat()->createStreamed($requestOptions);
@@ -239,6 +241,7 @@ class OpenAIProvider implements ChatProviderInterface, EmbeddingProviderInterfac
             ];
 
             $firstChunk = true;
+            $finishReason = null;
             foreach ($stream as $response) {
                 $responseArray = $response->toArray();
 
@@ -257,6 +260,12 @@ class OpenAIProvider implements ChatProviderInterface, EmbeddingProviderInterfac
                     ];
                 }
 
+                // Capture finish_reason (set on the final chunk)
+                $chunkFinishReason = $responseArray['choices'][0]['finish_reason'] ?? null;
+                if (null !== $chunkFinishReason) {
+                    $finishReason = $chunkFinishReason;
+                }
+
                 // Handle reasoning content (o1, o3, gpt-5 models)
                 $reasoningContent = $responseArray['choices'][0]['delta']['reasoning_content'] ?? null;
                 if (null !== $reasoningContent) {
@@ -268,6 +277,11 @@ class OpenAIProvider implements ChatProviderInterface, EmbeddingProviderInterfac
                 if ($content) {
                     $callback(['type' => 'content', 'content' => $content]);
                 }
+            }
+
+            // Signal finish_reason so callers know if the response was truncated
+            if (null !== $finishReason) {
+                $callback(['type' => 'finish', 'finish_reason' => $finishReason]);
             }
 
             return ['usage' => $usage];

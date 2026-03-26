@@ -5,7 +5,7 @@ description: AI-powered knowledge management system with RAG, chat widgets, and 
 
 # Synaplan Development Guide
 
-Full-stack AI knowledge management platform: RAG with MariaDB VECTOR, embeddable chat widgets, WhatsApp/Email integration, multiple AI providers (Ollama, OpenAI, Anthropic, Groq, Gemini).
+Full-stack AI knowledge management platform: RAG with MariaDB VECTOR + Qdrant, embeddable chat widgets, WhatsApp/Email integration, multiple AI providers (Ollama, OpenAI, Anthropic, Groq, Gemini).
 
 **Stack:** PHP 8.3/Symfony 7, Vue 3/TypeScript/Vite, Docker Compose, frankenphp/caddy.
 
@@ -13,16 +13,13 @@ Full-stack AI knowledge management platform: RAG with MariaDB VECTOR, embeddable
 
 | Repo | Purpose |
 |------|---------|
-| `synaplan/` | Main app source code, local development environment |
+| `synaplan/` | Main app source code, local development environment (includes Qdrant) |
 | `synaplan-base-php/` | Base Docker image (FrankenPHP + gRPC + whisper.cpp) |
 | `synaplan-platform/` | Production deployment configs, pulls pre-built images |
-| `synaplan-memories/` | Optional Qdrant vector storage for AI memories |
 
-**Local dev** (`synaplan/`): Builds from source, includes all dev tools (phpMyAdmin, MailHog, Vite dev server).
+**Local dev** (`synaplan/`): Builds from source, includes all dev tools (phpMyAdmin, MailHog, Vite dev server). Qdrant runs as a Docker service for AI memories and RAG vector search.
 
 **Production** (`synaplan-platform/`): Uses `ghcr.io/metadist/synaplan:latest`, multi-server with Galera cluster.
-
-**Memories** (`synaplan-memories/`): Rust microservice + Qdrant for user profiling. Connect via `QDRANT_SERVICE_URL`.
 
 See `_devextras/SYSADMIN-help.md` for deployment details.
 

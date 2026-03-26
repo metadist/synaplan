@@ -210,6 +210,9 @@ export const selectors = {
       testButton: '[data-testid="btn-widget-test"]',
       advancedButton: '[data-testid="btn-widget-advanced"]',
     },
+    detailPage: {
+      settingsButton: '[data-testid="btn-widget-settings"]',
+    },
     testChatOverlay: '[data-testid="test-chat-overlay"]',
     advancedConfig: {
       modal: '[data-testid="modal-advanced-config"]',

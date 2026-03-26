@@ -254,8 +254,7 @@ cat << 'SECTION7'
 
 SECTION7
 
-output_var "QDRANT_SERVICE_URL" "http://qdrant-service:8090"
-output_var "QDRANT_SERVICE_API_KEY" "changeme-in-production"
+output_var "QDRANT_URL" "http://qdrant:6333"
 
 
 cat << 'SECTION8'

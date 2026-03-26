@@ -721,6 +721,15 @@ final readonly class ChatHandler implements MessageHandlerInterface
             ]);
         }
 
+        // Append live API data from widget flow api-type responses
+        $apiContext = $options['api_context'] ?? '';
+        if ('' !== $apiContext) {
+            $systemPrompt .= "\n\n".$apiContext;
+            $this->logger->info('ChatHandler: API context appended to system prompt', [
+                'api_context_length' => \strlen($apiContext),
+            ]);
+        }
+
         // Append plugin context (external data sources like casting platforms)
         $systemPrompt = $this->appendPluginContext($systemPrompt, $message, $classification, $options);
 
@@ -770,14 +779,16 @@ final readonly class ChatHandler implements MessageHandlerInterface
 
         // Resolve model ID to provider + model name + features
         $modelFeatures = [];
+        $modelMaxTokens = null;
         if ($modelId) {
             $provider = $this->modelConfigService->getProviderForModel($modelId);
             $modelName = $this->modelConfigService->getModelName($modelId);
 
-            // Get model features from DB
+            // Get model features and config from DB
             $model = $this->modelRepository->find($modelId);
             if ($model) {
                 $modelFeatures = $model->getFeatures();
+                $modelMaxTokens = $model->getMaxTokens();
             }
 
             error_log('🟢 ChatHandler RESOLVED CHAT MODEL: '.$provider.' / '.$modelName.' (ID: '.$modelId.')');
@@ -795,8 +806,13 @@ final readonly class ChatHandler implements MessageHandlerInterface
             'provider' => $provider,
             'model' => $modelName,
             'temperature' => 0.7,
-            'modelFeatures' => $modelFeatures, // Pass features to provider
-        ], $options); // Options from frontend (e.g., reasoning: true/false)
+            'modelFeatures' => $modelFeatures,
+        ], $options);
+
+        // Apply model-specific max_tokens from DB config (if set and valid)
+        if (null !== $modelMaxTokens && $modelMaxTokens > 0 && !isset($aiOptions['max_tokens'])) {
+            $aiOptions['max_tokens'] = $modelMaxTokens;
+        }
 
         // Log reasoning option
         error_log('🧠 ChatHandler: Reasoning option = '.($aiOptions['reasoning'] ?? 'NOT SET'));

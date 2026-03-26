@@ -166,11 +166,71 @@
           data-testid="section-messages"
           @click="handleMessagesClick"
         >
+          <!-- Privacy Notice -->
+          <div
+            v-if="!privacyDismissed"
+            class="text-[11px] leading-relaxed px-3 py-2 rounded-xl"
+            :style="{
+              backgroundColor: widgetTheme === 'dark' ? '#2a2a2a' : '#f9fafb',
+              color: widgetTheme === 'dark' ? '#9ca3af' : '#6b7280',
+              border: `1px solid ${widgetTheme === 'dark' ? '#374151' : '#e5e7eb'}`,
+            }"
+            data-testid="privacy-notice"
+          >
+            <div class="flex items-start gap-2">
+              <svg
+                class="w-3.5 h-3.5 flex-shrink-0 mt-0.5 opacity-60"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                stroke-width="2"
+              >
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  d="M9 12.75L11.25 15 15 9.75m-3-7.036A11.959 11.959 0 013.598 6 11.99 11.99 0 003 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285z"
+                />
+              </svg>
+              <div class="flex-1">
+                <span>
+                  {{
+                    externalUserId
+                      ? $t('widget.privacyNoticePersonalized')
+                      : $t('widget.privacyNotice')
+                  }}
+                </span>
+                <a
+                  v-if="privacyPolicyUrl"
+                  :href="privacyPolicyUrl"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  class="underline hover:opacity-80 ml-1"
+                  :style="{ color: primaryColor }"
+                  >{{ $t('widget.privacyPolicyLink') }}</a
+                >
+                <button
+                  class="ml-2 opacity-50 hover:opacity-100 transition-opacity"
+                  :aria-label="$t('widget.dismissPrivacy')"
+                  @click.stop="dismissPrivacy()"
+                >
+                  <svg class="w-3 h-3 inline" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                      stroke-width="2"
+                      d="M6 18L18 6M6 6l12 12"
+                    />
+                  </svg>
+                </button>
+              </div>
+            </div>
+          </div>
+
           <div
             v-for="message in sortedMessages"
             :key="message.id"
             :class="['flex', message.role === 'user' ? 'justify-end' : 'justify-start']"
-            :data-testid="`message-${message.role}`"
+            :data-testid="'message-' + message.role"
           >
             <div
               :class="['max-w-[80%] rounded-2xl px-4 py-2', message.role === 'user' ? '' : '']"
@@ -316,9 +376,12 @@
           </div>
 
           <!-- Limit Warning -->
-          <div v-if="showLimitWarning" class="flex justify-center">
+          <div
+            v-if="showLimitWarning"
+            class="flex justify-center"
+            data-testid="warning-message-limit"
+          >
             <div
-              data-testid="warning-message-limit"
               class="bg-orange-500/10 border border-orange-500/30 rounded-xl px-4 py-3 max-w-[90%]"
             >
               <div class="flex items-start gap-2">
@@ -334,11 +397,12 @@
           </div>
 
           <!-- Limit Reached -->
-          <div v-if="limitReached" class="flex justify-center">
-            <div
-              data-testid="error-message-limit-reached"
-              class="bg-red-500/10 border border-red-500/30 rounded-xl px-4 py-3 max-w-[90%]"
-            >
+          <div
+            v-if="limitReached"
+            class="flex justify-center"
+            data-testid="error-message-limit-reached"
+          >
+            <div class="bg-red-500/10 border border-red-500/30 rounded-xl px-4 py-3 max-w-[90%]">
               <div class="flex items-start gap-2">
                 <XCircleIcon class="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5" />
                 <div>
@@ -358,8 +422,8 @@
         >
           <div
             v-if="fileUploadError"
-            data-testid="error-file-upload"
             class="mb-2 p-2 bg-red-500/10 border border-red-500/30 rounded-lg"
+            data-testid="error-file-upload"
           >
             <div class="flex items-start gap-2">
               <XCircleIcon class="w-4 h-4 text-red-500 flex-shrink-0 mt-0.5" />
@@ -369,8 +433,8 @@
 
           <div
             v-if="allowFileUploads && fileLimitReached && selectedFiles.length === 0"
-            data-testid="error-file-upload-limit"
             class="mb-2 p-2 bg-amber-500/10 border border-amber-500/30 rounded-lg"
+            data-testid="error-file-upload-limit"
           >
             <div class="flex items-start gap-2">
               <ExclamationTriangleIcon class="w-4 h-4 text-amber-500 flex-shrink-0 mt-0.5" />
@@ -420,7 +484,6 @@
           <!-- File Size Error -->
           <div
             v-if="fileSizeError"
-            data-testid="error-file-size"
             class="mb-2 p-2 bg-red-500/10 border border-red-500/30 rounded-lg"
           >
             <div class="flex items-start gap-2">
@@ -599,6 +662,8 @@ interface Props {
   hideButton?: boolean
   fullscreenMode?: boolean
   allowFullscreen?: boolean
+  externalUserId?: string
+  privacyPolicyUrl?: string
   testMode?: boolean
   internalMode?: boolean
 }
@@ -654,6 +719,19 @@ const isOpen = ref(false)
 const isFullscreen = ref(props.fullscreenMode)
 const widgetTheme = ref<'light' | 'dark'>(props.defaultTheme)
 const inputMessage = ref('')
+const privacyStorageKey = `synaplan_privacy_${props.widgetId}`
+const privacyDismissed = ref(
+  typeof window !== 'undefined' && window.localStorage.getItem(privacyStorageKey) === '1'
+)
+
+function dismissPrivacy() {
+  privacyDismissed.value = true
+  try {
+    window.localStorage.setItem(privacyStorageKey, '1')
+  } catch {
+    /* storage may be unavailable in some contexts */
+  }
+}
 
 // Get button icon component based on buttonIcon prop
 const getButtonIconComponent = computed(() => {
@@ -1373,6 +1451,7 @@ const sendMessage = async () => {
     const result = await sendWidgetMessage(props.widgetId, userMessage, sessionId.value, {
       chatId: chatId.value ?? undefined,
       fileIds,
+      externalUserId: props.externalUserId,
       apiUrl: props.apiUrl,
       headers: testModeHeaders.value,
       onChunk: async (chunk: string) => {
@@ -1405,10 +1484,6 @@ const sendMessage = async () => {
     if (!sessionCreatedEmitted.value && isTestEnvironment.value && sessionId.value) {
       sessionCreatedEmitted.value = true
       emit('session-created', sessionId.value)
-    }
-
-    if (typeof result.messageCount === 'number') {
-      messageCount.value = result.messageCount
     }
 
     if (typeof result.remainingUploads === 'number') {

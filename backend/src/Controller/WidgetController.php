@@ -5,9 +5,12 @@ namespace App\Controller;
 use App\Entity\Prompt;
 use App\Entity\User;
 use App\Entity\Widget;
+use App\Message\CrawlWidgetUrlMessage;
 use App\Repository\PromptRepository;
 use App\Repository\WidgetRepository;
+use App\Service\BillingService;
 use App\Service\File\UserUploadPathBuilder;
+use App\Service\UserMemoryService;
 use App\Service\WidgetService;
 use App\Service\WidgetSessionService;
 use App\Service\WidgetSetupService;
@@ -18,6 +21,7 @@ use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
+use Symfony\Component\Messenger\MessageBusInterface;
 use Symfony\Component\Routing\Attribute\Route;
 use Symfony\Component\Security\Http\Attribute\CurrentUser;
 
@@ -34,10 +38,13 @@ class WidgetController extends AbstractController
         private WidgetService $widgetService,
         private WidgetSessionService $sessionService,
         private WidgetSetupService $setupService,
+        private UserMemoryService $memoryService,
         private WidgetRepository $widgetRepository,
         private PromptRepository $promptRepository,
         private UserUploadPathBuilder $userUploadPathBuilder,
         private EntityManagerInterface $em,
+        private MessageBusInterface $messageBus,
+        private BillingService $billingService,
         private LoggerInterface $logger,
         private string $uploadDir,
     ) {
@@ -296,17 +303,12 @@ class WidgetController extends AbstractController
 
         $data = json_decode($request->getContent(), true);
 
-        error_log('🔧 Widget update request - widgetId: '.$widgetId);
-        error_log('🔧 Data received: '.json_encode($data));
-
         try {
             if (isset($data['name'])) {
                 $this->widgetService->updateWidgetName($widget, $data['name']);
             }
 
             if (isset($data['config'])) {
-                error_log('🔧 Config received: '.json_encode($data['config']));
-                error_log('🔧 allowedDomains in config: '.json_encode($data['config']['allowedDomains'] ?? []));
                 $this->widgetService->updateWidget($widget, $data['config']);
             }
 
@@ -314,19 +316,13 @@ class WidgetController extends AbstractController
                 $widget->setStatus($data['status']);
             }
 
-            // Always flush after updates
             $this->em->flush();
-
-            error_log('🔧 After flush - allowedDomains: '.json_encode($widget->getAllowedDomains()));
 
             return $this->json([
                 'success' => true,
                 'message' => 'Widget updated successfully',
             ]);
         } catch (\Exception $e) {
-            error_log('❌ Widget update error: '.$e->getMessage());
-            error_log('❌ Stack trace: '.$e->getTraceAsString());
-
             $this->logger->error('Failed to update widget', [
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString(),
@@ -518,7 +514,7 @@ class WidgetController extends AbstractController
             $uploadedFile->move($absoluteDir, $filename);
 
             // Public URL via file-serving API (works cross-origin for embedded widgets)
-            $baseUrl = $_ENV['APP_URL'] ?? $request->getSchemeAndHttpHost();
+            $baseUrl = $_ENV['SYNAPLAN_URL'] ?? $request->getSchemeAndHttpHost();
             $baseUrl = rtrim($baseUrl, '/');
             $iconUrl = $baseUrl.'/api/v1/files/uploads/'.$relativePath;
 
@@ -582,6 +578,7 @@ class WidgetController extends AbstractController
                     )
                 ),
                 new OA\Property(property: 'language', type: 'string', description: 'Language code (en, de, etc.)'),
+                new OA\Property(property: 'mode', type: 'string', enum: ['interview', 'flow-builder'], description: 'Setup mode: interview (default) or flow-builder for Q&A generation'),
             ]
         )
     )]
@@ -624,7 +621,9 @@ class WidgetController extends AbstractController
                 $user,
                 $data['text'],
                 $data['history'] ?? [],
-                $data['language'] ?? 'en'
+                $data['language'] ?? 'en',
+                $data['mode'] ?? 'interview',
+                $data['currentFlow'] ?? null
             );
 
             return $this->json([
@@ -642,6 +641,70 @@ class WidgetController extends AbstractController
                 'error' => 'Failed to process message',
             ], Response::HTTP_INTERNAL_SERVER_ERROR);
         }
+    }
+
+    /**
+     * Suggest user memories relevant for widget configuration.
+     */
+    #[Route('/{widgetId}/suggest-memories', name: 'suggest_memories', methods: ['POST'])]
+    #[OA\Post(
+        path: '/api/v1/widgets/{widgetId}/suggest-memories',
+        summary: 'Suggest relevant user memories for widget Q&A setup',
+        security: [['Bearer' => []]],
+        tags: ['Widgets']
+    )]
+    #[OA\Parameter(
+        name: 'widgetId',
+        in: 'path',
+        required: true,
+        schema: new OA\Schema(type: 'string')
+    )]
+    #[OA\Response(
+        response: 200,
+        description: 'Suggested memories',
+        content: new OA\JsonContent(
+            properties: [
+                new OA\Property(
+                    property: 'suggestions',
+                    type: 'array',
+                    items: new OA\Items(properties: [
+                        new OA\Property(property: 'id', type: 'integer'),
+                        new OA\Property(property: 'category', type: 'string'),
+                        new OA\Property(property: 'key', type: 'string'),
+                        new OA\Property(property: 'value', type: 'string'),
+                        new OA\Property(property: 'widgetField', type: 'string'),
+                        new OA\Property(property: 'responseType', type: 'string'),
+                        new OA\Property(property: 'meta', type: 'object'),
+                    ])
+                ),
+            ]
+        )
+    )]
+    public function suggestMemories(
+        string $widgetId,
+        #[CurrentUser] User $user,
+    ): JsonResponse {
+        $widget = $this->widgetRepository->findOneBy(['widgetId' => $widgetId]);
+        if (!$widget) {
+            return $this->json(['error' => 'Widget not found'], Response::HTTP_NOT_FOUND);
+        }
+
+        if ($widget->getOwnerId() !== $user->getId()) {
+            return $this->json(['error' => 'Access denied'], Response::HTTP_FORBIDDEN);
+        }
+
+        if (!$this->memoryService->isAvailable()) {
+            return $this->json(['suggestions' => []]);
+        }
+
+        $memories = $this->memoryService->getUserMemories($user->getId());
+        if ([] === $memories) {
+            return $this->json(['suggestions' => []]);
+        }
+
+        $suggestions = $this->setupService->suggestMemoriesForWidget($user, $memories);
+
+        return $this->json(['suggestions' => $suggestions]);
     }
 
     /**
@@ -942,5 +1005,135 @@ class WidgetController extends AbstractController
         }
 
         return $this->json(['success' => true]);
+    }
+
+    /**
+     * Trigger crawling for all link-type responses that have a URL configured.
+     * Reads URLs from the widget's prompt metadata (widgetFlowRules) and dispatches
+     * async crawl jobs that fetch, chunk and vectorize the page content.
+     *
+     * Requires PRO+ subscription when billing is enabled.
+     */
+    #[Route('/{widgetId}/crawl', name: 'crawl', methods: ['POST'])]
+    #[OA\Post(
+        path: '/api/v1/widgets/{widgetId}/crawl',
+        summary: 'Crawl link-type response URLs and vectorize content for RAG',
+        security: [['Bearer' => []]],
+        tags: ['Widgets'],
+        parameters: [
+            new OA\Parameter(name: 'widgetId', in: 'path', required: true, schema: new OA\Schema(type: 'string')),
+        ],
+        responses: [
+            new OA\Response(
+                response: 200,
+                description: 'Crawl jobs dispatched',
+                content: new OA\JsonContent(
+                    properties: [
+                        new OA\Property(property: 'success', type: 'boolean'),
+                        new OA\Property(property: 'urls_queued', type: 'integer'),
+                    ]
+                )
+            ),
+            new OA\Response(response: 401, description: 'Not authenticated'),
+            new OA\Response(response: 403, description: 'Upgrade required'),
+            new OA\Response(response: 404, description: 'Widget not found'),
+        ]
+    )]
+    public function crawl(
+        string $widgetId,
+        #[CurrentUser] ?User $user,
+    ): JsonResponse {
+        if (!$user) {
+            return $this->json(['error' => 'Not authenticated'], Response::HTTP_UNAUTHORIZED);
+        }
+
+        $widget = $this->widgetRepository->findByWidgetId($widgetId);
+        if (!$widget || $widget->getOwnerId() !== $user->getId()) {
+            return $this->json(['error' => 'Widget not found'], Response::HTTP_NOT_FOUND);
+        }
+
+        if ($this->billingService->isEnabled() && \in_array($user->getUserLevel(), ['NEW', 'ANONYMOUS'], true)) {
+            return $this->json([
+                'error' => 'upgrade_required',
+                'message' => 'External sources require a Pro subscription',
+            ], Response::HTTP_FORBIDDEN);
+        }
+
+        $crawlData = $this->extractCrawlableUrls($widget);
+        $urls = $crawlData['urls'];
+        $promptId = $crawlData['promptId'];
+
+        foreach ($urls as $entry) {
+            $this->messageBus->dispatch(new CrawlWidgetUrlMessage(
+                $widgetId,
+                $entry['url'],
+                $user->getId(),
+                $entry['nodeId'],
+                $promptId,
+            ));
+        }
+
+        $this->logger->info('Widget crawl dispatched', [
+            'widget_id' => $widgetId,
+            'urls_queued' => \count($urls),
+        ]);
+
+        return $this->json([
+            'success' => true,
+            'urls_queued' => \count($urls),
+        ]);
+    }
+
+    /**
+     * @return array{urls: array<array{nodeId: string, url: string}>, promptId: int}
+     */
+    private function extractCrawlableUrls(Widget $widget): array
+    {
+        $empty = ['urls' => [], 'promptId' => 0];
+
+        $topic = $widget->getTaskPromptTopic();
+        if (!$topic) {
+            return $empty;
+        }
+
+        $prompt = $this->promptRepository->findByTopicAndUser($topic, $widget->getOwnerId());
+        if (!$prompt) {
+            return $empty;
+        }
+
+        $metadata = $this->em->getRepository(\App\Entity\PromptMeta::class)
+            ->findBy(['promptId' => $prompt->getId()]);
+
+        $flowRulesRaw = null;
+        foreach ($metadata as $meta) {
+            if ('widgetFlowRules' === $meta->getMetaKey()) {
+                $flowRulesRaw = $meta->getMetaValue();
+                break;
+            }
+        }
+
+        if (!$flowRulesRaw) {
+            return $empty;
+        }
+
+        try {
+            $flow = json_decode($flowRulesRaw, true, 512, JSON_THROW_ON_ERROR);
+        } catch (\JsonException) {
+            return $empty;
+        }
+
+        $urls = [];
+        foreach ($flow['responses'] ?? [] as $response) {
+            $type = $response['type'] ?? null;
+            $url = $response['meta']['url'] ?? null;
+            if ('link' === $type && \is_string($url) && '' !== trim($url)) {
+                $urls[] = [
+                    'nodeId' => $response['id'] ?? 'unknown',
+                    'url' => trim($url),
+                ];
+            }
+        }
+
+        return ['urls' => $urls, 'promptId' => $prompt->getId()];
     }
 }

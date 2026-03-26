@@ -246,13 +246,8 @@ The System Config page will have **6 main tabs**, organized by functional area:
 **Purpose:** Configure Qdrant vector search service
 
 **Sections:**
-1. **Qdrant Service Connection**
-   - `QDRANT_SERVICE_URL` - URL input
-   - `QDRANT_SERVICE_API_KEY` - Password input
-
-2. **Qdrant Direct (Optional/Advanced)**
-   - `QDRANT_URL` - URL input (from synaplan-memories)
-   - `QDRANT_API_KEY` - Password input
+1. **Qdrant Vector Database**
+   - `QDRANT_URL` - URL input (e.g. `http://qdrant:6333`)
 
 **UI Features:**
 - "Test Connection" button

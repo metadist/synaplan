@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Service;
 
 use App\AI\Service\AiFacade;
+use App\DTO\UserMemoryDTO;
 use App\Entity\Prompt;
 use App\Entity\User;
 use App\Entity\Widget;
@@ -24,6 +25,7 @@ final readonly class WidgetSetupService
     public const SETUP_TOPIC_PREFIX = 'wsetup_';
     public const DEFAULT_SETUP_MODEL_ID = 73;
     private const START_MARKER = '__START_INTERVIEW__';
+    private const FLOW_BUILDER_START_MARKER = '__START_FLOW_BUILDER__';
 
     public function __construct(
         private EntityManagerInterface $em,
@@ -32,6 +34,7 @@ final readonly class WidgetSetupService
         private PromptRepository $promptRepository,
         private WidgetService $widgetService,
         private ModelConfigService $modelConfigService,
+        private UrlContentService $urlContentService,
         private LoggerInterface $logger,
     ) {
     }
@@ -60,8 +63,12 @@ final readonly class WidgetSetupService
      *
      * @return array{text: string, progress: int}
      */
-    public function sendSetupMessage(Widget $widget, User $user, string $text, array $history = [], string $language = 'en'): array
+    public function sendSetupMessage(Widget $widget, User $user, string $text, array $history = [], string $language = 'en', string $mode = 'interview', ?array $currentFlow = null): array
     {
+        if ('flow-builder' === $mode) {
+            return $this->sendFlowBuilderMessage($widget, $user, $text, $history, $language, $currentFlow);
+        }
+
         $setupConfig = $this->resolveSetupConfig($widget);
         $systemPrompt = $setupConfig['prompt'];
         $modelId = $setupConfig['modelId'];
@@ -102,8 +109,8 @@ final readonly class WidgetSetupService
         $languageInstruction = "**CRITICAL LANGUAGE RULE**: You MUST detect the language the user writes in and ALWAYS respond in that same language. If the user writes in German, respond in German. If the user writes in French, respond in French. The application language is {$languageName}, so start in {$languageName}, but IMMEDIATELY switch to whatever language the user uses. This rule overrides everything else.\n\n";
         $systemPromptWithLanguage = $languageInstruction.$systemPrompt;
 
-        // Build conversation history from passed messages
-        $messages = $this->buildConversationMessagesFromHistory($history, $systemPromptWithLanguage, $text);
+        $enrichedText = $this->enrichWithWebsiteContent($text);
+        $messages = $this->buildConversationMessagesFromHistory($history, $systemPromptWithLanguage, $enrichedText);
 
         // Build AI options
         $aiOptions = [
@@ -141,6 +148,196 @@ final readonly class WidgetSetupService
             'text' => $aiResponse,
             'progress' => $progress,
         ];
+    }
+
+    /**
+     * Handle messages in flow-builder mode — generates Q&A pairs for the widget flow.
+     *
+     * @param array<array{role: string, content: string}> $history
+     *
+     * @return array{text: string, progress: int}
+     */
+    /**
+     * @param array<array{role: string, content: string}> $history
+     * @param array<string, mixed>|null                   $currentFlow
+     *
+     * @return array{text: string, progress: int}
+     */
+    private function sendFlowBuilderMessage(Widget $widget, User $user, string $text, array $history, string $language, ?array $currentFlow = null): array
+    {
+        $systemPrompt = self::getFlowBuilderPromptText($widget->getName());
+        $modelId = self::DEFAULT_SETUP_MODEL_ID;
+
+        $provider = $this->modelConfigService->getProviderForModel($modelId);
+        $modelName = $this->modelConfigService->getModelName($modelId);
+
+        if (!$provider || !$modelName) {
+            $fallbackId = $this->modelConfigService->getDefaultModel('CHAT', $user->getId());
+            if ($fallbackId && $fallbackId > 0) {
+                $provider = $this->modelConfigService->getProviderForModel($fallbackId);
+                $modelName = $this->modelConfigService->getModelName($fallbackId);
+            }
+        }
+
+        $languageNames = [
+            'en' => 'English', 'de' => 'German', 'fr' => 'French',
+            'es' => 'Spanish', 'it' => 'Italian', 'pt' => 'Portuguese',
+            'nl' => 'Dutch', 'pl' => 'Polish', 'ru' => 'Russian',
+            'ja' => 'Japanese', 'zh' => 'Chinese', 'ko' => 'Korean',
+        ];
+        $languageName = $languageNames[$language] ?? 'English';
+        $languageInstruction = "**CRITICAL LANGUAGE RULE**: You MUST detect the language the user writes in and ALWAYS respond in that same language. The application language is {$languageName}, so start in {$languageName}. This rule overrides everything else.\n\n";
+
+        $flowContext = '';
+        if ($currentFlow && (\count($currentFlow['triggers'] ?? []) > 0 || \count($currentFlow['responses'] ?? []) > 0)) {
+            $flowContext = "\n\n### CURRENT FLOW STATE (this is what the widget currently has) ###\n```json\n".json_encode($currentFlow, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE)."\n```\nYou MUST include ALL of these entries in your next <<<FLOW_UPDATE>>> unless the user explicitly asks to remove something. When adding new entries, keep all existing ones and append new ones.\n";
+        }
+
+        $fullPrompt = $languageInstruction.$systemPrompt.$flowContext;
+
+        $messages = [['role' => 'system', 'content' => $fullPrompt]];
+        foreach ($history as $msg) {
+            $messages[] = ['role' => $msg['role'], 'content' => $msg['content']];
+        }
+
+        $isStart = self::FLOW_BUILDER_START_MARKER === trim($text);
+        if (!$isStart) {
+            $enrichedText = $this->enrichWithWebsiteContent($text);
+            $messages[] = ['role' => 'user', 'content' => $enrichedText];
+        }
+
+        $aiOptions = ['temperature' => 0.7];
+        if ($provider) {
+            $aiOptions['provider'] = $provider;
+        }
+        if ($modelName) {
+            $aiOptions['model'] = $modelName;
+        }
+
+        $response = $this->aiFacade->chat($messages, $user->getId(), $aiOptions);
+        $aiResponse = $response['content'] ?? '';
+
+        $this->logger->info('Widget flow-builder message processed', [
+            'widget_id' => $widget->getWidgetId(),
+            'history_length' => \count($history),
+        ]);
+
+        return [
+            'text' => $aiResponse,
+            'progress' => 0,
+        ];
+    }
+
+    /**
+     * Evaluate user memories and suggest which ones are relevant for a chat widget.
+     *
+     * @param UserMemoryDTO[] $memories
+     *
+     * @return array<array{id: int, category: string, key: string, value: string, widgetField: string, responseType: string, meta: array<string, string>}>
+     */
+    public function suggestMemoriesForWidget(User $user, array $memories): array
+    {
+        if ([] === $memories) {
+            return [];
+        }
+
+        $memoryLines = [];
+        foreach ($memories as $m) {
+            $memoryLines[] = sprintf('[%d] %s | %s | %s', $m->id, $m->category, $m->key, $m->value);
+        }
+
+        $systemPrompt = <<<'PROMPT'
+You are a memory analyzer. Given a list of user memories, decide which ones are useful for configuring a chat widget (Q&A knowledge base).
+
+Relevant memories include: business info, location, contact details, personal info, websites, social media, products, services, opening hours, descriptions — anything a website visitor might ask about.
+
+Irrelevant memories include: internal preferences, UI settings, coding habits, tool preferences, private personal data unrelated to business.
+
+For each relevant memory, output a JSON array entry with:
+- "id": the memory ID
+- "widgetField": a short trigger label (e.g. "Location", "Website", "About", "Contact", "Opening Hours")
+- "responseType": one of "text", "link", "list"
+- "meta": {} for text, {"url": "..."} for links (extract URL from value if present)
+
+Output ONLY a raw JSON array. No markdown, no explanation.
+Example: [{"id": 42, "widgetField": "Website", "responseType": "link", "meta": {"url": "https://example.com"}}, {"id": 7, "widgetField": "Location", "responseType": "text", "meta": {}}]
+
+If no memories are relevant, output: []
+PROMPT;
+
+        $userMessage = "User memories:\n".implode("\n", $memoryLines);
+
+        $modelId = self::DEFAULT_SETUP_MODEL_ID;
+        $provider = $this->modelConfigService->getProviderForModel($modelId);
+        $modelName = $this->modelConfigService->getModelName($modelId);
+
+        if (!$provider || !$modelName) {
+            $fallbackId = $this->modelConfigService->getDefaultModel('CHAT', $user->getId());
+            if ($fallbackId && $fallbackId > 0) {
+                $provider = $this->modelConfigService->getProviderForModel($fallbackId);
+                $modelName = $this->modelConfigService->getModelName($fallbackId);
+            }
+        }
+
+        $aiOptions = ['temperature' => 0.1];
+        if ($provider) {
+            $aiOptions['provider'] = $provider;
+        }
+        if ($modelName) {
+            $aiOptions['model'] = $modelName;
+        }
+
+        try {
+            $response = $this->aiFacade->chat([
+                ['role' => 'system', 'content' => $systemPrompt],
+                ['role' => 'user', 'content' => $userMessage],
+            ], $user->getId(), $aiOptions);
+
+            $content = trim($response['content'] ?? '');
+            if (preg_match('/\[.*\]/s', $content, $matches)) {
+                $content = $matches[0];
+            }
+
+            $suggestions = json_decode($content, true);
+            if (!\is_array($suggestions)) {
+                return [];
+            }
+
+            $memoryMap = [];
+            foreach ($memories as $m) {
+                $memoryMap[$m->id] = $m;
+            }
+
+            $result = [];
+            /** @var mixed $s */
+            foreach ($suggestions as $s) {
+                if (!\is_array($s)) {
+                    continue;
+                }
+                $id = (int) ($s['id'] ?? 0);
+                if (!isset($memoryMap[$id])) {
+                    continue;
+                }
+                $m = $memoryMap[$id];
+                $result[] = [
+                    'id' => $m->id,
+                    'category' => $m->category,
+                    'key' => $m->key,
+                    'value' => $m->value,
+                    'widgetField' => (string) ($s['widgetField'] ?? $m->key),
+                    'responseType' => (string) ($s['responseType'] ?? 'text'),
+                    'meta' => \is_array($s['meta'] ?? null) ? $s['meta'] : [],
+                ];
+            }
+
+            return $result;
+        } catch (\Exception $e) {
+            $this->logger->warning('Memory suggestion for widget failed', [
+                'error' => $e->getMessage(),
+            ]);
+
+            return [];
+        }
     }
 
     /**
@@ -509,6 +706,112 @@ PROMPT;
     }
 
     /**
+     * Return the flow-builder system prompt that generates structured Q&A pairs.
+     */
+    public static function getFlowBuilderPromptText(string $widgetName = ''): string
+    {
+        $widgetContext = '';
+        if ('' !== $widgetName) {
+            $widgetContext = "\n\n## WIDGET CONTEXT\nThe widget is named \"{$widgetName}\". Use this as the business/website name. Do NOT ask what the business is — you already know it. Jump straight into building Q&A entries.\n";
+        }
+
+        return <<<PROMPT
+# Widget Q&A Flow Builder
+
+You are a widget configurator that ACTS, not talks. Your job: build and maintain a complete set of Q&A pairs for a chat widget. Every response you give (after the greeting) MUST contain a <<<FLOW_UPDATE>>> block with the COMPLETE flow state.{$widgetContext}
+
+## CORE PRINCIPLE: ACT, DON'T CHAT
+
+- When the user gives info → CREATE Q&A pairs immediately
+- When the user says "remove X" → REMOVE it from the flow
+- When the user says "change X" → MODIFY it in the flow
+- NEVER just acknowledge or discuss without acting. 1-2 sentences max, then the FLOW_UPDATE.
+
+## FULL-STATE FLOW UPDATES
+
+**CRITICAL: Every <<<FLOW_UPDATE>>> must contain the COMPLETE flow — ALL triggers, responses, and connections.**
+The frontend REPLACES the entire flow with what you send. If you omit an entry, it gets deleted.
+
+- To ADD: include all existing entries + new ones
+- To REMOVE: include all existing entries EXCEPT the removed ones
+- To MODIFY: include all entries with the modified ones updated
+
+If a CURRENT FLOW STATE is provided in the system prompt, use those exact IDs and entries as your base. Add new entries on top, or remove/modify as the user requests.
+
+Format:
+<<<FLOW_UPDATE>>>
+{
+  "widgetName": "Business Name",
+  "triggers": [
+    {"id": "t-1", "label": "Opening Hours"},
+    {"id": "t-2", "label": "About Us"}
+  ],
+  "responses": [
+    {"id": "r-1", "type": "text", "label": "Opening Hours: Mon-Fri 9am-5pm, Sat 10am-2pm"},
+    {"id": "r-2", "type": "link", "label": "About Us", "meta": {"url": "https://example.com/about"}}
+  ],
+  "connections": [
+    {"from": "t-1", "to": "r-1"},
+    {"from": "t-2", "to": "r-2"}
+  ]
+}
+<<<END_FLOW_UPDATE>>>
+
+## RESPONSE TYPES
+
+- **"text"** — Direct text answer
+- **"link"** — URL. MUST include `"meta": {"url": "https://..."}`.
+- **"api"** — Live API endpoint. Include `"meta": {"url": "...", "method": "GET"}`.
+- **"list"** — Semicolon-separated items in label.
+- **"pdf"** — Document/file reference.
+- **"custom"** — Anything else.
+
+URLs → ALWAYS type "link" with meta.url, NEVER type "text"!
+
+## ID RULES
+
+- Use incrementing IDs: t-1, t-2, t-3... and r-1, r-2, r-3...
+- When current flow state is provided, PRESERVE existing IDs exactly
+- For new entries, continue from the highest existing ID
+- Each trigger connects to exactly one response
+
+## CUSTOM ENTRIES
+
+Create whatever Q&A pairs fit the business. Adapt to the type (restaurant → Menu/Reservation, law firm → Practice Areas, etc.).
+
+## WIDGET NAME
+
+Include "widgetName" in your FIRST flow update. Omit in subsequent updates unless changed.
+
+## LABEL FORMAT
+
+- Triggers: SHORT names ("Opening Hours", "About Us")
+- Text: "Category: details"
+- Link: short label, URL in meta.url
+
+## STYLE
+
+- 1-2 sentences max, then FLOW_UPDATE
+- NO rambling. After acting, ONE short follow-up question.
+
+## WEBSITE RESEARCH
+
+When the user mentions a URL, the system crawls it and appends content. When you receive crawled content:
+1. Summarize findings in 2-3 sentences
+2. Create Q&A entries from the data
+3. Ask user to confirm
+
+## START
+
+Greet briefly (2-3 sentences). Mention they can share a website URL for automatic data extraction. Ask what Q&A entries they need. If WIDGET CONTEXT has a business name, don't ask what the business is. No FLOW_UPDATE in the greeting.
+
+## REMINDER
+
+After the greeting, EVERY response MUST have a <<<FLOW_UPDATE>>> with the COMPLETE flow state. No exceptions.
+PROMPT;
+    }
+
+    /**
      * Return the default setup interview prompt text.
      * Used as fallback when no DB entry exists yet.
      */
@@ -534,6 +837,14 @@ You are a friendly assistant helping the user configure their chat widget. Have 
 - Keep responses short (2-3 sentences), don't ramble
 - Briefly acknowledge answers before moving to the next question
 - If the user switches to a different language, follow their lead
+
+## WEBSITE RESEARCH
+
+When the user mentions a URL or domain name, the system automatically crawls the website and appends the extracted content to their message. When you receive crawled content (marked with "--- WEBSITE CONTENT ---"):
+- Use the information to answer your own questions (business type, products, target audience, etc.)
+- Summarize what you found in 2-3 sentences so the user can confirm
+- Count answered questions based on what the website reveals (e.g., business description, services → that's question 1 answered!)
+- Ask follow-up questions only for information NOT found on the website
 
 ## IMPORTANT RULES
 
@@ -604,5 +915,61 @@ Example: "Hey! Great to have you here. Tell me a bit about what you do – what'
 
 [QUESTION:1]
 PROMPT;
+    }
+
+    /**
+     * Detect URLs in user text, crawl them, and append extracted content.
+     */
+    private function enrichWithWebsiteContent(string $text): string
+    {
+        $urls = [];
+
+        if (preg_match_all('#https?://[^\s<>"\')]+#i', $text, $matches)) {
+            $urls = array_merge($urls, $matches[0]);
+        }
+
+        if (preg_match_all('#(?<![/:])\b([a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.(?:com|de|org|net|io|co|eu|at|ch|info|biz|app|dev|me|tech|ai|shop)(?:/[^\s<>"\')]*)?)\b#i', $text, $bareMatches)) {
+            foreach ($bareMatches[1] as $bare) {
+                $urls[] = 'https://'.$bare;
+            }
+        }
+
+        $urls = array_unique($urls);
+        if ([] === $urls) {
+            return $text;
+        }
+        $crawledSections = [];
+        $maxTotalLength = 6000;
+        $totalLength = 0;
+
+        foreach ($urls as $url) {
+            if ($totalLength >= $maxTotalLength) {
+                break;
+            }
+
+            try {
+                $result = $this->urlContentService->fetchForCrawling($url);
+                if ($result->success && '' !== $result->extractedText) {
+                    $content = $result->extractedText;
+                    $remaining = $maxTotalLength - $totalLength;
+                    if (\strlen($content) > $remaining) {
+                        $content = mb_substr($content, 0, $remaining).'... [truncated]';
+                    }
+                    $crawledSections[] = sprintf("[Crawled: %s]\n%s", $url, $content);
+                    $totalLength += \strlen($content);
+                }
+            } catch (\Throwable $e) {
+                $this->logger->warning('Failed to crawl URL for widget setup', [
+                    'url' => $url,
+                    'error' => $e->getMessage(),
+                ]);
+            }
+        }
+
+        if ([] === $crawledSections) {
+            return $text;
+        }
+
+        return $text."\n\n--- WEBSITE CONTENT (crawled automatically, use this to create Q&A entries) ---\n".implode("\n\n", $crawledSections);
     }
 }

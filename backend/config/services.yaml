@@ -43,8 +43,8 @@ parameters:
     env(TIKA_HTTP_USER): ''
     env(TIKA_HTTP_PASS): ''
     env(VECTOR_STORAGE_PROVIDER): ''
-    env(QDRANT_SERVICE_URL): ''
-    env(QDRANT_SERVICE_API_KEY): ''
+    env(QDRANT_URL): ''
+    env(QDRANT_MEMORIES_COLLECTION): ''
     env(QDRANT_DOCUMENTS_COLLECTION): ''
     env(TRITON_SERVER_URL): ''
     env(GOOGLE_CLIENT_ID): ''
@@ -467,16 +467,16 @@ services:
 
     App\Service\File\VectorizationService: ~
 
-    # Qdrant Vector Search Client (User Memories)
-    # Defaults to empty string when env vars not set (disables memory service gracefully)
-    App\Service\VectorSearch\QdrantClientHttp:
+    # Qdrant Vector Search Client — talks directly to Qdrant REST API
+    App\Service\VectorSearch\QdrantClientDirect:
         arguments:
             $httpClient: '@Symfony\Contracts\HttpClient\HttpClientInterface'
-            $baseUrl: '%env(QDRANT_SERVICE_URL)%'
-            $apiKey: '%env(QDRANT_SERVICE_API_KEY)%'
+            $qdrantUrl: '%env(QDRANT_URL)%'
+            $memoriesCollection: '%env(default::QDRANT_MEMORIES_COLLECTION)%'
+            $documentsCollection: '%env(default::QDRANT_DOCUMENTS_COLLECTION)%'
 
     App\Service\VectorSearch\QdrantClientInterface:
-        alias: App\Service\VectorSearch\QdrantClientHttp
+        alias: App\Service\VectorSearch\QdrantClientDirect
     # For Development without Qdrant: alias: App\Service\VectorSearch\QdrantClientMock
 
     # Monolog Formatter Factory (for env-based log format switching)
@@ -501,22 +501,17 @@ services:
     App\Service\RAG\VectorStorage\VectorStorageConfig:
         arguments:
             $envProvider: '%env(VECTOR_STORAGE_PROVIDER)%'
-            $qdrantServiceUrl: '%env(QDRANT_SERVICE_URL)%'
-            $qdrantApiKey: '%env(QDRANT_SERVICE_API_KEY)%'
-            $qdrantDocumentsCollection: '%env(QDRANT_DOCUMENTS_COLLECTION)%'
+            $qdrantUrl: '%env(QDRANT_URL)%'
+            $qdrantDocumentsCollection: '%env(default::QDRANT_DOCUMENTS_COLLECTION)%'
 
     # Vector Storage Implementations
     App\Service\RAG\VectorStorage\MariaDBVectorStorage: ~
-
-    App\Service\RAG\VectorStorage\QdrantVectorStorage:
-        arguments:
-            $qdrantClient: '@App\Service\VectorSearch\QdrantClientHttp'
+    App\Service\RAG\VectorStorage\QdrantVectorStorage: ~
 
     # Vector Migration Service (MariaDB → Qdrant)
     App\Service\RAG\VectorStorage\VectorMigrationService:
         arguments:
             $qdrantStorage: '@App\Service\RAG\VectorStorage\QdrantVectorStorage'
-            $qdrantClient: '@App\Service\VectorSearch\QdrantClientHttp'
             $mariaDbStorage: '@App\Service\RAG\VectorStorage\MariaDBVectorStorage'
 
     # Vector Storage Facade

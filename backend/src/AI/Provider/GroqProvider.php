@@ -114,11 +114,8 @@ class GroqProvider implements ChatProviderInterface, VisionProviderInterface, Sp
             $requestOptions = [
                 'model' => $model,
                 'messages' => $messages,
+                'max_tokens' => $options['max_tokens'] ?? ChatProviderInterface::DEFAULT_MAX_COMPLETION_TOKENS,
             ];
-
-            if (isset($options['max_tokens'])) {
-                $requestOptions['max_tokens'] = $options['max_tokens'];
-            }
 
             if (isset($options['temperature'])) {
                 $requestOptions['temperature'] = $options['temperature'];
@@ -173,11 +170,8 @@ class GroqProvider implements ChatProviderInterface, VisionProviderInterface, Sp
                 'messages' => $messages,
                 'stream' => true,
                 'stream_options' => ['include_usage' => true],
+                'max_tokens' => $options['max_tokens'] ?? ChatProviderInterface::DEFAULT_MAX_COMPLETION_TOKENS,
             ];
-
-            if (isset($options['max_tokens'])) {
-                $requestOptions['max_tokens'] = $options['max_tokens'];
-            }
 
             if (isset($options['temperature'])) {
                 $requestOptions['temperature'] = $options['temperature'];
@@ -193,6 +187,7 @@ class GroqProvider implements ChatProviderInterface, VisionProviderInterface, Sp
                 'cached_tokens' => 0,
                 'cache_creation_tokens' => 0,
             ];
+            $finishReason = null;
 
             foreach ($stream as $response) {
                 ++$chunkCount;
@@ -207,6 +202,12 @@ class GroqProvider implements ChatProviderInterface, VisionProviderInterface, Sp
                         'cached_tokens' => $responseArray['usage']['prompt_tokens_details']['cached_tokens'] ?? 0,
                         'cache_creation_tokens' => 0,
                     ];
+                }
+
+                // Capture finish_reason (set on the final chunk)
+                $chunkFinishReason = $responseArray['choices'][0]['finish_reason'] ?? null;
+                if (null !== $chunkFinishReason) {
+                    $finishReason = $chunkFinishReason;
                 }
 
                 // Handle reasoning content (for models with structured reasoning like OpenAI o1)
@@ -225,6 +226,10 @@ class GroqProvider implements ChatProviderInterface, VisionProviderInterface, Sp
 
                     $callback($content);
                 }
+            }
+
+            if (null !== $finishReason) {
+                $callback(['type' => 'finish', 'finish_reason' => $finishReason]);
             }
 
             $this->logger->info('✅ Groq streaming COMPLETE', [

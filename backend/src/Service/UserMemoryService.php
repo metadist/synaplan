@@ -174,34 +174,6 @@ final readonly class UserMemoryService
     }
 
     /**
-     * Delete all memories for a user from Qdrant.
-     * Used during user deletion to prevent orphaned data.
-     */
-    public function deleteAllForUser(int $userId): void
-    {
-        if (!$this->qdrantClient->isAvailable()) {
-            $this->logger->warning('Memory service unavailable - skipping bulk delete', [
-                'user_id' => $userId,
-            ]);
-
-            return;
-        }
-
-        try {
-            $deleted = $this->qdrantClient->deleteAllMemoriesForUser($userId);
-            $this->logger->info('All memories deleted for user', [
-                'user_id' => $userId,
-                'deleted_count' => $deleted,
-            ]);
-        } catch (\Throwable $e) {
-            $this->logger->error('Failed to delete all memories for user', [
-                'user_id' => $userId,
-                'error' => $e->getMessage(),
-            ]);
-        }
-    }
-
-    /**
      * Delete memory from Qdrant.
      */
     public function deleteMemory(int $memoryId, User $user, ?string $namespace = null): void
@@ -223,6 +195,39 @@ final readonly class UserMemoryService
         } catch (\Throwable $e) {
             $this->logger->error('Failed to delete memory', ['error' => $e->getMessage()]);
             throw new \InvalidArgumentException('Failed to delete memory: '.$e->getMessage());
+        }
+    }
+
+    /**
+     * Delete all memories for a given user (used during account deletion).
+     */
+    public function deleteAllForUser(int $userId): void
+    {
+        if (!$this->qdrantClient->isAvailable()) {
+            $this->logger->warning('Memory service unavailable - skipping deleteAllForUser', [
+                'user_id' => $userId,
+            ]);
+
+            return;
+        }
+
+        try {
+            $memories = $this->qdrantClient->scrollMemories($userId, null, 10000, null);
+
+            foreach ($memories as $memory) {
+                $pointId = "mem_{$userId}_{$memory['id']}";
+                $this->qdrantClient->deleteMemory($pointId);
+            }
+
+            $this->logger->info('All memories deleted for user', [
+                'user_id' => $userId,
+                'count' => \count($memories),
+            ]);
+        } catch (\Throwable $e) {
+            $this->logger->error('Failed to delete all memories for user', [
+                'user_id' => $userId,
+                'error' => $e->getMessage(),
+            ]);
         }
     }
 

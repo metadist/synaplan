@@ -297,10 +297,23 @@ services:
     networks:
       - synaplan-network
 
+  # Qdrant Vector Database (memories + document vectors)
+  qdrant:
+    image: qdrant/qdrant:v1.17.0
+    container_name: synaplan-qdrant
+    ports:
+      - "6333:6333"
+    volumes:
+      - qdrant_storage:/qdrant/storage
+    restart: unless-stopped
+    networks:
+      - synaplan-network
+
 volumes:
   mysql_data:
   ollama_data:
   whisper_models:
+  qdrant_storage:
 
 networks:
   synaplan-network:

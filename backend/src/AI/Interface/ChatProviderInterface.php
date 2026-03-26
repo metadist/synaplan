@@ -7,9 +7,23 @@ namespace App\AI\Interface;
  *
  * Generic interface for text-based AI chat providers.
  * Business logic (prompts, parsing, etc.) belongs in Services, not Providers.
+ *
+ * Streaming callback contract:
+ *   - Content chunks:  fn(string $text) or fn(['type' => 'content', 'content' => $text])
+ *   - Reasoning chunks: fn(['type' => 'reasoning', 'content' => $text])
+ *   - Finish signal:    fn(['type' => 'finish', 'finish_reason' => 'stop'|'length'|...])
+ *     Providers SHOULD emit a finish signal as the last callback invocation so callers
+ *     can detect truncated responses (finish_reason = 'length').
  */
 interface ChatProviderInterface extends ProviderMetadataInterface
 {
+    /**
+     * Default max completion tokens when not specified via options.
+     * Providers may override this with their own constant for
+     * provider-specific defaults (e.g. OpenAI/Anthropic use 65536).
+     */
+    public const DEFAULT_MAX_COMPLETION_TOKENS = 65536;
+
     /**
      * Generate chat completion (non-streaming).
      *
@@ -24,7 +38,8 @@ interface ChatProviderInterface extends ProviderMetadataInterface
      * Generate chat completion (streaming).
      *
      * @param array    $messages Messages array in OpenAI format
-     * @param callable $callback Callback for each chunk: fn(array $chunk) where chunk has 'type' and 'content'
+     * @param callable $callback callback for each chunk: fn(string|array $chunk)
+     *                           See class-level docblock for the full callback contract
      * @param array    $options  options: model (required), temperature, max_tokens, reasoning, etc
      *
      * @return array{usage: array{prompt_tokens: int, completion_tokens: int, total_tokens: int, cached_tokens: int, cache_creation_tokens: int}}

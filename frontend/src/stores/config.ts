@@ -18,7 +18,7 @@ import { checkMemoryServiceAvailability } from '@/services/api/configApi'
 import { i18n } from '@/i18n'
 import { ref } from 'vue'
 
-// Async state for memory service availability
+// Async state for Qdrant availability
 const memoryServiceAvailable = ref<boolean | null>(null)
 const memoryServiceLoading = ref(false)
 
@@ -144,7 +144,7 @@ const config = {
    * Load runtime configuration from backend
    * Call this before accessing config values (e.g., in main.ts)
    *
-   * Note: Memory service check is NOT done here - it's done in reload()
+   * Note: Qdrant check is NOT done here - it's done in reload()
    * which is called after successful authentication. This prevents
    * unnecessary API calls on public pages (shared chats, login, etc.)
    */
@@ -153,7 +153,7 @@ const config = {
   },
 
   /**
-   * Check memory service availability asynchronously (non-blocking)
+   * Check Qdrant availability asynchronously (non-blocking)
    * This runs in background and updates memoryServiceAvailable when done
    */
   async checkMemoryServiceAsync(): Promise<void> {
@@ -168,7 +168,7 @@ const config = {
       const result = await checkMemoryServiceAvailability()
       memoryServiceAvailable.value = result.available
     } catch (err) {
-      console.warn('⚠️ Memory service check failed:', err)
+      console.warn('⚠️ Qdrant availability check failed:', err)
       memoryServiceAvailable.value = false
     } finally {
       memoryServiceLoading.value = false

@@ -123,6 +123,10 @@ test.describe('@ci @smoke Widget', () => {
         .filter({ hasText: widgetName })
         .first()
       await widgetCard.locator(selectors.widgets.widgetCard.advancedButton).click()
+      await page
+        .locator(selectors.widgets.detailPage.settingsButton)
+        .waitFor({ state: 'visible', timeout: TIMEOUTS.STANDARD })
+      await page.locator(selectors.widgets.detailPage.settingsButton).click()
       await page.waitForSelector(selectors.widgets.advancedConfig.modal, {
         timeout: TIMEOUTS.STANDARD,
       })

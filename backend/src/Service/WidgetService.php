@@ -199,47 +199,45 @@ final readonly class WidgetService
         $widgetId = $widget->getWidgetId();
         $config = $widget->getConfig();
 
-        // Extract configuration
-        $position = $config['position'] ?? 'bottom-right';
-        $primaryColor = $config['primaryColor'] ?? '#007bff';
-        $iconColor = $config['iconColor'] ?? '#ffffff';
-        $buttonIcon = $config['buttonIcon'] ?? 'chat';
-        $buttonIconUrl = $config['buttonIconUrl'] ?? '';
-        $theme = $config['defaultTheme'] ?? 'light';
-        $autoOpen = $config['autoOpen'] ?? false;
-        $autoOpenStr = $autoOpen ? 'true' : 'false';
-        $autoMessage = $config['autoMessage'] ?? 'Hello! How can I help you today?';
-        $messageLimit = (int) ($config['messageLimit'] ?? 50);
-        $maxFileSize = (int) ($config['maxFileSize'] ?? 10);
-        $allowFileUpload = !empty($config['allowFileUpload']);
-        $fileUploadLimit = (int) ($config['fileUploadLimit'] ?? 3);
-        $allowFileUploadStr = $allowFileUpload ? 'true' : 'false';
+        $initConfig = [
+            'widgetId' => $widgetId,
+            'position' => $config['position'] ?? 'bottom-right',
+            'primaryColor' => $config['primaryColor'] ?? '#007bff',
+            'iconColor' => $config['iconColor'] ?? '#ffffff',
+            'defaultTheme' => $config['defaultTheme'] ?? 'light',
+            'autoOpen' => !empty($config['autoOpen']),
+            'autoMessage' => $config['autoMessage'] ?? 'Hello! How can I help you today?',
+            'messageLimit' => (int) ($config['messageLimit'] ?? 50),
+            'maxFileSize' => (int) ($config['maxFileSize'] ?? 10),
+            'allowFileUpload' => !empty($config['allowFileUpload']),
+            'fileUploadLimit' => (int) ($config['fileUploadLimit'] ?? 3),
+            'lazy' => true,
+        ];
 
-        // Build icon config
-        $iconConfig = $buttonIconUrl
-            ? "buttonIconUrl: '{$buttonIconUrl}',"
-            : "buttonIcon: '{$buttonIcon}',";
+        $buttonIconUrl = $config['buttonIconUrl'] ?? '';
+        if ('' !== $buttonIconUrl) {
+            $initConfig['buttonIconUrl'] = $buttonIconUrl;
+        } else {
+            $initConfig['buttonIcon'] = $config['buttonIcon'] ?? 'chat';
+        }
+
+        $externalApiUrl = \array_key_exists('externalApiUrl', $config) && \is_string($config['externalApiUrl'])
+            ? trim($config['externalApiUrl'])
+            : '';
+        if ('' !== $externalApiUrl) {
+            $initConfig['externalUserId'] = 'YOUR_USER_ID';
+        }
+
+        $jsonConfig = json_encode($initConfig, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR);
+        $jsonConfig = str_replace("\n", "\n  ", $jsonConfig);
+        $safeBaseUrl = htmlspecialchars($baseUrl, ENT_QUOTES, 'UTF-8');
 
         return <<<HTML
 <!-- Synaplan Chat Widget (ES Module with Auto Code-Splitting) -->
 <script type="module">
-  import SynaplanWidget from '{$baseUrl}/widget.js'
+  import SynaplanWidget from '{$safeBaseUrl}/widget.js'
 
-  SynaplanWidget.init({
-    widgetId: '{$widgetId}',
-    position: '{$position}',
-    primaryColor: '{$primaryColor}',
-    iconColor: '{$iconColor}',
-    {$iconConfig}
-    defaultTheme: '{$theme}',
-    autoOpen: {$autoOpenStr},
-    autoMessage: '{$autoMessage}',
-    messageLimit: {$messageLimit},
-    maxFileSize: {$maxFileSize},
-    allowFileUpload: {$allowFileUploadStr},
-    fileUploadLimit: {$fileUploadLimit},
-    lazy: true  // Load chat on button click (set to false for immediate load)
-  })
+  SynaplanWidget.init({$jsonConfig})
 </script>
 HTML;
     }

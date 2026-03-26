@@ -68,7 +68,7 @@ export const configApi = {
   checkModelAvailability,
 }
 
-// Memory Service Check (new)
+// Qdrant Availability Check
 const MemoryServiceCheckSchema = z.object({
   available: z.boolean(),
   configured: z.boolean(),
@@ -77,7 +77,7 @@ const MemoryServiceCheckSchema = z.object({
 export type MemoryServiceCheck = z.infer<typeof MemoryServiceCheckSchema>
 
 /**
- * Check memory service availability (lightweight, async check)
+ * Check Qdrant availability (lightweight, async check)
  * Uses skipAuth because this is called during app init before auth is established
  * and may run on public pages (shared chats)
  */

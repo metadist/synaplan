@@ -126,7 +126,7 @@ class GoogleProvider implements ChatProviderInterface, ImageGenerationProviderIn
                     'temperature' => $options['temperature'] ?? 0.7,
                     'topP' => $options['top_p'] ?? 0.95,
                     'topK' => $options['top_k'] ?? 40,
-                    'maxOutputTokens' => $options['max_tokens'] ?? 2048,
+                    'maxOutputTokens' => $options['max_tokens'] ?? ChatProviderInterface::DEFAULT_MAX_COMPLETION_TOKENS,
                 ],
             ];
 
@@ -194,7 +194,7 @@ class GoogleProvider implements ChatProviderInterface, ImageGenerationProviderIn
                     'temperature' => $options['temperature'] ?? 0.7,
                     'topP' => $options['top_p'] ?? 0.95,
                     'topK' => $options['top_k'] ?? 40,
-                    'maxOutputTokens' => $options['max_tokens'] ?? 2048,
+                    'maxOutputTokens' => $options['max_tokens'] ?? ChatProviderInterface::DEFAULT_MAX_COMPLETION_TOKENS,
                 ],
             ];
 
@@ -219,6 +219,7 @@ class GoogleProvider implements ChatProviderInterface, ImageGenerationProviderIn
                 'cached_tokens' => 0,
                 'cache_creation_tokens' => 0,
             ];
+            $finishReason = null;
 
             foreach ($this->httpClient->stream($response) as $chunk) {
                 if ($chunk->isLast()) {
@@ -234,6 +235,16 @@ class GoogleProvider implements ChatProviderInterface, ImageGenerationProviderIn
 
                     if ($data) {
                         $this->checkGeminiFinishReason($data);
+
+                        // Capture finishReason from the last chunk (Gemini uses "MAX_TOKENS" or "STOP")
+                        $geminiFinishReason = $data['candidates'][0]['finishReason'] ?? null;
+                        if (null !== $geminiFinishReason) {
+                            $finishReason = match ($geminiFinishReason) {
+                                'MAX_TOKENS' => 'length',
+                                'STOP', 'END_TURN' => 'stop',
+                                default => $geminiFinishReason,
+                            };
+                        }
                     }
 
                     // Capture usage from each chunk (last chunk has final values)
@@ -255,6 +266,10 @@ class GoogleProvider implements ChatProviderInterface, ImageGenerationProviderIn
                         $callback($data['candidates'][0]['content']['parts'][0]['text']);
                     }
                 }
+            }
+
+            if (null !== $finishReason) {
+                $callback(['type' => 'finish', 'finish_reason' => $finishReason]);
             }
 
             return ['usage' => $usage];
