@@ -133,7 +133,7 @@ class MediaGenerationServiceTest extends TestCase
         $cacheItem->expects($this->once())->method('set')->with($this->callback(function ($data) {
             return 'ops/123' === $data['operationName'] && 1 === $data['userId'] && 'test prompt' === $data['prompt'];
         }));
-        $cacheItem->expects($this->once())->method('expiresAfter')->with(600);
+        $cacheItem->expects($this->once())->method('expiresAfter')->with(1200);
 
         $this->cache->expects($this->once())
             ->method('getItem')

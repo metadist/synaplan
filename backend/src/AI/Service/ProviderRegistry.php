@@ -13,6 +13,7 @@ use App\AI\Interface\VideoGenerationProviderInterface;
 use App\AI\Interface\VisionProviderInterface;
 use App\Repository\ModelRepository;
 use Psr\Log\LoggerInterface;
+use Symfony\Component\DependencyInjection\Attribute\Autowire;
 use Symfony\Component\DependencyInjection\Attribute\TaggedIterator;
 
 /**
@@ -46,6 +47,8 @@ class ProviderRegistry
         private ModelRepository $modelRepository,
         private LoggerInterface $logger,
         private string $defaultProvider = 'test',
+        #[Autowire('%kernel.environment%')]
+        private string $appEnv = 'prod',
     ) {
         // Index providers by their getName() method dynamically
         foreach ($chatProviders as $provider) {
@@ -131,7 +134,7 @@ class ProviderRegistry
 
     private function canUseInternalTestProvider(string $providerName): bool
     {
-        $appEnv = strtolower((string) ($_SERVER['APP_ENV'] ?? $_ENV['APP_ENV'] ?? 'prod'));
+        $appEnv = strtolower($this->appEnv);
 
         return 'test' === $providerName && 'prod' !== $appEnv;
     }

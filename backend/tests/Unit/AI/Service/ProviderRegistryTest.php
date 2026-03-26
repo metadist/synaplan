@@ -81,6 +81,7 @@ class ProviderRegistryTest extends TestCase
             $this->modelRepository,
             new NullLogger(),
             'test',
+            $_SERVER['APP_ENV'] ?? 'prod'
         );
     }
 }

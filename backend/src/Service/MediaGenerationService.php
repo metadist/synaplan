@@ -23,7 +23,7 @@ final readonly class MediaGenerationService implements MediaGenerationServiceInt
     private const DEFAULT_IMAGE_SIZE = '1024x1024';
     private const DEFAULT_VIDEO_DURATION = 8;
     private const DEFAULT_VIDEO_ASPECT_RATIO = '16:9';
-    private const VIDEO_JOB_TTL_SECONDS = 600;
+    private const VIDEO_JOB_TTL_SECONDS = 1200;
 
     public function __construct(
         private AiFacade $aiFacade,
@@ -259,36 +259,42 @@ final readonly class MediaGenerationService implements MediaGenerationServiceInt
             ];
         }
 
-        try {
-            $result = $this->aiFacade->pollVideoOperation($jobData['operationName'], $jobData['provider']);
-        } catch (ProviderException $e) {
-            $jobData['status'] = 'failed';
-            $jobData['error'] = $e->getMessage();
-            $this->storeVideoJobState($jobId, $jobData);
+        if (isset($jobData['videoUri'])) {
+            // If we already have the URI from a previous poll but download failed, reuse it
+            $result = ['done' => true, 'videoUri' => $jobData['videoUri'], 'error' => null];
+        } else {
+            try {
+                $result = $this->aiFacade->pollVideoOperation($jobData['operationName'], $jobData['provider']);
+            } catch (ProviderException $e) {
+                $jobData['status'] = 'failed';
+                $jobData['error'] = $e->getMessage();
+                $this->storeVideoJobState($jobId, $jobData);
 
-            throw $e;
-        }
+                throw $e;
+            }
 
-        if (!$result['done']) {
-            return [
-                'status' => 'processing',
-                'elapsed_seconds' => $elapsed,
-            ];
-        }
+            if (!$result['done']) {
+                return [
+                    'status' => 'processing',
+                    'elapsed_seconds' => $elapsed,
+                ];
+            }
 
-        if ($result['error']) {
-            $jobData['status'] = 'failed';
-            $jobData['error'] = $result['error'];
-            $this->storeVideoJobState($jobId, $jobData);
+            if ($result['error']) {
+                $jobData['status'] = 'failed';
+                $jobData['error'] = $result['error'];
+                $this->storeVideoJobState($jobId, $jobData);
 
-            return [
-                'status' => 'failed',
-                'error' => $result['error'],
-                'elapsed_seconds' => $elapsed,
-            ];
+                return [
+                    'status' => 'failed',
+                    'error' => $result['error'],
+                    'elapsed_seconds' => $elapsed,
+                ];
+            }
         }
 
         $jobData['status'] = 'finalizing';
+        $jobData['videoUri'] = $result['videoUri'];
         $this->storeVideoJobState($jobId, $jobData);
 
         try {

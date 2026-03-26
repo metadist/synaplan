@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Tests\Unit\AI\Service;
 
 use App\AI\Provider\GoogleProvider;
