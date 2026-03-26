@@ -1,6 +1,14 @@
 {
   "name": "Synaplan",
   "short_name": "Synaplan",
+  "description": "AI-powered knowledge management",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "any",
+  "theme_color": "#0003c7",
+  "background_color": "#ffffff",
+  "categories": ["productivity", "business"],
   "icons": [
     {
       "src": "./icon-192.png",
@@ -11,10 +19,17 @@
       "src": "./icon-512.png",
       "sizes": "512x512",
       "type": "image/png"
+    },
+    {
+      "src": "./icon-512-maskable.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "./single_bird.svg",
+      "sizes": "any",
+      "type": "image/svg+xml"
     }
-  ],
-  "theme_color": "#0003c7",
-  "background_color": "#ffffff",
-  "display": "standalone"
+  ]
 }
-

@@ -34,6 +34,10 @@ import type { CookieConsent as CookieConsentType } from '@/composables/useCookie
 
 useTheme()
 
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('/sw.js')
+}
+
 const { injectGoogleTag, trackPageView } = useGoogleTag()
 
 const handleCookieConsent = (consent: CookieConsentType) => {
