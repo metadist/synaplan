@@ -38,10 +38,7 @@ export default defineConfig(({ mode }) => {
 
   return {
     base: basePath,
-    plugins: [
-      vue(),
-      gitkeepPlugin(),
-    ],
+    plugins: [vue(), gitkeepPlugin()],
     build: {
       outDir: 'dist',
       emptyOutDir: true,
