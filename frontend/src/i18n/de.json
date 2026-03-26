@@ -2665,13 +2665,5 @@
   },
   "system": {
     "missingApiKeys": "Einige API-Schlüssel fehlen — folgende Anbieter sind deaktiviert: {providers}"
-  },
-  "pwa": {
-    "updateAvailable": "Neue Version verfügbar",
-    "updateMessage": "Eine neue Version von Synaplan ist verfügbar. Jetzt aktualisieren?",
-    "updateNow": "Jetzt aktualisieren",
-    "offlineReady": "App ist offline verfügbar",
-    "offline": "Keine Internetverbindung",
-    "online": "Wieder online"
   }
 }

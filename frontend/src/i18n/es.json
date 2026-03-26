@@ -1918,13 +1918,5 @@
   },
   "system": {
     "missingApiKeys": "Faltan algunas claves API — los siguientes proveedores están desactivados: {providers}"
-  },
-  "pwa": {
-    "updateAvailable": "Nueva versión disponible",
-    "updateMessage": "Hay una nueva versión de Synaplan disponible. ¿Actualizar ahora?",
-    "updateNow": "Actualizar ahora",
-    "offlineReady": "La app está disponible sin conexión",
-    "offline": "Sin conexión a internet",
-    "online": "De nuevo en línea"
   }
 }

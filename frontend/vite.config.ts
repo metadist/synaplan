@@ -1,6 +1,5 @@
 import { defineConfig, loadEnv, Plugin } from 'vite'
 import vue from '@vitejs/plugin-vue'
-import { VitePWA } from 'vite-plugin-pwa'
 import { fileURLToPath, URL } from 'node:url'
 
 /**
@@ -42,26 +41,6 @@ export default defineConfig(({ mode }) => {
     plugins: [
       vue(),
       gitkeepPlugin(),
-      VitePWA({
-        registerType: 'prompt',
-        includeAssets: ['single_bird.svg', 'favicon-32.png', 'apple-touch-icon.png'],
-        manifest: false,
-        workbox: {
-          globPatterns: ['**/*.{js,css,html,svg,png,woff2}'],
-          navigateFallback: 'index.html',
-          navigateFallbackDenylist: [/^\/api/, /^\/shared/, /^\/uploads/, /^\/widget/],
-          runtimeCaching: [
-            {
-              urlPattern: /\.(?:png|jpg|jpeg|svg|gif|webp)$/,
-              handler: 'CacheFirst',
-              options: {
-                cacheName: 'images-cache',
-                expiration: { maxEntries: 60, maxAgeSeconds: 30 * 24 * 60 * 60 },
-              },
-            },
-          ],
-        },
-      }),
     ],
     build: {
       outDir: 'dist',

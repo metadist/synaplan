@@ -1919,13 +1919,5 @@
   },
   "system": {
     "missingApiKeys": "Bazı API anahtarları eksik — şu sağlayıcılar devre dışı: {providers}"
-  },
-  "pwa": {
-    "updateAvailable": "Yeni sürüm mevcut",
-    "updateMessage": "Synaplan'ın yeni bir sürümü mevcut. Şimdi güncellensin mi?",
-    "updateNow": "Şimdi güncelle",
-    "offlineReady": "Uygulama çevrimdışı kullanılabilir",
-    "offline": "İnternet bağlantısı yok",
-    "online": "Tekrar çevrimiçi"
   }
 }

@@ -23,7 +23,7 @@
 
 	# Service Worker must never be cached by browsers or proxies
 	@sw_files {
-		path /sw.js /workbox-*.js
+		path /sw.js
 	}
 	header @sw_files {
 		Cache-Control "no-cache, no-store, must-revalidate"
@@ -42,7 +42,7 @@
 	# Cache static assets from frontend
 	@static_assets {
 		path *.css *.js *.jpg *.jpeg *.png *.gif *.ico *.svg *.woff *.woff2 *.ttf *.eot *.webp
-		not path /widget.js /sw.js /workbox-*.js
+		not path /widget.js /sw.js
 	}
 	header @static_assets {
 		Cache-Control "public, max-age=31536000, immutable"

@@ -1,11 +1,9 @@
 interface Env {}
 
 const NO_CACHE_PATHS = ['/sw.js', '/site.webmanifest']
-const NO_CACHE_PREFIXES = ['/workbox-']
 
 function shouldNeverCache(pathname: string): boolean {
-  if (NO_CACHE_PATHS.includes(pathname)) return true
-  return NO_CACHE_PREFIXES.some((prefix) => pathname.startsWith(prefix))
+  return NO_CACHE_PATHS.includes(pathname)
 }
 
 function isHashedAsset(pathname: string): boolean {
