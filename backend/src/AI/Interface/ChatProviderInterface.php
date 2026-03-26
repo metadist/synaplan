@@ -20,8 +20,9 @@ interface ChatProviderInterface extends ProviderMetadataInterface
     /**
      * Default max completion tokens when not specified via options.
      *
-     * Conservative fallback that all models support. Each model should
-     * declare its actual limit via max_tokens in ModelCatalog JSON.
+     * Conservative fallback that all models support. Providers use this
+     * when a model config omits max_tokens. Models are encouraged to
+     * declare their actual limit via max_tokens in ModelCatalog JSON.
      */
     public const DEFAULT_MAX_COMPLETION_TOKENS = 4096;
 

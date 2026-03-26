@@ -234,18 +234,16 @@ final readonly class ChatHandler implements MessageHandlerInterface
             'temperature' => 0.7,
         ];
 
+        // Clamp max_tokens to min(plan_limit, model_max)
         $user = $this->em->getRepository(User::class)->find($message->getUserId());
         $planMaxTokens = null !== $user ? $this->rateLimitService->getMaxOutputTokens($user) : null;
-        $effectiveMax = $modelMaxTokens;
+        $tokenLimits = array_filter(
+            [$planMaxTokens, $modelMaxTokens],
+            static fn ($v) => is_int($v) && $v > 0,
+        );
 
-        if (null !== $planMaxTokens && null !== $effectiveMax) {
-            $effectiveMax = min($planMaxTokens, $effectiveMax);
-        } elseif (null !== $planMaxTokens) {
-            $effectiveMax = $planMaxTokens;
-        }
-
-        if (null !== $effectiveMax && $effectiveMax > 0) {
-            $aiOptions['max_tokens'] = $effectiveMax;
+        if (!empty($tokenLimits)) {
+            $aiOptions['max_tokens'] = min($tokenLimits);
         }
 
         $response = $this->aiFacade->chat(
@@ -829,20 +827,15 @@ final readonly class ChatHandler implements MessageHandlerInterface
             'modelFeatures' => $modelFeatures,
         ], $options);
 
-        // Apply effective max_tokens: min(plan_limit, model_max)
-        if (!isset($aiOptions['max_tokens'])) {
-            $planMaxTokens = null !== $user ? $this->rateLimitService->getMaxOutputTokens($user) : null;
-            $effectiveMax = $modelMaxTokens;
+        // Clamp max_tokens to min(requested, plan_limit, model_max)
+        $planMaxTokens = null !== $user ? $this->rateLimitService->getMaxOutputTokens($user) : null;
+        $tokenLimits = array_filter(
+            [$aiOptions['max_tokens'] ?? null, $planMaxTokens, $modelMaxTokens],
+            static fn ($v) => is_int($v) && $v > 0,
+        );
 
-            if (null !== $planMaxTokens && null !== $effectiveMax) {
-                $effectiveMax = min($planMaxTokens, $effectiveMax);
-            } elseif (null !== $planMaxTokens) {
-                $effectiveMax = $planMaxTokens;
-            }
-
-            if (null !== $effectiveMax && $effectiveMax > 0) {
-                $aiOptions['max_tokens'] = $effectiveMax;
-            }
+        if (!empty($tokenLimits)) {
+            $aiOptions['max_tokens'] = min($tokenLimits);
         }
 
         // Log reasoning option
