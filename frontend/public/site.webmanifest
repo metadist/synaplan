@@ -21,12 +21,6 @@
       "type": "image/png"
     },
     {
-      "src": "./icon-512-maskable.png",
-      "sizes": "512x512",
-      "type": "image/png",
-      "purpose": "maskable"
-    },
-    {
       "src": "./single_bird.svg",
       "sizes": "any",
       "type": "image/svg+xml"
