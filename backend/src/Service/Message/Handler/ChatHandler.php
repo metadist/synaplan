@@ -17,6 +17,7 @@ use App\Service\ModelConfigService;
 use App\Service\Plugin\PluginContextProviderInterface;
 use App\Service\PromptService;
 use App\Service\RAG\VectorSearchService;
+use App\Service\RateLimitService;
 use App\Service\UserMemoryService;
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;
@@ -47,6 +48,7 @@ final readonly class ChatHandler implements MessageHandlerInterface
         private UserMemoryService $memoryService,
         private MemoryExtractionService $memoryExtractionService,
         private FeedbackConfigService $feedbackConfig,
+        private RateLimitService $rateLimitService,
         iterable $pluginContextProviders = [],
     ) {
         $this->pluginContextProviders = $pluginContextProviders;
@@ -809,9 +811,20 @@ final readonly class ChatHandler implements MessageHandlerInterface
             'modelFeatures' => $modelFeatures,
         ], $options);
 
-        // Apply model-specific max_tokens from DB config (if set and valid)
-        if (null !== $modelMaxTokens && $modelMaxTokens > 0 && !isset($aiOptions['max_tokens'])) {
-            $aiOptions['max_tokens'] = $modelMaxTokens;
+        // Apply effective max_tokens: min(plan_limit, model_max)
+        if (!isset($aiOptions['max_tokens'])) {
+            $planMaxTokens = null !== $user ? $this->rateLimitService->getMaxOutputTokens($user) : null;
+            $effectiveMax = $modelMaxTokens;
+
+            if (null !== $planMaxTokens && null !== $effectiveMax) {
+                $effectiveMax = min($planMaxTokens, $effectiveMax);
+            } elseif (null !== $planMaxTokens) {
+                $effectiveMax = $planMaxTokens;
+            }
+
+            if (null !== $effectiveMax && $effectiveMax > 0) {
+                $aiOptions['max_tokens'] = $effectiveMax;
+            }
         }
 
         // Log reasoning option

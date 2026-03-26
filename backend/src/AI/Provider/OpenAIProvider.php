@@ -16,7 +16,7 @@ use Symfony\Contracts\HttpClient\HttpClientInterface;
 
 class OpenAIProvider implements ChatProviderInterface, EmbeddingProviderInterface, ImageGenerationProviderInterface, VisionProviderInterface, SpeechToTextProviderInterface, TextToSpeechProviderInterface
 {
-    private const DEFAULT_MAX_TOKENS = 65536;
+    private const DEFAULT_MAX_TOKENS = 4096;
 
     private $client;
     private array $modelCapabilities = [];

@@ -313,6 +313,35 @@ final class RateLimitService
     }
 
     /**
+     * Get max output tokens allowed for a user based on their subscription level.
+     *
+     * Returns null when billing is disabled (Open Source Mode) or for admins,
+     * meaning the model's own max_tokens should be used without restriction.
+     */
+    public function getMaxOutputTokens(User $user): ?int
+    {
+        if (!$this->billingService->isEnabled()) {
+            return null;
+        }
+
+        $level = $user->getRateLimitLevel();
+
+        if ('ADMIN' === $level) {
+            return null;
+        }
+
+        $raw = $this->configRepository->getValue(0, "RATELIMITS_{$level}", 'MAX_OUTPUT_TOKENS');
+
+        if (null === $raw) {
+            return null;
+        }
+
+        $value = (int) $raw;
+
+        return $value > 0 ? $value : null;
+    }
+
+    /**
      * Get all limits for a user (for display).
      */
     public function getUserLimits(User $user): array
