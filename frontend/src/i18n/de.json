@@ -1484,7 +1484,15 @@
       "loading": "Lade Features...",
       "requiredConfig": "Erforderliche Konfiguration:",
       "set": "Gesetzt",
-      "notSet": "Nicht gesetzt"
+      "notSet": "Nicht gesetzt",
+      "allOperational": "Alle Systeme betriebsbereit",
+      "issuesDetected": "Probleme erkannt",
+      "ready": "Bereit",
+      "healthSummary": "{healthy} von {total} Services gesund",
+      "model": "Modell",
+      "models": "Modelle",
+      "devOnlyTitle": "Nur Entwicklungsmodus",
+      "devOnlyMessage": "Diese Seite ist nur in Entwicklungsumgebungen verfügbar. Die Systemstatusüberwachung ist in der Produktion eingeschränkt."
     }
   },
   "mail": {
