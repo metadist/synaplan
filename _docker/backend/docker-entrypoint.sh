@@ -260,10 +260,6 @@ echo "🧹 Clearing cache..."
 php bin/console cache:clear
 echo "✅ Cache ready!"
 
-# Scheduled tasks (daily price sync) should be run via system cron on the host:
-#   0 0 * * * docker compose exec -T backend php bin/console app:sync-model-prices
-# This avoids duplicate runs in scaled deployments and keeps the web process clean.
-
 # Start FrankenPHP
 echo ""
 echo "🎉 Backend ready! Starting FrankenPHP..."
