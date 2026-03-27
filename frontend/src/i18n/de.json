@@ -2732,6 +2732,7 @@
     "missingApiKeys": "Einige API-Schlüssel fehlen — folgende Anbieter sind deaktiviert: {providers}"
   },
   "models": {
+    "loading": "Modelle werden geladen...",
     "costTier": {
       "free": "Kostenlos",
       "low": "Low Cost",

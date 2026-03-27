@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Command;
 
+use App\Entity\Model;
 use App\Entity\ModelPriceHistory;
 use App\Repository\ModelPriceHistoryRepository;
 use App\Repository\ModelRepository;
@@ -227,7 +228,7 @@ class SyncModelPricesCommand extends Command
      *
      * @param array<string, array<string, mixed>> $litellmData
      */
-    private function findLiteLLMKey(object $model, array $litellmData): ?string
+    private function findLiteLLMKey(Model $model, array $litellmData): ?string
     {
         $providerId = $model->getProviderId();
         $serviceLower = strtolower($model->getService());
@@ -344,7 +345,7 @@ class SyncModelPricesCommand extends Command
         return (float) $perToken * 1_000_000;
     }
 
-    private function isNullPriceRisk(object $model, float $newPriceIn, float $newPriceOut): bool
+    private function isNullPriceRisk(Model $model, float $newPriceIn, float $newPriceOut): bool
     {
         $hasExistingPrice = $model->getPriceIn() > 0.000001 || $model->getPriceOut() > 0.000001;
         $newPriceIsZero = $newPriceIn < 0.000001 && $newPriceOut < 0.000001;
@@ -355,7 +356,7 @@ class SyncModelPricesCommand extends Command
     /**
      * @param array{pricing_mode: string, price_in: float, price_out: float, in_unit: string, out_unit: string, cache_price_in: float, mode_prices: array<string, float>} $pricing
      */
-    private function updateModelPrice(object $model, array $pricing): void
+    private function updateModelPrice(Model $model, array $pricing): void
     {
         $now = new \DateTimeImmutable();
 

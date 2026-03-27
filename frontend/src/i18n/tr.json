@@ -1923,6 +1923,7 @@
     "missingApiKeys": "Bazı API anahtarları eksik — şu sağlayıcılar devre dışı: {providers}"
   },
   "models": {
+    "loading": "Modeller yükleniyor...",
     "costTier": {
       "free": "Ücretsiz",
       "low": "Low Cost",

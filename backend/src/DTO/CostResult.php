@@ -1,9 +1,14 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\DTO;
 
 final readonly class CostResult
 {
+    /**
+     * @param array<string, mixed> $priceSnapshot
+     */
     public function __construct(
         public string $totalCost,
         public string $inputCost,

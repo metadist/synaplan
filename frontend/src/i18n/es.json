@@ -1922,6 +1922,7 @@
     "missingApiKeys": "Faltan algunas claves API — los siguientes proveedores están desactivados: {providers}"
   },
   "models": {
+    "loading": "Cargando modelos...",
     "costTier": {
       "free": "Gratis",
       "low": "Low Cost",

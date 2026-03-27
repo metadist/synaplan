@@ -82,7 +82,7 @@
 
         <div v-if="loading" class="dropdown-item w-full pointer-events-none">
           <Icon icon="heroicons:arrow-path" class="w-4 h-4 animate-spin txt-secondary" />
-          <span class="txt-secondary">Loading models...</span>
+          <span class="txt-secondary">{{ $t('models.loading') }}</span>
         </div>
       </div>
     </Teleport>
