@@ -115,7 +115,10 @@
                 <div class="flex-1 min-w-0 text-left">
                   <div class="flex items-center gap-2">
                     <span class="font-medium truncate">{{ model.name }}</span>
-                    <ModelCostBadge :model="model" :peers="getModelsByPurpose(capability as Capability)" />
+                    <ModelCostBadge
+                      :model="model"
+                      :peers="getModelsByPurpose(capability as Capability)"
+                    />
                   </div>
                   <div class="text-xs txt-secondary truncate">{{ model.service }}</div>
                 </div>
@@ -611,7 +614,7 @@ const getSelectedModelLabel = (purpose: Capability): string => {
 const getSelectedModelObj = (purpose: Capability): AIModel | null => {
   const models = modelsByPurpose.value[purpose] || []
   const selectedId = defaultConfig.value[purpose]
-  return selectedId ? models.find((m) => m.id === selectedId) ?? null : null
+  return selectedId ? (models.find((m) => m.id === selectedId) ?? null) : null
 }
 
 const toggleDropdown = (capability: Capability) => {

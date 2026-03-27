@@ -175,7 +175,9 @@
               :loading="loadingModels"
               default-option="Default Model (Auto-selected based on capability)"
               data-testid="input-ai-model"
-              @update:model-value="(v: string | number | null) => (formData.aiModel = String(v ?? 'default'))"
+              @update:model-value="
+                (v: string | number | null) => (formData.aiModel = String(v ?? 'default'))
+              "
             />
             <p class="text-xs txt-secondary mt-1.5 flex items-center gap-1">
               <Icon icon="heroicons:information-circle" class="w-3.5 h-3.5" />

@@ -12,11 +12,7 @@
       <span class="text-xs md:text-sm font-medium hidden sm:inline truncate max-w-[120px]">
         {{ selectedModelName }}
       </span>
-      <ModelCostBadge
-        v-if="selectedModelObj"
-        :model="selectedModelObj"
-        :peers="chatModels"
-      />
+      <ModelCostBadge v-if="selectedModelObj" :model="selectedModelObj" :peers="chatModels" />
       <ChevronUpIcon class="w-4 h-4" />
     </button>
     <div

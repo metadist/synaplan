@@ -313,9 +313,7 @@
             >
               <span class="flex items-center gap-1.5">
                 <ChatBubbleLeftIcon class="w-4 h-4" />
-                <span>{{
-                  $t('chat.browser.messages', { count: chat.messageCount })
-                }}</span>
+                <span>{{ $t('chat.browser.messages', { count: chat.messageCount }) }}</span>
               </span>
               <span class="flex items-center gap-1.5">
                 <ClockIcon class="w-4 h-4" />

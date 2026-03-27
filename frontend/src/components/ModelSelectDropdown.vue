@@ -14,11 +14,7 @@
     >
       <span class="flex items-center gap-2 truncate">
         <span class="truncate">{{ selectedLabel }}</span>
-        <ModelCostBadge
-          v-if="selectedModel"
-          :model="selectedModel"
-          :peers="allModels"
-        />
+        <ModelCostBadge v-if="selectedModel" :model="selectedModel" :peers="allModels" />
       </span>
     </button>
 
@@ -28,11 +24,7 @@
         :size="16"
         class-name="txt-primary"
       />
-      <Icon
-        v-else
-        :icon="getProviderIcon(selectedModel?.service ?? '')"
-        class="w-4 h-4"
-      />
+      <Icon v-else :icon="getProviderIcon(selectedModel?.service ?? '')" class="w-4 h-4" />
     </div>
 
     <ChevronDownIcon
@@ -52,10 +44,7 @@
         <button
           v-if="defaultOption"
           type="button"
-          :class="[
-            'dropdown-item w-full',
-            isDefaultSelected && 'dropdown-item--active',
-          ]"
+          :class="['dropdown-item w-full', isDefaultSelected && 'dropdown-item--active']"
           @click="selectDefault"
         >
           <span class="txt-secondary italic">{{ defaultOption }}</span>
@@ -72,10 +61,7 @@
             v-for="model in group.models"
             :key="model.id"
             type="button"
-            :class="[
-              'dropdown-item w-full',
-              isSelected(model) && 'dropdown-item--active',
-            ]"
+            :class="['dropdown-item w-full', isSelected(model) && 'dropdown-item--active']"
             @click="selectModel(model)"
           >
             <GroqIcon
@@ -83,11 +69,7 @@
               :size="20"
               class-name="flex-shrink-0"
             />
-            <Icon
-              v-else
-              :icon="getProviderIcon(model.service)"
-              class="w-5 h-5 flex-shrink-0"
-            />
+            <Icon v-else :icon="getProviderIcon(model.service)" class="w-5 h-5 flex-shrink-0" />
             <div class="flex-1 min-w-0 text-left">
               <div class="flex items-center gap-2">
                 <span class="font-medium truncate">{{ model.name }}</span>
@@ -136,7 +118,7 @@ const props = withDefaults(
     disabled: false,
     valueFormat: 'nameService',
     defaultOption: undefined,
-  },
+  }
 )
 
 const emit = defineEmits<{
