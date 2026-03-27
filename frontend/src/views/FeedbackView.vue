@@ -246,11 +246,10 @@
                       </button>
                     </div>
                   </div>
-                  <p
-                    v-else
-                    class="txt-primary text-sm leading-relaxed"
-                    v-html="highlightSearch(feedback.value)"
-                  />
+                  <p v-else class="txt-primary text-sm leading-relaxed">
+                    <!-- eslint-disable-next-line vue/no-v-html -- search highlights as HTML markup -->
+                    <span v-html="highlightSearch(feedback.value)"></span>
+                  </p>
                 </div>
 
                 <!-- Actions -->

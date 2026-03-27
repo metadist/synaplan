@@ -760,6 +760,8 @@ import {
   type TaskPrompt as ApiTaskPrompt,
   type PromptFile,
   type AvailableFile,
+  type PromptMetadata,
+  type UpdatePromptRequest,
 } from '@/services/api/promptsApi'
 import { configApi } from '@/services/api/configApi'
 import type { AIModel, Capability } from '@/types/ai-models'
@@ -955,8 +957,8 @@ const markdownTools = [
 
 // Unsaved changes tracking
 const { hasUnsavedChanges, saveChanges, discardChanges, setupNavigationGuard } = useUnsavedChanges(
-  formData as any,
-  originalData as any
+  formData,
+  originalData
 )
 
 let cleanupGuard: (() => void) | undefined
@@ -996,7 +998,7 @@ const loadPrompts = async () => {
         let foundModel = null
         for (const models of Object.values(allModels.value)) {
           if (models) {
-            foundModel = models.find((m: any) => m.id === metadata.aiModel)
+            foundModel = models.find((m: AIModel) => m.id === metadata.aiModel)
             if (foundModel) break
           }
         }
@@ -1100,7 +1102,7 @@ const handleSave = saveChanges(async () => {
 
   try {
     // Build metadata object
-    const metadata: Record<string, any> = {}
+    const metadata: PromptMetadata = {}
 
     if (formData.value.aiModel === 'default' || !formData.value.aiModel) {
       metadata.aiModel = 0
@@ -1149,7 +1151,7 @@ const handleSave = saveChanges(async () => {
       // For system prompts: do NOT send language (backend will preserve original)
       // For custom prompts: send the language from the form
       const isSystemPrompt = currentPrompt.value.isDefault
-      const updatePayload: Record<string, any> = {
+      const updatePayload: UpdatePromptRequest = {
         shortDescription: currentPrompt.value.shortDescription, // Keep original name
         prompt: formData.value.content || '',
         selectionRules: formData.value.rules || null,
@@ -1269,7 +1271,7 @@ const handleCreateNew = async () => {
 
   try {
     // Build metadata object
-    const metadata: Record<string, any> = {}
+    const metadata: PromptMetadata = {}
 
     metadata.aiModel = 0 // Default to 0 for new prompts
     metadata.tool_internet_search = true // Enable by default

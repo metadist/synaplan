@@ -210,6 +210,7 @@
 </template>
 
 <script setup lang="ts">
+import { getErrorMessage } from '@/utils/errorMessage'
 import { ref, computed, onMounted, onBeforeUnmount, nextTick } from 'vue'
 import { Icon } from '@iconify/vue'
 import { useI18n } from 'vue-i18n'
@@ -254,8 +255,8 @@ const loadWidgets = async () => {
       const sub = subscribeToNotifications(widget.widgetId, handleNotification)
       notificationSubscriptions.push(sub)
     }
-  } catch (err: any) {
-    error(err.message || 'Failed to load widgets')
+  } catch (err: unknown) {
+    error(getErrorMessage(err) || 'Failed to load widgets')
   }
 }
 
@@ -279,8 +280,8 @@ const loadSessions = async () => {
       }
       sessions.value.sort((a, b) => b.lastMessage - a.lastMessage)
     }
-  } catch (err: any) {
-    error(err.message || 'Failed to load sessions')
+  } catch (err: unknown) {
+    error(getErrorMessage(err) || 'Failed to load sessions')
   } finally {
     loading.value = false
   }
@@ -292,16 +293,15 @@ const selectSession = async (session: widgetSessionsApi.WidgetSession) => {
 
   try {
     // Find the widget ID for this session
-    const widgetId =
-      selectedWidgetId.value || (session as any).widgetId || widgets.value[0]?.widgetId
+    const widgetId = selectedWidgetId.value || session.widgetId || widgets.value[0]?.widgetId
     if (!widgetId) return
 
     const response = await widgetSessionsApi.getWidgetSession(widgetId, session.sessionId)
     sessionMessages.value = response.messages
     await nextTick()
     scrollToBottom()
-  } catch (err: any) {
-    error(err.message || 'Failed to load messages')
+  } catch (err: unknown) {
+    error(getErrorMessage(err) || 'Failed to load messages')
   } finally {
     loadingMessages.value = false
   }
@@ -311,7 +311,7 @@ const sendReply = async () => {
   if (!replyText.value.trim() || !selectedSession.value) return
 
   const widgetId =
-    selectedWidgetId.value || (selectedSession.value as any).widgetId || widgets.value[0]?.widgetId
+    selectedWidgetId.value || selectedSession.value.widgetId || widgets.value[0]?.widgetId
   if (!widgetId) return
 
   sending.value = true
@@ -341,8 +341,8 @@ const sendReply = async () => {
     await nextTick()
     scrollToBottom()
     success(t('liveSupport.messageSent'))
-  } catch (err: any) {
-    error(err.message || 'Failed to send message')
+  } catch (err: unknown) {
+    error(getErrorMessage(err) || 'Failed to send message')
   } finally {
     sending.value = false
   }
@@ -352,7 +352,7 @@ const handBackToAi = async () => {
   if (!selectedSession.value) return
 
   const widgetId =
-    selectedWidgetId.value || (selectedSession.value as any).widgetId || widgets.value[0]?.widgetId
+    selectedWidgetId.value || selectedSession.value.widgetId || widgets.value[0]?.widgetId
   if (!widgetId) return
 
   try {
@@ -360,12 +360,12 @@ const handBackToAi = async () => {
     selectedSession.value.mode = 'ai'
     success(t('liveSupport.handBackSuccess'))
     loadSessions()
-  } catch (err: any) {
-    error(err.message || 'Failed to hand back to AI')
+  } catch (err: unknown) {
+    error(getErrorMessage(err) || 'Failed to hand back to AI')
   }
 }
 
-const handleNotification = (data: any) => {
+const handleNotification = (data: { type?: string }) => {
   if (data.type === 'new_message') {
     // Reload sessions to show new messages
     loadSessions()

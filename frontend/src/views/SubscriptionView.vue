@@ -198,6 +198,7 @@
 </template>
 
 <script setup lang="ts">
+import { getErrorMessage } from '@/utils/errorMessage'
 import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { Icon } from '@iconify/vue'
@@ -281,13 +282,13 @@ async function selectPlan(planId: string) {
     const response = await subscriptionApi.createCheckoutSession(planId)
     // Redirect to Stripe Checkout
     window.location.href = response.url
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Failed to create checkout session:', error)
 
     // Show user-friendly error
     if (
-      error.message?.includes('unavailable') ||
-      error.message?.includes('STRIPE_NOT_CONFIGURED')
+      getErrorMessage(error)?.includes('unavailable') ||
+      getErrorMessage(error)?.includes('STRIPE_NOT_CONFIGURED')
     ) {
       await dialog.alert({
         title: t('subscription.serviceNotAvailable'),
@@ -318,7 +319,7 @@ async function openBillingPortal() {
     const response = await subscriptionApi.createPortalSession()
     // Redirect to Stripe Customer Portal
     window.location.href = response.url
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Failed to open billing portal:', error)
     await dialog.alert({
       title: t('common.error'),

@@ -174,6 +174,7 @@
                     class="w-12 h-12 rounded-full flex items-center justify-center"
                     :style="{ backgroundColor: config.primaryColor }"
                   >
+                    <!-- eslint-disable-next-line vue/no-v-html -- inline SVG icon preview -->
                     <div v-html="getIconPreview(icon.value)"></div>
                   </div>
                   <span class="text-xs txt-secondary">{{ icon.label }}</span>
@@ -1451,6 +1452,7 @@ SynaplanWidget.init({
 </template>
 
 <script setup lang="ts">
+import { getErrorMessage } from '@/utils/errorMessage'
 import { ref, reactive, computed, onMounted, watch } from 'vue'
 import { Icon } from '@iconify/vue'
 import { useI18n } from 'vue-i18n'
@@ -1478,6 +1480,7 @@ const props = withDefaults(
     promptOnly?: boolean
   }>(),
   {
+    initialTab: undefined,
     promptOnly: false,
   }
 )
@@ -1779,7 +1782,7 @@ const handleIconUpload = async (event: Event) => {
       config.buttonIcon = 'custom'
       success(t('widgets.iconUploadSuccess'))
     }
-  } catch (err) {
+  } catch {
     showError(t('widgets.iconUploadFailed'))
   } finally {
     uploadingIcon.value = false
@@ -1909,9 +1912,9 @@ Be friendly, professional, and concise in your responses.`
 
     // Load AI models for the dropdown
     await loadAIModels()
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error('Failed to create manual prompt:', err)
-    showError(err.message || t('widgets.advancedConfig.manualCreateError'))
+    showError(getErrorMessage(err) || t('widgets.advancedConfig.manualCreateError'))
   } finally {
     creatingManualPrompt.value = false
   }
@@ -1987,9 +1990,9 @@ const handleSave = async () => {
 
     success(t('widgets.advancedConfig.saveSuccess'))
     emit('saved')
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error('Failed to save config:', err)
-    showError(err.message || t('widgets.advancedConfig.saveError'))
+    showError(getErrorMessage(err) || t('widgets.advancedConfig.saveError'))
   } finally {
     saving.value = false
   }
@@ -2002,7 +2005,7 @@ const loadAIModels = async () => {
     if (response.success) {
       allModels.value = response.models
     }
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error('Failed to load AI models:', err)
   } finally {
     loadingModels.value = false
@@ -2060,9 +2063,9 @@ const loadPromptData = async () => {
       manualPromptContent.value = removeKnowledgeBaseSection(parsedPrompt.manualPrompt)
       promptData.content = manualPromptContent.value
     }
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error('Failed to load prompt:', err)
-    promptError.value = err.message || 'Failed to load prompt data'
+    promptError.value = getErrorMessage(err) || 'Failed to load prompt data'
   } finally {
     promptLoading.value = false
   }
@@ -2149,9 +2152,9 @@ const handleFileUpload = async (event: Event) => {
         generateFileSummary(file.id)
       }
     }
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error('Failed to upload file:', err)
-    showError(err.message || t('widgets.advancedConfig.fileUploadError'))
+    showError(getErrorMessage(err) || t('widgets.advancedConfig.fileUploadError'))
   } finally {
     uploadingFile.value = false
     // Reset input
@@ -2178,9 +2181,9 @@ const handleDeleteFile = async (fileId: number) => {
     fileSummaries.value.delete(fileId)
     refreshPromptContent()
     success(t('widgets.advancedConfig.fileDeleteSuccess'))
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error('Failed to delete file:', err)
-    showError(err.message || t('widgets.advancedConfig.fileDeleteError'))
+    showError(getErrorMessage(err) || t('widgets.advancedConfig.fileDeleteError'))
   } finally {
     deletingFileId.value = null
   }
@@ -2198,9 +2201,9 @@ const generateFileSummary = async (fileId: number) => {
     fileSummaries.value.set(fileId, summary)
     fileSummaries.value = new Map(fileSummaries.value)
     refreshPromptContent()
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error('Failed to generate summary:', err)
-    showError(err.message || t('widgets.advancedConfig.summaryError'))
+    showError(getErrorMessage(err) || t('widgets.advancedConfig.summaryError'))
   } finally {
     loadingSummary.value.delete(fileId)
     loadingSummary.value = new Set(loadingSummary.value)
@@ -2225,9 +2228,9 @@ const handleFilePickerSelect = async (files: AvailableFile[]) => {
 
       // Generate summary for the file
       generateFileSummary(file.messageId)
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Failed to link file:', err)
-      showError(err.message || t('widgets.advancedConfig.linkFileError'))
+      showError(getErrorMessage(err) || t('widgets.advancedConfig.linkFileError'))
     }
   }
 

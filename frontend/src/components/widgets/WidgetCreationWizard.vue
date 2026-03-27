@@ -678,6 +678,7 @@
 </template>
 
 <script setup lang="ts">
+import { getErrorMessage } from '@/utils/errorMessage'
 import { ref, computed, onMounted, onBeforeUnmount, watch } from 'vue'
 import { Icon } from '@iconify/vue'
 import { useEscapeKey } from '@/composables/useEscapeKey'
@@ -685,6 +686,7 @@ import { useConfigStore } from '@/stores/config'
 import ChatWidget from '@/components/widgets/ChatWidget.vue'
 import * as widgetsApi from '@/services/api/widgetsApi'
 import { promptsApi } from '@/services/api/promptsApi'
+import type { TaskPrompt } from '@/services/api/promptsApi'
 import { useNotification } from '@/composables/useNotification'
 import { useI18n } from 'vue-i18n'
 
@@ -699,7 +701,7 @@ const { t, locale } = useI18n()
 
 const currentStep = ref(0)
 const creating = ref(false)
-const taskPrompts = ref<any[]>([])
+const taskPrompts = ref<TaskPrompt[]>([])
 const previewWidget = ref<widgetsApi.Widget | null>(null)
 const isCreatingPreview = ref(false)
 const previewWebsite = ref('')
@@ -793,7 +795,7 @@ const sanitizeDomainInput = (value: string): string | null => {
   if (!normalized) return null
   normalized = normalized.replace(/^https?:\/\//, '')
   normalized = normalized.replace(/^\/\//, '')
-  normalized = normalized.split(/[\/?#]/)[0]
+  normalized = normalized.split(/[/?#]/)[0]
   if (!normalized) return null
   const domainPattern = /^(?:\*\.)?[a-z0-9-]+(?:\.[a-z0-9-]+)*(?::\d+)?$/
   if (!domainPattern.test(normalized)) {
@@ -885,7 +887,7 @@ const createPreviewWidget = async () => {
     })
     previewWidget.value = tempWidget
     console.log('✅ Preview widget created:', tempWidget.widgetId)
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Failed to create preview widget:', error)
     // Don't show error to user - preview is optional
   } finally {
@@ -975,9 +977,9 @@ const createWidget = async () => {
     }
 
     emit('created')
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Widget creation failed:', error)
-    showError(error.message || 'Failed to create widget')
+    showError(getErrorMessage(error) || 'Failed to create widget')
   } finally {
     creating.value = false
   }

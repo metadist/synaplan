@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest'
+import type { ComponentPublicInstance } from 'vue'
 import { mount } from '@vue/test-utils'
 import CommandPalette from '@/components/CommandPalette.vue'
 import { useCommandsStore } from '@/stores/commands'
@@ -99,7 +100,7 @@ describe('CommandPalette', () => {
       },
     })
 
-    const vm = wrapper.vm as any
+    const vm = wrapper.vm as ComponentPublicInstance & { handleKeyDown: (e: KeyboardEvent) => void }
     const event = new KeyboardEvent('keydown', { key: 'ArrowDown' })
 
     vm.handleKeyDown(event)
@@ -117,7 +118,7 @@ describe('CommandPalette', () => {
       },
     })
 
-    const vm = wrapper.vm as any
+    const vm = wrapper.vm as ComponentPublicInstance & { handleKeyDown: (e: KeyboardEvent) => void }
     const event = new KeyboardEvent('keydown', { key: 'Escape' })
 
     vm.handleKeyDown(event)

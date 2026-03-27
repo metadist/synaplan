@@ -766,12 +766,22 @@ async function loadRegistrationAnalytics() {
 }
 
 async function updateAnalyticsPeriod(newPeriod: string) {
-  analyticsPeriod.value = newPeriod as any
+  if (
+    newPeriod === '7d' ||
+    newPeriod === '30d' ||
+    newPeriod === '90d' ||
+    newPeriod === '1y' ||
+    newPeriod === 'all'
+  ) {
+    analyticsPeriod.value = newPeriod
+  }
   await loadRegistrationAnalytics()
 }
 
 async function updateAnalyticsGroupBy(newGroupBy: string) {
-  analyticsGroupBy.value = newGroupBy as any
+  if (newGroupBy === 'day' || newGroupBy === 'week' || newGroupBy === 'month') {
+    analyticsGroupBy.value = newGroupBy
+  }
   await loadRegistrationAnalytics()
 }
 

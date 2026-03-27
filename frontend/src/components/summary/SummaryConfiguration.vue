@@ -395,6 +395,7 @@ import { summaryTypes, summaryLengths, outputLanguages, focusAreaOptions } from 
 import { useNotification } from '@/composables/useNotification'
 import { uploadFiles, getFileContent, type FileItem } from '@/services/filesService'
 import FileSelectionModal from '@/components/FileSelectionModal.vue'
+import { getErrorMessage } from '@/utils/errorMessage'
 
 interface Props {
   isGenerating?: boolean
@@ -547,9 +548,9 @@ const handleFile = async (file: File) => {
     } else {
       error('Failed to extract text from file. Please try again.')
     }
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error('File upload error:', err)
-    error(err?.message || 'Failed to upload file. Please try again.')
+    error(getErrorMessage(err) || 'Failed to upload file. Please try again.')
   } finally {
     isUploadingFile.value = false
     // Reset file input
@@ -627,9 +628,9 @@ const handleFilesSelected = async (selectedFiles: FileItem[]) => {
     } else {
       warning('No text could be extracted from selected files.')
     }
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error('Failed to load file content:', err)
-    error(err?.message || 'Failed to load files. Please try again.')
+    error(getErrorMessage(err) || 'Failed to load files. Please try again.')
   } finally {
     isUploadingFile.value = false
     fileSelectionModalVisible.value = false

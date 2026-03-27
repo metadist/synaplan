@@ -79,11 +79,10 @@
               <p v-if="message.role === 'user'" class="text-sm whitespace-pre-wrap">
                 {{ message.content }}
               </p>
-              <div
-                v-else
-                class="text-sm prose prose-sm dark:prose-invert max-w-none"
-                v-html="renderMarkdown(message.content)"
-              />
+              <div v-else class="text-sm prose prose-sm dark:prose-invert max-w-none">
+                <!-- eslint-disable-next-line vue/no-v-html -- assistant message markdown -->
+                <div v-html="renderMarkdown(message.content)"></div>
+              </div>
             </div>
           </div>
 
@@ -201,6 +200,7 @@
 </template>
 
 <script setup lang="ts">
+import { getErrorMessage } from '@/utils/errorMessage'
 import { ref, computed, onMounted, nextTick } from 'vue'
 import { Icon } from '@iconify/vue'
 import { useI18n } from 'vue-i18n'
@@ -340,9 +340,9 @@ const sendMessage = async () => {
     }
 
     await scrollToBottom()
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error('Failed to send message:', err)
-    showError(err.message || t('widgets.setupChat.sendError'))
+    showError(getErrorMessage(err) || t('widgets.setupChat.sendError'))
     // Remove the user message from history on error
     conversationHistory.value.pop()
   } finally {
@@ -381,9 +381,9 @@ const saveGeneratedPrompt = async () => {
 
     success(t('widgets.setupChat.saveSuccess'))
     emit('completed', result.promptTopic)
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error('Failed to save prompt:', err)
-    showError(err.message || t('widgets.setupChat.saveError'))
+    showError(getErrorMessage(err) || t('widgets.setupChat.saveError'))
   } finally {
     isSending.value = false
   }
@@ -418,9 +418,9 @@ const startInterview = async () => {
     }
 
     await scrollToBottom()
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error('Failed to start interview:', err)
-    showError(err.message || t('widgets.setupChat.startError'))
+    showError(getErrorMessage(err) || t('widgets.setupChat.startError'))
   } finally {
     isTyping.value = false
 

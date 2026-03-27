@@ -413,7 +413,7 @@ async function httpClient<T = unknown, S extends z.Schema | undefined = undefine
   }
 
   // Parse response based on requested type
-  let data: any
+  let data: Blob | string | ArrayBuffer | unknown
   switch (responseType) {
     case 'blob':
       data = await response.blob()

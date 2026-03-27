@@ -527,6 +527,7 @@
 </template>
 
 <script setup lang="ts">
+import { getErrorMessage } from '@/utils/errorMessage'
 import { ref, computed, watch, onMounted, onUnmounted, nextTick } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { Icon } from '@iconify/vue'
@@ -633,8 +634,8 @@ onMounted(async () => {
         authStore.user.memoriesEnabled = response.profile.memoriesEnabled
       }
     }
-  } catch (err: any) {
-    error(err.message || 'Failed to load profile')
+  } catch (err: unknown) {
+    error(getErrorMessage(err) || 'Failed to load profile')
   } finally {
     loading.value = false
   }
@@ -696,8 +697,8 @@ const handleSave = saveChanges(async () => {
     }
 
     originalData.value = { ...formData.value }
-  } catch (err: any) {
-    error(err.message || 'Failed to update profile')
+  } catch (err: unknown) {
+    error(getErrorMessage(err) || 'Failed to update profile')
     throw err
   } finally {
     loading.value = false
@@ -725,8 +726,8 @@ const handleDeleteAccount = async () => {
     await authStore.logout()
     showDeleteModal.value = false
     router.push('/login')
-  } catch (err: any) {
-    error(err.message || 'Failed to delete account')
+  } catch (err: unknown) {
+    error(getErrorMessage(err) || 'Failed to delete account')
   } finally {
     deletingAccount.value = false
     deleteConfirmPassword.value = ''

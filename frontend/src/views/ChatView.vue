@@ -235,6 +235,7 @@ import { parseAIResponse } from '@/utils/responseParser'
 import { normalizeMediaUrl } from '@/utils/urlHelper'
 import { AudioStreamer } from '@/utils/AudioStreamer'
 import { httpClient } from '@/services/api/httpClient'
+import { z } from 'zod'
 import type { UserMemory } from '@/services/api/userMemoriesApi'
 import { getCategories, deleteMemory as deleteMemoryApi } from '@/services/api/userMemoriesApi'
 import { deleteFeedback as deleteFeedbackApi } from '@/services/api/userFeedbackApi'
@@ -254,6 +255,15 @@ import MemoriesDialog from '@/components/MemoriesDialog.vue'
 import MemoryDeleteDialog from '@/components/memories/MemoryDeleteDialog.vue'
 import PromoTipBanner from '@/components/PromoTipBanner.vue'
 import { usePromoTips } from '@/composables/usePromoTips'
+
+const SaveCancelledMessageResponseSchema = z
+  .object({
+    messageId: z.number().optional(),
+    topic: z.string().optional(),
+    provider: z.string().optional(),
+    model: z.string().optional(),
+  })
+  .passthrough()
 
 const { t } = useI18n()
 const router = useRouter()
@@ -288,7 +298,17 @@ const isAudioStreaming = ref(false)
 
 // Processing status for real-time feedback
 const processingStatus = ref<string>('')
-const processingMetadata = ref<any>({})
+type StreamingProcessingMetadata = {
+  model_name?: string
+  provider?: string
+  topic?: string
+  language?: string
+  customMessage?: string
+  results_count?: number
+  handler?: string
+}
+
+const processingMetadata = ref<StreamingProcessingMetadata>({})
 
 // Memory suggestion toasts
 const activeMemoryToasts = ref<Array<UserMemory & { toastId: number }>>([])
@@ -557,7 +577,7 @@ const handleDragOver = (event: DragEvent) => {
   event.preventDefault()
 }
 
-const handleDragLeave = (_event: DragEvent) => {
+const handleDragLeave = () => {
   dragCounter.value--
   // Only hide overlay when truly leaving the area
   if (dragCounter.value <= 0) {
@@ -716,7 +736,7 @@ const handleSendMessage = async (
   autoScroll.value = true
 
   // Prepare files info if fileIds are provided
-  let files: any[] | undefined = undefined
+  let files: import('@/stores/history').MessageFile[] | undefined = undefined
   if (options?.fileIds && options.fileIds.length > 0) {
     // Import filesService dynamically
     const { default: filesService } = await import('@/services/filesService')
@@ -956,11 +976,13 @@ const streamAIResponse = async (
             // Update message with sorting model from backend (instead of store model)
             const message = historyStore.messages.find((m) => m.id === messageId)
             if (message && data.metadata) {
-              if (data.metadata.provider) {
-                message.provider = data.metadata.provider
+              const prov = data.metadata.provider
+              const mname = data.metadata.model_name
+              if (typeof prov === 'string') {
+                message.provider = prov
               }
-              if (data.metadata.model_name) {
-                message.modelLabel = data.metadata.model_name
+              if (typeof mname === 'string') {
+                message.modelLabel = mname
               }
             }
           } else if (data.status === 'classified') {
@@ -968,7 +990,7 @@ const streamAIResponse = async (
             processingMetadata.value = meta
             processingStatus.value = 'classified'
             // Capture language for TTS streaming
-            if (meta.language) {
+            if (typeof meta.language === 'string') {
               detectedLanguage = meta.language
             }
           } else if (data.status === 'searching') {
@@ -993,11 +1015,13 @@ const streamAIResponse = async (
             // Update message with real model from backend (instead of store model)
             const message = historyStore.messages.find((m) => m.id === messageId)
             if (message && data.metadata) {
-              if (data.metadata.provider) {
-                message.provider = data.metadata.provider
+              const prov = data.metadata.provider
+              const mname = data.metadata.model_name
+              if (typeof prov === 'string') {
+                message.provider = prov
               }
-              if (data.metadata.model_name) {
-                message.modelLabel = data.metadata.model_name
+              if (typeof mname === 'string') {
+                message.modelLabel = mname
               }
             }
           } else if (data.status === 'processing') {
@@ -1124,7 +1148,7 @@ const streamAIResponse = async (
             if (message && data.links) {
               message.parts.push({
                 type: 'links',
-                items: data.links.map((l: any) => {
+                items: data.links.map((l) => {
                   try {
                     return {
                       title: l.title || l.url,
@@ -1153,17 +1177,17 @@ const streamAIResponse = async (
               return
             }
 
-            const toastMemory: UserMemory & { toastId: number } = {
+            const toastMemory = {
               id: memoryData.id,
-              category: memoryData.category,
-              key: memoryData.key,
-              value: memoryData.value,
-              source: memoryData.source || 'auto_detected',
-              messageId: memoryData.messageId || null,
-              created: memoryData.created || Date.now(),
-              updated: memoryData.updated || Date.now(),
+              category: memoryData.category ?? '',
+              key: memoryData.key ?? '',
+              value: memoryData.value ?? '',
+              source: (memoryData.source ?? 'auto_detected') as UserMemory['source'],
+              messageId: memoryData.messageId ?? null,
+              created: memoryData.created ?? Date.now(),
+              updated: memoryData.updated ?? Date.now(),
               toastId: memoryToastIdCounter++,
-            }
+            } as UserMemory & { toastId: number }
 
             if (memoryData.action === 'delete') {
               openMemoryDeleteDialog(toastMemory)
@@ -1190,8 +1214,8 @@ const streamAIResponse = async (
                     category: mem.category || 'personal',
                     key: mem.key || '',
                     value: mem.value || '',
-                    source: mem.source || 'auto_detected',
-                    messageId: mem.messageId || null,
+                    source: (mem.source || 'auto_detected') as UserMemory['source'],
+                    messageId: mem.messageId ?? null,
                     created: mem.created || 0,
                     updated: mem.updated || 0,
                   })
@@ -1219,8 +1243,8 @@ const streamAIResponse = async (
                   // Add to store temporarily for badge rendering
                   feedbackStore.feedbacks.push({
                     id: fb.id,
-                    type: fb.type,
-                    value: fb.value,
+                    type: fb.type as 'false_positive' | 'positive',
+                    value: fb.value ?? '',
                     messageId: null,
                     created: 0,
                     updated: 0,
@@ -1283,10 +1307,9 @@ const streamAIResponse = async (
                   message.files = []
                 }
 
-                const fileData = {
+                const fileData: import('@/stores/history').MessageFile = {
                   id: data.generatedFile.id,
-                  fileName: data.generatedFile.filename,
-                  filename: data.generatedFile.filename, // Both camelCase and lowercase for compatibility
+                  filename: data.generatedFile.filename,
                   filePath: data.generatedFile.path,
                   fileSize: data.generatedFile.size,
                   fileType: data.generatedFile.type,
@@ -1352,7 +1375,7 @@ const streamAIResponse = async (
                 Array.isArray(data.searchResults) &&
                 data.searchResults.length > 0
               ) {
-                message.searchResults = data.searchResults
+                message.searchResults = data.searchResults as NonNullable<Message['searchResults']>
 
                 // Also set webSearch metadata for assistant message
                 message.webSearch = {
@@ -1427,7 +1450,7 @@ const streamAIResponse = async (
             }
             streamingDirty = false
 
-            const errorMsg = data.error || data.message || 'Unknown error'
+            const errorMsg = String(data.error ?? data.message ?? 'Unknown error')
             console.error('Error:', errorMsg, data)
             processingStatus.value = ''
             processingMetadata.value = {}
@@ -1490,7 +1513,12 @@ const streamAIResponse = async (
               const lastUserMessage = userMessages[userMessages.length - 1]
               if (lastUserMessage) {
                 historyStore.setMessageStatus(lastUserMessage.id, 'rate_limited', 'rate_limit', {
-                  limitType: data.limit_type || 'lifetime',
+                  limitType:
+                    data.limit_type === 'hourly' ||
+                    data.limit_type === 'monthly' ||
+                    data.limit_type === 'lifetime'
+                      ? data.limit_type
+                      : 'lifetime',
                   actionType: data.action_type || 'MESSAGES',
                   used: data.used || 0,
                   limit: data.limit || 0,
@@ -1502,7 +1530,12 @@ const streamAIResponse = async (
 
               checkAndShowLimit({
                 allowed: false,
-                limitType: data.limit_type || 'lifetime',
+                limitType:
+                  data.limit_type === 'hourly' ||
+                  data.limit_type === 'monthly' ||
+                  data.limit_type === 'lifetime'
+                    ? data.limit_type
+                    : 'lifetime',
                 actionType: data.action_type || 'MESSAGES',
                 used: data.used || 0,
                 limit: data.limit || 0,
@@ -1724,7 +1757,7 @@ async function saveCancelledMessageToBackend(
   metadata?: { provider?: string; model?: string; topic?: string }
 ) {
   try {
-    const data = await httpClient<any>('/api/v1/messages/save-cancelled', {
+    const data = await httpClient('/api/v1/messages/save-cancelled', {
       method: 'POST',
       body: JSON.stringify({
         trackId,
@@ -1734,6 +1767,7 @@ async function saveCancelledMessageToBackend(
         model: metadata?.model,
         topic: metadata?.topic,
       }),
+      schema: SaveCancelledMessageResponseSchema,
     })
 
     // Update the message with backend message ID and metadata so the footer buttons appear

@@ -118,13 +118,14 @@ watch(
 )
 
 const handleConfirm = () => {
-  if (dialog.value.resolve) {
+  const resolve = dialog.value.resolve
+  if (resolve) {
     if (dialog.value.type === 'confirm') {
-      dialog.value.resolve(true)
+      ;(resolve as (value: boolean) => void)(true)
     } else if (dialog.value.type === 'prompt') {
-      dialog.value.resolve(inputValue.value || null)
+      ;(resolve as (value: string | null) => void)(inputValue.value || null)
     } else {
-      dialog.value.resolve(undefined)
+      ;(resolve as () => void)()
     }
   }
   dialog.value.isOpen = false

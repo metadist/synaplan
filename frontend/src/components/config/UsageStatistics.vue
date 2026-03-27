@@ -483,6 +483,7 @@
 </template>
 
 <script setup lang="ts">
+import { getErrorMessage } from '@/utils/errorMessage'
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { Icon } from '@iconify/vue'
 import {
@@ -548,7 +549,7 @@ const loadActivity = async (page = 1) => {
     activityItems.value = data.items
     activityTotal.value = data.total
     activityTotalPages.value = data.total_pages
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error('Failed to load activity:', err)
   } finally {
     activityLoading.value = false
@@ -580,9 +581,9 @@ const loadStats = async () => {
     }
 
     stats.value = await getUsageStats()
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error('Failed to load usage stats:', err)
-    error.value = err.message || t('config.usage.errorLoading')
+    error.value = getErrorMessage(err) || t('config.usage.errorLoading')
   } finally {
     loading.value = false
   }
@@ -593,9 +594,9 @@ const exportUsage = async () => {
     exporting.value = true
     await downloadUsageExport()
     success(t('config.usage.exportSuccess'))
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error('Failed to export usage:', err)
-    showError(err.message || t('config.usage.errorExporting'))
+    showError(getErrorMessage(err) || t('config.usage.errorExporting'))
   } finally {
     exporting.value = false
   }

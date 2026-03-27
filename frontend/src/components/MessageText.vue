@@ -4,6 +4,7 @@
     class="prose prose-sm max-w-none txt-primary markdown-content"
     data-testid="section-message-text"
   >
+    <!-- eslint-disable-next-line vue/no-v-html -- content from DOMPurify + markdown pipeline -->
     <div data-testid="message-text" v-html="renderedContent"></div>
   </div>
 </template>
@@ -487,8 +488,8 @@ function normalizeInlineReferences(text: string): string {
   // does not wrap them in separate <p> blocks.
   // Handles both numeric IDs ([Memory:12345]) and named keys ([Memory:hobby]).
   return text
-    .replace(/\n+(\[(?:Feedback|Memory)\s*:\s*[\w.\-]+\])/gi, ' $1')
-    .replace(/(\[(?:Feedback|Memory)\s*:\s*[\w.\-]+\])\n+/gi, '$1 ')
+    .replace(/\n+(\[(?:Feedback|Memory)\s*:\s*[\w.-]+\])/gi, ' $1')
+    .replace(/(\[(?:Feedback|Memory)\s*:\s*[\w.-]+\])\n+/gi, '$1 ')
 }
 
 // Process content - sync for regular markdown, async for math formulas

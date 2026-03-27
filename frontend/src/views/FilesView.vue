@@ -1135,6 +1135,7 @@
 </template>
 
 <script setup lang="ts">
+import { getErrorMessage } from '@/utils/errorMessage'
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import MainLayout from '@/components/MainLayout.vue'
@@ -1331,7 +1332,7 @@ const moveFileToFolder = async (fileId: number, folderName: string) => {
     await loadFileGroups()
     await loadFiles()
   } catch (err: unknown) {
-    const msg = err instanceof Error ? err.message : 'Failed to move file'
+    const msg = err instanceof Error ? getErrorMessage(err) : 'Failed to move file'
     showError(msg)
   }
 }
@@ -1377,7 +1378,7 @@ const handleDragOver = (event: DragEvent) => {
   event.preventDefault()
 }
 
-const handleDragLeave = (_event: DragEvent) => {
+const handleDragLeave = () => {
   dragCounter.value--
   // Only hide overlay when truly leaving the area
   if (dragCounter.value <= 0) {
@@ -1557,7 +1558,7 @@ const loadFiles = async (page = currentPage.value) => {
   } catch (error: unknown) {
     console.error('Failed to load files:', error)
 
-    const msg = error instanceof Error ? error.message : ''
+    const msg = error instanceof Error ? getErrorMessage(error) : ''
     if (msg.includes('401')) {
       files.value = []
       totalCount.value = 0
@@ -1599,11 +1600,11 @@ const resetFilters = () => {
 const loadFileGroups = async () => {
   try {
     fileGroups.value = await filesService.getFileGroups()
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Failed to load file groups:', error)
 
     // Handle 401 (not authenticated) gracefully
-    if (error.message && error.message.includes('401')) {
+    if (getErrorMessage(error) && getErrorMessage(error).includes('401')) {
       // Silently fail - router should redirect to login
       fileGroups.value = []
     }

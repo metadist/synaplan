@@ -582,6 +582,7 @@
 </template>
 
 <script setup lang="ts">
+import { getErrorMessage } from '@/utils/errorMessage'
 import { ref, computed, watch, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { Icon } from '@iconify/vue'
@@ -676,7 +677,7 @@ const loadSavedSummaries = async () => {
   try {
     const response = await widgetSessionsApi.getWidgetSummaries(props.widgetId, 10)
     savedSummaries.value = response.summaries || []
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error('Failed to load summaries:', err)
   } finally {
     loadingSummaries.value = false
@@ -756,8 +757,8 @@ const generateAnalysis = async (forceRegenerate = false) => {
     success(t('summary.generateSuccess'))
     // Reload saved summaries to reflect the update
     await loadSavedSummaries()
-  } catch (err: any) {
-    error(err.message || 'Failed to generate analysis')
+  } catch (err: unknown) {
+    error(getErrorMessage(err) || 'Failed to generate analysis')
   } finally {
     generating.value = false
   }

@@ -387,6 +387,7 @@
 </template>
 
 <script setup lang="ts">
+import { getErrorMessage } from '@/utils/errorMessage'
 import { ref, onMounted } from 'vue'
 import {
   PlusIcon,
@@ -450,9 +451,9 @@ const loadAPIKeys = async () => {
       usageCount: 0, // Backend doesn't track this yet
       scopes: key.scopes,
     }))
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error('Failed to load API keys:', err)
-    error.value = err.message || 'Failed to load API keys'
+    error.value = getErrorMessage(err) || 'Failed to load API keys'
   } finally {
     loading.value = false
   }
@@ -504,9 +505,9 @@ const createAPIKey = async () => {
 
     // Show success notification
     success(t('config.apiKeys.keyCreatedSuccess'))
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error('Failed to create API key:', err)
-    error.value = err.message || t('config.apiKeys.errorCreating')
+    error.value = getErrorMessage(err) || t('config.apiKeys.errorCreating')
     showError(error.value!)
   } finally {
     loading.value = false
@@ -560,9 +561,9 @@ const revokeAPIKey = async (keyId: number) => {
       key.status = 'inactive'
     }
     success(t('config.apiKeys.revokedSuccess'))
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error('Failed to revoke API key:', err)
-    showError(err.message || t('config.apiKeys.errorRevoking'))
+    showError(getErrorMessage(err) || t('config.apiKeys.errorRevoking'))
   }
 }
 
@@ -574,9 +575,9 @@ const activateAPIKey = async (keyId: number) => {
       key.status = 'active'
     }
     success(t('config.apiKeys.activatedSuccess'))
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error('Failed to activate API key:', err)
-    showError(err.message || t('config.apiKeys.errorActivating'))
+    showError(getErrorMessage(err) || t('config.apiKeys.errorActivating'))
   }
 }
 
@@ -598,9 +599,9 @@ const deleteAPIKey = async (keyId: number) => {
       apiKeys.value.splice(index, 1)
     }
     success(t('config.apiKeys.deletedSuccess'))
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error('Failed to delete API key:', err)
-    showError(err.message || t('config.apiKeys.errorDeleting'))
+    showError(getErrorMessage(err) || t('config.apiKeys.errorDeleting'))
   }
 }
 

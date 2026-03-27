@@ -274,7 +274,9 @@
             </p>
             <p class="text-xs txt-secondary mt-2">
               {{
-                $t('config.phoneVerification.verifiedAt', { date: formatDate(status.verified_at) })
+                $t('config.phoneVerification.verifiedAt', {
+                  date: formatDate(status.verified_at ?? undefined),
+                })
               }}
             </p>
           </div>
@@ -300,14 +302,33 @@ import { useI18n } from 'vue-i18n'
 import { DevicePhoneMobileIcon } from '@heroicons/vue/24/outline'
 import { useConfigStore } from '@/stores/config'
 import { refreshAccessToken } from '@/services/api/httpClient'
+import { getErrorMessage as getUnknownErrorMessage } from '@/utils/errorMessage'
 
 const { success, error: showError } = useNotification()
 const dialog = useDialog()
 const { t } = useI18n()
 
+interface PhoneVerificationStatus {
+  verification_code?: string | null
+  expires_at?: number | null
+  phone_number?: string
+  verified?: boolean
+  verified_at?: number | null
+  pending_verification?: boolean
+}
+
+interface PhoneVerificationActionPayload {
+  verification_code?: string
+  expires_at?: number
+  phone_number?: string
+  rate_limit?: { retry_after?: number; attempts_remaining?: number | null }
+  cooldown_remaining?: number
+  retry_after?: number
+}
+
 const loading = ref(false)
 const error = ref<string | null>(null)
-const status = ref<any>(null)
+const status = ref<PhoneVerificationStatus | null>(null)
 const phoneNumber = ref('')
 const verificationCode = ref('')
 const verificationPending = ref(false)
@@ -400,7 +421,7 @@ const requestWithFallback = async (
   return { response, payload }
 }
 
-const getErrorMessage = (payload: unknown, fallback: string) => {
+const errorMessageFromPayload = (payload: unknown, fallback: string) => {
   // If payload is HTML (like Symfony error pages), extract title or show generic message
   if (typeof payload === 'string') {
     // Check if it's HTML
@@ -430,9 +451,9 @@ const getErrorMessage = (payload: unknown, fallback: string) => {
   return fallback
 }
 
-const isNetworkError = (err: any) => {
+const isNetworkError = (err: unknown) => {
   if (!err) return false
-  const message = err.message || ''
+  const message = getUnknownErrorMessage(err)
   return message === 'Failed to fetch' || message.includes('NetworkError')
 }
 
@@ -446,10 +467,10 @@ const loadStatus = async () => {
     })
 
     if (!response.ok) {
-      throw new Error(getErrorMessage(payload, 'Failed to load status'))
+      throw new Error(errorMessageFromPayload(payload, 'Failed to load status'))
     }
 
-    const data = payload as any
+    const data = payload as PhoneVerificationStatus
     status.value = data
 
     // Don't automatically show verification pending on initial load
@@ -465,11 +486,11 @@ const loadStatus = async () => {
       verificationPending.value = false
       // Success message is shown on WhatsApp after verification
     }
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error('Failed to load phone verification status:', err)
     error.value = isNetworkError(err)
       ? t('config.phoneVerification.errorLoading')
-      : err?.message || t('config.phoneVerification.errorLoading')
+      : getUnknownErrorMessage(err) || t('config.phoneVerification.errorLoading')
   } finally {
     loading.value = false
   }
@@ -489,7 +510,7 @@ const requestVerification = async () => {
       body: JSON.stringify({ phone_number: phoneNumber.value }),
     })
 
-    const data = payload as any
+    const data = payload as PhoneVerificationActionPayload
 
     // Handle rate limiting
     if (response.status === 429) {
@@ -509,7 +530,7 @@ const requestVerification = async () => {
     }
 
     if (!response.ok) {
-      throw new Error(getErrorMessage(payload, 'Failed to generate verification code'))
+      throw new Error(errorMessageFromPayload(payload, 'Failed to generate verification code'))
     }
 
     // Update status with the new code and expiration
@@ -527,18 +548,18 @@ const requestVerification = async () => {
       // Set cooldown and attempts remaining
       if (data?.rate_limit) {
         cooldownRemaining.value = data.rate_limit.retry_after || 30
-        attemptsRemaining.value = data.rate_limit.attempts_remaining
+        attemptsRemaining.value = data.rate_limit.attempts_remaining ?? null
       }
 
       success('Verification code generated! Send it to our WhatsApp number.')
     } else {
       throw new Error('Invalid response from server')
     }
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error('Failed to request verification:', err)
     const message = isNetworkError(err)
       ? t('config.phoneVerification.errorLoading')
-      : err?.message || t('config.phoneVerification.errorSending')
+      : getUnknownErrorMessage(err) || t('config.phoneVerification.errorSending')
     error.value = message
     showError(message)
   } finally {
@@ -594,16 +615,16 @@ const removePhone = async () => {
     })
 
     if (!response.ok) {
-      throw new Error(getErrorMessage(payload, 'Failed to remove phone'))
+      throw new Error(errorMessageFromPayload(payload, 'Failed to remove phone'))
     }
 
     success(t('config.phoneVerification.removedSuccess'))
     await loadStatus()
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error('Failed to remove phone verification:', err)
     const message = isNetworkError(err)
       ? t('config.phoneVerification.errorLoading')
-      : err?.message || t('config.phoneVerification.errorRemoving')
+      : getUnknownErrorMessage(err) || t('config.phoneVerification.errorRemoving')
     error.value = message
     showError(message)
   } finally {

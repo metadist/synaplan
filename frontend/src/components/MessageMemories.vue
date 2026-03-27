@@ -87,8 +87,11 @@ const navigateToMemory = (memory: UserMemory) => {
   emit('click-memory', memory)
 }
 
+const MEMORY_REF_CLICKED = 'memory-ref-clicked'
+
 // Listen for memory reference clicks from the message text
-const handleMemoryRefClick = (event: CustomEvent) => {
+const handleMemoryRefClick = (event: Event) => {
+  if (!(event instanceof CustomEvent)) return
   const { memoryId } = event.detail as { memoryId: number }
   const memoryIndex = props.memories.findIndex((m) => m.id === memoryId)
   if (memoryIndex >= 0) {
@@ -115,11 +118,11 @@ const handleMemoryRefClick = (event: CustomEvent) => {
 }
 
 onMounted(() => {
-  window.addEventListener('memory-ref-clicked' as any, handleMemoryRefClick as any)
+  window.addEventListener(MEMORY_REF_CLICKED, handleMemoryRefClick as EventListener)
 })
 
 onUnmounted(() => {
-  window.removeEventListener('memory-ref-clicked' as any, handleMemoryRefClick as any)
+  window.removeEventListener(MEMORY_REF_CLICKED, handleMemoryRefClick as EventListener)
 })
 </script>
 

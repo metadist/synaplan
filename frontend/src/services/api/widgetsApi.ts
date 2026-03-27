@@ -188,13 +188,19 @@ export async function getWidgetStats(widgetId: string): Promise<{
   active_sessions: number
   total_messages: number
 }> {
-  const data = await httpClient<{ success: boolean; stats: any }>(
-    `/api/v1/widgets/${widgetId}/stats`,
-    {
-      method: 'GET',
-    }
-  )
+  const data = await httpClient<{
+    success: boolean
+    stats: { active_sessions: number; total_messages: number }
+  }>(`/api/v1/widgets/${widgetId}/stats`, {
+    method: 'GET',
+  })
   return data.stats
+}
+
+export type WidgetStreamStatusPayload = {
+  status: string
+  message?: string
+  metadata?: Record<string, unknown>
 }
 
 export interface SendWidgetMessageOptions {
@@ -204,7 +210,7 @@ export interface SendWidgetMessageOptions {
   apiUrl?: string
   headers?: Record<string, string>
   onChunk?: (chunk: string) => void | Promise<void>
-  onStatus?: (payload: { status: string; message?: string; metadata?: any }) => void
+  onStatus?: (payload: WidgetStreamStatusPayload) => void
 }
 
 export interface SendWidgetMessageResult {
@@ -316,20 +322,21 @@ export async function sendWidgetMessage(
 
     const jsonStr = dataLines.join('')
 
-    let data: any
+    let data: Record<string, unknown>
     try {
-      data = JSON.parse(jsonStr)
+      data = JSON.parse(jsonStr) as Record<string, unknown>
     } catch (error) {
       console.error('Failed to parse SSE data:', error, jsonStr)
       return
     }
 
-    const status = data.status ?? 'data'
+    const status = (typeof data.status === 'string' ? data.status : null) ?? 'data'
 
     if (status === 'data' && typeof data.chunk === 'string') {
       await emitChunk(data.chunk)
     } else if (status === 'error') {
-      throw new Error(data.error || 'Streaming error')
+      const errMsg = typeof data.error === 'string' ? data.error : 'Streaming error'
+      throw new Error(errMsg)
     } else if (status === 'complete') {
       messageId = typeof data.messageId === 'number' ? data.messageId : messageId
       finalChatId = typeof data.chatId === 'number' ? data.chatId : finalChatId
@@ -338,12 +345,12 @@ export async function sendWidgetMessage(
         remainingUploads = data.remainingUploads
       }
       if (onStatus) {
-        onStatus(data)
+        onStatus(data as WidgetStreamStatusPayload)
       }
       completed = true
     } else {
       if (onStatus) {
-        onStatus(data)
+        onStatus(data as WidgetStreamStatusPayload)
       }
     }
   }
