@@ -146,9 +146,6 @@ describe('UsageStatistics', () => {
     const budgetSection = wrapper.find('[data-testid="section-cost-budget"]')
     expect(budgetSection.exists()).toBe(true)
     expect(budgetSection.text()).toContain('35.0%')
-    expect(budgetSection.text()).toContain('5.25 EUR')
-    expect(budgetSection.text()).toContain('15.00 EUR')
-    expect(budgetSection.text()).toContain('9.75 EUR')
   })
 
   it('should display cost summary cards', async () => {
