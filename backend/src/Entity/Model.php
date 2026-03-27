@@ -276,10 +276,12 @@ class Model
     }
 
     /**
-     * Get max completion tokens from JSON config.
+     * Get max completion tokens from JSON config (the model's technical limit).
      *
-     * Returns null when not configured or invalid — providers fall back to
-     * ChatProviderInterface::DEFAULT_MAX_COMPLETION_TOKENS in that case.
+     * The ChatHandler combines this with the user's plan-level cap via
+     * min(plan_limit, model_max) before passing to the provider.
+     * Returns null when not configured — providers fall back to
+     * ChatProviderInterface::DEFAULT_MAX_COMPLETION_TOKENS (4096).
      */
     public function getMaxTokens(): ?int
     {

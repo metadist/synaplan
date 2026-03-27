@@ -15,7 +15,6 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const publicDir = join(__dirname, '..', 'public');
 const svgPath = join(publicDir, 'single_bird.svg');
 
-// Read SVG and add white background for better visibility on iOS
 const svgContent = readFileSync(svgPath, 'utf-8');
 
 // Icon sizes needed
@@ -35,7 +34,7 @@ async function generateIcons() {
     await sharp(Buffer.from(svgContent))
       .resize(size, size, {
         fit: 'contain',
-        background: { r: 255, g: 255, b: 255, alpha: 0 } // Transparent background
+        background: { r: 255, g: 255, b: 255, alpha: 0 },
       })
       .png()
       .toFile(outputPath);

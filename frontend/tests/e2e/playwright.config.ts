@@ -40,7 +40,6 @@ export default defineConfig({
       name: 'chromium',
       use: {
         ...devices['Desktop Chrome'],
-        // Chrome 142+ Local Network Access: disable prompt so dev-stack widget tests run without user interaction
         launchOptions: {
           args: [
             '--disable-features=LocalNetworkAccessChecks',

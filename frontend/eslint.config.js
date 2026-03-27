@@ -103,6 +103,7 @@ export default [
       'dist/**',
       'dist-widget/**',
       'node_modules/**',
+      'public/**',
       'src/generated/**',
       'tests/e2e/test-results/**',
       'tests/e2e/reports/**',

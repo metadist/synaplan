@@ -41,4 +41,18 @@ interface MediaGenerationServiceInterface
      * @throws \RuntimeException          on storage failure
      */
     public function generateFromImages(User $user, string $prompt, array $imagePaths, ?int $modelId = null): array;
+
+    /**
+     * Start async video generation (returns immediately with a job ID).
+     *
+     * @return array{jobId: string, status: string, provider: string, model: string}
+     */
+    public function startVideoGeneration(User $user, string $prompt, ?int $modelId = null): array;
+
+    /**
+     * Check status of an async video generation job.
+     *
+     * @return array{status: string, file?: array{url: string, type: string, mimeType: string}, provider?: string, model?: string, error?: string, elapsed_seconds?: int}
+     */
+    public function checkVideoJob(User $user, string $jobId): array;
 }

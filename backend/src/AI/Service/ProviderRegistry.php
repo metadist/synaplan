@@ -13,6 +13,7 @@ use App\AI\Interface\VideoGenerationProviderInterface;
 use App\AI\Interface\VisionProviderInterface;
 use App\Repository\ModelRepository;
 use Psr\Log\LoggerInterface;
+use Symfony\Component\DependencyInjection\Attribute\Autowire;
 use Symfony\Component\DependencyInjection\Attribute\TaggedIterator;
 
 /**
@@ -46,6 +47,8 @@ class ProviderRegistry
         private ModelRepository $modelRepository,
         private LoggerInterface $logger,
         private string $defaultProvider = 'test',
+        #[Autowire('%kernel.environment%')]
+        private string $appEnv = 'prod',
     ) {
         // Index providers by their getName() method dynamically
         foreach ($chatProviders as $provider) {
@@ -99,6 +102,10 @@ class ProviderRegistry
         // Normalize provider name (case-insensitive)
         $providerName = strtolower($providerName);
 
+        if ($this->canUseInternalTestProvider($providerName)) {
+            return true;
+        }
+
         // Normalize DB keys to lowercase
         $dbCaps = array_change_key_case($dbCaps, CASE_LOWER);
 
@@ -123,6 +130,13 @@ class ProviderRegistry
         $dbCapability = $capabilityMap[$capability] ?? $capability;
 
         return isset($dbCaps[$providerName]) && in_array($dbCapability, $dbCaps[$providerName]);
+    }
+
+    private function canUseInternalTestProvider(string $providerName): bool
+    {
+        $appEnv = strtolower($this->appEnv);
+
+        return 'test' === $providerName && 'prod' !== $appEnv;
     }
 
     /**

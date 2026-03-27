@@ -16,6 +16,7 @@ use App\Service\Message\Handler\ChatHandler;
 use App\Service\ModelConfigService;
 use App\Service\PromptService;
 use App\Service\RAG\VectorSearchService;
+use App\Service\RateLimitService;
 use App\Service\UserMemoryService;
 use Doctrine\ORM\EntityManagerInterface;
 use PHPUnit\Framework\TestCase;
@@ -35,6 +36,7 @@ class ChatHandlerTest extends TestCase
     private UserMemoryService $userMemoryService;
     private MemoryExtractionService $memoryExtractionService;
     private FeedbackConfigService $feedbackConfigService;
+    private RateLimitService $rateLimitService;
     private ChatHandler $handler;
 
     protected function setUp(): void
@@ -51,6 +53,7 @@ class ChatHandlerTest extends TestCase
         $this->userMemoryService = $this->createMock(UserMemoryService::class);
         $this->memoryExtractionService = $this->createMock(MemoryExtractionService::class);
         $this->feedbackConfigService = new FeedbackConfigService($this->createStub(ConfigRepository::class));
+        $this->rateLimitService = $this->createMock(RateLimitService::class);
 
         $this->handler = new ChatHandler(
             $this->aiFacade,
@@ -65,7 +68,8 @@ class ChatHandlerTest extends TestCase
             $this->userUploadPathBuilder,
             $this->userMemoryService,
             $this->memoryExtractionService,
-            $this->feedbackConfigService
+            $this->feedbackConfigService,
+            $this->rateLimitService
         );
     }
 

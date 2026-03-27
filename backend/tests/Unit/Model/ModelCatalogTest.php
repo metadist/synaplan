@@ -54,10 +54,10 @@ class ModelCatalogTest extends TestCase
 
     public function testFindReplacesColonsInProviderIdWithDashes(): void
     {
-        $results = ModelCatalog::find('ollama:deepseek-r1-14b');
+        $results = ModelCatalog::find('ollama:gpt-oss-20b');
 
         $this->assertNotEmpty($results);
-        $this->assertSame('deepseek-r1:14b', $results[0]['providerId']);
+        $this->assertSame('gpt-oss:20b', $results[0]['providerId']);
     }
 
     public function testKeysAreUnique(): void
