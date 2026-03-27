@@ -260,24 +260,9 @@ echo "🧹 Clearing cache..."
 php bin/console cache:clear
 echo "✅ Cache ready!"
 
-# Start scheduled tasks in background (daily price sync at midnight)
-if [ "${DISABLE_CRON:-false}" != "true" ]; then
-    echo "⏰ Starting background scheduler for daily tasks..."
-    (
-        while true; do
-            NEXT_MIDNIGHT=$(date -d "tomorrow 00:00" +%s 2>/dev/null || date -v+1d -v0H -v0M -v0S +%s 2>/dev/null)
-            NOW=$(date +%s)
-            SLEEP_SECONDS=$((NEXT_MIDNIGHT - NOW))
-            if [ "$SLEEP_SECONDS" -le 0 ]; then
-                SLEEP_SECONDS=86400
-            fi
-            sleep "$SLEEP_SECONDS"
-            echo "[Scheduler] Running app:sync-model-prices..."
-            php /var/www/backend/bin/console app:sync-model-prices 2>&1 || echo "[Scheduler] sync-model-prices failed"
-        done
-    ) &
-    echo "✅ Background scheduler started (sync-model-prices daily at midnight)"
-fi
+# Scheduled tasks (daily price sync) should be run via system cron on the host:
+#   0 0 * * * docker compose exec -T backend php bin/console app:sync-model-prices
+# This avoids duplicate runs in scaled deployments and keeps the web process clean.
 
 # Start FrankenPHP
 echo ""

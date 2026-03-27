@@ -1,7 +1,9 @@
 /**
  * Safe message extraction for catch blocks and unknown errors.
+ * Returns null when no meaningful message can be derived,
+ * so callers can use `getErrorMessage(err) || 'Friendly fallback'`.
  */
-export function getErrorMessage(error: unknown): string {
+export function getErrorMessage(error: unknown): string | null {
   if (error instanceof Error) {
     return error.message
   }
@@ -16,11 +18,11 @@ export function getErrorMessage(error: unknown): string {
   ) {
     return (error as { message: string }).message
   }
-  return 'Unknown error'
+  return null
 }
 
 /** Axios-style errors with `response.data.error` (legacy API clients). */
-export function getApiErrorMessage(error: unknown): string {
+export function getApiErrorMessage(error: unknown): string | null {
   if (error && typeof error === 'object' && 'response' in error) {
     const response = (error as { response?: { data?: { error?: string; message?: string } } })
       .response

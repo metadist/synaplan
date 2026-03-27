@@ -528,7 +528,7 @@
 
 <script setup lang="ts">
 import { getErrorMessage } from '@/utils/errorMessage'
-import { ref, computed, watch, onMounted, onUnmounted, nextTick } from 'vue'
+import { ref, computed, onMounted, onUnmounted, nextTick } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { Icon } from '@iconify/vue'
 import MainLayout from '@/components/MainLayout.vue'
@@ -588,22 +588,15 @@ const canConfirmDelete = computed(() => {
   return deleteConfirmPassword.value.length > 0
 })
 
-const { hasUnsavedChanges, saveChanges, discardChanges, setupNavigationGuard } = useUnsavedChanges(
-  formData,
-  originalData
-)
-
 const hasPasswordChanges = computed(
   () => !!(passwordData.value.current || passwordData.value.new || passwordData.value.confirm)
 )
 
-const hasFormChanges = computed(
-  () => JSON.stringify(formData.value) !== JSON.stringify(originalData.value)
+const { hasUnsavedChanges, saveChanges, discardChanges, setupNavigationGuard } = useUnsavedChanges(
+  formData,
+  originalData,
+  { extraDirtyCheck: hasPasswordChanges }
 )
-
-watch([hasPasswordChanges, hasFormChanges], () => {
-  hasUnsavedChanges.value = hasPasswordChanges.value || hasFormChanges.value
-})
 
 let cleanupGuard: (() => void) | undefined
 

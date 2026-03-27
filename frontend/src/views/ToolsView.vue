@@ -518,7 +518,7 @@ const saveMailHandler = async (
     const payload: Omit<CreateHandlerRequest, 'password' | 'smtpPassword'> & {
       password?: string
       smtpPassword?: string
-      status: 'active' | 'inactive'
+      status?: 'active' | 'inactive'
     } = {
       name,
       mailServer: config.mailServer,
@@ -529,7 +529,6 @@ const saveMailHandler = async (
       checkInterval: config.checkInterval,
       deleteAfter: config.deleteAfter,
       departments,
-      status: isActive ? 'active' : 'inactive',
       // SMTP credentials (required)
       smtpServer: smtpConfig.smtpServer,
       smtpPort: smtpConfig.smtpPort,
@@ -568,7 +567,8 @@ const saveMailHandler = async (
     let savedHandlerId = currentMailHandlerId.value
 
     if (currentMailHandlerId.value) {
-      // Update existing
+      // Status is only relevant for updates (backend ignores it on create)
+      payload.status = isActive ? 'active' : 'inactive'
       const updated = await inboundEmailHandlersApi.update(currentMailHandlerId.value, payload)
 
       const index = mailHandlers.value.findIndex((h) => h.id === currentMailHandlerId.value)
