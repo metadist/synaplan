@@ -313,8 +313,7 @@
             >
               <span class="flex items-center gap-1.5">
                 <ChatBubbleLeftIcon class="w-4 h-4" />
-                <span class="font-medium">{{ chat.messageCount }}</span>
-                <span class="hidden sm:inline">{{
+                <span>{{
                   $t('chat.browser.messages', { count: chat.messageCount })
                 }}</span>
               </span>
