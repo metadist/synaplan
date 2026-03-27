@@ -1925,9 +1925,9 @@
   "models": {
     "costTier": {
       "free": "Ücretsiz",
-      "low": "Düşük",
-      "mid": "Orta",
-      "high": "Yüksek"
+      "low": "Low Cost",
+      "mid": "Mid Cost",
+      "high": "High Cost"
     }
   }
 }

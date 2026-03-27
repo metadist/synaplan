@@ -2814,9 +2814,9 @@
   "models": {
     "costTier": {
       "free": "Free",
-      "low": "Low",
-      "mid": "Mid",
-      "high": "High"
+      "low": "Low Cost",
+      "mid": "Mid Cost",
+      "high": "High Cost"
     }
   }
 }

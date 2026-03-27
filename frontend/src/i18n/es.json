@@ -1924,9 +1924,9 @@
   "models": {
     "costTier": {
       "free": "Gratis",
-      "low": "Bajo",
-      "mid": "Medio",
-      "high": "Alto"
+      "low": "Low Cost",
+      "mid": "Mid Cost",
+      "high": "High Cost"
     }
   }
 }

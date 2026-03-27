@@ -90,7 +90,7 @@
             </div>
           </div>
 
-          <div class="text-xs txt-secondary text-right">
+          <div class="text-xs txt-secondary text-left">
             {{ formatDate(stats.cost_budget.period_start) }} -
             {{ formatDate(stats.cost_budget.period_end) }}
           </div>
