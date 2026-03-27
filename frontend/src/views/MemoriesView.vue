@@ -310,7 +310,7 @@ onMounted(async () => {
     // Check if it's a service unavailable error
     if (
       err instanceof Error &&
-      (getErrorMessage(err).includes('503') || getErrorMessage(err).includes('unavailable'))
+      (getErrorMessage(err)?.includes('503') || getErrorMessage(err)?.includes('unavailable'))
     ) {
       isServiceUnavailable.value = true
     }
@@ -345,7 +345,7 @@ async function retryConnection() {
   } catch (err) {
     if (
       err instanceof Error &&
-      (getErrorMessage(err).includes('503') || getErrorMessage(err).includes('unavailable'))
+      (getErrorMessage(err)?.includes('503') || getErrorMessage(err)?.includes('unavailable'))
     ) {
       isServiceUnavailable.value = true
     }
@@ -492,7 +492,7 @@ async function handleSaveMultiple(actions: ParsedAction[]) {
       }
     } catch (err) {
       errorCount++
-      errors.push(err instanceof Error ? getErrorMessage(err) : 'Unknown error')
+      errors.push(getErrorMessage(err) || 'Unknown error')
       // Continue with other actions even if one fails
     }
   }

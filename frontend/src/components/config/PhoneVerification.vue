@@ -454,7 +454,7 @@ const errorMessageFromPayload = (payload: unknown, fallback: string) => {
 const isNetworkError = (err: unknown) => {
   if (!err) return false
   const message = getUnknownErrorMessage(err)
-  return message === 'Failed to fetch' || message.includes('NetworkError')
+  return message === 'Failed to fetch' || (message?.includes('NetworkError') ?? false)
 }
 
 const loadStatus = async () => {

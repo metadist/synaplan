@@ -1332,8 +1332,7 @@ const moveFileToFolder = async (fileId: number, folderName: string) => {
     await loadFileGroups()
     await loadFiles()
   } catch (err: unknown) {
-    const msg = err instanceof Error ? getErrorMessage(err) : 'Failed to move file'
-    showError(msg)
+    showError(getErrorMessage(err) || 'Failed to move file')
   }
 }
 
@@ -1558,7 +1557,7 @@ const loadFiles = async (page = currentPage.value) => {
   } catch (error: unknown) {
     console.error('Failed to load files:', error)
 
-    const msg = error instanceof Error ? getErrorMessage(error) : ''
+    const msg = getErrorMessage(error) ?? ''
     if (msg.includes('401')) {
       files.value = []
       totalCount.value = 0
@@ -1604,7 +1603,7 @@ const loadFileGroups = async () => {
     console.error('Failed to load file groups:', error)
 
     // Handle 401 (not authenticated) gracefully
-    if (getErrorMessage(error) && getErrorMessage(error).includes('401')) {
+    if (getErrorMessage(error)?.includes('401')) {
       // Silently fail - router should redirect to login
       fileGroups.value = []
     }

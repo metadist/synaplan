@@ -29,7 +29,7 @@ onErrorCaptured((err: unknown) => {
       ? (err as { statusCode: number }).statusCode
       : 500
   errorInfo.value = {
-    message: getErrorMessage(err),
+    message: getErrorMessage(err) ?? undefined,
     statusCode: statusFromErr,
     stack: err instanceof Error ? err.stack || '' : '',
   }
