@@ -527,7 +527,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted, nextTick } from 'vue'
+import { ref, computed, watch, onMounted, onUnmounted, nextTick } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { Icon } from '@iconify/vue'
 import MainLayout from '@/components/MainLayout.vue'
@@ -591,6 +591,18 @@ const { hasUnsavedChanges, saveChanges, discardChanges, setupNavigationGuard } =
   formData,
   originalData
 )
+
+const hasPasswordChanges = computed(
+  () => !!(passwordData.value.current || passwordData.value.new || passwordData.value.confirm)
+)
+
+const hasFormChanges = computed(
+  () => JSON.stringify(formData.value) !== JSON.stringify(originalData.value)
+)
+
+watch([hasPasswordChanges, hasFormChanges], () => {
+  hasUnsavedChanges.value = hasPasswordChanges.value || hasFormChanges.value
+})
 
 let cleanupGuard: (() => void) | undefined
 
