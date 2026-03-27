@@ -50,8 +50,13 @@
               data-testid="btn-model-dropdown"
               @click="toggleDropdown(capability as Capability)"
             >
-              <span class="block truncate">
-                {{ getSelectedModelLabel(capability as Capability) }}
+              <span class="flex items-center gap-2 truncate">
+                <span class="truncate">{{ getSelectedModelLabel(capability as Capability) }}</span>
+                <ModelCostBadge
+                  v-if="getSelectedModelObj(capability as Capability)"
+                  :model="getSelectedModelObj(capability as Capability)!"
+                  :peers="getModelsByPurpose(capability as Capability)"
+                />
               </span>
             </button>
             <div class="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none">
@@ -108,7 +113,10 @@
                 />
                 <Icon v-else :icon="getProviderIcon(model.service)" class="w-5 h-5 flex-shrink-0" />
                 <div class="flex-1 min-w-0 text-left">
-                  <div class="font-medium truncate">{{ model.name }}</div>
+                  <div class="flex items-center gap-2">
+                    <span class="font-medium truncate">{{ model.name }}</span>
+                    <ModelCostBadge :model="model" :peers="getModelsByPurpose(capability as Capability)" />
+                  </div>
                   <div class="text-xs txt-secondary truncate">{{ model.service }}</div>
                 </div>
               </button>
@@ -363,6 +371,7 @@ import { Icon } from '@iconify/vue'
 import AIModelsAdminPanel from '@/components/config/AIModelsAdminPanel.vue'
 import SortIndicator from '@/components/config/SortIndicator.vue'
 import GroqIcon from '@/components/icons/GroqIcon.vue'
+import ModelCostBadge from '@/components/ModelCostBadge.vue'
 import { useNotification } from '@/composables/useNotification'
 import { serviceColors } from '@/mocks/aiModels'
 import {
@@ -597,6 +606,12 @@ const getSelectedModelService = (purpose: Capability): string => {
 
 const getSelectedModelLabel = (purpose: Capability): string => {
   return selectedModelInfo.value[purpose]?.label || '-- Select Model --'
+}
+
+const getSelectedModelObj = (purpose: Capability): AIModel | null => {
+  const models = modelsByPurpose.value[purpose] || []
+  const selectedId = defaultConfig.value[purpose]
+  return selectedId ? models.find((m) => m.id === selectedId) ?? null : null
 }
 
 const toggleDropdown = (capability: Capability) => {

@@ -2730,5 +2730,13 @@
   },
   "system": {
     "missingApiKeys": "Einige API-Schlüssel fehlen — folgende Anbieter sind deaktiviert: {providers}"
+  },
+  "models": {
+    "costTier": {
+      "free": "Kostenlos",
+      "low": "Günstig",
+      "mid": "Mittel",
+      "high": "Teuer"
+    }
   }
 }

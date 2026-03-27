@@ -1920,5 +1920,13 @@
   },
   "system": {
     "missingApiKeys": "Faltan algunas claves API — los siguientes proveedores están desactivados: {providers}"
+  },
+  "models": {
+    "costTier": {
+      "free": "Gratis",
+      "low": "Bajo",
+      "mid": "Medio",
+      "high": "Alto"
+    }
   }
 }

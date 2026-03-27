@@ -671,7 +671,14 @@
                       class="w-5 h-5 flex-shrink-0"
                     />
                     <div class="flex-1 min-w-0">
-                      <div class="text-sm font-medium">{{ option.label }}</div>
+                      <div class="flex items-center gap-2">
+                        <span class="text-sm font-medium">{{ option.label }}</span>
+                        <ModelCostBadge
+                          v-if="getModelForOption(option)"
+                          :model="getModelForOption(option)!"
+                          :peers="peerModelsForCost"
+                        />
+                      </div>
                       <div class="text-xs txt-secondary">{{ option.provider }}</div>
                     </div>
                   </button>
@@ -750,6 +757,9 @@ import {
 } from '@heroicons/vue/24/outline'
 import { Icon } from '@iconify/vue'
 import { useModelSelection, type ModelOption } from '@/composables/useModelSelection'
+import ModelCostBadge from '@/components/ModelCostBadge.vue'
+import { useAiConfigStore } from '@/stores/aiConfig'
+import type { AIModel } from '@/types/ai-models'
 import { useNotification } from '@/composables/useNotification'
 import { getProviderIcon } from '@/utils/providerIcons'
 import { useMemoriesStore } from '@/stores/userMemories'
@@ -1168,6 +1178,24 @@ const { modelOptions, predictedModel, hasModels } = useModelSelection(
 
 // Selected model: use predicted or first available
 const selectedModel = computed(() => predictedModel.value)
+
+const aiConfigStoreForCost = useAiConfigStore()
+const peerModelsForCost = computed((): AIModel[] => {
+  return modelOptions.value
+    .map((opt) => {
+      for (const models of Object.values(aiConfigStoreForCost.models)) {
+        if (!models) continue
+        const found = models.find((m: AIModel) => m.id === opt.id)
+        if (found) return found
+      }
+      return undefined
+    })
+    .filter((m): m is AIModel => !!m)
+})
+
+const getModelForOption = (option: ModelOption): AIModel | undefined => {
+  return peerModelsForCost.value.find((m) => m.id === option.id)
+}
 
 // Navigate to AI models configuration with highlight
 const showModelDetails = (modelType?: 'chat' | 'sorting') => {

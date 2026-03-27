@@ -1921,5 +1921,13 @@
   },
   "system": {
     "missingApiKeys": "Bazı API anahtarları eksik — şu sağlayıcılar devre dışı: {providers}"
+  },
+  "models": {
+    "costTier": {
+      "free": "Ücretsiz",
+      "low": "Düşük",
+      "mid": "Orta",
+      "high": "Yüksek"
+    }
   }
 }

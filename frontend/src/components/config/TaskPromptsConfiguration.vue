@@ -169,33 +169,14 @@
               <Icon icon="heroicons:cpu-chip" class="w-4 h-4" />
               {{ $t('config.taskPrompts.aiModel') }}
             </label>
-            <select
-              v-model="formData.aiModel"
-              class="w-full px-4 py-3 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)] disabled:opacity-50 disabled:cursor-not-allowed"
+            <ModelSelectDropdown
+              :model-value="formData.aiModel ?? 'default'"
+              :groups="groupedModels"
+              :loading="loadingModels"
+              default-option="Default Model (Auto-selected based on capability)"
               data-testid="input-ai-model"
-            >
-              <!-- Grouped Models by Capability -->
-              <template v-if="!loadingModels && groupedModels.length > 0">
-                <option value="default">Default Model (Auto-selected based on capability)</option>
-                <optgroup
-                  v-for="group in groupedModels"
-                  :key="group.capability"
-                  :label="group.label"
-                >
-                  <option
-                    v-for="model in group.models"
-                    :key="model.id"
-                    :value="`${model.name} (${model.service})`"
-                  >
-                    {{ model.name }} ({{ model.service }})
-                    <template v-if="model.rating">⭐ {{ model.rating.toFixed(1) }}</template>
-                  </option>
-                </optgroup>
-              </template>
-
-              <!-- Loading state -->
-              <option v-if="loadingModels" disabled>Loading models...</option>
-            </select>
+              @update:model-value="(v: string | number | null) => (formData.aiModel = String(v ?? 'default'))"
+            />
             <p class="text-xs txt-secondary mt-1.5 flex items-center gap-1">
               <Icon icon="heroicons:information-circle" class="w-3.5 h-3.5" />
               {{ $t('config.taskPrompts.aiModelHelp') }}
@@ -784,6 +765,7 @@ import { findModelIdByString } from '@/utils/aiModelDefaults'
 import { useNotification } from '@/composables/useNotification'
 import { useUnsavedChanges } from '@/composables/useUnsavedChanges'
 import { useDialog } from '@/composables/useDialog'
+import ModelSelectDropdown from '@/components/ModelSelectDropdown.vue'
 import { useAuthStore } from '@/stores/auth'
 import UnsavedChangesBar from '@/components/UnsavedChangesBar.vue'
 

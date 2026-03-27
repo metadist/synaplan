@@ -2810,5 +2810,13 @@
   },
   "system": {
     "missingApiKeys": "Some API keys are missing — the following providers are disabled: {providers}"
+  },
+  "models": {
+    "costTier": {
+      "free": "Free",
+      "low": "Low",
+      "mid": "Mid",
+      "high": "High"
+    }
   }
 }
