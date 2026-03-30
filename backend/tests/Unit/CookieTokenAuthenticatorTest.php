@@ -70,6 +70,41 @@ class CookieTokenAuthenticatorTest extends TestCase
         $this->assertFalse($this->authenticator->supports($request));
     }
 
+    // ========== supports() - API Key Deferral Tests ==========
+
+    public function testSupportsReturnsFalseWhenXApiKeyHeaderPresent(): void
+    {
+        $request = new Request();
+        $request->headers->set('X-API-Key', 'sk_test_key_123');
+        $request->cookies->set(TokenService::ACCESS_COOKIE, 'app-token');
+
+        $this->assertFalse($this->authenticator->supports($request));
+    }
+
+    public function testSupportsReturnsFalseWhenApiKeyQueryParamPresent(): void
+    {
+        $request = new Request(['api_key' => 'sk_test_key_123']);
+        $request->cookies->set(TokenService::ACCESS_COOKIE, 'app-token');
+
+        $this->assertFalse($this->authenticator->supports($request));
+    }
+
+    public function testSupportsReturnsFalseWithBearerSkPrefix(): void
+    {
+        $request = new Request();
+        $request->headers->set('Authorization', 'Bearer sk_d591f587142824de04');
+
+        $this->assertFalse($this->authenticator->supports($request));
+    }
+
+    public function testSupportsReturnsTrueWithNonSkBearerToken(): void
+    {
+        $request = new Request();
+        $request->headers->set('Authorization', 'Bearer eyJhbGciOiJIUzI1NiJ9.jwt-token');
+
+        $this->assertTrue($this->authenticator->supports($request));
+    }
+
     // ========== authenticate() - OIDC Token Tests ==========
 
     public function testAuthenticateSucceedsWithValidOidcToken(): void

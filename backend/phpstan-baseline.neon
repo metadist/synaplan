@@ -621,7 +621,7 @@ parameters:
 		-
 			message: '#^Call to an undefined method App\\Repository\\ApiKeyRepository\:\:expects\(\)\.$#'
 			identifier: method.notFound
-			count: 3
+			count: 4
 			path: tests/Unit/ApiKeyAuthenticatorTest.php
 
 		-
