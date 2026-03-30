@@ -362,6 +362,11 @@ const saveGeneratedPrompt = async () => {
   try {
     const parsedOutput = parseWidgetSetupOutput(generatedPrompt.value)
 
+    if (!parsedOutput.promptText) {
+      showError(t('widgets.setupChat.saveError'))
+      return
+    }
+
     const result = await widgetsApi.generateWidgetPrompt(
       props.widget.widgetId,
       parsedOutput.promptText,

@@ -107,12 +107,35 @@ export const parseWidgetSetupOutput = (raw: string): WidgetSetupParsedOutput => 
         source: 'json',
       }
     } catch {
-      // Continue with fallback parser
+      // Zod validation failed but JSON was valid — try partial recovery
+      try {
+        const parsedJson = JSON.parse(jsonCandidate)
+        const text =
+          typeof parsedJson.promptText === 'string' ? parsedJson.promptText.trim() : ''
+        if (text) {
+          return {
+            promptText: text,
+            rules: normalizeWidgetBehaviorRules(parsedJson.rules ?? DEFAULT_WIDGET_BEHAVIOR_RULES),
+            scenarios: Array.isArray(parsedJson.scenarios)
+              ? parsedJson.scenarios
+              : defaultScenarios(),
+            knowledgeMapping:
+              parsedJson.knowledgeMapping && typeof parsedJson.knowledgeMapping === 'object'
+                ? (parsedJson.knowledgeMapping as Record<string, string[]>)
+                : {},
+            source: 'json',
+          }
+        }
+      } catch {
+        // JSON itself was malformed, continue to fallback
+      }
     }
   }
 
+  const fallbackText = cleanupPromptText(raw)
+
   return {
-    promptText: cleanupPromptText(raw),
+    promptText: fallbackText || raw.trim(),
     rules: inferRulesFromText(raw),
     scenarios: defaultScenarios(),
     knowledgeMapping: {},
