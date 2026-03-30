@@ -1,15 +1,16 @@
 /**
- * Cloud AI Model Health Check — API-only smoke tests.
+ * AI Model Health Check — API-only smoke tests.
  *
- * Purpose: Verify that every cloud model we offer still responds correctly.
- *          Chef starts this, sees which models need attention.
+ * Purpose: Verify that every configured model still responds correctly.
+ *          Run this to see which models need attention.
  *
  * Tagged @noci @local — never runs in CI.
  *
  * Run:
- *   npm run test:e2e:real-ai                (all tests — API + UI)
- *   npm run test:e2e:real-ai -- --grep api  (API-only)
- *   INCLUDE_VIDEO=1 npm run test:e2e:real-ai -- --grep api  (with TEXT2VID)
+ *   npm run test:e2e:model-check                          (cloud models only)
+ *   INCLUDE_LOCAL=1 npm run test:e2e:model-check          (all models incl. Ollama)
+ *   INCLUDE_VIDEO=1 npm run test:e2e:model-check          (with TEXT2VID)
+ *   INCLUDE_LOCAL=1 INCLUDE_VIDEO=1 npm run test:e2e:model-check  (everything)
  */
 import { test, expect } from '@playwright/test'
 import { getApiUrl } from '../config/config'
@@ -19,6 +20,7 @@ import {
   getDefaultModels,
   setDefaultModel,
   isCloudProvider,
+  type ModelInfo,
 } from '../helpers/api'
 import { readFileSync } from 'fs'
 import { resolve, dirname } from 'path'
@@ -36,6 +38,7 @@ const CREDENTIALS = {
 }
 
 const INCLUDE_VIDEO = process.env.INCLUDE_VIDEO === '1'
+const INCLUDE_LOCAL = process.env.INCLUDE_LOCAL === '1'
 
 function api(): string {
   return getApiUrl()
@@ -102,7 +105,8 @@ function printConsoleSummary(results: ModelResult[]): void {
   const tested = results.filter((r) => r.status !== 'SKIP')
   const caps = [...new Set(tested.map((r) => r.capability))]
 
-  console.log('\n========== Cloud AI Health Check ==========')
+  const scope = INCLUDE_LOCAL ? 'All' : 'Cloud'
+  console.log(`\n========== ${scope} AI Model Health Check ==========`)
   for (const cap of caps) {
     const capResults = tested.filter((r) => r.capability === cap)
     const pass = capResults.filter((r) => r.status === 'PASS').length
@@ -145,8 +149,9 @@ async function attachReport(
 
   const tested = report.results.filter((r) => r.status !== 'SKIP')
   const caps = [...new Set(tested.map((r) => r.capability))]
+  const scope = INCLUDE_LOCAL ? 'All' : 'Cloud'
   const lines: string[] = [
-    `Cloud AI Health Check — ${report.timestamp}`,
+    `${scope} AI Model Health Check — ${report.timestamp}`,
     `URL: ${report.baseUrl}`,
     '',
   ]
@@ -250,6 +255,7 @@ async function streamMessage(
     chatId: number
     message: string
     fileIds?: number[]
+    modelId?: number
     timeoutMs?: number
   }
 ): Promise<StreamResult> {
@@ -258,6 +264,7 @@ async function streamMessage(
     chatId: String(opts.chatId),
   })
   if (opts.fileIds?.length) params.set('fileIds', opts.fileIds.join(','))
+  if (opts.modelId) params.set('modelId', String(opts.modelId))
 
   const url = `${api()}/api/v1/messages/stream?${params}`
   const timeout = opts.timeoutMs ?? 60_000
@@ -328,6 +335,14 @@ interface CapabilityConfig {
   message: string
   needsFile?: { path: string; name: string; mime: string }
   requireFile?: boolean
+  // When true, the model is selected via the `modelId` query param on the
+  // stream endpoint (override_model_id path in ChatHandler — priority 2).
+  // This avoids mutating the user's DB defaults entirely.
+  //
+  // When false, the test must temporarily set the DB default because the
+  // backend handler for that capability only reads `classification['model_id']`
+  // (Again path) or the DB default — not `override_model_id`.
+  supportsModelIdParam?: boolean
   // BUG: The SSE complete event always reports the CHAT provider, not the
   // capability-specific provider. For SOUND2TEXT the backend transcribes via
   // whisper (OpenAI/Groq) then forwards the text to the chat default (Groq),
@@ -345,11 +360,17 @@ async function runCapability(
   const allModels = await fetchModelsByCapability(request, cookie)
   const models = allModels[config.capability] ?? []
   const results: ModelResult[] = []
-  const originalDefaults = await getDefaultModels(request, cookie)
-  const originalCapDefault = originalDefaults[config.capability] ?? null
 
-  const cloudModels = models.filter(isCloudProvider)
-  const skippedModels = models.filter((m) => !isCloudProvider(m))
+  const needsDefaultSwitch = !config.supportsModelIdParam
+  let originalCapDefault: number | null = null
+  if (needsDefaultSwitch) {
+    const originalDefaults = await getDefaultModels(request, cookie)
+    originalCapDefault = originalDefaults[config.capability] ?? null
+  }
+
+  const shouldTest = (m: ModelInfo) => INCLUDE_LOCAL || isCloudProvider(m)
+  const testableModels = models.filter(shouldTest)
+  const skippedModels = models.filter((m) => !shouldTest(m))
 
   for (const m of skippedModels) {
     results.push({
@@ -362,14 +383,16 @@ async function runCapability(
     })
   }
 
-  if (cloudModels.length === 0) return results
+  if (testableModels.length === 0) return results
 
   try {
-    for (const model of cloudModels) {
+    for (const model of testableModels) {
       const start = Date.now()
       let chatId: number | undefined
       try {
-        await setDefaultModel(request, cookie, config.capability, model.id)
+        if (needsDefaultSwitch) {
+          await setDefaultModel(request, cookie, config.capability, model.id)
+        }
         chatId = await createChat(request, cookie)
 
         let fileIds: number[] | undefined
@@ -388,6 +411,7 @@ async function runCapability(
           chatId,
           message: config.message,
           fileIds,
+          modelId: config.supportsModelIdParam ? model.id : undefined,
           timeoutMs: STREAM_TIMEOUT[config.capability],
         })
 
@@ -462,9 +486,13 @@ async function runCapability(
       }
     }
   } finally {
-    if (originalCapDefault !== null) {
+    if (needsDefaultSwitch && originalCapDefault !== null) {
       await setDefaultModel(request, cookie, config.capability, originalCapDefault).catch(() => {})
     }
+    // Note: if originalCapDefault was null (no user-specific default existed),
+    // we can't delete the default we created — there's no "delete default" API.
+    // The user will see the last-tested model as their default for this capability.
+    // This is acceptable because this test only runs manually, never in CI.
   }
 
   return results
@@ -478,6 +506,7 @@ const DAILY_CAPABILITIES: CapabilityConfig[] = [
   {
     capability: 'CHAT',
     message: 'Hello! Reply with one short sentence.',
+    supportsModelIdParam: true,
   },
   {
     capability: 'TEXT2PIC',
@@ -486,7 +515,7 @@ const DAILY_CAPABILITIES: CapabilityConfig[] = [
   },
   {
     capability: 'TEXT2SOUND',
-    message: 'Read this aloud: Hello, this is a test.',
+    message: 'Generate an audio voice note saying: Hello, this is a test.',
     requireFile: true,
   },
   {
@@ -509,38 +538,41 @@ const VIDEO_CAPABILITY: CapabilityConfig = {
   requireFile: true,
 }
 
-// ===========================================================================
-// Test
-// ===========================================================================
+// ---------------------------------------------------------------------------
+// Orchestration — parallel-safe vs sequential capabilities
+// ---------------------------------------------------------------------------
 
-test.describe('@noci @local @api Cloud AI health check', () => {
-  test('smoke-test every cloud model across all capabilities', async ({ request }, testInfo) => {
-    testInfo.setTimeout(300_000)
+async function runAllCapabilities(
+  configs: CapabilityConfig[],
+  allModels: Record<string, ModelInfo[]>,
+  request: import('@playwright/test').APIRequestContext
+): Promise<ModelResult[]> {
+  const shouldTest = (m: ModelInfo) => INCLUDE_LOCAL || isCloudProvider(m)
+  const activeConfigs = configs.filter((c) =>
+    (allModels[c.capability] ?? []).some(shouldTest)
+  )
 
-    const cookie = await loginAndGetCookie(request, CREDENTIALS)
-    const allModels = await fetchModelsByCapability(request, cookie)
+  // Capabilities using modelId param can run in parallel (no DB mutation).
+  // Capabilities using setDefaultModel must run sequentially to avoid races
+  // (they all mutate the same user's defaults).
+  const parallel = activeConfigs.filter((c) => c.supportsModelIdParam)
+  const sequential = activeConfigs.filter((c) => !c.supportsModelIdParam)
 
-    const configs = INCLUDE_VIDEO ? [...DAILY_CAPABILITIES, VIDEO_CAPABILITY] : DAILY_CAPABILITIES
+  const allResults: ModelResult[] = []
 
-    const activeConfigs = configs.filter((c) =>
-      (allModels[c.capability] ?? []).some(isCloudProvider)
-    )
-
-    const settled = await Promise.allSettled(
-      activeConfigs.map((config) => runCapability(config, request))
-    )
-
-    const allResults: ModelResult[] = []
+  const collectSettled = (
+    settled: PromiseSettledResult<ModelResult[]>[],
+    cfgs: CapabilityConfig[]
+  ) => {
     for (let i = 0; i < settled.length; i++) {
       const outcome = settled[i]
-      const config = activeConfigs[i]
       if (outcome.status === 'fulfilled') {
         allResults.push(...outcome.value)
       } else {
         allResults.push({
-          capability: config.capability,
+          capability: cfgs[i].capability,
           service: '(runner)',
-          modelName: config.capability,
+          modelName: cfgs[i].capability,
           modelId: 0,
           status: 'FAIL',
           durationMs: 0,
@@ -549,6 +581,52 @@ test.describe('@noci @local @api Cloud AI health check', () => {
         })
       }
     }
+  }
+
+  // Run parallel-safe capabilities concurrently
+  if (parallel.length > 0) {
+    const settled = await Promise.allSettled(
+      parallel.map((config) => runCapability(config, request))
+    )
+    collectSettled(settled, parallel)
+  }
+
+  // Run DB-mutating capabilities one at a time
+  for (const config of sequential) {
+    try {
+      const results = await runCapability(config, request)
+      allResults.push(...results)
+    } catch (error) {
+      allResults.push({
+        capability: config.capability,
+        service: '(runner)',
+        modelName: config.capability,
+        modelId: 0,
+        status: 'FAIL',
+        durationMs: 0,
+        errorType: 'unknown',
+        errorMessage: String(error),
+      })
+    }
+  }
+
+  return allResults
+}
+
+// ===========================================================================
+// Test
+// ===========================================================================
+
+test.describe('@noci @local AI model health check', () => {
+  test('smoke-test every model across all capabilities', async ({ request }, testInfo) => {
+    const configs = INCLUDE_VIDEO ? [...DAILY_CAPABILITIES, VIDEO_CAPABILITY] : DAILY_CAPABILITIES
+    const modelCount = configs.length * 10 // rough upper bound per capability
+    testInfo.setTimeout(Math.max(300_000, modelCount * STREAM_TIMEOUT.CHAT))
+
+    const cookie = await loginAndGetCookie(request, CREDENTIALS)
+    const allModels = await fetchModelsByCapability(request, cookie)
+
+    const allResults = await runAllCapabilities(configs, allModels, request)
 
     const report: HealthReport = {
       timestamp: new Date().toISOString(),

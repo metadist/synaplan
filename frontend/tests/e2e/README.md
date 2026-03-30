@@ -92,7 +92,8 @@ From the **frontend** directory:
 | **Test stack**: CI-like (no @noci) | `BASE_URL=http://localhost:8001 npm run test:e2e -- --grep-invert "@noci"` |
 | **Test stack**: single test        | `BASE_URL=http://localhost:8001 npm run test:e2e -- -g "embedded chat"`    |
 | **WhatsApp only**                  | `BASE_URL=http://localhost:8001 npm run test:e2e:whatsapp`                 |
-| **Real AI** (local only)           | `npm run test:e2e:real-ai`                                                 |
+| **Model health check** (cloud)     | `npm run test:e2e:model-check`                                             |
+| **Model health check** (all)       | `INCLUDE_LOCAL=1 npm run test:e2e:model-check`                             |
 | **Playwright UI**                  | `npm run test:e2e:ui`                                                      |
 
 Everything after `--` is passed through to Playwright.
@@ -168,16 +169,17 @@ docker compose -f docker-compose.test.yml up -d app_test
 
 ## npm Scripts
 
-| Script                           | Description                                           |
-| -------------------------------- | ----------------------------------------------------- |
-| `npm run test:e2e`               | E2E tests (Chromium, excludes OIDC and plugin)        |
-| `npm run test:e2e:whatsapp`      | WhatsApp API smoke tests (requires stub server)       |
-| `npm run test:e2e:firefox`       | E2E tests (Firefox, excludes OIDC and plugin)         |
-| `npm run test:e2e:oidc`          | Full suite with OIDC button login (skips `@password`) |
-| `npm run test:e2e:oidc-button`   | OIDC button login/logout tests only                   |
-| `npm run test:e2e:oidc-redirect` | OIDC auto-redirect tests (separate project)           |
-| `npm run test:e2e:ui`            | Interactive Playwright UI mode                        |
-| `npm run test:e2e:report`        | View HTML test report                                 |
+| Script                           | Description                                                      |
+| -------------------------------- | ---------------------------------------------------------------- |
+| `npm run test:e2e`               | E2E tests (Chromium, excludes OIDC and plugin)                   |
+| `npm run test:e2e:whatsapp`      | WhatsApp API smoke tests (requires stub server)                  |
+| `npm run test:e2e:firefox`       | E2E tests (Firefox, excludes OIDC and plugin)                    |
+| `npm run test:e2e:oidc`          | Full suite with OIDC button login (skips `@password`)            |
+| `npm run test:e2e:oidc-button`   | OIDC button login/logout tests only                              |
+| `npm run test:e2e:oidc-redirect` | OIDC auto-redirect tests (separate project)                      |
+| `npm run test:e2e:model-check`   | AI model health check (cloud; `INCLUDE_LOCAL=1` for all models)  |
+| `npm run test:e2e:ui`            | Interactive Playwright UI mode                                   |
+| `npm run test:e2e:report`        | View HTML test report                                            |
 
 All scripts accept additional Playwright args via `--`, e.g. `npm run test:e2e -- --grep "@smoke"`.
 
@@ -207,6 +209,8 @@ Tests use tags in their names for filtering:
 | `AUTH_PASS`   | `admin123`              | Password-auth password                                                   |
 | `OIDC_USER`   | `testuser@synaplan.com` | Keycloak test user email                                                 |
 | `OIDC_PASS`   | `testpass123`           | Keycloak test user password                                              |
+| `INCLUDE_LOCAL` | —                     | Set to `1` to include local models (Ollama, etc.) in model health check  |
+| `INCLUDE_VIDEO` | —                     | Set to `1` to include TEXT2VID in model health check                     |
 | `MAILHOG_URL` | `http://localhost:8025` | MailHog API (registration + email smoke tests)                           |
 
 ## CI Matrix
