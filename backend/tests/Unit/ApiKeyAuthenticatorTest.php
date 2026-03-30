@@ -138,12 +138,51 @@ class ApiKeyAuthenticatorTest extends TestCase
         $this->assertTrue($this->authenticator->supports($request));
     }
 
-    public function testSupportsReturnsFalseWithBearerOnApiRoute(): void
+    public function testSupportsReturnsTrueWithAnyBearerOnV1Route(): void
+    {
+        $request = Request::create('/v1/models', 'GET');
+        $request->headers->set('Authorization', 'Bearer some-openai-compatible-key');
+
+        $this->assertTrue($this->authenticator->supports($request));
+    }
+
+    public function testSupportsReturnsFalseWithNonSkBearerOnApiRoute(): void
     {
         $request = Request::create('/api/v1/messages/stream', 'GET');
         $request->headers->set('Authorization', 'Bearer some-session-token');
 
         $this->assertFalse($this->authenticator->supports($request));
+    }
+
+    public function testSupportsReturnsTrueWithSkBearerOnApiRoute(): void
+    {
+        $request = Request::create('/api/v1/chats', 'GET');
+        $request->headers->set('Authorization', 'Bearer sk_abc123def456');
+
+        $this->assertTrue($this->authenticator->supports($request));
+    }
+
+    public function testAuthenticateWithBearerSkPrefixOnApiRoute(): void
+    {
+        $apiKey = $this->createMock(ApiKey::class);
+        $apiKey->method('isActive')->willReturn(true);
+        $apiKey->method('getId')->willReturn(1);
+        $apiKey->method('getOwnerId')->willReturn(10);
+        $apiKey->method('getName')->willReturn('My API Key');
+        $apiKey->method('getScopes')->willReturn(['api']);
+
+        $request = Request::create('/api/v1/chats', 'GET');
+        $request->headers->set('Authorization', 'Bearer sk_valid_api_key_here');
+
+        $this->apiKeyRepository->method('findActiveByKey')
+            ->with('sk_valid_api_key_here')
+            ->willReturn($apiKey);
+        $this->apiKeyRepository->method('save');
+
+        $passport = $this->authenticator->authenticate($request);
+
+        $this->assertInstanceOf(\Symfony\Component\Security\Http\Authenticator\Passport\Passport::class, $passport);
+        $this->assertSame($apiKey, $request->attributes->get('api_key'));
     }
 
     public function testAuthenticateWithBearerOnV1Route(): void
