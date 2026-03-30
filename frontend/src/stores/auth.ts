@@ -26,11 +26,17 @@ export const useAuthStore = defineStore('auth', () => {
   const isAdmin = computed(() => user.value?.isAdmin === true || user.value?.level === 'ADMIN')
   const isPro = computed(() => {
     const config = useConfigStore()
-    return !config.billing.enabled || isAdmin.value || ['PRO', 'TEAM', 'BUSINESS'].includes(userLevel.value)
+    return (
+      !config.billing.enabled ||
+      isAdmin.value ||
+      ['PRO', 'TEAM', 'BUSINESS'].includes(userLevel.value)
+    )
   })
   const isTeam = computed(() => {
     const config = useConfigStore()
-    return !config.billing.enabled || isAdmin.value || ['TEAM', 'BUSINESS'].includes(userLevel.value)
+    return (
+      !config.billing.enabled || isAdmin.value || ['TEAM', 'BUSINESS'].includes(userLevel.value)
+    )
   })
 
   // Actions

@@ -110,8 +110,7 @@ export const parseWidgetSetupOutput = (raw: string): WidgetSetupParsedOutput => 
       // Zod validation failed but JSON was valid — try partial recovery
       try {
         const parsedJson = JSON.parse(jsonCandidate)
-        const text =
-          typeof parsedJson.promptText === 'string' ? parsedJson.promptText.trim() : ''
+        const text = typeof parsedJson.promptText === 'string' ? parsedJson.promptText.trim() : ''
         if (text) {
           return {
             promptText: text,
