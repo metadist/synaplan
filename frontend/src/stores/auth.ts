@@ -23,15 +23,21 @@ export const useAuthStore = defineStore('auth', () => {
   // Computed
   const isAuthenticated = computed(() => !!user.value)
   const userLevel = computed(() => user.value?.level || 'NEW')
+  const isAdmin = computed(() => user.value?.isAdmin === true || user.value?.level === 'ADMIN')
   const isPro = computed(() => {
     const config = useConfigStore()
-    return !config.billing.enabled || ['PRO', 'TEAM', 'BUSINESS'].includes(userLevel.value)
+    return (
+      !config.billing.enabled ||
+      isAdmin.value ||
+      ['PRO', 'TEAM', 'BUSINESS'].includes(userLevel.value)
+    )
   })
   const isTeam = computed(() => {
     const config = useConfigStore()
-    return !config.billing.enabled || ['TEAM', 'BUSINESS'].includes(userLevel.value)
+    return (
+      !config.billing.enabled || isAdmin.value || ['TEAM', 'BUSINESS'].includes(userLevel.value)
+    )
   })
-  const isAdmin = computed(() => user.value?.isAdmin === true || user.value?.level === 'ADMIN')
 
   // Actions
   async function login(email: string, password: string, recaptchaToken?: string): Promise<boolean> {
