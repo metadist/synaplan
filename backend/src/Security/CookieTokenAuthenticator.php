@@ -36,7 +36,22 @@ class CookieTokenAuthenticator extends AbstractAuthenticator
 
     public function supports(Request $request): ?bool
     {
-        // Support requests with access token cookie OR OIDC token cookie OR Authorization header
+        // Defer to ApiKeyAuthenticator when non-empty API key signals are present
+        $apiKeyHeader = $request->headers->get('X-API-Key');
+        if (is_string($apiKeyHeader) && '' !== trim($apiKeyHeader)) {
+            return false;
+        }
+
+        $apiKeyQuery = $request->query->get('api_key');
+        if (is_string($apiKeyQuery) && '' !== trim($apiKeyQuery)) {
+            return false;
+        }
+
+        $authHeader = (string) $request->headers->get('Authorization', '');
+        if (str_starts_with($authHeader, 'Bearer sk_')) {
+            return false;
+        }
+
         return $request->cookies->has(TokenService::ACCESS_COOKIE)
             || $request->cookies->has(OidcTokenService::OIDC_ACCESS_COOKIE)
             || $request->headers->has('Authorization');

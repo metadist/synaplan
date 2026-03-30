@@ -37,13 +37,24 @@ class ApiKeyAuthenticator extends AbstractAuthenticator
      */
     public function supports(Request $request): ?bool
     {
-        if ($request->headers->has('X-API-Key') || $request->query->has('api_key')) {
+        $apiKeyHeader = $request->headers->get('X-API-Key');
+        $apiKeyQuery = $request->query->get('api_key');
+
+        if ((is_string($apiKeyHeader) && '' !== trim($apiKeyHeader))
+            || (is_string($apiKeyQuery) && '' !== trim($apiKeyQuery))) {
             return true;
         }
 
-        // Authorization: Bearer support for OpenAI-compatible /v1/ endpoints only
+        $authHeader = (string) $request->headers->get('Authorization', '');
+
+        // Accept Bearer with sk_ prefix on any route (Synaplan API keys)
+        if (str_starts_with($authHeader, 'Bearer sk_')) {
+            return true;
+        }
+
+        // Accept any Bearer on /v1/ routes (OpenAI-compatible format)
         if (str_starts_with($request->getPathInfo(), '/v1/')
-            && str_starts_with((string) $request->headers->get('Authorization', ''), 'Bearer ')) {
+            && str_starts_with($authHeader, 'Bearer ')) {
             return true;
         }
 
@@ -58,7 +69,7 @@ class ApiKeyAuthenticator extends AbstractAuthenticator
         $apiKey = $request->headers->get('X-API-Key')
                   ?? $request->query->get('api_key');
 
-        // Fall back to Authorization: Bearer for /v1/ routes
+        // Fall back to Authorization: Bearer (sk_ prefix on any route, any Bearer on /v1/)
         if (!$apiKey) {
             $authHeader = (string) $request->headers->get('Authorization', '');
             if (str_starts_with($authHeader, 'Bearer ')) {
