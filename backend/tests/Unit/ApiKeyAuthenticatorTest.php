@@ -1,10 +1,13 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Tests\Unit;
 
 use App\Entity\ApiKey;
 use App\Repository\ApiKeyRepository;
 use App\Security\ApiKeyAuthenticator;
+use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\HttpFoundation\Request;
@@ -12,8 +15,8 @@ use Symfony\Component\Security\Core\Exception\AuthenticationException;
 
 class ApiKeyAuthenticatorTest extends TestCase
 {
-    private ApiKeyRepository $apiKeyRepository;
-    private LoggerInterface $logger;
+    private ApiKeyRepository&MockObject $apiKeyRepository;
+    private LoggerInterface&MockObject $logger;
     private ApiKeyAuthenticator $authenticator;
 
     protected function setUp(): void
