@@ -1,9 +1,10 @@
 #!/bin/sh
 set -e
 
-# Copy .env.example to .env if .env doesn't exist
-if [ ! -f "/var/www/backend/.env" ]; then
-    echo "🔧 No .env file found, copying from .env.example..."
+# Copy .env.example to .env if missing or empty
+# Docker Compose env_file with required:false may create an empty file before the entrypoint runs
+if [ ! -f "/var/www/backend/.env" ] || [ ! -s "/var/www/backend/.env" ]; then
+    echo "🔧 No .env file found (or empty), copying from .env.example..."
     if [ -f "/var/www/backend/.env.example" ]; then
         cp /var/www/backend/.env.example /var/www/backend/.env
         echo "✅ .env created from .env.example"
