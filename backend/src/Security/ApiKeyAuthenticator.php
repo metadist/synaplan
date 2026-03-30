@@ -37,7 +37,11 @@ class ApiKeyAuthenticator extends AbstractAuthenticator
      */
     public function supports(Request $request): ?bool
     {
-        if ($request->headers->has('X-API-Key') || $request->query->has('api_key')) {
+        $apiKeyHeader = $request->headers->get('X-API-Key');
+        $apiKeyQuery = $request->query->get('api_key');
+
+        if ((is_string($apiKeyHeader) && '' !== trim($apiKeyHeader))
+            || (is_string($apiKeyQuery) && '' !== trim($apiKeyQuery))) {
             return true;
         }
 

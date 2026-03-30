@@ -105,6 +105,23 @@ class CookieTokenAuthenticatorTest extends TestCase
         $this->assertTrue($this->authenticator->supports($request));
     }
 
+    public function testSupportsReturnsTrueWhenXApiKeyHeaderIsEmpty(): void
+    {
+        $request = new Request();
+        $request->headers->set('X-API-Key', '');
+        $request->cookies->set(TokenService::ACCESS_COOKIE, 'app-token');
+
+        $this->assertTrue($this->authenticator->supports($request));
+    }
+
+    public function testSupportsReturnsTrueWhenApiKeyQueryParamIsEmpty(): void
+    {
+        $request = new Request(['api_key' => '']);
+        $request->cookies->set(TokenService::ACCESS_COOKIE, 'app-token');
+
+        $this->assertTrue($this->authenticator->supports($request));
+    }
+
     // ========== authenticate() - OIDC Token Tests ==========
 
     public function testAuthenticateSucceedsWithValidOidcToken(): void

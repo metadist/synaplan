@@ -305,4 +305,19 @@ class ApiKeyAuthenticatorTest extends TestCase
 
         $this->assertTrue($this->authenticator->supports($request));
     }
+
+    public function testSupportsReturnsFalseWithEmptyXApiKeyHeader(): void
+    {
+        $request = new Request();
+        $request->headers->set('X-API-Key', '');
+
+        $this->assertFalse($this->authenticator->supports($request));
+    }
+
+    public function testSupportsReturnsFalseWithEmptyApiKeyQueryParam(): void
+    {
+        $request = new Request(['api_key' => '']);
+
+        $this->assertFalse($this->authenticator->supports($request));
+    }
 }

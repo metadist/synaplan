@@ -36,8 +36,14 @@ class CookieTokenAuthenticator extends AbstractAuthenticator
 
     public function supports(Request $request): ?bool
     {
-        // Defer to ApiKeyAuthenticator when API key signals are present
-        if ($request->headers->has('X-API-Key') || $request->query->has('api_key')) {
+        // Defer to ApiKeyAuthenticator when non-empty API key signals are present
+        $apiKeyHeader = $request->headers->get('X-API-Key');
+        if (is_string($apiKeyHeader) && '' !== trim($apiKeyHeader)) {
+            return false;
+        }
+
+        $apiKeyQuery = $request->query->get('api_key');
+        if (is_string($apiKeyQuery) && '' !== trim($apiKeyQuery)) {
             return false;
         }
 
