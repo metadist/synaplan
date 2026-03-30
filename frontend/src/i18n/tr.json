@@ -464,7 +464,8 @@
     "retry": "Tekrar Dene",
     "enabled": "Etkin",
     "disabled": "Devre Dışı",
-    "reset": "Sıfırla"
+    "reset": "Sıfırla",
+    "expand": "Genişlet"
   },
   "search": {
     "sources": "Kaynaklar",

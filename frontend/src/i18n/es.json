@@ -464,7 +464,8 @@
     "retry": "Reintentar",
     "enabled": "Habilitado",
     "disabled": "Deshabilitado",
-    "reset": "Restablecer"
+    "reset": "Restablecer",
+    "expand": "Expandir"
   },
   "search": {
     "sources": "Fuentes",

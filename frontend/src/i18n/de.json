@@ -1284,7 +1284,8 @@
     "reset": "Zurücksetzen",
     "remove": "Entfernen",
     "clearSelection": "Auswahl aufheben",
-    "view": "Ansehen"
+    "view": "Ansehen",
+    "expand": "Erweitern"
   },
   "search": {
     "sources": "Quellen",
