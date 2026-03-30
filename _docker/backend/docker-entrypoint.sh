@@ -124,6 +124,13 @@ echo "🔄 Running database schema update..."
 php bin/console doctrine:schema:update --force
 echo "✅ Database schema ready!"
 
+# Create test database schema (for PHPUnit with DAMA transaction rollback)
+if [ "$APP_ENV" = "dev" ]; then
+    echo "🔄 Updating test database schema..."
+    php bin/console doctrine:schema:update --force --env=test 2>/dev/null || true
+    echo "✅ Test database schema ready!"
+fi
+
 # Load fixtures on first run (dev/test only)
 FIXTURES_MARKER="/var/www/backend/var/.fixtures_loaded"
 

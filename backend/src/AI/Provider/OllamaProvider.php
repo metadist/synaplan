@@ -89,7 +89,7 @@ class OllamaProvider implements ChatProviderInterface, EmbeddingProviderInterfac
         ];
     }
 
-    public function chat(array $messages, array $options = []): string
+    public function chat(array $messages, array $options = []): array
     {
         if (!isset($options['model'])) {
             throw new ProviderException('Model must be specified in options', 'ollama');
@@ -110,7 +110,21 @@ class OllamaProvider implements ChatProviderInterface, EmbeddingProviderInterfac
                 'messages' => $ollamaMessages,
             ]);
 
-            return $response->message->content ?? '';
+            $promptTokens = $response->prompt_eval_count ?? 0;
+            $completionTokens = $response->eval_count ?? 0;
+
+            $usage = [
+                'prompt_tokens' => $promptTokens,
+                'completion_tokens' => $completionTokens,
+                'total_tokens' => $promptTokens + $completionTokens,
+                'cached_tokens' => 0,
+                'cache_creation_tokens' => 0,
+            ];
+
+            return [
+                'content' => $response->message->content ?? '',
+                'usage' => $usage,
+            ];
         } catch (ProviderException $e) {
             throw $e;
         } catch (\Exception $e) {
@@ -130,7 +144,7 @@ class OllamaProvider implements ChatProviderInterface, EmbeddingProviderInterfac
         }
     }
 
-    public function chatStream(array $messages, callable $callback, array $options = []): void
+    public function chatStream(array $messages, callable $callback, array $options = []): array
     {
         if (!isset($options['model'])) {
             throw new ProviderException('Model must be specified in options', 'ollama');
@@ -184,6 +198,8 @@ class OllamaProvider implements ChatProviderInterface, EmbeddingProviderInterfac
 
             $chunkCount = 0;
             $fullResponse = '';
+            $promptTokens = 0;
+            $completionTokens = 0;
 
             foreach ($stream as $chunk) {
                 $textChunk = $chunk->message->content ?? '';
@@ -207,7 +223,10 @@ class OllamaProvider implements ChatProviderInterface, EmbeddingProviderInterfac
                     }
                 }
 
+                // Final chunk contains usage data
                 if (isset($chunk->done) && $chunk->done) {
+                    $promptTokens = $chunk->prompt_eval_count ?? 0;
+                    $completionTokens = $chunk->eval_count ?? 0;
                     $this->logger->info('🔵 Ollama: Stream done signal received');
                     break;
                 }
@@ -222,8 +241,17 @@ class OllamaProvider implements ChatProviderInterface, EmbeddingProviderInterfac
                 'chunks_sent' => $chunkCount,
                 'total_length' => strlen($fullResponse),
             ]);
+
+            return [
+                'usage' => [
+                    'prompt_tokens' => $promptTokens,
+                    'completion_tokens' => $completionTokens,
+                    'total_tokens' => $promptTokens + $completionTokens,
+                    'cached_tokens' => 0,
+                    'cache_creation_tokens' => 0,
+                ],
+            ];
         } catch (ProviderException $e) {
-            // Re-throw ProviderException as-is (with our friendly message)
             throw $e;
         } catch (\Exception $e) {
             $this->logger->error('🔴 Ollama streaming error', [
@@ -231,7 +259,6 @@ class OllamaProvider implements ChatProviderInterface, EmbeddingProviderInterfac
                 'trace' => $e->getTraceAsString(),
             ]);
 
-            // Check if error is about model not found (404, "not found", etc.)
             $errorMsg = $e->getMessage();
             if (false !== stripos($errorMsg, '404')
                 || false !== stripos($errorMsg, 'not found')

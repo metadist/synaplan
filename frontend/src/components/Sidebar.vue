@@ -149,7 +149,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, onMounted } from 'vue'
+import { ref, computed, watch, onMounted, type Component } from 'vue'
 import { useRoute } from 'vue-router'
 import {
   ChatBubbleLeftRightIcon,
@@ -234,7 +234,7 @@ const logoSrc = computed(
 interface NavItem {
   path: string
   label: string
-  icon: any
+  icon: Component
   isUpgrade?: boolean
   children?: Array<{
     path: string

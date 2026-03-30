@@ -230,8 +230,8 @@ async function httpClient<T = unknown, S extends z.Schema | undefined = undefine
     }
 
     return data as T
-  } catch (error: any) {
-    if (error.name === 'AbortError') {
+  } catch (error: unknown) {
+    if ((error instanceof Error || error instanceof DOMException) && error.name === 'AbortError') {
       const seconds = Math.round(timeout / 1000)
       throw new Error(
         `Request timeout after ${seconds}s on ${options.method || 'GET'} ${endpoint}. ` +
@@ -276,54 +276,54 @@ export const apiService = {
     })
   },
 
-  async verifyEmail(token: string): Promise<any> {
-    return httpClient<any>('/api/v1/auth/verify-email', {
+  async verifyEmail(token: string): Promise<unknown> {
+    return httpClient('/api/v1/auth/verify-email', {
       method: 'POST',
       body: JSON.stringify({ token }),
     })
   },
 
-  async forgotPassword(email: string): Promise<any> {
-    return httpClient<any>('/api/v1/auth/forgot-password', {
+  async forgotPassword(email: string): Promise<unknown> {
+    return httpClient('/api/v1/auth/forgot-password', {
       method: 'POST',
       body: JSON.stringify({ email }),
     })
   },
 
-  async resetPassword(token: string, password: string): Promise<any> {
-    return httpClient<any>('/api/v1/auth/reset-password', {
+  async resetPassword(token: string, password: string): Promise<unknown> {
+    return httpClient('/api/v1/auth/reset-password', {
       method: 'POST',
       body: JSON.stringify({ token, password }),
     })
   },
 
   // Profile Management
-  async getProfile(): Promise<any> {
-    return httpClient<any>('/api/v1/profile', {
+  async getProfile(): Promise<unknown> {
+    return httpClient('/api/v1/profile', {
       method: 'GET',
     })
   },
 
-  async updateProfile(profileData: any): Promise<any> {
-    return httpClient<any>('/api/v1/profile', {
+  async updateProfile(profileData: Record<string, unknown>): Promise<unknown> {
+    return httpClient('/api/v1/profile', {
       method: 'PUT',
       body: JSON.stringify(profileData),
     })
   },
 
-  async changePassword(currentPassword: string, newPassword: string): Promise<any> {
-    return httpClient<any>('/api/v1/profile/password', {
+  async changePassword(currentPassword: string, newPassword: string): Promise<unknown> {
+    return httpClient('/api/v1/profile/password', {
       method: 'PUT',
       body: JSON.stringify({ currentPassword, newPassword }),
     })
   },
 
-  async sendMessage(userId: number, message: string, trackId?: number): Promise<any> {
+  async sendMessage(userId: number, message: string, trackId?: number): Promise<unknown> {
     if (useMockData) {
       const { mockChatResponse } = await import('@/mocks/chatResponses')
       return new Promise((resolve) => setTimeout(() => resolve(mockChatResponse(message)), 800))
     }
-    return httpClient<any>('/messages/send', {
+    return httpClient('/messages/send', {
       method: 'POST',
       body: JSON.stringify({ userId, message, trackId }),
     })
@@ -332,7 +332,7 @@ export const apiService = {
   streamMessage(
     userId: number,
     message: string,
-    onUpdate: (data: any) => void,
+    onUpdate: (data: Record<string, unknown>) => void,
     trackId?: number
   ): () => void {
     if (useMockData) {
@@ -384,13 +384,16 @@ export const apiService = {
 
 // Axios-like API client for filesService
 export const api = {
-  get: async <T>(url: string, config?: { params?: Record<string, any> }): Promise<{ data: T }> => {
+  get: async <T>(
+    url: string,
+    config?: { params?: Record<string, unknown> }
+  ): Promise<{ data: T }> => {
     let endpoint = url.startsWith('/') ? url : '/' + url
 
     if (config?.params) {
       const queryString = new URLSearchParams(
         Object.entries(config.params)
-          .filter(([_, value]) => value !== undefined && value !== null)
+          .filter(([, value]) => value !== undefined && value !== null)
           .map(([key, value]) => [key, String(value)])
       ).toString()
       if (queryString) {
@@ -404,7 +407,7 @@ export const api = {
 
   post: async <T>(
     url: string,
-    body: any,
+    body: unknown,
     config?: { headers?: Record<string, string> }
   ): Promise<{ data: T }> => {
     const endpoint = url.startsWith('/') ? url : '/' + url

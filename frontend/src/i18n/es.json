@@ -1366,7 +1366,9 @@
         "images": "Imágenes",
         "videos": "Videos",
         "audios": "Archivos de Audio",
-        "file_analysis": "Análisis de Archivos"
+        "file_analysis": "Análisis de Archivos",
+        "sorting": "Clasificación",
+        "search_query": "Consulta de búsqueda"
       },
       "sources": {
         "whatsapp": "WhatsApp",
@@ -1918,5 +1920,14 @@
   },
   "system": {
     "missingApiKeys": "Faltan algunas claves API — los siguientes proveedores están desactivados: {providers}"
+  },
+  "models": {
+    "loading": "Cargando modelos...",
+    "costTier": {
+      "free": "Gratis",
+      "low": "Low Cost",
+      "mid": "Mid Cost",
+      "high": "High Cost"
+    }
   }
 }

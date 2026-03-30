@@ -1,10 +1,18 @@
-import { ref, watch, type Ref } from 'vue'
+import { ref, watch, type Ref, type ComputedRef } from 'vue'
 import { useRouter } from 'vue-router'
 import { useNotification } from './useNotification'
 import { useDialog } from './useDialog'
 import { useI18n } from 'vue-i18n'
 
-export function useUnsavedChanges<T>(formData: Ref<T>, originalData: Ref<T>) {
+export interface UnsavedChangesOptions {
+  extraDirtyCheck?: ComputedRef<boolean>
+}
+
+export function useUnsavedChanges<T>(
+  formData: Ref<T>,
+  originalData: Ref<T>,
+  options?: UnsavedChangesOptions
+) {
   const router = useRouter()
   const { success } = useNotification()
   const dialog = useDialog()
@@ -12,10 +20,16 @@ export function useUnsavedChanges<T>(formData: Ref<T>, originalData: Ref<T>) {
 
   const hasUnsavedChanges = ref(false)
 
+  const sources = options?.extraDirtyCheck
+    ? ([formData, originalData, options.extraDirtyCheck] as const)
+    : ([formData, originalData] as const)
+
   watch(
-    [formData, originalData],
-    ([newForm, newOriginal]) => {
-      hasUnsavedChanges.value = JSON.stringify(newForm) !== JSON.stringify(newOriginal)
+    sources,
+    () => {
+      const formDirty = JSON.stringify(formData.value) !== JSON.stringify(originalData.value)
+      const extraDirty = options?.extraDirtyCheck?.value ?? false
+      hasUnsavedChanges.value = formDirty || extraDirty
     },
     { deep: true }
   )

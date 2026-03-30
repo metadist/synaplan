@@ -19,7 +19,7 @@ interface Props {
   segments: string[]
   fullText: string
   step: 'select' | 'confirm'
-  classification: 'memory' | 'feedback'
+  classification?: 'memory' | 'feedback'
   summaryOptions: string[]
   correctionOptions: string[]
   userMessage?: string
@@ -469,8 +469,10 @@ const isMemory = computed(() => props.classification === 'memory')
                     />
                     <div
                       class="text-sm txt-primary prose prose-sm dark:prose-invert max-w-none pointer-events-none flex-1 min-w-0"
-                      v-html="renderMarkdown(segment)"
-                    />
+                    >
+                      <!-- eslint-disable-next-line vue/no-v-html -- markdown rendered for preview -->
+                      <div v-html="renderMarkdown(segment)"></div>
+                    </div>
                   </div>
                 </div>
               </div>

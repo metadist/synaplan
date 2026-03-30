@@ -11,15 +11,27 @@
 // - Up to 3 retries with delays: 200ms, 400ms, 800ms (max ~1.4s total)
 // - Only triggered during OAuth callback flow
 // - Falls back to normal refresh token flow if retries exhausted
-import { ref } from 'vue'
+import { ref, type Ref } from 'vue'
 import { clearSseToken } from '@/services/api/chatApi'
 import { getApiBaseUrl } from '@/services/api/httpClient'
 
 const API_BASE_URL = getApiBaseUrl()
 
+/** User payload from /api/v1/auth/me (in-memory only) */
+export interface AuthUser {
+  id: number
+  email: string
+  level: string
+  roles?: string[]
+  created?: string
+  isAdmin?: boolean
+  emailVerified?: boolean
+  memoriesEnabled?: boolean
+}
+
 // Auth State - only in memory, never in localStorage
 // This prevents manipulation of isAdmin, level, etc.
-const user = ref<any | null>(null)
+const user = ref<AuthUser | null>(null)
 const isRefreshing = ref(false)
 const isLoggingOut = ref(false) // Prevent auth checks during logout
 let refreshPromise: Promise<boolean> | null = null
@@ -149,7 +161,7 @@ export const authService = {
           oidcLogoutUrl = data.oidc_logout_url || null
         }
       }
-    } catch (error) {
+    } catch {
       // Ignore errors during logout - session might already be expired
     } finally {
       user.value = null
@@ -171,7 +183,7 @@ export const authService = {
    * @param retries Number of retry attempts (used for OAuth callback race conditions)
    * @param retryDelay Initial delay between retries in ms (exponential backoff)
    */
-  async getCurrentUser(retries = 0, retryDelay = 200): Promise<any | null> {
+  async getCurrentUser(retries = 0, retryDelay = 200): Promise<AuthUser | null> {
     // Don't check auth during logout process
     if (isLoggingOut.value) {
       return null
@@ -231,7 +243,7 @@ export const authService = {
       setSessionHint()
 
       return data.user
-    } catch (error) {
+    } catch {
       // Network errors are expected (e.g., offline) - don't log
       return null
     }
@@ -311,7 +323,7 @@ export const authService = {
   /**
    * Get Current User (reactive)
    */
-  getUser() {
+  getUser(): Ref<AuthUser | null> {
     return user
   },
 

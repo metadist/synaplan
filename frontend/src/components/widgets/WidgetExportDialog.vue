@@ -145,6 +145,7 @@
 </template>
 
 <script setup lang="ts">
+import { getErrorMessage } from '@/utils/errorMessage'
 import { ref, computed, onMounted } from 'vue'
 import { Icon } from '@iconify/vue'
 import { useConfigStore } from '@/stores/config'
@@ -184,7 +185,7 @@ const loadFormats = async () => {
   try {
     const response = await widgetSessionsApi.getExportFormats(props.widgetId)
     formats.value = response.formats
-  } catch (err) {
+  } catch {
     // Use defaults
   }
 }
@@ -256,8 +257,8 @@ const startExport = async () => {
 
     // Close modal after download starts
     emit('close')
-  } catch (err: any) {
-    error(err.message || 'Export failed')
+  } catch (err: unknown) {
+    error(getErrorMessage(err) || 'Export failed')
   } finally {
     exporting.value = false
   }

@@ -8,6 +8,7 @@
 <script setup lang="ts">
 import { ref, onErrorCaptured } from 'vue'
 import ErrorView from '@/views/ErrorView.vue'
+import { getErrorMessage } from '@/utils/errorMessage'
 
 const error = ref(false)
 const errorInfo = ref<{
@@ -16,14 +17,21 @@ const errorInfo = ref<{
   stack?: string
 }>({})
 
-onErrorCaptured((err: any) => {
+onErrorCaptured((err: unknown) => {
   console.error('Component error:', err)
 
   error.value = true
+  const statusFromErr =
+    err &&
+    typeof err === 'object' &&
+    'statusCode' in err &&
+    typeof (err as { statusCode: unknown }).statusCode === 'number'
+      ? (err as { statusCode: number }).statusCode
+      : 500
   errorInfo.value = {
-    message: err.message || 'Unknown error',
-    statusCode: err.statusCode || 500,
-    stack: err.stack || '',
+    message: getErrorMessage(err) ?? undefined,
+    statusCode: statusFromErr,
+    stack: err instanceof Error ? err.stack || '' : '',
   }
 
   // Optionally redirect to error page instead

@@ -97,6 +97,12 @@ final readonly class UsageStatsService
         // Get recent usage (last 10 actions)
         $recentUsage = $this->getRecentUsage($userId, 10);
 
+        // Cost budget
+        $costBudget = $this->rateLimitService->checkCostBudget($user);
+
+        // Cost summary (today / this week / this month)
+        $costSummary = $this->getCostSummary($userId);
+
         return [
             'user_level' => $level,
             'phone_verified' => $user->hasVerifiedPhone(),
@@ -110,6 +116,15 @@ final readonly class UsageStatsService
             ],
             'recent_usage' => $recentUsage,
             'total_requests' => array_sum(array_column($usage, 'used')),
+            'cost_budget' => [
+                'used' => (float) $costBudget['used_cost'],
+                'budget' => (float) $costBudget['budget'],
+                'remaining' => (float) $costBudget['remaining'],
+                'percent' => $costBudget['percent'],
+                'period_start' => $costBudget['period_start'],
+                'period_end' => $costBudget['period_end'],
+            ],
+            'cost_summary' => $costSummary,
         ];
     }
 
@@ -208,7 +223,6 @@ final readonly class UsageStatsService
     {
         $conn = $this->em->getConnection();
 
-        // Validate limit to prevent SQL injection
         $limit = max(1, min(100, (int) $limit));
 
         $sql = "
@@ -218,6 +232,11 @@ final readonly class UsageStatsService
                 BPROVIDER as source,
                 BMODEL as model,
                 BTOKENS as tokens,
+                BPROMPT_TOKENS as prompt_tokens,
+                BCOMPLETION_TOKENS as completion_tokens,
+                BCACHED_TOKENS as cached_tokens,
+                BCACHE_CREATION_TOKENS as cache_creation_tokens,
+                BESTIMATED as estimated,
                 BCOST as cost,
                 BLATENCY as latency,
                 BSTATUS as status
@@ -239,6 +258,11 @@ final readonly class UsageStatsService
                 'source' => $row['source'] ?: 'WEB',
                 'model' => $row['model'],
                 'tokens' => (int) $row['tokens'],
+                'prompt_tokens' => (int) ($row['prompt_tokens'] ?? 0),
+                'completion_tokens' => (int) ($row['completion_tokens'] ?? 0),
+                'cached_tokens' => (int) ($row['cached_tokens'] ?? 0),
+                'cache_creation_tokens' => (int) ($row['cache_creation_tokens'] ?? 0),
+                'estimated' => (bool) ($row['estimated'] ?? false),
                 'cost' => (float) $row['cost'],
                 'latency' => (float) $row['latency'],
                 'status' => $row['status'],
@@ -397,6 +421,172 @@ final readonly class UsageStatsService
     }
 
     /**
+     * Get cost summary by time period.
+     */
+    private function getCostSummary(int $userId): array
+    {
+        $conn = $this->em->getConnection();
+
+        $todayStart = (int) strtotime('today');
+        $weekStart = (int) strtotime('monday this week');
+        $monthStart = (int) strtotime('first day of this month');
+
+        $periods = [
+            'today' => $todayStart,
+            'this_week' => $weekStart,
+            'this_month' => $monthStart,
+        ];
+
+        $summary = [];
+
+        foreach ($periods as $period => $since) {
+            $row = $conn->fetchAssociative(
+                'SELECT COALESCE(SUM(BCOST), 0) as total_cost
+                 FROM BUSELOG WHERE BUSERID = :user_id AND BUNIXTIMES >= :since',
+                ['user_id' => $userId, 'since' => $since]
+            );
+
+            $summary[$period] = (float) ($row['total_cost'] ?? 0);
+        }
+
+        $cacheSavingsRows = $conn->fetchAllAssociative(
+            'SELECT BPRICE_SNAPSHOT, BCACHED_TOKENS
+             FROM BUSELOG
+             WHERE BUSERID = :user_id AND BUNIXTIMES >= :since AND BCACHED_TOKENS > 0',
+            ['user_id' => $userId, 'since' => $monthStart]
+        );
+
+        $totalCacheSavings = 0.0;
+        foreach ($cacheSavingsRows as $row) {
+            $cachedTokens = (int) $row['BCACHED_TOKENS'];
+            $snapshot = json_decode($row['BPRICE_SNAPSHOT'] ?? '{}', true);
+            $priceIn = (float) ($snapshot['price_in'] ?? 0);
+            $inUnit = $snapshot['in_unit'] ?? 'per1M';
+            $cachePriceIn = isset($snapshot['cache_price_in']) ? (float) $snapshot['cache_price_in'] : null;
+
+            if ($priceIn <= 0 || $cachedTokens <= 0) {
+                continue;
+            }
+
+            $divisor = match ($inUnit) {
+                'per1K' => 1_000,
+                'per1' => 1,
+                default => 1_000_000,
+            };
+
+            $fullCost = $cachedTokens * ($priceIn / $divisor);
+            $actualCost = null !== $cachePriceIn
+                ? $cachedTokens * ($cachePriceIn / $divisor)
+                : $fullCost * 0.5;
+
+            $totalCacheSavings += max(0, $fullCost - $actualCost);
+        }
+
+        $summary['cache_savings'] = round($totalCacheSavings, 6);
+
+        return $summary;
+    }
+
+    /**
+     * Get paginated, filterable activity log.
+     *
+     * @return array{items: list<array>, total: int, page: int, per_page: int, total_pages: int}
+     */
+    public function getActivityLog(
+        int $userId,
+        int $page = 1,
+        int $perPage = 20,
+        ?string $search = null,
+        ?string $action = null,
+        ?int $from = null,
+        ?int $to = null,
+    ): array {
+        $conn = $this->em->getConnection();
+        $page = max(1, $page);
+        $perPage = max(1, min(100, $perPage));
+
+        $where = ['BUSERID = :user_id'];
+        $params = ['user_id' => $userId];
+
+        if ($search) {
+            $where[] = '(BMODEL LIKE :search OR BPROVIDER LIKE :search)';
+            $params['search'] = '%'.$search.'%';
+        }
+
+        if ($action) {
+            $where[] = 'BACTION = :action';
+            $params['action'] = $action;
+        }
+
+        if ($from) {
+            $where[] = 'BUNIXTIMES >= :from_ts';
+            $params['from_ts'] = $from;
+        }
+
+        if ($to) {
+            $where[] = 'BUNIXTIMES <= :to_ts';
+            $params['to_ts'] = $to;
+        }
+
+        $whereClause = implode(' AND ', $where);
+
+        $total = (int) $conn->fetchOne(
+            "SELECT COUNT(*) FROM BUSELOG WHERE {$whereClause}",
+            $params,
+        );
+
+        $totalPages = max(1, (int) ceil($total / $perPage));
+        $offset = ($page - 1) * $perPage;
+
+        $rows = $conn->fetchAllAssociative(
+            "SELECT
+                BUNIXTIMES as timestamp,
+                BACTION as action,
+                BPROVIDER as source,
+                BMODEL as model,
+                BTOKENS as tokens,
+                BPROMPT_TOKENS as prompt_tokens,
+                BCOMPLETION_TOKENS as completion_tokens,
+                BCACHED_TOKENS as cached_tokens,
+                BCACHE_CREATION_TOKENS as cache_creation_tokens,
+                BESTIMATED as estimated,
+                BCOST as cost,
+                BLATENCY as latency,
+                BSTATUS as status
+             FROM BUSELOG
+             WHERE {$whereClause}
+             ORDER BY BUNIXTIMES DESC
+             LIMIT {$perPage} OFFSET {$offset}",
+            $params,
+        );
+
+        $items = array_map(static fn (array $row) => [
+            'timestamp' => (int) $row['timestamp'],
+            'datetime' => date('Y-m-d H:i:s', (int) $row['timestamp']),
+            'action' => $row['action'],
+            'source' => $row['source'] ?: 'WEB',
+            'model' => $row['model'],
+            'tokens' => (int) $row['tokens'],
+            'prompt_tokens' => (int) ($row['prompt_tokens'] ?? 0),
+            'completion_tokens' => (int) ($row['completion_tokens'] ?? 0),
+            'cached_tokens' => (int) ($row['cached_tokens'] ?? 0),
+            'cache_creation_tokens' => (int) ($row['cache_creation_tokens'] ?? 0),
+            'estimated' => (bool) ($row['estimated'] ?? false),
+            'cost' => (float) $row['cost'],
+            'latency' => (float) $row['latency'],
+            'status' => $row['status'],
+        ], $rows);
+
+        return [
+            'items' => $items,
+            'total' => $total,
+            'page' => $page,
+            'per_page' => $perPage,
+            'total_pages' => $totalPages,
+        ];
+    }
+
+    /**
      * Export usage data as CSV.
      */
     public function exportUsageAsCsv(User $user, ?int $sinceTimestamp = null): string
@@ -411,10 +601,14 @@ final readonly class UsageStatsService
                 BPROVIDER as source,
                 BMODEL as model,
                 BTOKENS as tokens,
+                BPROMPT_TOKENS as prompt_tokens,
+                BCOMPLETION_TOKENS as completion_tokens,
+                BCACHED_TOKENS as cached_tokens,
+                BCACHE_CREATION_TOKENS as cache_creation_tokens,
+                BESTIMATED as estimated,
                 BCOST as cost,
                 BLATENCY as latency,
-                BSTATUS as status,
-                BMETADATA as metadata
+                BSTATUS as status
             FROM BUSELOG
             WHERE BUSERID = :user_id
         ';
@@ -430,18 +624,22 @@ final readonly class UsageStatsService
 
         $results = $conn->fetchAllAssociative($sql, $params);
 
-        // Build CSV
-        $csv = "Timestamp,Date,Action,Source,Model,Tokens,Cost,Latency,Status\n";
+        $csv = "Timestamp,Date,Action,Source,Model,Tokens,Prompt Tokens,Completion Tokens,Cached Tokens,Cache Creation Tokens,Estimated,Cost,Latency,Status\n";
 
         foreach ($results as $row) {
             $csv .= sprintf(
-                "%d,%s,%s,%s,%s,%d,%.4f,%.2f,%s\n",
+                "%d,%s,%s,%s,%s,%d,%d,%d,%d,%d,%s,%.6f,%.2f,%s\n",
                 $row['timestamp'],
                 date('Y-m-d H:i:s', $row['timestamp']),
                 $row['action'],
                 $row['source'] ?: 'WEB',
                 $row['model'],
                 $row['tokens'],
+                $row['prompt_tokens'] ?? 0,
+                $row['completion_tokens'] ?? 0,
+                $row['cached_tokens'] ?? 0,
+                $row['cache_creation_tokens'] ?? 0,
+                $row['estimated'] ? 'Yes' : 'No',
                 $row['cost'],
                 $row['latency'],
                 $row['status']

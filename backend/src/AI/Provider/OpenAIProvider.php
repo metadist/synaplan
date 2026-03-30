@@ -138,7 +138,7 @@ class OpenAIProvider implements ChatProviderInterface, EmbeddingProviderInterfac
 
     // ==================== CHAT ====================
 
-    public function chat(array $messages, array $options = []): string
+    public function chat(array $messages, array $options = []): array
     {
         if (!isset($options['model'])) {
             throw new ProviderException('Model must be specified in options', 'openai');
@@ -171,16 +171,15 @@ class OpenAIProvider implements ChatProviderInterface, EmbeddingProviderInterfac
                 $requestOptions['max_tokens'] = $options['max_tokens'] ?? self::DEFAULT_MAX_TOKENS;
             }
 
-            // NOTE: Only o3 models support reasoning_effort parameter
-            // o1 models automatically use reasoning without this parameter
-            // We don't pass reasoning flag to OpenAI - models handle it automatically
-
             $response = $this->client->chat()->create($requestOptions);
 
+            $cachedTokens = $response['usage']['prompt_tokens_details']['cached_tokens'] ?? 0;
             $usage = [
                 'prompt_tokens' => $response['usage']['prompt_tokens'] ?? 0,
                 'completion_tokens' => $response['usage']['completion_tokens'] ?? 0,
                 'total_tokens' => $response['usage']['total_tokens'] ?? 0,
+                'cached_tokens' => $cachedTokens,
+                'cache_creation_tokens' => 0,
             ];
 
             $this->logger->info('OpenAI: Chat completed', [
@@ -188,13 +187,16 @@ class OpenAIProvider implements ChatProviderInterface, EmbeddingProviderInterfac
                 'usage' => $usage,
             ]);
 
-            return $response['choices'][0]['message']['content'] ?? '';
+            return [
+                'content' => $response['choices'][0]['message']['content'] ?? '',
+                'usage' => $usage,
+            ];
         } catch (\Exception $e) {
             throw new ProviderException('OpenAI chat error: '.$e->getMessage(), 'openai');
         }
     }
 
-    public function chatStream(array $messages, callable $callback, array $options = []): void
+    public function chatStream(array $messages, callable $callback, array $options = []): array
     {
         if (!isset($options['model'])) {
             throw new ProviderException('Model must be specified in options', 'openai');
@@ -213,6 +215,7 @@ class OpenAIProvider implements ChatProviderInterface, EmbeddingProviderInterfac
             $requestOptions = [
                 'model' => $model,
                 'messages' => $messages,
+                'stream_options' => ['include_usage' => true],
             ];
 
             // Reasoning models don't support custom temperature (only default 1.0)
@@ -227,26 +230,34 @@ class OpenAIProvider implements ChatProviderInterface, EmbeddingProviderInterfac
                 $requestOptions['max_tokens'] = $options['max_tokens'] ?? self::DEFAULT_MAX_TOKENS;
             }
 
-            // NOTE: Reasoning models handle reasoning automatically
-            // No need to pass reasoning_effort parameter
-
             $stream = $this->client->chat()->createStreamed($requestOptions);
+
+            $usage = [
+                'prompt_tokens' => 0,
+                'completion_tokens' => 0,
+                'total_tokens' => 0,
+                'cached_tokens' => 0,
+                'cache_creation_tokens' => 0,
+            ];
 
             $firstChunk = true;
             $finishReason = null;
             foreach ($stream as $response) {
                 $responseArray = $response->toArray();
 
-                // Debug first chunk to see structure
                 if ($firstChunk && $reasoning) {
-                    error_log('🧠 OpenAI reasoning stream - First chunk structure:');
-                    error_log('  Response keys: '.implode(', ', array_keys($responseArray)));
-                    error_log('  Choices: '.json_encode($responseArray['choices'] ?? null));
-                    if (isset($responseArray['choices'][0]['delta'])) {
-                        error_log('  Delta keys: '.implode(', ', array_keys($responseArray['choices'][0]['delta'])));
-                        error_log('  Has reasoning_content: '.(isset($responseArray['choices'][0]['delta']['reasoning_content']) ? 'YES' : 'NO'));
-                    }
                     $firstChunk = false;
+                }
+
+                // Capture usage from the final chunk (stream_options: include_usage)
+                if (isset($responseArray['usage'])) {
+                    $usage = [
+                        'prompt_tokens' => $responseArray['usage']['prompt_tokens'] ?? 0,
+                        'completion_tokens' => $responseArray['usage']['completion_tokens'] ?? 0,
+                        'total_tokens' => $responseArray['usage']['total_tokens'] ?? 0,
+                        'cached_tokens' => $responseArray['usage']['prompt_tokens_details']['cached_tokens'] ?? 0,
+                        'cache_creation_tokens' => 0,
+                    ];
                 }
 
                 // Capture finish_reason (set on the final chunk)
@@ -272,6 +283,8 @@ class OpenAIProvider implements ChatProviderInterface, EmbeddingProviderInterfac
             if (null !== $finishReason) {
                 $callback(['type' => 'finish', 'finish_reason' => $finishReason]);
             }
+
+            return ['usage' => $usage];
         } catch (\Exception $e) {
             throw new ProviderException('OpenAI streaming error: '.$e->getMessage(), 'openai');
         }

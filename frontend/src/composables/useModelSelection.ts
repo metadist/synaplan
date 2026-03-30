@@ -1,5 +1,6 @@
 import { computed, type ComputedRef } from 'vue'
 import { useAiConfigStore } from '@/stores/aiConfig'
+import type { MessageFile } from '@/stores/history'
 import type { AIModel, Capability } from '@/types/ai-models'
 import type { AgainData as BackendAgainData } from '@/types/ai-models'
 
@@ -28,7 +29,7 @@ export interface ModelOption {
  */
 export function useModelSelection(
   againData?: ComputedRef<BackendAgainData | null | undefined>,
-  files?: ComputedRef<any[] | undefined>,
+  files?: ComputedRef<MessageFile[] | undefined>,
   currentProvider?: ComputedRef<string | undefined>,
   currentModelName?: ComputedRef<string | undefined>,
   mediaHint?: ComputedRef<'image' | 'video' | 'audio' | 'chat' | 'vision' | null | undefined>
@@ -84,9 +85,10 @@ export function useModelSelection(
     }
 
     const file = files.value[0]
-    if (file.type?.startsWith('image/')) return 'image'
-    if (file.type?.startsWith('video/')) return 'video'
-    if (file.type?.startsWith('audio/')) return 'audio'
+    const mime = file.fileMime ?? ''
+    if (mime.startsWith('image/')) return 'image'
+    if (mime.startsWith('video/')) return 'video'
+    if (mime.startsWith('audio/')) return 'audio'
 
     return 'chat'
   })

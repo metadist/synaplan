@@ -32,9 +32,9 @@ interface ChatProviderInterface extends ProviderMetadataInterface
      * @param array $messages Messages array in OpenAI format: [['role' => 'user', 'content' => '...']]
      * @param array $options  options: model (required), temperature, max_tokens, reasoning, etc
      *
-     * @return string Response content
+     * @return array{content: string, usage: array{prompt_tokens: int, completion_tokens: int, total_tokens: int, cached_tokens: int, cache_creation_tokens: int}}
      */
-    public function chat(array $messages, array $options = []): string;
+    public function chat(array $messages, array $options = []): array;
 
     /**
      * Generate chat completion (streaming).
@@ -44,7 +44,7 @@ interface ChatProviderInterface extends ProviderMetadataInterface
      *                           See class-level docblock for the full callback contract
      * @param array    $options  options: model (required), temperature, max_tokens, reasoning, etc
      *
-     * @return void Chunks are sent via callback
+     * @return array{usage: array{prompt_tokens: int, completion_tokens: int, total_tokens: int, cached_tokens: int, cache_creation_tokens: int}}
      */
-    public function chatStream(array $messages, callable $callback, array $options = []): void;
+    public function chatStream(array $messages, callable $callback, array $options = []): array;
 }

@@ -732,11 +732,11 @@ final class WhatsAppService
         $metadata = $result['response']['metadata'] ?? [];
         $fileData = $metadata['file'] ?? null;
 
-        // Record usage with response content for token estimation
         $this->rateLimitService->recordUsage($user, 'MESSAGES', [
             'provider' => $metadata['provider'] ?? 'unknown',
             'model' => $metadata['model'] ?? 'unknown',
-            'tokens' => 0,
+            'usage' => $metadata['usage'] ?? [],
+            'model_id' => $metadata['model_id'] ?? null,
             'source' => 'WHATSAPP',
             'response_text' => $responseText,
             'input_text' => $message->getText(),

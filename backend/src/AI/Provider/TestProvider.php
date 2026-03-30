@@ -60,7 +60,24 @@ class TestProvider implements ChatProviderInterface, EmbeddingProviderInterface,
         return []; // Test provider requires no configuration
     }
 
-    public function chat(array $messages, array $options = []): string
+    public function chat(array $messages, array $options = []): array
+    {
+        $content = $this->generateContent($messages);
+        $tokenEstimate = (int) ceil(strlen($content) / 4);
+
+        return [
+            'content' => $content,
+            'usage' => [
+                'prompt_tokens' => 10,
+                'completion_tokens' => $tokenEstimate,
+                'total_tokens' => 10 + $tokenEstimate,
+                'cached_tokens' => 0,
+                'cache_creation_tokens' => 0,
+            ],
+        ];
+    }
+
+    private function generateContent(array $messages): string
     {
         $lastMessage = end($messages);
         $userContent = $lastMessage['content'] ?? 'hello';
@@ -120,13 +137,15 @@ class TestProvider implements ChatProviderInterface, EmbeddingProviderInterface,
         return $text;
     }
 
-    public function chatStream(array $messages, callable $callback, array $options = []): void
+    public function chatStream(array $messages, callable $callback, array $options = []): array
     {
-        $response = $this->chat($messages, $options);
-        foreach (str_split($response, 10) as $chunk) {
+        $result = $this->chat($messages, $options);
+        foreach (str_split($result['content'], 10) as $chunk) {
             $callback($chunk);
             usleep(50000);
         }
+
+        return ['usage' => $result['usage']];
     }
 
     // EmbeddingProviderInterface

@@ -189,6 +189,7 @@ import { ref, computed, watch } from 'vue'
 import * as filesService from '@/services/filesService'
 import { useNotification } from '@/composables/useNotification'
 import { useConfigStore } from '@/stores/config'
+import { getErrorMessage } from '@/utils/errorMessage'
 
 const { success: showSuccess, error: showError } = useNotification()
 const config = useConfigStore()
@@ -273,10 +274,10 @@ const makePublic = async () => {
     }
     showSuccess('File is now public!')
     emit('shared')
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Failed to share file:', error)
     // Don't show error toast if it's an auth error (redirecting to login)
-    if (error.message !== 'Authentication required') {
+    if (getErrorMessage(error) !== 'Authentication required') {
       showError('Failed to make file public')
     }
   } finally {
@@ -299,9 +300,9 @@ const revoke = async () => {
     }
     showSuccess('Public access revoked')
     emit('unshared')
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Failed to revoke share:', error)
-    if (error.message !== 'Authentication required') {
+    if (getErrorMessage(error) !== 'Authentication required') {
       showError('Failed to revoke access')
     }
   } finally {
@@ -317,7 +318,7 @@ const copyLink = async () => {
     setTimeout(() => {
       copied.value = false
     }, 2000)
-  } catch (error) {
+  } catch {
     showError('Failed to copy link')
   }
 }

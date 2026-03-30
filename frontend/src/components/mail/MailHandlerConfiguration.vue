@@ -734,6 +734,7 @@
 </template>
 
 <script setup lang="ts">
+import { getErrorMessage } from '@/utils/errorMessage'
 import { ref, computed, watch } from 'vue'
 import {
   EnvelopeIcon,
@@ -956,10 +957,10 @@ const testConnection = async () => {
       success: result.success,
       message: result.message,
     }
-  } catch (error: any) {
+  } catch (error: unknown) {
     testResult.value = {
       success: false,
-      message: error.message || 'Failed to test connection',
+      message: getErrorMessage(error) || 'Failed to test connection',
     }
   } finally {
     isTestingConnection.value = false

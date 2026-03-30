@@ -73,6 +73,7 @@
 </template>
 
 <script setup lang="ts">
+import { getErrorMessage } from '@/utils/errorMessage'
 import { ref, onMounted } from 'vue'
 import { Icon } from '@iconify/vue'
 import { useRouter } from 'vue-router'
@@ -108,10 +109,10 @@ async function syncSubscription() {
       syncSuccess.value = false
       errorMessage.value = 'Could not activate subscription.'
     }
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Sync failed:', error)
     syncSuccess.value = false
-    errorMessage.value = error.message || 'Failed to sync subscription'
+    errorMessage.value = getErrorMessage(error) || 'Failed to sync subscription'
   } finally {
     syncing.value = false
   }

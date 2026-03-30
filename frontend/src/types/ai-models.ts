@@ -22,8 +22,8 @@ export interface AIModel {
   providerId: string
   quality: number
   rating: number
-  priceIn?: number | null // Not returned by backend getModels
-  priceOut?: number | null // Not returned by backend getModels
+  priceIn: number
+  priceOut: number
   selectable?: boolean // Not returned by backend getModels
   description: string | null
   isSystemModel: boolean

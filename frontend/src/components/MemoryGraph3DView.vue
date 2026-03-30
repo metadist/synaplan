@@ -210,7 +210,7 @@ function addLine(
         gapSize: 1.1,
       })
     : new THREE.LineBasicMaterial({ color, transparent: true, opacity })
-  const line = new THREE.Line(geometry, material as any)
+  const line = new THREE.Line(geometry, material as THREE.Material)
   if (dashed) {
     line.computeLineDistances()
   }
@@ -394,7 +394,10 @@ function addTextLabel(text: string, mesh: THREE.Mesh, type: string) {
   sprite.scale.set(scale, scale / 4, 1)
 
   // Get radius from geometry - handle both old and new Three.js APIs
-  const radius = (mesh.geometry as any).parameters?.radius || 2
+  const radius =
+    mesh.geometry instanceof THREE.SphereGeometry && mesh.geometry.parameters?.radius !== undefined
+      ? mesh.geometry.parameters.radius
+      : 2
   sprite.position.set(0, radius + 2, 0)
 
   mesh.add(sprite)

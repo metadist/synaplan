@@ -67,11 +67,10 @@
               : 'bg-gray-100 dark:bg-white/5 txt-primary rounded-bl-md',
           ]"
         >
-          <div
-            v-if="msg.role === 'assistant'"
-            class="break-words markdown-content"
-            v-html="renderMarkdown(msg.displayText || msg.content)"
-          ></div>
+          <div v-if="msg.role === 'assistant'" class="break-words markdown-content">
+            <!-- eslint-disable-next-line vue/no-v-html -- assistant markdown in setup chat -->
+            <div v-html="renderMarkdown(msg.displayText || msg.content)"></div>
+          </div>
           <p v-else class="whitespace-pre-wrap break-words">
             {{ msg.displayText || msg.content }}
           </p>

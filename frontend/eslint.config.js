@@ -38,7 +38,8 @@ export default [
       'no-useless-escape': 'warn',
       'no-undef': 'off', // TypeScript handles this better
       'no-loss-of-precision': 'warn',
-      'no-redeclare': 'warn', // Allow function overloads
+      'no-redeclare': 'off', // Use TypeScript-aware rule (supports overloads)
+      '@typescript-eslint/no-redeclare': 'warn',
     },
   },
   // Node.js config files (vite, tailwind, etc.)
@@ -95,6 +96,8 @@ export default [
       ...typescript.configs.recommended.rules,
       '@typescript-eslint/no-explicit-any': 'warn',
       '@typescript-eslint/no-unused-vars': 'warn',
+      '@typescript-eslint/no-redeclare': 'warn',
+      'no-redeclare': 'off',
       'no-undef': 'off',
     },
   },

@@ -169,33 +169,16 @@
               <Icon icon="heroicons:cpu-chip" class="w-4 h-4" />
               {{ $t('config.taskPrompts.aiModel') }}
             </label>
-            <select
-              v-model="formData.aiModel"
-              class="w-full px-4 py-3 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)] disabled:opacity-50 disabled:cursor-not-allowed"
+            <ModelSelectDropdown
+              :model-value="formData.aiModel ?? 'default'"
+              :groups="groupedModels"
+              :loading="loadingModels"
+              default-option="Default Model (Auto-selected based on capability)"
               data-testid="input-ai-model"
-            >
-              <!-- Grouped Models by Capability -->
-              <template v-if="!loadingModels && groupedModels.length > 0">
-                <option value="default">Default Model (Auto-selected based on capability)</option>
-                <optgroup
-                  v-for="group in groupedModels"
-                  :key="group.capability"
-                  :label="group.label"
-                >
-                  <option
-                    v-for="model in group.models"
-                    :key="model.id"
-                    :value="`${model.name} (${model.service})`"
-                  >
-                    {{ model.name }} ({{ model.service }})
-                    <template v-if="model.rating">⭐ {{ model.rating.toFixed(1) }}</template>
-                  </option>
-                </optgroup>
-              </template>
-
-              <!-- Loading state -->
-              <option v-if="loadingModels" disabled>Loading models...</option>
-            </select>
+              @update:model-value="
+                (v: string | number | null) => (formData.aiModel = String(v ?? 'default'))
+              "
+            />
             <p class="text-xs txt-secondary mt-1.5 flex items-center gap-1">
               <Icon icon="heroicons:information-circle" class="w-3.5 h-3.5" />
               {{ $t('config.taskPrompts.aiModelHelp') }}
@@ -777,6 +760,8 @@ import {
   type TaskPrompt as ApiTaskPrompt,
   type PromptFile,
   type AvailableFile,
+  type PromptMetadata,
+  type UpdatePromptRequest,
 } from '@/services/api/promptsApi'
 import { configApi } from '@/services/api/configApi'
 import type { AIModel, Capability } from '@/types/ai-models'
@@ -784,6 +769,7 @@ import { findModelIdByString } from '@/utils/aiModelDefaults'
 import { useNotification } from '@/composables/useNotification'
 import { useUnsavedChanges } from '@/composables/useUnsavedChanges'
 import { useDialog } from '@/composables/useDialog'
+import ModelSelectDropdown from '@/components/ModelSelectDropdown.vue'
 import { useAuthStore } from '@/stores/auth'
 import UnsavedChangesBar from '@/components/UnsavedChangesBar.vue'
 
@@ -971,8 +957,8 @@ const markdownTools = [
 
 // Unsaved changes tracking
 const { hasUnsavedChanges, saveChanges, discardChanges, setupNavigationGuard } = useUnsavedChanges(
-  formData as any,
-  originalData as any
+  formData,
+  originalData
 )
 
 let cleanupGuard: (() => void) | undefined
@@ -1012,7 +998,7 @@ const loadPrompts = async () => {
         let foundModel = null
         for (const models of Object.values(allModels.value)) {
           if (models) {
-            foundModel = models.find((m: any) => m.id === metadata.aiModel)
+            foundModel = models.find((m: AIModel) => m.id === metadata.aiModel)
             if (foundModel) break
           }
         }
@@ -1116,7 +1102,7 @@ const handleSave = saveChanges(async () => {
 
   try {
     // Build metadata object
-    const metadata: Record<string, any> = {}
+    const metadata: PromptMetadata = {}
 
     if (formData.value.aiModel === 'default' || !formData.value.aiModel) {
       metadata.aiModel = 0
@@ -1165,7 +1151,7 @@ const handleSave = saveChanges(async () => {
       // For system prompts: do NOT send language (backend will preserve original)
       // For custom prompts: send the language from the form
       const isSystemPrompt = currentPrompt.value.isDefault
-      const updatePayload: Record<string, any> = {
+      const updatePayload: UpdatePromptRequest = {
         shortDescription: currentPrompt.value.shortDescription, // Keep original name
         prompt: formData.value.content || '',
         selectionRules: formData.value.rules || null,
@@ -1285,7 +1271,7 @@ const handleCreateNew = async () => {
 
   try {
     // Build metadata object
-    const metadata: Record<string, any> = {}
+    const metadata: PromptMetadata = {}
 
     metadata.aiModel = 0 // Default to 0 for new prompts
     metadata.tool_internet_search = true // Enable by default

@@ -74,6 +74,7 @@
 </template>
 
 <script setup lang="ts">
+import { getErrorMessage } from '@/utils/errorMessage'
 import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
@@ -142,7 +143,7 @@ onMounted(async () => {
           console.error('❌ Session verification failed')
           error.value = t('auth.socialLoginError')
         }
-      } catch (e: any) {
+      } catch (e: unknown) {
         console.error('❌ Failed to verify session after OAuth:', e)
         error.value = t('auth.socialLoginError')
       }
@@ -151,9 +152,9 @@ onMounted(async () => {
       console.error('❌ OAuth callback without success or error')
       error.value = t('auth.socialLoginError')
     }
-  } catch (e: any) {
+  } catch (e: unknown) {
     console.error('❌ OAuth callback error:', e)
-    error.value = e.message || t('auth.socialLoginError')
+    error.value = getErrorMessage(e) || t('auth.socialLoginError')
   }
 })
 </script>

@@ -41,7 +41,7 @@ export interface AdminModelCreateRequest {
   json?: Record<string, unknown>
 }
 
-export interface AdminModelUpdateRequest extends Partial<AdminModelCreateRequest> {}
+export type AdminModelUpdateRequest = Partial<AdminModelCreateRequest>
 
 export interface AdminModelUpsertResponse {
   success: boolean

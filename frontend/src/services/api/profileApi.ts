@@ -48,15 +48,15 @@ export const profileApi = {
     })
   },
 
-  async updateProfile(profileData: Partial<Profile>): Promise<any> {
-    return httpClient<any>('/api/v1/profile', {
+  async updateProfile(profileData: Partial<Profile>): Promise<unknown> {
+    return httpClient('/api/v1/profile', {
       method: 'PUT',
       body: JSON.stringify(profileData),
     })
   },
 
-  async changePassword(currentPassword: string, newPassword: string): Promise<any> {
-    return httpClient<any>('/api/v1/profile/password', {
+  async changePassword(currentPassword: string, newPassword: string): Promise<unknown> {
+    return httpClient('/api/v1/profile/password', {
       method: 'PUT',
       body: JSON.stringify({ currentPassword, newPassword }),
     })
@@ -75,8 +75,8 @@ export const profileApi = {
     })
   },
 
-  async deleteAccount(password: string): Promise<any> {
-    return httpClient<any>('/api/v1/profile', {
+  async deleteAccount(password: string): Promise<unknown> {
+    return httpClient('/api/v1/profile', {
       method: 'DELETE',
       body: JSON.stringify({ password }),
     })

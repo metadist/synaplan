@@ -96,7 +96,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, nextTick } from 'vue'
+import { ref, computed, watch, nextTick, type ComponentPublicInstance } from 'vue'
 import { Icon } from '@iconify/vue'
 import { useCommandsStore, type Command } from '@/stores/commands'
 
@@ -117,9 +117,9 @@ const emit = defineEmits<{
 const selectedIndex = ref(0)
 const itemRefs = ref<Array<HTMLElement | null>>([])
 
-const setItemRef = (el: any, index: number) => {
-  if (el) {
-    itemRefs.value[index] = el as HTMLElement
+const setItemRef = (el: Element | ComponentPublicInstance | null, index: number) => {
+  if (el && el instanceof HTMLElement) {
+    itemRefs.value[index] = el
   }
 }
 

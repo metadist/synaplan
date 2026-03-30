@@ -527,6 +527,7 @@
 </template>
 
 <script setup lang="ts">
+import { getErrorMessage } from '@/utils/errorMessage'
 import { ref, computed, onMounted, onUnmounted, nextTick } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { Icon } from '@iconify/vue'
@@ -587,9 +588,14 @@ const canConfirmDelete = computed(() => {
   return deleteConfirmPassword.value.length > 0
 })
 
+const hasPasswordChanges = computed(
+  () => !!(passwordData.value.current || passwordData.value.new || passwordData.value.confirm)
+)
+
 const { hasUnsavedChanges, saveChanges, discardChanges, setupNavigationGuard } = useUnsavedChanges(
   formData,
-  originalData
+  originalData,
+  { extraDirtyCheck: hasPasswordChanges }
 )
 
 let cleanupGuard: (() => void) | undefined
@@ -621,8 +627,8 @@ onMounted(async () => {
         authStore.user.memoriesEnabled = response.profile.memoriesEnabled
       }
     }
-  } catch (err: any) {
-    error(err.message || 'Failed to load profile')
+  } catch (err: unknown) {
+    error(getErrorMessage(err) || 'Failed to load profile')
   } finally {
     loading.value = false
   }
@@ -684,8 +690,8 @@ const handleSave = saveChanges(async () => {
     }
 
     originalData.value = { ...formData.value }
-  } catch (err: any) {
-    error(err.message || 'Failed to update profile')
+  } catch (err: unknown) {
+    error(getErrorMessage(err) || 'Failed to update profile')
     throw err
   } finally {
     loading.value = false
@@ -713,8 +719,8 @@ const handleDeleteAccount = async () => {
     await authStore.logout()
     showDeleteModal.value = false
     router.push('/login')
-  } catch (err: any) {
-    error(err.message || 'Failed to delete account')
+  } catch (err: unknown) {
+    error(getErrorMessage(err) || 'Failed to delete account')
   } finally {
     deletingAccount.value = false
     deleteConfirmPassword.value = ''

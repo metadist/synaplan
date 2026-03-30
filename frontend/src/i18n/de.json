@@ -110,7 +110,8 @@
       "overview": "Übersicht",
       "users": "Benutzer",
       "prompts": "Prompts",
-      "usage": "Nutzung"
+      "usage": "Nutzung",
+      "subscriptions": "Abonnements"
     },
     "overview": {
       "totalUsers": "Gesamtbenutzer",
@@ -182,6 +183,26 @@
       "cost": "Kosten",
       "activeSubscriptions": "Aktive Abos",
       "subscriptionOverview": "Abo-Übersicht"
+    },
+    "subscriptions": {
+      "title": "Abo-Budget-Verwaltung",
+      "description": "Kostenbudgets und Aktivstatus für jede Abo-Stufe verwalten. Preise sind schreibgeschützt und werden über Stripe verwaltet.",
+      "level": "Stufe",
+      "name": "Name",
+      "priceMonthly": "Preis/Monat",
+      "priceYearly": "Preis/Jahr",
+      "budgetMonthly": "Budget/Monat",
+      "budgetYearly": "Budget/Jahr",
+      "active": "Aktiv",
+      "actions": "Aktionen",
+      "edit": "Bearbeiten",
+      "save": "Speichern",
+      "cancel": "Abbrechen",
+      "saveSuccess": "Budget erfolgreich aktualisiert",
+      "saveError": "Budget-Aktualisierung fehlgeschlagen",
+      "loadError": "Abonnements konnten nicht geladen werden",
+      "noSubscriptions": "Keine Abo-Pläne gefunden. Erstellen Sie zuerst Abo-Pläne in der Datenbank.",
+      "budgetHint": "Das Budget definiert die maximalen Token-Kosten (in EUR) pro Abrechnungszeitraum. Setzen Sie es auf 0 für unbegrenzte Nutzung. Preise sind nur zur Anzeige und werden über Stripe verwaltet."
     },
     "config": {
       "title": "Systemkonfiguration",
@@ -802,6 +823,8 @@
       "sortPurpose": "Sortierung: Verwendungszweck",
       "qualityScore": "Qualitätswert: {score}/10",
       "noModelsAvailable": "Keine Modelle für diesen Verwendungszweck verfügbar",
+      "saveSuccess": "Modellkonfiguration gespeichert",
+      "saveError": "Modellkonfiguration konnte nicht gespeichert werden",
       "tableName": "Name",
       "tableService": "Anbieter",
       "tableRating": "Bewertung",
@@ -867,6 +890,7 @@
         "priceOut": "Preis aus",
         "unitOut": "Einheit aus",
         "actions": "Aktionen",
+        "edit": "Bearbeiten",
         "save": "Speichern",
         "saving": "Speichere…",
         "delete": "Löschen",
@@ -883,7 +907,11 @@
         "failedCreate": "Modell erstellen fehlgeschlagen",
         "failedSave": "Modell speichern fehlgeschlagen",
         "failedDelete": "Modell löschen fehlgeschlagen",
-        "requiredFields": "Alle Felder sind erforderlich: Service, Tag, Provider-ID, Name"
+        "requiredFields": "Alle Felder sind erforderlich: Service, Tag, Provider-ID, Name",
+        "searchPlaceholder": "Modelle suchen..."
+      },
+      "pagination": {
+        "showing": "Zeige {start}–{end} von {total}"
       }
     },
     "taskPrompts": {
@@ -1017,6 +1045,7 @@
       "exportSuccess": "Nutzungsdaten erfolgreich exportiert",
       "errorLoading": "Fehler beim Laden der Nutzungsstatistiken",
       "errorExporting": "Fehler beim Exportieren der Nutzungsdaten",
+      "notAuthenticated": "Nicht authentifiziert. Bitte melden Sie sich an, um Statistiken anzuzeigen.",
       "subscription": "Abonnement",
       "userLevel": "Benutzerebene",
       "phoneVerified": "Telefon verifiziert",
@@ -1036,13 +1065,41 @@
       "source": "Quelle",
       "tokens": "Tokens",
       "latency": "Latenz",
+      "model": "Modell",
+      "promptTokens": "Prompt",
+      "completionTokens": "Completion",
+      "cachedTokens": "Cache",
+      "cost": "Kosten",
+      "estimatedTooltip": "Tokenanzahl geschätzt (keine exakte Messung vom Provider)",
       "noRecentActivity": "Keine aktuellen Aktivitäten",
+      "activity": {
+        "searchPlaceholder": "Nach Modell oder Provider suchen...",
+        "allActions": "Alle Aktionen",
+        "dateFrom": "Von Datum",
+        "dateTo": "Bis Datum",
+        "clearFilters": "Filter zurücksetzen",
+        "showing": "{from}-{to} von {total} angezeigt"
+      },
+      "costBudget": {
+        "title": "Kostenbudget",
+        "consumption": "Verbrauch",
+        "remaining": "Verbleibend",
+        "thisMonth": "Kosten diesen Monat",
+        "unlimited": "Kein Limit"
+      },
+      "costSummary": {
+        "today": "Heute",
+        "thisWeek": "Diese Woche",
+        "thisMonth": "Dieser Monat"
+      },
       "actions": {
         "messages": "Nachrichten",
         "images": "Bilder",
         "videos": "Videos",
         "audios": "Audiodateien",
-        "file_analysis": "Textanalyse"
+        "file_analysis": "Dateianalyse",
+        "sorting": "Klassifikation",
+        "search_query": "Suchanfrage"
       },
       "sources": {
         "whatsapp": "WhatsApp",
@@ -1427,7 +1484,15 @@
       "loading": "Lade Features...",
       "requiredConfig": "Erforderliche Konfiguration:",
       "set": "Gesetzt",
-      "notSet": "Nicht gesetzt"
+      "notSet": "Nicht gesetzt",
+      "allOperational": "Alle Systeme betriebsbereit",
+      "issuesDetected": "Probleme erkannt",
+      "ready": "Bereit",
+      "healthSummary": "{healthy} von {total} Services gesund",
+      "model": "Modell",
+      "models": "Modelle",
+      "devOnlyTitle": "Nur Entwicklungsmodus",
+      "devOnlyMessage": "Diese Seite ist nur in Entwicklungsumgebungen verfügbar. Die Systemstatusüberwachung ist in der Produktion eingeschränkt."
     }
   },
   "mail": {
@@ -2665,5 +2730,14 @@
   },
   "system": {
     "missingApiKeys": "Einige API-Schlüssel fehlen — folgende Anbieter sind deaktiviert: {providers}"
+  },
+  "models": {
+    "loading": "Modelle werden geladen...",
+    "costTier": {
+      "free": "Kostenlos",
+      "low": "Low Cost",
+      "mid": "Mid Cost",
+      "high": "High Cost"
+    }
   }
 }

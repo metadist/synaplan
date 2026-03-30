@@ -88,10 +88,10 @@
 
               <!-- Summary Text (Markdown formatted) -->
               <div class="surface-elevated rounded-lg p-6">
-                <div
-                  class="prose prose-sm max-w-none txt-primary leading-relaxed"
-                  v-html="formattedSummary"
-                ></div>
+                <div class="prose prose-sm max-w-none txt-primary leading-relaxed">
+                  <!-- eslint-disable-next-line vue/no-v-html -- summary markdown output -->
+                  <div v-html="formattedSummary"></div>
+                </div>
               </div>
 
               <!-- Statistics -->
@@ -246,7 +246,7 @@ const copyToClipboard = async () => {
   try {
     await navigator.clipboard.writeText(contentToCopy)
     success('Summary copied to clipboard!')
-  } catch (err) {
+  } catch {
     showError('Failed to copy summary')
   }
 }

@@ -11,6 +11,7 @@ use Doctrine\ORM\Mapping as ORM;
 #[ORM\Index(columns: ['BUNIXTIMES'], name: 'idx_uselog_time')]
 #[ORM\Index(columns: ['BACTION'], name: 'idx_uselog_action')]
 #[ORM\Index(columns: ['BPROVIDER'], name: 'idx_uselog_provider')]
+#[ORM\Index(columns: ['BMODEL_ID'], name: 'idx_uselog_model')]
 class UseLog
 {
     #[ORM\Id]
@@ -29,10 +30,10 @@ class UseLog
     private int $unixTimestamp;
 
     #[ORM\Column(name: 'BACTION', length: 64)]
-    private string $action; // 'chat', 'image_generation', 'embedding', etc.
+    private string $action;
 
     #[ORM\Column(name: 'BPROVIDER', length: 32, options: ['default' => ''])]
-    private string $provider = ''; // 'anthropic', 'openai', 'ollama'
+    private string $provider = '';
 
     #[ORM\Column(name: 'BMODEL', length: 128, options: ['default' => ''])]
     private string $model = '';
@@ -40,14 +41,36 @@ class UseLog
     #[ORM\Column(name: 'BTOKENS', type: 'integer', options: ['default' => 0])]
     private int $tokens = 0;
 
+    #[ORM\Column(name: 'BPROMPT_TOKENS', type: 'integer', options: ['default' => 0])]
+    private int $promptTokens = 0;
+
+    #[ORM\Column(name: 'BCOMPLETION_TOKENS', type: 'integer', options: ['default' => 0])]
+    private int $completionTokens = 0;
+
+    #[ORM\Column(name: 'BCACHED_TOKENS', type: 'integer', options: ['default' => 0])]
+    private int $cachedTokens = 0;
+
+    #[ORM\Column(name: 'BCACHE_CREATION_TOKENS', type: 'integer', options: ['default' => 0])]
+    private int $cacheCreationTokens = 0;
+
+    #[ORM\Column(name: 'BESTIMATED', type: 'boolean', options: ['default' => false])]
+    private bool $estimated = false;
+
+    #[ORM\ManyToOne(targetEntity: Model::class)]
+    #[ORM\JoinColumn(name: 'BMODEL_ID', referencedColumnName: 'BID', nullable: true)]
+    private ?Model $modelEntity = null;
+
+    #[ORM\Column(name: 'BPRICE_SNAPSHOT', type: 'json', nullable: true)]
+    private ?array $priceSnapshot = null;
+
     #[ORM\Column(name: 'BCOST', type: 'decimal', precision: 10, scale: 6, options: ['default' => 0])]
     private string $cost = '0.000000';
 
     #[ORM\Column(name: 'BLATENCY', type: 'integer', options: ['default' => 0])]
-    private int $latency = 0; // in milliseconds
+    private int $latency = 0;
 
     #[ORM\Column(name: 'BSTATUS', length: 16, options: ['default' => 'success'])]
-    private string $status = 'success'; // 'success', 'error', 'timeout'
+    private string $status = 'success';
 
     #[ORM\Column(name: 'BERROR', type: 'text', options: ['default' => ''])]
     private string $error = '';
@@ -196,6 +219,90 @@ class UseLog
     public function setError(string $error): self
     {
         $this->error = $error;
+
+        return $this;
+    }
+
+    public function getPromptTokens(): int
+    {
+        return $this->promptTokens;
+    }
+
+    public function setPromptTokens(int $promptTokens): self
+    {
+        $this->promptTokens = $promptTokens;
+
+        return $this;
+    }
+
+    public function getCompletionTokens(): int
+    {
+        return $this->completionTokens;
+    }
+
+    public function setCompletionTokens(int $completionTokens): self
+    {
+        $this->completionTokens = $completionTokens;
+
+        return $this;
+    }
+
+    public function getCachedTokens(): int
+    {
+        return $this->cachedTokens;
+    }
+
+    public function setCachedTokens(int $cachedTokens): self
+    {
+        $this->cachedTokens = $cachedTokens;
+
+        return $this;
+    }
+
+    public function getCacheCreationTokens(): int
+    {
+        return $this->cacheCreationTokens;
+    }
+
+    public function setCacheCreationTokens(int $cacheCreationTokens): self
+    {
+        $this->cacheCreationTokens = $cacheCreationTokens;
+
+        return $this;
+    }
+
+    public function isEstimated(): bool
+    {
+        return $this->estimated;
+    }
+
+    public function setEstimated(bool $estimated): self
+    {
+        $this->estimated = $estimated;
+
+        return $this;
+    }
+
+    public function getModelEntity(): ?Model
+    {
+        return $this->modelEntity;
+    }
+
+    public function setModelEntity(?Model $modelEntity): self
+    {
+        $this->modelEntity = $modelEntity;
+
+        return $this;
+    }
+
+    public function getPriceSnapshot(): ?array
+    {
+        return $this->priceSnapshot;
+    }
+
+    public function setPriceSnapshot(?array $priceSnapshot): self
+    {
+        $this->priceSnapshot = $priceSnapshot;
 
         return $this;
     }

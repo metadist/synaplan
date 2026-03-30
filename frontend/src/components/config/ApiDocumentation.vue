@@ -211,6 +211,7 @@
 </template>
 
 <script setup lang="ts">
+import { getErrorMessage } from '@/utils/errorMessage'
 import { ref, computed, onMounted } from 'vue'
 import { CommandLineIcon, ChevronDownIcon, ChevronUpIcon } from '@heroicons/vue/24/outline'
 
@@ -220,12 +221,37 @@ interface OpenAPISpec {
     description?: string
     version?: string
   }
-  paths?: Record<string, Record<string, any>>
+  paths?: Record<string, Record<string, unknown>>
   tags?: Array<{ name: string; description?: string }>
   components?: {
-    schemas?: Record<string, any>
-    securitySchemes?: Record<string, any>
+    schemas?: Record<string, unknown>
+    securitySchemes?: Record<string, unknown>
   }
+}
+
+interface OpenApiParameter {
+  name?: string
+  in?: string
+  required?: boolean
+  description?: string
+  schema?: unknown
+}
+
+interface OpenApiMediaType {
+  schema?: unknown
+  example?: unknown
+}
+
+interface OpenApiRequestBody {
+  required?: boolean
+  description?: string
+  content?: Record<string, OpenApiMediaType>
+}
+
+interface OpenApiResponse {
+  description?: string
+  content?: Record<string, OpenApiMediaType>
+  headers?: Record<string, { description?: string }>
 }
 
 interface EndpointPath {
@@ -233,12 +259,16 @@ interface EndpointPath {
   method: string
   summary?: string
   description?: string
-  parameters?: any[]
-  requestBody?: any
-  responses?: Record<string, any>
-  security?: any[]
+  parameters?: OpenApiParameter[]
+  requestBody?: OpenApiRequestBody
+  responses?: Record<string, OpenApiResponse>
+  security?: unknown[]
   tags?: string[]
   expandable?: boolean
+}
+
+function isObjectRecord(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === 'object' && !Array.isArray(value)
 }
 
 const loading = ref(true)
@@ -247,10 +277,7 @@ const apiSpec = ref<OpenAPISpec | null>(null)
 const expandedEndpoints = ref<Set<string>>(new Set())
 
 // Check if we're in development mode
-const isDevelopment = computed(() => {
-  const env = import.meta.env as any
-  return env.DEV || env.MODE === 'development'
-})
+const isDevelopment = computed(() => import.meta.env.DEV || import.meta.env.MODE === 'development')
 
 // Filter out authentication-related endpoints (only in production)
 const excludedPaths = computed(() => {
@@ -290,23 +317,25 @@ const loadApiSpec = async () => {
       throw new Error(`Failed to load API documentation: ${response.statusText}`)
     }
 
-    const spec = await response.json()
+    const spec = (await response.json()) as OpenAPISpec
 
     // Filter out excluded paths
     if (spec.paths) {
-      const filteredPaths: Record<string, any> = {}
+      const filteredPaths: Record<string, Record<string, unknown>> = {}
       for (const [path, methods] of Object.entries(spec.paths)) {
         if (!excludedPaths.value.some((excluded: string) => path.startsWith(excluded))) {
-          filteredPaths[path] = methods
+          if (isObjectRecord(methods)) {
+            filteredPaths[path] = methods as Record<string, unknown>
+          }
         }
       }
       spec.paths = filteredPaths
     }
 
     apiSpec.value = spec
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error('Failed to load API spec:', err)
-    error.value = err.message || 'Failed to load API documentation'
+    error.value = getErrorMessage(err) || 'Failed to load API documentation'
   } finally {
     loading.value = false
   }
@@ -318,10 +347,13 @@ const filteredTags = computed(() => {
   const tagSet = new Set<string>()
 
   for (const methods of Object.values(apiSpec.value.paths)) {
-    for (const endpoint of Object.values(methods as Record<string, any>)) {
-      if (endpoint.tags) {
-        for (const tag of endpoint.tags) {
-          if (!excludedTags.value.includes(tag)) {
+    if (!isObjectRecord(methods)) continue
+    for (const endpoint of Object.values(methods)) {
+      if (!isObjectRecord(endpoint)) continue
+      const tags = endpoint.tags
+      if (Array.isArray(tags)) {
+        for (const tag of tags) {
+          if (typeof tag === 'string' && !excludedTags.value.includes(tag)) {
             tagSet.add(tag)
           }
         }
@@ -338,18 +370,36 @@ const getPathsByTag = (tag: string): EndpointPath[] => {
   const endpoints: EndpointPath[] = []
 
   for (const [path, methods] of Object.entries(apiSpec.value.paths)) {
-    for (const [method, endpoint] of Object.entries(methods as Record<string, any>)) {
-      if (endpoint.tags && endpoint.tags.includes(tag)) {
+    if (!isObjectRecord(methods)) continue
+    for (const [method, endpointUnknown] of Object.entries(methods)) {
+      if (!isObjectRecord(endpointUnknown)) continue
+      const tags = endpointUnknown.tags
+      if (Array.isArray(tags) && tags.includes(tag)) {
+        const parametersRaw = endpointUnknown.parameters
+        const parameters = Array.isArray(parametersRaw)
+          ? (parametersRaw.filter(isObjectRecord) as OpenApiParameter[])
+          : undefined
+        const requestBody = isObjectRecord(endpointUnknown.requestBody)
+          ? (endpointUnknown.requestBody as OpenApiRequestBody)
+          : undefined
+        const responsesUnknown = endpointUnknown.responses
+        const responses = isObjectRecord(responsesUnknown)
+          ? (responsesUnknown as Record<string, OpenApiResponse>)
+          : undefined
         endpoints.push({
           path,
           method,
-          summary: endpoint.summary,
-          description: endpoint.description,
-          parameters: endpoint.parameters,
-          requestBody: endpoint.requestBody,
-          responses: endpoint.responses,
-          security: endpoint.security,
-          tags: endpoint.tags,
+          summary:
+            typeof endpointUnknown.summary === 'string' ? endpointUnknown.summary : undefined,
+          description:
+            typeof endpointUnknown.description === 'string'
+              ? endpointUnknown.description
+              : undefined,
+          parameters,
+          requestBody,
+          responses,
+          security: Array.isArray(endpointUnknown.security) ? endpointUnknown.security : undefined,
+          tags: tags.filter((t): t is string => typeof t === 'string'),
           expandable: true, // Always expandable
         })
       }
@@ -394,104 +444,91 @@ const getStatusCodeColorClass = (statusCode: string): string => {
   return 'bg-gray-500 text-white'
 }
 
-const getTypeString = (schema: any): string => {
-  if (!schema) return 'unknown'
-  if (schema.type) {
-    if (schema.type === 'array' && schema.items) {
-      return `array<${getTypeString(schema.items)}>`
+const getTypeString = (schema: unknown): string => {
+  if (!isObjectRecord(schema)) return 'unknown'
+  const typeVal = schema['type']
+  if (typeof typeVal === 'string') {
+    if (typeVal === 'array' && schema['items'] !== undefined) {
+      return `array<${getTypeString(schema['items'])}>`
     }
-    return schema.type
+    return typeVal
   }
-  if (schema.$ref) {
-    return schema.$ref.split('/').pop() || 'object'
+  const refVal = schema['$ref']
+  if (typeof refVal === 'string') {
+    return refVal.split('/').pop() || 'object'
   }
   return 'object'
 }
 
-const formatSchema = (schema: any): any => {
-  if (!schema) return {}
+const formatSchemaDetailed = (schema: unknown, apiSpec: OpenAPISpec | null): string => {
+  if (!isObjectRecord(schema)) return '{}'
 
-  if (schema.type === 'object' && schema.properties) {
-    const obj: any = {}
-    for (const [key, prop] of Object.entries(schema.properties as Record<string, any>)) {
-      obj[key] = formatSchema(prop)
-    }
-    return obj
-  }
-
-  if (schema.type === 'array' && schema.items) {
-    return [formatSchema(schema.items)]
-  }
-
-  if (schema.example !== undefined) {
-    return schema.example
-  }
-
-  if (schema.type === 'string') return 'string'
-  if (schema.type === 'number') return 0
-  if (schema.type === 'integer') return 0
-  if (schema.type === 'boolean') return true
-  if (schema.type === 'array') return []
-
-  return {}
-}
-
-const formatSchemaDetailed = (schema: any, apiSpec: OpenAPISpec | null): string => {
-  if (!schema) return '{}'
-
-  // Handle $ref references
-  if (schema.$ref) {
-    const refPath = schema.$ref.replace('#/components/schemas/', '')
-    if (apiSpec?.components?.schemas?.[refPath]) {
-      return formatSchemaDetailed(apiSpec.components.schemas[refPath], apiSpec)
+  const refVal = schema['$ref']
+  if (typeof refVal === 'string') {
+    const refPath = refVal.replace('#/components/schemas/', '')
+    const refSchema = apiSpec?.components?.schemas?.[refPath]
+    if (refSchema !== undefined) {
+      return formatSchemaDetailed(refSchema, apiSpec)
     }
     return `Reference: ${refPath}`
   }
 
-  // Handle allOf, anyOf, oneOf
-  if (schema.allOf) {
-    const combined = schema.allOf.map((s: any) => formatSchemaDetailed(s, apiSpec))
+  const allOf = schema['allOf']
+  if (Array.isArray(allOf)) {
+    const combined = allOf.map((item) => formatSchemaDetailed(item, apiSpec))
     return combined.join('\n\n--- Combined ---\n\n')
   }
 
-  if (schema.anyOf || schema.oneOf) {
-    const options = (schema.anyOf || schema.oneOf).map((s: any) => formatSchemaDetailed(s, apiSpec))
+  const anyOf = schema['anyOf']
+  const oneOf = schema['oneOf']
+  const union = Array.isArray(anyOf) ? anyOf : Array.isArray(oneOf) ? oneOf : null
+  if (union) {
+    const options = union.map((item) => formatSchemaDetailed(item, apiSpec))
     return options
       .map((opt: string, idx: number) => `Option ${idx + 1}:\n${opt}`)
       .join('\n\n--- OR ---\n\n')
   }
 
-  // Handle object with properties
-  if (schema.type === 'object' || schema.properties) {
-    const properties = schema.properties || {}
-    const required = schema.required || []
-    const result: any = {}
+  const schemaType = schema['type']
+  const properties = schema['properties']
+  if (schemaType === 'object' || isObjectRecord(properties)) {
+    const props = isObjectRecord(properties) ? properties : {}
+    const requiredRaw = schema['required']
+    const required = Array.isArray(requiredRaw)
+      ? requiredRaw.filter((k): k is string => typeof k === 'string')
+      : []
+    const result: Record<string, unknown> = {}
 
-    for (const [key, prop] of Object.entries(properties as Record<string, any>)) {
-      const propSchema = prop as any
-      let value: any
+    for (const [key, prop] of Object.entries(props)) {
+      if (!isObjectRecord(prop)) continue
+      const propSchema = prop
+      let value: unknown
 
-      if (propSchema.$ref) {
-        value = `Reference: ${propSchema.$ref.replace('#/components/schemas/', '')}`
-      } else if (propSchema.type === 'object' && propSchema.properties) {
+      const pRef = propSchema['$ref']
+      if (typeof pRef === 'string') {
+        value = `Reference: ${pRef.replace('#/components/schemas/', '')}`
+      } else if (propSchema['type'] === 'object' && isObjectRecord(propSchema['properties'])) {
         value = formatSchemaDetailed(propSchema, apiSpec)
-      } else if (propSchema.type === 'array') {
-        value = propSchema.items ? [formatSchemaDetailed(propSchema.items, apiSpec)] : []
-      } else if (propSchema.example !== undefined) {
-        value = propSchema.example
-      } else if (propSchema.type === 'string') {
-        value = propSchema.enum ? `enum: ${propSchema.enum.join(' | ')}` : 'string'
-      } else if (propSchema.type === 'number' || propSchema.type === 'integer') {
-        value = propSchema.example !== undefined ? propSchema.example : 0
-      } else if (propSchema.type === 'boolean') {
-        value = propSchema.example !== undefined ? propSchema.example : true
+      } else if (propSchema['type'] === 'array') {
+        const items = propSchema['items']
+        value = items !== undefined ? [formatSchemaDetailed(items, apiSpec)] : []
+      } else if (propSchema['example'] !== undefined) {
+        value = propSchema['example']
+      } else if (propSchema['type'] === 'string') {
+        const en = propSchema['enum']
+        value = Array.isArray(en) ? `enum: ${en.join(' | ')}` : 'string'
+      } else if (propSchema['type'] === 'number' || propSchema['type'] === 'integer') {
+        value = propSchema['example'] !== undefined ? propSchema['example'] : 0
+      } else if (propSchema['type'] === 'boolean') {
+        value = propSchema['example'] !== undefined ? propSchema['example'] : true
       } else {
-        value = propSchema.type || 'any'
+        value = propSchema['type'] ?? 'any'
       }
 
       result[key] = value
       if (required.includes(key)) {
-        result[`${key} (required)`] = result[key]
+        const reqKey = `${key} (required)`
+        result[reqKey] = result[key]
         delete result[key]
       }
     }
@@ -499,29 +536,28 @@ const formatSchemaDetailed = (schema: any, apiSpec: OpenAPISpec | null): string 
     return JSON.stringify(result, null, 2)
   }
 
-  // Handle array
-  if (schema.type === 'array' && schema.items) {
-    return JSON.stringify([formatSchemaDetailed(schema.items, apiSpec)], null, 2)
+  if (schemaType === 'array' && schema['items'] !== undefined) {
+    return JSON.stringify([formatSchemaDetailed(schema['items'], apiSpec)], null, 2)
   }
 
-  // Handle simple types
-  if (schema.example !== undefined) {
-    return JSON.stringify(schema.example, null, 2)
+  if (schema['example'] !== undefined) {
+    return JSON.stringify(schema['example'], null, 2)
   }
 
-  if (schema.type === 'string') {
-    if (schema.enum) {
-      return `enum: ${schema.enum.join(' | ')}`
+  if (schemaType === 'string') {
+    const en = schema['enum']
+    if (Array.isArray(en)) {
+      return `enum: ${en.map(String).join(' | ')}`
     }
     return 'string'
   }
 
-  if (schema.type === 'number' || schema.type === 'integer') {
-    return schema.example !== undefined ? String(schema.example) : '0'
+  if (schemaType === 'number' || schemaType === 'integer') {
+    return schema['example'] !== undefined ? String(schema['example']) : '0'
   }
 
-  if (schema.type === 'boolean') {
-    return schema.example !== undefined ? String(schema.example) : 'true'
+  if (schemaType === 'boolean') {
+    return schema['example'] !== undefined ? String(schema['example']) : 'true'
   }
 
   return JSON.stringify({}, null, 2)

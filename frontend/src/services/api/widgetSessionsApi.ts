@@ -2,6 +2,8 @@ import { httpClient } from './httpClient'
 
 export interface WidgetSession {
   id: number
+  /** Present when the API embeds the widget id on list/detail session rows */
+  widgetId?: string
   sessionId: string
   sessionIdDisplay?: string
   chatId: number | null

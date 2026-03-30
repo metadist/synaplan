@@ -159,6 +159,7 @@
 </template>
 
 <script setup lang="ts">
+import { getErrorMessage } from '@/utils/errorMessage'
 import { ref, computed, watch, toRef } from 'vue'
 import { getFileContent } from '@/services/filesService'
 import { useEscapeKey } from '@/composables/useEscapeKey'
@@ -221,8 +222,8 @@ const loadContent = async (fileId: number) => {
 
   try {
     fileData.value = await getFileContent(fileId)
-  } catch (err: any) {
-    error.value = err.message || 'Failed to load file content'
+  } catch (err: unknown) {
+    error.value = getErrorMessage(err) || 'Failed to load file content'
     showError('Failed to load file content')
   } finally {
     loading.value = false
@@ -246,7 +247,7 @@ const copyToClipboard = async () => {
   try {
     await navigator.clipboard.writeText(fileData.value.extracted_text)
     success('Text copied to clipboard')
-  } catch (err) {
+  } catch {
     showError('Failed to copy text')
   }
 }

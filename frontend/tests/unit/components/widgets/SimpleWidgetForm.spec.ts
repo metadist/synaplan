@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { mount, flushPromises } from '@vue/test-utils'
 import SimpleWidgetForm from '@/components/widgets/SimpleWidgetForm.vue'
+import type { Widget } from '@/services/api/widgetsApi'
 
 // Mock the widgetsApi
 vi.mock('@/services/api/widgetsApi', () => ({
@@ -112,7 +113,7 @@ describe('SimpleWidgetForm', () => {
       created: Date.now(),
       updated: Date.now(),
     }
-    ;(quickCreateWidget as any).mockResolvedValue(mockWidget)
+    vi.mocked(quickCreateWidget).mockResolvedValue(mockWidget as Widget)
 
     const wrapper = mount(SimpleWidgetForm, {
       global: {
@@ -148,7 +149,7 @@ describe('SimpleWidgetForm', () => {
       created: Date.now(),
       updated: Date.now(),
     }
-    ;(quickCreateWidget as any).mockResolvedValue(mockWidget)
+    vi.mocked(quickCreateWidget).mockResolvedValue(mockWidget as Widget)
 
     const wrapper = mount(SimpleWidgetForm, {
       global: {

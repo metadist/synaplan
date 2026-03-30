@@ -259,7 +259,7 @@ final readonly class ChatHandler implements MessageHandlerInterface
         $metadata = [
             'provider' => $response['provider'] ?? 'unknown',
             'model' => $response['model'] ?? 'unknown',
-            'tokens' => $response['usage'] ?? [],
+            'usage' => $response['usage'] ?? [],
         ];
 
         // Check for file generation format first (for OfficeM maker)
@@ -897,7 +897,7 @@ final readonly class ChatHandler implements MessageHandlerInterface
                 'provider' => $metadata['provider'] ?? 'unknown',
                 'model' => $metadata['model'] ?? 'unknown',
                 'model_id' => $modelId, // Include resolved model_id for storage
-                'tokens' => $metadata['usage'] ?? [],
+                'usage' => $metadata['usage'] ?? [],
                 'memories' => $loadedMemories, // Include memories used for this response
                 'feedbacks' => $loadedFeedbacks, // Include feedback examples used for this response
             ],

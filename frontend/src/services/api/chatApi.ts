@@ -3,6 +3,7 @@
  */
 
 import { httpClient, getApiBaseUrl } from './httpClient'
+import type { StreamUpdatePayload } from '@/types/chatStream'
 
 // SSE token configuration
 // Note: SSE_TOKEN_EXPIRY_MS = 5 * 60 * 1000 (5 minutes, backend setting)
@@ -37,7 +38,7 @@ async function refreshAccessToken(): Promise<boolean> {
       }
 
       return false
-    } catch (error) {
+    } catch {
       return false
     } finally {
       tokenRefreshPromise = null
@@ -149,25 +150,27 @@ export function clearSseToken(): void {
   cachedSseToken = null
 }
 
+export type { StreamUpdatePayload }
+
 export const chatApi = {
-  async sendMessage(userId: number, message: string, trackId?: number): Promise<any> {
+  async sendMessage(userId: number, message: string, trackId?: number): Promise<unknown> {
     // Mock data temporarily disabled - direct backend communication
-    return httpClient<any>('/api/v1/messages/send', {
+    return httpClient('/api/v1/messages/send', {
       method: 'POST',
       body: JSON.stringify({ userId, message, trackId }),
     })
   },
 
-  async getConversations(userId: number): Promise<any> {
+  async getConversations(userId: number): Promise<unknown> {
     // Mock data temporarily disabled - direct backend communication
-    return httpClient<any>(`/api/v1/conversations/${userId}`, {
+    return httpClient(`/api/v1/conversations/${userId}`, {
       method: 'GET',
     })
   },
 
-  async getMessages(conversationId: number): Promise<any> {
+  async getMessages(conversationId: number): Promise<unknown> {
     // Mock data temporarily disabled - direct backend communication
-    return httpClient<any>(`/api/v1/conversations/${conversationId}/messages`, {
+    return httpClient(`/api/v1/conversations/${conversationId}/messages`, {
       method: 'GET',
     })
   },
@@ -177,7 +180,7 @@ export const chatApi = {
     message: string
     trackId?: number
     chatId: number
-    onUpdate: (data: any) => void
+    onUpdate: (data: StreamUpdatePayload) => void
     includeReasoning?: boolean
     webSearch?: boolean
     modelId?: number
@@ -247,7 +250,7 @@ export const chatApi = {
           }
 
           try {
-            const data = JSON.parse(event.data)
+            const data = JSON.parse(event.data) as StreamUpdatePayload
             completionReceived = data.status === 'complete'
             opts.onUpdate(data)
 
@@ -315,12 +318,12 @@ export const chatApi = {
     }
   },
 
-  async getHistory(limit = 50, trackId?: number): Promise<any> {
+  async getHistory(limit = 50, trackId?: number): Promise<unknown> {
     const params = new URLSearchParams({ limit: limit.toString() })
     if (trackId) {
       params.append('trackId', trackId.toString())
     }
-    return httpClient<any>(`/api/v1/messages/history?${params}`, { method: 'GET' })
+    return httpClient(`/api/v1/messages/history?${params}`, { method: 'GET' })
   },
 
   async enhanceMessage(text: string): Promise<{ original: string; enhanced: string }> {
@@ -330,8 +333,8 @@ export const chatApi = {
     })
   },
 
-  async getChatMessages(chatId: number, offset = 0, limit = 50): Promise<any> {
-    return httpClient<any>(`/api/v1/chats/${chatId}/messages?offset=${offset}&limit=${limit}`, {
+  async getChatMessages(chatId: number, offset = 0, limit = 50): Promise<unknown> {
+    return httpClient(`/api/v1/chats/${chatId}/messages?offset=${offset}&limit=${limit}`, {
       method: 'GET',
     })
   },
@@ -357,7 +360,7 @@ export const chatApi = {
     const formData = new FormData()
     formData.append('file', file)
 
-    return httpClient<any>('/api/v1/messages/upload-file', {
+    return httpClient('/api/v1/messages/upload-file', {
       method: 'POST',
       body: formData,
       signal,
@@ -382,7 +385,7 @@ export const chatApi = {
     const formData = new FormData()
     formData.append('file', audioBlob, filename)
 
-    return httpClient<any>('/api/v1/messages/upload-file', {
+    return httpClient('/api/v1/messages/upload-file', {
       method: 'POST',
       body: formData,
     })

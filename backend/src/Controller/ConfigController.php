@@ -398,6 +398,8 @@ class ConfigController extends AbstractController
                 'tag' => strtoupper($model->getTag()),
                 'isSystemModel' => $model->isSystemModel(),
                 'features' => $model->getFeatures(),
+                'priceIn' => $model->getPriceIn(),
+                'priceOut' => $model->getPriceOut(),
             ];
         }
 

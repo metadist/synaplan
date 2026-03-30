@@ -54,6 +54,7 @@
 </template>
 
 <script setup lang="ts">
+import { getErrorMessage } from '@/utils/errorMessage'
 import { ref, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useConfigStore } from '@/stores/config'
@@ -78,7 +79,7 @@ onMounted(async () => {
     if (oidcConfig.success) {
       oidcAvailable.value = true
     }
-  } catch (e) {
+  } catch {
     // OIDC not configured - button will be hidden
     oidcAvailable.value = false
   }
@@ -91,8 +92,8 @@ const loginWithGoogle = () => {
 
     // Redirect to Google OAuth
     window.location.href = `${API_BASE_URL}/api/v1/auth/google/login`
-  } catch (e: any) {
-    error.value = e.message || t('auth.socialLoginError')
+  } catch (e: unknown) {
+    error.value = getErrorMessage(e) || t('auth.socialLoginError')
     loading.value = false
   }
 }
@@ -104,8 +105,8 @@ const loginWithGitHub = () => {
 
     // Redirect to GitHub OAuth
     window.location.href = `${API_BASE_URL}/api/v1/auth/github/login`
-  } catch (e: any) {
-    error.value = e.message || t('auth.socialLoginError')
+  } catch (e: unknown) {
+    error.value = getErrorMessage(e) || t('auth.socialLoginError')
     loading.value = false
   }
 }
@@ -117,8 +118,8 @@ const loginWithKeycloak = () => {
 
     // Redirect to Keycloak OIDC login (with PKCE)
     window.location.href = `${API_BASE_URL}/api/v1/auth/keycloak/login`
-  } catch (e: any) {
-    error.value = e.message || t('auth.socialLoginError')
+  } catch (e: unknown) {
+    error.value = getErrorMessage(e) || t('auth.socialLoginError')
     loading.value = false
   }
 }

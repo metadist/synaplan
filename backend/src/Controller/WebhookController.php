@@ -379,11 +379,11 @@ class WebhookController extends AbstractController
             $provider = $metadata['provider'] ?? null;
             $model = $metadata['model'] ?? null;
 
-            // Record usage with response content for token estimation
             $this->rateLimitService->recordUsage($user, 'MESSAGES', [
                 'provider' => $provider ?? 'unknown',
                 'model' => $model ?? 'unknown',
-                'tokens' => 0,
+                'usage' => $metadata['usage'] ?? [],
+                'model_id' => $metadata['model_id'] ?? null,
                 'latency' => (int) ($processingTime * 1000),
                 'source' => 'EMAIL',
                 'response_text' => $responseText,
@@ -764,11 +764,11 @@ class WebhookController extends AbstractController
             $responseContent = $response['content'] ?? '';
             $responseMeta = $response['metadata'] ?? [];
 
-            // Record usage with response content for token estimation
             $this->rateLimitService->recordUsage($user, 'MESSAGES', [
                 'provider' => $responseMeta['provider'] ?? 'unknown',
                 'model' => $responseMeta['model'] ?? 'unknown',
-                'tokens' => 0,
+                'usage' => $responseMeta['usage'] ?? [],
+                'model_id' => $responseMeta['model_id'] ?? null,
                 'source' => 'WEBHOOK',
                 'response_text' => $responseContent,
                 'input_text' => $message->getText(),

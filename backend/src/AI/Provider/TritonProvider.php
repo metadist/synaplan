@@ -171,7 +171,7 @@ class TritonProvider implements ChatProviderInterface, EmbeddingProviderInterfac
 
     // ==================== Chat ====================
 
-    public function chat(array $messages, array $options = []): string
+    public function chat(array $messages, array $options = []): array
     {
         if (!$this->client) {
             throw new ProviderException('Triton client not initialized', 'triton');
@@ -193,7 +193,18 @@ class TritonProvider implements ChatProviderInterface, EmbeddingProviderInterfac
             $prompt = $this->buildPrompt($messages);
             $answer = $this->collectInference($prompt, $model, $maxTokens);
 
-            return $answer;
+            $tokenEstimate = (int) ceil(strlen($answer) / 4);
+
+            return [
+                'content' => $answer,
+                'usage' => [
+                    'prompt_tokens' => 0,
+                    'completion_tokens' => $tokenEstimate,
+                    'total_tokens' => $tokenEstimate,
+                    'cached_tokens' => 0,
+                    'cache_creation_tokens' => 0,
+                ],
+            ];
         } catch (\Exception $e) {
             $this->logger->error('Triton chat error', [
                 'error' => $e->getMessage(),
@@ -204,7 +215,7 @@ class TritonProvider implements ChatProviderInterface, EmbeddingProviderInterfac
         }
     }
 
-    public function chatStream(array $messages, callable $callback, array $options = []): void
+    public function chatStream(array $messages, callable $callback, array $options = []): array
     {
         if (!$this->client) {
             throw new ProviderException('Triton client not initialized', 'triton');
@@ -348,6 +359,18 @@ class TritonProvider implements ChatProviderInterface, EmbeddingProviderInterfac
             if (empty($fullResponse)) {
                 throw new ProviderException('Triton streaming completed with no content', 'triton');
             }
+
+            $tokenEstimate = (int) ceil(strlen($fullResponse) / 4);
+
+            return [
+                'usage' => [
+                    'prompt_tokens' => 0,
+                    'completion_tokens' => $tokenEstimate,
+                    'total_tokens' => $tokenEstimate,
+                    'cached_tokens' => 0,
+                    'cache_creation_tokens' => 0,
+                ],
+            ];
         } catch (ProviderException $e) {
             throw $e;
         } catch (\Exception $e) {

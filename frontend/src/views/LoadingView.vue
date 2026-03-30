@@ -48,6 +48,8 @@ interface Props {
 }
 
 withDefaults(defineProps<Props>(), {
+  message: undefined,
+  subtitle: undefined,
   showProgress: false,
   progress: 0,
 })

@@ -104,7 +104,7 @@ class HuggingFaceProvider implements ChatProviderInterface, EmbeddingProviderInt
 
     // ==================== CHAT (OpenAI-compatible) ====================
 
-    public function chat(array $messages, array $options = []): string
+    public function chat(array $messages, array $options = []): array
     {
         if (!isset($options['model'])) {
             throw new ProviderException('Model must be specified in options', 'huggingface');
@@ -147,7 +147,18 @@ class HuggingFaceProvider implements ChatProviderInterface, EmbeddingProviderInt
 
             $data = $response->toArray();
 
-            return $data['choices'][0]['message']['content'] ?? '';
+            $usage = [
+                'prompt_tokens' => $data['usage']['prompt_tokens'] ?? 0,
+                'completion_tokens' => $data['usage']['completion_tokens'] ?? 0,
+                'total_tokens' => $data['usage']['total_tokens'] ?? 0,
+                'cached_tokens' => 0,
+                'cache_creation_tokens' => 0,
+            ];
+
+            return [
+                'content' => $data['choices'][0]['message']['content'] ?? '',
+                'usage' => $usage,
+            ];
         } catch (\Exception $e) {
             $this->logger->error('HuggingFace chat error', [
                 'error' => $e->getMessage(),
@@ -158,7 +169,7 @@ class HuggingFaceProvider implements ChatProviderInterface, EmbeddingProviderInt
         }
     }
 
-    public function chatStream(array $messages, callable $callback, array $options = []): void
+    public function chatStream(array $messages, callable $callback, array $options = []): array
     {
         if (!isset($options['model'])) {
             throw new ProviderException('Model must be specified in options', 'huggingface');
@@ -180,6 +191,7 @@ class HuggingFaceProvider implements ChatProviderInterface, EmbeddingProviderInt
                 'model' => $model,
                 'messages' => $messages,
                 'stream' => true,
+                'stream_options' => ['include_usage' => true],
             ];
 
             if (isset($options['max_tokens'])) {
@@ -201,8 +213,14 @@ class HuggingFaceProvider implements ChatProviderInterface, EmbeddingProviderInt
             ]);
 
             $chunkCount = 0;
+            $usage = [
+                'prompt_tokens' => 0,
+                'completion_tokens' => 0,
+                'total_tokens' => 0,
+                'cached_tokens' => 0,
+                'cache_creation_tokens' => 0,
+            ];
 
-            // Process Server-Sent Events stream
             foreach ($this->httpClient->stream($response) as $chunk) {
                 $content = $chunk->getContent();
 
@@ -223,6 +241,17 @@ class HuggingFaceProvider implements ChatProviderInterface, EmbeddingProviderInt
                         continue;
                     }
 
+                    // Capture usage from final chunk
+                    if (isset($json['usage'])) {
+                        $usage = [
+                            'prompt_tokens' => $json['usage']['prompt_tokens'] ?? 0,
+                            'completion_tokens' => $json['usage']['completion_tokens'] ?? 0,
+                            'total_tokens' => $json['usage']['total_tokens'] ?? 0,
+                            'cached_tokens' => 0,
+                            'cache_creation_tokens' => 0,
+                        ];
+                    }
+
                     $delta = $json['choices'][0]['delta']['content'] ?? '';
                     if (!empty($delta)) {
                         ++$chunkCount;
@@ -235,6 +264,8 @@ class HuggingFaceProvider implements ChatProviderInterface, EmbeddingProviderInt
                 'model' => $model,
                 'chunks' => $chunkCount,
             ]);
+
+            return ['usage' => $usage];
         } catch (\Exception $e) {
             $this->logger->error('HuggingFace streaming error', [
                 'error' => $e->getMessage(),

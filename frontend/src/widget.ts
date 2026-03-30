@@ -17,6 +17,7 @@
  * </script>
  */
 
+import type { App } from 'vue'
 import { detectApiUrl } from './widget-utils'
 
 interface WidgetConfig {
@@ -53,7 +54,7 @@ class SynaplanWidget {
   private config: WidgetConfig | null = null
   private button: HTMLElement | null = null
   private themeObserver: MutationObserver | null = null
-  private app: any = null
+  private app: App | null = null
   private container: HTMLElement | null = null
   private chatLoaded = false
   private chatLoading = false
@@ -466,7 +467,7 @@ class SynaplanWidget {
     // null = skip Vue loading (Vue is either bundled or already in page)
     if (vueUrl === null) {
       // Check if Vue is available as global (for legacy support)
-      if (!(window as any).Vue) {
+      if (!(window as Window & { Vue?: unknown }).Vue) {
         // Vue is not global, but that's okay - it might be bundled as ES module
         // The dynamic import will handle it
         console.debug('Vue.js not found as global, assuming ES module bundle')
@@ -475,7 +476,7 @@ class SynaplanWidget {
     }
 
     // Check if Vue is already loaded globally
-    if ((window as any).Vue) {
+    if ((window as Window & { Vue?: unknown }).Vue) {
       return
     }
 

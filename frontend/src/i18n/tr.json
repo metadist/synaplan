@@ -1367,7 +1367,9 @@
         "images": "Görseller",
         "videos": "Videolar",
         "audios": "Ses Dosyaları",
-        "file_analysis": "Dosya Analizi"
+        "file_analysis": "Dosya Analizi",
+        "sorting": "Sınıflandırma",
+        "search_query": "Arama Sorgusu"
       },
       "sources": {
         "whatsapp": "WhatsApp",
@@ -1919,5 +1921,14 @@
   },
   "system": {
     "missingApiKeys": "Bazı API anahtarları eksik — şu sağlayıcılar devre dışı: {providers}"
+  },
+  "models": {
+    "loading": "Modeller yükleniyor...",
+    "costTier": {
+      "free": "Ücretsiz",
+      "low": "Low Cost",
+      "mid": "Mid Cost",
+      "high": "High Cost"
+    }
   }
 }

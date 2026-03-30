@@ -186,6 +186,7 @@
 </template>
 
 <script setup lang="ts">
+import { getErrorMessage } from '@/utils/errorMessage'
 import { ref, computed, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
@@ -208,6 +209,9 @@ import type {
   MailConfig,
   Department,
   SavedMailHandler,
+  SmtpConfig,
+  EmailFilterConfig,
+  CreateHandlerRequest,
 } from '@/services/api/inboundEmailHandlersApi'
 import { inboundEmailHandlersApi } from '@/services/api/inboundEmailHandlersApi'
 import * as summaryService from '@/services/summaryService'
@@ -293,9 +297,9 @@ const loadMailHandlers = async () => {
   isLoadingMailHandlers.value = true
   try {
     mailHandlers.value = await inboundEmailHandlersApi.list()
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Failed to load mail handlers:', error)
-    showError(error.message || 'Failed to load mail handlers')
+    showError(getErrorMessage(error) || 'Failed to load mail handlers')
   } finally {
     isLoadingMailHandlers.value = false
   }
@@ -456,9 +460,9 @@ const handleGenerateSummary = async (text: string, config: SummaryConfig) => {
     } else {
       showError(response.error || 'Failed to generate summary')
     }
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error('Summary generation error:', err)
-    showError(err.message || 'Failed to generate summary')
+    showError(getErrorMessage(err) || 'Failed to generate summary')
   } finally {
     isGeneratingSummary.value = false
   }
@@ -495,8 +499,8 @@ const saveMailHandler = async (
   name: string,
   config: MailConfig,
   departments: Department[],
-  smtpConfig: any,
-  emailFilter: any,
+  smtpConfig: SmtpConfig,
+  emailFilter: EmailFilterConfig,
   isActive: boolean
 ) => {
   try {
@@ -511,7 +515,11 @@ const saveMailHandler = async (
       return
     }
 
-    const payload: any = {
+    const payload: Omit<CreateHandlerRequest, 'password' | 'smtpPassword'> & {
+      password?: string
+      smtpPassword?: string
+      status?: 'active' | 'inactive'
+    } = {
       name,
       mailServer: config.mailServer,
       port: config.port,
@@ -521,7 +529,6 @@ const saveMailHandler = async (
       checkInterval: config.checkInterval,
       deleteAfter: config.deleteAfter,
       departments,
-      status: isActive ? 'active' : 'inactive',
       // SMTP credentials (required)
       smtpServer: smtpConfig.smtpServer,
       smtpPort: smtpConfig.smtpPort,
@@ -560,7 +567,8 @@ const saveMailHandler = async (
     let savedHandlerId = currentMailHandlerId.value
 
     if (currentMailHandlerId.value) {
-      // Update existing
+      // Status is only relevant for updates (backend ignores it on create)
+      payload.status = isActive ? 'active' : 'inactive'
       const updated = await inboundEmailHandlersApi.update(currentMailHandlerId.value, payload)
 
       const index = mailHandlers.value.findIndex((h) => h.id === currentMailHandlerId.value)
@@ -570,7 +578,7 @@ const saveMailHandler = async (
       success('Mail handler updated successfully!')
     } else {
       // Create new
-      const newHandler = await inboundEmailHandlersApi.create(payload)
+      const newHandler = await inboundEmailHandlersApi.create(payload as CreateHandlerRequest)
       mailHandlers.value.push(newHandler)
       savedHandlerId = newHandler.id
       success('Mail handler created successfully!')
@@ -586,15 +594,15 @@ const saveMailHandler = async (
       } else {
         showWarning(t('mail.connectionTestWarning') + ': ' + testResult.message)
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Connection test failed:', error)
       showWarning(t('mail.handlerSavedTestFailed'))
     }
 
     cancelMailHandlerEdit()
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Failed to save mail handler:', error)
-    showError(error.message || 'Failed to save mail handler')
+    showError(getErrorMessage(error) || 'Failed to save mail handler')
   }
 }
 
@@ -617,9 +625,9 @@ const deleteMailHandler = async (handlerId: string) => {
     await inboundEmailHandlersApi.delete(handlerId)
     mailHandlers.value = mailHandlers.value.filter((h) => h.id !== handlerId)
     success(t('mail.handlerDeleted'))
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Failed to delete mail handler:', error)
-    showError(error.message || t('mail.deleteFailed'))
+    showError(getErrorMessage(error) || t('mail.deleteFailed'))
   }
 }
 
@@ -642,9 +650,9 @@ const bulkUpdateHandlerStatus = async (handlerIds: string[], status: 'active' | 
     })
 
     success(t('mail.bulkUpdateSuccess', { count: handlerIds.length }))
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Failed to bulk update handlers:', error)
-    showError(error.message || t('mail.bulkUpdateFailed'))
+    showError(getErrorMessage(error) || t('mail.bulkUpdateFailed'))
   }
 }
 
@@ -668,9 +676,9 @@ const bulkDeleteHandlers = async (handlerIds: string[]) => {
     mailHandlers.value = mailHandlers.value.filter((h) => !handlerIds.includes(h.id))
 
     success(t('mail.bulkDeleteSuccess', { count: handlerIds.length }))
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Failed to bulk delete handlers:', error)
-    showError(error.message || t('mail.bulkDeleteFailed'))
+    showError(getErrorMessage(error) || t('mail.bulkDeleteFailed'))
   }
 }
 </script>

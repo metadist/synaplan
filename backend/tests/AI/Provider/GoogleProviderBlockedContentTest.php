@@ -124,7 +124,8 @@ class GoogleProviderBlockedContentTest extends TestCase
         $provider = $this->createProviderWithMockResponse($data);
 
         $response = $provider->chat([['role' => 'user', 'content' => 'test']], ['model' => 'gemini-1.5-flash']);
-        $this->assertSame('Normal response', $response);
+        $this->assertSame('Normal response', $response['content']);
+        $this->assertArrayHasKey('usage', $response);
     }
 
     public function testMaxTokensFinishReasonDoesNotThrow(): void
@@ -139,7 +140,7 @@ class GoogleProviderBlockedContentTest extends TestCase
         $provider = $this->createProviderWithMockResponse($data);
 
         $response = $provider->chat([['role' => 'user', 'content' => 'test']], ['model' => 'gemini-1.5-flash']);
-        $this->assertSame('Truncated...', $response);
+        $this->assertSame('Truncated...', $response['content']);
     }
 
     public function testNoCandidatesAndNoBlockReasonDoesNotThrow(): void
@@ -149,7 +150,7 @@ class GoogleProviderBlockedContentTest extends TestCase
         $provider = $this->createProviderWithMockResponse($data);
 
         $response = $provider->chat([['role' => 'user', 'content' => 'test']], ['model' => 'gemini-1.5-flash']);
-        $this->assertSame('', $response);
+        $this->assertSame('', $response['content']);
     }
 
     public function testNullFinishReasonDoesNotThrow(): void
@@ -163,7 +164,7 @@ class GoogleProviderBlockedContentTest extends TestCase
         $provider = $this->createProviderWithMockResponse($data);
 
         $response = $provider->chat([['role' => 'user', 'content' => 'test']], ['model' => 'gemini-1.5-flash']);
-        $this->assertSame('Normal response', $response);
+        $this->assertSame('Normal response', $response['content']);
     }
 
     public function testBlockedResponsePreservesTextResponse(): void

@@ -556,7 +556,7 @@ async function handleEasySubmit() {
 
     similarMemories.value = response.similarMemories || []
     step.value = 'preview'
-  } catch (err) {
+  } catch {
     // No fallback - show error and stay on input step
     error(t('memories.form.aiUnavailable'))
   } finally {
