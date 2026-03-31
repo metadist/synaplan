@@ -90,7 +90,7 @@ final readonly class MessageForwardingService
                     'error' => $result['error'] ?? 'Unknown error',
                 ]);
             }
-        } catch (\Exception $e) {
+        } catch (\Throwable $e) {
             $this->logger->error('Exception while forwarding message to WhatsApp', [
                 'chat_id' => $chatId,
                 'to' => $toPhone,
