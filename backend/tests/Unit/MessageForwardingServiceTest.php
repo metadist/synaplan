@@ -8,7 +8,9 @@ use App\Entity\Chat;
 use App\Entity\Message;
 use App\Repository\MessageRepository;
 use App\Service\Message\MessageForwardingService;
+use App\Service\UserMemoryService;
 use App\Service\WhatsAppService;
+use Doctrine\ORM\EntityManagerInterface;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
@@ -17,6 +19,8 @@ class MessageForwardingServiceTest extends TestCase
 {
     private WhatsAppService&MockObject $whatsAppService;
     private MessageRepository&MockObject $messageRepository;
+    private UserMemoryService&MockObject $memoryService;
+    private EntityManagerInterface&MockObject $em;
     private LoggerInterface&MockObject $logger;
     private MessageForwardingService $service;
 
@@ -24,11 +28,18 @@ class MessageForwardingServiceTest extends TestCase
     {
         $this->whatsAppService = $this->createMock(WhatsAppService::class);
         $this->messageRepository = $this->createMock(MessageRepository::class);
+        $this->memoryService = $this->createMock(UserMemoryService::class);
+        $this->em = $this->createMock(EntityManagerInterface::class);
         $this->logger = $this->createMock(LoggerInterface::class);
+
+        $this->memoryService->method('resolveMemoryTags')
+            ->willReturnArgument(0);
 
         $this->service = new MessageForwardingService(
             $this->whatsAppService,
             $this->messageRepository,
+            $this->memoryService,
+            $this->em,
             $this->logger,
         );
     }

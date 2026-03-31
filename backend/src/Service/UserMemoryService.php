@@ -598,6 +598,40 @@ final readonly class UserMemoryService
         }
     }
 
+    /**
+     * Replace [Memory:ID] tags in text with their resolved values.
+     *
+     * Used before forwarding AI responses to external channels (WhatsApp, Email)
+     * where the frontend badge renderer is not available.
+     * Unresolvable tags are silently removed so external users never see raw IDs.
+     */
+    public function resolveMemoryTags(string $text, User $user): string
+    {
+        if (!str_contains($text, '[Memory:')) {
+            return $text;
+        }
+
+        return (string) preg_replace_callback(
+            '/\[Memory\s*:\s*(\d+)\.{0,3}\]/i',
+            function (array $matches) use ($user): string {
+                $memoryId = (int) $matches[1];
+                $memory = $this->getMemoryById($memoryId, $user);
+
+                if ($memory) {
+                    return $memory->value;
+                }
+
+                $this->logger->debug('Memory tag could not be resolved, removing', [
+                    'memory_id' => $memoryId,
+                    'user_id' => $user->getId(),
+                ]);
+
+                return '';
+            },
+            $text
+        );
+    }
+
     private function isHiddenCategory(string $category): bool
     {
         return in_array($category, self::HIDDEN_CATEGORIES, true);

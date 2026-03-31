@@ -66,6 +66,7 @@ final class WhatsAppService
         private CacheInterface $cache,
         private LockFactory $lockFactory,
         private EmailChatService $emailChatService,
+        private UserMemoryService $memoryService,
         string $whatsappAccessToken,
         bool $whatsappEnabled,
         private string $uploadsDir,
@@ -733,6 +734,7 @@ final class WhatsAppService
         }
 
         $responseText = $result['response']['content'] ?? $collectedResponse;
+        $responseText = $this->memoryService->resolveMemoryTags($responseText, $user);
         $metadata = $result['response']['metadata'] ?? [];
         $fileData = $metadata['file'] ?? null;
 
