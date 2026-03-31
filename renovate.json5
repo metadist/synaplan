@@ -5,11 +5,11 @@
     "docker:enableMajor",
     ":separateMultipleMajorReleases"
   ],
+  "enabled": true,
   "timezone": "Europe/Berlin",
-  "schedule": ["before 9am on monday"],
   "prConcurrentLimit": 6,
   "prHourlyLimit": 2,
-  "prCreation": "not-pending",
+  "prCreation": "immediate",
   "dependencyDashboard": true,
   "labels": ["dependencies"],
   "packageRules": [
