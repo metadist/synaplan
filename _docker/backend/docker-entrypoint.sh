@@ -10,6 +10,16 @@ if [ ! -f /var/www/backend/.env ]; then
     touch /var/www/backend/.env
 fi
 
+# Fix .env ownership to match the parent directory (host user's UID/GID on bind-mounts).
+# Runs on every startup to repair root-owned files from previous container runs.
+EXPECTED_OWNER="$(stat -c %u:%g /var/www/backend 2>/dev/null)" || true
+if [ -n "$EXPECTED_OWNER" ]; then
+    CURRENT_OWNER="$(stat -c %u:%g /var/www/backend/.env 2>/dev/null)" || true
+    if [ "$CURRENT_OWNER" != "$EXPECTED_OWNER" ]; then
+        chown "$EXPECTED_OWNER" /var/www/backend/.env 2>/dev/null || true
+    fi
+fi
+
 # Source .env file as defaults (existing env vars from docker-compose take precedence)
 if [ -f /var/www/backend/.env ]; then
     echo "📄 Loading defaults from .env file (existing env vars take precedence)..."
