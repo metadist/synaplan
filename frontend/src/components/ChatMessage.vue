@@ -535,7 +535,9 @@
               >
                 <Icon :icon="getModelTypeIcon" class="w-3.5 h-3.5 flex-shrink-0" />
                 <span class="hidden sm:inline flex-shrink-0">{{ getModelTypeLabel }}:</span>
-                <span class="font-semibold truncate">{{ shortenModel(aiModels.chat.model) }}</span>
+                <span class="font-semibold truncate min-w-0">{{
+                  shortenModel(aiModels.chat.model)
+                }}</span>
               </button>
 
               <!-- Sorting Model Badge -->
@@ -551,7 +553,7 @@
                 <span class="hidden sm:inline flex-shrink-0"
                   >{{ $t('config.aiModels.sorting') }}:</span
                 >
-                <span class="font-semibold truncate">{{
+                <span class="font-semibold truncate min-w-0">{{
                   shortenModel(aiModels.sorting.model)
                 }}</span>
               </button>
