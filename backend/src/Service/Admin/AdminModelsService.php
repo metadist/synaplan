@@ -66,7 +66,8 @@ final readonly class AdminModelsService
             ->setPriceOut((float) ($data['priceOut'] ?? 0.0))
             ->setOutUnit((string) ($data['outUnit'] ?? 'per1M'))
             ->setQuality((float) ($data['quality'] ?? 7.0))
-            ->setRating((float) ($data['rating'] ?? 0.5));
+            ->setRating((float) ($data['rating'] ?? 0.5))
+            ->setShowWhenFree((int) ($data['showWhenFree'] ?? 0));
 
         if (array_key_exists('description', $data)) {
             $model->setDescription(null !== $data['description'] ? (string) $data['description'] : null);
@@ -153,6 +154,9 @@ final readonly class AdminModelsService
         if (array_key_exists('json', $data) && is_array($data['json'])) {
             $model->setJson($data['json']);
         }
+        if (array_key_exists('showWhenFree', $data)) {
+            $model->setShowWhenFree((int) $data['showWhenFree']);
+        }
 
         $this->em->flush();
 
@@ -230,6 +234,7 @@ final readonly class AdminModelsService
             'description' => $model->getDescription(),
             'json' => $model->getJson(),
             'isSystemModel' => $model->isSystemModel(),
+            'showWhenFree' => $model->getShowWhenFree(),
         ];
     }
 

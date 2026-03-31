@@ -384,9 +384,12 @@ class ConfigController extends AbstractController
             ['quality' => 'DESC', 'rating' => 'DESC']
         );
 
-        // Build model list with tag information
+        // Build model list with tag information, excluding free models without override
         $modelList = [];
         foreach ($models as $model) {
+            if ($model->isHiddenBecauseFree()) {
+                continue;
+            }
             $modelList[] = [
                 'id' => $model->getId(),
                 'service' => $model->getService(),

@@ -9,6 +9,7 @@ use App\Entity\Prompt;
 use App\Entity\User;
 use App\Service\File\FileHelper;
 use App\Service\File\UserUploadPathBuilder;
+use App\Service\Message\MessageForwardingService;
 use App\Service\Message\MessageProcessor;
 use App\Service\ModelConfigService;
 use App\Service\PromptService;
@@ -42,6 +43,7 @@ class StreamController extends AbstractController
         private string $uploadDir,
         private UserUploadPathBuilder $userUploadPathBuilder,
         private PromptService $promptService,
+        private MessageForwardingService $messageForwardingService,
     ) {
     }
 
@@ -1042,6 +1044,10 @@ class StreamController extends AbstractController
                 $chat->updateTimestamp();
 
                 $this->em->flush();
+
+                if (!$isWidgetMode) {
+                    $this->messageForwardingService->forwardIfNeeded($chat, $finalText);
+                }
 
                 $this->rateLimitService->recordUsage($user, 'MESSAGES', [
                     'provider' => $response['metadata']['provider'] ?? 'unknown',

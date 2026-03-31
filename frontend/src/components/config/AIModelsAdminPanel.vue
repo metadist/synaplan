@@ -176,7 +176,7 @@
       </div>
 
       <div v-else class="overflow-x-auto scroll-thin">
-        <table class="w-full min-w-[980px]">
+        <table class="w-full min-w-[1060px]">
           <thead>
             <tr class="border-b-2 border-light-border/30 dark:border-dark-border/20">
               <th
@@ -213,6 +213,12 @@
                 class="text-left py-3 px-2 txt-secondary text-xs font-semibold uppercase tracking-wide"
               >
                 {{ t('config.aiModels.admin.active') }}
+              </th>
+              <th
+                class="text-left py-3 px-2 txt-secondary text-xs font-semibold uppercase tracking-wide"
+                :title="t('config.aiModels.admin.showWhenFreeTooltip')"
+              >
+                {{ t('config.aiModels.admin.showWhenFree') }}
               </th>
               <th
                 class="text-left py-3 px-2 txt-secondary text-xs font-semibold uppercase tracking-wide"
@@ -299,6 +305,15 @@
                     <option :value="1">1</option>
                   </select>
                 </td>
+                <td class="py-2 px-2 text-center">
+                  <input
+                    v-model="editForm.showWhenFree"
+                    type="checkbox"
+                    :true-value="1"
+                    :false-value="0"
+                    class="rounded border-light-border/30 dark:border-dark-border/20 text-[var(--brand)] focus:ring-[var(--brand)]"
+                  />
+                </td>
                 <td class="py-2 px-2">
                   <input
                     v-model.number="editForm.priceIn"
@@ -371,6 +386,17 @@
                     class="inline-block w-2 h-2 rounded-full"
                     :class="m.active ? 'bg-green-500' : 'bg-gray-400'"
                     :title="m.active ? '1' : '0'"
+                  />
+                </td>
+                <td class="py-2 px-2 text-center">
+                  <span
+                    class="inline-block w-2 h-2 rounded-full"
+                    :class="m.showWhenFree ? 'bg-amber-500' : 'bg-gray-400'"
+                    :title="
+                      m.showWhenFree
+                        ? t('config.aiModels.admin.showWhenFreeOn')
+                        : t('config.aiModels.admin.showWhenFreeOff')
+                    "
                   />
                 </td>
                 <td class="py-2 px-2 txt-secondary text-xs tabular-nums">{{ m.priceIn }}</td>
@@ -468,6 +494,7 @@ interface EditForm {
   name: string
   selectable: number
   active: number
+  showWhenFree: number
   priceIn: number
   inUnit: string
   priceOut: number
@@ -509,6 +536,7 @@ const editForm = ref<EditForm>({
   name: '',
   selectable: 1,
   active: 1,
+  showWhenFree: 0,
   priceIn: 0,
   inUnit: 'per1M',
   priceOut: 0,
@@ -565,6 +593,7 @@ function startEdit(m: AdminModel) {
     name: m.name,
     selectable: m.selectable,
     active: m.active,
+    showWhenFree: m.showWhenFree,
     priceIn: m.priceIn,
     inUnit: m.inUnit,
     priceOut: m.priceOut,
@@ -677,6 +706,7 @@ async function saveEditingModel(id: number) {
       name: form.name,
       selectable: form.selectable,
       active: form.active,
+      showWhenFree: form.showWhenFree,
       priceIn: form.priceIn,
       inUnit: form.inUnit,
       priceOut: form.priceOut,

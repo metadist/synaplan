@@ -55,6 +55,10 @@ class Model
     #[ORM\Column(name: 'BACTIVE', type: 'integer', options: ['default' => 1])]
     private int $active = 1;
 
+    /** @var int Override to show this model in selection even when both prices are 0 */
+    #[ORM\Column(name: 'BSHOWWHENFREE', type: 'integer', options: ['default' => 0])]
+    private int $showWhenFree = 0;
+
     #[ORM\Column(name: 'BDESCRIPTION', type: 'text', nullable: true)]
     private ?string $description = null;
 
@@ -232,6 +236,29 @@ class Model
         $this->active = $active;
 
         return $this;
+    }
+
+    public function getShowWhenFree(): int
+    {
+        return $this->showWhenFree;
+    }
+
+    public function setShowWhenFree(int $showWhenFree): self
+    {
+        $this->showWhenFree = $showWhenFree;
+
+        return $this;
+    }
+
+    /**
+     * Whether this model should be hidden from user-facing selection lists.
+     *
+     * A model is considered "free" when both priceIn and priceOut are 0.
+     * Free models are hidden unless the admin explicitly enables showWhenFree.
+     */
+    public function isHiddenBecauseFree(): bool
+    {
+        return 0.0 === $this->priceIn && 0.0 === $this->priceOut && 0 === $this->showWhenFree;
     }
 
     public function getDescription(): ?string
