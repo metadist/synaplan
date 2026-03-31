@@ -617,8 +617,10 @@ final class WhatsAppService
         $chat = $this->emailChatService->findOrCreateWhatsAppChat($user, $dto->from);
 
         // 5. Create database record
-        // Always use the chat owner's userId for message ownership so that
-        // findChatHistory returns ALL messages in the chat consistently.
+        // Always use the chat owner's userId so message.userId stays aligned
+        // with chat.userId. This is required for ownership checks in
+        // findChatHistory (which JOINs on chat.userId) and for consistent
+        // authorization across all queries that filter by userId.
         // The effectiveUserId is only needed for service-level operations
         // (media download paths, TTS generation) below.
         $message = new Message();

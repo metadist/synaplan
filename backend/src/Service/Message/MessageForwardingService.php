@@ -59,10 +59,23 @@ final readonly class MessageForwardingService
 
         $user = $this->em->getRepository(User::class)->find($chat->getUserId());
         if (!$user) {
-            return $text;
+            $this->logger->warning('Unable to resolve memory tags: chat owner user not found', [
+                'chat_id' => $chat->getId(),
+                'user_id' => $chat->getUserId(),
+            ]);
+
+            return self::stripMemoryTags($text);
         }
 
         return $this->memoryService->resolveMemoryTags($text, $user);
+    }
+
+    /**
+     * Strip [Memory:ID] tags from text when they cannot be safely resolved.
+     */
+    private static function stripMemoryTags(string $text): string
+    {
+        return (string) preg_replace('/\[Memory\s*:\s*\d+\.{0,3}\]/i', '', $text);
     }
 
     private function forwardToWhatsApp(Chat $chat, string $text): void

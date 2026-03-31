@@ -604,6 +604,8 @@ final readonly class UserMemoryService
      * Used before forwarding AI responses to external channels (WhatsApp, Email)
      * where the frontend badge renderer is not available.
      * Unresolvable tags are silently removed so external users never see raw IDs.
+     *
+     * Unique IDs are resolved once and cached within the call to avoid N+1 lookups.
      */
     public function resolveMemoryTags(string $text, User $user): string
     {
@@ -611,23 +613,28 @@ final readonly class UserMemoryService
             return $text;
         }
 
-        return (string) preg_replace_callback(
-            '/\[Memory\s*:\s*(\d+)\.{0,3}\]/i',
-            function (array $matches) use ($user): string {
-                $memoryId = (int) $matches[1];
-                $memory = $this->getMemoryById($memoryId, $user);
+        // Extract all unique memory IDs to avoid repeated Qdrant lookups
+        preg_match_all('/\[Memory\s*:\s*(\d+)\.{0,3}\]/i', $text, $allMatches);
+        $uniqueIds = array_unique(array_map('intval', $allMatches[1]));
 
-                if ($memory) {
-                    return $memory->value;
-                }
-
+        /** @var array<int, string> */
+        $resolved = [];
+        foreach ($uniqueIds as $memoryId) {
+            $memory = $this->getMemoryById($memoryId, $user);
+            if ($memory) {
+                $resolved[$memoryId] = $memory->value;
+            } else {
                 $this->logger->debug('Memory tag could not be resolved, removing', [
                     'memory_id' => $memoryId,
                     'user_id' => $user->getId(),
                 ]);
+                $resolved[$memoryId] = '';
+            }
+        }
 
-                return '';
-            },
+        return (string) preg_replace_callback(
+            '/\[Memory\s*:\s*(\d+)\.{0,3}\]/i',
+            fn (array $matches): string => $resolved[(int) $matches[1]] ?? '',
             $text
         );
     }

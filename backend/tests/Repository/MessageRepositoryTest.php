@@ -266,9 +266,9 @@ class MessageRepositoryTest extends KernelTestCase
         $incomingMsg = new Message();
         $incomingMsg->setUserId($whatsappSystemUserId);
         $incomingMsg->setChat($this->testChat);
-        $incomingMsg->setTrackingId(time());
+        $incomingMsg->setTrackingId(1000001);
         $incomingMsg->setUnixTimestamp(100);
-        $incomingMsg->setDateTime(date('YmdHis'));
+        $incomingMsg->setDateTime('20260101120000');
         $incomingMsg->setText('User question via WhatsApp');
         $incomingMsg->setDirection('IN');
         $incomingMsg->setProviderIndex('WHATSAPP');
@@ -281,9 +281,9 @@ class MessageRepositoryTest extends KernelTestCase
         $outgoingMsg = new Message();
         $outgoingMsg->setUserId($this->testUser->getId());
         $outgoingMsg->setChat($this->testChat);
-        $outgoingMsg->setTrackingId(time());
+        $outgoingMsg->setTrackingId(1000002);
         $outgoingMsg->setUnixTimestamp(200);
-        $outgoingMsg->setDateTime(date('YmdHis'));
+        $outgoingMsg->setDateTime('20260101120100');
         $outgoingMsg->setText('AI response');
         $outgoingMsg->setDirection('OUT');
         $outgoingMsg->setProviderIndex('WHATSAPP');
