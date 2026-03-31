@@ -8,7 +8,7 @@
   "enabled": true,
   "timezone": "Europe/Berlin",
   "prConcurrentLimit": 6,
-  "prHourlyLimit": 4,
+  "prHourlyLimit": 2,
   "prCreation": "immediate",
   "dependencyDashboard": true,
   "labels": ["dependencies"],
