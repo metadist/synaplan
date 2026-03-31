@@ -148,9 +148,6 @@ class MessageForwardingServiceTest extends TestCase
         $this->service->forwardIfNeeded($chat, 'Hello');
     }
 
-    /**
-     * @return Chat&MockObject
-     */
     private function createChatWithSource(string $source): Chat&MockObject
     {
         $chat = $this->createMock(Chat::class);
@@ -160,9 +157,6 @@ class MessageForwardingServiceTest extends TestCase
         return $chat;
     }
 
-    /**
-     * @return Message&MockObject
-     */
     private function createInboundMessageWithMeta(?string $fromPhone, ?string $phoneNumberId): Message&MockObject
     {
         $message = $this->createMock(Message::class);
