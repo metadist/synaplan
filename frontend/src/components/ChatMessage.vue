@@ -507,7 +507,7 @@
           ]"
         >
           <!-- Left: AI Model Badges + timestamp -->
-          <div class="flex items-center gap-1 min-w-0 flex-wrap">
+          <div class="flex items-center gap-1 min-w-0">
             <!-- Topic Badge (assistant only) - Ultra compact + Clickable -->
             <template v-if="role === 'assistant' && topic">
               <router-link
@@ -528,28 +528,32 @@
               <button
                 v-if="aiModels.chat"
                 type="button"
-                class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-xs font-medium bg-brand-alpha-light hover:bg-brand-alpha transition-colors cursor-pointer"
+                class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-xs font-medium bg-brand-alpha-light hover:bg-brand-alpha transition-colors cursor-pointer min-w-0"
                 :title="getModelTypeTitle"
                 data-testid="btn-message-model-chat"
                 @click="showModelDetails('chat')"
               >
-                <Icon :icon="getModelTypeIcon" class="w-3.5 h-3.5" />
-                <span class="hidden sm:inline">{{ getModelTypeLabel }}:</span>
-                <span class="font-semibold">{{ shortenModel(aiModels.chat.model) }}</span>
+                <Icon :icon="getModelTypeIcon" class="w-3.5 h-3.5 flex-shrink-0" />
+                <span class="hidden sm:inline flex-shrink-0">{{ getModelTypeLabel }}:</span>
+                <span class="font-semibold truncate">{{ shortenModel(aiModels.chat.model) }}</span>
               </button>
 
               <!-- Sorting Model Badge -->
               <button
                 v-if="aiModels.sorting"
                 type="button"
-                class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-xs font-medium bg-purple-500/10 hover:bg-purple-500/20 text-purple-600 dark:text-purple-400 transition-colors cursor-pointer"
+                class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-xs font-medium bg-purple-500/10 hover:bg-purple-500/20 text-purple-600 dark:text-purple-400 transition-colors cursor-pointer min-w-0"
                 :title="`${$t('config.aiModels.messageClassification')}: ${aiModels.sorting.model}`"
                 data-testid="btn-message-model-sorting"
                 @click="showModelDetails('sorting')"
               >
-                <Icon icon="mdi:sort" class="w-3.5 h-3.5" />
-                <span class="hidden sm:inline">{{ $t('config.aiModels.sorting') }}:</span>
-                <span class="font-semibold">{{ shortenModel(aiModels.sorting.model) }}</span>
+                <Icon icon="mdi:sort" class="w-3.5 h-3.5 flex-shrink-0" />
+                <span class="hidden sm:inline flex-shrink-0"
+                  >{{ $t('config.aiModels.sorting') }}:</span
+                >
+                <span class="font-semibold truncate">{{
+                  shortenModel(aiModels.sorting.model)
+                }}</span>
               </button>
 
               <span
@@ -559,7 +563,13 @@
               >
             </template>
 
-            <div :class="['text-xs truncate', role === 'user' ? 'text-white/80' : 'txt-secondary']">
+            <div
+              :class="[
+                'text-xs',
+                aiModels ? 'flex-shrink-0 whitespace-nowrap' : 'truncate',
+                role === 'user' ? 'text-white/80' : 'txt-secondary',
+              ]"
+            >
               <!-- Hide model info during processing states (classifying, analyzing, etc.) -->
               <template
                 v-if="role === 'assistant' && modelLabel && provider && !aiModels && !isProcessing"

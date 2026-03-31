@@ -306,6 +306,29 @@ class MessageRepository extends ServiceEntityRepository
     }
 
     /**
+     * Find the most recent inbound message for a given chat and channel.
+     *
+     * Used to retrieve contact metadata (e.g. phone number, phone_number_id)
+     * for forwarding responses to external channels like WhatsApp.
+     */
+    public function findLatestInboundByChannel(int $chatId, string $channel): ?Message
+    {
+        return $this->createQueryBuilder('m')
+            ->innerJoin('m.metadata', 'channelMeta', 'WITH', 'channelMeta.metaKey = :channelKey')
+            ->where('m.chatId = :chatId')
+            ->andWhere('m.direction = :direction')
+            ->andWhere('channelMeta.metaValue = :channel')
+            ->setParameter('channelKey', 'channel')
+            ->setParameter('chatId', $chatId)
+            ->setParameter('direction', 'IN')
+            ->setParameter('channel', $channel)
+            ->orderBy('m.id', 'DESC')
+            ->setMaxResults(1)
+            ->getQuery()
+            ->getOneOrNullResult();
+    }
+
+    /**
      * Delete all messages for the given chat IDs.
      *
      * @param array<int> $chatIds
