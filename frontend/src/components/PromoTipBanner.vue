@@ -38,7 +38,7 @@
                 'w-6 h-6 rounded-md flex items-center justify-center transition-colors',
                 isDark ? 'hover:bg-white/5' : 'hover:bg-black/5',
               ]"
-              :title="$t('common.expand') || 'Expand'"
+              :title="$t('common.expand')"
               @click.stop="$emit('toggle')"
             >
               <Icon icon="mdi:arrow-expand" class="w-3.5 h-3.5 txt-secondary" />

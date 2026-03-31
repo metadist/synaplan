@@ -17,6 +17,8 @@ DATABASE_URL=mysql://synaplan_user:synaplan_password@db:3306/synaplan?serverVers
 EOF
         echo "✅ Minimal .env created"
     fi
+    # Match .env ownership to the parent directory (host user's UID/GID on bind-mounts)
+    chown "$(stat -c %u:%g /var/www/backend)" /var/www/backend/.env
 else
     echo "✅ .env file already exists"
 fi

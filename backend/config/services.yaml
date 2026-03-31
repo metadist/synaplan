@@ -64,9 +64,9 @@ parameters:
     env(WHATSAPP_ACCESS_TOKEN): ''
     env(WHATSAPP_WEBHOOK_VERIFY_TOKEN): ''
 
-    # Piper TTS Service default
+    # Piper TTS Service default (localhost for native; Docker Compose overrides via env)
     env(SYNAPLAN_TTS_URL): ''
-    synaplan_tts_url_default: 'http://host.docker.internal:10200'
+    synaplan_tts_url_default: 'http://localhost:10200'
 
     # Plugins - mounted at /plugins in Docker, relative path for CI
     plugins_dir: '/plugins'
@@ -496,6 +496,7 @@ services:
     App\Service\Admin\SystemConfigService:
         arguments:
             $projectDir: '%kernel.project_dir%'
+            $defaultTtsUrl: '%synaplan_tts_url_default%'
 
     # Vector Storage Configuration
     App\Service\RAG\VectorStorage\VectorStorageConfig:
