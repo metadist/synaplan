@@ -6,9 +6,13 @@ namespace App\Tests\Unit;
 
 use App\Entity\Chat;
 use App\Entity\Message;
+use App\Entity\User;
 use App\Repository\MessageRepository;
 use App\Service\Message\MessageForwardingService;
+use App\Service\UserMemoryService;
 use App\Service\WhatsAppService;
+use Doctrine\ORM\EntityManagerInterface;
+use Doctrine\ORM\EntityRepository;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
@@ -17,6 +21,8 @@ class MessageForwardingServiceTest extends TestCase
 {
     private WhatsAppService&MockObject $whatsAppService;
     private MessageRepository&MockObject $messageRepository;
+    private UserMemoryService&MockObject $memoryService;
+    private EntityManagerInterface&MockObject $em;
     private LoggerInterface&MockObject $logger;
     private MessageForwardingService $service;
 
@@ -24,11 +30,18 @@ class MessageForwardingServiceTest extends TestCase
     {
         $this->whatsAppService = $this->createMock(WhatsAppService::class);
         $this->messageRepository = $this->createMock(MessageRepository::class);
+        $this->memoryService = $this->createMock(UserMemoryService::class);
+        $this->em = $this->createMock(EntityManagerInterface::class);
         $this->logger = $this->createMock(LoggerInterface::class);
+
+        $this->memoryService->method('resolveMemoryTags')
+            ->willReturnArgument(0);
 
         $this->service = new MessageForwardingService(
             $this->whatsAppService,
             $this->messageRepository,
+            $this->memoryService,
+            $this->em,
             $this->logger,
         );
     }
@@ -146,6 +159,67 @@ class MessageForwardingServiceTest extends TestCase
             );
 
         $this->service->forwardIfNeeded($chat, 'Hello');
+    }
+
+    public function testResolvesMemoryTagsBeforeForwarding(): void
+    {
+        $chat = $this->createChatWithSource('whatsapp');
+        $chat->method('getUserId')->willReturn(7);
+
+        $user = $this->createMock(User::class);
+        $user->method('getId')->willReturn(7);
+
+        $userRepo = $this->createMock(EntityRepository::class);
+        $userRepo->method('find')->with(7)->willReturn($user);
+        $this->em->method('getRepository')->with(User::class)->willReturn($userRepo);
+
+        $this->memoryService = $this->createMock(UserMemoryService::class);
+        $this->memoryService->expects($this->once())
+            ->method('resolveMemoryTags')
+            ->with('Hallo [Memory:12345]!', $user)
+            ->willReturn('Hallo Cristian!');
+
+        $this->service = new MessageForwardingService(
+            $this->whatsAppService,
+            $this->messageRepository,
+            $this->memoryService,
+            $this->em,
+            $this->logger,
+        );
+
+        $inbound = $this->createInboundMessageWithMeta('+491234567890', 'phone-id');
+
+        $this->whatsAppService->method('isAvailable')->willReturn(true);
+        $this->messageRepository->method('findLatestInboundByChannel')->willReturn($inbound);
+
+        $this->whatsAppService->expects($this->once())
+            ->method('sendMessage')
+            ->with('+491234567890', 'Hallo Cristian!', 'phone-id')
+            ->willReturn(['success' => true, 'message_id' => 'wa_123']);
+
+        $this->service->forwardIfNeeded($chat, 'Hallo [Memory:12345]!');
+    }
+
+    public function testStripsMemoryTagsWhenUserNotFound(): void
+    {
+        $chat = $this->createChatWithSource('whatsapp');
+        $chat->method('getUserId')->willReturn(999);
+
+        $userRepo = $this->createMock(EntityRepository::class);
+        $userRepo->method('find')->with(999)->willReturn(null);
+        $this->em->method('getRepository')->with(User::class)->willReturn($userRepo);
+
+        $inbound = $this->createInboundMessageWithMeta('+491234567890', 'phone-id');
+
+        $this->whatsAppService->method('isAvailable')->willReturn(true);
+        $this->messageRepository->method('findLatestInboundByChannel')->willReturn($inbound);
+
+        $this->whatsAppService->expects($this->once())
+            ->method('sendMessage')
+            ->with('+491234567890', 'Hallo !', 'phone-id')
+            ->willReturn(['success' => true, 'message_id' => 'wa_123']);
+
+        $this->service->forwardIfNeeded($chat, 'Hallo [Memory:12345]!');
     }
 
     private function createChatWithSource(string $source): Chat&MockObject

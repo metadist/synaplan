@@ -66,6 +66,7 @@ final class WhatsAppService
         private CacheInterface $cache,
         private LockFactory $lockFactory,
         private EmailChatService $emailChatService,
+        private UserMemoryService $memoryService,
         string $whatsappAccessToken,
         bool $whatsappEnabled,
         private string $uploadsDir,
@@ -616,8 +617,14 @@ final class WhatsAppService
         $chat = $this->emailChatService->findOrCreateWhatsAppChat($user, $dto->from);
 
         // 5. Create database record
+        // Always use the chat owner's userId so message.userId stays aligned
+        // with chat.userId. This is required for ownership checks in
+        // findChatHistory (which JOINs on chat.userId) and for consistent
+        // authorization across all queries that filter by userId.
+        // The effectiveUserId is only needed for service-level operations
+        // (media download paths, TTS generation) below.
         $message = new Message();
-        $message->setUserId($effectiveUserId);
+        $message->setUserId($user->getId());
         $message->setChat($chat);
         $message->setTrackingId($dto->timestamp);
         $message->setProviderIndex('WHATSAPP');
@@ -729,6 +736,7 @@ final class WhatsAppService
         }
 
         $responseText = $result['response']['content'] ?? $collectedResponse;
+        $responseText = $this->memoryService->resolveMemoryTags($responseText, $user);
         $metadata = $result['response']['metadata'] ?? [];
         $fileData = $metadata['file'] ?? null;
 

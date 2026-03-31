@@ -14,6 +14,7 @@ use App\Service\File\FileProcessor;
 use App\Service\File\UserUploadPathBuilder;
 use App\Service\Message\MessageProcessor;
 use App\Service\RateLimitService;
+use App\Service\UserMemoryService;
 use App\Service\WhatsAppService;
 use Doctrine\ORM\EntityManagerInterface;
 use PHPUnit\Framework\TestCase;
@@ -61,6 +62,8 @@ class WhatsAppServiceTest extends TestCase
     private $lockFactory;
     /** @var EmailChatService&\PHPUnit\Framework\MockObject\MockObject */
     private $emailChatService;
+    /** @var UserMemoryService&\PHPUnit\Framework\MockObject\MockObject */
+    private $memoryService;
     private string $testPhoneNumberId = '123456789'; // Test phone number ID
 
     protected function setUp(): void
@@ -93,6 +96,8 @@ class WhatsAppServiceTest extends TestCase
         $this->lockFactory->method('createLock')->willReturn($lock);
 
         $this->emailChatService = $this->createMock(EmailChatService::class);
+        $this->memoryService = $this->createMock(UserMemoryService::class);
+        $this->memoryService->method('resolveMemoryTags')->willReturnArgument(0);
 
         // Create service with test configuration (dynamic multi-number support)
         $this->service = new WhatsAppService(
@@ -108,6 +113,7 @@ class WhatsAppServiceTest extends TestCase
             $this->cache,
             $this->lockFactory,
             $this->emailChatService,
+            $this->memoryService,
             'test_token',
             true,
             '/tmp/test_uploads',
@@ -136,6 +142,7 @@ class WhatsAppServiceTest extends TestCase
             $this->cache,
             $this->lockFactory,
             $this->emailChatService,
+            $this->memoryService,
             'test_token',
             false, // disabled
             '/tmp/test_uploads',
@@ -160,6 +167,7 @@ class WhatsAppServiceTest extends TestCase
             $this->cache,
             $this->lockFactory,
             $this->emailChatService,
+            $this->memoryService,
             'test_token',
             false,
             '/tmp/test_uploads',
@@ -375,6 +383,7 @@ class WhatsAppServiceTest extends TestCase
             $this->cache,
             $this->lockFactory,
             $this->emailChatService,
+            $this->memoryService,
             'test_token',
             false,
             '/tmp/test_uploads',
@@ -1200,6 +1209,7 @@ class WhatsAppServiceTest extends TestCase
             $cacheWithHit,
             $lockFactory,
             $this->emailChatService,
+            $this->memoryService,
             'test_token',
             true,
             '/tmp/test_uploads',
@@ -1419,6 +1429,7 @@ class WhatsAppServiceTest extends TestCase
             $this->cache,
             $lockFactory,
             $this->emailChatService,
+            $this->memoryService,
             'test_token',
             true,
             '/tmp/test_uploads',

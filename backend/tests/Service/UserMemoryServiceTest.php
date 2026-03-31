@@ -123,4 +123,96 @@ final class UserMemoryServiceTest extends TestCase
 
         $this->assertTrue($result);
     }
+
+    public function testResolveMemoryTagsWithNoTags(): void
+    {
+        $user = $this->createMock(User::class);
+
+        $result = $this->service->resolveMemoryTags('Hello world', $user);
+
+        $this->assertSame('Hello world', $result);
+    }
+
+    public function testResolveMemoryTagsSingleTag(): void
+    {
+        $user = $this->createMock(User::class);
+        $user->method('getId')->willReturn(1);
+
+        $this->qdrantClient->method('isAvailable')->willReturn(true);
+        $this->qdrantClient->method('getMemory')
+            ->with('mem_1_12345')
+            ->willReturn(['key' => 'name', 'value' => 'Cristian', 'category' => 'personal']);
+
+        $result = $this->service->resolveMemoryTags('Hallo [Memory:12345]', $user);
+
+        $this->assertSame('Hallo Cristian', $result);
+    }
+
+    public function testResolveMemoryTagsMultipleDifferentTags(): void
+    {
+        $user = $this->createMock(User::class);
+        $user->method('getId')->willReturn(1);
+
+        $this->qdrantClient->method('isAvailable')->willReturn(true);
+        $this->qdrantClient->method('getMemory')
+            ->willReturnCallback(fn (string $pointId): ?array => match ($pointId) {
+                'mem_1_111' => ['key' => 'name', 'value' => 'Cristian', 'category' => 'personal'],
+                'mem_1_222' => ['key' => 'city', 'value' => 'Berlin', 'category' => 'personal'],
+                default => null,
+            });
+
+        $result = $this->service->resolveMemoryTags(
+            'Hallo [Memory:111], du wohnst in [Memory:222]!',
+            $user
+        );
+
+        $this->assertSame('Hallo Cristian, du wohnst in Berlin!', $result);
+    }
+
+    public function testResolveMemoryTagsRepeatedIdOnlyLookedUpOnce(): void
+    {
+        $user = $this->createMock(User::class);
+        $user->method('getId')->willReturn(1);
+
+        $this->qdrantClient->method('isAvailable')->willReturn(true);
+        $this->qdrantClient->expects($this->once())
+            ->method('getMemory')
+            ->with('mem_1_111')
+            ->willReturn(['key' => 'name', 'value' => 'Cristian', 'category' => 'personal']);
+
+        $result = $this->service->resolveMemoryTags(
+            '[Memory:111] ist [Memory:111]',
+            $user
+        );
+
+        $this->assertSame('Cristian ist Cristian', $result);
+    }
+
+    public function testResolveMemoryTagsUnknownIdRemoved(): void
+    {
+        $user = $this->createMock(User::class);
+        $user->method('getId')->willReturn(1);
+
+        $this->qdrantClient->method('isAvailable')->willReturn(true);
+        $this->qdrantClient->method('getMemory')->willReturn(null);
+
+        $result = $this->service->resolveMemoryTags('Hallo [Memory:99999]!', $user);
+
+        $this->assertSame('Hallo !', $result);
+    }
+
+    public function testResolveMemoryTagsHandlesTrailingDots(): void
+    {
+        $user = $this->createMock(User::class);
+        $user->method('getId')->willReturn(1);
+
+        $this->qdrantClient->method('isAvailable')->willReturn(true);
+        $this->qdrantClient->method('getMemory')
+            ->with('mem_1_12345')
+            ->willReturn(['key' => 'name', 'value' => 'Cristian', 'category' => 'personal']);
+
+        $result = $this->service->resolveMemoryTags('Hallo [Memory:12345...]', $user);
+
+        $this->assertSame('Hallo Cristian', $result);
+    }
 }
