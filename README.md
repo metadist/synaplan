@@ -78,6 +78,22 @@ Starts automatically with `docker compose up -d`. Synaplan works fully without i
 
 ---
 
+## Text-to-Speech (Optional)
+
+Synaplan supports voice output via [Piper TTS](https://github.com/rhasspy/piper) — a self-hosted, free, multi-language TTS engine. It runs as a separate service:
+
+```bash
+git clone https://github.com/metadist/synaplan-tts.git
+cd synaplan-tts
+docker compose up -d
+```
+
+First run downloads ~250 MB of voice models (en, de, es, tr, ru, fa). Subsequent starts are instant.
+
+Synaplan detects the TTS service automatically — no configuration needed.
+
+---
+
 ## Common Commands
 
 ```bash
