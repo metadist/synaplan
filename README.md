@@ -78,6 +78,16 @@ Starts automatically with `docker compose up -d`. Synaplan works fully without i
 
 ---
 
+## Text-to-Speech (Optional)
+
+For voice output, run [synaplan-tts](https://github.com/metadist/synaplan-tts) alongside Synaplan:
+
+```bash
+git clone https://github.com/metadist/synaplan-tts.git && cd synaplan-tts && docker compose up -d
+```
+
+---
+
 ## Common Commands
 
 ```bash
