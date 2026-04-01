@@ -3,16 +3,11 @@ set -euo pipefail
 
 echo "🚀 Starting Synaplan Backend..."
 
-# Create .env from .env.example if missing or empty
-# Docker Compose env_file with required:false may create an empty file before the entrypoint runs
-if [ ! -f /var/www/backend/.env ] || [ ! -s /var/www/backend/.env ]; then
-    if [ -f /var/www/backend/.env.example ]; then
-        echo "📝 Creating .env from .env.example..."
-        cp /var/www/backend/.env.example /var/www/backend/.env
-    else
-        echo "📝 Creating empty .env file..."
-        touch /var/www/backend/.env
-    fi
+# Create empty .env file if it doesn't exist
+# This is needed for Symfony's Dotenv component to work properly
+if [ ! -f /var/www/backend/.env ]; then
+    echo "📝 Creating empty .env file..."
+    touch /var/www/backend/.env
 fi
 
 # Fix .env ownership to match the parent directory (host user's UID/GID on bind-mounts).
