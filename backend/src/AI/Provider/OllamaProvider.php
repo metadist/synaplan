@@ -110,8 +110,8 @@ class OllamaProvider implements ChatProviderInterface, EmbeddingProviderInterfac
                 'messages' => $ollamaMessages,
             ]);
 
-            $promptTokens = $response->prompt_eval_count ?? 0;
-            $completionTokens = $response->eval_count ?? 0;
+            $promptTokens = $response->promptEvalCount ?? 0;
+            $completionTokens = $response->evalCount ?? 0;
 
             $usage = [
                 'prompt_tokens' => $promptTokens,
@@ -225,9 +225,12 @@ class OllamaProvider implements ChatProviderInterface, EmbeddingProviderInterfac
 
                 // Final chunk contains usage data
                 if (isset($chunk->done) && $chunk->done) {
-                    $promptTokens = $chunk->prompt_eval_count ?? 0;
-                    $completionTokens = $chunk->eval_count ?? 0;
-                    $this->logger->info('🔵 Ollama: Stream done signal received');
+                    $promptTokens = $chunk->promptEvalCount ?? 0;
+                    $completionTokens = $chunk->evalCount ?? 0;
+                    $this->logger->info('🔵 Ollama: Stream done signal received', [
+                        'prompt_tokens' => $promptTokens,
+                        'completion_tokens' => $completionTokens,
+                    ]);
                     break;
                 }
             }
