@@ -516,7 +516,10 @@
             </div>
 
             <!-- By Model -->
-            <div v-if="usageStats.byModel && Object.keys(usageStats.byModel).length > 0" class="surface-card rounded-lg p-6">
+            <div
+              v-if="usageStats.byModel && Object.keys(usageStats.byModel).length > 0"
+              class="surface-card rounded-lg p-6"
+            >
               <h3 class="text-lg font-semibold txt-primary mb-4 flex items-center gap-2">
                 <Icon icon="mdi:robot" class="w-5 h-5" />
                 {{ $t('admin.usage.topModels') }}
@@ -527,7 +530,11 @@
                   :key="model"
                   class="flex items-center justify-between py-2 px-4 rounded-lg bg-chat"
                 >
-                  <span class="txt-primary font-medium text-sm truncate max-w-[200px]" :title="String(model)">{{ model }}</span>
+                  <span
+                    class="txt-primary font-medium text-sm truncate max-w-[200px]"
+                    :title="String(model)"
+                    >{{ model }}</span
+                  >
                   <div class="flex gap-6 text-sm txt-secondary">
                     <span>{{ stats.count.toLocaleString() }} {{ $t('admin.usage.requests') }}</span>
                     <span>{{ stats.tokens.toLocaleString() }} {{ $t('admin.usage.tokens') }}</span>
