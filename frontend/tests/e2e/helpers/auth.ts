@@ -8,6 +8,72 @@ function apiBaseUrl(): string {
   return getApiUrl()
 }
 
+const KEYCLOAK_URL = process.env.KEYCLOAK_URL || 'http://host.docker.internal:8080'
+const KEYCLOAK_REALM = 'synaplan'
+const KEYCLOAK_TOKEN_ENDPOINT = `${KEYCLOAK_URL}/realms/${KEYCLOAK_REALM}/protocol/openid-connect/token`
+
+/**
+ * Get a Keycloak access token via direct access grant (resource owner password).
+ * Used for API-only tests that need an OIDC token without browser interaction.
+ */
+export async function getKeycloakToken(
+  clientId: string = 'opencloud',
+  credentials?: { user?: string; pass?: string }
+): Promise<string> {
+  const user = credentials?.user ?? process.env.OIDC_USER ?? 'testuser'
+  const pass = credentials?.pass ?? process.env.OIDC_PASS ?? 'testpass123'
+
+  const response = await fetch(KEYCLOAK_TOKEN_ENDPOINT, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({
+      grant_type: 'password',
+      client_id: clientId,
+      username: user,
+      password: pass,
+    }),
+  })
+
+  if (!response.ok) {
+    const body = await response.text()
+    throw new Error(`Failed to get Keycloak token: ${response.status} ${body}`)
+  }
+
+  const data = await response.json()
+  return data.access_token
+}
+
+/**
+ * Exchange a user's OIDC token for a Synaplan-scoped token via RFC 8693 token exchange.
+ * Uses the synaplan-opencloud confidential client.
+ */
+export async function exchangeTokenForSynaplan(subjectToken: string): Promise<string> {
+  const clientId = process.env.EXCHANGE_CLIENT_ID || 'synaplan-opencloud'
+  const clientSecret = process.env.EXCHANGE_CLIENT_SECRET || 'synaplan-opencloud-secret'
+  const audience = process.env.TARGET_AUDIENCE || 'synaplan-app'
+
+  const response = await fetch(KEYCLOAK_TOKEN_ENDPOINT, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({
+      grant_type: 'urn:ietf:params:oauth:grant-type:token-exchange',
+      subject_token: subjectToken,
+      subject_token_type: 'urn:ietf:params:oauth:token-type:access_token',
+      audience,
+      client_id: clientId,
+      client_secret: clientSecret,
+    }),
+  })
+
+  if (!response.ok) {
+    const body = await response.text()
+    throw new Error(`Token exchange failed: ${response.status} ${body}`)
+  }
+
+  const data = await response.json()
+  return data.access_token
+}
+
 interface AdminUserSummary {
   id: number
   email: string | null
