@@ -408,6 +408,7 @@ jobs:
         working-directory: frontend
         env:
           BASE_URL: http://localhost:8001
+          KEYCLOAK_URL: http://host.docker.internal:8081
           MAILHOG_URL: http://localhost:8025
         run: |
           echo "============================================"
