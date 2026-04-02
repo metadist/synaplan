@@ -97,7 +97,7 @@ class OidcUserService
             return;
         }
 
-        $userDetails = $user->getUserDetails() ?? [];
+        $userDetails = $user->getUserDetails();
         $userDetails['oidc_roles'] = $oidcRoles;
         $user->setUserDetails($userDetails);
 
@@ -182,7 +182,7 @@ class OidcUserService
      */
     private function updateUserDetails(User $user, array $claims, ?string $refreshToken): void
     {
-        $userDetails = $user->getUserDetails() ?? [];
+        $userDetails = $user->getUserDetails();
         $userDetails['oidc_sub'] = $claims['sub'];
         $userDetails['oidc_email'] = $claims['email'] ?? null;
         $userDetails['oidc_username'] = $claims['preferred_username'] ?? null;

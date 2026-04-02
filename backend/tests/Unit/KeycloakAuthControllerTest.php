@@ -5,12 +5,10 @@ declare(strict_types=1);
 namespace App\Tests\Unit;
 
 use App\Controller\KeycloakAuthController;
-use App\Entity\User;
-use App\Repository\UserRepository;
 use App\Service\OAuthStateService;
 use App\Service\OidcTokenService;
+use App\Service\OidcUserService;
 use App\Service\TokenService;
-use Doctrine\ORM\EntityManagerInterface;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
@@ -19,43 +17,36 @@ use Symfony\Contracts\HttpClient\HttpClientInterface;
 class KeycloakAuthControllerTest extends TestCase
 {
     private HttpClientInterface&MockObject $httpClient;
-    private UserRepository&MockObject $userRepository;
-    private EntityManagerInterface&MockObject $em;
     private TokenService&MockObject $tokenService;
     private OidcTokenService&MockObject $oidcTokenService;
+    private OidcUserService&MockObject $oidcUserService;
     private OAuthStateService $oauthStateService;
     private NullLogger $logger;
 
     protected function setUp(): void
     {
         $this->httpClient = $this->createMock(HttpClientInterface::class);
-        $this->userRepository = $this->createMock(UserRepository::class);
-        $this->em = $this->createMock(EntityManagerInterface::class);
         $this->tokenService = $this->createMock(TokenService::class);
         $this->oidcTokenService = $this->createMock(OidcTokenService::class);
+        $this->oidcUserService = $this->createMock(OidcUserService::class);
         $this->logger = new NullLogger();
         // OAuthStateService is final — use a real instance with a dummy secret
         $this->oauthStateService = new OAuthStateService($this->logger, 'test-secret');
     }
 
     private function createController(
-        string $oidcAdminRoles = 'admin,realm-admin,synaplan-admin,administrator',
-        string $oidcRoleClaims = 'realm_access.roles,resource_access.{client_id}.roles,groups',
         string $oidcScopes = 'openid email profile offline_access',
     ): KeycloakAuthController {
         return new KeycloakAuthController(
             $this->httpClient,
-            $this->userRepository,
-            $this->em,
             $this->tokenService,
             $this->oidcTokenService,
+            $this->oidcUserService,
             $this->oauthStateService,
             $this->logger,
             'test-client-id',
             'test-client-secret',
             'https://keycloak.example.com/realms/test',
-            $oidcAdminRoles,
-            $oidcRoleClaims,
             $oidcScopes,
             'https://app.example.com',
             'https://app.example.com',
@@ -70,56 +61,6 @@ class KeycloakAuthControllerTest extends TestCase
         $ref = new \ReflectionMethod($object, $method);
 
         return $ref->invoke($object, ...$args);
-    }
-
-    private function getPrivateProperty(object $object, string $property): mixed
-    {
-        $ref = new \ReflectionProperty($object, $property);
-
-        return $ref->getValue($object);
-    }
-
-    // ========== Constructor: OIDC_ADMIN_ROLES parsing ==========
-
-    public function testConstructorParsesCommaSeparatedAdminRoles(): void
-    {
-        $controller = $this->createController('admin,realm-admin,superuser');
-        $roles = $this->getPrivateProperty($controller, 'adminRoleNames');
-
-        $this->assertSame(['admin', 'realm-admin', 'superuser'], $roles);
-    }
-
-    public function testConstructorLowercasesAdminRoles(): void
-    {
-        $controller = $this->createController('Admin,REALM-ADMIN,SuperUser');
-        $roles = $this->getPrivateProperty($controller, 'adminRoleNames');
-
-        $this->assertSame(['admin', 'realm-admin', 'superuser'], $roles);
-    }
-
-    public function testConstructorTrimsWhitespaceFromAdminRoles(): void
-    {
-        $controller = $this->createController(' admin , realm-admin , superuser ');
-        $roles = $this->getPrivateProperty($controller, 'adminRoleNames');
-
-        $this->assertSame(['admin', 'realm-admin', 'superuser'], $roles);
-    }
-
-    public function testConstructorHandlesEmptyAdminRoles(): void
-    {
-        $controller = $this->createController('');
-        $roles = $this->getPrivateProperty($controller, 'adminRoleNames');
-
-        // Empty string results in a single empty element — defaults are in services.yaml
-        $this->assertSame([''], $roles);
-    }
-
-    public function testConstructorHandlesSingleAdminRole(): void
-    {
-        $controller = $this->createController('administrator');
-        $roles = $this->getPrivateProperty($controller, 'adminRoleNames');
-
-        $this->assertSame(['administrator'], $roles);
     }
 
     // ========== decodeJwtPayload ==========
@@ -165,271 +106,6 @@ class KeycloakAuthControllerTest extends TestCase
 
         $this->assertIsArray($result);
         $this->assertSame('value with special chars: +/=', $result['key']);
-    }
-
-    // ========== findOrCreateUser: admin promotion/demotion ==========
-
-    private function makeKeycloakUser(string $email, string $userLevel): User
-    {
-        $user = new User();
-        $user->setMail($email);
-        $user->setProviderId('keycloak');
-        $user->setUserLevel($userLevel);
-        $user->setUserDetails([]);
-        $user->setPaymentDetails([]);
-
-        return $user;
-    }
-
-    public function testFindOrCreateUserPromotesToAdminWhenOidcRoleMatches(): void
-    {
-        $controller = $this->createController('administrator');
-        $user = $this->makeKeycloakUser('test@example.com', 'FREE');
-
-        $this->userRepository->method('findOneBy')->willReturn($user);
-        $this->em->expects($this->once())->method('persist');
-        $this->em->expects($this->once())->method('flush');
-
-        $userInfo = [
-            'sub' => 'sub-123',
-            'email' => 'test@example.com',
-            'realm_access' => ['roles' => ['administrator', 'default-roles-synaplan']],
-        ];
-
-        $result = $this->invokePrivateMethod($controller, 'findOrCreateUser', $userInfo, null);
-
-        $this->assertSame('ADMIN', $result->getUserLevel());
-    }
-
-    public function testFindOrCreateUserDemotesAdminWhenOidcRoleRemoved(): void
-    {
-        $controller = $this->createController('administrator');
-        $user = $this->makeKeycloakUser('test@example.com', 'ADMIN');
-
-        $this->userRepository->method('findOneBy')->willReturn($user);
-        $this->em->expects($this->once())->method('persist');
-        $this->em->expects($this->once())->method('flush');
-
-        $userInfo = [
-            'sub' => 'sub-123',
-            'email' => 'test@example.com',
-            'realm_access' => ['roles' => ['default-roles-synaplan']],
-        ];
-
-        $result = $this->invokePrivateMethod($controller, 'findOrCreateUser', $userInfo, null);
-
-        $this->assertSame('NEW', $result->getUserLevel());
-    }
-
-    public function testFindOrCreateUserKeepsAdminWhenOidcRoleStillPresent(): void
-    {
-        $controller = $this->createController('administrator');
-        $user = $this->makeKeycloakUser('test@example.com', 'ADMIN');
-
-        $this->userRepository->method('findOneBy')->willReturn($user);
-        $this->em->expects($this->once())->method('persist');
-        $this->em->expects($this->once())->method('flush');
-
-        $userInfo = [
-            'sub' => 'sub-123',
-            'email' => 'test@example.com',
-            'realm_access' => ['roles' => ['administrator']],
-        ];
-
-        $result = $this->invokePrivateMethod($controller, 'findOrCreateUser', $userInfo, null);
-
-        $this->assertSame('ADMIN', $result->getUserLevel());
-    }
-
-    public function testFindOrCreateUserDoesNotPromoteWhenNoMatchingRole(): void
-    {
-        $controller = $this->createController('administrator');
-        $user = $this->makeKeycloakUser('test@example.com', 'NEW');
-
-        $this->userRepository->method('findOneBy')->willReturn($user);
-        $this->em->expects($this->once())->method('persist');
-        $this->em->expects($this->once())->method('flush');
-
-        $userInfo = [
-            'sub' => 'sub-123',
-            'email' => 'test@example.com',
-            'realm_access' => ['roles' => ['viewer', 'editor']],
-        ];
-
-        $result = $this->invokePrivateMethod($controller, 'findOrCreateUser', $userInfo, null);
-
-        $this->assertSame('NEW', $result->getUserLevel());
-    }
-
-    public function testFindOrCreateUserAdminMatchIsCaseInsensitive(): void
-    {
-        $controller = $this->createController('administrator');
-        $user = $this->makeKeycloakUser('test@example.com', 'FREE');
-
-        $this->userRepository->method('findOneBy')->willReturn($user);
-        $this->em->expects($this->once())->method('persist');
-        $this->em->expects($this->once())->method('flush');
-
-        $userInfo = [
-            'sub' => 'sub-123',
-            'email' => 'test@example.com',
-            'realm_access' => ['roles' => ['Administrator']],
-        ];
-
-        $result = $this->invokePrivateMethod($controller, 'findOrCreateUser', $userInfo, null);
-
-        $this->assertSame('ADMIN', $result->getUserLevel());
-    }
-
-    public function testFindOrCreateUserChecksResourceAccessRoles(): void
-    {
-        $controller = $this->createController('administrator');
-        $user = $this->makeKeycloakUser('test@example.com', 'FREE');
-
-        $this->userRepository->method('findOneBy')->willReturn($user);
-        $this->em->expects($this->once())->method('persist');
-        $this->em->expects($this->once())->method('flush');
-
-        $userInfo = [
-            'sub' => 'sub-123',
-            'email' => 'test@example.com',
-            'resource_access' => [
-                'test-client-id' => ['roles' => ['administrator']],
-            ],
-        ];
-
-        $result = $this->invokePrivateMethod($controller, 'findOrCreateUser', $userInfo, null);
-
-        $this->assertSame('ADMIN', $result->getUserLevel());
-    }
-
-    public function testFindOrCreateUserChecksGroupsClaim(): void
-    {
-        $controller = $this->createController('administrator');
-        $user = $this->makeKeycloakUser('test@example.com', 'FREE');
-
-        $this->userRepository->method('findOneBy')->willReturn($user);
-        $this->em->expects($this->once())->method('persist');
-        $this->em->expects($this->once())->method('flush');
-
-        $userInfo = [
-            'sub' => 'sub-123',
-            'email' => 'test@example.com',
-            'groups' => ['administrator', '/users'],
-        ];
-
-        $result = $this->invokePrivateMethod($controller, 'findOrCreateUser', $userInfo, null);
-
-        $this->assertSame('ADMIN', $result->getUserLevel());
-    }
-
-    // ========== Constructor: OIDC_ROLE_CLAIMS parsing ==========
-
-    public function testConstructorParsesDefaultClaimPaths(): void
-    {
-        $controller = $this->createController();
-        $paths = $this->getPrivateProperty($controller, 'roleClaimPaths');
-
-        $this->assertCount(3, $paths);
-        $this->assertSame(['realm_access', 'roles'], $paths[0]);
-        $this->assertSame(['resource_access', 'test-client-id', 'roles'], $paths[1]);
-        $this->assertSame(['groups'], $paths[2]);
-    }
-
-    public function testConstructorParsesCustomClaimPaths(): void
-    {
-        $controller = $this->createController(oidcRoleClaims: 'roles,custom.nested.path');
-        $paths = $this->getPrivateProperty($controller, 'roleClaimPaths');
-
-        $this->assertCount(2, $paths);
-        $this->assertSame(['roles'], $paths[0]);
-        $this->assertSame(['custom', 'nested', 'path'], $paths[1]);
-    }
-
-    public function testConstructorReplacesClientIdPlaceholder(): void
-    {
-        $controller = $this->createController(oidcRoleClaims: 'resource_access.{client_id}.roles');
-        $paths = $this->getPrivateProperty($controller, 'roleClaimPaths');
-
-        $this->assertCount(1, $paths);
-        $this->assertSame(['resource_access', 'test-client-id', 'roles'], $paths[0]);
-    }
-
-    public function testConstructorTrimsWhitespaceInClaimPaths(): void
-    {
-        $controller = $this->createController(oidcRoleClaims: ' roles , groups ');
-        $paths = $this->getPrivateProperty($controller, 'roleClaimPaths');
-
-        $this->assertCount(2, $paths);
-        $this->assertSame(['roles'], $paths[0]);
-        $this->assertSame(['groups'], $paths[1]);
-    }
-
-    public function testConstructorSkipsEmptyClaimPathSegments(): void
-    {
-        $controller = $this->createController(oidcRoleClaims: 'roles,,groups,');
-        $paths = $this->getPrivateProperty($controller, 'roleClaimPaths');
-
-        $this->assertCount(2, $paths);
-        $this->assertSame(['roles'], $paths[0]);
-        $this->assertSame(['groups'], $paths[1]);
-    }
-
-    public function testConstructorHandlesEscapedDotsInClaimPaths(): void
-    {
-        $controller = $this->createController(oidcRoleClaims: 'https://myapp\.com/roles');
-        $paths = $this->getPrivateProperty($controller, 'roleClaimPaths');
-
-        $this->assertCount(1, $paths);
-        $this->assertSame(['https://myapp.com/roles'], $paths[0]);
-    }
-
-    // ========== findOrCreateUser: custom claim paths ==========
-
-    public function testFindOrCreateUserExtractsFlatRolesClaim(): void
-    {
-        $controller = $this->createController(
-            oidcAdminRoles: 'administrator',
-            oidcRoleClaims: 'roles',
-        );
-        $user = $this->makeKeycloakUser('test@example.com', 'NEW');
-
-        $this->userRepository->method('findOneBy')->willReturn($user);
-        $this->em->expects($this->once())->method('persist');
-        $this->em->expects($this->once())->method('flush');
-
-        $userInfo = [
-            'sub' => 'sub-123',
-            'email' => 'test@example.com',
-            'roles' => ['administrator', 'viewer'],
-        ];
-
-        $result = $this->invokePrivateMethod($controller, 'findOrCreateUser', $userInfo, null);
-
-        $this->assertSame('ADMIN', $result->getUserLevel());
-    }
-
-    public function testFindOrCreateUserExtractsEscapedDotClaim(): void
-    {
-        $controller = $this->createController(
-            oidcAdminRoles: 'admin',
-            oidcRoleClaims: 'https://myapp\.com/roles',
-        );
-        $user = $this->makeKeycloakUser('test@example.com', 'NEW');
-
-        $this->userRepository->method('findOneBy')->willReturn($user);
-        $this->em->expects($this->once())->method('persist');
-        $this->em->expects($this->once())->method('flush');
-
-        $userInfo = [
-            'sub' => 'sub-123',
-            'email' => 'test@example.com',
-            'https://myapp.com/roles' => ['admin', 'user'],
-        ];
-
-        $result = $this->invokePrivateMethod($controller, 'findOrCreateUser', $userInfo, null);
-
-        $this->assertSame('ADMIN', $result->getUserLevel());
     }
 
     // ========== Helpers ==========
