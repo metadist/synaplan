@@ -2,10 +2,10 @@
 
 namespace App\Controller;
 
-use App\Entity\User;
 use App\Repository\UserRepository;
 use App\Service\OAuthStateService;
 use App\Service\OidcTokenService;
+use App\Service\OidcUserService;
 use App\Service\TokenService;
 use Doctrine\ORM\EntityManagerInterface;
 use OpenApi\Attributes as OA;
@@ -47,6 +47,7 @@ class KeycloakAuthController extends AbstractController
         private EntityManagerInterface $em,
         private TokenService $tokenService,
         private OidcTokenService $oidcTokenService,
+        private OidcUserService $oidcUserService,
         private OAuthStateService $oauthStateService,
         private LoggerInterface $logger,
         private string $oidcClientId,
@@ -235,8 +236,18 @@ class KeycloakAuthController extends AbstractController
                 'email' => $userInfo['email'] ?? 'unknown',
             ]);
 
-            // Find or create user
-            $user = $this->findOrCreateUser($userInfo, $refreshToken);
+            // Find or create user via shared OIDC user service
+            $user = $this->oidcUserService->findOrCreateFromClaims($userInfo, $refreshToken);
+
+            // Sync OIDC roles (uses controller-specific role claim config)
+            $oidcRoles = [];
+            foreach ($this->roleClaimPaths as $segments) {
+                $value = $this->resolveClaimPath($userInfo, $segments);
+                if (is_array($value)) {
+                    $oidcRoles = array_values(array_unique(array_merge($oidcRoles, $value)));
+                }
+            }
+            $this->oidcUserService->syncRoles($user, $oidcRoles, $this->adminRoleNames);
 
             // Create redirect response
             $callbackUrl = $this->frontendUrl.'/auth/callback?'.http_build_query([
@@ -358,117 +369,6 @@ class KeycloakAuthController extends AbstractController
     private function base64UrlEncode(string $data): string
     {
         return rtrim(strtr(base64_encode($data), '+/', '-_'), '=');
-    }
-
-    private function findOrCreateUser(array $userInfo, ?string $refreshToken): User
-    {
-        $sub = $userInfo['sub'] ?? null;
-        $email = $userInfo['email'] ?? null;
-        $username = $userInfo['preferred_username'] ?? null;
-
-        if (!$sub) {
-            throw new \Exception('User subject (sub) not provided by Keycloak');
-        }
-
-        // Try to find existing user by email
-        $user = null;
-        if ($email) {
-            $user = $this->userRepository->findOneBy(['mail' => $email]);
-        }
-
-        if (!$user) {
-            // Try to find by OIDC sub
-            $users = $this->userRepository->findAll();
-            foreach ($users as $existingUser) {
-                $details = $existingUser->getUserDetails() ?? [];
-                if (isset($details['oidc_sub']) && $details['oidc_sub'] === $sub) {
-                    $user = $existingUser;
-                    break;
-                }
-            }
-        }
-
-        if ($user) {
-            if ('keycloak' !== $user->getProviderId()) {
-                throw new \Exception(sprintf('This email is already registered using %s. Please use the same login method.', $user->getAuthProviderName()));
-            }
-
-            $this->logger->info('Existing Keycloak user logging in', [
-                'user_id' => $user->getId(),
-            ]);
-        } else {
-            // Create new user
-            $user = new User();
-            $user->setMail($email ?? $username.'@keycloak.local');
-            $user->setType('WEB');
-            $user->setProviderId('keycloak');
-            $user->setUserLevel('NEW');
-            $user->setEmailVerified(true);
-            $user->setCreated(date('Y-m-d H:i:s'));
-            $user->setUserDetails([]);
-            $user->setPaymentDetails([]);
-
-            $this->logger->info('Creating new user from Keycloak OAuth', [
-                'email' => $email,
-                'sub' => $sub,
-            ]);
-        }
-
-        // Update user details
-        $userDetails = $user->getUserDetails() ?? [];
-        $userDetails['oidc_sub'] = $sub;
-        $userDetails['oidc_email'] = $email;
-        $userDetails['oidc_username'] = $username;
-        $userDetails['oidc_refresh_token'] = $refreshToken; // Also store in DB as backup
-        $userDetails['oidc_last_login'] = (new \DateTime())->format('Y-m-d H:i:s');
-
-        if (isset($userInfo['given_name'])) {
-            $userDetails['first_name'] = $userInfo['given_name'];
-        }
-        if (isset($userInfo['family_name'])) {
-            $userDetails['last_name'] = $userInfo['family_name'];
-        }
-        if (isset($userInfo['name'])) {
-            $userDetails['full_name'] = $userInfo['name'];
-        }
-
-        // Sync OIDC roles from configured claim paths
-        $oidcRoles = [];
-        foreach ($this->roleClaimPaths as $segments) {
-            $value = $this->resolveClaimPath($userInfo, $segments);
-            if (is_array($value)) {
-                $oidcRoles = array_values(array_unique(array_merge($oidcRoles, $value)));
-            }
-        }
-        if (!empty($oidcRoles)) {
-            $userDetails['oidc_roles'] = $oidcRoles;
-
-            $hasAdmin = !empty(array_intersect(array_map('strtolower', $oidcRoles), $this->adminRoleNames));
-            if ($hasAdmin && 'ADMIN' !== $user->getUserLevel()) {
-                $user->setUserLevel('ADMIN');
-                $this->logger->info('User promoted to ADMIN via OIDC role', [
-                    'user_id' => $user->getId(),
-                    'oidc_roles' => $oidcRoles,
-                ]);
-            } elseif (!$hasAdmin && 'ADMIN' === $user->getUserLevel()) {
-                $user->setUserLevel('NEW');
-                $this->logger->info('User demoted from ADMIN — OIDC roles no longer include admin', [
-                    'user_id' => $user->getId(),
-                    'oidc_roles' => $oidcRoles,
-                ]);
-            }
-        }
-
-        $user->setUserDetails($userDetails);
-
-        if (!$user->isEmailVerified() && $email && ($userInfo['email_verified'] ?? true)) {
-            $user->setEmailVerified(true);
-        }
-
-        $this->em->persist($user);
-        $this->em->flush();
-
-        return $user;
     }
 
     /**

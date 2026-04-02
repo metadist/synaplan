@@ -2,11 +2,8 @@
 
 namespace App\Security;
 
-use App\Entity\User;
-use App\Repository\UserRepository;
-use App\Service\JwtValidator;
 use App\Service\OidcTokenService;
-use Doctrine\ORM\EntityManagerInterface;
+use App\Service\OidcUserService;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
@@ -27,16 +24,14 @@ use Symfony\Component\Security\Http\Authenticator\Passport\SelfValidatingPasspor
  * OIDC token exchange to call Synaplan API on behalf of a user.
  *
  * The token is a Keycloak-issued JWT validated via signature verification.
- * Users are auto-provisioned on first access.
+ * Users are auto-provisioned on first access via OidcUserService.
  */
 class OidcBearerAuthenticator extends AbstractAuthenticator
 {
     public function __construct(
         private OidcTokenService $oidcTokenService,
-        private UserRepository $userRepository,
-        private EntityManagerInterface $em,
+        private OidcUserService $oidcUserService,
         private LoggerInterface $logger,
-        private string $oidcDiscoveryUrl,
     ) {
     }
 
@@ -89,32 +84,19 @@ class OidcBearerAuthenticator extends AbstractAuthenticator
         $authHeader = (string) $request->headers->get('Authorization', '');
         $token = substr($authHeader, 7);
 
-        // Validate via OidcTokenService (JWT signature + claims)
-        $user = $this->oidcTokenService->getUserFromOidcToken($token);
-
-        if ($user) {
-            $this->logger->debug('OIDC bearer token authenticated existing user', [
-                'user_id' => $user->getId(),
-            ]);
-
-            return new SelfValidatingPassport(
-                new UserBadge((string) $user->getId(), fn () => $user)
-            );
-        }
-
-        // User not found — try auto-provisioning
+        // Validate JWT and get claims
         $claims = $this->oidcTokenService->validateOidcToken($token);
 
         if (!$claims) {
             throw new CustomUserMessageAuthenticationException('Invalid or expired OIDC bearer token');
         }
 
-        $user = $this->provisionUser($claims);
+        // Find or create user via shared service
+        $user = $this->oidcUserService->findOrCreateFromClaims($claims);
 
-        $this->logger->info('OIDC bearer token auto-provisioned new user', [
+        $this->logger->debug('OIDC bearer token authenticated', [
             'user_id' => $user->getId(),
             'sub' => $claims['sub'] ?? 'unknown',
-            'email' => $claims['email'] ?? 'unknown',
         ]);
 
         return new SelfValidatingPassport(
@@ -134,55 +116,5 @@ class OidcBearerAuthenticator extends AbstractAuthenticator
             'message' => $exception->getMessage(),
             'code' => 'OIDC_BEARER_AUTH_FAILED',
         ], Response::HTTP_UNAUTHORIZED);
-    }
-
-    /**
-     * Auto-provision a Synaplan user from OIDC claims.
-     *
-     * Same logic as KeycloakAuthController::findOrCreateUser but without
-     * provider conflict checks (bearer tokens come from token exchange,
-     * the user may not have logged in via browser before).
-     */
-    private function provisionUser(array $claims): User
-    {
-        $sub = $claims['sub'] ?? null;
-        $email = $claims['email'] ?? null;
-
-        if (!$sub) {
-            throw new CustomUserMessageAuthenticationException('OIDC token missing subject claim');
-        }
-
-        $user = new User();
-        $user->setMail($email ?? $sub.'@oidc.local');
-        $user->setType('WEB');
-        $user->setProviderId('keycloak');
-        $user->setUserLevel('NEW');
-        $user->setEmailVerified(true);
-        $user->setCreated(date('Y-m-d H:i:s'));
-
-        $userDetails = [
-            'oidc_sub' => $sub,
-            'oidc_email' => $email,
-            'oidc_username' => $claims['preferred_username'] ?? null,
-            'oidc_last_login' => (new \DateTime())->format('Y-m-d H:i:s'),
-        ];
-
-        if (isset($claims['given_name'])) {
-            $userDetails['first_name'] = $claims['given_name'];
-        }
-        if (isset($claims['family_name'])) {
-            $userDetails['last_name'] = $claims['family_name'];
-        }
-        if (isset($claims['name'])) {
-            $userDetails['full_name'] = $claims['name'];
-        }
-
-        $user->setUserDetails($userDetails);
-        $user->setPaymentDetails([]);
-
-        $this->em->persist($user);
-        $this->em->flush();
-
-        return $user;
     }
 }
