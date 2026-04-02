@@ -6,6 +6,7 @@ use App\AI\Service\AiFacade;
 use App\Entity\Chat;
 use App\Entity\WidgetSession;
 use App\Repository\MessageRepository;
+use App\Repository\UserRepository;
 use App\Repository\WidgetSessionRepository;
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;
@@ -31,8 +32,10 @@ final class WidgetSessionService
         private EntityManagerInterface $em,
         private WidgetSessionRepository $sessionRepository,
         private MessageRepository $messageRepository,
+        private UserRepository $userRepository,
         private AiFacade $aiFacade,
         private ModelConfigService $modelConfigService,
+        private RateLimitService $rateLimitService,
         private LoggerInterface $logger,
     ) {
     }
@@ -201,9 +204,10 @@ final class WidgetSessionService
             }
 
             // Use gpt-4o-mini for cheap, fast summarization
+            $titleModelId = ModelConfigService::DEFAULT_LIGHTWEIGHT_MODEL_ID;
             $aiOptions = ['temperature' => 0.3];
-            $provider = $this->modelConfigService->getProviderForModel(73);
-            $modelName = $this->modelConfigService->getModelName(73);
+            $provider = $this->modelConfigService->getProviderForModel($titleModelId);
+            $modelName = $this->modelConfigService->getModelName($titleModelId);
             if ($provider && $modelName) {
                 $aiOptions['provider'] = $provider;
                 $aiOptions['model'] = $modelName;
@@ -226,6 +230,19 @@ PROMPT;
             );
 
             $title = trim($response['content'] ?? '');
+
+            $owner = $this->userRepository->find($ownerId);
+            if ($owner) {
+                $this->rateLimitService->recordUsage($owner, 'WIDGET_TITLE', [
+                    'provider' => $response['provider'] ?? 'unknown',
+                    'model' => $response['model'] ?? 'unknown',
+                    'model_id' => $titleModelId,
+                    'usage' => $response['usage'] ?? [],
+                    'response_text' => $title,
+                    'input_text' => $prompt,
+                ]);
+            }
+
             // Clean up: remove quotes and limit length
             $title = trim($title, '"\'');
             $title = mb_substr($title, 0, 50);

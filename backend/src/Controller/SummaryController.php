@@ -6,6 +6,7 @@ use App\AI\Service\AiFacade;
 use App\Entity\User;
 use App\Repository\PromptRepository;
 use App\Service\ModelConfigService;
+use App\Service\RateLimitService;
 use OpenApi\Attributes as OA;
 use Psr\Log\LoggerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -23,6 +24,7 @@ class SummaryController extends AbstractController
         private AiFacade $aiFacade,
         private PromptRepository $promptRepository,
         private ModelConfigService $modelConfigService,
+        private RateLimitService $rateLimitService,
         private LoggerInterface $logger,
     ) {
     }
@@ -255,6 +257,16 @@ class SummaryController extends AbstractController
 
             $summary = trim($response['content']);
             $processingTime = (int) ((microtime(true) - $startTime) * 1000);
+
+            $this->rateLimitService->recordUsage($user, 'DOC_SUMMARY', [
+                'provider' => $response['provider'] ?? 'unknown',
+                'model' => $response['model'] ?? 'unknown',
+                'model_id' => $modelId,
+                'usage' => $response['usage'] ?? [],
+                'latency' => $processingTime,
+                'response_text' => $summary,
+                'input_text' => $text,
+            ]);
 
             // Calculate statistics
             $originalWordCount = str_word_count($text);

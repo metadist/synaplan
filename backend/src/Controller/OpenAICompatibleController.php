@@ -160,11 +160,13 @@ class OpenAICompatibleController extends AbstractController
             'messages_count' => count($messages),
         ]);
 
+        $dbModelId = $resolvedModel['model_id'];
+
         if ($stream) {
-            return $this->handleStream($user, $messages, $options, $completionId, $created, $resolvedModel['displayModel']);
+            return $this->handleStream($user, $messages, $options, $completionId, $created, $resolvedModel['displayModel'], $dbModelId);
         }
 
-        return $this->handleNonStream($user, $messages, $options, $completionId, $created, $resolvedModel['displayModel']);
+        return $this->handleNonStream($user, $messages, $options, $completionId, $created, $resolvedModel['displayModel'], $dbModelId);
     }
 
     #[Route('/v1/models', name: 'openai_list_models', methods: ['GET'])]
@@ -221,10 +223,28 @@ class OpenAICompatibleController extends AbstractController
         ]);
     }
 
-    private function handleNonStream(User $user, array $messages, array $options, string $completionId, int $created, string $displayModel): JsonResponse
+    private function handleNonStream(User $user, array $messages, array $options, string $completionId, int $created, string $displayModel, ?int $dbModelId): JsonResponse
     {
         try {
             $result = $this->aiFacade->chat($messages, $user->getId(), $options);
+
+            $lastUserMessage = '';
+            foreach (array_reverse($messages) as $msg) {
+                if ('user' === ($msg['role'] ?? '')) {
+                    $lastUserMessage = $msg['content'] ?? '';
+                    break;
+                }
+            }
+
+            $this->rateLimitService->recordUsage($user, 'API_CHAT', [
+                'provider' => $result['provider'] ?? 'unknown',
+                'model' => $result['model'] ?? 'unknown',
+                'model_id' => $dbModelId,
+                'usage' => $result['usage'] ?? [],
+                'response_text' => $result['content'] ?? '',
+                'input_text' => $lastUserMessage,
+                'source' => 'OPENAI_API',
+            ]);
 
             return new JsonResponse([
                 'id' => $completionId,
@@ -257,7 +277,7 @@ class OpenAICompatibleController extends AbstractController
         }
     }
 
-    private function handleStream(User $user, array $messages, array $options, string $completionId, int $created, string $displayModel): StreamedResponse
+    private function handleStream(User $user, array $messages, array $options, string $completionId, int $created, string $displayModel, ?int $dbModelId): StreamedResponse
     {
         $response = new StreamedResponse();
         $response->headers->set('Content-Type', 'text/event-stream');
@@ -265,7 +285,7 @@ class OpenAICompatibleController extends AbstractController
         $response->headers->set('X-Accel-Buffering', 'no');
         $response->headers->set('Connection', 'keep-alive');
 
-        $response->setCallback(function () use ($user, $messages, $options, $completionId, $created, $displayModel) {
+        $response->setCallback(function () use ($user, $messages, $options, $completionId, $created, $displayModel, $dbModelId) {
             while (ob_get_level()) {
                 ob_end_clean();
             }
@@ -274,11 +294,12 @@ class OpenAICompatibleController extends AbstractController
             ignore_user_abort(false);
 
             $firstChunk = true;
+            $accumulatedContent = '';
 
             try {
-                $this->aiFacade->chatStream(
+                $streamMetadata = $this->aiFacade->chatStream(
                     $messages,
-                    function ($chunk) use ($completionId, $created, $displayModel, &$firstChunk) {
+                    function ($chunk) use ($completionId, $created, $displayModel, &$firstChunk, &$accumulatedContent) {
                         if (connection_aborted()) {
                             return;
                         }
@@ -293,6 +314,8 @@ class OpenAICompatibleController extends AbstractController
                         if ('' === $content) {
                             return;
                         }
+
+                        $accumulatedContent .= $content;
 
                         if ($firstChunk) {
                             $this->writeSSE([
@@ -347,6 +370,24 @@ class OpenAICompatibleController extends AbstractController
                     ob_flush();
                 }
                 flush();
+
+                $lastUserMessage = '';
+                foreach (array_reverse($messages) as $msg) {
+                    if ('user' === ($msg['role'] ?? '')) {
+                        $lastUserMessage = $msg['content'] ?? '';
+                        break;
+                    }
+                }
+
+                $this->rateLimitService->recordUsage($user, 'API_CHAT', [
+                    'provider' => $streamMetadata['provider'] ?? 'unknown',
+                    'model' => $streamMetadata['model'] ?? 'unknown',
+                    'model_id' => $dbModelId,
+                    'usage' => $streamMetadata['usage'] ?? [],
+                    'source' => 'OPENAI_API',
+                    'input_text' => $lastUserMessage,
+                    'response_text' => $accumulatedContent,
+                ]);
             } catch (\Throwable $e) {
                 $errorPayload = [
                     'error' => [
@@ -370,7 +411,7 @@ class OpenAICompatibleController extends AbstractController
     /**
      * Resolve a model string (e.g., "gpt-4o") to a Synaplan model with provider info.
      *
-     * @return array{provider: string, providerModelId: string, displayModel: string}
+     * @return array{provider: string, providerModelId: string, displayModel: string, model_id: ?int}
      */
     private function resolveModel(?string $modelString, int $userId): array
     {
@@ -388,6 +429,7 @@ class OpenAICompatibleController extends AbstractController
                     'provider' => strtolower($model->getService()),
                     'providerModelId' => $model->getProviderId(),
                     'displayModel' => $model->getProviderId(),
+                    'model_id' => $model->getId(),
                 ];
             }
 
@@ -404,6 +446,7 @@ class OpenAICompatibleController extends AbstractController
                     'provider' => strtolower($model->getService()),
                     'providerModelId' => $model->getProviderId(),
                     'displayModel' => $model->getProviderId(),
+                    'model_id' => $model->getId(),
                 ];
             }
         }
@@ -416,6 +459,7 @@ class OpenAICompatibleController extends AbstractController
                     'provider' => strtolower($defaultModel->getService()),
                     'providerModelId' => $defaultModel->getProviderId(),
                     'displayModel' => $defaultModel->getProviderId(),
+                    'model_id' => $defaultModel->getId(),
                 ];
             }
         }
@@ -424,6 +468,7 @@ class OpenAICompatibleController extends AbstractController
             'provider' => 'openai',
             'providerModelId' => $modelString ?? 'gpt-4o',
             'displayModel' => $modelString ?? 'gpt-4o',
+            'model_id' => null,
         ];
     }
 

@@ -5,10 +5,13 @@ namespace App\Tests\Unit;
 use App\AI\Service\AiFacade;
 use App\Entity\Message;
 use App\Entity\Prompt;
+use App\Entity\User;
 use App\Repository\PromptRepository;
 use App\Service\MemoryExtractionService;
 use App\Service\ModelConfigService;
+use App\Service\RateLimitService;
 use App\Service\UserMemoryService;
+use Doctrine\ORM\EntityManagerInterface;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
 
@@ -76,10 +79,17 @@ final class MemoryExtractionServicePromptRulesTest extends TestCase
                 ], JSON_THROW_ON_ERROR),
             ]);
 
+        $entityManager = $this->createMock(EntityManagerInterface::class);
+        $entityManager->method('getReference')
+            ->with(User::class, 1)
+            ->willReturn($this->createMock(User::class));
+
         $service = new MemoryExtractionService(
             $aiFacade,
             $modelConfigService,
+            $this->createMock(RateLimitService::class),
             $promptRepository,
+            $entityManager,
             $logger
         );
 
