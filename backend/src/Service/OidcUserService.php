@@ -53,10 +53,7 @@ class OidcUserService
 
         if ($user) {
             if ('keycloak' !== $user->getProviderId()) {
-                throw new \RuntimeException(sprintf(
-                    'This email is already registered using %s. Please use the same login method.',
-                    $user->getAuthProviderName()
-                ));
+                throw new \RuntimeException(sprintf('This email is already registered using %s. Please use the same login method.', $user->getAuthProviderName()));
             }
 
             $this->logger->info('Existing OIDC user found', ['user_id' => $user->getId()]);
