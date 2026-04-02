@@ -5,10 +5,10 @@ import { test, expect } from '@playwright/test'
  *
  * Verifies that Keycloak's KC_HOSTNAME + KC_HOSTNAME_BACKCHANNEL_DYNAMIC
  * configuration produces consistent issuers across HTTP and HTTPS ports.
- * This is critical for the synaplan-opencloud integration where:
- * - The browser uses HTTPS (8443) for OIDC flows
- * - The Synaplan backend uses HTTP (8080) for backchannel token validation
- * - JWTs must validate against both discovery endpoints
+ * The dev stack runs Keycloak with both HTTP (8080) and HTTPS (8443) to
+ * support the synaplan-opencloud dev stack, which needs HTTPS for browser
+ * OIDC flows. These tests ensure the Keycloak hostname config keeps both
+ * ports reporting a consistent issuer.
  *
  * Requires: docker compose --profile oidc (Keycloak with HTTPS enabled)
  */
