@@ -20,13 +20,13 @@ function apiBaseUrl(): string {
 
 test.describe('@ci @oidc @token-exchange OIDC Token Exchange', () => {
   test('should get a user token from Keycloak via direct access grant', async () => {
-    const token = await getOidcAccessToken('opencloud')
+    const token = await getOidcAccessToken({ clientId: 'opencloud' })
     expect(token).toBeTruthy()
     expect(token.split('.').length).toBe(3) // JWT format
   })
 
   test('should exchange user token for Synaplan-scoped token', async () => {
-    const userToken = await getOidcAccessToken('opencloud')
+    const userToken = await getOidcAccessToken({ clientId: 'opencloud' })
     const exchangedToken = await exchangeTokenForSynaplan(userToken)
 
     expect(exchangedToken).toBeTruthy()
@@ -35,7 +35,7 @@ test.describe('@ci @oidc @token-exchange OIDC Token Exchange', () => {
   })
 
   test('should authenticate to Synaplan API with exchanged token', async () => {
-    const userToken = await getOidcAccessToken('opencloud')
+    const userToken = await getOidcAccessToken({ clientId: 'opencloud' })
     const synaplanToken = await exchangeTokenForSynaplan(userToken)
 
     const response = await fetch(`${apiBaseUrl()}/api/v1/auth/me`, {
@@ -53,7 +53,7 @@ test.describe('@ci @oidc @token-exchange OIDC Token Exchange', () => {
   })
 
   test('should auto-provision user on first access via exchanged token', async () => {
-    const userToken = await getOidcAccessToken('opencloud')
+    const userToken = await getOidcAccessToken({ clientId: 'opencloud' })
     const synaplanToken = await exchangeTokenForSynaplan(userToken)
 
     const response = await fetch(`${apiBaseUrl()}/api/v1/auth/me`, {

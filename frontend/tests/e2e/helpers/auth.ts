@@ -16,19 +16,20 @@ const KEYCLOAK_TOKEN_ENDPOINT = `${KEYCLOAK_URL}/realms/${KEYCLOAK_REALM}/protoc
  * Get an OIDC access token via direct access grant (resource owner password).
  * Used for API-only tests that need an OIDC token without browser interaction.
  */
-export async function getOidcAccessToken(
-  clientId: string,
-  credentials?: { user?: string; pass?: string }
-): Promise<string> {
-  const user = credentials?.user ?? process.env.OIDC_USER ?? 'testuser'
-  const pass = credentials?.pass ?? process.env.OIDC_PASS ?? 'testpass123'
+export async function getOidcAccessToken(options: {
+  clientId: string
+  user?: string
+  pass?: string
+}): Promise<string> {
+  const user = options.user ?? process.env.OIDC_USER ?? 'testuser'
+  const pass = options.pass ?? process.env.OIDC_PASS ?? 'testpass123'
 
   const response = await fetch(KEYCLOAK_TOKEN_ENDPOINT, {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     body: new URLSearchParams({
       grant_type: 'password',
-      client_id: clientId,
+      client_id: options.clientId,
       username: user,
       password: pass,
     }),
