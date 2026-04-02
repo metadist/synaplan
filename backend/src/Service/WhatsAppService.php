@@ -774,6 +774,19 @@ final class WhatsAppService
 
                 $sendResult = $this->sendMedia($dto->from, $generatedMediaType, $mediaUrl, $dto->phoneNumberId, $caption);
                 if ($sendResult['success']) {
+                    $mediaAction = match ($generatedMediaType) {
+                        'image' => 'IMAGES',
+                        'video' => 'VIDEOS',
+                        default => 'AUDIOS',
+                    };
+                    $this->rateLimitService->recordUsage($user, $mediaAction, [
+                        'provider' => $metadata['provider'] ?? 'unknown',
+                        'model' => $metadata['model'] ?? 'unknown',
+                        'model_id' => $metadata['model_id'] ?? null,
+                        'source' => 'WHATSAPP',
+                        'media_usage' => $metadata['media_usage'] ?? [],
+                    ]);
+
                     $placeholderText = match ($generatedMediaType) {
                         'image' => '[Image response]',
                         'video' => '[Video response]',

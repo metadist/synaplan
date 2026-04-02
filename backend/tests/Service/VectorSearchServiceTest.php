@@ -236,6 +236,11 @@ class VectorSearchServiceTest extends KernelTestCase
         // Delete test vectors
         $conn->executeStatement('DELETE FROM BRAG WHERE BMID = ?', [$this->testMessageId]);
 
+        // Delete usage log entries created by recordUsage (FK on BMODEL_ID)
+        if ($this->testUserId > 0) {
+            $conn->executeStatement('DELETE FROM BUSELOG WHERE BUSERID = ?', [$this->testUserId]);
+        }
+
         $entitiesToRemove = [];
 
         // Delete test message

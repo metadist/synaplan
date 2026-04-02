@@ -102,7 +102,7 @@
             <span class="txt-primary font-medium">
               {{ $t('config.usage.costBudget.thisMonth') }}
             </span>
-            <span class="txt-secondary"> {{ stats.cost_budget.used.toFixed(4) }} EUR </span>
+            <span class="txt-secondary"> ${{ stats.cost_budget.used.toFixed(4) }} </span>
           </div>
 
           <div class="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-4">
@@ -129,18 +129,18 @@
       >
         <div class="surface-card p-4 text-center">
           <p class="text-xs txt-secondary mb-1">{{ $t('config.usage.costSummary.today') }}</p>
-          <p class="text-xl font-bold txt-primary">{{ stats.cost_summary.today.toFixed(4) }} EUR</p>
+          <p class="text-xl font-bold txt-primary">${{ stats.cost_summary.today.toFixed(4) }}</p>
         </div>
         <div class="surface-card p-4 text-center">
           <p class="text-xs txt-secondary mb-1">{{ $t('config.usage.costSummary.thisWeek') }}</p>
           <p class="text-xl font-bold txt-primary">
-            {{ stats.cost_summary.this_week.toFixed(4) }} EUR
+            ${{ stats.cost_summary.this_week.toFixed(4) }}
           </p>
         </div>
         <div class="surface-card p-4 text-center">
           <p class="text-xs txt-secondary mb-1">{{ $t('config.usage.costSummary.thisMonth') }}</p>
           <p class="text-xl font-bold txt-primary">
-            {{ stats.cost_summary.this_month.toFixed(4) }} EUR
+            ${{ stats.cost_summary.this_month.toFixed(4) }}
           </p>
         </div>
       </div>
@@ -290,6 +290,7 @@
             <option value="FILE_ANALYSIS">{{ $t('config.usage.actions.file_analysis') }}</option>
             <option value="SORTING">{{ $t('config.usage.actions.sorting') }}</option>
             <option value="SEARCH_QUERY">{{ $t('config.usage.actions.search_query') }}</option>
+            <option value="EMBEDDINGS">{{ $t('config.usage.actions.embeddings') }}</option>
           </select>
 
           <input
@@ -390,7 +391,7 @@
                   <span v-else class="txt-secondary">-</span>
                 </td>
                 <td class="px-3 py-3 text-right txt-secondary whitespace-nowrap">
-                  {{ entry.cost > 0 ? entry.cost.toFixed(4) + ' EUR' : '-' }}
+                  {{ entry.cost > 0 ? '$' + entry.cost.toFixed(4) : '-' }}
                 </td>
                 <td class="px-3 py-3 text-right txt-secondary">
                   {{ entry.latency > 0 ? (entry.latency / 1000).toFixed(1) + 's' : '-' }}

@@ -7,6 +7,7 @@ namespace App\Tests\Service;
 use App\AI\Service\AiFacade;
 use App\Entity\User;
 use App\Service\ModelConfigService;
+use App\Service\RateLimitService;
 use App\Service\UserMemoryService;
 use App\Service\VectorSearch\QdrantClientInterface;
 use Doctrine\ORM\EntityManagerInterface;
@@ -24,6 +25,7 @@ final class UserMemoryServiceTest extends TestCase
     private QdrantClientInterface $qdrantClient;
     private AiFacade $aiFacade;
     private ModelConfigService $modelConfigService;
+    private RateLimitService $rateLimitService;
     private LoggerInterface $logger;
     private UserMemoryService $service;
 
@@ -33,6 +35,7 @@ final class UserMemoryServiceTest extends TestCase
         $this->qdrantClient = $this->createMock(QdrantClientInterface::class);
         $this->aiFacade = $this->createMock(AiFacade::class);
         $this->modelConfigService = $this->createMock(ModelConfigService::class);
+        $this->rateLimitService = $this->createMock(RateLimitService::class);
         $this->logger = $this->createMock(LoggerInterface::class);
 
         $this->service = new UserMemoryService(
@@ -40,6 +43,7 @@ final class UserMemoryServiceTest extends TestCase
             $this->qdrantClient,
             $this->aiFacade,
             $this->modelConfigService,
+            $this->rateLimitService,
             $this->logger
         );
     }

@@ -33,6 +33,7 @@ final readonly class UserMemoryService
         private QdrantClientInterface $qdrantClient,
         private AiFacade $aiFacade,
         private ModelConfigService $modelConfigService,
+        private RateLimitService $rateLimitService,
         private LoggerInterface $logger,
     ) {
     }
@@ -441,6 +442,17 @@ final readonly class UserMemoryService
                 'provider' => $provider,
             ]));
 
+            $user = $this->em->getRepository(User::class)->find($userId);
+            if ($user) {
+                $this->rateLimitService->recordUsage($user, 'EMBEDDINGS', [
+                    'provider' => $provider ?? 'unknown',
+                    'model' => $modelName ?? 'unknown',
+                    'model_id' => $embeddingModelId,
+                    'input_text' => $queryText,
+                    'source' => 'MEMORY_SEARCH',
+                ]);
+            }
+
             $this->logger->info('📊 Embedding created', [
                 'userId' => $userId,
                 'vectorLength' => count($queryVector),
@@ -526,6 +538,14 @@ final readonly class UserMemoryService
             if (empty($embedding)) {
                 throw new \RuntimeException('Failed to create embedding');
             }
+
+            $this->rateLimitService->recordUsage($user, 'EMBEDDINGS', [
+                'provider' => $provider ?? 'unknown',
+                'model' => $modelName ?? 'unknown',
+                'model_id' => $embeddingModelId,
+                'input_text' => $textToEmbed,
+                'source' => 'MEMORY_STORE',
+            ]);
 
             // Generate point ID
             $pointId = "mem_{$user->getId()}_{$memoryId}";

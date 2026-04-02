@@ -1103,7 +1103,8 @@
         "audios": "Audiodateien",
         "file_analysis": "Dateianalyse",
         "sorting": "Klassifikation",
-        "search_query": "Suchanfrage"
+        "search_query": "Suchanfrage",
+        "embeddings": "Embeddings"
       },
       "sources": {
         "whatsapp": "WhatsApp",

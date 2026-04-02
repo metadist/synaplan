@@ -7,6 +7,7 @@ use App\AI\Interface\ChatProviderInterface;
 use App\AI\Interface\EmbeddingProviderInterface;
 use ArdaGnsrn\Ollama\Ollama;
 use Psr\Log\LoggerInterface;
+use Symfony\Contracts\HttpClient\HttpClientInterface;
 
 class OllamaProvider implements ChatProviderInterface, EmbeddingProviderInterface
 {
@@ -15,6 +16,7 @@ class OllamaProvider implements ChatProviderInterface, EmbeddingProviderInterfac
     public function __construct(
         private LoggerInterface $logger,
         private string $baseUrl,
+        private HttpClientInterface $httpClient,
     ) {
         // Set timeout to 5 minutes for slow CPU-based models
         ini_set('default_socket_timeout', 300);
@@ -173,7 +175,7 @@ class OllamaProvider implements ChatProviderInterface, EmbeddingProviderInterfac
                 throw ProviderException::noModelAvailable('chat', 'ollama', $model);
             }
 
-            $this->logger->info('🔵 Ollama streaming chat START', [
+            $this->logger->info('Ollama streaming chat START', [
                 'model' => $model,
                 'message_count' => count($messages),
                 'supportsReasoning' => $supportsReasoning,
@@ -181,66 +183,134 @@ class OllamaProvider implements ChatProviderInterface, EmbeddingProviderInterfac
 
             $ollamaMessages = $this->convertMessages($messages);
 
-            $requestOptions = [
+            $requestBody = [
                 'model' => $model,
                 'messages' => $ollamaMessages,
+                'stream' => true,
             ];
 
             if (isset($options['max_tokens'])) {
-                $requestOptions['options'] = [
+                $requestBody['options'] = [
                     'num_predict' => $options['max_tokens'],
                 ];
             }
 
-            $stream = $this->client->chat()->createStreamed($requestOptions);
-
-            $this->logger->info('🟡 Ollama: Stream created, iterating...');
+            // Stream directly via HttpClient so we can read the `thinking` field
+            // that the Ollama PHP SDK (ChatMessageResponse) silently drops.
+            $apiUrl = rtrim($this->baseUrl, '/').'/api/chat';
+            $response = $this->httpClient->request('POST', $apiUrl, [
+                'json' => $requestBody,
+                'buffer' => false,
+                'timeout' => 300,
+            ]);
 
             $chunkCount = 0;
             $fullResponse = '';
             $promptTokens = 0;
             $completionTokens = 0;
+            $lineBuffer = '';
 
-            foreach ($stream as $chunk) {
-                $textChunk = $chunk->message->content ?? '';
-
-                // Sanitize UTF-8 to prevent "Malformed UTF-8 characters" errors
-                if (!empty($textChunk)) {
-                    $textChunk = mb_convert_encoding($textChunk, 'UTF-8', 'UTF-8');
-                }
-
-                if (!empty($textChunk)) {
-                    $fullResponse .= $textChunk;
-
-                    $callback($textChunk);
-                    ++$chunkCount;
-
-                    if (1 === $chunkCount) {
-                        $this->logger->info('🟢 Ollama: First chunk sent!', [
-                            'length' => strlen($textChunk),
-                            'preview' => substr($textChunk, 0, 50),
-                        ]);
+            foreach ($this->httpClient->stream($response) as $chunk) {
+                if ($chunk->isFirst()) {
+                    try {
+                        $statusCode = $response->getStatusCode();
+                    } catch (\Throwable $e) {
+                        throw new ProviderException('Ollama API HTTP error: '.$e->getMessage(), 'ollama', null, 0, $e);
+                    }
+                    if (200 !== $statusCode) {
+                        throw new ProviderException(sprintf('Ollama API HTTP error %d', $statusCode), 'ollama');
                     }
                 }
 
-                // Final chunk contains usage data
-                if (isset($chunk->done) && $chunk->done) {
-                    $promptTokens = $chunk->promptEvalCount ?? 0;
-                    $completionTokens = $chunk->evalCount ?? 0;
-                    $this->logger->info('🔵 Ollama: Stream done signal received', [
-                        'prompt_tokens' => $promptTokens,
-                        'completion_tokens' => $completionTokens,
-                    ]);
+                if (null !== $chunk->getError()) {
+                    throw new ProviderException('Ollama transport error: '.$chunk->getError(), 'ollama');
+                }
+
+                $content = $chunk->getContent();
+
+                if ($chunk->isLast() && '' === $content) {
                     break;
+                }
+
+                if ('' === $content) {
+                    continue;
+                }
+
+                $lineBuffer .= $content;
+
+                while (false !== ($newlinePos = strpos($lineBuffer, "\n"))) {
+                    $line = substr($lineBuffer, 0, $newlinePos);
+                    $lineBuffer = substr($lineBuffer, $newlinePos + 1);
+
+                    $line = trim($line);
+                    if ('' === $line) {
+                        continue;
+                    }
+
+                    try {
+                        $data = json_decode($line, true, 512, JSON_THROW_ON_ERROR);
+                    } catch (\JsonException $e) {
+                        $this->logger->warning('Ollama: Skipping malformed JSON line', [
+                            'line' => substr($line, 0, 200),
+                        ]);
+                        continue;
+                    }
+
+                    if (isset($data['error'])) {
+                        throw new ProviderException('Ollama API error: '.$data['error'], 'ollama');
+                    }
+
+                    $msg = $data['message'] ?? [];
+                    $textChunk = $msg['content'] ?? '';
+                    $thinkingChunk = $msg['thinking'] ?? '';
+
+                    // Sanitize UTF-8
+                    if ('' !== $thinkingChunk) {
+                        $thinkingChunk = mb_convert_encoding($thinkingChunk, 'UTF-8', 'UTF-8');
+                    }
+                    if ('' !== $textChunk) {
+                        $textChunk = mb_convert_encoding($textChunk, 'UTF-8', 'UTF-8');
+                    }
+
+                    // Forward thinking tokens as reasoning
+                    if ('' !== $thinkingChunk) {
+                        $callback(['type' => 'reasoning', 'content' => $thinkingChunk]);
+                        ++$chunkCount;
+                    }
+
+                    // Forward content tokens
+                    if ('' !== $textChunk) {
+                        $fullResponse .= $textChunk;
+                        $callback(['type' => 'content', 'content' => $textChunk]);
+                        ++$chunkCount;
+
+                        if (1 === $chunkCount || ('' === $fullResponse && strlen($textChunk) > 0)) {
+                            $this->logger->info('Ollama: First content chunk sent', [
+                                'length' => strlen($textChunk),
+                                'preview' => substr($textChunk, 0, 50),
+                            ]);
+                        }
+                    }
+
+                    if (!empty($data['done'])) {
+                        $promptTokens = $data['prompt_eval_count'] ?? 0;
+                        $completionTokens = $data['eval_count'] ?? 0;
+
+                        $doneReason = $data['done_reason'] ?? 'stop';
+                        $finishReason = ('length' === $doneReason) ? 'length' : 'stop';
+                        $callback(['type' => 'finish', 'finish_reason' => $finishReason]);
+
+                        $this->logger->info('Ollama: Stream done', [
+                            'prompt_tokens' => $promptTokens,
+                            'completion_tokens' => $completionTokens,
+                            'done_reason' => $doneReason,
+                        ]);
+                        break 2;
+                    }
                 }
             }
 
-            // Note: The Ollama PHP SDK (ardagnsrn/ollama-php) does not expose
-            // done_reason from the API response, so we cannot detect truncation
-            // (done_reason="length"). Once the SDK adds this field, we should
-            // emit callback(['type' => 'finish', 'finish_reason' => ...]) here.
-
-            $this->logger->info('🔵 Ollama: Streaming complete', [
+            $this->logger->info('Ollama: Streaming complete', [
                 'chunks_sent' => $chunkCount,
                 'total_length' => strlen($fullResponse),
             ]);
@@ -257,7 +327,7 @@ class OllamaProvider implements ChatProviderInterface, EmbeddingProviderInterfac
         } catch (ProviderException $e) {
             throw $e;
         } catch (\Exception $e) {
-            $this->logger->error('🔴 Ollama streaming error', [
+            $this->logger->error('Ollama streaming error', [
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString(),
             ]);
