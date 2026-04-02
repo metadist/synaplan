@@ -256,23 +256,43 @@ services:
     networks:
       - synaplan-network
 
+  # Generates a self-signed TLS certificate for Keycloak HTTPS (runs once)
+  keycloak_certs:
+    image: alpine:3.20
+    container_name: synaplan-keycloak-certs
+    command: sh -c 'if [ -f /certs/cert.pem ]; then echo "Keycloak TLS cert exists"; exit 0; fi && apk add --no-cache openssl && openssl req -x509 -newkey rsa:2048 -keyout /certs/key.pem -out /certs/cert.pem -days 3650 -nodes -subj "/CN=host.docker.internal" -addext "subjectAltName=DNS:host.docker.internal,DNS:keycloak,DNS:localhost" && chmod 644 /certs/*.pem && echo "Keycloak TLS cert generated"'
+    volumes:
+      - keycloak_certs:/certs
+    profiles: [oidc]
+    restart: "no"
+    networks:
+      - synaplan-network
+
   # Keycloak OIDC Identity Provider (optional - activated with --profile oidc)
   keycloak:
     image: quay.io/keycloak/keycloak:26.1
     container_name: synaplan-keycloak
+    depends_on:
+      keycloak_certs:
+        condition: service_completed_successfully
     command: start-dev
     environment:
       KC_BOOTSTRAP_ADMIN_USERNAME: admin
       KC_BOOTSTRAP_ADMIN_PASSWORD: admin
       KC_HEALTH_ENABLED: "true"
       KC_FEATURES: token-exchange,admin-fine-grained-authz
-      KC_HOSTNAME: ${KC_HOSTNAME:-host.docker.internal}
-      KC_HOSTNAME_PORT: ${KC_HOSTNAME_PORT:-8080}
+      KC_HOSTNAME: ${KC_HOSTNAME:-https://host.docker.internal:8443}
+      KC_HOSTNAME_BACKCHANNEL_DYNAMIC: "true"
       KC_HOSTNAME_STRICT: "false"
+      KC_HTTPS_CERTIFICATE_FILE: /opt/keycloak/certs/cert.pem
+      KC_HTTPS_CERTIFICATE_KEY_FILE: /opt/keycloak/certs/key.pem
     ports:
       - "8080:8080"
+      - "8443:8443"
+    volumes:
+      - keycloak_certs:/opt/keycloak/certs:ro
     healthcheck:
-      test: ["CMD-SHELL", "exec 3<>/dev/tcp/localhost/9000 && echo -en 'GET /health/ready HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n' >&3 && cat <&3 | grep -q '\"status\": \"UP\"'"]
+      test: ["CMD-SHELL", "exec 3<>/dev/tcp/localhost/8080"]
       interval: 10s
       timeout: 5s
       retries: 15
@@ -319,6 +339,7 @@ volumes:
   ollama_data:
   whisper_models:
   qdrant_storage:
+  keycloak_certs:
 
 networks:
   synaplan-network:
