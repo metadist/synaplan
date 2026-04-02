@@ -8,9 +8,11 @@ use App\AI\Service\AiFacade;
 use App\Entity\InboundEmailHandler;
 use App\Repository\InboundEmailHandlerRepository;
 use App\Repository\PromptRepository;
+use App\Repository\UserRepository;
 use App\Service\EncryptionService;
 use App\Service\InboundEmailHandlerService;
 use App\Service\ModelConfigService;
+use App\Service\RateLimitService;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
 
@@ -36,8 +38,10 @@ class InboundEmailHandlerServiceTest extends TestCase
         $this->service = new InboundEmailHandlerService(
             $this->handlerRepository,
             $this->promptRepository,
+            $this->createMock(UserRepository::class),
             $this->aiFacade,
             $this->modelConfigService,
+            $this->createMock(RateLimitService::class),
             $this->encryptionService,
             $this->logger
         );

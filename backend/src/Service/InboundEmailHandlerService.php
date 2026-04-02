@@ -6,6 +6,7 @@ use App\AI\Service\AiFacade;
 use App\Entity\InboundEmailHandler;
 use App\Repository\InboundEmailHandlerRepository;
 use App\Repository\PromptRepository;
+use App\Repository\UserRepository;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\Mailer\Transport;
 use Symfony\Component\Mime\Email;
@@ -21,8 +22,10 @@ final readonly class InboundEmailHandlerService
     public function __construct(
         private InboundEmailHandlerRepository $handlerRepository,
         private PromptRepository $promptRepository,
+        private UserRepository $userRepository,
         private AiFacade $aiFacade,
         private ModelConfigService $modelConfigService,
+        private RateLimitService $rateLimitService,
         private EncryptionService $encryptionService,
         private LoggerInterface $logger,
     ) {
@@ -317,6 +320,18 @@ final readonly class InboundEmailHandlerService
             );
 
             $routedEmail = trim($response['content'] ?? '');
+
+            $handlerUser = $this->userRepository->find($handler->getUserId());
+            if ($handlerUser) {
+                $this->rateLimitService->recordUsage($handlerUser, 'EMAIL_ROUTING', [
+                    'provider' => $response['provider'] ?? $provider,
+                    'model' => $response['model'] ?? $modelName,
+                    'model_id' => $modelId,
+                    'usage' => $response['usage'] ?? [],
+                    'response_text' => $routedEmail,
+                    'input_text' => $fullPrompt,
+                ]);
+            }
 
             // Check if AI decided to discard the email
             if ('DISCARD' === strtoupper($routedEmail)) {

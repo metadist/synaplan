@@ -8,6 +8,7 @@ use App\AI\Service\AiFacade;
 use App\Entity\Message;
 use App\Entity\User;
 use App\Repository\PromptRepository;
+use App\Repository\UserRepository;
 use Psr\Log\LoggerInterface;
 
 /**
@@ -20,7 +21,9 @@ final readonly class MemoryExtractionService
     public function __construct(
         private AiFacade $aiFacade,
         private ModelConfigService $modelConfigService,
+        private RateLimitService $rateLimitService,
         private PromptRepository $promptRepository,
+        private UserRepository $userRepository,
         private LoggerInterface $logger,
     ) {
     }
@@ -145,6 +148,18 @@ PROMPT;
             );
 
             $content = $response['content'] ?? '';
+
+            $user = $this->userRepository->find($message->getUserId());
+            if ($user) {
+                $this->rateLimitService->recordUsage($user, 'MEMORY_EXTRACTION', [
+                    'provider' => $response['provider'] ?? 'unknown',
+                    'model' => $response['model'] ?? 'unknown',
+                    'model_id' => $extractionConfig['model_id'] ?? null,
+                    'usage' => $response['usage'] ?? [],
+                    'response_text' => $content,
+                    'input_text' => $userPrompt,
+                ]);
+            }
 
             $this->logger->info('Memory extraction AI response received', [
                 'message_id' => $message->getId(),
@@ -348,7 +363,7 @@ PROMPT;
      * Resolves both the model name AND the matching provider from the model ID
      * to avoid provider/model mismatch (e.g., sending an OpenAI model to Groq).
      *
-     * @return array{model: string|null, provider: string|null}
+     * @return array{model: string|null, provider: string|null, model_id: int|null}
      */
     private function getExtractionModelConfig(int $userId): array
     {
@@ -366,9 +381,9 @@ PROMPT;
                 'provider' => $provider,
             ]);
 
-            return ['model' => $model, 'provider' => $provider];
+            return ['model' => $model, 'provider' => $provider, 'model_id' => $modelId];
         }
 
-        return ['model' => null, 'provider' => null]; // Use system default
+        return ['model' => null, 'provider' => null, 'model_id' => null];
     }
 }

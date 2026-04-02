@@ -13,6 +13,7 @@ use App\Repository\PromptRepository;
 use App\Service\ModelConfigService;
 use App\Service\PromptService;
 use App\Service\RAG\VectorStorage\VectorStorageFacade;
+use App\Service\RateLimitService;
 use Doctrine\ORM\EntityManagerInterface;
 use OpenApi\Attributes as OA;
 use Psr\Log\LoggerInterface;
@@ -41,6 +42,7 @@ class PromptController extends AbstractController
         private PromptRepository $promptRepository,
         private PromptMetaRepository $promptMetaRepository,
         private PromptService $promptService,
+        private RateLimitService $rateLimitService,
         private EntityManagerInterface $em,
         private LoggerInterface $logger,
         private AiFacade $aiFacade,
@@ -1441,20 +1443,22 @@ class PromptController extends AbstractController
             // Get a cheap, fast model for summarization
             $provider = null;
             $modelName = null;
+            $summaryModelId = 73;
 
             // Try OpenAI gpt-4o-mini first (cheap and fast)
-            $openaiProvider = $this->modelConfigService->getProviderForModel(73);
-            $openaiModel = $this->modelConfigService->getModelName(73);
+            $openaiProvider = $this->modelConfigService->getProviderForModel($summaryModelId);
+            $openaiModel = $this->modelConfigService->getModelName($summaryModelId);
 
             if ($openaiProvider && $openaiModel) {
                 $provider = $openaiProvider;
                 $modelName = $openaiModel;
             } else {
                 // Fallback to user's default chat model
-                $modelId = $this->modelConfigService->getDefaultModel('CHAT', $user->getId());
-                if ($modelId && $modelId > 0) {
-                    $provider = $this->modelConfigService->getProviderForModel($modelId);
-                    $modelName = $this->modelConfigService->getModelName($modelId);
+                $fallbackModelId = $this->modelConfigService->getDefaultModel('CHAT', $user->getId());
+                if ($fallbackModelId && $fallbackModelId > 0) {
+                    $summaryModelId = $fallbackModelId;
+                    $provider = $this->modelConfigService->getProviderForModel($fallbackModelId);
+                    $modelName = $this->modelConfigService->getModelName($fallbackModelId);
                 }
             }
 
@@ -1486,6 +1490,14 @@ PROMPT;
 
             $response = $this->aiFacade->chat($messages, $user->getId(), $aiOptions);
             $summary = trim($response['content'] ?? '');
+
+            $this->rateLimitService->recordUsage($user, 'FILE_SUMMARY', [
+                'provider' => $response['provider'] ?? 'unknown',
+                'model' => $response['model'] ?? 'unknown',
+                'model_id' => $summaryModelId,
+                'usage' => $response['usage'] ?? [],
+                'response_text' => $summary,
+            ]);
 
             $this->logger->info('File summary generated', [
                 'user_id' => $user->getId(),

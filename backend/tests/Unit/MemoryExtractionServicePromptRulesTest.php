@@ -6,8 +6,10 @@ use App\AI\Service\AiFacade;
 use App\Entity\Message;
 use App\Entity\Prompt;
 use App\Repository\PromptRepository;
+use App\Repository\UserRepository;
 use App\Service\MemoryExtractionService;
 use App\Service\ModelConfigService;
+use App\Service\RateLimitService;
 use App\Service\UserMemoryService;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
@@ -79,7 +81,9 @@ final class MemoryExtractionServicePromptRulesTest extends TestCase
         $service = new MemoryExtractionService(
             $aiFacade,
             $modelConfigService,
+            $this->createMock(RateLimitService::class),
             $promptRepository,
+            $this->createMock(UserRepository::class),
             $logger
         );
 

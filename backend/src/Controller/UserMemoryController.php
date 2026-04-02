@@ -9,6 +9,7 @@ use App\AI\Service\AiFacade;
 use App\Entity\User;
 use App\Service\ModelConfigService;
 use App\Service\PromptService;
+use App\Service\RateLimitService;
 use App\Service\UserMemoryService;
 use OpenApi\Attributes as OA;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -27,6 +28,7 @@ class UserMemoryController extends AbstractController
         private readonly AiFacade $aiFacade,
         private readonly PromptService $promptService,
         private readonly ModelConfigService $modelConfigService,
+        private readonly RateLimitService $rateLimitService,
     ) {
     }
 
@@ -605,6 +607,15 @@ class UserMemoryController extends AbstractController
 
             $content = $response['content'] ?? '';
 
+            $this->rateLimitService->recordUsage($user, 'MEMORY_PARSE', [
+                'provider' => $response['provider'] ?? 'unknown',
+                'model' => $response['model'] ?? 'unknown',
+                'model_id' => $chatModelConfig['model_id'] ?? null,
+                'usage' => $response['usage'] ?? [],
+                'response_text' => $content,
+                'input_text' => $userMessage,
+            ]);
+
             // Get ALL valid memory IDs for this user to validate AI suggestions
             // We need all user memories, not just similar ones, because AI might reference any
             $allUserMemories = $this->memoryService->getUserMemories($user->getId());
@@ -879,7 +890,7 @@ class UserMemoryController extends AbstractController
      * Resolves both from the same model ID to prevent provider/model mismatch
      * (e.g., sending an OpenAI model name to Groq provider).
      *
-     * @return array{model: string|null, provider: string|null}
+     * @return array{model: string|null, provider: string|null, model_id: int|null}
      */
     private function getUserChatModelConfig(int $userId): array
     {
@@ -889,9 +900,10 @@ class UserMemoryController extends AbstractController
             return [
                 'model' => $this->modelConfigService->getModelName($modelId),
                 'provider' => $this->modelConfigService->getProviderForModel($modelId),
+                'model_id' => $modelId,
             ];
         }
 
-        return ['model' => null, 'provider' => null];
+        return ['model' => null, 'provider' => null, 'model_id' => null];
     }
 }

@@ -12,6 +12,7 @@ use App\Repository\ChatRepository;
 use App\Repository\MessageRepository;
 use App\Repository\ModelRepository;
 use App\Repository\PromptRepository;
+use App\Repository\UserRepository;
 use App\Repository\WidgetSessionRepository;
 use App\Repository\WidgetSummaryRepository;
 use Doctrine\ORM\EntityManagerInterface;
@@ -40,8 +41,10 @@ final readonly class WidgetSummaryService
         private MessageRepository $messageRepository,
         private PromptRepository $promptRepository,
         private ModelRepository $modelRepository,
+        private UserRepository $userRepository,
         private AiFacade $aiFacade,
         private ModelConfigService $modelConfigService,
+        private RateLimitService $rateLimitService,
         private LoggerInterface $logger,
     ) {
     }
@@ -520,6 +523,18 @@ PROMPT;
             ], $userId, $aiOptions);
 
             $responseText = $result['text'] ?? $result['content'] ?? '';
+
+            $owner = $this->userRepository->find($userId);
+            if ($owner) {
+                $this->rateLimitService->recordUsage($owner, 'WIDGET_SUMMARY', [
+                    'provider' => $result['provider'] ?? 'unknown',
+                    'model' => $result['model'] ?? 'unknown',
+                    'model_id' => $modelId,
+                    'usage' => $result['usage'] ?? [],
+                    'response_text' => $responseText,
+                    'input_text' => $analysisPrompt,
+                ]);
+            }
 
             // Parse the structured response
             return $this->parseStructuredResponse($responseText);
