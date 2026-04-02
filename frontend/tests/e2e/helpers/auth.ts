@@ -8,7 +8,10 @@ function apiBaseUrl(): string {
   return getApiUrl()
 }
 
-const KEYCLOAK_URL = process.env.KEYCLOAK_URL || 'http://host.docker.internal:8080'
+// Default Keycloak port: 8081 for test stack (BASE_URL includes :8001), 8080 for dev stack
+const KEYCLOAK_DEFAULT_PORT = process.env.BASE_URL?.includes(':8001') ? '8081' : '8080'
+const KEYCLOAK_URL =
+  process.env.KEYCLOAK_URL || `http://host.docker.internal:${KEYCLOAK_DEFAULT_PORT}`
 const KEYCLOAK_REALM = 'synaplan'
 const KEYCLOAK_TOKEN_ENDPOINT = `${KEYCLOAK_URL}/realms/${KEYCLOAK_REALM}/protocol/openid-connect/token`
 
