@@ -26,7 +26,7 @@ class OpenAIProvider implements ChatProviderInterface, EmbeddingProviderInterfac
         private HttpClientInterface $httpClient,
         private ?string $apiKey = null,
         private string $uploadDir = '/var/www/backend/var/uploads',
-        private bool $storeResponses = true,
+        private bool $storeResponses = false,
     ) {
         if (!empty($apiKey)) {
             $this->client = \OpenAI::client($apiKey);
@@ -298,10 +298,8 @@ class OpenAIProvider implements ChatProviderInterface, EmbeddingProviderInterfac
 
     /**
      * Execute responses()->create() with fallback when previous_response_id is invalid.
-     *
-     * @return OpenAI\Responses\Responses\CreateResponse
      */
-    private function executeResponsesCreate(array $requestOptions)
+    private function executeResponsesCreate(array $requestOptions): mixed
     {
         try {
             return $this->client->responses()->create($requestOptions);
@@ -322,10 +320,8 @@ class OpenAIProvider implements ChatProviderInterface, EmbeddingProviderInterfac
 
     /**
      * Execute responses()->createStreamed() with fallback when previous_response_id is invalid.
-     *
-     * @return OpenAI\Responses\StreamResponse<OpenAI\Responses\Responses\CreateStreamedResponse>
      */
-    private function executeResponsesCreateStreamed(array $requestOptions)
+    private function executeResponsesCreateStreamed(array $requestOptions): mixed
     {
         try {
             return $this->client->responses()->createStreamed($requestOptions);

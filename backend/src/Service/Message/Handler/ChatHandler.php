@@ -807,8 +807,6 @@ final readonly class ChatHandler implements MessageHandlerInterface
                 $modelMaxTokens = $model->getMaxTokens();
             }
 
-            error_log('🟢 ChatHandler RESOLVED CHAT MODEL: '.$provider.' / '.$modelName.' (ID: '.$modelId.')');
-
             $this->logger->info('ChatHandler: Resolved model for streaming', [
                 'model_id' => $modelId,
                 'provider' => $provider,
@@ -828,10 +826,10 @@ final readonly class ChatHandler implements MessageHandlerInterface
             }
         }
 
-        // Conversation History bauen (TEXT only for streaming)
+        // Build conversation history (TEXT only for streaming)
         $messages = $this->buildStreamingMessages($systemPrompt, $thread, $message, $options);
 
-        // AI streaming aufrufen - merge processing options with model config
+        // Call AI streaming - merge processing options with model config
         $aiOptions = array_merge([
             'provider' => $provider,
             'model' => $modelName,
@@ -850,17 +848,13 @@ final readonly class ChatHandler implements MessageHandlerInterface
             $aiOptions['max_tokens'] = min($tokenLimits);
         }
 
-        // Log reasoning option
-        error_log('🧠 ChatHandler: Reasoning option = '.($aiOptions['reasoning'] ?? 'NOT SET'));
-
-        $this->logger->info('🔵 ChatHandler: Calling AiFacade chatStream', [
+        $this->logger->info('ChatHandler: Calling AiFacade chatStream', [
             'provider' => $provider,
             'model' => $modelName,
             'user_id' => $message->getUserId(),
             'reasoning' => $aiOptions['reasoning'] ?? false,
         ]);
 
-        // 🎯 CAPTURE AI RESPONSE: Collect the full response text for memory extraction
         $fullResponseText = '';
         $wrappedStreamCallback = function (string|array $chunk, array $metadata = []) use ($streamCallback, &$fullResponseText): void {
             // Handle both string chunks (old providers) and array chunks (new providers with type/content)
@@ -885,7 +879,7 @@ final readonly class ChatHandler implements MessageHandlerInterface
             $aiOptions
         );
 
-        $this->logger->info('🔵 ChatHandler: AiFacade chatStream returned', [
+        $this->logger->info('ChatHandler: AiFacade chatStream returned', [
             'response_length' => strlen($fullResponseText),
         ]);
 
@@ -898,10 +892,10 @@ final readonly class ChatHandler implements MessageHandlerInterface
         } else {
             // Memory Extraction (Option B: After AI-Response, in the same Request)
             // Pass the AI response to memory extraction so it can extract from the answer too
-            $this->logger->info('💾 Loading relevant memories for extraction', ['user_id' => $message->getUserId()]);
+            $this->logger->info('ChatHandler: Loading relevant memories for extraction', ['user_id' => $message->getUserId()]);
             $allMemories = $this->memoryService->searchRelevantMemories($message->getUserId(), $message->getText(), limit: 20, minScore: $this->feedbackConfig->getMinExtractionScore());
             $this->extractMemoriesAfterResponse($message, $fullResponseText, $thread, $allMemories, $progressCallback);
-            $this->logger->info('✅ Loaded memories for extraction', ['count' => count($allMemories)]);
+            $this->logger->info('ChatHandler: Loaded memories for extraction', ['count' => count($allMemories)]);
         }
 
         return [
@@ -1775,7 +1769,7 @@ final readonly class ChatHandler implements MessageHandlerInterface
             // 🎯 NOTIFY: Starting memory analysis
             $this->notify($progressCallback, 'analyzing_memories', 'Analyzing memories...');
 
-            $this->logger->info('🧠 ChatHandler: Starting memory extraction', [
+            $this->logger->info('ChatHandler: Starting memory extraction', [
                 'message_id' => $message->getId(),
                 'user_id' => $userId,
                 'relevant_memories_count' => count($relevantMemories),
