@@ -31,7 +31,7 @@ final readonly class WidgetSummaryService
 {
     public const SUMMARY_TOPIC_PREFIX = 'ws_';
     public const DEFAULT_SUMMARY_TOPIC = 'tools:widget-summary-default';
-    public const DEFAULT_SUMMARY_MODEL_ID = 73;
+    public const DEFAULT_SUMMARY_MODEL_ID = ModelConfigService::DEFAULT_LIGHTWEIGHT_MODEL_ID;
 
     public function __construct(
         private EntityManagerInterface $em,

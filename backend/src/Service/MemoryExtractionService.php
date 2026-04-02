@@ -8,7 +8,7 @@ use App\AI\Service\AiFacade;
 use App\Entity\Message;
 use App\Entity\User;
 use App\Repository\PromptRepository;
-use App\Repository\UserRepository;
+use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;
 
 /**
@@ -23,7 +23,7 @@ final readonly class MemoryExtractionService
         private ModelConfigService $modelConfigService,
         private RateLimitService $rateLimitService,
         private PromptRepository $promptRepository,
-        private UserRepository $userRepository,
+        private EntityManagerInterface $entityManager,
         private LoggerInterface $logger,
     ) {
     }
@@ -149,17 +149,16 @@ PROMPT;
 
             $content = $response['content'] ?? '';
 
-            $user = $this->userRepository->find($message->getUserId());
-            if ($user) {
-                $this->rateLimitService->recordUsage($user, 'MEMORY_EXTRACTION', [
-                    'provider' => $response['provider'] ?? 'unknown',
-                    'model' => $response['model'] ?? 'unknown',
-                    'model_id' => $extractionConfig['model_id'] ?? null,
-                    'usage' => $response['usage'] ?? [],
-                    'response_text' => $content,
-                    'input_text' => $userPrompt,
-                ]);
-            }
+            /** @var User $user */
+            $user = $this->entityManager->getReference(User::class, $message->getUserId());
+            $this->rateLimitService->recordUsage($user, 'MEMORY_EXTRACTION', [
+                'provider' => $response['provider'] ?? 'unknown',
+                'model' => $response['model'] ?? 'unknown',
+                'model_id' => $extractionConfig['model_id'] ?? null,
+                'usage' => $response['usage'] ?? [],
+                'response_text' => $content,
+                'input_text' => $userPrompt,
+            ]);
 
             $this->logger->info('Memory extraction AI response received', [
                 'message_id' => $message->getId(),

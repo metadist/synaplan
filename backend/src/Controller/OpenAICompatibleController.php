@@ -228,12 +228,21 @@ class OpenAICompatibleController extends AbstractController
         try {
             $result = $this->aiFacade->chat($messages, $user->getId(), $options);
 
+            $lastUserMessage = '';
+            foreach (array_reverse($messages) as $msg) {
+                if ('user' === ($msg['role'] ?? '')) {
+                    $lastUserMessage = $msg['content'] ?? '';
+                    break;
+                }
+            }
+
             $this->rateLimitService->recordUsage($user, 'API_CHAT', [
                 'provider' => $result['provider'] ?? 'unknown',
                 'model' => $result['model'] ?? 'unknown',
                 'model_id' => $dbModelId,
                 'usage' => $result['usage'] ?? [],
                 'response_text' => $result['content'] ?? '',
+                'input_text' => $lastUserMessage,
                 'source' => 'OPENAI_API',
             ]);
 
@@ -285,11 +294,12 @@ class OpenAICompatibleController extends AbstractController
             ignore_user_abort(false);
 
             $firstChunk = true;
+            $accumulatedContent = '';
 
             try {
                 $streamMetadata = $this->aiFacade->chatStream(
                     $messages,
-                    function ($chunk) use ($completionId, $created, $displayModel, &$firstChunk) {
+                    function ($chunk) use ($completionId, $created, $displayModel, &$firstChunk, &$accumulatedContent) {
                         if (connection_aborted()) {
                             return;
                         }
@@ -304,6 +314,8 @@ class OpenAICompatibleController extends AbstractController
                         if ('' === $content) {
                             return;
                         }
+
+                        $accumulatedContent .= $content;
 
                         if ($firstChunk) {
                             $this->writeSSE([
@@ -359,12 +371,22 @@ class OpenAICompatibleController extends AbstractController
                 }
                 flush();
 
+                $lastUserMessage = '';
+                foreach (array_reverse($messages) as $msg) {
+                    if ('user' === ($msg['role'] ?? '')) {
+                        $lastUserMessage = $msg['content'] ?? '';
+                        break;
+                    }
+                }
+
                 $this->rateLimitService->recordUsage($user, 'API_CHAT', [
                     'provider' => $streamMetadata['provider'] ?? 'unknown',
                     'model' => $streamMetadata['model'] ?? 'unknown',
                     'model_id' => $dbModelId,
                     'usage' => $streamMetadata['usage'] ?? [],
                     'source' => 'OPENAI_API',
+                    'input_text' => $lastUserMessage,
+                    'response_text' => $accumulatedContent,
                 ]);
             } catch (\Throwable $e) {
                 $errorPayload = [

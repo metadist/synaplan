@@ -17,6 +17,8 @@ use Psr\Cache\CacheItemPoolInterface;
  */
 final readonly class ModelConfigService
 {
+    public const DEFAULT_LIGHTWEIGHT_MODEL_ID = 73;
+
     public function __construct(
         private ConfigRepository $configRepository,
         private ModelRepository $modelRepository,

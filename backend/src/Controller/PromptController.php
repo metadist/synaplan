@@ -1443,7 +1443,7 @@ class PromptController extends AbstractController
             // Get a cheap, fast model for summarization
             $provider = null;
             $modelName = null;
-            $summaryModelId = 73;
+            $summaryModelId = ModelConfigService::DEFAULT_LIGHTWEIGHT_MODEL_ID;
 
             // Try OpenAI gpt-4o-mini first (cheap and fast)
             $openaiProvider = $this->modelConfigService->getProviderForModel($summaryModelId);
@@ -1497,6 +1497,7 @@ PROMPT;
                 'model_id' => $summaryModelId,
                 'usage' => $response['usage'] ?? [],
                 'response_text' => $summary,
+                'input_text' => "Summarize this document:\n\n{$fileText}",
             ]);
 
             $this->logger->info('File summary generated', [

@@ -23,7 +23,7 @@ final readonly class WidgetSetupService
 {
     public const SETUP_INTERVIEW_TOPIC = 'tools:widget-setup-interview';
     public const SETUP_TOPIC_PREFIX = 'wsetup_';
-    public const DEFAULT_SETUP_MODEL_ID = 73;
+    public const DEFAULT_SETUP_MODEL_ID = ModelConfigService::DEFAULT_LIGHTWEIGHT_MODEL_ID;
     private const START_MARKER = '__START_INTERVIEW__';
     private const FLOW_BUILDER_START_MARKER = '__START_FLOW_BUILDER__';
 
@@ -235,7 +235,7 @@ final readonly class WidgetSetupService
             'model_id' => $modelId,
             'usage' => $response['usage'] ?? [],
             'response_text' => $aiResponse,
-            'input_text' => $text,
+            'input_text' => $isStart ? '' : $enrichedText,
         ]);
 
         $this->logger->info('Widget flow-builder message processed', [

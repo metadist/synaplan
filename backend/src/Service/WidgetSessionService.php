@@ -204,7 +204,7 @@ final class WidgetSessionService
             }
 
             // Use gpt-4o-mini for cheap, fast summarization
-            $titleModelId = 73;
+            $titleModelId = ModelConfigService::DEFAULT_LIGHTWEIGHT_MODEL_ID;
             $aiOptions = ['temperature' => 0.3];
             $provider = $this->modelConfigService->getProviderForModel($titleModelId);
             $modelName = $this->modelConfigService->getModelName($titleModelId);
