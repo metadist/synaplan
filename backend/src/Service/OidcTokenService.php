@@ -193,6 +193,44 @@ final class OidcTokenService
     }
 
     /**
+     * Validate OIDC bearer token with full claims and audience check.
+     *
+     * Unlike validateOidcToken(), this returns ALL JWT claims (including role claims
+     * like realm_access, resource_access, groups) and enforces an audience check.
+     * Used by OidcBearerAuthenticator for externally supplied tokens (token exchange).
+     *
+     * @return array<string, mixed>|null Full JWT claims if valid, null otherwise
+     */
+    public function validateBearerToken(string $accessToken, ?string $expectedAudience = null, string $provider = 'keycloak'): ?array
+    {
+        try {
+            $discovery = $this->getDiscoveryConfig($provider);
+
+            $claims = $this->jwtValidator->validateToken(
+                token: $accessToken,
+                jwksUri: $discovery['jwks_uri'],
+                expectedIssuer: $discovery['issuer'],
+                expectedAudience: $expectedAudience,
+            );
+
+            if (!$claims) {
+                $this->logger->debug('Bearer token JWT validation failed', ['provider' => $provider]);
+
+                return null;
+            }
+
+            return $claims;
+        } catch (\Exception $e) {
+            $this->logger->error('Bearer token validation error', [
+                'error' => $e->getMessage(),
+                'provider' => $provider,
+            ]);
+
+            return null;
+        }
+    }
+
+    /**
      * Get user from OIDC token (validates and returns user).
      */
     public function getUserFromOidcToken(string $accessToken, string $provider = 'keycloak'): ?User

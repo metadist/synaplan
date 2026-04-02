@@ -51,6 +51,7 @@ parameters:
     env(GOOGLE_CLIENT_ID): ''
     env(GITHUB_CLIENT_ID): ''
     env(OIDC_CLIENT_ID): ''
+    env(OIDC_BEARER_AUDIENCE): ''
     env(OIDC_DISCOVERY_URL): ''
     env(RECAPTCHA_SECRET_KEY): ''
     env(GOOGLE_CLIENT_SECRET): ''
@@ -315,14 +316,25 @@ services:
             $oidcClientSecret: '%env(OIDC_CLIENT_SECRET)%'
             $oidcDiscoveryUrl: '%env(OIDC_DISCOVERY_URL)%'
 
+    # OIDC Bearer Token Authenticator (for external services like synaplan-opencloud)
+    App\Security\OidcBearerAuthenticator:
+        arguments:
+            $oidcBearerAudience: '%env(OIDC_BEARER_AUDIENCE)%'
+            $oidcClientId: '%env(OIDC_CLIENT_ID)%'
+
+    # OIDC User Provisioning Service (shared by controller + bearer authenticator)
+    App\Service\OidcUserService:
+        arguments:
+            $oidcAdminRoles: '%env(string:OIDC_ADMIN_ROLES)%'
+            $oidcRoleClaims: '%env(string:OIDC_ROLE_CLAIMS)%'
+            $oidcClientId: '%env(OIDC_CLIENT_ID)%'
+
     # Keycloak OIDC OAuth Controller
     App\Controller\KeycloakAuthController:
         arguments:
             $oidcClientId: '%env(OIDC_CLIENT_ID)%'
             $oidcClientSecret: '%env(OIDC_CLIENT_SECRET)%'
             $oidcDiscoveryUrl: '%env(OIDC_DISCOVERY_URL)%'
-            $oidcAdminRoles: '%env(string:OIDC_ADMIN_ROLES)%'
-            $oidcRoleClaims: '%env(string:OIDC_ROLE_CLAIMS)%'
             $oidcScopes: '%env(string:OIDC_SCOPES)%'
             $appUrl: '%env(APP_URL)%'
             $frontendUrl: '%env(FRONTEND_URL)%'

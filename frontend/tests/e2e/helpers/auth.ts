@@ -8,6 +8,74 @@ function apiBaseUrl(): string {
   return getApiUrl()
 }
 
+const KEYCLOAK_URL = process.env.KEYCLOAK_URL || 'http://host.docker.internal:8080'
+const KEYCLOAK_REALM = 'synaplan'
+const KEYCLOAK_TOKEN_ENDPOINT = `${KEYCLOAK_URL}/realms/${KEYCLOAK_REALM}/protocol/openid-connect/token`
+
+/**
+ * Retrieve an OIDC access token via direct access grant (resource owner password).
+ * Used for API-only tests that need an OIDC token without browser interaction.
+ */
+export async function retrieveOidcAccessToken(options: {
+  clientId: string
+  username: string
+  password: string
+  grantType?: string
+}): Promise<string> {
+  const response = await fetch(KEYCLOAK_TOKEN_ENDPOINT, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({
+      grant_type: options.grantType ?? 'password',
+      client_id: options.clientId,
+      username: options.username,
+      password: options.password,
+    }),
+  })
+
+  if (!response.ok) {
+    const body = await response.text()
+    throw new Error(`Failed to retrieve OIDC access token: ${response.status} ${body}`)
+  }
+
+  const data = await response.json()
+  return data.access_token
+}
+
+/**
+ * Exchange an OIDC token for a different-audience token via RFC 8693 token exchange.
+ */
+export async function exchangeOidcToken(options: {
+  subjectToken: string
+  clientId: string
+  clientSecret: string
+  audience: string
+  subjectTokenType?: string
+  grantType?: string
+}): Promise<string> {
+  const response = await fetch(KEYCLOAK_TOKEN_ENDPOINT, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({
+      grant_type: options.grantType ?? 'urn:ietf:params:oauth:grant-type:token-exchange',
+      subject_token: options.subjectToken,
+      subject_token_type:
+        options.subjectTokenType ?? 'urn:ietf:params:oauth:token-type:access_token',
+      audience: options.audience,
+      client_id: options.clientId,
+      client_secret: options.clientSecret,
+    }),
+  })
+
+  if (!response.ok) {
+    const body = await response.text()
+    throw new Error(`Token exchange failed: ${response.status} ${body}`)
+  }
+
+  const data = await response.json()
+  return data.access_token
+}
+
 interface AdminUserSummary {
   id: number
   email: string | null

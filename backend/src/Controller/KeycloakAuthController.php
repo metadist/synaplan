@@ -2,12 +2,10 @@
 
 namespace App\Controller;
 
-use App\Entity\User;
-use App\Repository\UserRepository;
 use App\Service\OAuthStateService;
 use App\Service\OidcTokenService;
+use App\Service\OidcUserService;
 use App\Service\TokenService;
-use Doctrine\ORM\EntityManagerInterface;
 use OpenApi\Attributes as OA;
 use Psr\Log\LoggerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -35,32 +33,21 @@ class KeycloakAuthController extends AbstractController
 {
     private string $appEnv;
 
-    /** @var array<string> */
-    private array $adminRoleNames;
-
-    /** @var array<array<string>> Each element is an array of path segments, e.g. ['realm_access', 'roles'] */
-    private array $roleClaimPaths;
-
     public function __construct(
         private HttpClientInterface $httpClient,
-        private UserRepository $userRepository,
-        private EntityManagerInterface $em,
         private TokenService $tokenService,
         private OidcTokenService $oidcTokenService,
+        private OidcUserService $oidcUserService,
         private OAuthStateService $oauthStateService,
         private LoggerInterface $logger,
         private string $oidcClientId,
         private string $oidcClientSecret,
         private string $oidcDiscoveryUrl,
-        string $oidcAdminRoles,
-        string $oidcRoleClaims,
         private string $oidcScopes,
         private string $appUrl,
         private string $frontendUrl,
     ) {
         $this->appEnv = $_ENV['APP_ENV'] ?? 'prod';
-        $this->adminRoleNames = array_map('strtolower', array_map('trim', explode(',', $oidcAdminRoles)));
-        $this->roleClaimPaths = $this->parseRoleClaims($oidcRoleClaims);
     }
 
     #[Route('/login', name: 'keycloak_auth_login', methods: ['GET'])]
@@ -219,13 +206,13 @@ class KeycloakAuthController extends AbstractController
 
             $userInfo = $userInfoResponse->toArray();
 
-            // Merge role claims from the access token JWT.
-            // The userinfo endpoint typically omits these; the JWT always has them.
+            // Merge JWT claims into userInfo — the userinfo endpoint often omits
+            // role claims that the access token JWT contains.
             $tokenClaims = $this->decodeJwtPayload($accessToken);
             if ($tokenClaims) {
-                foreach ($this->getTopLevelRoleClaimKeys() as $claim) {
-                    if (isset($tokenClaims[$claim]) && !isset($userInfo[$claim])) {
-                        $userInfo[$claim] = $tokenClaims[$claim];
+                foreach ($tokenClaims as $key => $value) {
+                    if (!isset($userInfo[$key])) {
+                        $userInfo[$key] = $value;
                     }
                 }
             }
@@ -235,8 +222,8 @@ class KeycloakAuthController extends AbstractController
                 'email' => $userInfo['email'] ?? 'unknown',
             ]);
 
-            // Find or create user
-            $user = $this->findOrCreateUser($userInfo, $refreshToken);
+            // Find or create user + sync roles via shared OIDC user service
+            $user = $this->oidcUserService->findOrCreateFromClaims($userInfo, $refreshToken);
 
             // Create redirect response
             $callbackUrl = $this->frontendUrl.'/auth/callback?'.http_build_query([
@@ -358,182 +345,6 @@ class KeycloakAuthController extends AbstractController
     private function base64UrlEncode(string $data): string
     {
         return rtrim(strtr(base64_encode($data), '+/', '-_'), '=');
-    }
-
-    private function findOrCreateUser(array $userInfo, ?string $refreshToken): User
-    {
-        $sub = $userInfo['sub'] ?? null;
-        $email = $userInfo['email'] ?? null;
-        $username = $userInfo['preferred_username'] ?? null;
-
-        if (!$sub) {
-            throw new \Exception('User subject (sub) not provided by Keycloak');
-        }
-
-        // Try to find existing user by email
-        $user = null;
-        if ($email) {
-            $user = $this->userRepository->findOneBy(['mail' => $email]);
-        }
-
-        if (!$user) {
-            // Try to find by OIDC sub
-            $users = $this->userRepository->findAll();
-            foreach ($users as $existingUser) {
-                $details = $existingUser->getUserDetails() ?? [];
-                if (isset($details['oidc_sub']) && $details['oidc_sub'] === $sub) {
-                    $user = $existingUser;
-                    break;
-                }
-            }
-        }
-
-        if ($user) {
-            if ('keycloak' !== $user->getProviderId()) {
-                throw new \Exception(sprintf('This email is already registered using %s. Please use the same login method.', $user->getAuthProviderName()));
-            }
-
-            $this->logger->info('Existing Keycloak user logging in', [
-                'user_id' => $user->getId(),
-            ]);
-        } else {
-            // Create new user
-            $user = new User();
-            $user->setMail($email ?? $username.'@keycloak.local');
-            $user->setType('WEB');
-            $user->setProviderId('keycloak');
-            $user->setUserLevel('NEW');
-            $user->setEmailVerified(true);
-            $user->setCreated(date('Y-m-d H:i:s'));
-            $user->setUserDetails([]);
-            $user->setPaymentDetails([]);
-
-            $this->logger->info('Creating new user from Keycloak OAuth', [
-                'email' => $email,
-                'sub' => $sub,
-            ]);
-        }
-
-        // Update user details
-        $userDetails = $user->getUserDetails() ?? [];
-        $userDetails['oidc_sub'] = $sub;
-        $userDetails['oidc_email'] = $email;
-        $userDetails['oidc_username'] = $username;
-        $userDetails['oidc_refresh_token'] = $refreshToken; // Also store in DB as backup
-        $userDetails['oidc_last_login'] = (new \DateTime())->format('Y-m-d H:i:s');
-
-        if (isset($userInfo['given_name'])) {
-            $userDetails['first_name'] = $userInfo['given_name'];
-        }
-        if (isset($userInfo['family_name'])) {
-            $userDetails['last_name'] = $userInfo['family_name'];
-        }
-        if (isset($userInfo['name'])) {
-            $userDetails['full_name'] = $userInfo['name'];
-        }
-
-        // Sync OIDC roles from configured claim paths
-        $oidcRoles = [];
-        foreach ($this->roleClaimPaths as $segments) {
-            $value = $this->resolveClaimPath($userInfo, $segments);
-            if (is_array($value)) {
-                $oidcRoles = array_values(array_unique(array_merge($oidcRoles, $value)));
-            }
-        }
-        if (!empty($oidcRoles)) {
-            $userDetails['oidc_roles'] = $oidcRoles;
-
-            $hasAdmin = !empty(array_intersect(array_map('strtolower', $oidcRoles), $this->adminRoleNames));
-            if ($hasAdmin && 'ADMIN' !== $user->getUserLevel()) {
-                $user->setUserLevel('ADMIN');
-                $this->logger->info('User promoted to ADMIN via OIDC role', [
-                    'user_id' => $user->getId(),
-                    'oidc_roles' => $oidcRoles,
-                ]);
-            } elseif (!$hasAdmin && 'ADMIN' === $user->getUserLevel()) {
-                $user->setUserLevel('NEW');
-                $this->logger->info('User demoted from ADMIN — OIDC roles no longer include admin', [
-                    'user_id' => $user->getId(),
-                    'oidc_roles' => $oidcRoles,
-                ]);
-            }
-        }
-
-        $user->setUserDetails($userDetails);
-
-        if (!$user->isEmailVerified() && $email && ($userInfo['email_verified'] ?? true)) {
-            $user->setEmailVerified(true);
-        }
-
-        $this->em->persist($user);
-        $this->em->flush();
-
-        return $user;
-    }
-
-    /**
-     * Parse OIDC_ROLE_CLAIMS into an array of claim path segments.
-     *
-     * Each path is a dot-separated string (e.g. "realm_access.roles").
-     * Backslash-escaped dots (\.) are treated as literal dots in key names.
-     * The placeholder {client_id} is replaced with the actual OIDC client ID.
-     * Empty/unset input falls back to Keycloak-compatible defaults.
-     *
-     * @return array<array<string>>
-     */
-    private function parseRoleClaims(string $oidcRoleClaims): array
-    {
-        $raw = array_map('trim', explode(',', $oidcRoleClaims));
-
-        $paths = [];
-        foreach ($raw as $path) {
-            if ('' === $path) {
-                continue;
-            }
-            $path = str_replace('{client_id}', $this->oidcClientId, $path);
-            // Split on unescaped dots (backslash-escaped dots are literal)
-            $segments = preg_split('/(?<!\\\\)\./', $path);
-            $segments = array_map(static fn (string $s) => str_replace('\\.', '.', $s), $segments);
-            $paths[] = $segments;
-        }
-
-        return $paths;
-    }
-
-    /**
-     * Resolve a value from a nested array by following a path of segments.
-     *
-     * @param array<string, mixed> $data
-     * @param array<string>        $segments
-     */
-    private function resolveClaimPath(array $data, array $segments): mixed
-    {
-        $current = $data;
-        foreach ($segments as $segment) {
-            if (!is_array($current) || !array_key_exists($segment, $current)) {
-                return null;
-            }
-            $current = $current[$segment];
-        }
-
-        return $current;
-    }
-
-    /**
-     * Get the unique set of top-level claim keys needed for role extraction.
-     *
-     * Used to merge JWT claims into userInfo (the userinfo endpoint often omits them).
-     *
-     * @return array<string>
-     */
-    private function getTopLevelRoleClaimKeys(): array
-    {
-        $keys = [];
-        foreach ($this->roleClaimPaths as $segments) {
-            $keys[] = $segments[0];
-        }
-
-        return array_values(array_unique($keys));
     }
 
     /**
