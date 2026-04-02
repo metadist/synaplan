@@ -409,6 +409,7 @@ jobs:
         env:
           BASE_URL: http://localhost:8001
           KEYCLOAK_URL: http://host.docker.internal:8081
+          KEYCLOAK_HTTPS_URL: https://host.docker.internal:8444
           MAILHOG_URL: http://localhost:8025
         run: |
           echo "============================================"

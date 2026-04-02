@@ -21,6 +21,7 @@ export default defineConfig({
   use: {
     baseURL: process.env.BASE_URL || 'http://localhost:5173',
     headless: process.env.CI ? true : false,
+    ignoreHTTPSErrors: true, // Keycloak uses self-signed cert in dev/test
     screenshot: 'only-on-failure',
     video: 'retain-on-failure',
     trace: 'retain-on-failure',
