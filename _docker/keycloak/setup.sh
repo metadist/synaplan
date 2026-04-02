@@ -56,8 +56,9 @@ $KCADM add-roles -r synaplan --uusername testuser --rolename administrator
 # Requires Keycloak to run with: KC_FEATURES=token-exchange,admin-fine-grained-authz
 
 OC_CLIENT_ID="${KC_OC_CLIENT_ID:-opencloud}"
-OC_CALLBACK="${KC_OC_CALLBACK:-https://host.docker.internal:9201/oidc-callback.html}"
-OC_ORIGIN="${KC_OC_ORIGIN:-https://host.docker.internal:9201}"
+OC_CALLBACK="${KC_OC_CALLBACK:-https://host.docker.internal:9200/oidc-callback.html}"
+OC_ORIGIN="${KC_OC_ORIGIN:-https://host.docker.internal:9200}"
+OC_DEV_ORIGIN="https://host.docker.internal:9201"
 EXCHANGE_CLIENT_ID="${KC_EXCHANGE_CLIENT_ID:-synaplan-opencloud}"
 EXCHANGE_CLIENT_SECRET="${KC_EXCHANGE_CLIENT_SECRET:-synaplan-opencloud-secret}"
 
@@ -68,9 +69,9 @@ $KCADM create clients -r synaplan \
   -s publicClient=true \
   -s standardFlowEnabled=true \
   -s directAccessGrantsEnabled=true \
-  -s "redirectUris=[\"${OC_CALLBACK}\",\"${OC_ORIGIN}/*\"]" \
-  -s "webOrigins=[\"${OC_ORIGIN}\"]" \
-  -s 'attributes={"pkce.code.challenge.method":"S256","post.logout.redirect.uris":"'"${OC_ORIGIN}"'/*"}'
+  -s "redirectUris=[\"${OC_CALLBACK}\",\"${OC_ORIGIN}/*\",\"${OC_DEV_ORIGIN}/*\"]" \
+  -s "webOrigins=[\"${OC_ORIGIN}\",\"${OC_DEV_ORIGIN}\"]" \
+  -s 'attributes={"pkce.code.challenge.method":"S256","post.logout.redirect.uris":"'"${OC_ORIGIN}/*+${OC_DEV_ORIGIN}/*"'"}'
 
 # Confidential client for the synaplan-opencloud backend (token exchange)
 $KCADM create clients -r synaplan \
