@@ -318,7 +318,7 @@ final readonly class MediaGenerationService implements MediaGenerationServiceInt
             throw new \RuntimeException('Failed to save generated video to disk');
         }
 
-        $this->recordUsage($user, 'video', $jobData['provider'], $jobData['model'], $jobData['modelId'] ?? null);
+        $this->recordUsage($user, 'video', $jobData['provider'], $jobData['model'], $jobData['modelId'] ?? null, (float) ($jobData['duration'] ?? self::DEFAULT_VIDEO_DURATION));
         $completedResult = $this->buildCompletedVideoJobResult($jobData['provider'], $jobData['model'], $localPath, $elapsed);
         $jobData['status'] = 'completed';
         $jobData['result'] = $completedResult;
@@ -600,16 +600,18 @@ final readonly class MediaGenerationService implements MediaGenerationServiceInt
         };
     }
 
-    private function recordUsage(User $user, string $type, ?string $provider, ?string $modelName, ?int $modelId = null): void
+    private function recordUsage(User $user, string $type, ?string $provider, ?string $modelName, ?int $modelId = null, ?float $durationSeconds = null): void
     {
         $action = 'image' === $type ? 'IMAGES' : 'VIDEOS';
+        $mediaUsage = 'image' === $type
+            ? ['images' => 1.0]
+            : ['duration_seconds' => $durationSeconds ?? (float) self::DEFAULT_VIDEO_DURATION];
+
         $this->rateLimitService->recordUsage($user, $action, [
             'provider' => $provider ?? 'unknown',
             'model' => $modelName ?? 'unknown',
             'model_id' => $modelId,
-            'media_usage' => [
-                'images' => 'image' === $type ? 1.0 : 0.0,
-            ],
+            'media_usage' => $mediaUsage,
         ]);
     }
 }

@@ -535,6 +535,10 @@ final readonly class UserMemoryService
                 'provider' => $provider,
             ]));
 
+            if (empty($embedding)) {
+                throw new \RuntimeException('Failed to create embedding');
+            }
+
             $this->rateLimitService->recordUsage($user, 'EMBEDDINGS', [
                 'provider' => $provider ?? 'unknown',
                 'model' => $modelName ?? 'unknown',
@@ -542,10 +546,6 @@ final readonly class UserMemoryService
                 'input_text' => $textToEmbed,
                 'source' => 'MEMORY_STORE',
             ]);
-
-            if (empty($embedding)) {
-                throw new \RuntimeException('Failed to create embedding');
-            }
 
             // Generate point ID
             $pointId = "mem_{$user->getId()}_{$memoryId}";

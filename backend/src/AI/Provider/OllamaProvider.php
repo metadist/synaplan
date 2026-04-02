@@ -211,7 +211,32 @@ class OllamaProvider implements ChatProviderInterface, EmbeddingProviderInterfac
             $lineBuffer = '';
 
             foreach ($this->httpClient->stream($response) as $chunk) {
-                $lineBuffer .= $chunk->getContent();
+                if ($chunk->isFirst()) {
+                    try {
+                        $statusCode = $response->getStatusCode();
+                    } catch (\Throwable $e) {
+                        throw new ProviderException('Ollama API HTTP error: '.$e->getMessage(), 'ollama', null, 0, $e);
+                    }
+                    if (200 !== $statusCode) {
+                        throw new ProviderException(sprintf('Ollama API HTTP error %d', $statusCode), 'ollama');
+                    }
+                }
+
+                if (null !== $chunk->getError()) {
+                    throw new ProviderException('Ollama transport error: '.$chunk->getError(), 'ollama');
+                }
+
+                $content = $chunk->getContent();
+
+                if ($chunk->isLast() && '' === $content) {
+                    break;
+                }
+
+                if ('' === $content) {
+                    continue;
+                }
+
+                $lineBuffer .= $content;
 
                 while (false !== ($newlinePos = strpos($lineBuffer, "\n"))) {
                     $line = substr($lineBuffer, 0, $newlinePos);
