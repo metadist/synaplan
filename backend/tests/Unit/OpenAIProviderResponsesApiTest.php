@@ -252,7 +252,8 @@ class OpenAIProviderResponsesApiTest extends TestCase
         $result = $method->invoke($provider, $messages, 'o3-mini', true, $options);
 
         $this->assertArrayHasKey('reasoning', $result);
-        $this->assertSame('concise', $result['reasoning']['generate_summary']);
+        $this->assertSame('auto', $result['reasoning']['summary']);
+        $this->assertSame('medium', $result['reasoning']['effort']);
     }
 
     public function testBuildResponsesRequestNoReasoningForNonReasoningModel(): void

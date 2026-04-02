@@ -20,6 +20,7 @@ final readonly class UsageStatsService
         'VIDEOS',
         'AUDIOS',
         'FILE_ANALYSIS',
+        'EMBEDDINGS',
     ];
 
     public function __construct(
@@ -60,8 +61,8 @@ final readonly class UsageStatsService
                     'limit' => $limitCheck['limit'],
                     'remaining' => $limitCheck['remaining'],
                     'allowed' => $limitCheck['allowed'],
-                    'resets_at' => $limitCheck['resets_at'] ?? null,
-                    'type' => $limitCheck['type'] ?? 'unlimited',
+                    'resets_at' => $limitCheck['reset_at'] ?? null,
+                    'type' => $limitCheck['limit_type'] ?? 'unlimited',
                 ];
 
                 $limits[$action] = $limitCheck['limit'];

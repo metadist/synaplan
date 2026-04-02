@@ -57,6 +57,7 @@ final readonly class MediaGenerationService implements MediaGenerationServiceInt
         $provider = $resolved['provider'];
         $modelName = $resolved['modelName'];
         $modelConfig = $resolved['modelConfig'];
+        $resolvedModelId = $resolved['modelId'];
 
         $this->logger->info('Media generation request', [
             'user_id' => $user->getId(),
@@ -81,7 +82,7 @@ final readonly class MediaGenerationService implements MediaGenerationServiceInt
 
         $mimeType = $this->guessMimeType($localPath, $type);
 
-        $this->recordUsage($user, $type, $provider, $modelName);
+        $this->recordUsage($user, $type, $provider, $modelName, $resolvedModelId);
 
         return [
             'success' => true,
@@ -117,6 +118,7 @@ final readonly class MediaGenerationService implements MediaGenerationServiceInt
         $provider = $resolved['provider'];
         $modelName = $resolved['modelName'];
         $modelConfig = $resolved['modelConfig'];
+        $resolvedModelId = $resolved['modelId'];
 
         $this->logger->info('Pic2pic generation request', [
             'user_id' => $user->getId(),
@@ -149,7 +151,7 @@ final readonly class MediaGenerationService implements MediaGenerationServiceInt
 
         $mimeType = $this->guessMimeType($localPath, 'image');
 
-        $this->recordUsage($user, 'image', $provider, $modelName);
+        $this->recordUsage($user, 'image', $provider, $modelName, $resolvedModelId);
 
         // Clean up temporary upload files
         foreach ($imagePaths as $tmpPath) {
@@ -181,6 +183,7 @@ final readonly class MediaGenerationService implements MediaGenerationServiceInt
         $resolved = $this->resolveModel($user, 'video', $modelId);
         $provider = $resolved['provider'];
         $modelName = $resolved['modelName'];
+        $resolvedModelId = $resolved['modelId'];
 
         $this->logger->info('Starting async video generation', [
             'user_id' => $user->getId(),
@@ -207,6 +210,7 @@ final readonly class MediaGenerationService implements MediaGenerationServiceInt
             'userId' => $user->getId(),
             'prompt' => $prompt,
             'startedAt' => time(),
+            'modelId' => $resolvedModelId,
         ]);
         $item->expiresAfter(self::VIDEO_JOB_TTL_SECONDS);
         $this->cache->save($item);
@@ -314,7 +318,7 @@ final readonly class MediaGenerationService implements MediaGenerationServiceInt
             throw new \RuntimeException('Failed to save generated video to disk');
         }
 
-        $this->recordUsage($user, 'video', $jobData['provider'], $jobData['model']);
+        $this->recordUsage($user, 'video', $jobData['provider'], $jobData['model'], $jobData['modelId'] ?? null);
         $completedResult = $this->buildCompletedVideoJobResult($jobData['provider'], $jobData['model'], $localPath, $elapsed);
         $jobData['status'] = 'completed';
         $jobData['result'] = $completedResult;
@@ -345,7 +349,7 @@ final readonly class MediaGenerationService implements MediaGenerationServiceInt
     }
 
     /**
-     * @return array{provider: ?string, modelName: ?string, modelConfig: array<string, mixed>}
+     * @return array{provider: ?string, modelName: ?string, modelConfig: array<string, mixed>, modelId: int}
      */
     private function resolveModel(User $user, string $type, ?int $modelId): array
     {
@@ -371,6 +375,7 @@ final readonly class MediaGenerationService implements MediaGenerationServiceInt
             'provider' => strtolower($model->getService()),
             'modelName' => $model->getProviderId() ?: $model->getName(),
             'modelConfig' => $model->getJson(),
+            'modelId' => $modelId,
         ];
     }
 
@@ -595,12 +600,16 @@ final readonly class MediaGenerationService implements MediaGenerationServiceInt
         };
     }
 
-    private function recordUsage(User $user, string $type, ?string $provider, ?string $modelName): void
+    private function recordUsage(User $user, string $type, ?string $provider, ?string $modelName, ?int $modelId = null): void
     {
         $action = 'image' === $type ? 'IMAGES' : 'VIDEOS';
         $this->rateLimitService->recordUsage($user, $action, [
             'provider' => $provider ?? 'unknown',
             'model' => $modelName ?? 'unknown',
+            'model_id' => $modelId,
+            'media_usage' => [
+                'images' => 'image' === $type ? 1.0 : 0.0,
+            ],
         ]);
     }
 }

@@ -296,10 +296,17 @@ class OpenAIProvider implements ChatProviderInterface, EmbeddingProviderInterfac
             $requestOptions['temperature'] = $options['temperature'] ?? 0.7;
         }
 
-        if ($isReasoningModel && !empty($options['reasoning'])) {
-            $requestOptions['reasoning'] = [
-                'generate_summary' => 'concise',
-            ];
+        if ($isReasoningModel) {
+            $reasoning = [];
+
+            if (!empty($options['reasoning'])) {
+                $reasoning['effort'] = $options['reasoning_effort'] ?? 'medium';
+                $reasoning['summary'] = 'auto';
+            }
+
+            if (!empty($reasoning)) {
+                $requestOptions['reasoning'] = $reasoning;
+            }
         }
 
         if (isset($options['previous_response_id'])) {

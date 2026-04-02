@@ -390,6 +390,24 @@ class WebhookController extends AbstractController
                 'input_text' => $message->getText(),
             ]);
 
+            if ($responseMediaType) {
+                $mediaAction = match ($responseMediaType) {
+                    'image' => 'IMAGES',
+                    'video' => 'VIDEOS',
+                    'audio' => 'AUDIOS',
+                    default => null,
+                };
+                if ($mediaAction) {
+                    $this->rateLimitService->recordUsage($user, $mediaAction, [
+                        'provider' => $provider ?? 'unknown',
+                        'model' => $model ?? 'unknown',
+                        'model_id' => $metadata['model_id'] ?? null,
+                        'source' => 'EMAIL',
+                        'media_usage' => $metadata['media_usage'] ?? [],
+                    ]);
+                }
+            }
+
             // Generate TTS if voice_reply is set and no media attachment already exists.
             if (null === $attachmentPath && '1' === $message->getMeta('voice_reply')) {
                 try {
@@ -404,6 +422,16 @@ class WebhookController extends AbstractController
                         ]);
                         // Get absolute path for attachment
                         $attachmentPath = $this->getParameter('kernel.project_dir').'/var/uploads/'.$ttsResult['relativePath'];
+
+                        $this->rateLimitService->recordUsage($user, 'AUDIOS', [
+                            'provider' => $ttsResult['provider'] ?? 'unknown',
+                            'model' => $ttsResult['model'] ?? 'unknown',
+                            'model_id' => $ttsResult['model_id'] ?? null,
+                            'source' => 'EMAIL',
+                            'media_usage' => [
+                                'characters' => $ttsResult['text_length'] ?? mb_strlen($ttsText),
+                            ],
+                        ]);
                     }
                 } catch (\Exception $e) {
                     $this->logger->error('Failed to generate TTS for email', ['error' => $e->getMessage()]);
@@ -773,6 +801,25 @@ class WebhookController extends AbstractController
                 'response_text' => $responseContent,
                 'input_text' => $message->getText(),
             ]);
+
+            $webhookMediaType = $responseMeta['media_type'] ?? null;
+            if ($webhookMediaType) {
+                $mediaAction = match ($webhookMediaType) {
+                    'image' => 'IMAGES',
+                    'video' => 'VIDEOS',
+                    'audio' => 'AUDIOS',
+                    default => null,
+                };
+                if ($mediaAction) {
+                    $this->rateLimitService->recordUsage($user, $mediaAction, [
+                        'provider' => $responseMeta['provider'] ?? 'unknown',
+                        'model' => $responseMeta['model'] ?? 'unknown',
+                        'model_id' => $responseMeta['model_id'] ?? null,
+                        'source' => 'WEBHOOK',
+                        'media_usage' => $responseMeta['media_usage'] ?? [],
+                    ]);
+                }
+            }
 
             return $this->json([
                 'success' => true,

@@ -154,9 +154,9 @@ describe('UsageStatistics', () => {
 
     const summarySection = wrapper.find('[data-testid="section-cost-summary"]')
     expect(summarySection.exists()).toBe(true)
-    expect(summarySection.text()).toContain('0.0523 EUR')
-    expect(summarySection.text()).toContain('1.2340 EUR')
-    expect(summarySection.text()).toContain('5.2500 EUR')
+    expect(summarySection.text()).toContain('$0.0523')
+    expect(summarySection.text()).toContain('$1.2340')
+    expect(summarySection.text()).toContain('$5.2500')
   })
 
   it('should display recent activity with token breakdown', async () => {
@@ -171,7 +171,7 @@ describe('UsageStatistics', () => {
     expect(firstRow.text()).toContain('1,000')
     expect(firstRow.text()).toContain('500')
     expect(firstRow.text()).toContain('200')
-    expect(firstRow.text()).toContain('0.0105 EUR')
+    expect(firstRow.text()).toContain('$0.0105')
   })
 
   it('should show estimated badge for estimated token counts', async () => {
