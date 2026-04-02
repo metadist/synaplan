@@ -13,31 +13,29 @@ const KEYCLOAK_REALM = 'synaplan'
 const KEYCLOAK_TOKEN_ENDPOINT = `${KEYCLOAK_URL}/realms/${KEYCLOAK_REALM}/protocol/openid-connect/token`
 
 /**
- * Get an OIDC access token via direct access grant (resource owner password).
+ * Retrieve an OIDC access token via direct access grant (resource owner password).
  * Used for API-only tests that need an OIDC token without browser interaction.
  */
-export async function getOidcAccessToken(options: {
+export async function retrieveOidcAccessToken(options: {
   clientId: string
-  user?: string
-  pass?: string
+  username: string
+  password: string
+  grantType?: string
 }): Promise<string> {
-  const user = options.user ?? process.env.OIDC_USER ?? 'testuser'
-  const pass = options.pass ?? process.env.OIDC_PASS ?? 'testpass123'
-
   const response = await fetch(KEYCLOAK_TOKEN_ENDPOINT, {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     body: new URLSearchParams({
-      grant_type: 'password',
+      grant_type: options.grantType ?? 'password',
       client_id: options.clientId,
-      username: user,
-      password: pass,
+      username: options.username,
+      password: options.password,
     }),
   })
 
   if (!response.ok) {
     const body = await response.text()
-    throw new Error(`Failed to get OIDC access token: ${response.status} ${body}`)
+    throw new Error(`Failed to retrieve OIDC access token: ${response.status} ${body}`)
   }
 
   const data = await response.json()
@@ -45,24 +43,28 @@ export async function getOidcAccessToken(options: {
 }
 
 /**
- * Exchange a user's OIDC token for a Synaplan-scoped token via RFC 8693 token exchange.
- * Uses the synaplan-opencloud confidential client.
+ * Exchange an OIDC token for a different-audience token via RFC 8693 token exchange.
  */
-export async function exchangeTokenForSynaplan(subjectToken: string): Promise<string> {
-  const clientId = process.env.EXCHANGE_CLIENT_ID || 'synaplan-opencloud'
-  const clientSecret = process.env.EXCHANGE_CLIENT_SECRET || 'synaplan-opencloud-secret'
-  const audience = process.env.TARGET_AUDIENCE || 'synaplan-app'
-
+export async function exchangeOidcToken(options: {
+  subjectToken: string
+  clientId: string
+  clientSecret: string
+  audience: string
+  subjectTokenType?: string
+  grantType?: string
+}): Promise<string> {
   const response = await fetch(KEYCLOAK_TOKEN_ENDPOINT, {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     body: new URLSearchParams({
-      grant_type: 'urn:ietf:params:oauth:grant-type:token-exchange',
-      subject_token: subjectToken,
-      subject_token_type: 'urn:ietf:params:oauth:token-type:access_token',
-      audience,
-      client_id: clientId,
-      client_secret: clientSecret,
+      grant_type:
+        options.grantType ?? 'urn:ietf:params:oauth:grant-type:token-exchange',
+      subject_token: options.subjectToken,
+      subject_token_type:
+        options.subjectTokenType ?? 'urn:ietf:params:oauth:token-type:access_token',
+      audience: options.audience,
+      client_id: options.clientId,
+      client_secret: options.clientSecret,
     }),
   })
 
