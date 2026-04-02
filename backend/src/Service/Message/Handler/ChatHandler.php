@@ -260,6 +260,7 @@ final readonly class ChatHandler implements MessageHandlerInterface
             'provider' => $response['provider'] ?? 'unknown',
             'model' => $response['model'] ?? 'unknown',
             'usage' => $response['usage'] ?? [],
+            'response_id' => $response['response_id'] ?? null,
         ];
 
         // Check for file generation format first (for OfficeM maker)
@@ -792,10 +793,7 @@ final readonly class ChatHandler implements MessageHandlerInterface
         // Add include_images flag to options for message building
         $options['include_images'] = $includeImagesInMessages;
 
-        // Conversation History bauen (TEXT only for streaming)
-        $messages = $this->buildStreamingMessages($systemPrompt, $thread, $message, $options);
-
-        // Resolve model ID to provider + model name + features
+        // Resolve model ID to provider + model name + features (before building messages)
         $modelFeatures = [];
         $modelMaxTokens = null;
         if ($modelId) {
@@ -809,8 +807,6 @@ final readonly class ChatHandler implements MessageHandlerInterface
                 $modelMaxTokens = $model->getMaxTokens();
             }
 
-            error_log('🟢 ChatHandler RESOLVED CHAT MODEL: '.$provider.' / '.$modelName.' (ID: '.$modelId.')');
-
             $this->logger->info('ChatHandler: Resolved model for streaming', [
                 'model_id' => $modelId,
                 'provider' => $provider,
@@ -819,7 +815,21 @@ final readonly class ChatHandler implements MessageHandlerInterface
             ]);
         }
 
-        // AI streaming aufrufen - merge processing options with model config
+        // Load previous_response_id for OpenAI stateful conversations
+        if ('openai' === $provider) {
+            $previousResponseId = $this->loadPreviousResponseId($thread);
+            if (null !== $previousResponseId) {
+                $options['previous_response_id'] = $previousResponseId;
+                $this->logger->info('ChatHandler: Using previous_response_id for stateful conversation', [
+                    'previous_response_id' => $previousResponseId,
+                ]);
+            }
+        }
+
+        // Build conversation history (TEXT only for streaming)
+        $messages = $this->buildStreamingMessages($systemPrompt, $thread, $message, $options);
+
+        // Call AI streaming - merge processing options with model config
         $aiOptions = array_merge([
             'provider' => $provider,
             'model' => $modelName,
@@ -838,17 +848,13 @@ final readonly class ChatHandler implements MessageHandlerInterface
             $aiOptions['max_tokens'] = min($tokenLimits);
         }
 
-        // Log reasoning option
-        error_log('🧠 ChatHandler: Reasoning option = '.($aiOptions['reasoning'] ?? 'NOT SET'));
-
-        $this->logger->info('🔵 ChatHandler: Calling AiFacade chatStream', [
+        $this->logger->info('ChatHandler: Calling AiFacade chatStream', [
             'provider' => $provider,
             'model' => $modelName,
             'user_id' => $message->getUserId(),
             'reasoning' => $aiOptions['reasoning'] ?? false,
         ]);
 
-        // 🎯 CAPTURE AI RESPONSE: Collect the full response text for memory extraction
         $fullResponseText = '';
         $wrappedStreamCallback = function (string|array $chunk, array $metadata = []) use ($streamCallback, &$fullResponseText): void {
             // Handle both string chunks (old providers) and array chunks (new providers with type/content)
@@ -873,7 +879,7 @@ final readonly class ChatHandler implements MessageHandlerInterface
             $aiOptions
         );
 
-        $this->logger->info('🔵 ChatHandler: AiFacade chatStream returned', [
+        $this->logger->info('ChatHandler: AiFacade chatStream returned', [
             'response_length' => strlen($fullResponseText),
         ]);
 
@@ -886,20 +892,21 @@ final readonly class ChatHandler implements MessageHandlerInterface
         } else {
             // Memory Extraction (Option B: After AI-Response, in the same Request)
             // Pass the AI response to memory extraction so it can extract from the answer too
-            $this->logger->info('💾 Loading relevant memories for extraction', ['user_id' => $message->getUserId()]);
+            $this->logger->info('ChatHandler: Loading relevant memories for extraction', ['user_id' => $message->getUserId()]);
             $allMemories = $this->memoryService->searchRelevantMemories($message->getUserId(), $message->getText(), limit: 20, minScore: $this->feedbackConfig->getMinExtractionScore());
             $this->extractMemoriesAfterResponse($message, $fullResponseText, $thread, $allMemories, $progressCallback);
-            $this->logger->info('✅ Loaded memories for extraction', ['count' => count($allMemories)]);
+            $this->logger->info('ChatHandler: Loaded memories for extraction', ['count' => count($allMemories)]);
         }
 
         return [
             'metadata' => [
                 'provider' => $metadata['provider'] ?? 'unknown',
                 'model' => $metadata['model'] ?? 'unknown',
-                'model_id' => $modelId, // Include resolved model_id for storage
+                'model_id' => $modelId,
                 'usage' => $metadata['usage'] ?? [],
-                'memories' => $loadedMemories, // Include memories used for this response
-                'feedbacks' => $loadedFeedbacks, // Include feedback examples used for this response
+                'response_id' => $metadata['response_id'] ?? null,
+                'memories' => $loadedMemories,
+                'feedbacks' => $loadedFeedbacks,
             ],
         ];
     }
@@ -1035,17 +1042,32 @@ final readonly class ChatHandler implements MessageHandlerInterface
             ];
         }
 
-        // Aktuelle Message
-        $content = $currentMessage->getText();
-        $allFilesText = $currentMessage->getAllFilesText(); // Combines all files
+        $messageContent = $this->buildCurrentMessageContent($currentMessage, $includeImages, $options);
 
-        $this->logger->info('🔍 ChatHandler: File text debug', [
+        $messages[] = [
+            'role' => 'user',
+            'content' => $messageContent,
+        ];
+
+        return $messages;
+    }
+
+    /**
+     * Build the content for the current user message (files, search results, images).
+     *
+     * @return string|array Content string or multimodal array when images are included
+     */
+    private function buildCurrentMessageContent(Message $currentMessage, bool $includeImages, array $options = []): string|array
+    {
+        $content = $currentMessage->getText();
+        $allFilesText = $currentMessage->getAllFilesText();
+
+        $this->logger->debug('ChatHandler: File text debug', [
             'message_id' => $currentMessage->getId(),
             'has_legacy_file' => $currentMessage->getFile() > 0,
             'legacy_file_text_length' => strlen($currentMessage->getFileText() ?? ''),
             'files_collection_count' => $currentMessage->getFiles()->count(),
             'all_files_text_length' => strlen($allFilesText),
-            'all_files_text_preview' => substr($allFilesText, 0, 200),
         ]);
 
         if (!empty($allFilesText)) {
@@ -1057,52 +1079,44 @@ final readonly class ChatHandler implements MessageHandlerInterface
             }
 
             $content .= "\n\n\n---\n\n\nUser provided $fileInfo:\n\n".
-                       substr($allFilesText, 0, 10000). // Increased limit
+                       substr($allFilesText, 0, 10000).
                        "\n\n";
-
-            $this->logger->info('✅ ChatHandler: File text added to prompt', [
-                'file_info' => $fileInfo,
-                'content_length' => strlen($content),
-            ]);
-        } else {
-            $this->logger->warning('⚠️ ChatHandler: No file text found!', [
-                'message_id' => $currentMessage->getId(),
-                'file_flag' => $currentMessage->getFile(),
-            ]);
         }
 
-        // Add web search results if available
         if (isset($options['search_results']) && !empty($options['search_results']['results'])) {
             $searchContext = $this->formatSearchResultsForPrompt($options['search_results']);
             $content .= "\n\n".$searchContext;
-
-            $this->logger->info('✅ ChatHandler: Web search results added to prompt', [
-                'results_count' => count($options['search_results']['results']),
-                'query' => $options['search_results']['query'],
-            ]);
         }
 
-        // Extract images from current message for vision support (only if enabled)
         if ($includeImages) {
             $imageUrls = $this->extractImageDataUrls($currentMessage);
-            $messageContent = $this->buildMultimodalContent($content, $imageUrls);
 
-            if (!empty($imageUrls)) {
-                $this->logger->info('🖼️ ChatHandler: Images included for vision analysis', [
-                    'message_id' => $currentMessage->getId(),
-                    'image_count' => count($imageUrls),
-                ]);
-            }
-        } else {
-            $messageContent = $content;
+            return $this->buildMultimodalContent($content, $imageUrls);
         }
 
-        $messages[] = [
-            'role' => 'user',
-            'content' => $messageContent,
-        ];
+        return $content;
+    }
 
-        return $messages;
+    /**
+     * Find the OpenAI response_id from the last assistant message in the thread.
+     *
+     * Used for stateful conversations via the Responses API previous_response_id parameter.
+     * Only returns an ID when the last assistant message was generated by OpenAI.
+     */
+    private function loadPreviousResponseId(array $thread): ?string
+    {
+        foreach (array_reverse($thread) as $msg) {
+            if ('OUT' === $msg->getDirection()) {
+                $responseId = $msg->getMeta('openai_response_id');
+                if (null !== $responseId && '' !== $responseId) {
+                    return $responseId;
+                }
+
+                return null;
+            }
+        }
+
+        return null;
     }
 
     /**
@@ -1736,7 +1750,7 @@ final readonly class ChatHandler implements MessageHandlerInterface
             // 🎯 NOTIFY: Starting memory analysis
             $this->notify($progressCallback, 'analyzing_memories', 'Analyzing memories...');
 
-            $this->logger->info('🧠 ChatHandler: Starting memory extraction', [
+            $this->logger->info('ChatHandler: Starting memory extraction', [
                 'message_id' => $message->getId(),
                 'user_id' => $userId,
                 'relevant_memories_count' => count($relevantMemories),

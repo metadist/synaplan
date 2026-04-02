@@ -995,6 +995,10 @@ class StreamController extends AbstractController
                     $outgoingMessage->setMeta('ai_chat_usage', json_encode($response['metadata']['usage']));
                 }
 
+                if (!empty($response['metadata']['response_id'])) {
+                    $outgoingMessage->setMeta('openai_response_id', $response['metadata']['response_id']);
+                }
+
                 if (!empty($response['metadata']['media_prompt'])) {
                     $outgoingMessage->setMeta('media_prompt', $response['metadata']['media_prompt']);
                 }
