@@ -15,17 +15,28 @@ use Psr\Log\LoggerInterface;
  */
 class OidcUserService
 {
+    /** @var array<string> */
+    private array $adminRoleNames;
+
+    /** @var array<array<string>> */
+    private array $roleClaimPaths;
+
     public function __construct(
         private UserRepository $userRepository,
         private EntityManagerInterface $em,
         private LoggerInterface $logger,
+        string $oidcAdminRoles,
+        string $oidcRoleClaims,
+        string $oidcClientId,
     ) {
+        $this->adminRoleNames = array_map('strtolower', array_map('trim', explode(',', $oidcAdminRoles)));
+        $this->roleClaimPaths = $this->parseRoleClaims($oidcRoleClaims, $oidcClientId);
     }
 
     /**
-     * Find or create a user from OIDC claims.
+     * Find or create a user from OIDC claims, sync roles, persist.
      *
-     * @param array<string, mixed> $claims       OIDC token/userinfo claims (sub, email, preferred_username, given_name, family_name, name)
+     * @param array<string, mixed> $claims       OIDC token/userinfo claims
      * @param string|null          $refreshToken Keycloak refresh token (only set during browser login)
      */
     public function findOrCreateFromClaims(array $claims, ?string $refreshToken = null): User
@@ -67,6 +78,7 @@ class OidcUserService
         }
 
         $this->updateUserDetails($user, $claims, $refreshToken);
+        $this->syncRoles($user, $claims);
 
         $this->em->persist($user);
         $this->em->flush();
@@ -74,22 +86,25 @@ class OidcUserService
         return $user;
     }
 
-    /**
-     * Sync OIDC roles and update admin level.
-     *
-     * @param array<string>        $oidcRoles      Roles extracted from the OIDC token
-     * @param array<string>        $adminRoleNames  Role names that grant admin level (lowercase)
-     */
-    public function syncRoles(User $user, array $oidcRoles, array $adminRoleNames): void
+    private function syncRoles(User $user, array $claims): void
     {
+        $oidcRoles = [];
+        foreach ($this->roleClaimPaths as $segments) {
+            $value = $this->resolveClaimPath($claims, $segments);
+            if (is_array($value)) {
+                $oidcRoles = array_values(array_unique(array_merge($oidcRoles, $value)));
+            }
+        }
+
         if (empty($oidcRoles)) {
             return;
         }
 
         $userDetails = $user->getUserDetails() ?? [];
         $userDetails['oidc_roles'] = $oidcRoles;
+        $user->setUserDetails($userDetails);
 
-        $hasAdmin = !empty(array_intersect(array_map('strtolower', $oidcRoles), $adminRoleNames));
+        $hasAdmin = !empty(array_intersect(array_map('strtolower', $oidcRoles), $this->adminRoleNames));
         if ($hasAdmin && 'ADMIN' !== $user->getUserLevel()) {
             $user->setUserLevel('ADMIN');
             $this->logger->info('User promoted to ADMIN via OIDC role', [
@@ -103,10 +118,44 @@ class OidcUserService
                 'oidc_roles' => $oidcRoles,
             ]);
         }
+    }
 
-        $user->setUserDetails($userDetails);
-        $this->em->persist($user);
-        $this->em->flush();
+    /**
+     * @param array<string, mixed> $data
+     * @param array<string>        $segments
+     */
+    private function resolveClaimPath(array $data, array $segments): mixed
+    {
+        $current = $data;
+        foreach ($segments as $segment) {
+            if (!is_array($current) || !array_key_exists($segment, $current)) {
+                return null;
+            }
+            $current = $current[$segment];
+        }
+
+        return $current;
+    }
+
+    /**
+     * @return array<array<string>>
+     */
+    private function parseRoleClaims(string $oidcRoleClaims, string $clientId): array
+    {
+        $raw = array_map('trim', explode(',', $oidcRoleClaims));
+
+        $paths = [];
+        foreach ($raw as $path) {
+            if ('' === $path) {
+                continue;
+            }
+            $path = str_replace('{client_id}', $clientId, $path);
+            $segments = preg_split('/(?<!\\\\)\./', $path);
+            $segments = array_map(static fn (string $s) => str_replace('\\.', '.', $s), $segments);
+            $paths[] = $segments;
+        }
+
+        return $paths;
     }
 
     private function findBySub(string $sub): ?User
