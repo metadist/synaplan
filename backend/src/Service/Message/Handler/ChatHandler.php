@@ -997,24 +997,6 @@ final readonly class ChatHandler implements MessageHandlerInterface
         // Check if we should include images (only if vision model is available)
         $includeImages = $options['include_images'] ?? false;
 
-        // When previous_response_id is available, OpenAI already knows the conversation
-        // context. Only send system prompt + current message to save input tokens.
-        if (!empty($options['previous_response_id'])) {
-            if (null !== $systemPrompt) {
-                $messages[] = ['role' => 'system', 'content' => $systemPrompt];
-            }
-
-            $content = $this->buildCurrentMessageContent($currentMessage, $includeImages, $options);
-            $messages[] = ['role' => 'user', 'content' => $content];
-
-            $this->logger->info('ChatHandler: Using previous_response_id, skipping thread history', [
-                'previous_response_id' => $options['previous_response_id'],
-                'thread_size_skipped' => \count($thread),
-            ]);
-
-            return $messages;
-        }
-
         // Add system message if supported (o1 models don't support it)
         if (null !== $systemPrompt) {
             $messages[] = ['role' => 'system', 'content' => $systemPrompt];
@@ -1080,13 +1062,12 @@ final readonly class ChatHandler implements MessageHandlerInterface
         $content = $currentMessage->getText();
         $allFilesText = $currentMessage->getAllFilesText();
 
-        $this->logger->info('ChatHandler: File text debug', [
+        $this->logger->debug('ChatHandler: File text debug', [
             'message_id' => $currentMessage->getId(),
             'has_legacy_file' => $currentMessage->getFile() > 0,
             'legacy_file_text_length' => strlen($currentMessage->getFileText() ?? ''),
             'files_collection_count' => $currentMessage->getFiles()->count(),
             'all_files_text_length' => strlen($allFilesText),
-            'all_files_text_preview' => substr($allFilesText, 0, 200),
         ]);
 
         if (!empty($allFilesText)) {

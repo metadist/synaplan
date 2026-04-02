@@ -25,7 +25,7 @@ class OpenAIProviderResponsesApiTest extends TestCase
         $provider = $this->createProvider();
 
         $this->expectException(\App\AI\Exception\ProviderException::class);
-        $this->expectExceptionMessage('Model must be specified');
+        $this->expectExceptionMessage('Model must be specified in options');
 
         $provider->chat([['role' => 'user', 'content' => 'Hello']], []);
     }
@@ -44,7 +44,7 @@ class OpenAIProviderResponsesApiTest extends TestCase
         $provider = $this->createProvider();
 
         $this->expectException(\App\AI\Exception\ProviderException::class);
-        $this->expectExceptionMessage('Model must be specified');
+        $this->expectExceptionMessage('Model must be specified in options');
 
         $provider->chatStream(
             [['role' => 'user', 'content' => 'Hello']],
@@ -226,6 +226,78 @@ class OpenAIProviderResponsesApiTest extends TestCase
         $result = $method->invoke($provider, $messages, 'gpt-4o', false, []);
 
         $this->assertFalse($result['store']);
+    }
+
+    public function testBuildResponsesRequestPreviousResponseIdWithStoreDisabled(): void
+    {
+        $provider = $this->createProvider(storeResponses: false);
+        $method = new \ReflectionMethod($provider, 'buildResponsesRequest');
+
+        $messages = [['role' => 'user', 'content' => 'Follow up']];
+        $options = ['previous_response_id' => 'resp_abc123'];
+
+        $result = $method->invoke($provider, $messages, 'gpt-4o', false, $options);
+
+        $this->assertSame('resp_abc123', $result['previous_response_id']);
+    }
+
+    public function testBuildResponsesRequestReasoningWithSummary(): void
+    {
+        $provider = $this->createProvider();
+        $method = new \ReflectionMethod($provider, 'buildResponsesRequest');
+
+        $messages = [['role' => 'user', 'content' => 'Explain this']];
+        $options = ['reasoning' => true];
+
+        $result = $method->invoke($provider, $messages, 'o3-mini', true, $options);
+
+        $this->assertArrayHasKey('reasoning', $result);
+        $this->assertSame('concise', $result['reasoning']['generate_summary']);
+    }
+
+    public function testBuildResponsesRequestNoReasoningForNonReasoningModel(): void
+    {
+        $provider = $this->createProvider();
+        $method = new \ReflectionMethod($provider, 'buildResponsesRequest');
+
+        $messages = [['role' => 'user', 'content' => 'Hello']];
+        $options = ['reasoning' => true];
+
+        $result = $method->invoke($provider, $messages, 'gpt-4o', false, $options);
+
+        $this->assertArrayNotHasKey('reasoning', $result);
+    }
+
+    public function testReduceToLastUserMessageViaReflection(): void
+    {
+        $provider = $this->createProvider();
+        $method = new \ReflectionMethod($provider, 'reduceToLastUserMessage');
+
+        $input = [
+            ['role' => 'user', 'content' => 'First question'],
+            ['role' => 'assistant', 'content' => 'First answer'],
+            ['role' => 'user', 'content' => 'Follow up'],
+        ];
+
+        $result = $method->invoke($provider, $input);
+
+        $this->assertCount(1, $result);
+        $this->assertSame('Follow up', $result[0]['content']);
+    }
+
+    public function testReduceToLastUserMessageFallsBackToFullInput(): void
+    {
+        $provider = $this->createProvider();
+        $method = new \ReflectionMethod($provider, 'reduceToLastUserMessage');
+
+        $input = [
+            ['role' => 'assistant', 'content' => 'Only assistant messages'],
+        ];
+
+        $result = $method->invoke($provider, $input);
+
+        $this->assertCount(1, $result);
+        $this->assertSame('Only assistant messages', $result[0]['content']);
     }
 
     public function testIsPreviousResponseErrorViaReflection(): void

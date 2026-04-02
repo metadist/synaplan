@@ -230,6 +230,13 @@ class OpenAIProvider implements ChatProviderInterface, EmbeddingProviderInterfac
                         }
                         break;
 
+                    case 'response.reasoning_summary_text.delta':
+                        $reasoningContent = $eventData['delta'] ?? '';
+                        if ('' !== $reasoningContent) {
+                            $callback(['type' => 'reasoning', 'content' => $reasoningContent]);
+                        }
+                        break;
+
                     case 'response.completed':
                         $usage = $this->normalizeResponsesUsage($eventData['response'] ?? []);
                         $responseId = $eventData['response']['id'] ?? $responseId;
@@ -289,7 +296,13 @@ class OpenAIProvider implements ChatProviderInterface, EmbeddingProviderInterfac
             $requestOptions['temperature'] = $options['temperature'] ?? 0.7;
         }
 
-        if ($this->storeResponses && isset($options['previous_response_id'])) {
+        if ($isReasoningModel && !empty($options['reasoning'])) {
+            $requestOptions['reasoning'] = [
+                'generate_summary' => 'concise',
+            ];
+        }
+
+        if (isset($options['previous_response_id'])) {
             $requestOptions['previous_response_id'] = $options['previous_response_id'];
         }
 
@@ -298,18 +311,29 @@ class OpenAIProvider implements ChatProviderInterface, EmbeddingProviderInterfac
 
     /**
      * Execute responses()->create() with fallback when previous_response_id is invalid.
+     *
+     * When previous_response_id is present, the input is reduced to just the last user
+     * message (the API already has prior context). On fallback the full input is restored.
      */
     private function executeResponsesCreate(array $requestOptions): mixed
     {
+        $fullInput = $requestOptions['input'] ?? [];
+        $hasPreviousResponse = isset($requestOptions['previous_response_id']);
+
+        if ($hasPreviousResponse) {
+            $requestOptions['input'] = $this->reduceToLastUserMessage($fullInput);
+        }
+
         try {
             return $this->client->responses()->create($requestOptions);
         } catch (\Exception $e) {
-            if (isset($requestOptions['previous_response_id']) && $this->isPreviousResponseError($e)) {
-                $this->logger->warning('OpenAI: previous_response_id invalid, retrying without', [
+            if ($hasPreviousResponse && $this->isPreviousResponseError($e)) {
+                $this->logger->warning('OpenAI: previous_response_id invalid, retrying with full context', [
                     'previous_response_id' => $requestOptions['previous_response_id'],
                     'error' => $e->getMessage(),
                 ]);
                 unset($requestOptions['previous_response_id']);
+                $requestOptions['input'] = $fullInput;
 
                 return $this->client->responses()->create($requestOptions);
             }
@@ -320,24 +344,52 @@ class OpenAIProvider implements ChatProviderInterface, EmbeddingProviderInterfac
 
     /**
      * Execute responses()->createStreamed() with fallback when previous_response_id is invalid.
+     *
+     * When previous_response_id is present, the input is reduced to just the last user
+     * message (the API already has prior context). On fallback the full input is restored.
      */
     private function executeResponsesCreateStreamed(array $requestOptions): mixed
     {
+        $fullInput = $requestOptions['input'] ?? [];
+        $hasPreviousResponse = isset($requestOptions['previous_response_id']);
+
+        if ($hasPreviousResponse) {
+            $requestOptions['input'] = $this->reduceToLastUserMessage($fullInput);
+        }
+
         try {
             return $this->client->responses()->createStreamed($requestOptions);
         } catch (\Exception $e) {
-            if (isset($requestOptions['previous_response_id']) && $this->isPreviousResponseError($e)) {
-                $this->logger->warning('OpenAI: previous_response_id invalid for stream, retrying without', [
+            if ($hasPreviousResponse && $this->isPreviousResponseError($e)) {
+                $this->logger->warning('OpenAI: previous_response_id invalid for stream, retrying with full context', [
                     'previous_response_id' => $requestOptions['previous_response_id'],
                     'error' => $e->getMessage(),
                 ]);
                 unset($requestOptions['previous_response_id']);
+                $requestOptions['input'] = $fullInput;
 
                 return $this->client->responses()->createStreamed($requestOptions);
             }
 
             throw $e;
         }
+    }
+
+    /**
+     * Reduce input to just the last user message for stateful conversations.
+     *
+     * When previous_response_id is used, the API already has the conversation context.
+     * Only the new user message needs to be sent.
+     */
+    private function reduceToLastUserMessage(array $input): array
+    {
+        foreach (array_reverse($input) as $msg) {
+            if ('user' === ($msg['role'] ?? '')) {
+                return [$msg];
+            }
+        }
+
+        return $input;
     }
 
     /**
