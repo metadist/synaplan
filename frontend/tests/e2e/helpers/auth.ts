@@ -57,8 +57,7 @@ export async function exchangeOidcToken(options: {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     body: new URLSearchParams({
-      grant_type:
-        options.grantType ?? 'urn:ietf:params:oauth:grant-type:token-exchange',
+      grant_type: options.grantType ?? 'urn:ietf:params:oauth:grant-type:token-exchange',
       subject_token: options.subjectToken,
       subject_token_type:
         options.subjectTokenType ?? 'urn:ietf:params:oauth:token-type:access_token',
