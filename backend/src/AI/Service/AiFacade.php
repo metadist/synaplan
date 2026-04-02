@@ -118,6 +118,7 @@ class AiFacade
             'provider' => $provider->getName(),
             'model' => $options['model'] ?? $provider->getDefaultModels()['chat'] ?? 'unknown',
             'usage' => $response['usage'] ?? [],
+            'response_id' => $response['response_id'] ?? null,
         ];
     }
 
@@ -185,6 +186,7 @@ class AiFacade
             'provider' => $provider->getName(),
             'model' => $options['model'] ?? $provider->getDefaultModels()['chat'] ?? 'unknown',
             'usage' => $streamResult['usage'] ?? [],
+            'response_id' => $streamResult['response_id'] ?? null,
         ];
     }
 

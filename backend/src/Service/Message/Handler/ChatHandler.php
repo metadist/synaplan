@@ -260,6 +260,7 @@ final readonly class ChatHandler implements MessageHandlerInterface
             'provider' => $response['provider'] ?? 'unknown',
             'model' => $response['model'] ?? 'unknown',
             'usage' => $response['usage'] ?? [],
+            'response_id' => $response['response_id'] ?? null,
         ];
 
         // Check for file generation format first (for OfficeM maker)
@@ -792,10 +793,7 @@ final readonly class ChatHandler implements MessageHandlerInterface
         // Add include_images flag to options for message building
         $options['include_images'] = $includeImagesInMessages;
 
-        // Conversation History bauen (TEXT only for streaming)
-        $messages = $this->buildStreamingMessages($systemPrompt, $thread, $message, $options);
-
-        // Resolve model ID to provider + model name + features
+        // Resolve model ID to provider + model name + features (before building messages)
         $modelFeatures = [];
         $modelMaxTokens = null;
         if ($modelId) {
@@ -818,6 +816,20 @@ final readonly class ChatHandler implements MessageHandlerInterface
                 'features' => $modelFeatures,
             ]);
         }
+
+        // Load previous_response_id for OpenAI stateful conversations
+        if ('openai' === $provider) {
+            $previousResponseId = $this->loadPreviousResponseId($thread);
+            if (null !== $previousResponseId) {
+                $options['previous_response_id'] = $previousResponseId;
+                $this->logger->info('ChatHandler: Using previous_response_id for stateful conversation', [
+                    'previous_response_id' => $previousResponseId,
+                ]);
+            }
+        }
+
+        // Conversation History bauen (TEXT only for streaming)
+        $messages = $this->buildStreamingMessages($systemPrompt, $thread, $message, $options);
 
         // AI streaming aufrufen - merge processing options with model config
         $aiOptions = array_merge([
@@ -896,10 +908,11 @@ final readonly class ChatHandler implements MessageHandlerInterface
             'metadata' => [
                 'provider' => $metadata['provider'] ?? 'unknown',
                 'model' => $metadata['model'] ?? 'unknown',
-                'model_id' => $modelId, // Include resolved model_id for storage
+                'model_id' => $modelId,
                 'usage' => $metadata['usage'] ?? [],
-                'memories' => $loadedMemories, // Include memories used for this response
-                'feedbacks' => $loadedFeedbacks, // Include feedback examples used for this response
+                'response_id' => $metadata['response_id'] ?? null,
+                'memories' => $loadedMemories,
+                'feedbacks' => $loadedFeedbacks,
             ],
         ];
     }
@@ -990,6 +1003,24 @@ final readonly class ChatHandler implements MessageHandlerInterface
         // Check if we should include images (only if vision model is available)
         $includeImages = $options['include_images'] ?? false;
 
+        // When previous_response_id is available, OpenAI already knows the conversation
+        // context. Only send system prompt + current message to save input tokens.
+        if (!empty($options['previous_response_id'])) {
+            if (null !== $systemPrompt) {
+                $messages[] = ['role' => 'system', 'content' => $systemPrompt];
+            }
+
+            $content = $this->buildCurrentMessageContent($currentMessage, $includeImages, $options);
+            $messages[] = ['role' => 'user', 'content' => $content];
+
+            $this->logger->info('ChatHandler: Using previous_response_id, skipping thread history', [
+                'previous_response_id' => $options['previous_response_id'],
+                'thread_size_skipped' => \count($thread),
+            ]);
+
+            return $messages;
+        }
+
         // Add system message if supported (o1 models don't support it)
         if (null !== $systemPrompt) {
             $messages[] = ['role' => 'system', 'content' => $systemPrompt];
@@ -1035,11 +1066,27 @@ final readonly class ChatHandler implements MessageHandlerInterface
             ];
         }
 
-        // Aktuelle Message
-        $content = $currentMessage->getText();
-        $allFilesText = $currentMessage->getAllFilesText(); // Combines all files
+        $messageContent = $this->buildCurrentMessageContent($currentMessage, $includeImages, $options);
 
-        $this->logger->info('🔍 ChatHandler: File text debug', [
+        $messages[] = [
+            'role' => 'user',
+            'content' => $messageContent,
+        ];
+
+        return $messages;
+    }
+
+    /**
+     * Build the content for the current user message (files, search results, images).
+     *
+     * @return string|array Content string or multimodal array when images are included
+     */
+    private function buildCurrentMessageContent(Message $currentMessage, bool $includeImages, array $options = []): string|array
+    {
+        $content = $currentMessage->getText();
+        $allFilesText = $currentMessage->getAllFilesText();
+
+        $this->logger->info('ChatHandler: File text debug', [
             'message_id' => $currentMessage->getId(),
             'has_legacy_file' => $currentMessage->getFile() > 0,
             'legacy_file_text_length' => strlen($currentMessage->getFileText() ?? ''),
@@ -1057,52 +1104,44 @@ final readonly class ChatHandler implements MessageHandlerInterface
             }
 
             $content .= "\n\n\n---\n\n\nUser provided $fileInfo:\n\n".
-                       substr($allFilesText, 0, 10000). // Increased limit
+                       substr($allFilesText, 0, 10000).
                        "\n\n";
-
-            $this->logger->info('✅ ChatHandler: File text added to prompt', [
-                'file_info' => $fileInfo,
-                'content_length' => strlen($content),
-            ]);
-        } else {
-            $this->logger->warning('⚠️ ChatHandler: No file text found!', [
-                'message_id' => $currentMessage->getId(),
-                'file_flag' => $currentMessage->getFile(),
-            ]);
         }
 
-        // Add web search results if available
         if (isset($options['search_results']) && !empty($options['search_results']['results'])) {
             $searchContext = $this->formatSearchResultsForPrompt($options['search_results']);
             $content .= "\n\n".$searchContext;
-
-            $this->logger->info('✅ ChatHandler: Web search results added to prompt', [
-                'results_count' => count($options['search_results']['results']),
-                'query' => $options['search_results']['query'],
-            ]);
         }
 
-        // Extract images from current message for vision support (only if enabled)
         if ($includeImages) {
             $imageUrls = $this->extractImageDataUrls($currentMessage);
-            $messageContent = $this->buildMultimodalContent($content, $imageUrls);
 
-            if (!empty($imageUrls)) {
-                $this->logger->info('🖼️ ChatHandler: Images included for vision analysis', [
-                    'message_id' => $currentMessage->getId(),
-                    'image_count' => count($imageUrls),
-                ]);
-            }
-        } else {
-            $messageContent = $content;
+            return $this->buildMultimodalContent($content, $imageUrls);
         }
 
-        $messages[] = [
-            'role' => 'user',
-            'content' => $messageContent,
-        ];
+        return $content;
+    }
 
-        return $messages;
+    /**
+     * Find the OpenAI response_id from the last assistant message in the thread.
+     *
+     * Used for stateful conversations via the Responses API previous_response_id parameter.
+     * Only returns an ID when the last assistant message was generated by OpenAI.
+     */
+    private function loadPreviousResponseId(array $thread): ?string
+    {
+        foreach (array_reverse($thread) as $msg) {
+            if ('OUT' === $msg->getDirection()) {
+                $responseId = $msg->getMeta('openai_response_id');
+                if (null !== $responseId && '' !== $responseId) {
+                    return $responseId;
+                }
+
+                return null;
+            }
+        }
+
+        return null;
     }
 
     /**
