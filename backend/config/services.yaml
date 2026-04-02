@@ -315,6 +315,11 @@ services:
             $oidcClientSecret: '%env(OIDC_CLIENT_SECRET)%'
             $oidcDiscoveryUrl: '%env(OIDC_DISCOVERY_URL)%'
 
+    # OIDC Bearer Token Authenticator (for external services like synaplan-opencloud)
+    App\Security\OidcBearerAuthenticator:
+        arguments:
+            $oidcDiscoveryUrl: '%env(OIDC_DISCOVERY_URL)%'
+
     # Keycloak OIDC OAuth Controller
     App\Controller\KeycloakAuthController:
         arguments:

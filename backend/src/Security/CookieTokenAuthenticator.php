@@ -52,6 +52,18 @@ class CookieTokenAuthenticator extends AbstractAuthenticator
             return false;
         }
 
+        // Defer to OidcBearerAuthenticator for JWT Bearer tokens when no cookies are present.
+        // JWTs have 3 dot-separated parts; app tokens use HMAC format (2 parts).
+        if (str_starts_with($authHeader, 'Bearer ')
+            && !$request->cookies->has(TokenService::ACCESS_COOKIE)
+            && !$request->cookies->has(OidcTokenService::OIDC_ACCESS_COOKIE)
+        ) {
+            $token = substr($authHeader, 7);
+            if (3 === count(explode('.', $token))) {
+                return false;
+            }
+        }
+
         return $request->cookies->has(TokenService::ACCESS_COOKIE)
             || $request->cookies->has(OidcTokenService::OIDC_ACCESS_COOKIE)
             || $request->headers->has('Authorization');
