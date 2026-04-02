@@ -318,7 +318,7 @@ services:
     # OIDC Bearer Token Authenticator (for external services like synaplan-opencloud)
     App\Security\OidcBearerAuthenticator:
         arguments:
-            $oidcClientId: '%env(OIDC_CLIENT_ID)%'
+            $oidcBearerAudience: '%env(default:OIDC_CLIENT_ID:OIDC_BEARER_AUDIENCE)%'
 
     # OIDC User Provisioning Service (shared by controller + bearer authenticator)
     App\Service\OidcUserService:
