@@ -87,7 +87,7 @@ class OidcBearerAuthenticator extends AbstractAuthenticator
         $token = substr($authHeader, 7);
 
         // Validate JWT with full claims + audience check
-        $audience = $this->oidcBearerAudience !== '' ? $this->oidcBearerAudience : $this->oidcClientId;
+        $audience = '' !== $this->oidcBearerAudience ? $this->oidcBearerAudience : $this->oidcClientId;
         $claims = $this->oidcTokenService->validateBearerToken($token, $audience ?: null);
 
         if (!$claims) {
