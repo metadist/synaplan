@@ -13,11 +13,11 @@ const KEYCLOAK_REALM = 'synaplan'
 const KEYCLOAK_TOKEN_ENDPOINT = `${KEYCLOAK_URL}/realms/${KEYCLOAK_REALM}/protocol/openid-connect/token`
 
 /**
- * Get a Keycloak access token via direct access grant (resource owner password).
+ * Get an OIDC access token via direct access grant (resource owner password).
  * Used for API-only tests that need an OIDC token without browser interaction.
  */
-export async function getKeycloakToken(
-  clientId: string = 'opencloud',
+export async function getOidcAccessToken(
+  clientId: string,
   credentials?: { user?: string; pass?: string }
 ): Promise<string> {
   const user = credentials?.user ?? process.env.OIDC_USER ?? 'testuser'
@@ -36,7 +36,7 @@ export async function getKeycloakToken(
 
   if (!response.ok) {
     const body = await response.text()
-    throw new Error(`Failed to get Keycloak token: ${response.status} ${body}`)
+    throw new Error(`Failed to get OIDC access token: ${response.status} ${body}`)
   }
 
   const data = await response.json()
