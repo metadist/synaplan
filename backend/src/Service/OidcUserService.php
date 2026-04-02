@@ -157,15 +157,12 @@ class OidcUserService
 
     private function findBySub(string $sub): ?User
     {
-        $users = $this->userRepository->findAll();
-        foreach ($users as $user) {
-            $details = $user->getUserDetails() ?? [];
-            if (isset($details['oidc_sub']) && $details['oidc_sub'] === $sub) {
-                return $user;
-            }
-        }
+        $qb = $this->userRepository->createQueryBuilder('u');
+        $qb->where('u.userDetails LIKE :pattern')
+            ->setParameter('pattern', '%"oidc_sub":"'.addcslashes($sub, '"\\').'"%')
+            ->setMaxResults(1);
 
-        return null;
+        return $qb->getQuery()->getOneOrNullResult();
     }
 
     private function findByEmail(?string $email): ?User

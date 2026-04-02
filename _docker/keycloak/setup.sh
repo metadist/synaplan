@@ -91,47 +91,44 @@ json_field() {
 }
 
 # Get the internal UUID of the synaplan-app client
-SYNAPLAN_CLIENT_UUID=$($KCADM get clients -r synaplan --fields id,clientId | json_field id <<< "$($KCADM get "clients?clientId=${CLIENT_ID}" -r synaplan --fields id)")
+SYNAPLAN_CLIENT_UUID=$($KCADM get "clients?clientId=${CLIENT_ID}" -r synaplan --fields id | json_field id)
 
-# Enable fine-grained permissions on the synaplan-app client.
-# This creates the token-exchange scope + permission under realm-management's authz.
-$KCADM update "clients/${SYNAPLAN_CLIENT_UUID}/management/permissions" -r synaplan \
-  -s enabled=true 2>/dev/null || echo "Note: permissions endpoint may require admin-fine-grained-authz feature"
-
-# Get the exchange client UUID
-EXCHANGE_CLIENT_UUID=$($KCADM get "clients?clientId=${EXCHANGE_CLIENT_ID}" -r synaplan --fields id | json_field id)
-
-# Find the realm-management client (holds the authorization server for client permissions)
-REALM_MGMT_UUID=$($KCADM get "clients?clientId=realm-management" -r synaplan --fields id | json_field id)
-
-if [ -n "${REALM_MGMT_UUID}" ] && [ -n "${EXCHANGE_CLIENT_UUID}" ]; then
-  # Create a client policy that matches the exchange client
-  $KCADM create "clients/${REALM_MGMT_UUID}/authz/resource-server/policy/client" -r synaplan \
-    -s name=synaplan-opencloud-exchange-policy \
-    -s "description=Allow synaplan-opencloud to perform token exchange" \
-    -s "clients=[\"${EXCHANGE_CLIENT_UUID}\"]" \
-    -s logic=POSITIVE 2>/dev/null && echo "Created token exchange policy" || echo "Policy may already exist"
-
-  # Get the policy UUID
-  POLICY_UUID=$($KCADM get "clients/${REALM_MGMT_UUID}/authz/resource-server/policy?name=synaplan-opencloud-exchange-policy" -r synaplan --fields id | json_field id)
-
-  # Find and update the token-exchange permission for the synaplan-app client
-  PERM_NAME="token-exchange.permission.client.${SYNAPLAN_CLIENT_UUID}"
-  TOKEN_EXCHANGE_PERM=$($KCADM get "clients/${REALM_MGMT_UUID}/authz/resource-server/permission?name=${PERM_NAME}" -r synaplan --fields id | json_field id)
-
-  if [ -n "${TOKEN_EXCHANGE_PERM}" ] && [ -n "${POLICY_UUID}" ]; then
-    $KCADM update "clients/${REALM_MGMT_UUID}/authz/resource-server/permission/scope/${TOKEN_EXCHANGE_PERM}" -r synaplan \
-      -s "name=${PERM_NAME}" \
-      -s decisionStrategy=AFFIRMATIVE \
-      -s "policies=[\"${POLICY_UUID}\"]" 2>/dev/null \
-      && echo "Token exchange permission configured for ${EXCHANGE_CLIENT_ID} -> ${CLIENT_ID}" \
-      || echo "WARNING: Failed to update token exchange permission"
-  else
-    echo "WARNING: Could not find token-exchange permission (PERM=${TOKEN_EXCHANGE_PERM}, POLICY=${POLICY_UUID})"
-    echo "Token exchange may need manual configuration in Keycloak admin console."
-  fi
+if [ -z "${SYNAPLAN_CLIENT_UUID}" ]; then
+  echo "WARNING: Could not resolve synaplan client UUID; skipping token exchange configuration"
 else
-  echo "WARNING: Could not resolve realm-management or exchange client UUID"
+  # Enable fine-grained permissions on the synaplan-app client.
+  $KCADM update "clients/${SYNAPLAN_CLIENT_UUID}/management/permissions" -r synaplan \
+    -s enabled=true 2>/dev/null || echo "Note: permissions endpoint may require admin-fine-grained-authz feature"
+
+  EXCHANGE_CLIENT_UUID=$($KCADM get "clients?clientId=${EXCHANGE_CLIENT_ID}" -r synaplan --fields id | json_field id)
+  REALM_MGMT_UUID=$($KCADM get "clients?clientId=realm-management" -r synaplan --fields id | json_field id)
+
+  if [ -n "${REALM_MGMT_UUID}" ] && [ -n "${EXCHANGE_CLIENT_UUID}" ]; then
+    $KCADM create "clients/${REALM_MGMT_UUID}/authz/resource-server/policy/client" -r synaplan \
+      -s name=synaplan-opencloud-exchange-policy \
+      -s "description=Allow synaplan-opencloud to perform token exchange" \
+      -s "clients=[\"${EXCHANGE_CLIENT_UUID}\"]" \
+      -s logic=POSITIVE 2>/dev/null && echo "Created token exchange policy" || echo "Policy may already exist"
+
+    POLICY_UUID=$($KCADM get "clients/${REALM_MGMT_UUID}/authz/resource-server/policy?name=synaplan-opencloud-exchange-policy" -r synaplan --fields id | json_field id)
+
+    PERM_NAME="token-exchange.permission.client.${SYNAPLAN_CLIENT_UUID}"
+    TOKEN_EXCHANGE_PERM=$($KCADM get "clients/${REALM_MGMT_UUID}/authz/resource-server/permission?name=${PERM_NAME}" -r synaplan --fields id | json_field id)
+
+    if [ -n "${TOKEN_EXCHANGE_PERM}" ] && [ -n "${POLICY_UUID}" ]; then
+      $KCADM update "clients/${REALM_MGMT_UUID}/authz/resource-server/permission/scope/${TOKEN_EXCHANGE_PERM}" -r synaplan \
+        -s "name=${PERM_NAME}" \
+        -s decisionStrategy=AFFIRMATIVE \
+        -s "policies=[\"${POLICY_UUID}\"]" 2>/dev/null \
+        && echo "Token exchange permission configured for ${EXCHANGE_CLIENT_ID} -> ${CLIENT_ID}" \
+        || echo "WARNING: Failed to update token exchange permission"
+    else
+      echo "WARNING: Could not find token-exchange permission (PERM=${TOKEN_EXCHANGE_PERM}, POLICY=${POLICY_UUID})"
+      echo "Token exchange may need manual configuration in Keycloak admin console."
+    fi
+  else
+    echo "WARNING: Could not resolve realm-management or exchange client UUID"
+  fi
 fi
 
 echo "OpenCloud integration clients provisioned"

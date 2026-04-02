@@ -32,6 +32,7 @@ class OidcBearerAuthenticator extends AbstractAuthenticator
         private OidcTokenService $oidcTokenService,
         private OidcUserService $oidcUserService,
         private LoggerInterface $logger,
+        private string $oidcClientId,
     ) {
     }
 
@@ -84,14 +85,14 @@ class OidcBearerAuthenticator extends AbstractAuthenticator
         $authHeader = (string) $request->headers->get('Authorization', '');
         $token = substr($authHeader, 7);
 
-        // Validate JWT and get claims
-        $claims = $this->oidcTokenService->validateOidcToken($token);
+        // Validate JWT with full claims + audience check
+        $claims = $this->oidcTokenService->validateBearerToken($token, $this->oidcClientId);
 
         if (!$claims) {
             throw new CustomUserMessageAuthenticationException('Invalid or expired OIDC bearer token');
         }
 
-        // Find or create user via shared service
+        // Find or create user via shared service (full claims include role data)
         $user = $this->oidcUserService->findOrCreateFromClaims($claims);
 
         $this->logger->debug('OIDC bearer token authenticated', [
