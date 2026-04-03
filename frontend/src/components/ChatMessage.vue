@@ -424,45 +424,39 @@
                         ? '!border-[var(--brand)] border-2 bg-[var(--brand-alpha-light)] shadow-lg'
                         : 'border-[var(--border-light)]',
                     ]"
-                    @click="focusSource(index)"
+                    @click="focusSource(index); openSource(result.url)"
                   >
                     <!-- Header: Badge + Source Name + Open Button (Mobile) -->
                     <div class="flex items-center gap-2">
-                      <!-- Badge Number (clickable) -->
-                      <button
+                      <!-- Badge Number -->
+                      <span
                         :class="[
                           'inline-flex items-center justify-center w-6 h-6 rounded-full text-xs font-bold flex-shrink-0 transition-all',
-                          'hover:scale-110 active:scale-95',
                           highlightedSource === index
                             ? 'bg-[var(--brand)] text-white shadow-md'
-                            : 'bg-[var(--brand-alpha-light)] text-[var(--brand)] hover:bg-[var(--brand)] hover:text-white',
+                            : 'bg-[var(--brand-alpha-light)] text-[var(--brand)]',
                         ]"
-                        :title="`Highlight source ${index + 1}`"
-                        @click.stop="focusSource(index)"
                       >
                         {{ index + 1 }}
-                      </button>
+                      </span>
 
                       <!-- Source Name -->
                       <span class="text-xs txt-muted truncate flex-1">{{ result.source }}</span>
 
-                      <!-- Open Link Button (visible when highlighted) -->
-                      <button
+                      <!-- Open Link Icon (visible when highlighted) -->
+                      <span
                         v-if="highlightedSource === index"
-                        class="flex items-center gap-1 px-2 py-1 rounded-md bg-[var(--brand)] text-white text-xs font-medium hover:opacity-90 transition-opacity"
-                        title="Open link"
-                        @click.stop="openSource(result.url)"
+                        class="flex items-center gap-1 px-2 py-1 rounded-md bg-[var(--brand)] text-white text-xs font-medium"
                       >
                         <Icon icon="mdi:open-in-new" class="w-3.5 h-3.5" />
                         <span class="hidden sm:inline">Open</span>
-                      </button>
+                      </span>
                     </div>
 
-                    <!-- Thumbnail (clickable to open) -->
+                    <!-- Thumbnail -->
                     <div
                       v-if="result.thumbnail"
-                      class="w-full aspect-video rounded-lg overflow-hidden bg-black/5 dark:bg-white/5 hover:opacity-90 transition-opacity cursor-pointer"
-                      @click.stop="openSource(result.url)"
+                      class="w-full aspect-video rounded-lg overflow-hidden bg-black/5 dark:bg-white/5 hover:opacity-90 transition-opacity"
                     >
                       <img
                         :src="result.thumbnail"
@@ -475,10 +469,9 @@
 
                     <!-- Content -->
                     <div class="flex-1 min-w-0 space-y-1">
-                      <!-- Title (clickable to open) -->
+                      <!-- Title -->
                       <div
-                        class="text-sm font-medium line-clamp-2 group-hover:text-[var(--brand)] transition-colors hover:underline cursor-pointer"
-                        @click.stop="openSource(result.url)"
+                        class="text-sm font-medium line-clamp-2 group-hover:text-[var(--brand)] transition-colors group-hover:underline"
                       >
                         {{ result.title }}
                       </div>
