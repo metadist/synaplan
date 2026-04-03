@@ -182,6 +182,8 @@
       "byProvider": "By Provider",
       "topModels": "Top Models",
       "topUsers": "Top Users",
+      "topUsersHint": "Users with the most API requests in the selected period (up to 25).",
+      "topUsersEmpty": "No usage data for this period. Try \"All time\" or wait until users generate activity.",
       "model": "Model",
       "requests": "requests",
       "tokens": "tokens",

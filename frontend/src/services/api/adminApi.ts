@@ -46,7 +46,7 @@ export interface UsageStats {
   byAction: Record<string, { count: number; tokens: number; cost: number }>
   byProvider: Record<string, { count: number; tokens: number; cost: number }>
   byModel: Record<string, { count: number; tokens: number; cost: number }>
-  topUsers?: Array<{
+  topUsers: Array<{
     id: number
     email: string
     level: string

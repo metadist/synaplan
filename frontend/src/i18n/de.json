@@ -177,6 +177,8 @@
       "byProvider": "Nach Anbieter",
       "topModels": "Top Modelle",
       "topUsers": "Top-Benutzer",
+      "topUsersHint": "Benutzer mit den meisten API-Anfragen im gewählten Zeitraum (max. 25).",
+      "topUsersEmpty": "Keine Nutzungsdaten für diesen Zeitraum. Versuchen Sie „Gesamte Zeit“ oder warten Sie auf Aktivität.",
       "model": "Modell",
       "requests": "Anfragen",
       "tokens": "Tokens",
