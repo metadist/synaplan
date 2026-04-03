@@ -424,7 +424,10 @@
                         ? '!border-[var(--brand)] border-2 bg-[var(--brand-alpha-light)] shadow-lg'
                         : 'border-[var(--border-light)]',
                     ]"
-                    @click="focusSource(index); openSource(result.url)"
+                    @click="
+                      focusSource(index)
+                      openSource(result.url)
+                    "
                   >
                     <!-- Header: Badge + Source Name + Open Button (Mobile) -->
                     <div class="flex items-center gap-2">
