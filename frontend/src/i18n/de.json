@@ -796,6 +796,7 @@
       "apiChannel": "API-Kanal",
       "webWidget": "Web-Widget",
       "defaultHandling": "Standardverarbeitung",
+      "personalKeyword": "persönliches Keyword",
       "addKeyword": "Prüfen Sie, ob ein Keyword frei ist, um Ihre eigene Verarbeitung hinzuzufügen:",
       "keywordPlaceholder": "Keyword",
       "yourEmailAddress": "Ihre E-Mail-Adresse: {email}",

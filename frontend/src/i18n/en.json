@@ -650,6 +650,7 @@
       "apiChannel": "API Channel",
       "webWidget": "Web Widget",
       "defaultHandling": "default handling",
+      "personalKeyword": "personal keyword",
       "addKeyword": "Check for a free keyword to add your own handling:",
       "keywordPlaceholder": "keyword",
       "yourEmailAddress": "Your email address: {email}",
