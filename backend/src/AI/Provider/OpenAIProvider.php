@@ -478,14 +478,13 @@ class OpenAIProvider implements ChatProviderInterface, EmbeddingProviderInterfac
             }
 
             $response = $this->client->embeddings()->create($params);
-
             $usage = $response->usage;
 
             return [
                 'embedding' => $response['data'][0]['embedding'] ?? [],
                 'usage' => [
-                    'prompt_tokens' => $usage->promptTokens ?? 0,
-                    'total_tokens' => $usage->totalTokens ?? 0,
+                    'prompt_tokens' => null !== $usage ? $usage->promptTokens : 0,
+                    'total_tokens' => null !== $usage ? $usage->totalTokens : 0,
                 ],
             ];
         } catch (\Exception $e) {
@@ -520,8 +519,8 @@ class OpenAIProvider implements ChatProviderInterface, EmbeddingProviderInterfac
             return [
                 'embeddings' => array_map(fn ($item) => $item['embedding'], $response['data']),
                 'usage' => [
-                    'prompt_tokens' => $usage->promptTokens ?? 0,
-                    'total_tokens' => $usage->totalTokens ?? 0,
+                    'prompt_tokens' => null !== $usage ? $usage->promptTokens : 0,
+                    'total_tokens' => null !== $usage ? $usage->totalTokens : 0,
                 ],
             ];
         } catch (\Exception $e) {

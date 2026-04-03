@@ -12,6 +12,8 @@ use App\AI\Interface\VisionProviderInterface;
 
 class TestProvider implements ChatProviderInterface, EmbeddingProviderInterface, VisionProviderInterface, ImageGenerationProviderInterface, SpeechToTextProviderInterface, TextToSpeechProviderInterface, FileAnalysisProviderInterface
 {
+    private const FAKE_TOKENS_PER_EMBED = 8;
+
     public function getName(): string
     {
         return 'test';
@@ -154,8 +156,8 @@ class TestProvider implements ChatProviderInterface, EmbeddingProviderInterface,
         return [
             'embedding' => array_fill(0, 1536, 0.123),
             'usage' => [
-                'prompt_tokens' => 8,
-                'total_tokens' => 8,
+                'prompt_tokens' => self::FAKE_TOKENS_PER_EMBED,
+                'total_tokens' => self::FAKE_TOKENS_PER_EMBED,
             ],
         ];
     }
@@ -167,7 +169,7 @@ class TestProvider implements ChatProviderInterface, EmbeddingProviderInterface,
             $embeddings[] = $this->embed($t, $options)['embedding'];
         }
 
-        $promptTokens = 8 * count($texts);
+        $promptTokens = self::FAKE_TOKENS_PER_EMBED * count($texts);
 
         return [
             'embeddings' => $embeddings,
