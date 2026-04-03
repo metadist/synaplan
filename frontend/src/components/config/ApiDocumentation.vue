@@ -33,11 +33,14 @@
           :key="path.path + path.method"
           class="surface-card p-6"
         >
-          <div
-            class="flex items-start justify-between gap-4 mb-4 cursor-pointer select-none"
+          <button
+            type="button"
+            class="flex items-start justify-between gap-4 mb-4 w-full text-left cursor-pointer select-none border-0 bg-transparent p-0 rounded-lg focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--bg-card)]"
+            :aria-expanded="isExpanded(path.path + path.method)"
+            :aria-controls="getExpandPanelId(path.path, path.method)"
             @click="toggleExpand(path.path + path.method)"
           >
-            <div class="flex-1">
+            <div class="flex-1 min-w-0">
               <div class="flex items-center gap-3 mb-2">
                 <span
                   :class="[
@@ -51,18 +54,21 @@
               </div>
               <p class="txt-secondary text-sm mt-2">{{ path.summary || path.description || '' }}</p>
             </div>
-            <span class="icon-ghost">
+            <span class="icon-ghost shrink-0" aria-hidden="true">
               <component
                 :is="isExpanded(path.path + path.method) ? ChevronUpIcon : ChevronDownIcon"
                 class="w-4 h-4"
               />
             </span>
-          </div>
+          </button>
 
           <!-- Expanded Details -->
           <div
             v-if="isExpanded(path.path + path.method)"
+            :id="getExpandPanelId(path.path, path.method)"
             class="mt-4 pt-4 border-t border-light-border/30 dark:border-dark-border/20 space-y-4"
+            role="region"
+            :aria-label="path.path + ' ' + path.method"
           >
             <!-- Parameters -->
             <div v-if="path.parameters && path.parameters.length > 0">
@@ -447,6 +453,11 @@ const toggleExpand = (key: string) => {
 
 const isExpanded = (key: string): boolean => {
   return expandedEndpoints.value.has(key)
+}
+
+function getExpandPanelId(pathStr: string, method: string): string {
+  const safe = `${method}-${pathStr}`.replace(/[^a-zA-Z0-9_-]/g, '-')
+  return `api-doc-endpoint-${safe}`
 }
 
 const getMethodColorClass = (method: string): string => {

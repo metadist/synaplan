@@ -413,13 +413,14 @@
                     transform: `translateX(calc(-${carouselPage * 100}%))`,
                   }"
                 >
-                  <div
+                  <button
                     v-for="(result, index) in searchResults"
                     :key="index"
+                    type="button"
                     :class="[
                       'group flex flex-col gap-2 p-2 sm:p-3 rounded-lg transition-all cursor-pointer flex-shrink-0 snap-start',
                       'w-[85%] sm:w-[calc(33.333%-0.5rem)]',
-                      'bg-[var(--bg-chip)] border shadow-sm',
+                      'bg-[var(--bg-chip)] border shadow-sm text-left font-inherit',
                       highlightedSource === index
                         ? '!border-[var(--brand)] border-2 bg-[var(--brand-alpha-light)] shadow-lg'
                         : 'border-[var(--border-light)]',
@@ -449,7 +450,7 @@
                         class="flex items-center gap-1 px-2 py-1 rounded-md bg-[var(--brand)] text-white text-xs font-medium"
                       >
                         <Icon icon="mdi:open-in-new" class="w-3.5 h-3.5" />
-                        <span class="hidden sm:inline">Open</span>
+                        <span class="hidden sm:inline">{{ $t('common.open') }}</span>
                       </span>
                     </div>
 
@@ -483,7 +484,7 @@
                         {{ result.published }}
                       </div>
                     </div>
-                  </div>
+                  </button>
                 </div>
               </div>
             </div>

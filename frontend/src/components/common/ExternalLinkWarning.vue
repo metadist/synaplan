@@ -44,15 +44,28 @@ function cancel() {
 function handleKeydown(event: KeyboardEvent) {
   if (!props.isOpen) return
 
-  if (event.key === 'Enter') {
-    event.preventDefault()
-    proceed()
-  }
-
   if (event.key === 'Escape') {
     event.preventDefault()
     cancel()
+    return
   }
+
+  if (event.key !== 'Enter') {
+    return
+  }
+
+  const target = event.target as HTMLElement | null
+  if (!target) {
+    return
+  }
+
+  const tag = target.tagName
+  if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'BUTTON' || tag === 'SELECT') {
+    return
+  }
+
+  event.preventDefault()
+  proceed()
 }
 
 onMounted(() => {
@@ -77,19 +90,19 @@ defineExpose({ shouldShowWarning })
 <template>
   <Teleport :to="teleportTarget">
     <Transition name="dialog-fade">
-      <div
-        v-if="isOpen"
-        class="fixed inset-0 z-[10000] flex items-center justify-center p-4"
-        @click.self="cancel"
-      >
-        <!-- Backdrop -->
-        <div class="absolute inset-0 bg-black/50 dark:bg-black/70 backdrop-blur-sm"></div>
+      <div v-if="isOpen" class="fixed inset-0 z-[10000] flex items-center justify-center p-4">
+        <!-- Backdrop: receives outside clicks (parent has no @click.self because child covers it) -->
+        <div
+          class="absolute inset-0 bg-black/50 dark:bg-black/70 backdrop-blur-sm"
+          @click="cancel"
+        ></div>
 
         <!-- Dialog -->
         <div
           class="relative surface-card rounded-xl shadow-2xl max-w-md w-full p-6 space-y-4 animate-scale-in"
           role="dialog"
           aria-modal="true"
+          @click.stop
         >
           <!-- Header -->
           <div class="flex items-center gap-3">
