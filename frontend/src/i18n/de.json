@@ -797,13 +797,31 @@
       "webWidget": "Web-Widget",
       "defaultHandling": "Standardverarbeitung",
       "personalKeyword": "persönliches Keyword",
+      "keywordSaved": "E-Mail-Keyword erfolgreich gespeichert",
       "addKeyword": "Prüfen Sie, ob ein Keyword frei ist, um Ihre eigene Verarbeitung hinzuzufügen:",
       "keywordPlaceholder": "Keyword",
       "yourEmailAddress": "Ihre E-Mail-Adresse: {email}",
       "noKeywordSet": "Sie haben noch kein persönliches Keyword festgelegt. Sie können nur anonym an den Standard-Handler schreiben!",
       "apiDescription": "Einfache API-Aufrufe mit Ihrem persönlichen API-Schlüssel:",
       "apiDocumentationInfo": "Für eine ausführliche API-Dokumentation mit allen verfügbaren Endpunkten, Anfrage-/Antwortformaten und Authentifizierungsmethoden besuchen Sie bitte unsere umfassende API-Dokumentation.",
-      "viewApiDocumentation": "API-Dokumentation ansehen"
+      "viewApiDocumentation": "API-Dokumentation ansehen",
+      "apiDocumentation": {
+        "title": "API-Dokumentation",
+        "description": "Vollständige API-Referenz zur Integration mit Synaplan. Alle Endpunkte sind mit Anfrage-/Antwortbeispielen dokumentiert.",
+        "loading": "API-Dokumentation wird geladen...",
+        "loadError": "API-Dokumentation konnte nicht geladen werden",
+        "parameters": "Parameter",
+        "requestBody": "Anfragekörper",
+        "responses": "Antworten",
+        "authentication": "Authentifizierung",
+        "version": "Version:",
+        "required": "erforderlich",
+        "type": "Typ:",
+        "contentType": "Content-Type:",
+        "example": "Beispiel:",
+        "headers": "Header:",
+        "requiresAuth": "Dieser Endpunkt erfordert Authentifizierung:"
+      }
     },
     "aiModels": {
       "title": "KI-Modelle",

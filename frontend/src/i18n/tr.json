@@ -1140,7 +1140,15 @@
         "parameters": "Parametreler",
         "requestBody": "İstek Gövdesi",
         "responses": "Yanıtlar",
-        "authentication": "Kimlik Doğrulama"
+        "authentication": "Kimlik Doğrulama",
+        "loadError": "API dokümantasyonu yüklenemedi",
+        "version": "Sürüm:",
+        "required": "zorunlu",
+        "type": "Tür:",
+        "contentType": "Content-Type:",
+        "example": "Örnek:",
+        "headers": "Başlıklar:",
+        "requiresAuth": "Bu uç nokta kimlik doğrulama gerektirir:"
       },
       "exampleCurl": "Örnek:",
       "widgetDescription": "Widgetı etkinleştirmek için lütfen aşağıdaki alana \"siteadınız.com\" gibi domain adınızı girin.",

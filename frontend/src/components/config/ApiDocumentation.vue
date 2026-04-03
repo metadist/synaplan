@@ -1,7 +1,7 @@
 <template>
   <div class="space-y-6" data-testid="page-api-documentation">
     <div v-if="loading" class="surface-card p-8 text-center">
-      <p class="txt-secondary">{{ $t('config.apiDocumentation.loading') }}</p>
+      <p class="txt-secondary">{{ $t('config.inbound.apiDocumentation.loading') }}</p>
     </div>
 
     <div v-else-if="error" class="surface-card p-6">
@@ -12,11 +12,11 @@
       <!-- API Info -->
       <div class="surface-card p-6">
         <h2 class="text-xl font-semibold txt-primary mb-2">
-          {{ apiSpec.info?.title || 'API Documentation' }}
+          {{ apiSpec.info?.title || $t('config.inbound.apiDocumentation.title') }}
         </h2>
         <p class="txt-secondary mb-4">{{ apiSpec.info?.description || '' }}</p>
         <div class="flex items-center gap-4 text-sm">
-          <span class="txt-secondary">Version:</span>
+          <span class="txt-secondary">{{ $t('config.inbound.apiDocumentation.version') }}</span>
           <span class="pill pill--active">{{ apiSpec.info?.version || '1.0.0' }}</span>
         </div>
       </div>
@@ -33,7 +33,10 @@
           :key="path.path + path.method"
           class="surface-card p-6"
         >
-          <div class="flex items-start justify-between gap-4 mb-4">
+          <div
+            class="flex items-start justify-between gap-4 mb-4 cursor-pointer select-none"
+            @click="toggleExpand(path.path + path.method)"
+          >
             <div class="flex-1">
               <div class="flex items-center gap-3 mb-2">
                 <span
@@ -48,12 +51,12 @@
               </div>
               <p class="txt-secondary text-sm mt-2">{{ path.summary || path.description || '' }}</p>
             </div>
-            <button class="icon-ghost" @click="toggleExpand(path.path + path.method)">
+            <span class="icon-ghost">
               <component
                 :is="isExpanded(path.path + path.method) ? ChevronUpIcon : ChevronDownIcon"
                 class="w-4 h-4"
               />
-            </button>
+            </span>
           </div>
 
           <!-- Expanded Details -->
@@ -63,7 +66,7 @@
           >
             <!-- Parameters -->
             <div v-if="path.parameters && path.parameters.length > 0">
-              <h4 class="text-sm font-semibold txt-primary mb-3">Parameters</h4>
+              <h4 class="text-sm font-semibold txt-primary mb-3">{{ $t('config.inbound.apiDocumentation.parameters') }}</h4>
               <div class="space-y-2">
                 <div
                   v-for="param in path.parameters"
@@ -75,10 +78,10 @@
                       <code class="text-sm font-mono txt-primary font-semibold">{{
                         param.name
                       }}</code>
-                      <span v-if="param.required" class="ml-2 text-xs text-red-500">required</span>
+                      <span v-if="param.required" class="ml-2 text-xs text-red-500">{{ $t('config.inbound.apiDocumentation.required') }}</span>
                       <p class="text-xs txt-secondary mt-1">{{ param.description || '' }}</p>
                       <span class="text-xs txt-tertiary mt-1 inline-block">
-                        Type: <code>{{ getTypeString(param.schema) }}</code>
+                        {{ $t('config.inbound.apiDocumentation.type') }} <code>{{ getTypeString(param.schema) }}</code>
                         <span v-if="param.in"> in {{ param.in }}</span>
                       </span>
                     </div>
@@ -90,10 +93,10 @@
             <!-- Request Body -->
             <div v-if="path.requestBody">
               <h4 class="text-sm font-semibold txt-primary mb-3">
-                {{ $t('config.apiDocumentation.requestBody') }}
+                {{ $t('config.inbound.apiDocumentation.requestBody') }}
               </h4>
               <div v-if="path.requestBody.required" class="mb-2">
-                <span class="text-xs text-red-500">required</span>
+                <span class="text-xs text-red-500">{{ $t('config.inbound.apiDocumentation.required') }}</span>
               </div>
               <div v-if="path.requestBody.description" class="mb-3">
                 <p class="text-sm txt-secondary">{{ path.requestBody.description }}</p>
@@ -105,7 +108,7 @@
                   class="space-y-2"
                 >
                   <div class="flex items-center gap-2">
-                    <span class="text-xs font-semibold txt-primary">Content-Type:</span>
+                    <span class="text-xs font-semibold txt-primary">{{ $t('config.inbound.apiDocumentation.contentType') }}</span>
                     <code class="text-xs font-mono txt-primary">{{ contentType }}</code>
                   </div>
                   <div
@@ -118,7 +121,7 @@
                     v-if="content.example"
                     class="code-block p-4 font-mono text-xs overflow-x-auto"
                   >
-                    <div class="text-xs txt-secondary mb-1">Example:</div>
+                    <div class="text-xs txt-secondary mb-1">{{ $t('config.inbound.apiDocumentation.example') }}</div>
                     <pre>{{ JSON.stringify(content.example, null, 2) }}</pre>
                   </div>
                 </div>
@@ -128,7 +131,7 @@
             <!-- Responses -->
             <div v-if="path.responses">
               <h4 class="text-sm font-semibold txt-primary mb-3">
-                {{ $t('config.apiDocumentation.responses') }}
+                {{ $t('config.inbound.apiDocumentation.responses') }}
               </h4>
               <div class="space-y-3">
                 <div
@@ -152,7 +155,7 @@
                       class="space-y-2"
                     >
                       <div class="flex items-center gap-2">
-                        <span class="text-xs font-semibold txt-primary">Content-Type:</span>
+                        <span class="text-xs font-semibold txt-primary">{{ $t('config.inbound.apiDocumentation.contentType') }}</span>
                         <code class="text-xs font-mono txt-primary">{{ contentType }}</code>
                       </div>
                       <div
@@ -165,13 +168,13 @@
                         v-if="content.example"
                         class="code-block p-4 font-mono text-xs overflow-x-auto"
                       >
-                        <div class="text-xs txt-secondary mb-1">Example:</div>
+                        <div class="text-xs txt-secondary mb-1">{{ $t('config.inbound.apiDocumentation.example') }}</div>
                         <pre>{{ JSON.stringify(content.example, null, 2) }}</pre>
                       </div>
                     </div>
                   </div>
                   <div v-if="response.headers" class="mt-3">
-                    <div class="text-xs font-semibold txt-primary mb-2">Headers:</div>
+                    <div class="text-xs font-semibold txt-primary mb-2">{{ $t('config.inbound.apiDocumentation.headers') }}</div>
                     <div class="space-y-1">
                       <div
                         v-for="(header, headerName) in response.headers"
@@ -190,10 +193,10 @@
             <!-- Security -->
             <div v-if="path.security && path.security.length > 0">
               <h4 class="text-sm font-semibold txt-primary mb-3">
-                {{ $t('config.apiDocumentation.authentication') }}
+                {{ $t('config.inbound.apiDocumentation.authentication') }}
               </h4>
               <div class="p-3 surface-chip rounded-lg space-y-2">
-                <p class="text-sm txt-secondary">This endpoint requires authentication:</p>
+                <p class="text-sm txt-secondary">{{ $t('config.inbound.apiDocumentation.requiresAuth') }}</p>
                 <div class="flex flex-wrap gap-2">
                   <span v-for="(sec, idx) in path.security" :key="idx">
                     <span v-for="(_, name) in sec" :key="name" class="pill pill--active text-xs">
@@ -213,7 +216,10 @@
 <script setup lang="ts">
 import { getErrorMessage } from '@/utils/errorMessage'
 import { ref, computed, onMounted } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { CommandLineIcon, ChevronDownIcon, ChevronUpIcon } from '@heroicons/vue/24/outline'
+
+const { t } = useI18n()
 
 interface OpenAPISpec {
   info?: {
@@ -335,7 +341,7 @@ const loadApiSpec = async () => {
     apiSpec.value = spec
   } catch (err: unknown) {
     console.error('Failed to load API spec:', err)
-    error.value = getErrorMessage(err) || 'Failed to load API documentation'
+    error.value = getErrorMessage(err) || t('config.inbound.apiDocumentation.loadError')
   } finally {
     loading.value = false
   }

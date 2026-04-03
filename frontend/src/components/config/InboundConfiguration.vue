@@ -102,18 +102,16 @@
         {{ $t('config.inbound.apiDescription') }}
       </p>
 
-      <div class="p-4 bg-blue-500/10 border border-blue-500/30 rounded-lg">
-        <p class="text-sm txt-primary mb-3">
-          {{ $t('config.inbound.apiDocumentationInfo') }}
-        </p>
-        <router-link
-          to="/config/api-documentation"
-          class="btn-primary inline-flex items-center gap-2"
-        >
-          <CommandLineIcon class="w-4 h-4" />
-          {{ $t('config.inbound.viewApiDocumentation') }}
-        </router-link>
-      </div>
+      <p class="text-sm txt-secondary mb-4">
+        {{ $t('config.inbound.apiDocumentationInfo') }}
+      </p>
+      <router-link
+        to="/config/api-documentation"
+        class="btn-primary px-4 py-3 rounded-lg font-medium inline-flex items-center gap-2"
+      >
+        <CommandLineIcon class="w-4 h-4" />
+        {{ $t('config.inbound.viewApiDocumentation') }}
+      </router-link>
     </div>
 
     <div class="h-20"></div>

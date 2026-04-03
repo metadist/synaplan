@@ -1139,7 +1139,15 @@
         "parameters": "Parámetros",
         "requestBody": "Cuerpo de Solicitud",
         "responses": "Respuestas",
-        "authentication": "Autenticación"
+        "authentication": "Autenticación",
+        "loadError": "No se pudo cargar la documentación API",
+        "version": "Versión:",
+        "required": "requerido",
+        "type": "Tipo:",
+        "contentType": "Content-Type:",
+        "example": "Ejemplo:",
+        "headers": "Encabezados:",
+        "requiresAuth": "Este endpoint requiere autenticación:"
       },
       "exampleCurl": "Ejemplo:",
       "widgetDescription": "Para activar el widget, ingresa tu nombre de dominio como \"tudominio.com\" en el campo de abajo.",
