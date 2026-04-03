@@ -66,8 +66,8 @@ class AiFacade
     /**
      * Chat: Messages-Array or simple prompt.
      *
-     * @param array|string $messages Messages array oder einfacher string prompt
-     * @param int|null     $userId   User ID für Config-Lookup
+     * @param array|string $messages Messages array or simple string prompt
+     * @param int|null     $userId   User ID for config lookup
      * @param array        $options  Additional options (provider, model, temperature, etc.)
      *
      * @return array Response mit content, provider, model, usage
@@ -76,7 +76,7 @@ class AiFacade
     {
         $providerName = $options['provider'] ?? null;
 
-        // Wenn kein Provider explizit angegeben, nutze User-Konfiguration
+        // Fall back to user configuration when no provider is explicitly given
         if (!$providerName && $userId > 0) {
             $providerName = $this->modelConfig->getDefaultProvider($userId, 'chat');
         }
@@ -197,14 +197,14 @@ class AiFacade
      * @param int|null $userId  User ID for config lookup
      * @param array    $options Additional options (provider, model, etc.)
      *
-     * @return array Vector embedding
+     * @return array{embedding: array<float>, usage: array{prompt_tokens: int, total_tokens: int}}
      */
     public function embed(string $text, ?int $userId = null, array $options = []): array
     {
         $providerName = $options['provider'] ?? null;
         $model = $options['model'] ?? null;
 
-        // Wenn kein Provider explizit angegeben, nutze User-Konfiguration
+        // Fall back to user configuration when no provider is explicitly given
         if (!$providerName && $userId > 0) {
             $providerName = $this->modelConfig->getDefaultProvider($userId, 'vectorize');
         }
@@ -229,7 +229,7 @@ class AiFacade
      * @param string|null $providerName Explicit provider name
      * @param array       $options      Additional options (model, etc.) forwarded to the provider
      *
-     * @return array[] Array of embedding vectors
+     * @return array{embeddings: array<array<float>>, usage: array{prompt_tokens: int, total_tokens: int}}
      */
     public function embedBatch(array $texts, ?int $userId = null, ?string $providerName = null, array $options = []): array
     {
@@ -413,7 +413,7 @@ class AiFacade
     {
         $providerName = $options['provider'] ?? null;
 
-        // Wenn kein Provider explizit angegeben, nutze User-Konfiguration
+        // Fall back to user configuration when no provider is explicitly given
         if (!$providerName && $userId > 0) {
             $providerName = $this->modelConfig->getDefaultProvider($userId, 'image_generation');
         }
@@ -462,7 +462,7 @@ class AiFacade
     {
         $providerName = $options['provider'] ?? null;
 
-        // Wenn kein Provider explizit angegeben, nutze User-Konfiguration
+        // Fall back to user configuration when no provider is explicitly given
         if (!$providerName && $userId > 0) {
             $providerName = $this->modelConfig->getDefaultProvider($userId, 'video_generation');
         }
@@ -592,7 +592,7 @@ class AiFacade
     {
         $providerName = $options['provider'] ?? null;
 
-        // Wenn kein Provider explizit angegeben, nutze User-Konfiguration
+        // Fall back to user configuration when no provider is explicitly given
         if (!$providerName && $userId > 0) {
             $providerName = $this->modelConfig->getDefaultProvider($userId, 'speech_to_text');
         }

@@ -122,21 +122,20 @@ final readonly class VectorizationService
 
             $chunkTexts = array_map(fn (array $c): string => $c['content'], $chunks);
 
-            $embeddings = $this->aiFacade->embedBatch($chunkTexts, $userId, $provider, [
+            $batchResult = $this->aiFacade->embedBatch($chunkTexts, $userId, $provider, [
                 'model' => $modelName,
                 'provider' => $provider,
             ]);
+            $embeddings = $batchResult['embeddings'];
 
             $user = $this->em->getRepository(User::class)->find($userId);
             if ($user) {
-                $estimatedTokens = RateLimitService::estimateTokens(
-                    array_sum(array_map('strlen', $chunkTexts))
-                );
                 $this->rateLimitService->recordUsage($user, 'EMBEDDINGS', [
+                    'usage' => $batchResult['usage'],
                     'provider' => $provider,
                     'model' => $modelName,
                     'model_id' => $embeddingModelId,
-                    'tokens' => $estimatedTokens,
+                    'input_bytes' => array_sum(array_map('strlen', $chunkTexts)),
                     'source' => 'VECTORIZATION',
                 ]);
             }

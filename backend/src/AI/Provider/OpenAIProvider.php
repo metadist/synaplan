@@ -478,8 +478,15 @@ class OpenAIProvider implements ChatProviderInterface, EmbeddingProviderInterfac
             }
 
             $response = $this->client->embeddings()->create($params);
+            $usage = $response->usage;
 
-            return $response['data'][0]['embedding'] ?? [];
+            return [
+                'embedding' => $response['data'][0]['embedding'] ?? [],
+                'usage' => [
+                    'prompt_tokens' => null !== $usage ? $usage->promptTokens : 0,
+                    'total_tokens' => null !== $usage ? $usage->totalTokens : 0,
+                ],
+            ];
         } catch (\Exception $e) {
             throw new ProviderException('OpenAI embedding error: '.$e->getMessage(), 'openai');
         }
@@ -507,8 +514,15 @@ class OpenAIProvider implements ChatProviderInterface, EmbeddingProviderInterfac
             }
 
             $response = $this->client->embeddings()->create($params);
+            $usage = $response->usage;
 
-            return array_map(fn ($item) => $item['embedding'], $response['data']);
+            return [
+                'embeddings' => array_map(fn ($item) => $item['embedding'], $response['data']),
+                'usage' => [
+                    'prompt_tokens' => null !== $usage ? $usage->promptTokens : 0,
+                    'total_tokens' => null !== $usage ? $usage->totalTokens : 0,
+                ],
+            ];
         } catch (\Exception $e) {
             throw new ProviderException('OpenAI batch embedding error: '.$e->getMessage(), 'openai');
         }

@@ -430,9 +430,15 @@ class OllamaProvider implements ChatProviderInterface, EmbeddingProviderInterfac
                 'input' => [$text],
             ]);
 
-            $arrRes = method_exists($response, 'toArray') ? $response->toArray() : (array) $response;
+            $promptTokens = $response->promptEvalCount ?? 0;
 
-            return $arrRes['embeddings'][0] ?? [];
+            return [
+                'embedding' => $response->embeddings[0] ?? [],
+                'usage' => [
+                    'prompt_tokens' => $promptTokens,
+                    'total_tokens' => $promptTokens,
+                ],
+            ];
         } catch (\Exception $e) {
             throw new ProviderException('Ollama embedding error: '.$e->getMessage(), 'ollama');
         }
@@ -445,7 +451,7 @@ class OllamaProvider implements ChatProviderInterface, EmbeddingProviderInterfac
         }
 
         if (empty($texts)) {
-            return [];
+            return ['embeddings' => [], 'usage' => ['prompt_tokens' => 0, 'total_tokens' => 0]];
         }
 
         try {
@@ -454,9 +460,15 @@ class OllamaProvider implements ChatProviderInterface, EmbeddingProviderInterfac
                 'input' => $texts,
             ]);
 
-            $arrRes = method_exists($response, 'toArray') ? $response->toArray() : (array) $response;
+            $promptTokens = $response->promptEvalCount ?? 0;
 
-            return $arrRes['embeddings'] ?? [];
+            return [
+                'embeddings' => $response->embeddings ?? [],
+                'usage' => [
+                    'prompt_tokens' => $promptTokens,
+                    'total_tokens' => $promptTokens,
+                ],
+            ];
         } catch (\Exception $e) {
             throw new ProviderException('Ollama batch embedding error: '.$e->getMessage(), 'ollama');
         }

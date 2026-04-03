@@ -437,14 +437,16 @@ final readonly class UserMemoryService
             ]);
 
             // Create embedding for query (with EXPLICIT model!)
-            $queryVector = $this->aiFacade->embed($queryText, $userId, array_filter([
+            $embedResult = $this->aiFacade->embed($queryText, $userId, array_filter([
                 'model' => $modelName,
                 'provider' => $provider,
             ]));
+            $queryVector = $embedResult['embedding'];
 
             $user = $this->em->getRepository(User::class)->find($userId);
             if ($user) {
                 $this->rateLimitService->recordUsage($user, 'EMBEDDINGS', [
+                    'usage' => $embedResult['usage'],
                     'provider' => $provider ?? 'unknown',
                     'model' => $modelName ?? 'unknown',
                     'model_id' => $embeddingModelId,
@@ -530,16 +532,18 @@ final readonly class UserMemoryService
             }
 
             // Create embedding
-            $embedding = $this->aiFacade->embed($textToEmbed, $user->getId(), array_filter([
+            $embedResult = $this->aiFacade->embed($textToEmbed, $user->getId(), array_filter([
                 'model' => $modelName,
                 'provider' => $provider,
             ]));
+            $embedding = $embedResult['embedding'];
 
             if (empty($embedding)) {
                 throw new \RuntimeException('Failed to create embedding');
             }
 
             $this->rateLimitService->recordUsage($user, 'EMBEDDINGS', [
+                'usage' => $embedResult['usage'],
                 'provider' => $provider ?? 'unknown',
                 'model' => $modelName ?? 'unknown',
                 'model_id' => $embeddingModelId,

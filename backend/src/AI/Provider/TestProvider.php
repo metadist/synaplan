@@ -12,6 +12,8 @@ use App\AI\Interface\VisionProviderInterface;
 
 class TestProvider implements ChatProviderInterface, EmbeddingProviderInterface, VisionProviderInterface, ImageGenerationProviderInterface, SpeechToTextProviderInterface, TextToSpeechProviderInterface, FileAnalysisProviderInterface
 {
+    private const FAKE_TOKENS_PER_EMBED = 8;
+
     public function getName(): string
     {
         return 'test';
@@ -151,13 +153,31 @@ class TestProvider implements ChatProviderInterface, EmbeddingProviderInterface,
     // EmbeddingProviderInterface
     public function embed(string $text, array $options = []): array
     {
-        // Fake 1536-dimensional embedding
-        return array_fill(0, 1536, 0.123);
+        return [
+            'embedding' => array_fill(0, 1536, 0.123),
+            'usage' => [
+                'prompt_tokens' => self::FAKE_TOKENS_PER_EMBED,
+                'total_tokens' => self::FAKE_TOKENS_PER_EMBED,
+            ],
+        ];
     }
 
     public function embedBatch(array $texts, array $options = []): array
     {
-        return array_map(fn ($t) => $this->embed($t, $options), $texts);
+        $embeddings = [];
+        foreach ($texts as $t) {
+            $embeddings[] = $this->embed($t, $options)['embedding'];
+        }
+
+        $promptTokens = self::FAKE_TOKENS_PER_EMBED * count($texts);
+
+        return [
+            'embeddings' => $embeddings,
+            'usage' => [
+                'prompt_tokens' => $promptTokens,
+                'total_tokens' => $promptTokens,
+            ],
+        ];
     }
 
     public function getDimensions(string $model): int
