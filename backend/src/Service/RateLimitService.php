@@ -161,6 +161,20 @@ final class RateLimitService
             }
         }
 
+        if ($totalTokens > 0 && 0 === $promptTokens && 0 === $completionTokens) {
+            $inputBytes = !empty($metadata['input_text']) ? strlen($metadata['input_text']) : 0;
+            $outputBytes = (!empty($metadata['response_text']) ? strlen($metadata['response_text']) : 0)
+                         + (!empty($metadata['response_bytes']) ? (int) $metadata['response_bytes'] : 0);
+
+            if ($inputBytes > 0 && $outputBytes > 0) {
+                $ratio = $inputBytes / ($inputBytes + $outputBytes);
+                $promptTokens = (int) ceil($totalTokens * $ratio);
+                $completionTokens = $totalTokens - $promptTokens;
+            } else {
+                $promptTokens = $totalTokens;
+            }
+        }
+
         $modelId = $metadata['model_id'] ?? null;
         $mediaUsage = $metadata['media_usage'] ?? [];
         $pricingMode = $this->costCalculationService->getPricingMode($modelId);

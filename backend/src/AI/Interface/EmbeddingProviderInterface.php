@@ -10,7 +10,7 @@ interface EmbeddingProviderInterface extends ProviderMetadataInterface
      * @param string $text    Text to embed
      * @param array  $options options: model (required), etc
      *
-     * @return array Embedding vector
+     * @return array{embedding: array<float>, usage: array{prompt_tokens: int, total_tokens: int}}
      */
     public function embed(string $text, array $options = []): array;
 
@@ -20,7 +20,7 @@ interface EmbeddingProviderInterface extends ProviderMetadataInterface
      * @param array $texts   Texts to embed
      * @param array $options options: model (required), etc
      *
-     * @return array Array of embedding vectors
+     * @return array{embeddings: array<array<float>>, usage: array{prompt_tokens: int, total_tokens: int}}
      */
     public function embedBatch(array $texts, array $options = []): array;
 

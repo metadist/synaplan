@@ -71,14 +71,16 @@ final readonly class VectorSearchService
         ]);
 
         // 2. Embed the query with model details
-        $queryEmbedding = $this->aiFacade->embed($query, $userId, [
+        $embedResult = $this->aiFacade->embed($query, $userId, [
             'model' => $modelName,
             'provider' => $provider,
         ]);
+        $queryEmbedding = $embedResult['embedding'];
 
         $user = $this->em->getRepository(User::class)->find($userId);
         if ($user) {
             $this->rateLimitService->recordUsage($user, 'EMBEDDINGS', [
+                'usage' => $embedResult['usage'],
                 'provider' => $provider,
                 'model' => $modelName,
                 'model_id' => $embeddingModelId,

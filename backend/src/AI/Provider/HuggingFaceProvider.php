@@ -319,11 +319,15 @@ class HuggingFaceProvider implements ChatProviderInterface, EmbeddingProviderInt
             $data = $response->toArray();
 
             // Response is either nested array [[...]] or flat array [...]
-            if (isset($data[0]) && is_array($data[0])) {
-                return $data[0];
-            }
+            $embedding = (isset($data[0]) && is_array($data[0])) ? $data[0] : $data;
 
-            return $data;
+            return [
+                'embedding' => $embedding,
+                'usage' => [
+                    'prompt_tokens' => 0,
+                    'total_tokens' => 0,
+                ],
+            ];
         } catch (\Exception $e) {
             $this->logger->error('HuggingFace embedding error', [
                 'error' => $e->getMessage(),
@@ -372,7 +376,13 @@ class HuggingFaceProvider implements ChatProviderInterface, EmbeddingProviderInt
                 'timeout' => 120,
             ]);
 
-            return $response->toArray();
+            return [
+                'embeddings' => $response->toArray(),
+                'usage' => [
+                    'prompt_tokens' => 0,
+                    'total_tokens' => 0,
+                ],
+            ];
         } catch (\Exception $e) {
             $this->logger->error('HuggingFace batch embedding error', [
                 'error' => $e->getMessage(),

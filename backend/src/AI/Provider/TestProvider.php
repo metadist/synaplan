@@ -151,13 +151,31 @@ class TestProvider implements ChatProviderInterface, EmbeddingProviderInterface,
     // EmbeddingProviderInterface
     public function embed(string $text, array $options = []): array
     {
-        // Fake 1536-dimensional embedding
-        return array_fill(0, 1536, 0.123);
+        return [
+            'embedding' => array_fill(0, 1536, 0.123),
+            'usage' => [
+                'prompt_tokens' => 8,
+                'total_tokens' => 8,
+            ],
+        ];
     }
 
     public function embedBatch(array $texts, array $options = []): array
     {
-        return array_map(fn ($t) => $this->embed($t, $options), $texts);
+        $embeddings = [];
+        foreach ($texts as $t) {
+            $embeddings[] = $this->embed($t, $options)['embedding'];
+        }
+
+        $promptTokens = 8 * count($texts);
+
+        return [
+            'embeddings' => $embeddings,
+            'usage' => [
+                'prompt_tokens' => $promptTokens,
+                'total_tokens' => $promptTokens,
+            ],
+        ];
     }
 
     public function getDimensions(string $model): int

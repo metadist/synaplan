@@ -415,7 +415,13 @@ class TritonProvider implements ChatProviderInterface, EmbeddingProviderInterfac
                 throw new \RuntimeException('No embedding output returned');
             }
 
-            return $this->decodeFp32Array($rawContents[0]);
+            return [
+                'embedding' => $this->decodeFp32Array($rawContents[0]),
+                'usage' => [
+                    'prompt_tokens' => 0,
+                    'total_tokens' => 0,
+                ],
+            ];
         } catch (ProviderException $e) {
             throw $e;
         } catch (\Exception $e) {
@@ -430,7 +436,22 @@ class TritonProvider implements ChatProviderInterface, EmbeddingProviderInterfac
 
     public function embedBatch(array $texts, array $options = []): array
     {
-        return array_map(fn ($text) => $this->embed($text, $options), $texts);
+        $embeddings = [];
+        $totalPromptTokens = 0;
+
+        foreach ($texts as $text) {
+            $result = $this->embed($text, $options);
+            $embeddings[] = $result['embedding'];
+            $totalPromptTokens += $result['usage']['prompt_tokens'];
+        }
+
+        return [
+            'embeddings' => $embeddings,
+            'usage' => [
+                'prompt_tokens' => $totalPromptTokens,
+                'total_tokens' => $totalPromptTokens,
+            ],
+        ];
     }
 
     public function getDimensions(string $model): int

@@ -197,7 +197,7 @@ class AiFacade
      * @param int|null $userId  User ID for config lookup
      * @param array    $options Additional options (provider, model, etc.)
      *
-     * @return array Vector embedding
+     * @return array{embedding: array<float>, usage: array{prompt_tokens: int, total_tokens: int}}
      */
     public function embed(string $text, ?int $userId = null, array $options = []): array
     {
@@ -229,7 +229,7 @@ class AiFacade
      * @param string|null $providerName Explicit provider name
      * @param array       $options      Additional options (model, etc.) forwarded to the provider
      *
-     * @return array[] Array of embedding vectors
+     * @return array{embeddings: array<array<float>>, usage: array{prompt_tokens: int, total_tokens: int}}
      */
     public function embedBatch(array $texts, ?int $userId = null, ?string $providerName = null, array $options = []): array
     {
