@@ -509,6 +509,7 @@
     "proOnly": "PRO+"
   },
   "files": {
+    "searchPlaceholder": "Search files...",
     "uploadTitle": "Upload Files",
     "groupKeyword": "Folder:",
     "groupKeywordPlaceholder": "Enter a folder name",

@@ -57,7 +57,7 @@
         />
         <button
           :disabled="!newKeyName.trim() || loading"
-          class="w-full sm:w-auto btn-primary px-6 py-2.5 rounded flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+          class="w-full sm:w-auto btn-primary px-5 py-3 rounded-lg font-medium text-sm flex items-center justify-center gap-2 whitespace-nowrap transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           data-testid="btn-create"
           @click="createAPIKey"
         >

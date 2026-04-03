@@ -1050,6 +1050,7 @@
     "unlimited": "Sınırsız"
   },
   "files": {
+    "searchPlaceholder": "Dosya ara...",
     "uploadTitle": "RAG Dosyaları Yükle",
     "groupKeyword": "Grup Anahtar Kelimesi:",
     "groupKeywordPlaceholder": "Dosya gruplandırma için anahtar kelime girin",

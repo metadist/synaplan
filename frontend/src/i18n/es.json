@@ -1049,6 +1049,7 @@
     "unlimited": "Ilimitado"
   },
   "files": {
+    "searchPlaceholder": "Buscar archivos...",
     "uploadTitle": "Subir Archivos RAG",
     "groupKeyword": "Palabra Clave del Grupo:",
     "groupKeywordPlaceholder": "Ingresa palabra clave para agrupar archivos",

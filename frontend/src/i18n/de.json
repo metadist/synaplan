@@ -1333,6 +1333,7 @@
     "revoke": "Öffentlichen Zugriff Widerrufen"
   },
   "files": {
+    "searchPlaceholder": "Dateien suchen...",
     "uploadTitle": "Dateien hochladen",
     "groupKeyword": "Ordner:",
     "groupKeywordPlaceholder": "Ordnernamen eingeben",
