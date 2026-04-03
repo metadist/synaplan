@@ -141,15 +141,18 @@ final class RateLimitService
             $estimated = true;
         }
 
+        // Resolve input byte count: prefer precomputed input_bytes over strlen(input_text)
+        $inputBytes = !empty($metadata['input_bytes']) ? (int) $metadata['input_bytes'] : 0;
+        if (0 === $inputBytes && !empty($metadata['input_text'])) {
+            $inputBytes = strlen($metadata['input_text']);
+        }
+
         // Auto-estimate if no token data at all
         if (0 === $totalTokens) {
-            $totalBytes = 0;
+            $totalBytes = $inputBytes;
 
             if (!empty($metadata['response_text'])) {
                 $totalBytes += strlen($metadata['response_text']);
-            }
-            if (!empty($metadata['input_text'])) {
-                $totalBytes += strlen($metadata['input_text']);
             }
             if (!empty($metadata['response_bytes'])) {
                 $totalBytes += (int) $metadata['response_bytes'];
@@ -162,7 +165,6 @@ final class RateLimitService
         }
 
         if ($totalTokens > 0 && 0 === $promptTokens && 0 === $completionTokens) {
-            $inputBytes = !empty($metadata['input_text']) ? strlen($metadata['input_text']) : 0;
             $outputBytes = (!empty($metadata['response_text']) ? strlen($metadata['response_text']) : 0)
                          + (!empty($metadata['response_bytes']) ? (int) $metadata['response_bytes'] : 0);
 
@@ -170,6 +172,7 @@ final class RateLimitService
                 $ratio = $inputBytes / ($inputBytes + $outputBytes);
                 $promptTokens = (int) ceil($totalTokens * $ratio);
                 $completionTokens = $totalTokens - $promptTokens;
+                $estimated = true;
             } else {
                 $promptTokens = $totalTokens;
             }
@@ -210,6 +213,7 @@ final class RateLimitService
         unset(
             $storedMetadata['response_text'],
             $storedMetadata['input_text'],
+            $storedMetadata['input_bytes'],
             $storedMetadata['response_bytes'],
             $storedMetadata['usage'],
             $storedMetadata['model_id'],

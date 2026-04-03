@@ -135,7 +135,7 @@ final readonly class VectorizationService
                     'provider' => $provider,
                     'model' => $modelName,
                     'model_id' => $embeddingModelId,
-                    'input_text' => implode('', $chunkTexts),
+                    'input_bytes' => array_sum(array_map('strlen', $chunkTexts)),
                     'source' => 'VECTORIZATION',
                 ]);
             }
