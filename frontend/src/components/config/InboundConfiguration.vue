@@ -111,7 +111,7 @@
       >
         <CommandLineIcon class="w-4 h-4" />
         {{ $t('config.inbound.viewApiDocumentation') }}
-      </router-link>  
+      </router-link>
     </div>
 
     <div class="h-20"></div>
