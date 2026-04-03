@@ -23,6 +23,19 @@ const guardSubscription = (
   }
 }
 
+/** System / feature status page is for local development only (not shown in production builds). */
+const guardDevOnlyAdminFeatures = (
+  _to: RouteLocationNormalized,
+  _from: RouteLocationNormalized,
+  next: NavigationGuardNext
+) => {
+  if (!import.meta.env.DEV) {
+    next({ name: 'admin' })
+    return
+  }
+  next()
+}
+
 export const APP_NAME = 'Synaplan'
 
 const router = createRouter({
@@ -287,6 +300,7 @@ const router = createRouter({
       path: '/admin/features',
       name: 'admin-features',
       component: () => import('@/views/FeatureStatusView.vue'),
+      beforeEnter: guardDevOnlyAdminFeatures,
       meta: { requiresAuth: true, requiresAdmin: true, titleKey: 'pageTitles.adminFeatures' },
     },
     {

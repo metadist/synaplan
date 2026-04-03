@@ -546,10 +546,13 @@
 
             <!-- Top Users -->
             <div class="surface-card rounded-lg p-6">
-              <h3 class="text-lg font-semibold txt-primary mb-4 flex items-center gap-2">
+              <h3 class="text-lg font-semibold txt-primary mb-2 flex items-center gap-2">
                 <Icon icon="mdi:trophy" class="w-5 h-5" />
                 {{ $t('admin.usage.topUsers') }}
               </h3>
+              <p class="text-sm txt-secondary mb-4">
+                {{ $t('admin.usage.topUsersHint') }}
+              </p>
               <div class="overflow-x-auto">
                 <table class="w-full">
                   <thead>
@@ -573,26 +576,35 @@
                     </tr>
                   </thead>
                   <tbody>
-                    <tr
-                      v-for="(user, index) in usageStats.topUsers"
-                      :key="user.id"
-                      class="border-b border-light-border/30 dark:border-dark-border/20"
-                    >
-                      <td class="py-3 px-4 txt-secondary text-sm">{{ index + 1 }}</td>
-                      <td class="py-3 px-4 txt-primary">{{ user.email }}</td>
-                      <td class="py-3 px-4">
-                        <span :class="getLevelBadgeClass(user.level)">{{ user.level }}</span>
-                      </td>
-                      <td class="py-3 px-4 text-right txt-secondary">
-                        {{ user.requests.toLocaleString() }}
-                      </td>
-                      <td class="py-3 px-4 text-right txt-secondary">
-                        {{ user.tokens.toLocaleString() }}
-                      </td>
-                      <td class="py-3 px-4 text-right txt-secondary">
-                        ${{ user.cost.toFixed(2) }}
-                      </td>
-                    </tr>
+                    <template v-if="usageStatsTopUsers.length === 0">
+                      <tr>
+                        <td colspan="6" class="py-10 px-4 text-center text-sm txt-secondary">
+                          {{ $t('admin.usage.topUsersEmpty') }}
+                        </td>
+                      </tr>
+                    </template>
+                    <template v-else>
+                      <tr
+                        v-for="(user, index) in usageStatsTopUsers"
+                        :key="user.id"
+                        class="border-b border-light-border/30 dark:border-dark-border/20"
+                      >
+                        <td class="py-3 px-4 txt-secondary text-sm">{{ index + 1 }}</td>
+                        <td class="py-3 px-4 txt-primary">{{ user.email || '—' }}</td>
+                        <td class="py-3 px-4">
+                          <span :class="getLevelBadgeClass(user.level)">{{ user.level }}</span>
+                        </td>
+                        <td class="py-3 px-4 text-right txt-secondary">
+                          {{ user.requests.toLocaleString() }}
+                        </td>
+                        <td class="py-3 px-4 text-right txt-secondary">
+                          {{ user.tokens.toLocaleString() }}
+                        </td>
+                        <td class="py-3 px-4 text-right txt-secondary">
+                          ${{ user.cost.toFixed(2) }}
+                        </td>
+                      </tr>
+                    </template>
                   </tbody>
                 </table>
               </div>
@@ -747,6 +759,7 @@ const promptSaving = ref(false)
 const usageStats = ref<UsageStats | null>(null)
 const usageStatsLoading = ref(false)
 const usageStatsPeriod = ref<'day' | 'week' | 'month' | 'all'>('week')
+const usageStatsTopUsers = computed(() => usageStats.value?.topUsers ?? [])
 
 // Delete Modal
 const showDeleteModal = ref(false)

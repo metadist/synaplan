@@ -182,6 +182,8 @@
       "byProvider": "By Provider",
       "topModels": "Top Models",
       "topUsers": "Top Users",
+      "topUsersHint": "Users with the most API requests in the selected period (up to 25).",
+      "topUsersEmpty": "No usage data for this period. Try \"All time\" or wait until users generate activity.",
       "model": "Model",
       "requests": "requests",
       "tokens": "tokens",
@@ -509,6 +511,7 @@
     "proOnly": "PRO+"
   },
   "files": {
+    "searchPlaceholder": "Search files...",
     "uploadTitle": "Upload Files",
     "groupKeyword": "Folder:",
     "groupKeywordPlaceholder": "Enter a folder name",
@@ -650,6 +653,8 @@
       "apiChannel": "API Channel",
       "webWidget": "Web Widget",
       "defaultHandling": "default handling",
+      "personalKeyword": "personal keyword",
+      "keywordSaved": "Email keyword saved successfully",
       "addKeyword": "Check for a free keyword to add your own handling:",
       "keywordPlaceholder": "keyword",
       "yourEmailAddress": "Your email address: {email}",
@@ -664,7 +669,15 @@
         "parameters": "Parameters",
         "requestBody": "Request Body",
         "responses": "Responses",
-        "authentication": "Authentication"
+        "authentication": "Authentication",
+        "loadError": "Failed to load API documentation",
+        "version": "Version:",
+        "required": "required",
+        "type": "Type:",
+        "contentType": "Content-Type:",
+        "example": "Example:",
+        "headers": "Headers:",
+        "requiresAuth": "This endpoint requires authentication:"
       },
       "exampleCurl": "Example:",
       "widgetDescription": "To activate the widget, please enter your domain name like \"yourdomain.net\" in the field below.",

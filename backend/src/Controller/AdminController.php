@@ -454,13 +454,29 @@ class AdminController extends AbstractController
         description: 'Usage statistics',
         content: new OA\JsonContent(
             properties: [
-                new OA\Property(property: 'totalUsers', type: 'integer'),
-                new OA\Property(property: 'totalRequests', type: 'integer'),
-                new OA\Property(property: 'totalTokens', type: 'integer'),
-                new OA\Property(property: 'totalCost', type: 'number'),
+                new OA\Property(property: 'period', type: 'string'),
+                new OA\Property(property: 'total_requests', type: 'integer'),
+                new OA\Property(property: 'total_tokens', type: 'integer'),
+                new OA\Property(property: 'total_cost', type: 'number'),
+                new OA\Property(property: 'avg_latency', type: 'number'),
                 new OA\Property(property: 'byAction', type: 'object'),
                 new OA\Property(property: 'byProvider', type: 'object'),
-                new OA\Property(property: 'topUsers', type: 'array', items: new OA\Items(type: 'object')),
+                new OA\Property(property: 'byModel', type: 'object'),
+                new OA\Property(
+                    property: 'topUsers',
+                    type: 'array',
+                    items: new OA\Items(
+                        properties: [
+                            new OA\Property(property: 'id', type: 'integer'),
+                            new OA\Property(property: 'email', type: 'string'),
+                            new OA\Property(property: 'level', type: 'string'),
+                            new OA\Property(property: 'requests', type: 'integer'),
+                            new OA\Property(property: 'tokens', type: 'integer'),
+                            new OA\Property(property: 'cost', type: 'number'),
+                        ],
+                        type: 'object'
+                    )
+                ),
             ]
         )
     )]

@@ -108,7 +108,7 @@
         </p>
         <router-link
           to="/config/api-documentation"
-          class="btn-primary inline-flex items-center gap-2"
+          class="btn-primary px-6 py-3 rounded-lg font-medium inline-flex items-center gap-2"
         >
           <CommandLineIcon class="w-4 h-4" />
           {{ $t('config.inbound.viewApiDocumentation') }}

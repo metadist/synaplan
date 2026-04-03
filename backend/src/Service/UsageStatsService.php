@@ -409,6 +409,36 @@ final readonly class UsageStatsService
             ];
         }
 
+        $topUsersWhere = $since > 0 ? 'WHERE l.BUNIXTIMES >= :since' : '';
+        $sql = "
+            SELECT
+                u.BID AS id,
+                u.BMAIL AS email,
+                u.BUSERLEVEL AS level,
+                COUNT(*) AS requests,
+                COALESCE(SUM(l.BTOKENS), 0) AS tokens,
+                COALESCE(SUM(l.BCOST), 0) AS cost
+            FROM BUSELOG l
+            INNER JOIN BUSER u ON u.BID = l.BUSERID
+            {$topUsersWhere}
+            GROUP BY u.BID, u.BMAIL, u.BUSERLEVEL
+            ORDER BY requests DESC
+            LIMIT 25
+        ";
+
+        $topUsersRows = $conn->fetchAllAssociative($sql, $params);
+        $topUsersFormatted = [];
+        foreach ($topUsersRows as $row) {
+            $topUsersFormatted[] = [
+                'id' => (int) $row['id'],
+                'email' => (string) ($row['email'] ?? ''),
+                'level' => (string) ($row['level'] ?? 'NEW'),
+                'requests' => (int) $row['requests'],
+                'tokens' => (int) $row['tokens'],
+                'cost' => (float) $row['cost'],
+            ];
+        }
+
         return [
             'period' => $period,
             'total_requests' => (int) $totals['total_requests'],
@@ -418,6 +448,7 @@ final readonly class UsageStatsService
             'byAction' => $byActionFormatted,
             'byProvider' => $byProviderFormatted,
             'byModel' => $byModelFormatted,
+            'topUsers' => $topUsersFormatted,
         ];
     }
 
