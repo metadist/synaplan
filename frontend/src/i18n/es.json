@@ -428,7 +428,9 @@
       "mediumModels": "Medio (Mejor Calidad)",
       "largeModels": "Grande (Mejor Calidad)",
       "exampleCommand": "Comando de Instalación",
-      "restartNote": "Después de descargar, actualiza la página e intenta de nuevo."
+      "restartNote": "Después de descargar, actualiza la página e intenta de nuevo.",
+      "visionModelHint": "No hay modelo con visión configurado",
+      "visionModelHintDetail": "Tu mensaje incluye imágenes, pero tu modelo de chat actual no puede analizarlas. Ve a **Configuración → Modelos IA** y activa un modelo con soporte de visión (p. ej. GPT-4o, Gemini, Llama 4), o configura un modelo **Pic→Text** predeterminado."
     }
   },
   "common": {

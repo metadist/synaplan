@@ -552,6 +552,7 @@
     "status_extracted": "Extracted",
     "status_vectorizing": "Indexing…",
     "status_vectorized": "Ready",
+    "status_processed": "Processed",
     "attached": "Attached",
     "standalone": "Standalone",
     "attachedToMessage": "This file is attached to a message",
@@ -2320,7 +2321,9 @@
       "mediumModels": "Medium (Better Quality)",
       "largeModels": "Large (Best Quality)",
       "exampleCommand": "Installation Command",
-      "restartNote": "After downloading, refresh the page and try again."
+      "restartNote": "After downloading, refresh the page and try again.",
+      "visionModelHint": "No vision-capable model configured",
+      "visionModelHintDetail": "Your message includes images, but your current chat model cannot analyze them. Go to **Settings → AI Models** and enable a model with vision support (e.g. GPT-4o, Gemini, Llama 4), or set a default **Pic→Text** model."
     }
   },
   "chatShare": {

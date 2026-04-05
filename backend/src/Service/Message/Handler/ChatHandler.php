@@ -8,6 +8,7 @@ use App\Entity\Message;
 use App\Entity\User;
 use App\Repository\ModelRepository;
 use App\Repository\PromptRepository;
+use App\Service\Exception\VisionModelRequiredException;
 use App\Service\FeedbackConfigService;
 use App\Service\FeedbackConstants;
 use App\Service\File\FileHelper;
@@ -219,6 +220,10 @@ final readonly class ChatHandler implements MessageHandlerInterface
                     $systemPrompt = null;
                 }
             }
+        }
+
+        if ($hasImages && !$includeImagesInMessages) {
+            throw new VisionModelRequiredException();
         }
 
         $messages = $this->buildMessages($systemPrompt, $thread, $message, [
@@ -792,6 +797,10 @@ final readonly class ChatHandler implements MessageHandlerInterface
 
         // Add include_images flag to options for message building
         $options['include_images'] = $includeImagesInMessages;
+
+        if ($hasImages && !$includeImagesInMessages) {
+            throw new VisionModelRequiredException();
+        }
 
         // Resolve model ID to provider + model name + features (before building messages)
         $modelFeatures = [];

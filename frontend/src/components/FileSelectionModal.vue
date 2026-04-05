@@ -3,19 +3,19 @@
     <Transition name="modal">
       <div
         v-if="visible"
-        class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50"
+        class="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4 bg-black/50"
         data-testid="modal-file-selection-root"
         @click.self="emit('close')"
       >
         <div
-          class="max-w-4xl w-full max-h-[80vh] overflow-hidden flex flex-col rounded-xl shadow-2xl bg-white dark:bg-[#0f1729] border border-light-border/20 dark:border-dark-border/20"
+          class="w-full sm:max-w-4xl max-h-[95dvh] sm:max-h-[80vh] overflow-hidden flex flex-col rounded-t-2xl sm:rounded-xl shadow-2xl bg-white dark:bg-[#0f1729] border border-light-border/20 dark:border-dark-border/20"
           data-testid="modal-file-selection"
         >
           <!-- Header -->
           <div
-            class="flex items-center justify-between p-6 border-b border-light-border/20 dark:border-dark-border/15"
+            class="flex items-center justify-between px-4 py-3 sm:p-6 border-b border-light-border/20 dark:border-dark-border/15"
           >
-            <h2 class="text-xl font-semibold txt-primary">
+            <h2 class="text-base sm:text-xl font-semibold txt-primary">
               {{ $t('fileSelection.title') }}
             </h2>
             <button
@@ -30,27 +30,28 @@
 
           <!-- Upload Area -->
           <div
-            class="p-4 border-b border-light-border/20 dark:border-dark-border/15 transition-colors"
+            class="px-3 py-2.5 sm:p-4 border-b border-light-border/20 dark:border-dark-border/15 transition-colors"
             :class="isDragging ? 'bg-brand-alpha-light' : 'bg-gray-50 dark:bg-white/[0.03]'"
             data-testid="section-file-dropzone"
             @dragover.prevent="handleDragOver"
             @dragleave.prevent="handleDragLeave"
             @drop.prevent="handleDrop"
           >
-            <div class="flex items-center gap-3">
+            <div class="flex items-center gap-2 sm:gap-3 flex-wrap">
               <button
                 :disabled="isUploading"
-                class="btn-primary px-4 py-2 rounded-lg flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                class="btn-primary px-3 py-1.5 sm:px-4 sm:py-2 rounded-lg flex items-center gap-1.5 sm:gap-2 text-sm sm:text-base disabled:opacity-50 disabled:cursor-not-allowed"
                 data-testid="btn-file-selection-upload"
                 @click="triggerFileUpload"
               >
                 <Icon
                   v-if="isUploading || isBackgroundProcessing"
                   icon="mdi:loading"
-                  class="w-5 h-5 animate-spin"
+                  class="w-4 h-4 sm:w-5 sm:h-5 animate-spin"
                 />
-                <Icon v-else icon="mdi:cloud-upload" class="w-5 h-5" />
-                <span>{{ $t('fileSelection.uploadNew') }}</span>
+                <Icon v-else icon="mdi:cloud-upload" class="w-4 h-4 sm:w-5 sm:h-5" />
+                <span class="hidden sm:inline">{{ $t('fileSelection.uploadNew') }}</span>
+                <span class="sm:hidden">{{ $t('files.selectAndUpload') }}</span>
               </button>
               <input
                 ref="fileInputRef"
@@ -63,7 +64,7 @@
               />
               <span
                 v-if="isUploading && uploadProgress"
-                class="text-sm txt-secondary flex items-center gap-2 min-w-0"
+                class="text-xs sm:text-sm txt-secondary flex items-center gap-1.5 min-w-0"
               >
                 <template v-if="uploadBytePercent !== null && uploadBytePercent < 100">
                   {{
@@ -88,37 +89,37 @@
               </span>
               <span
                 v-else-if="isBackgroundProcessing"
-                class="text-sm txt-secondary inline-flex items-center gap-2 min-w-0"
+                class="text-xs sm:text-sm txt-secondary inline-flex items-center gap-1.5 min-w-0"
               >
-                <Icon icon="mdi:loading" class="w-4 h-4 flex-shrink-0 animate-spin" />
+                <Icon icon="mdi:loading" class="w-3.5 h-3.5 flex-shrink-0 animate-spin" />
                 {{
                   $t('fileSelection.processingOnServer', {
                     count: pendingProcessingIds.size,
                   })
                 }}
               </span>
-              <span v-else-if="isDragging" class="text-sm txt-brand font-medium">
+              <span v-else-if="isDragging" class="text-xs sm:text-sm txt-brand font-medium">
                 {{ $t('fileSelection.dropHere') }}
               </span>
-              <span v-else class="text-sm txt-secondary">
+              <span v-else class="text-xs sm:text-sm txt-secondary hidden sm:inline">
                 {{ $t('fileSelection.orDragDrop') }}
               </span>
             </div>
           </div>
 
           <!-- Search and Filter -->
-          <div class="p-4 border-b border-light-border/20 dark:border-dark-border/15">
-            <div class="flex gap-3">
+          <div class="px-3 py-2 sm:p-4 border-b border-light-border/20 dark:border-dark-border/15">
+            <div class="flex gap-2 sm:gap-3">
               <input
                 v-model="searchQuery"
                 type="text"
                 :placeholder="$t('fileSelection.searchPlaceholder')"
-                class="flex-1 px-4 py-2 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
+                class="flex-1 px-3 py-1.5 sm:px-4 sm:py-2 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
                 data-testid="input-file-selection-search"
               />
               <select
                 v-model="filterStatus"
-                class="px-4 py-2 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
+                class="px-2 py-1.5 sm:px-4 sm:py-2 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
                 data-testid="select-file-selection-status"
               >
                 <option value="all">{{ $t('fileSelection.allStatuses') }}</option>
@@ -130,7 +131,7 @@
           </div>
 
           <!-- Files List -->
-          <div class="flex-1 overflow-y-auto p-4">
+          <div class="flex-1 overflow-y-auto px-2 py-1.5 sm:p-4">
             <div v-if="isLoading" class="flex items-center justify-center py-12">
               <Icon icon="mdi:loading" class="w-8 h-8 animate-spin txt-secondary" />
             </div>
@@ -139,11 +140,11 @@
               {{ $t('files.noFiles') }}
             </div>
 
-            <div v-else class="space-y-2">
+            <div v-else class="space-y-1 sm:space-y-2">
               <div
                 v-for="file in filteredFiles"
                 :key="file.id"
-                class="group flex items-center gap-4 p-4 rounded-xl border cursor-pointer transition-all"
+                class="group flex items-center gap-2 sm:gap-4 px-2 py-2 sm:p-4 rounded-lg sm:rounded-xl border cursor-pointer transition-all"
                 :class="
                   isSelected(file.id)
                     ? 'border-[var(--brand)]/40 bg-[var(--brand)]/[0.04] ring-1 ring-[var(--brand)]/30'
@@ -154,23 +155,43 @@
                 <input
                   type="checkbox"
                   :checked="isSelected(file.id)"
-                  class="w-5 h-5 rounded border-light-border/30 dark:border-dark-border/20 text-[var(--brand)]"
+                  class="w-4 h-4 sm:w-5 sm:h-5 rounded border-light-border/30 dark:border-dark-border/20 text-[var(--brand)] flex-shrink-0"
                   @click.stop
                   @change="toggleFileSelection(file)"
                 />
 
-                <Icon
-                  :icon="getFileIcon(file.file_type)"
-                  class="w-8 h-8 txt-secondary flex-shrink-0"
-                />
+                <!-- Thumbnail / Icon -->
+                <div
+                  class="w-10 h-10 sm:w-12 sm:h-12 flex-shrink-0 rounded-lg overflow-hidden bg-gray-100 dark:bg-white/[0.06] flex items-center justify-center"
+                >
+                  <img
+                    v-if="isImageFile(file.file_type)"
+                    :src="getDownloadUrl(file.id)"
+                    :alt="file.filename"
+                    class="w-full h-full object-cover"
+                    loading="lazy"
+                    @error="
+                      ;($event.target as HTMLImageElement).style.display = 'none'
+                      ;($event.target as HTMLImageElement).nextElementSibling?.classList.remove(
+                        'hidden'
+                      )
+                    "
+                  />
+                  <Icon
+                    :icon="getFileIcon(file.file_type)"
+                    :class="['w-6 h-6 txt-secondary', isImageFile(file.file_type) ? 'hidden' : '']"
+                  />
+                </div>
 
                 <div class="flex-1 min-w-0">
-                  <div class="font-medium txt-primary truncate">{{ file.filename }}</div>
-                  <div class="text-sm txt-secondary flex items-center gap-2 mt-1">
+                  <div class="text-sm sm:text-base font-medium txt-primary truncate">
+                    {{ file.filename }}
+                  </div>
+                  <div class="text-xs sm:text-sm txt-secondary flex items-center gap-1.5 mt-0.5">
                     <span>{{ formatFileSize(file.file_size) }}</span>
                     <span>·</span>
                     <span
-                      class="inline-flex items-center gap-1"
+                      class="inline-flex items-center gap-0.5"
                       :class="{
                         'text-green-600 dark:text-green-400':
                           file.status === 'vectorized' || file.status === 'processed',
@@ -184,41 +205,37 @@
                       <Icon
                         v-if="file.status === 'extracting' || file.status === 'vectorizing'"
                         icon="mdi:loading"
-                        class="w-3.5 h-3.5 animate-spin"
+                        class="w-3 h-3 animate-spin"
                       />
                       {{ $t(`files.status_${file.status}`) }}
-                    </span>
-                    <span v-if="file.is_attached">·</span>
-                    <span v-if="file.is_attached" class="text-blue-600 dark:text-blue-400">
-                      {{ $t('files.attached') }}
                     </span>
                   </div>
                 </div>
 
-                <!-- Per-file action buttons -->
+                <!-- Per-file action buttons (desktop: hover, mobile: always visible but compact) -->
                 <div
-                  class="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0"
+                  class="flex items-center gap-0.5 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity flex-shrink-0"
                   @click.stop
                 >
                   <button
                     v-if="!['vectorized', 'extracting', 'vectorizing'].includes(file.status)"
-                    class="p-1.5 rounded hover:bg-purple-500/10 text-purple-600 dark:text-purple-400 transition-colors"
+                    class="p-1 sm:p-1.5 rounded hover:bg-purple-500/10 text-purple-600 dark:text-purple-400 transition-colors"
                     :title="$t('fileSelection.reVectorize')"
                     data-testid="btn-file-revectorize"
                     @click="handleReVectorize(file.id)"
                   >
-                    <Icon icon="heroicons:arrow-path" class="w-4 h-4" />
+                    <Icon icon="heroicons:arrow-path" class="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                   </button>
                   <button
-                    class="p-1.5 rounded hover:bg-[var(--brand)]/10 text-[var(--brand)] transition-colors"
+                    class="p-1 sm:p-1.5 rounded hover:bg-[var(--brand)]/10 text-[var(--brand)] transition-colors"
                     :title="$t('fileSelection.viewContent')"
                     data-testid="btn-file-view"
                     @click="openContentModal(file.id)"
                   >
-                    <Icon icon="heroicons:eye" class="w-4 h-4" />
+                    <Icon icon="heroicons:eye" class="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                   </button>
                   <button
-                    class="p-1.5 rounded hover:bg-blue-500/10 text-blue-400 transition-colors"
+                    class="hidden sm:block p-1.5 rounded hover:bg-blue-500/10 text-blue-400 transition-colors"
                     :title="$t('fileSelection.download')"
                     data-testid="btn-file-download"
                     @click="handleDownload(file.id, file.filename)"
@@ -226,39 +243,37 @@
                     <ArrowDownTrayIcon class="w-4 h-4" />
                   </button>
                   <button
-                    class="p-1.5 rounded hover:bg-red-500/10 text-red-400 transition-colors"
+                    class="p-1 sm:p-1.5 rounded hover:bg-red-500/10 text-red-400 transition-colors"
                     :title="$t('fileSelection.deleteFile')"
                     data-testid="btn-file-delete"
                     @click="confirmDeleteFile(file.id)"
                   >
-                    <TrashIcon class="w-4 h-4" />
+                    <TrashIcon class="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                   </button>
                 </div>
               </div>
             </div>
           </div>
 
-          <!-- Footer with actions -->
+          <!-- Footer with actions — stacked on mobile -->
           <div
-            class="flex items-center justify-between p-6 border-t border-light-border/20 dark:border-dark-border/15"
+            class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between px-3 py-3 sm:p-6 border-t border-light-border/20 dark:border-dark-border/15"
           >
-            <div class="flex items-center gap-3">
-              <span class="txt-secondary text-sm">
-                {{ $t('fileSelection.selectedCount', { count: selectedFiles.length }) }}
-              </span>
+            <span class="txt-secondary text-xs sm:text-sm text-center sm:text-left">
+              {{ $t('fileSelection.selectedCount', { count: selectedFiles.length }) }}
+            </span>
+            <div class="flex gap-2 sm:gap-3">
               <button
                 v-if="selectedFiles.length > 0"
-                class="px-3 py-1.5 rounded-lg bg-red-500/10 text-red-500 hover:bg-red-500/20 transition-colors text-sm flex items-center gap-1.5"
+                class="flex-1 sm:flex-none px-3 py-2 sm:py-1.5 rounded-lg bg-red-500/10 text-red-500 hover:bg-red-500/20 transition-colors text-sm flex items-center justify-center gap-1.5"
                 data-testid="btn-file-selection-delete-selected"
                 @click="confirmDeleteSelected"
               >
                 <TrashIcon class="w-3.5 h-3.5" />
-                {{ $t('fileSelection.deleteSelected') }}
+                <span class="hidden sm:inline">{{ $t('fileSelection.deleteSelected') }}</span>
               </button>
-            </div>
-            <div class="flex gap-3">
               <button
-                class="btn-secondary px-6 py-2 rounded-lg"
+                class="flex-1 sm:flex-none btn-secondary px-4 py-2 rounded-lg text-sm"
                 data-testid="btn-file-selection-cancel"
                 @click="emit('close')"
               >
@@ -266,7 +281,7 @@
               </button>
               <button
                 :disabled="selectedFiles.length === 0"
-                class="btn-primary px-6 py-2 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed"
+                class="flex-1 sm:flex-none btn-primary px-4 py-2 rounded-lg text-sm disabled:opacity-50 disabled:cursor-not-allowed"
                 data-testid="btn-file-selection-attach"
                 @click="attachFiles"
               >
@@ -304,6 +319,7 @@ import { useI18n } from 'vue-i18n'
 import { XMarkIcon, ArrowDownTrayIcon, TrashIcon } from '@heroicons/vue/24/outline'
 import { Icon } from '@iconify/vue'
 import filesService, { type FileItem } from '@/services/filesService'
+import { getApiBaseUrl } from '@/services/api/httpClient'
 import { useNotification } from '@/composables/useNotification'
 import FileContentModal from './FileContentModal.vue'
 import ConfirmDialog from './ConfirmDialog.vue'
@@ -664,6 +680,15 @@ const formatFileSize = (bytes: number): string => {
   return (bytes / (1024 * 1024 * 1024)).toFixed(1) + ' GB'
 }
 
+const isImageFile = (fileType: string): boolean => {
+  const type = fileType.toLowerCase()
+  return type.includes('image') || /jpg|jpeg|png|gif|webp/.test(type)
+}
+
+const getDownloadUrl = (fileId: number): string => {
+  return `${getApiBaseUrl()}/api/v1/files/${fileId}/download`
+}
+
 const getFileIcon = (fileType: string): string => {
   const type = fileType.toLowerCase()
   if (type.includes('pdf')) return 'mdi:file-pdf-box'
@@ -671,9 +696,9 @@ const getFileIcon = (fileType: string): string => {
   if (type.includes('xls') || type.includes('csv')) return 'mdi:file-excel'
   if (type.includes('ppt')) return 'mdi:file-powerpoint'
   if (type.includes('txt')) return 'mdi:file-document'
-  if (type.includes('image') || type.match(/jpg|jpeg|png|gif|webp/)) return 'mdi:file-image'
-  if (type.includes('audio') || type.match(/mp3|wav|ogg/)) return 'mdi:file-music'
-  if (type.includes('video') || type.match(/mp4|avi|mov/)) return 'mdi:file-video'
+  if (isImageFile(type)) return 'mdi:file-image'
+  if (type.includes('audio') || /mp3|wav|ogg/.test(type)) return 'mdi:file-music'
+  if (type.includes('video') || /mp4|avi|mov/.test(type)) return 'mdi:file-video'
   return 'mdi:file'
 }
 
