@@ -7,19 +7,30 @@
   ],
   "enabled": true,
   "timezone": "Europe/Berlin",
-  "prConcurrentLimit": 6,
   "prHourlyLimit": 2,
   "prCreation": "immediate",
   "dependencyDashboard": true,
   "labels": ["dependencies"],
   "packageRules": [
     {
+      "description": "Framework updates isolated — historically broke CI (#669)",
       "groupName": "PHP Framework",
       "matchManagers": ["composer"],
       "matchPackageNames": ["symfony/**", "doctrine/**", "api-platform/**"],
       "matchUpdateTypes": ["minor", "patch"]
     },
     {
+      "description": "QA tools isolated — historically broke CI (#580)",
+      "groupName": "QA & Dev Tools",
+      "matchPackageNames": [
+        "phpunit/phpunit", "phpstan/phpstan", "phpstan/phpstan-doctrine",
+        "friendsofphp/php-cs-fixer", "dg/bypass-finals",
+        "@playwright/test", "vitest", "@vitest/**", "happy-dom"
+      ],
+      "matchUpdateTypes": ["minor", "patch"]
+    },
+    {
+      "description": "Frontend core frameworks grouped separately",
       "groupName": "Frontend Core",
       "matchManagers": ["npm"],
       "matchPackageNames": [
@@ -31,20 +42,25 @@
       "matchUpdateTypes": ["minor", "patch"]
     },
     {
-      "groupName": "QA & Dev Tools",
-      "matchPackageNames": [
-        "phpunit/phpunit", "phpstan/phpstan", "phpstan/phpstan-doctrine",
-        "friendsofphp/php-cs-fixer", "dg/bypass-finals",
-        "@playwright/test", "vitest", "@vitest/**", "happy-dom"
-      ],
+      "description": "All remaining backend packages — never broke CI",
+      "groupName": "Backend Dependencies",
+      "matchManagers": ["composer"],
       "matchUpdateTypes": ["minor", "patch"]
     },
     {
+      "description": "All remaining frontend packages — never broke CI",
+      "groupName": "Frontend Dependencies",
+      "matchManagers": ["npm"],
+      "matchUpdateTypes": ["minor", "patch"]
+    },
+    {
+      "description": "Docker image updates grouped",
       "groupName": "Docker Images",
       "matchManagers": ["dockerfile", "docker-compose"],
       "matchUpdateTypes": ["minor", "patch"]
     },
     {
+      "description": "Major updates: always individual, manual review",
       "matchUpdateTypes": ["major"],
       "automerge": false,
       "labels": ["dependencies", "breaking"]
