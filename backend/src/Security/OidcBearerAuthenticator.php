@@ -32,8 +32,6 @@ class OidcBearerAuthenticator extends AbstractAuthenticator
         private OidcTokenService $oidcTokenService,
         private OidcUserService $oidcUserService,
         private LoggerInterface $logger,
-        private string $oidcBearerAudience,
-        private string $oidcClientId,
     ) {
     }
 
@@ -86,13 +84,10 @@ class OidcBearerAuthenticator extends AbstractAuthenticator
         $authHeader = (string) $request->headers->get('Authorization', '');
         $token = substr($authHeader, 7);
 
-        // Validate JWT with full claims + audience check
-        $audience = '' !== $this->oidcBearerAudience ? $this->oidcBearerAudience : $this->oidcClientId;
-        if ('' === $audience) {
-            $this->logger->error('OIDC bearer auth: no audience configured (set OIDC_CLIENT_ID or OIDC_BEARER_AUDIENCE)');
-            throw new CustomUserMessageAuthenticationException('OIDC bearer authentication not configured');
-        }
-        $claims = $this->oidcTokenService->validateBearerToken($token, $audience);
+        // Audience resolution + JWT validation live in OidcTokenService.
+        // It returns null on signature/issuer/audience failures and logs
+        // the specific reason at warning/debug level.
+        $claims = $this->oidcTokenService->validateBearerToken($token);
 
         if (!$claims) {
             throw new CustomUserMessageAuthenticationException('Invalid or expired OIDC bearer token');

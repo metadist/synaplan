@@ -40,7 +40,30 @@ final class OidcTokenService
         private string $oidcClientId,
         private string $oidcClientSecret,
         private string $oidcDiscoveryUrl,
+        private string $oidcBearerAudience = '',
     ) {
+    }
+
+    /**
+     * Resolve the audience to enforce on Keycloak-issued tokens.
+     * Explicit OIDC_BEARER_AUDIENCE override wins, otherwise fall back
+     * to OIDC_CLIENT_ID. Returns null only when neither is configured;
+     * the validator treats null as "skip aud check", which is fine for
+     * the cookie path (it has bigger problems if OIDC isn't configured)
+     * and acceptable for the bearer path (token would also fail issuer
+     * validation against an unconfigured discovery URL). Single source
+     * of truth for both validate*Token methods below.
+     */
+    private function resolveExpectedAudience(): ?string
+    {
+        if ('' !== $this->oidcBearerAudience) {
+            return $this->oidcBearerAudience;
+        }
+        if ('' !== $this->oidcClientId) {
+            return $this->oidcClientId;
+        }
+
+        return null;
     }
 
     /**
@@ -159,12 +182,17 @@ final class OidcTokenService
         try {
             $discovery = $this->getDiscoveryConfig($provider);
 
-            // Validate JWT signature + claims (no audience check for Keycloak compatibility)
+            // Validate JWT signature + claims, including audience.
+            // Symmetric with validateBearerToken(): both paths use the
+            // OIDC_BEARER_AUDIENCE → OIDC_CLIENT_ID fallback. The Keycloak
+            // client must have a hardcoded audience mapper so its tokens
+            // carry aud=<client_id> (otherwise Keycloak only emits
+            // aud=account and validation fails).
             $claims = $this->jwtValidator->validateToken(
                 token: $accessToken,
                 jwksUri: $discovery['jwks_uri'],
                 expectedIssuer: $discovery['issuer'],
-                expectedAudience: null, // Skip audience check (Keycloak sends "account", not client_id)
+                expectedAudience: $this->resolveExpectedAudience(),
             );
 
             if (!$claims) {
@@ -201,7 +229,7 @@ final class OidcTokenService
      *
      * @return array<string, mixed>|null Full JWT claims if valid, null otherwise
      */
-    public function validateBearerToken(string $accessToken, ?string $expectedAudience = null, string $provider = 'keycloak'): ?array
+    public function validateBearerToken(string $accessToken, string $provider = 'keycloak'): ?array
     {
         try {
             $discovery = $this->getDiscoveryConfig($provider);
@@ -210,7 +238,7 @@ final class OidcTokenService
                 token: $accessToken,
                 jwksUri: $discovery['jwks_uri'],
                 expectedIssuer: $discovery['issuer'],
-                expectedAudience: $expectedAudience,
+                expectedAudience: $this->resolveExpectedAudience(),
             );
 
             if (!$claims) {
