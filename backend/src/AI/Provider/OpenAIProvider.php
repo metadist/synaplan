@@ -455,7 +455,7 @@ class OpenAIProvider implements ChatProviderInterface, EmbeddingProviderInterfac
                     [
                         'type' => $textType,
                         'text' => $text,
-                    ]
+                    ],
                 ];
                 continue;
             }
