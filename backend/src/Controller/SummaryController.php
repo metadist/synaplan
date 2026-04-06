@@ -4,6 +4,7 @@ namespace App\Controller;
 
 use App\AI\Service\AiFacade;
 use App\Entity\User;
+use App\Repository\FileRepository;
 use App\Repository\PromptRepository;
 use App\Service\ModelConfigService;
 use App\Service\RateLimitService;
@@ -25,6 +26,7 @@ class SummaryController extends AbstractController
         private PromptRepository $promptRepository,
         private ModelConfigService $modelConfigService,
         private RateLimitService $rateLimitService,
+        private FileRepository $fileRepository,
         private LoggerInterface $logger,
     ) {
     }
@@ -33,20 +35,31 @@ class SummaryController extends AbstractController
     #[OA\Post(
         path: '/api/v1/summary/generate',
         summary: 'Generate document summary using AI',
-        description: 'Generates a summary of the provided document text based on configuration',
+        description: 'Generates a summary from either raw text (via the "text" property) '
+            .'or the extracted text of a previously uploaded file (via the "fileId" property). '
+            .'Exactly one of the two must be provided.',
         security: [['Bearer' => []]],
         tags: ['Summary']
     )]
     #[OA\RequestBody(
         required: true,
         content: new OA\JsonContent(
-            required: ['text'],
             properties: [
                 new OA\Property(
                     property: 'text',
                     type: 'string',
-                    description: 'Document text to summarize',
+                    description: 'Document text to summarize. Mutually exclusive with fileId.',
                     example: 'This is a long document that needs to be summarized...'
+                ),
+                new OA\Property(
+                    property: 'fileId',
+                    type: 'integer',
+                    description: 'ID of a previously uploaded file whose extracted text '
+                        .'should be summarized. The file must belong to the authenticated '
+                        .'user and must have been processed with process_level=extract or '
+                        .'higher. Mutually exclusive with text.',
+                    example: 42,
+                    nullable: true
                 ),
                 new OA\Property(
                     property: 'summaryType',
@@ -113,6 +126,8 @@ class SummaryController extends AbstractController
     )]
     #[OA\Response(response: 401, description: 'Not authenticated')]
     #[OA\Response(response: 400, description: 'Invalid request parameters')]
+    #[OA\Response(response: 404, description: 'File not found (fileId)')]
+    #[OA\Response(response: 422, description: 'File has no extracted text yet')]
     #[OA\Response(response: 500, description: 'Summary generation failed')]
     public function generate(
         Request $request,
@@ -124,17 +139,57 @@ class SummaryController extends AbstractController
 
         $startTime = microtime(true);
         $data = json_decode($request->getContent(), true);
+        if (!is_array($data)) {
+            $data = [];
+        }
 
-        // Validate required fields
-        if (!isset($data['text']) || empty(trim($data['text']))) {
+        // Resolve the text to summarize. Callers must provide exactly one of
+        // "text" (raw string) or "fileId" (reference to a previously uploaded
+        // file). The fileId path lets the caller skip a wasteful round-trip
+        // through /api/v1/files/{id}/content — we pull the extracted text
+        // directly from the database here.
+        $textProvided = isset($data['text']) && is_string($data['text']) && '' !== trim($data['text']);
+        $fileIdProvided = isset($data['fileId']) && (is_int($data['fileId']) || ctype_digit((string) $data['fileId']));
+
+        if (!$textProvided && !$fileIdProvided) {
             return $this->json([
                 'success' => false,
-                'error' => 'Document text is required',
+                'error' => 'Either text or fileId is required',
+            ], Response::HTTP_BAD_REQUEST);
+        }
+        if ($textProvided && $fileIdProvided) {
+            return $this->json([
+                'success' => false,
+                'error' => 'Provide either text or fileId, not both',
             ], Response::HTTP_BAD_REQUEST);
         }
 
-        // Extract configuration
-        $text = trim($data['text']);
+        if ($fileIdProvided) {
+            $fileId = (int) $data['fileId'];
+            $file = $this->fileRepository->find($fileId);
+            // Collapse "not found" and "wrong owner" into the same 404 so
+            // the endpoint doesn't leak which file IDs exist.
+            if (!$file || $file->getUserId() !== $user->getId()) {
+                return $this->json([
+                    'success' => false,
+                    'error' => 'File not found',
+                ], Response::HTTP_NOT_FOUND);
+            }
+            $extracted = $file->getFileText();
+            if ('' === trim($extracted)) {
+                return $this->json([
+                    'success' => false,
+                    'error' => sprintf(
+                        'File has no extracted text yet (status: %s). Upload with process_level=extract or higher.',
+                        $file->getStatus()
+                    ),
+                ], Response::HTTP_UNPROCESSABLE_ENTITY);
+            }
+            $text = $extracted;
+        } else {
+            $text = trim($data['text']);
+        }
+
         $summaryType = $data['summaryType'] ?? 'abstractive';
         $length = $data['length'] ?? 'medium';
         $customLength = $data['customLength'] ?? null;
@@ -188,6 +243,7 @@ class SummaryController extends AbstractController
 
         $this->logger->info('Summary generation request', [
             'user_id' => $user->getId(),
+            'file_id' => $fileIdProvided ? (int) $data['fileId'] : null,
             'text_length' => strlen($text),
             'summary_type' => $summaryType,
             'length' => $length,
