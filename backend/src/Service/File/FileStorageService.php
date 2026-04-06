@@ -18,7 +18,7 @@ final readonly class FileStorageService
     private const ALLOWED_EXTENSIONS = [
         'pdf', 'docx', 'doc', 'xlsx', 'xls', 'pptx', 'ppt', 'txt', 'md', 'csv',
         'odt', 'ods', 'odp', 'odg', 'odf',
-        'jpg', 'jpeg', 'png', 'gif', 'webp', 'heic', 'heif',
+        'jpg', 'jpeg', 'png', 'gif', 'webp',
         'mp3', 'mp4', 'wav', 'ogg', 'm4a', 'webm',
     ];
     private const VIDEO_EXTENSIONS = ['mp4', 'webm', 'mov', 'avi', 'mkv'];

@@ -440,7 +440,7 @@ class OpenAIProvider implements ChatProviderInterface, EmbeddingProviderInterfac
      * Convert Chat Completions message format to Responses API format.
      *
      * Chat Completions uses: {type: "text", text: "..."} and {type: "image_url", image_url: {url: "..."}}
-     * Responses API uses:    {type: "input_text", text: "..."} and {type: "input_image", image_url: "..."}
+     * Responses API uses:    {type: "input_text"/"output_text", text: "..."} and {type: "input_image", image_url: "..."}
      */
     private function convertToResponsesFormat(array $messages): array
     {
