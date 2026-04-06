@@ -257,23 +257,23 @@
 
           <!-- Footer with actions — stacked on mobile -->
           <div
-            class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between px-3 py-3 sm:p-6 border-t border-light-border/20 dark:border-dark-border/15"
+            class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between px-4 py-4 sm:p-6 border-t border-light-border/20 dark:border-dark-border/15"
           >
-            <span class="txt-secondary text-xs sm:text-sm text-center sm:text-left">
+            <span class="txt-secondary text-sm text-center sm:text-left">
               {{ $t('fileSelection.selectedCount', { count: selectedFiles.length }) }}
             </span>
-            <div class="flex gap-2 sm:gap-3">
+            <div class="flex flex-col sm:flex-row gap-2 sm:gap-3">
               <button
                 v-if="selectedFiles.length > 0"
-                class="flex-1 sm:flex-none px-3 py-2 sm:py-1.5 rounded-lg bg-red-500/10 text-red-500 hover:bg-red-500/20 transition-colors text-sm flex items-center justify-center gap-1.5"
+                class="w-full sm:w-auto px-4 py-2.5 sm:py-1.5 rounded-lg bg-red-500/10 text-red-500 hover:bg-red-500/20 transition-colors text-sm flex items-center justify-center gap-2"
                 data-testid="btn-file-selection-delete-selected"
                 @click="confirmDeleteSelected"
               >
-                <TrashIcon class="w-3.5 h-3.5" />
-                <span class="hidden sm:inline">{{ $t('fileSelection.deleteSelected') }}</span>
+                <TrashIcon class="w-4 h-4" />
+                <span>{{ $t('fileSelection.deleteSelected') }}</span>
               </button>
               <button
-                class="flex-1 sm:flex-none btn-secondary px-4 py-2 rounded-lg text-sm"
+                class="w-full sm:w-auto btn-secondary px-4 py-2.5 sm:py-2 rounded-lg text-sm font-medium"
                 data-testid="btn-file-selection-cancel"
                 @click="emit('close')"
               >
@@ -281,7 +281,7 @@
               </button>
               <button
                 :disabled="selectedFiles.length === 0"
-                class="flex-1 sm:flex-none btn-primary px-4 py-2 rounded-lg text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                class="w-full sm:w-auto btn-primary px-4 py-2.5 sm:py-2 rounded-lg text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
                 data-testid="btn-file-selection-attach"
                 @click="attachFiles"
               >

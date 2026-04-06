@@ -445,7 +445,18 @@ class OpenAIProvider implements ChatProviderInterface, EmbeddingProviderInterfac
     private function convertToResponsesFormat(array $messages): array
     {
         foreach ($messages as &$message) {
+            $role = $message['role'] ?? 'user';
+            $isAssistant = 'assistant' === $role;
+            $textType = $isAssistant ? 'output_text' : 'input_text';
+
             if (!is_array($message['content'] ?? null)) {
+                $text = $message['content'] ?? '';
+                $message['content'] = [
+                    [
+                        'type' => $textType,
+                        'text' => $text,
+                    ]
+                ];
                 continue;
             }
 
@@ -454,7 +465,7 @@ class OpenAIProvider implements ChatProviderInterface, EmbeddingProviderInterfac
                 $type = $part['type'] ?? '';
                 if ('text' === $type) {
                     $converted[] = [
-                        'type' => 'input_text',
+                        'type' => $textType,
                         'text' => $part['text'] ?? '',
                     ];
                 } elseif ('image_url' === $type) {
