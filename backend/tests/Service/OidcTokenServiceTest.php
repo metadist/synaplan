@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Service;
 
+use App\Service\JwtValidator;
 use App\Service\OidcTokenService;
 use Doctrine\DBAL\Connection;
 use PHPUnit\Framework\TestCase;
@@ -21,12 +22,176 @@ class OidcTokenServiceTest extends TestCase
             $this->createMock(\Doctrine\ORM\EntityManagerInterface::class),
             $this->createMock(Connection::class),
             $this->createMock(LoggerInterface::class),
-            $this->createMock(\App\Service\JwtValidator::class),
+            $this->createMock(JwtValidator::class),
             'test',
             'test-client-id',
             'test-client-secret',
             'https://keycloak.example.com/realms/test'
         );
+    }
+
+    /**
+     * Builds a service wired with mocked discovery + JWT validator so the
+     * audience-resolution branches in validateOidcToken / validateBearerToken
+     * can be exercised in isolation. Returns the JwtValidator mock so the
+     * caller can assert which expectedAudience value was passed through.
+     */
+    private function createServiceForAudienceTest(
+        string $oidcClientId,
+        string $oidcBearerAudience,
+        ?LoggerInterface $logger = null,
+    ): array {
+        $discoveryResponse = $this->createMock(ResponseInterface::class);
+        $discoveryResponse->method('toArray')->willReturn([
+            'issuer' => 'https://keycloak.example.com/realms/test',
+            'jwks_uri' => 'https://keycloak.example.com/realms/test/protocol/openid-connect/certs',
+        ]);
+
+        $httpClient = $this->createMock(HttpClientInterface::class);
+        $httpClient->method('request')->willReturn($discoveryResponse);
+
+        $jwtValidator = $this->createMock(JwtValidator::class);
+
+        $service = new OidcTokenService(
+            $httpClient,
+            $this->createMock(\App\Repository\UserRepository::class),
+            $this->createMock(\Doctrine\ORM\EntityManagerInterface::class),
+            $this->createMock(Connection::class),
+            $logger ?? $this->createMock(LoggerInterface::class),
+            $jwtValidator,
+            'test',
+            $oidcClientId,
+            'test-client-secret',
+            'https://keycloak.example.com/realms/test',
+            $oidcBearerAudience,
+        );
+
+        return [$service, $jwtValidator];
+    }
+
+    public function testValidateBearerTokenUsesClientIdAsAudienceWhenBearerAudienceUnset(): void
+    {
+        [$service, $jwtValidator] = $this->createServiceForAudienceTest(
+            oidcClientId: 'synaplan-app',
+            oidcBearerAudience: '',
+        );
+
+        $jwtValidator->expects($this->once())
+            ->method('validateToken')
+            ->with(
+                token: 'jwt',
+                jwksUri: $this->anything(),
+                expectedIssuer: $this->anything(),
+                expectedAudience: 'synaplan-app',
+            )
+            ->willReturn(['sub' => 'user-1']);
+
+        $this->assertSame(['sub' => 'user-1'], $service->validateBearerToken('jwt'));
+    }
+
+    public function testValidateBearerTokenPrefersExplicitBearerAudience(): void
+    {
+        [$service, $jwtValidator] = $this->createServiceForAudienceTest(
+            oidcClientId: 'synaplan-app',
+            oidcBearerAudience: 'override-audience',
+        );
+
+        $jwtValidator->expects($this->once())
+            ->method('validateToken')
+            ->with(
+                token: 'jwt',
+                jwksUri: $this->anything(),
+                expectedIssuer: $this->anything(),
+                expectedAudience: 'override-audience',
+            )
+            ->willReturn(['sub' => 'user-1']);
+
+        $this->assertSame(['sub' => 'user-1'], $service->validateBearerToken('jwt'));
+    }
+
+    public function testValidateBearerTokenFailsClosedWhenNoAudienceConfigured(): void
+    {
+        $logger = $this->createMock(LoggerInterface::class);
+        $logger->expects($this->once())
+            ->method('error')
+            ->with($this->stringContains('no audience configured'));
+
+        [$service, $jwtValidator] = $this->createServiceForAudienceTest(
+            oidcClientId: '',
+            oidcBearerAudience: '',
+            logger: $logger,
+        );
+
+        $jwtValidator->expects($this->never())->method('validateToken');
+
+        $this->assertNull($service->validateBearerToken('jwt'));
+    }
+
+    public function testValidateOidcTokenUsesClientIdAsAudienceWhenBearerAudienceUnset(): void
+    {
+        [$service, $jwtValidator] = $this->createServiceForAudienceTest(
+            oidcClientId: 'synaplan-app',
+            oidcBearerAudience: '',
+        );
+
+        $jwtValidator->expects($this->once())
+            ->method('validateToken')
+            ->with(
+                token: 'jwt',
+                jwksUri: $this->anything(),
+                expectedIssuer: $this->anything(),
+                expectedAudience: 'synaplan-app',
+            )
+            ->willReturn(['sub' => 'user-1', 'email' => 'u@example.com']);
+
+        $userInfo = $service->validateOidcToken('jwt');
+
+        $this->assertNotNull($userInfo);
+        $this->assertSame('user-1', $userInfo['sub']);
+    }
+
+    public function testValidateOidcTokenPrefersExplicitBearerAudience(): void
+    {
+        [$service, $jwtValidator] = $this->createServiceForAudienceTest(
+            oidcClientId: 'synaplan-app',
+            oidcBearerAudience: 'override-audience',
+        );
+
+        $jwtValidator->expects($this->once())
+            ->method('validateToken')
+            ->with(
+                token: 'jwt',
+                jwksUri: $this->anything(),
+                expectedIssuer: $this->anything(),
+                expectedAudience: 'override-audience',
+            )
+            ->willReturn(['sub' => 'user-1']);
+
+        $this->assertNotNull($service->validateOidcToken('jwt'));
+    }
+
+    public function testValidateOidcTokenToleratesMissingAudienceConfig(): void
+    {
+        // Cookie path keeps its prior lenient behavior — when nothing is
+        // configured, validateOidcToken still calls JwtValidator with
+        // expectedAudience=null (which the validator treats as "skip").
+        // Bearer path is the strict one (see test above).
+        [$service, $jwtValidator] = $this->createServiceForAudienceTest(
+            oidcClientId: '',
+            oidcBearerAudience: '',
+        );
+
+        $jwtValidator->expects($this->once())
+            ->method('validateToken')
+            ->with(
+                token: 'jwt',
+                jwksUri: $this->anything(),
+                expectedIssuer: $this->anything(),
+                expectedAudience: null,
+            )
+            ->willReturn(['sub' => 'user-1']);
+
+        $this->assertNotNull($service->validateOidcToken('jwt'));
     }
 
     public function testRevokeOidcTokensSucceeds(): void
@@ -62,7 +227,7 @@ class OidcTokenServiceTest extends TestCase
             $this->createMock(\Doctrine\ORM\EntityManagerInterface::class),
             $this->createMock(Connection::class),
             $logger,
-            $this->createMock(\App\Service\JwtValidator::class),
+            $this->createMock(JwtValidator::class),
             'test',
             'test-client-id',
             'test-client-secret',
@@ -95,7 +260,7 @@ class OidcTokenServiceTest extends TestCase
             $this->createMock(\Doctrine\ORM\EntityManagerInterface::class),
             $this->createMock(Connection::class),
             $logger,
-            $this->createMock(\App\Service\JwtValidator::class),
+            $this->createMock(JwtValidator::class),
             'test',
             'test-client-id',
             'test-client-secret',
@@ -172,7 +337,7 @@ class OidcTokenServiceTest extends TestCase
             $this->createMock(\Doctrine\ORM\EntityManagerInterface::class),
             $this->createMock(Connection::class),
             $logger,
-            $this->createMock(\App\Service\JwtValidator::class),
+            $this->createMock(JwtValidator::class),
             'test',
             'test-client-id',
             'test-client-secret',
@@ -205,7 +370,7 @@ class OidcTokenServiceTest extends TestCase
             $this->createMock(\Doctrine\ORM\EntityManagerInterface::class),
             $this->createMock(Connection::class),
             $logger,
-            $this->createMock(\App\Service\JwtValidator::class),
+            $this->createMock(JwtValidator::class),
             'test',
             'test-client-id',
             'test-client-secret',
@@ -241,7 +406,7 @@ class OidcTokenServiceTest extends TestCase
             $this->createMock(\Doctrine\ORM\EntityManagerInterface::class),
             $this->createMock(Connection::class),
             $logger,
-            $this->createMock(\App\Service\JwtValidator::class),
+            $this->createMock(JwtValidator::class),
             'test',
             'test-client-id',
             'test-client-secret',
