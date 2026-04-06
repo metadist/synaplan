@@ -84,9 +84,6 @@ class OidcBearerAuthenticator extends AbstractAuthenticator
         $authHeader = (string) $request->headers->get('Authorization', '');
         $token = substr($authHeader, 7);
 
-        // Audience resolution + JWT validation live in OidcTokenService.
-        // It returns null on signature/issuer/audience failures and logs
-        // the specific reason at warning/debug level.
         $claims = $this->oidcTokenService->validateBearerToken($token);
 
         if (!$claims) {
