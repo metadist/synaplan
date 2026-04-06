@@ -58,8 +58,7 @@ class SummaryController extends AbstractController
                         .'should be summarized. The file must belong to the authenticated '
                         .'user and must have been processed with process_level=extract or '
                         .'higher. Mutually exclusive with text.',
-                    example: 42,
-                    nullable: true
+                    example: 42
                 ),
                 new OA\Property(
                     property: 'summaryType',
@@ -149,7 +148,19 @@ class SummaryController extends AbstractController
         // through /api/v1/files/{id}/content — we pull the extracted text
         // directly from the database here.
         $textProvided = isset($data['text']) && is_string($data['text']) && '' !== trim($data['text']);
-        $fileIdProvided = isset($data['fileId']) && (is_int($data['fileId']) || ctype_digit((string) $data['fileId']));
+        $fileId = null;
+        if (isset($data['fileId'])) {
+            $raw = $data['fileId'];
+            if (is_int($raw)) {
+                $fileId = $raw;
+            } elseif (is_string($raw) && ctype_digit($raw)) {
+                $fileId = (int) $raw;
+            }
+            // Everything else (bool, array, float, null, non-digit string)
+            // falls through as "not provided" and gets caught by the
+            // "either text or fileId is required" check below.
+        }
+        $fileIdProvided = null !== $fileId;
 
         if (!$textProvided && !$fileIdProvided) {
             return $this->json([
@@ -165,7 +176,6 @@ class SummaryController extends AbstractController
         }
 
         if ($fileIdProvided) {
-            $fileId = (int) $data['fileId'];
             $file = $this->fileRepository->find($fileId);
             // Collapse "not found" and "wrong owner" into the same 404 so
             // the endpoint doesn't leak which file IDs exist.
@@ -243,7 +253,7 @@ class SummaryController extends AbstractController
 
         $this->logger->info('Summary generation request', [
             'user_id' => $user->getId(),
-            'file_id' => $fileIdProvided ? (int) $data['fileId'] : null,
+            'file_id' => $fileId,
             'text_length' => strlen($text),
             'summary_type' => $summaryType,
             'length' => $length,

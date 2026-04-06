@@ -7,6 +7,7 @@ use App\Entity\File;
 use App\Entity\User;
 use App\Repository\UserRepository;
 use App\Tests\Trait\AuthenticatedTestTrait;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\MockObject\MockObject;
 use Symfony\Bundle\FrameworkBundle\Test\WebTestCase;
 
@@ -138,6 +139,39 @@ class SummaryControllerTest extends WebTestCase
 
         $data = json_decode($response->getContent(), true);
         $this->assertFalse($data['success']);
+    }
+
+    #[DataProvider('invalidFileIdProvider')]
+    public function testRejectsInvalidFileIdTypes(mixed $fileId): void
+    {
+        $this->aiFacade->expects($this->never())->method('chat');
+
+        $this->postSummary(['fileId' => $fileId]);
+
+        $response = $this->client->getResponse();
+        // A non-scalar / non-numeric fileId should be rejected the
+        // same way as "no fileId at all" — 400 "text or fileId
+        // required". Critically it must not blow up with a notice or
+        // accept bools/arrays as digits.
+        $this->assertEquals(400, $response->getStatusCode());
+        $data = json_decode($response->getContent(), true);
+        $this->assertFalse($data['success']);
+        $this->assertStringContainsString('text or fileId', $data['error']);
+    }
+
+    /**
+     * @return iterable<string, array{0: mixed}>
+     */
+    public static function invalidFileIdProvider(): iterable
+    {
+        yield 'null' => [null];
+        yield 'empty string' => [''];
+        yield 'non-digit string' => ['not-a-number'];
+        yield 'true' => [true];
+        yield 'false' => [false];
+        yield 'array' => [[1, 2, 3]];
+        yield 'object' => [['nested' => 'thing']];
+        yield 'float' => [3.14];
     }
 
     public function testFileIdWithoutExtractedText(): void
