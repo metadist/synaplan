@@ -1422,6 +1422,16 @@ const streamAIResponse = async (
                 message.originalMediaType = data.originalMediaType
               }
 
+              if (data.error_hint === 'vision_model_required') {
+                const hint =
+                  '\n\n---\n\n' +
+                  '**💡 ' +
+                  t('aiProvider.error.visionModelHint') +
+                  '**\n\n' +
+                  t('aiProvider.error.visionModelHintDetail')
+                message.parts.push({ type: 'text', content: hint })
+              }
+
               // Mark reasoning parts as complete (remove streaming flag)
               message.parts.forEach((part) => {
                 if (part.type === 'thinking' && part.isStreaming) {

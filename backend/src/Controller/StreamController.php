@@ -808,7 +808,7 @@ class StreamController extends AbstractController
 
                     $chat->updateTimestamp();
                     $this->em->flush();
-                    $this->sendSSE('complete', [
+                    $completePayload = [
                         'messageId' => $outgoingMessage->getId(),
                         'trackId' => $trackId,
                         'provider' => $intendedChat['provider'] ?? ($result['provider'] ?? 'system'),
@@ -818,7 +818,13 @@ class StreamController extends AbstractController
                         'originalTopic' => $originalTopic,
                         'originalMediaType' => $originalMediaType,
                         'language' => 'en',
-                    ]);
+                    ];
+
+                    if (isset($result['error_hint'])) {
+                        $completePayload['error_hint'] = $result['error_hint'];
+                    }
+
+                    $this->sendSSE('complete', $completePayload);
 
                     return; // Exit early
                 }

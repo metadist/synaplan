@@ -602,7 +602,9 @@
       "mediumModels": "Mittel (Bessere Qualität)",
       "largeModels": "Groß (Beste Qualität)",
       "exampleCommand": "Installationsbefehl",
-      "restartNote": "Nach dem Herunterladen die Seite aktualisieren und erneut versuchen."
+      "restartNote": "Nach dem Herunterladen die Seite aktualisieren und erneut versuchen.",
+      "visionModelHint": "Kein Vision-fähiges Modell konfiguriert",
+      "visionModelHintDetail": "Deine Nachricht enthält Bilder, aber dein aktuelles Chat-Modell kann diese nicht analysieren. Gehe zu **Einstellungen → KI-Modelle** und aktiviere ein Modell mit Vision-Unterstützung (z.B. GPT-4o, Gemini, Llama 4), oder setze ein Standard-**Pic→Text**-Modell."
     }
   },
   "login": {
@@ -1376,6 +1378,7 @@
     "status_extracted": "Extrahiert",
     "status_vectorizing": "Wird indexiert…",
     "status_vectorized": "Bereit",
+    "status_processed": "Verarbeitet",
     "attached": "Angehängt",
     "standalone": "Eigenständig",
     "attachedToMessage": "Diese Datei ist an eine Nachricht angehängt",

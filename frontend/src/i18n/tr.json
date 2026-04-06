@@ -428,7 +428,9 @@
       "mediumModels": "Orta (Daha İyi Kalite)",
       "largeModels": "Büyük (En İyi Kalite)",
       "exampleCommand": "Kurulum Komutu",
-      "restartNote": "İndirdikten sonra sayfayı yenileyin ve tekrar deneyin."
+      "restartNote": "İndirdikten sonra sayfayı yenileyin ve tekrar deneyin.",
+      "visionModelHint": "Görüntü destekli model yapılandırılmamış",
+      "visionModelHintDetail": "Mesajınız görüntüler içeriyor, ancak mevcut sohbet modeliniz bunları analiz edemiyor. **Ayarlar → AI Modelleri**'ne gidin ve görüntü destekli bir model etkinleştirin (ör. GPT-4o, Gemini, Llama 4) veya varsayılan bir **Pic→Text** modeli ayarlayın."
     }
   },
   "common": {
