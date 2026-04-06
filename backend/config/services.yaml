@@ -317,9 +317,6 @@ services:
             $oidcDiscoveryUrl: '%env(OIDC_DISCOVERY_URL)%'
             $oidcBearerAudience: '%env(OIDC_BEARER_AUDIENCE)%'
 
-    # OIDC Bearer Token Authenticator (for external services like synaplan-opencloud)
-    # Audience resolution lives in OidcTokenService — see resolveExpectedAudience().
-
     # OIDC User Provisioning Service (shared by controller + bearer authenticator)
     App\Service\OidcUserService:
         arguments:
