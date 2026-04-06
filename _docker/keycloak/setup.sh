@@ -50,7 +50,7 @@ if [ -z "${SYNAPLAN_CLIENT_UUID}" ]; then
 fi
 
 # Hardcoded audience mapper so every token issued for this client (ROPC,
-# auth-code flow, etc.) carries aud=synaplan-app. JwtValidator validates
+# auth-code flow, etc.) carries aud=${CLIENT_ID}. JwtValidator validates
 # aud strictly against OIDC_CLIENT_ID and there's no azp fallback, so
 # without this mapper any direct grant produces aud=account and Synaplan
 # rejects the token. Token exchange works around this with its own
@@ -105,11 +105,11 @@ $KCADM create clients -r synaplan \
   -s 'attributes={"pkce.code.challenge.method":"S256","post.logout.redirect.uris":"'"${OC_ORIGIN}/*+${OC_DEV_ORIGIN}/*"'"}'
 
 # Hardcoded audience mapper for the opencloud client — same rationale as
-# synaplan-app above. Tokens minted for opencloud now carry aud=opencloud
-# instead of relying on aud=account from the default Audience Resolve
-# mapper. Token exchange continues to work because the source token's
-# aud is irrelevant — the target token's audience is set explicitly via
-# the audience parameter on the exchange grant.
+# the synaplan-app one above. Tokens minted for this client now carry
+# aud=${OC_CLIENT_ID} instead of relying on aud=account from the default
+# Audience Resolve mapper. Token exchange continues to work because the
+# source token's aud is irrelevant — the target token's audience is set
+# explicitly via the audience parameter on the exchange grant.
 OC_CLIENT_UUID=$($KCADM get "clients?clientId=${OC_CLIENT_ID}" -r synaplan --fields id | json_field id)
 
 if [ -z "${OC_CLIENT_UUID}" ]; then

@@ -47,12 +47,11 @@ final class OidcTokenService
     /**
      * Resolve the audience to enforce on Keycloak-issued tokens.
      * Explicit OIDC_BEARER_AUDIENCE override wins, otherwise fall back
-     * to OIDC_CLIENT_ID. Returns null only when neither is configured;
-     * the validator treats null as "skip aud check", which is fine for
-     * the cookie path (it has bigger problems if OIDC isn't configured)
-     * and acceptable for the bearer path (token would also fail issuer
-     * validation against an unconfigured discovery URL). Single source
-     * of truth for both validate*Token methods below.
+     * to OIDC_CLIENT_ID. Returns null when neither is configured — the
+     * bearer path checks for null explicitly and fails closed; the
+     * cookie path tolerates it (matches the prior behavior before this
+     * method was extracted). Single source of truth for both
+     * validate*Token methods below.
      */
     private function resolveExpectedAudience(): ?string
     {
@@ -231,6 +230,13 @@ final class OidcTokenService
      */
     public function validateBearerToken(string $accessToken, string $provider = 'keycloak'): ?array
     {
+        $expectedAudience = $this->resolveExpectedAudience();
+        if (null === $expectedAudience) {
+            $this->logger->error('OIDC bearer auth: no audience configured (set OIDC_CLIENT_ID or OIDC_BEARER_AUDIENCE)');
+
+            return null;
+        }
+
         try {
             $discovery = $this->getDiscoveryConfig($provider);
 
@@ -238,7 +244,7 @@ final class OidcTokenService
                 token: $accessToken,
                 jwksUri: $discovery['jwks_uri'],
                 expectedIssuer: $discovery['issuer'],
-                expectedAudience: $this->resolveExpectedAudience(),
+                expectedAudience: $expectedAudience,
             );
 
             if (!$claims) {
