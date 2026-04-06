@@ -279,7 +279,7 @@ class OpenAIProvider implements ChatProviderInterface, EmbeddingProviderInterfac
     private function buildResponsesRequest(array $messages, string $model, bool $isReasoningModel, array $options): array
     {
         $systemMessage = $this->extractSystemMessage($messages);
-        $input = $this->removeSystemMessages($messages);
+        $input = $this->convertToResponsesFormat($this->removeSystemMessages($messages));
 
         $requestOptions = [
             'model' => $model,
@@ -434,6 +434,43 @@ class OpenAIProvider implements ChatProviderInterface, EmbeddingProviderInterfac
             $messages,
             static fn (array $msg) => 'system' !== ($msg['role'] ?? '')
         ));
+    }
+
+    /**
+     * Convert Chat Completions message format to Responses API format.
+     *
+     * Chat Completions uses: {type: "text", text: "..."} and {type: "image_url", image_url: {url: "..."}}
+     * Responses API uses:    {type: "input_text", text: "..."} and {type: "input_image", image_url: "..."}
+     */
+    private function convertToResponsesFormat(array $messages): array
+    {
+        foreach ($messages as &$message) {
+            if (!is_array($message['content'] ?? null)) {
+                continue;
+            }
+
+            $converted = [];
+            foreach ($message['content'] as $part) {
+                $type = $part['type'] ?? '';
+                if ('text' === $type) {
+                    $converted[] = [
+                        'type' => 'input_text',
+                        'text' => $part['text'] ?? '',
+                    ];
+                } elseif ('image_url' === $type) {
+                    $url = $part['image_url']['url'] ?? ($part['image_url'] ?? '');
+                    $converted[] = [
+                        'type' => 'input_image',
+                        'image_url' => $url,
+                    ];
+                } else {
+                    $converted[] = $part;
+                }
+            }
+            $message['content'] = $converted;
+        }
+
+        return $messages;
     }
 
     /**
