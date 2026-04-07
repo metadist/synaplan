@@ -81,7 +81,7 @@ test.describe('@ci @smoke Ollama Integration', () => {
 
     await test.step('Assert: response from Ollama stub is deterministic', async () => {
       expect(aiText.length).toBeGreaterThan(0)
-      expect(aiText).toContain('fake ollama stub response')
+      expect(aiText).toContain('ollama stub response')
     })
 
     await test.step('Verify: stub received chat request with correct model', async () => {
@@ -91,7 +91,7 @@ test.describe('@ci @smoke Ollama Integration', () => {
 
       const lastChat = chatReqs[chatReqs.length - 1]
       const body = lastChat.body as Record<string, unknown>
-      expect(body.model).toBe('fake-chat-model')
+      expect(body.model).toBe('stub-chat-model')
       expect(Array.isArray(body.messages)).toBe(true)
     })
   })
@@ -120,7 +120,7 @@ test.describe('@ci @smoke Ollama Integration', () => {
 
     await test.step('Assert: response completed with content', async () => {
       expect(aiText.length).toBeGreaterThan(0)
-      expect(aiText).toContain('fake ollama stub response')
+      expect(aiText).toContain('ollama stub response')
     })
 
     await test.step('Verify: stub received request through thinking path', async () => {

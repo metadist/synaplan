@@ -47,7 +47,7 @@ type StubConfig = {
 
 const requests: RequestRecord[] = []
 
-const FAKE_MODEL_DETAILS = {
+const STUB_MODEL_DETAILS = {
   format: 'gguf',
   family: 'llama',
   parameter_size: '3B',
@@ -59,23 +59,23 @@ const FAKE_MODEL_DETAILS = {
 const DEFAULT_CONFIG: StubConfig = {
   models: [
     {
-      name: 'fake-chat-model',
-      model: 'fake-chat-model',
+      name: 'stub-chat-model',
+      model: 'stub-chat-model',
       size: 1_000_000,
       modified_at: '2025-01-01T00:00:00Z',
-      digest: 'sha256:fake-chat-digest',
-      details: FAKE_MODEL_DETAILS,
+      digest: 'sha256:stub-chat-digest',
+      details: STUB_MODEL_DETAILS,
     },
     {
-      name: 'fake-embed-model',
-      model: 'fake-embed-model',
+      name: 'stub-embed-model',
+      model: 'stub-embed-model',
       size: 500_000,
       modified_at: '2025-01-01T00:00:00Z',
-      digest: 'sha256:fake-embed-digest',
-      details: FAKE_MODEL_DETAILS,
+      digest: 'sha256:stub-embed-digest',
+      details: STUB_MODEL_DETAILS,
     },
   ],
-  chatResponse: 'Fake Ollama stub response',
+  chatResponse: 'Ollama stub response',
   enableThinking: false,
   thinkingText: 'Let me think about this step by step...',
   streamDelayMs: 10,
