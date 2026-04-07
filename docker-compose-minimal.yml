@@ -135,7 +135,7 @@ services:
 
   # MariaDB 11.8 Database
   db:
-    image: mariadb:11.8.2@sha256:2bcbaec92bd9d4f6591bc8103d3a8e6d0512ee2235506e47a2e129d190444405
+    image: mariadb:11.8.6@sha256:f5644a292224cdf4b6514aca38b3b4436f0b0443d54170a472cd14261f31402d
     container_name: synaplan-db
     command: --max-allowed-packet=256M --innodb-buffer-pool-size=512M
     environment:
