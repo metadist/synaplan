@@ -160,7 +160,7 @@ services:
 
   # Apache Tika - Document Text Extraction
   tika:
-    image: apache/tika:2.9.2.1@sha256:2be134745fcb59826c54041489946c66218b948ea0c0be3a37cb7919ecc845ba
+    image: apache/tika:3.3.0.0@sha256:2a565f1ea1290bdcb74a7d35957d16a989ed44ef98790dcdcc28121d728fa583
     container_name: synaplan-tika
     command: -h 0.0.0.0 -p 9998
     ports:
