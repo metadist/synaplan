@@ -172,7 +172,7 @@ services:
       KC_BOOTSTRAP_ADMIN_USERNAME: admin
       KC_BOOTSTRAP_ADMIN_PASSWORD: admin
       KC_HEALTH_ENABLED: "true"
-      KC_FEATURES: token-exchange,admin-fine-grained-authz
+      KC_FEATURES: token-exchange:v1,admin-fine-grained-authz:v1
       KC_HOSTNAME: ${KC_HOSTNAME:-https://host.docker.internal:${KEYCLOAK_TEST_HTTPS_PORT:-8444}}
       KC_HOSTNAME_BACKCHANNEL_DYNAMIC: "true"
       KC_HOSTNAME_STRICT: "false"

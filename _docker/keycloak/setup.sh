@@ -84,7 +84,7 @@ $KCADM add-roles -r synaplan --uusername testuser --rolename administrator
 # --- OpenCloud integration clients (for synaplan-opencloud) ---
 # These are created here pragmatically so both Synaplan and OpenCloud
 # share the same Keycloak realm without maintaining separate setups.
-# Requires Keycloak to run with: KC_FEATURES=token-exchange,admin-fine-grained-authz
+# Requires Keycloak to run with: KC_FEATURES=token-exchange:v1,admin-fine-grained-authz:v1
 
 OC_CLIENT_ID="${KC_OC_CLIENT_ID:-opencloud}"
 OC_CALLBACK="${KC_OC_CALLBACK:-https://host.docker.internal:9200/oidc-callback.html}"
