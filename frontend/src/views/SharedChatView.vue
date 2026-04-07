@@ -319,8 +319,34 @@ import MessageCode from '../components/MessageCode.vue'
 import MessageText from '../components/MessageText.vue'
 import { useConfigStore } from '@/stores/config'
 import { httpClient } from '@/services/api/httpClient'
+import { z } from 'zod'
 import { supportedLanguages, type SupportedLanguage } from '@/i18n'
 import { parseAIResponse } from '@/utils/responseParser'
+
+const SharedChatMessageSchema = z.object({
+  id: z.number(),
+  text: z.string(),
+  direction: z.enum(['IN', 'OUT']),
+  timestamp: z.number(),
+  topic: z.string().optional(),
+  language: z.string().optional(),
+  provider: z.string().optional(),
+  file: z
+    .object({
+      path: z.string(),
+      type: z.string(),
+    })
+    .optional(),
+})
+
+const SharedChatPayloadSchema = z.object({
+  success: z.boolean(),
+  chat: z.object({
+    title: z.string(),
+    createdAt: z.string(),
+  }),
+  messages: z.array(SharedChatMessageSchema).optional(),
+})
 
 const config = useConfigStore()
 const route = useRoute()
@@ -525,8 +551,9 @@ onMounted(async () => {
   }
 
   try {
-    const data = await httpClient<any>(`/api/v1/chats/shared/${token.value}`, {
+    const data = await httpClient(`/api/v1/chats/shared/${token.value}`, {
       skipAuth: true,
+      schema: SharedChatPayloadSchema,
     })
 
     if (!data.success) {

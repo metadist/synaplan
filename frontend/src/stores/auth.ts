@@ -2,19 +2,10 @@
 // Cookie-based authentication store
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
-import { authService } from '@/services/authService'
+import { authService, type AuthUser } from '@/services/authService'
 import { useConfigStore } from '@/stores/config'
 
-export interface User {
-  id: number
-  email: string
-  level: string
-  roles?: string[]
-  created?: string
-  isAdmin?: boolean
-  emailVerified?: boolean
-  memoriesEnabled?: boolean
-}
+export type User = AuthUser
 
 // Promise that resolves when initial auth check is complete
 let authReadyResolve: (() => void) | null = null
@@ -32,15 +23,21 @@ export const useAuthStore = defineStore('auth', () => {
   // Computed
   const isAuthenticated = computed(() => !!user.value)
   const userLevel = computed(() => user.value?.level || 'NEW')
+  const isAdmin = computed(() => user.value?.isAdmin === true || user.value?.level === 'ADMIN')
   const isPro = computed(() => {
     const config = useConfigStore()
-    return !config.billing.enabled || ['PRO', 'TEAM', 'BUSINESS'].includes(userLevel.value)
+    return (
+      !config.billing.enabled ||
+      isAdmin.value ||
+      ['PRO', 'TEAM', 'BUSINESS'].includes(userLevel.value)
+    )
   })
   const isTeam = computed(() => {
     const config = useConfigStore()
-    return !config.billing.enabled || ['TEAM', 'BUSINESS'].includes(userLevel.value)
+    return (
+      !config.billing.enabled || isAdmin.value || ['TEAM', 'BUSINESS'].includes(userLevel.value)
+    )
   })
-  const isAdmin = computed(() => user.value?.isAdmin === true || user.value?.level === 'ADMIN')
 
   // Actions
   async function login(email: string, password: string, recaptchaToken?: string): Promise<boolean> {
@@ -59,7 +56,7 @@ export const useAuthStore = defineStore('auth', () => {
         error.value = result.error || 'Login failed'
         return false
       }
-    } catch (err) {
+    } catch {
       error.value = 'Network error'
       return false
     } finally {
@@ -84,7 +81,7 @@ export const useAuthStore = defineStore('auth', () => {
         error.value = result.error || 'Registration failed'
         return false
       }
-    } catch (err) {
+    } catch {
       error.value = 'Network error'
       return false
     } finally {
@@ -135,7 +132,7 @@ export const useAuthStore = defineStore('auth', () => {
         // Reload config to get user-specific data like plugins
         await useConfigStore().reload()
       }
-    } catch (err) {
+    } catch {
       // Not authenticated or network error - that's fine, just stay logged out
       user.value = null
     } finally {
@@ -172,7 +169,7 @@ export const useAuthStore = defineStore('auth', () => {
         error.value = result.error || 'OAuth login failed'
         return false
       }
-    } catch (err) {
+    } catch {
       error.value = 'OAuth callback failed'
       return false
     } finally {

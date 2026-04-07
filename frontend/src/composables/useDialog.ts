@@ -13,7 +13,7 @@ export interface DialogOptions {
 
 export interface DialogState extends DialogOptions {
   isOpen: boolean
-  resolve?: (value: any) => void
+  resolve?: ((value: boolean) => void) | ((value: string | null) => void) | (() => void)
   reject?: () => void
 }
 
@@ -73,11 +73,12 @@ export const useDialog = () => {
   }
 
   const close = () => {
-    if (dialog.value.resolve) {
+    const resolve = dialog.value.resolve
+    if (resolve) {
       if (dialog.value.type === 'confirm') {
-        dialog.value.resolve(false)
+        ;(resolve as (value: boolean) => void)(false)
       } else if (dialog.value.type === 'prompt') {
-        dialog.value.resolve(null)
+        ;(resolve as (value: string | null) => void)(null)
       }
     }
     dialog.value.isOpen = false

@@ -7,6 +7,7 @@ use App\Service\UsageStatsService;
 use OpenApi\Attributes as OA;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
+use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 use Symfony\Component\Routing\Attribute\Route;
@@ -77,6 +78,67 @@ class UsageStatsController extends AbstractController
     }
 
     /**
+     * Get paginated activity log with filters.
+     */
+    #[Route('/activity', name: 'activity', methods: ['GET'])]
+    #[OA\Get(
+        path: '/api/v1/usage/activity',
+        summary: 'Get paginated activity log with search, action filter and date range',
+        tags: ['Usage Statistics'],
+        parameters: [
+            new OA\Parameter(name: 'page', in: 'query', schema: new OA\Schema(type: 'integer', default: 1)),
+            new OA\Parameter(name: 'per_page', in: 'query', schema: new OA\Schema(type: 'integer', default: 20)),
+            new OA\Parameter(name: 'search', in: 'query', schema: new OA\Schema(type: 'string', nullable: true)),
+            new OA\Parameter(name: 'action', in: 'query', schema: new OA\Schema(type: 'string', nullable: true)),
+            new OA\Parameter(name: 'from', in: 'query', description: 'Unix timestamp (start)', schema: new OA\Schema(type: 'integer', nullable: true)),
+            new OA\Parameter(name: 'to', in: 'query', description: 'Unix timestamp (end)', schema: new OA\Schema(type: 'integer', nullable: true)),
+        ],
+        responses: [
+            new OA\Response(
+                response: 200,
+                description: 'Paginated activity log',
+                content: new OA\JsonContent(
+                    properties: [
+                        new OA\Property(property: 'success', type: 'boolean'),
+                        new OA\Property(property: 'data', type: 'object'),
+                    ]
+                )
+            ),
+            new OA\Response(response: 401, description: 'Not authenticated'),
+        ]
+    )]
+    public function getActivity(
+        Request $request,
+        #[CurrentUser] ?User $user,
+    ): JsonResponse {
+        if (!$user) {
+            return $this->json(['error' => 'Not authenticated'], Response::HTTP_UNAUTHORIZED);
+        }
+
+        $page = max(1, $request->query->getInt('page', 1));
+        $perPage = max(1, min(100, $request->query->getInt('per_page', 20)));
+        $search = $request->query->get('search') ? trim($request->query->get('search')) : null;
+        $action = $request->query->get('action') ? trim($request->query->get('action')) : null;
+        $from = $request->query->getInt('from') ?: null;
+        $to = $request->query->getInt('to') ?: null;
+
+        $data = $this->usageStatsService->getActivityLog(
+            $user->getId(),
+            $page,
+            $perPage,
+            $search,
+            $action,
+            $from,
+            $to,
+        );
+
+        return $this->json([
+            'success' => true,
+            'data' => $data,
+        ]);
+    }
+
+    /**
      * Export usage data as CSV.
      *
      * GET /api/v1/usage/export
@@ -88,6 +150,7 @@ class UsageStatsController extends AbstractController
      */
     #[Route('/export', name: 'export', methods: ['GET'])]
     public function exportCsv(
+        Request $request,
         #[CurrentUser] ?User $user,
     ): StreamedResponse {
         if (!$user) {
@@ -99,10 +162,7 @@ class UsageStatsController extends AbstractController
             );
         }
 
-        $sinceTimestamp = $_GET['since'] ?? null;
-        if ($sinceTimestamp) {
-            $sinceTimestamp = (int) $sinceTimestamp;
-        }
+        $sinceTimestamp = $request->query->getInt('since') ?: null;
 
         $csv = $this->usageStatsService->exportUsageAsCsv($user, $sinceTimestamp);
 

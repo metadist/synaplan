@@ -13,6 +13,8 @@ use App\AI\Interface\VisionProviderInterface;
 
 class TestProvider implements ChatProviderInterface, EmbeddingProviderInterface, VisionProviderInterface, ImageGenerationProviderInterface, VideoGenerationProviderInterface, SpeechToTextProviderInterface, TextToSpeechProviderInterface, FileAnalysisProviderInterface
 {
+    private const FAKE_TOKENS_PER_EMBED = 8;
+
     public function __construct(
         private readonly string $uploadDir = '/var/www/backend/var/uploads',
     ) {
@@ -66,7 +68,24 @@ class TestProvider implements ChatProviderInterface, EmbeddingProviderInterface,
         return []; // Test provider requires no configuration
     }
 
-    public function chat(array $messages, array $options = []): string
+    public function chat(array $messages, array $options = []): array
+    {
+        $content = $this->generateContent($messages);
+        $tokenEstimate = (int) ceil(strlen($content) / 4);
+
+        return [
+            'content' => $content,
+            'usage' => [
+                'prompt_tokens' => 10,
+                'completion_tokens' => $tokenEstimate,
+                'total_tokens' => 10 + $tokenEstimate,
+                'cached_tokens' => 0,
+                'cache_creation_tokens' => 0,
+            ],
+        ];
+    }
+
+    private function generateContent(array $messages): string
     {
         $lastMessage = end($messages);
         $userContent = $lastMessage['content'] ?? 'hello';
@@ -126,25 +145,45 @@ class TestProvider implements ChatProviderInterface, EmbeddingProviderInterface,
         return $text;
     }
 
-    public function chatStream(array $messages, callable $callback, array $options = []): void
+    public function chatStream(array $messages, callable $callback, array $options = []): array
     {
-        $response = $this->chat($messages, $options);
-        foreach (str_split($response, 10) as $chunk) {
+        $result = $this->chat($messages, $options);
+        foreach (str_split($result['content'], 10) as $chunk) {
             $callback($chunk);
             usleep(50000);
         }
+
+        return ['usage' => $result['usage']];
     }
 
     // EmbeddingProviderInterface
     public function embed(string $text, array $options = []): array
     {
-        // Fake 1536-dimensional embedding
-        return array_fill(0, 1536, 0.123);
+        return [
+            'embedding' => array_fill(0, 1536, 0.123),
+            'usage' => [
+                'prompt_tokens' => self::FAKE_TOKENS_PER_EMBED,
+                'total_tokens' => self::FAKE_TOKENS_PER_EMBED,
+            ],
+        ];
     }
 
     public function embedBatch(array $texts, array $options = []): array
     {
-        return array_map(fn ($t) => $this->embed($t, $options), $texts);
+        $embeddings = [];
+        foreach ($texts as $t) {
+            $embeddings[] = $this->embed($t, $options)['embedding'];
+        }
+
+        $promptTokens = self::FAKE_TOKENS_PER_EMBED * count($texts);
+
+        return [
+            'embeddings' => $embeddings,
+            'usage' => [
+                'prompt_tokens' => $promptTokens,
+                'total_tokens' => $promptTokens,
+            ],
+        ];
     }
 
     public function getDimensions(string $model): int

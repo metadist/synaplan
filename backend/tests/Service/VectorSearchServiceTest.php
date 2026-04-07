@@ -29,7 +29,10 @@ class VectorSearchServiceTest extends KernelTestCase
 
         $aiFacadeMock = $this->createMock(AiFacade::class);
         $aiFacadeMock->method('embed')
-            ->willReturnCallback(fn (string $text, ?int $userId = null, array $options = []): array => array_fill(0, 1024, 0.2));
+            ->willReturnCallback(fn (string $text, ?int $userId = null, array $options = []): array => [
+                'embedding' => array_fill(0, 1024, 0.2),
+                'usage' => ['prompt_tokens' => 0, 'total_tokens' => 0],
+            ]);
         $container->set(AiFacade::class, $aiFacadeMock);
 
         $this->vectorSearchService = $container->get(VectorSearchService::class);
@@ -235,6 +238,11 @@ class VectorSearchServiceTest extends KernelTestCase
 
         // Delete test vectors
         $conn->executeStatement('DELETE FROM BRAG WHERE BMID = ?', [$this->testMessageId]);
+
+        // Delete usage log entries created by recordUsage (FK on BMODEL_ID)
+        if ($this->testUserId > 0) {
+            $conn->executeStatement('DELETE FROM BUSELOG WHERE BUSERID = ?', [$this->testUserId]);
+        }
 
         $entitiesToRemove = [];
 

@@ -28,6 +28,7 @@ security:
             provider: app_user_provider
             custom_authenticators:
                 - App\Security\CookieTokenAuthenticator
+                - App\Security\OidcBearerAuthenticator
                 - App\Security\QueryTokenAuthenticator
                 - App\Security\ApiKeyAuthenticator
 

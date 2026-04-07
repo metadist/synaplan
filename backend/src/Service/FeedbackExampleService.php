@@ -22,6 +22,7 @@ final readonly class FeedbackExampleService
     public function __construct(
         private AiFacade $aiFacade,
         private ModelConfigService $modelConfigService,
+        private RateLimitService $rateLimitService,
         private UserMemoryService $memoryService,
         private VectorSearchService $vectorSearchService,
         private BraveSearchService $braveSearchService,
@@ -303,6 +304,16 @@ PROMPT;
             );
 
             $content = trim((string) ($response['content'] ?? ''));
+
+            $this->rateLimitService->recordUsage($user, 'FEEDBACK', [
+                'provider' => $response['provider'] ?? 'unknown',
+                'model' => $response['model'] ?? 'unknown',
+                'model_id' => $toolsConfig['model_id'] ?? null,
+                'usage' => $response['usage'] ?? [],
+                'response_text' => $content,
+                'input_text' => $userPrompt,
+            ]);
+
             $parsed = $this->parseCombinedPreview($content);
 
             if (null !== $parsed) {
@@ -468,6 +479,15 @@ PROMPT;
 
             $correction = trim((string) ($response['content'] ?? ''));
 
+            $this->rateLimitService->recordUsage($user, 'FEEDBACK', [
+                'provider' => $response['provider'] ?? 'unknown',
+                'model' => $response['model'] ?? 'unknown',
+                'model_id' => $toolsConfig['model_id'] ?? null,
+                'usage' => $response['usage'] ?? [],
+                'response_text' => $correction,
+                'input_text' => $userPrompt,
+            ]);
+
             return $this->normalizeSummary($correction, $falseClaim);
         } catch (\Throwable $e) {
             $this->logger->warning('Correction regeneration failed', [
@@ -519,7 +539,18 @@ PROMPT;
                 ])
             );
 
-            return trim((string) ($response['content'] ?? ''));
+            $content = trim((string) ($response['content'] ?? ''));
+
+            $this->rateLimitService->recordUsage($user, 'FEEDBACK', [
+                'provider' => $response['provider'] ?? 'unknown',
+                'model' => $response['model'] ?? 'unknown',
+                'model_id' => $toolsConfig['model_id'] ?? null,
+                'usage' => $response['usage'] ?? [],
+                'response_text' => $content,
+                'input_text' => $userPrompt,
+            ]);
+
+            return $content;
         } catch (\Throwable $e) {
             $this->logger->warning('False-positive summarization failed, using fallback', [
                 'user_id' => $user->getId(),
@@ -570,7 +601,18 @@ PROMPT;
                 ])
             );
 
-            return trim((string) ($response['content'] ?? ''));
+            $content = trim((string) ($response['content'] ?? ''));
+
+            $this->rateLimitService->recordUsage($user, 'FEEDBACK', [
+                'provider' => $response['provider'] ?? 'unknown',
+                'model' => $response['model'] ?? 'unknown',
+                'model_id' => $toolsConfig['model_id'] ?? null,
+                'usage' => $response['usage'] ?? [],
+                'response_text' => $content,
+                'input_text' => $userPrompt,
+            ]);
+
+            return $content;
         } catch (\Throwable $e) {
             $this->logger->warning('False-positive correction failed, using fallback', [
                 'user_id' => $user->getId(),
@@ -848,7 +890,7 @@ PROMPT;
         unset($src);
 
         // Use AI to summarize what each source says about the claim
-        $sources = $this->summarizeSourcesWithAi($claimText, $rawSources);
+        $sources = $this->summarizeSourcesWithAi($user, $claimText, $rawSources);
 
         return ['sources' => $sources];
     }
@@ -860,7 +902,7 @@ PROMPT;
      *
      * @return array<array{id: int, sourceType: string, fileName: string, excerpt: string, summary: string, score: float}>
      */
-    private function summarizeSourcesWithAi(string $claimText, array $rawSources): array
+    private function summarizeSourcesWithAi(User $user, string $claimText, array $rawSources): array
     {
         $toolsConfig = $this->modelConfigService->getToolsModelConfig();
         $provider = $toolsConfig['provider'];
@@ -916,6 +958,16 @@ PROMPT;
             );
 
             $content = trim((string) ($response['content'] ?? ''));
+
+            $this->rateLimitService->recordUsage($user, 'FEEDBACK', [
+                'provider' => $response['provider'] ?? 'unknown',
+                'model' => $response['model'] ?? 'unknown',
+                'model_id' => $toolsConfig['model_id'] ?? null,
+                'usage' => $response['usage'] ?? [],
+                'response_text' => $content,
+                'input_text' => $userPrompt,
+            ]);
+
             $summaries = $this->parseSourceSummaries($content, count($rawSources));
 
             // Merge AI summaries with source metadata
@@ -987,7 +1039,7 @@ PROMPT;
      *
      * @return array{sources: array<array{id: int, title: string, url: string, summary: string, snippet: string}>}
      */
-    public function webResearchSources(string $claimText): array
+    public function webResearchSources(User $user, string $claimText): array
     {
         if (!$this->braveSearchService->isEnabled()) {
             $this->logger->info('FeedbackExampleService: Brave Search not enabled');
@@ -1042,7 +1094,7 @@ PROMPT;
         }
 
         // Use AI to summarize what each web source says about the claim
-        return ['sources' => $this->summarizeWebSourcesWithAi($claimText, $rawSources)];
+        return ['sources' => $this->summarizeWebSourcesWithAi($user, $claimText, $rawSources)];
     }
 
     /**
@@ -1052,7 +1104,7 @@ PROMPT;
      *
      * @return array<array{id: int, title: string, url: string, summary: string, snippet: string}>
      */
-    private function summarizeWebSourcesWithAi(string $claimText, array $rawSources): array
+    private function summarizeWebSourcesWithAi(User $user, string $claimText, array $rawSources): array
     {
         $toolsConfig = $this->modelConfigService->getToolsModelConfig();
         $provider = $toolsConfig['provider'];
@@ -1101,6 +1153,16 @@ PROMPT;
             );
 
             $content = trim((string) ($response['content'] ?? ''));
+
+            $this->rateLimitService->recordUsage($user, 'FEEDBACK', [
+                'provider' => $response['provider'] ?? 'unknown',
+                'model' => $response['model'] ?? 'unknown',
+                'model_id' => $toolsConfig['model_id'] ?? null,
+                'usage' => $response['usage'] ?? [],
+                'response_text' => $content,
+                'input_text' => $userPrompt,
+            ]);
+
             $summaries = $this->parseSourceSummaries($content, count($rawSources));
 
             $result = [];

@@ -3,10 +3,13 @@
 namespace App\Service\Message;
 
 use App\AI\Service\AiFacade;
+use App\Entity\User;
 use App\Repository\PromptRepository;
 use App\Service\DiscordNotificationService;
 use App\Service\ModelConfigService;
 use App\Service\PromptService;
+use App\Service\RateLimitService;
+use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;
 
 /**
@@ -34,6 +37,8 @@ final readonly class MessageSorter
         private PromptRepository $promptRepository,
         private ModelConfigService $modelConfigService,
         private PromptService $promptService,
+        private RateLimitService $rateLimitService,
+        private EntityManagerInterface $em,
         private LoggerInterface $logger,
         private DiscordNotificationService $discord,
     ) {
@@ -174,6 +179,8 @@ final readonly class MessageSorter
 
             $aiResponse = $response['content'];
 
+            $this->recordSortingUsage($userId, $modelId, $response);
+
             $this->logger->info('MessageSorter: AI response received', [
                 'provider' => $response['provider'],
                 'response_length' => strlen($aiResponse),
@@ -229,8 +236,9 @@ final readonly class MessageSorter
                 'input_mode' => $parsed['input_mode'] ?? null,
                 'raw_response' => $aiResponse,
                 'prompt_metadata' => $promptMetadata,
-                // Don't return model_id/provider/model_name from sorting - they are for internal use only
-                // The ChatHandler should use its own model selection logic
+                'sorting_model_id' => $modelId,
+                'sorting_provider' => $response['provider'] ?? $provider,
+                'sorting_model_name' => $response['model'] ?? $modelName,
             ];
         } catch (\App\AI\Exception\ProviderException $e) {
             // Re-throw ProviderException to preserve install instructions
@@ -383,6 +391,37 @@ final readonly class MessageSorter
                 'duration' => null,
                 'input_mode' => null,
             ];
+        }
+    }
+
+    /**
+     * Record token usage for the sorting AI call.
+     */
+    private function recordSortingUsage(?int $userId, ?int $modelId, array $response): void
+    {
+        if (!$userId) {
+            return;
+        }
+
+        try {
+            $user = $this->em->getRepository(User::class)->find($userId);
+            if (!$user) {
+                return;
+            }
+
+            $this->rateLimitService->recordUsage($user, 'SORTING', [
+                'usage' => $response['usage'] ?? [],
+                'model_id' => $modelId,
+                'provider' => $response['provider'] ?? '',
+                'model' => $response['model'] ?? '',
+                'input_text' => '',
+                'response_text' => $response['content'] ?? '',
+            ]);
+        } catch (\Throwable $e) {
+            $this->logger->warning('MessageSorter: Failed to record sorting usage', [
+                'error' => $e->getMessage(),
+                'user_id' => $userId,
+            ]);
         }
     }
 

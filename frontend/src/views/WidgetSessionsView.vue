@@ -966,6 +966,7 @@ import * as widgetSessionsApi from '@/services/api/widgetSessionsApi'
 import * as widgetsApi from '@/services/api/widgetsApi'
 import { useNotification } from '@/composables/useNotification'
 import { useDialog } from '@/composables/useDialog'
+import { getErrorMessage } from '@/utils/errorMessage'
 import { subscribeToSession, type EventSubscription, type WidgetEvent } from '@/services/sseClient'
 
 const route = useRoute()
@@ -1153,8 +1154,8 @@ const goBack = () => {
 const loadWidget = async () => {
   try {
     widget.value = await widgetsApi.getWidget(widgetId.value)
-  } catch (err: any) {
-    error(err.message || 'Failed to load widget')
+  } catch (err: unknown) {
+    error(getErrorMessage(err) || 'Failed to load widget')
   }
 }
 
@@ -1176,8 +1177,8 @@ const loadSessions = async () => {
     sessions.value = response.sessions
     pagination.value = response.pagination
     stats.value = response.stats
-  } catch (err: any) {
-    error(err.message || 'Failed to load sessions')
+  } catch (err: unknown) {
+    error(getErrorMessage(err) || 'Failed to load sessions')
   } finally {
     loading.value = false
   }
@@ -1199,8 +1200,8 @@ const loadMore = async () => {
     const response = await widgetSessionsApi.listWidgetSessions(widgetId.value, params)
     sessions.value.push(...response.sessions)
     pagination.value = response.pagination
-  } catch (err: any) {
-    error(err.message || 'Failed to load more sessions')
+  } catch (err: unknown) {
+    error(getErrorMessage(err) || 'Failed to load more sessions')
   }
 }
 
@@ -1276,8 +1277,8 @@ const deleteSelectedSessions = async () => {
 
     // Reload stats
     await loadSessions()
-  } catch (err: any) {
-    error(err.message || t('widgetSessions.deleteFailed'))
+  } catch (err: unknown) {
+    error(getErrorMessage(err) || t('widgetSessions.deleteFailed'))
   } finally {
     deletingSessions.value = false
   }
@@ -1342,8 +1343,8 @@ const viewSession = async (session: widgetSessionsApi.WidgetSession) => {
       (err) => console.warn('[Admin SSE] Error:', err),
       { initialLastEventId: response.latestEventId ?? 0 }
     )
-  } catch (err: any) {
-    error(err.message || 'Failed to load session details')
+  } catch (err: unknown) {
+    error(getErrorMessage(err) || 'Failed to load session details')
   } finally {
     loadingDetail.value = false
     // Scroll after messages are rendered (after loadingDetail is false)
@@ -1560,8 +1561,8 @@ const takeOver = async (session: widgetSessionsApi.WidgetSession) => {
     stats.value.human++
 
     success(t('widgetSessions.takeOverSuccess'))
-  } catch (err: any) {
-    error(err.message || 'Failed to take over session')
+  } catch (err: unknown) {
+    error(getErrorMessage(err) || 'Failed to take over session')
   }
 }
 
@@ -1597,8 +1598,8 @@ const handBack = async (session: widgetSessionsApi.WidgetSession) => {
     stats.value.ai++
 
     success(t('widgetSessions.handBackSuccess'))
-  } catch (err: any) {
-    error(err.message || 'Failed to hand back session')
+  } catch (err: unknown) {
+    error(getErrorMessage(err) || 'Failed to hand back session')
   }
 }
 
@@ -1910,8 +1911,8 @@ const toggleSessionFavorite = async (session: widgetSessionsApi.WidgetSession) =
     if (filters.value.favorite && !response.isFavorite) {
       sessions.value = sessions.value.filter((s) => s.id !== session.id)
     }
-  } catch (err: any) {
-    error(err.message || 'Failed to toggle favorite')
+  } catch (err: unknown) {
+    error(getErrorMessage(err) || 'Failed to toggle favorite')
   }
 }
 
@@ -1960,8 +1961,8 @@ const saveTitle = async () => {
     }
 
     success(t('chat.renameSuccess'))
-  } catch (err: any) {
-    error(err.message || 'Failed to rename session')
+  } catch (err: unknown) {
+    error(getErrorMessage(err) || 'Failed to rename session')
   } finally {
     isEditingTitle.value = false
     editTitleValue.value = ''

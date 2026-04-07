@@ -30,6 +30,7 @@ parameters:
     # Optional API keys — empty string default means "not configured"
     env(ANTHROPIC_API_KEY): ''
     env(OPENAI_API_KEY): ''
+    env(OPENAI_STORE_RESPONSES): 'false'
     env(GROQ_API_KEY): ''
     env(GOOGLE_GEMINI_API_KEY): ''
     env(GOOGLE_CLOUD_PROJECT_ID): ''
@@ -50,6 +51,7 @@ parameters:
     env(GOOGLE_CLIENT_ID): ''
     env(GITHUB_CLIENT_ID): ''
     env(OIDC_CLIENT_ID): ''
+    env(OIDC_BEARER_AUDIENCE): ''
     env(OIDC_DISCOVERY_URL): ''
     env(RECAPTCHA_SECRET_KEY): ''
     env(GOOGLE_CLIENT_SECRET): ''
@@ -64,9 +66,9 @@ parameters:
     env(WHATSAPP_ACCESS_TOKEN): ''
     env(WHATSAPP_WEBHOOK_VERIFY_TOKEN): ''
 
-    # Piper TTS Service default
+    # Piper TTS Service default (localhost for native; Docker Compose overrides via env)
     env(SYNAPLAN_TTS_URL): ''
-    synaplan_tts_url_default: 'http://host.docker.internal:10200'
+    synaplan_tts_url_default: 'http://localhost:10200'
 
     # Plugins - mounted at /plugins in Docker, relative path for CI
     plugins_dir: '/plugins'
@@ -103,6 +105,7 @@ services:
         arguments:
             $apiKey: '%env(OPENAI_API_KEY)%'
             $uploadDir: '%kernel.project_dir%/var/uploads'
+            $storeResponses: '%env(bool:OPENAI_STORE_RESPONSES)%'
         tags:
             - { name: 'app.ai.chat' }
             - { name: 'app.ai.embedding' }
@@ -312,6 +315,14 @@ services:
             $oidcClientId: '%env(OIDC_CLIENT_ID)%'
             $oidcClientSecret: '%env(OIDC_CLIENT_SECRET)%'
             $oidcDiscoveryUrl: '%env(OIDC_DISCOVERY_URL)%'
+            $oidcBearerAudience: '%env(OIDC_BEARER_AUDIENCE)%'
+
+    # OIDC User Provisioning Service (shared by controller + bearer authenticator)
+    App\Service\OidcUserService:
+        arguments:
+            $oidcAdminRoles: '%env(string:OIDC_ADMIN_ROLES)%'
+            $oidcRoleClaims: '%env(string:OIDC_ROLE_CLAIMS)%'
+            $oidcClientId: '%env(OIDC_CLIENT_ID)%'
 
     # Keycloak OIDC OAuth Controller
     App\Controller\KeycloakAuthController:
@@ -319,8 +330,6 @@ services:
             $oidcClientId: '%env(OIDC_CLIENT_ID)%'
             $oidcClientSecret: '%env(OIDC_CLIENT_SECRET)%'
             $oidcDiscoveryUrl: '%env(OIDC_DISCOVERY_URL)%'
-            $oidcAdminRoles: '%env(string:OIDC_ADMIN_ROLES)%'
-            $oidcRoleClaims: '%env(string:OIDC_ROLE_CLAIMS)%'
             $oidcScopes: '%env(string:OIDC_SCOPES)%'
             $appUrl: '%env(APP_URL)%'
             $frontendUrl: '%env(FRONTEND_URL)%'
@@ -496,6 +505,7 @@ services:
     App\Service\Admin\SystemConfigService:
         arguments:
             $projectDir: '%kernel.project_dir%'
+            $defaultTtsUrl: '%synaplan_tts_url_default%'
 
     # Vector Storage Configuration
     App\Service\RAG\VectorStorage\VectorStorageConfig:

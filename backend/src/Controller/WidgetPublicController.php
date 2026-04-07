@@ -683,7 +683,8 @@ class WidgetPublicController extends AbstractController
                     $this->rateLimitService->recordUsage($owner, 'MESSAGES', [
                         'provider' => $responseMetadata['provider'] ?? null,
                         'model' => $responseMetadata['model'] ?? null,
-                        'tokens' => $tokens,
+                        'model_id' => $responseMetadata['model_id'] ?? null,
+                        'usage' => $responseMetadata['usage'] ?? [],
                         'channel' => 'WIDGET',
                         'files' => $fileIds,
                         'response_text' => $responseText,

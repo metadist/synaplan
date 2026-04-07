@@ -12,6 +12,7 @@
       <span class="text-xs md:text-sm font-medium hidden sm:inline truncate max-w-[120px]">
         {{ selectedModelName }}
       </span>
+      <ModelCostBadge v-if="selectedModelObj" :model="selectedModelObj" :peers="chatModels" />
       <ChevronUpIcon class="w-4 h-4" />
     </button>
     <div
@@ -60,6 +61,7 @@
         <div class="flex-1 min-w-0">
           <div class="flex items-center gap-2">
             <span class="text-sm font-medium">{{ model.name }}</span>
+            <ModelCostBadge :model="model" :peers="chatModels" />
           </div>
           <div class="text-xs txt-secondary">
             {{ model.service }}
@@ -82,6 +84,8 @@ import { ChevronUpIcon, CheckIcon } from '@heroicons/vue/24/outline'
 import { Icon } from '@iconify/vue'
 import { useAiConfigStore } from '@/stores/aiConfig'
 import { useI18n } from 'vue-i18n'
+import ModelCostBadge from '@/components/ModelCostBadge.vue'
+import type { AIModel } from '@/types/ai-models'
 
 const props = defineProps<{
   modelValue: number | null
@@ -109,10 +113,14 @@ const defaultModelName = computed(() => {
   return model ? model.name : t('chatInput.modelDropdown.default')
 })
 
+const selectedModelObj = computed((): AIModel | null => {
+  if (props.modelValue === null) return null
+  return chatModels.value.find((m) => m.id === props.modelValue) ?? null
+})
+
 const selectedModelName = computed(() => {
-  if (props.modelValue === null) return t('chatInput.modelDropdown.default')
-  const model = chatModels.value.find((m) => m.id === props.modelValue)
-  return model ? model.name : t('chatInput.modelDropdown.default')
+  if (selectedModelObj.value) return selectedModelObj.value.name
+  return t('chatInput.modelDropdown.default')
 })
 
 const getProviderIcon = (provider: string): string => {

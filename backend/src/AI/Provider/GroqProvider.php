@@ -93,7 +93,7 @@ class GroqProvider implements ChatProviderInterface, VisionProviderInterface, Sp
 
     // ==================== CHAT ====================
 
-    public function chat(array $messages, array $options = []): string
+    public function chat(array $messages, array $options = []): array
     {
         if (!isset($options['model'])) {
             throw new ProviderException('Model must be specified in options', 'groq');
@@ -123,7 +123,20 @@ class GroqProvider implements ChatProviderInterface, VisionProviderInterface, Sp
 
             $response = $this->client->chat()->create($requestOptions);
 
-            return $response->choices[0]->message->content ?? '';
+            $responseArray = $response->toArray();
+            $cachedTokens = $responseArray['usage']['prompt_tokens_details']['cached_tokens'] ?? 0;
+            $usage = [
+                'prompt_tokens' => $responseArray['usage']['prompt_tokens'] ?? 0,
+                'completion_tokens' => $responseArray['usage']['completion_tokens'] ?? 0,
+                'total_tokens' => $responseArray['usage']['total_tokens'] ?? 0,
+                'cached_tokens' => $cachedTokens,
+                'cache_creation_tokens' => 0,
+            ];
+
+            return [
+                'content' => $response->choices[0]->message->content ?? '',
+                'usage' => $usage,
+            ];
         } catch (\Exception $e) {
             $this->logger->error('Groq chat error', [
                 'error' => $e->getMessage(),
@@ -134,7 +147,7 @@ class GroqProvider implements ChatProviderInterface, VisionProviderInterface, Sp
         }
     }
 
-    public function chatStream(array $messages, callable $callback, array $options = []): void
+    public function chatStream(array $messages, callable $callback, array $options = []): array
     {
         if (!isset($options['model'])) {
             throw new ProviderException('Model must be specified in options', 'groq');
@@ -146,8 +159,6 @@ class GroqProvider implements ChatProviderInterface, VisionProviderInterface, Sp
 
         try {
             $model = $options['model'];
-            // Note: Qwen3 models send <think> tags directly in content, not via reasoning_format
-            // reasoning_format is mainly for OpenAI o-series models
 
             $this->logger->info('🟢 Groq streaming chat START', [
                 'model' => $model,
@@ -158,6 +169,7 @@ class GroqProvider implements ChatProviderInterface, VisionProviderInterface, Sp
                 'model' => $model,
                 'messages' => $messages,
                 'stream' => true,
+                'stream_options' => ['include_usage' => true],
                 'max_tokens' => $options['max_tokens'] ?? ChatProviderInterface::DEFAULT_MAX_COMPLETION_TOKENS,
             ];
 
@@ -168,12 +180,29 @@ class GroqProvider implements ChatProviderInterface, VisionProviderInterface, Sp
             $stream = $this->client->chat()->createStreamed($requestOptions);
 
             $chunkCount = 0;
+            $usage = [
+                'prompt_tokens' => 0,
+                'completion_tokens' => 0,
+                'total_tokens' => 0,
+                'cached_tokens' => 0,
+                'cache_creation_tokens' => 0,
+            ];
             $finishReason = null;
 
             foreach ($stream as $response) {
                 ++$chunkCount;
-
                 $responseArray = $response->toArray();
+
+                // Capture usage from the final chunk
+                if (isset($responseArray['usage'])) {
+                    $usage = [
+                        'prompt_tokens' => $responseArray['usage']['prompt_tokens'] ?? 0,
+                        'completion_tokens' => $responseArray['usage']['completion_tokens'] ?? 0,
+                        'total_tokens' => $responseArray['usage']['total_tokens'] ?? 0,
+                        'cached_tokens' => $responseArray['usage']['prompt_tokens_details']['cached_tokens'] ?? 0,
+                        'cache_creation_tokens' => 0,
+                    ];
+                }
 
                 // Capture finish_reason (set on the final chunk)
                 $chunkFinishReason = $responseArray['choices'][0]['finish_reason'] ?? null;
@@ -206,7 +235,10 @@ class GroqProvider implements ChatProviderInterface, VisionProviderInterface, Sp
             $this->logger->info('✅ Groq streaming COMPLETE', [
                 'model' => $model,
                 'chunks' => $chunkCount,
+                'usage' => $usage,
             ]);
+
+            return ['usage' => $usage];
         } catch (\Exception $e) {
             $this->logger->error('Groq streaming error', [
                 'error' => $e->getMessage(),

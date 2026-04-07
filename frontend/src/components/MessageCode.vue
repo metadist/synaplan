@@ -43,9 +43,10 @@
         {{ copied ? $t('commands.copied') : $t('commands.copy') }}
       </button>
     </div>
-    <pre
-      class="p-4 overflow-x-auto text-sm scroll-thin"
-    ><code ref="codeRef" class="hljs font-mono" v-html="highlightedCode"></code></pre>
+    <pre class="p-4 overflow-x-auto text-sm scroll-thin">
+      <!-- eslint-disable-next-line vue/no-v-html -- trusted HTML from syntax highlighter -->
+      <code ref="codeRef" class="hljs font-mono" v-html="highlightedCode"></code>
+    </pre>
   </div>
 </template>
 

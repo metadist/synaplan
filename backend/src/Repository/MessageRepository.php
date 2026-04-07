@@ -85,7 +85,13 @@ class MessageRepository extends ServiceEntityRepository
      * Retrieves the most recent messages from a chat, with adaptive limit
      * based on message length to optimize context window usage.
      *
-     * @param int $userId        User ID to filter by
+     * Ownership is enforced by joining the Chat entity and filtering on
+     * chat.userId, so the $userId parameter remains meaningful as a
+     * safe-by-default guard against IDOR. Individual Message.userId values
+     * may differ within a chat (e.g. WhatsApp anonymous flow), and all
+     * are returned as long as the chat belongs to the given user.
+     *
+     * @param int $userId        Owner of the chat (verified via Chat.userId)
      * @param int $chatId        Chat ID to get messages from
      * @param int $maxMessages   Maximum number of messages (default: 30)
      * @param int $maxTotalChars Maximum total characters across all messages (default: 15000)
@@ -98,13 +104,12 @@ class MessageRepository extends ServiceEntityRepository
         int $maxMessages = 30,
         int $maxTotalChars = 15000,
     ): array {
-        // Get recent messages from this chat
-        // Order by timestamp DESC, then by id DESC to ensure correct order when timestamps are equal
         $messages = $this->createQueryBuilder('m')
-            ->where('m.userId = :userId')
-            ->andWhere('m.chatId = :chatId')
-            ->setParameter('userId', $userId)
+            ->join('m.chat', 'c')
+            ->where('m.chatId = :chatId')
+            ->andWhere('c.userId = :userId')
             ->setParameter('chatId', $chatId)
+            ->setParameter('userId', $userId)
             ->orderBy('m.unixTimestamp', 'DESC')
             ->addOrderBy('m.id', 'DESC')
             ->setMaxResults($maxMessages)
@@ -139,15 +144,18 @@ class MessageRepository extends ServiceEntityRepository
      * Find all messages for a chat, ordered chronologically. No character or count limits.
      * Used for summary analysis where we need the complete conversation.
      *
+     * Ownership is enforced by joining Chat and filtering on chat.userId.
+     *
      * @return Message[]
      */
     public function findAllByChatId(int $userId, int $chatId): array
     {
         return $this->createQueryBuilder('m')
-            ->where('m.userId = :userId')
-            ->andWhere('m.chatId = :chatId')
-            ->setParameter('userId', $userId)
+            ->join('m.chat', 'c')
+            ->where('m.chatId = :chatId')
+            ->andWhere('c.userId = :userId')
             ->setParameter('chatId', $chatId)
+            ->setParameter('userId', $userId)
             ->orderBy('m.unixTimestamp', 'ASC')
             ->addOrderBy('m.id', 'ASC')
             ->getQuery()
@@ -303,6 +311,29 @@ class MessageRepository extends ServiceEntityRepository
         }
 
         return $messages;
+    }
+
+    /**
+     * Find the most recent inbound message for a given chat and channel.
+     *
+     * Used to retrieve contact metadata (e.g. phone number, phone_number_id)
+     * for forwarding responses to external channels like WhatsApp.
+     */
+    public function findLatestInboundByChannel(int $chatId, string $channel): ?Message
+    {
+        return $this->createQueryBuilder('m')
+            ->innerJoin('m.metadata', 'channelMeta', 'WITH', 'channelMeta.metaKey = :channelKey')
+            ->where('m.chatId = :chatId')
+            ->andWhere('m.direction = :direction')
+            ->andWhere('channelMeta.metaValue = :channel')
+            ->setParameter('channelKey', 'channel')
+            ->setParameter('chatId', $chatId)
+            ->setParameter('direction', 'IN')
+            ->setParameter('channel', $channel)
+            ->orderBy('m.id', 'DESC')
+            ->setMaxResults(1)
+            ->getQuery()
+            ->getOneOrNullResult();
     }
 
     /**

@@ -765,7 +765,7 @@ final class FeedbackController extends AbstractController
         }
 
         try {
-            $result = $this->feedbackExampleService->webResearchSources($text);
+            $result = $this->feedbackExampleService->webResearchSources($user, $text);
 
             return $this->json($result);
         } catch (\Throwable $e) {

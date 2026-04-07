@@ -30,6 +30,7 @@
 </template>
 
 <script setup lang="ts">
+import { getErrorMessage } from '@/utils/errorMessage'
 import { computed, ref, onMounted, onUnmounted, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { useConfigStore } from '@/stores/config'
@@ -83,9 +84,9 @@ async function loadPlugin() {
     } else {
       throw new Error('Plugin does not export a default object with a mount() function')
     }
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error(`Failed to load plugin ${pluginName.value}:`, err)
-    error.value = `Failed to load plugin: ${err.message || 'Unknown error'}`
+    error.value = `Failed to load plugin: ${getErrorMessage(err) || 'Unknown error'}`
 
     // Fallback: Check for index.html if index.js failed
     try {
@@ -96,7 +97,7 @@ async function loadPlugin() {
         pluginContainer.value.innerHTML = html
         error.value = null // Clear error if we found index.html
       }
-    } catch (htmlErr) {
+    } catch {
       // Ignore html error if JS failed
     }
   } finally {

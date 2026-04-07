@@ -78,7 +78,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, type DirectiveBinding } from 'vue'
 import { useRouter } from 'vue-router'
 import {
   UserCircleIcon,
@@ -155,26 +155,37 @@ const handleLogout = async () => {
   router.push('/login')
 }
 
+interface ClickOutsideHTMLElement extends HTMLElement {
+  clickOutsideEvent?: (event: Event) => void
+  keydownEvent?: (event: KeyboardEvent) => void
+}
+
 const vClickOutside = {
-  mounted(el: any, binding: any) {
-    el.clickOutsideEvent = (event: Event) => {
+  mounted(el: ClickOutsideHTMLElement, binding: DirectiveBinding<() => void>) {
+    const onClickOutside = (event: Event) => {
       if (!(el === event.target || el.contains(event.target as Node))) {
         binding.value()
       }
     }
-    el.keydownEvent = (event: KeyboardEvent) => {
+    const onKeydown = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
         binding.value()
       }
     }
+    el.clickOutsideEvent = onClickOutside
+    el.keydownEvent = onKeydown
     setTimeout(() => {
-      document.addEventListener('click', el.clickOutsideEvent)
-      document.addEventListener('keydown', el.keydownEvent)
+      document.addEventListener('click', onClickOutside)
+      document.addEventListener('keydown', onKeydown)
     }, 0)
   },
-  unmounted(el: any) {
-    document.removeEventListener('click', el.clickOutsideEvent)
-    document.removeEventListener('keydown', el.keydownEvent)
+  unmounted(el: ClickOutsideHTMLElement) {
+    if (el.clickOutsideEvent) {
+      document.removeEventListener('click', el.clickOutsideEvent)
+    }
+    if (el.keydownEvent) {
+      document.removeEventListener('keydown', el.keydownEvent)
+    }
   },
 }
 </script>

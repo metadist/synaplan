@@ -193,6 +193,7 @@
                 data-testid="btn-icon"
                 @click="selectIcon(icon.value)"
               >
+                <!-- eslint-disable-next-line vue/no-v-html -- inline SVG icon preview -->
                 <div v-html="getIconPreview(icon.value)"></div>
                 <span class="text-xs txt-secondary">{{ icon.label }}</span>
               </button>
@@ -480,10 +481,12 @@
 </template>
 
 <script setup lang="ts">
+import { getErrorMessage } from '@/utils/errorMessage'
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { Icon } from '@iconify/vue'
 import type { Widget, WidgetConfig } from '@/services/api/widgetsApi'
 import { promptsApi } from '@/services/api/promptsApi'
+import type { TaskPrompt } from '@/services/api/promptsApi'
 import * as widgetsApi from '@/services/api/widgetsApi'
 import { useI18n } from 'vue-i18n'
 import { useNotification } from '@/composables/useNotification'
@@ -494,22 +497,26 @@ interface Props {
 
 const props = defineProps<Props>()
 
+type WidgetEditorConfig = WidgetConfig & { allowedDomains: string[] }
+
+type WidgetEditorSavePayload =
+  | { name: string; taskPromptTopic: string; config: WidgetConfig }
+  | { name: string; config: WidgetConfig; status: 'active' | 'inactive' }
+
 const emit = defineEmits<{
   close: []
-  save: [data: any]
+  save: [data: WidgetEditorSavePayload]
 }>()
 
 const isEdit = computed(() => !!props.widget)
 
-const taskPrompts = ref<any[]>([])
+const taskPrompts = ref<TaskPrompt[]>([])
 const { t, locale } = useI18n()
 const { error, success } = useNotification()
 
 const MAX_ALLOWED_DOMAINS = 20
 const newAllowedDomain = ref('')
 const allowedDomainError = ref<string | null>(null)
-
-type WidgetEditorConfig = WidgetConfig & { allowedDomains: string[] }
 
 const sanitizeDomainInput = (value: string): string | null => {
   if (!value) return null
@@ -646,7 +653,7 @@ const selectIcon = async (iconValue: string) => {
           buttonIconUrl: undefined,
         },
       })
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Failed to update icon:', err)
       error('Failed to update icon')
     }
@@ -706,9 +713,9 @@ const handleIconUpload = async (event: Event) => {
     } else {
       error(t('widgets.iconUploadFailed') || 'Icon upload failed')
     }
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error('Icon upload error:', err)
-    error(err?.message || t('widgets.iconUploadFailed') || 'Icon upload failed')
+    error(getErrorMessage(err) || t('widgets.iconUploadFailed') || 'Icon upload failed')
   } finally {
     // Reset input
     target.value = ''
@@ -744,7 +751,7 @@ const removeCustomIcon = async () => {
     }
 
     success('Custom icon removed successfully')
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error('Failed to remove custom icon:', err)
     error('Failed to remove custom icon')
   }

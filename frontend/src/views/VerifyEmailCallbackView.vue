@@ -96,6 +96,7 @@
 </template>
 
 <script setup lang="ts">
+import { getErrorMessage } from '@/utils/errorMessage'
 import { ref, computed, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { useTheme } from '../composables/useTheme'
@@ -130,9 +131,10 @@ onMounted(async () => {
   try {
     await authApi.verifyEmail(token)
     verified.value = true
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error('Email verification failed:', err)
-    error.value = err.response?.data?.error || err.message || 'Verification failed.'
+    const ax = err as { response?: { data?: { error?: string } } }
+    error.value = ax.response?.data?.error || getErrorMessage(err) || 'Verification failed.'
     verified.value = false
   } finally {
     loading.value = false

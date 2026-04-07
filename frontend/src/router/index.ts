@@ -1,17 +1,39 @@
-import { createRouter, createWebHistory } from 'vue-router'
+import {
+  createRouter,
+  createWebHistory,
+  type NavigationGuardNext,
+  type RouteLocationNormalized,
+} from 'vue-router'
 import { useAuth } from '@/composables/useAuth'
 import { useConfigStore } from '@/stores/config'
 import { authReady } from '@/stores/auth'
 import { i18n } from '@/i18n'
 import LoadingView from '@/views/LoadingView.vue'
 
-const guardSubscription = (_to: any, _from: any, next: any) => {
+const guardSubscription = (
+  _to: RouteLocationNormalized,
+  _from: RouteLocationNormalized,
+  next: NavigationGuardNext
+) => {
   const configStore = useConfigStore()
   if (!configStore.billing.enabled) {
     next({ name: 'chat' })
   } else {
     next()
   }
+}
+
+/** System / feature status page is for local development only (not shown in production builds). */
+const guardDevOnlyAdminFeatures = (
+  _to: RouteLocationNormalized,
+  _from: RouteLocationNormalized,
+  next: NavigationGuardNext
+) => {
+  if (!import.meta.env.DEV) {
+    next({ name: 'admin' })
+    return
+  }
+  next()
 }
 
 export const APP_NAME = 'Synaplan'
@@ -278,6 +300,7 @@ const router = createRouter({
       path: '/admin/features',
       name: 'admin-features',
       component: () => import('@/views/FeatureStatusView.vue'),
+      beforeEnter: guardDevOnlyAdminFeatures,
       meta: { requiresAuth: true, requiresAdmin: true, titleKey: 'pageTitles.adminFeatures' },
     },
     {

@@ -57,7 +57,7 @@
         />
         <button
           :disabled="!newKeyName.trim() || loading"
-          class="w-full sm:w-auto btn-primary px-6 py-2.5 rounded flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+          class="w-full sm:w-auto btn-primary px-5 py-3 rounded-lg font-medium text-sm flex items-center justify-center gap-2 whitespace-nowrap transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           data-testid="btn-create"
           @click="createAPIKey"
         >
@@ -89,35 +89,18 @@
     </div>
 
     <!-- API Documentation Reference -->
-    <router-link
-      to="/config/api-documentation"
-      class="group block relative overflow-hidden surface-card rounded-xl hover:shadow-lg transition-all duration-300"
-    >
-      <div
-        class="absolute inset-0 bg-gradient-to-r from-[var(--brand)]/5 via-transparent to-purple-500/5 group-hover:from-[var(--brand)]/10 group-hover:to-purple-500/10 transition-all duration-300"
-      ></div>
-      <div
-        class="absolute top-0 right-0 w-32 h-32 bg-[var(--brand)]/5 rounded-full blur-2xl -translate-y-1/2 translate-x-1/3 group-hover:bg-[var(--brand)]/10 transition-all"
-      ></div>
-      <div class="relative px-6 py-4 flex items-center gap-4">
-        <div
-          class="w-10 h-10 rounded-xl bg-gradient-to-br from-[var(--brand)] to-purple-500 flex items-center justify-center shadow-md shadow-[var(--brand)]/20 shrink-0"
-        >
-          <BookOpenIcon class="w-5 h-5 text-white" />
-        </div>
-        <div class="flex-1 min-w-0">
-          <p
-            class="text-sm font-semibold txt-primary group-hover:text-[var(--brand)] transition-colors"
-          >
-            {{ $t('config.apiKeys.docsTitle') }}
-          </p>
-          <p class="text-xs txt-secondary mt-0.5">{{ $t('config.apiKeys.docsDesc') }}</p>
-        </div>
-        <ArrowRightIcon
-          class="w-5 h-5 txt-secondary group-hover:text-[var(--brand)] group-hover:translate-x-1 transition-all shrink-0"
-        />
-      </div>
-    </router-link>
+    <div class="surface-card p-6">
+      <p class="text-sm txt-secondary mb-3">
+        {{ $t('config.apiKeys.docsDesc') }}
+      </p>
+      <router-link
+        to="/config/api-documentation"
+        class="btn-primary inline-flex items-center gap-2"
+      >
+        <BookOpenIcon class="w-4 h-4" />
+        {{ $t('config.apiKeys.docsTitle') }}
+      </router-link>
+    </div>
 
     <!-- Loading State -->
     <div
@@ -387,6 +370,7 @@
 </template>
 
 <script setup lang="ts">
+import { getErrorMessage } from '@/utils/errorMessage'
 import { ref, onMounted } from 'vue'
 import {
   PlusIcon,
@@ -394,7 +378,6 @@ import {
   ClipboardDocumentIcon,
   CheckIcon,
   BookOpenIcon,
-  ArrowRightIcon,
 } from '@heroicons/vue/24/outline'
 import {
   listApiKeys,
@@ -450,9 +433,9 @@ const loadAPIKeys = async () => {
       usageCount: 0, // Backend doesn't track this yet
       scopes: key.scopes,
     }))
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error('Failed to load API keys:', err)
-    error.value = err.message || 'Failed to load API keys'
+    error.value = getErrorMessage(err) || 'Failed to load API keys'
   } finally {
     loading.value = false
   }
@@ -504,9 +487,9 @@ const createAPIKey = async () => {
 
     // Show success notification
     success(t('config.apiKeys.keyCreatedSuccess'))
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error('Failed to create API key:', err)
-    error.value = err.message || t('config.apiKeys.errorCreating')
+    error.value = getErrorMessage(err) || t('config.apiKeys.errorCreating')
     showError(error.value!)
   } finally {
     loading.value = false
@@ -560,9 +543,9 @@ const revokeAPIKey = async (keyId: number) => {
       key.status = 'inactive'
     }
     success(t('config.apiKeys.revokedSuccess'))
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error('Failed to revoke API key:', err)
-    showError(err.message || t('config.apiKeys.errorRevoking'))
+    showError(getErrorMessage(err) || t('config.apiKeys.errorRevoking'))
   }
 }
 
@@ -574,9 +557,9 @@ const activateAPIKey = async (keyId: number) => {
       key.status = 'active'
     }
     success(t('config.apiKeys.activatedSuccess'))
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error('Failed to activate API key:', err)
-    showError(err.message || t('config.apiKeys.errorActivating'))
+    showError(getErrorMessage(err) || t('config.apiKeys.errorActivating'))
   }
 }
 
@@ -598,9 +581,9 @@ const deleteAPIKey = async (keyId: number) => {
       apiKeys.value.splice(index, 1)
     }
     success(t('config.apiKeys.deletedSuccess'))
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error('Failed to delete API key:', err)
-    showError(err.message || t('config.apiKeys.errorDeleting'))
+    showError(getErrorMessage(err) || t('config.apiKeys.errorDeleting'))
   }
 }
 

@@ -26,6 +26,7 @@ class OpenAIProvider implements ChatProviderInterface, EmbeddingProviderInterfac
         private HttpClientInterface $httpClient,
         private ?string $apiKey = null,
         private string $uploadDir = '/var/www/backend/var/uploads',
+        private bool $storeResponses = false,
     ) {
         if (!empty($apiKey)) {
             $this->client = \OpenAI::client($apiKey);
@@ -136,9 +137,9 @@ class OpenAIProvider implements ChatProviderInterface, EmbeddingProviderInterfac
         }
     }
 
-    // ==================== CHAT ====================
+    // ==================== CHAT (Responses API) ====================
 
-    public function chat(array $messages, array $options = []): string
+    public function chat(array $messages, array $options = []): array
     {
         if (!isset($options['model'])) {
             throw new ProviderException('Model must be specified in options', 'openai');
@@ -149,52 +150,35 @@ class OpenAIProvider implements ChatProviderInterface, EmbeddingProviderInterfac
         }
 
         try {
-            $reasoning = $options['reasoning'] ?? false;
             $model = $options['model'];
+            $isReasoningModel = $this->usesCompletionTokens($model);
 
-            $usesCompletionTokensParam = $this->usesCompletionTokens($model);
+            $requestOptions = $this->buildResponsesRequest($messages, $model, $isReasoningModel, $options);
 
-            $requestOptions = [
+            $response = $this->executeResponsesCreate($requestOptions);
+            $responseArray = $response->toArray();
+
+            $usage = $this->normalizeResponsesUsage($responseArray);
+
+            $this->logger->info('OpenAI: Chat completed via Responses API', [
                 'model' => $model,
-                'messages' => $messages,
-            ];
-
-            // Reasoning models don't support custom temperature (only default 1.0)
-            if (!$usesCompletionTokensParam) {
-                $requestOptions['temperature'] = $options['temperature'] ?? 0.7;
-            }
-
-            // Use correct token parameter based on model capabilities
-            if ($usesCompletionTokensParam) {
-                $requestOptions['max_completion_tokens'] = $options['max_tokens'] ?? self::DEFAULT_MAX_TOKENS;
-            } else {
-                $requestOptions['max_tokens'] = $options['max_tokens'] ?? self::DEFAULT_MAX_TOKENS;
-            }
-
-            // NOTE: Only o3 models support reasoning_effort parameter
-            // o1 models automatically use reasoning without this parameter
-            // We don't pass reasoning flag to OpenAI - models handle it automatically
-
-            $response = $this->client->chat()->create($requestOptions);
-
-            $usage = [
-                'prompt_tokens' => $response['usage']['prompt_tokens'] ?? 0,
-                'completion_tokens' => $response['usage']['completion_tokens'] ?? 0,
-                'total_tokens' => $response['usage']['total_tokens'] ?? 0,
-            ];
-
-            $this->logger->info('OpenAI: Chat completed', [
-                'model' => $options['model'],
+                'response_id' => $response->id,
                 'usage' => $usage,
             ]);
 
-            return $response['choices'][0]['message']['content'] ?? '';
+            return [
+                'content' => $response->outputText ?? '',
+                'response_id' => $this->storeResponses ? $response->id : null,
+                'usage' => $usage,
+            ];
+        } catch (ProviderException $e) {
+            throw $e;
         } catch (\Exception $e) {
             throw new ProviderException('OpenAI chat error: '.$e->getMessage(), 'openai');
         }
     }
 
-    public function chatStream(array $messages, callable $callback, array $options = []): void
+    public function chatStream(array $messages, callable $callback, array $options = []): array
     {
         if (!isset($options['model'])) {
             throw new ProviderException('Model must be specified in options', 'openai');
@@ -205,76 +189,317 @@ class OpenAIProvider implements ChatProviderInterface, EmbeddingProviderInterfac
         }
 
         try {
-            $reasoning = $options['reasoning'] ?? false;
             $model = $options['model'];
+            $isReasoningModel = $this->usesCompletionTokens($model);
 
-            $usesCompletionTokensParam = $this->usesCompletionTokens($model);
+            $requestOptions = $this->buildResponsesRequest($messages, $model, $isReasoningModel, $options);
 
-            $requestOptions = [
-                'model' => $model,
-                'messages' => $messages,
+            $stream = $this->executeResponsesCreateStreamed($requestOptions);
+
+            $usage = [
+                'prompt_tokens' => 0,
+                'completion_tokens' => 0,
+                'total_tokens' => 0,
+                'cached_tokens' => 0,
+                'cache_creation_tokens' => 0,
             ];
 
-            // Reasoning models don't support custom temperature (only default 1.0)
-            if (!$usesCompletionTokensParam) {
-                $requestOptions['temperature'] = $options['temperature'] ?? 0.7;
-            }
-
-            // Use correct token parameter based on model capabilities
-            if ($usesCompletionTokensParam) {
-                $requestOptions['max_completion_tokens'] = $options['max_tokens'] ?? self::DEFAULT_MAX_TOKENS;
-            } else {
-                $requestOptions['max_tokens'] = $options['max_tokens'] ?? self::DEFAULT_MAX_TOKENS;
-            }
-
-            // NOTE: Reasoning models handle reasoning automatically
-            // No need to pass reasoning_effort parameter
-
-            $stream = $this->client->chat()->createStreamed($requestOptions);
-
-            $firstChunk = true;
+            $responseId = null;
             $finishReason = null;
-            foreach ($stream as $response) {
-                $responseArray = $response->toArray();
 
-                // Debug first chunk to see structure
-                if ($firstChunk && $reasoning) {
-                    error_log('🧠 OpenAI reasoning stream - First chunk structure:');
-                    error_log('  Response keys: '.implode(', ', array_keys($responseArray)));
-                    error_log('  Choices: '.json_encode($responseArray['choices'] ?? null));
-                    if (isset($responseArray['choices'][0]['delta'])) {
-                        error_log('  Delta keys: '.implode(', ', array_keys($responseArray['choices'][0]['delta'])));
-                        error_log('  Has reasoning_content: '.(isset($responseArray['choices'][0]['delta']['reasoning_content']) ? 'YES' : 'NO'));
-                    }
-                    $firstChunk = false;
-                }
+            foreach ($stream as $event) {
+                $eventType = $event->event;
+                $eventData = $event->response->toArray();
 
-                // Capture finish_reason (set on the final chunk)
-                $chunkFinishReason = $responseArray['choices'][0]['finish_reason'] ?? null;
-                if (null !== $chunkFinishReason) {
-                    $finishReason = $chunkFinishReason;
-                }
+                switch ($eventType) {
+                    case 'response.created':
+                        $responseId = $eventData['response']['id'] ?? null;
+                        break;
 
-                // Handle reasoning content (o1, o3, gpt-5 models)
-                $reasoningContent = $responseArray['choices'][0]['delta']['reasoning_content'] ?? null;
-                if (null !== $reasoningContent) {
-                    $callback(['type' => 'reasoning', 'content' => $reasoningContent]);
-                }
+                    case 'response.output_text.delta':
+                        $content = $eventData['delta'] ?? '';
+                        if ('' !== $content) {
+                            $callback(['type' => 'content', 'content' => $content]);
+                        }
+                        break;
 
-                // Handle regular content
-                $content = $responseArray['choices'][0]['delta']['content'] ?? '';
-                if ($content) {
-                    $callback(['type' => 'content', 'content' => $content]);
+                    case 'response.refusal.delta':
+                        $refusal = $eventData['delta'] ?? '';
+                        if ('' !== $refusal) {
+                            $callback(['type' => 'content', 'content' => $refusal]);
+                        }
+                        break;
+
+                    case 'response.reasoning_summary_text.delta':
+                        $reasoningContent = $eventData['delta'] ?? '';
+                        if ('' !== $reasoningContent) {
+                            $callback(['type' => 'reasoning', 'content' => $reasoningContent]);
+                        }
+                        break;
+
+                    case 'response.completed':
+                        $usage = $this->normalizeResponsesUsage($eventData['response'] ?? []);
+                        $responseId = $eventData['response']['id'] ?? $responseId;
+                        $status = $eventData['response']['status'] ?? 'completed';
+                        $finishReason = ('completed' === $status) ? 'stop' : 'length';
+                        break;
+
+                    case 'response.failed':
+                        $error = $eventData['response']['error']['message'] ?? 'Unknown error';
+                        throw new ProviderException('OpenAI Responses API failed: '.$error, 'openai');
+                    case 'response.incomplete':
+                        $usage = $this->normalizeResponsesUsage($eventData['response'] ?? []);
+                        $responseId = $eventData['response']['id'] ?? $responseId;
+                        $finishReason = 'length';
+                        break;
                 }
             }
 
-            // Signal finish_reason so callers know if the response was truncated
             if (null !== $finishReason) {
                 $callback(['type' => 'finish', 'finish_reason' => $finishReason]);
             }
+
+            return [
+                'usage' => $usage,
+                'response_id' => $this->storeResponses ? $responseId : null,
+            ];
+        } catch (ProviderException $e) {
+            throw $e;
         } catch (\Exception $e) {
             throw new ProviderException('OpenAI streaming error: '.$e->getMessage(), 'openai');
         }
+    }
+
+    /**
+     * Build the Responses API request from the standard messages array.
+     *
+     * Extracts the system message into `instructions` and converts
+     * user/assistant messages into the `input` field.
+     */
+    private function buildResponsesRequest(array $messages, string $model, bool $isReasoningModel, array $options): array
+    {
+        $systemMessage = $this->extractSystemMessage($messages);
+        $input = $this->convertToResponsesFormat($this->removeSystemMessages($messages));
+
+        $requestOptions = [
+            'model' => $model,
+            'input' => $input,
+            'store' => $this->storeResponses,
+            'max_output_tokens' => $options['max_tokens'] ?? self::DEFAULT_MAX_TOKENS,
+        ];
+
+        if (null !== $systemMessage) {
+            $requestOptions['instructions'] = $systemMessage;
+        }
+
+        if (!$isReasoningModel) {
+            $requestOptions['temperature'] = $options['temperature'] ?? 0.7;
+        }
+
+        if ($isReasoningModel) {
+            $reasoning = [];
+
+            if (!empty($options['reasoning'])) {
+                $reasoning['effort'] = $options['reasoning_effort'] ?? 'medium';
+                $reasoning['summary'] = 'auto';
+            }
+
+            if (!empty($reasoning)) {
+                $requestOptions['reasoning'] = $reasoning;
+            }
+        }
+
+        if (isset($options['previous_response_id'])) {
+            $requestOptions['previous_response_id'] = $options['previous_response_id'];
+        }
+
+        return $requestOptions;
+    }
+
+    /**
+     * Execute responses()->create() with fallback when previous_response_id is invalid.
+     *
+     * When previous_response_id is present, the input is reduced to just the last user
+     * message (the API already has prior context). On fallback the full input is restored.
+     */
+    private function executeResponsesCreate(array $requestOptions): mixed
+    {
+        $fullInput = $requestOptions['input'] ?? [];
+        $hasPreviousResponse = isset($requestOptions['previous_response_id']);
+
+        if ($hasPreviousResponse) {
+            $requestOptions['input'] = $this->reduceToLastUserMessage($fullInput);
+        }
+
+        try {
+            return $this->client->responses()->create($requestOptions);
+        } catch (\Exception $e) {
+            if ($hasPreviousResponse && $this->isPreviousResponseError($e)) {
+                $this->logger->warning('OpenAI: previous_response_id invalid, retrying with full context', [
+                    'previous_response_id' => $requestOptions['previous_response_id'],
+                    'error' => $e->getMessage(),
+                ]);
+                unset($requestOptions['previous_response_id']);
+                $requestOptions['input'] = $fullInput;
+
+                return $this->client->responses()->create($requestOptions);
+            }
+
+            throw $e;
+        }
+    }
+
+    /**
+     * Execute responses()->createStreamed() with fallback when previous_response_id is invalid.
+     *
+     * When previous_response_id is present, the input is reduced to just the last user
+     * message (the API already has prior context). On fallback the full input is restored.
+     */
+    private function executeResponsesCreateStreamed(array $requestOptions): mixed
+    {
+        $fullInput = $requestOptions['input'] ?? [];
+        $hasPreviousResponse = isset($requestOptions['previous_response_id']);
+
+        if ($hasPreviousResponse) {
+            $requestOptions['input'] = $this->reduceToLastUserMessage($fullInput);
+        }
+
+        try {
+            return $this->client->responses()->createStreamed($requestOptions);
+        } catch (\Exception $e) {
+            if ($hasPreviousResponse && $this->isPreviousResponseError($e)) {
+                $this->logger->warning('OpenAI: previous_response_id invalid for stream, retrying with full context', [
+                    'previous_response_id' => $requestOptions['previous_response_id'],
+                    'error' => $e->getMessage(),
+                ]);
+                unset($requestOptions['previous_response_id']);
+                $requestOptions['input'] = $fullInput;
+
+                return $this->client->responses()->createStreamed($requestOptions);
+            }
+
+            throw $e;
+        }
+    }
+
+    /**
+     * Reduce input to just the last user message for stateful conversations.
+     *
+     * When previous_response_id is used, the API already has the conversation context.
+     * Only the new user message needs to be sent.
+     */
+    private function reduceToLastUserMessage(array $input): array
+    {
+        foreach (array_reverse($input) as $msg) {
+            if ('user' === ($msg['role'] ?? '')) {
+                return [$msg];
+            }
+        }
+
+        return $input;
+    }
+
+    /**
+     * Check if exception is caused by an invalid/expired previous_response_id.
+     */
+    private function isPreviousResponseError(\Exception $e): bool
+    {
+        $message = strtolower($e->getMessage());
+
+        return str_contains($message, 'previous_response_id')
+            || str_contains($message, 'previous response')
+            || str_contains($message, 'invalid_response_id');
+    }
+
+    /**
+     * Extract the first system message content from a messages array.
+     */
+    private function extractSystemMessage(array $messages): ?string
+    {
+        foreach ($messages as $message) {
+            if ('system' === ($message['role'] ?? '')) {
+                return \is_string($message['content']) ? $message['content'] : null;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Remove all system messages from a messages array.
+     */
+    private function removeSystemMessages(array $messages): array
+    {
+        return array_values(array_filter(
+            $messages,
+            static fn (array $msg) => 'system' !== ($msg['role'] ?? '')
+        ));
+    }
+
+    /**
+     * Convert Chat Completions message format to Responses API format.
+     *
+     * Chat Completions uses: {type: "text", text: "..."} and {type: "image_url", image_url: {url: "..."}}
+     * Responses API uses:    {type: "input_text"/"output_text", text: "..."} and {type: "input_image", image_url: "..."}
+     */
+    private function convertToResponsesFormat(array $messages): array
+    {
+        foreach ($messages as &$message) {
+            $role = $message['role'] ?? 'user';
+            $isAssistant = 'assistant' === $role;
+            $textType = $isAssistant ? 'output_text' : 'input_text';
+
+            if (!is_array($message['content'] ?? null)) {
+                $text = $message['content'] ?? '';
+                $message['content'] = [
+                    [
+                        'type' => $textType,
+                        'text' => $text,
+                    ],
+                ];
+                continue;
+            }
+
+            $converted = [];
+            foreach ($message['content'] as $part) {
+                $type = $part['type'] ?? '';
+                if ('text' === $type) {
+                    $converted[] = [
+                        'type' => $textType,
+                        'text' => $part['text'] ?? '',
+                    ];
+                } elseif ('image_url' === $type) {
+                    $url = $part['image_url']['url'] ?? ($part['image_url'] ?? '');
+                    $converted[] = [
+                        'type' => 'input_image',
+                        'image_url' => $url,
+                    ];
+                } else {
+                    $converted[] = $part;
+                }
+            }
+            $message['content'] = $converted;
+        }
+
+        return $messages;
+    }
+
+    /**
+     * Normalize Responses API usage into the internal token format.
+     *
+     * Responses API uses input_tokens/output_tokens vs Chat Completions prompt_tokens/completion_tokens.
+     */
+    private function normalizeResponsesUsage(array $responseData): array
+    {
+        $usage = $responseData['usage'] ?? [];
+
+        return [
+            'prompt_tokens' => $usage['input_tokens'] ?? 0,
+            'completion_tokens' => $usage['output_tokens'] ?? 0,
+            'total_tokens' => $usage['total_tokens'] ?? 0,
+            'cached_tokens' => $usage['input_tokens_details']['cached_tokens'] ?? 0,
+            'cache_creation_tokens' => 0,
+        ];
     }
 
     // ==================== EMBEDDING ====================
@@ -301,8 +526,15 @@ class OpenAIProvider implements ChatProviderInterface, EmbeddingProviderInterfac
             }
 
             $response = $this->client->embeddings()->create($params);
+            $usage = $response->usage;
 
-            return $response['data'][0]['embedding'] ?? [];
+            return [
+                'embedding' => $response['data'][0]['embedding'] ?? [],
+                'usage' => [
+                    'prompt_tokens' => null !== $usage ? $usage->promptTokens : 0,
+                    'total_tokens' => null !== $usage ? $usage->totalTokens : 0,
+                ],
+            ];
         } catch (\Exception $e) {
             throw new ProviderException('OpenAI embedding error: '.$e->getMessage(), 'openai');
         }
@@ -330,8 +562,15 @@ class OpenAIProvider implements ChatProviderInterface, EmbeddingProviderInterfac
             }
 
             $response = $this->client->embeddings()->create($params);
+            $usage = $response->usage;
 
-            return array_map(fn ($item) => $item['embedding'], $response['data']);
+            return [
+                'embeddings' => array_map(fn ($item) => $item['embedding'], $response['data']),
+                'usage' => [
+                    'prompt_tokens' => null !== $usage ? $usage->promptTokens : 0,
+                    'total_tokens' => null !== $usage ? $usage->totalTokens : 0,
+                ],
+            ];
         } catch (\Exception $e) {
             throw new ProviderException('OpenAI batch embedding error: '.$e->getMessage(), 'openai');
         }

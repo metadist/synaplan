@@ -34,6 +34,12 @@ class Subscription
     #[ORM\Column(name: 'BACTIVE', type: 'boolean', options: ['default' => true])]
     private bool $active = true;
 
+    #[ORM\Column(name: 'BCOST_BUDGET_MONTHLY', type: 'decimal', precision: 10, scale: 2, options: ['default' => 0])]
+    private string $costBudgetMonthly = '0.00';
+
+    #[ORM\Column(name: 'BCOST_BUDGET_YEARLY', type: 'decimal', precision: 10, scale: 2, options: ['default' => 0])]
+    private string $costBudgetYearly = '0.00';
+
     #[ORM\Column(name: 'BSTRIPE_MONTHLY_ID', length: 128, nullable: true)]
     private ?string $stripeMonthlyId = null;
 
@@ -137,6 +143,30 @@ class Subscription
     public function setStripeYearlyId(?string $stripeYearlyId): self
     {
         $this->stripeYearlyId = $stripeYearlyId;
+
+        return $this;
+    }
+
+    public function getCostBudgetMonthly(): string
+    {
+        return $this->costBudgetMonthly;
+    }
+
+    public function setCostBudgetMonthly(string $costBudgetMonthly): self
+    {
+        $this->costBudgetMonthly = $costBudgetMonthly;
+
+        return $this;
+    }
+
+    public function getCostBudgetYearly(): string
+    {
+        return $this->costBudgetYearly;
+    }
+
+    public function setCostBudgetYearly(string $costBudgetYearly): self
+    {
+        $this->costBudgetYearly = $costBudgetYearly;
 
         return $this;
     }

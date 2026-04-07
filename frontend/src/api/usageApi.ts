@@ -47,11 +47,30 @@ export interface UsageStats {
     source: string
     model: string
     tokens: number
+    prompt_tokens: number
+    completion_tokens: number
+    cached_tokens: number
+    cache_creation_tokens: number
+    estimated: boolean
     cost: number
     latency: number
     status: string
   }>
   total_requests: number
+  cost_budget: {
+    used: number
+    budget: number
+    remaining: number
+    percent: number
+    period_start: number
+    period_end: number
+  }
+  cost_summary: {
+    today: number
+    this_week: number
+    this_month: number
+    cache_savings: number
+  }
 }
 
 interface UsageResponse {
@@ -91,6 +110,56 @@ export async function getExportCsvUrl(sinceTimestamp?: number): Promise<string> 
   }
 
   return url
+}
+
+export interface ActivityEntry {
+  timestamp: number
+  datetime: string
+  action: string
+  source: string
+  model: string
+  tokens: number
+  prompt_tokens: number
+  completion_tokens: number
+  cached_tokens: number
+  cache_creation_tokens: number
+  estimated: boolean
+  cost: number
+  latency: number
+  status: string
+}
+
+export interface ActivityLogResponse {
+  items: ActivityEntry[]
+  total: number
+  page: number
+  per_page: number
+  total_pages: number
+}
+
+export interface ActivityFilters {
+  page?: number
+  per_page?: number
+  search?: string
+  action?: string
+  from?: number
+  to?: number
+}
+
+export async function getActivityLog(filters: ActivityFilters = {}): Promise<ActivityLogResponse> {
+  const params: Record<string, string> = {}
+  if (filters.page) params.page = filters.page.toString()
+  if (filters.per_page) params.per_page = filters.per_page.toString()
+  if (filters.search) params.search = filters.search
+  if (filters.action) params.action = filters.action
+  if (filters.from) params.from = filters.from.toString()
+  if (filters.to) params.to = filters.to.toString()
+
+  const data = await httpClient<{ success: boolean; data: ActivityLogResponse }>(
+    '/api/v1/usage/activity',
+    { method: 'GET', params }
+  )
+  return data.data
 }
 
 export async function downloadUsageExport(sinceTimestamp?: number): Promise<void> {

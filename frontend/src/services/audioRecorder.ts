@@ -96,7 +96,7 @@ export class AudioRecorder {
         console.warn('⚠️ Could not enumerate devices:', err)
         return { supported: true, hasDevices: true } // Assume devices exist
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       return {
         supported: false,
         hasDevices: false,
@@ -165,9 +165,13 @@ export class AudioRecorder {
         }
       }
 
-      this.mediaRecorder.onerror = (event: any) => {
-        console.error('❌ MediaRecorder error:', event.error)
-        const error = this.parseError(event.error)
+      this.mediaRecorder.onerror = (event: Event) => {
+        const mediaError: unknown =
+          'error' in event && (event as { error?: unknown }).error !== undefined
+            ? (event as { error: unknown }).error
+            : new Error('MediaRecorder error')
+        console.error('❌ MediaRecorder error:', mediaError)
+        const error = this.parseError(mediaError)
         if (this.options.onError) {
           this.options.onError(error)
         }
@@ -181,7 +185,7 @@ export class AudioRecorder {
       if (this.options.onStart) {
         this.options.onStart()
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('❌ Recording failed:', err)
       this.cleanup()
 
@@ -253,9 +257,10 @@ export class AudioRecorder {
   /**
    * Parse error into structured format
    */
-  private parseError(err: any): AudioRecorderError {
-    const name = err.name || 'Unknown'
-    const message = err.message || 'Unknown error'
+  private parseError(err: unknown): AudioRecorderError {
+    const name = err instanceof Error || err instanceof DOMException ? err.name : 'Unknown'
+    const message =
+      err instanceof Error || err instanceof DOMException ? err.message : 'Unknown error'
 
     // Permission errors
     if (name === 'NotAllowedError' || name === 'PermissionDeniedError') {

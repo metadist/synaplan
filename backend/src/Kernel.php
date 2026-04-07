@@ -26,6 +26,16 @@ class Kernel extends BaseKernel
             (require $path)($container->withPath($path), $this);
         }
 
+        if ('test' === $this->environment
+            && class_exists(\DAMA\DoctrineTestBundle\DAMADoctrineTestBundle::class)
+        ) {
+            $container->extension('dama_doctrine_test', [
+                'enable_static_connection' => true,
+                'enable_static_meta_data_cache' => true,
+                'enable_static_query_cache' => true,
+            ]);
+        }
+
         $this->loadPluginServices($container);
     }
 

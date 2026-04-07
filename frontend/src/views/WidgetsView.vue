@@ -421,6 +421,7 @@ import ChatWidget from '@/components/widgets/ChatWidget.vue'
 import WidgetCustomFieldsPanel from '@/components/widgets/WidgetCustomFieldsPanel.vue'
 import { useI18n } from 'vue-i18n'
 import { useConfigStore } from '@/stores/config'
+import { getErrorMessage } from '@/utils/errorMessage'
 
 const router = useRouter()
 const route = useRoute()
@@ -463,8 +464,8 @@ const loadWidgets = async () => {
   loading.value = true
   try {
     widgets.value = await widgetsApi.listWidgets()
-  } catch (err: any) {
-    error(err.message || 'Failed to load widgets')
+  } catch (err: unknown) {
+    error(getErrorMessage(err) || 'Failed to load widgets')
   } finally {
     loading.value = false
   }
@@ -611,7 +612,7 @@ const viewSessions = (widget: widgetsApi.Widget) => {
 /**
  * Handle save (legacy editor)
  */
-const handleSave = async (data: any) => {
+const handleSave = async (data: widgetsApi.UpdateWidgetRequest) => {
   try {
     if (currentWidget.value) {
       await widgetsApi.updateWidget(currentWidget.value.widgetId, data)
@@ -620,8 +621,8 @@ const handleSave = async (data: any) => {
 
     currentWidget.value = null
     await loadWidgets()
-  } catch (err: any) {
-    error(err.message || 'Failed to save widget')
+  } catch (err: unknown) {
+    error(getErrorMessage(err) || 'Failed to save widget')
   }
 }
 
@@ -636,8 +637,8 @@ const showEmbed = async (widget: widgetsApi.Widget) => {
     legacyEmbedCode.value = data.legacyEmbedCode || ''
     wordpressShortcode.value = data.wordpressShortcode
     showEmbedModal.value = true
-  } catch (err: any) {
-    error(err.message || 'Failed to load embed code')
+  } catch (err: unknown) {
+    error(getErrorMessage(err) || 'Failed to load embed code')
   }
 }
 
@@ -658,8 +659,8 @@ const confirmDelete = async (widget: widgetsApi.Widget) => {
       await widgetsApi.deleteWidget(widget.widgetId)
       success(t('widgets.deleteSuccess'))
       await loadWidgets()
-    } catch (err: any) {
-      error(err.message || 'Failed to delete widget')
+    } catch (err: unknown) {
+      error(getErrorMessage(err) || 'Failed to delete widget')
     }
   }
 }

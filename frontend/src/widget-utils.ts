@@ -15,7 +15,7 @@ export function detectApiUrl(): string {
     pathname = pathname.substring(0, pathname.indexOf('/chunks/'))
   } else {
     // Otherwise just remove the filename
-    pathname = pathname.replace(/\/[^\/]+$/, '')
+    pathname = pathname.replace(/\/[^/]+$/, '')
   }
 
   return `${url.origin}${pathname}`

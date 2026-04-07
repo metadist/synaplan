@@ -66,6 +66,7 @@ final class WhatsAppService
         private CacheInterface $cache,
         private LockFactory $lockFactory,
         private EmailChatService $emailChatService,
+        private UserMemoryService $memoryService,
         string $whatsappAccessToken,
         bool $whatsappEnabled,
         private string $uploadsDir,
@@ -616,8 +617,14 @@ final class WhatsAppService
         $chat = $this->emailChatService->findOrCreateWhatsAppChat($user, $dto->from);
 
         // 5. Create database record
+        // Always use the chat owner's userId so message.userId stays aligned
+        // with chat.userId. This is required for ownership checks in
+        // findChatHistory (which JOINs on chat.userId) and for consistent
+        // authorization across all queries that filter by userId.
+        // The effectiveUserId is only needed for service-level operations
+        // (media download paths, TTS generation) below.
         $message = new Message();
-        $message->setUserId($effectiveUserId);
+        $message->setUserId($user->getId());
         $message->setChat($chat);
         $message->setTrackingId($dto->timestamp);
         $message->setProviderIndex('WHATSAPP');
@@ -729,14 +736,15 @@ final class WhatsAppService
         }
 
         $responseText = $result['response']['content'] ?? $collectedResponse;
+        $responseText = $this->memoryService->resolveMemoryTags($responseText, $user);
         $metadata = $result['response']['metadata'] ?? [];
         $fileData = $metadata['file'] ?? null;
 
-        // Record usage with response content for token estimation
         $this->rateLimitService->recordUsage($user, 'MESSAGES', [
             'provider' => $metadata['provider'] ?? 'unknown',
             'model' => $metadata['model'] ?? 'unknown',
-            'tokens' => 0,
+            'usage' => $metadata['usage'] ?? [],
+            'model_id' => $metadata['model_id'] ?? null,
             'source' => 'WHATSAPP',
             'response_text' => $responseText,
             'input_text' => $message->getText(),
@@ -766,6 +774,19 @@ final class WhatsAppService
 
                 $sendResult = $this->sendMedia($dto->from, $generatedMediaType, $mediaUrl, $dto->phoneNumberId, $caption);
                 if ($sendResult['success']) {
+                    $mediaAction = match ($generatedMediaType) {
+                        'image' => 'IMAGES',
+                        'video' => 'VIDEOS',
+                        default => 'AUDIOS',
+                    };
+                    $this->rateLimitService->recordUsage($user, $mediaAction, [
+                        'provider' => $metadata['provider'] ?? 'unknown',
+                        'model' => $metadata['model'] ?? 'unknown',
+                        'model_id' => $metadata['model_id'] ?? null,
+                        'source' => 'WHATSAPP',
+                        'media_usage' => $metadata['media_usage'] ?? [],
+                    ]);
+
                     $placeholderText = match ($generatedMediaType) {
                         'image' => '[Image response]',
                         'video' => '[Video response]',

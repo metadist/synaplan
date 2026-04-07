@@ -4,7 +4,9 @@ namespace App\Tests\Service;
 
 use App\Entity\User;
 use App\Repository\ConfigRepository;
+use App\Repository\SubscriptionRepository;
 use App\Service\BillingService;
+use App\Service\CostCalculationService;
 use App\Service\RateLimitService;
 use Doctrine\DBAL\Connection;
 use Doctrine\ORM\EntityManagerInterface;
@@ -40,12 +42,26 @@ class RateLimitServiceUnifiedTest extends TestCase
         });
 
         $billingService = new BillingService('sk_test_valid_key', 'price_1RealProId');
+        $costCalculationService = $this->createMock(CostCalculationService::class);
+        $costCalculationService->method('calculateCost')->willReturn(
+            new \App\DTO\CostResult(
+                totalCost: '0.000000',
+                inputCost: '0.000000',
+                outputCost: '0.000000',
+                cacheSavings: '0.000000',
+                priceSnapshot: [],
+                billedInputTokens: 0,
+            )
+        );
+        $subscriptionRepository = $this->createMock(SubscriptionRepository::class);
 
         $this->service = new RateLimitService(
             $this->configRepository,
             $this->em,
             $this->logger,
-            $billingService
+            $billingService,
+            $costCalculationService,
+            $subscriptionRepository,
         );
     }
 

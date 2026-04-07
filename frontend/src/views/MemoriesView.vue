@@ -204,6 +204,7 @@
 </template>
 
 <script setup lang="ts">
+import { getErrorMessage } from '@/utils/errorMessage'
 import { ref, onMounted, computed, watch, onBeforeUnmount } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { Icon } from '@iconify/vue'
@@ -309,7 +310,7 @@ onMounted(async () => {
     // Check if it's a service unavailable error
     if (
       err instanceof Error &&
-      (err.message.includes('503') || err.message.includes('unavailable'))
+      (getErrorMessage(err)?.includes('503') || getErrorMessage(err)?.includes('unavailable'))
     ) {
       isServiceUnavailable.value = true
     }
@@ -344,7 +345,7 @@ async function retryConnection() {
   } catch (err) {
     if (
       err instanceof Error &&
-      (err.message.includes('503') || err.message.includes('unavailable'))
+      (getErrorMessage(err)?.includes('503') || getErrorMessage(err)?.includes('unavailable'))
     ) {
       isServiceUnavailable.value = true
     }
@@ -491,7 +492,7 @@ async function handleSaveMultiple(actions: ParsedAction[]) {
       }
     } catch (err) {
       errorCount++
-      errors.push(err instanceof Error ? err.message : 'Unknown error')
+      errors.push(getErrorMessage(err) || 'Unknown error')
       // Continue with other actions even if one fails
     }
   }
@@ -537,8 +538,8 @@ async function enableMemoriesForUser() {
     await profileApi.updateProfile({ memoriesEnabled: true })
     await authStore.refreshUser()
     success(t('memories.userDisabled.enable'))
-  } catch (err: any) {
-    error(err.message || 'Failed to enable memories')
+  } catch (err: unknown) {
+    error(getErrorMessage(err) || 'Failed to enable memories')
   }
 }
 </script>

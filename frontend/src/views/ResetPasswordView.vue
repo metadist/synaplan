@@ -115,6 +115,7 @@ import { useRouter, useRoute } from 'vue-router'
 import { useTheme } from '../composables/useTheme'
 import { usePasswordValidation } from '../composables/usePasswordValidation'
 import { authApi } from '@/services/api'
+import { getApiErrorMessage } from '@/utils/errorMessage'
 import Button from '../components/Button.vue'
 
 const router = useRouter()
@@ -166,8 +167,8 @@ const handleReset = async () => {
     await authApi.resetPassword(token.value, password.value)
     success.value = true
     setTimeout(() => router.push('/login'), 3000)
-  } catch (err: any) {
-    error.value = err.response?.data?.error || 'Password reset failed'
+  } catch (err: unknown) {
+    error.value = getApiErrorMessage(err) || 'Password reset failed'
   } finally {
     loading.value = false
   }

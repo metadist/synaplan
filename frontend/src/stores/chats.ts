@@ -3,6 +3,7 @@ import { ref, computed } from 'vue'
 import { httpClient } from '@/services/api/httpClient'
 import { useConfigStore } from '@/stores/config'
 import { authService } from '@/services/authService'
+import { getErrorMessage } from '@/utils/errorMessage'
 
 const ACTIVE_CHAT_STORAGE_KEY = 'synaplan_active_chat_id'
 
@@ -54,11 +55,13 @@ export const useChatsStore = defineStore('chats', () => {
   const loading = ref(false)
   const error = ref<string | null>(null)
 
-  const normalizeChat = (chat: any): Chat =>
-    ({
-      ...chat,
-      widgetSession: chat.widgetSession ?? null,
-    }) as Chat
+  const normalizeChat = (chat: unknown): Chat => {
+    const c = chat as Chat
+    return {
+      ...c,
+      widgetSession: c.widgetSession ?? null,
+    }
+  }
 
   const activeChat = computed(() => {
     return chats.value.find((c) => c.id === activeChatId.value) || null
@@ -117,11 +120,11 @@ export const useChatsStore = defineStore('chats', () => {
     error.value = null
 
     try {
-      const data = await httpClient<{ chats: any[] }>('/api/v1/chats')
-      chats.value = (data.chats || []).map((chat: any) => normalizeChat(chat))
+      const data = await httpClient<{ chats: unknown[] }>('/api/v1/chats')
+      chats.value = (data.chats || []).map((chat) => normalizeChat(chat))
       ensureValidActiveChat()
-    } catch (err: any) {
-      error.value = err.message || 'Failed to load chats'
+    } catch (err: unknown) {
+      error.value = getErrorMessage(err) || 'Failed to load chats'
       console.error('Error loading chats:', err)
     } finally {
       loading.value = false
@@ -135,7 +138,7 @@ export const useChatsStore = defineStore('chats', () => {
     error.value = null
 
     try {
-      const data = await httpClient<{ success: boolean; chat: any }>('/api/v1/chats', {
+      const data = await httpClient<{ success: boolean; chat: unknown }>('/api/v1/chats', {
         method: 'POST',
         body: JSON.stringify({ title }),
       })
@@ -146,8 +149,8 @@ export const useChatsStore = defineStore('chats', () => {
       updateActiveChatSelection(newChat.id)
 
       return newChat
-    } catch (err: any) {
-      error.value = err.message || 'Failed to create chat'
+    } catch (err: unknown) {
+      error.value = getErrorMessage(err) || 'Failed to create chat'
       console.error('Error creating chat:', err)
       return null
     } finally {
@@ -221,8 +224,8 @@ export const useChatsStore = defineStore('chats', () => {
       if (chat) {
         chat.title = title
       }
-    } catch (err: any) {
-      error.value = err.message || 'Failed to update chat'
+    } catch (err: unknown) {
+      error.value = getErrorMessage(err) || 'Failed to update chat'
       console.error('Error updating chat:', err)
     }
   }
@@ -245,9 +248,9 @@ export const useChatsStore = defineStore('chats', () => {
         // Select another chat if the deleted one was active
         updateActiveChatSelection(chats.value[0].id)
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       if (!silent) {
-        error.value = err.message || 'Failed to delete chat'
+        error.value = getErrorMessage(err) || 'Failed to delete chat'
         console.error('Error deleting chat:', err)
       }
     }
@@ -279,8 +282,8 @@ export const useChatsStore = defineStore('chats', () => {
         isShared: data.isShared,
         shareUrl: data.shareUrl,
       }
-    } catch (err: any) {
-      error.value = err.message || 'Failed to share chat'
+    } catch (err: unknown) {
+      error.value = getErrorMessage(err) || 'Failed to share chat'
       console.error('Error sharing chat:', err)
       throw err
     }
@@ -290,20 +293,22 @@ export const useChatsStore = defineStore('chats', () => {
     if (!checkAuthOrRedirect()) return null
 
     try {
-      const data = await httpClient<{ chat: any }>(`/api/v1/chats/${chatId}`)
+      const data = await httpClient<{ chat: Record<string, unknown> }>(`/api/v1/chats/${chatId}`)
 
       // Import config store for building share URL
       const config = useConfigStore()
 
+      const chat = data.chat
+      const shareTok = typeof chat.shareToken === 'string' ? chat.shareToken : null
+      const isShared = Boolean(chat.isShared)
+
       return {
-        isShared: data.chat.isShared || false,
-        shareToken: data.chat.shareToken || null,
-        shareUrl: data.chat.shareToken
-          ? `${config.appBaseUrl}/shared/${data.chat.shareToken}`
-          : null,
+        isShared,
+        shareToken: shareTok,
+        shareUrl: shareTok ? `${config.appBaseUrl}/shared/${shareTok}` : null,
       }
-    } catch (err: any) {
-      error.value = err.message || 'Failed to get share info'
+    } catch (err: unknown) {
+      error.value = getErrorMessage(err) || 'Failed to get share info'
       console.error('Error getting share info:', err)
       throw err
     }

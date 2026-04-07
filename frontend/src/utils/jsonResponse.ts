@@ -1,6 +1,6 @@
 export interface ParsedBTextResult {
   text?: string
-  data?: Record<string, any>
+  data?: Record<string, unknown>
   remainder?: string
 }
 

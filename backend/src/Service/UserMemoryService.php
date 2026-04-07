@@ -33,6 +33,7 @@ final readonly class UserMemoryService
         private QdrantClientInterface $qdrantClient,
         private AiFacade $aiFacade,
         private ModelConfigService $modelConfigService,
+        private RateLimitService $rateLimitService,
         private LoggerInterface $logger,
     ) {
     }
@@ -436,10 +437,23 @@ final readonly class UserMemoryService
             ]);
 
             // Create embedding for query (with EXPLICIT model!)
-            $queryVector = $this->aiFacade->embed($queryText, $userId, array_filter([
+            $embedResult = $this->aiFacade->embed($queryText, $userId, array_filter([
                 'model' => $modelName,
                 'provider' => $provider,
             ]));
+            $queryVector = $embedResult['embedding'];
+
+            $user = $this->em->getRepository(User::class)->find($userId);
+            if ($user) {
+                $this->rateLimitService->recordUsage($user, 'EMBEDDINGS', [
+                    'usage' => $embedResult['usage'],
+                    'provider' => $provider ?? 'unknown',
+                    'model' => $modelName ?? 'unknown',
+                    'model_id' => $embeddingModelId,
+                    'input_text' => $queryText,
+                    'source' => 'MEMORY_SEARCH',
+                ]);
+            }
 
             $this->logger->info('📊 Embedding created', [
                 'userId' => $userId,
@@ -518,14 +532,24 @@ final readonly class UserMemoryService
             }
 
             // Create embedding
-            $embedding = $this->aiFacade->embed($textToEmbed, $user->getId(), array_filter([
+            $embedResult = $this->aiFacade->embed($textToEmbed, $user->getId(), array_filter([
                 'model' => $modelName,
                 'provider' => $provider,
             ]));
+            $embedding = $embedResult['embedding'];
 
             if (empty($embedding)) {
                 throw new \RuntimeException('Failed to create embedding');
             }
+
+            $this->rateLimitService->recordUsage($user, 'EMBEDDINGS', [
+                'usage' => $embedResult['usage'],
+                'provider' => $provider ?? 'unknown',
+                'model' => $modelName ?? 'unknown',
+                'model_id' => $embeddingModelId,
+                'input_text' => $textToEmbed,
+                'source' => 'MEMORY_STORE',
+            ]);
 
             // Generate point ID
             $pointId = "mem_{$user->getId()}_{$memoryId}";
@@ -596,6 +620,47 @@ final readonly class UserMemoryService
 
             return [];
         }
+    }
+
+    /**
+     * Replace [Memory:ID] tags in text with their resolved values.
+     *
+     * Used before forwarding AI responses to external channels (WhatsApp, Email)
+     * where the frontend badge renderer is not available.
+     * Unresolvable tags are silently removed so external users never see raw IDs.
+     *
+     * Unique IDs are resolved once and cached within the call to avoid N+1 lookups.
+     */
+    public function resolveMemoryTags(string $text, User $user): string
+    {
+        if (!str_contains($text, '[Memory:')) {
+            return $text;
+        }
+
+        // Extract all unique memory IDs to avoid repeated Qdrant lookups
+        preg_match_all('/\[Memory\s*:\s*(\d+)\.{0,3}\]/i', $text, $allMatches);
+        $uniqueIds = array_unique(array_map('intval', $allMatches[1]));
+
+        /** @var array<int, string> */
+        $resolved = [];
+        foreach ($uniqueIds as $memoryId) {
+            $memory = $this->getMemoryById($memoryId, $user);
+            if ($memory) {
+                $resolved[$memoryId] = $memory->value;
+            } else {
+                $this->logger->debug('Memory tag could not be resolved, removing', [
+                    'memory_id' => $memoryId,
+                    'user_id' => $user->getId(),
+                ]);
+                $resolved[$memoryId] = '';
+            }
+        }
+
+        return (string) preg_replace_callback(
+            '/\[Memory\s*:\s*(\d+)\.{0,3}\]/i',
+            fn (array $matches): string => $resolved[(int) $matches[1]] ?? '',
+            $text
+        );
     }
 
     private function isHiddenCategory(string $category): bool

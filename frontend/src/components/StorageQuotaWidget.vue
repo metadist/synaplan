@@ -59,7 +59,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import { Icon } from '@iconify/vue'
-import filesService from '@/services/filesService'
+import { getStorageStats } from '@/services/filesService'
 
 import { useConfigStore } from '@/stores/config'
 
@@ -68,7 +68,9 @@ defineEmits<{
 }>()
 
 const config = useConfigStore()
-const stats = ref<any>(null)
+
+type StorageStatsPayload = Awaited<ReturnType<typeof getStorageStats>>
+const stats = ref<StorageStatsPayload | null>(null)
 const loading = ref(true)
 
 const percentage = computed(() => {
@@ -109,7 +111,7 @@ const progressBarColor = computed(() => {
 const loadStats = async () => {
   loading.value = true
   try {
-    const response = await filesService.getStorageStats()
+    const response = await getStorageStats()
     stats.value = response
   } catch (error) {
     console.error('Failed to load storage stats:', error)

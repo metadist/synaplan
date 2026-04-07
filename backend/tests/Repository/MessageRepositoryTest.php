@@ -257,17 +257,51 @@ class MessageRepositoryTest extends KernelTestCase
         $this->assertEmpty($history);
     }
 
-    public function testFindChatHistoryWithWrongUserId(): void
+    public function testFindChatHistoryReturnsMixedUserIdMessages(): void
     {
-        $this->createTestMessage('Test message', time());
+        // Simulate WhatsApp scenario: incoming messages have a different userId
+        // than outgoing messages, but all belong to the same chat.
+        $whatsappSystemUserId = 99999;
 
-        // Try to get chat history with wrong user ID
+        $incomingMsg = new Message();
+        $incomingMsg->setUserId($whatsappSystemUserId);
+        $incomingMsg->setChat($this->testChat);
+        $incomingMsg->setTrackingId(1000001);
+        $incomingMsg->setUnixTimestamp(100);
+        $incomingMsg->setDateTime('20260101120000');
+        $incomingMsg->setText('User question via WhatsApp');
+        $incomingMsg->setDirection('IN');
+        $incomingMsg->setProviderIndex('WHATSAPP');
+        $incomingMsg->setMessageType('WTSP');
+        $incomingMsg->setTopic('CHAT');
+        $incomingMsg->setLanguage('en');
+        $incomingMsg->setStatus('complete');
+        $this->em->persist($incomingMsg);
+
+        $outgoingMsg = new Message();
+        $outgoingMsg->setUserId($this->testUser->getId());
+        $outgoingMsg->setChat($this->testChat);
+        $outgoingMsg->setTrackingId(1000002);
+        $outgoingMsg->setUnixTimestamp(200);
+        $outgoingMsg->setDateTime('20260101120100');
+        $outgoingMsg->setText('AI response');
+        $outgoingMsg->setDirection('OUT');
+        $outgoingMsg->setProviderIndex('WHATSAPP');
+        $outgoingMsg->setMessageType('WTSP');
+        $outgoingMsg->setTopic('CHAT');
+        $outgoingMsg->setLanguage('en');
+        $outgoingMsg->setStatus('complete');
+        $this->em->persist($outgoingMsg);
+        $this->em->flush();
+
         $history = $this->repository->findChatHistory(
-            999999,  // Non-existent user
+            $this->testUser->getId(),
             $this->testChat->getId()
         );
 
-        $this->assertEmpty($history, 'Should return empty array for wrong user');
+        $this->assertCount(2, $history, 'Should return both messages regardless of userId');
+        $this->assertEquals('User question via WhatsApp', $history[0]->getText());
+        $this->assertEquals('AI response', $history[1]->getText());
     }
 
     public function testFindLatestIncomingEmailByExternalIdFindsMatchingMessage(): void

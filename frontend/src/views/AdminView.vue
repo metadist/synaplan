@@ -515,12 +515,44 @@
               </div>
             </div>
 
+            <!-- By Model -->
+            <div
+              v-if="usageStats.byModel && Object.keys(usageStats.byModel).length > 0"
+              class="surface-card rounded-lg p-6"
+            >
+              <h3 class="text-lg font-semibold txt-primary mb-4 flex items-center gap-2">
+                <Icon icon="mdi:robot" class="w-5 h-5" />
+                {{ $t('admin.usage.topModels') }}
+              </h3>
+              <div class="space-y-2">
+                <div
+                  v-for="(stats, model) in usageStats.byModel"
+                  :key="model"
+                  class="flex items-center justify-between py-2 px-4 rounded-lg bg-chat"
+                >
+                  <span
+                    class="txt-primary font-medium text-sm truncate max-w-[200px]"
+                    :title="String(model)"
+                    >{{ model }}</span
+                  >
+                  <div class="flex gap-6 text-sm txt-secondary">
+                    <span>{{ stats.count.toLocaleString() }} {{ $t('admin.usage.requests') }}</span>
+                    <span>{{ stats.tokens.toLocaleString() }} {{ $t('admin.usage.tokens') }}</span>
+                    <span>${{ stats.cost.toFixed(4) }}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
             <!-- Top Users -->
             <div class="surface-card rounded-lg p-6">
-              <h3 class="text-lg font-semibold txt-primary mb-4 flex items-center gap-2">
+              <h3 class="text-lg font-semibold txt-primary mb-2 flex items-center gap-2">
                 <Icon icon="mdi:trophy" class="w-5 h-5" />
                 {{ $t('admin.usage.topUsers') }}
               </h3>
+              <p class="text-sm txt-secondary mb-4">
+                {{ $t('admin.usage.topUsersHint') }}
+              </p>
               <div class="overflow-x-auto">
                 <table class="w-full">
                   <thead>
@@ -544,31 +576,45 @@
                     </tr>
                   </thead>
                   <tbody>
-                    <tr
-                      v-for="(user, index) in usageStats.topUsers"
-                      :key="user.id"
-                      class="border-b border-light-border/30 dark:border-dark-border/20"
-                    >
-                      <td class="py-3 px-4 txt-secondary text-sm">{{ index + 1 }}</td>
-                      <td class="py-3 px-4 txt-primary">{{ user.email }}</td>
-                      <td class="py-3 px-4">
-                        <span :class="getLevelBadgeClass(user.level)">{{ user.level }}</span>
-                      </td>
-                      <td class="py-3 px-4 text-right txt-secondary">
-                        {{ user.requests.toLocaleString() }}
-                      </td>
-                      <td class="py-3 px-4 text-right txt-secondary">
-                        {{ user.tokens.toLocaleString() }}
-                      </td>
-                      <td class="py-3 px-4 text-right txt-secondary">
-                        ${{ user.cost.toFixed(2) }}
-                      </td>
-                    </tr>
+                    <template v-if="usageStatsTopUsers.length === 0">
+                      <tr>
+                        <td colspan="6" class="py-10 px-4 text-center text-sm txt-secondary">
+                          {{ $t('admin.usage.topUsersEmpty') }}
+                        </td>
+                      </tr>
+                    </template>
+                    <template v-else>
+                      <tr
+                        v-for="(user, index) in usageStatsTopUsers"
+                        :key="user.id"
+                        class="border-b border-light-border/30 dark:border-dark-border/20"
+                      >
+                        <td class="py-3 px-4 txt-secondary text-sm">{{ index + 1 }}</td>
+                        <td class="py-3 px-4 txt-primary">{{ user.email || '—' }}</td>
+                        <td class="py-3 px-4">
+                          <span :class="getLevelBadgeClass(user.level)">{{ user.level }}</span>
+                        </td>
+                        <td class="py-3 px-4 text-right txt-secondary">
+                          {{ user.requests.toLocaleString() }}
+                        </td>
+                        <td class="py-3 px-4 text-right txt-secondary">
+                          {{ user.tokens.toLocaleString() }}
+                        </td>
+                        <td class="py-3 px-4 text-right txt-secondary">
+                          ${{ user.cost.toFixed(2) }}
+                        </td>
+                      </tr>
+                    </template>
                   </tbody>
                 </table>
               </div>
             </div>
           </div>
+        </div>
+
+        <!-- Subscriptions Tab -->
+        <div v-if="activeTab === 'subscriptions'" data-testid="section-subscriptions">
+          <AdminSubscriptionsPanel />
         </div>
       </div>
     </div>
@@ -637,7 +683,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, watch } from 'vue'
+import { defineAsyncComponent, ref, computed, onMounted, watch } from 'vue'
 import { Icon } from '@iconify/vue'
 import MainLayout from '@/components/MainLayout.vue'
 import { useEscapeKey } from '@/composables/useEscapeKey'
@@ -651,6 +697,10 @@ import {
   type SystemOverview,
   type RegistrationAnalytics,
 } from '@/services/api/adminApi'
+const AdminSubscriptionsPanel = defineAsyncComponent(
+  () => import('@/components/admin/AdminSubscriptionsPanel.vue')
+)
+
 import { useAuthStore } from '@/stores/auth'
 import { useConfigStore } from '@/stores/config'
 import { useI18n } from 'vue-i18n'
@@ -661,7 +711,7 @@ const authStore = useAuthStore()
 const config = useConfigStore()
 const { success, error: showError } = useNotification()
 
-type TabId = 'overview' | 'users' | 'prompts' | 'usage'
+type TabId = 'overview' | 'users' | 'prompts' | 'usage' | 'subscriptions'
 interface AdminTab {
   id: TabId
   label: string
@@ -675,6 +725,7 @@ const tabs = computed<AdminTab[]>(() => [
   { id: 'users', label: t('admin.tabs.users'), icon: 'mdi:account-multiple' },
   { id: 'prompts', label: t('admin.tabs.prompts'), icon: 'mdi:text-box-multiple' },
   { id: 'usage', label: t('admin.tabs.usage'), icon: 'mdi:chart-bar' },
+  { id: 'subscriptions', label: t('admin.tabs.subscriptions'), icon: 'mdi:credit-card-outline' },
 ])
 
 // Overview
@@ -708,6 +759,7 @@ const promptSaving = ref(false)
 const usageStats = ref<UsageStats | null>(null)
 const usageStatsLoading = ref(false)
 const usageStatsPeriod = ref<'day' | 'week' | 'month' | 'all'>('week')
+const usageStatsTopUsers = computed(() => usageStats.value?.topUsers ?? [])
 
 // Delete Modal
 const showDeleteModal = ref(false)
@@ -756,12 +808,22 @@ async function loadRegistrationAnalytics() {
 }
 
 async function updateAnalyticsPeriod(newPeriod: string) {
-  analyticsPeriod.value = newPeriod as any
+  if (
+    newPeriod === '7d' ||
+    newPeriod === '30d' ||
+    newPeriod === '90d' ||
+    newPeriod === '1y' ||
+    newPeriod === 'all'
+  ) {
+    analyticsPeriod.value = newPeriod
+  }
   await loadRegistrationAnalytics()
 }
 
 async function updateAnalyticsGroupBy(newGroupBy: string) {
-  analyticsGroupBy.value = newGroupBy as any
+  if (newGroupBy === 'day' || newGroupBy === 'week' || newGroupBy === 'month') {
+    analyticsGroupBy.value = newGroupBy
+  }
   await loadRegistrationAnalytics()
 }
 

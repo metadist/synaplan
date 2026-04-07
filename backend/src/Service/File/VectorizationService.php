@@ -3,9 +3,11 @@
 namespace App\Service\File;
 
 use App\AI\Service\AiFacade;
+use App\Entity\User;
 use App\Service\ModelConfigService;
 use App\Service\RAG\VectorStorage\DTO\VectorChunk;
 use App\Service\RAG\VectorStorage\VectorStorageFacade;
+use App\Service\RateLimitService;
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;
 
@@ -24,6 +26,7 @@ final readonly class VectorizationService
         private TextChunker $textChunker,
         private ModelConfigService $modelConfigService,
         private VectorStorageFacade $vectorStorage,
+        private RateLimitService $rateLimitService,
         private EntityManagerInterface $em,
         private LoggerInterface $logger,
     ) {
@@ -119,10 +122,23 @@ final readonly class VectorizationService
 
             $chunkTexts = array_map(fn (array $c): string => $c['content'], $chunks);
 
-            $embeddings = $this->aiFacade->embedBatch($chunkTexts, $userId, $provider, [
+            $batchResult = $this->aiFacade->embedBatch($chunkTexts, $userId, $provider, [
                 'model' => $modelName,
                 'provider' => $provider,
             ]);
+            $embeddings = $batchResult['embeddings'];
+
+            $user = $this->em->getRepository(User::class)->find($userId);
+            if ($user) {
+                $this->rateLimitService->recordUsage($user, 'EMBEDDINGS', [
+                    'usage' => $batchResult['usage'],
+                    'provider' => $provider,
+                    'model' => $modelName,
+                    'model_id' => $embeddingModelId,
+                    'input_bytes' => array_sum(array_map('strlen', $chunkTexts)),
+                    'source' => 'VECTORIZATION',
+                ]);
+            }
 
             $vectorChunks = [];
             $chunksCreated = 0;

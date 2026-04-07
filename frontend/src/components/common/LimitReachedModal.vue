@@ -187,10 +187,10 @@ const router = useRouter()
 
 interface Props {
   isOpen: boolean
-  limitType: 'lifetime' | 'hourly' | 'monthly'
-  actionType: string
-  used: number
-  currentLimit: number
+  limitType?: 'lifetime' | 'hourly' | 'monthly'
+  actionType?: string
+  used?: number
+  currentLimit?: number
   resetTime?: number | null
   userLevel?: string
   phoneVerified?: boolean

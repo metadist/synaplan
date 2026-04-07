@@ -66,8 +66,8 @@ class AiFacade
     /**
      * Chat: Messages-Array or simple prompt.
      *
-     * @param array|string $messages Messages array oder einfacher string prompt
-     * @param int|null     $userId   User ID für Config-Lookup
+     * @param array|string $messages Messages array or simple string prompt
+     * @param int|null     $userId   User ID for config lookup
      * @param array        $options  Additional options (provider, model, temperature, etc.)
      *
      * @return array Response mit content, provider, model, usage
@@ -76,7 +76,7 @@ class AiFacade
     {
         $providerName = $options['provider'] ?? null;
 
-        // Wenn kein Provider explizit angegeben, nutze User-Konfiguration
+        // Fall back to user configuration when no provider is explicitly given
         if (!$providerName && $userId > 0) {
             $providerName = $this->modelConfig->getDefaultProvider($userId, 'chat');
         }
@@ -105,7 +105,6 @@ class AiFacade
                 fallback: null // NO FALLBACK - let ProviderException bubble up
             );
         } catch (ProviderException $e) {
-            // Re-throw ProviderException with helpful message (no model installed, etc.)
             throw $e;
         } catch (\Exception $e) {
             $this->logger->error('AI chat failed', [
@@ -115,10 +114,11 @@ class AiFacade
         }
 
         return [
-            'content' => $response,
+            'content' => $response['content'] ?? '',
             'provider' => $provider->getName(),
             'model' => $options['model'] ?? $provider->getDefaultModels()['chat'] ?? 'unknown',
-            'usage' => [],
+            'usage' => $response['usage'] ?? [],
+            'response_id' => $response['response_id'] ?? null,
         ];
     }
 
@@ -159,20 +159,20 @@ class AiFacade
         ]);
 
         // Execute streaming with Circuit Breaker protection
+        $streamResult = null;
         try {
             $this->circuitBreaker->execute(
-                callback: function () use ($provider, $messages, $streamCallback, $options) {
+                callback: function () use ($provider, $messages, $streamCallback, $options, &$streamResult) {
                     $this->logger->info('🟢 AiFacade: Calling provider chatStream');
-                    $provider->chatStream($messages, $streamCallback, $options);
+                    $streamResult = $provider->chatStream($messages, $streamCallback, $options);
                     $this->logger->info('🔵 AiFacade: Provider chatStream completed');
 
-                    return null; // void return
+                    return null;
                 },
                 serviceName: 'ai_provider_'.$provider->getName(),
                 fallback: null // NO FALLBACK - let ProviderException bubble up
             );
         } catch (ProviderException $e) {
-            // Re-throw ProviderException with helpful message (no model installed, etc.)
             throw $e;
         } catch (\Exception $e) {
             $this->logger->error('🔴 AiFacade: Chat stream failed', [
@@ -185,7 +185,8 @@ class AiFacade
         return [
             'provider' => $provider->getName(),
             'model' => $options['model'] ?? $provider->getDefaultModels()['chat'] ?? 'unknown',
-            'usage' => [],
+            'usage' => $streamResult['usage'] ?? [],
+            'response_id' => $streamResult['response_id'] ?? null,
         ];
     }
 
@@ -196,14 +197,14 @@ class AiFacade
      * @param int|null $userId  User ID for config lookup
      * @param array    $options Additional options (provider, model, etc.)
      *
-     * @return array Vector embedding
+     * @return array{embedding: array<float>, usage: array{prompt_tokens: int, total_tokens: int}}
      */
     public function embed(string $text, ?int $userId = null, array $options = []): array
     {
         $providerName = $options['provider'] ?? null;
         $model = $options['model'] ?? null;
 
-        // Wenn kein Provider explizit angegeben, nutze User-Konfiguration
+        // Fall back to user configuration when no provider is explicitly given
         if (!$providerName && $userId > 0) {
             $providerName = $this->modelConfig->getDefaultProvider($userId, 'vectorize');
         }
@@ -228,7 +229,7 @@ class AiFacade
      * @param string|null $providerName Explicit provider name
      * @param array       $options      Additional options (model, etc.) forwarded to the provider
      *
-     * @return array[] Array of embedding vectors
+     * @return array{embeddings: array<array<float>>, usage: array{prompt_tokens: int, total_tokens: int}}
      */
     public function embedBatch(array $texts, ?int $userId = null, ?string $providerName = null, array $options = []): array
     {
@@ -412,7 +413,7 @@ class AiFacade
     {
         $providerName = $options['provider'] ?? null;
 
-        // Wenn kein Provider explizit angegeben, nutze User-Konfiguration
+        // Fall back to user configuration when no provider is explicitly given
         if (!$providerName && $userId > 0) {
             $providerName = $this->modelConfig->getDefaultProvider($userId, 'image_generation');
         }
@@ -444,6 +445,7 @@ class AiFacade
             'images' => $images,
             'provider' => $provider->getName(),
             'model' => $options['model'] ?? 'unknown',
+            'image_count' => is_array($images) ? count($images) : 1,
         ];
     }
 
@@ -460,7 +462,7 @@ class AiFacade
     {
         $providerName = $options['provider'] ?? null;
 
-        // Wenn kein Provider explizit angegeben, nutze User-Konfiguration
+        // Fall back to user configuration when no provider is explicitly given
         if (!$providerName && $userId > 0) {
             $providerName = $this->modelConfig->getDefaultProvider($userId, 'video_generation');
         }
@@ -488,10 +490,16 @@ class AiFacade
             throw new ProviderException('Video generation failed', 'unknown', null, 0, $e);
         }
 
+        $durationSeconds = null;
+        if (is_array($videos) && !empty($videos)) {
+            $durationSeconds = $videos[0]['duration'] ?? $videos[0]['duration_seconds'] ?? null;
+        }
+
         return [
             'videos' => $videos,
             'provider' => $provider->getName(),
             'model' => $options['model'] ?? 'unknown',
+            'duration_seconds' => $durationSeconds,
         ];
     }
 
@@ -584,7 +592,7 @@ class AiFacade
     {
         $providerName = $options['provider'] ?? null;
 
-        // Wenn kein Provider explizit angegeben, nutze User-Konfiguration
+        // Fall back to user configuration when no provider is explicitly given
         if (!$providerName && $userId > 0) {
             $providerName = $this->modelConfig->getDefaultProvider($userId, 'speech_to_text');
         }
@@ -648,8 +656,8 @@ class AiFacade
     public function synthesize(string $text, ?int $userId = null, array $options = []): array
     {
         $providerName = $options['provider'] ?? null;
+        $ttsModelId = null;
 
-        // Resolve provider and model from user's TEXT2SOUND config (same as synthesizeStream)
         if ($userId > 0) {
             $ttsModelId = $this->modelConfig->getDefaultModel('TEXT2SOUND', $userId);
             if ($ttsModelId) {
@@ -689,7 +697,6 @@ class AiFacade
             throw new ProviderException('TTS failed', 'unknown', null, 0, $e);
         }
 
-        // Provider saves file to uploadDir root - move it to user-based path
         $relativePath = $this->moveToUserPath($filename, $userId, $provider->getName());
 
         return [
@@ -697,6 +704,8 @@ class AiFacade
             'relativePath' => $relativePath,
             'provider' => $provider->getName(),
             'model' => $options['model'] ?? 'unknown',
+            'model_id' => $ttsModelId ?? null,
+            'text_length' => mb_strlen($text),
         ];
     }
 

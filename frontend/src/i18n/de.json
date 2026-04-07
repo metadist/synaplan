@@ -110,7 +110,8 @@
       "overview": "Übersicht",
       "users": "Benutzer",
       "prompts": "Prompts",
-      "usage": "Nutzung"
+      "usage": "Nutzung",
+      "subscriptions": "Abonnements"
     },
     "overview": {
       "totalUsers": "Gesamtbenutzer",
@@ -176,12 +177,34 @@
       "byProvider": "Nach Anbieter",
       "topModels": "Top Modelle",
       "topUsers": "Top-Benutzer",
+      "topUsersHint": "Benutzer mit den meisten API-Anfragen im gewählten Zeitraum (max. 25).",
+      "topUsersEmpty": "Keine Nutzungsdaten für diesen Zeitraum. Versuchen Sie „Gesamte Zeit“ oder warten Sie auf Aktivität.",
       "model": "Modell",
       "requests": "Anfragen",
       "tokens": "Tokens",
       "cost": "Kosten",
       "activeSubscriptions": "Aktive Abos",
       "subscriptionOverview": "Abo-Übersicht"
+    },
+    "subscriptions": {
+      "title": "Abo-Budget-Verwaltung",
+      "description": "Kostenbudgets und Aktivstatus für jede Abo-Stufe verwalten. Preise sind schreibgeschützt und werden über Stripe verwaltet.",
+      "level": "Stufe",
+      "name": "Name",
+      "priceMonthly": "Preis/Monat",
+      "priceYearly": "Preis/Jahr",
+      "budgetMonthly": "Budget/Monat",
+      "budgetYearly": "Budget/Jahr",
+      "active": "Aktiv",
+      "actions": "Aktionen",
+      "edit": "Bearbeiten",
+      "save": "Speichern",
+      "cancel": "Abbrechen",
+      "saveSuccess": "Budget erfolgreich aktualisiert",
+      "saveError": "Budget-Aktualisierung fehlgeschlagen",
+      "loadError": "Abonnements konnten nicht geladen werden",
+      "noSubscriptions": "Keine Abo-Pläne gefunden. Erstellen Sie zuerst Abo-Pläne in der Datenbank.",
+      "budgetHint": "Das Budget definiert die maximalen Token-Kosten (in EUR) pro Abrechnungszeitraum. Setzen Sie es auf 0 für unbegrenzte Nutzung. Preise sind nur zur Anzeige und werden über Stripe verwaltet."
     },
     "config": {
       "title": "Systemkonfiguration",
@@ -579,7 +602,9 @@
       "mediumModels": "Mittel (Bessere Qualität)",
       "largeModels": "Groß (Beste Qualität)",
       "exampleCommand": "Installationsbefehl",
-      "restartNote": "Nach dem Herunterladen die Seite aktualisieren und erneut versuchen."
+      "restartNote": "Nach dem Herunterladen die Seite aktualisieren und erneut versuchen.",
+      "visionModelHint": "Kein Vision-fähiges Modell konfiguriert",
+      "visionModelHintDetail": "Deine Nachricht enthält Bilder, aber dein aktuelles Chat-Modell kann diese nicht analysieren. Gehe zu **Einstellungen → KI-Modelle** und aktiviere ein Modell mit Vision-Unterstützung (z.B. GPT-4o, Gemini, Llama 4), oder setze ein Standard-**Pic→Text**-Modell."
     }
   },
   "login": {
@@ -775,13 +800,32 @@
       "apiChannel": "API-Kanal",
       "webWidget": "Web-Widget",
       "defaultHandling": "Standardverarbeitung",
+      "personalKeyword": "persönliches Keyword",
+      "keywordSaved": "E-Mail-Keyword erfolgreich gespeichert",
       "addKeyword": "Prüfen Sie, ob ein Keyword frei ist, um Ihre eigene Verarbeitung hinzuzufügen:",
       "keywordPlaceholder": "Keyword",
       "yourEmailAddress": "Ihre E-Mail-Adresse: {email}",
       "noKeywordSet": "Sie haben noch kein persönliches Keyword festgelegt. Sie können nur anonym an den Standard-Handler schreiben!",
       "apiDescription": "Einfache API-Aufrufe mit Ihrem persönlichen API-Schlüssel:",
       "apiDocumentationInfo": "Für eine ausführliche API-Dokumentation mit allen verfügbaren Endpunkten, Anfrage-/Antwortformaten und Authentifizierungsmethoden besuchen Sie bitte unsere umfassende API-Dokumentation.",
-      "viewApiDocumentation": "API-Dokumentation ansehen"
+      "viewApiDocumentation": "API-Dokumentation ansehen",
+      "apiDocumentation": {
+        "title": "API-Dokumentation",
+        "description": "Vollständige API-Referenz zur Integration mit Synaplan. Alle Endpunkte sind mit Anfrage-/Antwortbeispielen dokumentiert.",
+        "loading": "API-Dokumentation wird geladen...",
+        "loadError": "API-Dokumentation konnte nicht geladen werden",
+        "parameters": "Parameter",
+        "requestBody": "Anfragekörper",
+        "responses": "Antworten",
+        "authentication": "Authentifizierung",
+        "version": "Version:",
+        "required": "erforderlich",
+        "type": "Typ:",
+        "contentType": "Content-Type:",
+        "example": "Beispiel:",
+        "headers": "Header:",
+        "requiresAuth": "Dieser Endpunkt erfordert Authentifizierung:"
+      }
     },
     "aiModels": {
       "title": "KI-Modelle",
@@ -802,6 +846,8 @@
       "sortPurpose": "Sortierung: Verwendungszweck",
       "qualityScore": "Qualitätswert: {score}/10",
       "noModelsAvailable": "Keine Modelle für diesen Verwendungszweck verfügbar",
+      "saveSuccess": "Modellkonfiguration gespeichert",
+      "saveError": "Modellkonfiguration konnte nicht gespeichert werden",
       "tableName": "Name",
       "tableService": "Anbieter",
       "tableRating": "Bewertung",
@@ -866,7 +912,12 @@
         "unitIn": "Einheit ein",
         "priceOut": "Preis aus",
         "unitOut": "Einheit aus",
+        "showWhenFree": "Gratis OK",
+        "showWhenFreeTooltip": "Modell in der Auswahl anzeigen, auch wenn Preis ein und Preis aus beide 0 sind (kostenlos)",
+        "showWhenFreeOn": "Override aktiv: Modell sichtbar, auch wenn beide Preise 0 sind",
+        "showWhenFreeOff": "Standard: Modell wird ausgeblendet, wenn beide Preise 0 sind",
         "actions": "Aktionen",
+        "edit": "Bearbeiten",
         "save": "Speichern",
         "saving": "Speichere…",
         "delete": "Löschen",
@@ -883,7 +934,11 @@
         "failedCreate": "Modell erstellen fehlgeschlagen",
         "failedSave": "Modell speichern fehlgeschlagen",
         "failedDelete": "Modell löschen fehlgeschlagen",
-        "requiredFields": "Alle Felder sind erforderlich: Service, Tag, Provider-ID, Name"
+        "requiredFields": "Alle Felder sind erforderlich: Service, Tag, Provider-ID, Name",
+        "searchPlaceholder": "Modelle suchen..."
+      },
+      "pagination": {
+        "showing": "Zeige {start}–{end} von {total}"
       }
     },
     "taskPrompts": {
@@ -1017,6 +1072,7 @@
       "exportSuccess": "Nutzungsdaten erfolgreich exportiert",
       "errorLoading": "Fehler beim Laden der Nutzungsstatistiken",
       "errorExporting": "Fehler beim Exportieren der Nutzungsdaten",
+      "notAuthenticated": "Nicht authentifiziert. Bitte melden Sie sich an, um Statistiken anzuzeigen.",
       "subscription": "Abonnement",
       "userLevel": "Benutzerebene",
       "phoneVerified": "Telefon verifiziert",
@@ -1036,13 +1092,42 @@
       "source": "Quelle",
       "tokens": "Tokens",
       "latency": "Latenz",
+      "model": "Modell",
+      "promptTokens": "Prompt",
+      "completionTokens": "Completion",
+      "cachedTokens": "Cache",
+      "cost": "Kosten",
+      "estimatedTooltip": "Tokenanzahl geschätzt (keine exakte Messung vom Provider)",
       "noRecentActivity": "Keine aktuellen Aktivitäten",
+      "activity": {
+        "searchPlaceholder": "Nach Modell oder Provider suchen...",
+        "allActions": "Alle Aktionen",
+        "dateFrom": "Von Datum",
+        "dateTo": "Bis Datum",
+        "clearFilters": "Filter zurücksetzen",
+        "showing": "{from}-{to} von {total} angezeigt"
+      },
+      "costBudget": {
+        "title": "Kostenbudget",
+        "consumption": "Verbrauch",
+        "remaining": "Verbleibend",
+        "thisMonth": "Kosten diesen Monat",
+        "unlimited": "Kein Limit"
+      },
+      "costSummary": {
+        "today": "Heute",
+        "thisWeek": "Diese Woche",
+        "thisMonth": "Dieser Monat"
+      },
       "actions": {
         "messages": "Nachrichten",
         "images": "Bilder",
         "videos": "Videos",
         "audios": "Audiodateien",
-        "file_analysis": "Textanalyse"
+        "file_analysis": "Dateianalyse",
+        "sorting": "Klassifikation",
+        "search_query": "Suchanfrage",
+        "embeddings": "Embeddings"
       },
       "sources": {
         "whatsapp": "WhatsApp",
@@ -1223,7 +1308,8 @@
     "reset": "Zurücksetzen",
     "remove": "Entfernen",
     "clearSelection": "Auswahl aufheben",
-    "view": "Ansehen"
+    "view": "Ansehen",
+    "expand": "Erweitern"
   },
   "search": {
     "sources": "Quellen",
@@ -1251,6 +1337,7 @@
     "revoke": "Öffentlichen Zugriff Widerrufen"
   },
   "files": {
+    "searchPlaceholder": "Dateien suchen...",
     "uploadTitle": "Dateien hochladen",
     "groupKeyword": "Ordner:",
     "groupKeywordPlaceholder": "Ordnernamen eingeben",
@@ -1291,6 +1378,7 @@
     "status_extracted": "Extrahiert",
     "status_vectorizing": "Wird indexiert…",
     "status_vectorized": "Bereit",
+    "status_processed": "Verarbeitet",
     "attached": "Angehängt",
     "standalone": "Eigenständig",
     "attachedToMessage": "Diese Datei ist an eine Nachricht angehängt",
@@ -1427,7 +1515,15 @@
       "loading": "Lade Features...",
       "requiredConfig": "Erforderliche Konfiguration:",
       "set": "Gesetzt",
-      "notSet": "Nicht gesetzt"
+      "notSet": "Nicht gesetzt",
+      "allOperational": "Alle Systeme betriebsbereit",
+      "issuesDetected": "Probleme erkannt",
+      "ready": "Bereit",
+      "healthSummary": "{healthy} von {total} Services gesund",
+      "model": "Modell",
+      "models": "Modelle",
+      "devOnlyTitle": "Nur Entwicklungsmodus",
+      "devOnlyMessage": "Diese Seite ist nur in Entwicklungsumgebungen verfügbar. Die Systemstatusüberwachung ist in der Produktion eingeschränkt."
     }
   },
   "mail": {
@@ -2665,5 +2761,14 @@
   },
   "system": {
     "missingApiKeys": "Einige API-Schlüssel fehlen — folgende Anbieter sind deaktiviert: {providers}"
+  },
+  "models": {
+    "loading": "Modelle werden geladen...",
+    "costTier": {
+      "free": "Kostenlos",
+      "low": "Low Cost",
+      "mid": "Mid Cost",
+      "high": "High Cost"
+    }
   }
 }

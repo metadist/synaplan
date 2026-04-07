@@ -8,6 +8,8 @@ use App\Service\DiscordNotificationService;
 use App\Service\Message\MessageSorter;
 use App\Service\ModelConfigService;
 use App\Service\PromptService;
+use App\Service\RateLimitService;
+use Doctrine\ORM\EntityManagerInterface;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
@@ -24,6 +26,8 @@ class MessageSorterTest extends TestCase
         $promptRepository = $this->createMock(PromptRepository::class);
         $modelConfigService = $this->createMock(ModelConfigService::class);
         $promptService = $this->createMock(PromptService::class);
+        $rateLimitService = $this->createMock(RateLimitService::class);
+        $em = $this->createMock(EntityManagerInterface::class);
         $logger = $this->createMock(LoggerInterface::class);
         $discord = $this->createMock(DiscordNotificationService::class);
 
@@ -32,6 +36,8 @@ class MessageSorterTest extends TestCase
             $promptRepository,
             $modelConfigService,
             $promptService,
+            $rateLimitService,
+            $em,
             $logger,
             $discord
         );

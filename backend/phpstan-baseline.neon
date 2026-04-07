@@ -619,24 +619,6 @@ parameters:
 			path: tests/Service/VectorSearchServiceTest.php
 
 		-
-			message: '#^Call to an undefined method App\\Repository\\ApiKeyRepository\:\:expects\(\)\.$#'
-			identifier: method.notFound
-			count: 3
-			path: tests/Unit/ApiKeyAuthenticatorTest.php
-
-		-
-			message: '#^Call to an undefined method App\\Repository\\ApiKeyRepository\:\:method\(\)\.$#'
-			identifier: method.notFound
-			count: 6
-			path: tests/Unit/ApiKeyAuthenticatorTest.php
-
-		-
-			message: '#^Call to an undefined method Psr\\Log\\LoggerInterface\:\:expects\(\)\.$#'
-			identifier: method.notFound
-			count: 1
-			path: tests/Unit/ApiKeyAuthenticatorTest.php
-
-		-
 			message: '#^Call to an undefined method App\\AI\\Service\\AiFacade\:\:expects\(\)\.$#'
 			identifier: method.notFound
 			count: 4

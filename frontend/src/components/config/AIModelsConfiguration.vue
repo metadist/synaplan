@@ -50,8 +50,13 @@
               data-testid="btn-model-dropdown"
               @click="toggleDropdown(capability as Capability)"
             >
-              <span class="block truncate">
-                {{ getSelectedModelLabel(capability as Capability) }}
+              <span class="flex items-center gap-2 truncate">
+                <span class="truncate">{{ getSelectedModelLabel(capability as Capability) }}</span>
+                <ModelCostBadge
+                  v-if="getSelectedModelObj(capability as Capability)"
+                  :model="getSelectedModelObj(capability as Capability)!"
+                  :peers="getModelsByPurpose(capability as Capability)"
+                />
               </span>
             </button>
             <div class="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none">
@@ -108,7 +113,13 @@
                 />
                 <Icon v-else :icon="getProviderIcon(model.service)" class="w-5 h-5 flex-shrink-0" />
                 <div class="flex-1 min-w-0 text-left">
-                  <div class="font-medium truncate">{{ model.name }}</div>
+                  <div class="flex items-center gap-2">
+                    <span class="font-medium truncate">{{ model.name }}</span>
+                    <ModelCostBadge
+                      :model="model"
+                      :peers="getModelsByPurpose(capability as Capability)"
+                    />
+                  </div>
                   <div class="text-xs txt-secondary truncate">{{ model.service }}</div>
                 </div>
               </button>
@@ -251,7 +262,7 @@
           </thead>
           <tbody>
             <tr
-              v-for="model in sortedModels"
+              v-for="model in paginatedModels"
               :key="`${model.id}-${model.purpose}`"
               class="border-b border-light-border/10 dark:border-dark-border/10 hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
               data-testid="item-model"
@@ -314,6 +325,40 @@
           </tbody>
         </table>
       </div>
+
+      <div
+        v-if="modelsTotalPages > 1"
+        class="flex items-center justify-between pt-4 border-t border-light-border/10 dark:border-dark-border/10 mt-4"
+      >
+        <span class="text-sm txt-secondary">
+          {{
+            $t('config.aiModels.pagination.showing', {
+              start: (modelsPage - 1) * MODELS_PER_PAGE + 1,
+              end: Math.min(modelsPage * MODELS_PER_PAGE, sortedModels.length),
+              total: sortedModels.length,
+            })
+          }}
+        </span>
+        <div class="flex items-center gap-1">
+          <button
+            class="p-1.5 rounded-lg border border-light-border/30 dark:border-dark-border/20 txt-secondary hover:txt-primary transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+            :disabled="modelsPage <= 1"
+            @click="modelsPage--"
+          >
+            <ChevronLeftIcon class="w-4 h-4" />
+          </button>
+          <span class="px-3 text-sm txt-primary font-medium">
+            {{ modelsPage }} / {{ modelsTotalPages }}
+          </span>
+          <button
+            class="p-1.5 rounded-lg border border-light-border/30 dark:border-dark-border/20 txt-secondary hover:txt-primary transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+            :disabled="modelsPage >= modelsTotalPages"
+            @click="modelsPage++"
+          >
+            <ChevronRightIcon class="w-4 h-4" />
+          </button>
+        </div>
+      </div>
     </div>
 
     <AIModelsAdminPanel v-if="authStore.isAdmin" />
@@ -322,12 +367,14 @@
 
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { ChevronLeftIcon, ChevronRightIcon } from '@heroicons/vue/20/solid'
 import { useRoute } from 'vue-router'
 import { ChevronDownIcon, CpuChipIcon, FunnelIcon, ListBulletIcon } from '@heroicons/vue/24/outline'
 import { Icon } from '@iconify/vue'
 import AIModelsAdminPanel from '@/components/config/AIModelsAdminPanel.vue'
 import SortIndicator from '@/components/config/SortIndicator.vue'
 import GroqIcon from '@/components/icons/GroqIcon.vue'
+import ModelCostBadge from '@/components/ModelCostBadge.vue'
 import { useNotification } from '@/composables/useNotification'
 import { serviceColors } from '@/mocks/aiModels'
 import {
@@ -385,6 +432,8 @@ const openDropdown = ref<Capability | null>(null)
 const showRatings = ref(false)
 const sortBy = ref<'alphabet' | 'service' | 'rating' | 'quality' | 'purpose'>('alphabet')
 const sortDirection = ref<'asc' | 'desc'>('asc')
+const modelsPage = ref(1)
+const MODELS_PER_PAGE = 20
 
 const { success, error: showError, warning } = useNotification()
 
@@ -526,26 +575,46 @@ const loadData = async () => {
   }
 }
 
+const modelsByPurpose = computed<Record<string, AIModel[]>>(() => {
+  const result: Record<string, AIModel[]> = {}
+  for (const [purpose, models] of Object.entries(availableModels.value)) {
+    result[purpose] = [...models].sort((a, b) => a.name.localeCompare(b.name))
+  }
+  return result
+})
+
 const getModelsByPurpose = (purpose: Capability): AIModel[] => {
-  const models = availableModels.value[purpose] || []
-  // Sort alphabetically by name
-  return models.sort((a, b) => a.name.localeCompare(b.name))
+  return modelsByPurpose.value[purpose] || []
 }
 
+const selectedModelInfo = computed<Record<string, { label: string; service: string }>>(() => {
+  const info: Record<string, { label: string; service: string }> = {}
+  for (const purpose of Object.keys(purposeLabels.value)) {
+    const models = modelsByPurpose.value[purpose] || []
+    const selectedId = defaultConfig.value[purpose as Capability]
+    const selected = selectedId ? models.find((m) => m.id === selectedId) : null
+    info[purpose] = {
+      label: selected
+        ? `${selected.providerId || selected.name} (${selected.service})`
+        : '-- Select Model --',
+      service: selected?.service || 'unknown',
+    }
+  }
+  return info
+})
+
 const getSelectedModelService = (purpose: Capability): string => {
-  const models = getModelsByPurpose(purpose)
-  const selectedModelId = defaultConfig.value[purpose]
-  const selectedModel = models.find((m) => m.id === selectedModelId)
-  return selectedModel?.service || 'unknown'
+  return selectedModelInfo.value[purpose]?.service || 'unknown'
 }
 
 const getSelectedModelLabel = (purpose: Capability): string => {
-  const models = getModelsByPurpose(purpose)
-  const selectedModelId = defaultConfig.value[purpose]
-  if (!selectedModelId) return '-- Select Model --'
-  const selectedModel = models.find((m) => m.id === selectedModelId)
-  if (!selectedModel) return '-- Select Model --'
-  return `${selectedModel.providerId || selectedModel.name} (${selectedModel.service})`
+  return selectedModelInfo.value[purpose]?.label || '-- Select Model --'
+}
+
+const getSelectedModelObj = (purpose: Capability): AIModel | null => {
+  const models = modelsByPurpose.value[purpose] || []
+  const selectedId = defaultConfig.value[purpose]
+  return selectedId ? (models.find((m) => m.id === selectedId) ?? null) : null
 }
 
 const toggleDropdown = (capability: Capability) => {
@@ -641,56 +710,46 @@ const getStarRating = (quality: number): number => {
   return Math.round(quality / 2)
 }
 
+type ModelWithPurpose = AIModel & { purpose: Capability }
+
 const sortedModels = computed(() => {
-  // Force dependency tracking by reading values at the start
-  const currentSortBy = sortBy.value
-  const currentSortDirection = sortDirection.value
-  const sourceModels = filteredModels.value
+  const dir = sortDirection.value === 'asc' ? 1 : -1
+  const col = sortBy.value
 
-  // Create a deep copy to avoid any mutation issues
-  const models = sourceModels.map((m) => ({ ...m }))
-  const dir = currentSortDirection === 'asc' ? 1 : -1
-
-  // Sort function that uses the current sort column and direction
-  const compareFn = (a: (typeof models)[0], b: (typeof models)[0]): number => {
-    let primaryCmp = 0
-
-    switch (currentSortBy) {
+  const compareFn = (a: ModelWithPurpose, b: ModelWithPurpose): number => {
+    let cmp = 0
+    switch (col) {
       case 'alphabet':
-        primaryCmp = a.name.localeCompare(b.name)
+        cmp = a.name.localeCompare(b.name)
         break
-
       case 'service':
-        primaryCmp = a.service.localeCompare(b.service)
+        cmp = a.service.localeCompare(b.service)
         break
-
       case 'rating':
       case 'quality':
-        primaryCmp = a.quality - b.quality
+        cmp = a.quality - b.quality
         break
-
       case 'purpose':
-        primaryCmp = a.purpose.localeCompare(b.purpose)
+        cmp = a.purpose.localeCompare(b.purpose)
         break
-
-      default:
-        return 0
     }
-
-    // Apply direction multiplier
-    if (primaryCmp !== 0) {
-      return dir * primaryCmp
-    }
-
-    // Fallback: sort by name (always in the same direction as primary sort)
-    return dir * a.name.localeCompare(b.name)
+    return cmp !== 0 ? dir * cmp : dir * a.name.localeCompare(b.name)
   }
 
-  // Sort the array
-  const sorted = models.sort(compareFn)
+  return [...filteredModels.value].sort(compareFn)
+})
 
-  // Return a new array reference to ensure Vue detects the change
-  return Array.from(sorted)
+const modelsTotalPages = computed(() =>
+  Math.max(1, Math.ceil(sortedModels.value.length / MODELS_PER_PAGE))
+)
+
+const paginatedModels = computed(() => {
+  const start = (modelsPage.value - 1) * MODELS_PER_PAGE
+  return sortedModels.value.slice(start, start + MODELS_PER_PAGE)
+})
+
+watch([selectedPurpose, sortBy, sortDirection], () => {
+  modelsPage.value = 1
 })
 
 const saveConfiguration = async () => {
@@ -708,11 +767,11 @@ const saveConfiguration = async () => {
 
     if (response.success) {
       originalConfig.value = { ...defaultConfig.value }
-      success('Configuration saved successfully!')
+      success(t('config.aiModels.saveSuccess'))
     }
-  } catch (error: any) {
-    console.error('Failed to save configuration:', error)
-    showError(error.response?.data?.error || 'Failed to save configuration')
+  } catch (err: unknown) {
+    console.error('Failed to save configuration:', err)
+    showError(t('config.aiModels.saveError'))
   } finally {
     saving.value = false
   }

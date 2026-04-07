@@ -413,56 +413,51 @@
                     transform: `translateX(calc(-${carouselPage * 100}%))`,
                   }"
                 >
-                  <div
+                  <button
                     v-for="(result, index) in searchResults"
                     :key="index"
+                    type="button"
                     :class="[
                       'group flex flex-col gap-2 p-2 sm:p-3 rounded-lg transition-all cursor-pointer flex-shrink-0 snap-start',
                       'w-[85%] sm:w-[calc(33.333%-0.5rem)]',
-                      'bg-[var(--bg-chip)] border shadow-sm',
+                      'bg-[var(--bg-chip)] border shadow-sm text-left font-inherit',
                       highlightedSource === index
                         ? '!border-[var(--brand)] border-2 bg-[var(--brand-alpha-light)] shadow-lg'
                         : 'border-[var(--border-light)]',
                     ]"
-                    @click="focusSource(index)"
+                    @click="openSourceCard(index, result.url)"
                   >
                     <!-- Header: Badge + Source Name + Open Button (Mobile) -->
                     <div class="flex items-center gap-2">
-                      <!-- Badge Number (clickable) -->
-                      <button
+                      <!-- Badge Number -->
+                      <span
                         :class="[
                           'inline-flex items-center justify-center w-6 h-6 rounded-full text-xs font-bold flex-shrink-0 transition-all',
-                          'hover:scale-110 active:scale-95',
                           highlightedSource === index
                             ? 'bg-[var(--brand)] text-white shadow-md'
-                            : 'bg-[var(--brand-alpha-light)] text-[var(--brand)] hover:bg-[var(--brand)] hover:text-white',
+                            : 'bg-[var(--brand-alpha-light)] text-[var(--brand)]',
                         ]"
-                        :title="`Highlight source ${index + 1}`"
-                        @click.stop="focusSource(index)"
                       >
                         {{ index + 1 }}
-                      </button>
+                      </span>
 
                       <!-- Source Name -->
                       <span class="text-xs txt-muted truncate flex-1">{{ result.source }}</span>
 
-                      <!-- Open Link Button (visible when highlighted) -->
-                      <button
+                      <!-- Open Link Icon (visible when highlighted) -->
+                      <span
                         v-if="highlightedSource === index"
-                        class="flex items-center gap-1 px-2 py-1 rounded-md bg-[var(--brand)] text-white text-xs font-medium hover:opacity-90 transition-opacity"
-                        title="Open link"
-                        @click.stop="openSource(result.url)"
+                        class="flex items-center gap-1 px-2 py-1 rounded-md bg-[var(--brand)] text-white text-xs font-medium"
                       >
                         <Icon icon="mdi:open-in-new" class="w-3.5 h-3.5" />
-                        <span class="hidden sm:inline">Open</span>
-                      </button>
+                        <span class="hidden sm:inline">{{ $t('common.open') }}</span>
+                      </span>
                     </div>
 
-                    <!-- Thumbnail (clickable to open) -->
+                    <!-- Thumbnail -->
                     <div
                       v-if="result.thumbnail"
-                      class="w-full aspect-video rounded-lg overflow-hidden bg-black/5 dark:bg-white/5 hover:opacity-90 transition-opacity cursor-pointer"
-                      @click.stop="openSource(result.url)"
+                      class="w-full aspect-video rounded-lg overflow-hidden bg-black/5 dark:bg-white/5 hover:opacity-90 transition-opacity"
                     >
                       <img
                         :src="result.thumbnail"
@@ -475,10 +470,9 @@
 
                     <!-- Content -->
                     <div class="flex-1 min-w-0 space-y-1">
-                      <!-- Title (clickable to open) -->
+                      <!-- Title -->
                       <div
-                        class="text-sm font-medium line-clamp-2 group-hover:text-[var(--brand)] transition-colors hover:underline cursor-pointer"
-                        @click.stop="openSource(result.url)"
+                        class="text-sm font-medium line-clamp-2 group-hover:text-[var(--brand)] transition-colors group-hover:underline"
                       >
                         {{ result.title }}
                       </div>
@@ -490,7 +484,7 @@
                         {{ result.published }}
                       </div>
                     </div>
-                  </div>
+                  </button>
                 </div>
               </div>
             </div>
@@ -507,7 +501,7 @@
           ]"
         >
           <!-- Left: AI Model Badges + timestamp -->
-          <div class="flex items-center gap-1 min-w-0 flex-wrap">
+          <div class="flex items-center gap-1 min-w-0">
             <!-- Topic Badge (assistant only) - Ultra compact + Clickable -->
             <template v-if="role === 'assistant' && topic">
               <router-link
@@ -528,28 +522,34 @@
               <button
                 v-if="aiModels.chat"
                 type="button"
-                class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-xs font-medium bg-brand-alpha-light hover:bg-brand-alpha transition-colors cursor-pointer"
+                class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-xs font-medium bg-brand-alpha-light hover:bg-brand-alpha transition-colors cursor-pointer min-w-0"
                 :title="getModelTypeTitle"
                 data-testid="btn-message-model-chat"
                 @click="showModelDetails('chat')"
               >
-                <Icon :icon="getModelTypeIcon" class="w-3.5 h-3.5" />
-                <span class="hidden sm:inline">{{ getModelTypeLabel }}:</span>
-                <span class="font-semibold">{{ shortenModel(aiModels.chat.model) }}</span>
+                <Icon :icon="getModelTypeIcon" class="w-3.5 h-3.5 flex-shrink-0" />
+                <span class="hidden sm:inline flex-shrink-0">{{ getModelTypeLabel }}:</span>
+                <span class="font-semibold truncate min-w-0">{{
+                  shortenModel(aiModels.chat.model)
+                }}</span>
               </button>
 
               <!-- Sorting Model Badge -->
               <button
                 v-if="aiModels.sorting"
                 type="button"
-                class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-xs font-medium bg-purple-500/10 hover:bg-purple-500/20 text-purple-600 dark:text-purple-400 transition-colors cursor-pointer"
+                class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-xs font-medium bg-purple-500/10 hover:bg-purple-500/20 text-purple-600 dark:text-purple-400 transition-colors cursor-pointer min-w-0"
                 :title="`${$t('config.aiModels.messageClassification')}: ${aiModels.sorting.model}`"
                 data-testid="btn-message-model-sorting"
                 @click="showModelDetails('sorting')"
               >
-                <Icon icon="mdi:sort" class="w-3.5 h-3.5" />
-                <span class="hidden sm:inline">{{ $t('config.aiModels.sorting') }}:</span>
-                <span class="font-semibold">{{ shortenModel(aiModels.sorting.model) }}</span>
+                <Icon icon="mdi:sort" class="w-3.5 h-3.5 flex-shrink-0" />
+                <span class="hidden sm:inline flex-shrink-0"
+                  >{{ $t('config.aiModels.sorting') }}:</span
+                >
+                <span class="font-semibold truncate min-w-0">{{
+                  shortenModel(aiModels.sorting.model)
+                }}</span>
               </button>
 
               <span
@@ -559,7 +559,13 @@
               >
             </template>
 
-            <div :class="['text-xs truncate', role === 'user' ? 'text-white/80' : 'txt-secondary']">
+            <div
+              :class="[
+                'text-xs',
+                aiModels ? 'flex-shrink-0 whitespace-nowrap' : 'truncate',
+                role === 'user' ? 'text-white/80' : 'txt-secondary',
+              ]"
+            >
               <!-- Hide model info during processing states (classifying, analyzing, etc.) -->
               <template
                 v-if="role === 'assistant' && modelLabel && provider && !aiModels && !isProcessing"
@@ -671,7 +677,14 @@
                       class="w-5 h-5 flex-shrink-0"
                     />
                     <div class="flex-1 min-w-0">
-                      <div class="text-sm font-medium">{{ option.label }}</div>
+                      <div class="flex items-center gap-2">
+                        <span class="text-sm font-medium">{{ option.label }}</span>
+                        <ModelCostBadge
+                          v-if="getModelForOption(option)"
+                          :model="getModelForOption(option)!"
+                          :peers="peerModelsForCost"
+                        />
+                      </div>
                       <div class="text-xs txt-secondary">{{ option.provider }}</div>
                     </div>
                   </button>
@@ -750,6 +763,9 @@ import {
 } from '@heroicons/vue/24/outline'
 import { Icon } from '@iconify/vue'
 import { useModelSelection, type ModelOption } from '@/composables/useModelSelection'
+import ModelCostBadge from '@/components/ModelCostBadge.vue'
+import { useAiConfigStore } from '@/stores/aiConfig'
+import type { AIModel } from '@/types/ai-models'
 import { useNotification } from '@/composables/useNotification'
 import { getProviderIcon } from '@/utils/providerIcons'
 import { useMemoriesStore } from '@/stores/userMemories'
@@ -914,8 +930,8 @@ const focusSource = (index: number) => {
   }
 }
 
-// Open source URL (with external link warning)
-const openSource = (url: string) => {
+const openSourceCard = (index: number, url: string) => {
+  focusSource(index)
   openExternalLink(url)
 }
 
@@ -1168,6 +1184,24 @@ const { modelOptions, predictedModel, hasModels } = useModelSelection(
 
 // Selected model: use predicted or first available
 const selectedModel = computed(() => predictedModel.value)
+
+const aiConfigStoreForCost = useAiConfigStore()
+const peerModelsForCost = computed((): AIModel[] => {
+  return modelOptions.value
+    .map((opt) => {
+      for (const models of Object.values(aiConfigStoreForCost.models)) {
+        if (!models) continue
+        const found = models.find((m: AIModel) => m.id === opt.id)
+        if (found) return found
+      }
+      return undefined
+    })
+    .filter((m): m is AIModel => !!m)
+})
+
+const getModelForOption = (option: ModelOption): AIModel | undefined => {
+  return peerModelsForCost.value.find((m) => m.id === option.id)
+}
 
 // Navigate to AI models configuration with highlight
 const showModelDetails = (modelType?: 'chat' | 'sorting') => {

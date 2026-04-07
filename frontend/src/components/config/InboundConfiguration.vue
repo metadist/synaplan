@@ -108,7 +108,7 @@
         </p>
         <router-link
           to="/config/api-documentation"
-          class="btn-primary inline-flex items-center gap-2"
+          class="btn-primary px-6 py-3 rounded-lg font-medium inline-flex items-center gap-2"
         >
           <CommandLineIcon class="w-4 h-4" />
           {{ $t('config.inbound.viewApiDocumentation') }}
@@ -148,6 +148,7 @@ import type { EmailChannel } from '@/mocks/config'
 import { useUnsavedChanges } from '@/composables/useUnsavedChanges'
 import { useNotification } from '@/composables/useNotification'
 import { profileApi } from '@/services/api/profileApi'
+import { getApiErrorMessage } from '@/utils/errorMessage'
 
 const { t } = useI18n()
 const { success, error } = useNotification()
@@ -208,7 +209,7 @@ const loadEmailKeyword = async () => {
       originalData.value.emailKeyword = response.keyword || ''
       originalData.value.personalEmailAddress = response.emailAddress
     }
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error('Failed to load email keyword:', err)
     // Don't show error on initial load, just log it
   }
@@ -236,9 +237,8 @@ const handleSave = saveChanges(async () => {
       originalData.value.personalEmailAddress = response.emailAddress
       success(t('config.inbound.keywordSaved'))
     }
-  } catch (err: any) {
-    const errorMessage =
-      err?.response?.data?.error || err?.message || 'Failed to save email keyword'
+  } catch (err: unknown) {
+    const errorMessage = getApiErrorMessage(err) || 'Failed to save email keyword'
     error(errorMessage)
     throw err // Re-throw to prevent hasUnsavedChanges from being cleared
   }

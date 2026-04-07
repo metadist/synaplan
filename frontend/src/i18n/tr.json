@@ -174,6 +174,8 @@
       "byProvider": "Sağlayıcı Bazında",
       "topModels": "En Çok Kullanılan Modeller",
       "topUsers": "En Aktif Kullanıcılar",
+      "topUsersHint": "Seçilen dönemde en çok API isteği yapan kullanıcılar (en fazla 25).",
+      "topUsersEmpty": "Bu dönem için kullanım verisi yok. \"Tüm zamanlar\"ı deneyin veya kullanıcı etkinliği bekleyin.",
       "model": "Model",
       "requests": "istek",
       "tokens": "token",
@@ -426,7 +428,9 @@
       "mediumModels": "Orta (Daha İyi Kalite)",
       "largeModels": "Büyük (En İyi Kalite)",
       "exampleCommand": "Kurulum Komutu",
-      "restartNote": "İndirdikten sonra sayfayı yenileyin ve tekrar deneyin."
+      "restartNote": "İndirdikten sonra sayfayı yenileyin ve tekrar deneyin.",
+      "visionModelHint": "Görüntü destekli model yapılandırılmamış",
+      "visionModelHintDetail": "Mesajınız görüntüler içeriyor, ancak mevcut sohbet modeliniz bunları analiz edemiyor. **Ayarlar → AI Modelleri**'ne gidin ve görüntü destekli bir model etkinleştirin (ör. GPT-4o, Gemini, Llama 4) veya varsayılan bir **Pic→Text** modeli ayarlayın."
     }
   },
   "common": {
@@ -464,7 +468,8 @@
     "retry": "Tekrar Dene",
     "enabled": "Etkin",
     "disabled": "Devre Dışı",
-    "reset": "Sıfırla"
+    "reset": "Sıfırla",
+    "expand": "Genişlet"
   },
   "search": {
     "sources": "Kaynaklar",
@@ -1049,6 +1054,7 @@
     "unlimited": "Sınırsız"
   },
   "files": {
+    "searchPlaceholder": "Dosya ara...",
     "uploadTitle": "RAG Dosyaları Yükle",
     "groupKeyword": "Grup Anahtar Kelimesi:",
     "groupKeywordPlaceholder": "Dosya gruplandırma için anahtar kelime girin",
@@ -1139,7 +1145,15 @@
         "parameters": "Parametreler",
         "requestBody": "İstek Gövdesi",
         "responses": "Yanıtlar",
-        "authentication": "Kimlik Doğrulama"
+        "authentication": "Kimlik Doğrulama",
+        "loadError": "API dokümantasyonu yüklenemedi",
+        "version": "Sürüm:",
+        "required": "zorunlu",
+        "type": "Tür:",
+        "contentType": "Content-Type:",
+        "example": "Örnek:",
+        "headers": "Başlıklar:",
+        "requiresAuth": "Bu uç nokta kimlik doğrulama gerektirir:"
       },
       "exampleCurl": "Örnek:",
       "widgetDescription": "Widgetı etkinleştirmek için lütfen aşağıdaki alana \"siteadınız.com\" gibi domain adınızı girin.",
@@ -1367,7 +1381,9 @@
         "images": "Görseller",
         "videos": "Videolar",
         "audios": "Ses Dosyaları",
-        "file_analysis": "Dosya Analizi"
+        "file_analysis": "Dosya Analizi",
+        "sorting": "Sınıflandırma",
+        "search_query": "Arama Sorgusu"
       },
       "sources": {
         "whatsapp": "WhatsApp",
@@ -1919,5 +1935,14 @@
   },
   "system": {
     "missingApiKeys": "Bazı API anahtarları eksik — şu sağlayıcılar devre dışı: {providers}"
+  },
+  "models": {
+    "loading": "Modeller yükleniyor...",
+    "costTier": {
+      "free": "Ücretsiz",
+      "low": "Low Cost",
+      "mid": "Mid Cost",
+      "high": "High Cost"
+    }
   }
 }

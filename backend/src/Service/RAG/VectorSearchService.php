@@ -3,9 +3,11 @@
 namespace App\Service\RAG;
 
 use App\AI\Service\AiFacade;
+use App\Entity\User;
 use App\Service\ModelConfigService;
 use App\Service\RAG\VectorStorage\DTO\SearchQuery;
 use App\Service\RAG\VectorStorage\VectorStorageFacade;
+use App\Service\RateLimitService;
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;
 
@@ -16,6 +18,7 @@ final readonly class VectorSearchService
         private AiFacade $aiFacade,
         private ModelConfigService $modelConfigService,
         private VectorStorageFacade $vectorStorage,
+        private RateLimitService $rateLimitService,
         private LoggerInterface $logger,
     ) {
     }
@@ -68,10 +71,23 @@ final readonly class VectorSearchService
         ]);
 
         // 2. Embed the query with model details
-        $queryEmbedding = $this->aiFacade->embed($query, $userId, [
+        $embedResult = $this->aiFacade->embed($query, $userId, [
             'model' => $modelName,
             'provider' => $provider,
         ]);
+        $queryEmbedding = $embedResult['embedding'];
+
+        $user = $this->em->getRepository(User::class)->find($userId);
+        if ($user) {
+            $this->rateLimitService->recordUsage($user, 'EMBEDDINGS', [
+                'usage' => $embedResult['usage'],
+                'provider' => $provider,
+                'model' => $modelName,
+                'model_id' => $embeddingModelId,
+                'input_text' => $query,
+                'source' => 'RAG_SEARCH',
+            ]);
+        }
 
         if (empty($queryEmbedding)) {
             $this->logger->error('VectorSearchService: Failed to embed query');

@@ -5,7 +5,9 @@ declare(strict_types=1);
 namespace App\Service\Admin;
 
 use App\Entity\Model;
+use App\Entity\ModelPriceHistory;
 use App\Repository\ConfigRepository;
+use App\Repository\ModelPriceHistoryRepository;
 use App\Repository\ModelRepository;
 use Doctrine\ORM\EntityManagerInterface;
 
@@ -17,6 +19,7 @@ final readonly class AdminModelsService
         private ConfigRepository $configRepository,
         private ModelImportService $importService,
         private ModelSqlValidator $sqlValidator,
+        private ModelPriceHistoryRepository $priceHistoryRepository,
     ) {
     }
 
@@ -63,7 +66,8 @@ final readonly class AdminModelsService
             ->setPriceOut((float) ($data['priceOut'] ?? 0.0))
             ->setOutUnit((string) ($data['outUnit'] ?? 'per1M'))
             ->setQuality((float) ($data['quality'] ?? 7.0))
-            ->setRating((float) ($data['rating'] ?? 0.5));
+            ->setRating((float) ($data['rating'] ?? 0.5))
+            ->setShowWhenFree((int) ($data['showWhenFree'] ?? 0));
 
         if (array_key_exists('description', $data)) {
             $model->setDescription(null !== $data['description'] ? (string) $data['description'] : null);
@@ -114,6 +118,18 @@ final readonly class AdminModelsService
         if (array_key_exists('active', $data)) {
             $model->setActive((int) $data['active']);
         }
+        $priceChanged = false;
+        if (array_key_exists('priceIn', $data) && (float) $data['priceIn'] !== $model->getPriceIn()) {
+            $priceChanged = true;
+        }
+        if (array_key_exists('priceOut', $data) && (float) $data['priceOut'] !== $model->getPriceOut()) {
+            $priceChanged = true;
+        }
+
+        if ($priceChanged) {
+            $this->createPriceHistoryEntry($model, $data);
+        }
+
         if (array_key_exists('priceIn', $data)) {
             $model->setPriceIn((float) $data['priceIn']);
         }
@@ -137,6 +153,9 @@ final readonly class AdminModelsService
         }
         if (array_key_exists('json', $data) && is_array($data['json'])) {
             $model->setJson($data['json']);
+        }
+        if (array_key_exists('showWhenFree', $data)) {
+            $model->setShowWhenFree((int) $data['showWhenFree']);
         }
 
         $this->em->flush();
@@ -215,6 +234,32 @@ final readonly class AdminModelsService
             'description' => $model->getDescription(),
             'json' => $model->getJson(),
             'isSystemModel' => $model->isSystemModel(),
+            'showWhenFree' => $model->getShowWhenFree(),
         ];
+    }
+
+    private function createPriceHistoryEntry(Model $model, array $data): void
+    {
+        $now = new \DateTimeImmutable();
+
+        // Close current price entry
+        $this->priceHistoryRepository->closeCurrentPrice($model, $now);
+
+        // Create new price entry
+        $newPriceIn = array_key_exists('priceIn', $data) ? (float) $data['priceIn'] : $model->getPriceIn();
+        $newPriceOut = array_key_exists('priceOut', $data) ? (float) $data['priceOut'] : $model->getPriceOut();
+        $newInUnit = array_key_exists('inUnit', $data) ? (string) $data['inUnit'] : $model->getInUnit();
+        $newOutUnit = array_key_exists('outUnit', $data) ? (string) $data['outUnit'] : $model->getOutUnit();
+
+        $entry = new ModelPriceHistory();
+        $entry->setModel($model)
+            ->setPriceIn(number_format($newPriceIn, 8, '.', ''))
+            ->setInUnit($newInUnit)
+            ->setPriceOut(number_format($newPriceOut, 8, '.', ''))
+            ->setOutUnit($newOutUnit)
+            ->setSource('admin')
+            ->setValidFrom($now);
+
+        $this->em->persist($entry);
     }
 }

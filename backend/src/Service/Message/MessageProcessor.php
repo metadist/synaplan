@@ -5,6 +5,7 @@ namespace App\Service\Message;
 use App\Entity\Message;
 use App\Repository\MessageRepository;
 use App\Repository\SearchResultRepository;
+use App\Service\Exception\VisionModelRequiredException;
 use App\Service\ModelConfigService;
 use App\Service\PromptService;
 use App\Service\Search\BraveSearchService;
@@ -399,6 +400,17 @@ final readonly class MessageProcessor
                 'preprocessed' => $preprocessed,
                 'search_results' => $searchResults, // Include search results in return
             ];
+        } catch (VisionModelRequiredException $e) {
+            $this->logger->warning('Vision-capable model required for image attachments', [
+                'error' => $e->getMessage(),
+            ]);
+
+            return [
+                'success' => false,
+                'error' => $e->getMessage(),
+                'error_hint' => VisionModelRequiredException::HINT_CODE,
+                'classification' => $classification ?? null,
+            ];
         } catch (\App\AI\Exception\ProviderException $e) {
             // Handle ProviderException specially to preserve context (install instructions, etc.)
             $this->logger->error('AI Provider failed', [
@@ -766,6 +778,20 @@ final readonly class MessageProcessor
                 'classification' => $classification,
                 'preprocessing' => $preprocessed,
                 'search_results' => $searchResults,
+            ];
+        } catch (VisionModelRequiredException $e) {
+            $this->logger->warning('Vision-capable model required for image attachments', [
+                'message_id' => $message->getId(),
+                'error' => $e->getMessage(),
+            ]);
+
+            $this->notify($statusCallback, 'error', $e->getMessage());
+
+            return [
+                'success' => false,
+                'error' => $e->getMessage(),
+                'error_hint' => VisionModelRequiredException::HINT_CODE,
+                'classification' => $classification ?? null,
             ];
         } catch (\App\AI\Exception\ProviderException $e) {
             // Handle ProviderException specially to preserve context (install instructions, etc.)

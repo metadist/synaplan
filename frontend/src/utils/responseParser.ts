@@ -14,10 +14,10 @@ export interface ParsedResponse {
   hasLinks: boolean
   hasCode: boolean
   hasJson: boolean
-  jsonPayload?: Record<string, any> | null
+  jsonPayload?: Record<string, unknown> | null
 }
 
-const URL_REGEX = /https?:\/\/[^\s<>"{}|\\^`\[\]]+/g
+const URL_REGEX = /https?:\/\/[^\s<>"{}|\\^`[\]]+/g
 const MARKDOWN_LINK_REGEX = /\[([^\]]+)\]\(([^)]+)\)/g
 const CODE_BLOCK_REGEX = /```(\w+)?\n([\s\S]*?)```/g
 
@@ -26,7 +26,7 @@ export function parseAIResponse(content: string): ParsedResponse {
   let hasLinks = false
   let hasCode = false
   let hasJson = false
-  let jsonPayload: Record<string, any> | null = null
+  let jsonPayload: Record<string, unknown> | null = null
 
   // Legacy: Extract BTEXT from JSON (only for backward compatibility with old messages)
   // New messages return plain text directly
@@ -124,7 +124,7 @@ function parseTextContent(text: string, parts: ParsedResponsePart[]) {
 
   // Find plain URLs (that are not part of markdown links)
   let urlMatch: RegExpExecArray | null
-  const urlRegex = /https?:\/\/[^\s<>"{}|\\^`\[\]]+/g
+  const urlRegex = /https?:\/\/[^\s<>"{}|\\^`[\]]+/g
   while ((urlMatch = urlRegex.exec(text)) !== null) {
     const currentMatch = urlMatch
     const matchIndex = currentMatch.index ?? 0
@@ -201,16 +201,6 @@ function isClusteredLinkList(
   const last = sorted[sorted.length - 1]
   const spanStart = first.position
   const spanEnd = last.position + last.url.length
-
-  // Build a picture of the text between links
-  let totalGapText = 0
-  for (let i = 0; i < sorted.length - 1; i++) {
-    const gapStart = sorted[i].position + sorted[i].url.length
-    const gapEnd = sorted[i + 1].position
-    if (gapEnd > gapStart) {
-      totalGapText += gapEnd - gapStart
-    }
-  }
 
   // If any single gap between consecutive links is > 200 chars, this is
   // regular prose with inline URLs, not a dedicated link list.

@@ -131,7 +131,7 @@ class MediaGenerationServiceTest extends TestCase
 
         $cacheItem = $this->createMock(\Psr\Cache\CacheItemInterface::class);
         $cacheItem->expects($this->once())->method('set')->with($this->callback(function ($data) {
-            return 'ops/123' === $data['operationName'] && 1 === $data['userId'] && 'test prompt' === $data['prompt'];
+            return 'ops/123' === $data['operationName'] && 1 === $data['userId'] && 'test prompt' === $data['prompt'] && 45 === $data['modelId'];
         }));
         $cacheItem->expects($this->once())->method('expiresAfter')->with(1200);
 
@@ -546,7 +546,7 @@ class MediaGenerationServiceTest extends TestCase
             ->with(
                 self::anything(),
                 'IMAGES',
-                self::callback(fn (array $meta) => 'openai' === $meta['provider']),
+                self::callback(fn (array $meta) => 'openai' === $meta['provider'] && 42 === $meta['model_id']),
             );
 
         $this->service->generate($this->createUser(), 'sunset', 'image', 42);

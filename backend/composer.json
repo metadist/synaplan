@@ -27,7 +27,7 @@
         "nelmio/api-doc-bundle": ">=5.9.2",
         "nelmio/cors-bundle": "^2.6",
         "netflie/whatsapp-cloud-api": "^2.2.1",
-        "openai-php/client": "^0.19.0",
+        "openai-php/client": "^0.19.1",
         "phpdocumentor/reflection-docblock": "^5.6.6",
         "phpoffice/phppresentation": "^1.2",
         "phpoffice/phpspreadsheet": "^2.4.3",
@@ -130,6 +130,7 @@
         }
     },
     "require-dev": {
+        "dama/doctrine-test-bundle": "^8.6",
         "dg/bypass-finals": "^1.9",
         "friendsofphp/php-cs-fixer": "^3.92.5",
         "phpstan/phpstan": "^2.1.33",

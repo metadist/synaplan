@@ -28,6 +28,7 @@ final readonly class SystemConfigService
         private readonly string $projectDir,
         private readonly LoggerInterface $logger,
         private readonly ConfigRepository $configRepository,
+        private readonly string $defaultTtsUrl = 'http://localhost:10200',
     ) {
         $this->schema = $this->buildSchema();
     }
@@ -518,8 +519,7 @@ final readonly class SystemConfigService
     {
         $url = $this->getEnvValue('SYNAPLAN_TTS_URL');
         if (!$url) {
-            // Fall back to default URL (same as PiperProvider::DEFAULT_URL)
-            $url = 'http://host.docker.internal:10200';
+            $url = $this->defaultTtsUrl;
         }
 
         try {
@@ -618,7 +618,7 @@ final readonly class SystemConfigService
             'SYNAPLAN_TTS_URL' => [
                 'tab' => 'ai', 'section' => 'tts', 'type' => 'url',
                 'sensitive' => false, 'description' => 'Synaplan TTS service URL (self-hosted, Piper-based)',
-                'default' => 'http://host.docker.internal:10200',
+                'default' => $this->defaultTtsUrl,
             ],
             'ELEVENLABS_API_KEY' => [
                 'tab' => 'ai', 'section' => 'tts', 'type' => 'password',

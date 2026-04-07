@@ -24,12 +24,13 @@ class TestController extends AbstractController
     #[Route('/api/test/embed', name: 'api_test_embed', methods: ['GET'])]
     public function testEmbed(AiFacade $aiFacade): JsonResponse
     {
-        $embedding = $aiFacade->embed('This is a test text');
+        $result = $aiFacade->embed('This is a test text');
 
         return $this->json([
             'text' => 'This is a test text',
-            'dimensions' => count($embedding),
-            'sample' => array_slice($embedding, 0, 5),
+            'dimensions' => count($result['embedding']),
+            'sample' => array_slice($result['embedding'], 0, 5),
+            'usage' => $result['usage'],
         ]);
     }
 }

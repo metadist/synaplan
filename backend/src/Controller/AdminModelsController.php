@@ -61,6 +61,7 @@ final class AdminModelsController extends AbstractController
                             new OA\Property(property: 'description', type: 'string', nullable: true, example: 'Advanced language model'),
                             new OA\Property(property: 'json', type: 'object', nullable: true),
                             new OA\Property(property: 'isSystemModel', type: 'boolean', example: false),
+                            new OA\Property(property: 'showWhenFree', type: 'integer', example: 0, description: 'Override to show model in selection even when pricing is 0'),
                         ]
                     )
                 ),
@@ -109,6 +110,7 @@ final class AdminModelsController extends AbstractController
                 new OA\Property(property: 'rating', type: 'number', format: 'float', example: 0.9),
                 new OA\Property(property: 'description', type: 'string', nullable: true),
                 new OA\Property(property: 'json', type: 'object', nullable: true),
+                new OA\Property(property: 'showWhenFree', type: 'integer', example: 0, description: 'Override to show model in selection even when pricing is 0'),
             ]
         )
     )]
@@ -166,6 +168,7 @@ final class AdminModelsController extends AbstractController
                 new OA\Property(property: 'rating', type: 'number', format: 'float'),
                 new OA\Property(property: 'description', type: 'string', nullable: true),
                 new OA\Property(property: 'json', type: 'object', nullable: true),
+                new OA\Property(property: 'showWhenFree', type: 'integer', description: 'Override to show model in selection even when pricing is 0'),
             ]
         )
     )]

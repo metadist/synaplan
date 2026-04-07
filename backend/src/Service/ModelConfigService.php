@@ -17,6 +17,8 @@ use Psr\Cache\CacheItemPoolInterface;
  */
 final readonly class ModelConfigService
 {
+    public const DEFAULT_LIGHTWEIGHT_MODEL_ID = 73;
+
     public function __construct(
         private ConfigRepository $configRepository,
         private ModelRepository $modelRepository,
@@ -304,7 +306,7 @@ final readonly class ModelConfigService
      * Get provider + model config for internal/tools tasks (feedback, memories, contradiction checks).
      * Uses DEFAULTMODEL/TOOLS config. Falls back to global CHAT default.
      *
-     * @return array{provider: ?string, model: ?string}
+     * @return array{provider: ?string, model: ?string, model_id: ?int}
      */
     public function getToolsModelConfig(): array
     {
@@ -316,12 +318,13 @@ final readonly class ModelConfigService
         }
 
         if (!$modelId) {
-            return ['provider' => null, 'model' => null];
+            return ['provider' => null, 'model' => null, 'model_id' => null];
         }
 
         return [
             'provider' => $this->getProviderForModel($modelId),
             'model' => $this->getModelName($modelId),
+            'model_id' => $modelId,
         ];
     }
 

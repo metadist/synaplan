@@ -192,6 +192,7 @@ import {
 } from '@heroicons/vue/24/outline'
 import { useTheme } from '../composables/useTheme'
 import { authApi } from '@/services/api'
+import { getApiErrorMessage } from '@/utils/errorMessage'
 import Button from '../components/Button.vue'
 
 const route = useRoute()
@@ -256,7 +257,11 @@ const handleResendEmail = async () => {
   isResending.value = true
 
   try {
-    const response = await authApi.resendVerification(userEmail.value)
+    const response = (await authApi.resendVerification(userEmail.value)) as {
+      message?: string
+      remainingAttempts?: number
+      cooldownMinutes?: number
+    }
 
     successMessage.value = response.message || 'Verification email sent!'
 
@@ -268,39 +273,40 @@ const handleResendEmail = async () => {
       cooldownMinutes.value = response.cooldownMinutes
       startCountdown(response.cooldownMinutes * 60)
     }
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error('Failed to resend email:', err)
 
-    if (err.response?.status === 429) {
-      // Rate limit error
-      const data = err.response.data
-      error.value = data.message || data.error || 'Please wait before requesting another email'
+    const ax = err as {
+      response?: { status?: number; data?: Record<string, unknown> }
+    }
+    const status = ax.response?.status
+    const data = ax.response?.data
 
-      if (data.waitSeconds) {
+    if (status === 429 && data) {
+      error.value = String(
+        data.message || data.error || 'Please wait before requesting another email'
+      )
+
+      if (typeof data.waitSeconds === 'number') {
         startCountdown(data.waitSeconds)
       }
 
       if (data.remainingAttempts !== undefined) {
-        remainingAttempts.value = data.remainingAttempts
+        remainingAttempts.value = Number(data.remainingAttempts)
       }
 
       if (data.maxAttemptsReached) {
         error.value = 'Maximum attempts reached. Please contact support.'
         remainingAttempts.value = 0
       }
-    } else if (err.response?.status === 500) {
-      // Technical error (e.g., mail server issues)
+    } else if (status === 500) {
       error.value =
-        err.response?.data?.message || 'A technical error occurred. Please try again later.'
-    } else if (err.response?.status === 400) {
-      // Validation error
-      error.value = err.response?.data?.error || err.response?.data?.message || 'Invalid request'
+        (data?.message !== undefined ? String(data.message) : null) ||
+        'A technical error occurred. Please try again later.'
+    } else if (status === 400) {
+      error.value = String(data?.error || data?.message || 'Invalid request')
     } else {
-      // Generic error
-      error.value =
-        err.response?.data?.message ||
-        err.response?.data?.error ||
-        'Failed to send email. Please try again.'
+      error.value = getApiErrorMessage(err) || 'Failed to send email. Please try again.'
     }
   } finally {
     isResending.value = false

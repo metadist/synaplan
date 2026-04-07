@@ -18,6 +18,7 @@ final readonly class FeedbackContradictionService
     public function __construct(
         private AiFacade $aiFacade,
         private ModelConfigService $modelConfigService,
+        private RateLimitService $rateLimitService,
         private UserMemoryService $memoryService,
         private PromptRepository $promptRepository,
         private LoggerInterface $logger,
@@ -333,6 +334,15 @@ PROMPT;
             );
 
             $content = trim((string) ($response['content'] ?? ''));
+
+            $this->rateLimitService->recordUsage($user, 'FEEDBACK', [
+                'provider' => $response['provider'] ?? 'unknown',
+                'model' => $response['model'] ?? 'unknown',
+                'model_id' => $toolsConfig['model_id'] ?? null,
+                'usage' => $response['usage'] ?? [],
+                'response_text' => $content,
+                'input_text' => $userPrompt,
+            ]);
 
             return $this->parseContradictionResponse($content, $related);
         } catch (\Throwable $e) {

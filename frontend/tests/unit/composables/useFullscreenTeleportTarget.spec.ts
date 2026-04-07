@@ -13,7 +13,8 @@ describe('useFullscreenTeleportTarget', () => {
   })
 
   afterEach(() => {
-    ;(document.fullscreenElement as any) = null
+    const doc = document as Document & { fullscreenElement: Element | null }
+    doc.fullscreenElement = null
   })
 
   it('should use body by default and switch to fullscreen element on fullscreenchange', async () => {
@@ -35,12 +36,13 @@ describe('useFullscreenTeleportTarget', () => {
     expect(wrapper.text()).toContain('#app')
 
     const fsEl = document.createElement('div')
-    ;(document.fullscreenElement as any) = fsEl
+    const doc = document as Document & { fullscreenElement: Element | null }
+    doc.fullscreenElement = fsEl
     document.dispatchEvent(new Event('fullscreenchange'))
     await nextTick()
 
     expect(wrapper.text()).toContain('DIV')
-    ;(document.fullscreenElement as any) = null
+    doc.fullscreenElement = null
     document.dispatchEvent(new Event('fullscreenchange'))
     await nextTick()
 

@@ -17,6 +17,7 @@ export interface AdminModel {
   description: string | null
   json: Record<string, unknown>
   isSystemModel: boolean
+  showWhenFree: number
 }
 
 export interface AdminModelsListResponse {
@@ -39,9 +40,10 @@ export interface AdminModelCreateRequest {
   rating?: number
   description?: string | null
   json?: Record<string, unknown>
+  showWhenFree?: number
 }
 
-export interface AdminModelUpdateRequest extends Partial<AdminModelCreateRequest> {}
+export type AdminModelUpdateRequest = Partial<AdminModelCreateRequest>
 
 export interface AdminModelUpsertResponse {
   success: boolean

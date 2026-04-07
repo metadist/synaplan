@@ -544,7 +544,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount, type Component } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import {
   ChatBubbleLeftRightIcon,
@@ -693,7 +693,7 @@ interface NavChild {
 interface NavItem {
   path: string
   label: string
-  icon: any
+  icon: Component
   isUpgrade?: boolean
   children?: NavChild[]
 }
@@ -764,14 +764,16 @@ const navItems = computed<NavItem[]>(() => {
   if (authStore.isAdmin) {
     const adminChildren: NavChild[] = [{ path: '/admin', label: t('nav.adminDashboard') }]
 
-    const featureStatusItem: NavChild = {
-      path: '/admin/features',
-      label: t('nav.adminFeatureStatus'),
+    if (import.meta.env.DEV) {
+      const featureStatusItem: NavChild = {
+        path: '/admin/features',
+        label: t('nav.adminFeatureStatus'),
+      }
+      if (disabledFeaturesCount.value > 0) {
+        featureStatusItem.badge = String(disabledFeaturesCount.value)
+      }
+      adminChildren.push(featureStatusItem)
     }
-    if (disabledFeaturesCount.value > 0) {
-      featureStatusItem.badge = String(disabledFeaturesCount.value)
-    }
-    adminChildren.push(featureStatusItem)
     adminChildren.push({ path: '/admin/config', label: t('nav.adminSystemConfig') })
 
     items.push({

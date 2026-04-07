@@ -556,7 +556,6 @@ function animate() {
   }
 
   // Draw nodes
-  let drawnNodes = 0
   for (const node of nodes.value) {
     // Validate node position and radius
     if (!isFinite(node.x) || !isFinite(node.y) || !isFinite(node.radius) || node.radius <= 0) {
@@ -590,8 +589,6 @@ function animate() {
     context.strokeStyle = isDarkMode ? 'rgba(255, 255, 255, 0.3)' : 'rgba(0, 0, 0, 0.2)'
     context.lineWidth = node.type === 'hub' ? 2 : 1
     context.stroke()
-
-    drawnNodes++
 
     // Highlight selected
     if (node.type === 'memory' && selectedMemory.value?.id === node.id) {

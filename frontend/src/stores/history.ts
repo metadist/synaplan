@@ -122,7 +122,40 @@ export interface Message {
   memoryIds?: number[] | null // IDs of memories used (resolved from memoriesStore)
   feedbackIds?: number[] | null // IDs of feedbacks used (resolved from feedbackStore)
   processingStatus?: string
-  processingMetadata?: any
+  processingMetadata?: Record<string, unknown> | null
+}
+
+/** Attachment row from chat messages API */
+interface ApiLoadedAttachmentFile {
+  id: number
+  filename?: string
+  fileName?: string
+  fileType?: string
+  file_type?: string
+  filePath?: string
+  file_path?: string
+  fileSize?: number
+  file_size?: number
+  fileMime?: string
+  file_mime?: string
+}
+
+/** Message row from GET /chats/:id/messages */
+interface ApiLoadedMessageRow {
+  id: number
+  direction?: string
+  text?: string
+  timestamp: number
+  topic?: string
+  originalTopic?: string
+  originalMediaType?: string
+  original_media_type?: string
+  provider?: string
+  aiModels?: Message['aiModels']
+  webSearch?: Message['webSearch']
+  searchResults?: Message['searchResults']
+  file?: { path: string; type: string }
+  files?: ApiLoadedAttachmentFile[]
 }
 
 /**
@@ -370,10 +403,14 @@ export const useHistoryStore = defineStore('history', () => {
 
     try {
       const { chatApi } = await import('@/services/api')
-      const response = await chatApi.getChatMessages(chatId, offset, limit)
+      const response = (await chatApi.getChatMessages(chatId, offset, limit)) as {
+        success?: boolean
+        messages?: ApiLoadedMessageRow[]
+        pagination?: { hasMore?: boolean }
+      }
 
       if (response.success && response.messages) {
-        const loadedMessages: Message[] = response.messages.map((m: any) => {
+        const loadedMessages: Message[] = response.messages.map((m) => {
           const role = m.direction === 'IN' ? 'user' : 'assistant'
 
           const parts = parseContentWithThinking(m.text || '', role)
@@ -404,13 +441,13 @@ export const useHistoryStore = defineStore('history', () => {
           const files: MessageFile[] = []
           if (m.files && Array.isArray(m.files)) {
             files.push(
-              ...m.files.map((f: any) => ({
+              ...m.files.map((f) => ({
                 id: f.id,
-                filename: f.filename || f.fileName,
-                fileType: f.fileType || f.file_type,
-                filePath: f.filePath || f.file_path,
-                fileSize: f.fileSize || f.file_size,
-                fileMime: f.fileMime || f.file_mime,
+                filename: f.filename || f.fileName || '',
+                fileType: f.fileType || f.file_type || '',
+                filePath: f.filePath || f.file_path || '',
+                fileSize: f.fileSize ?? f.file_size,
+                fileMime: f.fileMime ?? f.file_mime,
               }))
             )
           }

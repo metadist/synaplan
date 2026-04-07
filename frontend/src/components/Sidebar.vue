@@ -149,7 +149,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, onMounted } from 'vue'
+import { ref, computed, watch, onMounted, type Component } from 'vue'
 import { useRoute } from 'vue-router'
 import {
   ChatBubbleLeftRightIcon,
@@ -234,7 +234,7 @@ const logoSrc = computed(
 interface NavItem {
   path: string
   label: string
-  icon: any
+  icon: Component
   isUpgrade?: boolean
   children?: Array<{
     path: string
@@ -321,15 +321,16 @@ const navItems = computed<NavItem[]>(() => {
   if (authStore.isAdmin) {
     const adminChildren = [{ path: '/admin', label: t('nav.adminDashboard') }]
 
-    // Feature Status in Admin (always available for admins)
-    const featureStatusItem: { path: string; label: string; badge?: string } = {
-      path: '/admin/features',
-      label: t('nav.adminFeatureStatus'),
+    if (import.meta.env.DEV) {
+      const featureStatusItem: { path: string; label: string; badge?: string } = {
+        path: '/admin/features',
+        label: t('nav.adminFeatureStatus'),
+      }
+      if (disabledFeaturesCount.value > 0) {
+        featureStatusItem.badge = String(disabledFeaturesCount.value)
+      }
+      adminChildren.push(featureStatusItem)
     }
-    if (disabledFeaturesCount.value > 0) {
-      featureStatusItem.badge = String(disabledFeaturesCount.value)
-    }
-    adminChildren.push(featureStatusItem)
 
     // System Config in Admin
     adminChildren.push({ path: '/admin/config', label: t('nav.adminSystemConfig') })

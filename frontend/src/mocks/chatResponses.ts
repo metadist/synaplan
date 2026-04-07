@@ -1,3 +1,5 @@
+import type { StreamUpdatePayload } from '@/services/api/chatApi'
+
 export interface ChatResponse {
   success: boolean
   messageId: number
@@ -63,7 +65,10 @@ export function mockChatResponse(message: string): ChatResponse {
   }
 }
 
-export function mockStreamingResponse(message: string, callback: (data: any) => void) {
+export function mockStreamingResponse(
+  message: string,
+  callback: (data: StreamUpdatePayload) => void
+) {
   const steps = [
     { status: 'created', messageId: 12345, timestamp: Date.now() },
     { status: 'pre_processing', message: 'Processing message...', timestamp: Date.now() },

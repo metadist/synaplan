@@ -9,6 +9,7 @@ use App\Entity\Prompt;
 use App\Entity\User;
 use App\Service\File\FileHelper;
 use App\Service\File\UserUploadPathBuilder;
+use App\Service\Message\MessageForwardingService;
 use App\Service\Message\MessageProcessor;
 use App\Service\ModelConfigService;
 use App\Service\PromptService;
@@ -42,6 +43,7 @@ class StreamController extends AbstractController
         private string $uploadDir,
         private UserUploadPathBuilder $userUploadPathBuilder,
         private PromptService $promptService,
+        private MessageForwardingService $messageForwardingService,
     ) {
     }
 
@@ -806,7 +808,7 @@ class StreamController extends AbstractController
 
                     $chat->updateTimestamp();
                     $this->em->flush();
-                    $this->sendSSE('complete', [
+                    $completePayload = [
                         'messageId' => $outgoingMessage->getId(),
                         'trackId' => $trackId,
                         'provider' => $intendedChat['provider'] ?? ($result['provider'] ?? 'system'),
@@ -816,7 +818,13 @@ class StreamController extends AbstractController
                         'originalTopic' => $originalTopic,
                         'originalMediaType' => $originalMediaType,
                         'language' => 'en',
-                    ]);
+                    ];
+
+                    if (isset($result['error_hint'])) {
+                        $completePayload['error_hint'] = $result['error_hint'];
+                    }
+
+                    $this->sendSSE('complete', $completePayload);
 
                     return; // Exit early
                 }
@@ -964,11 +972,7 @@ class StreamController extends AbstractController
                     $this->em->flush();
                 }
 
-                // DEBUG: Log what we're about to save
-                error_log('🔍 CHAT MODEL: '.($response['metadata']['provider'] ?? 'unknown').' / '.($response['metadata']['model'] ?? 'unknown'));
-                error_log('🔍 SORTING MODEL: '.($classification['sorting_provider'] ?? 'null').' / '.($classification['sorting_model_name'] ?? 'null').' (ID: '.($classification['sorting_model_id'] ?? 'null').')');
-
-                $this->logger->info('🔍 StreamController: Saving model metadata', [
+                $this->logger->info('StreamController: Saving model metadata', [
                     'chat_provider' => $response['metadata']['provider'] ?? 'unknown',
                     'chat_model' => $response['metadata']['model'] ?? 'unknown',
                     'sorting_provider' => $classification['sorting_provider'] ?? null,
@@ -995,6 +999,10 @@ class StreamController extends AbstractController
 
                 if (!empty($response['metadata']['usage'])) {
                     $outgoingMessage->setMeta('ai_chat_usage', json_encode($response['metadata']['usage']));
+                }
+
+                if (!empty($response['metadata']['response_id'])) {
+                    $outgoingMessage->setMeta('openai_response_id', $response['metadata']['response_id']);
                 }
 
                 if (!empty($response['metadata']['media_prompt'])) {
@@ -1047,13 +1055,15 @@ class StreamController extends AbstractController
 
                 $this->em->flush();
 
-                // Record usage for rate limiting and statistics
-                // Provider token counts are preferred; if unavailable, tokens are auto-estimated
-                // from content bytes (input + output) using the ~1.3 bytes/token heuristic
+                if (!$isWidgetMode) {
+                    $this->messageForwardingService->forwardIfNeeded($chat, $finalText);
+                }
+
                 $this->rateLimitService->recordUsage($user, 'MESSAGES', [
                     'provider' => $response['metadata']['provider'] ?? 'unknown',
                     'model' => $response['metadata']['model'] ?? 'unknown',
-                    'tokens' => $response['metadata']['usage']['total_tokens'] ?? 0,
+                    'model_id' => $response['metadata']['model_id'] ?? null,
+                    'usage' => $response['metadata']['usage'] ?? [],
                     'latency' => $response['metadata']['latency'] ?? 0,
                     'chat_id' => $chatId,
                     'source' => $isWidgetMode ? 'WIDGET' : 'WEB',
@@ -1072,16 +1082,17 @@ class StreamController extends AbstractController
                     };
 
                     if ($mediaAction) {
-                        // Include generated file size for token estimation (bytes / 1.3)
                         $mediaBytes = $generatedFile ? $generatedFile->getFileSize() : 0;
 
                         $this->rateLimitService->recordUsage($user, $mediaAction, [
                             'provider' => $response['metadata']['provider'] ?? 'unknown',
                             'model' => $response['metadata']['model'] ?? 'unknown',
+                            'model_id' => $response['metadata']['model_id'] ?? null,
                             'chat_id' => $chatId,
                             'source' => $isWidgetMode ? 'WIDGET' : 'WEB',
                             'response_bytes' => $mediaBytes,
                             'input_text' => $messageText,
+                            'media_usage' => $response['metadata']['media_usage'] ?? [],
                         ]);
                     }
                 }
@@ -1172,7 +1183,6 @@ class StreamController extends AbstractController
                         $voiceReply = false;
                     }
 
-                    // GUARD 2: Rate limit check for AUDIOS
                     if ($voiceReply) {
                         $limitCheck = $this->rateLimitService->checkLimit($user, 'AUDIOS');
                         if (!$limitCheck['allowed']) {
@@ -1180,8 +1190,6 @@ class StreamController extends AbstractController
                                 'user_id' => $user->getId(),
                             ]);
                             $voiceReply = false;
-                        } else {
-                            $this->rateLimitService->recordUsage($user, 'AUDIOS');
                         }
                     }
                 }
@@ -1190,34 +1198,34 @@ class StreamController extends AbstractController
                     try {
                         $language = $classification['language'] ?? 'en';
 
-                        // Notify frontend that TTS is being generated
                         $this->sendSSE('tts_generating', ['language' => $language]);
 
-                        // Sanitize: strip [Memory:ID], markdown, code blocks, <think> tags
                         $ttsText = TtsTextSanitizer::sanitize($responseText);
                         $ttsText = mb_substr($ttsText, 0, 4000);
 
                         if (!empty(trim($ttsText))) {
-                            // Resolve provider from user's default TEXT2SOUND model
-                            $ttsModelId = $this->modelConfigService->getDefaultModel('TEXT2SOUND', $user->getId());
-                            $ttsProvider = $ttsModelId ? $this->modelConfigService->getProviderForModel($ttsModelId) : null;
-
                             $ttsResult = $this->aiFacade->synthesize($ttsText, $user->getId(), [
                                 'format' => 'mp3',
                                 'language' => $language,
-                                'provider' => $ttsProvider ? strtolower($ttsProvider) : null,
                             ]);
 
                             $audioUrl = '/api/v1/files/uploads/'.$ttsResult['relativePath'];
 
-                            // Store audio on outgoing message
                             $outgoingMessage->setFile(1);
                             $outgoingMessage->setFilePath($audioUrl);
                             $outgoingMessage->setFileType('audio');
                             $this->em->flush();
 
-                            // Send audio SSE event BEFORE complete
                             $this->sendSSE('audio', ['url' => $audioUrl]);
+
+                            $this->rateLimitService->recordUsage($user, 'AUDIOS', [
+                                'provider' => $ttsResult['provider'] ?? 'unknown',
+                                'model' => $ttsResult['model'] ?? 'unknown',
+                                'model_id' => $ttsResult['model_id'] ?? null,
+                                'media_usage' => [
+                                    'characters' => $ttsResult['text_length'] ?? mb_strlen($ttsText),
+                                ],
+                            ]);
 
                             $this->logger->info('StreamController: Voice reply generated', [
                                 'url' => $audioUrl,
@@ -1228,7 +1236,6 @@ class StreamController extends AbstractController
                         $this->logger->warning('StreamController: Voice reply TTS failed', [
                             'error' => $e->getMessage(),
                         ]);
-                        // Don't fail the response — text was already delivered
                     }
                 }
 

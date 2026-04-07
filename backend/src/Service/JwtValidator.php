@@ -156,8 +156,16 @@ final readonly class JwtValidator
             return false;
         }
 
-        // Check audience (aud) - optional
-        if ($expectedAudience && isset($claims['aud'])) {
+        // Check audience (aud) - when expectedAudience is set, require it in the token
+        if ($expectedAudience) {
+            if (!isset($claims['aud'])) {
+                $this->logger->warning('JWT missing aud claim', [
+                    'expected' => $expectedAudience,
+                ]);
+
+                return false;
+            }
+
             $audiences = is_array($claims['aud']) ? $claims['aud'] : [$claims['aud']];
             if (!in_array($expectedAudience, $audiences, true)) {
                 $this->logger->warning('JWT audience mismatch', [

@@ -4,6 +4,7 @@ import { useI18n } from 'vue-i18n'
 import { Icon } from '@iconify/vue'
 import { useNotification } from '@/composables/useNotification'
 import { useDialog } from '@/composables/useDialog'
+import ModelSelectDropdown from '@/components/ModelSelectDropdown.vue'
 import type { AIModel, Capability } from '@/types/ai-models'
 import { findDefaultModelId } from '@/utils/aiModelDefaults'
 
@@ -168,19 +169,12 @@ onMounted(load)
             <Icon icon="heroicons:cpu-chip" class="w-4 h-4" />
             {{ $t('widgets.advancedConfig.aiPrompts.modelLabel') }}
           </label>
-          <select
+          <ModelSelectDropdown
             v-model="modelId"
-            class="w-full px-4 py-2.5 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
-          >
-            <template v-if="!loadingModels && groupedModels.length > 0">
-              <optgroup v-for="group in groupedModels" :key="group.capability" :label="group.label">
-                <option v-for="model in group.models" :key="model.id" :value="model.id">
-                  {{ model.name }} ({{ model.service }})
-                </option>
-              </optgroup>
-            </template>
-            <option v-if="loadingModels" disabled>Loading models...</option>
-          </select>
+            :groups="groupedModels"
+            :loading="loadingModels"
+            value-format="id"
+          />
           <p class="text-xs txt-secondary mt-1">{{ $t(modelHelpKey) }}</p>
         </div>
 

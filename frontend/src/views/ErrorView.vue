@@ -155,6 +155,7 @@ interface Props {
 }
 
 const props = withDefaults(defineProps<Props>(), {
+  error: undefined,
   showStack: import.meta.env.VITE_SHOW_ERROR_STACK === 'true',
 })
 

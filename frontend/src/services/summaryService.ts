@@ -61,9 +61,10 @@ export const generateSummary = async (request: SummaryRequest): Promise<SummaryR
     })
 
     return response
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Summary generation failed:', error)
-    throw new Error(error.message || 'Failed to generate summary')
+    const msg = error instanceof Error ? error.message : 'Failed to generate summary'
+    throw new Error(msg || 'Failed to generate summary')
   }
 }
 

@@ -278,8 +278,10 @@
                           ? '#e5e5e5'
                           : '#1f2937',
                   }"
-                  v-html="renderMessageContent(message.content)"
-                ></div>
+                >
+                  <!-- eslint-disable-next-line vue/no-v-html -- widget message markdown/linkify -->
+                  <div v-html="renderMessageContent(message.content)"></div>
+                </div>
               </template>
               <div v-else-if="message.type === 'file'" class="space-y-2">
                 <!-- File attachments (clickable for download) -->
@@ -331,8 +333,10 @@
                           ? '#e5e5e5'
                           : '#1f2937',
                   }"
-                  v-html="renderMessageContent(message.content)"
-                />
+                >
+                  <!-- eslint-disable-next-line vue/no-v-html -- widget file message markdown -->
+                  <div v-html="renderMessageContent(message.content)"></div>
+                </div>
               </div>
               <p
                 v-if="message.timestamp"
@@ -614,6 +618,7 @@
 </template>
 
 <script setup lang="ts">
+import { getErrorMessage } from '@/utils/errorMessage'
 import { ref, computed, watch, nextTick, onMounted, onBeforeUnmount } from 'vue'
 import {
   ChatBubbleLeftRightIcon,
@@ -672,6 +677,7 @@ const props = withDefaults(defineProps<Props>(), {
   primaryColor: '#007bff',
   iconColor: '#ffffff',
   buttonIcon: 'chat',
+  buttonIconUrl: undefined,
   position: 'bottom-right',
   autoOpen: false,
   autoMessage: 'Hello! How can I help you today?',
@@ -685,6 +691,8 @@ const props = withDefaults(defineProps<Props>(), {
   hideButton: false,
   fullscreenMode: false,
   allowFullscreen: false,
+  externalUserId: undefined,
+  privacyPolicyUrl: undefined,
   testMode: false,
   internalMode: false,
 })
@@ -713,6 +721,35 @@ interface Message {
   files?: MessageFile[]
   timestamp: Date
   sender?: 'user' | 'ai' | 'human' | 'system'
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === 'object'
+}
+
+function rawHistoryFileToMessageFile(f: Record<string, unknown>): MessageFile {
+  const id = typeof f.id === 'number' ? f.id : Number(f.id)
+  return {
+    id: Number.isFinite(id) ? id : 0,
+    filename: String(f.filename ?? ''),
+    fileType: typeof f.fileType === 'string' ? f.fileType : undefined,
+    filePath: typeof f.filePath === 'string' ? f.filePath : undefined,
+    fileSize: typeof f.fileSize === 'number' ? f.fileSize : undefined,
+    fileMime: typeof f.fileMime === 'string' ? f.fileMime : undefined,
+  }
+}
+
+function operatorEventFileToMessageFile(item: unknown): MessageFile {
+  if (!isRecord(item)) {
+    return { id: 0, filename: '' }
+  }
+  const id = typeof item.id === 'number' ? item.id : Number(item.id)
+  return {
+    id: Number.isFinite(id) ? id : 0,
+    filename: String(item.filename ?? ''),
+    fileSize: typeof item.size === 'number' ? item.size : undefined,
+    fileMime: typeof item.mimeType === 'string' ? item.mimeType : undefined,
+  }
 }
 
 const isOpen = ref(false)
@@ -1385,13 +1422,13 @@ const sendMessage = async () => {
       if (fileInput.value) {
         fileInput.value.value = ''
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       if (error instanceof WidgetUnavailableError) {
         handleWidgetUnavailable()
         return
       }
       console.error('Widget file upload failed:', error)
-      fileUploadError.value = error?.message || t('widget.fileUploadFailed')
+      fileUploadError.value = getErrorMessage(error) || t('widget.fileUploadFailed')
       return
     } finally {
       uploadingFile.value = false
@@ -1701,50 +1738,44 @@ const handleThemeSyncEvent = (event: Event) => {
   }
 }
 
-const normalizeServerMessage = (raw: any): Message => {
-  let content = raw.text ?? ''
-  if (typeof content === 'string') {
-    const parsed = parseAIResponse(content)
-    const textParts = parsed.parts
-      .filter((part) => part.type === 'text' && part.content)
-      .map((part) => part.content.trim())
-      .filter(Boolean)
+const normalizeServerMessage = (rawUnknown: unknown): Message => {
+  const raw = isRecord(rawUnknown) ? rawUnknown : {}
+  let content = typeof raw.text === 'string' ? raw.text : ''
+  const parsed = parseAIResponse(content)
+  const textParts = parsed.parts
+    .filter((part) => part.type === 'text' && part.content)
+    .map((part) => part.content.trim())
+    .filter(Boolean)
 
-    if (textParts.length > 0) {
-      content = textParts.join('\n\n')
-    } else if (parsed.parts.length > 0) {
-      content = parsed.parts.map((part) => part.content).join('\n\n')
-    }
+  if (textParts.length > 0) {
+    content = textParts.join('\n\n')
+  } else if (parsed.parts.length > 0) {
+    content = parsed.parts.map((part) => part.content).join('\n\n')
   }
 
   const role = raw.direction === 'IN' ? 'user' : 'assistant'
   const timestampSeconds = typeof raw.timestamp === 'number' ? raw.timestamp : Date.now() / 1000
 
-  // Check if message has attached files
-  const files: MessageFile[] =
-    raw.files && Array.isArray(raw.files)
-      ? raw.files.map((f: any) => ({
-          id: f.id,
-          filename: f.filename,
-          fileType: f.fileType,
-          filePath: f.filePath,
-          fileSize: f.fileSize,
-          fileMime: f.fileMime,
-        }))
-      : []
+  const rawFiles = raw.files
+  const files: MessageFile[] = Array.isArray(rawFiles)
+    ? rawFiles.map((item) => rawHistoryFileToMessageFile(isRecord(item) ? item : {}))
+    : []
 
-  // If message has files, mark as file message (works for both user and operator files)
   const hasFiles = files.length > 0
   const isFileMessage = hasFiles
 
-  // Determine sender from server data
-  const sender: Message['sender'] = raw.sender ?? (role === 'user' ? 'user' : 'ai')
+  const senderRaw = raw.sender
+  const sender: Message['sender'] =
+    senderRaw === 'user' || senderRaw === 'ai' || senderRaw === 'human' || senderRaw === 'system'
+      ? senderRaw
+      : role === 'user'
+        ? 'user'
+        : 'ai'
 
   return {
     id: String(raw.id ?? crypto.randomUUID()),
     role,
     type: isFileMessage ? 'file' : 'text',
-    // Keep the original text content - the file info is shown separately via files array
     content,
     fileName: isFileMessage && files[0] ? files[0].filename : undefined,
     fileId: isFileMessage && files[0] ? files[0].id : undefined,
@@ -1794,34 +1825,37 @@ const loadConversationHistory = async (force = false) => {
       throw new Error(`History request failed with status ${response.status}`)
     }
 
-    const data = await response.json()
-    if (data.success) {
-      if (data.chatId) {
-        chatId.value = data.chatId
+    const data: unknown = await response.json()
+    if (isRecord(data) && data.success) {
+      if (data.chatId != null && data.chatId !== '') {
+        const cid = typeof data.chatId === 'number' ? data.chatId : Number(data.chatId)
+        chatId.value = Number.isFinite(cid) ? cid : null
       }
 
-      const loadedMessages = Array.isArray(data.messages)
-        ? data.messages.map((msg: any) => normalizeServerMessage(msg))
+      const messagesRaw = data.messages
+      const loadedMessages = Array.isArray(messagesRaw)
+        ? messagesRaw.map((msg) => normalizeServerMessage(msg))
         : []
 
       if (loadedMessages.length > 0) {
         messages.value = loadedMessages
       }
 
-      if (data.session && typeof data.session.messageCount === 'number') {
-        messageCount.value = data.session.messageCount
-        if (typeof data.session.fileCount === 'number') {
-          fileUploadCount.value = data.session.fileCount
+      const session = data.session
+      if (isRecord(session) && typeof session.messageCount === 'number') {
+        messageCount.value = session.messageCount
+        if (typeof session.fileCount === 'number') {
+          fileUploadCount.value = session.fileCount
         }
 
-        // Update chat mode from session
-        if (data.session.mode) {
-          chatMode.value = data.session.mode
+        const mode = session.mode
+        if (mode === 'ai' || mode === 'human' || mode === 'waiting') {
+          chatMode.value = mode
         }
 
         // Only subscribe to SSE if the session has messages (exists on server)
         // Skip SSE in dashboard mode (test/internal) -- not needed and causes 404s
-        if (!eventSubscription && data.session.messageCount > 0 && !isTestEnvironment.value) {
+        if (!eventSubscription && session.messageCount > 0 && !isTestEnvironment.value) {
           console.debug('[Widget] Subscribing to SSE for real-time events')
           subscribeToEvents()
         }
@@ -2095,12 +2129,7 @@ function handleWidgetEvent(data: WidgetEvent) {
           const text = data.text as string
           // Handle files from operator message
           const files: MessageFile[] = Array.isArray(data.files)
-            ? data.files.map((f: any) => ({
-                id: f.id,
-                filename: f.filename,
-                fileSize: f.size,
-                fileMime: f.mimeType,
-              }))
+            ? data.files.map(operatorEventFileToMessageFile)
             : []
           messages.value.push({
             id: msgId,
