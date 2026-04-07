@@ -105,6 +105,8 @@ External services (WhatsApp, Ollama) are replaced by deterministic Node.js stub 
 | `whatsapp-stub` | 3999  | Meta WhatsApp Graph API |
 | `ollama-stub`   | 11434 | Ollama AI server        |
 
+**Note:** The `ollama-stub` binds host port 11434 — the same default port as a real Ollama installation. Stop any local Ollama before starting the test stack, or adjust the port mapping in `docker-compose.test.yml`.
+
 ### WhatsApp tests (`@whatsapp`)
 
 WhatsApp API smoke tests use the `@whatsapp` tag and are **included in the default `test:e2e` run**. They require the WhatsApp stub server on `:3999` and the backend configured with `WHATSAPP_ENABLED=true` and `WHATSAPP_GRAPH_API_BASE_URL=http://whatsapp-stub:3999`. The stub starts automatically in `docker-compose.test.yml`.

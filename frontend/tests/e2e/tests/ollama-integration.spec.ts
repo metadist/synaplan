@@ -38,10 +38,11 @@ async function restoreDefaults(
   ctx: Awaited<ReturnType<typeof playwrightRequest.newContext>>,
   defaults: Record<string, number>
 ) {
+  if (!('CHAT' in defaults)) return
   const authHeaders = await getAuthHeaders(ctx, CREDENTIALS.getAdminCredentials())
   await ctx.post(`${getApiUrl()}${DEFAULTS_PATH}`, {
     headers: authHeaders,
-    data: { defaults: { CHAT: defaults.CHAT ?? -1 }, global: true },
+    data: { defaults: { CHAT: defaults.CHAT }, global: true },
   })
 }
 

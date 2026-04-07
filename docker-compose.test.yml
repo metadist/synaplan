@@ -126,7 +126,7 @@ services:
     networks:
       - synaplan-test-network
 
-  # Ollama API stub (deterministic fake for OllamaProvider integration tests).
+  # Ollama API stub (deterministic responses for OllamaProvider integration tests).
   ollama-stub:
     build:
       context: frontend/tests/e2e/stub-servers/ollama
