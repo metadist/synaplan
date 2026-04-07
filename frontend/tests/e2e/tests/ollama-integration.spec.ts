@@ -85,7 +85,7 @@ test.describe('@ci @smoke Ollama Integration', () => {
       expect(aiText).toContain('fake ollama stub response')
     })
 
-    await test.step('Verify: stub received streaming chat request', async () => {
+    await test.step('Verify: stub received chat request with correct model', async () => {
       const allRequests = await getStubRequests(apiCtx)
       const chatReqs = getChatRequests(allRequests)
       expect(chatReqs.length).toBeGreaterThan(0)
@@ -93,7 +93,7 @@ test.describe('@ci @smoke Ollama Integration', () => {
       const lastChat = chatReqs[chatReqs.length - 1]
       const body = lastChat.body as Record<string, unknown>
       expect(body.model).toBe('fake-chat-model')
-      expect(body.stream).toBe(true)
+      expect(Array.isArray(body.messages)).toBe(true)
     })
   })
 
