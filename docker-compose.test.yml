@@ -34,7 +34,7 @@ services:
       PLUGINS_DIR: /plugins
       DATABASE_WRITE_URL: mysql://synaplan_test:synaplan_test@db_test:3306/synaplan?serverVersion=11.8&charset=utf8mb4
       DATABASE_READ_URL: mysql://synaplan_test:synaplan_test@db_test:3306/synaplan?serverVersion=11.8&charset=utf8mb4
-      OLLAMA_BASE_URL: http://ollama_test:11434
+      OLLAMA_BASE_URL: http://ollama-stub:11434
       TIKA_BASE_URL: http://tika_test:9998
       AI_DEFAULT_PROVIDER: test
       MAILER_DSN: smtp://mailhog_test:1025
@@ -58,6 +58,8 @@ services:
       db_test:
         condition: service_healthy
       mailhog_test:
+        condition: service_started
+      ollama-stub:
         condition: service_started
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost/api/health"]
@@ -120,6 +122,19 @@ services:
       - "9997:9998"
     profiles:
       - integration
+    restart: "no"
+    networks:
+      - synaplan-test-network
+
+  # Ollama API stub (deterministic fake for OllamaProvider integration tests).
+  ollama-stub:
+    build:
+      context: frontend/tests/e2e/stub-servers/ollama
+      dockerfile: Dockerfile
+    container_name: synaplan-ollama-stub
+    ports:
+      - "11434:11434"
+    init: true
     restart: "no"
     networks:
       - synaplan-test-network

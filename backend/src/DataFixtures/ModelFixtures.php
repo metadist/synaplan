@@ -23,6 +23,9 @@ class ModelFixtures extends Fixture
         ['id' => -5, 'service' => 'test', 'name' => 'test-text2vid',   'tag' => 'text2vid',   'providerId' => 'test-text2vid'],
         ['id' => -6, 'service' => 'test', 'name' => 'test-sound2text', 'tag' => 'sound2text', 'providerId' => 'test-sound2text'],
         ['id' => -7, 'service' => 'test', 'name' => 'test-text2sound', 'tag' => 'text2sound', 'providerId' => 'test-text2sound'],
+        // Ollama stub models — route through OllamaProvider to the fake ollama-stub service
+        ['id' => -10, 'service' => 'ollama', 'name' => 'fake-chat-model',  'tag' => 'chat',      'providerId' => 'fake-chat-model'],
+        ['id' => -11, 'service' => 'ollama', 'name' => 'fake-embed-model', 'tag' => 'vectorize', 'providerId' => 'fake-embed-model'],
     ];
 
     public function load(ObjectManager $manager): void
@@ -42,7 +45,7 @@ class ModelFixtures extends Fixture
                     'outUnit' => '-',
                     'quality' => 1,
                     'rating' => 0,
-                    'json' => ['description' => 'Mock model for E2E/CI (TestProvider). No API key required.'],
+                    'json' => ['description' => 'Mock model for E2E/CI. No API key required.'],
                 ]));
             }
         }
