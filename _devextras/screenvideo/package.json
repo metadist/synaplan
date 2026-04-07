@@ -13,7 +13,7 @@
     "check:tts": "curl -sf http://127.0.0.1:10200/health | node -e \"const d=JSON.parse(require('fs').readFileSync('/dev/stdin','utf8'));console.log('TTS:',d.status,'—',d.voices_loaded,'voices loaded')\" || echo 'TTS service not reachable at http://127.0.0.1:10200'"
   },
   "devDependencies": {
-    "@playwright/test": "^1.50.0",
-    "dotenv": "^16.4.0"
+    "@playwright/test": "1.58.2",
+    "dotenv": "16.6.1"
   }
 }

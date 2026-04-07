@@ -16,7 +16,7 @@
 services:
   # Vue.js Frontend
   frontend:
-    image: node:22
+    image: node:22@sha256:e7d95ac7c2c482384615faea13520d7125d3776b8aa3c57355a57fb0ab1c4f2e
     container_name: synaplan-frontend
     working_dir: /app
     entrypoint: ["/usr/local/bin/docker-entrypoint.sh"]
@@ -41,7 +41,7 @@ services:
   # Memory-limited to prevent unbounded growth from Chokidar polling (#515).
   # Container auto-restarts on OOM thanks to restart policy.
   frontend-widgets:
-    image: node:22
+    image: node:22@sha256:e7d95ac7c2c482384615faea13520d7125d3776b8aa3c57355a57fb0ab1c4f2e
     container_name: synaplan-frontend-widgets
     working_dir: /app
     command: sh -c "npm ci && npm run build:widget -- --watch"
@@ -135,7 +135,7 @@ services:
 
   # MariaDB 11.8 Database
   db:
-    image: mariadb:11.8.2
+    image: mariadb:11.8.2@sha256:2bcbaec92bd9d4f6591bc8103d3a8e6d0512ee2235506e47a2e129d190444405
     container_name: synaplan-db
     command: --max-allowed-packet=256M --innodb-buffer-pool-size=512M
     environment:
@@ -160,7 +160,7 @@ services:
 
   # Apache Tika - Document Text Extraction
   tika:
-    image: apache/tika:2.9.2.1
+    image: apache/tika:2.9.2.1@sha256:2be134745fcb59826c54041489946c66218b948ea0c0be3a37cb7919ecc845ba
     container_name: synaplan-tika
     command: -h 0.0.0.0 -p 9998
     ports:
@@ -177,7 +177,7 @@ services:
 
   # phpMyAdmin (optional - for DB management)
   phpmyadmin:
-    image: phpmyadmin/phpmyadmin:latest
+    image: phpmyadmin/phpmyadmin:latest@sha256:42a200db07b4e70fbf32c594ad4521cf16399b8e54bbb5adceae98e7566dfbeb
     container_name: synaplan-phpmyadmin
     environment:
       PMA_HOST: db
@@ -194,7 +194,7 @@ services:
 
   # MailHog (SMTP testing)
   mailhog:
-    image: mailhog/mailhog:latest
+    image: mailhog/mailhog:latest@sha256:8d76a3d4ffa32a3661311944007a415332c4bb855657f4f6c57996405c009bea
     container_name: synaplan-mailhog
     ports:
       - "1025:1025"  # SMTP
