@@ -28,7 +28,14 @@ type RequestRecord = {
 }
 
 type StubConfig = {
-  models: Array<{ name: string; model: string; size: number; details: Record<string, unknown> }>
+  models: Array<{
+    name: string
+    model: string
+    size: number
+    modified_at: string
+    digest: string
+    details: Record<string, unknown>
+  }>
   chatResponse: string
   enableThinking: boolean
   thinkingText: string
@@ -40,10 +47,33 @@ type StubConfig = {
 
 const requests: RequestRecord[] = []
 
+const FAKE_MODEL_DETAILS = {
+  format: 'gguf',
+  family: 'llama',
+  parameter_size: '3B',
+  quantization_level: 'Q4_0',
+  families: ['llama'],
+  parent_model: '',
+}
+
 const DEFAULT_CONFIG: StubConfig = {
   models: [
-    { name: 'fake-chat-model', model: 'fake-chat-model', size: 1_000_000, details: {} },
-    { name: 'fake-embed-model', model: 'fake-embed-model', size: 500_000, details: {} },
+    {
+      name: 'fake-chat-model',
+      model: 'fake-chat-model',
+      size: 1_000_000,
+      modified_at: '2025-01-01T00:00:00Z',
+      digest: 'sha256:fake-chat-digest',
+      details: FAKE_MODEL_DETAILS,
+    },
+    {
+      name: 'fake-embed-model',
+      model: 'fake-embed-model',
+      size: 500_000,
+      modified_at: '2025-01-01T00:00:00Z',
+      digest: 'sha256:fake-embed-digest',
+      details: FAKE_MODEL_DETAILS,
+    },
   ],
   chatResponse: 'Fake Ollama stub response',
   enableThinking: false,
