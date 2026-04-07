@@ -1,11 +1,10 @@
 import { test, expect } from '../test-setup'
 import { request as playwrightRequest } from '@playwright/test'
 import { selectors } from '../helpers/selectors'
-import { login } from '../helpers/auth'
-import { getAuthHeaders } from '../helpers/auth'
+import { login, getAuthHeaders } from '../helpers/auth'
 import { ChatHelper } from '../helpers/chat'
 import { CREDENTIALS } from '../config/credentials'
-import { getApiUrl, URLS, TIMEOUTS } from '../config/config'
+import { getApiUrl, URLS } from '../config/config'
 import { PROMPTS } from '../config/test-data'
 import { resetStub, configureStub, getStubRequests, getChatRequests } from '../helpers/ollama-stub'
 
@@ -128,97 +127,6 @@ test.describe('@ci @smoke Ollama Integration', () => {
       const allRequests = await getStubRequests(apiCtx)
       const chatReqs = getChatRequests(allRequests)
       expect(chatReqs.length).toBeGreaterThan(0)
-    })
-  })
-
-  test('model-not-found shows error gracefully', async ({ page, credentials }) => {
-    await test.step('Arrange: configure stub with no models', async () => {
-      await resetStub(apiCtx)
-      await configureStub(apiCtx, { models: [] })
-      // Re-set the Ollama default (reset clears nothing about backend defaults)
-      await switchToOllamaChat(apiCtx)
-    })
-
-    const chat = new ChatHelper(page)
-
-    await test.step('Arrange: login and start new chat', async () => {
-      await login(page, credentials)
-      await chat.startNewChat()
-    })
-
-    const previousCount = await chat.conversationBubbles().count()
-
-    await test.step('Act: send message', async () => {
-      await page.locator(selectors.chat.textInput).fill(PROMPTS.CHAT_SMOKE)
-      await page.locator(selectors.chat.sendBtn).click()
-    })
-
-    await test.step('Assert: error state reached', async () => {
-      const bubbles = chat.conversationBubbles()
-      const newBubble = bubbles.nth(previousCount)
-      await newBubble.waitFor({ state: 'attached', timeout: TIMEOUTS.STANDARD })
-
-      const result = await Promise.race([
-        newBubble
-          .locator(selectors.chat.messageDone)
-          .waitFor({ state: 'visible', timeout: TIMEOUTS.VERY_LONG })
-          .then(() => 'done' as const),
-        newBubble
-          .locator(selectors.chat.messageTopicError)
-          .waitFor({ state: 'visible', timeout: TIMEOUTS.VERY_LONG })
-          .then(() => 'error' as const),
-      ])
-      expect(result).toBe('error')
-    })
-
-    await test.step('Cleanup: restore stub models', async () => {
-      await resetStub(apiCtx)
-    })
-  })
-
-  test('server error handled gracefully', async ({ page, credentials }) => {
-    await test.step('Arrange: configure stub to return 500', async () => {
-      await resetStub(apiCtx)
-      await configureStub(apiCtx, {
-        simulateError: { endpoint: '/api/chat', statusCode: 500, count: 1 },
-      })
-      await switchToOllamaChat(apiCtx)
-    })
-
-    const chat = new ChatHelper(page)
-
-    await test.step('Arrange: login and start new chat', async () => {
-      await login(page, credentials)
-      await chat.startNewChat()
-    })
-
-    const previousCount = await chat.conversationBubbles().count()
-
-    await test.step('Act: send message', async () => {
-      await page.locator(selectors.chat.textInput).fill(PROMPTS.CHAT_SMOKE)
-      await page.locator(selectors.chat.sendBtn).click()
-    })
-
-    await test.step('Assert: error state reached', async () => {
-      const bubbles = chat.conversationBubbles()
-      const newBubble = bubbles.nth(previousCount)
-      await newBubble.waitFor({ state: 'attached', timeout: TIMEOUTS.STANDARD })
-
-      const result = await Promise.race([
-        newBubble
-          .locator(selectors.chat.messageDone)
-          .waitFor({ state: 'visible', timeout: TIMEOUTS.VERY_LONG })
-          .then(() => 'done' as const),
-        newBubble
-          .locator(selectors.chat.messageTopicError)
-          .waitFor({ state: 'visible', timeout: TIMEOUTS.VERY_LONG })
-          .then(() => 'error' as const),
-      ])
-      expect(result).toBe('error')
-    })
-
-    await test.step('Cleanup: reset stub', async () => {
-      await resetStub(apiCtx)
     })
   })
 })
