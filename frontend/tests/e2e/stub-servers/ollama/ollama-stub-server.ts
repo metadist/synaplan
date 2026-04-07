@@ -123,7 +123,9 @@ function shouldSimulateError(endpoint: string): number | null {
 
 function modelExists(name: string): boolean {
   const lower = name.toLowerCase()
-  return config.models.some((m) => m.name.toLowerCase() === lower || m.model.toLowerCase() === lower)
+  return config.models.some(
+    (m) => m.name.toLowerCase() === lower || m.model.toLowerCase() === lower
+  )
 }
 
 // --- NDJSON streaming helper ---
