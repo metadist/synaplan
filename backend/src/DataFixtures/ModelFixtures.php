@@ -11,7 +11,13 @@ use Doctrine\Persistence\ObjectManager;
  *
  * In dev/test: also seeds TestProvider models (negative IDs) for all capability tags.
  * Negative IDs can never collide with auto-increment (which starts at 1 and goes up).
- * selectable=0 keeps them out of user-facing dropdowns; E2E sets them as defaults via API.
+ *
+ * Dev: selectable=0 — mock models stay out of normal lists; global defaults remain from
+ * ConfigFixtures (real catalog IDs), never auto-switched to TestProvider.
+ *
+ * Test: after upsert, BSELECTABLE/BSHOWWHENFREE are set so GET /config/models returns them
+ * (isHiddenBecauseFree would otherwise hide zero-price rows). Makes the test-stack admin UI
+ * match actual DEFAULTMODEL config from ConfigFixtures::loadTestConfig.
  */
 class ModelFixtures extends Fixture
 {
@@ -44,6 +50,12 @@ class ModelFixtures extends Fixture
                     'rating' => 0,
                     'json' => ['description' => 'Mock model for E2E/CI (TestProvider). No API key required.'],
                 ]));
+            }
+
+            if ('test' === $env) {
+                $connection->executeStatement(
+                    'UPDATE BMODELS SET BSELECTABLE = 1, BSHOWWHENFREE = 1 WHERE BID < 0'
+                );
             }
         }
 
