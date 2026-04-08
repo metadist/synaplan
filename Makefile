@@ -32,7 +32,9 @@ test-e2e-plugin-castingdata: ## Run Casting Data plugin e2e tests (CastApp + Syn
 
 test-stack-build: ## Build frontend + widget + test Docker image + start test stack on port 8001
 	docker compose -f docker-compose.test.yml down 2>/dev/null || true
-	sudo rm -rf frontend/dist frontend/dist-widget
+	rm -rf frontend/dist frontend/dist-widget || ( \
+		echo "$(MAKE): dist not removable as current user; cleaning via Docker (no sudo)..." && \
+		docker run --rm -v "$(CURDIR)/frontend:/t" alpine:3.20 sh -c 'rm -rf /t/dist /t/dist-widget' )
 	cd frontend && npm run build && npm run build:widget
 	docker compose -f docker-compose.test.yml build
 	docker compose -f docker-compose.test.yml up -d

@@ -23,8 +23,7 @@ Both stacks share **MailHog ports** (8025/1025) — always stop one before start
 
 ```bash
 docker compose down                                     # Stop dev stack
-sudo rm -rf frontend/dist frontend/dist-widget          # Remove root-owned build artifacts (if permission error)
-make test-stack-build                                   # Build + start test stack, waits until healthy (~30-60s)
+make test-stack-build                                   # Cleans dist/ via rm or Docker if root-owned, then build + up (~30–60s)
 ```
 
 Then run tests from the **frontend** directory with `BASE_URL=http://localhost:8001` (see [Test commands](#test-commands) below).
@@ -45,7 +44,7 @@ docker compose up -d                                    # Start dev stack
 | Docker / Compose config    | **Yes** — image needs rebuild                                |
 | Database schema / fixtures | **No** — just `down` + `up` (test DB is tmpfs, always fresh) |
 
-Permission error on `frontend/dist/` (container creates it as root): `sudo rm -rf frontend/dist frontend/dist-widget` then re-run `make test-stack-build`.
+If `frontend/dist/` is root-owned, `make test-stack-build` removes `dist`/`dist-widget` as your user or falls back to a short `docker run … alpine` cleanup (no `sudo`). Last resort: `sudo chown -R "$(id -u):$(id -g)" frontend/dist frontend/dist-widget`.
 
 ## Test stack details
 
