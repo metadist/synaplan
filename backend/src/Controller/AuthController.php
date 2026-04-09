@@ -100,6 +100,9 @@ class AuthController extends AbstractController
                 'ip' => $request->getClientIp(),
             ]);
 
+            // Hash the password anyway to prevent timing attacks
+            $this->passwordHasher->hashPassword($existingUser, $dto->password);
+
             return $this->json([
                 'success' => true,
                 'message' => 'If this email is not already registered, you will receive a verification email shortly.',
@@ -200,23 +203,27 @@ class AuthController extends AbstractController
 
         $user = $this->userRepository->findOneBy(['mail' => $email]);
 
+        // Dummy hash for timing attack prevention (valid bcrypt format)
+        $dummyHash = '$2y$13$A5.u1234567890123456789012345678901234567890123456789';
+
         if (!$user) {
-            usleep(100000); // Timing attack prevention
+            $dummy = new User();
+            $dummy->setPw($dummyHash);
+            $this->passwordHasher->isPasswordValid($dummy, $password);
 
             return $this->json(['error' => 'Invalid credentials'], Response::HTTP_UNAUTHORIZED);
         }
 
         // User has no password yet (e.g. registered via Google/GitHub only)
         if (null === $user->getPw()) {
-            return $this->json([
-                'error' => 'No password set for this account. Use "Forgot password" to create one, or sign in with your social provider.',
-                'code' => 'NO_PASSWORD',
-            ], Response::HTTP_UNAUTHORIZED);
+            $dummy = new User();
+            $dummy->setPw($dummyHash);
+            $this->passwordHasher->isPasswordValid($dummy, $password);
+
+            return $this->json(['error' => 'Invalid credentials'], Response::HTTP_UNAUTHORIZED);
         }
 
         if (!$this->passwordHasher->isPasswordValid($user, $password)) {
-            usleep(100000); // Timing attack prevention
-
             return $this->json(['error' => 'Invalid credentials'], Response::HTTP_UNAUTHORIZED);
         }
 
@@ -534,7 +541,7 @@ class AuthController extends AbstractController
 
         $user = $this->userRepository->findOneBy(['mail' => $email]);
 
-        if (!$user) {
+        if (!$user || $user->isManagedExternally()) {
             return $this->json([
                 'success' => true,
                 'message' => 'If email exists, reset instructions sent',
@@ -584,6 +591,12 @@ class AuthController extends AbstractController
         }
 
         $user = $token->getUser();
+
+        if ($user->isManagedExternally()) {
+            return $this->json([
+                'error' => 'This account is managed by your organization. Password reset is not allowed.',
+            ], Response::HTTP_FORBIDDEN);
+        }
 
         $user->setPw($this->passwordHasher->hashPassword($user, $newPassword));
         $this->tokenRepository->markAsUsed($token);

@@ -406,6 +406,15 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     }
 
     /**
+     * Check if user is managed by an enterprise identity provider (e.g. Keycloak).
+     * These users cannot manage passwords or delete accounts locally.
+     */
+    public function isManagedExternally(): bool
+    {
+        return 'keycloak' === $this->providerId;
+    }
+
+    /**
      * Check if user is using external authentication exclusively (no password set).
      * Users without a password cannot change their password locally or confirm actions with a password.
      */
@@ -420,7 +429,7 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
      */
     public function canChangePassword(): bool
     {
-        return !empty($this->pw);
+        return !$this->isManagedExternally() && !empty($this->pw);
     }
 
     /**

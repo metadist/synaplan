@@ -268,6 +268,12 @@ class ProfileController extends AbstractController
             return $this->json(['error' => 'Not authenticated'], Response::HTTP_UNAUTHORIZED);
         }
 
+        if ($user->isManagedExternally()) {
+            return $this->json([
+                'error' => 'This account is managed by your organization. Password changes are not allowed.',
+            ], Response::HTTP_FORBIDDEN);
+        }
+
         // Block password change for users without a password
         if (!$user->canChangePassword()) {
             return $this->json([
@@ -471,6 +477,12 @@ class ProfileController extends AbstractController
             return $this->json(['error' => 'Not authenticated'], Response::HTTP_UNAUTHORIZED);
         }
 
+        if ($user->isManagedExternally()) {
+            return $this->json([
+                'error' => 'This account is managed by your organization and cannot be deleted here.',
+            ], Response::HTTP_FORBIDDEN);
+        }
+
         $data = json_decode($request->getContent(), true);
         $password = $data['password'] ?? '';
 
@@ -493,8 +505,6 @@ class ProfileController extends AbstractController
         } else {
             // Verify password for local auth users
             if (!$this->passwordHasher->isPasswordValid($user, $password)) {
-                usleep(100000); // Timing attack prevention
-
                 return $this->json([
                     'error' => 'Incorrect password',
                 ], Response::HTTP_FORBIDDEN);

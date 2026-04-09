@@ -52,6 +52,14 @@ class OidcUserService
         $user = $this->findBySub($sub) ?? $this->findByEmail($email);
 
         if ($user) {
+            if ('keycloak' !== $user->getProviderId()) {
+                $this->logger->warning('OIDC login attempt for email registered to different provider', [
+                    'email' => $email,
+                    'existing_provider' => $user->getProviderId(),
+                ]);
+                throw new \RuntimeException('Authentication failed: Email conflict.');
+            }
+
             $this->logger->info('Existing user logging in via OIDC', [
                 'user_id' => $user->getId(),
                 'original_provider' => $user->getProviderId(),
