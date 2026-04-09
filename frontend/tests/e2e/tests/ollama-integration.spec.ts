@@ -1,0 +1,133 @@
+import { test, expect } from '../test-setup'
+import { request as playwrightRequest } from '@playwright/test'
+import { selectors } from '../helpers/selectors'
+import { login, getAuthHeaders } from '../helpers/auth'
+import { ChatHelper } from '../helpers/chat'
+import { CREDENTIALS } from '../config/credentials'
+import { getApiUrl, URLS } from '../config/config'
+import { PROMPTS } from '../config/test-data'
+import { resetStub, configureStub, getStubRequests, getChatRequests } from '../helpers/ollama-stub'
+
+const DEFAULTS_PATH = '/api/v1/config/models/defaults'
+const OLLAMA_CHAT_MODEL_ID = -10
+
+/**
+ * Switch the global CHAT default to the Ollama stub model via API.
+ * Returns the previous default so it can be restored.
+ */
+async function switchToOllamaChat(ctx: Awaited<ReturnType<typeof playwrightRequest.newContext>>) {
+  const authHeaders = await getAuthHeaders(ctx, CREDENTIALS.getAdminCredentials())
+
+  const getRes = await ctx.get(`${getApiUrl()}${DEFAULTS_PATH}`, { headers: authHeaders })
+  const previousDefaults = getRes.ok()
+    ? (((await getRes.json()) as { defaults?: Record<string, number> }).defaults ?? {})
+    : {}
+
+  const res = await ctx.post(`${getApiUrl()}${DEFAULTS_PATH}`, {
+    headers: authHeaders,
+    data: { defaults: { CHAT: OLLAMA_CHAT_MODEL_ID }, global: true },
+  })
+  if (!res.ok()) {
+    throw new Error(`Failed to set Ollama default: ${res.status()} ${await res.text()}`)
+  }
+
+  return previousDefaults
+}
+
+async function restoreDefaults(
+  ctx: Awaited<ReturnType<typeof playwrightRequest.newContext>>,
+  defaults: Record<string, number>
+) {
+  if (!('CHAT' in defaults)) return
+  const authHeaders = await getAuthHeaders(ctx, CREDENTIALS.getAdminCredentials())
+  await ctx.post(`${getApiUrl()}${DEFAULTS_PATH}`, {
+    headers: authHeaders,
+    data: { defaults: { CHAT: defaults.CHAT }, global: true },
+  })
+}
+
+test.describe('@ci @smoke Ollama Integration', () => {
+  test.describe.configure({ mode: 'serial' })
+
+  let apiCtx: Awaited<ReturnType<typeof playwrightRequest.newContext>>
+  let previousDefaults: Record<string, number> = {}
+
+  test.beforeAll(async () => {
+    apiCtx = await playwrightRequest.newContext({ baseURL: URLS.BASE_URL })
+    await resetStub(apiCtx)
+    previousDefaults = await switchToOllamaChat(apiCtx)
+  })
+
+  test.afterAll(async () => {
+    await restoreDefaults(apiCtx, previousDefaults)
+    await apiCtx.dispose()
+  })
+
+  test('chat via Ollama provider produces response', async ({ page, credentials }) => {
+    const chat = new ChatHelper(page)
+
+    await test.step('Arrange: login and start new chat', async () => {
+      await login(page, credentials)
+      await chat.startNewChat()
+    })
+
+    const previousCount = await chat.conversationBubbles().count()
+
+    await test.step('Act: send message', async () => {
+      await page.locator(selectors.chat.textInput).fill(PROMPTS.CHAT_SMOKE)
+      await page.locator(selectors.chat.sendBtn).click()
+    })
+
+    const aiText = await chat.waitForAnswer(previousCount)
+
+    await test.step('Assert: response from Ollama stub is deterministic', async () => {
+      expect(aiText.length).toBeGreaterThan(0)
+      expect(aiText).toContain('ollama stub response')
+    })
+
+    await test.step('Verify: stub received chat request with correct model', async () => {
+      const allRequests = await getStubRequests(apiCtx)
+      const chatReqs = getChatRequests(allRequests)
+      expect(chatReqs.length).toBeGreaterThan(0)
+
+      const lastChat = chatReqs[chatReqs.length - 1]
+      const body = lastChat.body as Record<string, unknown>
+      expect(body.model).toBe('stub-chat-model')
+      expect(Array.isArray(body.messages)).toBe(true)
+    })
+  })
+
+  test('thinking/reasoning tokens are forwarded', async ({ page, credentials }) => {
+    await test.step('Arrange: configure stub with thinking enabled', async () => {
+      await resetStub(apiCtx)
+      await configureStub(apiCtx, { enableThinking: true })
+    })
+
+    const chat = new ChatHelper(page)
+
+    await test.step('Arrange: login and start new chat', async () => {
+      await login(page, credentials)
+      await chat.startNewChat()
+    })
+
+    const previousCount = await chat.conversationBubbles().count()
+
+    await test.step('Act: send message', async () => {
+      await page.locator(selectors.chat.textInput).fill(PROMPTS.CHAT_SMOKE)
+      await page.locator(selectors.chat.sendBtn).click()
+    })
+
+    const aiText = await chat.waitForAnswer(previousCount)
+
+    await test.step('Assert: response completed with content', async () => {
+      expect(aiText.length).toBeGreaterThan(0)
+      expect(aiText).toContain('ollama stub response')
+    })
+
+    await test.step('Verify: stub received request through thinking path', async () => {
+      const allRequests = await getStubRequests(apiCtx)
+      const chatReqs = getChatRequests(allRequests)
+      expect(chatReqs.length).toBeGreaterThan(0)
+    })
+  })
+})

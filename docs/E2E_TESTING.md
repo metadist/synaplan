@@ -108,15 +108,16 @@ Only with deterministic UI hooks (no text scanning).
 
 ### AI-Specific Rules
 
-* Never assert on specific AI words like `"success"`, `"Mamma Mia"`, or any model-generated content.
-* Valid pattern:
+* Never assert on specific AI words like `"success"`, `"Mamma Mia"`, or any model-generated content from **real, non-deterministic** AI providers.
+* **Exception — Stub responses:** When a test uses a deterministic stub server (e.g. `ollama-stub`), the response text is controlled by the test infrastructure and is identical in every environment. Asserting on stub response text (e.g. `expect(text).toContain('ollama stub response')`) **is allowed and encouraged** because it proves the full request/response pipeline works end-to-end.
+* Valid pattern for real AI:
 
   1. Assistant message exists.
   2. Terminal `done` state reached.
   3. No deterministic error.
   4. Final text is non-empty.
 * Error detection must use deterministic hooks (`data-testid`), not text scanning.
-* No copy/model-dependent assertions.
+* No copy/model-dependent assertions for real AI providers.
 
 ---
 
