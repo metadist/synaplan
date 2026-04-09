@@ -23,8 +23,7 @@ Both stacks share **MailHog ports** (8025/1025) — always stop one before start
 
 ```bash
 docker compose down                                     # Stop dev stack
-sudo rm -rf frontend/dist frontend/dist-widget          # Remove root-owned build artifacts (if permission error)
-make test-stack-build                                   # Build + start test stack, waits until healthy (~30-60s)
+make test-stack-build                                   # Cleans dist/ via rm or Docker if root-owned, then build + up (~30–60s)
 ```
 
 Then run tests from the **frontend** directory with `BASE_URL=http://localhost:8001` (see [Test commands](#test-commands) below).
@@ -45,20 +44,20 @@ docker compose up -d                                    # Start dev stack
 | Docker / Compose config    | **Yes** — image needs rebuild                                |
 | Database schema / fixtures | **No** — just `down` + `up` (test DB is tmpfs, always fresh) |
 
-Permission error on `frontend/dist/` (container creates it as root): `sudo rm -rf frontend/dist frontend/dist-widget` then re-run `make test-stack-build`.
+If `frontend/dist/` is root-owned, `make test-stack-build` removes `dist`/`dist-widget` as your user or falls back to a short `docker run … alpine` cleanup (no `sudo`). Last resort: `sudo chown -R "$(id -u):$(id -g)" frontend/dist frontend/dist-widget`.
 
 ## Test stack details
 
-|               | Dev stack                                 | Test stack                                |
-| ------------- | ----------------------------------------- | ----------------------------------------- |
-| **Start**     | `docker compose up -d`                    | `make test-stack-build`                   |
-| **Backend**   | http://localhost:8000                     | http://localhost:8001                     |
-| **Frontend**  | http://localhost:5173 (Vite)              | Served by backend (:8001)                 |
-| **APP_ENV**   | `dev`                                     | `test`                                    |
-| **AI models** | Real providers + TestProvider (IDs -1…-7) | Real providers + TestProvider (IDs -1…-7) |
-| **DB**        | Persistent volume                         | **tmpfs** (fresh on every `up`)           |
-| **MailHog**   | :8025 / :1025                             | :8025 / :1025 (shared ports!)             |
-| **Login**     | admin@synaplan.com / admin123             | admin@synaplan.com / admin123             |
+|               | Dev stack                                 | Test stack                                                             |
+| ------------- | ----------------------------------------- | ---------------------------------------------------------------------- |
+| **Start**     | `docker compose up -d`                    | `make test-stack-build`                                                |
+| **Backend**   | http://localhost:8000                     | http://localhost:8001                                                  |
+| **Frontend**  | http://localhost:5173 (Vite)              | Served by backend (:8001)                                              |
+| **APP_ENV**   | `dev`                                     | `test`                                                                 |
+| **AI models** | Real providers + TestProvider (IDs -1…-7) | Real providers + TestProvider (IDs -1…-7) + Ollama stub (IDs -10, -11) |
+| **DB**        | Persistent volume                         | **tmpfs** (fresh on every `up`)                                        |
+| **MailHog**   | :8025 / :1025                             | :8025 / :1025 (shared ports!)                                          |
+| **Login**     | admin@synaplan.com / admin123             | admin@synaplan.com / admin123                                          |
 
 Widget E2E tests use the page at `/widget-test.html`. Tests use `page.route()` to serve the fixture from disk.
 
@@ -95,6 +94,17 @@ From the **frontend** directory:
 | **Playwright UI**                  | `npm run test:e2e:ui`                                                      |
 
 Everything after `--` is passed through to Playwright.
+
+### Stub servers
+
+External services (WhatsApp, Ollama) are replaced by deterministic Node.js stub servers in the test stack. They start automatically via `docker-compose.test.yml`. Each stub exposes `/__requests`, `/__reset`, and `/__configure` control endpoints — see the header comment in each `*-stub-server.ts` for details.
+
+| Stub            | Port  | Replaces                |
+| --------------- | ----- | ----------------------- |
+| `whatsapp-stub` | 3999  | Meta WhatsApp Graph API |
+| `ollama-stub`   | 11434 | Ollama AI server        |
+
+**Note:** The `ollama-stub` binds host port 11434 — the same default port as a real Ollama installation. Stop any local Ollama before starting the test stack, or adjust the port mapping in `docker-compose.test.yml`.
 
 ### WhatsApp tests (`@whatsapp`)
 

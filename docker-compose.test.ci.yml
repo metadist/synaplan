@@ -4,6 +4,7 @@
 #   2. Removing volume mounts: no backend/plugins mounts (baked into image)
 #
 # app_test reaches whatsapp-stub at http://whatsapp-stub:3999 via backend/.env.test (WHATSAPP_GRAPH_API_BASE_URL).
+# app_test reaches ollama-stub at http://ollama-stub:11434 via OLLAMA_BASE_URL in compose environment.
 #
 # Usage in CI:
 #   docker compose -f docker-compose.test.yml -f docker-compose.test.ci.yml up

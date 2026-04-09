@@ -34,7 +34,7 @@ services:
       PLUGINS_DIR: /plugins
       DATABASE_WRITE_URL: mysql://synaplan_test:synaplan_test@db_test:3306/synaplan?serverVersion=11.8&charset=utf8mb4
       DATABASE_READ_URL: mysql://synaplan_test:synaplan_test@db_test:3306/synaplan?serverVersion=11.8&charset=utf8mb4
-      OLLAMA_BASE_URL: http://ollama_test:11434
+      OLLAMA_BASE_URL: http://ollama-stub:11434
       TIKA_BASE_URL: http://tika_test:9998
       AI_DEFAULT_PROVIDER: test
       MAILER_DSN: smtp://mailhog_test:1025
@@ -58,6 +58,8 @@ services:
       db_test:
         condition: service_healthy
       mailhog_test:
+        condition: service_started
+      ollama-stub:
         condition: service_started
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost/api/health"]
@@ -124,12 +126,32 @@ services:
     networks:
       - synaplan-test-network
 
+  # Ollama API stub (deterministic responses for OllamaProvider integration tests).
+  # Same pattern as whatsapp-stub: pinned node:22-alpine + bind mount so CI `docker compose pull` retries cover it.
+  ollama-stub:
+    image: node:22-alpine@sha256:4d64b49e6c891c8fc821007cb1cdc6c0db7773110ac2c34bf2e6960adef62ed3
+    container_name: synaplan-ollama-stub
+    user: node
+    working_dir: /app
+    volumes:
+      - ./frontend/tests/e2e/stub-servers/ollama/ollama-stub-server.ts:/app/ollama-stub-server.ts:ro
+    environment:
+      PORT: "11434"
+    command: ["node", "ollama-stub-server.ts"]
+    ports:
+      - "11434:11434"
+    init: true
+    restart: "no"
+    networks:
+      - synaplan-test-network
+
   # WhatsApp Graph API stub (starts by default for all E2E jobs).
   # Uses node:22-alpine directly instead of a Dockerfile build so that
   # `docker compose pull` (with retry) covers this image too.
   whatsapp-stub:
     image: node:22-alpine@sha256:4d64b49e6c891c8fc821007cb1cdc6c0db7773110ac2c34bf2e6960adef62ed3
     container_name: synaplan-whatsapp-stub
+    user: node
     working_dir: /app
     volumes:
       - ./frontend/tests/e2e/stub-servers/whatsapp/whatsapp-stub-server.ts:/app/whatsapp-stub-server.ts:ro
