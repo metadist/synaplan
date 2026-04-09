@@ -12,15 +12,39 @@ use App\Repository\WidgetSessionRepository;
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
 use PhpOffice\PhpSpreadsheet\Style\Alignment;
 use PhpOffice\PhpSpreadsheet\Style\Fill;
+use PhpOffice\PhpSpreadsheet\Worksheet\Worksheet;
 use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
 
 /**
  * Service for exporting widget chat data in various formats.
  *
  * Supports: Excel (primary), CSV, JSON
+ *
+ * Matches {@see WidgetSessionRepository::findSessionsByWidget()} filter keys.
+ *
+ * @phpstan-type WidgetSessionExportFilters array{
+ *     from?: int,
+ *     to?: int,
+ *     mode?: string,
+ *     sessionIds?: array<string>,
+ *     status?: string,
+ *     favorite?: bool,
+ *     sort?: string,
+ *     order?: string
+ * }
  */
 final readonly class WidgetExportService
 {
+    /**
+     * Max sessions loaded per Excel detail sheet (Conversations, Sessions); matches sort order of the API export.
+     */
+    private const EXCEL_DETAIL_SHEET_SESSION_LIMIT = 500;
+
+    /**
+     * Max sessions loaded per CSV/JSON export iteration (single page).
+     */
+    private const CSV_JSON_SESSION_LIMIT = 1000;
+
     public function __construct(
         private WidgetSessionRepository $sessionRepository,
         private ChatRepository $chatRepository,
@@ -31,7 +55,7 @@ final readonly class WidgetExportService
     /**
      * Export widget sessions to Excel format.
      *
-     * @param array{from?: int, to?: int, mode?: string} $filters
+     * @param WidgetSessionExportFilters $filters
      */
     public function exportToExcel(Widget $widget, array $filters = []): string
     {
@@ -63,7 +87,7 @@ final readonly class WidgetExportService
     /**
      * Export widget sessions to CSV format.
      *
-     * @param array{from?: int, to?: int, mode?: string} $filters
+     * @param WidgetSessionExportFilters $filters
      */
     public function exportToCsv(Widget $widget, array $filters = []): string
     {
@@ -94,7 +118,7 @@ final readonly class WidgetExportService
         // Get sessions
         $result = $this->sessionRepository->findSessionsByWidget(
             $widget->getWidgetId(),
-            1000,
+            self::CSV_JSON_SESSION_LIMIT,
             0,
             $filters
         );
@@ -131,13 +155,13 @@ final readonly class WidgetExportService
     /**
      * Export widget sessions to JSON format.
      *
-     * @param array{from?: int, to?: int, mode?: string} $filters
+     * @param WidgetSessionExportFilters $filters
      */
     public function exportToJson(Widget $widget, array $filters = [], string $baseUrl = ''): string
     {
         $result = $this->sessionRepository->findSessionsByWidget(
             $widget->getWidgetId(),
-            1000,
+            self::CSV_JSON_SESSION_LIMIT,
             0,
             $filters
         );
@@ -247,7 +271,7 @@ final readonly class WidgetExportService
         return $tempFile;
     }
 
-    private function createOverviewSheet($sheet, Widget $widget, array $filters): void
+    private function createOverviewSheet(Worksheet $sheet, Widget $widget, array $filters): void
     {
         // Title styling
         $sheet->setCellValue('A1', 'Widget Export Report');
@@ -269,42 +293,60 @@ final readonly class WidgetExportService
         $toDate = isset($filters['to']) ? date('Y-m-d', $filters['to']) : 'Present';
         $sheet->setCellValue('B7', $fromDate.' to '.$toDate);
 
-        // Statistics
-        $result = $this->sessionRepository->findSessionsByWidget($widget->getWidgetId(), 1000, 0, $filters);
-        $modeStats = $this->sessionRepository->countSessionsByMode($widget->getWidgetId());
+        $totalSessions = $this->sessionRepository->countSessionsWithFilters($widget->getWidgetId(), $filters);
+        $modeStats = $this->sessionRepository->countSessionsByModeWithFilters($widget->getWidgetId(), $filters);
+        $totalMessages = $this->sessionRepository->sumMessageCountWithFilters($widget->getWidgetId(), $filters);
 
         $sheet->setCellValue('A9', 'Statistics');
         $sheet->getStyle('A9')->getFont()->setBold(true)->setSize(12);
 
-        $totalMessages = 0;
-        foreach ($result['sessions'] as $session) {
-            $totalMessages += count($this->getSessionMessages($session));
-        }
-
         $sheet->setCellValue('A10', 'Total Sessions:');
-        $sheet->setCellValue('B10', $result['total']);
+        $sheet->setCellValue('B10', $totalSessions);
         $sheet->setCellValue('A11', 'Total Messages:');
         $sheet->setCellValue('B11', $totalMessages);
-        $sheet->setCellValue('A12', 'AI Sessions:');
-        $sheet->setCellValue('B12', $modeStats['ai']);
-        $sheet->setCellValue('A13', 'Human Sessions:');
-        $sheet->setCellValue('B13', $modeStats['human']);
-        $sheet->setCellValue('A14', 'Waiting Sessions:');
-        $sheet->setCellValue('B14', $modeStats['waiting']);
+
+        $sheet->setCellValue('A13', 'Session modes (export scope)');
+        $sheet->mergeCells('A13:B13');
+        $sheet->getStyle('A13')->getFont()->setBold(true)->setSize(11);
+
+        $sheet->setCellValue('A14', 'Mode');
+        $sheet->setCellValue('B14', 'Count');
+        foreach (['A14', 'B14'] as $headerCell) {
+            $sheet->getStyle($headerCell)->getFont()->setBold(true);
+            $sheet->getStyle($headerCell)->getFill()
+                ->setFillType(Fill::FILL_SOLID)
+                ->getStartColor()->setRGB('E2E8F0');
+        }
+
+        $sheet->setCellValue('A15', 'AI');
+        $sheet->setCellValue('B15', $modeStats[WidgetSession::MODE_AI]);
+        $sheet->setCellValue('A16', 'Human');
+        $sheet->setCellValue('B16', $modeStats[WidgetSession::MODE_HUMAN]);
+        $sheet->setCellValue('A17', 'Waiting');
+        $sheet->setCellValue('B17', $modeStats[WidgetSession::MODE_WAITING]);
+        $sheet->setCellValue('A18', 'Internal');
+        $sheet->setCellValue('B18', $modeStats[WidgetSession::MODE_INTERNAL]);
+
+        $sheet->setCellValue(
+            'A20',
+            'Note: Conversations and Sessions sheets list at most '.self::EXCEL_DETAIL_SHEET_SESSION_LIMIT.' sessions (last activity, descending). Overview totals include all sessions matching the export filters.'
+        );
+        $sheet->mergeCells('A20:D22');
+        $sheet->getStyle('A20')->getAlignment()->setWrapText(true)->setVertical(Alignment::VERTICAL_TOP);
 
         // Auto-size columns
-        $sheet->getColumnDimension('A')->setWidth(20);
+        $sheet->getColumnDimension('A')->setWidth(28);
         $sheet->getColumnDimension('B')->setWidth(40);
     }
 
-    private function createConversationsSheet($sheet, Widget $widget, array $filters): void
+    private function createConversationsSheet(Worksheet $sheet, Widget $widget, array $filters): void
     {
         $customFields = $widget->getConfig()['customFields'] ?? [];
 
-        // Header
-        $headers = ['Session', 'Time', 'From', 'Message'];
+        // Header: fixed columns end at E (Message); custom fields follow
+        $headers = ['Session', 'Date', 'Time', 'From', 'Message'];
         foreach ($customFields as $field) {
-            $headers[] = $field['name'];
+            $headers[] = $this->sanitizeCellValue((string) ($field['name'] ?? ''));
         }
 
         $col = 'A';
@@ -317,10 +359,15 @@ final readonly class WidgetExportService
             ++$col;
         }
 
-        $lastCol = chr(ord('D') + count($customFields));
+        $lastCol = chr(ord('E') + count($customFields));
 
         // Get sessions and messages
-        $result = $this->sessionRepository->findSessionsByWidget($widget->getWidgetId(), 500, 0, $filters);
+        $result = $this->sessionRepository->findSessionsByWidget(
+            $widget->getWidgetId(),
+            self::EXCEL_DETAIL_SHEET_SESSION_LIMIT,
+            0,
+            $filters
+        );
 
         $row = 2;
         $sessionNum = 1;
@@ -342,12 +389,13 @@ final readonly class WidgetExportService
                 }
 
                 $sheet->setCellValue('A'.$row, '#'.$sessionNum);
-                $sheet->setCellValue('B'.$row, date('H:i:s', $message['timestamp']));
-                $sheet->setCellValue('C'.$row, $message['sender']);
-                $sheet->setCellValue('D'.$row, $message['text']);
+                $sheet->setCellValue('B'.$row, date('Y-m-d', $message['timestamp']));
+                $sheet->setCellValue('C'.$row, date('H:i:s', $message['timestamp']));
+                $sheet->setCellValue('D'.$row, $message['sender']);
+                $sheet->setCellValue('E'.$row, $message['text']);
 
                 if (!empty($customFields)) {
-                    $cfCol = chr(ord('D') + 1);
+                    $cfCol = chr(ord('E') + 1);
                     foreach ($customFields as $field) {
                         $val = $cfValues[$field['id']] ?? ('boolean' === $field['type'] ? false : '');
                         $displayVal = is_bool($val) ? ($val ? 'Yes' : 'No') : $this->sanitizeCellValue((string) $val);
@@ -371,19 +419,20 @@ final readonly class WidgetExportService
         // Auto-size columns
         $sheet->getColumnDimension('A')->setWidth(10);
         $sheet->getColumnDimension('B')->setWidth(12);
-        $sheet->getColumnDimension('C')->setWidth(14);
-        $sheet->getColumnDimension('D')->setWidth(80);
-        $cfCol = chr(ord('D') + 1);
+        $sheet->getColumnDimension('C')->setWidth(10);
+        $sheet->getColumnDimension('D')->setWidth(14);
+        $sheet->getColumnDimension('E')->setWidth(80);
+        $cfCol = chr(ord('E') + 1);
         foreach ($customFields as $field) {
             $sheet->getColumnDimension($cfCol)->setAutoSize(true);
             ++$cfCol;
         }
 
         // Wrap text in message column
-        $sheet->getStyle('D:D')->getAlignment()->setWrapText(true);
+        $sheet->getStyle('E:E')->getAlignment()->setWrapText(true);
     }
 
-    private function createSessionsSheet($sheet, Widget $widget, array $filters): void
+    private function createSessionsSheet(Worksheet $sheet, Widget $widget, array $filters): void
     {
         // Header
         $headers = ['Session ID', 'Created', 'Last Activity', 'Messages', 'Files', 'Mode', 'Duration'];
@@ -399,7 +448,12 @@ final readonly class WidgetExportService
         }
 
         // Get sessions
-        $result = $this->sessionRepository->findSessionsByWidget($widget->getWidgetId(), 500, 0, $filters);
+        $result = $this->sessionRepository->findSessionsByWidget(
+            $widget->getWidgetId(),
+            self::EXCEL_DETAIL_SHEET_SESSION_LIMIT,
+            0,
+            $filters
+        );
 
         $row = 2;
         foreach ($result['sessions'] as $session) {
