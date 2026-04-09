@@ -5,6 +5,7 @@ namespace App\Repository;
 use App\Entity\WidgetSession;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
 use Doctrine\DBAL\ArrayParameterType;
+use Doctrine\ORM\QueryBuilder;
 use Doctrine\Persistence\ManagerRegistry;
 
 /**
@@ -115,6 +116,48 @@ class WidgetSessionRepository extends ServiceEntityRepository
     }
 
     /**
+     * Count sessions grouped by mode using the same filters as findSessionsByWidget (excluding sort/pagination).
+     * Test sessions (session ID starting with 'test_') are excluded.
+     *
+     * @param array{
+     *     status?: string,
+     *     mode?: string,
+     *     from?: int,
+     *     to?: int,
+     *     favorite?: bool,
+     *     sessionIds?: array<string>
+     * } $filters
+     *
+     * @return array{ai: int, human: int, waiting: int, internal: int}
+     */
+    public function countSessionsByModeWithFilters(string $widgetId, array $filters): array
+    {
+        $qb = $this->createQueryBuilder('ws')
+            ->select('ws.mode, COUNT(ws.id) AS cnt')
+            ->where('ws.widgetId = :widgetId')
+            ->andWhere('ws.sessionId NOT LIKE :testPrefix')
+            ->setParameter('widgetId', $widgetId)
+            ->setParameter('testPrefix', 'test_%');
+
+        $this->applyWidgetSessionListFilters($qb, $filters);
+        $qb->groupBy('ws.mode');
+
+        $results = $qb->getQuery()->getArrayResult();
+
+        $counts = ['ai' => 0, 'human' => 0, 'waiting' => 0, 'internal' => 0];
+        foreach ($results as $row) {
+            $mode = $row['mode'] ?? 'ai';
+            if (isset($counts[$mode])) {
+                $counts[$mode] = (int) $row['cnt'];
+            } else {
+                $counts['ai'] += (int) $row['cnt'];
+            }
+        }
+
+        return $counts;
+    }
+
+    /**
      * Get total message count for a widget.
      * Test sessions (session ID starting with 'test_') are excluded.
      */
@@ -194,45 +237,7 @@ class WidgetSessionRepository extends ServiceEntityRepository
             ->setParameter('widgetId', $widgetId)
             ->setParameter('testPrefix', 'test_%');
 
-        // Filter by status (active/expired)
-        if (isset($filters['status'])) {
-            $now = time();
-            if ('active' === $filters['status']) {
-                $qb->andWhere('ws.expires > :now')
-                    ->setParameter('now', $now);
-            } elseif ('expired' === $filters['status']) {
-                $qb->andWhere('ws.expires <= :now')
-                    ->setParameter('now', $now);
-            }
-        }
-
-        // Filter by mode (ai/human/waiting/internal)
-        if (isset($filters['mode']) && in_array($filters['mode'], ['ai', 'human', 'waiting', 'internal'], true)) {
-            $qb->andWhere('ws.mode = :mode')
-                ->setParameter('mode', $filters['mode']);
-        }
-
-        // Filter by date range
-        if (isset($filters['from'])) {
-            $qb->andWhere('ws.created >= :from')
-                ->setParameter('from', $filters['from']);
-        }
-        if (isset($filters['to'])) {
-            $qb->andWhere('ws.created <= :to')
-                ->setParameter('to', $filters['to']);
-        }
-
-        // Filter by favorite status
-        if (isset($filters['favorite'])) {
-            $qb->andWhere('ws.isFavorite = :isFavorite')
-                ->setParameter('isFavorite', $filters['favorite']);
-        }
-
-        // Filter by specific session IDs
-        if (isset($filters['sessionIds']) && count($filters['sessionIds']) > 0) {
-            $qb->andWhere('ws.sessionId IN (:sessionIds)')
-                ->setParameter('sessionIds', $filters['sessionIds']);
-        }
+        $this->applyWidgetSessionListFilters($qb, $filters);
 
         // Get total count
         $countQb = clone $qb;
@@ -322,5 +327,53 @@ class WidgetSessionRepository extends ServiceEntityRepository
             ->setParameter('sessionIds', $sessionIds)
             ->getQuery()
             ->getResult();
+    }
+
+    /**
+     * @param array{
+     *     status?: string,
+     *     mode?: string,
+     *     from?: int,
+     *     to?: int,
+     *     favorite?: bool,
+     *     sessionIds?: array<string>
+     * } $filters
+     */
+    private function applyWidgetSessionListFilters(QueryBuilder $qb, array $filters): void
+    {
+        if (isset($filters['status'])) {
+            $now = time();
+            if ('active' === $filters['status']) {
+                $qb->andWhere('ws.expires > :now')
+                    ->setParameter('now', $now);
+            } elseif ('expired' === $filters['status']) {
+                $qb->andWhere('ws.expires <= :now')
+                    ->setParameter('now', $now);
+            }
+        }
+
+        if (isset($filters['mode']) && in_array($filters['mode'], ['ai', 'human', 'waiting', 'internal'], true)) {
+            $qb->andWhere('ws.mode = :mode')
+                ->setParameter('mode', $filters['mode']);
+        }
+
+        if (isset($filters['from'])) {
+            $qb->andWhere('ws.created >= :from')
+                ->setParameter('from', $filters['from']);
+        }
+        if (isset($filters['to'])) {
+            $qb->andWhere('ws.created <= :to')
+                ->setParameter('to', $filters['to']);
+        }
+
+        if (isset($filters['favorite'])) {
+            $qb->andWhere('ws.isFavorite = :isFavorite')
+                ->setParameter('isFavorite', $filters['favorite']);
+        }
+
+        if (isset($filters['sessionIds']) && count($filters['sessionIds']) > 0) {
+            $qb->andWhere('ws.sessionId IN (:sessionIds)')
+                ->setParameter('sessionIds', $filters['sessionIds']);
+        }
     }
 }
