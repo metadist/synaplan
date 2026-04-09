@@ -7,6 +7,7 @@ export interface ModelInfo {
   service: string
   tag: string
   rating: number
+  features?: string[]
 }
 
 type Capability = string

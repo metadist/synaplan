@@ -19,6 +19,7 @@
     "test:e2e:oidc": "AUTH_METHOD=oidc playwright test --config=tests/e2e/playwright.config.ts --project=chromium",
     "test:e2e:oidc-button": "AUTH_METHOD=oidc playwright test --config=tests/e2e/playwright.config.ts --project=chromium --grep @oidc-button",
     "test:e2e:oidc-redirect": "AUTH_METHOD=oidc playwright test --config=tests/e2e/playwright.config.ts --project=chromium-oidc-redirect",
+    "test:e2e:model-api-check": "playwright test --config=tests/e2e/playwright.health-check.config.ts tests/e2e/tests/model-api-health-check.spec.ts",
     "test:e2e:model-check": "playwright test --config=tests/e2e/playwright.health-check.config.ts",
     "test:e2e:ui": "playwright test --config=tests/e2e/playwright.config.ts --ui",
     "test:e2e:report": "playwright show-report tests/e2e/reports/html",

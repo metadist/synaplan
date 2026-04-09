@@ -1,16 +1,32 @@
 /**
- * AI Model Health Check — API-only smoke tests.
+ * AI models — API health check (HTTP/SSE only, no browser).
  *
- * Purpose: Verify that every configured model still responds correctly.
- *          Run this to see which models need attention.
+ * Exercises each model row from GET /api/v1/config/models across capabilities (CHAT, vision,
+ * audio, …). Fails when the stream ends with topic ERROR, SSE error, or backend error markdown
+ * (## ⚠️).
  *
- * Tagged @noci @local — never runs in CI.
+ * Complement: browser/chat coverage is in model-ui-health-check.spec.ts (run via
+ * npm run test:e2e:model-check or npx playwright with that file — see its header).
  *
- * Run:
- *   npm run test:e2e:model-check                          (cloud models only)
- *   INCLUDE_LOCAL=1 npm run test:e2e:model-check          (all models incl. Ollama)
- *   INCLUDE_VIDEO=1 npm run test:e2e:model-check          (with TEXT2VID)
- *   INCLUDE_LOCAL=1 INCLUDE_VIDEO=1 npm run test:e2e:model-check  (everything)
+ * Tags: @noci @local — not run in CI.
+ *
+ * Prerequisite — DB model list must match the code catalog (BMODELS / ModelFixtures). Otherwise
+ * you get stale names in the UI, missing catalog rows in the API, or id mismatches vs chat.
+ * Reload fixtures before a trusted run:
+ *
+ *   docker compose exec -T backend php bin/console doctrine:fixtures:load --no-interaction
+ *
+ * (DELETE purge; FK-safe. Avoid --purge-with-truncate: MariaDB may error on FK-referenced tables.)
+ *
+ * Optional after catalog edits: php bin/console app:sync-model-prices
+ *
+ * Run (from frontend/):
+ *   npm run test:e2e:model-api-check
+ *   INCLUDE_LOCAL=1 npm run test:e2e:model-api-check
+ *   INCLUDE_VIDEO=1 npm run test:e2e:model-api-check
+ *   INCLUDE_LOCAL=1 INCLUDE_VIDEO=1 npm run test:e2e:model-api-check
+ *
+ * Full stack (this spec + chat UI spec): npm run test:e2e:model-check
  */
 import { test, expect } from '@playwright/test'
 import { getApiUrl } from '../config/config'
@@ -22,6 +38,7 @@ import {
   isCloudProvider,
   type ModelInfo,
 } from '../helpers/api'
+import { CREDENTIALS } from '../config/credentials'
 import { readFileSync } from 'fs'
 import { resolve, dirname } from 'path'
 import { fileURLToPath } from 'url'
@@ -32,10 +49,7 @@ const e2eDir = resolve(__dirname, '..')
 const VISION_IMAGE = resolve(e2eDir, 'test_data/vision-pattern-64.png')
 const AUDIO_FILE = resolve(e2eDir, 'test_data/test-audio.mp3')
 
-const CREDENTIALS = {
-  user: process.env.AUTH_USER || 'admin@synaplan.com',
-  pass: process.env.AUTH_PASS || 'admin123',
-}
+const ADMIN = CREDENTIALS.getAdminCredentials()
 
 const INCLUDE_VIDEO = process.env.INCLUDE_VIDEO === '1'
 const INCLUDE_LOCAL = process.env.INCLUDE_LOCAL === '1'
@@ -106,7 +120,7 @@ function printConsoleSummary(results: ModelResult[]): void {
   const caps = [...new Set(tested.map((r) => r.capability))]
 
   const scope = INCLUDE_LOCAL ? 'All' : 'Cloud'
-  console.log(`\n========== ${scope} AI Model Health Check ==========`)
+  console.log(`\n========== ${scope} AI models — API health check ==========`)
   for (const cap of caps) {
     const capResults = tested.filter((r) => r.capability === cap)
     const pass = capResults.filter((r) => r.status === 'PASS').length
@@ -151,7 +165,7 @@ async function attachReport(
   const caps = [...new Set(tested.map((r) => r.capability))]
   const scope = INCLUDE_LOCAL ? 'All' : 'Cloud'
   const lines: string[] = [
-    `${scope} AI Model Health Check — ${report.timestamp}`,
+    `${scope} AI models — API health check — ${report.timestamp}`,
     `URL: ${report.baseUrl}`,
     '',
   ]
@@ -248,6 +262,24 @@ interface StreamResult {
   topic?: string
 }
 
+/** Backend marks user-facing failures with this prefix in streamed chunks (StreamController). */
+const BACKEND_ERROR_MARKDOWN_PREFIX = '## ⚠️'
+
+function isErrorTopic(topic: string | undefined): boolean {
+  if (topic == null || topic === '') return false
+  return String(topic).toUpperCase() === 'ERROR'
+}
+
+/** True when the stream reports failure (SSE error event, ERROR topic, or error-shaped body text). */
+function streamReportsAiFailure(stream: StreamResult): boolean {
+  if (stream.error) return true
+  if (isErrorTopic(stream.topic)) return true
+  if ((stream.model ?? '').toLowerCase() === 'error') return true
+  const body = stream.chunks.join('')
+  if (body.includes(BACKEND_ERROR_MARKDOWN_PREFIX)) return true
+  return false
+}
+
 async function streamMessage(
   request: import('@playwright/test').APIRequestContext,
   cookie: string,
@@ -288,9 +320,10 @@ async function streamMessage(
   const result: StreamResult = { completed: false, chunks: [], hasFile: false }
 
   for (const line of lines) {
-    if (!line.startsWith('data: ')) continue
+    const trimmed = line.trimStart()
+    if (!trimmed.startsWith('data: ')) continue
     try {
-      const data = JSON.parse(line.slice(6))
+      const data = JSON.parse(trimmed.slice(6))
       if (data.status === 'data' && data.chunk) {
         result.chunks.push(data.chunk)
       } else if (data.status === 'complete') {
@@ -356,7 +389,7 @@ async function runCapability(
   config: CapabilityConfig,
   request: import('@playwright/test').APIRequestContext
 ): Promise<ModelResult[]> {
-  const cookie = await loginAndGetCookie(request, CREDENTIALS)
+  const cookie = await loginAndGetCookie(request, ADMIN)
   const allModels = await fetchModelsByCapability(request, cookie)
   const models = allModels[config.capability] ?? []
   const results: ModelResult[] = []
@@ -424,9 +457,10 @@ async function runCapability(
 
         const actualProvider = stream.provider ?? 'unknown'
         const actualModel = stream.model ?? 'unknown'
+        const fullText = stream.chunks.join('')
 
-        if (actualModel === 'error' || stream.topic === 'ERROR') {
-          const errorText = stream.chunks.join('').trim().slice(0, 200)
+        if (streamReportsAiFailure(stream)) {
+          const errorText = fullText.trim().slice(0, 400)
           throw new Error(`Provider error (${actualProvider}/${actualModel}): ${errorText}`)
         }
 
@@ -445,13 +479,12 @@ async function runCapability(
         }
 
         if (config.requireFile && !stream.hasFile) {
-          const fullText = stream.chunks.join('').trim()
-          const hint = fullText.length > 0 ? ` (got text: "${fullText.slice(0, 100)}...")` : ''
+          const fullTextTrim = fullText.trim()
+          const hint = fullTextTrim.length > 0 ? ` (got text: "${fullTextTrim.slice(0, 100)}...")` : ''
           throw new Error(`Expected file event for ${config.capability} but none received${hint}`)
         }
 
         if (!config.requireFile) {
-          const fullText = stream.chunks.join('')
           if (fullText.trim().length === 0 && !stream.hasFile) {
             throw new Error('Response has no text and no file — empty result')
           }
@@ -617,13 +650,13 @@ async function runAllCapabilities(
 // Test
 // ===========================================================================
 
-test.describe('@noci @local AI model health check', () => {
+test.describe('@noci @local AI models — API health check', () => {
   test('smoke-test every model across all capabilities', async ({ request }, testInfo) => {
     const configs = INCLUDE_VIDEO ? [...DAILY_CAPABILITIES, VIDEO_CAPABILITY] : DAILY_CAPABILITIES
     const modelCount = configs.length * 10 // rough upper bound per capability
     testInfo.setTimeout(Math.max(300_000, modelCount * STREAM_TIMEOUT.CHAT))
 
-    const cookie = await loginAndGetCookie(request, CREDENTIALS)
+    const cookie = await loginAndGetCookie(request, ADMIN)
     const allModels = await fetchModelsByCapability(request, cookie)
 
     const allResults = await runAllCapabilities(configs, allModels, request)
