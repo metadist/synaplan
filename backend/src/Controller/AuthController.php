@@ -200,33 +200,24 @@ class AuthController extends AbstractController
 
         $user = $this->userRepository->findOneBy(['mail' => $email]);
 
-        if (!$user || !$this->passwordHasher->isPasswordValid($user, $password)) {
+        if (!$user) {
             usleep(100000); // Timing attack prevention
 
             return $this->json(['error' => 'Invalid credentials'], Response::HTTP_UNAUTHORIZED);
         }
 
-        // Check if user registered with external auth (Google, GitHub, Keycloak)
-        if ($user->isExternalAuth()) {
-            $this->logger->warning('Login attempt with password for external auth user', [
-                'email' => $email,
-                'auth_provider' => $user->getAuthProviderName(),
-            ]);
-
-            return $this->json([
-                'error' => sprintf('This account uses %s for authentication. Please use the "%s" button to sign in.',
-                    $user->getAuthProviderName(),
-                    $user->getAuthProviderName()
-                ),
-            ], Response::HTTP_FORBIDDEN);
-        }
-
-        // Check if user is an OAuth user (no password set)
+        // User has no password yet (e.g. registered via Google/GitHub only)
         if (null === $user->getPw()) {
             return $this->json([
-                'error' => 'OAuth account',
-                'message' => 'This account uses social login. Please use Google, GitHub, or Keycloak to sign in.',
+                'error' => 'No password set for this account. Use "Forgot password" to create one, or sign in with your social provider.',
+                'code' => 'NO_PASSWORD',
             ], Response::HTTP_UNAUTHORIZED);
+        }
+
+        if (!$this->passwordHasher->isPasswordValid($user, $password)) {
+            usleep(100000); // Timing attack prevention
+
+            return $this->json(['error' => 'Invalid credentials'], Response::HTTP_UNAUTHORIZED);
         }
 
         // Check email verification
@@ -550,14 +541,6 @@ class AuthController extends AbstractController
             ]);
         }
 
-        // Block password reset for external auth users
-        if (!$user->canChangePassword()) {
-            return $this->json([
-                'success' => true,
-                'message' => 'If email exists, reset instructions sent',
-            ]);
-        }
-
         // Generate reset token (1 hour expiry)
         $token = $this->tokenRepository->createToken($user, 'password_reset', 3600);
 
@@ -601,14 +584,6 @@ class AuthController extends AbstractController
         }
 
         $user = $token->getUser();
-
-        if (!$user->canChangePassword()) {
-            $provider = $user->getAuthProviderName();
-
-            return $this->json([
-                'error' => "This account is managed by {$provider}. Please use {$provider} to manage your password.",
-            ], Response::HTTP_FORBIDDEN);
-        }
 
         $user->setPw($this->passwordHasher->hashPassword($user, $newPassword));
         $this->tokenRepository->markAsUsed($token);

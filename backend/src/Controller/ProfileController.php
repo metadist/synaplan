@@ -82,11 +82,11 @@ class ProfileController extends AbstractController
         // Get external auth info if applicable
         $externalAuthInfo = null;
         if ($user->isExternalAuth()) {
-            $type = $user->getType();
-            $lastLoginKey = match ($type) {
-                'GOOGLE' => 'google_last_login',
-                'GITHUB' => 'github_last_login',
-                'OIDC' => 'oidc_last_login',
+            $provider = $user->getProviderId();
+            $lastLoginKey = match ($provider) {
+                'google' => 'google_last_login',
+                'github' => 'github_last_login',
+                'keycloak' => 'oidc_last_login',
                 default => null,
             };
 
@@ -268,12 +268,10 @@ class ProfileController extends AbstractController
             return $this->json(['error' => 'Not authenticated'], Response::HTTP_UNAUTHORIZED);
         }
 
-        // Block password change for external authentication users (OAuth, OIDC)
+        // Block password change for users without a password
         if (!$user->canChangePassword()) {
-            $provider = $user->getAuthProviderName();
-
             return $this->json([
-                'error' => "Password cannot be changed for {$provider} accounts. Please manage your password through {$provider}.",
+                'error' => 'You do not have a password set. Please use the "Forgot password" link on the login page to create one.',
             ], Response::HTTP_FORBIDDEN);
         }
 

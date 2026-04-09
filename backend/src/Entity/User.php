@@ -406,26 +406,21 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     }
 
     /**
-     * Check if user is using external authentication (OAuth, OIDC)
-     * External users cannot change their password locally.
-     *
-     * Note: BINTYPE is always 'WEB' for web-based logins
-     * BPROVIDERID determines the actual authentication provider
+     * Check if user is using external authentication exclusively (no password set).
+     * Users without a password cannot change their password locally or confirm actions with a password.
      */
     public function isExternalAuth(): bool
     {
-        // Check provider ID instead of type
-        return 'local' !== $this->providerId && '' !== $this->providerId;
+        return empty($this->pw);
     }
 
     /**
-     * Check if user can change password
-     * Only local users with passwords can change their password.
+     * Check if user can change password (has an existing password to verify against).
+     * Users without a password should use "forgot password" to set one.
      */
     public function canChangePassword(): bool
     {
-        // Only local provider users with a password can change it
-        return 'local' === $this->providerId && !empty($this->pw);
+        return !empty($this->pw);
     }
 
     /**
