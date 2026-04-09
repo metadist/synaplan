@@ -86,7 +86,7 @@ class ProfileController extends AbstractController
             $lastLoginKey = match ($provider) {
                 'google' => 'google_last_login',
                 'github' => 'github_last_login',
-                'keycloak' => 'oidc_last_login',
+                'keycloak', 'oidc' => 'oidc_last_login',
                 default => null,
             };
 

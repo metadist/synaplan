@@ -52,6 +52,8 @@ class OidcUserService
         $user = $this->findBySub($sub) ?? $this->findByEmail($email);
 
         if ($user) {
+            // Strict isolation for enterprise users: if an email is already registered
+            // via Google/GitHub/Local, we DO NOT merge it with a Keycloak login.
             if ('keycloak' !== $user->getProviderId()) {
                 $this->logger->warning('OIDC login attempt for email registered to different provider', [
                     'email' => $email,
