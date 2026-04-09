@@ -49,16 +49,16 @@ Permission error on `frontend/dist/` (container creates it as root): `sudo rm -r
 
 ## Test stack details
 
-|               | Dev stack                                 | Test stack                                |
-| ------------- | ----------------------------------------- | ----------------------------------------- |
-| **Start**     | `docker compose up -d`                    | `make test-stack-build`                   |
-| **Backend**   | http://localhost:8000                     | http://localhost:8001                     |
-| **Frontend**  | http://localhost:5173 (Vite)              | Served by backend (:8001)                 |
-| **APP_ENV**   | `dev`                                     | `test`                                    |
-| **AI models** | Real providers + TestProvider (IDs -1…-7) | Real providers + TestProvider (IDs -1…-7) |
-| **DB**        | Persistent volume                         | **tmpfs** (fresh on every `up`)           |
-| **MailHog**   | :8025 / :1025                             | :8025 / :1025 (shared ports!)             |
-| **Login**     | admin@synaplan.com / admin123             | admin@synaplan.com / admin123             |
+|               | Dev stack                                 | Test stack                                                             |
+| ------------- | ----------------------------------------- | ---------------------------------------------------------------------- |
+| **Start**     | `docker compose up -d`                    | `make test-stack-build`                                                |
+| **Backend**   | http://localhost:8000                     | http://localhost:8001                                                  |
+| **Frontend**  | http://localhost:5173 (Vite)              | Served by backend (:8001)                                              |
+| **APP_ENV**   | `dev`                                     | `test`                                                                 |
+| **AI models** | Real providers + TestProvider (IDs -1…-7) | Real providers + TestProvider (IDs -1…-7) + Ollama stub (IDs -10, -11) |
+| **DB**        | Persistent volume                         | **tmpfs** (fresh on every `up`)                                        |
+| **MailHog**   | :8025 / :1025                             | :8025 / :1025 (shared ports!)                                          |
+| **Login**     | admin@synaplan.com / admin123             | admin@synaplan.com / admin123                                          |
 
 Widget E2E tests use the page at `/widget-test.html`. Tests use `page.route()` to serve the fixture from disk.
 
@@ -95,6 +95,17 @@ From the **frontend** directory:
 | **Playwright UI**                  | `npm run test:e2e:ui`                                                      |
 
 Everything after `--` is passed through to Playwright.
+
+### Stub servers
+
+External services (WhatsApp, Ollama) are replaced by deterministic Node.js stub servers in the test stack. They start automatically via `docker-compose.test.yml`. Each stub exposes `/__requests`, `/__reset`, and `/__configure` control endpoints — see the header comment in each `*-stub-server.ts` for details.
+
+| Stub            | Port  | Replaces                |
+| --------------- | ----- | ----------------------- |
+| `whatsapp-stub` | 3999  | Meta WhatsApp Graph API |
+| `ollama-stub`   | 11434 | Ollama AI server        |
+
+**Note:** The `ollama-stub` binds host port 11434 — the same default port as a real Ollama installation. Stop any local Ollama before starting the test stack, or adjust the port mapping in `docker-compose.test.yml`.
 
 ### WhatsApp tests (`@whatsapp`)
 
