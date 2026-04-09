@@ -686,11 +686,11 @@ class ModelCatalog
             'quality' => 10,
             'rating' => 1,
             'json' => [
-                'description' => 'Claude Opus 4.6 - Anthropic\'s most intelligent model for agents and coding. 200K context, 64K default output (128K max).',
+                'description' => 'Claude Opus 4.6 - Anthropic\'s most intelligent model for agents and coding. 1M context, 128K max output.',
                 'max_tokens' => 65536,
                 'params' => ['model' => 'claude-opus-4-6'],
                 'features' => ['vision', 'reasoning'],
-                'meta' => ['context_window' => '200000', 'max_output' => '65536'],
+                'meta' => ['context_window' => '1000000', 'max_output' => '128000'],
             ],
         ],
         [
@@ -708,11 +708,11 @@ class ModelCatalog
             'quality' => 9,
             'rating' => 1,
             'json' => [
-                'description' => 'Claude Sonnet 4.6 - best combination of speed and intelligence. 200K context, 64K output.',
+                'description' => 'Claude Sonnet 4.6 - best combination of speed and intelligence. 1M context, 64K output.',
                 'max_tokens' => 64000,
                 'params' => ['model' => 'claude-sonnet-4-6'],
                 'features' => ['vision', 'reasoning'],
-                'meta' => ['context_window' => '200000', 'max_output' => '64000'],
+                'meta' => ['context_window' => '1000000', 'max_output' => '64000'],
             ],
         ],
         [
