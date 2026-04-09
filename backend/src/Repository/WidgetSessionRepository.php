@@ -158,6 +158,62 @@ class WidgetSessionRepository extends ServiceEntityRepository
     }
 
     /**
+     * Count sessions matching the same filters as findSessionsByWidget (excluding sort/pagination).
+     * Test sessions (session ID starting with 'test_') are excluded.
+     *
+     * @param array{
+     *     status?: string,
+     *     mode?: string,
+     *     from?: int,
+     *     to?: int,
+     *     favorite?: bool,
+     *     sessionIds?: array<string>
+     * } $filters
+     */
+    public function countSessionsWithFilters(string $widgetId, array $filters): int
+    {
+        $qb = $this->createQueryBuilder('ws')
+            ->select('COUNT(ws.id)')
+            ->where('ws.widgetId = :widgetId')
+            ->andWhere('ws.sessionId NOT LIKE :testPrefix')
+            ->setParameter('widgetId', $widgetId)
+            ->setParameter('testPrefix', 'test_%');
+
+        $this->applyWidgetSessionListFilters($qb, $filters);
+
+        return (int) $qb->getQuery()->getSingleScalarResult();
+    }
+
+    /**
+     * Sum persisted {@see WidgetSession::messageCount} for sessions matching the same filters as findSessionsByWidget.
+     * Test sessions (session ID starting with 'test_') are excluded.
+     *
+     * @param array{
+     *     status?: string,
+     *     mode?: string,
+     *     from?: int,
+     *     to?: int,
+     *     favorite?: bool,
+     *     sessionIds?: array<string>
+     * } $filters
+     */
+    public function sumMessageCountWithFilters(string $widgetId, array $filters): int
+    {
+        $qb = $this->createQueryBuilder('ws')
+            ->select('COALESCE(SUM(ws.messageCount), 0)')
+            ->where('ws.widgetId = :widgetId')
+            ->andWhere('ws.sessionId NOT LIKE :testPrefix')
+            ->setParameter('widgetId', $widgetId)
+            ->setParameter('testPrefix', 'test_%');
+
+        $this->applyWidgetSessionListFilters($qb, $filters);
+
+        $sum = $qb->getQuery()->getSingleScalarResult();
+
+        return (int) $sum;
+    }
+
+    /**
      * Get total message count for a widget.
      * Test sessions (session ID starting with 'test_') are excluded.
      */
@@ -239,7 +295,6 @@ class WidgetSessionRepository extends ServiceEntityRepository
 
         $this->applyWidgetSessionListFilters($qb, $filters);
 
-        // Get total count
         $countQb = clone $qb;
         $total = (int) $countQb->select('COUNT(ws.id)')->getQuery()->getSingleScalarResult();
 

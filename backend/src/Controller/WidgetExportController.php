@@ -72,8 +72,8 @@ class WidgetExportController extends AbstractController
         name: 'mode',
         in: 'query',
         required: false,
-        description: 'Filter by mode',
-        schema: new OA\Schema(type: 'string', enum: ['ai', 'human', 'waiting'])
+        description: 'Filter by session mode',
+        schema: new OA\Schema(type: 'string', enum: ['ai', 'human', 'waiting', 'internal'])
     )]
     #[OA\Response(
         response: 200,
