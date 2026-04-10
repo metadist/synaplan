@@ -44,7 +44,7 @@
 - **Environment Variable:** `GROQ_API_KEY`
 - **Capabilities:**
   - **Chat:** OpenAI-compatible API, fast inference
-  - **Vision:** llama-4-scout, llama-4-maverick vision models
+  - **Vision:** llama-4-scout vision model
 
 ### 5. Ollama (Local/Self-hosted)
 - **Location:** `backend/src/AI/Provider/OllamaProvider.php`

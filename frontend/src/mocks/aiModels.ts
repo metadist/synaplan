@@ -63,13 +63,6 @@ export const mockAvailableModels: AIModel[] = [
     description: 'Fast API service via groq',
   },
   {
-    id: 49,
-    purpose: 'chat',
-    service: 'Groq',
-    name: 'llama-4-maverick-17b-128e-instruct',
-    description: 'Groq Llama4 128e processing and text extraction',
-  },
-  {
     id: 1,
     purpose: 'chat',
     service: 'OpenAI',
