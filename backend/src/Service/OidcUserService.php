@@ -6,6 +6,7 @@ use App\Entity\User;
 use App\Repository\UserRepository;
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;
+use Symfony\Component\Security\Core\Exception\CustomUserMessageAuthenticationException;
 
 /**
  * Shared OIDC user provisioning service.
@@ -59,7 +60,7 @@ class OidcUserService
                     'email' => $email,
                     'existing_provider' => $user->getProviderId(),
                 ]);
-                throw new \RuntimeException('Authentication failed: Email conflict.');
+                throw new CustomUserMessageAuthenticationException('Authentication failed.');
             }
 
             $this->logger->info('Existing user logging in via OIDC', [

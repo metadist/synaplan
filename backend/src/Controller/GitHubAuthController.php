@@ -237,6 +237,14 @@ class GitHubAuthController extends AbstractController
         }
 
         if ($user) {
+            if ($user->isManagedExternally()) {
+                $this->logger->warning('GitHub OAuth blocked for Keycloak-managed user', [
+                    'user_id' => $user->getId(),
+                    'email' => $email,
+                ]);
+                throw new \Exception('GitHub OAuth not allowed for organization-managed account');
+            }
+
             $this->logger->info('Existing user logging in via GitHub', [
                 'user_id' => $user->getId(),
                 'email' => $email,
