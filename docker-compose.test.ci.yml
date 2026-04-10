@@ -11,7 +11,8 @@
 
 services:
   app_test:
-    # Use pre-built image from CI (e.g., synaplan-test:ci)
+    # Use pre-built image from CI (loaded via `docker load` from build artifact)
     image: ${APP_IMAGE:-}
- 
+    pull_policy: never
+
     volumes: !reset []
