@@ -930,6 +930,8 @@ const streamAIResponse = async (
       }
 
       let spokenLength = 0
+      let audioText = ''
+      let insideThinkBlock = false
       let detectedLanguage = 'en'
 
       if (options?.voiceReply) {
@@ -1055,10 +1057,31 @@ const streamAIResponse = async (
 
             fullContent += data.chunk
 
-            // Stream audio if enabled (cheap — keep on every chunk)
             if (currentAudioStreamer) {
+              let audioChunk = data.chunk.replace(/<think>[\s\S]*?<\/think>/gi, '')
+
+              if (insideThinkBlock) {
+                const closeMatch = audioChunk.match(/<\/think>/i)
+                if (closeMatch && closeMatch.index !== undefined) {
+                  audioChunk = audioChunk.substring(closeMatch.index + closeMatch[0].length)
+                  insideThinkBlock = false
+                } else {
+                  audioChunk = ''
+                }
+              }
+
+              if (!insideThinkBlock) {
+                const openMatch = audioChunk.match(/<think>/i)
+                if (openMatch && openMatch.index !== undefined) {
+                  audioChunk = audioChunk.substring(0, openMatch.index)
+                  insideThinkBlock = true
+                }
+              }
+
+              audioText += audioChunk
+
               while (true) {
-                const currentUnprocessed = fullContent.slice(spokenLength)
+                const currentUnprocessed = audioText.slice(spokenLength)
                 const boundaryMatch = currentUnprocessed.match(/([.?!]+)(\s+|$)|(\n+)/)
 
                 if (!boundaryMatch || boundaryMatch.index === undefined) break
@@ -1282,9 +1305,8 @@ const streamAIResponse = async (
               renderStreamingContent(fullContent, messageId)
             }
 
-            // Speak remaining text then signal no more sentences coming
             if (currentAudioStreamer) {
-              const remaining = fullContent.slice(spokenLength)
+              const remaining = audioText.slice(spokenLength)
               if (remaining.trim()) {
                 currentAudioStreamer.streamText(remaining, undefined, detectedLanguage)
               }
