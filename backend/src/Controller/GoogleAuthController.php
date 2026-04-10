@@ -197,14 +197,18 @@ class GoogleAuthController extends AbstractController
         $user = $this->userRepository->findOneBy(['mail' => $email]);
 
         if ($user) {
-            // User exists - verify they registered with Google
-            if ('google' !== $user->getProviderId()) {
-                throw new \Exception(sprintf('This email is already registered using %s. Please use the same login method.', $user->getAuthProviderName()));
+            if ($user->isManagedExternally()) {
+                $this->logger->warning('Google OAuth blocked for Keycloak-managed user', [
+                    'user_id' => $user->getId(),
+                    'email' => $email,
+                ]);
+                throw new \Exception('Google OAuth not allowed for organization-managed account');
             }
 
-            $this->logger->info('Existing Google user logging in', [
+            $this->logger->info('Existing user logging in via Google', [
                 'user_id' => $user->getId(),
                 'email' => $email,
+                'original_provider' => $user->getProviderId(),
             ]);
         } else {
             // Create new user

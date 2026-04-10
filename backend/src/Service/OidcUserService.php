@@ -6,6 +6,7 @@ use App\Entity\User;
 use App\Repository\UserRepository;
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;
+use Symfony\Component\Security\Core\Exception\CustomUserMessageAuthenticationException;
 
 /**
  * Shared OIDC user provisioning service.
@@ -52,11 +53,20 @@ class OidcUserService
         $user = $this->findBySub($sub) ?? $this->findByEmail($email);
 
         if ($user) {
+            // Strict isolation for enterprise users: if an email is already registered
+            // via Google/GitHub/Local, we DO NOT merge it with a Keycloak login.
             if ('keycloak' !== $user->getProviderId()) {
-                throw new \RuntimeException(sprintf('This email is already registered using %s. Please use the same login method.', $user->getAuthProviderName()));
+                $this->logger->warning('OIDC login attempt for email registered to different provider', [
+                    'email' => $email,
+                    'existing_provider' => $user->getProviderId(),
+                ]);
+                throw new CustomUserMessageAuthenticationException('Authentication failed.');
             }
 
-            $this->logger->info('Existing OIDC user found', ['user_id' => $user->getId()]);
+            $this->logger->info('Existing user logging in via OIDC', [
+                'user_id' => $user->getId(),
+                'original_provider' => $user->getProviderId(),
+            ]);
         } else {
             $user = new User();
             $user->setMail($email ?? $username.'@keycloak.local');
