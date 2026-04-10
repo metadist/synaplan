@@ -343,7 +343,7 @@ jobs:
         run: |
           COMPOSE="docker compose -f docker-compose.test.yml -f docker-compose.test.ci.yml"
           PROFILE="${{ matrix.compose_profiles }}"
-          n=0; until $COMPOSE $PROFILE pull; do n=$((n+1)); [ "$n" -ge 4 ] && exit 1; sleep $((n*15)); done
+          n=0; until $COMPOSE $PROFILE pull --ignore-buildable; do n=$((n+1)); [ "$n" -ge 4 ] && exit 1; sleep $((n*15)); done
 
           # app_test entrypoint loads fixtures on first run (APP_ENV=test, empty DB)
           # so TestProvider model (-1 > -7) and admin user exist for E2E.
