@@ -1273,7 +1273,8 @@ class StreamController extends AbstractController
                 ]);
 
                 // Widget Mode: Increment session message count
-                if ($isWidgetMode && $widgetSession) {
+                if ($isWidgetMode) {
+                    /** @var \App\Entity\WidgetSession $widgetSession */
                     $this->widgetSessionService->incrementMessageCount($widgetSession);
                     $this->logger->info('Widget session message count incremented', [
                         'session_id' => $widgetSession->getSessionId(),

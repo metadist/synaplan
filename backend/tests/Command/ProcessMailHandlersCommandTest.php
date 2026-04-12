@@ -7,6 +7,7 @@ namespace App\Tests\Command;
 use App\Command\ProcessMailHandlersCommand;
 use App\Service\InboundEmailHandlerService;
 use Doctrine\ORM\EntityManagerInterface;
+use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\Console\Application;
@@ -17,9 +18,9 @@ use Symfony\Component\Lock\Store\FlockStore;
 class ProcessMailHandlersCommandTest extends TestCase
 {
     private CommandTester $commandTester;
-    private InboundEmailHandlerService $handlerService;
-    private EntityManagerInterface $em;
-    private LoggerInterface $logger;
+    private InboundEmailHandlerService&MockObject $handlerService;
+    private EntityManagerInterface&MockObject $em;
+    private LoggerInterface&MockObject $logger;
     private LockFactory $lockFactory;
 
     protected function setUp(): void
@@ -48,14 +49,12 @@ class ProcessMailHandlersCommandTest extends TestCase
 
     public function testExecuteWithNoHandlers(): void
     {
-        // @phpstan-ignore-next-line (PHPUnit mock method)
         $this->handlerService
             ->expects($this->once())
             ->method('processAllHandlers')
             ->willReturn([]);
 
         // Flush is not called when there are no handlers
-        // @phpstan-ignore-next-line (PHPUnit mock method)
         $this->em
             ->expects($this->never())
             ->method('flush');
@@ -69,7 +68,6 @@ class ProcessMailHandlersCommandTest extends TestCase
 
     public function testExecuteWithSuccessfulHandlers(): void
     {
-        // @phpstan-ignore-next-line (PHPUnit mock method)
         $this->handlerService
             ->expects($this->once())
             ->method('processAllHandlers')
@@ -86,7 +84,6 @@ class ProcessMailHandlersCommandTest extends TestCase
                 ],
             ]);
 
-        // @phpstan-ignore-next-line (PHPUnit mock method)
         $this->em
             ->expects($this->once())
             ->method('flush');
@@ -103,7 +100,6 @@ class ProcessMailHandlersCommandTest extends TestCase
 
     public function testExecuteWithFailedHandler(): void
     {
-        // @phpstan-ignore-next-line (PHPUnit mock method)
         $this->handlerService
             ->expects($this->once())
             ->method('processAllHandlers')
@@ -115,7 +111,6 @@ class ProcessMailHandlersCommandTest extends TestCase
                 ],
             ]);
 
-        // @phpstan-ignore-next-line (PHPUnit mock method)
         $this->em
             ->expects($this->once())
             ->method('flush');
@@ -132,7 +127,6 @@ class ProcessMailHandlersCommandTest extends TestCase
 
     public function testExecuteWithPartialErrors(): void
     {
-        // @phpstan-ignore-next-line (PHPUnit mock method)
         $this->handlerService
             ->expects($this->once())
             ->method('processAllHandlers')
@@ -144,7 +138,6 @@ class ProcessMailHandlersCommandTest extends TestCase
                 ],
             ]);
 
-        // @phpstan-ignore-next-line (PHPUnit mock method)
         $this->em
             ->expects($this->once())
             ->method('flush');
@@ -164,12 +157,10 @@ class ProcessMailHandlersCommandTest extends TestCase
         $lock = $this->lockFactory->createLock('mail-handler-process', 900);
         $lock->acquire();
 
-        // @phpstan-ignore-next-line (PHPUnit mock method)
         $this->handlerService
             ->expects($this->never())
             ->method('processAllHandlers');
 
-        // @phpstan-ignore-next-line (PHPUnit mock method)
         $this->em
             ->expects($this->never())
             ->method('flush');
@@ -186,13 +177,11 @@ class ProcessMailHandlersCommandTest extends TestCase
 
     public function testCommandHandlesException(): void
     {
-        // @phpstan-ignore-next-line (PHPUnit mock method)
         $this->handlerService
             ->expects($this->once())
             ->method('processAllHandlers')
             ->willThrowException(new \Exception('Database connection failed'));
 
-        // @phpstan-ignore-next-line (PHPUnit mock method)
         $this->logger
             ->expects($this->once())
             ->method('error')
