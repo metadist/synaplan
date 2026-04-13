@@ -11,6 +11,7 @@ export const selectors = {
     password: '#password',
     submit: 'button[type="submit"]',
     signUpLink: '[data-testid="link-signup"]',
+    errorAlert: '[data-testid="alert-login-error"]',
   },
   register: {
     fullName: '[data-testid="input-full-name"]',

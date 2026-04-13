@@ -1,3 +1,4 @@
+import { randomUUID } from 'crypto'
 import { test, expect } from '@playwright/test'
 import { selectors } from '../helpers/selectors'
 import { TIMEOUTS, getApiUrl } from '../config/config'
@@ -80,15 +81,19 @@ test.describe('@ci Guest API', () => {
     })
   })
 
-  test('guest session API returns existing session', async ({ request }) => {
+  test('guest session API returns existing session and supports chat creation', async ({
+    request,
+  }) => {
     let sessionId: string
 
     await test.step('Arrange: create initial session', async () => {
       const response = await request.post(`${apiBaseUrl()}/api/v1/guest/session`, {
         data: {},
       })
+      expect(response.ok(), 'Session creation must succeed').toBeTruthy()
       const data = await response.json()
       sessionId = data.sessionId
+      expect(sessionId, 'Session must return a sessionId').toBeTruthy()
     })
 
     await test.step('Assert: re-posting with same sessionId returns it', async () => {
@@ -100,13 +105,33 @@ test.describe('@ci Guest API', () => {
       const data = await response.json()
       expect(data.sessionId).toBe(sessionId!)
     })
+
+    await test.step('Act: create chat for the same session', async () => {
+      const response = await request.post(`${apiBaseUrl()}/api/v1/guest/chat`, {
+        data: { sessionId: sessionId! },
+      })
+      const data = await response.json()
+      expect(
+        response.ok(),
+        `Chat creation should succeed but got ${response.status()}: ${JSON.stringify(data)}`
+      ).toBeTruthy()
+      expect(data.chatId).toBeTruthy()
+      expect(typeof data.chatId).toBe('number')
+    })
   })
 
-  test('guest session status returns 404 for unknown session', async ({ request }) => {
-    await test.step('Act & Assert: GET unknown session returns 404', async () => {
+  test('guest session status returns 400 for invalid ID and 404 for unknown UUID', async ({
+    request,
+  }) => {
+    await test.step('Act & Assert: non-UUID returns 400', async () => {
       const response = await request.get(
         `${apiBaseUrl()}/api/v1/guest/session/nonexistent-session-id`
       )
+      expect(response.status()).toBe(400)
+    })
+
+    await test.step('Act & Assert: valid but unknown UUID returns 404', async () => {
+      const response = await request.get(`${apiBaseUrl()}/api/v1/guest/session/${randomUUID()}`)
       expect(response.status()).toBe(404)
     })
   })
@@ -120,29 +145,6 @@ test.describe('@ci Guest API', () => {
     })
   })
 
-  test('guest chat creation works with valid session', async ({ request }) => {
-    let sessionId: string
-
-    await test.step('Arrange: create guest session', async () => {
-      const response = await request.post(`${apiBaseUrl()}/api/v1/guest/session`, {
-        data: {},
-      })
-      const data = await response.json()
-      sessionId = data.sessionId
-    })
-
-    await test.step('Act: create chat for guest session', async () => {
-      const response = await request.post(`${apiBaseUrl()}/api/v1/guest/chat`, {
-        data: { sessionId: sessionId! },
-      })
-      expect(response.ok()).toBeTruthy()
-
-      const data = await response.json()
-      expect(data.chatId).toBeTruthy()
-      expect(typeof data.chatId).toBe('number')
-    })
-  })
-
   test('guest endpoints do not require authentication', async ({ request }) => {
     await test.step('Assert: session endpoint accessible without auth', async () => {
       const response = await request.post(`${apiBaseUrl()}/api/v1/guest/session`, {
@@ -152,7 +154,7 @@ test.describe('@ci Guest API', () => {
     })
 
     await test.step('Assert: status endpoint accessible without auth', async () => {
-      const response = await request.get(`${apiBaseUrl()}/api/v1/guest/session/test-id`)
+      const response = await request.get(`${apiBaseUrl()}/api/v1/guest/session/${randomUUID()}`)
       expect(response.status()).not.toBe(401)
     })
   })

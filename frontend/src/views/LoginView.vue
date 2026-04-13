@@ -281,6 +281,7 @@
                 <div
                   v-if="error"
                   class="p-3 rounded-xl bg-red-50 dark:bg-red-900/20 border border-red-200/60 dark:border-red-800/40"
+                  data-testid="alert-login-error"
                 >
                   <p class="text-sm text-red-600 dark:text-red-300">{{ error }}</p>
                 </div>
