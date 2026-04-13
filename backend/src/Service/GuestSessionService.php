@@ -34,14 +34,16 @@ final class GuestSessionService
     }
 
     /**
+     * Create a new guest session with the given (server-generated) session ID.
+     *
      * @throws \OverflowException when the IP has exceeded its session limit
+     * @throws \LogicException    when the sessionId already exists (should never happen with server UUIDs)
      */
     public function createSession(string $sessionId, Request $request): GuestSession
     {
         $existing = $this->sessionRepository->findBySessionId($sessionId);
         if ($existing) {
-            $this->em->remove($existing);
-            $this->em->flush();
+            throw new \LogicException(sprintf('Session ID already exists: %s', substr($sessionId, 0, 12)));
         }
 
         $ip = $this->resolveClientIp($request);

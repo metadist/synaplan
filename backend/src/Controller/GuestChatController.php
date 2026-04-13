@@ -70,10 +70,10 @@ class GuestChatController extends AbstractController
     public function createSession(Request $request): JsonResponse
     {
         $data = json_decode($request->getContent(), true) ?? [];
-        $sessionId = $data['sessionId'] ?? null;
+        $clientSessionId = $data['sessionId'] ?? null;
 
-        if ($sessionId) {
-            $session = $this->guestSessionService->getSession($sessionId);
+        if ($clientSessionId && Uuid::isValid($clientSessionId)) {
+            $session = $this->guestSessionService->getSession($clientSessionId);
             if ($session && !$session->isExpired()) {
                 return $this->json([
                     'sessionId' => $session->getSessionId(),
@@ -134,6 +134,10 @@ class GuestChatController extends AbstractController
     #[OA\Response(response: 404, description: 'Session not found or expired')]
     public function getSessionStatus(string $sessionId): JsonResponse
     {
+        if (!Uuid::isValid($sessionId)) {
+            return $this->json(['error' => 'Invalid session ID'], Response::HTTP_BAD_REQUEST);
+        }
+
         $session = $this->guestSessionService->getSession($sessionId);
 
         if (!$session || $session->isExpired()) {
@@ -182,8 +186,8 @@ class GuestChatController extends AbstractController
         $data = json_decode($request->getContent(), true) ?? [];
         $sessionId = $data['sessionId'] ?? null;
 
-        if (!$sessionId) {
-            return $this->json(['error' => 'sessionId is required'], Response::HTTP_BAD_REQUEST);
+        if (!$sessionId || !Uuid::isValid($sessionId)) {
+            return $this->json(['error' => 'Valid sessionId is required'], Response::HTTP_BAD_REQUEST);
         }
 
         $session = $this->guestSessionService->getSession($sessionId);
@@ -273,6 +277,10 @@ class GuestChatController extends AbstractController
     #[OA\Response(response: 404, description: 'Session not found or has no chat')]
     public function getMessages(string $sessionId): JsonResponse
     {
+        if (!Uuid::isValid($sessionId)) {
+            return $this->json(['error' => 'Invalid session ID'], Response::HTTP_BAD_REQUEST);
+        }
+
         $session = $this->guestSessionService->getSession($sessionId);
 
         if (!$session || $session->isExpired() || !$session->getChatId()) {

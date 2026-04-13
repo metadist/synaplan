@@ -87,6 +87,25 @@ class GuestSessionServiceTest extends TestCase
         $this->assertNull($session->getCountry());
     }
 
+    public function testCreateSessionThrowsLogicExceptionOnDuplicateId(): void
+    {
+        $existing = new GuestSession();
+        $existing->setSessionId('duplicate-uuid');
+
+        $this->sessionRepository->expects($this->once())
+            ->method('findBySessionId')
+            ->with('duplicate-uuid')
+            ->willReturn($existing);
+
+        $request = new Request();
+        $request->headers->set('CF-Connecting-IP', '1.2.3.4');
+
+        $this->expectException(\LogicException::class);
+        $this->expectExceptionMessage('Session ID already exists');
+
+        $this->service->createSession('duplicate-uuid', $request);
+    }
+
     public function testCreateSessionThrowsOverflowWhenIpLimitExceeded(): void
     {
         $request = new Request();
