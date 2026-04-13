@@ -20,16 +20,24 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, onBeforeUnmount } from 'vue'
+import { computed, watchEffect, onMounted, onBeforeUnmount } from 'vue'
 import Sidebar from './Sidebar.vue'
 import SidebarV2 from './SidebarV2.vue'
 import Header from './Header.vue'
 import HelpHost from './help/HelpHost.vue'
 import { useSidebarStore } from '../stores/sidebar'
-import { useDesignVariant } from '../composables/useDesignVariant'
+import { useAuthStore } from '../stores/auth'
+import { useGuestStore } from '../stores/guest'
 
 const sidebarStore = useSidebarStore()
-const { isV2 } = useDesignVariant()
+const authStore = useAuthStore()
+const guestStore = useGuestStore()
+
+const isV2 = computed(() => !authStore.isAuthenticated && guestStore.isGuestMode)
+
+watchEffect(() => {
+  document.documentElement.classList.toggle('design-v2', isV2.value)
+})
 
 const handleEscape = (event: KeyboardEvent) => {
   if (event.key === 'Escape') {
