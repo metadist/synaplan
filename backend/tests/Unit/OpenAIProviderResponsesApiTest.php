@@ -189,6 +189,23 @@ class OpenAIProviderResponsesApiTest extends TestCase
         $this->assertArrayNotHasKey('previous_response_id', $result);
     }
 
+    public function testBuildResponsesRequestSystemOnlyMessagesFallback(): void
+    {
+        $provider = $this->createProvider();
+        $method = new \ReflectionMethod($provider, 'buildResponsesRequest');
+
+        $messages = [
+            ['role' => 'system', 'content' => 'You are a helpful assistant.'],
+        ];
+
+        $result = $method->invoke($provider, $messages, 'gpt-4o', false, []);
+
+        $this->assertSame('You are a helpful assistant.', $result['instructions']);
+        $this->assertNotEmpty($result['input']);
+        $this->assertCount(1, $result['input']);
+        $this->assertSame('user', $result['input'][0]['role']);
+    }
+
     public function testBuildResponsesRequestWithPreviousResponseId(): void
     {
         $provider = $this->createProvider();
