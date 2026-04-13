@@ -6,9 +6,9 @@ use App\AI\Service\AiFacade;
 use App\Entity\File;
 use App\Entity\Message;
 use App\Repository\MessageRepository;
+use App\Service\File\TikaClient;
 use App\Service\WhisperService;
 use Psr\Log\LoggerInterface;
-use Symfony\Contracts\HttpClient\HttpClientInterface;
 
 /**
  * PreProcessor für eingehende Nachrichten.
@@ -25,13 +25,21 @@ final readonly class MessagePreProcessor
     public const AUDIO_EXTENSIONS = ['ogg', 'mp3', 'wav', 'm4a', 'opus', 'flac', 'webm', 'amr'];
     public const IMAGE_EXTENSIONS = ['jpg', 'jpeg', 'png', 'webp', 'gif'];
 
+    private const OFFICE_EXT_TO_MIME = [
+        'xls' => 'application/vnd.ms-excel',
+        'xlsx' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        'doc' => 'application/msword',
+        'docx' => 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        'ppt' => 'application/vnd.ms-powerpoint',
+        'pptx' => 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+    ];
+
     public function __construct(
         private MessageRepository $messageRepository,
-        private HttpClientInterface $httpClient,
+        private TikaClient $tikaClient,
         private WhisperService $whisperService,
         private AiFacade $aiFacade,
         private LoggerInterface $logger,
-        private string $tikaBaseUrl,
         private string $uploadsDir,
     ) {
     }
@@ -331,24 +339,28 @@ final readonly class MessagePreProcessor
     }
 
     /**
-     * Parse File mit Apache Tika.
+     * Parse File mit Apache Tika (via TikaClient with correct MIME type).
      */
     private function parseWithTika(string $filePath): ?string
     {
         try {
-            // Tika Server: PUT /tika
-            $response = $this->httpClient->request('PUT', $this->tikaBaseUrl.'/tika', [
-                'headers' => [
-                    'Accept' => 'text/plain',
-                ],
-                'body' => fopen($filePath, 'r'),
-                'timeout' => 30,
-            ]);
+            $mime = mime_content_type($filePath) ?: null;
+            $ext = strtolower(pathinfo($filePath, PATHINFO_EXTENSION));
 
-            if (200 === $response->getStatusCode()) {
-                $text = $response->getContent();
+            if (isset(self::OFFICE_EXT_TO_MIME[$ext])) {
+                if (!$mime || 'application/zip' === $mime || 'application/octet-stream' === $mime) {
+                    $mime = self::OFFICE_EXT_TO_MIME[$ext];
+                }
+            }
 
+            [$text, $meta] = $this->tikaClient->extractText($filePath, $mime);
+
+            if ($text) {
                 return trim($text);
+            }
+
+            if (!empty($meta['error'])) {
+                $this->logger->warning('Tika extraction returned no text', ['meta' => $meta]);
             }
         } catch (\Exception $e) {
             $this->logger->error("Tika parsing failed: {$e->getMessage()}");
