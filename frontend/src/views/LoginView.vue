@@ -29,12 +29,16 @@
     </div>
 
     <div class="w-full max-w-sm auth-card-enter" data-testid="section-card">
-      <!-- Logo + Title -->
       <div class="text-center mb-10" data-testid="section-header">
-        <img :src="logoSrc" alt="synaplan" class="h-10 mx-auto mb-5 auth-logo-enter" />
+        <div class="auth-logo-enter mb-6">
+          <img :src="logoSrc" alt="synaplan" class="h-9 mx-auto" />
+        </div>
         <h1 class="text-2xl font-bold txt-primary auth-title-enter">
-          {{ $t('auth.login') }}
+          {{ $t('auth.welcomeBack') }}
         </h1>
+        <p class="text-sm txt-secondary mt-1.5 auth-subtitle-enter">
+          {{ $t('auth.loginSubtitle') }}
+        </p>
       </div>
 
       <!-- OIDC Auto-Redirect -->
@@ -52,7 +56,7 @@
         <p class="txt-primary text-sm font-medium mb-4">{{ $t('auth.redirectingToSso') }}</p>
         <button
           type="button"
-          class="inline-flex items-center px-5 py-2.5 rounded-xl surface-chip txt-secondary text-sm hover-surface transition-all duration-200"
+          class="inline-flex items-center px-5 py-2.5 rounded-xl surface-chip txt-secondary text-sm hover-surface transition-all duration-200 active:scale-[0.97]"
           data-testid="btn-social-keycloak"
           @click="handleSocialLogin('keycloak')"
         >
@@ -91,30 +95,36 @@
       <template v-else>
         <div class="auth-form-enter">
           <!-- Banners -->
-          <div
-            v-if="justRegistered"
-            class="mb-5 p-3.5 rounded-xl bg-green-50 dark:bg-green-900/20 border border-green-200/60 dark:border-green-800/40 flex items-center gap-3 auth-banner-enter"
-            data-testid="section-registration-success"
-          >
-            <Icon icon="mdi:check-circle" class="w-5 h-5 flex-shrink-0 text-green-500" />
-            <p class="text-sm text-green-800 dark:text-green-200">
-              {{ $t('auth.registrationCompleteTitle') }}
-            </p>
-          </div>
-
-          <div
-            v-if="sessionExpired"
-            class="mb-5 p-3.5 rounded-xl border border-brand/20 bg-brand/5 dark:bg-brand/10 flex items-center gap-3 auth-banner-enter"
-            data-testid="section-session-expired"
-          >
-            <Icon icon="mdi:hand-wave" class="w-5 h-5 flex-shrink-0 text-brand" />
-            <div class="min-w-0">
-              <p class="text-sm font-medium txt-primary">{{ $t('auth.sessionExpiredTitle') }}</p>
-              <p class="text-xs txt-secondary mt-0.5">{{ $t('auth.sessionExpiredDesc') }}</p>
+          <Transition name="banner-slide">
+            <div
+              v-if="justRegistered"
+              class="mb-5 p-3.5 rounded-xl bg-green-50 dark:bg-green-900/20 border border-green-200/60 dark:border-green-800/40 flex items-center gap-3"
+              data-testid="section-registration-success"
+            >
+              <Icon icon="mdi:check-circle" class="w-5 h-5 flex-shrink-0 text-green-500" />
+              <p class="text-sm text-green-800 dark:text-green-200">
+                {{ $t('auth.registrationCompleteTitle') }}
+              </p>
             </div>
-          </div>
+          </Transition>
 
-          <!-- Social login first -->
+          <Transition name="banner-slide">
+            <div
+              v-if="sessionExpired"
+              class="mb-5 p-3.5 rounded-xl border border-brand/20 bg-brand/5 dark:bg-brand/10 flex items-center gap-3"
+              data-testid="section-session-expired"
+            >
+              <Icon icon="mdi:hand-wave" class="w-5 h-5 flex-shrink-0 text-brand" />
+              <div class="min-w-0">
+                <p class="text-sm font-medium txt-primary">
+                  {{ $t('auth.sessionExpiredTitle') }}
+                </p>
+                <p class="text-xs txt-secondary mt-0.5">{{ $t('auth.sessionExpiredDesc') }}</p>
+              </div>
+            </div>
+          </Transition>
+
+          <!-- Social login -->
           <div
             v-if="socialProviders.length > 0"
             class="space-y-2.5 mb-6"
@@ -124,7 +134,7 @@
               v-for="provider in socialProviders"
               :key="provider.id"
               type="button"
-              class="flex items-center justify-center gap-2.5 w-full py-2.5 rounded-xl text-sm font-medium surface-chip txt-primary ring-1 ring-black/[0.06] dark:ring-white/[0.06] hover:ring-black/[0.12] dark:hover:ring-white/[0.12] hover:shadow-sm transition-all duration-200 active:scale-[0.98]"
+              class="group flex items-center justify-center gap-2.5 w-full py-2.5 rounded-xl text-sm font-medium surface-chip txt-primary ring-1 ring-black/[0.06] dark:ring-white/[0.06] hover:ring-brand/30 hover:shadow-sm transition-all duration-200 active:scale-[0.97]"
               :data-testid="`btn-social-${provider.id}`"
               @click="handleSocialLogin(provider.id)"
             >
@@ -161,7 +171,9 @@
                 icon="mdi:key-variant"
                 class="w-4.5 h-4.5"
               />
-              <span>{{ provider.name }}</span>
+              <span class="group-hover:translate-x-0.5 transition-transform duration-200">{{
+                provider.name
+              }}</span>
             </button>
           </div>
 
@@ -183,11 +195,11 @@
 
           <!-- Form -->
           <form class="space-y-3" data-testid="comp-login-form" @submit.prevent="handleLogin">
-            <!-- Email -->
             <div class="relative">
               <Icon
                 icon="mdi:email-outline"
-                class="absolute left-3.5 top-1/2 -translate-y-1/2 w-4.5 h-4.5 txt-secondary pointer-events-none"
+                class="absolute left-3.5 top-1/2 -translate-y-1/2 w-4.5 h-4.5 pointer-events-none transition-colors duration-200"
+                :class="focusedField === 'email' ? 'text-brand' : 'txt-secondary'"
               />
               <input
                 id="email"
@@ -198,18 +210,21 @@
                 :class="{ 'ring-2 ring-red-500/60': emailError }"
                 :placeholder="$t('auth.email')"
                 data-testid="input-email"
-                @blur="emailError = !validateEmail(email) && email ? 'Invalid email format' : ''"
+                @focus="focusedField = 'email'"
+                @blur="onEmailBlur"
               />
             </div>
-            <p v-if="emailError" class="text-xs text-red-500 dark:text-red-400 -mt-1 pl-1">
-              {{ emailError }}
-            </p>
+            <Transition name="error-slide">
+              <p v-if="emailError" class="text-xs text-red-500 dark:text-red-400 -mt-1 pl-1">
+                {{ emailError }}
+              </p>
+            </Transition>
 
-            <!-- Password -->
             <div class="relative">
               <Icon
                 icon="mdi:lock-outline"
-                class="absolute left-3.5 top-1/2 -translate-y-1/2 w-4.5 h-4.5 txt-secondary pointer-events-none"
+                class="absolute left-3.5 top-1/2 -translate-y-1/2 w-4.5 h-4.5 pointer-events-none transition-colors duration-200"
+                :class="focusedField === 'password' ? 'text-brand' : 'txt-secondary'"
               />
               <input
                 id="password"
@@ -219,10 +234,12 @@
                 class="auth-input pl-10 pr-10 surface-chip txt-primary placeholder:txt-secondary hover:ring-1 hover:ring-black/[0.06] dark:hover:ring-white/[0.06]"
                 :placeholder="$t('auth.password')"
                 data-testid="input-password"
+                @focus="focusedField = 'password'"
+                @blur="focusedField = null"
               />
               <button
                 type="button"
-                class="absolute right-3 top-1/2 -translate-y-1/2 p-1 rounded-md txt-secondary hover:txt-primary transition-colors"
+                class="absolute right-3 top-1/2 -translate-y-1/2 p-1 rounded-md txt-secondary hover:txt-primary hover:bg-black/5 dark:hover:bg-white/10 transition-all duration-150"
                 data-testid="btn-toggle-password"
                 @click="showPassword = !showPassword"
               >
@@ -231,7 +248,6 @@
               </button>
             </div>
 
-            <!-- Forgot password -->
             <div class="flex justify-end">
               <router-link
                 to="/forgot-password"
@@ -242,32 +258,49 @@
               </router-link>
             </div>
 
-            <!-- Error -->
-            <div
-              v-if="error"
-              class="p-3 rounded-xl bg-red-50 dark:bg-red-900/20 border border-red-200/60 dark:border-red-800/40 auth-banner-enter"
-            >
-              <p class="text-sm text-red-600 dark:text-red-300">{{ error }}</p>
-            </div>
+            <Transition name="error-slide">
+              <div
+                v-if="error"
+                class="p-3 rounded-xl bg-red-50 dark:bg-red-900/20 border border-red-200/60 dark:border-red-800/40"
+              >
+                <p class="text-sm text-red-600 dark:text-red-300">{{ error }}</p>
+              </div>
+            </Transition>
 
-            <!-- Submit -->
+            <!-- Submit button with state animation -->
             <button
               type="submit"
-              class="w-full py-3 rounded-xl btn-primary font-semibold text-sm transition-all duration-200 hover:shadow-lg hover:shadow-brand/25 active:scale-[0.98] disabled:opacity-50 disabled:pointer-events-none"
-              :disabled="loading"
+              class="auth-submit-btn btn-primary"
+              :class="{
+                'auth-submit-btn--loading': loading,
+                'auth-submit-btn--success': loginSuccess,
+              }"
+              :disabled="loading || loginSuccess"
               data-testid="btn-login"
             >
-              <span v-if="loading" class="flex items-center justify-center gap-2">
+              <Transition name="btn-content" mode="out-in">
                 <span
-                  class="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"
-                />
-                {{ $t('auth.signingIn') }}
-              </span>
-              <span v-else>{{ $t('auth.signIn') }}</span>
+                  v-if="loginSuccess"
+                  key="success"
+                  class="flex items-center justify-center gap-2"
+                >
+                  <Icon icon="mdi:check" class="w-5 h-5" />
+                </span>
+                <span
+                  v-else-if="loading"
+                  key="loading"
+                  class="flex items-center justify-center gap-2"
+                >
+                  <span
+                    class="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"
+                  />
+                  {{ $t('auth.signingIn') }}
+                </span>
+                <span v-else key="idle">{{ $t('auth.signIn') }}</span>
+              </Transition>
             </button>
           </form>
 
-          <!-- Switch to register -->
           <p class="mt-6 text-center text-sm txt-secondary">
             {{ $t('auth.noAccount') }}
             <router-link
@@ -282,17 +315,22 @@
       </template>
 
       <!-- Footer -->
-      <p class="mt-8 text-center text-[11px] txt-secondary opacity-60">
+      <div class="mt-10 flex justify-center">
         <a
-          :href="config.billing.enabled ? 'https://www.synaplan.com' : 'https://www.synaplan.com'"
-          class="hover:underline underline-offset-2 hover:opacity-100 transition-opacity"
+          href="https://www.synaplan.com"
           target="_blank"
           rel="noopener noreferrer"
+          class="group inline-flex items-center gap-1.5 txt-secondary opacity-40 hover:opacity-70 transition-all duration-300"
           :data-testid="config.billing.enabled ? 'link-homepage' : 'link-powered-by'"
         >
-          {{ config.billing.enabled ? $t('auth.backToHomepage') : $t('auth.poweredBySynaplan') }}
+          <img
+            :src="logoSrc"
+            alt=""
+            class="h-3 opacity-50 group-hover:opacity-80 transition-opacity duration-300"
+          />
+          <span class="text-[10px] tracking-wide">synaplan.com</span>
         </a>
-      </p>
+      </div>
     </div>
   </div>
 </template>
@@ -329,6 +367,8 @@ const logoSrc = computed(
 const email = ref('')
 const password = ref('')
 const showPassword = ref(false)
+const focusedField = ref<string | null>(null)
+const loginSuccess = ref(false)
 const currentLanguage = computed(() => locale.value)
 
 const cycleLanguage = () => {
@@ -347,6 +387,11 @@ const toggleTheme = () => {
 const { login, error: authError, loading, clearError } = useAuth()
 const emailError = ref('')
 const error = computed(() => authError.value)
+
+const onEmailBlur = () => {
+  focusedField.value = null
+  emailError.value = !validateEmail(email.value) && email.value ? 'Invalid email format' : ''
+}
 
 interface SocialProvider {
   id: string
@@ -399,7 +444,10 @@ const handleLogin = async () => {
   const recaptchaToken = await getReCaptchaToken('login')
   const success = await login(email.value, password.value, recaptchaToken)
   if (success) {
-    router.push((router.currentRoute.value.query.redirect as string) || '/')
+    loginSuccess.value = true
+    setTimeout(() => {
+      router.push((router.currentRoute.value.query.redirect as string) || '/')
+    }, 400)
   }
 }
 
@@ -424,6 +472,82 @@ const handleSocialLogin = (provider: string) => {
   box-shadow: 0 0 0 2px color-mix(in srgb, var(--brand) 40%, transparent);
 }
 
+/* Submit button states */
+.auth-submit-btn {
+  width: 100%;
+  padding: 0.75rem;
+  border-radius: 0.75rem;
+  font-weight: 600;
+  font-size: 0.875rem;
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  position: relative;
+  overflow: hidden;
+}
+.auth-submit-btn:not(.auth-submit-btn--loading):not(.auth-submit-btn--success):hover {
+  box-shadow: 0 4px 16px color-mix(in srgb, var(--brand) 30%, transparent);
+  transform: translateY(-1px);
+}
+.auth-submit-btn:not(.auth-submit-btn--loading):not(.auth-submit-btn--success):active {
+  transform: scale(0.98) translateY(0);
+}
+.auth-submit-btn--success {
+  background-color: #22c55e !important;
+  transform: scale(0.96);
+}
+.auth-submit-btn:disabled:not(.auth-submit-btn--loading):not(.auth-submit-btn--success) {
+  opacity: 0.5;
+  pointer-events: none;
+}
+
+/* Button content transitions */
+.btn-content-enter-active {
+  transition: all 0.2s ease-out;
+}
+.btn-content-leave-active {
+  transition: all 0.15s ease-in;
+}
+.btn-content-enter-from {
+  opacity: 0;
+  transform: translateY(6px);
+}
+.btn-content-leave-to {
+  opacity: 0;
+  transform: translateY(-6px);
+}
+
+/* Banner transitions */
+.banner-slide-enter-active {
+  transition: all 0.3s ease-out;
+}
+.banner-slide-leave-active {
+  transition: all 0.2s ease-in;
+}
+.banner-slide-enter-from {
+  opacity: 0;
+  transform: translateY(-8px);
+  max-height: 0;
+}
+.banner-slide-leave-to {
+  opacity: 0;
+  max-height: 0;
+}
+
+/* Error slide */
+.error-slide-enter-active {
+  transition: all 0.2s ease-out;
+}
+.error-slide-leave-active {
+  transition: all 0.15s ease-in;
+}
+.error-slide-enter-from {
+  opacity: 0;
+  transform: translateY(-4px);
+}
+.error-slide-leave-to {
+  opacity: 0;
+}
+
+/* Entry animations */
 @keyframes authCardEnter {
   from {
     opacity: 0;
@@ -465,6 +589,9 @@ const handleSocialLogin = (provider: string) => {
 .auth-title-enter {
   animation: authTitleEnter 0.4s ease-out 0.12s both;
 }
+.auth-subtitle-enter {
+  animation: authTitleEnter 0.4s ease-out 0.18s both;
+}
 
 @keyframes authFormEnter {
   from {
@@ -478,19 +605,5 @@ const handleSocialLogin = (provider: string) => {
 }
 .auth-form-enter {
   animation: authFormEnter 0.45s ease-out 0.18s both;
-}
-
-@keyframes authBannerEnter {
-  from {
-    opacity: 0;
-    transform: translateY(-4px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-.auth-banner-enter {
-  animation: authBannerEnter 0.3s ease-out both;
 }
 </style>

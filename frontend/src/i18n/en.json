@@ -1209,6 +1209,10 @@
   "auth": {
     "login": "Login",
     "register": "Register",
+    "welcomeBack": "Welcome back",
+    "loginSubtitle": "Sign in to continue",
+    "getStarted": "Get started",
+    "registerSubtitle": "Create your free account",
     "email": "Email",
     "emailPlaceholderPrefix": "your",
     "emailPlaceholderSuffix": "email.com",

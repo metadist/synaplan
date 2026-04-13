@@ -34,44 +34,52 @@
     </div>
 
     <div class="w-full max-w-sm auth-card-enter">
-      <!-- Logo + Title -->
       <div class="text-center mb-10">
-        <img :src="logoSrc" alt="synaplan" class="h-10 mx-auto mb-5 auth-logo-enter" />
+        <div class="auth-logo-enter mb-6">
+          <img :src="logoSrc" alt="synaplan" class="h-9 mx-auto" />
+        </div>
         <h1 class="text-2xl font-bold txt-primary auth-title-enter">
-          {{ $t('auth.register') }}
+          {{ $t('auth.getStarted') }}
         </h1>
+        <p class="text-sm txt-secondary mt-1.5 auth-subtitle-enter">
+          {{ $t('auth.registerSubtitle') }}
+        </p>
       </div>
 
       <div class="auth-form-enter">
         <!-- Success State -->
-        <div
-          v-if="registrationSuccess"
-          class="text-center py-6"
-          data-testid="section-registration-success"
-        >
-          <div class="success-icon-wrapper mb-5">
-            <div class="success-icon-ring"></div>
-            <Icon
-              icon="mdi:check-circle"
-              class="w-14 h-14 text-green-500 dark:text-green-400 relative z-10"
-            />
-          </div>
-          <h3 class="text-xl font-bold txt-primary mb-2">{{ $t('auth.registrationSuccess') }}</h3>
-          <p class="txt-secondary text-sm leading-relaxed mb-6 max-w-xs mx-auto">
-            {{ $t('auth.registrationSuccessDesc') }}
-          </p>
-          <button
-            class="w-full py-3 rounded-xl btn-primary font-semibold text-sm transition-all duration-200 hover:shadow-lg hover:shadow-brand/25 active:scale-[0.98]"
-            data-testid="btn-goto-login"
-            @click="router.push({ name: 'login', query: { registered: 'true' } })"
+        <Transition name="success-fade">
+          <div
+            v-if="registrationSuccess"
+            class="text-center py-6"
+            data-testid="section-registration-success"
           >
-            {{ $t('auth.backToLogin') }}
-          </button>
-        </div>
+            <div class="success-icon-wrapper mb-5">
+              <div class="success-icon-ring"></div>
+              <Icon
+                icon="mdi:check-circle"
+                class="w-14 h-14 text-green-500 dark:text-green-400 relative z-10"
+              />
+            </div>
+            <h3 class="text-xl font-bold txt-primary mb-2">
+              {{ $t('auth.registrationSuccess') }}
+            </h3>
+            <p class="txt-secondary text-sm leading-relaxed mb-6 max-w-xs mx-auto">
+              {{ $t('auth.registrationSuccessDesc') }}
+            </p>
+            <button
+              class="auth-submit-btn btn-primary"
+              data-testid="btn-goto-login"
+              @click="router.push({ name: 'login', query: { registered: 'true' } })"
+            >
+              {{ $t('auth.backToLogin') }}
+            </button>
+          </div>
+        </Transition>
 
         <!-- Registration Form -->
-        <template v-else>
-          <!-- Social login first -->
+        <template v-if="!registrationSuccess">
+          <!-- Social login -->
           <div
             v-if="socialProviders.length > 0"
             class="space-y-2.5 mb-6"
@@ -81,7 +89,7 @@
               v-for="provider in socialProviders"
               :key="provider.id"
               type="button"
-              class="flex items-center justify-center gap-2.5 w-full py-2.5 rounded-xl text-sm font-medium surface-chip txt-primary ring-1 ring-black/[0.06] dark:ring-white/[0.06] hover:ring-black/[0.12] dark:hover:ring-white/[0.12] hover:shadow-sm transition-all duration-200 active:scale-[0.98]"
+              class="group flex items-center justify-center gap-2.5 w-full py-2.5 rounded-xl text-sm font-medium surface-chip txt-primary ring-1 ring-black/[0.06] dark:ring-white/[0.06] hover:ring-brand/30 hover:shadow-sm transition-all duration-200 active:scale-[0.97]"
               :data-testid="`btn-social-${provider.id}`"
               @click="handleSocialLogin(provider.id)"
             >
@@ -118,7 +126,9 @@
                 icon="mdi:key-variant"
                 class="w-4.5 h-4.5"
               />
-              <span>{{ provider.name }}</span>
+              <span class="group-hover:translate-x-0.5 transition-transform duration-200">{{
+                provider.name
+              }}</span>
             </button>
           </div>
 
@@ -136,11 +146,11 @@
 
           <!-- Form -->
           <form class="space-y-3" data-testid="form-register" @submit.prevent="handleRegister">
-            <!-- Full Name -->
             <div class="relative" data-testid="field-full-name">
               <Icon
                 icon="mdi:account-outline"
-                class="absolute left-3.5 top-1/2 -translate-y-1/2 w-4.5 h-4.5 txt-secondary pointer-events-none"
+                class="absolute left-3.5 top-1/2 -translate-y-1/2 w-4.5 h-4.5 pointer-events-none transition-colors duration-200"
+                :class="focusedField === 'fullName' ? 'text-brand' : 'txt-secondary'"
               />
               <input
                 id="fullName"
@@ -150,14 +160,16 @@
                 class="auth-input pl-10 surface-chip txt-primary placeholder:txt-secondary hover:ring-1 hover:ring-black/[0.06] dark:hover:ring-white/[0.06]"
                 :placeholder="$t('auth.fullName')"
                 data-testid="input-full-name"
+                @focus="focusedField = 'fullName'"
+                @blur="focusedField = null"
               />
             </div>
 
-            <!-- Email -->
             <div class="relative" data-testid="field-email">
               <Icon
                 icon="mdi:email-outline"
-                class="absolute left-3.5 top-1/2 -translate-y-1/2 w-4.5 h-4.5 txt-secondary pointer-events-none"
+                class="absolute left-3.5 top-1/2 -translate-y-1/2 w-4.5 h-4.5 pointer-events-none transition-colors duration-200"
+                :class="focusedField === 'email' ? 'text-brand' : 'txt-secondary'"
               />
               <input
                 id="email"
@@ -168,18 +180,21 @@
                 :class="{ 'ring-2 ring-red-500/60': emailError }"
                 :placeholder="$t('auth.email')"
                 data-testid="input-email"
-                @blur="emailError = !validateEmail(email) && email ? 'Invalid email format' : ''"
+                @focus="focusedField = 'email'"
+                @blur="onEmailBlur"
               />
             </div>
-            <p v-if="emailError" class="text-xs text-red-500 dark:text-red-400 -mt-1 pl-1">
-              {{ emailError }}
-            </p>
+            <Transition name="error-slide">
+              <p v-if="emailError" class="text-xs text-red-500 dark:text-red-400 -mt-1 pl-1">
+                {{ emailError }}
+              </p>
+            </Transition>
 
-            <!-- Password -->
             <div class="relative" data-testid="field-password">
               <Icon
                 icon="mdi:lock-outline"
-                class="absolute left-3.5 top-1/2 -translate-y-1/2 w-4.5 h-4.5 txt-secondary pointer-events-none"
+                class="absolute left-3.5 top-1/2 -translate-y-1/2 w-4.5 h-4.5 pointer-events-none transition-colors duration-200"
+                :class="focusedField === 'password' ? 'text-brand' : 'txt-secondary'"
               />
               <input
                 id="password"
@@ -190,10 +205,12 @@
                 :class="{ 'ring-2 ring-red-500/60': passwordErrors.length > 0 }"
                 :placeholder="$t('auth.password')"
                 data-testid="input-password"
+                @focus="focusedField = 'password'"
+                @blur="focusedField = null"
               />
               <button
                 type="button"
-                class="absolute right-3 top-1/2 -translate-y-1/2 p-1 rounded-md txt-secondary hover:txt-primary transition-colors"
+                class="absolute right-3 top-1/2 -translate-y-1/2 p-1 rounded-md txt-secondary hover:txt-primary hover:bg-black/5 dark:hover:bg-white/10 transition-all duration-150"
                 data-testid="btn-toggle-password"
                 @click="showPassword = !showPassword"
               >
@@ -201,21 +218,23 @@
                 <EyeIcon v-else class="w-4 h-4" />
               </button>
             </div>
-            <div v-if="passwordErrors.length > 0" class="-mt-1 pl-1 space-y-0.5">
-              <p
-                v-for="err in passwordErrors"
-                :key="err"
-                class="text-xs text-red-500 dark:text-red-400"
-              >
-                {{ err }}
-              </p>
-            </div>
+            <Transition name="error-slide">
+              <div v-if="passwordErrors.length > 0" class="-mt-1 pl-1 space-y-0.5">
+                <p
+                  v-for="err in passwordErrors"
+                  :key="err"
+                  class="text-xs text-red-500 dark:text-red-400"
+                >
+                  {{ err }}
+                </p>
+              </div>
+            </Transition>
 
-            <!-- Confirm Password -->
             <div class="relative" data-testid="field-confirm-password">
               <Icon
                 icon="mdi:lock-check-outline"
-                class="absolute left-3.5 top-1/2 -translate-y-1/2 w-4.5 h-4.5 txt-secondary pointer-events-none"
+                class="absolute left-3.5 top-1/2 -translate-y-1/2 w-4.5 h-4.5 pointer-events-none transition-colors duration-200"
+                :class="focusedField === 'confirmPassword' ? 'text-brand' : 'txt-secondary'"
               />
               <input
                 id="confirmPassword"
@@ -225,10 +244,12 @@
                 class="auth-input pl-10 pr-10 surface-chip txt-primary placeholder:txt-secondary hover:ring-1 hover:ring-black/[0.06] dark:hover:ring-white/[0.06]"
                 :placeholder="$t('auth.confirmPassword')"
                 data-testid="input-confirm-password"
+                @focus="focusedField = 'confirmPassword'"
+                @blur="focusedField = null"
               />
               <button
                 type="button"
-                class="absolute right-3 top-1/2 -translate-y-1/2 p-1 rounded-md txt-secondary hover:txt-primary transition-colors"
+                class="absolute right-3 top-1/2 -translate-y-1/2 p-1 rounded-md txt-secondary hover:txt-primary hover:bg-black/5 dark:hover:bg-white/10 transition-all duration-150"
                 data-testid="btn-toggle-confirm-password"
                 @click="showConfirmPassword = !showConfirmPassword"
               >
@@ -237,45 +258,48 @@
               </button>
             </div>
 
-            <!-- Mismatch -->
-            <p
-              v-if="password && confirmPassword && password !== confirmPassword"
-              class="text-xs text-amber-600 dark:text-amber-400 pl-1"
-              data-testid="alert-password-mismatch"
-            >
-              {{ $t('auth.passwordMismatch') }}
-            </p>
+            <Transition name="error-slide">
+              <p
+                v-if="password && confirmPassword && password !== confirmPassword"
+                class="text-xs text-amber-600 dark:text-amber-400 pl-1"
+                data-testid="alert-password-mismatch"
+              >
+                {{ $t('auth.passwordMismatch') }}
+              </p>
+            </Transition>
 
-            <!-- Error -->
-            <div
-              v-if="error"
-              class="p-3 rounded-xl bg-red-50 dark:bg-red-900/20 border border-red-200/60 dark:border-red-800/40 auth-banner-enter"
-              data-testid="alert-register-error"
-            >
-              <p class="text-sm text-red-600 dark:text-red-300">{{ error }}</p>
-            </div>
+            <Transition name="error-slide">
+              <div
+                v-if="error"
+                class="p-3 rounded-xl bg-red-50 dark:bg-red-900/20 border border-red-200/60 dark:border-red-800/40"
+                data-testid="alert-register-error"
+              >
+                <p class="text-sm text-red-600 dark:text-red-300">{{ error }}</p>
+              </div>
+            </Transition>
 
-            <!-- Submit -->
             <button
               type="submit"
-              class="w-full py-3 rounded-xl btn-primary font-semibold text-sm transition-all duration-200 hover:shadow-lg hover:shadow-brand/25 active:scale-[0.98] disabled:opacity-50 disabled:pointer-events-none"
+              class="auth-submit-btn btn-primary"
               :disabled="
                 loading || (!!password && !!confirmPassword && password !== confirmPassword)
               "
               data-testid="btn-register"
             >
-              <span v-if="loading" class="flex items-center justify-center gap-2">
-                <span
-                  class="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"
-                />
-                {{ $t('auth.signingUp') }}
-              </span>
-              <span v-else>{{ $t('auth.signUp') }}</span>
+              <Transition name="btn-content" mode="out-in">
+                <span v-if="loading" key="loading" class="flex items-center justify-center gap-2">
+                  <span
+                    class="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"
+                  />
+                  {{ $t('auth.signingUp') }}
+                </span>
+                <span v-else key="idle">{{ $t('auth.signUp') }}</span>
+              </Transition>
             </button>
           </form>
 
           <!-- Terms -->
-          <p class="mt-4 text-center text-[11px] txt-secondary leading-relaxed opacity-70">
+          <p class="mt-4 text-center text-[11px] txt-secondary leading-relaxed opacity-60">
             {{ $t('auth.termsAgree') }}
             <a
               href="https://www.synaplan.com/de/imprint"
@@ -294,7 +318,6 @@
             >
           </p>
 
-          <!-- Switch to login -->
           <p class="mt-5 text-center text-sm txt-secondary">
             {{ $t('auth.hasAccount') }}
             <router-link
@@ -309,17 +332,22 @@
       </div>
 
       <!-- Footer -->
-      <p class="mt-8 text-center text-[11px] txt-secondary opacity-60">
+      <div class="mt-10 flex justify-center">
         <a
-          :href="config.billing.enabled ? 'https://www.synaplan.com' : 'https://www.synaplan.com'"
-          class="hover:underline underline-offset-2 hover:opacity-100 transition-opacity"
+          href="https://www.synaplan.com"
           target="_blank"
           rel="noopener noreferrer"
+          class="group inline-flex items-center gap-1.5 txt-secondary opacity-40 hover:opacity-70 transition-all duration-300"
           :data-testid="config.billing.enabled ? 'link-homepage' : 'link-powered-by'"
         >
-          {{ config.billing.enabled ? $t('auth.backToHomepage') : $t('auth.poweredBySynaplan') }}
+          <img
+            :src="logoSrc"
+            alt=""
+            class="h-3 opacity-50 group-hover:opacity-80 transition-opacity duration-300"
+          />
+          <span class="text-[10px] tracking-wide">synaplan.com</span>
         </a>
-      </p>
+      </div>
     </div>
   </div>
 </template>
@@ -358,6 +386,7 @@ const password = ref('')
 const confirmPassword = ref('')
 const showPassword = ref(false)
 const showConfirmPassword = ref(false)
+const focusedField = ref<string | null>(null)
 const currentLanguage = computed(() => locale.value)
 
 const cycleLanguage = () => {
@@ -377,6 +406,11 @@ const { register, error, loading, clearError } = useAuth()
 const passwordErrors = ref<string[]>([])
 const emailError = ref('')
 const registrationSuccess = ref(false)
+
+const onEmailBlur = () => {
+  focusedField.value = null
+  emailError.value = !validateEmail(email.value) && email.value ? 'Invalid email format' : ''
+}
 
 interface SocialProvider {
   id: string
@@ -446,6 +480,70 @@ const handleSocialLogin = (provider: string) => {
   box-shadow: 0 0 0 2px color-mix(in srgb, var(--brand) 40%, transparent);
 }
 
+/* Submit button */
+.auth-submit-btn {
+  width: 100%;
+  padding: 0.75rem;
+  border-radius: 0.75rem;
+  font-weight: 600;
+  font-size: 0.875rem;
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  position: relative;
+  overflow: hidden;
+}
+.auth-submit-btn:not(:disabled):hover {
+  box-shadow: 0 4px 16px color-mix(in srgb, var(--brand) 30%, transparent);
+  transform: translateY(-1px);
+}
+.auth-submit-btn:not(:disabled):active {
+  transform: scale(0.98) translateY(0);
+}
+.auth-submit-btn:disabled {
+  opacity: 0.5;
+  pointer-events: none;
+}
+
+/* Button content transitions */
+.btn-content-enter-active {
+  transition: all 0.2s ease-out;
+}
+.btn-content-leave-active {
+  transition: all 0.15s ease-in;
+}
+.btn-content-enter-from {
+  opacity: 0;
+  transform: translateY(6px);
+}
+.btn-content-leave-to {
+  opacity: 0;
+  transform: translateY(-6px);
+}
+
+/* Error slide */
+.error-slide-enter-active {
+  transition: all 0.2s ease-out;
+}
+.error-slide-leave-active {
+  transition: all 0.15s ease-in;
+}
+.error-slide-enter-from {
+  opacity: 0;
+  transform: translateY(-4px);
+}
+.error-slide-leave-to {
+  opacity: 0;
+}
+
+/* Success fade */
+.success-fade-enter-active {
+  transition: all 0.4s ease-out;
+}
+.success-fade-enter-from {
+  opacity: 0;
+  transform: scale(0.95);
+}
+
+/* Entry animations */
 @keyframes authCardEnter {
   from {
     opacity: 0;
@@ -487,6 +585,9 @@ const handleSocialLogin = (provider: string) => {
 .auth-title-enter {
   animation: authTitleEnter 0.4s ease-out 0.12s both;
 }
+.auth-subtitle-enter {
+  animation: authTitleEnter 0.4s ease-out 0.18s both;
+}
 
 @keyframes authFormEnter {
   from {
@@ -500,20 +601,6 @@ const handleSocialLogin = (provider: string) => {
 }
 .auth-form-enter {
   animation: authFormEnter 0.45s ease-out 0.18s both;
-}
-
-@keyframes authBannerEnter {
-  from {
-    opacity: 0;
-    transform: translateY(-4px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-.auth-banner-enter {
-  animation: authBannerEnter 0.3s ease-out both;
 }
 
 @keyframes successPulse {

@@ -2263,6 +2263,10 @@
   "auth": {
     "login": "Anmelden",
     "register": "Registrieren",
+    "welcomeBack": "Willkommen zurück",
+    "loginSubtitle": "Melde dich an, um fortzufahren",
+    "getStarted": "Loslegen",
+    "registerSubtitle": "Erstelle dein kostenloses Konto",
     "email": "E-Mail",
     "emailPlaceholderPrefix": "deine",
     "emailPlaceholderSuffix": "email.de",
