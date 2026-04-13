@@ -208,10 +208,17 @@ class GuestChatController extends AbstractController
         $chat->setUpdatedAt($now);
 
         $this->em->persist($chat);
-        $this->guestSessionService->attachChat($session, $chat->getId());
         $this->em->flush();
 
-        return $this->json(['chatId' => $chat->getId()]);
+        $chatId = $chat->getId();
+        if (!$chatId) {
+            return $this->json(['error' => 'Failed to create chat'], Response::HTTP_INTERNAL_SERVER_ERROR);
+        }
+
+        $this->guestSessionService->attachChat($session, $chatId);
+        $this->em->flush();
+
+        return $this->json(['chatId' => $chatId]);
     }
 
     /**
