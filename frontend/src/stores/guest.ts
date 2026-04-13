@@ -103,9 +103,7 @@ export const useGuestStore = defineStore('guest', () => {
     if (!sessionId.value || !chatId.value) return []
 
     try {
-      const response = await fetch(
-        `${getApiBaseUrl()}/api/v1/guest/messages/${sessionId.value}`,
-      )
+      const response = await fetch(`${getApiBaseUrl()}/api/v1/guest/messages/${sessionId.value}`)
       if (!response.ok) return []
 
       const data = await response.json()
