@@ -82,11 +82,11 @@ class ProfileController extends AbstractController
         // Get external auth info if applicable
         $externalAuthInfo = null;
         if ($user->isExternalAuth()) {
-            $type = $user->getType();
-            $lastLoginKey = match ($type) {
-                'GOOGLE' => 'google_last_login',
-                'GITHUB' => 'github_last_login',
-                'OIDC' => 'oidc_last_login',
+            $provider = $user->getProviderId();
+            $lastLoginKey = match ($provider) {
+                'google' => 'google_last_login',
+                'github' => 'github_last_login',
+                'keycloak', 'oidc' => 'oidc_last_login',
                 default => null,
             };
 
@@ -268,12 +268,16 @@ class ProfileController extends AbstractController
             return $this->json(['error' => 'Not authenticated'], Response::HTTP_UNAUTHORIZED);
         }
 
-        // Block password change for external authentication users (OAuth, OIDC)
-        if (!$user->canChangePassword()) {
-            $provider = $user->getAuthProviderName();
-
+        if ($user->isManagedExternally()) {
             return $this->json([
-                'error' => "Password cannot be changed for {$provider} accounts. Please manage your password through {$provider}.",
+                'error' => 'This account is managed by your organization. Password changes are not allowed.',
+            ], Response::HTTP_FORBIDDEN);
+        }
+
+        // Block password change for users without a password
+        if (!$user->canChangePassword()) {
+            return $this->json([
+                'error' => 'You do not have a password set. Please use the "Forgot password" link on the login page to create one.',
             ], Response::HTTP_FORBIDDEN);
         }
 
@@ -473,6 +477,12 @@ class ProfileController extends AbstractController
             return $this->json(['error' => 'Not authenticated'], Response::HTTP_UNAUTHORIZED);
         }
 
+        if ($user->isManagedExternally()) {
+            return $this->json([
+                'error' => 'This account is managed by your organization and cannot be deleted here.',
+            ], Response::HTTP_FORBIDDEN);
+        }
+
         $data = json_decode($request->getContent(), true);
         $password = $data['password'] ?? '';
 
@@ -495,8 +505,6 @@ class ProfileController extends AbstractController
         } else {
             // Verify password for local auth users
             if (!$this->passwordHasher->isPasswordValid($user, $password)) {
-                usleep(100000); // Timing attack prevention
-
                 return $this->json([
                     'error' => 'Incorrect password',
                 ], Response::HTTP_FORBIDDEN);
