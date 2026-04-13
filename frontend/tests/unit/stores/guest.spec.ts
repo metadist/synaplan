@@ -211,7 +211,8 @@ describe('Guest Store', () => {
       const store = useGuestStore()
       await store.initSession()
 
-      expect(store.initialized).toBe(false)
+      expect(store.initialized).toBe(true)
+      expect(store.initFailed).toBe(true)
       expect(store.sessionId).toBeNull()
     })
   })

@@ -7,7 +7,7 @@ import {
 import { useAuth } from '@/composables/useAuth'
 import { useConfigStore } from '@/stores/config'
 import { authReady } from '@/stores/auth'
-import { GUEST_STORAGE_KEY } from '@/stores/guest'
+import { useGuestStore } from '@/stores/guest'
 import { i18n } from '@/i18n'
 import LoadingView from '@/views/LoadingView.vue'
 
@@ -439,8 +439,8 @@ router.beforeEach(async (to, from, next) => {
     }
 
     // Guest users: redirect to chat with feature-gate modal instead of login
-    const guestSessionId = localStorage.getItem(GUEST_STORAGE_KEY)
-    if (guestSessionId) {
+    const guestStore = useGuestStore()
+    if (guestStore.isGuestMode) {
       const featureKey = mapPathToFeatureKey(to.path)
       next({ name: 'chat', query: { restricted: featureKey } })
       return

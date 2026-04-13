@@ -11,6 +11,7 @@ export const useGuestStore = defineStore('guest', () => {
   const maxMessages = ref(5)
   const limitReached = ref(false)
   const initialized = ref(false)
+  const initFailed = ref(false)
   const bannerDismissed = ref(false)
 
   const remainingMessages = computed(() => Math.max(0, maxMessages.value - messageCount.value))
@@ -39,6 +40,7 @@ export const useGuestStore = defineStore('guest', () => {
     if (initialized.value) return
 
     const storedId = loadFromStorage()
+    initFailed.value = false
 
     try {
       const response = await fetch(`${getApiBaseUrl()}/api/v1/guest/session`, {
@@ -60,7 +62,15 @@ export const useGuestStore = defineStore('guest', () => {
       initialized.value = true
     } catch (err) {
       console.error('Guest session init failed:', err)
+      initFailed.value = true
+      initialized.value = true
     }
+  }
+
+  async function retryInit(): Promise<void> {
+    initialized.value = false
+    initFailed.value = false
+    await initSession()
   }
 
   async function ensureChat(): Promise<number | null> {
@@ -134,6 +144,7 @@ export const useGuestStore = defineStore('guest', () => {
     maxMessages.value = 5
     limitReached.value = false
     initialized.value = false
+    initFailed.value = false
     bannerDismissed.value = false
     try {
       localStorage.removeItem(GUEST_STORAGE_KEY)
@@ -149,11 +160,13 @@ export const useGuestStore = defineStore('guest', () => {
     maxMessages,
     limitReached,
     initialized,
+    initFailed,
     bannerDismissed,
     remainingMessages,
     isGuestMode,
     shouldShowBanner,
     initSession,
+    retryInit,
     ensureChat,
     loadMessages,
     updateCount,
