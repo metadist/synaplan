@@ -10,32 +10,29 @@ use App\Repository\GuestSessionRepository;
 use App\Repository\UserRepository;
 use App\Service\GuestSessionService;
 use Doctrine\ORM\EntityManagerInterface;
-use Doctrine\ORM\QueryBuilder;
-use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\HttpFoundation\Request;
 
 class GuestSessionServiceTest extends TestCase
 {
-    private EntityManagerInterface&MockObject $em;
-    private GuestSessionRepository&MockObject $sessionRepository;
-    private UserRepository&MockObject $userRepository;
-    private LoggerInterface&MockObject $logger;
-    private GuestSessionService $service;
-
-    protected function setUp(): void
-    {
-        $this->em = $this->createMock(EntityManagerInterface::class);
-        $this->sessionRepository = $this->createMock(GuestSessionRepository::class);
-        $this->userRepository = $this->createMock(UserRepository::class);
-        $this->logger = $this->createMock(LoggerInterface::class);
-
-        $this->service = new GuestSessionService(
-            $this->em,
-            $this->sessionRepository,
-            $this->userRepository,
-            $this->logger,
+    /**
+     * @param EntityManagerInterface|null $em          override EntityManager
+     * @param GuestSessionRepository|null $sessionRepo override session repository
+     * @param UserRepository|null         $userRepo    override user repository
+     * @param LoggerInterface|null        $logger      override logger
+     */
+    private function createService(
+        ?EntityManagerInterface $em = null,
+        ?GuestSessionRepository $sessionRepo = null,
+        ?UserRepository $userRepo = null,
+        ?LoggerInterface $logger = null,
+    ): GuestSessionService {
+        return new GuestSessionService(
+            $em ?? $this->createStub(EntityManagerInterface::class),
+            $sessionRepo ?? $this->createStub(GuestSessionRepository::class),
+            $userRepo ?? $this->createStub(UserRepository::class),
+            $logger ?? $this->createStub(LoggerInterface::class),
         );
     }
 
@@ -45,11 +42,15 @@ class GuestSessionServiceTest extends TestCase
         $request->headers->set('CF-Connecting-IP', '203.0.113.42');
         $request->headers->set('CF-IPCountry', 'DE');
 
-        $this->sessionRepository->method('countActiveSessionsByIp')->willReturn(0);
-        $this->em->expects($this->once())->method('persist');
-        $this->em->expects($this->once())->method('flush');
+        $sessionRepo = $this->createStub(GuestSessionRepository::class);
+        $sessionRepo->method('countActiveSessionsByIp')->willReturn(0);
 
-        $session = $this->service->createSession('test-uuid-123', $request);
+        $em = $this->createMock(EntityManagerInterface::class);
+        $em->expects($this->once())->method('persist');
+        $em->expects($this->once())->method('flush');
+
+        $service = $this->createService(em: $em, sessionRepo: $sessionRepo);
+        $session = $service->createSession('test-uuid-123', $request);
 
         $this->assertSame('test-uuid-123', $session->getSessionId());
         $this->assertSame('203.0.113.42', $session->getIpAddress());
@@ -62,11 +63,15 @@ class GuestSessionServiceTest extends TestCase
     {
         $request = Request::create('/', 'GET', [], [], [], ['REMOTE_ADDR' => '127.0.0.1']);
 
-        $this->sessionRepository->method('countActiveSessionsByIp')->willReturn(0);
-        $this->em->expects($this->once())->method('persist');
-        $this->em->expects($this->once())->method('flush');
+        $sessionRepo = $this->createStub(GuestSessionRepository::class);
+        $sessionRepo->method('countActiveSessionsByIp')->willReturn(0);
 
-        $session = $this->service->createSession('fallback-uuid', $request);
+        $em = $this->createMock(EntityManagerInterface::class);
+        $em->expects($this->once())->method('persist');
+        $em->expects($this->once())->method('flush');
+
+        $service = $this->createService(em: $em, sessionRepo: $sessionRepo);
+        $session = $service->createSession('fallback-uuid', $request);
 
         $this->assertSame('127.0.0.1', $session->getIpAddress());
         $this->assertNull($session->getCountry());
@@ -78,11 +83,15 @@ class GuestSessionServiceTest extends TestCase
         $request->headers->set('CF-Connecting-IP', '1.2.3.4');
         $request->headers->set('CF-IPCountry', 'T1');
 
-        $this->sessionRepository->method('countActiveSessionsByIp')->willReturn(0);
-        $this->em->expects($this->once())->method('persist');
-        $this->em->expects($this->once())->method('flush');
+        $sessionRepo = $this->createStub(GuestSessionRepository::class);
+        $sessionRepo->method('countActiveSessionsByIp')->willReturn(0);
 
-        $session = $this->service->createSession('tor-uuid', $request);
+        $em = $this->createMock(EntityManagerInterface::class);
+        $em->expects($this->once())->method('persist');
+        $em->expects($this->once())->method('flush');
+
+        $service = $this->createService(em: $em, sessionRepo: $sessionRepo);
+        $session = $service->createSession('tor-uuid', $request);
 
         $this->assertNull($session->getCountry());
     }
@@ -92,7 +101,8 @@ class GuestSessionServiceTest extends TestCase
         $existing = new GuestSession();
         $existing->setSessionId('duplicate-uuid');
 
-        $this->sessionRepository->expects($this->once())
+        $sessionRepo = $this->createMock(GuestSessionRepository::class);
+        $sessionRepo->expects($this->once())
             ->method('findBySessionId')
             ->with('duplicate-uuid')
             ->willReturn($existing);
@@ -100,10 +110,12 @@ class GuestSessionServiceTest extends TestCase
         $request = new Request();
         $request->headers->set('CF-Connecting-IP', '1.2.3.4');
 
+        $service = $this->createService(sessionRepo: $sessionRepo);
+
         $this->expectException(\LogicException::class);
         $this->expectExceptionMessage('Session ID already exists');
 
-        $this->service->createSession('duplicate-uuid', $request);
+        $service->createSession('duplicate-uuid', $request);
     }
 
     public function testCreateSessionThrowsOverflowWhenIpLimitExceeded(): void
@@ -111,21 +123,25 @@ class GuestSessionServiceTest extends TestCase
         $request = new Request();
         $request->headers->set('CF-Connecting-IP', '1.2.3.4');
 
-        $this->sessionRepository->expects($this->once())
+        $sessionRepo = $this->createMock(GuestSessionRepository::class);
+        $sessionRepo->expects($this->once())
             ->method('countActiveSessionsByIp')
             ->with('1.2.3.4')
             ->willReturn(5);
 
-        $this->logger->expects($this->once())
+        $logger = $this->createMock(LoggerInterface::class);
+        $logger->expects($this->once())
             ->method('warning')
             ->with(
                 $this->stringContains('IP rate limit exceeded'),
                 $this->callback(fn (array $ctx) => '1.2.3.4' === $ctx['ip'] && 5 === $ctx['active_sessions'])
             );
 
+        $service = $this->createService(sessionRepo: $sessionRepo, logger: $logger);
+
         $this->expectException(\OverflowException::class);
 
-        $this->service->createSession('rate-limited-uuid', $request);
+        $service->createSession('rate-limited-uuid', $request);
     }
 
     public function testCreateSessionAllowsWhenUnderIpLimit(): void
@@ -133,15 +149,18 @@ class GuestSessionServiceTest extends TestCase
         $request = new Request();
         $request->headers->set('CF-Connecting-IP', '1.2.3.4');
 
-        $this->sessionRepository->expects($this->once())
+        $sessionRepo = $this->createMock(GuestSessionRepository::class);
+        $sessionRepo->expects($this->once())
             ->method('countActiveSessionsByIp')
             ->with('1.2.3.4')
             ->willReturn(4);
 
-        $this->em->expects($this->once())->method('persist');
-        $this->em->expects($this->once())->method('flush');
+        $em = $this->createMock(EntityManagerInterface::class);
+        $em->expects($this->once())->method('persist');
+        $em->expects($this->once())->method('flush');
 
-        $session = $this->service->createSession('allowed-uuid', $request);
+        $service = $this->createService(em: $em, sessionRepo: $sessionRepo);
+        $session = $service->createSession('allowed-uuid', $request);
 
         $this->assertSame('allowed-uuid', $session->getSessionId());
     }
@@ -151,23 +170,27 @@ class GuestSessionServiceTest extends TestCase
         $expectedSession = new GuestSession();
         $expectedSession->setSessionId('find-me');
 
-        $this->sessionRepository->expects($this->once())
+        $sessionRepo = $this->createMock(GuestSessionRepository::class);
+        $sessionRepo->expects($this->once())
             ->method('findBySessionId')
             ->with('find-me')
             ->willReturn($expectedSession);
 
-        $result = $this->service->getSession('find-me');
+        $service = $this->createService(sessionRepo: $sessionRepo);
+        $result = $service->getSession('find-me');
 
         $this->assertSame($expectedSession, $result);
     }
 
     public function testGetSessionReturnsNullWhenNotFound(): void
     {
-        $this->sessionRepository->expects($this->once())
+        $sessionRepo = $this->createMock(GuestSessionRepository::class);
+        $sessionRepo->expects($this->once())
             ->method('findBySessionId')
             ->willReturn(null);
 
-        $result = $this->service->getSession('nonexistent');
+        $service = $this->createService(sessionRepo: $sessionRepo);
+        $result = $service->getSession('nonexistent');
 
         $this->assertNull($result);
     }
@@ -178,7 +201,9 @@ class GuestSessionServiceTest extends TestCase
         $session->setMaxMessages(5);
         $session->setMessageCount(3);
 
-        $this->assertTrue($this->service->checkLimit($session));
+        $service = $this->createService();
+
+        $this->assertTrue($service->checkLimit($session));
     }
 
     public function testCheckLimitReturnsFalseWhenAtLimit(): void
@@ -187,7 +212,9 @@ class GuestSessionServiceTest extends TestCase
         $session->setMaxMessages(5);
         $session->setMessageCount(5);
 
-        $this->assertFalse($this->service->checkLimit($session));
+        $service = $this->createService();
+
+        $this->assertFalse($service->checkLimit($session));
     }
 
     public function testCheckLimitReturnsFalseWhenOverLimit(): void
@@ -196,7 +223,9 @@ class GuestSessionServiceTest extends TestCase
         $session->setMaxMessages(5);
         $session->setMessageCount(7);
 
-        $this->assertFalse($this->service->checkLimit($session));
+        $service = $this->createService();
+
+        $this->assertFalse($service->checkLimit($session));
     }
 
     public function testIncrementCountFlushesEntityManager(): void
@@ -204,9 +233,11 @@ class GuestSessionServiceTest extends TestCase
         $session = new GuestSession();
         $session->setMessageCount(2);
 
-        $this->em->expects($this->once())->method('flush');
+        $em = $this->createMock(EntityManagerInterface::class);
+        $em->expects($this->once())->method('flush');
 
-        $this->service->incrementCount($session);
+        $service = $this->createService(em: $em);
+        $service->incrementCount($session);
 
         $this->assertSame(3, $session->getMessageCount());
     }
@@ -217,7 +248,9 @@ class GuestSessionServiceTest extends TestCase
         $session->setMaxMessages(5);
         $session->setMessageCount(2);
 
-        $this->assertSame(3, $this->service->getRemainingMessages($session));
+        $service = $this->createService();
+
+        $this->assertSame(3, $service->getRemainingMessages($session));
     }
 
     public function testGetProcessingUserReturnsAdminUser(): void
@@ -227,22 +260,27 @@ class GuestSessionServiceTest extends TestCase
         $reflection->setAccessible(true);
         $reflection->setValue($adminUser, 1);
 
-        $this->mockUserQueryBuilder($adminUser);
+        $userRepo = $this->createMock(UserRepository::class);
+        $service = $this->createService(userRepo: $userRepo);
+        $this->mockUserQueryBuilder($userRepo, $adminUser);
 
-        $result = $this->service->getProcessingUser();
+        $result = $service->getProcessingUser();
 
         $this->assertSame($adminUser, $result);
     }
 
     public function testGetProcessingUserReturnsNullAndLogsWhenNoAdmin(): void
     {
-        $this->mockUserQueryBuilder(null);
-
-        $this->logger->expects($this->once())
+        $userRepo = $this->createMock(UserRepository::class);
+        $logger = $this->createMock(LoggerInterface::class);
+        $logger->expects($this->once())
             ->method('error')
             ->with($this->stringContains('No admin user found'));
 
-        $result = $this->service->getProcessingUser();
+        $service = $this->createService(userRepo: $userRepo, logger: $logger);
+        $this->mockUserQueryBuilder($userRepo, null);
+
+        $result = $service->getProcessingUser();
 
         $this->assertNull($result);
     }
@@ -251,10 +289,12 @@ class GuestSessionServiceTest extends TestCase
     {
         $adminUser = new User();
 
-        $this->mockUserQueryBuilder($adminUser);
+        $userRepo = $this->createMock(UserRepository::class);
+        $service = $this->createService(userRepo: $userRepo);
+        $this->mockUserQueryBuilder($userRepo, $adminUser);
 
-        $first = $this->service->getProcessingUser();
-        $second = $this->service->getProcessingUser();
+        $first = $service->getProcessingUser();
+        $second = $service->getProcessingUser();
 
         $this->assertSame($first, $second);
     }
@@ -264,7 +304,8 @@ class GuestSessionServiceTest extends TestCase
         $session = new GuestSession();
         $this->assertNull($session->getChatId());
 
-        $this->service->attachChat($session, 42);
+        $service = $this->createService();
+        $service->attachChat($session, 42);
 
         $this->assertSame(42, $session->getChatId());
     }
@@ -274,26 +315,25 @@ class GuestSessionServiceTest extends TestCase
         $session = new GuestSession();
         $session->setChatId(42);
 
-        $this->service->attachChat($session, 42);
+        $service = $this->createService();
+        $service->attachChat($session, 42);
 
         $this->assertSame(42, $session->getChatId());
     }
 
-    private function mockUserQueryBuilder(?User $result): void
+    private function mockUserQueryBuilder(UserRepository&\PHPUnit\Framework\MockObject\MockObject $userRepo, ?User $result): void
     {
-        $query = $this->getMockBuilder(\Doctrine\ORM\Query::class)
-            ->disableOriginalConstructor()
-            ->getMock();
+        $query = $this->createStub(\Doctrine\ORM\Query::class);
         $query->method('getOneOrNullResult')->willReturn($result);
 
-        $qb = $this->createMock(QueryBuilder::class);
+        $qb = $this->createStub(\Doctrine\ORM\QueryBuilder::class);
         $qb->method('where')->willReturnSelf();
         $qb->method('setParameter')->willReturnSelf();
         $qb->method('orderBy')->willReturnSelf();
         $qb->method('setMaxResults')->willReturnSelf();
         $qb->method('getQuery')->willReturn($query);
 
-        $this->userRepository->expects($this->once())
+        $userRepo->expects($this->once())
             ->method('createQueryBuilder')
             ->with('u')
             ->willReturn($qb);
