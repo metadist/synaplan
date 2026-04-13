@@ -8,9 +8,12 @@ use App\Entity\User;
 use App\Repository\UserRepository;
 use App\Service\OidcUserService;
 use Doctrine\ORM\EntityManagerInterface;
+use Doctrine\ORM\Query;
+use Doctrine\ORM\QueryBuilder;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
+use Symfony\Component\Security\Core\Exception\CustomUserMessageAuthenticationException;
 
 class OidcUserServiceTest extends TestCase
 {
@@ -51,6 +54,18 @@ class OidcUserServiceTest extends TestCase
         $user->setMail($email);
         $user->setProviderId('keycloak');
         $user->setUserLevel($userLevel);
+        $user->setUserDetails([]);
+        $user->setPaymentDetails([]);
+
+        return $user;
+    }
+
+    private function makeGoogleUser(string $email): User
+    {
+        $user = new User();
+        $user->setMail($email);
+        $user->setProviderId('google');
+        $user->setUserLevel('NEW');
         $user->setUserDetails([]);
         $user->setPaymentDetails([]);
 
@@ -332,5 +347,31 @@ class OidcUserServiceTest extends TestCase
         ]);
 
         $this->assertSame('ADMIN', $result->getUserLevel());
+    }
+
+    public function testFindOrCreateFromClaimsThrowsGenericMessageWhenEmailBoundToNonKeycloakProvider(): void
+    {
+        $service = $this->createService();
+        $googleUser = $this->makeGoogleUser('overlap@example.com');
+
+        $qb = $this->createMock(QueryBuilder::class);
+        $qb->method('where')->willReturnSelf();
+        $qb->method('setParameter')->willReturnSelf();
+        $qb->method('setMaxResults')->willReturnSelf();
+        $query = $this->createMock(Query::class);
+        $query->method('getOneOrNullResult')->willReturn(null);
+        $qb->method('getQuery')->willReturn($query);
+        $this->userRepository->method('createQueryBuilder')->willReturn($qb);
+        $this->userRepository->method('findOneBy')->with(['mail' => 'overlap@example.com'])->willReturn($googleUser);
+
+        $this->em->expects($this->never())->method('persist');
+
+        $this->expectException(CustomUserMessageAuthenticationException::class);
+        $this->expectExceptionMessage('Authentication failed.');
+
+        $service->findOrCreateFromClaims([
+            'sub' => 'oidc-sub-xyz',
+            'email' => 'overlap@example.com',
+        ]);
     }
 }
