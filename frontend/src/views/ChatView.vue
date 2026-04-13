@@ -161,7 +161,7 @@
     />
 
     <!-- Guest Signup Modal (shown when guest message limit is reached) -->
-    <GuestSignupModal :is-open="showGuestSignupModal" />
+    <GuestSignupModal :is-open="showGuestSignupModal" @close="showGuestSignupModal = false" />
 
     <!-- Guest Feature Gate Modal (shown when guest tries to access a restricted feature) -->
     <GuestFeatureGateModal

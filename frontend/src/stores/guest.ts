@@ -2,7 +2,7 @@ import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { getApiBaseUrl } from '@/services/api/httpClient'
 
-const STORAGE_KEY = 'synaplan_guest_session'
+export const GUEST_STORAGE_KEY = 'synaplan_guest_session'
 
 export const useGuestStore = defineStore('guest', () => {
   const sessionId = ref<string | null>(null)
@@ -21,7 +21,7 @@ export const useGuestStore = defineStore('guest', () => {
 
   function loadFromStorage(): string | null {
     try {
-      return localStorage.getItem(STORAGE_KEY)
+      return localStorage.getItem(GUEST_STORAGE_KEY)
     } catch {
       return null
     }
@@ -29,7 +29,7 @@ export const useGuestStore = defineStore('guest', () => {
 
   function saveToStorage(id: string): void {
     try {
-      localStorage.setItem(STORAGE_KEY, id)
+      localStorage.setItem(GUEST_STORAGE_KEY, id)
     } catch {
       // localStorage unavailable
     }
@@ -136,7 +136,7 @@ export const useGuestStore = defineStore('guest', () => {
     initialized.value = false
     bannerDismissed.value = false
     try {
-      localStorage.removeItem(STORAGE_KEY)
+      localStorage.removeItem(GUEST_STORAGE_KEY)
     } catch {
       // ignore
     }

@@ -6,7 +6,7 @@
         data-testid="guest-signup-modal"
         class="fixed inset-0 z-[100] flex items-center justify-center p-4"
       >
-        <div class="absolute inset-0 bg-black/60 backdrop-blur-sm" />
+        <div class="absolute inset-0 bg-black/60 backdrop-blur-sm" @click="$emit('close')" />
 
         <div
           class="relative w-full max-w-md rounded-2xl overflow-hidden shadow-2xl animate-modal-enter"
@@ -16,6 +16,13 @@
             class="relative px-8 pt-10 pb-8 text-center text-white"
             style="background: linear-gradient(135deg, var(--brand) 0%, #1a2980 100%)"
           >
+            <button
+              class="absolute top-3 right-3 w-8 h-8 rounded-lg bg-white/10 hover:bg-white/20 flex items-center justify-center transition-colors"
+              data-testid="guest-signup-close"
+              @click="$emit('close')"
+            >
+              <Icon icon="mdi:close" class="w-4 h-4" />
+            </button>
             <div
               class="mx-auto mb-4 w-16 h-16 rounded-2xl bg-white/15 backdrop-blur-sm flex items-center justify-center"
             >
@@ -73,6 +80,10 @@ import { Icon } from '@iconify/vue'
 
 defineProps<{
   isOpen: boolean
+}>()
+
+defineEmits<{
+  close: []
 }>()
 
 const features = {

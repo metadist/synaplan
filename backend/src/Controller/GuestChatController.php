@@ -84,9 +84,7 @@ class GuestChatController extends AbstractController
             }
         }
 
-        if (!$sessionId) {
-            $sessionId = Uuid::v4()->toRfc4122();
-        }
+        $sessionId = Uuid::v4()->toRfc4122();
 
         $session = $this->guestSessionService->createSession($sessionId, $request);
 
@@ -195,6 +193,12 @@ class GuestChatController extends AbstractController
             return $this->json(['error' => 'Guest mode unavailable'], Response::HTTP_INTERNAL_SERVER_ERROR);
         }
 
+        // Re-check after potential concurrent request
+        $this->em->refresh($session);
+        if ($session->getChatId()) {
+            return $this->json(['chatId' => $session->getChatId()]);
+        }
+
         $now = new \DateTimeImmutable();
         $chat = new Chat();
         $chat->setUserId($user->getId());
@@ -204,9 +208,8 @@ class GuestChatController extends AbstractController
         $chat->setUpdatedAt($now);
 
         $this->em->persist($chat);
-        $this->em->flush();
-
         $this->guestSessionService->attachChat($session, $chat->getId());
+        $this->em->flush();
 
         return $this->json(['chatId' => $chat->getId()]);
     }

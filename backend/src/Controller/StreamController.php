@@ -1298,8 +1298,8 @@ class StreamController extends AbstractController
 
                 // Guest Mode: Increment count and send remaining messages
                 if ($isGuestMode && $guestSession) {
-                    $this->guestSessionService->incrementCount($guestSession);
                     $this->guestSessionService->attachChat($guestSession, (int) $chatId);
+                    $this->guestSessionService->incrementCount($guestSession);
                     $this->sendSSE('guest_remaining', [
                         'remaining' => $this->guestSessionService->getRemainingMessages($guestSession),
                         'maxMessages' => $guestSession->getMaxMessages(),
