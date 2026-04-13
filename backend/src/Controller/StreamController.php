@@ -480,6 +480,11 @@ class StreamController extends AbstractController
                             }
                         }
 
+                        // Reload continuation entity after em->clear() so it stays managed
+                        if ($originalOutgoingMessage) {
+                            $originalOutgoingMessage = $this->em->getRepository(Message::class)->find((int) $continueMessageId);
+                        }
+
                         $this->logger->info('StreamController: Files attached and entity reloaded', [
                             'message_id' => $incomingMessage->getId(),
                             'files_count' => $incomingMessage->getFiles()->count(),
@@ -1061,8 +1066,9 @@ class StreamController extends AbstractController
                     ]);
                 }
 
-                // Update incoming message (preserve topic/status for continuation messages)
-                if (!$originalOutgoingMessage) {
+                if ($originalOutgoingMessage) {
+                    $incomingMessage->setStatus('complete');
+                } else {
                     $incomingMessage->setTopic($classification['topic']);
                     $incomingMessage->setLanguage($classification['language']);
                     $incomingMessage->setStatus('complete');

@@ -554,6 +554,7 @@
     "typeMessage": "Nachricht eingeben...",
     "messageSent": "Nachricht gesendet",
     "sendFailed": "Nachricht konnte nicht gesendet werden. Bitte versuchen Sie es erneut.",
+    "continueFailed": "Antwort konnte nicht fortgesetzt werden. Bitte versuche es erneut.",
     "typing": "Schreibt",
     "attachFile": "Datei anhängen",
     "uploadingFiles": "Dateien werden hochgeladen...",

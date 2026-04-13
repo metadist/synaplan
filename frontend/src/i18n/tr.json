@@ -572,6 +572,7 @@
     "fileUploadFailed": "Dosya yükleme başarısız. Lütfen tekrar deneyin.",
     "fileUploadDefaultMessage": "Lütfen ekli dosyayı inceleyin.",
     "sendFailed": "Üzgünüz, bir hatayla karşılaştık. Lütfen tekrar deneyin.",
+    "continueFailed": "Yanıt sürdürülemedi. Lütfen tekrar deneyin.",
     "defaultAssistantReply": "Mesajınız için teşekkürler! Hemen size döneceğim.",
     "previewWidget": "Widget Önizlemesi",
     "configuration": "Widget Yapılandırması",

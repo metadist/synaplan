@@ -735,10 +735,14 @@ const handleContinueResponse = async (message: Message) => {
   message.truncated = false
   message.isStreaming = true
 
-  let fullContent = message.parts
-    .filter((p) => p.type === 'text')
-    .map((p) => p.content ?? '')
-    .join('\n')
+  let fullContent = ''
+  for (const p of message.parts) {
+    if (p.type === 'thinking' && p.content) {
+      fullContent += `<think>${p.content}</think>\n`
+    } else if (p.type === 'text' && p.content) {
+      fullContent += p.content
+    }
+  }
 
   const trackId = Date.now()
   let streamingRafId: number | null = null
@@ -763,6 +767,16 @@ const handleContinueResponse = async (message: Message) => {
             renderStreamingContent(fullContent, message.id)
           })
         }
+      } else if (data.status === 'reasoning' && data.chunk) {
+        const msg = historyStore.messages.find((m) => m.id === message.id)
+        if (msg) {
+          let reasoningPart = msg.parts.find((p) => p.type === 'thinking' && p.isStreaming)
+          if (!reasoningPart) {
+            reasoningPart = { type: 'thinking', content: '', isStreaming: true }
+            msg.parts.push(reasoningPart)
+          }
+          reasoningPart.content += data.chunk
+        }
       } else if (data.status === 'complete') {
         if (streamingRafId !== null) {
           cancelAnimationFrame(streamingRafId)
@@ -781,6 +795,7 @@ const handleContinueResponse = async (message: Message) => {
         message.truncated = true
         message.isStreaming = false
         historyStore.finishStreamingMessage(message.id)
+        showErrorToast(t('chat.continueFailed'))
       }
     },
   })

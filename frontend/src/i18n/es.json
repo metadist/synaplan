@@ -572,6 +572,7 @@
     "fileUploadFailed": "Error al subir archivo. Por favor intenta de nuevo.",
     "fileUploadDefaultMessage": "Por favor revisa el archivo adjunto.",
     "sendFailed": "Lo siento, ocurrió un error. Por favor intenta de nuevo.",
+    "continueFailed": "No se pudo continuar la respuesta. Por favor intenta de nuevo.",
     "defaultAssistantReply": "¡Gracias por tu mensaje! Te responderé de inmediato.",
     "previewWidget": "Vista Previa del Widget",
     "configuration": "Configuración del Widget",

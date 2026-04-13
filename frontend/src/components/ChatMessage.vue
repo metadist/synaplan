@@ -336,7 +336,7 @@
           <!-- Continue Button (truncated response) -->
           <div
             v-if="role === 'assistant' && truncated && !isStreaming"
-            class="mt-3 pt-3 border-t border-amber-300/30 dark:border-amber-500/20"
+            class="mt-3 pt-3 border-t border-light-border/30 dark:border-dark-border/20"
           >
             <p class="text-sm txt-muted mb-2">
               {{ $t('message.truncated') }}
