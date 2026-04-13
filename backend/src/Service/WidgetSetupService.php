@@ -213,7 +213,9 @@ final readonly class WidgetSetupService
         }
 
         $isStart = self::FLOW_BUILDER_START_MARKER === trim($text);
-        if (!$isStart) {
+        if ($isStart) {
+            $messages[] = ['role' => 'user', 'content' => 'Start'];
+        } else {
             $enrichedText = $this->enrichWithWebsiteContent($text);
             $messages[] = ['role' => 'user', 'content' => $enrichedText];
         }
@@ -565,8 +567,12 @@ PROMPT;
             ];
         }
 
-        // Add new user message (unless it's the start marker)
-        if (self::START_MARKER !== $newUserMessage) {
+        if (self::START_MARKER === $newUserMessage) {
+            $messages[] = [
+                'role' => 'user',
+                'content' => 'Start',
+            ];
+        } else {
             $messages[] = [
                 'role' => 'user',
                 'content' => $newUserMessage,
