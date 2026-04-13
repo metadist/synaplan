@@ -1,0 +1,166 @@
+import { defineStore } from 'pinia'
+import { ref, computed } from 'vue'
+import { getApiBaseUrl } from '@/services/api/httpClient'
+
+const STORAGE_KEY = 'synaplan_guest_session'
+
+export const useGuestStore = defineStore('guest', () => {
+  const sessionId = ref<string | null>(null)
+  const chatId = ref<number | null>(null)
+  const messageCount = ref(0)
+  const maxMessages = ref(5)
+  const limitReached = ref(false)
+  const initialized = ref(false)
+  const bannerDismissed = ref(false)
+
+  const remainingMessages = computed(() => Math.max(0, maxMessages.value - messageCount.value))
+  const isGuestMode = computed(() => !!sessionId.value)
+  const shouldShowBanner = computed(
+    () => isGuestMode.value && !limitReached.value && !bannerDismissed.value
+  )
+
+  function loadFromStorage(): string | null {
+    try {
+      return localStorage.getItem(STORAGE_KEY)
+    } catch {
+      return null
+    }
+  }
+
+  function saveToStorage(id: string): void {
+    try {
+      localStorage.setItem(STORAGE_KEY, id)
+    } catch {
+      // localStorage unavailable
+    }
+  }
+
+  async function initSession(): Promise<void> {
+    if (initialized.value) return
+
+    const storedId = loadFromStorage()
+
+    try {
+      const response = await fetch(`${getApiBaseUrl()}/api/v1/guest/session`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sessionId: storedId }),
+      })
+
+      if (!response.ok) throw new Error('Failed to init guest session')
+
+      const data = await response.json()
+      sessionId.value = data.sessionId
+      chatId.value = data.chatId ?? null
+      messageCount.value = data.maxMessages - data.remaining
+      maxMessages.value = data.maxMessages
+      limitReached.value = data.limitReached
+
+      saveToStorage(data.sessionId)
+      initialized.value = true
+    } catch (err) {
+      console.error('Guest session init failed:', err)
+    }
+  }
+
+  async function ensureChat(): Promise<number | null> {
+    if (chatId.value) return chatId.value
+    if (!sessionId.value) return null
+
+    try {
+      const response = await fetch(`${getApiBaseUrl()}/api/v1/guest/chat`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sessionId: sessionId.value }),
+      })
+
+      if (!response.ok) throw new Error('Failed to create guest chat')
+
+      const data = await response.json()
+      chatId.value = data.chatId
+      return data.chatId
+    } catch (err) {
+      console.error('Guest chat creation failed:', err)
+      return null
+    }
+  }
+
+  async function loadMessages(): Promise<
+    Array<{
+      id: number
+      text: string
+      direction: string
+      timestamp: number
+      provider: string | null
+      topic: string | null
+      language: string | null
+      createdAt: string | null
+      aiModels: Record<string, unknown> | null
+      webSearch: Record<string, unknown> | null
+      searchResults: Array<Record<string, unknown>> | null
+    }>
+  > {
+    if (!sessionId.value || !chatId.value) return []
+
+    try {
+      const response = await fetch(
+        `${getApiBaseUrl()}/api/v1/guest/messages/${sessionId.value}`,
+      )
+      if (!response.ok) return []
+
+      const data = await response.json()
+      return data.messages ?? []
+    } catch {
+      return []
+    }
+  }
+
+  function updateCount(remaining: number, max: number, reached: boolean): void {
+    messageCount.value = max - remaining
+    maxMessages.value = max
+    limitReached.value = reached
+  }
+
+  function dismissBanner(): void {
+    bannerDismissed.value = true
+  }
+
+  function showBanner(): void {
+    bannerDismissed.value = false
+  }
+
+  function $reset(): void {
+    sessionId.value = null
+    chatId.value = null
+    messageCount.value = 0
+    maxMessages.value = 5
+    limitReached.value = false
+    initialized.value = false
+    bannerDismissed.value = false
+    try {
+      localStorage.removeItem(STORAGE_KEY)
+    } catch {
+      // ignore
+    }
+  }
+
+  return {
+    sessionId,
+    chatId,
+    messageCount,
+    maxMessages,
+    limitReached,
+    initialized,
+    bannerDismissed,
+    remainingMessages,
+    isGuestMode,
+    shouldShowBanner,
+    initSession,
+    ensureChat,
+    loadMessages,
+    updateCount,
+    dismissBanner,
+    showBanner,
+    $reset,
+  }
+})

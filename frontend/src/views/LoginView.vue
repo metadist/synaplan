@@ -60,14 +60,28 @@
           </button>
         </div>
 
-        <!-- Session expired with OIDC auto-redirect: show error + manual button -->
+        <!-- Session expired with OIDC auto-redirect: show friendly banner + manual button -->
         <div
           v-else-if="oidcAutoRedirect && sessionExpired"
           class="py-4"
           data-testid="section-oidc-session-expired"
         >
-          <div class="alert-error mb-4">
-            <p class="text-sm alert-error-text">{{ $t('auth.sessionExpiredDesc') }}</p>
+          <div
+            class="mb-4 p-4 rounded-xl border border-[var(--brand)]/20 bg-[var(--brand)]/5 dark:bg-[var(--brand)]/10"
+          >
+            <div class="flex gap-3">
+              <Icon
+                icon="mdi:hand-wave"
+                class="w-5 h-5 flex-shrink-0 mt-0.5"
+                style="color: var(--brand)"
+              />
+              <div>
+                <p class="text-sm font-semibold txt-primary">
+                  {{ $t('auth.sessionExpiredTitle') }}
+                </p>
+                <p class="text-sm txt-secondary mt-1">{{ $t('auth.sessionExpiredDesc') }}</p>
+              </div>
+            </div>
           </div>
           <button
             type="button"
@@ -113,6 +127,27 @@
                 <p class="text-sm text-green-700 dark:text-green-300 mt-1">
                   {{ $t('auth.registrationCompleteDesc') }}
                 </p>
+              </div>
+            </div>
+          </div>
+
+          <!-- Session expired banner (friendly, not an error) -->
+          <div
+            v-if="sessionExpired"
+            class="mb-5 p-4 rounded-xl border border-[var(--brand)]/20 bg-[var(--brand)]/5 dark:bg-[var(--brand)]/10"
+            data-testid="section-session-expired"
+          >
+            <div class="flex gap-3">
+              <Icon
+                icon="mdi:hand-wave"
+                class="w-5 h-5 flex-shrink-0 mt-0.5"
+                style="color: var(--brand)"
+              />
+              <div>
+                <p class="text-sm font-semibold txt-primary">
+                  {{ $t('auth.sessionExpiredTitle') }}
+                </p>
+                <p class="text-sm txt-secondary mt-1">{{ $t('auth.sessionExpiredDesc') }}</p>
               </div>
             </div>
           </div>
@@ -314,6 +349,7 @@ import { ref, computed, onMounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { SunIcon, MoonIcon, EyeIcon, EyeSlashIcon } from '@heroicons/vue/24/outline'
+import { Icon } from '@iconify/vue'
 import { useTheme } from '../composables/useTheme'
 import { useAuth } from '../composables/useAuth'
 import { useRecaptcha } from '../composables/useRecaptcha'
@@ -323,7 +359,7 @@ import { useConfigStore } from '@/stores/config'
 
 const router = useRouter()
 const route = useRoute()
-const { locale, t } = useI18n()
+const { locale } = useI18n()
 const themeStore = useTheme()
 const { getToken: getReCaptchaToken } = useRecaptcha()
 const config = useConfigStore()
@@ -362,10 +398,8 @@ const toggleTheme = () => {
 
 const { login, error: authError, loading, clearError } = useAuth()
 const emailError = ref('')
-const sessionExpiredMessage = ref('')
 
-// Computed error to show either auth error or session expired message
-const error = computed(() => sessionExpiredMessage.value || authError.value)
+const error = computed(() => authError.value)
 
 // Social login providers
 interface SocialProvider {
@@ -398,7 +432,6 @@ onMounted(async () => {
   const reason = route.query.reason as string
   if (reason === 'session_expired') {
     sessionExpired.value = true
-    sessionExpiredMessage.value = t('auth.sessionExpiredDesc')
   }
 
   if (route.query.registered === 'true') {
@@ -427,7 +460,6 @@ onMounted(async () => {
 const handleLogin = async () => {
   clearError()
   emailError.value = ''
-  sessionExpiredMessage.value = ''
 
   // Validate email
   if (!validateEmail(email.value)) {

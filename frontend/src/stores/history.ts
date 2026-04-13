@@ -162,7 +162,7 @@ interface ApiLoadedMessageRow {
  * Parse content to extract thinking blocks, code blocks, and regular text.
  * This ensures consistent rendering between streaming and loaded messages.
  */
-function parseContentWithThinking(
+export function parseContentWithThinking(
   content: string,
   role: 'user' | 'assistant' = 'assistant'
 ): Part[] {

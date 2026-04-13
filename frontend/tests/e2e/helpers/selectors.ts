@@ -299,5 +299,13 @@ export const selectors = {
     statistics: '[data-testid="page-statistics"]',
     admin: '[data-testid="view-admin"]',
   },
+  guest: {
+    banner: '[data-testid="guest-banner"]',
+    bannerSignup: '[data-testid="guest-banner-signup"]',
+    bannerDismiss: '[data-testid="guest-banner-dismiss"]',
+    signupModal: '[data-testid="guest-signup-modal"]',
+    modalRegister: '[data-testid="guest-modal-register"]',
+    modalLogin: '[data-testid="guest-modal-login"]',
+  },
   toast: {},
 } as const

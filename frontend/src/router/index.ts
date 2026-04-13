@@ -128,13 +128,15 @@ const router = createRouter({
       meta: { requiresAuth: false },
     },
 
-    // Protected routes (require authentication)
+    // Chat route (accessible for both authenticated users and guests)
     {
       path: '/',
       name: 'chat',
       component: () => import('@/views/ChatView.vue'),
-      meta: { requiresAuth: true, titleKey: 'pageTitles.chat' },
+      meta: { requiresAuth: false, allowGuest: true, titleKey: 'pageTitles.chat' },
     },
+
+    // Protected routes (require authentication)
     {
       path: '/tools',
       redirect: '/tools/chat-widget',
@@ -379,6 +381,15 @@ function detectRedirectLoop(targetPath: string): boolean {
   return false
 }
 
+function mapPathToFeatureKey(path: string): string {
+  if (path.startsWith('/files')) return 'files'
+  if (path.startsWith('/memories') || path.startsWith('/feedbacks')) return 'memories'
+  if (path.startsWith('/config') || path.startsWith('/settings') || path.startsWith('/tools'))
+    return 'settings'
+  if (path.startsWith('/statistics')) return 'statistics'
+  return 'general'
+}
+
 // Global navigation guard for authentication
 // With cookie-based auth, we wait for auth check then verify session
 router.beforeEach(async (to, from, next) => {
@@ -422,12 +433,18 @@ router.beforeEach(async (to, from, next) => {
     const targetPath = `/login?redirect=${encodeURIComponent(to.fullPath)}&reason=auth_required`
     if (detectRedirectLoop(targetPath)) {
       console.error('🛑 Breaking redirect loop - staying on current page')
-      // Break the loop by going to error page or just proceeding
       next({ name: 'error', query: { reason: 'redirect_loop' } })
       return
     }
 
-    // Expected for non-logged-in users visiting protected routes - not an error
+    // Guest users: redirect to chat with feature-gate modal instead of login
+    const guestSessionId = localStorage.getItem('guest_session_id')
+    if (guestSessionId) {
+      const featureKey = mapPathToFeatureKey(to.path)
+      next({ name: 'chat', query: { restricted: featureKey } })
+      return
+    }
+
     if (import.meta.env.DEV) console.debug('🔒 Redirecting unauthenticated user to login')
     next({
       name: 'login',

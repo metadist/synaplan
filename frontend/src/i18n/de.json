@@ -2319,7 +2319,8 @@
     "backToHomepage": "← Zurück zu www.synaplan.com",
     "hostingTermsNote": "Es gelten die Allgemeinen Geschäftsbedingungen der Hosting-Plattform.",
     "sessionExpired": "Sitzung abgelaufen",
-    "sessionExpiredDesc": "Deine Sitzung ist abgelaufen. Bitte melde dich erneut an, um fortzufahren.",
+    "sessionExpiredTitle": "Willkommen zurück!",
+    "sessionExpiredDesc": "Deine Sitzung ist abgelaufen — melde dich einfach erneut an, um dort weiterzumachen, wo du aufgehört hast.",
     "authenticationRequired": "Anmeldung erforderlich. Bitte melde dich an, um fortzufahren.",
     "tokenRefreshFailed": "Sitzung konnte nicht erneuert werden. Bitte melde dich erneut an.",
     "showPassword": "Passwort anzeigen",
@@ -2769,6 +2770,39 @@
       "low": "Low Cost",
       "mid": "Mid Cost",
       "high": "High Cost"
+    }
+  },
+  "guest": {
+    "banner": {
+      "title": "Du nutzt Synaplan als Gast",
+      "subtitle": "Registriere dich für Erinnerungen, Chat-Verlauf und mehr",
+      "remaining": "{count} Nachrichten übrig",
+      "signUp": "Kostenlos registrieren"
+    },
+    "featureGate": {
+      "title": "Diese Funktion erfordert einen Account",
+      "subtitle": "Erstelle einen kostenlosen Account, um alle Funktionen freizuschalten",
+      "features": {
+        "files": "Lade Dokumente als Wissensbasis für deine KI hoch",
+        "memories": "Deine KI merkt sich wichtige Informationen für persönlichere Antworten",
+        "settings": "Konfiguriere KI-Modelle, Prompts und Integrationen",
+        "statistics": "Verfolge deine Nutzung, Kosten und Chat-Verläufe",
+        "general": "Zugang zu allen Premium-Funktionen und Tools"
+      },
+      "registerButton": "Kostenlosen Account erstellen",
+      "loginButton": "Bereits einen Account? Einloggen"
+    },
+    "limitModal": {
+      "title": "Du hast das Gast-Limit erreicht",
+      "subtitle": "Erstelle einen kostenlosen Account, um weiter mit KI zu chatten",
+      "features": {
+        "memories": "KI, die sich deine Präferenzen merkt",
+        "history": "Dauerhafter Chat-Verlauf",
+        "files": "Datei-Uploads und Dokumentanalyse",
+        "models": "Wähle aus mehreren KI-Modellen"
+      },
+      "registerButton": "Kostenlosen Account erstellen",
+      "loginButton": "Bereits einen Account? Einloggen"
     }
   }
 }
