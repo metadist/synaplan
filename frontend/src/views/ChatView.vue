@@ -993,7 +993,7 @@ const streamAIResponse = async (
 
       historyStore.finishStreamingMessage(messageId)
     } else if (isGuestMode.value) {
-      // Guest mode streaming (no auth token, uses guestSession param)
+      // Guest mode streaming — mirrors the authenticated handler for full feature parity
       const guestChatId = await guestStore.ensureChat()
       if (!guestChatId || !guestStore.sessionId) {
         console.error('Guest chat or session not available')
@@ -1039,15 +1039,18 @@ const streamAIResponse = async (
           } else if (data.status === 'preprocessing') {
             processingStatus.value = 'preprocessing'
             processingMetadata.value = { customMessage: data.message }
+          } else if (data.status === 'analyzing') {
+            processingStatus.value = 'analyzing'
+            processingMetadata.value = { customMessage: data.message }
           } else if (data.status === 'classifying') {
             processingStatus.value = 'classifying'
             processingMetadata.value = data.metadata || {}
             const message = historyStore.messages.find((m) => m.id === messageId)
             if (message && data.metadata) {
-              if (typeof data.metadata.provider === 'string')
-                message.provider = data.metadata.provider
-              if (typeof data.metadata.model_name === 'string')
-                message.modelLabel = data.metadata.model_name
+              const prov = data.metadata.provider
+              const mname = data.metadata.model_name
+              if (typeof prov === 'string') message.provider = prov
+              if (typeof mname === 'string') message.modelLabel = mname
             }
           } else if (data.status === 'classified') {
             const meta = data.metadata || {}
@@ -1065,22 +1068,59 @@ const streamAIResponse = async (
               customMessage: data.message || undefined,
               ...(data.metadata || {}),
             }
+            if (data.message && (data.message.includes('Datei') || data.message.includes('file'))) {
+              processingStatus.value = 'generating_file'
+            }
             const message = historyStore.messages.find((m) => m.id === messageId)
             if (message && data.metadata) {
-              if (typeof data.metadata.provider === 'string')
-                message.provider = data.metadata.provider
-              if (typeof data.metadata.model_name === 'string')
-                message.modelLabel = data.metadata.model_name
+              const prov = data.metadata.provider
+              const mname = data.metadata.model_name
+              if (typeof prov === 'string') message.provider = prov
+              if (typeof mname === 'string') message.modelLabel = mname
             }
+          } else if (data.status === 'processing') {
+            // Processing/routing — no UI update needed
           } else if (data.status === 'data' && data.chunk) {
             if (processingStatus.value) {
               processingStatus.value = ''
               processingMetadata.value = {}
             }
             fullContent += data.chunk
-            historyStore.updateStreamingMessage(messageId, fullContent)
-            scrollToBottom()
+
+            streamingDirty = true
+            if (streamingRafId === null) {
+              streamingRafId = requestAnimationFrame(() => {
+                streamingRafId = null
+                if (!streamingDirty) return
+                streamingDirty = false
+                renderStreamingContent(fullContent, messageId)
+              })
+            }
+          } else if (data.status === 'reasoning' && data.chunk) {
+            const message = historyStore.messages.find((m) => m.id === messageId)
+            if (message) {
+              let reasoningPart = message.parts.find((p) => p.type === 'thinking' && p.isStreaming)
+              if (!reasoningPart) {
+                reasoningPart = { type: 'thinking', content: '', isStreaming: true }
+                message.parts.unshift(reasoningPart)
+              }
+              reasoningPart.content += data.chunk
+            }
           } else if (data.status === 'complete') {
+            if (streamingRafId !== null) {
+              cancelAnimationFrame(streamingRafId)
+              streamingRafId = null
+            }
+            streamingDirty = false
+
+            if (data.truncated) {
+              fullContent += '\n\n---\n\n⚠️ *' + t('message.truncated') + '*'
+            }
+
+            if (fullContent) {
+              renderStreamingContent(fullContent, messageId)
+            }
+
             processingStatus.value = ''
             processingMetadata.value = {}
 
@@ -1112,6 +1152,10 @@ const streamAIResponse = async (
             historyStore.finishStreamingMessage(messageId)
             scrollToBottom()
           } else if (data.status === 'error') {
+            if (streamingRafId !== null) {
+              cancelAnimationFrame(streamingRafId)
+              streamingRafId = null
+            }
             processingStatus.value = ''
             processingMetadata.value = {}
             historyStore.finishStreamingMessage(messageId)
