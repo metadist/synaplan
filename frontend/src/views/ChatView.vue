@@ -414,15 +414,17 @@ onMounted(async () => {
         const loaded: Message[] = rawMessages.map((m) => {
           const role: 'user' | 'assistant' = m.direction === 'IN' ? 'user' : 'assistant'
           const parts = parseContentWithThinking(m.text || '', role)
+          const models = m.aiModels as Message['aiModels']
+          const chatModel = models?.chat
           return {
             id: `backend-${m.id}`,
             role,
             parts,
             timestamp: new Date(m.timestamp * 1000),
-            provider: m.aiModels?.chat?.provider ?? m.provider ?? undefined,
-            modelLabel: m.aiModels?.chat?.model ?? m.provider ?? (role === 'assistant' ? 'AI' : undefined),
+            provider: chatModel?.provider ?? m.provider ?? undefined,
+            modelLabel: chatModel?.model ?? m.provider ?? (role === 'assistant' ? 'AI' : undefined),
             backendMessageId: m.id,
-            aiModels: (m.aiModels as Message['aiModels']) ?? null,
+            aiModels: models ?? null,
             webSearch: (m.webSearch as Message['webSearch']) ?? null,
             searchResults: (m.searchResults as Message['searchResults']) ?? null,
           }
