@@ -554,6 +554,7 @@
     "typeMessage": "Nachricht eingeben...",
     "messageSent": "Nachricht gesendet",
     "sendFailed": "Nachricht konnte nicht gesendet werden. Bitte versuchen Sie es erneut.",
+    "continueFailed": "Antwort konnte nicht fortgesetzt werden. Bitte versuche es erneut.",
     "typing": "Schreibt",
     "attachFile": "Datei anhängen",
     "uploadingFiles": "Dateien werden hochgeladen...",
@@ -784,7 +785,8 @@
     "fileGenerated": "Ich habe die Datei '{filename}' für dich erstellt. Du kannst sie jetzt herunterladen.",
     "fileGenerationFailed": "Es gab ein Problem beim Erstellen der Datei. Bitte versuche es erneut.",
     "cancelledByUser": "⚠️ Vom Benutzer abgebrochen",
-    "truncated": "Diese Antwort wurde abgeschnitten, weil das Modell sein Token-Limit erreicht hat. Versuche eine gezieltere Frage oder bitte um die Antwort in Teilen."
+    "truncated": "Diese Antwort wurde abgeschnitten, weil das Modell sein Token-Limit erreicht hat.",
+    "continueButton": "Antwort fortsetzen"
   },
   "plugins": {
     "title": "Plugins",

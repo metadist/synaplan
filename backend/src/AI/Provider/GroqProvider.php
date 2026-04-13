@@ -258,7 +258,7 @@ class GroqProvider implements ChatProviderInterface, VisionProviderInterface, Sp
         }
 
         try {
-            // Groq supports llama-4-scout and llama-4-maverick vision models
+            // Groq supports llama-4-scout vision model
             $model = $options['model'] ?? 'meta-llama/llama-4-scout-17b-16e-instruct';
 
             // Build full path

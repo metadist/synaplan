@@ -11,7 +11,7 @@ use Symfony\Contracts\HttpClient\HttpClientInterface;
  * Extracts plain text from documents (PDF, DOCX, XLSX, PPTX, etc.)
  * using Apache Tika server.
  */
-final class TikaClient
+class TikaClient
 {
     private bool $healthCheckDone = false;
 

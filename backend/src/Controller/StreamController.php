@@ -235,6 +235,7 @@ class StreamController extends AbstractController
         $fileIds = $request->query->get('fileIds', ''); // NEW: comma-separated list or single ID
         $promptTopic = $request->query->get('promptTopic');
         $promptId = $request->query->get('promptId');
+        $continueMessageId = $request->query->get('continueMessageId');
 
         // Parse fileIds (can be comma-separated string or single ID)
         $fileIdArray = [];
@@ -242,7 +243,7 @@ class StreamController extends AbstractController
             $fileIdArray = array_map('intval', array_filter(explode(',', $fileIds)));
         }
 
-        if (empty($messageText) && empty($fileIdArray)) {
+        if (empty($messageText) && empty($fileIdArray) && !$continueMessageId) {
             return $this->json(['error' => 'Message or file attachment is required'], Response::HTTP_BAD_REQUEST);
         }
 
@@ -306,7 +307,7 @@ class StreamController extends AbstractController
         $response->headers->set('X-Accel-Buffering', 'no');
         $response->headers->set('Connection', 'keep-alive');
 
-        $response->setCallback(function () use ($user, $messageText, $trackId, $chatId, $includeReasoning, $webSearch, $modelId, $isAgain, $fileIdArray, $isWidgetMode, $fixedTaskPromptTopic, $widgetSession, $rateLimitError, $voiceReply) {
+        $response->setCallback(function () use ($user, $messageText, $trackId, $chatId, $includeReasoning, $webSearch, $modelId, $isAgain, $fileIdArray, $isWidgetMode, $fixedTaskPromptTopic, $widgetSession, $rateLimitError, $voiceReply, $continueMessageId) {
             // Disable output buffering
             while (ob_get_level()) {
                 ob_end_clean();
@@ -391,6 +392,22 @@ class StreamController extends AbstractController
                 // Rate limit was already checked before stream started
                 // (see check before StreamedResponse creation)
 
+                // Load original message for continuation (before creating IncomingMessage)
+                $originalOutgoingMessage = null;
+                if ($continueMessageId) {
+                    $originalOutgoingMessage = $this->em->getRepository(Message::class)->find((int) $continueMessageId);
+                    if (!$originalOutgoingMessage
+                        || $originalOutgoingMessage->getUserId() !== $user->getId()
+                        || $originalOutgoingMessage->getChatId() !== (int) $chatId
+                        || 'OUT' !== $originalOutgoingMessage->getDirection()
+                    ) {
+                        $this->sendSSE('error', ['error' => 'Original message not found']);
+
+                        return;
+                    }
+                    $messageText = 'Continue your previous response.';
+                }
+
                 // Create incoming message
                 $incomingMessage = new Message();
                 $incomingMessage->setUserId($user->getId());
@@ -401,11 +418,11 @@ class StreamController extends AbstractController
                 $incomingMessage->setDateTime(date('YmdHis'));
                 $incomingMessage->setMessageType('WEB');
                 $incomingMessage->setFile(0);
-                $incomingMessage->setTopic('CHAT');
-                $incomingMessage->setLanguage('en');
+                $incomingMessage->setTopic($continueMessageId ? 'CONTINUE' : 'CHAT');
+                $incomingMessage->setLanguage($originalOutgoingMessage ? $originalOutgoingMessage->getLanguage() : 'en');
                 $incomingMessage->setText($messageText);
                 $incomingMessage->setDirection('IN');
-                $incomingMessage->setStatus('processing');
+                $incomingMessage->setStatus($continueMessageId ? 'hidden' : 'processing');
 
                 $this->em->persist($incomingMessage);
                 $this->em->flush(); // Flush first so message has an ID
@@ -463,6 +480,11 @@ class StreamController extends AbstractController
                             }
                         }
 
+                        // Reload continuation entity after em->clear() so it stays managed
+                        if ($originalOutgoingMessage) {
+                            $originalOutgoingMessage = $this->em->getRepository(Message::class)->find((int) $continueMessageId);
+                        }
+
                         $this->logger->info('StreamController: Files attached and entity reloaded', [
                             'message_id' => $incomingMessage->getId(),
                             'files_count' => $incomingMessage->getFiles()->count(),
@@ -483,8 +505,9 @@ class StreamController extends AbstractController
 
                 $processingOptions = [
                     'reasoning' => $includeReasoning,
-                    'web_search' => $webSearch, // Use snake_case for consistency with backend
-                    'voice_reply' => $voiceReply, // Hint for ChatHandler to enforce concise answers
+                    'web_search' => $webSearch,
+                    'voice_reply' => $voiceReply,
+                    'is_continuation' => (bool) $continueMessageId,
                 ];
 
                 if ($isWidgetMode) {
@@ -866,110 +889,107 @@ class StreamController extends AbstractController
                     $this->logger->info('StreamController: Handler provided links');
                 }
 
-                // Create outgoing message
-                $outgoingMessage = new Message();
-                $outgoingMessage->setUserId($user->getId());
-                $outgoingMessage->setChat($chat);
-                $outgoingMessage->setTrackingId($trackId);
-                $outgoingMessage->setProviderIndex($incomingMessage->getProviderIndex()); // Use same channel as incoming
-                $outgoingMessage->setUnixTimestamp(time());
-                $outgoingMessage->setDateTime(date('YmdHis'));
-                $outgoingMessage->setMessageType('WEB');
-                $outgoingMessage->setFile($hasFile);
-                $outgoingMessage->setFilePath($filePath);
-                $outgoingMessage->setFileType($fileType);
-                $outgoingMessage->setTopic($classification['topic']);
-                $outgoingMessage->setLanguage($classification['language']);
-
-                // ✨ Parse JSON response if AI responded in JSON format (fallback for non-streamed parsing)
                 $finalText = $responseText;
                 $generatedFile = null;
 
-                // NEW: Check for file generation format first (for OfficeM maker)
-                // Extract JSON from markdown code blocks if present (```json ... ```)
-                $jsonContent = $responseText;
-                if (preg_match('/```(?:json)?\s*\n(.*?)\n```/s', $responseText, $matches)) {
-                    $jsonContent = trim($matches[1]);
-                    $this->logger->info('StreamController: Extracted JSON from markdown code block');
-                }
+                if ($originalOutgoingMessage) {
+                    // Continuation: append new text to the original message
+                    $existingText = $originalOutgoingMessage->getText();
+                    $originalOutgoingMessage->setText($existingText.$finalText);
+                    $this->em->flush();
 
-                if (str_starts_with(trim($jsonContent), '{')) {
-                    try {
-                        $jsonData = json_decode($jsonContent, true, 512, JSON_THROW_ON_ERROR);
+                    $outgoingMessage = $originalOutgoingMessage;
+                } else {
+                    // Normal flow: create new outgoing message
+                    $outgoingMessage = new Message();
+                    $outgoingMessage->setUserId($user->getId());
+                    $outgoingMessage->setChat($chat);
+                    $outgoingMessage->setTrackingId($trackId);
+                    $outgoingMessage->setProviderIndex($incomingMessage->getProviderIndex());
+                    $outgoingMessage->setUnixTimestamp(time());
+                    $outgoingMessage->setDateTime(date('YmdHis'));
+                    $outgoingMessage->setMessageType('WEB');
+                    $outgoingMessage->setFile($hasFile);
+                    $outgoingMessage->setFilePath($filePath);
+                    $outgoingMessage->setFileType($fileType);
+                    $outgoingMessage->setTopic($classification['topic']);
+                    $outgoingMessage->setLanguage($classification['language']);
 
-                        // Check for NEW file generation format
-                        if (isset($jsonData['BFILEPATH']) && isset($jsonData['BFILETEXT'])) {
-                            $this->logger->info('StreamController: Detected AI file generation', [
-                                'filename' => $jsonData['BFILEPATH'],
-                            ]);
+                    // Parse JSON response if AI responded in JSON format
+                    $jsonContent = $responseText;
+                    if (preg_match('/```(?:json)?\s*\n(.*?)\n```/s', $responseText, $matches)) {
+                        $jsonContent = trim($matches[1]);
+                        $this->logger->info('StreamController: Extracted JSON from markdown code block');
+                    }
 
-                            // Send generating status BEFORE creating the file
-                            $this->sendSSE('generating', [
-                                'message' => 'Datei wird generiert...',
-                                'metadata' => [
-                                    'customMessage' => 'Erstelle Datei: '.$jsonData['BFILEPATH'],
-                                ],
-                            ]);
-
-                            // Store the file
-                            $fileData = [
-                                'filename' => $jsonData['BFILEPATH'],
-                                'content' => $jsonData['BFILETEXT'],
-                                'extension' => strtolower(pathinfo($jsonData['BFILEPATH'], PATHINFO_EXTENSION)),
-                            ];
-
-                            $generatedFile = $this->storeGeneratedFileInStream($fileData, $incomingMessage);
-
-                            if ($generatedFile) {
-                                $finalText = "__FILE_GENERATED__:{$jsonData['BFILEPATH']}";
-                                $this->logger->info('StreamController: File generation successful', [
-                                    'file_id' => $generatedFile->getId(),
-                                    'filename' => $generatedFile->getFileName(),
-                                ]);
-                            } else {
-                                $finalText = '__FILE_GENERATION_FAILED__';
-                                $this->logger->error('StreamController: File generation failed');
-                            }
-                        }
-                        // Legacy BTEXT format
-                        elseif (isset($jsonData['BTEXT'])) {
-                            $finalText = $jsonData['BTEXT'];
-                        }
-                    } catch (\JsonException $e) {
-                        // Not valid JSON or extraction failed
-                        // ✨ FIX: AI sometimes generates invalid JSON with "BFILE": \n} instead of "BFILE": 0
-                        $cleanedJson = preg_replace('/"BFILE":\s*\n/', '"BFILE": 0'."\n", $jsonContent);
-                        $cleanedJson = preg_replace('/"BFILE":\s*\r\n/', '"BFILE": 0'."\r\n", $cleanedJson);
-                        $cleanedJson = preg_replace('/"BFILE":\s*}/', '"BFILE": 0}', $cleanedJson);
-
+                    if (str_starts_with(trim($jsonContent), '{')) {
                         try {
-                            $jsonData = json_decode($cleanedJson, true, 512, JSON_THROW_ON_ERROR);
+                            $jsonData = json_decode($jsonContent, true, 512, JSON_THROW_ON_ERROR);
 
-                            // Extract BTEXT as main content
-                            if (isset($jsonData['BTEXT'])) {
+                            if (isset($jsonData['BFILEPATH']) && isset($jsonData['BFILETEXT'])) {
+                                $this->logger->info('StreamController: Detected AI file generation', [
+                                    'filename' => $jsonData['BFILEPATH'],
+                                ]);
+
+                                $this->sendSSE('generating', [
+                                    'message' => 'Datei wird generiert...',
+                                    'metadata' => [
+                                        'customMessage' => 'Erstelle Datei: '.$jsonData['BFILEPATH'],
+                                    ],
+                                ]);
+
+                                $fileData = [
+                                    'filename' => $jsonData['BFILEPATH'],
+                                    'content' => $jsonData['BFILETEXT'],
+                                    'extension' => strtolower(pathinfo($jsonData['BFILEPATH'], PATHINFO_EXTENSION)),
+                                ];
+
+                                $generatedFile = $this->storeGeneratedFileInStream($fileData, $incomingMessage);
+
+                                if ($generatedFile) {
+                                    $finalText = "__FILE_GENERATED__:{$jsonData['BFILEPATH']}";
+                                    $this->logger->info('StreamController: File generation successful', [
+                                        'file_id' => $generatedFile->getId(),
+                                        'filename' => $generatedFile->getFileName(),
+                                    ]);
+                                } else {
+                                    $finalText = '__FILE_GENERATION_FAILED__';
+                                    $this->logger->error('StreamController: File generation failed');
+                                }
+                            } elseif (isset($jsonData['BTEXT'])) {
                                 $finalText = $jsonData['BTEXT'];
                             }
-                        } catch (\JsonException $e2) {
-                            // Not valid JSON or extraction failed, use content as-is
-                            $this->logger->warning('StreamController: Failed to parse JSON', [
-                                'error' => $e2->getMessage(),
-                                'content_preview' => substr($jsonContent, 0, 200),
-                            ]);
+                        } catch (\JsonException $e) {
+                            $cleanedJson = preg_replace('/"BFILE":\s*\n/', '"BFILE": 0'."\n", $jsonContent);
+                            $cleanedJson = preg_replace('/"BFILE":\s*\r\n/', '"BFILE": 0'."\r\n", $cleanedJson);
+                            $cleanedJson = preg_replace('/"BFILE":\s*}/', '"BFILE": 0}', $cleanedJson);
+
+                            try {
+                                $jsonData = json_decode($cleanedJson, true, 512, JSON_THROW_ON_ERROR);
+
+                                if (isset($jsonData['BTEXT'])) {
+                                    $finalText = $jsonData['BTEXT'];
+                                }
+                            } catch (\JsonException $e2) {
+                                $this->logger->warning('StreamController: Failed to parse JSON', [
+                                    'error' => $e2->getMessage(),
+                                    'content_preview' => substr($jsonContent, 0, 200),
+                                ]);
+                            }
                         }
                     }
-                }
 
-                $outgoingMessage->setText($finalText); // Pure TEXT, not JSON
-                $outgoingMessage->setDirection('OUT');
-                $outgoingMessage->setStatus('complete');
+                    $outgoingMessage->setText($finalText);
+                    $outgoingMessage->setDirection('OUT');
+                    $outgoingMessage->setStatus('complete');
 
-                $this->em->persist($outgoingMessage);
-                $this->em->flush(); // Flush to get message ID for metadata
-
-                // Attach generated file to message if present
-                if ($generatedFile) {
-                    $outgoingMessage->addFile($generatedFile);
+                    $this->em->persist($outgoingMessage);
                     $this->em->flush();
+
+                    if ($generatedFile) {
+                        $outgoingMessage->addFile($generatedFile);
+                        $this->em->flush();
+                    }
                 }
 
                 $this->logger->info('StreamController: Saving model metadata', [
@@ -1046,10 +1066,13 @@ class StreamController extends AbstractController
                     ]);
                 }
 
-                // Update incoming message
-                $incomingMessage->setTopic($classification['topic']);
-                $incomingMessage->setLanguage($classification['language']);
-                $incomingMessage->setStatus('complete');
+                if ($originalOutgoingMessage) {
+                    $incomingMessage->setStatus('complete');
+                } else {
+                    $incomingMessage->setTopic($classification['topic']);
+                    $incomingMessage->setLanguage($classification['language']);
+                    $incomingMessage->setStatus('complete');
+                }
 
                 $chat->updateTimestamp();
 

@@ -222,7 +222,6 @@ services:
     # Message Processing Services
     App\Service\Message\MessagePreProcessor:
         arguments:
-            $tikaBaseUrl: '%env(TIKA_BASE_URL)%'
             $uploadsDir: '%kernel.project_dir%/var/uploads'
     App\Service\Message\MessageSorter: ~
     App\Service\Message\MessageClassifier: ~
