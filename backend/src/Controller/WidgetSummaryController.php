@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Controller;
 
+use App\AI\Exception\ModelNotConfiguredException;
 use App\Entity\Prompt;
 use App\Entity\User;
 use App\Repository\PromptRepository;
@@ -248,6 +249,15 @@ class WidgetSummaryController extends AbstractController
                     'created' => $summary->getCreated(),
                 ],
             ]);
+        } catch (ModelNotConfiguredException $e) {
+            $this->logger->warning('Summary model configuration error', [
+                'widget_id' => $widgetId,
+                'error' => $e->getMessage(),
+            ]);
+
+            return $this->json([
+                'error' => 'model_not_configured',
+            ], Response::HTTP_SERVICE_UNAVAILABLE);
         } catch (\Exception $e) {
             $this->logger->error('Summary generation failed', [
                 'widget_id' => $widgetId,
@@ -350,6 +360,15 @@ class WidgetSummaryController extends AbstractController
                 'success' => true,
                 'summary' => $summary,
             ]);
+        } catch (ModelNotConfiguredException $e) {
+            $this->logger->warning('Summary model configuration error', [
+                'widget_id' => $widgetId,
+                'error' => $e->getMessage(),
+            ]);
+
+            return $this->json([
+                'error' => 'model_not_configured',
+            ], Response::HTTP_SERVICE_UNAVAILABLE);
         } catch (\Exception $e) {
             $this->logger->error('Custom summary generation failed', [
                 'widget_id' => $widgetId,
