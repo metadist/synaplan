@@ -777,6 +777,11 @@ final readonly class ChatHandler implements MessageHandlerInterface
             $systemPrompt .= "\n\n**IMPORTANT: The user's current message is in {$languageName}. You MUST respond in {$languageName}.**";
         }
 
+        // Continuation mode: instruct the model to continue from where it left off
+        if (!empty($options['is_continuation'])) {
+            $systemPrompt .= "\n\n**CONTINUATION: Your previous response was cut off by the token limit. Continue EXACTLY where you left off. Do NOT repeat, summarize, or re-introduce anything you already said. Start immediately from the point where the text was cut off.**";
+        }
+
         // Voice reply mode: enforce concise answers for TTS (spoken responses should be brief)
         if (!empty($options['voice_reply'])) {
             $systemPrompt .= "\n\n**VOICE MODE: Your response will be spoken aloud as audio. Keep your answer concise and conversational — maximum 4-5 sentences. Avoid markdown formatting, code blocks, bullet lists, and tables. Write in natural, flowing prose suitable for speech.**";

@@ -68,6 +68,7 @@ export interface Message {
   timestamp: Date
   isSuperseded?: boolean
   isStreaming?: boolean
+  truncated?: boolean
   provider?: string
   modelLabel?: string
   topic?: string // Topic from message classification (e.g., 'general', 'mediamaker')

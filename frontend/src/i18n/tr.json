@@ -572,6 +572,7 @@
     "fileUploadFailed": "Dosya yükleme başarısız. Lütfen tekrar deneyin.",
     "fileUploadDefaultMessage": "Lütfen ekli dosyayı inceleyin.",
     "sendFailed": "Üzgünüz, bir hatayla karşılaştık. Lütfen tekrar deneyin.",
+    "continueFailed": "Yanıt sürdürülemedi. Lütfen tekrar deneyin.",
     "defaultAssistantReply": "Mesajınız için teşekkürler! Hemen size döneceğim.",
     "previewWidget": "Widget Önizlemesi",
     "configuration": "Widget Yapılandırması",
@@ -876,7 +877,8 @@
     "fileGenerated": "Sizin için '{filename}' dosyasını oluşturdum. Şimdi indirebilirsiniz.",
     "fileGenerationFailed": "Dosya oluşturulurken bir sorun oluştu. Lütfen tekrar deneyin.",
     "cancelledByUser": "⚠️ Kullanıcı tarafından iptal edildi",
-    "truncated": "Bu yanıt, model token sınırına ulaştığı için kesildi. Daha odaklı bir soru sormayı veya yanıtı parçalar halinde istemeyi deneyin."
+    "truncated": "Bu yanıt, model token sınırına ulaştığı için kesildi.",
+    "continueButton": "Yanıtı sürdür"
   },
   "subscription": {
     "serviceNotAvailable": "Hizmet Kullanılamıyor",

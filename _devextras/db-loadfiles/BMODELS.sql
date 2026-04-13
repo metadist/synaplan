@@ -2,9 +2,9 @@
 -- Generated: Mar 25, 2026
 -- Source: ModelCatalog.php (code) merged with live DB dump (pricing)
 --
--- Removed obsolete models: 25 (dall-e-3), 30 (gpt-4.1), 57 (o1-preview),
---   59 (o3), 69 (Claude Opus 4.1), 72 (o3-pro), 80/81 (gpt-4o),
---   86 (dall-e-2), 89 (o1-mini), 93 (Claude Opus 4.1 Vision),
+-- Removed obsolete models: 25 (dall-e-3), 30 (gpt-4.1), 49 (Llama 4 Maverick),
+--   57 (o1-preview), 59 (o3), 69 (Claude Opus 4.1), 72 (o3-pro),
+--   80/81 (gpt-4o), 86 (dall-e-2), 89 (o1-mini), 93 (Claude Opus 4.1 Vision),
 --   121 (Claude Opus 4.5), 1/2/3/6 (old Ollama: deepseek-r1:14b/32b,
 --   Llama 3.3 70b, mistral)
 --
@@ -63,7 +63,6 @@ INSERT INTO `BMODELS` (`BID`, `BSERVICE`, `BNAME`, `BTAG`, `BSELECTABLE`, `BPROV
 (9, 'Groq', 'Llama 3.3 70b versatile', 'chat', 1, 'llama-3.3-70b-versatile', 0.59, 'per1M', 0.79, 'per1M', 9, 1, 0, 1, NULL, '{\"description\":\"Fast API service via groq\",\"params\":{\"model\":\"llama-3.3-70b-versatile\",\"reasoning_format\":\"hidden\",\"messages\":[]}}'),
 (17, 'Groq', 'Llama 4 Scout Vision', 'pic2text', 1, 'meta-llama/llama-4-scout-17b-16e-instruct', 0.11, 'per1M', 0.34, 'per1M', 8, 0, 0, 1, NULL, '{\"description\":\"Groq Llama 4 Scout vision model - 128K context, up to 5 images, supports tool use and JSON mode\",\"params\":{\"model\":\"meta-llama/llama-4-scout-17b-16e-instruct\",\"max_completion_tokens\":1024}}'),
 (21, 'Groq', 'whisper-large-v3', 'sound2text', 1, 'whisper-large-v3', 0.111, 'perhour', 0, '-', 8, 1, 0, 1, NULL, '{\"description\":\"Groq Whisper Large V3 - Best accuracy for multilingual transcription and translation. Supports 50+ languages.\",\"params\":{\"file\":\"*LOCALFILEPATH*\",\"model\":\"whisper-large-v3\",\"response_format\":\"verbose_json\"}}'),
-(49, 'Groq', 'Llama 4 Maverick', 'chat', 1, 'meta-llama/llama-4-maverick-17b-128e-instruct', 0.2, 'per1M', 0.6, 'per1M', 7, 0, 0, 1, NULL, '{\"description\":\"Groq Llama4 128e processing and text extraction\",\"params\":{\"model\":\"meta-llama/llama-4-maverick-17b-128e-instruct\"}}'),
 (50, 'Groq', 'whisper-large-v3-turbo', 'sound2text', 1, 'whisper-large-v3-turbo', 0.04, 'perhour', 0, '-', 7, 1, 0, 1, NULL, '{\"description\":\"Groq Whisper Large V3 Turbo - Fast and cost-effective transcription. 3x cheaper than V3. No translation support.\",\"params\":{\"file\":\"*LOCALFILEPATH*\",\"model\":\"whisper-large-v3-turbo\",\"response_format\":\"verbose_json\"}}'),
 (53, 'Groq', 'Qwen3 32B (Reasoning)', 'chat', 1, 'qwen/qwen3-32b', 0.29, 'per1M', 0.59, 'per1M', 9, 5, 0, 1, NULL, '{\"description\":\"Groq Qwen3 32B with Reasoning - 32B parameter reasoning model by Qwen. Shows thinking process with <think> tags. Very fast on Groq hardware.\",\"params\":{\"model\":\"qwen/qwen3-32b\"},\"features\":[\"reasoning\"],\"meta\":{\"context_window\":\"32768\",\"reasoning_format\":\"raw\"}}'),
 (75, 'Groq', 'gpt-oss-20b', 'chat', 1, 'openai/gpt-oss-20b', 0.075, 'per1M', 0.3, 'per1M', 9, 3, 0, 1, NULL, '{\"description\":\"Groq GPT-OSS 20B - fast, low-latency inference. Apache-2.0 open-weight model.\",\"params\":{\"model\":\"openai/gpt-oss-20b\"},\"meta\":{\"context_window\":\"131072\",\"license\":\"Apache-2.0\",\"quantization\":\"TruePoint Numerics\"}}'),

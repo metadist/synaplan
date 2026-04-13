@@ -189,6 +189,7 @@ export const chatApi = {
     fileIds?: number[]
     voiceReply?: boolean
     isAgain?: boolean
+    continueMessageId?: number
   }): () => void {
     const paramsObj: Record<string, string> = {
       message: opts.message,
@@ -202,6 +203,7 @@ export const chatApi = {
     if (opts.modelId) paramsObj.modelId = opts.modelId.toString()
     if (opts.voiceReply) paramsObj.voiceReply = '1'
     if (opts.isAgain) paramsObj.isAgain = '1'
+    if (opts.continueMessageId) paramsObj.continueMessageId = opts.continueMessageId.toString()
 
     if (opts.fileIds && opts.fileIds.length > 0) {
       paramsObj.fileIds = opts.fileIds.join(',')

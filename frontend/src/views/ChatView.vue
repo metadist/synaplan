@@ -106,11 +106,13 @@
               :status="message.status"
               :error-type="message.errorType"
               :error-data="message.errorData"
+              :truncated="message.truncated"
               @regenerate="handleRegenerate(message, $event)"
               @again="handleAgain"
               @retry="handleRetryMessage(message, $event)"
               @false-positive="openFalsePositiveModal"
               @click-memory="handleClickMemory"
+              @continue="handleContinueResponse(message)"
             />
           </template>
         </div>
@@ -814,6 +816,84 @@ function renderStreamingContent(content: string, msgId: string): void {
   }
 }
 
+const handleContinueResponse = async (message: Message) => {
+  if (!message.backendMessageId) return
+
+  const chatId = chatsStore.activeChatId
+  const userId = authStore.user?.id
+  if (!chatId || !userId) return
+
+  message.truncated = false
+  message.isStreaming = true
+
+  let fullContent = ''
+  for (const p of message.parts) {
+    if (p.type === 'thinking' && p.content) {
+      fullContent += `<think>${p.content}</think>\n`
+    } else if (p.type === 'text' && p.content) {
+      fullContent += p.content
+    }
+  }
+
+  const trackId = Date.now()
+  let streamingRafId: number | null = null
+  let streamingDirty = false
+
+  const stopStreaming = chatApi.streamMessage({
+    userId,
+    message: '',
+    chatId,
+    trackId,
+    continueMessageId: message.backendMessageId,
+    onUpdate: (data) => {
+      if (data.status === 'data' && data.chunk) {
+        fullContent += data.chunk
+
+        streamingDirty = true
+        if (streamingRafId === null) {
+          streamingRafId = requestAnimationFrame(() => {
+            streamingRafId = null
+            if (!streamingDirty) return
+            streamingDirty = false
+            renderStreamingContent(fullContent, message.id)
+          })
+        }
+      } else if (data.status === 'reasoning' && data.chunk) {
+        const msg = historyStore.messages.find((m) => m.id === message.id)
+        if (msg) {
+          let reasoningPart = msg.parts.find((p) => p.type === 'thinking' && p.isStreaming)
+          if (!reasoningPart) {
+            reasoningPart = { type: 'thinking', content: '', isStreaming: true }
+            msg.parts.push(reasoningPart)
+          }
+          reasoningPart.content += data.chunk
+        }
+      } else if (data.status === 'complete') {
+        if (streamingRafId !== null) {
+          cancelAnimationFrame(streamingRafId)
+          streamingRafId = null
+        }
+
+        renderStreamingContent(fullContent, message.id)
+
+        if (data.truncated) {
+          message.truncated = true
+        }
+
+        message.isStreaming = false
+        historyStore.finishStreamingMessage(message.id)
+      } else if (data.status === 'error') {
+        message.truncated = true
+        message.isStreaming = false
+        historyStore.finishStreamingMessage(message.id)
+        showErrorToast(t('chat.continueFailed'))
+      }
+    },
+  })
+
+  stopStreamingFn = stopStreaming
+}
+
 const handleSendMessage = async (
   content: string,
   options?: {
@@ -1193,6 +1273,8 @@ const streamAIResponse = async (
       }
 
       let spokenLength = 0
+      let audioText = ''
+      let insideThinkBlock = false
       let detectedLanguage = 'en'
 
       if (options?.voiceReply) {
@@ -1318,10 +1400,31 @@ const streamAIResponse = async (
 
             fullContent += data.chunk
 
-            // Stream audio if enabled (cheap — keep on every chunk)
             if (currentAudioStreamer) {
+              let audioChunk = data.chunk.replace(/<think>[\s\S]*?<\/think>/gi, '')
+
+              if (insideThinkBlock) {
+                const closeMatch = audioChunk.match(/<\/think>/i)
+                if (closeMatch && closeMatch.index !== undefined) {
+                  audioChunk = audioChunk.substring(closeMatch.index + closeMatch[0].length)
+                  insideThinkBlock = false
+                } else {
+                  audioChunk = ''
+                }
+              }
+
+              if (!insideThinkBlock) {
+                const openMatch = audioChunk.match(/<think>/i)
+                if (openMatch && openMatch.index !== undefined) {
+                  audioChunk = audioChunk.substring(0, openMatch.index)
+                  insideThinkBlock = true
+                }
+              }
+
+              audioText += audioChunk
+
               while (true) {
-                const currentUnprocessed = fullContent.slice(spokenLength)
+                const currentUnprocessed = audioText.slice(spokenLength)
                 const boundaryMatch = currentUnprocessed.match(/([.?!]+)(\s+|$)|(\n+)/)
 
                 if (!boundaryMatch || boundaryMatch.index === undefined) break
@@ -1536,18 +1639,12 @@ const streamAIResponse = async (
             }
             streamingDirty = false
 
-            // If the response was truncated by token limit, append a notice
-            if (data.truncated) {
-              fullContent += '\n\n---\n\n⚠️ *' + t('message.truncated') + '*'
-            }
-
             if (fullContent) {
               renderStreamingContent(fullContent, messageId)
             }
 
-            // Speak remaining text then signal no more sentences coming
             if (currentAudioStreamer) {
-              const remaining = fullContent.slice(spokenLength)
+              const remaining = audioText.slice(spokenLength)
               if (remaining.trim()) {
                 currentAudioStreamer.streamText(remaining, undefined, detectedLanguage)
               }
@@ -1561,6 +1658,10 @@ const streamAIResponse = async (
             // Update message metadata
             const message = historyStore.messages.find((m) => m.id === messageId)
             if (message) {
+              // Mark as truncated so the Continue button appears
+              if (data.truncated) {
+                message.truncated = true
+              }
               // Clean up any leftover tts_loading indicator (TTS may have failed silently)
               message.parts = message.parts.filter((p) => p.type !== 'tts_loading')
               // ✨ NEW: Handle generated file from backend
