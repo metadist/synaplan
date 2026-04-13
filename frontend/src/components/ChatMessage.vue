@@ -343,9 +343,7 @@
             </p>
             <button
               type="button"
-              class="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg transition-colors
-                     bg-[var(--color-accent)] text-white hover:opacity-90
-                     dark:bg-[var(--color-accent)] dark:text-white dark:hover:opacity-90"
+              class="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg transition-colors bg-[var(--color-accent)] text-white hover:opacity-90 dark:bg-[var(--color-accent)] dark:text-white dark:hover:opacity-90"
               data-testid="btn-continue-response"
               @click="emit('continue')"
             >
