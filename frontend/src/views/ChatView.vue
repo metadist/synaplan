@@ -138,7 +138,7 @@
       <ChatInput
         ref="chatInputRef"
         :is-streaming="isStreaming"
-        :is-guest-mode="guestStore.isGuestMode"
+        :is-guest-mode="isGuestMode"
         @send="handleSendMessage"
         @stop="handleStopStreaming"
         @guest-feature-gate="handleGuestFeatureGate"

@@ -194,7 +194,7 @@
                 v-model="email"
                 type="email"
                 required
-                class="auth-input pl-10"
+                class="auth-input pl-10 surface-chip txt-primary placeholder:txt-secondary hover:ring-1 hover:ring-black/[0.06] dark:hover:ring-white/[0.06]"
                 :class="{ 'ring-2 ring-red-500/60': emailError }"
                 :placeholder="$t('auth.email')"
                 data-testid="input-email"
@@ -216,7 +216,7 @@
                 v-model="password"
                 :type="showPassword ? 'text' : 'password'"
                 required
-                class="auth-input pl-10 pr-10"
+                class="auth-input pl-10 pr-10 surface-chip txt-primary placeholder:txt-secondary hover:ring-1 hover:ring-black/[0.06] dark:hover:ring-white/[0.06]"
                 :placeholder="$t('auth.password')"
                 data-testid="input-password"
               />
@@ -410,11 +410,18 @@ const handleSocialLogin = (provider: string) => {
 
 <style scoped>
 .auth-input {
-  @apply w-full py-3 rounded-xl text-sm border-0;
-  @apply surface-chip txt-primary placeholder:txt-secondary;
-  @apply focus:outline-none focus:ring-2 focus:ring-brand/40;
-  @apply transition-all duration-200;
-  @apply hover:ring-1 hover:ring-black/[0.06] dark:hover:ring-white/[0.06];
+  width: 100%;
+  padding-top: 0.75rem;
+  padding-bottom: 0.75rem;
+  border-radius: 0.75rem;
+  font-size: 0.875rem;
+  line-height: 1.25rem;
+  border: 0;
+  transition: all 0.2s;
+}
+.auth-input:focus {
+  outline: none;
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--brand) 40%, transparent);
 }
 
 @keyframes authCardEnter {
