@@ -9,8 +9,11 @@
           <span
             v-for="i in maxMessages"
             :key="i"
-            class="w-1.5 h-1.5 rounded-full transition-colors duration-300"
-            :class="i <= messagesUsed ? 'bg-brand' : 'bg-gray-300 dark:bg-gray-600'"
+            class="w-1.5 h-1.5 rounded-full transition-all duration-500"
+            :class="
+              i <= messagesUsed ? 'bg-brand scale-110' : 'bg-gray-300 dark:bg-gray-600 scale-100'
+            "
+            :style="{ transitionDelay: `${(i - 1) * 60}ms` }"
           />
         </div>
 
@@ -23,9 +26,10 @@
         <router-link
           to="/register"
           data-testid="guest-banner-signup"
-          class="text-xs font-semibold text-brand hover:underline whitespace-nowrap"
+          class="group relative text-xs font-semibold text-white whitespace-nowrap px-2.5 py-0.5 rounded-full bg-brand overflow-hidden transition-shadow duration-300 hover:shadow-md hover:shadow-brand/30"
         >
-          {{ $t('guest.banner.signUp') }}
+          <span class="relative z-10">{{ $t('guest.banner.signUp') }}</span>
+          <span class="cta-shimmer" />
         </router-link>
 
         <button
@@ -66,5 +70,25 @@ const messagesUsed = computed(() => props.maxMessages - props.remaining)
 .slide-down-leave-to {
   opacity: 0;
   transform: translateY(-8px);
+}
+
+@keyframes shimmer {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(100%);
+  }
+}
+.cta-shimmer {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(255, 255, 255, 0.25) 50%,
+    transparent 100%
+  );
+  animation: shimmer 2.5s ease-in-out infinite;
 }
 </style>
