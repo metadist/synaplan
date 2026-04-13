@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Controller;
 
+use App\AI\Exception\ModelNotConfiguredException;
 use App\Entity\Prompt;
 use App\Entity\User;
 use App\Repository\PromptRepository;
@@ -248,7 +249,7 @@ class WidgetSummaryController extends AbstractController
                     'created' => $summary->getCreated(),
                 ],
             ]);
-        } catch (\RuntimeException $e) {
+        } catch (ModelNotConfiguredException $e) {
             $this->logger->warning('Summary model configuration error', [
                 'widget_id' => $widgetId,
                 'error' => $e->getMessage(),
@@ -359,7 +360,7 @@ class WidgetSummaryController extends AbstractController
                 'success' => true,
                 'summary' => $summary,
             ]);
-        } catch (\RuntimeException $e) {
+        } catch (ModelNotConfiguredException $e) {
             $this->logger->warning('Summary model configuration error', [
                 'widget_id' => $widgetId,
                 'error' => $e->getMessage(),

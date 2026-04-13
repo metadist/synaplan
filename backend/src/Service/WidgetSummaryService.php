@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Service;
 
+use App\AI\Exception\ModelNotConfiguredException;
 use App\AI\Service\AiFacade;
 use App\Entity\Prompt;
 use App\Entity\Widget;
@@ -81,7 +82,7 @@ final readonly class WidgetSummaryService
      *
      * @return array{provider: string, model: string, model_id: int}
      *
-     * @throws \RuntimeException when no usable AI model can be found
+     * @throws ModelNotConfiguredException when no usable AI model can be found
      */
     private function resolveAiModelConfig(int $ownerId, ?int $preferredModelId = null): array
     {
@@ -105,7 +106,7 @@ final readonly class WidgetSummaryService
             }
         }
 
-        throw new \RuntimeException('No AI model configured for chat summary. Please configure a default CHAT model in settings.');
+        throw new ModelNotConfiguredException('No AI model configured for chat summary. Please configure a default CHAT model in settings.');
     }
 
     /**

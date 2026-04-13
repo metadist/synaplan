@@ -334,7 +334,6 @@
   "summary": {
     "title": "Resumen de IA",
     "generate": "Generar",
-    "generating": "Analizando...",
     "generateFirst": "Crear primer resumen",
     "generateSuccess": "Análisis completado exitosamente",
     "generateAI": "Generar análisis de IA",

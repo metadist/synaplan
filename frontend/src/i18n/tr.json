@@ -334,7 +334,6 @@
   "summary": {
     "title": "AI Özeti",
     "generate": "Oluştur",
-    "generating": "Analiz ediliyor...",
     "generateFirst": "İlk özeti oluştur",
     "generateSuccess": "Analiz başarıyla tamamlandı",
     "generateAI": "AI analizi oluştur",

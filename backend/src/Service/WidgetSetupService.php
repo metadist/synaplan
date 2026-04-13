@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Service;
 
+use App\AI\Exception\ModelNotConfiguredException;
 use App\AI\Service\AiFacade;
 use App\DTO\UserMemoryDTO;
 use App\Entity\Prompt;
@@ -52,7 +53,7 @@ final readonly class WidgetSetupService
      *
      * @return array{provider: string, model: string, model_id: int}
      *
-     * @throws \RuntimeException when no usable AI model can be found
+     * @throws ModelNotConfiguredException when no usable AI model can be found
      */
     private function resolveAiModelConfig(User $user, ?int $preferredModelId = null): array
     {
@@ -76,7 +77,7 @@ final readonly class WidgetSetupService
             }
         }
 
-        throw new \RuntimeException('No AI model configured for widget setup. Please configure a default CHAT model in settings.');
+        throw new ModelNotConfiguredException('No AI model configured for widget setup. Please configure a default CHAT model in settings.');
     }
 
     /**

@@ -2,6 +2,7 @@
 
 namespace App\Controller;
 
+use App\AI\Exception\ModelNotConfiguredException;
 use App\Entity\Prompt;
 use App\Entity\User;
 use App\Entity\Widget;
@@ -631,7 +632,7 @@ class WidgetController extends AbstractController
                 'text' => $result['text'],
                 'progress' => $result['progress'],
             ]);
-        } catch (\RuntimeException $e) {
+        } catch (ModelNotConfiguredException $e) {
             $this->logger->warning('Widget setup configuration error', [
                 'widget_id' => $widgetId,
                 'error' => $e->getMessage(),
