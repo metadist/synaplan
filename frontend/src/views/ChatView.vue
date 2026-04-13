@@ -778,6 +778,7 @@ const handleContinueResponse = async (message: Message) => {
         message.isStreaming = false
         historyStore.finishStreamingMessage(message.id)
       } else if (data.status === 'error') {
+        message.truncated = true
         message.isStreaming = false
         historyStore.finishStreamingMessage(message.id)
       }

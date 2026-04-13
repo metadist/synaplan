@@ -396,7 +396,11 @@ class StreamController extends AbstractController
                 $originalOutgoingMessage = null;
                 if ($continueMessageId) {
                     $originalOutgoingMessage = $this->em->getRepository(Message::class)->find((int) $continueMessageId);
-                    if (!$originalOutgoingMessage || $originalOutgoingMessage->getUserId() !== $user->getId()) {
+                    if (!$originalOutgoingMessage
+                        || $originalOutgoingMessage->getUserId() !== $user->getId()
+                        || $originalOutgoingMessage->getChatId() !== (int) $chatId
+                        || 'OUT' !== $originalOutgoingMessage->getDirection()
+                    ) {
                         $this->sendSSE('error', ['error' => 'Original message not found']);
 
                         return;
@@ -415,7 +419,7 @@ class StreamController extends AbstractController
                 $incomingMessage->setMessageType('WEB');
                 $incomingMessage->setFile(0);
                 $incomingMessage->setTopic($continueMessageId ? 'CONTINUE' : 'CHAT');
-                $incomingMessage->setLanguage('en');
+                $incomingMessage->setLanguage($originalOutgoingMessage ? $originalOutgoingMessage->getLanguage() : 'en');
                 $incomingMessage->setText($messageText);
                 $incomingMessage->setDirection('IN');
                 $incomingMessage->setStatus($continueMessageId ? 'hidden' : 'processing');
@@ -1057,10 +1061,12 @@ class StreamController extends AbstractController
                     ]);
                 }
 
-                // Update incoming message
-                $incomingMessage->setTopic($classification['topic']);
-                $incomingMessage->setLanguage($classification['language']);
-                $incomingMessage->setStatus('complete');
+                // Update incoming message (preserve topic/status for continuation messages)
+                if (!$originalOutgoingMessage) {
+                    $incomingMessage->setTopic($classification['topic']);
+                    $incomingMessage->setLanguage($classification['language']);
+                    $incomingMessage->setStatus('complete');
+                }
 
                 $chat->updateTimestamp();
 

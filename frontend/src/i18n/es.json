@@ -876,7 +876,8 @@
     "fileGenerated": "He creado el archivo '{filename}' para ti. Ahora puedes descargarlo.",
     "fileGenerationFailed": "Hubo un problema al crear el archivo. Por favor intenta de nuevo.",
     "cancelledByUser": "⚠️ Cancelado por el usuario",
-    "truncated": "Esta respuesta fue cortada porque el modelo alcanzó su límite de tokens. Intenta hacer una pregunta más específica o pide la respuesta en partes."
+    "truncated": "Esta respuesta fue cortada porque el modelo alcanzó su límite de tokens.",
+    "continueButton": "Continuar respuesta"
   },
   "subscription": {
     "serviceNotAvailable": "Servicio No Disponible",
