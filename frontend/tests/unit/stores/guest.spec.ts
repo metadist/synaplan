@@ -215,6 +215,18 @@ describe('Guest Store', () => {
       expect(store.initFailed).toBe(true)
       expect(store.sessionId).toBeNull()
     })
+
+    it('should set rateLimited on 429 response', async () => {
+      global.fetch = vi.fn().mockResolvedValue({ ok: false, status: 429 })
+
+      const store = useGuestStore()
+      await store.initSession()
+
+      expect(store.initialized).toBe(true)
+      expect(store.initFailed).toBe(true)
+      expect(store.rateLimited).toBe(true)
+      expect(store.sessionId).toBeNull()
+    })
   })
 
   describe('ensureChat()', () => {
@@ -261,7 +273,31 @@ describe('Guest Store', () => {
       expect(result).toBeNull()
     })
 
-    it('should return null on API failure', async () => {
+    it('should return null on API failure and set initFailed', async () => {
+      global.fetch = vi.fn().mockRejectedValue(new Error('Network error'))
+
+      const store = useGuestStore()
+      store.sessionId = 'abc'
+
+      const result = await store.ensureChat()
+
+      expect(result).toBeNull()
+      expect(store.initFailed).toBe(true)
+    })
+
+    it('should set initFailed on 404 (expired session)', async () => {
+      global.fetch = vi.fn().mockResolvedValue({ ok: false, status: 404 })
+
+      const store = useGuestStore()
+      store.sessionId = 'expired-session'
+
+      const result = await store.ensureChat()
+
+      expect(result).toBeNull()
+      expect(store.initFailed).toBe(true)
+    })
+
+    it('should return null on non-404 failure', async () => {
       global.fetch = vi.fn().mockResolvedValue({ ok: false, status: 500 })
 
       const store = useGuestStore()
@@ -270,6 +306,7 @@ describe('Guest Store', () => {
       const result = await store.ensureChat()
 
       expect(result).toBeNull()
+      expect(store.initFailed).toBe(true)
     })
   })
 })

@@ -45,6 +45,7 @@ class GuestSessionServiceTest extends TestCase
         $request->headers->set('CF-Connecting-IP', '203.0.113.42');
         $request->headers->set('CF-IPCountry', 'DE');
 
+        $this->sessionRepository->method('countActiveSessionsByIp')->willReturn(0);
         $this->em->expects($this->once())->method('persist');
         $this->em->expects($this->once())->method('flush');
 
@@ -61,6 +62,7 @@ class GuestSessionServiceTest extends TestCase
     {
         $request = Request::create('/', 'GET', [], [], [], ['REMOTE_ADDR' => '127.0.0.1']);
 
+        $this->sessionRepository->method('countActiveSessionsByIp')->willReturn(0);
         $this->em->expects($this->once())->method('persist');
         $this->em->expects($this->once())->method('flush');
 
@@ -76,12 +78,53 @@ class GuestSessionServiceTest extends TestCase
         $request->headers->set('CF-Connecting-IP', '1.2.3.4');
         $request->headers->set('CF-IPCountry', 'T1');
 
+        $this->sessionRepository->method('countActiveSessionsByIp')->willReturn(0);
         $this->em->expects($this->once())->method('persist');
         $this->em->expects($this->once())->method('flush');
 
         $session = $this->service->createSession('tor-uuid', $request);
 
         $this->assertNull($session->getCountry());
+    }
+
+    public function testCreateSessionThrowsOverflowWhenIpLimitExceeded(): void
+    {
+        $request = new Request();
+        $request->headers->set('CF-Connecting-IP', '1.2.3.4');
+
+        $this->sessionRepository->expects($this->once())
+            ->method('countActiveSessionsByIp')
+            ->with('1.2.3.4')
+            ->willReturn(5);
+
+        $this->logger->expects($this->once())
+            ->method('warning')
+            ->with(
+                $this->stringContains('IP rate limit exceeded'),
+                $this->callback(fn (array $ctx) => '1.2.3.4' === $ctx['ip'] && 5 === $ctx['active_sessions'])
+            );
+
+        $this->expectException(\OverflowException::class);
+
+        $this->service->createSession('rate-limited-uuid', $request);
+    }
+
+    public function testCreateSessionAllowsWhenUnderIpLimit(): void
+    {
+        $request = new Request();
+        $request->headers->set('CF-Connecting-IP', '1.2.3.4');
+
+        $this->sessionRepository->expects($this->once())
+            ->method('countActiveSessionsByIp')
+            ->with('1.2.3.4')
+            ->willReturn(4);
+
+        $this->em->expects($this->once())->method('persist');
+        $this->em->expects($this->once())->method('flush');
+
+        $session = $this->service->createSession('allowed-uuid', $request);
+
+        $this->assertSame('allowed-uuid', $session->getSessionId());
     }
 
     public function testGetSessionDelegatesToRepository(): void
