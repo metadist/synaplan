@@ -77,12 +77,11 @@
         @click="handleNavClick(item)"
       >
         <component :is="item.icon" class="w-6 h-6" />
-        <span
+        <Icon
           v-if="item.requiresAuth && isGuestMode"
-          class="absolute -top-0.5 -right-0.5 w-3.5 h-3.5 rounded-full bg-gray-400 dark:bg-gray-500 flex items-center justify-center"
-        >
-          <Icon icon="mdi:lock" class="w-2 h-2 text-white" />
-        </span>
+          icon="mdi:lock-outline"
+          class="absolute -top-0.5 -right-0.5 w-3.5 h-3.5 text-amber-500"
+        />
       </button>
     </nav>
 

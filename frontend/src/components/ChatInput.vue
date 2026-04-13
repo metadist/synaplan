@@ -109,7 +109,7 @@
               <PlusIcon class="w-5 h-5" />
               <Icon
                 v-if="isGuestMode"
-                icon="mdi:lock"
+                icon="mdi:lock-outline"
                 class="w-2.5 h-2.5 absolute -top-0.5 -right-0.5 text-amber-500"
               />
             </template>
@@ -179,7 +179,7 @@
           >
             <Icon icon="mdi:tune-vertical" class="w-4 h-4 md:w-5 md:h-5" />
             <span class="text-xs md:text-sm font-medium hidden sm:inline">Model</span>
-            <Icon icon="mdi:lock" class="w-3 h-3 text-amber-500" />
+            <Icon icon="mdi:lock-outline" class="w-3 h-3 text-amber-500" />
           </button>
         </template>
         <ModelDropdown v-else v-model="selectedModelId" class="flex-shrink-0" />
@@ -193,7 +193,7 @@
           >
             <Icon icon="mdi:toolbox-outline" class="w-4 h-4 md:w-5 md:h-5" />
             <span class="text-xs md:text-sm font-medium hidden sm:inline">Tools</span>
-            <Icon icon="mdi:lock" class="w-3 h-3 text-amber-500" />
+            <Icon icon="mdi:lock-outline" class="w-3 h-3 text-amber-500" />
           </button>
         </template>
         <ToolsDropdown
@@ -220,7 +220,7 @@
           <span class="text-xs md:text-sm font-medium hidden sm:inline">{{
             $t('chatInput.enhance')
           }}</span>
-          <Icon v-if="isGuestMode" icon="mdi:lock" class="w-3 h-3 text-amber-500" />
+          <Icon v-if="isGuestMode" icon="mdi:lock-outline" class="w-3 h-3 text-amber-500" />
         </button>
         <button
           type="button"
