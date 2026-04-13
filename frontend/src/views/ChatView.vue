@@ -60,7 +60,53 @@
           </div>
 
           <div
-            v-if="historyStore.messages.length === 0 && !historyStore.isLoadingMessages"
+            v-if="guestStore.initFailed && !authStore.isAuthenticated"
+            class="flex items-center justify-center h-full px-6"
+            data-testid="state-guest-error"
+          >
+            <div class="text-center max-w-md">
+              <div
+                class="w-12 h-12 mx-auto mb-4 rounded-full bg-red-100 dark:bg-red-900/30 flex items-center justify-center"
+              >
+                <svg
+                  class="w-6 h-6 text-red-500"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                >
+                  <path
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    stroke-width="2"
+                    d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4.5c-.77-.833-2.694-.833-3.464 0L3.34 16.5c-.77.833.192 2.5 1.732 2.5z"
+                  />
+                </svg>
+              </div>
+              <h2 class="text-xl font-semibold txt-primary mb-2">
+                {{ $t('guest.errorTitle') }}
+              </h2>
+              <p class="txt-secondary mb-4">
+                {{ $t('guest.errorDescription') }}
+              </p>
+              <div class="flex gap-3 justify-center">
+                <button
+                  class="px-4 py-2 rounded-lg btn-brand text-sm font-medium"
+                  @click="guestStore.retryInit()"
+                >
+                  {{ $t('guest.retry') }}
+                </button>
+                <router-link
+                  :to="{ name: 'register' }"
+                  class="px-4 py-2 rounded-lg border border-[var(--border)] txt-secondary text-sm font-medium hover:bg-[var(--bg-secondary)] transition-colors"
+                >
+                  {{ $t('guest.createAccount') }}
+                </router-link>
+              </div>
+            </div>
+          </div>
+
+          <div
+            v-else-if="historyStore.messages.length === 0 && !historyStore.isLoadingMessages"
             class="flex items-center justify-center h-full px-6"
             data-testid="state-empty"
           >

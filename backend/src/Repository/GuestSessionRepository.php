@@ -32,6 +32,18 @@ class GuestSessionRepository extends ServiceEntityRepository
         return $this->findOneBy(['sessionId' => $sessionId]);
     }
 
+    public function countActiveSessionsByIp(string $ip): int
+    {
+        return (int) $this->createQueryBuilder('gs')
+            ->select('COUNT(gs.id)')
+            ->where('gs.ipAddress = :ip')
+            ->andWhere('gs.expires > :now')
+            ->setParameter('ip', $ip)
+            ->setParameter('now', time())
+            ->getQuery()
+            ->getSingleScalarResult();
+    }
+
     public function deleteExpiredSessions(): int
     {
         return $this->createQueryBuilder('gs')

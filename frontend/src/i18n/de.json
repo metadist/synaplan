@@ -2812,6 +2812,10 @@
       },
       "registerButton": "Kostenlosen Account erstellen",
       "loginButton": "Bereits einen Account? Einloggen"
-    }
+    },
+    "errorTitle": "Testmodus derzeit nicht verfügbar",
+    "errorDescription": "Deine Gastsitzung konnte nicht gestartet werden. Bitte versuche es erneut oder erstelle einen kostenlosen Account.",
+    "retry": "Erneut versuchen",
+    "createAccount": "Account erstellen"
   }
 }

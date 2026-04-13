@@ -12,6 +12,7 @@ export const useGuestStore = defineStore('guest', () => {
   const limitReached = ref(false)
   const initialized = ref(false)
   const initFailed = ref(false)
+  const rateLimited = ref(false)
   const bannerDismissed = ref(false)
 
   const remainingMessages = computed(() => Math.max(0, maxMessages.value - messageCount.value))
@@ -49,6 +50,13 @@ export const useGuestStore = defineStore('guest', () => {
         body: JSON.stringify({ sessionId: storedId }),
       })
 
+      if (response.status === 429) {
+        rateLimited.value = true
+        initFailed.value = true
+        initialized.value = true
+        return
+      }
+
       if (!response.ok) throw new Error('Failed to init guest session')
 
       const data = await response.json()
@@ -84,6 +92,11 @@ export const useGuestStore = defineStore('guest', () => {
         body: JSON.stringify({ sessionId: sessionId.value }),
       })
 
+      if (response.status === 404) {
+        initFailed.value = true
+        return null
+      }
+
       if (!response.ok) throw new Error('Failed to create guest chat')
 
       const data = await response.json()
@@ -91,6 +104,7 @@ export const useGuestStore = defineStore('guest', () => {
       return data.chatId
     } catch (err) {
       console.error('Guest chat creation failed:', err)
+      initFailed.value = true
       return null
     }
   }
@@ -145,6 +159,7 @@ export const useGuestStore = defineStore('guest', () => {
     limitReached.value = false
     initialized.value = false
     initFailed.value = false
+    rateLimited.value = false
     bannerDismissed.value = false
     try {
       localStorage.removeItem(GUEST_STORAGE_KEY)
@@ -161,6 +176,7 @@ export const useGuestStore = defineStore('guest', () => {
     limitReached,
     initialized,
     initFailed,
+    rateLimited,
     bannerDismissed,
     remainingMessages,
     isGuestMode,

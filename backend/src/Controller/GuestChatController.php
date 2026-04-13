@@ -37,8 +37,9 @@ class GuestChatController extends AbstractController
     /**
      * Create or retrieve a guest session.
      *
-     * If a valid sessionId is provided and the session exists, returns its current state.
-     * Otherwise creates a new session.
+     * If a valid, non-expired sessionId is provided, returns its current state.
+     * Otherwise creates a new session with a server-generated UUID.
+     * The client must never generate session IDs — they are always issued by the server.
      */
     #[Route('/session', name: 'session_create', methods: ['POST'])]
     #[OA\Post(
@@ -50,7 +51,7 @@ class GuestChatController extends AbstractController
         required: false,
         content: new OA\JsonContent(
             properties: [
-                new OA\Property(property: 'sessionId', type: 'string', description: 'Client-generated UUID (optional)', example: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890'),
+                new OA\Property(property: 'sessionId', type: 'string', description: 'Previously server-issued session ID for reconnection (optional)', example: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890'),
             ]
         )
     )]
@@ -86,7 +87,13 @@ class GuestChatController extends AbstractController
 
         $sessionId = Uuid::v4()->toRfc4122();
 
-        $session = $this->guestSessionService->createSession($sessionId, $request);
+        try {
+            $session = $this->guestSessionService->createSession($sessionId, $request);
+        } catch (\OverflowException) {
+            return $this->json([
+                'error' => 'Too many guest sessions. Please try again later or register for an account.',
+            ], Response::HTTP_TOO_MANY_REQUESTS);
+        }
 
         return $this->json([
             'sessionId' => $session->getSessionId(),
@@ -193,32 +200,49 @@ class GuestChatController extends AbstractController
             return $this->json(['error' => 'Guest mode unavailable'], Response::HTTP_INTERNAL_SERVER_ERROR);
         }
 
-        // Re-check after potential concurrent request
-        $this->em->refresh($session);
-        if ($session->getChatId()) {
-            return $this->json(['chatId' => $session->getChatId()]);
+        // Pessimistic write lock to prevent duplicate chat creation from concurrent requests
+        $this->em->getConnection()->beginTransaction();
+        try {
+            $lockedSession = $this->em->find(
+                \App\Entity\GuestSession::class,
+                $session->getId(),
+                \Doctrine\DBAL\LockMode::PESSIMISTIC_WRITE
+            );
+
+            if (!$lockedSession || $lockedSession->getChatId()) {
+                $this->em->getConnection()->commit();
+
+                return $this->json(['chatId' => $lockedSession?->getChatId()]);
+            }
+
+            $now = new \DateTimeImmutable();
+            $chat = new Chat();
+            $chat->setUserId($user->getId());
+            $chat->setTitle('Guest Chat • '.substr($sessionId, 0, 8));
+            $chat->setSource('guest');
+            $chat->setCreatedAt($now);
+            $chat->setUpdatedAt($now);
+
+            $this->em->persist($chat);
+            $this->em->flush();
+
+            $chatId = $chat->getId();
+            if (!$chatId) {
+                $this->em->getConnection()->rollBack();
+
+                return $this->json(['error' => 'Failed to create chat'], Response::HTTP_INTERNAL_SERVER_ERROR);
+            }
+
+            $this->guestSessionService->attachChat($lockedSession, $chatId);
+            $this->em->flush();
+            $this->em->getConnection()->commit();
+
+            return $this->json(['chatId' => $chatId]);
+        } catch (\Throwable $e) {
+            $this->em->getConnection()->rollBack();
+
+            throw $e;
         }
-
-        $now = new \DateTimeImmutable();
-        $chat = new Chat();
-        $chat->setUserId($user->getId());
-        $chat->setTitle('Guest Chat • '.substr($sessionId, 0, 8));
-        $chat->setSource('guest');
-        $chat->setCreatedAt($now);
-        $chat->setUpdatedAt($now);
-
-        $this->em->persist($chat);
-        $this->em->flush();
-
-        $chatId = $chat->getId();
-        if (!$chatId) {
-            return $this->json(['error' => 'Failed to create chat'], Response::HTTP_INTERNAL_SERVER_ERROR);
-        }
-
-        $this->guestSessionService->attachChat($session, $chatId);
-        $this->em->flush();
-
-        return $this->json(['chatId' => $chatId]);
     }
 
     /**

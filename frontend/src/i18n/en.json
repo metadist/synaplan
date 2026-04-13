@@ -2883,6 +2883,10 @@
       },
       "registerButton": "Create free account",
       "loginButton": "Already have an account? Log in"
-    }
+    },
+    "errorTitle": "Trial currently unavailable",
+    "errorDescription": "We couldn't start your guest session. Please try again or create a free account.",
+    "retry": "Try again",
+    "createAccount": "Create account"
   }
 }

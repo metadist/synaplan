@@ -16,6 +16,7 @@ final class GuestSessionService
 {
     public const DEFAULT_MAX_MESSAGES = 5;
     public const SESSION_EXPIRY_HOURS = 24;
+    public const MAX_SESSIONS_PER_IP = 5;
 
     private ?User $cachedProcessingUser = null;
 
@@ -27,6 +28,14 @@ final class GuestSessionService
     ) {
     }
 
+    public function resolveClientIp(Request $request): ?string
+    {
+        return $request->headers->get('CF-Connecting-IP') ?? $request->getClientIp();
+    }
+
+    /**
+     * @throws \OverflowException when the IP has exceeded its session limit
+     */
     public function createSession(string $sessionId, Request $request): GuestSession
     {
         $existing = $this->sessionRepository->findBySessionId($sessionId);
@@ -35,11 +44,24 @@ final class GuestSessionService
             $this->em->flush();
         }
 
+        $ip = $this->resolveClientIp($request);
+
+        if ($ip) {
+            $activeCount = $this->sessionRepository->countActiveSessionsByIp($ip);
+            if ($activeCount >= self::MAX_SESSIONS_PER_IP) {
+                $this->logger->warning('Guest session IP rate limit exceeded', [
+                    'ip' => $ip,
+                    'active_sessions' => $activeCount,
+                ]);
+
+                throw new \OverflowException('Too many guest sessions from this IP');
+            }
+        }
+
         $session = new GuestSession();
         $session->setSessionId($sessionId);
         $session->setMaxMessages(self::DEFAULT_MAX_MESSAGES);
 
-        $ip = $request->headers->get('CF-Connecting-IP') ?? $request->getClientIp();
         $session->setIpAddress($ip);
 
         $country = $request->headers->get('CF-IPCountry');
