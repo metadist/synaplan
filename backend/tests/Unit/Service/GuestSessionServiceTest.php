@@ -10,6 +10,7 @@ use App\Repository\GuestSessionRepository;
 use App\Repository\UserRepository;
 use App\Service\GuestSessionService;
 use Doctrine\ORM\EntityManagerInterface;
+use Doctrine\ORM\QueryBuilder;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
@@ -164,10 +165,7 @@ class GuestSessionServiceTest extends TestCase
         $reflection->setAccessible(true);
         $reflection->setValue($adminUser, 1);
 
-        $this->userRepository->expects($this->once())
-            ->method('findOneBy')
-            ->with(['userLevel' => 'ADMIN'])
-            ->willReturn($adminUser);
+        $this->mockUserQueryBuilder($adminUser);
 
         $result = $this->service->getProcessingUser();
 
@@ -176,9 +174,7 @@ class GuestSessionServiceTest extends TestCase
 
     public function testGetProcessingUserReturnsNullAndLogsWhenNoAdmin(): void
     {
-        $this->userRepository->expects($this->once())
-            ->method('findOneBy')
-            ->willReturn(null);
+        $this->mockUserQueryBuilder(null);
 
         $this->logger->expects($this->once())
             ->method('error')
@@ -189,25 +185,55 @@ class GuestSessionServiceTest extends TestCase
         $this->assertNull($result);
     }
 
-    public function testAttachChatSetsIdAndFlushes(): void
+    public function testGetProcessingUserCachesResult(): void
+    {
+        $adminUser = new User();
+
+        $this->mockUserQueryBuilder($adminUser);
+
+        $first = $this->service->getProcessingUser();
+        $second = $this->service->getProcessingUser();
+
+        $this->assertSame($first, $second);
+    }
+
+    public function testAttachChatSetsId(): void
     {
         $session = new GuestSession();
         $this->assertNull($session->getChatId());
-
-        $this->em->expects($this->once())->method('flush');
 
         $this->service->attachChat($session, 42);
 
         $this->assertSame(42, $session->getChatId());
     }
 
-    public function testAttachChatSkipsFlushWhenAlreadyAttached(): void
+    public function testAttachChatSkipsWhenAlreadyAttached(): void
     {
         $session = new GuestSession();
         $session->setChatId(42);
 
-        $this->em->expects($this->never())->method('flush');
-
         $this->service->attachChat($session, 42);
+
+        $this->assertSame(42, $session->getChatId());
+    }
+
+    private function mockUserQueryBuilder(?User $result): void
+    {
+        $query = $this->getMockBuilder(\Doctrine\ORM\Query::class)
+            ->disableOriginalConstructor()
+            ->getMock();
+        $query->method('getOneOrNullResult')->willReturn($result);
+
+        $qb = $this->createMock(QueryBuilder::class);
+        $qb->method('where')->willReturnSelf();
+        $qb->method('setParameter')->willReturnSelf();
+        $qb->method('orderBy')->willReturnSelf();
+        $qb->method('setMaxResults')->willReturnSelf();
+        $qb->method('getQuery')->willReturn($query);
+
+        $this->userRepository->expects($this->once())
+            ->method('createQueryBuilder')
+            ->with('u')
+            ->willReturn($qb);
     }
 }

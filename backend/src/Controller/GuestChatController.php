@@ -265,7 +265,46 @@ class GuestChatController extends AbstractController
             ->getQuery()
             ->getResult();
 
-        $messageData = array_map(function ($m) {
+        // Build in-memory index of IN messages for preceding-message lookup
+        $inMessages = [];
+        foreach ($messages as $m) {
+            if ('IN' === $m->getDirection()) {
+                $inMessages[] = $m;
+            }
+        }
+
+        // Collect IN messages that precede OUT messages with web search data
+        $inMessagesNeedingResults = [];
+        $outToInMap = []; // outMessageId => inMessage
+        foreach ($messages as $m) {
+            if ('OUT' !== $m->getDirection()) {
+                continue;
+            }
+            $searchQuery = $m->getMeta('web_search_query');
+            $searchResultsCount = $m->getMeta('web_search_results_count');
+            if (!$searchQuery && !$searchResultsCount) {
+                continue;
+            }
+            // Find the closest preceding IN message in-memory
+            $preceding = null;
+            foreach ($inMessages as $inMsg) {
+                if ($inMsg->getUnixTimestamp() < $m->getUnixTimestamp()) {
+                    $preceding = $inMsg;
+                } else {
+                    break;
+                }
+            }
+            if ($preceding) {
+                $outToInMap[$m->getId()] = $preceding;
+                $inMessagesNeedingResults[$preceding->getId()] = $preceding;
+            }
+        }
+
+        // Batch-load all needed search results in a single query
+        $searchResultsByMessageId = $this->searchResultRepository
+            ->findByMessages(array_values($inMessagesNeedingResults));
+
+        $messageData = array_map(function ($m) use ($outToInMap, $searchResultsByMessageId) {
             $aiModels = [];
             $webSearchData = null;
             $searchResultsData = [];
@@ -301,21 +340,10 @@ class GuestChatController extends AbstractController
                         'resultsCount' => $searchResultsCount ? (int) $searchResultsCount : 0,
                     ];
 
-                    $incomingMessage = $this->messageRepository->createQueryBuilder('prev')
-                        ->where('prev.chatId = :chatId')
-                        ->andWhere('prev.direction = :direction')
-                        ->andWhere('prev.unixTimestamp < :timestamp')
-                        ->setParameter('chatId', $m->getChatId())
-                        ->setParameter('direction', 'IN')
-                        ->setParameter('timestamp', $m->getUnixTimestamp())
-                        ->orderBy('prev.unixTimestamp', 'DESC')
-                        ->setMaxResults(1)
-                        ->getQuery()
-                        ->getOneOrNullResult();
-
+                    $incomingMessage = $outToInMap[$m->getId()] ?? null;
                     if ($incomingMessage) {
-                        $searchResults = $this->searchResultRepository->findByMessage($incomingMessage);
-                        foreach ($searchResults as $sr) {
+                        $results = $searchResultsByMessageId[$incomingMessage->getId()] ?? [];
+                        foreach ($results as $sr) {
                             $searchResultsData[] = [
                                 'title' => $sr->getTitle(),
                                 'url' => $sr->getUrl(),

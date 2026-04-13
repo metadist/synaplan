@@ -427,6 +427,16 @@ class StreamController extends AbstractController
                     return;
                 }
 
+                // Guest mode: verify the chat belongs to THIS guest session
+                if ($isGuestMode && $guestSession) {
+                    $sessionChatId = $guestSession->getChatId();
+                    if (null !== $sessionChatId && $sessionChatId !== (int) $chatId) {
+                        $this->sendSSE('error', ['error' => 'Chat does not belong to this guest session']);
+
+                        return;
+                    }
+                }
+
                 // Rate limit was already checked before stream started
                 // (see check before StreamedResponse creation)
 
