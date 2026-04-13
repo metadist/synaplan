@@ -1376,6 +1376,8 @@
     "teamRequired": "Team Plan Required",
     "teamRequiredDescription": "AI-powered conversation summaries and insights are available for Team and Business plans. Upgrade to unlock this feature.",
     "upgrade": "Upgrade Plan",
+    "modelNotConfigured": "No AI model configured. Please select a model under Settings → AI Prompts → Summary Prompt.",
+    "generateError": "Failed to generate analysis",
     "existingFound": "Found existing analysis",
     "existingFoundInfo": "An analysis for this exact date range already exists. You're viewing the previously generated summary.",
     "regenerateAnyway": "Regenerate anyway"
@@ -1622,6 +1624,7 @@
       "saveError": "Failed to save configuration",
       "sendError": "Failed to send message",
       "startError": "Failed to start interview",
+      "modelNotConfigured": "No AI model configured. Please select a model under Settings → AI Prompts → AI Setup Interview.",
       "editHintTitle": "Want to fine-tune your assistant?",
       "editHintDescription": "After saving, you can edit the AI assistant configuration anytime in the widget's Advanced Settings under the 'AI Assistant' tab."
     },

@@ -408,6 +408,8 @@
     "teamRequired": "Team-Plan erforderlich",
     "teamRequiredDescription": "KI-gestützte Gesprächszusammenfassungen und Einblicke sind für Team- und Business-Pläne verfügbar. Upgraden Sie, um diese Funktion freizuschalten.",
     "upgrade": "Plan upgraden",
+    "modelNotConfigured": "Kein KI-Modell konfiguriert. Bitte wählen Sie unter Einstellungen → KI-Prompts → Zusammenfassungs-Prompt ein Modell aus.",
+    "generateError": "Analyse konnte nicht generiert werden",
     "existingFound": "Bestehende Analyse gefunden",
     "existingFoundInfo": "Eine Analyse für genau diesen Zeitraum existiert bereits. Sie sehen die zuvor erstellte Zusammenfassung.",
     "regenerateAnyway": "Trotzdem neu generieren",
@@ -1655,6 +1657,7 @@
       "saveError": "Konfiguration konnte nicht gespeichert werden",
       "sendError": "Nachricht konnte nicht gesendet werden",
       "startError": "Interview konnte nicht gestartet werden",
+      "modelNotConfigured": "Kein KI-Modell konfiguriert. Bitte wählen Sie unter Einstellungen → KI-Prompts → KI-Setup-Interview ein Modell aus.",
       "editHintTitle": "Möchten Sie Ihren Assistenten feinabstimmen?",
       "editHintDescription": "Nach dem Speichern können Sie die KI-Assistenten-Konfiguration jederzeit in den erweiterten Einstellungen unter dem Tab 'KI-Assistent' bearbeiten."
     },

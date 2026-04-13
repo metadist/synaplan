@@ -631,6 +631,15 @@ class WidgetController extends AbstractController
                 'text' => $result['text'],
                 'progress' => $result['progress'],
             ]);
+        } catch (\RuntimeException $e) {
+            $this->logger->warning('Widget setup configuration error', [
+                'widget_id' => $widgetId,
+                'error' => $e->getMessage(),
+            ]);
+
+            return $this->json([
+                'error' => 'model_not_configured',
+            ], Response::HTTP_SERVICE_UNAVAILABLE);
         } catch (\Exception $e) {
             $this->logger->error('Widget setup chat failed', [
                 'widget_id' => $widgetId,

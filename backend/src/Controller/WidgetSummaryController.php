@@ -248,6 +248,15 @@ class WidgetSummaryController extends AbstractController
                     'created' => $summary->getCreated(),
                 ],
             ]);
+        } catch (\RuntimeException $e) {
+            $this->logger->warning('Summary model configuration error', [
+                'widget_id' => $widgetId,
+                'error' => $e->getMessage(),
+            ]);
+
+            return $this->json([
+                'error' => 'model_not_configured',
+            ], Response::HTTP_SERVICE_UNAVAILABLE);
         } catch (\Exception $e) {
             $this->logger->error('Summary generation failed', [
                 'widget_id' => $widgetId,
@@ -350,6 +359,15 @@ class WidgetSummaryController extends AbstractController
                 'success' => true,
                 'summary' => $summary,
             ]);
+        } catch (\RuntimeException $e) {
+            $this->logger->warning('Summary model configuration error', [
+                'widget_id' => $widgetId,
+                'error' => $e->getMessage(),
+            ]);
+
+            return $this->json([
+                'error' => 'model_not_configured',
+            ], Response::HTTP_SERVICE_UNAVAILABLE);
         } catch (\Exception $e) {
             $this->logger->error('Custom summary generation failed', [
                 'widget_id' => $widgetId,
