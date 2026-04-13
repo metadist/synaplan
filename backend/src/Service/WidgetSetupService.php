@@ -213,10 +213,8 @@ final readonly class WidgetSetupService
         }
 
         $isStart = self::FLOW_BUILDER_START_MARKER === trim($text);
-        if (!$isStart) {
-            $enrichedText = $this->enrichWithWebsiteContent($text);
-            $messages[] = ['role' => 'user', 'content' => $enrichedText];
-        }
+        $inputText = $isStart ? 'Start' : $this->enrichWithWebsiteContent($text);
+        $messages[] = ['role' => 'user', 'content' => $inputText];
 
         $aiOptions = ['temperature' => 0.7];
         if ($provider) {
@@ -235,7 +233,7 @@ final readonly class WidgetSetupService
             'model_id' => $modelId,
             'usage' => $response['usage'] ?? [],
             'response_text' => $aiResponse,
-            'input_text' => $isStart ? '' : $enrichedText,
+            'input_text' => $inputText,
         ]);
 
         $this->logger->info('Widget flow-builder message processed', [
@@ -565,13 +563,10 @@ PROMPT;
             ];
         }
 
-        // Add new user message (unless it's the start marker)
-        if (self::START_MARKER !== $newUserMessage) {
-            $messages[] = [
-                'role' => 'user',
-                'content' => $newUserMessage,
-            ];
-        }
+        $messages[] = [
+            'role' => 'user',
+            'content' => $this->isStartMarker($newUserMessage) ? 'Start' : $newUserMessage,
+        ];
 
         return $messages;
     }

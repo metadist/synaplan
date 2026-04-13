@@ -281,6 +281,10 @@ class OpenAIProvider implements ChatProviderInterface, EmbeddingProviderInterfac
         $systemMessage = $this->extractSystemMessage($messages);
         $input = $this->convertToResponsesFormat($this->removeSystemMessages($messages));
 
+        if (empty($input)) {
+            $input = [['role' => 'user', 'content' => [['type' => 'input_text', 'text' => 'Start']]]];
+        }
+
         $requestOptions = [
             'model' => $model,
             'input' => $input,
