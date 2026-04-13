@@ -283,7 +283,7 @@
               <!-- Tool Badge (replaces Web Search Badge for better consistency) -->
               <div
                 v-if="tool"
-                class="flex items-center gap-2 px-3 py-2 rounded-lg bg-[var(--brand-alpha-light)] text-[var(--brand)] text-sm"
+                class="flex items-center gap-2 px-3 py-2 rounded-lg bg-[var(--brand-alpha-light)] text-[var(--brand)] dark:text-[var(--brand-light)] text-sm"
               >
                 <Icon :icon="tool.icon" class="w-4 h-4 flex-shrink-0" />
                 <span class="font-medium">{{ tool.label }}</span>
@@ -292,7 +292,7 @@
               <!-- Web Search Badge (fallback for legacy messages without tool metadata) -->
               <div
                 v-else-if="webSearch"
-                class="flex items-center gap-2 px-3 py-2 rounded-lg bg-[var(--brand-alpha-light)] text-[var(--brand)] text-sm"
+                class="flex items-center gap-2 px-3 py-2 rounded-lg bg-[var(--brand-alpha-light)] text-[var(--brand)] dark:text-[var(--brand-light)] text-sm"
               >
                 <Icon icon="mdi:web" class="w-4 h-4 flex-shrink-0" />
                 <span class="font-medium">Web Search</span>
