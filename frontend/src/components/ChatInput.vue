@@ -224,20 +224,22 @@
         </button>
         <button
           type="button"
-          :disabled="!supportsReasoning"
+          :disabled="!isGuestMode && !supportsReasoning"
           :class="[
             'pill flex-shrink-0',
-            thinkingEnabled && 'pill--active',
-            !supportsReasoning && 'opacity-50 cursor-not-allowed',
+            !isGuestMode && thinkingEnabled && 'pill--active',
+            isGuestMode && 'opacity-50',
+            !isGuestMode && !supportsReasoning && 'opacity-50 cursor-not-allowed',
           ]"
           :aria-label="$t('chatInput.thinking')"
           data-testid="btn-chat-thinking"
-          @click="toggleThinking"
+          @click="isGuestMode ? emit('guestFeatureGate', 'models') : toggleThinking()"
         >
           <Icon icon="mdi:brain" class="w-4 h-4 md:w-5 md:h-5" />
           <span class="text-xs md:text-sm font-medium hidden sm:inline">{{
             $t('chatInput.thinking')
           }}</span>
+          <Icon v-if="isGuestMode" icon="mdi:lock-outline" class="w-3 h-3 text-amber-500" />
         </button>
         <button
           type="button"
