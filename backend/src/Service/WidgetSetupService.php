@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Service;
 
+use App\AI\Exception\ModelNotConfiguredException;
 use App\AI\Service\AiFacade;
 use App\DTO\UserMemoryDTO;
 use App\Entity\Prompt;
@@ -46,6 +47,40 @@ final readonly class WidgetSetupService
     }
 
     /**
+     * Resolve AI model configuration with multi-level fallback.
+     *
+     * Priority: preferredModelId → DEFAULT_SETUP_MODEL_ID → user default CHAT → global default CHAT.
+     *
+     * @return array{provider: string, model: string, model_id: int}
+     *
+     * @throws ModelNotConfiguredException when no usable AI model can be found
+     */
+    private function resolveAiModelConfig(User $user, ?int $preferredModelId = null): array
+    {
+        $candidates = array_filter([
+            $preferredModelId,
+            self::DEFAULT_SETUP_MODEL_ID,
+            $this->modelConfigService->getDefaultModel('CHAT', $user->getId()),
+            $this->modelConfigService->getDefaultModel('CHAT', 0),
+        ]);
+
+        foreach ($candidates as $modelId) {
+            if ($modelId <= 0) {
+                continue;
+            }
+
+            $provider = $this->modelConfigService->getProviderForModel($modelId);
+            $modelName = $this->modelConfigService->getModelName($modelId);
+
+            if ($provider && $modelName) {
+                return ['provider' => $provider, 'model' => $modelName, 'model_id' => $modelId];
+            }
+        }
+
+        throw new ModelNotConfiguredException('No AI model configured for widget setup. Please configure a default CHAT model in settings.');
+    }
+
+    /**
      * Parse the model ID stored in a setup prompt's shortDescription field.
      */
     public static function parseModelId(Prompt $prompt): int
@@ -72,23 +107,13 @@ final readonly class WidgetSetupService
 
         $setupConfig = $this->resolveSetupConfig($widget);
         $systemPrompt = $setupConfig['prompt'];
-        $modelId = $setupConfig['modelId'];
 
-        $provider = $this->modelConfigService->getProviderForModel($modelId);
-        $modelName = $this->modelConfigService->getModelName($modelId);
-
-        if (!$provider || !$modelName) {
-            $fallbackId = $this->modelConfigService->getDefaultModel('CHAT', $user->getId());
-            if ($fallbackId && $fallbackId > 0) {
-                $modelId = $fallbackId;
-                $provider = $this->modelConfigService->getProviderForModel($fallbackId);
-                $modelName = $this->modelConfigService->getModelName($fallbackId);
-            }
-        }
+        $modelConfig = $this->resolveAiModelConfig($user, $setupConfig['modelId']);
+        $modelId = $modelConfig['model_id'];
 
         $this->logger->info('Widget setup using AI model', [
-            'provider' => $provider,
-            'model' => $modelName,
+            'provider' => $modelConfig['provider'],
+            'model' => $modelConfig['model'],
             'language' => $language,
         ]);
 
@@ -114,18 +139,12 @@ final readonly class WidgetSetupService
         $enrichedText = $this->enrichWithWebsiteContent($text);
         $messages = $this->buildConversationMessagesFromHistory($history, $systemPromptWithLanguage, $enrichedText);
 
-        // Build AI options
         $aiOptions = [
             'temperature' => 0.7,
+            'provider' => $modelConfig['provider'],
+            'model' => $modelConfig['model'],
         ];
-        if ($provider) {
-            $aiOptions['provider'] = $provider;
-        }
-        if ($modelName) {
-            $aiOptions['model'] = $modelName;
-        }
 
-        // Call AI
         $response = $this->aiFacade->chat(
             $messages,
             $user->getId(),
@@ -177,19 +196,8 @@ final readonly class WidgetSetupService
     private function sendFlowBuilderMessage(Widget $widget, User $user, string $text, array $history, string $language, ?array $currentFlow = null): array
     {
         $systemPrompt = self::getFlowBuilderPromptText($widget->getName());
-        $modelId = self::DEFAULT_SETUP_MODEL_ID;
-
-        $provider = $this->modelConfigService->getProviderForModel($modelId);
-        $modelName = $this->modelConfigService->getModelName($modelId);
-
-        if (!$provider || !$modelName) {
-            $fallbackId = $this->modelConfigService->getDefaultModel('CHAT', $user->getId());
-            if ($fallbackId && $fallbackId > 0) {
-                $modelId = $fallbackId;
-                $provider = $this->modelConfigService->getProviderForModel($fallbackId);
-                $modelName = $this->modelConfigService->getModelName($fallbackId);
-            }
-        }
+        $modelConfig = $this->resolveAiModelConfig($user);
+        $modelId = $modelConfig['model_id'];
 
         $languageNames = [
             'en' => 'English', 'de' => 'German', 'fr' => 'French',
@@ -216,13 +224,11 @@ final readonly class WidgetSetupService
         $inputText = $isStart ? 'Start' : $this->enrichWithWebsiteContent($text);
         $messages[] = ['role' => 'user', 'content' => $inputText];
 
-        $aiOptions = ['temperature' => 0.7];
-        if ($provider) {
-            $aiOptions['provider'] = $provider;
-        }
-        if ($modelName) {
-            $aiOptions['model'] = $modelName;
-        }
+        $aiOptions = [
+            'temperature' => 0.7,
+            'provider' => $modelConfig['provider'],
+            'model' => $modelConfig['model'],
+        ];
 
         $response = $this->aiFacade->chat($messages, $user->getId(), $aiOptions);
         $aiResponse = $response['content'] ?? '';
@@ -286,26 +292,13 @@ PROMPT;
 
         $userMessage = "User memories:\n".implode("\n", $memoryLines);
 
-        $modelId = self::DEFAULT_SETUP_MODEL_ID;
-        $provider = $this->modelConfigService->getProviderForModel($modelId);
-        $modelName = $this->modelConfigService->getModelName($modelId);
+        $modelConfig = $this->resolveAiModelConfig($user);
 
-        if (!$provider || !$modelName) {
-            $fallbackId = $this->modelConfigService->getDefaultModel('CHAT', $user->getId());
-            if ($fallbackId && $fallbackId > 0) {
-                $modelId = $fallbackId;
-                $provider = $this->modelConfigService->getProviderForModel($fallbackId);
-                $modelName = $this->modelConfigService->getModelName($fallbackId);
-            }
-        }
-
-        $aiOptions = ['temperature' => 0.1];
-        if ($provider) {
-            $aiOptions['provider'] = $provider;
-        }
-        if ($modelName) {
-            $aiOptions['model'] = $modelName;
-        }
+        $aiOptions = [
+            'temperature' => 0.1,
+            'provider' => $modelConfig['provider'],
+            'model' => $modelConfig['model'],
+        ];
 
         try {
             $response = $this->aiFacade->chat([
@@ -318,7 +311,7 @@ PROMPT;
             $this->rateLimitService->recordUsage($user, 'WIDGET_SETUP', [
                 'provider' => $response['provider'] ?? 'unknown',
                 'model' => $response['model'] ?? 'unknown',
-                'model_id' => $modelId,
+                'model_id' => $modelConfig['model_id'],
                 'usage' => $response['usage'] ?? [],
                 'response_text' => $content,
                 'input_text' => $userMessage,
@@ -479,14 +472,12 @@ Generate a JSON response with EXACTLY this format (no markdown, just JSON):
 IMPORTANT: Respond ONLY with valid JSON, no explanations.
 PROMPT;
 
-                $aiOptions = ['temperature' => 0.3];
-                $metaModelId = self::DEFAULT_SETUP_MODEL_ID;
-                $metaProvider = $this->modelConfigService->getProviderForModel($metaModelId);
-                $metaModel = $this->modelConfigService->getModelName($metaModelId);
-                if ($metaProvider && $metaModel) {
-                    $aiOptions['provider'] = $metaProvider;
-                    $aiOptions['model'] = $metaModel;
-                }
+                $metaModelConfig = $this->resolveAiModelConfig($user);
+                $aiOptions = [
+                    'temperature' => 0.3,
+                    'provider' => $metaModelConfig['provider'],
+                    'model' => $metaModelConfig['model'],
+                ];
 
                 $response = $this->aiFacade->chat(
                     [['role' => 'user', 'content' => $metadataPrompt]],
@@ -499,7 +490,7 @@ PROMPT;
                 $this->rateLimitService->recordUsage($user, 'WIDGET_SETUP', [
                     'provider' => $response['provider'] ?? 'unknown',
                     'model' => $response['model'] ?? 'unknown',
-                    'model_id' => $metaModelId,
+                    'model_id' => $metaModelConfig['model_id'],
                     'usage' => $response['usage'] ?? [],
                     'response_text' => $content,
                     'input_text' => $metadataPrompt,
