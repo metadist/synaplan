@@ -1310,16 +1310,6 @@ class StreamController extends AbstractController
                     }
                 }
 
-                $this->sendSSE('complete', $completeData);
-
-                usleep(100000);
-
-                $this->logger->info('Streamed message processed', [
-                    'user_id' => $user->getId(),
-                    'message_id' => $outgoingMessage->getId(),
-                    'topic' => $classification['topic'],
-                ]);
-
                 // Widget Mode: Increment session message count
                 if ($isWidgetMode && $widgetSession) {
                     $this->widgetSessionService->incrementMessageCount($widgetSession);
@@ -1329,7 +1319,8 @@ class StreamController extends AbstractController
                     ]);
                 }
 
-                // Guest Mode: Increment count and send remaining messages
+                // Guest Mode: Increment count and send remaining BEFORE complete
+                // (complete closes the EventSource on the client)
                 if ($isGuestMode && $guestSession) {
                     $this->guestSessionService->attachChat($guestSession, (int) $chatId);
                     $this->guestSessionService->incrementCount($guestSession);
@@ -1339,6 +1330,16 @@ class StreamController extends AbstractController
                         'limitReached' => $guestSession->isLimitReached(),
                     ]);
                 }
+
+                $this->sendSSE('complete', $completeData);
+
+                usleep(100000);
+
+                $this->logger->info('Streamed message processed', [
+                    'user_id' => $user->getId(),
+                    'message_id' => $outgoingMessage->getId(),
+                    'topic' => $classification['topic'],
+                ]);
             } catch (\App\AI\Exception\ProviderException $e) {
                 $this->logger->error('AI Provider failed', [
                     'user_id' => $user->getId(),
