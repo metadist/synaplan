@@ -333,6 +333,27 @@
             :memories="memories"
           />
 
+          <!-- Continue Button (truncated response) -->
+          <div
+            v-if="role === 'assistant' && truncated && !isStreaming"
+            class="mt-3 pt-3 border-t border-amber-300/30 dark:border-amber-500/20"
+          >
+            <p class="text-sm txt-muted mb-2">
+              {{ $t('message.truncated') }}
+            </p>
+            <button
+              type="button"
+              class="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg transition-colors
+                     bg-[var(--color-accent)] text-white hover:opacity-90
+                     dark:bg-[var(--color-accent)] dark:text-white dark:hover:opacity-90"
+              data-testid="btn-continue-response"
+              @click="emit('continue')"
+            >
+              <Icon icon="mdi:arrow-down-bold" class="w-4 h-4" />
+              {{ $t('message.continueButton') }}
+            </button>
+          </div>
+
           <!-- Used Memories (AFTER content, before search results) -->
           <MessageMemories
             v-if="role === 'assistant' && memories"
@@ -842,6 +863,7 @@ interface Props {
   } | null // Tool metadata (e.g., web search, file generation)
   memoryIds?: number[] | null // IDs of memories used (resolved from memoriesStore)
   feedbackIds?: number[] | null // IDs of feedbacks used (resolved from feedbackStore)
+  truncated?: boolean
   // Status for failed/pending messages
   status?: 'sent' | 'failed' | 'rate_limited'
   errorType?: 'rate_limit' | 'connection' | 'unknown'
@@ -1158,6 +1180,7 @@ const emit = defineEmits<{
   retry: [messageContent: string]
   falsePositive: [text: string, messageId?: number]
   'click-memory': [memory: UserMemory]
+  continue: []
 }>()
 
 const router = useRouter()

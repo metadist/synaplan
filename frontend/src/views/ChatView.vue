@@ -106,11 +106,13 @@
               :status="message.status"
               :error-type="message.errorType"
               :error-data="message.errorData"
+              :truncated="message.truncated"
               @regenerate="handleRegenerate(message, $event)"
               @again="handleAgain"
               @retry="handleRetryMessage(message, $event)"
               @false-positive="openFalsePositiveModal"
               @click-memory="handleClickMemory"
+              @continue="handleContinueResponse(message)"
             />
           </template>
         </div>
@@ -723,6 +725,68 @@ function renderStreamingContent(content: string, msgId: string): void {
   }
 }
 
+const handleContinueResponse = async (message: Message) => {
+  if (!message.backendMessageId) return
+
+  const chatId = chatsStore.activeChatId
+  const userId = authStore.user?.id
+  if (!chatId || !userId) return
+
+  message.truncated = false
+  message.isStreaming = true
+
+  let fullContent = message.parts
+    .filter((p) => p.type === 'text')
+    .map((p) => p.content ?? '')
+    .join('\n')
+
+  const trackId = Date.now()
+  let streamingRafId: number | null = null
+  let streamingDirty = false
+
+  const stopStreaming = chatApi.streamMessage({
+    userId,
+    message: '',
+    chatId,
+    trackId,
+    continueMessageId: message.backendMessageId,
+    onUpdate: (data) => {
+      if (data.status === 'data' && data.chunk) {
+        fullContent += data.chunk
+
+        streamingDirty = true
+        if (streamingRafId === null) {
+          streamingRafId = requestAnimationFrame(() => {
+            streamingRafId = null
+            if (!streamingDirty) return
+            streamingDirty = false
+            renderStreamingContent(fullContent, message.id)
+          })
+        }
+      } else if (data.status === 'complete') {
+        if (streamingRafId !== null) {
+          cancelAnimationFrame(streamingRafId)
+          streamingRafId = null
+        }
+
+        renderStreamingContent(fullContent, message.id)
+
+        if (data.truncated) {
+          message.truncated = true
+        }
+
+        message.isStreaming = false
+        historyStore.finishStreamingMessage(message.id)
+      } else if (data.status === 'error') {
+        message.isStreaming = false
+        historyStore.finishStreamingMessage(message.id)
+      }
+    },
+  })
+
+  stopStreamingFn = stopStreaming
+}
+
 const handleSendMessage = async (
   content: string,
   options?: {
@@ -1296,11 +1360,6 @@ const streamAIResponse = async (
             }
             streamingDirty = false
 
-            // If the response was truncated by token limit, append a notice
-            if (data.truncated) {
-              fullContent += '\n\n---\n\n⚠️ *' + t('message.truncated') + '*'
-            }
-
             if (fullContent) {
               renderStreamingContent(fullContent, messageId)
             }
@@ -1320,6 +1379,10 @@ const streamAIResponse = async (
             // Update message metadata
             const message = historyStore.messages.find((m) => m.id === messageId)
             if (message) {
+              // Mark as truncated so the Continue button appears
+              if (data.truncated) {
+                message.truncated = true
+              }
               // Clean up any leftover tts_loading indicator (TTS may have failed silently)
               message.parts = message.parts.filter((p) => p.type !== 'tts_loading')
               // ✨ NEW: Handle generated file from backend
