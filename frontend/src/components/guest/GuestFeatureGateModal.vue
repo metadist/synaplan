@@ -107,6 +107,9 @@ const featureIcons: Record<string, string> = {
   memories: 'mdi:brain',
   settings: 'mdi:cog-outline',
   statistics: 'mdi:chart-bar',
+  models: 'mdi:tune-vertical',
+  tools: 'mdi:toolbox-outline',
+  enhance: 'mdi:auto-fix',
   general: 'mdi:lock-open-outline',
 }
 

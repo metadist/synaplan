@@ -2787,7 +2787,10 @@
         "memories": "Deine KI merkt sich wichtige Informationen für persönlichere Antworten",
         "settings": "Konfiguriere KI-Modelle, Prompts und Integrationen",
         "statistics": "Verfolge deine Nutzung, Kosten und Chat-Verläufe",
-        "general": "Zugang zu allen Premium-Funktionen und Tools"
+        "general": "Zugang zu allen Premium-Funktionen und Tools",
+        "models": "Wähle aus mehreren KI-Modellen und passe dein Erlebnis an",
+        "tools": "Nutze erweiterte Tools wie Bild- und Videogenerierung",
+        "enhance": "KI-gestützte Nachrichtenverbesserung für bessere Antworten"
       },
       "registerButton": "Kostenlosen Account erstellen",
       "loginButton": "Bereits einen Account? Einloggen"

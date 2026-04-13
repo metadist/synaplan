@@ -2858,7 +2858,10 @@
         "memories": "Your AI remembers important information for personalized answers",
         "settings": "Configure AI models, prompts, and integrations",
         "statistics": "Track your usage, costs, and chat history",
-        "general": "Access all premium features and tools"
+        "general": "Access all premium features and tools",
+        "models": "Choose from multiple AI models and customize your experience",
+        "tools": "Use advanced tools like image generation and video creation",
+        "enhance": "AI-powered message enhancement for better responses"
       },
       "registerButton": "Create free account",
       "loginButton": "Already have an account? Log in"

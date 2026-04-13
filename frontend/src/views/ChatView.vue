@@ -138,8 +138,10 @@
       <ChatInput
         ref="chatInputRef"
         :is-streaming="isStreaming"
+        :is-guest-mode="guestStore.isGuestMode"
         @send="handleSendMessage"
         @stop="handleStopStreaming"
+        @guest-feature-gate="handleGuestFeatureGate"
       />
     </div>
 
@@ -318,6 +320,11 @@ const isGuestMode = computed(() => !authStore.isAuthenticated && guestStore.isGu
 const showGuestSignupModal = ref(false)
 const featureGateOpen = ref(false)
 const featureGateKey = ref('general')
+
+function handleGuestFeatureGate(key: string) {
+  featureGateKey.value = key
+  featureGateOpen.value = true
+}
 
 const handlePromoAction = (route: string) => {
   promoTips.dismissTip(false)
