@@ -92,7 +92,7 @@ test.describe('@ci @auth Authentication', () => {
       await page.fill(selectors.login.password, password)
       await page.locator(selectors.login.submit).click()
 
-      const errorEl = page.locator('.alert-error-text')
+      const errorEl = page.locator(selectors.login.errorAlert)
       await errorEl.waitFor({ state: 'visible', timeout: TIMEOUTS.STANDARD })
       const text = (await errorEl.innerText()).trim().toLowerCase()
       expect(text).toContain('invalid')

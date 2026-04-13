@@ -86,6 +86,9 @@ security:
         # Plugin assets (static JS/CSS files, served without auth for ES module loading)
         - { path: ^/api/v1/user/[^/]+/plugins/[^/]+/assets/, roles: PUBLIC_ACCESS }
 
+        # Public guest trial chat endpoints (no auth required)
+        - { path: ^/api/v1/guest/, roles: PUBLIC_ACCESS }
+
         # Public widget endpoints (no auth required - embedded on external websites)
         - { path: ^/api/v1/widget/[^/]+/config, roles: PUBLIC_ACCESS }
         - { path: ^/api/v1/widget/[^/]+/history, roles: PUBLIC_ACCESS }

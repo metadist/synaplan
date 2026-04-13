@@ -1209,6 +1209,10 @@
   "auth": {
     "login": "Login",
     "register": "Register",
+    "welcomeBack": "Welcome back",
+    "loginSubtitle": "Sign in to continue",
+    "getStarted": "Get started",
+    "registerSubtitle": "Create your free account",
     "email": "Email",
     "emailPlaceholderPrefix": "your",
     "emailPlaceholderSuffix": "email.com",
@@ -1265,7 +1269,8 @@
     "backToHomepage": "← Back to www.synaplan.com",
     "hostingTermsNote": "The terms and conditions of the hosting platform apply.",
     "sessionExpired": "Session Expired",
-    "sessionExpiredDesc": "Your session has expired. Please log in again to continue.",
+    "sessionExpiredTitle": "Welcome back!",
+    "sessionExpiredDesc": "Your session has expired — simply log in again to pick up where you left off.",
     "authenticationRequired": "Authentication required. Please log in to continue.",
     "tokenRefreshFailed": "Failed to refresh your session. Please log in again.",
     "showPassword": "Show password",
@@ -2846,5 +2851,49 @@
       "mid": "Mid Cost",
       "high": "High Cost"
     }
+  },
+  "guest": {
+    "banner": {
+      "title": "You're using Synaplan as a guest",
+      "subtitle": "Sign up for memories, chat history, and more",
+      "remaining": "{count} messages remaining",
+      "signUp": "Sign up free"
+    },
+    "featureGate": {
+      "title": "This feature requires an account",
+      "subtitle": "Create a free account to unlock all features",
+      "features": {
+        "files": "Upload documents as a knowledge base for your AI",
+        "memories": "Your AI remembers important information for personalized answers",
+        "settings": "Configure AI models, prompts, and integrations",
+        "statistics": "Track your usage, costs, and chat history",
+        "general": "Access all premium features and tools",
+        "models": "Choose from multiple AI models and customize your experience",
+        "tools": "Use advanced tools like image generation and video creation",
+        "enhance": "AI-powered message enhancement for better responses"
+      },
+      "registerButton": "Create free account",
+      "loginButton": "Already have an account? Log in"
+    },
+    "limitModal": {
+      "title": "You've reached the guest limit",
+      "subtitle": "Create a free account to continue chatting with AI",
+      "features": {
+        "memories": "AI that remembers your preferences",
+        "history": "Persistent chat history",
+        "files": "File uploads and document analysis",
+        "models": "Choose from multiple AI models"
+      },
+      "registerButton": "Create free account",
+      "loginButton": "Already have an account? Log in"
+    },
+    "errorTitle": "Trial currently unavailable",
+    "errorDescription": "We couldn't start your guest session. Please try again or create a free account.",
+    "expiredTitle": "Your session has expired",
+    "expiredDescription": "Guest sessions last 24 hours. Start a new trial or create a free account to keep your chat history.",
+    "rateLimitedTitle": "Too many sessions",
+    "rateLimitedDescription": "You've reached the session limit. Please try again later or create a free account.",
+    "retry": "Try again",
+    "createAccount": "Create account"
   }
 }

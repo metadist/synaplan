@@ -70,18 +70,24 @@
           'v2-rail-icon w-10 h-10 flex items-center justify-center relative',
           isItemActive(item) && 'v2-rail-icon--active',
           item.isUpgrade && 'text-amber-500 dark:text-amber-400',
+          item.requiresAuth && isGuestMode && 'opacity-50',
         ]"
         :title="item.label"
         :data-testid="`btn-sidebar-v2-${item.path.replace(/\//g, '-')}`"
         @click="handleNavClick(item)"
       >
         <component :is="item.icon" class="w-6 h-6" />
+        <Icon
+          v-if="item.requiresAuth && isGuestMode"
+          icon="mdi:lock-outline"
+          class="absolute -top-0.5 -right-0.5 w-3.5 h-3.5 text-amber-500"
+        />
       </button>
     </nav>
 
     <!-- Upgrade Button -->
     <div
-      v-if="!authStore.isAdmin && configStore.billing.enabled && !authStore.isPro"
+      v-if="!isGuestMode && !authStore.isAdmin && configStore.billing.enabled && !authStore.isPro"
       class="flex items-center justify-center py-2 flex-shrink-0"
     >
       <button
@@ -135,68 +141,99 @@
           data-testid="dropdown-sidebar-v2-user"
           @click.stop
         >
-          <div class="px-3 py-2 border-b border-light-border/10 dark:border-dark-border/10">
-            <p class="text-xs font-medium txt-primary truncate">
-              {{ authStore.user?.email || 'guest@synaplan.com' }}
-            </p>
-          </div>
-          <button
-            role="menuitem"
-            class="dropdown-item"
-            data-testid="btn-sidebar-v2-profile"
-            @click="handleProfileSettings"
-          >
-            <UserCircleIcon class="w-4 h-4" />
-            <span>{{ $t('nav.profile') }}</span>
-          </button>
-          <button
-            v-if="isMemoryServiceAvailable"
-            role="menuitem"
-            class="dropdown-item"
-            :class="{ 'opacity-60': !memoriesEnabledForUser }"
-            data-testid="btn-sidebar-v2-memories"
-            @click="handleOpenMemories"
-          >
-            <Icon icon="mdi:brain" class="w-4 h-4" />
-            <span>{{ $t('pageTitles.memories') }}</span>
-            <Icon
-              v-if="!memoriesEnabledForUser"
-              icon="mdi:lock"
-              class="w-3.5 h-3.5 ml-auto text-orange-500 dark:text-orange-400"
-            />
-          </button>
-          <div class="border-t border-light-border/10 dark:border-dark-border/10">
-            <button
-              role="menuitem"
-              class="dropdown-item"
-              data-testid="btn-sidebar-v2-statistics"
-              @click="handleNavigate('/statistics')"
+          <!-- Guest user menu -->
+          <template v-if="isGuestMode">
+            <div class="px-3 py-2 border-b border-light-border/10 dark:border-dark-border/10">
+              <p class="text-xs font-medium txt-secondary">
+                {{ $t('guest.banner.title') }}
+              </p>
+            </div>
+            <router-link
+              to="/register"
+              class="dropdown-item font-medium"
+              style="color: var(--brand)"
+              data-testid="btn-sidebar-v2-guest-register"
+              @click="userMenuOpen = false"
             >
-              <ChartBarIcon class="w-4 h-4" />
-              <span>{{ $t('nav.statistics') }}</span>
-            </button>
-            <button
-              v-if="!authStore.isAdmin && configStore.billing.enabled && authStore.isPro"
-              role="menuitem"
+              <Icon icon="mdi:account-plus-outline" class="w-4 h-4" />
+              <span>{{ $t('guest.featureGate.registerButton') }}</span>
+            </router-link>
+            <router-link
+              to="/login"
               class="dropdown-item"
-              data-testid="btn-sidebar-v2-subscription"
-              @click="handleNavigate('/subscription')"
-            >
-              <SparklesIcon class="w-4 h-4" />
-              <span>{{ $t('nav.subscription') }}</span>
-            </button>
-          </div>
-          <div class="border-t border-light-border/10 dark:border-dark-border/10">
-            <button
-              role="menuitem"
-              class="dropdown-item text-red-500 dark:text-red-400"
-              data-testid="btn-sidebar-v2-logout"
-              @click="handleLogout"
+              data-testid="btn-sidebar-v2-guest-login"
+              @click="userMenuOpen = false"
             >
               <ArrowRightOnRectangleIcon class="w-4 h-4" />
-              <span>{{ $t('settings.logout') }}</span>
+              <span>{{ $t('auth.signIn') }}</span>
+            </router-link>
+          </template>
+
+          <!-- Authenticated user menu -->
+          <template v-else>
+            <div class="px-3 py-2 border-b border-light-border/10 dark:border-dark-border/10">
+              <p class="text-xs font-medium txt-primary truncate">
+                {{ authStore.user?.email || '' }}
+              </p>
+            </div>
+            <button
+              role="menuitem"
+              class="dropdown-item"
+              data-testid="btn-sidebar-v2-profile"
+              @click="handleProfileSettings"
+            >
+              <UserCircleIcon class="w-4 h-4" />
+              <span>{{ $t('nav.profile') }}</span>
             </button>
-          </div>
+            <button
+              v-if="isMemoryServiceAvailable"
+              role="menuitem"
+              class="dropdown-item"
+              :class="{ 'opacity-60': !memoriesEnabledForUser }"
+              data-testid="btn-sidebar-v2-memories"
+              @click="handleOpenMemories"
+            >
+              <Icon icon="mdi:brain" class="w-4 h-4" />
+              <span>{{ $t('pageTitles.memories') }}</span>
+              <Icon
+                v-if="!memoriesEnabledForUser"
+                icon="mdi:lock"
+                class="w-3.5 h-3.5 ml-auto text-orange-500 dark:text-orange-400"
+              />
+            </button>
+            <div class="border-t border-light-border/10 dark:border-dark-border/10">
+              <button
+                role="menuitem"
+                class="dropdown-item"
+                data-testid="btn-sidebar-v2-statistics"
+                @click="handleNavigate('/statistics')"
+              >
+                <ChartBarIcon class="w-4 h-4" />
+                <span>{{ $t('nav.statistics') }}</span>
+              </button>
+              <button
+                v-if="!authStore.isAdmin && configStore.billing.enabled && authStore.isPro"
+                role="menuitem"
+                class="dropdown-item"
+                data-testid="btn-sidebar-v2-subscription"
+                @click="handleNavigate('/subscription')"
+              >
+                <SparklesIcon class="w-4 h-4" />
+                <span>{{ $t('nav.subscription') }}</span>
+              </button>
+            </div>
+            <div class="border-t border-light-border/10 dark:border-dark-border/10">
+              <button
+                role="menuitem"
+                class="dropdown-item text-red-500 dark:text-red-400"
+                data-testid="btn-sidebar-v2-logout"
+                @click="handleLogout"
+              >
+                <ArrowRightOnRectangleIcon class="w-4 h-4" />
+                <span>{{ $t('settings.logout') }}</span>
+              </button>
+            </div>
+          </template>
         </div>
       </div>
     </Transition>
@@ -541,6 +578,13 @@
 
   <!-- Memories Dialog -->
   <MemoriesDialog :is-open="isMemoriesDialogOpen" @close="isMemoriesDialogOpen = false" />
+
+  <!-- Guest Feature Gate Modal -->
+  <GuestFeatureGateModal
+    :is-open="featureGateOpen"
+    :feature-key="featureGateKey"
+    @close="featureGateOpen = false"
+  />
 </template>
 
 <script setup lang="ts">
@@ -570,6 +614,7 @@ import { getFeaturesStatus } from '../services/featuresService'
 import { useI18n } from 'vue-i18n'
 import MemoriesDialog from './MemoriesDialog.vue'
 import ChatShareModal from './ChatShareModal.vue'
+import GuestFeatureGateModal from './guest/GuestFeatureGateModal.vue'
 
 const { t } = useI18n()
 const sidebarStore = useSidebarStore()
@@ -695,15 +740,25 @@ interface NavItem {
   label: string
   icon: Component
   isUpgrade?: boolean
+  requiresAuth?: boolean
+  gateFeature?: string
   children?: NavChild[]
 }
+
+const isGuestMode = computed(() => !authStore.isAuthenticated)
 
 const navItems = computed<NavItem[]>(() => {
   const items: NavItem[] = [{ path: '/', label: t('nav.chat'), icon: ChatBubbleLeftRightIcon }]
 
-  items.push({ path: '/files', label: t('nav.files'), icon: FolderIcon })
+  items.push({
+    path: '/files',
+    label: t('nav.files'),
+    icon: FolderIcon,
+    requiresAuth: true,
+    gateFeature: 'files',
+  })
 
-  if (appModeStore.isAdvancedMode) {
+  if (appModeStore.isAdvancedMode || isGuestMode.value) {
     const settingsChildren: NavChild[] = [
       {
         path: '/tools/chat-widget',
@@ -743,7 +798,9 @@ const navItems = computed<NavItem[]>(() => {
       path: '/settings',
       label: t('nav.settings'),
       icon: Cog6ToothIcon,
-      children: settingsChildren,
+      requiresAuth: true,
+      gateFeature: 'settings',
+      children: isGuestMode.value ? undefined : settingsChildren,
     })
   }
 
@@ -832,8 +889,18 @@ const handleQuickNewChat = async () => {
   }
 }
 
+const featureGateOpen = ref(false)
+const featureGateKey = ref('general')
+
 const handleNavClick = (item: NavItem) => {
   userMenuOpen.value = false
+
+  if (item.requiresAuth && isGuestMode.value) {
+    featureGateKey.value = item.gateFeature || 'general'
+    featureGateOpen.value = true
+    sidebarStore.closeMobile()
+    return
+  }
 
   if (item.path === '/') {
     closeFlyout()

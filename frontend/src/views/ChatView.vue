@@ -60,7 +60,65 @@
           </div>
 
           <div
-            v-if="historyStore.messages.length === 0 && !historyStore.isLoadingMessages"
+            v-if="guestStore.initFailed && !authStore.isAuthenticated"
+            class="flex items-center justify-center h-full px-6"
+            data-testid="state-guest-error"
+          >
+            <div class="text-center max-w-md">
+              <div
+                class="w-12 h-12 mx-auto mb-4 rounded-full bg-red-100 dark:bg-red-900/30 flex items-center justify-center"
+              >
+                <svg
+                  class="w-6 h-6 text-red-500"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                >
+                  <path
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    stroke-width="2"
+                    d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4.5c-.77-.833-2.694-.833-3.464 0L3.34 16.5c-.77.833.192 2.5 1.732 2.5z"
+                  />
+                </svg>
+              </div>
+              <h2 class="text-xl font-semibold txt-primary mb-2">
+                {{
+                  guestStore.sessionExpired
+                    ? $t('guest.expiredTitle')
+                    : guestStore.rateLimited
+                      ? $t('guest.rateLimitedTitle')
+                      : $t('guest.errorTitle')
+                }}
+              </h2>
+              <p class="txt-secondary mb-4">
+                {{
+                  guestStore.sessionExpired
+                    ? $t('guest.expiredDescription')
+                    : guestStore.rateLimited
+                      ? $t('guest.rateLimitedDescription')
+                      : $t('guest.errorDescription')
+                }}
+              </p>
+              <div class="flex gap-3 justify-center">
+                <button
+                  class="px-4 py-2 rounded-lg btn-brand text-sm font-medium"
+                  @click="guestStore.retryInit()"
+                >
+                  {{ $t('guest.retry') }}
+                </button>
+                <router-link
+                  :to="{ name: 'register' }"
+                  class="px-4 py-2 rounded-lg border border-[var(--border)] txt-secondary text-sm font-medium hover:bg-[var(--bg-secondary)] transition-colors"
+                >
+                  {{ $t('guest.createAccount') }}
+                </router-link>
+              </div>
+            </div>
+          </div>
+
+          <div
+            v-else-if="historyStore.messages.length === 0 && !historyStore.isLoadingMessages"
             class="flex items-center justify-center h-full px-6"
             data-testid="state-empty"
           >
@@ -107,6 +165,7 @@
               :error-type="message.errorType"
               :error-data="message.errorData"
               :truncated="message.truncated"
+              :is-guest-mode="isGuestMode"
               @regenerate="handleRegenerate(message, $event)"
               @again="handleAgain"
               @retry="handleRetryMessage(message, $event)"
@@ -117,6 +176,15 @@
           </template>
         </div>
       </div>
+
+      <!-- Guest Banner (shown for unauthenticated trial users) -->
+      <GuestBanner
+        v-if="isGuestMode"
+        :visible="guestStore.shouldShowBanner"
+        :remaining="guestStore.remainingMessages"
+        :max-messages="guestStore.maxMessages"
+        @dismiss="guestStore.dismissBanner()"
+      />
 
       <!-- Contextual Promo Tips -->
       <PromoTipBanner
@@ -131,8 +199,10 @@
       <ChatInput
         ref="chatInputRef"
         :is-streaming="isStreaming"
+        :is-guest-mode="isGuestMode"
         @send="handleSendMessage"
         @stop="handleStopStreaming"
+        @guest-feature-gate="handleGuestFeatureGate"
       />
     </div>
 
@@ -149,6 +219,16 @@
       @close="closeLimitModal"
       @upgrade="closeLimitModal"
       @verify-phone="closeLimitModal"
+    />
+
+    <!-- Guest Signup Modal (shown when guest message limit is reached) -->
+    <GuestSignupModal :is-open="showGuestSignupModal" @close="showGuestSignupModal = false" />
+
+    <!-- Guest Feature Gate Modal (shown when guest tries to access a restricted feature) -->
+    <GuestFeatureGateModal
+      :is-open="featureGateOpen"
+      :feature-key="featureGateKey"
+      @close="featureGateOpen = false"
     />
 
     <!-- Memory Suggestion Toasts -->
@@ -216,17 +296,23 @@
 <script setup lang="ts">
 import { ref, computed, nextTick, watch, onMounted, onBeforeUnmount } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { Icon } from '@iconify/vue'
 import MainLayout from '@/components/MainLayout.vue'
 import ChatInput from '@/components/ChatInput.vue'
 import ChatMessage from '@/components/ChatMessage.vue'
 import LimitReachedModal from '@/components/common/LimitReachedModal.vue'
-import { useHistoryStore, type Message, type Part } from '@/stores/history'
+import {
+  useHistoryStore,
+  parseContentWithThinking,
+  type Message,
+  type Part,
+} from '@/stores/history'
 import { useChatsStore, isDefaultChatTitle } from '@/stores/chats'
 import { useModelsStore } from '@/stores/models'
 import { useAiConfigStore } from '@/stores/aiConfig'
 import { useAuthStore } from '@/stores/auth'
+import { useGuestStore } from '@/stores/guest'
 import { useMemoriesStore } from '@/stores/userMemories'
 import { useFeedbackStore } from '@/stores/userFeedback'
 import { useLimitCheck } from '@/composables/useLimitCheck'
@@ -256,6 +342,9 @@ import MemoryFormDialog from '@/components/MemoryFormDialog.vue'
 import MemoriesDialog from '@/components/MemoriesDialog.vue'
 import MemoryDeleteDialog from '@/components/memories/MemoryDeleteDialog.vue'
 import PromoTipBanner from '@/components/PromoTipBanner.vue'
+import GuestBanner from '@/components/guest/GuestBanner.vue'
+import GuestSignupModal from '@/components/guest/GuestSignupModal.vue'
+import GuestFeatureGateModal from '@/components/guest/GuestFeatureGateModal.vue'
 import { usePromoTips } from '@/composables/usePromoTips'
 
 const SaveCancelledMessageResponseSchema = z
@@ -268,6 +357,7 @@ const SaveCancelledMessageResponseSchema = z
   .passthrough()
 
 const { t } = useI18n()
+const route = useRoute()
 const router = useRouter()
 const { showLimitModal, limitData, checkAndShowLimit, closeLimitModal } = useLimitCheck()
 const { error: showErrorToast, success: showSuccessToast } = useNotification()
@@ -282,9 +372,20 @@ const chatsStore = useChatsStore()
 const modelsStore = useModelsStore()
 const aiConfigStore = useAiConfigStore()
 const authStore = useAuthStore()
+const guestStore = useGuestStore()
 const memoriesStore = useMemoriesStore()
 const feedbackStore = useFeedbackStore()
 const promoTips = usePromoTips()
+
+const isGuestMode = computed(() => !authStore.isAuthenticated && guestStore.isGuestMode)
+const showGuestSignupModal = ref(false)
+const featureGateOpen = ref(false)
+const featureGateKey = ref('general')
+
+function handleGuestFeatureGate(key: string) {
+  featureGateKey.value = key
+  featureGateOpen.value = true
+}
 
 const handlePromoAction = (route: string) => {
   promoTips.dismissTip(false)
@@ -371,6 +472,55 @@ const isStreaming = computed(() => {
 
 // Init on mount
 onMounted(async () => {
+  if (!authStore.isAuthenticated) {
+    await guestStore.initSession()
+
+    if (guestStore.chatId) {
+      const rawMessages = await guestStore.loadMessages()
+      if (rawMessages.length > 0) {
+        historyStore.clear()
+        const loaded: Message[] = rawMessages.map((m) => {
+          const role: 'user' | 'assistant' = m.direction === 'IN' ? 'user' : 'assistant'
+          const parts = parseContentWithThinking(m.text || '', role)
+          const models = m.aiModels as Message['aiModels']
+          const chatModel = models?.chat
+          return {
+            id: `backend-${m.id}`,
+            role,
+            parts,
+            timestamp: new Date(m.timestamp * 1000),
+            provider: chatModel?.provider ?? m.provider ?? undefined,
+            modelLabel: chatModel?.model ?? m.provider ?? (role === 'assistant' ? 'AI' : undefined),
+            backendMessageId: m.id,
+            aiModels: models ?? null,
+            webSearch: (m.webSearch as Message['webSearch']) ?? null,
+            searchResults: (m.searchResults as Message['searchResults']) ?? null,
+          }
+        })
+        historyStore.messages.push(...loaded)
+        await nextTick()
+        scrollToBottom()
+      }
+    }
+
+    const restricted = route.query.restricted as string | undefined
+    if (restricted) {
+      featureGateKey.value = restricted
+      featureGateOpen.value = true
+      router.replace({ query: {} })
+    }
+
+    setTimeout(() => {
+      if (chatInputRef.value?.textareaRef) {
+        chatInputRef.value.textareaRef.focus()
+      }
+    }, 100)
+
+    window.addEventListener('open-memory-dialog', handleOpenMemoryDialogEvent)
+    window.addEventListener('open-feedback-dialog', handleOpenFeedbackDialogEvent)
+    return
+  }
+
   // Load AI models config for Again functionality (await these - they're fast)
   await Promise.all([aiConfigStore.loadModels(), aiConfigStore.loadDefaults()])
 
@@ -981,6 +1131,178 @@ const streamAIResponse = async (
       }
 
       historyStore.finishStreamingMessage(messageId)
+    } else if (isGuestMode.value) {
+      // Guest mode streaming — mirrors the authenticated handler for full feature parity
+      const guestChatId = await guestStore.ensureChat()
+      if (!guestChatId || !guestStore.sessionId) {
+        console.error('Guest chat or session not available')
+        historyStore.finishStreamingMessage(messageId)
+        return
+      }
+
+      const trackId = Date.now()
+      currentTrackId = trackId
+      let fullContent = ''
+
+      processingStatus.value = 'started'
+      processingMetadata.value = {}
+
+      const stopStreaming = chatApi.streamGuestMessage({
+        guestSessionId: guestStore.sessionId,
+        message: userMessage,
+        chatId: guestChatId,
+        trackId,
+        onUpdate: (data) => {
+          if (streamingAbortController?.signal.aborted) return
+
+          if (data.status === 'guest_limit_reached') {
+            showGuestSignupModal.value = true
+            processingStatus.value = ''
+            processingMetadata.value = {}
+            historyStore.finishStreamingMessage(messageId)
+            return
+          }
+
+          if (data.status === 'guest_remaining') {
+            const remaining = (data as Record<string, unknown>).remaining as number
+            const max = (data as Record<string, unknown>).maxMessages as number
+            const reached = (data as Record<string, unknown>).limitReached as boolean
+            guestStore.updateCount(remaining, max, reached)
+            guestStore.showBanner()
+            return
+          }
+
+          if (data.status === 'started') {
+            processingStatus.value = 'started'
+            processingMetadata.value = {}
+          } else if (data.status === 'preprocessing') {
+            processingStatus.value = 'preprocessing'
+            processingMetadata.value = { customMessage: data.message }
+          } else if (data.status === 'analyzing') {
+            processingStatus.value = 'analyzing'
+            processingMetadata.value = { customMessage: data.message }
+          } else if (data.status === 'classifying') {
+            processingStatus.value = 'classifying'
+            processingMetadata.value = data.metadata || {}
+            const message = historyStore.messages.find((m) => m.id === messageId)
+            if (message && data.metadata) {
+              const prov = data.metadata.provider
+              const mname = data.metadata.model_name
+              if (typeof prov === 'string') message.provider = prov
+              if (typeof mname === 'string') message.modelLabel = mname
+            }
+          } else if (data.status === 'classified') {
+            const meta = data.metadata || {}
+            processingMetadata.value = meta
+            processingStatus.value = 'classified'
+          } else if (data.status === 'searching') {
+            processingStatus.value = 'searching'
+            processingMetadata.value = { customMessage: data.message }
+          } else if (data.status === 'search_complete') {
+            processingStatus.value = 'search_complete'
+            processingMetadata.value = data.metadata || {}
+          } else if (data.status === 'generating') {
+            processingStatus.value = 'generating'
+            processingMetadata.value = {
+              customMessage: data.message || undefined,
+              ...(data.metadata || {}),
+            }
+            if (data.message && (data.message.includes('Datei') || data.message.includes('file'))) {
+              processingStatus.value = 'generating_file'
+            }
+            const message = historyStore.messages.find((m) => m.id === messageId)
+            if (message && data.metadata) {
+              const prov = data.metadata.provider
+              const mname = data.metadata.model_name
+              if (typeof prov === 'string') message.provider = prov
+              if (typeof mname === 'string') message.modelLabel = mname
+            }
+          } else if (data.status === 'processing') {
+            // Processing/routing — no UI update needed
+          } else if (data.status === 'data' && data.chunk) {
+            if (processingStatus.value) {
+              processingStatus.value = ''
+              processingMetadata.value = {}
+            }
+            fullContent += data.chunk
+
+            streamingDirty = true
+            if (streamingRafId === null) {
+              streamingRafId = requestAnimationFrame(() => {
+                streamingRafId = null
+                if (!streamingDirty) return
+                streamingDirty = false
+                renderStreamingContent(fullContent, messageId)
+              })
+            }
+          } else if (data.status === 'reasoning' && data.chunk) {
+            const message = historyStore.messages.find((m) => m.id === messageId)
+            if (message) {
+              let reasoningPart = message.parts.find((p) => p.type === 'thinking' && p.isStreaming)
+              if (!reasoningPart) {
+                reasoningPart = { type: 'thinking', content: '', isStreaming: true }
+                message.parts.unshift(reasoningPart)
+              }
+              reasoningPart.content += data.chunk
+            }
+          } else if (data.status === 'complete') {
+            if (streamingRafId !== null) {
+              cancelAnimationFrame(streamingRafId)
+              streamingRafId = null
+            }
+            streamingDirty = false
+
+            if (data.truncated) {
+              fullContent += '\n\n---\n\n⚠️ *' + t('message.truncated') + '*'
+            }
+
+            if (fullContent) {
+              renderStreamingContent(fullContent, messageId)
+            }
+
+            processingStatus.value = ''
+            processingMetadata.value = {}
+
+            const message = historyStore.messages.find((m) => m.id === messageId)
+            if (message) {
+              if (
+                data.searchResults &&
+                Array.isArray(data.searchResults) &&
+                data.searchResults.length > 0
+              ) {
+                message.searchResults = data.searchResults as NonNullable<Message['searchResults']>
+                message.webSearch = {
+                  query: data.searchResults[0]?.query || '',
+                  resultsCount: data.searchResults.length,
+                }
+              }
+
+              applyAssistantChatModelFooter(
+                message,
+                {
+                  provider: data.provider,
+                  model: data.model,
+                  model_id: data.model_id ?? null,
+                },
+                { provider, model: modelLabel, model_id: currentModel?.id ?? null }
+              )
+            }
+
+            historyStore.finishStreamingMessage(messageId)
+            scrollToBottom()
+          } else if (data.status === 'error') {
+            if (streamingRafId !== null) {
+              cancelAnimationFrame(streamingRafId)
+              streamingRafId = null
+            }
+            processingStatus.value = ''
+            processingMetadata.value = {}
+            historyStore.finishStreamingMessage(messageId)
+          }
+        },
+      })
+
+      stopStreamingFn = stopStreaming
     } else {
       // Use real Backend API with SSE streaming
       const userId = authStore.user?.id || 1

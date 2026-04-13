@@ -30,6 +30,16 @@ export default {
           dark: { bg: '#0D0D0E', assistant: '#151517', input: '#1C1C1E', code: '#0A0A0B' },
         },
       },
+      fontFamily: {
+        sans: [
+          "'Plus Jakarta Sans'",
+          '-apple-system',
+          'BlinkMacSystemFont',
+          "'Segoe UI'",
+          'system-ui',
+          'sans-serif',
+        ],
+      },
       boxShadow: {
         subtle: '0 1px 2px 0 rgb(0 0 0 / 0.05)',
       },

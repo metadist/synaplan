@@ -95,14 +95,24 @@
         >
           <button
             type="button"
-            class="icon-ghost h-[44px] min-w-[44px] flex items-center justify-center rounded-xl pointer-events-auto"
+            :class="[
+              'icon-ghost h-[44px] min-w-[44px] flex items-center justify-center rounded-xl pointer-events-auto relative',
+              isGuestMode && 'opacity-50',
+            ]"
             :aria-label="$t('chatInput.attach')"
             :disabled="uploading"
             data-testid="btn-chat-attach"
             @click="triggerFileUpload"
           >
             <Icon v-if="uploading" icon="mdi:loading" class="w-5 h-5 animate-spin" />
-            <PlusIcon v-else class="w-5 h-5" />
+            <template v-else>
+              <PlusIcon class="w-5 h-5" />
+              <Icon
+                v-if="isGuestMode"
+                icon="mdi:lock-outline"
+                class="w-2.5 h-2.5 absolute -top-0.5 -right-0.5 text-amber-500"
+              />
+            </template>
           </button>
 
           <input
@@ -160,20 +170,48 @@
         class="mt-3 flex items-center gap-2"
         data-testid="section-chat-secondary-actions"
       >
-        <ModelDropdown v-model="selectedModelId" class="flex-shrink-0" />
+        <!-- Model dropdown: show gated pill in guest mode -->
+        <template v-if="isGuestMode">
+          <button
+            type="button"
+            class="pill flex-shrink-0 opacity-50 relative"
+            @click="emit('guestFeatureGate', 'models')"
+          >
+            <Icon icon="mdi:tune-vertical" class="w-4 h-4 md:w-5 md:h-5" />
+            <span class="text-xs md:text-sm font-medium hidden sm:inline">Model</span>
+            <Icon icon="mdi:lock-outline" class="w-3 h-3 text-amber-500" />
+          </button>
+        </template>
+        <ModelDropdown v-else v-model="selectedModelId" class="flex-shrink-0" />
+
+        <!-- Tools dropdown: show gated pill in guest mode -->
+        <template v-if="isGuestMode">
+          <button
+            type="button"
+            class="pill flex-shrink-0 opacity-50 relative"
+            @click="emit('guestFeatureGate', 'tools')"
+          >
+            <Icon icon="mdi:toolbox-outline" class="w-4 h-4 md:w-5 md:h-5" />
+            <span class="text-xs md:text-sm font-medium hidden sm:inline">Tools</span>
+            <Icon icon="mdi:lock-outline" class="w-3 h-3 text-amber-500" />
+          </button>
+        </template>
         <ToolsDropdown
+          v-else
           :active-command="activeCommand"
           class="flex-shrink-0"
           @insert-command="handleInsertCommand"
         />
+
         <button
           type="button"
           :class="[
             'pill flex-shrink-0',
-            enhanceLoading && 'pill--loading',
-            enhanceEnabled && 'pill--active',
+            !isGuestMode && enhanceLoading && 'pill--loading',
+            !isGuestMode && enhanceEnabled && 'pill--active',
+            isGuestMode && 'opacity-50',
           ]"
-          :disabled="enhanceLoading"
+          :disabled="!isGuestMode && enhanceLoading"
           :aria-label="$t('chatInput.enhance')"
           data-testid="btn-chat-enhance"
           @click="toggleEnhance"
@@ -182,23 +220,26 @@
           <span class="text-xs md:text-sm font-medium hidden sm:inline">{{
             $t('chatInput.enhance')
           }}</span>
+          <Icon v-if="isGuestMode" icon="mdi:lock-outline" class="w-3 h-3 text-amber-500" />
         </button>
         <button
           type="button"
-          :disabled="!supportsReasoning"
+          :disabled="!isGuestMode && !supportsReasoning"
           :class="[
             'pill flex-shrink-0',
-            thinkingEnabled && 'pill--active',
-            !supportsReasoning && 'opacity-50 cursor-not-allowed',
+            !isGuestMode && thinkingEnabled && 'pill--active',
+            isGuestMode && 'opacity-50',
+            !isGuestMode && !supportsReasoning && 'opacity-50 cursor-not-allowed',
           ]"
           :aria-label="$t('chatInput.thinking')"
           data-testid="btn-chat-thinking"
-          @click="toggleThinking"
+          @click="isGuestMode ? emit('guestFeatureGate', 'models') : toggleThinking()"
         >
           <Icon icon="mdi:brain" class="w-4 h-4 md:w-5 md:h-5" />
           <span class="text-xs md:text-sm font-medium hidden sm:inline">{{
             $t('chatInput.thinking')
           }}</span>
+          <Icon v-if="isGuestMode" icon="mdi:lock-outline" class="w-3 h-3 text-amber-500" />
         </button>
         <button
           type="button"
@@ -265,11 +306,13 @@ interface UploadedFile {
 
 interface Props {
   isStreaming?: boolean
+  isGuestMode?: boolean
 }
 
 const props = defineProps<Props>()
 
 const isStreaming = computed(() => props.isStreaming ?? false)
+const isGuestMode = computed(() => props.isGuestMode ?? false)
 
 const message = ref('')
 const originalMessage = ref('')
@@ -382,6 +425,7 @@ const emit = defineEmits<{
     },
   ]
   stop: []
+  guestFeatureGate: [featureKey: string]
 }>()
 
 const commandsStore = useCommandsStore()
@@ -635,8 +679,11 @@ const removeFile = (index: number) => {
 }
 
 const triggerFileUpload = () => {
+  if (props.isGuestMode) {
+    emit('guestFeatureGate', 'files')
+    return
+  }
   if (uploading.value) return
-  // Open file selection modal to choose from existing files
   fileSelectionModalVisible.value = true
 }
 
@@ -694,6 +741,20 @@ const handleDragLeave = () => {
 
 // Clipboard paste handler for images and files
 const handlePaste = async (event: ClipboardEvent) => {
+  if (props.isGuestMode) {
+    const items = event.clipboardData?.items
+    if (items) {
+      for (const item of items) {
+        if (item.type.startsWith('image/') || item.kind === 'file') {
+          event.preventDefault()
+          emit('guestFeatureGate', 'files')
+          return
+        }
+      }
+    }
+    return
+  }
+
   const items = event.clipboardData?.items
   if (!items) return
 
@@ -1040,6 +1101,10 @@ if (typeof window !== 'undefined') {
 }
 
 const toggleEnhance = async () => {
+  if (props.isGuestMode) {
+    emit('guestFeatureGate', 'enhance')
+    return
+  }
   if (enhanceLoading.value) return
 
   if (enhanceEnabled.value) {
