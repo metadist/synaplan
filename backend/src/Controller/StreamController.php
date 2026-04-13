@@ -430,7 +430,7 @@ class StreamController extends AbstractController
                 // Guest mode: verify the chat belongs to THIS guest session
                 if ($isGuestMode && $guestSession) {
                     $sessionChatId = $guestSession->getChatId();
-                    if (null !== $sessionChatId && $sessionChatId !== (int) $chatId) {
+                    if (null === $sessionChatId || $sessionChatId !== (int) $chatId) {
                         $this->sendSSE('error', ['error' => 'Chat does not belong to this guest session']);
 
                         return;

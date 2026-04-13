@@ -7,6 +7,7 @@ namespace App\Tests\Controller;
 use App\Entity\GuestSession;
 use Symfony\Bundle\FrameworkBundle\Test\WebTestCase;
 use Symfony\Component\HttpFoundation\Response;
+use Symfony\Component\Uid\Uuid;
 
 class GuestChatControllerTest extends WebTestCase
 {
@@ -15,13 +16,13 @@ class GuestChatControllerTest extends WebTestCase
 
     protected function setUp(): void
     {
+        self::ensureKernelShutdown();
         $this->client = static::createClient();
         $this->em = $this->client->getContainer()->get('doctrine')->getManager();
     }
 
     protected function tearDown(): void
     {
-        // Cleanup all test guest sessions
         if ($this->em->isOpen()) {
             $this->em->createQuery('DELETE FROM App\Entity\GuestSession gs')
                 ->execute();
@@ -30,7 +31,7 @@ class GuestChatControllerTest extends WebTestCase
         parent::tearDown();
     }
 
-    public function testCreateSessionReturnsNewSession(): void
+    private function createGuestSession(array $body = []): array
     {
         $this->client->request(
             'POST',
@@ -38,12 +39,17 @@ class GuestChatControllerTest extends WebTestCase
             [],
             [],
             ['CONTENT_TYPE' => 'application/json'],
-            json_encode([])
+            json_encode($body)
         );
 
-        $this->assertResponseIsSuccessful();
+        return json_decode($this->client->getResponse()->getContent(), true);
+    }
 
-        $data = json_decode($this->client->getResponse()->getContent(), true);
+    public function testCreateSessionReturnsNewSession(): void
+    {
+        $data = $this->createGuestSession();
+
+        $this->assertResponseIsSuccessful();
         $this->assertArrayHasKey('sessionId', $data);
         $this->assertArrayHasKey('remaining', $data);
         $this->assertArrayHasKey('maxMessages', $data);
@@ -51,109 +57,81 @@ class GuestChatControllerTest extends WebTestCase
         $this->assertSame(5, $data['remaining']);
         $this->assertSame(5, $data['maxMessages']);
         $this->assertFalse($data['limitReached']);
+        $this->assertTrue(Uuid::isValid($data['sessionId']));
     }
 
-    public function testCreateSessionWithClientGeneratedUuid(): void
+    public function testCreateSessionIgnoresInvalidClientId(): void
     {
-        $sessionId = 'client-uuid-'.time();
-
-        $this->client->request(
-            'POST',
-            '/api/v1/guest/session',
-            [],
-            [],
-            ['CONTENT_TYPE' => 'application/json'],
-            json_encode(['sessionId' => $sessionId])
-        );
+        $data = $this->createGuestSession(['sessionId' => 'not-a-uuid']);
 
         $this->assertResponseIsSuccessful();
-
-        $data = json_decode($this->client->getResponse()->getContent(), true);
-        $this->assertSame($sessionId, $data['sessionId']);
+        $this->assertTrue(Uuid::isValid($data['sessionId']));
+        $this->assertNotSame('not-a-uuid', $data['sessionId']);
     }
 
     public function testCreateSessionReturnsExistingSession(): void
     {
-        $sessionId = 'existing-session-'.time();
-
-        // First request creates the session
-        $this->client->request(
-            'POST',
-            '/api/v1/guest/session',
-            [],
-            [],
-            ['CONTENT_TYPE' => 'application/json'],
-            json_encode(['sessionId' => $sessionId])
-        );
+        $first = $this->createGuestSession();
         $this->assertResponseIsSuccessful();
+        $serverSessionId = $first['sessionId'];
 
-        // Increment message count directly for verification
-        $session = $this->em->getRepository(GuestSession::class)->findOneBy(['sessionId' => $sessionId]);
+        $session = $this->em->getRepository(GuestSession::class)->findOneBy(['sessionId' => $serverSessionId]);
         $session->setMessageCount(2);
         $this->em->flush();
 
-        // Second request should return the existing session with updated count
-        $this->client->request(
-            'POST',
-            '/api/v1/guest/session',
-            [],
-            [],
-            ['CONTENT_TYPE' => 'application/json'],
-            json_encode(['sessionId' => $sessionId])
-        );
+        $second = $this->createGuestSession(['sessionId' => $serverSessionId]);
         $this->assertResponseIsSuccessful();
 
-        $data = json_decode($this->client->getResponse()->getContent(), true);
-        $this->assertSame($sessionId, $data['sessionId']);
-        $this->assertSame(3, $data['remaining']);
+        $this->assertSame($serverSessionId, $second['sessionId']);
+        $this->assertSame(3, $second['remaining']);
     }
 
     public function testGetSessionStatusReturnsSession(): void
     {
-        $sessionId = 'status-test-'.time();
-
-        // Create session first
-        $this->client->request(
-            'POST',
-            '/api/v1/guest/session',
-            [],
-            [],
-            ['CONTENT_TYPE' => 'application/json'],
-            json_encode(['sessionId' => $sessionId])
-        );
+        $created = $this->createGuestSession();
         $this->assertResponseIsSuccessful();
 
-        // Get status
-        $this->client->request('GET', "/api/v1/guest/session/{$sessionId}");
+        $this->client->request('GET', "/api/v1/guest/session/{$created['sessionId']}");
 
         $this->assertResponseIsSuccessful();
         $data = json_decode($this->client->getResponse()->getContent(), true);
-        $this->assertSame($sessionId, $data['sessionId']);
+        $this->assertSame($created['sessionId'], $data['sessionId']);
         $this->assertSame(5, $data['remaining']);
         $this->assertFalse($data['limitReached']);
     }
 
-    public function testGetSessionStatusReturns404ForNonexistent(): void
+    public function testGetSessionStatusReturns400ForInvalidUuid(): void
     {
         $this->client->request('GET', '/api/v1/guest/session/nonexistent-uuid');
+
+        $this->assertResponseStatusCodeSame(Response::HTTP_BAD_REQUEST);
+    }
+
+    public function testGetSessionStatusReturns404ForNonexistent(): void
+    {
+        $uuid = Uuid::v4()->toRfc4122();
+        $this->client->request('GET', "/api/v1/guest/session/{$uuid}");
 
         $this->assertResponseStatusCodeSame(Response::HTTP_NOT_FOUND);
     }
 
-    public function testGetSessionStatusReturns404ForExpired(): void
+    public function testGetSessionStatusReturns410ForExpired(): void
     {
-        $sessionId = 'expired-test-'.time();
+        $sessionId = Uuid::v4()->toRfc4122();
 
-        // Create session
         $session = new GuestSession();
         $session->setSessionId($sessionId);
-        $session->setExpires(time() - 3600); // Expired 1 hour ago
+        $session->setExpires(time() - 3600);
         $this->em->persist($session);
         $this->em->flush();
 
         $this->client->request('GET', "/api/v1/guest/session/{$sessionId}");
 
-        $this->assertResponseStatusCodeSame(Response::HTTP_NOT_FOUND);
+        $this->assertResponseStatusCodeSame(Response::HTTP_GONE);
+
+        $data = json_decode($this->client->getResponse()->getContent(), true);
+        $this->assertSame('Session expired', $data['error']);
+        $this->assertSame('expired', $data['reason']);
     }
 
     public function testCreateChatRequiresSessionId(): void
@@ -170,7 +148,7 @@ class GuestChatControllerTest extends WebTestCase
         $this->assertResponseStatusCodeSame(Response::HTTP_BAD_REQUEST);
     }
 
-    public function testCreateChatReturns404ForInvalidSession(): void
+    public function testCreateChatReturns400ForInvalidSessionId(): void
     {
         $this->client->request(
             'POST',
@@ -181,12 +159,26 @@ class GuestChatControllerTest extends WebTestCase
             json_encode(['sessionId' => 'nonexistent'])
         );
 
+        $this->assertResponseStatusCodeSame(Response::HTTP_BAD_REQUEST);
+    }
+
+    public function testCreateChatReturns404ForNonexistentSession(): void
+    {
+        $uuid = Uuid::v4()->toRfc4122();
+        $this->client->request(
+            'POST',
+            '/api/v1/guest/chat',
+            [],
+            [],
+            ['CONTENT_TYPE' => 'application/json'],
+            json_encode(['sessionId' => $uuid])
+        );
+
         $this->assertResponseStatusCodeSame(Response::HTTP_NOT_FOUND);
     }
 
     public function testGuestEndpointsDoNotRequireAuthentication(): void
     {
-        // POST /api/v1/guest/session should be accessible without auth
         $this->client->request(
             'POST',
             '/api/v1/guest/session',

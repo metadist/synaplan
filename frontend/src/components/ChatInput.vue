@@ -96,7 +96,7 @@
           <button
             type="button"
             :class="[
-              'icon-ghost h-[44px] min-w-[44px] flex items-center justify-center rounded-xl pointer-events-auto',
+              'icon-ghost h-[44px] min-w-[44px] flex items-center justify-center rounded-xl pointer-events-auto relative',
               isGuestMode && 'opacity-50',
             ]"
             :aria-label="$t('chatInput.attach')"
