@@ -83,10 +83,22 @@
                 </svg>
               </div>
               <h2 class="text-xl font-semibold txt-primary mb-2">
-                {{ $t('guest.errorTitle') }}
+                {{
+                  guestStore.sessionExpired
+                    ? $t('guest.expiredTitle')
+                    : guestStore.rateLimited
+                      ? $t('guest.rateLimitedTitle')
+                      : $t('guest.errorTitle')
+                }}
               </h2>
               <p class="txt-secondary mb-4">
-                {{ $t('guest.errorDescription') }}
+                {{
+                  guestStore.sessionExpired
+                    ? $t('guest.expiredDescription')
+                    : guestStore.rateLimited
+                      ? $t('guest.rateLimitedDescription')
+                      : $t('guest.errorDescription')
+                }}
               </p>
               <div class="flex gap-3 justify-center">
                 <button

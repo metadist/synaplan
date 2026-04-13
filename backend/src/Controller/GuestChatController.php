@@ -93,6 +93,10 @@ class GuestChatController extends AbstractController
             return $this->json([
                 'error' => 'Too many guest sessions. Please try again later or register for an account.',
             ], Response::HTTP_TOO_MANY_REQUESTS);
+        } catch (\LogicException) {
+            return $this->json([
+                'error' => 'Session conflict. Please try again.',
+            ], Response::HTTP_CONFLICT);
         }
 
         return $this->json([
@@ -140,10 +144,12 @@ class GuestChatController extends AbstractController
 
         $session = $this->guestSessionService->getSession($sessionId);
 
-        if (!$session || $session->isExpired()) {
-            return $this->json([
-                'error' => 'Session not found or expired',
-            ], Response::HTTP_NOT_FOUND);
+        if (!$session) {
+            return $this->json(['error' => 'Session not found'], Response::HTTP_NOT_FOUND);
+        }
+
+        if ($session->isExpired()) {
+            return $this->json(['error' => 'Session expired', 'reason' => 'expired'], Response::HTTP_GONE);
         }
 
         return $this->json([
@@ -191,8 +197,11 @@ class GuestChatController extends AbstractController
         }
 
         $session = $this->guestSessionService->getSession($sessionId);
-        if (!$session || $session->isExpired()) {
-            return $this->json(['error' => 'Session not found or expired'], Response::HTTP_NOT_FOUND);
+        if (!$session) {
+            return $this->json(['error' => 'Session not found'], Response::HTTP_NOT_FOUND);
+        }
+        if ($session->isExpired()) {
+            return $this->json(['error' => 'Session expired', 'reason' => 'expired'], Response::HTTP_GONE);
         }
 
         if ($session->getChatId()) {
@@ -283,8 +292,14 @@ class GuestChatController extends AbstractController
 
         $session = $this->guestSessionService->getSession($sessionId);
 
-        if (!$session || $session->isExpired() || !$session->getChatId()) {
-            return $this->json(['error' => 'Session not found or has no chat'], Response::HTTP_NOT_FOUND);
+        if (!$session) {
+            return $this->json(['error' => 'Session not found'], Response::HTTP_NOT_FOUND);
+        }
+        if ($session->isExpired()) {
+            return $this->json(['error' => 'Session expired', 'reason' => 'expired'], Response::HTTP_GONE);
+        }
+        if (!$session->getChatId()) {
+            return $this->json(['error' => 'No chat in this session'], Response::HTTP_NOT_FOUND);
         }
 
         $chatId = $session->getChatId();

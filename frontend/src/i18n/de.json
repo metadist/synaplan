@@ -2815,6 +2815,10 @@
     },
     "errorTitle": "Testmodus derzeit nicht verfügbar",
     "errorDescription": "Deine Gastsitzung konnte nicht gestartet werden. Bitte versuche es erneut oder erstelle einen kostenlosen Account.",
+    "expiredTitle": "Deine Sitzung ist abgelaufen",
+    "expiredDescription": "Gastsitzungen sind 24 Stunden gültig. Starte einen neuen Test oder erstelle einen kostenlosen Account, um deinen Chatverlauf zu behalten.",
+    "rateLimitedTitle": "Zu viele Sitzungen",
+    "rateLimitedDescription": "Du hast das Sitzungslimit erreicht. Bitte versuche es später erneut oder erstelle einen kostenlosen Account.",
     "retry": "Erneut versuchen",
     "createAccount": "Account erstellen"
   }

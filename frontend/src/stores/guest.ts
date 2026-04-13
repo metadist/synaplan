@@ -13,6 +13,7 @@ export const useGuestStore = defineStore('guest', () => {
   const initialized = ref(false)
   const initFailed = ref(false)
   const rateLimited = ref(false)
+  const sessionExpired = ref(false)
   const bannerDismissed = ref(false)
 
   const remainingMessages = computed(() => Math.max(0, maxMessages.value - messageCount.value))
@@ -34,6 +35,16 @@ export const useGuestStore = defineStore('guest', () => {
       localStorage.setItem(GUEST_STORAGE_KEY, id)
     } catch {
       // localStorage unavailable
+    }
+  }
+
+  function clearExpiredStorage(): void {
+    sessionId.value = null
+    chatId.value = null
+    try {
+      localStorage.removeItem(GUEST_STORAGE_KEY)
+    } catch {
+      // ignore
     }
   }
 
@@ -91,6 +102,13 @@ export const useGuestStore = defineStore('guest', () => {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ sessionId: sessionId.value }),
       })
+
+      if (response.status === 410) {
+        sessionExpired.value = true
+        initFailed.value = true
+        clearExpiredStorage()
+        return null
+      }
 
       if (response.status === 404) {
         initFailed.value = true
@@ -160,6 +178,7 @@ export const useGuestStore = defineStore('guest', () => {
     initialized.value = false
     initFailed.value = false
     rateLimited.value = false
+    sessionExpired.value = false
     bannerDismissed.value = false
     try {
       localStorage.removeItem(GUEST_STORAGE_KEY)
@@ -177,6 +196,7 @@ export const useGuestStore = defineStore('guest', () => {
     initialized,
     initFailed,
     rateLimited,
+    sessionExpired,
     bannerDismissed,
     remainingMessages,
     isGuestMode,
