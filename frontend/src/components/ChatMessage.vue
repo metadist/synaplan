@@ -608,108 +608,131 @@
             v-if="role === 'assistant' && !isStreaming && backendMessageId"
             class="flex items-center gap-2 flex-shrink-0"
           >
-            <!-- False Positive Button - only show if memory/feedback service is available -->
-            <button
-              v-if="isFeedbackServiceAvailable"
-              type="button"
-              :disabled="isSuperseded"
-              :class="['pill text-xs', isSuperseded ? 'opacity-50 cursor-not-allowed' : '']"
-              :aria-label="$t('feedback.falsePositive.button')"
-              data-testid="btn-message-false-positive"
-              @click="handleFalsePositive"
-            >
-              <Icon icon="mdi:thumb-down-outline" class="w-4 h-4" />
-              <span class="font-medium hidden sm:inline">{{
-                $t('feedback.falsePositive.button')
-              }}</span>
-            </button>
-
-            <button
-              type="button"
-              :disabled="isSuperseded || !selectedModel || !hasModels"
-              :class="[
-                'pill text-xs whitespace-nowrap',
-                isSuperseded || !selectedModel || !hasModels ? 'opacity-50 cursor-not-allowed' : '',
-              ]"
-              :aria-label="$t('chatMessage.again')"
-              data-testid="btn-message-again"
-              @click="handleAgain"
-            >
-              <ArrowPathIcon class="w-4 h-4" />
-              <span v-if="selectedModel" class="font-medium hidden sm:inline"
-                >{{ $t('chatMessage.againWith') }} {{ selectedModel.label }}</span
-              >
-              <span v-else class="font-medium hidden sm:inline">{{ $t('chatMessage.again') }}</span>
-              <span class="font-medium sm:hidden">{{ $t('chatMessage.again') }}</span>
-            </button>
-
-            <div class="relative">
+            <!-- Guest mode: show disabled pill with lock icon -->
+            <template v-if="isGuestMode">
               <button
+                type="button"
+                disabled
+                class="pill text-xs whitespace-nowrap opacity-50 cursor-not-allowed relative"
+                :aria-label="$t('chatMessage.again')"
+              >
+                <ArrowPathIcon class="w-4 h-4" />
+                <span class="font-medium">{{ $t('chatMessage.again') }}</span>
+                <Icon
+                  icon="mdi:lock-outline"
+                  class="w-3 h-3 text-amber-500 absolute -top-1 -right-1"
+                />
+              </button>
+            </template>
+
+            <template v-else>
+              <!-- False Positive Button - only show if memory/feedback service is available -->
+              <button
+                v-if="isFeedbackServiceAvailable"
                 type="button"
                 :disabled="isSuperseded"
                 :class="['pill text-xs', isSuperseded ? 'opacity-50 cursor-not-allowed' : '']"
-                :aria-label="$t('chatMessage.regenerateWith')"
-                data-testid="btn-message-model-toggle"
-                @click.stop="toggleModelDropdown"
-                @keydown.escape="closeModelDropdown"
+                :aria-label="$t('feedback.falsePositive.button')"
+                data-testid="btn-message-false-positive"
+                @click="handleFalsePositive"
               >
-                <ChevronDownIcon class="w-4 h-4" />
+                <Icon icon="mdi:thumb-down-outline" class="w-4 h-4" />
+                <span class="font-medium hidden sm:inline">{{
+                  $t('feedback.falsePositive.button')
+                }}</span>
               </button>
 
-              <Transition
-                enter-active-class="transition ease-out duration-100"
-                enter-from-class="transform opacity-0 scale-95"
-                enter-to-class="transform opacity-100 scale-100"
-                leave-active-class="transition ease-in duration-75"
-                leave-from-class="transform opacity-100 scale-100"
-                leave-to-class="transform opacity-0 scale-95"
+              <button
+                type="button"
+                :disabled="isSuperseded || !selectedModel || !hasModels"
+                :class="[
+                  'pill text-xs whitespace-nowrap',
+                  isSuperseded || !selectedModel || !hasModels
+                    ? 'opacity-50 cursor-not-allowed'
+                    : '',
+                ]"
+                :aria-label="$t('chatMessage.again')"
+                data-testid="btn-message-again"
+                @click="handleAgain"
               >
-                <div
-                  v-if="modelDropdownOpen && !isSuperseded"
-                  v-click-outside="closeModelDropdown"
-                  data-testid="dropdown-again-models"
-                  class="fixed sm:absolute bottom-[60px] sm:bottom-full right-2 sm:right-0 sm:mb-2 min-w-[14rem] max-w-[calc(100vw-1rem)] dropdown-panel z-[100] max-h-[16rem] overflow-y-auto scroll-thin"
+                <ArrowPathIcon class="w-4 h-4" />
+                <span v-if="selectedModel" class="font-medium hidden sm:inline"
+                  >{{ $t('chatMessage.againWith') }} {{ selectedModel.label }}</span
+                >
+                <span v-else class="font-medium hidden sm:inline">{{
+                  $t('chatMessage.again')
+                }}</span>
+                <span class="font-medium sm:hidden">{{ $t('chatMessage.again') }}</span>
+              </button>
+
+              <div class="relative">
+                <button
+                  type="button"
+                  :disabled="isSuperseded"
+                  :class="['pill text-xs', isSuperseded ? 'opacity-50 cursor-not-allowed' : '']"
+                  :aria-label="$t('chatMessage.regenerateWith')"
+                  data-testid="btn-message-model-toggle"
+                  @click.stop="toggleModelDropdown"
                   @keydown.escape="closeModelDropdown"
                 >
-                  <button
-                    v-for="option in modelOptions"
-                    :key="`${option.provider}-${option.model}`"
-                    type="button"
-                    :class="[
-                      'dropdown-item',
-                      selectedModel &&
-                      selectedModel.model === option.model &&
-                      selectedModel.provider === option.provider
-                        ? 'dropdown-item--active'
-                        : '',
-                    ]"
-                    @click="selectModel(option)"
+                  <ChevronDownIcon class="w-4 h-4" />
+                </button>
+
+                <Transition
+                  enter-active-class="transition ease-out duration-100"
+                  enter-from-class="transform opacity-0 scale-95"
+                  enter-to-class="transform opacity-100 scale-100"
+                  leave-active-class="transition ease-in duration-75"
+                  leave-from-class="transform opacity-100 scale-100"
+                  leave-to-class="transform opacity-0 scale-95"
+                >
+                  <div
+                    v-if="modelDropdownOpen && !isSuperseded"
+                    v-click-outside="closeModelDropdown"
+                    data-testid="dropdown-again-models"
+                    class="fixed sm:absolute bottom-[60px] sm:bottom-full right-2 sm:right-0 sm:mb-2 min-w-[14rem] max-w-[calc(100vw-1rem)] dropdown-panel z-[100] max-h-[16rem] overflow-y-auto scroll-thin"
+                    @keydown.escape="closeModelDropdown"
                   >
-                    <GroqIcon
-                      v-if="option.provider.toLowerCase().includes('groq')"
-                      :size="20"
-                      class-name="flex-shrink-0"
-                    />
-                    <Icon
-                      v-else
-                      :icon="getProviderIcon(option.provider)"
-                      class="w-5 h-5 flex-shrink-0"
-                    />
-                    <div class="flex-1 min-w-0">
-                      <div class="flex items-center gap-2">
-                        <span class="text-sm font-medium">{{ option.label }}</span>
-                        <ModelCostBadge
-                          v-if="getModelForOption(option)"
-                          :model="getModelForOption(option)!"
-                          :peers="peerModelsForCost"
-                        />
+                    <button
+                      v-for="option in modelOptions"
+                      :key="`${option.provider}-${option.model}`"
+                      type="button"
+                      :class="[
+                        'dropdown-item',
+                        selectedModel &&
+                        selectedModel.model === option.model &&
+                        selectedModel.provider === option.provider
+                          ? 'dropdown-item--active'
+                          : '',
+                      ]"
+                      @click="selectModel(option)"
+                    >
+                      <GroqIcon
+                        v-if="option.provider.toLowerCase().includes('groq')"
+                        :size="20"
+                        class-name="flex-shrink-0"
+                      />
+                      <Icon
+                        v-else
+                        :icon="getProviderIcon(option.provider)"
+                        class="w-5 h-5 flex-shrink-0"
+                      />
+                      <div class="flex-1 min-w-0">
+                        <div class="flex items-center gap-2">
+                          <span class="text-sm font-medium">{{ option.label }}</span>
+                          <ModelCostBadge
+                            v-if="getModelForOption(option)"
+                            :model="getModelForOption(option)!"
+                            :peers="peerModelsForCost"
+                          />
+                        </div>
+                        <div class="text-xs txt-secondary">{{ option.provider }}</div>
                       </div>
-                      <div class="text-xs txt-secondary">{{ option.provider }}</div>
-                    </div>
-                  </button>
-                </div>
-              </Transition>
-            </div>
+                    </button>
+                  </div>
+                </Transition>
+              </div>
+            </template>
           </div>
         </div>
 
@@ -863,6 +886,7 @@ interface Props {
   feedbackIds?: number[] | null // IDs of feedbacks used (resolved from feedbackStore)
   truncated?: boolean
   // Status for failed/pending messages
+  isGuestMode?: boolean
   status?: 'sent' | 'failed' | 'rate_limited'
   errorType?: 'rate_limit' | 'connection' | 'unknown'
   errorData?: {

@@ -165,6 +165,7 @@
               :error-type="message.errorType"
               :error-data="message.errorData"
               :truncated="message.truncated"
+              :is-guest-mode="isGuestMode"
               @regenerate="handleRegenerate(message, $event)"
               @again="handleAgain"
               @retry="handleRetryMessage(message, $event)"
