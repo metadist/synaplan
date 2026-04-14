@@ -49,9 +49,9 @@
   }
 
   .dark {
-    --brand: #003fc7;
-    --brand-light: #6b8fd6;
-    --brand-hover: #4d7adb;
+    --brand: #6d9ae0;
+    --brand-light: #93b8e8;
+    --brand-hover: #83b0e8;
 
     --bg-app: #0a0e1a;
     --bg-sidebar: #0d1525;
@@ -62,8 +62,8 @@
     --txt-primary: #fff;
     --txt-secondary: #a1a1a3;
 
-    --border-light: rgba(0, 63, 199, 0.12);
-    --brand-alpha-light: rgba(0, 63, 199, 0.15);
+    --border-light: rgba(109, 154, 224, 0.15);
+    --brand-alpha-light: rgba(109, 154, 224, 0.18);
 
     --status-success: #4ade80;
     --status-success-muted: rgba(34, 197, 94, 0.15);
