@@ -78,6 +78,10 @@ function rejectAll() {
 }
 
 onMounted(() => {
+  // Disabled: cookie consent is handled by a 3rd-party tool.
+  // To re-enable the built-in banner, remove this early return.
+  return
+
   // Only show banner when analytics is configured (Google Tag enabled)
   if (!config.googleTag.enabled) return
 
