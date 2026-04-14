@@ -28,11 +28,14 @@ describe('CookieConsent', () => {
     expect(wrapper.find('[data-testid="cookie-consent-banner"]').exists()).toBe(false)
   })
 
-  it('should show banner when googleTag is enabled and no consent stored', async () => {
+  it('should not show banner when built-in consent is disabled', async () => {
     mockConfig.googleTagEnabled = true
     const wrapper = mount(CookieConsent, mountOptions)
     await wrapper.vm.$nextTick()
-    expect(wrapper.find('[data-testid="cookie-consent-banner"]').exists()).toBe(true)
+    // Built-in consent banner is disabled (BUILT_IN_CONSENT_ENABLED = false)
+    // because a 3rd-party consent tool is used instead.
+    // When re-enabling, change this expectation back to true.
+    expect(wrapper.find('[data-testid="cookie-consent-banner"]').exists()).toBe(false)
   })
 
   it('should not show banner when googleTag is enabled but consent already stored', async () => {
