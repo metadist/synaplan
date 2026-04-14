@@ -133,7 +133,7 @@ jobs:
         run: php bin/console nelmio:apidoc:dump --format=json > openapi-spec.json
 
       - name: Upload OpenAPI spec artifact
-        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: openapi-spec
           path: backend/openapi-spec.json
@@ -200,14 +200,14 @@ jobs:
         run: npm run build:widget
 
       - name: Upload frontend build artifact
-        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: frontend-dist
           path: frontend/dist/
           retention-days: 1
 
       - name: Upload widget build artifact
-        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: widget-dist
           path: frontend/dist-widget/
@@ -270,7 +270,7 @@ jobs:
           outputs: type=docker,dest=/tmp/docker-image.tar
 
       - name: Upload Docker image artifact
-        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: docker-image
           path: /tmp/docker-image.tar
@@ -420,7 +420,7 @@ jobs:
 
       - name: Upload Playwright test results
         if: always()
-        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: playwright-results-${{ matrix.browser }}-${{ matrix.auth_method }}
           path: |
