@@ -758,7 +758,12 @@ const generateAnalysis = async (forceRegenerate = false) => {
     // Reload saved summaries to reflect the update
     await loadSavedSummaries()
   } catch (err: unknown) {
-    error(getErrorMessage(err) || 'Failed to generate analysis')
+    const errorMsg = getErrorMessage(err)
+    if (errorMsg === 'model_not_configured') {
+      error(t('summary.modelNotConfigured'))
+    } else {
+      error(errorMsg || t('summary.generateError'))
+    }
   } finally {
     generating.value = false
   }

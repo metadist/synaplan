@@ -9,6 +9,7 @@ use App\Entity\Prompt;
 use App\Entity\User;
 use App\Service\File\FileHelper;
 use App\Service\File\UserUploadPathBuilder;
+use App\Service\GuestSessionService;
 use App\Service\Message\MessageForwardingService;
 use App\Service\Message\MessageProcessor;
 use App\Service\ModelConfigService;
@@ -39,6 +40,7 @@ class StreamController extends AbstractController
         private ModelConfigService $modelConfigService,
         private WidgetService $widgetService,
         private WidgetSessionService $widgetSessionService,
+        private GuestSessionService $guestSessionService,
         private RateLimitService $rateLimitService,
         private string $uploadDir,
         private UserUploadPathBuilder $userUploadPathBuilder,
@@ -153,8 +155,10 @@ class StreamController extends AbstractController
     ): Response {
         // Widget-Mode: Check for Widget headers if no authenticated user
         $isWidgetMode = false;
+        $isGuestMode = false;
         $widget = null;
         $widgetSession = null;
+        $guestSession = null;
         $fixedTaskPromptTopic = null;
 
         if (!$user) {
@@ -215,8 +219,42 @@ class StreamController extends AbstractController
                     'task_prompt' => $fixedTaskPromptTopic,
                 ]);
             } else {
-                // No user and no widget headers = unauthorized
-                return $this->json(['error' => 'Not authenticated'], Response::HTTP_UNAUTHORIZED);
+                // Guest Mode: Check for guest session query parameter
+                $guestSessionId = $request->query->get('guestSession');
+                if ($guestSessionId) {
+                    $guestSession = $this->guestSessionService->getSession($guestSessionId);
+                    if ($guestSession && !$guestSession->isExpired()) {
+                        if (!$this->guestSessionService->checkLimit($guestSession)) {
+                            $response = new StreamedResponse();
+                            $response->headers->set('Content-Type', 'text/event-stream');
+                            $response->headers->set('Cache-Control', 'no-cache');
+                            $response->headers->set('X-Accel-Buffering', 'no');
+                            $response->setCallback(function () {
+                                $this->sendSSE('guest_limit_reached', [
+                                    'message' => 'Guest message limit reached',
+                                    'action' => 'signup_required',
+                                ]);
+                            });
+
+                            return $response;
+                        }
+
+                        $user = $this->guestSessionService->getProcessingUser();
+                        if (!$user) {
+                            return $this->json(['error' => 'Guest mode unavailable'], Response::HTTP_INTERNAL_SERVER_ERROR);
+                        }
+
+                        $isGuestMode = true;
+                        $this->logger->info('Guest request authenticated', [
+                            'session_id' => substr($guestSessionId, 0, 12).'...',
+                            'remaining' => $this->guestSessionService->getRemainingMessages($guestSession),
+                        ]);
+                    } else {
+                        return $this->json(['error' => 'Guest session not found or expired'], Response::HTTP_UNAUTHORIZED);
+                    }
+                } else {
+                    return $this->json(['error' => 'Not authenticated'], Response::HTTP_UNAUTHORIZED);
+                }
             }
         }
 
@@ -279,10 +317,10 @@ class StreamController extends AbstractController
             'file_count' => count($fileIdArray),
         ]);
 
-        // Check rate limit BEFORE starting the stream (not widget mode)
+        // Check rate limit BEFORE starting the stream (not widget/guest mode)
         // Send as SSE event so EventSource can parse it (EventSource cannot read JSON error responses)
         $rateLimitError = null;
-        if (!$isWidgetMode) {
+        if (!$isWidgetMode && !$isGuestMode) {
             $rateLimitCheck = $this->rateLimitService->checkLimit($user, 'MESSAGES');
             if (!$rateLimitCheck['allowed']) {
                 $rateLimitError = [
@@ -307,7 +345,7 @@ class StreamController extends AbstractController
         $response->headers->set('X-Accel-Buffering', 'no');
         $response->headers->set('Connection', 'keep-alive');
 
-        $response->setCallback(function () use ($user, $messageText, $trackId, $chatId, $includeReasoning, $webSearch, $modelId, $isAgain, $fileIdArray, $isWidgetMode, $fixedTaskPromptTopic, $widgetSession, $rateLimitError, $voiceReply, $continueMessageId) {
+        $response->setCallback(function () use ($user, $messageText, $trackId, $chatId, $includeReasoning, $webSearch, $modelId, $isAgain, $fileIdArray, $isWidgetMode, $isGuestMode, $fixedTaskPromptTopic, $widgetSession, $guestSession, $rateLimitError, $voiceReply, $continueMessageId) {
             // Disable output buffering
             while (ob_get_level()) {
                 ob_end_clean();
@@ -387,6 +425,16 @@ class StreamController extends AbstractController
                     $this->sendSSE('error', ['error' => 'Chat not found or access denied']);
 
                     return;
+                }
+
+                // Guest mode: verify the chat belongs to THIS guest session
+                if ($isGuestMode && $guestSession) {
+                    $sessionChatId = $guestSession->getChatId();
+                    if (null === $sessionChatId || $sessionChatId !== (int) $chatId) {
+                        $this->sendSSE('error', ['error' => 'Chat does not belong to this guest session']);
+
+                        return;
+                    }
                 }
 
                 // Rate limit was already checked before stream started
@@ -510,7 +558,7 @@ class StreamController extends AbstractController
                     'is_continuation' => (bool) $continueMessageId,
                 ];
 
-                if ($isWidgetMode) {
+                if ($isWidgetMode || $isGuestMode) {
                     $processingOptions['disable_memories'] = true;
                 }
 
@@ -1078,7 +1126,7 @@ class StreamController extends AbstractController
 
                 $this->em->flush();
 
-                if (!$isWidgetMode) {
+                if (!$isWidgetMode && !$isGuestMode) {
                     $this->messageForwardingService->forwardIfNeeded($chat, $finalText);
                 }
 
@@ -1089,7 +1137,7 @@ class StreamController extends AbstractController
                     'usage' => $response['metadata']['usage'] ?? [],
                     'latency' => $response['metadata']['latency'] ?? 0,
                     'chat_id' => $chatId,
-                    'source' => $isWidgetMode ? 'WIDGET' : 'WEB',
+                    'source' => $isWidgetMode ? 'WIDGET' : ($isGuestMode ? 'GUEST' : 'WEB'),
                     'response_text' => $finalText,
                     'input_text' => $messageText,
                 ]);
@@ -1112,7 +1160,7 @@ class StreamController extends AbstractController
                             'model' => $response['metadata']['model'] ?? 'unknown',
                             'model_id' => $response['metadata']['model_id'] ?? null,
                             'chat_id' => $chatId,
-                            'source' => $isWidgetMode ? 'WIDGET' : 'WEB',
+                            'source' => $isWidgetMode ? 'WIDGET' : ($isGuestMode ? 'GUEST' : 'WEB'),
                             'response_bytes' => $mediaBytes,
                             'input_text' => $messageText,
                             'media_usage' => $response['metadata']['media_usage'] ?? [],
@@ -1262,6 +1310,27 @@ class StreamController extends AbstractController
                     }
                 }
 
+                // Widget Mode: Increment session message count
+                if ($isWidgetMode && $widgetSession) {
+                    $this->widgetSessionService->incrementMessageCount($widgetSession);
+                    $this->logger->info('Widget session message count incremented', [
+                        'session_id' => $widgetSession->getSessionId(),
+                        'message_count' => $widgetSession->getMessageCount(),
+                    ]);
+                }
+
+                // Guest Mode: Increment count and send remaining BEFORE complete
+                // (complete closes the EventSource on the client)
+                if ($isGuestMode && $guestSession) {
+                    $this->guestSessionService->attachChat($guestSession, (int) $chatId);
+                    $this->guestSessionService->incrementCount($guestSession);
+                    $this->sendSSE('guest_remaining', [
+                        'remaining' => $this->guestSessionService->getRemainingMessages($guestSession),
+                        'maxMessages' => $guestSession->getMaxMessages(),
+                        'limitReached' => $guestSession->isLimitReached(),
+                    ]);
+                }
+
                 $this->sendSSE('complete', $completeData);
 
                 usleep(100000);
@@ -1271,16 +1340,6 @@ class StreamController extends AbstractController
                     'message_id' => $outgoingMessage->getId(),
                     'topic' => $classification['topic'],
                 ]);
-
-                // Widget Mode: Increment session message count
-                if ($isWidgetMode) {
-                    /* @var \App\Entity\WidgetSession $widgetSession */
-                    $this->widgetSessionService->incrementMessageCount($widgetSession);
-                    $this->logger->info('Widget session message count incremented', [
-                        'session_id' => $widgetSession->getSessionId(),
-                        'message_count' => $widgetSession->getMessageCount(),
-                    ]);
-                }
             } catch (\App\AI\Exception\ProviderException $e) {
                 $this->logger->error('AI Provider failed', [
                     'user_id' => $user->getId(),

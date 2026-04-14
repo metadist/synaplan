@@ -49,7 +49,8 @@ export const useAuthStore = defineStore('auth', () => {
 
       if (result.success) {
         user.value = authService.getUser().value
-        // Reload config to get user-specific data like plugins
+        const { useGuestStore } = await import('./guest')
+        useGuestStore().$reset()
         await useConfigStore().reload()
         return true
       } else {

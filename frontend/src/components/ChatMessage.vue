@@ -283,7 +283,7 @@
               <!-- Tool Badge (replaces Web Search Badge for better consistency) -->
               <div
                 v-if="tool"
-                class="flex items-center gap-2 px-3 py-2 rounded-lg bg-[var(--brand-alpha-light)] text-[var(--brand)] text-sm"
+                class="flex items-center gap-2 px-3 py-2 rounded-lg bg-[var(--brand-alpha-light)] text-[var(--brand)] dark:text-[var(--brand-light)] text-sm"
               >
                 <Icon :icon="tool.icon" class="w-4 h-4 flex-shrink-0" />
                 <span class="font-medium">{{ tool.label }}</span>
@@ -292,7 +292,7 @@
               <!-- Web Search Badge (fallback for legacy messages without tool metadata) -->
               <div
                 v-else-if="webSearch"
-                class="flex items-center gap-2 px-3 py-2 rounded-lg bg-[var(--brand-alpha-light)] text-[var(--brand)] text-sm"
+                class="flex items-center gap-2 px-3 py-2 rounded-lg bg-[var(--brand-alpha-light)] text-[var(--brand)] dark:text-[var(--brand-light)] text-sm"
               >
                 <Icon icon="mdi:web" class="w-4 h-4 flex-shrink-0" />
                 <span class="font-medium">Web Search</span>
@@ -612,48 +612,75 @@
             <button
               v-if="isFeedbackServiceAvailable"
               type="button"
-              :disabled="isSuperseded"
-              :class="['pill text-xs', isSuperseded ? 'opacity-50 cursor-not-allowed' : '']"
+              :disabled="isSuperseded || isGuestMode"
+              :class="[
+                'pill text-xs relative',
+                isSuperseded || isGuestMode ? 'opacity-50 cursor-not-allowed' : '',
+              ]"
               :aria-label="$t('feedback.falsePositive.button')"
               data-testid="btn-message-false-positive"
-              @click="handleFalsePositive"
+              @click="!isGuestMode && handleFalsePositive()"
             >
               <Icon icon="mdi:thumb-down-outline" class="w-4 h-4" />
               <span class="font-medium hidden sm:inline">{{
                 $t('feedback.falsePositive.button')
               }}</span>
+              <Icon
+                v-if="isGuestMode"
+                icon="mdi:lock-outline"
+                class="w-3 h-3 text-amber-500 absolute -top-1 -right-1"
+              />
             </button>
 
             <button
               type="button"
-              :disabled="isSuperseded || !selectedModel || !hasModels"
+              :disabled="isSuperseded || isGuestMode || !selectedModel || !hasModels"
               :class="[
-                'pill text-xs whitespace-nowrap',
-                isSuperseded || !selectedModel || !hasModels ? 'opacity-50 cursor-not-allowed' : '',
+                'pill text-xs whitespace-nowrap relative',
+                isSuperseded || isGuestMode || !selectedModel || !hasModels
+                  ? 'opacity-50 cursor-not-allowed'
+                  : '',
               ]"
               :aria-label="$t('chatMessage.again')"
               data-testid="btn-message-again"
-              @click="handleAgain"
+              @click="!isGuestMode && handleAgain()"
             >
               <ArrowPathIcon class="w-4 h-4" />
-              <span v-if="selectedModel" class="font-medium hidden sm:inline"
+              <span v-if="!isGuestMode && selectedModel" class="font-medium hidden sm:inline"
                 >{{ $t('chatMessage.againWith') }} {{ selectedModel.label }}</span
               >
-              <span v-else class="font-medium hidden sm:inline">{{ $t('chatMessage.again') }}</span>
-              <span class="font-medium sm:hidden">{{ $t('chatMessage.again') }}</span>
+              <span v-else-if="!isGuestMode" class="font-medium hidden sm:inline">{{
+                $t('chatMessage.again')
+              }}</span>
+              <span :class="isGuestMode ? 'font-medium' : 'font-medium sm:hidden'">{{
+                $t('chatMessage.again')
+              }}</span>
+              <Icon
+                v-if="isGuestMode"
+                icon="mdi:lock-outline"
+                class="w-3 h-3 text-amber-500 absolute -top-1 -right-1"
+              />
             </button>
 
             <div class="relative">
               <button
                 type="button"
-                :disabled="isSuperseded"
-                :class="['pill text-xs', isSuperseded ? 'opacity-50 cursor-not-allowed' : '']"
+                :disabled="isSuperseded || isGuestMode"
+                :class="[
+                  'pill text-xs relative',
+                  isSuperseded || isGuestMode ? 'opacity-50 cursor-not-allowed' : '',
+                ]"
                 :aria-label="$t('chatMessage.regenerateWith')"
                 data-testid="btn-message-model-toggle"
-                @click.stop="toggleModelDropdown"
+                @click.stop="!isGuestMode && toggleModelDropdown()"
                 @keydown.escape="closeModelDropdown"
               >
                 <ChevronDownIcon class="w-4 h-4" />
+                <Icon
+                  v-if="isGuestMode"
+                  icon="mdi:lock-outline"
+                  class="w-3 h-3 text-amber-500 absolute -top-1 -right-1"
+                />
               </button>
 
               <Transition
@@ -863,6 +890,7 @@ interface Props {
   feedbackIds?: number[] | null // IDs of feedbacks used (resolved from feedbackStore)
   truncated?: boolean
   // Status for failed/pending messages
+  isGuestMode?: boolean
   status?: 'sent' | 'failed' | 'rate_limited'
   errorType?: 'rate_limit' | 'connection' | 'unknown'
   errorData?: {

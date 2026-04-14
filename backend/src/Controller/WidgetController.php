@@ -2,6 +2,7 @@
 
 namespace App\Controller;
 
+use App\AI\Exception\ModelNotConfiguredException;
 use App\Entity\Prompt;
 use App\Entity\User;
 use App\Entity\Widget;
@@ -631,6 +632,15 @@ class WidgetController extends AbstractController
                 'text' => $result['text'],
                 'progress' => $result['progress'],
             ]);
+        } catch (ModelNotConfiguredException $e) {
+            $this->logger->warning('Widget setup configuration error', [
+                'widget_id' => $widgetId,
+                'error' => $e->getMessage(),
+            ]);
+
+            return $this->json([
+                'error' => 'model_not_configured',
+            ], Response::HTTP_SERVICE_UNAVAILABLE);
         } catch (\Exception $e) {
             $this->logger->error('Widget setup chat failed', [
                 'widget_id' => $widgetId,

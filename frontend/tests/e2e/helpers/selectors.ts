@@ -11,6 +11,7 @@ export const selectors = {
     password: '#password',
     submit: 'button[type="submit"]',
     signUpLink: '[data-testid="link-signup"]',
+    errorAlert: '[data-testid="alert-login-error"]',
   },
   register: {
     fullName: '[data-testid="input-full-name"]',
@@ -298,6 +299,14 @@ export const selectors = {
     profile: '[data-testid="page-profile"]',
     statistics: '[data-testid="page-statistics"]',
     admin: '[data-testid="view-admin"]',
+  },
+  guest: {
+    banner: '[data-testid="guest-banner"]',
+    bannerSignup: '[data-testid="guest-banner-signup"]',
+    bannerDismiss: '[data-testid="guest-banner-dismiss"]',
+    signupModal: '[data-testid="guest-signup-modal"]',
+    modalRegister: '[data-testid="guest-modal-register"]',
+    modalLogin: '[data-testid="guest-modal-login"]',
   },
   toast: {},
 } as const
