@@ -428,7 +428,9 @@ class StreamController extends AbstractController
                 }
 
                 // Guest mode: verify the chat belongs to THIS guest session
-                if ($isGuestMode) {
+                // $isGuestMode is only a flag — keep explicit session check as runtime guard (inconsistent state / refactors).
+                // @phpstan-ignore-next-line booleanAnd.rightAlwaysTrue
+                if ($isGuestMode && $guestSession) {
                     $sessionChatId = $guestSession->getChatId();
                     if (null === $sessionChatId || $sessionChatId !== (int) $chatId) {
                         $this->sendSSE('error', ['error' => 'Chat does not belong to this guest session']);
@@ -1311,7 +1313,9 @@ class StreamController extends AbstractController
                 }
 
                 // Widget Mode: Increment session message count
-                if ($isWidgetMode) {
+                // $isWidgetMode is only a flag — keep explicit widget session check as runtime guard.
+                // @phpstan-ignore-next-line booleanAnd.rightAlwaysTrue
+                if ($isWidgetMode && $widgetSession) {
                     $this->widgetSessionService->incrementMessageCount($widgetSession);
                     $this->logger->info('Widget session message count incremented', [
                         'session_id' => $widgetSession->getSessionId(),
@@ -1321,7 +1325,9 @@ class StreamController extends AbstractController
 
                 // Guest Mode: Increment count and send remaining BEFORE complete
                 // (complete closes the EventSource on the client)
-                if ($isGuestMode) {
+                // $isGuestMode is only a flag — keep explicit session check as runtime guard.
+                // @phpstan-ignore-next-line booleanAnd.rightAlwaysTrue
+                if ($isGuestMode && $guestSession) {
                     $this->guestSessionService->attachChat($guestSession, (int) $chatId);
                     $this->guestSessionService->incrementCount($guestSession);
                     $this->sendSSE('guest_remaining', [
