@@ -195,13 +195,24 @@ final readonly class MediaGenerationHandler implements MessageHandlerInterface
                 $mediaType = 'image';
                 $this->logger->info('MediaGenerationHandler: Using media type hint from extractor (image)');
             } else {
-                $modelId = $this->modelConfigService->getDefaultModel('TEXT2PIC', $effectiveUserId);
-                $mediaType = 'image';
-
-                $this->logger->warning('MediaGenerationHandler: Media type not determined from extractor, defaulting to image', [
-                    'model_id' => $modelId,
+                $this->logger->warning('MediaGenerationHandler: Media type not determined from extractor, asking user to clarify', [
                     'prompt_preview' => substr($prompt, 0, 100),
                 ]);
+
+                $lang = $classification['language'] ?? 'en';
+                $clarification = 'de' === $lang
+                    ? 'Ich konnte nicht erkennen, welche Art von Medium du erstellen möchtest. '
+                        .'Bitte verwende einen der folgenden Befehle: `/pic` für Bilder, `/vid` für Videos.'
+                    : 'I couldn\'t determine what type of media you want to generate. '
+                        .'Please use one of the following commands: `/pic` for images, `/vid` for videos.';
+
+                $streamCallback($clarification);
+
+                return [
+                    'metadata' => [
+                        'error' => 'media_type_not_determined',
+                    ],
+                ];
             }
         }
 
