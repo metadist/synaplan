@@ -13,17 +13,18 @@ use App\Service\EncryptionService;
 use App\Service\InboundEmailHandlerService;
 use App\Service\ModelConfigService;
 use App\Service\RateLimitService;
+use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
 
 class InboundEmailHandlerServiceTest extends TestCase
 {
     private InboundEmailHandlerService $service;
-    private InboundEmailHandlerRepository $handlerRepository;
+    private InboundEmailHandlerRepository&MockObject $handlerRepository;
     private PromptRepository $promptRepository;
     private AiFacade $aiFacade;
     private ModelConfigService $modelConfigService;
-    private EncryptionService $encryptionService;
+    private EncryptionService&MockObject $encryptionService;
     private LoggerInterface $logger;
 
     protected function setUp(): void
@@ -49,7 +50,6 @@ class InboundEmailHandlerServiceTest extends TestCase
 
     public function testProcessAllHandlersWithNoHandlers(): void
     {
-        // @phpstan-ignore-next-line (PHPUnit mock method)
         $this->handlerRepository
             ->expects($this->once())
             ->method('findHandlersToCheck')
@@ -75,7 +75,6 @@ class InboundEmailHandlerServiceTest extends TestCase
         $property->setAccessible(true);
         $property->setValue($handler, 'encrypted-password');
 
-        // @phpstan-ignore-next-line (PHPUnit mock method)
         $this->encryptionService
             ->expects($this->once())
             ->method('decrypt')

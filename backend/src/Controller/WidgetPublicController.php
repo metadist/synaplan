@@ -897,9 +897,9 @@ class WidgetPublicController extends AbstractController
                 return $this->json($result + [
                     'remainingUploads' => $remainingUploads,
                 ]);
-            } else {
-                return $this->json($result, Response::HTTP_BAD_REQUEST);
             }
+
+            return $this->json($result, Response::HTTP_BAD_REQUEST);
         } catch (\Throwable $e) {
             $this->logger->error('Widget file upload failed', [
                 'widget_id' => $widgetId,

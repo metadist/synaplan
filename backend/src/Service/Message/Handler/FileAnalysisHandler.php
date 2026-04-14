@@ -80,18 +80,17 @@ final readonly class FileAnalysisHandler implements MessageHandlerInterface
             if (!empty($fileInfo['text'])) {
                 // Audio with transcription → Use Chat Model
                 return $this->handleWithChatModel($message, $fileInfo, $userPrompt, $classification, $progressCallback);
-            } else {
-                // Audio without transcription → Error
-                $this->logger->error('FileAnalysisHandler: Audio file without transcription', [
-                    'file_id' => $fileInfo['id'],
-                    'file_name' => $fileInfo['name'],
-                ]);
-
-                return [
-                    'content' => 'Audio transcription failed or is not yet available. Please try again in a moment.',
-                    'metadata' => ['error' => 'audio_not_transcribed'],
-                ];
             }
+            // Audio without transcription → Error
+            $this->logger->error('FileAnalysisHandler: Audio file without transcription', [
+                'file_id' => $fileInfo['id'],
+                'file_name' => $fileInfo['name'],
+            ]);
+
+            return [
+                'content' => 'Audio transcription failed or is not yet available. Please try again in a moment.',
+                'metadata' => ['error' => 'audio_not_transcribed'],
+            ];
         }
 
         // 2. Documents (PDF, DOCX, etc.): Must have extracted text from PreProcessor
@@ -99,19 +98,18 @@ final readonly class FileAnalysisHandler implements MessageHandlerInterface
             if (!empty($fileInfo['text'])) {
                 // Document with extracted text → Use Chat Model
                 return $this->handleWithChatModel($message, $fileInfo, $userPrompt, $classification, $progressCallback);
-            } else {
-                // Document without extracted text → Error
-                $this->logger->error('FileAnalysisHandler: Document without extracted text', [
-                    'file_id' => $fileInfo['id'],
-                    'file_name' => $fileInfo['name'],
-                    'file_type' => $fileInfo['type'],
-                ]);
-
-                return [
-                    'content' => 'Document text extraction failed. The document may be empty, corrupted, or in an unsupported format.',
-                    'metadata' => ['error' => 'document_extraction_failed'],
-                ];
             }
+            // Document without extracted text → Error
+            $this->logger->error('FileAnalysisHandler: Document without extracted text', [
+                'file_id' => $fileInfo['id'],
+                'file_name' => $fileInfo['name'],
+                'file_type' => $fileInfo['type'],
+            ]);
+
+            return [
+                'content' => 'Document text extraction failed. The document may be empty, corrupted, or in an unsupported format.',
+                'metadata' => ['error' => 'document_extraction_failed'],
+            ];
         }
 
         // 3. Images → Use Vision Model
@@ -178,19 +176,18 @@ final readonly class FileAnalysisHandler implements MessageHandlerInterface
             if (!empty($fileInfo['text'])) {
                 // Audio with transcription → Use Chat Model
                 return $this->handleStreamWithChatModel($message, $fileInfo, $userPrompt, $classification, $streamCallback, $progressCallback, $options);
-            } else {
-                // Audio without transcription → Error
-                $this->logger->error('FileAnalysisHandler: Audio file without transcription (streaming)', [
-                    'file_id' => $fileInfo['id'],
-                    'file_name' => $fileInfo['name'],
-                ]);
-
-                $streamCallback('Audio transcription failed or is not yet available. Please try again in a moment.');
-
-                return [
-                    'metadata' => ['error' => 'audio_not_transcribed'],
-                ];
             }
+            // Audio without transcription → Error
+            $this->logger->error('FileAnalysisHandler: Audio file without transcription (streaming)', [
+                'file_id' => $fileInfo['id'],
+                'file_name' => $fileInfo['name'],
+            ]);
+
+            $streamCallback('Audio transcription failed or is not yet available. Please try again in a moment.');
+
+            return [
+                'metadata' => ['error' => 'audio_not_transcribed'],
+            ];
         }
 
         // 2. Documents (PDF, DOCX, etc.): Must have extracted text from PreProcessor
@@ -198,20 +195,19 @@ final readonly class FileAnalysisHandler implements MessageHandlerInterface
             if (!empty($fileInfo['text'])) {
                 // Document with extracted text → Use Chat Model with streaming
                 return $this->handleStreamWithChatModel($message, $fileInfo, $userPrompt, $classification, $streamCallback, $progressCallback, $options);
-            } else {
-                // Document without extracted text → Error
-                $this->logger->error('FileAnalysisHandler: Document without extracted text (streaming)', [
-                    'file_id' => $fileInfo['id'],
-                    'file_name' => $fileInfo['name'],
-                    'file_type' => $fileInfo['type'],
-                ]);
-
-                $streamCallback('Document text extraction failed. The document may be empty, corrupted, or in an unsupported format.');
-
-                return [
-                    'metadata' => ['error' => 'document_extraction_failed'],
-                ];
             }
+            // Document without extracted text → Error
+            $this->logger->error('FileAnalysisHandler: Document without extracted text (streaming)', [
+                'file_id' => $fileInfo['id'],
+                'file_name' => $fileInfo['name'],
+                'file_type' => $fileInfo['type'],
+            ]);
+
+            $streamCallback('Document text extraction failed. The document may be empty, corrupted, or in an unsupported format.');
+
+            return [
+                'metadata' => ['error' => 'document_extraction_failed'],
+            ];
         }
 
         // 3. Images → Use Vision Model (non-streaming, then output)
