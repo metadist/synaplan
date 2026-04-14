@@ -13,6 +13,12 @@
   "labels": ["dependencies"],
   "packageRules": [
     {
+      "description": "Catch-all composer patch/minor FIRST — later rules override groupName for Framework/QA",
+      "groupName": "Backend Dependencies",
+      "matchManagers": ["composer"],
+      "matchUpdateTypes": ["minor", "patch"]
+    },
+    {
       "description": "Framework updates isolated — historically broke CI (#669)",
       "groupName": "PHP Framework",
       "matchManagers": ["composer"],
@@ -30,6 +36,12 @@
       "matchUpdateTypes": ["minor", "patch"]
     },
     {
+      "description": "Catch-all npm patch/minor FIRST — Frontend Core rule below overrides",
+      "groupName": "Frontend Dependencies",
+      "matchManagers": ["npm"],
+      "matchUpdateTypes": ["minor", "patch"]
+    },
+    {
       "description": "Frontend core frameworks grouped separately",
       "groupName": "Frontend Core",
       "matchManagers": ["npm"],
@@ -39,18 +51,6 @@
         "typescript", "@typescript-eslint/**", "vue-tsc",
         "tailwindcss", "@tailwindcss/**"
       ],
-      "matchUpdateTypes": ["minor", "patch"]
-    },
-    {
-      "description": "All remaining backend packages — never broke CI",
-      "groupName": "Backend Dependencies",
-      "matchManagers": ["composer"],
-      "matchUpdateTypes": ["minor", "patch"]
-    },
-    {
-      "description": "All remaining frontend packages — never broke CI",
-      "groupName": "Frontend Dependencies",
-      "matchManagers": ["npm"],
       "matchUpdateTypes": ["minor", "patch"]
     },
     {
