@@ -63,5 +63,19 @@ export default defineConfig({
       use: { ...devices['Desktop Chrome'] },
       grep: /@oidc-redirect/,
     },
+    /** @noci tests (e.g. RAG + real embeddings) are excluded from chromium via grepInvert — run explicitly or in CI job that sets --project=chromium-noci */
+    {
+      name: 'chromium-noci',
+      use: {
+        ...devices['Desktop Chrome'],
+        launchOptions: {
+          args: [
+            '--disable-features=LocalNetworkAccessChecks',
+            ...(process.env.CI ? [] : ['--start-maximized']),
+          ],
+        },
+      },
+      grep: /@noci/,
+    },
   ],
 })
