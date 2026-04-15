@@ -1,6 +1,5 @@
 import { test, expect } from '../test-setup'
 import { login } from '../helpers/auth'
-import { ensureUserVectorizeTestProvider } from '../helpers/model-defaults'
 import { selectors } from '../helpers/selectors'
 import { FIXTURE_PATHS } from '../config/test-data'
 import { TIMEOUTS, INTERVALS } from '../config/config'
@@ -19,9 +18,9 @@ const RAG = selectors.rag
 const NAV = selectors.nav
 
 /**
- * Full flow: upload vectorized fixture, semantic search with same phrase.
- * Vectorization is async — we poll search until chunks appear.
- * Embeddings: per-user API default VECTORIZE → TestProvider (-2), no real AI/Ollama required.
+ * Full flow: upload file, semantic search with same phrase, poll until chunks appear.
+ * VECTORIZE default is set to TestProvider (-2) by globalSetup (global: true),
+ * so vectorization works without real AI / Ollama.
  */
 test.describe('@ci @smoke RAG Semantic Search', () => {
   test.setTimeout(TIMEOUTS.EXTREME + TIMEOUTS.VERY_LONG + TIMEOUTS.STANDARD)
@@ -29,13 +28,8 @@ test.describe('@ci @smoke RAG Semantic Search', () => {
   test('semantic search finds uploaded content (TestProvider embeddings)', async ({
     page,
     credentials,
-    request,
   }) => {
     const fileName = path.basename(ragFixturePath)
-
-    await test.step('Arrange: VECTORIZE default = TestProvider for this worker (API)', async () => {
-      await ensureUserVectorizeTestProvider(request, credentials)
-    })
 
     await login(page, credentials)
 

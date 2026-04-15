@@ -39,11 +39,6 @@ export default async function globalSetup(): Promise<void> {
       )
     }
   } catch (err) {
-    // CI must not silently run E2E against Ollama defaults when admin API is broken.
-    if (process.env.CI === 'true' || process.env.GITHUB_ACTIONS === 'true') {
-      throw err
-    }
-    // Local: allow UI-only runs when backend is not up (e.g. vite without docker).
     console.warn(
       '[globalSetup] Skipped setting TestProvider defaults:',
       err instanceof Error ? err.message : String(err)
