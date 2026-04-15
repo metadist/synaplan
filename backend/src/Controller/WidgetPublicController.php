@@ -151,6 +151,7 @@ class WidgetPublicController extends AbstractController
             'hideButton',
             'privacyPolicyUrl',
             'detectTheme',
+            'sessionMode',
         ];
 
         return \array_intersect_key($config, \array_flip($allowed));

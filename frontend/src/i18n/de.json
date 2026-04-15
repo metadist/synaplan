@@ -1977,7 +1977,11 @@
         "howItWorks": "So funktioniert es",
         "howStep1": "Ein User besucht deine Seite — das Widget erhält seine ID über den Embed-Code",
         "howStep2": "Das System ruft deine API mit der User-ID auf und holt das Profil ab",
-        "howStep3": "Die KI nutzt die Profildaten für personalisierte, kontextbezogene Antworten"
+        "howStep3": "Die KI nutzt die Profildaten für personalisierte, kontextbezogene Antworten",
+        "sessionModeTitle": "Session-Modus",
+        "sessionModeHelp": "Lege fest, ob Chat-Sessions an den Browser oder an einzelne User gebunden sind. User-basierte Sessions erfordern die externalUserId im Embed-Code.",
+        "sessionModeBrowser": "Browserbasiert",
+        "sessionModeUser": "Userbasiert"
       },
       "proRequired": "PRO-Abo erforderlich",
       "saveSuccess": "Einstellungen erfolgreich gespeichert!",

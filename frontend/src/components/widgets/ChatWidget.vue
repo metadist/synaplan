@@ -669,6 +669,7 @@ interface Props {
   allowFullscreen?: boolean
   externalUserId?: string
   privacyPolicyUrl?: string
+  sessionMode?: 'browser' | 'user'
   testMode?: boolean
   internalMode?: boolean
 }
@@ -693,6 +694,7 @@ const props = withDefaults(defineProps<Props>(), {
   allowFullscreen: false,
   externalUserId: undefined,
   privacyPolicyUrl: undefined,
+  sessionMode: 'browser',
   testMode: false,
   internalMode: false,
 })
@@ -1711,8 +1713,17 @@ const downloadFileById = async (fileId: number | undefined, filename: string | u
   }
 }
 
-const getSessionStorageKey = () => `synaplan_widget_session_${props.widgetId}`
+const isUserSessionMode = computed(() => props.sessionMode === 'user' && !!props.externalUserId)
+
+const getSessionStorageKey = () => {
+  if (isUserSessionMode.value) {
+    return `synaplan_widget_session_${props.widgetId}_${props.externalUserId}`
+  }
+  return `synaplan_widget_session_${props.widgetId}`
+}
+
 const getChatStorageKeyForSession = (id: string) => `synaplan_widget_chatid_${props.widgetId}_${id}`
+
 const createSessionId = () => `sess_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`
 
 const handleOpenEvent = (event: Event) => {
@@ -1752,6 +1763,8 @@ const normalizeServerMessage = (rawUnknown: unknown): Message => {
   } else if (parsed.parts.length > 0) {
     content = parsed.parts.map((part) => part.content).join('\n\n')
   }
+
+  content = stripThinkingBlocks(content)
 
   const role = raw.direction === 'IN' ? 'user' : 'assistant'
   const timestampSeconds = typeof raw.timestamp === 'number' ? raw.timestamp : Date.now() / 1000
@@ -1952,11 +1965,18 @@ async function handleMessagesClick(event: MouseEvent): Promise<void> {
   }
 }
 
-// Render message content with enhanced code blocks
+const stripThinkingBlocks = (text: string): string => {
+  let result = text.replace(/<think>[\s\S]*?<\/think>/g, '')
+  result = result.replace(/<think>[\s\S]*$/, '')
+  return result.trim()
+}
+
 const renderMessageContent = (value: string): string => {
   if (!value) {
     return ''
   }
+
+  value = stripThinkingBlocks(value)
 
   // Parse code blocks and render with copy button
   const { textParts, codeBlocks } = extractCodeBlocks(value)

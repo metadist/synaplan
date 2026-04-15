@@ -1949,7 +1949,11 @@
         "howItWorks": "How it works",
         "howStep1": "A user visits your site — the widget receives their ID via the embed code",
         "howStep2": "The system calls your API with the user's ID to fetch their profile",
-        "howStep3": "The AI uses the profile data to give personalized, context-aware answers"
+        "howStep3": "The AI uses the profile data to give personalized, context-aware answers",
+        "sessionModeTitle": "Session Mode",
+        "sessionModeHelp": "Choose whether chat sessions are tied to the browser or to individual users. User-based sessions require the externalUserId in the embed code.",
+        "sessionModeBrowser": "Browser-based",
+        "sessionModeUser": "User-based"
       },
       "proRequired": "PRO subscription required",
       "saveSuccess": "Settings saved successfully!",

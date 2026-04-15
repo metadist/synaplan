@@ -74,6 +74,7 @@ export interface WidgetConfig {
   customFields?: CustomFieldDef[]
   externalApiToken?: string
   externalApiUrl?: string
+  sessionMode?: 'browser' | 'user'
   privacyPolicyUrl?: string
   dataProcessingAccepted?: boolean
 }

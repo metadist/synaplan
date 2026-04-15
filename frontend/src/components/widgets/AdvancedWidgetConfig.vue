@@ -655,6 +655,36 @@ SynaplanWidget.init({
                 </ul>
               </div>
 
+              <!-- Session Mode -->
+              <div
+                v-if="config.externalApiUrl"
+                class="mt-3 p-3 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20"
+              >
+                <div class="flex items-center justify-between gap-3">
+                  <div>
+                    <p class="text-sm font-medium txt-primary">
+                      {{ $t('widgets.advancedConfig.userDataIntegration.sessionModeTitle') }}
+                    </p>
+                    <p class="text-xs txt-secondary mt-0.5">
+                      {{ $t('widgets.advancedConfig.userDataIntegration.sessionModeHelp') }}
+                    </p>
+                  </div>
+                  <select
+                    v-model="config.sessionMode"
+                    :disabled="!auth.isPro"
+                    class="px-3 py-1.5 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)] disabled:opacity-50 disabled:cursor-not-allowed"
+                    data-testid="select-session-mode"
+                  >
+                    <option value="browser">
+                      {{ $t('widgets.advancedConfig.userDataIntegration.sessionModeBrowser') }}
+                    </option>
+                    <option value="user">
+                      {{ $t('widgets.advancedConfig.userDataIntegration.sessionModeUser') }}
+                    </option>
+                  </select>
+                </div>
+              </div>
+
               <p v-if="!auth.isPro" class="text-xs text-amber-600 dark:text-amber-400">
                 {{ $t('widgets.advancedConfig.proRequired') }}
               </p>
@@ -1586,6 +1616,7 @@ const config = reactive<widgetsApi.WidgetConfig>({
   allowedDomains: [],
   externalApiToken: '',
   externalApiUrl: '',
+  sessionMode: 'browser' as 'browser' | 'user',
   privacyPolicyUrl: '',
   dataProcessingAccepted: false,
 })
@@ -2338,6 +2369,7 @@ onMounted(async () => {
     allowedDomains: widgetConfig.allowedDomains || props.widget.allowedDomains || [],
     externalApiToken: widgetConfig.externalApiToken || '',
     externalApiUrl: widgetConfig.externalApiUrl || '',
+    sessionMode: widgetConfig.sessionMode || 'browser',
     privacyPolicyUrl: widgetConfig.privacyPolicyUrl || '',
     dataProcessingAccepted: widgetConfig.dataProcessingAccepted || false,
   })
