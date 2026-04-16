@@ -236,7 +236,6 @@
                       class="w-4 h-4 text-[var(--brand)] shrink-0"
                     />
                     <input
-                      ref="newFolderInput"
                       v-model="groupKeyword"
                       type="text"
                       class="flex-1 px-3 py-2 text-sm rounded-lg bg-black/[0.03] dark:bg-white/[0.03] txt-primary placeholder:txt-secondary/50 focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
@@ -1167,7 +1166,7 @@ const storageWidget = ref<InstanceType<typeof StorageQuotaWidget> | null>(null)
 const groupKeyword = ref('')
 const selectedGroup = ref('')
 const isCreatingNewFolder = ref(false)
-const newFolderInput = ref<HTMLInputElement | null>(null)
+
 const fileInputRef = ref<HTMLInputElement | null>(null)
 // File upload state (removed processLevel - always vectorize)
 const selectedFiles = ref<File[]>([])

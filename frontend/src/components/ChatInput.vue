@@ -116,7 +116,6 @@
           </button>
 
           <input
-            ref="fileInputRef"
             type="file"
             multiple
             class="hidden"
@@ -329,7 +328,7 @@ const mentionPaletteVisible = ref(false)
 const mentionPaletteRef = ref<InstanceType<typeof FileMentionPalette> | null>(null)
 const mentionQuery = ref('')
 const textareaRef = ref<InstanceType<typeof Textarea> | null>(null)
-const fileInputRef = ref<HTMLInputElement | null>(null)
+
 const activeCommand = ref<string | null>(null)
 const isDragging = ref(false)
 const isFocused = ref(false)
