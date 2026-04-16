@@ -142,6 +142,10 @@ final readonly class MediaGenerationHandler implements MessageHandlerInterface
             $mediaType = 'video';
             $isSlashCommand = true;
             $this->logger->info('MediaGenerationHandler: Detected /vid command, forcing video generation');
+        } elseif ('tools:tts' === $topic) {
+            $mediaType = 'audio';
+            $isSlashCommand = true;
+            $this->logger->info('MediaGenerationHandler: Detected /tts command, forcing audio generation');
         }
 
         // Priority: Again model_id > Task-prompt aiModel > DB default
@@ -168,6 +172,8 @@ final readonly class MediaGenerationHandler implements MessageHandlerInterface
             if ($isSlashCommand) {
                 if ('video' === $mediaType) {
                     $modelId = $this->modelConfigService->getDefaultModel('TEXT2VID', $effectiveUserId);
+                } elseif ('audio' === $mediaType) {
+                    $modelId = $this->modelConfigService->getDefaultModel('TEXT2SOUND', $effectiveUserId);
                 } else {
                     $modelId = $this->modelConfigService->getDefaultModel('TEXT2PIC', $effectiveUserId);
                 }
@@ -202,9 +208,9 @@ final readonly class MediaGenerationHandler implements MessageHandlerInterface
                 $lang = $classification['language'] ?? 'en';
                 $clarification = 'de' === $lang
                     ? 'Ich konnte nicht erkennen, welche Art von Medium du erstellen möchtest. '
-                        .'Bitte verwende einen der folgenden Befehle: `/pic` für Bilder, `/vid` für Videos.'
+                        .'Bitte verwende einen der folgenden Befehle: `/pic` für Bilder, `/vid` für Videos, `/tts` für Audio.'
                     : 'I couldn\'t determine what type of media you want to generate. '
-                        .'Please use one of the following commands: `/pic` for images, `/vid` for videos.';
+                        .'Please use one of the following commands: `/pic` for images, `/vid` for videos, `/tts` for audio.';
 
                 $streamCallback($clarification);
 
