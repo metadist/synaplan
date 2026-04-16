@@ -373,7 +373,6 @@
             >
               <ChatWidget
                 :key="chatWidgetKey"
-                ref="chatWidgetRef"
                 :widget-id="testWidget.widgetId"
                 :api-url="apiUrl"
                 :primary-color="testWidget.config?.primaryColor || '#007bff'"
@@ -447,7 +446,6 @@ const testWidget = ref<widgetsApi.Widget | null>(null)
 const overlayMode = ref<'test' | 'internal'>('internal')
 const internalSessionId = ref('')
 const chatWidgetKey = ref(0)
-const chatWidgetRef = ref<InstanceType<typeof ChatWidget> | null>(null)
 
 const testWidgetCustomFields = computed(() => testWidget.value?.config?.customFields ?? [])
 
