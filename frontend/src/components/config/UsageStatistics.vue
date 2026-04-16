@@ -357,7 +357,7 @@
                 data-testid="item-activity"
               >
                 <td class="px-3 py-3 txt-secondary whitespace-nowrap">
-                  {{ formatDateTime(entry.timestamp) }}
+                  {{ getTimeAgo(entry.timestamp) }}
                 </td>
                 <td class="px-3 py-3">
                   <span class="px-2 py-1 rounded-full text-xs font-medium surface-chip">
@@ -496,10 +496,12 @@ import {
 } from '@/api/usageApi'
 import { useNotification } from '@/composables/useNotification'
 import { useI18n } from 'vue-i18n'
+import { useDateFormat } from '@/composables/useDateFormat'
 import { authService } from '@/services/authService'
 
 const { success, error: showError } = useNotification()
 const { t } = useI18n()
+const { formatDate: formatDateStr, formatRelativeTime } = useDateFormat()
 
 const loading = ref(false)
 const exporting = ref(false)
@@ -679,33 +681,11 @@ const getBudgetBarClass = (percent: number) => {
 }
 
 const formatDate = (timestamp: number) => {
-  return new Date(timestamp * 1000).toLocaleDateString()
+  return formatDateStr(new Date(timestamp * 1000))
 }
 
-const formatDateTime = (timestamp: number) => {
-  const date = new Date(timestamp * 1000)
-  const now = new Date()
-  const diff = now.getTime() - date.getTime()
-
-  // Less than 1 minute
-  if (diff < 60000) {
-    return t('common.justNow')
-  }
-
-  // Less than 1 hour
-  if (diff < 3600000) {
-    const minutes = Math.floor(diff / 60000)
-    return t('common.minutesAgo', { count: minutes })
-  }
-
-  // Less than 24 hours
-  if (diff < 86400000) {
-    const hours = Math.floor(diff / 3600000)
-    return t('common.hoursAgo', { count: hours })
-  }
-
-  // More than 24 hours - show full date
-  return date.toLocaleString()
+const getTimeAgo = (timestamp: number) => {
+  return formatRelativeTime(new Date(timestamp * 1000))
 }
 
 onMounted(() => {

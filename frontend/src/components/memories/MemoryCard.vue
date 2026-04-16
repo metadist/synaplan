@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { useDateFormat } from '@/composables/useDateFormat'
 import type { UserMemory } from '@/services/api/userMemoriesApi'
 import { Pencil, Trash2 } from 'lucide-vue-next'
 
@@ -15,7 +16,8 @@ const emit = defineEmits<{
   delete: [memory: UserMemory]
 }>()
 
-const { t, locale } = useI18n()
+const { t } = useI18n()
+const { formatDateTime } = useDateFormat()
 
 const sourceLabel = computed(() => {
   return t(`memories.source.${props.memory.source}`)
@@ -26,16 +28,7 @@ const categoryLabel = computed(() => {
 })
 
 const formattedDate = computed(() => {
-  const date = new Date(props.memory.updated * 1000)
-  const browserLocale = typeof navigator !== 'undefined' ? navigator.language : 'en'
-  const activeLocale = (locale?.value || browserLocale) as string
-  return new Intl.DateTimeFormat(activeLocale, {
-    day: '2-digit',
-    month: '2-digit',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  }).format(date)
+  return formatDateTime(new Date(props.memory.updated * 1000))
 })
 </script>
 

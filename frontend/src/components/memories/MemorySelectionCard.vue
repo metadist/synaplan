@@ -2,6 +2,7 @@
 import { Icon } from '@iconify/vue'
 import { useI18n } from 'vue-i18n'
 import type { UserMemory } from '@/services/api/userMemoriesApi'
+import { useDateFormat } from '@/composables/useDateFormat'
 
 const props = defineProps<{
   memory: UserMemory
@@ -15,6 +16,7 @@ const emit = defineEmits<{
 }>()
 
 const { t } = useI18n()
+const { formatDateTime } = useDateFormat()
 </script>
 
 <template>
@@ -50,9 +52,7 @@ const { t } = useI18n()
 
     <div class="flex items-center justify-between text-xs txt-tertiary mb-3 md:mb-4">
       <span>{{ $t(`memories.source.${props.memory.source}`) }}</span>
-      <span class="truncate ml-2">{{
-        new Date(props.memory.updated * 1000).toLocaleString()
-      }}</span>
+      <span class="truncate ml-2">{{ formatDateTime(new Date(props.memory.updated * 1000)) }}</span>
     </div>
 
     <div class="flex gap-2">

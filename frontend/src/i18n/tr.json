@@ -504,6 +504,8 @@
     "minutesAgo": "{count} dakika önce",
     "hoursAgo": "{count} saat önce",
     "daysAgo": "{count} gün önce",
+    "today": "Bugün",
+    "yesterday": "Dün",
     "previous": "Önceki",
     "error": "Hata",
     "success": "Başarılı",

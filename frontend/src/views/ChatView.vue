@@ -346,6 +346,7 @@ import GuestBanner from '@/components/guest/GuestBanner.vue'
 import GuestSignupModal from '@/components/guest/GuestSignupModal.vue'
 import GuestFeatureGateModal from '@/components/guest/GuestFeatureGateModal.vue'
 import { usePromoTips } from '@/composables/usePromoTips'
+import { useDateFormat } from '@/composables/useDateFormat'
 
 const SaveCancelledMessageResponseSchema = z
   .object({
@@ -376,6 +377,7 @@ const guestStore = useGuestStore()
 const memoriesStore = useMemoriesStore()
 const feedbackStore = useFeedbackStore()
 const promoTips = usePromoTips()
+const { getDateLabel } = useDateFormat()
 
 const isGuestMode = computed(() => !authStore.isAuthenticated && guestStore.isGuestMode)
 const showGuestSignupModal = ref(false)
@@ -664,26 +666,6 @@ async function generateChatTitleFromFirstMessage(firstMessage: string) {
 
   // Update chat title
   await chatsStore.updateChatTitle(chat.id, title)
-}
-
-const getDateLabel = (date: Date): string => {
-  const today = new Date()
-  today.setHours(0, 0, 0, 0)
-
-  const messageDate = new Date(date)
-  messageDate.setHours(0, 0, 0, 0)
-
-  const diffTime = today.getTime() - messageDate.getTime()
-  const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24))
-
-  if (diffDays === 0) return 'Today'
-  if (diffDays === 1) return 'Yesterday'
-
-  return messageDate.toLocaleDateString('de-DE', {
-    day: '2-digit',
-    month: '2-digit',
-    year: 'numeric',
-  })
 }
 
 const groupedMessages = computed(() => {

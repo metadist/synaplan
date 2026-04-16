@@ -704,9 +704,11 @@ const AdminSubscriptionsPanel = defineAsyncComponent(
 import { useAuthStore } from '@/stores/auth'
 import { useConfigStore } from '@/stores/config'
 import { useI18n } from 'vue-i18n'
+import { useDateFormat } from '@/composables/useDateFormat'
 import { useNotification } from '@/composables/useNotification'
 
 const { t } = useI18n()
+const { formatDateTime } = useDateFormat()
 const authStore = useAuthStore()
 const config = useConfigStore()
 const { success, error: showError } = useNotification()
@@ -1010,11 +1012,7 @@ function formatDate(dateStr: string): string {
   try {
     const date = new Date(dateStr)
     if (isNaN(date.getTime())) return '—'
-    return (
-      date.toLocaleDateString() +
-      ' ' +
-      date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-    )
+    return formatDateTime(date)
   } catch {
     return '—'
   }

@@ -214,6 +214,7 @@ import { getErrorMessage } from '@/utils/errorMessage'
 import { ref, computed, onMounted, onBeforeUnmount, nextTick } from 'vue'
 import { Icon } from '@iconify/vue'
 import { useI18n } from 'vue-i18n'
+import { useDateFormat } from '@/composables/useDateFormat'
 import MainLayout from '@/components/MainLayout.vue'
 import * as widgetsApi from '@/services/api/widgetsApi'
 import * as widgetSessionsApi from '@/services/api/widgetSessionsApi'
@@ -221,6 +222,7 @@ import { useNotification } from '@/composables/useNotification'
 import { subscribeToNotifications, type EventSubscription } from '@/services/sseClient'
 
 const { t } = useI18n()
+const { formatRelativeTime, formatTime: formatTimeStr } = useDateFormat()
 const { success, error } = useNotification()
 
 const widgets = ref<widgetsApi.Widget[]>([])
@@ -380,18 +382,11 @@ const scrollToBottom = () => {
 
 const formatTime = (timestamp: number) => {
   if (!timestamp) return '-'
-  const date = new Date(timestamp * 1000)
-  const now = new Date()
-  const diff = now.getTime() - date.getTime()
-
-  if (diff < 60000) return t('common.justNow')
-  if (diff < 3600000) return t('common.minutesAgo', { count: Math.floor(diff / 60000) })
-  if (diff < 86400000) return t('common.hoursAgo', { count: Math.floor(diff / 3600000) })
-  return date.toLocaleDateString()
+  return formatRelativeTime(new Date(timestamp * 1000))
 }
 
 const formatMessageTime = (timestamp: number) => {
-  return new Date(timestamp * 1000).toLocaleTimeString()
+  return formatTimeStr(new Date(timestamp * 1000))
 }
 
 onMounted(async () => {

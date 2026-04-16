@@ -641,6 +641,7 @@ import {
   WidgetUnavailableError,
 } from '@/services/api/widgetsApi'
 import { useI18n } from 'vue-i18n'
+import { useDateFormat } from '@/composables/useDateFormat'
 import { parseAIResponse } from '@/utils/responseParser'
 import { getMarkdownRenderer } from '@/composables/useMarkdown'
 import { subscribeToSession, type EventSubscription, type WidgetEvent } from '@/services/sseClient'
@@ -805,6 +806,7 @@ let operatorTypingTimer: ReturnType<typeof setTimeout> | null = null
 
 const isMobile = ref(false)
 const { t } = useI18n()
+const { formatTime, formatDateTime } = useDateFormat()
 
 const allowFileUploads = computed(
   () => !!props.allowFileUpload && (!props.isPreview || props.testMode || props.internalMode)
@@ -980,15 +982,8 @@ const toggleFullscreen = () => {
   isFullscreen.value = !isFullscreen.value
 }
 
-// Format a date for the export
 const formatExportDate = (date: Date): string => {
-  return date.toLocaleString(undefined, {
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-  })
+  return formatDateTime(date)
 }
 
 // Escape HTML special characters
@@ -1643,10 +1638,6 @@ const scrollToBottom = async () => {
   if (messagesContainer.value) {
     messagesContainer.value.scrollTop = messagesContainer.value.scrollHeight
   }
-}
-
-const formatTime = (date: Date): string => {
-  return date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })
 }
 
 const getSenderLabel = (message: Message): string => {

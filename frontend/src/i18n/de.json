@@ -1287,6 +1287,8 @@
     "minutesAgo": "vor {count} Minute | vor {count} Minuten",
     "hoursAgo": "vor {count} Stunde | vor {count} Stunden",
     "daysAgo": "vor {count} Tag | vor {count} Tagen",
+    "today": "Heute",
+    "yesterday": "Gestern",
     "back": "Zurück",
     "next": "Weiter",
     "continue": "Weiter",
