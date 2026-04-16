@@ -270,7 +270,7 @@ services:
 
   # Keycloak OIDC Identity Provider (optional - activated with --profile oidc)
   keycloak:
-    image: quay.io/keycloak/keycloak:26.6@sha256:b0e5dbced1775de4d629f103c0a9cfc057decc62ce8d3cb1c54f8849a6c6eb62
+    image: quay.io/keycloak/keycloak:26.6@sha256:26ae26445475f7fac5f90ee138b1bdb64324f5815fb16133ffdbdb122d97c4d8
     container_name: synaplan-keycloak
     depends_on:
       keycloak_certs:
@@ -303,7 +303,7 @@ services:
       - synaplan-network
 
   keycloak_setup:
-    image: quay.io/keycloak/keycloak:26.6@sha256:b0e5dbced1775de4d629f103c0a9cfc057decc62ce8d3cb1c54f8849a6c6eb62
+    image: quay.io/keycloak/keycloak:26.6@sha256:26ae26445475f7fac5f90ee138b1bdb64324f5815fb16133ffdbdb122d97c4d8
     container_name: synaplan-keycloak-setup
     depends_on:
       keycloak:
