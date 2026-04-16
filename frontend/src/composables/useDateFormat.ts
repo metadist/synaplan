@@ -1,37 +1,52 @@
+import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 
 const MINUTE_MS = 60_000
 const HOUR_MS = 3_600_000
-const DAY_MS = 86_400_000
 const DAYS_RELATIVE_THRESHOLD = 7
+
+function calendarDayDiff(a: Date, b: Date): number {
+  const utcA = Date.UTC(a.getFullYear(), a.getMonth(), a.getDate())
+  const utcB = Date.UTC(b.getFullYear(), b.getMonth(), b.getDate())
+  return Math.floor((utcA - utcB) / 86_400_000)
+}
 
 export const useDateFormat = () => {
   const { t, locale } = useI18n()
 
-  const formatTime = (date: Date): string => {
-    return new Intl.DateTimeFormat(locale.value, {
-      hour: '2-digit',
-      minute: '2-digit',
-    }).format(date)
-  }
+  const timeFormatter = computed(
+    () =>
+      new Intl.DateTimeFormat(locale.value, {
+        hour: '2-digit',
+        minute: '2-digit',
+      })
+  )
 
-  const formatDate = (date: Date): string => {
-    return new Intl.DateTimeFormat(locale.value, {
-      day: '2-digit',
-      month: '2-digit',
-      year: 'numeric',
-    }).format(date)
-  }
+  const dateFormatter = computed(
+    () =>
+      new Intl.DateTimeFormat(locale.value, {
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric',
+      })
+  )
 
-  const formatDateTime = (date: Date): string => {
-    return new Intl.DateTimeFormat(locale.value, {
-      day: '2-digit',
-      month: '2-digit',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-    }).format(date)
-  }
+  const dateTimeFormatter = computed(
+    () =>
+      new Intl.DateTimeFormat(locale.value, {
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+      })
+  )
+
+  const formatTime = (date: Date): string => timeFormatter.value.format(date)
+
+  const formatDate = (date: Date): string => dateFormatter.value.format(date)
+
+  const formatDateTime = (date: Date): string => dateTimeFormatter.value.format(date)
 
   const formatRelativeTime = (date: Date): string => {
     const now = Date.now()
@@ -45,22 +60,15 @@ export const useDateFormat = () => {
     const diffHours = Math.floor(diffMs / HOUR_MS)
     if (diffHours < 24) return t('common.hoursAgo', { count: diffHours }, diffHours)
 
-    const diffDays = Math.floor(diffMs / DAY_MS)
-    if (diffDays < DAYS_RELATIVE_THRESHOLD)
+    const diffDays = calendarDayDiff(new Date(now), date)
+    if (diffDays > 0 && diffDays < DAYS_RELATIVE_THRESHOLD)
       return t('common.daysAgo', { count: diffDays }, diffDays)
 
     return formatDate(date)
   }
 
   const getDateLabel = (date: Date): string => {
-    const today = new Date()
-    today.setHours(0, 0, 0, 0)
-
-    const target = new Date(date)
-    target.setHours(0, 0, 0, 0)
-
-    const diffMs = today.getTime() - target.getTime()
-    const diffDays = Math.round(diffMs / DAY_MS)
+    const diffDays = calendarDayDiff(new Date(), date)
 
     if (diffDays === 0) return t('common.today')
     if (diffDays === 1) return t('common.yesterday')
