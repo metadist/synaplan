@@ -89,6 +89,8 @@ export const selectors = {
     fileInput: '[data-testid="input-chat-file"]',
     messageContainer: '[data-testid="message-container"]',
     aiAnswerBubble: '[data-testid="assistant-message-bubble"]',
+    /** Empty-state for a new/empty chat (shown while messages.length === 0 && !isLoadingMessages). Use to assert that a fresh chat is fully committed before counting bubbles. */
+    stateEmpty: '[data-testid="state-empty"]',
     /** Terminal: present when streaming finished */
     chatDone: '[data-testid="message-done"]',
     /** Terminal: present when message ended in error */

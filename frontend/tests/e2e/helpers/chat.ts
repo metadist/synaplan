@@ -49,7 +49,15 @@ export class ChatHelper {
 
   /**
    * Start a new chat. Supports V2 (sidebar plus button) and V1 (chat toggle + dropdown).
-   * Waits for the new chat input to be visible, empty, and enabled.
+   *
+   * Waits for the new chat to be fully committed by asserting the empty-state
+   * marker (`state-empty`) is visible. This is required to avoid a race with
+   * `historyStore.loadMessages()` which is triggered asynchronously by the
+   * `activeChatId` watcher in ChatView: if we sample `conversationBubbles().count()`
+   * before that async call replaces `messages.value = []`, the count picks up
+   * DOM residue from the previously active chat, and any later bubbles added
+   * optimistically by `sendMessage` get wiped by the delayed replacement —
+   * leaving `waitForAnswer(previousCount)` stuck on a non-existent `nth(N)` bubble.
    */
   async startNewChat(): Promise<void> {
     const v2NewChatBtn = this.page.locator(selectors.nav.sidebarV2NewChat)
@@ -67,6 +75,10 @@ export class ChatHelper {
     await textInput.waitFor({ state: 'visible', timeout: TIMEOUTS.STANDARD })
     await expect(textInput).toHaveValue('', { timeout: TIMEOUTS.SHORT })
     await expect(textInput).toBeEnabled()
+
+    await this.page
+      .locator(selectors.chat.stateEmpty)
+      .waitFor({ state: 'visible', timeout: TIMEOUTS.STANDARD })
   }
 
   async attachFile(file: { name: string; mimeType: string; buffer: Buffer }): Promise<void> {
