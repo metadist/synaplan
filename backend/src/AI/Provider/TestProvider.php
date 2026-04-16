@@ -154,7 +154,7 @@ class TestProvider implements ChatProviderInterface, EmbeddingProviderInterface,
     public function embed(string $text, array $options = []): array
     {
         return [
-            'embedding' => array_fill(0, 1536, 0.123),
+            'embedding' => array_fill(0, 1024, 0.123),
             'usage' => [
                 'prompt_tokens' => self::FAKE_TOKENS_PER_EMBED,
                 'total_tokens' => self::FAKE_TOKENS_PER_EMBED,
@@ -182,7 +182,7 @@ class TestProvider implements ChatProviderInterface, EmbeddingProviderInterface,
 
     public function getDimensions(string $model): int
     {
-        return 1536;
+        return 1024;
     }
 
     // VisionProviderInterface

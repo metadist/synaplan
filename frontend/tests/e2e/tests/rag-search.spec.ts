@@ -2,7 +2,7 @@ import { test, expect } from '../test-setup'
 import { login } from '../helpers/auth'
 import { selectors } from '../helpers/selectors'
 import { FIXTURE_PATHS } from '../config/test-data'
-import { TIMEOUTS } from '../config/config'
+import { TIMEOUTS, INTERVALS } from '../config/config'
 import { readFileSync } from 'fs'
 import path from 'path'
 import { fileURLToPath } from 'url'
@@ -13,69 +13,87 @@ const e2eDir = path.join(__dirname, '..')
 const ragFixturePath = path.join(e2eDir, FIXTURE_PATHS.RAG_MOST_IMPORTANT)
 const RAG_SEARCH_PHRASE = readFileSync(ragFixturePath, 'utf-8').trim()
 
+const FILES = selectors.files
+const RAG = selectors.rag
+const NAV = selectors.nav
+
 /**
- * Full semantic search E2E: upload fixture file, search for same phrase, assert at least one result.
- * Requires real AI (embeddings); excluded from CI via @noci.
+ * Full flow: upload file, semantic search with same phrase, poll until chunks appear.
+ * VECTORIZE default is set to TestProvider (-2) by globalSetup (global: true),
+ * so vectorization works without real AI / Ollama.
  */
-test.describe('@noci @smoke RAG Semantic Search', () => {
-  test('semantic search finds uploaded content (real AI)', async ({ page, credentials }) => {
+test.describe('@ci @smoke RAG Semantic Search', () => {
+  test.setTimeout(TIMEOUTS.EXTREME + TIMEOUTS.VERY_LONG + TIMEOUTS.STANDARD)
+
+  test('semantic search finds uploaded content (TestProvider embeddings)', async ({
+    page,
+    credentials,
+  }) => {
+    const fileName = path.basename(ragFixturePath)
+
     await login(page, credentials)
 
-    await test.step('Arrange: navigate to Files page', async () => {
-      const filesBtn = page.locator('[data-testid="btn-sidebar-v2--files"]')
-      await filesBtn.waitFor({ state: 'visible', timeout: TIMEOUTS.STANDARD })
-      await filesBtn.click()
-      await page
-        .locator(selectors.files.page)
-        .waitFor({ state: 'visible', timeout: TIMEOUTS.STANDARD })
+    await test.step('Arrange: Files page', async () => {
+      await page.locator(NAV.sidebarV2Files).click()
+      await page.locator(FILES.page).waitFor({ state: 'visible', timeout: TIMEOUTS.STANDARD })
     })
 
-    const fileName = path.basename(ragFixturePath)
-    await test.step('Act: upload fixture file (most_important_thing.txt)', async () => {
-      await page.locator(selectors.files.fileInput).setInputFiles(ragFixturePath)
-      await page.locator(selectors.files.uploadButton).click()
+    await test.step('Act: upload fixture (vectorize)', async () => {
+      await page.locator(FILES.fileInput).setInputFiles(ragFixturePath)
+      await page.locator(FILES.uploadButton).click()
     })
 
-    await test.step('Assert: file appears in file list', async () => {
-      await page
-        .locator(selectors.files.table)
-        .waitFor({ state: 'visible', timeout: TIMEOUTS.VERY_LONG })
-      await expect(page.getByRole('row', { name: fileName })).toBeVisible({
-        timeout: TIMEOUTS.VERY_LONG,
-      })
+    await test.step('Assert: file visible in list (cards or table — use item-file, not table row role)', async () => {
+      await page.locator(FILES.table).waitFor({ state: 'visible', timeout: TIMEOUTS.VERY_LONG })
+      const rows = page.locator(FILES.fileRow)
+      await expect
+        .poll(
+          async () => {
+            const n = await rows.count()
+            for (let i = 0; i < n; i += 1) {
+              if ((await rows.nth(i).innerText()).includes(fileName)) return true
+            }
+            return false
+          },
+          { timeout: TIMEOUTS.VERY_LONG, intervals: INTERVALS.STANDARD() }
+        )
+        .toBe(true)
     })
 
-    await test.step('Act: navigate to Semantic Search and run query', async () => {
+    await test.step('Act: open /rag and run query', async () => {
       await page.goto('/rag')
-      await page
-        .locator(selectors.rag.page)
-        .waitFor({ state: 'visible', timeout: TIMEOUTS.STANDARD })
-      await page.locator(selectors.rag.queryInput).fill(RAG_SEARCH_PHRASE)
-      await page.locator(selectors.rag.searchButton).click()
+      await page.locator(RAG.page).waitFor({ state: 'visible', timeout: TIMEOUTS.STANDARD })
+      await page.locator(RAG.queryInput).fill(RAG_SEARCH_PHRASE)
     })
 
-    await test.step('Assert: search completes with at least one result, no error', async () => {
-      const summary = page.locator(selectors.rag.searchSummary)
-      const errorBanner = page.getByText(/error|failed|not found|model.*not found/i)
-      const result = await Promise.race([
-        summary
-          .waitFor({ state: 'visible', timeout: TIMEOUTS.EXTREME })
-          .then(() => 'done' as const),
-        errorBanner
-          .waitFor({ state: 'visible', timeout: TIMEOUTS.EXTREME })
-          .then(() => 'error' as const),
-      ])
-      if (result === 'error') {
-        const text = await errorBanner.textContent()
-        throw new Error(`RAG search ended in error: ${text?.trim() ?? 'error banner visible'}`)
-      }
-      await expect(summary).toBeVisible()
-      const results = page.locator(selectors.rag.resultItem)
-      const count = await results.count()
-      expect(
-        count,
-        'Semantic search should find at least one chunk for the uploaded phrase'
-      ).toBeGreaterThan(0)
+    await test.step('Assert: search eventually returns chunks (wait for vectorization)', async () => {
+      const errorToast = page.locator(selectors.notification.error)
+
+      await expect
+        .poll(
+          async () => {
+            await page.locator(RAG.searchButton).click()
+            await page.locator(RAG.searchSummary).waitFor({
+              state: 'visible',
+              timeout: TIMEOUTS.STANDARD,
+            })
+
+            const fatal = errorToast.filter({
+              hasNotText: /no results found/i,
+            })
+            if ((await fatal.count()) > 0) {
+              const t = await fatal.first().textContent()
+              throw new Error(`RAG search failed: ${t?.trim() ?? 'error toast'}`)
+            }
+
+            return page.locator(RAG.resultItem).count()
+          },
+          {
+            timeout: TIMEOUTS.EXTREME,
+            intervals: INTERVALS.STANDARD(),
+          }
+        )
+        .toBeGreaterThan(0)
     })
   })
 })
