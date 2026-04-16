@@ -1182,6 +1182,8 @@
     "minutesAgo": "{count} minute ago | {count} minutes ago",
     "hoursAgo": "{count} hour ago | {count} hours ago",
     "daysAgo": "{count} day ago | {count} days ago",
+    "today": "Today",
+    "yesterday": "Yesterday",
     "previous": "Previous",
     "loadMore": "Load more",
     "error": "Error",

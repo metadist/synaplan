@@ -754,6 +754,7 @@
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useEscapeKey } from '@/composables/useEscapeKey'
 import { useI18n } from 'vue-i18n'
+import { useDateFormat } from '@/composables/useDateFormat'
 import { Icon } from '@iconify/vue'
 import {
   promptsApi,
@@ -810,6 +811,7 @@ interface ToolOption {
 const { success, error: showError } = useNotification()
 const dialog = useDialog()
 const { t, locale } = useI18n()
+const { formatRelativeTime } = useDateFormat()
 const authStore = useAuthStore()
 const isAdmin = computed(() => authStore.isAdmin)
 
@@ -1484,19 +1486,8 @@ const handleDeleteFile = async (messageId: number) => {
   }
 }
 
-/**
- * Format date for display
- */
 const formatDate = (dateString: string): string => {
-  const date = new Date(dateString)
-  const now = new Date()
-  const diffInSeconds = Math.floor((now.getTime() - date.getTime()) / 1000)
-
-  if (diffInSeconds < 60) return 'Just now'
-  if (diffInSeconds < 3600) return `${Math.floor(diffInSeconds / 60)}m ago`
-  if (diffInSeconds < 86400) return `${Math.floor(diffInSeconds / 3600)}h ago`
-  if (diffInSeconds < 604800) return `${Math.floor(diffInSeconds / 86400)}d ago`
-  return date.toLocaleDateString()
+  return formatRelativeTime(new Date(dateString))
 }
 
 /**

@@ -299,6 +299,7 @@ import { ref, onMounted, computed, onUnmounted } from 'vue'
 import { useNotification } from '@/composables/useNotification'
 import { useDialog } from '@/composables/useDialog'
 import { useI18n } from 'vue-i18n'
+import { useDateFormat } from '@/composables/useDateFormat'
 import { DevicePhoneMobileIcon } from '@heroicons/vue/24/outline'
 import { useConfigStore } from '@/stores/config'
 import { refreshAccessToken } from '@/services/api/httpClient'
@@ -307,6 +308,7 @@ import { getErrorMessage as getUnknownErrorMessage } from '@/utils/errorMessage'
 const { success, error: showError } = useNotification()
 const dialog = useDialog()
 const { t } = useI18n()
+const { formatDate: formatDateStr } = useDateFormat()
 
 interface PhoneVerificationStatus {
   verification_code?: string | null
@@ -634,7 +636,7 @@ const removePhone = async () => {
 
 const formatDate = (timestamp?: number) => {
   if (!timestamp) return '—'
-  return new Date(timestamp * 1000).toLocaleDateString()
+  return formatDateStr(new Date(timestamp * 1000))
 }
 
 const formatDisplayPhone = (phone?: string) => {

@@ -824,6 +824,7 @@ import MessageFeedbacks from './MessageFeedbacks.vue'
 import GroqIcon from '@/components/icons/GroqIcon.vue'
 import ExternalLinkWarning from '@/components/common/ExternalLinkWarning.vue'
 import { useExternalLink } from '@/composables/useExternalLink'
+import { useDateFormat } from '@/composables/useDateFormat'
 import type { Part, MessageFile } from '@/stores/history'
 import type { AgainData } from '@/types/ai-models'
 import { mediaHintFromClassificationTopic } from '@/utils/mediaGenerationHint'
@@ -831,6 +832,7 @@ import { mediaHintFromClassificationTopic } from '@/utils/mediaGenerationHint'
 const { t } = useI18n()
 const { error: showError } = useNotification()
 const { pendingUrl, warningOpen, openExternalLink, closeWarning } = useExternalLink()
+const { formatTime } = useDateFormat()
 
 interface Props {
   role: 'user' | 'assistant'
@@ -1151,12 +1153,7 @@ const getModelTypeTitle = computed(() => {
   }
 })
 
-const formattedTime = computed(() => {
-  const date = props.timestamp
-  const hours = date.getHours().toString().padStart(2, '0')
-  const minutes = date.getMinutes().toString().padStart(2, '0')
-  return `${hours}:${minutes}`
-})
+const formattedTime = computed(() => formatTime(props.timestamp))
 
 // Check if we're in a processing state (hide model info during these states)
 const isProcessing = computed(() => {

@@ -51,7 +51,7 @@
 
     <!-- Footer -->
     <div class="flex items-center justify-between text-xs txt-secondary">
-      <span>{{ $t('widgetSessions.created') }}: {{ formatDate(session.created) }}</span>
+      <span>{{ $t('widgetSessions.created') }}: {{ formatSessionDate(session.created) }}</span>
       <div class="flex items-center gap-2" @click.stop>
         <button
           v-if="session.mode === 'ai' && !session.isExpired"
@@ -78,6 +78,7 @@
 import { computed } from 'vue'
 import { Icon } from '@iconify/vue'
 import { useI18n } from 'vue-i18n'
+import { useDateFormat } from '@/composables/useDateFormat'
 import type { WidgetSession } from '@/services/api/widgetSessionsApi'
 
 const props = defineProps<{
@@ -91,6 +92,7 @@ defineEmits<{
 }>()
 
 const { t } = useI18n()
+const { formatRelativeTime, formatDate } = useDateFormat()
 
 const modeIcon = computed(() => {
   switch (props.session.mode) {
@@ -154,17 +156,10 @@ const modeLabel = computed(() => {
 
 const timeAgo = computed(() => {
   if (!props.session.lastMessage) return '-'
-
-  const now = Math.floor(Date.now() / 1000)
-  const diff = now - props.session.lastMessage
-
-  if (diff < 60) return t('common.justNow')
-  if (diff < 3600) return t('common.minutesAgo', { count: Math.floor(diff / 60) })
-  if (diff < 86400) return t('common.hoursAgo', { count: Math.floor(diff / 3600) })
-  return t('common.daysAgo', { count: Math.floor(diff / 86400) })
+  return formatRelativeTime(new Date(props.session.lastMessage * 1000))
 })
 
-const formatDate = (timestamp: number) => {
-  return new Date(timestamp * 1000).toLocaleDateString()
+const formatSessionDate = (timestamp: number) => {
+  return formatDate(new Date(timestamp * 1000))
 }
 </script>
