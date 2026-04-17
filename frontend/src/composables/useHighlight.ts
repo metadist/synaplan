@@ -38,9 +38,9 @@ export function escapeHtml(text: string): string {
  */
 async function doLoad(): Promise<HLJSApi> {
   try {
+    // CSS side-effect import kept outside Promise.all to avoid
+    // Rolldown bundler issues with CSS modules in destructured arrays
     const [
-      ,
-      // CSS side-effect import (no export)
       { default: hljs },
       { default: javascript },
       { default: typescript },
@@ -61,7 +61,6 @@ async function doLoad(): Promise<HLJSApi> {
       { default: markdown },
       { default: plaintext },
     ] = await Promise.all([
-      import('highlight.js/styles/atom-one-dark.css'),
       import('highlight.js/lib/core'),
       import('highlight.js/lib/languages/javascript'),
       import('highlight.js/lib/languages/typescript'),
@@ -82,6 +81,7 @@ async function doLoad(): Promise<HLJSApi> {
       import('highlight.js/lib/languages/markdown'),
       import('highlight.js/lib/languages/plaintext'),
     ])
+    await import('highlight.js/styles/atom-one-dark.css')
 
     // Register primary language names
     hljs.registerLanguage('javascript', javascript)
