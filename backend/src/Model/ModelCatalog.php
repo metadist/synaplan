@@ -774,7 +774,7 @@ class ModelCatalog
             'rating' => 1,
             'json' => [
                 'description' => 'Claude Opus 4.7 - Anthropic\'s most capable model for advanced software engineering and complex reasoning. Self-verifies outputs and handles long-running tasks. 1M context, 128K max output.',
-                'max_tokens' => 65536,
+                'max_tokens' => 128000,
                 'params' => ['model' => 'claude-opus-4-7'],
                 'features' => ['vision', 'reasoning'],
                 'meta' => ['context_window' => '1000000', 'max_output' => '128000'],
