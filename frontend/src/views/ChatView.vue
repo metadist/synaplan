@@ -2098,7 +2098,7 @@ const handleStopStreaming = async () => {
     const cancelMessage = t('message.cancelledByUser')
 
     // Collect the current content for saving to backend
-    let finalContent = ''
+    let finalContent: string
 
     // Add cancellation message if there's no content yet
     if (
