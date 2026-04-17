@@ -35,7 +35,7 @@
     "dompurify": "^3.3.1",
     "highlight.js": "^11.11.1",
     "katex": "^0.16.27",
-    "lucide-vue-next": "^0.577.0",
+    "lucide-vue-next": "^1.0.0",
     "marked": "^18.0.0",
     "mermaid": "^11.12.2",
     "pinia": "^3.0.3",
