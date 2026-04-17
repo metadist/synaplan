@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "d266e3d381fed38145e7ad698e53c83f",
+    "content-hash": "06ed529fcabb0adc5a4ad239cc3675f7",
     "packages": [
         {
             "name": "api-platform/doctrine-common",
@@ -7763,16 +7763,16 @@
         },
         {
             "name": "stripe/stripe-php",
-            "version": "v16.6.0",
+            "version": "v17.6.0",
             "source": {
                 "type": "git",
                 "url": "https://github.com/stripe/stripe-php.git",
-                "reference": "d6de0a536f00b5c5c74f36b8f4d0d93b035499ff"
+                "reference": "a6219df5df1324a0d3f1da25fb5e4b8a3307ea16"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/stripe/stripe-php/zipball/d6de0a536f00b5c5c74f36b8f4d0d93b035499ff",
-                "reference": "d6de0a536f00b5c5c74f36b8f4d0d93b035499ff",
+                "url": "https://api.github.com/repos/stripe/stripe-php/zipball/a6219df5df1324a0d3f1da25fb5e4b8a3307ea16",
+                "reference": "a6219df5df1324a0d3f1da25fb5e4b8a3307ea16",
                 "shasum": ""
             },
             "require": {
@@ -7782,7 +7782,7 @@
                 "php": ">=5.6.0"
             },
             "require-dev": {
-                "friendsofphp/php-cs-fixer": "3.5.0",
+                "friendsofphp/php-cs-fixer": "3.72.0",
                 "phpstan/phpstan": "^1.2",
                 "phpunit/phpunit": "^5.7 || ^9.0"
             },
@@ -7816,9 +7816,9 @@
             ],
             "support": {
                 "issues": "https://github.com/stripe/stripe-php/issues",
-                "source": "https://github.com/stripe/stripe-php/tree/v16.6.0"
+                "source": "https://github.com/stripe/stripe-php/tree/v17.6.0"
             },
-            "time": "2025-02-24T22:35:29+00:00"
+            "time": "2025-08-27T19:32:42+00:00"
         },
         {
             "name": "symfony/asset",
