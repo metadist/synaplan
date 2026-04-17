@@ -666,7 +666,7 @@ class ModelCatalog
             'rating' => 1,
             'json' => [
                 'description' => 'Claude Opus 4.6 - Anthropic\'s most intelligent model for agents and coding. 1M context, 128K max output.',
-                'max_tokens' => 65536,
+                'max_tokens' => 128000,
                 'params' => ['model' => 'claude-opus-4-6'],
                 'features' => ['vision', 'reasoning'],
                 'meta' => ['context_window' => '1000000', 'max_output' => '128000'],
