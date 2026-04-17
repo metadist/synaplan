@@ -274,7 +274,7 @@ class WidgetPublicController extends AbstractController
             }
 
             if (!$chat) {
-                $now = new \DateTimeImmutable();
+                $now = new \DateTime();
                 $chat = new Chat();
                 $chat->setUserId($owner->getId());
                 $sessionSuffix = substr($session->getSessionId(), -6);

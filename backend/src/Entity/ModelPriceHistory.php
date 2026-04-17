@@ -52,8 +52,8 @@ class ModelPriceHistory
 
     public function __construct()
     {
-        $this->createdAt = new \DateTimeImmutable();
-        $this->validFrom = new \DateTimeImmutable();
+        $this->createdAt = new \DateTime();
+        $this->validFrom = new \DateTime();
     }
 
     public function getId(): ?int
