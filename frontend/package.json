@@ -44,7 +44,7 @@
     "vue-chartjs": "^5.3.3",
     "vue-i18n": "^11.1.12",
     "vue-recaptcha-v3": "^2.0.1",
-    "vue-router": "^4.5.1",
+    "vue-router": "^5.0.0",
     "zod": "^4.2.1"
   },
   "devDependencies": {
