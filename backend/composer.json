@@ -34,7 +34,7 @@
         "phpoffice/phpword": "^1.4",
         "phpstan/phpdoc-parser": "^2.3.2",
         "smalot/pdfparser": "^2.12.4",
-        "stripe/stripe-php": "^16.6",
+        "stripe/stripe-php": "^19.0",
         "symfony/asset": "7.4.*",
         "symfony/console": "7.4.*",
         "symfony/doctrine-messenger": "7.4.*",
