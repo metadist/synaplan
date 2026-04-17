@@ -29,6 +29,7 @@ final readonly class MessageClassifier
     private const TOOL_COMMANDS = [
         '/pic' => 'tools:pic',
         '/vid' => 'tools:vid',
+        '/tts' => 'tools:tts',
         '/search' => 'tools:search',
         '/lang' => 'tools:lang',
         '/web' => 'tools:web',
@@ -295,6 +296,7 @@ final readonly class MessageClassifier
             'text2sound' => 'image_generation',
             'tools:pic' => 'image_generation', // /pic command
             'tools:vid' => 'image_generation', // /vid command
+            'tools:tts' => 'image_generation', // /tts command (audio via MediaGenerationHandler)
 
             // Document/Office generation
             'officemaker' => 'document_generation',

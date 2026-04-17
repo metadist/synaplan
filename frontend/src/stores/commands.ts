@@ -26,6 +26,13 @@ export const commandsData: Command[] = [
     icon: 'mdi:video',
   },
   {
+    name: 'tts',
+    description: 'Generate audio from text',
+    usage: '/tts [text to speech]',
+    requiresArgs: true,
+    icon: 'mdi:microphone',
+  },
+  {
     name: 'search',
     description: 'Search the web',
     usage: '/search [query]',
