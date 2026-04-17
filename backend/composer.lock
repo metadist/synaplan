@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "16402e6e0e7591bddcfb766bc310acf6",
+    "content-hash": "7510d9c577c732b1b2f62381a5978ed8",
     "packages": [
         {
             "name": "api-platform/doctrine-common",
@@ -6467,16 +6467,16 @@
         },
         {
             "name": "phpoffice/phpspreadsheet",
-            "version": "2.4.4",
+            "version": "3.10.4",
             "source": {
                 "type": "git",
                 "url": "https://github.com/PHPOffice/PhpSpreadsheet.git",
-                "reference": "78bf6f0b4945ab31f1935741324ef3f0bf59a6fe"
+                "reference": "3dfa34f1af992c1db139872fab8186e5b4e021b9"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/PHPOffice/PhpSpreadsheet/zipball/78bf6f0b4945ab31f1935741324ef3f0bf59a6fe",
-                "reference": "78bf6f0b4945ab31f1935741324ef3f0bf59a6fe",
+                "url": "https://api.github.com/repos/PHPOffice/PhpSpreadsheet/zipball/3dfa34f1af992c1db139872fab8186e5b4e021b9",
+                "reference": "3dfa34f1af992c1db139872fab8186e5b4e021b9",
                 "shasum": ""
             },
             "require": {
@@ -6497,7 +6497,7 @@
                 "maennchen/zipstream-php": "^2.1 || ^3.0",
                 "markbaker/complex": "^3.0",
                 "markbaker/matrix": "^3.0",
-                "php": ">=8.1.0 <8.6.0",
+                "php": "^8.1",
                 "psr/simple-cache": "^1.0 || ^2.0 || ^3.0"
             },
             "require-dev": {
@@ -6509,7 +6509,7 @@
                 "phpcompatibility/php-compatibility": "^9.3",
                 "phpstan/phpstan": "^1.1",
                 "phpstan/phpstan-phpunit": "^1.0",
-                "phpunit/phpunit": "^9.6 || ^10.5",
+                "phpunit/phpunit": "^10.5",
                 "squizlabs/php_codesniffer": "^3.7",
                 "tecnickcom/tcpdf": "^6.5"
             },
@@ -6567,9 +6567,9 @@
             ],
             "support": {
                 "issues": "https://github.com/PHPOffice/PhpSpreadsheet/issues",
-                "source": "https://github.com/PHPOffice/PhpSpreadsheet/tree/2.4.4"
+                "source": "https://github.com/PHPOffice/PhpSpreadsheet/tree/3.10.4"
             },
-            "time": "2026-04-10T03:20:38+00:00"
+            "time": "2026-04-10T03:35:12+00:00"
         },
         {
             "name": "phpoffice/phpword",
