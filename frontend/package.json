@@ -36,7 +36,7 @@
     "highlight.js": "^11.11.1",
     "katex": "^0.16.27",
     "lucide-vue-next": "^0.577.0",
-    "marked": "^17.0.1",
+    "marked": "^18.0.0",
     "mermaid": "^11.12.2",
     "pinia": "^3.0.3",
     "three": "^0.183.0",
