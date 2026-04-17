@@ -49,6 +49,17 @@ class AnthropicProvider implements ChatProviderInterface, VisionProviderInterfac
         'claude-opus-4-7',
     ];
 
+    /**
+     * Models that no longer accept the `temperature` parameter.
+     *
+     * Anthropic removed `temperature` for Opus 4.7+ — sampling is now driven
+     * by `output_config.effort` and (for thinking) the adaptive thinking
+     * budget. Sending temperature returns HTTP 400 invalid_request_error.
+     */
+    private const TEMPERATURE_DEPRECATED_MODELS = [
+        'claude-opus-4-7',
+    ];
+
     public function __construct(
         private HttpClientInterface $httpClient,
         private LoggerInterface $logger,
@@ -163,8 +174,7 @@ class AnthropicProvider implements ChatProviderInterface, VisionProviderInterfac
                 $requestBody['system'] = $systemMessage;
             }
 
-            // Anthropic forbids temperature when thinking is enabled
-            if (!$thinkingEnabled && isset($options['temperature'])) {
+            if ($this->shouldSendTemperature($model, $thinkingEnabled, $options)) {
                 $requestBody['temperature'] = $options['temperature'];
             }
 
@@ -300,7 +310,7 @@ class AnthropicProvider implements ChatProviderInterface, VisionProviderInterfac
                 $requestBody['system'] = $systemMessage;
             }
 
-            if (!$thinkingEnabled && isset($options['temperature'])) {
+            if ($this->shouldSendTemperature($model, $thinkingEnabled, $options)) {
                 $requestBody['temperature'] = $options['temperature'];
             }
 
@@ -535,6 +545,51 @@ class AnthropicProvider implements ChatProviderInterface, VisionProviderInterfac
         }
 
         return false;
+    }
+
+    /**
+     * Returns true when the model still accepts the `temperature` parameter.
+     *
+     * Anthropic dropped temperature in Opus 4.7. Sending it produces an
+     * `invalid_request_error`, so we silently strip it for those models.
+     */
+    private function isTemperatureSupported(string $model): bool
+    {
+        foreach (self::TEMPERATURE_DEPRECATED_MODELS as $deprecatedModel) {
+            if (str_starts_with($model, $deprecatedModel)) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    /**
+     * Decide whether to attach `temperature` to the Anthropic request body.
+     *
+     * Anthropic forbids `temperature` in two cases:
+     *  - extended thinking is enabled, or
+     *  - the model itself has deprecated the parameter (Opus 4.7+).
+     */
+    private function shouldSendTemperature(string $model, bool $thinkingEnabled, array $options): bool
+    {
+        if (!isset($options['temperature'])) {
+            return false;
+        }
+
+        if ($thinkingEnabled) {
+            return false;
+        }
+
+        if (!$this->isTemperatureSupported($model)) {
+            $this->logger->debug('Anthropic: dropping temperature for model that no longer accepts it', [
+                'model' => $model,
+            ]);
+
+            return false;
+        }
+
+        return true;
     }
 
     /**
