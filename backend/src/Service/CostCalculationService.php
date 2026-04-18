@@ -108,7 +108,7 @@ final readonly class CostCalculationService
      */
     private function getPriceSnapshot(Model $model, ?int $timestamp): array
     {
-        $dateTime = $timestamp ? (new \DateTimeImmutable())->setTimestamp($timestamp) : new \DateTimeImmutable();
+        $dateTime = $timestamp ? (new \DateTime())->setTimestamp($timestamp) : new \DateTime();
 
         // Try price history first
         $historyEntry = $this->priceHistoryRepository->findPriceAtTimestamp($model, $dateTime);

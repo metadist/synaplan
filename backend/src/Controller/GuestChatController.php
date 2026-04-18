@@ -228,7 +228,7 @@ class GuestChatController extends AbstractController
                 return $this->json(['chatId' => $lockedSession?->getChatId()]);
             }
 
-            $now = new \DateTimeImmutable();
+            $now = new \DateTime();
             $chat = new Chat();
             $chat->setUserId($user->getId());
             $chat->setTitle('Guest Chat • '.substr($sessionId, 0, 8));

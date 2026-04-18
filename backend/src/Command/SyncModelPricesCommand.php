@@ -358,7 +358,7 @@ class SyncModelPricesCommand extends Command
      */
     private function updateModelPrice(Model $model, array $pricing): void
     {
-        $now = new \DateTimeImmutable();
+        $now = new \DateTime();
 
         $this->priceHistoryRepository->closeCurrentPrice($model, $now);
 
