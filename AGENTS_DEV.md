@@ -121,8 +121,8 @@ make -C backend test
 **Extending catalog data:**
 - Add an AI model → edit `App\Model\ModelCatalog::all()`, then `make -C backend seed-models`
 - System prompt → `App\Prompt\PromptCatalog`, then `make -C backend seed-prompts`
-- Default config (`DEFAULTMODEL`, `ai` group) → `App\Seed\DefaultModelConfigSeeder::ROWS`, then `make -C backend seed-defaults`
-- Rate limit defaults → `App\Seed\RateLimitConfigSeeder::ROWS`, then `make -C backend seed-ratelimits`
+- Default config (`DEFAULTMODEL`, `ai` group) → edit `App\Seed\DefaultModelConfigSeeder::PROD_DEFAULTS` (and `TEST_DEFAULTS` if relevant for PHPUnit/E2E), then `make -C backend seed-defaults`
+- Rate limit defaults → edit `App\Seed\RateLimitConfigSeeder::DEFAULTS`, then `make -C backend seed-ratelimits`
 - `make -C backend seed` runs all seeders in the correct order (idempotent — safe to re-run any number of times)
 
 **CRITICAL rules:**

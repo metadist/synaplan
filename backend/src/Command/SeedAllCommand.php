@@ -63,21 +63,21 @@ final class SeedAllCommand extends Command
         $io = new SymfonyStyle($input, $output);
         $io->title('Synaplan seed: idempotent catalog/config bootstrap');
 
-        $results = [
-            $this->runStep($io, 'models', fn (): SeedResult => $this->modelSeeder->seed()),
-            $this->runStep($io, 'prompts', fn (): SeedResult => $this->promptSeeder->seed()),
-            $this->runStep($io, 'defaults', fn (): SeedResult => $this->defaultModelConfigSeeder->seed()),
-            $this->runStep($io, 'rate-limits', fn (): SeedResult => $this->rateLimitConfigSeeder->seed()),
-            $this->runStep($io, 'demo-widget', fn (): SeedResult => $this->demoWidgetConfigSeeder->seed()),
+        $steps = [
+            ['models',      fn (): SeedResult => $this->modelSeeder->seed()],
+            ['prompts',     fn (): SeedResult => $this->promptSeeder->seed()],
+            ['defaults',    fn (): SeedResult => $this->defaultModelConfigSeeder->seed()],
+            ['rate-limits', fn (): SeedResult => $this->rateLimitConfigSeeder->seed()],
+            ['demo-widget', fn (): SeedResult => $this->demoWidgetConfigSeeder->seed()],
         ];
 
-        $io->table(
-            ['Step', 'Inserted', 'Updated', 'Skipped'],
-            array_map(
-                static fn (SeedResult $r): array => [$r->label, (string) $r->inserted, (string) $r->updated, (string) $r->skipped],
-                $results
-            )
-        );
+        $rows = [];
+        foreach ($steps as [$label, $callable]) {
+            $result = $this->runStep($io, $label, $callable);
+            $rows[] = [$label, (string) $result->inserted, (string) $result->updated, (string) $result->skipped];
+        }
+
+        $io->table(['Step', 'Inserted', 'Updated', 'Skipped'], $rows);
 
         $io->success('All seed steps completed.');
 

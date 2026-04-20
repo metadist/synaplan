@@ -44,8 +44,8 @@ Don't edit migrations or fixtures — extend the catalog source of truth:
 
 - **Models** → add to `App\Model\ModelCatalog::all()`, then `make -C backend seed-models`
 - **Prompts** → add to `App\Prompt\PromptCatalog`, then `make -C backend seed-prompts`
-- **Default config** → add to `App\Seed\DefaultModelConfigSeeder::ROWS`, then `make -C backend seed-defaults`
-- **Rate-limit defaults** → `App\Seed\RateLimitConfigSeeder::ROWS`, then `make -C backend seed-ratelimits`
+- **Default config** → add to `App\Seed\DefaultModelConfigSeeder::PROD_DEFAULTS` (and `TEST_DEFAULTS` for PHPUnit/E2E coverage), then `make -C backend seed-defaults`
+- **Rate-limit defaults** → add to `App\Seed\RateLimitConfigSeeder::DEFAULTS`, then `make -C backend seed-ratelimits`
 
 All seeders are idempotent (`INSERT … ON DUPLICATE KEY UPDATE` for models/prompts,
 `INSERT … WHERE NOT EXISTS` for `BCONFIG`), so re-running is always safe.

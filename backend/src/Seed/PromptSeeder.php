@@ -21,8 +21,12 @@ final class PromptSeeder
 
     public function seed(): SeedResult
     {
-        $seeded = PromptCatalog::seed($this->connection);
+        $result = PromptCatalog::seed($this->connection);
 
-        return new SeedResult('prompts', inserted: count($seeded));
+        return new SeedResult(
+            'prompts',
+            inserted: count($result['inserted']),
+            updated: count($result['updated']),
+        );
     }
 }

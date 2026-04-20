@@ -144,12 +144,15 @@ _count_sql() {
     php bin/console dbal:run-sql ${_env_flag} "$_sql" 2>/dev/null | grep -oE '[0-9]+' | tail -1
 }
 
-# Pre-create doctrine_migration_versions ourselves with the platform default charset
-# (utf8mb4) and then INSERT each existing migration version directly. We bypass
-# `doctrine:migrations:sync-metadata-storage` + `version --add --all` because the
-# DBAL MariaDB schema comparator wrongly reports the auto-created table as
-# "not up to date" (it attaches column-level charset on `version` that the comparator
-# can't reconcile), which breaks every subsequent migrations command.
+# Pre-create doctrine_migration_versions ourselves and INSERT each shipped migration
+# version directly. We bypass `doctrine:migrations:sync-metadata-storage` +
+# `version --add --all` because the DBAL MariaDB schema comparator wrongly reports
+# the auto-created table as "not up to date" (it attaches a column-level charset on
+# `version` that the comparator can't reconcile), which breaks every subsequent
+# migrations command.
+#
+# Charset/collation is aligned with the baseline migration (utf8mb4 +
+# utf8mb4_unicode_ci) to avoid collation drift across the database.
 _create_metadata_table() {
     local _env_flag="${1:-}"
     php bin/console dbal:run-sql ${_env_flag} \
@@ -158,7 +161,7 @@ _create_metadata_table() {
             executed_at DATETIME DEFAULT NULL,
             execution_time INT(11) DEFAULT NULL,
             PRIMARY KEY(version)
-        ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_uca1400_ai_ci ENGINE=InnoDB" \
+        ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci ENGINE=InnoDB" \
         >/dev/null 2>&1 || true
 }
 

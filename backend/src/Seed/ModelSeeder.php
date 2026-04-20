@@ -44,11 +44,13 @@ final class ModelSeeder
 
     public function seed(): SeedResult
     {
-        $upserted = 0;
+        $inserted = 0;
+        $updated = 0;
+        $skipped = 0;
 
         if (in_array($this->environment, ['dev', 'test'], true)) {
             foreach (self::TEST_MODELS as $base) {
-                ModelCatalog::upsert($this->connection, array_merge($base, [
+                $affected = ModelCatalog::upsert($this->connection, array_merge($base, [
                     'selectable' => 0,
                     'active' => 1,
                     'priceIn' => 0,
@@ -59,7 +61,7 @@ final class ModelSeeder
                     'rating' => 0,
                     'json' => ['description' => 'Mock model for E2E/CI. No API key required.'],
                 ]));
-                ++$upserted;
+                $this->tally($affected, $inserted, $updated, $skipped);
             }
 
             if ('test' === $this->environment) {
@@ -70,10 +72,22 @@ final class ModelSeeder
         }
 
         foreach (ModelCatalog::all() as $data) {
-            ModelCatalog::upsert($this->connection, $data);
-            ++$upserted;
+            $affected = ModelCatalog::upsert($this->connection, $data);
+            $this->tally($affected, $inserted, $updated, $skipped);
         }
 
-        return new SeedResult('models', inserted: $upserted);
+        return new SeedResult('models', inserted: $inserted, updated: $updated, skipped: $skipped);
+    }
+
+    /**
+     * Bucket the affected-rows value returned by ON DUPLICATE KEY UPDATE.
+     */
+    private function tally(int $affected, int &$inserted, int &$updated, int &$skipped): void
+    {
+        match ($affected) {
+            1 => ++$inserted,
+            2 => ++$updated,
+            default => ++$skipped,
+        };
     }
 }

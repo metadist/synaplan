@@ -41,9 +41,18 @@ class ModelCatalog
     /**
      * Upsert a model into the database (INSERT ... ON DUPLICATE KEY UPDATE).
      */
-    public static function upsert(Connection $connection, array $model, bool $system = false): void
+    /**
+     * Insert or update a model row via `INSERT … ON DUPLICATE KEY UPDATE`.
+     *
+     * Returns the MySQL/MariaDB affected-rows value so callers can distinguish
+     * inserts from updates:
+     *   - 1 → row was inserted
+     *   - 2 → existing row was updated (values differed)
+     *   - 0 → existing row was unchanged (values identical)
+     */
+    public static function upsert(Connection $connection, array $model, bool $system = false): int
     {
-        $connection->executeStatement(
+        return (int) $connection->executeStatement(
             'INSERT INTO BMODELS (BID, BSERVICE, BNAME, BTAG, BSELECTABLE, BACTIVE, BPROVID, BPRICEIN, BINUNIT, BPRICEOUT, BOUTUNIT, BQUALITY, BRATING, BISDEFAULT, BJSON)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON DUPLICATE KEY UPDATE

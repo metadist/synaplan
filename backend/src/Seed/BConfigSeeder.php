@@ -11,8 +11,8 @@ use Doctrine\DBAL\Connection;
  *
  * The BCONFIG table currently lacks a UNIQUE(BOWNERID, BGROUP, BSETTING) constraint
  * (would require a data-cleanup migration to dedupe historical rows first). Until that
- * ships, seeders use SELECT-then-INSERT to stay idempotent without overwriting
- * operator-tuned values.
+ * ships, we use a single atomic `INSERT … SELECT … WHERE NOT EXISTS` statement so
+ * concurrent container starts cannot race and produce duplicate rows.
  */
 final class BConfigSeeder
 {
@@ -25,21 +25,24 @@ final class BConfigSeeder
         $skipped = 0;
 
         foreach ($rows as $row) {
-            $existing = $connection->fetchOne(
-                'SELECT BID FROM BCONFIG WHERE BOWNERID = ? AND BGROUP = ? AND BSETTING = ? LIMIT 1',
-                [$row['ownerId'], $row['group'], $row['setting']]
+            $affected = $connection->executeStatement(
+                'INSERT INTO BCONFIG (BOWNERID, BGROUP, BSETTING, BVALUE)
+                 SELECT ?, ?, ?, ? FROM DUAL
+                 WHERE NOT EXISTS (
+                     SELECT 1 FROM BCONFIG
+                     WHERE BOWNERID = ? AND BGROUP = ? AND BSETTING = ?
+                 )',
+                [
+                    $row['ownerId'], $row['group'], $row['setting'], $row['value'],
+                    $row['ownerId'], $row['group'], $row['setting'],
+                ]
             );
 
-            if (false !== $existing) {
+            if ($affected > 0) {
+                ++$inserted;
+            } else {
                 ++$skipped;
-                continue;
             }
-
-            $connection->executeStatement(
-                'INSERT INTO BCONFIG (BOWNERID, BGROUP, BSETTING, BVALUE) VALUES (?, ?, ?, ?)',
-                [$row['ownerId'], $row['group'], $row['setting'], $row['value']]
-            );
-            ++$inserted;
         }
 
         return new SeedResult($label, inserted: $inserted, skipped: $skipped);

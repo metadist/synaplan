@@ -38,13 +38,21 @@ class PromptSeedCommand extends Command
     {
         $io = new SymfonyStyle($input, $output);
 
-        $seeded = PromptCatalog::seed($this->connection);
+        $result = PromptCatalog::seed($this->connection);
 
-        foreach ($seeded as $topic) {
-            $io->writeln("  <info>Seeded</info> $topic");
+        foreach ($result['inserted'] as $topic) {
+            $io->writeln("  <info>Inserted</info> $topic");
+        }
+        foreach ($result['updated'] as $topic) {
+            $io->writeln("  <comment>Updated</comment> $topic");
         }
 
-        $io->success(sprintf('Seeded %d system prompts.', count($seeded)));
+        $io->success(sprintf(
+            'Seeded %d system prompts (%d inserted, %d updated).',
+            count($result['inserted']) + count($result['updated']),
+            count($result['inserted']),
+            count($result['updated']),
+        ));
 
         return Command::SUCCESS;
     }

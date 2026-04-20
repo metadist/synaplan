@@ -132,9 +132,13 @@ class PromptCatalog
      *
      * @return string[] List of seeded topic keys
      */
+    /**
+     * @return array{inserted: list<string>, updated: list<string>}
+     */
     public static function seed(Connection $connection): array
     {
-        $seeded = [];
+        $inserted = [];
+        $updated = [];
 
         foreach (self::all() as $prompt) {
             $existing = $connection->fetchOne(
@@ -147,17 +151,17 @@ class PromptCatalog
                     'UPDATE BPROMPTS SET BSHORTDESC = ?, BPROMPT = ? WHERE BID = ?',
                     [$prompt['shortDescription'], $prompt['prompt'], $existing]
                 );
+                $updated[] = $prompt['topic'];
             } else {
                 $connection->executeStatement(
                     'INSERT INTO BPROMPTS (BOWNERID, BLANG, BTOPIC, BSHORTDESC, BPROMPT) VALUES (0, ?, ?, ?, ?)',
                     [$prompt['language'], $prompt['topic'], $prompt['shortDescription'], $prompt['prompt']]
                 );
+                $inserted[] = $prompt['topic'];
             }
-
-            $seeded[] = $prompt['topic'];
         }
 
-        return $seeded;
+        return ['inserted' => $inserted, 'updated' => $updated];
     }
 
     private static function generalPrompt(): string
