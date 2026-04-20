@@ -17,6 +17,9 @@ use Symfony\Component\HttpClient\Response\MockResponse;
  */
 final class QdrantClientDirectTest extends TestCase
 {
+    /**
+     * @param array<MockResponse> $responses
+     */
     private function createClient(array $responses): QdrantClientDirect
     {
         $mockClient = new MockHttpClient($responses);
@@ -35,7 +38,14 @@ final class QdrantClientDirectTest extends TestCase
         $responses = [
             // ensureMemoriesCollection -> GET /collections/user_memories
             new MockResponse(json_encode(['result' => ['status' => 'green']]), ['http_code' => 200]),
-            // upsertPoints -> PUT /collections/user_memories/points
+            // ensurePayloadIndexes -> PUT /collections/user_memories/index  x4
+            new MockResponse(json_encode(['result' => ['status' => 'acknowledged']]), ['http_code' => 200]),
+            new MockResponse(json_encode(['result' => ['status' => 'acknowledged']]), ['http_code' => 200]),
+            new MockResponse(json_encode(['result' => ['status' => 'acknowledged']]), ['http_code' => 200]),
+            new MockResponse(json_encode(['result' => ['status' => 'acknowledged']]), ['http_code' => 200]),
+            // upsertMemory -> pre-upsert POST /collections/user_memories/points/delete?wait=true
+            new MockResponse(json_encode(['result' => ['status' => 'completed']]), ['http_code' => 200]),
+            // upsertMemory -> PUT /collections/user_memories/points?wait=true
             new MockResponse(json_encode(['result' => ['status' => 'completed']]), ['http_code' => 200]),
         ];
 
@@ -60,19 +70,23 @@ final class QdrantClientDirectTest extends TestCase
     public function testGetMemorySuccess(): void
     {
         $responses = [
-            // POST /collections/user_memories/points (get by ID)
+            // getMemory -> POST /collections/user_memories/points/scroll
+            // (filter on `_point_id` payload, matches both legacy int + UUID keys)
             new MockResponse(json_encode([
                 'result' => [
-                    [
-                        'id' => 'some-uuid',
-                        'payload' => [
-                            '_point_id' => 'mem_1_123',
-                            'user_id' => 1,
-                            'category' => 'test',
-                            'key' => 'test_key',
-                            'value' => 'test_value',
+                    'points' => [
+                        [
+                            'id' => 'some-uuid',
+                            'payload' => [
+                                '_point_id' => 'mem_1_123',
+                                'user_id' => 1,
+                                'category' => 'test',
+                                'key' => 'test_key',
+                                'value' => 'test_value',
+                            ],
                         ],
                     ],
+                    'next_page_offset' => null,
                 ],
             ]), ['http_code' => 200]),
         ];
@@ -88,13 +102,109 @@ final class QdrantClientDirectTest extends TestCase
     public function testGetMemoryNotFound(): void
     {
         $responses = [
-            new MockResponse(json_encode(['result' => []]), ['http_code' => 200]),
+            new MockResponse(json_encode([
+                'result' => ['points' => [], 'next_page_offset' => null],
+            ]), ['http_code' => 200]),
         ];
 
         $client = $this->createClient($responses);
         $result = $client->getMemory('mem_1_nonexistent');
 
         $this->assertNull($result);
+    }
+
+    /**
+     * Regression lock for issue where deleteMemory was sending the derived
+     * UUIDv5 as the primary ID, which silently no-ops on legacy points stored
+     * by the pre-v2.4.0 Rust microservice under integer IDs. The delete MUST
+     * target the point by `_point_id` payload filter so both schemes resolve.
+     */
+    public function testDeleteMemoryUsesPointIdPayloadFilterNotPrimaryKey(): void
+    {
+        $capturedUrl = null;
+        $capturedBody = null;
+
+        $factory = function (string $method, string $url, array $options) use (&$capturedUrl, &$capturedBody): MockResponse {
+            $capturedUrl = $url;
+            $capturedBody = $options['body'] ?? null;
+
+            return new MockResponse(json_encode(['result' => ['status' => 'completed']]), ['http_code' => 200]);
+        };
+
+        $mockClient = new MockHttpClient($factory);
+        $client = new QdrantClientDirect(
+            httpClient: $mockClient,
+            qdrantUrl: 'http://localhost:6333',
+            logger: new NullLogger(),
+        );
+
+        $client->deleteMemory('mem_1_123');
+
+        $this->assertIsString($capturedUrl);
+        $this->assertStringContainsString('/collections/user_memories/points/delete', $capturedUrl);
+        $this->assertStringContainsString('wait=true', $capturedUrl);
+
+        $this->assertIsString($capturedBody);
+        /** @var array{filter?: array{must?: array<array{key?: string, match?: array{value?: string}}>}, points?: mixed} $decoded */
+        $decoded = json_decode($capturedBody, true);
+
+        // Must delete by payload filter, not by primary `points` ID list.
+        $this->assertArrayNotHasKey('points', $decoded, 'deleteMemory must not send primary-ID list; that breaks legacy int-keyed points');
+        $this->assertArrayHasKey('filter', $decoded);
+        $this->assertSame('_point_id', $decoded['filter']['must'][0]['key'] ?? null);
+        $this->assertSame('mem_1_123', $decoded['filter']['must'][0]['match']['value'] ?? null);
+    }
+
+    public function testDeleteMemorySuccess(): void
+    {
+        $this->expectNotToPerformAssertions();
+
+        $responses = [
+            new MockResponse(json_encode(['result' => ['status' => 'completed']]), ['http_code' => 200]),
+        ];
+
+        $client = $this->createClient($responses);
+        $client->deleteMemory('mem_1_123');
+    }
+
+    /**
+     * Regression lock for the getMemory read path — must scroll by `_point_id`
+     * payload filter (not lookup by primary UUID).
+     */
+    public function testGetMemoryUsesPointIdPayloadFilterNotPrimaryKey(): void
+    {
+        $capturedUrl = null;
+        $capturedBody = null;
+
+        $factory = function (string $method, string $url, array $options) use (&$capturedUrl, &$capturedBody): MockResponse {
+            $capturedUrl = $url;
+            $capturedBody = $options['body'] ?? null;
+
+            return new MockResponse(json_encode([
+                'result' => ['points' => [], 'next_page_offset' => null],
+            ]), ['http_code' => 200]);
+        };
+
+        $mockClient = new MockHttpClient($factory);
+        $client = new QdrantClientDirect(
+            httpClient: $mockClient,
+            qdrantUrl: 'http://localhost:6333',
+            logger: new NullLogger(),
+        );
+
+        $client->getMemory('mem_1_123');
+
+        $this->assertIsString($capturedUrl);
+        $this->assertStringContainsString('/collections/user_memories/points/scroll', $capturedUrl);
+
+        $this->assertIsString($capturedBody);
+        /** @var array{filter?: array{must?: array<array{key?: string, match?: array{value?: string}}>}, ids?: mixed} $decoded */
+        $decoded = json_decode($capturedBody, true);
+
+        $this->assertArrayNotHasKey('ids', $decoded, 'getMemory must not lookup by primary ID; that misses legacy int-keyed points');
+        $this->assertArrayHasKey('filter', $decoded);
+        $this->assertSame('_point_id', $decoded['filter']['must'][0]['key'] ?? null);
+        $this->assertSame('mem_1_123', $decoded['filter']['must'][0]['match']['value'] ?? null);
     }
 
     public function testSearchMemoriesSuccess(): void
@@ -130,18 +240,6 @@ final class QdrantClientDirectTest extends TestCase
         $this->assertCount(1, $results);
         $this->assertEquals('mem_1_123', $results[0]['id']);
         $this->assertEquals(0.95, $results[0]['score']);
-    }
-
-    public function testDeleteMemorySuccess(): void
-    {
-        $this->expectNotToPerformAssertions();
-
-        $responses = [
-            new MockResponse(json_encode(['result' => ['status' => 'completed']]), ['http_code' => 200]),
-        ];
-
-        $client = $this->createClient($responses);
-        $client->deleteMemory('mem_1_123');
     }
 
     public function testHealthCheckSuccess(): void
@@ -188,7 +286,14 @@ final class QdrantClientDirectTest extends TestCase
         $responses = [
             // ensureDocumentsCollection -> GET /collections/user_documents
             new MockResponse(json_encode(['result' => ['status' => 'green']]), ['http_code' => 200]),
-            // upsertPoints -> PUT /collections/user_documents/points
+            // ensurePayloadIndexes -> PUT /collections/user_documents/index  x4
+            new MockResponse(json_encode(['result' => ['status' => 'acknowledged']]), ['http_code' => 200]),
+            new MockResponse(json_encode(['result' => ['status' => 'acknowledged']]), ['http_code' => 200]),
+            new MockResponse(json_encode(['result' => ['status' => 'acknowledged']]), ['http_code' => 200]),
+            new MockResponse(json_encode(['result' => ['status' => 'acknowledged']]), ['http_code' => 200]),
+            // upsertDocument -> pre-upsert POST /points/delete?wait=true
+            new MockResponse(json_encode(['result' => ['status' => 'completed']]), ['http_code' => 200]),
+            // upsertDocument -> PUT /points?wait=true
             new MockResponse(json_encode(['result' => ['status' => 'completed']]), ['http_code' => 200]),
         ];
 
