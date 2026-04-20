@@ -6,6 +6,7 @@ namespace App\Tests\Service;
 
 use App\AI\Service\AiFacade;
 use App\Entity\User;
+use App\Service\Exception\MemoryServiceUnavailableException;
 use App\Service\ModelConfigService;
 use App\Service\RateLimitService;
 use App\Service\UserMemoryService;
@@ -98,7 +99,7 @@ final class UserMemoryServiceTest extends TestCase
         $this->service->deleteMemory($memoryId, $user);
     }
 
-    public function testDeleteMemoryDoesNotCallQdrantWhenUnavailable(): void
+    public function testDeleteMemoryThrowsWhenQdrantUnavailable(): void
     {
         $memoryId = 1768900000;
         $user = $this->createMock(User::class);
@@ -113,8 +114,50 @@ final class UserMemoryServiceTest extends TestCase
             ->expects($this->never())
             ->method('deleteMemory');
 
+        $this->expectException(MemoryServiceUnavailableException::class);
+
         $this->service->deleteMemory($memoryId, $user);
-        $this->addToAssertionCount(1);
+    }
+
+    public function testCreateMemoryThrowsWhenQdrantUnavailable(): void
+    {
+        $user = $this->createMock(User::class);
+        $user->method('getId')->willReturn(123);
+
+        $this->qdrantClient
+            ->expects($this->once())
+            ->method('isAvailable')
+            ->willReturn(false);
+
+        $this->qdrantClient
+            ->expects($this->never())
+            ->method('upsertMemory');
+
+        $this->expectException(MemoryServiceUnavailableException::class);
+
+        $this->service->createMemory($user, 'personal', 'favourite_colour', 'green');
+    }
+
+    public function testUpdateMemoryThrowsWhenQdrantUnavailable(): void
+    {
+        $user = $this->createMock(User::class);
+        $user->method('getId')->willReturn(123);
+
+        $this->qdrantClient
+            ->expects($this->once())
+            ->method('isAvailable')
+            ->willReturn(false);
+
+        $this->qdrantClient
+            ->expects($this->never())
+            ->method('getMemory');
+        $this->qdrantClient
+            ->expects($this->never())
+            ->method('upsertMemory');
+
+        $this->expectException(MemoryServiceUnavailableException::class);
+
+        $this->service->updateMemory(1768900000, $user, 'new value');
     }
 
     public function testServiceIsAvailableWhenQdrantConfigured(): void

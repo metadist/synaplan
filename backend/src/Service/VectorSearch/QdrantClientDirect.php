@@ -84,9 +84,9 @@ final class QdrantClientDirect implements QdrantClientInterface
     public function getMemory(string $pointId, ?string $namespace = null): ?array
     {
         $collection = $this->resolveMemoriesCollection($namespace);
+        $uuid = $this->generatePointUuid($pointId);
 
         try {
-            $uuid = $this->generatePointUuid($pointId);
             $response = $this->qdrantRequest('POST', "/collections/{$collection}/points", [
                 'ids' => [$uuid],
                 'with_payload' => true,
@@ -99,13 +99,22 @@ final class QdrantClientDirect implements QdrantClientInterface
             }
 
             return $points[0]['payload'] ?? null;
-        } catch (\Throwable $e) {
+        } catch (\RuntimeException $e) {
+            // qdrantRequest throws \RuntimeException for both transport errors
+            // (DNS failure, connection refused, timeout) and non-2xx responses.
+            // We treat HTTP 404 on the collection as "no such memory" (null),
+            // but surface every other failure so upstream callers can turn them
+            // into a 503 instead of a misleading "Memory not found".
+            if (str_contains($e->getMessage(), 'HTTP 404')) {
+                return null;
+            }
+
             $this->logger->error('Failed to get memory from Qdrant', [
                 'point_id' => $pointId,
                 'error' => $e->getMessage(),
             ]);
 
-            return null;
+            throw $e;
         }
     }
 
