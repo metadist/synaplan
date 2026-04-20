@@ -129,19 +129,88 @@ until php bin/console dbal:run-sql "SELECT 1" 2>&1; do
 done
 echo "✅ Database is ready!"
 
-# Run database schema update (until we have proper migrations)
-echo "🔄 Running database schema update..."
-php bin/console doctrine:schema:update --force
-echo "✅ Database schema ready!"
+# Run database migrations
+# Strategy:
+#  - Fresh DB: doctrine:migrations:migrate creates schema from baseline + any newer migrations.
+#  - Existing DB without migration metadata (e.g. legacy production created via SHELL/SQL):
+#    detect by checking that BUSER exists but doctrine_migration_versions does not, then mark
+#    the baseline as already applied so the migration is NOT re-executed against existing tables.
+echo "🔄 Running database migrations..."
 
-# Create test database schema (for PHPUnit with DAMA transaction rollback)
+# Helper: count rows from a SELECT COUNT(*) statement (handles dbal:run-sql output noise)
+_count_sql() {
+    local _sql="$1"
+    local _env_flag="${2:-}"
+    php bin/console dbal:run-sql ${_env_flag} "$_sql" 2>/dev/null | grep -oE '[0-9]+' | tail -1
+}
+
+# Pre-create doctrine_migration_versions ourselves with the platform default charset
+# (utf8mb4) and then INSERT each existing migration version directly. We bypass
+# `doctrine:migrations:sync-metadata-storage` + `version --add --all` because the
+# DBAL MariaDB schema comparator wrongly reports the auto-created table as
+# "not up to date" (it attaches column-level charset on `version` that the comparator
+# can't reconcile), which breaks every subsequent migrations command.
+_create_metadata_table() {
+    local _env_flag="${1:-}"
+    php bin/console dbal:run-sql ${_env_flag} \
+        "CREATE TABLE IF NOT EXISTS doctrine_migration_versions (
+            version VARCHAR(191) NOT NULL,
+            executed_at DATETIME DEFAULT NULL,
+            execution_time INT(11) DEFAULT NULL,
+            PRIMARY KEY(version)
+        ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_uca1400_ai_ci ENGINE=InnoDB" \
+        >/dev/null 2>&1 || true
+}
+
+_register_existing_migrations() {
+    local _env_flag="${1:-}"
+    local _file _basename _version
+    for _file in /var/www/backend/migrations/Version*.php; do
+        [ -f "$_file" ] || continue
+        _basename=$(basename "$_file" .php)
+        _version="DoctrineMigrations\\\\${_basename}"
+        php bin/console dbal:run-sql ${_env_flag} \
+            "INSERT IGNORE INTO doctrine_migration_versions (version, executed_at, execution_time) VALUES ('${_version}', NOW(), 0)" \
+            >/dev/null 2>&1 || true
+    done
+}
+
+bootstrap_migrations_metadata() {
+    local _env_flag="${1:-}"
+    local _label="${2:-database}"
+    local _has_versions
+    local _has_buser
+
+    _has_versions=$(_count_sql \
+        "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = 'doctrine_migration_versions'" \
+        "$_env_flag")
+    _has_buser=$(_count_sql \
+        "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = 'BUSER'" \
+        "$_env_flag")
+
+    if [ "${_has_versions:-0}" -eq 0 ] && [ "${_has_buser:-0}" -gt 0 ]; then
+        echo "📌 [$_label] Existing schema detected without migration metadata — marking all current migrations as applied"
+        _create_metadata_table "$_env_flag"
+        _register_existing_migrations "$_env_flag"
+    fi
+}
+
+bootstrap_migrations_metadata "" "main"
+php bin/console doctrine:migrations:migrate --no-interaction --allow-no-migration
+echo "✅ Database migrations applied!"
+
+# Same flow for the test database (PHPUnit + DAMA transaction rollback)
 if [ "$APP_ENV" = "dev" ]; then
-    echo "🔄 Updating test database schema..."
-    php bin/console doctrine:schema:update --force --env=test 2>/dev/null || true
-    echo "✅ Test database schema ready!"
+    echo "🔄 Migrating test database..."
+    bootstrap_migrations_metadata "--env=test" "test"
+    php bin/console doctrine:migrations:migrate --no-interaction --allow-no-migration --env=test 2>/dev/null || true
+    echo "✅ Test database migrations applied!"
 fi
 
-# Load fixtures on first run (dev/test only)
+# Load demo user fixtures FIRST (dev/test only, when DB is fresh).
+# Important: doctrine:fixtures:load purges ALL entity tables before reloading.
+# We therefore run fixtures BEFORE app:seed so the idempotent seed step can
+# re-populate models/prompts/config/rate-limits afterwards.
 FIXTURES_MARKER="/var/www/backend/var/.fixtures_loaded"
 
 if [ "$APP_ENV" = "dev" ] || [ "$APP_ENV" = "test" ]; then
@@ -154,34 +223,24 @@ if [ "$APP_ENV" = "dev" ] || [ "$APP_ENV" = "test" ]; then
     fi
 
     if [ -f "$FIXTURES_MARKER" ]; then
-        echo "✅ Fixtures already loaded (marker present)"
+        echo "✅ Demo user fixtures already loaded (marker present)"
         echo "   👤 Login: admin@synaplan.com / admin123"
         echo "   💡 To reload: rm backend/var/.fixtures_loaded && docker compose restart backend"
     else
         # Check if users actually exist in database (not just marker file)
-        # If table doesn't exist, command will fail and we get 0
         USER_COUNT=$(php bin/console dbal:run-sql "SELECT COUNT(*) as count FROM BUSER" 2>/dev/null | grep -oE '[0-9]+' | tail -1)
-        USER_COUNT=${USER_COUNT:-0}  # Default to 0 if empty
+        USER_COUNT=${USER_COUNT:-0}
 
         if [ "$USER_COUNT" -eq 0 ]; then
-            echo "🌱 Loading test data (current users: $USER_COUNT)..."
-
-            # Ensure schema is complete
-            echo "   Updating database schema..."
-            php bin/console doctrine:schema:update --force --complete || true
-
-            # Load fixtures
+            echo "🌱 Loading demo user fixtures (current users: $USER_COUNT)..."
             # Note: Not using --purge-with-truncate because TRUNCATE fails with foreign key constraints
-            # Even on empty tables, MariaDB/MySQL blocks TRUNCATE if FK constraints exist
-            echo "   Loading fixtures..."
             if php bin/console doctrine:fixtures:load --no-interaction 2>&1 | tee /tmp/fixtures.log; then
                 if grep -q "loading App" /tmp/fixtures.log; then
                     touch "$FIXTURES_MARKER"
-                    echo ""
-                    echo "✅ Fixtures loaded successfully!"
+                    echo "✅ Demo user fixtures loaded!"
                     echo "   👤 Admin: admin@synaplan.com / admin123"
-                    echo "   👤 Demo: demo@synaplan.com / demo123"
-                    echo "   👤 Test: test@example.com / test123"
+                    echo "   👤 Demo:  demo@synaplan.com / demo123"
+                    echo "   👤 Test:  test@example.com / test123"
                 else
                     echo "⚠️  Fixtures might have failed - check logs"
                 fi
@@ -191,12 +250,20 @@ if [ "$APP_ENV" = "dev" ] || [ "$APP_ENV" = "test" ]; then
             fi
         else
             touch "$FIXTURES_MARKER"
-            echo "✅ Fixtures already loaded ($USER_COUNT users)"
+            echo "✅ Demo user fixtures already present ($USER_COUNT users)"
             echo "   👤 Login: admin@synaplan.com / admin123"
             echo "   💡 To reload: rm backend/var/.fixtures_loaded && docker compose restart backend"
         fi
     fi
 fi
+
+# Seed production-essential catalogs (idempotent, safe in dev + prod).
+# Runs AFTER fixtures so a fresh dev DB ends up with both demo users and full
+# model/prompt/config catalogs. In prod this is the sole data-initialisation step.
+echo "🌱 Seeding catalogs (idempotent)..."
+php bin/console app:seed --no-interaction || {
+    echo "⚠️  app:seed failed — see logs above. Continuing startup."
+}
 
 # Ollama model downloads (optional, only if AUTO_DOWNLOAD_MODELS=true)
 if [ -n "${OLLAMA_BASE_URL:-}" ] && [ "${AUTO_DOWNLOAD_MODELS:-false}" = "true" ]; then

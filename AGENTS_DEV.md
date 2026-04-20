@@ -100,6 +100,38 @@ const routes = [
 - Check model availability: `/api/v1/config/models/{id}/check`
 - User can configure models via UI
 
+### Database Schema & Seed Data
+**Three clearly separated areas of responsibility — see `docs/MIGRATIONS.md`:**
+
+| What                             | Where / How                                               | Runs in       |
+|----------------------------------|-----------------------------------------------------------|---------------|
+| **Schema** (CREATE/ALTER/DROP)   | Doctrine Migrations in `backend/migrations/`              | dev + prod    |
+| **Catalog data** (models, prompts, default config, rate limits) | Idempotent seeders in `backend/src/Seed/` + `app:seed` | dev + prod    |
+| **Demo data** (users, widget)    | `backend/src/DataFixtures/UserFixtures.php` + `App\Seed\DemoWidgetConfigSeeder` | dev/test only |
+
+**Changing the schema (after editing an entity):**
+```bash
+make -C backend migrate-diff      # generates backend/migrations/VersionXYZ.php from ORM diff
+# Review the file (manually check VECTOR, JSON, FK columns!)
+make -C backend migrate           # apply
+docker compose exec backend php bin/console doctrine:migrations:migrate --env=test
+make -C backend test
+```
+
+**Extending catalog data:**
+- Add an AI model → edit `App\Model\ModelCatalog::all()`, then `make -C backend seed-models`
+- System prompt → `App\Prompt\PromptCatalog`, then `make -C backend seed-prompts`
+- Default config (`DEFAULTMODEL`, `ai` group) → `App\Seed\DefaultModelConfigSeeder::ROWS`, then `make -C backend seed-defaults`
+- Rate limit defaults → `App\Seed\RateLimitConfigSeeder::ROWS`, then `make -C backend seed-ratelimits`
+- `make -C backend seed` runs all seeders in the correct order (idempotent — safe to re-run any number of times)
+
+**CRITICAL rules:**
+- ❌ **NEVER** run `doctrine:schema:update --force` against prod or any shared database
+- ❌ **NEVER** run `doctrine:fixtures:load` in prod (purges all entity tables)
+- ❌ **NEVER** put production data in `DataFixtures/` (fixtures are demo data only)
+- ✅ **ALWAYS** write seeders using INSERT-IF-NOT-EXISTS (`BConfigSeeder::insertIfMissing`) or `INSERT … ON DUPLICATE KEY UPDATE` (for tables with a unique key)
+- ✅ On first boot against a legacy prod DB (BUSER exists but `doctrine_migration_versions` does not): the entrypoint automatically registers the baseline without re-executing DDL
+
 ### API Documentation (Swagger UI)
 - **ALWAYS use Swagger UI** to test endpoints: `http://localhost:8000/api/doc`
 - Interactive API testing (no need for Postman/curl)
@@ -1130,8 +1162,9 @@ make -C frontend generate-schemas  # Regenerate API schemas
 - Run: `make -C frontend test`
 
 ### Backend (PHPUnit)
-- Test with fixtures: `php bin/console doctrine:fixtures:load`
-- Use test database
+- Test DB is built via `doctrine:migrations:migrate --env=test` from `backend/migrations/` (NO LONGER via `schema:update`)
+- Demo users (admin/demo/test) come from `UserFixtures` (`doctrine:fixtures:load`); catalogs (models/prompts/config) come from `app:seed` — both are handled automatically by `docker-entrypoint.sh` at container start
+- After a schema change: `make -C backend migrate-diff` → `migrate` → `migrate --env=test` → `test`
 - Run: `make -C backend test`
 
 ---
@@ -1182,7 +1215,22 @@ docker compose up -d
 # Backend
 make -C backend lint format test
 make -C backend console -- list
-make -C backend migrate
+
+# Backend — Migrations (see docs/MIGRATIONS.md)
+make -C backend migrate           # apply pending migrations
+make -C backend migrate-status    # show what's applied / pending
+make -C backend migrate-diff      # generate new migration from ORM ↔ DB diff
+make -C backend migrate-generate  # empty migration skeleton
+
+# Backend — Seed (idempotent, prod-safe)
+make -C backend seed              # all seeders (models/prompts/defaults/ratelimits/demo)
+make -C backend seed-models
+make -C backend seed-prompts
+make -C backend seed-defaults
+make -C backend seed-ratelimits
+
+# Backend — Demo fixtures (dev/test only, purges entity tables!)
+make -C backend fixtures
 
 # Frontend
 make -C frontend lint test build
@@ -1202,7 +1250,11 @@ make lint test build
 - Backend controllers: `backend/src/Controller/`
 - Backend entities: `backend/src/Entity/`
 - Backend services: `backend/src/Service/`
-- Fixtures: `backend/src/DataFixtures/`
+- **Migrations**: `backend/migrations/` (Doctrine Migrations — owns the schema)
+- **Seeder** (idempotent, prod-safe): `backend/src/Seed/`
+- **Seed-Commands**: `backend/src/Command/{Seed*Command,Model/Prompt/RateLimit/Config*}.php`
+- **Catalogs** (source of truth): `backend/src/Model/ModelCatalog.php`, `backend/src/Prompt/PromptCatalog.php`
+- **Fixtures** (dev/test demo data only): `backend/src/DataFixtures/UserFixtures.php`
 
 ---
 
@@ -1242,6 +1294,7 @@ make lint test build
 - **Stores**: Check `src/stores/` for Pinia patterns
 - **SSE**: Check `ChatView.vue` for streaming event handling
 - **Prompts**: Internal prompts need `tools:` prefix in topic
+- **Migrations / Seed**: See `docs/MIGRATIONS.md` — schema via `make -C backend migrate-diff`, data via `App\Seed\*` + `app:seed`, NEVER `schema:update --force`
 
 ## Red Flags to Avoid
 
@@ -1271,4 +1324,8 @@ make lint test build
 - **Inventing Memory IDs** (only use IDs from provided list)
 - **Hardcoding API URL in widget** (use `detectApiUrl()`)
 - **Using `reactive()` in Pinia** (prefer `ref()` for flexibility)
+- **`doctrine:schema:update --force`** on a shared/prod DB (always generate a migration instead: `make -C backend migrate-diff`)
+- **Putting production data in `DataFixtures/`** (use an idempotent seeder in `backend/src/Seed/` + the `App\Seed\*` pattern instead)
+- **Running `doctrine:fixtures:load` in prod** (purges all entity tables)
+- **`BCONFIG` inserts without `BConfigSeeder::insertIfMissing`** (BCONFIG has no unique key — naive INSERTs duplicate on every re-run)
 

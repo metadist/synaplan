@@ -1,26 +1,29 @@
 <?php
 
-namespace App\DataFixtures;
+declare(strict_types=1);
+
+namespace App\Seed;
 
 use App\Model\ModelCatalog;
-use Doctrine\Bundle\FixturesBundle\Fixture;
-use Doctrine\Persistence\ObjectManager;
+use Doctrine\DBAL\Connection;
 
 /**
- * Loads all AI models from the built-in catalog into the database.
+ * Idempotent seeder for the AI model catalog (BMODELS).
  *
- * In dev/test: also seeds TestProvider models (negative IDs) for all capability tags.
- * Negative IDs can never collide with auto-increment (which starts at 1 and goes up).
+ * - Always upserts every model defined in App\Model\ModelCatalog::all() (positive IDs).
+ * - In dev/test, additionally upserts mock test-models with negative IDs (so they can
+ *   never collide with the auto-increment range used by real catalog rows).
+ * - In `test`, also flips test models to selectable/showWhenFree so the admin UI
+ *   exposes them in the E2E stack.
  *
- * Dev: selectable=0 — mock models stay out of normal lists; global defaults remain from
- * ConfigFixtures (real catalog IDs), never auto-switched to TestProvider.
- *
- * Test: after upsert, BSELECTABLE/BSHOWWHENFREE are set so GET /config/models returns them
- * (isHiddenBecauseFree would otherwise hide zero-price rows). Makes the test-stack admin UI
- * match actual DEFAULTMODEL config from ConfigFixtures::loadTestConfig.
+ * Safe to run repeatedly: ModelCatalog::upsert() uses INSERT ... ON DUPLICATE KEY UPDATE.
  */
-class ModelFixtures extends Fixture
+final class ModelSeeder
 {
+    /**
+     * Mock models for E2E/CI stacks. Negative IDs cannot collide with auto-increment.
+     * Routed through TestProvider/OllamaProvider stubs.
+     */
     public const TEST_MODELS = [
         ['id' => -1, 'service' => 'test', 'name' => 'test-model',      'tag' => 'chat',       'providerId' => 'test-model'],
         ['id' => -2, 'service' => 'test', 'name' => 'test-vectorize',  'tag' => 'vectorize',  'providerId' => 'test-vectorize'],
@@ -29,20 +32,23 @@ class ModelFixtures extends Fixture
         ['id' => -5, 'service' => 'test', 'name' => 'test-text2vid',   'tag' => 'text2vid',   'providerId' => 'test-text2vid'],
         ['id' => -6, 'service' => 'test', 'name' => 'test-sound2text', 'tag' => 'sound2text', 'providerId' => 'test-sound2text'],
         ['id' => -7, 'service' => 'test', 'name' => 'test-text2sound', 'tag' => 'text2sound', 'providerId' => 'test-text2sound'],
-        // Ollama stub models — route through OllamaProvider to the ollama-stub service
         ['id' => -10, 'service' => 'ollama', 'name' => 'stub-chat-model',  'tag' => 'chat',      'providerId' => 'stub-chat-model'],
         ['id' => -11, 'service' => 'ollama', 'name' => 'stub-embed-model', 'tag' => 'vectorize', 'providerId' => 'stub-embed-model'],
     ];
 
-    public function load(ObjectManager $manager): void
-    {
-        $connection = $manager->getConnection();
+    public function __construct(
+        private readonly Connection $connection,
+        private readonly string $environment,
+    ) {
+    }
 
-        // Use $_ENV (set by Symfony Dotenv when kernel boots); fallback to getenv for CLI
-        $env = $_ENV['APP_ENV'] ?? getenv('APP_ENV') ?: 'prod';
-        if (in_array($env, ['dev', 'test'], true)) {
+    public function seed(): SeedResult
+    {
+        $upserted = 0;
+
+        if (in_array($this->environment, ['dev', 'test'], true)) {
             foreach (self::TEST_MODELS as $base) {
-                ModelCatalog::upsert($connection, array_merge($base, [
+                ModelCatalog::upsert($this->connection, array_merge($base, [
                     'selectable' => 0,
                     'active' => 1,
                     'priceIn' => 0,
@@ -53,19 +59,21 @@ class ModelFixtures extends Fixture
                     'rating' => 0,
                     'json' => ['description' => 'Mock model for E2E/CI. No API key required.'],
                 ]));
+                ++$upserted;
             }
 
-            if ('test' === $env) {
-                $connection->executeStatement(
+            if ('test' === $this->environment) {
+                $this->connection->executeStatement(
                     'UPDATE BMODELS SET BSELECTABLE = 1, BSHOWWHENFREE = 1 WHERE BID < 0'
                 );
             }
         }
 
         foreach (ModelCatalog::all() as $data) {
-            ModelCatalog::upsert($connection, $data);
+            ModelCatalog::upsert($this->connection, $data);
+            ++$upserted;
         }
 
-        $manager->flush();
+        return new SeedResult('models', inserted: $upserted);
     }
 }
