@@ -121,7 +121,7 @@ make -C backend test
 **Extending catalog data:**
 - Add an AI model → edit `App\Model\ModelCatalog::all()`, then `make -C backend seed-models`
 - System prompt → `App\Prompt\PromptCatalog`, then `make -C backend seed-prompts`
-- Default config (`DEFAULTMODEL`, `ai` group) → edit `App\Seed\DefaultModelConfigSeeder::PROD_DEFAULTS` (and `TEST_DEFAULTS` if relevant for PHPUnit/E2E), then `make -C backend seed-defaults`
+- Default config (`DEFAULTMODEL`, `ai` group) → edit `App\Seed\DefaultModelConfigSeeder::PROD_MODEL_DEFAULTS` / `PROD_FLAGS` (and `TEST_DEFAULTS` if relevant for PHPUnit/E2E), then `make -C backend seed-defaults`. Model bindings reference catalog entries by `service:providerId:tag` keys (resolved via `ModelCatalog::findBidByKey`), never by raw BIDs.
 - Rate limit defaults → edit `App\Seed\RateLimitConfigSeeder::DEFAULTS`, then `make -C backend seed-ratelimits`
 - `make -C backend seed` runs all seeders in the correct order (idempotent — safe to re-run any number of times)
 
@@ -129,7 +129,7 @@ make -C backend test
 - ❌ **NEVER** run `doctrine:schema:update --force` against prod or any shared database
 - ❌ **NEVER** run `doctrine:fixtures:load` in prod (purges all entity tables)
 - ❌ **NEVER** put production data in `DataFixtures/` (fixtures are demo data only)
-- ✅ **ALWAYS** write seeders using INSERT-IF-NOT-EXISTS (`BConfigSeeder::insertIfMissing`) or `INSERT … ON DUPLICATE KEY UPDATE` (for tables with a unique key)
+- ✅ **ALWAYS** write seeders using INSERT-IF-NOT-EXISTS (`BConfigSeeder::insertIfMissing` — backed by `INSERT IGNORE` and the `uniq_config_owner_group_setting` UNIQUE index, race-safe) or `INSERT … ON DUPLICATE KEY UPDATE` (for tables with a unique key); for `BMODELS`, only catalog-owned fields (service/name/tag/provid/prices/units/quality/rating/json) are overwritten on UPDATE — operator-owned toggles (`BSELECTABLE`, `BACTIVE`, `BISDEFAULT`) are seeded once and never wiped on container restart
 - ✅ On first boot against a legacy prod DB (BUSER exists but `doctrine_migration_versions` does not): the entrypoint automatically registers the baseline without re-executing DDL
 
 ### API Documentation (Swagger UI)

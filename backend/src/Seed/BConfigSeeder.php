@@ -9,10 +9,12 @@ use Doctrine\DBAL\Connection;
 /**
  * Shared insert-if-missing helper for the BCONFIG table.
  *
- * The BCONFIG table currently lacks a UNIQUE(BOWNERID, BGROUP, BSETTING) constraint
- * (would require a data-cleanup migration to dedupe historical rows first). Until that
- * ships, we use a single atomic `INSERT … SELECT … WHERE NOT EXISTS` statement so
- * concurrent container starts cannot race and produce duplicate rows.
+ * Relies on the UNIQUE(BOWNERID, BGROUP, BSETTING) index added in
+ * Version20260420000000. With that constraint in place, `INSERT IGNORE` is
+ * atomic and race-safe under MariaDB InnoDB: concurrent container starts (or
+ * parallel calls) cannot produce duplicate rows even without an outer lock.
+ *
+ * Operator overrides are NEVER touched — this seeder only fills in missing rows.
  */
 final class BConfigSeeder
 {
@@ -33,16 +35,8 @@ final class BConfigSeeder
 
         foreach ($rows as $row) {
             $affected = $connection->executeStatement(
-                'INSERT INTO BCONFIG (BOWNERID, BGROUP, BSETTING, BVALUE)
-                 SELECT ?, ?, ?, ? FROM DUAL
-                 WHERE NOT EXISTS (
-                     SELECT 1 FROM BCONFIG
-                     WHERE BOWNERID = ? AND BGROUP = ? AND BSETTING = ?
-                 )',
-                [
-                    $row['ownerId'], $row['group'], $row['setting'], $row['value'],
-                    $row['ownerId'], $row['group'], $row['setting'],
-                ]
+                'INSERT IGNORE INTO BCONFIG (BOWNERID, BGROUP, BSETTING, BVALUE) VALUES (?, ?, ?, ?)',
+                [$row['ownerId'], $row['group'], $row['setting'], $row['value']]
             );
 
             if ($affected > 0) {

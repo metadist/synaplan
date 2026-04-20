@@ -124,4 +124,59 @@ class ModelCatalogTest extends TestCase
 
         ModelCatalog::remove($connection, $model);
     }
+
+    public function testUpsertSqlDoesNotOverwriteOperatorOwnedFields(): void
+    {
+        $connection = $this->createMock(Connection::class);
+        $model = ModelCatalog::find('groq:llama-3.3-70b-versatile')[0];
+
+        // @phpstan-ignore-next-line
+        $connection
+            ->expects($this->once())
+            ->method('executeStatement')
+            ->with(
+                $this->callback(static function (string $sql): bool {
+                    // Catalog-owned columns must appear in the UPDATE clause.
+                    foreach (['BSERVICE', 'BNAME', 'BTAG', 'BPROVID', 'BPRICEIN', 'BPRICEOUT', 'BJSON'] as $catalogOwned) {
+                        if (!str_contains($sql, sprintf('%s = VALUES(%s)', $catalogOwned, $catalogOwned))) {
+                            return false;
+                        }
+                    }
+
+                    // Operator-owned columns MUST NOT appear in the UPDATE clause —
+                    // otherwise admin-toggled values would be wiped on every container restart.
+                    [, $updateClause] = explode('ON DUPLICATE KEY UPDATE', $sql, 2);
+                    foreach (['BSELECTABLE', 'BACTIVE', 'BISDEFAULT'] as $operatorOwned) {
+                        if (str_contains($updateClause, sprintf('%s = VALUES(%s)', $operatorOwned, $operatorOwned))) {
+                            return false;
+                        }
+                    }
+
+                    return true;
+                }),
+            );
+
+        ModelCatalog::upsert($connection, $model);
+    }
+
+    public function testFindBidByKeyResolvesUniqueMatch(): void
+    {
+        $bid = ModelCatalog::findBidByKey('openai:gpt-5.4:chat');
+
+        $this->assertNotNull($bid);
+        $found = ModelCatalog::find('openai:gpt-5.4:chat');
+        $this->assertSame((int) $found[0]['id'], $bid);
+    }
+
+    public function testFindBidByKeyReturnsNullForAmbiguousKey(): void
+    {
+        // Bare service:providerId for openai:gpt-5.4 matches both chat + pic2text variants,
+        // so it intentionally cannot resolve to a single BID — callers must add the tag suffix.
+        $this->assertNull(ModelCatalog::findBidByKey('openai:gpt-5.4'));
+    }
+
+    public function testFindBidByKeyReturnsNullForUnknownKey(): void
+    {
+        $this->assertNull(ModelCatalog::findBidByKey('nonexistent:provider:chat'));
+    }
 }

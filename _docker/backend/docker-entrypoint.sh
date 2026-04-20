@@ -134,8 +134,15 @@ echo "✅ Database is ready!"
 #  - Fresh DB: doctrine:migrations:migrate creates schema from baseline + any newer migrations.
 #  - Existing DB without migration metadata (e.g. legacy production created via SHELL/SQL):
 #    detect by checking that BUSER exists but doctrine_migration_versions does not, then mark
-#    the baseline as already applied so the migration is NOT re-executed against existing tables.
+#    ONLY the baseline migration as already applied. Newer migrations after the baseline are
+#    intentionally NOT pre-marked, so doctrine:migrations:migrate can apply them on top of the
+#    legacy schema. This avoids silently skipping schema changes that ship after the baseline.
 echo "🔄 Running database migrations..."
+
+# Baseline = the snapshot migration that captures the legacy production schema.
+# Only this version is pre-marked as applied on legacy databases; everything newer
+# runs through the normal migrate path.
+BASELINE_MIGRATION="DoctrineMigrations\\Version20260417000000"
 
 # Helper: count rows from a SELECT COUNT(*) statement (handles dbal:run-sql output noise)
 _count_sql() {
@@ -165,17 +172,14 @@ _create_metadata_table() {
         >/dev/null 2>&1 || true
 }
 
-_register_existing_migrations() {
+# Mark ONLY the baseline migration as applied. Newer migrations are deliberately
+# left for doctrine:migrations:migrate to execute, so post-baseline schema changes
+# are NOT silently skipped on legacy databases.
+_register_baseline_migration() {
     local _env_flag="${1:-}"
-    local _file _basename _version
-    for _file in /var/www/backend/migrations/Version*.php; do
-        [ -f "$_file" ] || continue
-        _basename=$(basename "$_file" .php)
-        _version="DoctrineMigrations\\\\${_basename}"
-        php bin/console dbal:run-sql ${_env_flag} \
-            "INSERT IGNORE INTO doctrine_migration_versions (version, executed_at, execution_time) VALUES ('${_version}', NOW(), 0)" \
-            >/dev/null 2>&1 || true
-    done
+    php bin/console dbal:run-sql ${_env_flag} \
+        "INSERT IGNORE INTO doctrine_migration_versions (version, executed_at, execution_time) VALUES ('${BASELINE_MIGRATION}', NOW(), 0)" \
+        >/dev/null 2>&1 || true
 }
 
 bootstrap_migrations_metadata() {
@@ -192,9 +196,9 @@ bootstrap_migrations_metadata() {
         "$_env_flag")
 
     if [ "${_has_versions:-0}" -eq 0 ] && [ "${_has_buser:-0}" -gt 0 ]; then
-        echo "📌 [$_label] Existing schema detected without migration metadata — marking all current migrations as applied"
+        echo "📌 [$_label] Existing schema detected without migration metadata — marking baseline (${BASELINE_MIGRATION}) as applied; post-baseline migrations will run via doctrine:migrations:migrate"
         _create_metadata_table "$_env_flag"
-        _register_existing_migrations "$_env_flag"
+        _register_baseline_migration "$_env_flag"
     fi
 }
 

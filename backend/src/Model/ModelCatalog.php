@@ -41,6 +41,16 @@ class ModelCatalog
     /**
      * Insert or update a model row via `INSERT … ON DUPLICATE KEY UPDATE`.
      *
+     * Field ownership rules:
+     *   - **Catalog-owned** (always overwritten on UPDATE):
+     *     BSERVICE, BNAME, BTAG, BPROVID, BPRICEIN, BINUNIT, BPRICEOUT, BOUTUNIT,
+     *     BQUALITY, BRATING, BJSON. Truth lives in this class; deploy = update.
+     *   - **Operator-owned** (only set on INSERT, NEVER overwritten):
+     *     BSELECTABLE, BACTIVE, BISDEFAULT. These can be toggled by admins via
+     *     the AdminModelsService UI; container restarts must not wipe those choices.
+     *     Test fixtures that need to force a value should issue an explicit UPDATE
+     *     after the upsert (see ModelSeeder::seed()).
+     *
      * Returns the MySQL/MariaDB affected-rows value so callers can distinguish
      * inserts from updates:
      *   - 1 → row was inserted
@@ -54,11 +64,10 @@ class ModelCatalog
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON DUPLICATE KEY UPDATE
                 BSERVICE = VALUES(BSERVICE), BNAME = VALUES(BNAME), BTAG = VALUES(BTAG),
-                BSELECTABLE = VALUES(BSELECTABLE), BACTIVE = VALUES(BACTIVE),
                 BPROVID = VALUES(BPROVID), BPRICEIN = VALUES(BPRICEIN),
                 BINUNIT = VALUES(BINUNIT), BPRICEOUT = VALUES(BPRICEOUT),
                 BOUTUNIT = VALUES(BOUTUNIT), BQUALITY = VALUES(BQUALITY),
-                BRATING = VALUES(BRATING), BISDEFAULT = VALUES(BISDEFAULT),
+                BRATING = VALUES(BRATING),
                 BJSON = VALUES(BJSON)',
             [
                 $model['id'], $model['service'], $model['name'], $model['tag'],
@@ -69,6 +78,20 @@ class ModelCatalog
                 json_encode($model['json']),
             ]
         );
+    }
+
+    /**
+     * Resolve a catalog key like `service:providerId:tag` (or `service:providerId`
+     * for unambiguous keys) to the BMODELS BID. Returns null if no unique match exists.
+     *
+     * Used by seed code that needs to bind config to a specific catalog entry without
+     * hard-coding numeric IDs.
+     */
+    public static function findBidByKey(string $key): ?int
+    {
+        $matches = self::find($key);
+
+        return 1 === count($matches) ? (int) $matches[0]['id'] : null;
     }
 
     /**
