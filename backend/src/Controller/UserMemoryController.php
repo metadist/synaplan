@@ -73,6 +73,7 @@ class UserMemoryController extends AbstractController
                     ]
                 )
             ),
+            new OA\Response(response: 503, description: 'Memory service unavailable'),
         ]
     )]
     public function getMemories(
@@ -124,6 +125,7 @@ class UserMemoryController extends AbstractController
                 )
             ),
             new OA\Response(response: 404, description: 'Memory not found'),
+            new OA\Response(response: 503, description: 'Memory service unavailable'),
         ]
     )]
     public function getMemory(
@@ -168,6 +170,7 @@ class UserMemoryController extends AbstractController
                     ]
                 )
             ),
+            new OA\Response(response: 503, description: 'Memory service unavailable'),
         ]
     )]
     public function getCategories(#[CurrentUser] User $user): JsonResponse
@@ -229,6 +232,7 @@ class UserMemoryController extends AbstractController
                     ]
                 )
             ),
+            new OA\Response(response: 503, description: 'Memory service unavailable'),
         ]
     )]
     public function createMemory(
@@ -331,6 +335,7 @@ class UserMemoryController extends AbstractController
                     ]
                 )
             ),
+            new OA\Response(response: 503, description: 'Memory service unavailable'),
         ]
     )]
     public function updateMemory(
@@ -425,6 +430,7 @@ class UserMemoryController extends AbstractController
                     ]
                 )
             ),
+            new OA\Response(response: 503, description: 'Memory service unavailable'),
         ]
     )]
     public function deleteMemory(
@@ -485,6 +491,7 @@ class UserMemoryController extends AbstractController
                     ]
                 )
             ),
+            new OA\Response(response: 503, description: 'Memory service unavailable'),
         ]
     )]
     public function searchMemories(
@@ -551,6 +558,7 @@ class UserMemoryController extends AbstractController
                     ]
                 )
             ),
+            new OA\Response(response: 503, description: 'Memory service unavailable'),
         ]
     )]
     public function parseMemory(
@@ -933,20 +941,20 @@ class UserMemoryController extends AbstractController
      * Build the 503 response used whenever the Qdrant backend is unreachable.
      *
      * Regular users see a short, neutral message. Admins additionally receive
-     * the underlying technical detail (prefixed with `[Debug]` so the frontend
-     * store can surface it in the error notification), matching the pattern
-     * already used for {@see ProviderException}.
+     * the raw technical detail in `debug`. The frontend httpClient already
+     * renders the `debug` field with a "[Debug] " prefix, so the backend must
+     * NOT add its own prefix — otherwise the user sees "[Debug] [Debug] …".
+     * Matches the convention used by the {@see ProviderException} branches
+     * in this controller.
      */
     private function memoryServiceUnavailableResponse(User $user, ?\Throwable $e = null): JsonResponse
     {
         $payload = ['error' => 'Memory service temporarily unavailable'];
 
         if ($user->isAdmin()) {
-            $detail = null !== $e
+            $payload['debug'] = null !== $e
                 ? $e->getMessage()
                 : 'Qdrant client reports isAvailable() === false. Check QDRANT_URL and that the Qdrant container is reachable.';
-
-            $payload['debug'] = '[Debug] '.$detail;
         }
 
         return $this->json($payload, Response::HTTP_SERVICE_UNAVAILABLE);

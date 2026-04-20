@@ -160,6 +160,61 @@ final class UserMemoryServiceTest extends TestCase
         $this->service->updateMemory(1768900000, $user, 'new value');
     }
 
+    /**
+     * Covers the race window where isAvailable() returns true (health cache
+     * hit) but the subsequent Qdrant call fails. The service must translate
+     * the underlying \RuntimeException into MemoryServiceUnavailableException
+     * so the controller returns 503 instead of leaking the raw error as a
+     * misleading 400 or 500.
+     */
+    public function testDeleteMemoryMapsRuntimeExceptionFromQdrantTo503(): void
+    {
+        $memoryId = 1768900000;
+        $user = $this->createMock(User::class);
+        $user->method('getId')->willReturn(123);
+
+        $this->qdrantClient
+            ->expects($this->once())
+            ->method('isAvailable')
+            ->willReturn(true);
+
+        $this->qdrantClient
+            ->expects($this->once())
+            ->method('deleteMemory')
+            ->with("mem_123_{$memoryId}")
+            ->willThrowException(new \RuntimeException('Qdrant request failed: HTTP 500'));
+
+        $this->expectException(MemoryServiceUnavailableException::class);
+
+        $this->service->deleteMemory($memoryId, $user);
+    }
+
+    /**
+     * Same race as above, but for updateMemory() where the failure happens
+     * during the preflight getMemory() lookup.
+     */
+    public function testUpdateMemoryMapsRuntimeExceptionFromQdrantTo503(): void
+    {
+        $memoryId = 1768900000;
+        $user = $this->createMock(User::class);
+        $user->method('getId')->willReturn(123);
+
+        $this->qdrantClient
+            ->expects($this->once())
+            ->method('isAvailable')
+            ->willReturn(true);
+
+        $this->qdrantClient
+            ->expects($this->once())
+            ->method('getMemory')
+            ->with("mem_123_{$memoryId}")
+            ->willThrowException(new \RuntimeException('Qdrant request failed: connection refused'));
+
+        $this->expectException(MemoryServiceUnavailableException::class);
+
+        $this->service->updateMemory($memoryId, $user, 'new value');
+    }
+
     public function testServiceIsAvailableWhenQdrantConfigured(): void
     {
         $this->qdrantClient
