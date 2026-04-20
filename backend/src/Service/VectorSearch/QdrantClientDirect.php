@@ -84,28 +84,36 @@ final class QdrantClientDirect implements QdrantClientInterface
     public function getMemory(string $pointId, ?string $namespace = null): ?array
     {
         $collection = $this->resolveMemoriesCollection($namespace);
+        $uuid = $this->generatePointUuid($pointId);
 
         try {
-            $uuid = $this->generatePointUuid($pointId);
             $response = $this->qdrantRequest('POST', "/collections/{$collection}/points", [
                 'ids' => [$uuid],
                 'with_payload' => true,
                 'with_vector' => false,
             ]);
 
+            // "Point not found" is a successful request (HTTP 200) with an
+            // empty `result` array — handled here.
+            // HTTP 404 from the points endpoint, on the other hand, means the
+            // *collection* is missing (verified against Qdrant 1.x: HTTP 404
+            // with "Collection `<name>` doesn't exist!"). That's an
+            // infrastructure problem, not a missing memory, so we let the
+            // underlying \RuntimeException propagate so upstream callers can
+            // turn it into a 503.
             $points = $response['result'] ?? [];
             if (empty($points)) {
                 return null;
             }
 
             return $points[0]['payload'] ?? null;
-        } catch (\Throwable $e) {
+        } catch (\RuntimeException $e) {
             $this->logger->error('Failed to get memory from Qdrant', [
                 'point_id' => $pointId,
                 'error' => $e->getMessage(),
             ]);
 
-            return null;
+            throw $e;
         }
     }
 
@@ -964,7 +972,14 @@ final class QdrantClientDirect implements QdrantClientInterface
     /**
      * Send a request to the Qdrant REST API and return the decoded response.
      *
-     * @throws \RuntimeException on non-2xx responses or network errors
+     * All failure modes (transport errors, non-2xx responses, non-JSON bodies)
+     * are normalised to \RuntimeException so callers can use a single catch
+     * clause to surface outages as 503 instead of leaking mixed exception
+     * types (e.g. \JsonException, which extends \Exception directly and would
+     * otherwise bypass `catch (\RuntimeException $e)` blocks upstream).
+     *
+     * @throws \RuntimeException on network errors, non-2xx responses, or
+     *                           malformed JSON in the response body
      */
     private function qdrantRequest(string $method, string $path, ?array $body = null): array
     {
@@ -986,6 +1001,10 @@ final class QdrantClientDirect implements QdrantClientInterface
             return [];
         }
 
-        return json_decode($content, true, 512, \JSON_THROW_ON_ERROR);
+        try {
+            return json_decode($content, true, 512, \JSON_THROW_ON_ERROR);
+        } catch (\JsonException $e) {
+            throw new \RuntimeException("Qdrant returned a non-JSON response body [{$method} {$path}]: {$e->getMessage()}", 0, $e);
+        }
     }
 }
