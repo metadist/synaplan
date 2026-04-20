@@ -62,6 +62,16 @@ final class QdrantClientDirect implements QdrantClientInterface
         $payload['_point_id'] = $pointId;
 
         try {
+            // Remove any prior point carrying the same `_point_id` payload
+            // before writing the new UUID-keyed one. Without this step, a
+            // legacy integer-keyed point and the new UUID-keyed point would
+            // coexist (same `_point_id` payload, different primary IDs) and
+            // scrolls would surface duplicates. Deleting by payload filter is
+            // cheap and a no-op when nothing matches.
+            $this->qdrantRequest('POST', "/collections/{$collection}/points/delete?wait=true", [
+                'filter' => $this->pointIdFilter($pointId),
+            ]);
+
             $this->upsertPoints($collection, [
                 [
                     'id' => $this->generatePointUuid($pointId),
@@ -84,24 +94,23 @@ final class QdrantClientDirect implements QdrantClientInterface
     public function getMemory(string $pointId, ?string $namespace = null): ?array
     {
         $collection = $this->resolveMemoriesCollection($namespace);
-        $uuid = $this->generatePointUuid($pointId);
 
         try {
-            $response = $this->qdrantRequest('POST', "/collections/{$collection}/points", [
-                'ids' => [$uuid],
+            // Scroll by payload filter on `_point_id` — works regardless of
+            // whether the underlying Qdrant primary ID is the derived UUIDv5
+            // (current scheme) or a legacy integer from the pre-v2.4.0 Rust
+            // microservice. HTTP 404 from this endpoint means the *collection*
+            // is missing (verified against Qdrant 1.x), which is an
+            // infrastructure problem rather than a missing memory, so we let
+            // the underlying \RuntimeException propagate for 503 mapping.
+            $response = $this->qdrantRequest('POST', "/collections/{$collection}/points/scroll", [
+                'filter' => $this->pointIdFilter($pointId),
+                'limit' => 1,
                 'with_payload' => true,
                 'with_vector' => false,
             ]);
 
-            // "Point not found" is a successful request (HTTP 200) with an
-            // empty `result` array — handled here.
-            // HTTP 404 from the points endpoint, on the other hand, means the
-            // *collection* is missing (verified against Qdrant 1.x: HTTP 404
-            // with "Collection `<name>` doesn't exist!"). That's an
-            // infrastructure problem, not a missing memory, so we let the
-            // underlying \RuntimeException propagate so upstream callers can
-            // turn it into a 503.
-            $points = $response['result'] ?? [];
+            $points = $response['result']['points'] ?? [];
             if (empty($points)) {
                 return null;
             }
@@ -214,9 +223,14 @@ final class QdrantClientDirect implements QdrantClientInterface
         $collection = $this->resolveMemoriesCollection($namespace);
 
         try {
-            $uuid = $this->generatePointUuid($pointId);
+            // Delete by payload filter on `_point_id` rather than by the derived
+            // UUIDv5 primary key. This is the only scheme that works uniformly
+            // for BOTH legacy points (keyed by the Rust microservice's integer
+            // hash, pre-v2.4.0) and current points (keyed by UUIDv5). Deleting
+            // by a mismatched primary ID returns HTTP 200 with no effect — the
+            // bug this fix addresses.
             $this->qdrantRequest('POST', "/collections/{$collection}/points/delete?wait=true", [
-                'points' => [$uuid],
+                'filter' => $this->pointIdFilter($pointId),
             ]);
 
             $this->logger->debug('Memory deleted from Qdrant', ['point_id' => $pointId]);
@@ -279,6 +293,13 @@ final class QdrantClientDirect implements QdrantClientInterface
         $payload['_point_id'] = $pointId;
 
         try {
+            // See upsertMemory() for the rationale — prevents a primary-ID
+            // mismatch between a legacy point and the new UUID-keyed one from
+            // producing duplicate rows that share the same `_point_id`.
+            $this->qdrantRequest('POST', "/collections/{$this->documentsCollection}/points/delete?wait=true", [
+                'filter' => $this->pointIdFilter($pointId),
+            ]);
+
             $this->upsertPoints($this->documentsCollection, [
                 [
                     'id' => $this->generatePointUuid($pointId),
@@ -382,14 +403,16 @@ final class QdrantClientDirect implements QdrantClientInterface
     public function getDocument(string $pointId): ?array
     {
         try {
-            $uuid = $this->generatePointUuid($pointId);
-            $response = $this->qdrantRequest('POST', "/collections/{$this->documentsCollection}/points", [
-                'ids' => [$uuid],
+            // See getMemory() — scroll by `_point_id` payload so legacy
+            // integer-keyed points are still findable.
+            $response = $this->qdrantRequest('POST', "/collections/{$this->documentsCollection}/points/scroll", [
+                'filter' => $this->pointIdFilter($pointId),
+                'limit' => 1,
                 'with_payload' => true,
                 'with_vector' => true,
             ]);
 
-            $points = $response['result'] ?? [];
+            $points = $response['result']['points'] ?? [];
             if (empty($points)) {
                 return null;
             }
@@ -414,9 +437,11 @@ final class QdrantClientDirect implements QdrantClientInterface
     public function deleteDocument(string $pointId): void
     {
         try {
-            $uuid = $this->generatePointUuid($pointId);
+            // See deleteMemory() for why payload-filter delete is the only
+            // correct scheme for a collection that may still contain legacy
+            // integer-keyed points alongside current UUID-keyed ones.
             $this->qdrantRequest('POST', "/collections/{$this->documentsCollection}/points/delete?wait=true", [
-                'points' => [$uuid],
+                'filter' => $this->pointIdFilter($pointId),
             ]);
         } catch (\Throwable $e) {
             $this->logger->error('Failed to delete document', [
@@ -740,10 +765,30 @@ final class QdrantClientDirect implements QdrantClientInterface
 
     /**
      * Deterministic UUID v5 from a string point ID for stable mapping.
+     *
+     * Only used when writing NEW points. Read/delete paths route through the
+     * `_point_id` payload filter (see pointIdFilter()) to remain compatible
+     * with legacy integer-keyed points from the pre-v2.4.0 Rust microservice.
      */
     private function generatePointUuid(string $pointId): string
     {
         return Uuid::v5(Uuid::fromString('6ba7b810-9dad-11d1-80b4-00c04fd430c8'), $pointId)->toRfc4122();
+    }
+
+    /**
+     * Build a Qdrant filter that matches the point whose `_point_id` payload
+     * equals `$pointId` — the canonical logical identifier for both legacy
+     * (integer-keyed) and current (UUID-keyed) points.
+     *
+     * @return array{must: list<array{key: string, match: array{value: string}}>}
+     */
+    private function pointIdFilter(string $pointId): array
+    {
+        return [
+            'must' => [
+                ['key' => '_point_id', 'match' => ['value' => $pointId]],
+            ],
+        ];
     }
 
     private function resolveMemoriesCollection(?string $namespace): string
@@ -769,6 +814,16 @@ final class QdrantClientDirect implements QdrantClientInterface
 
         try {
             $this->qdrantRequest('GET', "/collections/{$collection}");
+            // Idempotently ensure payload indexes exist even on a pre-existing
+            // collection. Qdrant's PUT /collections/{c}/index is a no-op when
+            // the index already exists. This is what upgrades long-lived prod
+            // collections to have `_point_id` indexed without a schema migration.
+            $this->ensurePayloadIndexes($collection, [
+                'user_id' => 'integer',
+                'category' => 'keyword',
+                'active' => 'bool',
+                '_point_id' => 'keyword',
+            ]);
             $this->ensuredCollections[$collection] = true;
 
             return;
@@ -787,6 +842,7 @@ final class QdrantClientDirect implements QdrantClientInterface
             $this->createPayloadIndex($collection, 'user_id', 'integer');
             $this->createPayloadIndex($collection, 'category', 'keyword');
             $this->createPayloadIndex($collection, 'active', 'bool');
+            $this->createPayloadIndex($collection, '_point_id', 'keyword');
 
             $this->ensuredCollections[$collection] = true;
 
@@ -810,6 +866,14 @@ final class QdrantClientDirect implements QdrantClientInterface
 
         try {
             $this->qdrantRequest('GET', "/collections/{$collection}");
+            // See ensureMemoriesCollection() — idempotent payload-index
+            // backfill for long-lived pre-existing collections.
+            $this->ensurePayloadIndexes($collection, [
+                'user_id' => 'integer',
+                'file_id' => 'integer',
+                'group_key' => 'keyword',
+                '_point_id' => 'keyword',
+            ]);
             $this->ensuredCollections[$collection] = true;
 
             return;
@@ -832,6 +896,7 @@ final class QdrantClientDirect implements QdrantClientInterface
             $this->createPayloadIndex($collection, 'user_id', 'integer');
             $this->createPayloadIndex($collection, 'file_id', 'integer');
             $this->createPayloadIndex($collection, 'group_key', 'keyword');
+            $this->createPayloadIndex($collection, '_point_id', 'keyword');
 
             $this->ensuredCollections[$collection] = true;
 
@@ -853,6 +918,32 @@ final class QdrantClientDirect implements QdrantClientInterface
             'field_name' => $field,
             'field_schema' => $type,
         ]);
+    }
+
+    /**
+     * Idempotently ensure a set of payload indexes exist on a collection.
+     *
+     * Qdrant's PUT /collections/{c}/index succeeds even when the index
+     * already exists, so this is safe to call on every startup. Individual
+     * failures are logged but do not abort the loop — one missing index
+     * should not block the others from being created.
+     *
+     * @param array<string, string> $fields Map of field name => Qdrant schema type
+     */
+    private function ensurePayloadIndexes(string $collection, array $fields): void
+    {
+        foreach ($fields as $field => $type) {
+            try {
+                $this->createPayloadIndex($collection, $field, $type);
+            } catch (\Throwable $e) {
+                $this->logger->warning('Failed to ensure payload index', [
+                    'collection' => $collection,
+                    'field' => $field,
+                    'type' => $type,
+                    'error' => $e->getMessage(),
+                ]);
+            }
+        }
     }
 
     /**
