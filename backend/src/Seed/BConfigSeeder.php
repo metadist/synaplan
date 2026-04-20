@@ -17,6 +17,13 @@ use Doctrine\DBAL\Connection;
 final class BConfigSeeder
 {
     /**
+     * Static-only utility — instantiation is meaningless.
+     */
+    private function __construct()
+    {
+    }
+
+    /**
      * @param list<array{ownerId: int, group: string, setting: string, value: string}> $rows
      */
     public static function insertIfMissing(Connection $connection, string $label, array $rows): SeedResult

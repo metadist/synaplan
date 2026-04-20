@@ -13,7 +13,7 @@ use Doctrine\DBAL\Connection;
  * never be auto-injected. Uses insert-if-missing so it stays idempotent across
  * container restarts.
  */
-final class DemoWidgetConfigSeeder
+final readonly class DemoWidgetConfigSeeder
 {
     /**
      * @var list<array{ownerId: int, group: string, setting: string, value: string}>
@@ -26,8 +26,8 @@ final class DemoWidgetConfigSeeder
     ];
 
     public function __construct(
-        private readonly Connection $connection,
-        private readonly string $environment,
+        private Connection $connection,
+        private string $environment,
     ) {
     }
 

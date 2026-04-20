@@ -16,7 +16,7 @@ use Doctrine\DBAL\Connection;
  *
  * Operator overrides are preserved (insert-if-missing semantics).
  */
-final class RateLimitConfigSeeder
+final readonly class RateLimitConfigSeeder
 {
     /**
      * @var list<array{ownerId: int, group: string, setting: string, value: string}>
@@ -80,7 +80,7 @@ final class RateLimitConfigSeeder
         ['ownerId' => 0, 'group' => 'RATELIMITS_BUSINESS', 'setting' => 'MAX_OUTPUT_TOKENS',     'value' => '65536'],
     ];
 
-    public function __construct(private readonly Connection $connection)
+    public function __construct(private Connection $connection)
     {
     }
 

@@ -18,7 +18,7 @@ use Doctrine\DBAL\Connection;
  * so we use an explicit SELECT-then-INSERT pattern instead of ON DUPLICATE KEY UPDATE.
  * A follow-up migration can add that constraint and simplify this code.
  */
-final class DefaultModelConfigSeeder
+final readonly class DefaultModelConfigSeeder
 {
     /**
      * @var list<array{ownerId: int, group: string, setting: string, value: string}>
@@ -65,8 +65,8 @@ final class DefaultModelConfigSeeder
     ];
 
     public function __construct(
-        private readonly Connection $connection,
-        private readonly string $environment,
+        private Connection $connection,
+        private string $environment,
     ) {
     }
 

@@ -13,9 +13,9 @@ use Doctrine\DBAL\Connection;
  * Wraps PromptCatalog::seed(), which itself uses INSERT/UPDATE on
  * (ownerId, topic, language). User-created prompts (ownerId>0) are never touched.
  */
-final class PromptSeeder
+final readonly class PromptSeeder
 {
-    public function __construct(private readonly Connection $connection)
+    public function __construct(private Connection $connection)
     {
     }
 

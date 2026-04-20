@@ -18,7 +18,7 @@ use Doctrine\DBAL\Connection;
  *
  * Safe to run repeatedly: ModelCatalog::upsert() uses INSERT ... ON DUPLICATE KEY UPDATE.
  */
-final class ModelSeeder
+final readonly class ModelSeeder
 {
     /**
      * Mock models for E2E/CI stacks. Negative IDs cannot collide with auto-increment.
@@ -37,8 +37,8 @@ final class ModelSeeder
     ];
 
     public function __construct(
-        private readonly Connection $connection,
-        private readonly string $environment,
+        private Connection $connection,
+        private string $environment,
     ) {
     }
 

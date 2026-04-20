@@ -39,9 +39,6 @@ class ModelCatalog
     ];
 
     /**
-     * Upsert a model into the database (INSERT ... ON DUPLICATE KEY UPDATE).
-     */
-    /**
      * Insert or update a model row via `INSERT … ON DUPLICATE KEY UPDATE`.
      *
      * Returns the MySQL/MariaDB affected-rows value so callers can distinguish

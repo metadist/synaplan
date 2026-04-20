@@ -16,10 +16,10 @@ use Symfony\Component\Console\Style\SymfonyStyle;
     name: 'app:prompt:seed',
     description: 'Seed built-in system prompts into the database',
 )]
-class PromptSeedCommand extends Command
+final class PromptSeedCommand extends Command
 {
     public function __construct(
-        private Connection $connection,
+        private readonly Connection $connection,
     ) {
         parent::__construct();
     }
