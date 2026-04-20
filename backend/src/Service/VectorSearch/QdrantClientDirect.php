@@ -6,7 +6,6 @@ namespace App\Service\VectorSearch;
 
 use Psr\Log\LoggerInterface;
 use Symfony\Component\DependencyInjection\Attribute\Autowire;
-use Symfony\Component\Uid\Uuid;
 use Symfony\Contracts\Cache\CacheInterface;
 use Symfony\Contracts\Cache\ItemInterface;
 use Symfony\Contracts\HttpClient\HttpClientInterface;
@@ -50,6 +49,26 @@ final class QdrantClientDirect implements QdrantClientInterface
             : self::DEFAULT_DOCUMENTS_COLLECTION;
     }
 
+    public function getMemoriesCollection(): string
+    {
+        return $this->memoriesCollection;
+    }
+
+    public function getDocumentsCollection(): string
+    {
+        return $this->documentsCollection;
+    }
+
+    public function getQdrantUrl(): string
+    {
+        return $this->qdrantUrl;
+    }
+
+    public function getHttpClient(): HttpClientInterface
+    {
+        return $this->httpClient;
+    }
+
     // ──────────────────────────────────────────────
     //  Memory Operations
     // ──────────────────────────────────────────────
@@ -62,22 +81,27 @@ final class QdrantClientDirect implements QdrantClientInterface
         $payload['_point_id'] = $pointId;
 
         try {
-            // Remove any prior point carrying the same `_point_id` payload
-            // before writing the new UUID-keyed one. Without this step, a
-            // legacy integer-keyed point and the new UUID-keyed point would
-            // coexist (same `_point_id` payload, different primary IDs) and
-            // scrolls would surface duplicates. Deleting by payload filter is
-            // cheap and a no-op when nothing matches.
-            $this->qdrantRequest('POST', "/collections/{$collection}/points/delete?wait=true", [
-                'filter' => $this->pointIdFilter($pointId),
-            ]);
-
-            $this->upsertPoints($collection, [
-                [
-                    'id' => $this->generatePointUuid($pointId),
-                    'vector' => $vector,
-                    'payload' => $payload,
-                ],
+            // Atomic delete-by-payload + upsert in a single request. The pre-
+            // delete is needed because production clusters still contain
+            // legacy integer-keyed points from the pre-v2.4.0 Rust
+            // microservice that share `_point_id` with the new UUID-keyed
+            // points. Without this step, the legacy ghost and the new point
+            // would coexist and scrolls would surface duplicates.
+            //
+            // Using /points/batch rather than two sequential calls: keeps
+            // latency the same as a plain upsert, orders the ops server-side
+            // (delete is validated and applied before upsert), and avoids
+            // the "crash between delete and upsert leaves no point" window
+            // that two separate wait=true requests would open.
+            $this->pointsBatch($collection, [
+                ['delete' => ['filter' => QdrantPointId::payloadFilterFor($pointId)]],
+                ['upsert' => ['points' => [
+                    [
+                        'id' => QdrantPointId::uuidFor($pointId),
+                        'vector' => $vector,
+                        'payload' => $payload,
+                    ],
+                ]]],
             ]);
 
             $this->logger->debug('Memory upserted to Qdrant', ['point_id' => $pointId]);
@@ -91,6 +115,14 @@ final class QdrantClientDirect implements QdrantClientInterface
         }
     }
 
+    /**
+     * Fetch a single memory point's payload, if present.
+     *
+     * `with_vector: false` is deliberate — memory callers only need the
+     * payload (key/value/category/…) and skipping 1024 floats per request
+     * keeps this on the hot path of chat responses. Use getDocument() if
+     * you do need the vector.
+     */
     public function getMemory(string $pointId, ?string $namespace = null): ?array
     {
         $collection = $this->resolveMemoriesCollection($namespace);
@@ -104,7 +136,7 @@ final class QdrantClientDirect implements QdrantClientInterface
             // infrastructure problem rather than a missing memory, so we let
             // the underlying \RuntimeException propagate for 503 mapping.
             $response = $this->qdrantRequest('POST', "/collections/{$collection}/points/scroll", [
-                'filter' => $this->pointIdFilter($pointId),
+                'filter' => QdrantPointId::payloadFilterFor($pointId),
                 'limit' => 1,
                 'with_payload' => true,
                 'with_vector' => false,
@@ -146,24 +178,38 @@ final class QdrantClientDirect implements QdrantClientInterface
                 $must[] = ['key' => 'category', 'match' => ['value' => $category]];
             }
 
+            // Ask for up to 2x the requested limit so dedup below doesn't
+            // short-change the caller when legacy+UUID pairs sit above the
+            // score threshold for the same logical point.
             $response = $this->qdrantRequest('POST', "/collections/{$collection}/points/search", [
                 'vector' => $queryVector,
                 'filter' => ['must' => $must],
-                'limit' => $limit,
+                'limit' => $limit * 2,
                 'score_threshold' => $minScore,
                 'with_payload' => true,
             ]);
 
-            $results = [];
+            // Dedup by `_point_id` — keep the best-scoring copy of each
+            // logical point. Until `app:qdrant:migrate-legacy-point-ids`
+            // runs, production collections may still have two rows per
+            // logical point (one integer-keyed, one UUID-keyed), so the
+            // same `_point_id` can appear twice in one response.
+            $bestByLogical = [];
             foreach ($response['result'] ?? [] as $hit) {
-                $results[] = [
-                    'id' => $hit['payload']['_point_id'] ?? (string) $hit['id'],
-                    'score' => $hit['score'],
-                    'payload' => $hit['payload'] ?? [],
-                ];
+                $logical = $hit['payload']['_point_id'] ?? (string) $hit['id'];
+                if (!isset($bestByLogical[$logical]) || $hit['score'] > $bestByLogical[$logical]['score']) {
+                    $bestByLogical[$logical] = [
+                        'id' => $logical,
+                        'score' => $hit['score'],
+                        'payload' => $hit['payload'] ?? [],
+                    ];
+                }
             }
 
-            return $results;
+            $results = array_values($bestByLogical);
+            usort($results, static fn (array $a, array $b): int => $b['score'] <=> $a['score']);
+
+            return array_slice($results, 0, $limit);
         } catch (\Throwable $e) {
             $this->logger->error('Failed to search memories in Qdrant', [
                 'user_id' => $userId,
@@ -199,15 +245,21 @@ final class QdrantClientDirect implements QdrantClientInterface
                 'with_vector' => false,
             ]);
 
-            $memories = [];
+            // Dedup by `_point_id` — see searchMemories() for why this is
+            // needed until the legacy-point migration has run. First-seen
+            // wins; scrolls don't return a score to discriminate on.
+            $memoriesByLogical = [];
             foreach ($response['result']['points'] ?? [] as $point) {
-                $memories[] = [
-                    'id' => $point['payload']['_point_id'] ?? (string) $point['id'],
-                    'payload' => $point['payload'] ?? [],
-                ];
+                $logical = $point['payload']['_point_id'] ?? (string) $point['id'];
+                if (!isset($memoriesByLogical[$logical])) {
+                    $memoriesByLogical[$logical] = [
+                        'id' => $logical,
+                        'payload' => $point['payload'] ?? [],
+                    ];
+                }
             }
 
-            return $memories;
+            return array_values($memoriesByLogical);
         } catch (\Throwable $e) {
             $this->logger->error('Failed to scroll memories in Qdrant', [
                 'user_id' => $userId,
@@ -230,7 +282,7 @@ final class QdrantClientDirect implements QdrantClientInterface
             // by a mismatched primary ID returns HTTP 200 with no effect — the
             // bug this fix addresses.
             $this->qdrantRequest('POST', "/collections/{$collection}/points/delete?wait=true", [
-                'filter' => $this->pointIdFilter($pointId),
+                'filter' => QdrantPointId::payloadFilterFor($pointId),
             ]);
 
             $this->logger->debug('Memory deleted from Qdrant', ['point_id' => $pointId]);
@@ -293,19 +345,18 @@ final class QdrantClientDirect implements QdrantClientInterface
         $payload['_point_id'] = $pointId;
 
         try {
-            // See upsertMemory() for the rationale — prevents a primary-ID
-            // mismatch between a legacy point and the new UUID-keyed one from
-            // producing duplicate rows that share the same `_point_id`.
-            $this->qdrantRequest('POST', "/collections/{$this->documentsCollection}/points/delete?wait=true", [
-                'filter' => $this->pointIdFilter($pointId),
-            ]);
-
-            $this->upsertPoints($this->documentsCollection, [
-                [
-                    'id' => $this->generatePointUuid($pointId),
-                    'vector' => $vector,
-                    'payload' => $payload,
-                ],
+            // See upsertMemory() — atomic delete-by-payload + upsert via
+            // /points/batch removes any legacy integer-keyed ghost and
+            // writes the new UUID-keyed point in a single request.
+            $this->pointsBatch($this->documentsCollection, [
+                ['delete' => ['filter' => QdrantPointId::payloadFilterFor($pointId)]],
+                ['upsert' => ['points' => [
+                    [
+                        'id' => QdrantPointId::uuidFor($pointId),
+                        'vector' => $vector,
+                        'payload' => $payload,
+                    ],
+                ]]],
             ]);
         } catch (\Throwable $e) {
             $this->logger->error('Failed to upsert document to Qdrant', [
@@ -330,7 +381,7 @@ final class QdrantClientDirect implements QdrantClientInterface
                 $payload = $doc['payload'] ?? [];
                 $payload['_point_id'] = $doc['point_id'];
                 $points[] = [
-                    'id' => $this->generatePointUuid($doc['point_id']),
+                    'id' => QdrantPointId::uuidFor($doc['point_id']),
                     'vector' => $doc['vector'],
                     'payload' => $payload,
                 ];
@@ -400,13 +451,21 @@ final class QdrantClientDirect implements QdrantClientInterface
         }
     }
 
+    /**
+     * Fetch a single document chunk, including its vector.
+     *
+     * `with_vector: true` (unlike getMemory()) because callers of this
+     * endpoint are generally about to reuse the vector — e.g. re-indexing
+     * or rebuilding a RAG group. It is NOT on any hot request path, so
+     * paying the 1024-float payload cost is fine.
+     */
     public function getDocument(string $pointId): ?array
     {
         try {
             // See getMemory() — scroll by `_point_id` payload so legacy
             // integer-keyed points are still findable.
             $response = $this->qdrantRequest('POST', "/collections/{$this->documentsCollection}/points/scroll", [
-                'filter' => $this->pointIdFilter($pointId),
+                'filter' => QdrantPointId::payloadFilterFor($pointId),
                 'limit' => 1,
                 'with_payload' => true,
                 'with_vector' => true,
@@ -441,7 +500,7 @@ final class QdrantClientDirect implements QdrantClientInterface
             // correct scheme for a collection that may still contain legacy
             // integer-keyed points alongside current UUID-keyed ones.
             $this->qdrantRequest('POST', "/collections/{$this->documentsCollection}/points/delete?wait=true", [
-                'filter' => $this->pointIdFilter($pointId),
+                'filter' => QdrantPointId::payloadFilterFor($pointId),
             ]);
         } catch (\Throwable $e) {
             $this->logger->error('Failed to delete document', [
@@ -763,33 +822,10 @@ final class QdrantClientDirect implements QdrantClientInterface
     //  Internal helpers
     // ──────────────────────────────────────────────
 
-    /**
-     * Deterministic UUID v5 from a string point ID for stable mapping.
-     *
-     * Only used when writing NEW points. Read/delete paths route through the
-     * `_point_id` payload filter (see pointIdFilter()) to remain compatible
-     * with legacy integer-keyed points from the pre-v2.4.0 Rust microservice.
-     */
-    private function generatePointUuid(string $pointId): string
-    {
-        return Uuid::v5(Uuid::fromString('6ba7b810-9dad-11d1-80b4-00c04fd430c8'), $pointId)->toRfc4122();
-    }
-
-    /**
-     * Build a Qdrant filter that matches the point whose `_point_id` payload
-     * equals `$pointId` — the canonical logical identifier for both legacy
-     * (integer-keyed) and current (UUID-keyed) points.
-     *
-     * @return array{must: list<array{key: string, match: array{value: string}}>}
-     */
-    private function pointIdFilter(string $pointId): array
-    {
-        return [
-            'must' => [
-                ['key' => '_point_id', 'match' => ['value' => $pointId]],
-            ],
-        ];
-    }
+    // Canonical point-ID helpers (UUID derivation, `_point_id` payload filter)
+    // live in {@see QdrantPointId} so the maintenance CLI and any other
+    // consumer derive identical UUIDs without duplicating the namespace
+    // constant.
 
     private function resolveMemoriesCollection(?string $namespace): string
     {
@@ -947,12 +983,29 @@ final class QdrantClientDirect implements QdrantClientInterface
     }
 
     /**
-     * @param array<array{id: string, vector: float[], payload: array}> $points
+     * @param list<array{id: string, vector: list<float>, payload: array<string, mixed>}> $points
      */
     private function upsertPoints(string $collection, array $points): void
     {
         $this->qdrantRequest('PUT', "/collections/{$collection}/points?wait=true", [
             'points' => $points,
+        ]);
+    }
+
+    /**
+     * Execute a list of operations in a single batch request.
+     *
+     * Used by upsertMemory/upsertDocument to sequence
+     * `delete-by-payload-filter` and `upsert` inside one HTTP round-trip,
+     * which closes the "crash between two wait=true calls leaves no point"
+     * window that two separate calls would open.
+     *
+     * @param list<array<string, mixed>> $operations Qdrant batch operation descriptors
+     */
+    private function pointsBatch(string $collection, array $operations): void
+    {
+        $this->qdrantRequest('POST', "/collections/{$collection}/points/batch?wait=true", [
+            'operations' => $operations,
         ]);
     }
 
