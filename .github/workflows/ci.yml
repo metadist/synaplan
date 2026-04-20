@@ -115,14 +115,23 @@ jobs:
       - name: Setup database schema
         working-directory: backend
         run: |
-          # Run migrations (won't fail if none exist due to --allow-no-migration)
+          # Apply Doctrine migrations (baseline + future migrations).
           php bin/console doctrine:migrations:migrate --no-interaction --allow-no-migration
-          # Always run schema update to ensure all tables exist (idempotent)
+          # Defensive schema sync to catch any entity drift not yet covered by a migration.
           php bin/console doctrine:schema:update --force
 
-      - name: Load fixtures
+      - name: Load demo fixtures
         working-directory: backend
+        # Loads only dev/test demo data (admin/demo/test users). Production-essential
+        # catalog data (models, prompts, defaults, rate limits) is handled by app:seed below.
         run: php bin/console doctrine:fixtures:load --no-interaction
+
+      - name: Seed catalogs (models, prompts, defaults, rate limits)
+        working-directory: backend
+        # Idempotent seeders that populate BCONFIG with rate limits, default model bindings,
+        # AI model catalog and system prompts. Required for integration tests that exercise
+        # StorageQuotaService, MessageController, SummaryController, etc.
+        run: php bin/console app:seed --no-interaction
 
       - name: Run PHPUnit tests
         working-directory: backend
