@@ -461,13 +461,22 @@ final readonly class ChatHandler implements MessageHandlerInterface
         // Load user memories from Qdrant/Microservice
         $memoriesContext = '';
         $loadedMemories = [];
-        $memoriesDisabledByRequest = !empty($options['disable_memories'])
-            || ('WIDGET' === ($options['channel'] ?? null))
-            || ('widget' === ($classification['source'] ?? null));
 
-        // Load user entity (Message only has userId, not User object)
+        // Three-layer guard: explicit option, options channel, persisted message
+        // channel meta (tagged at WidgetPublicController / StreamController). The
+        // last one is the durable source of truth — it survives even if a future
+        // code path forgets to set options['disable_memories'].
+        $channelOption = strtoupper((string) ($options['channel'] ?? ''));
+        $channelMeta = strtoupper((string) $message->getMeta('channel'));
+        $memoriesDisabledByRequest = !empty($options['disable_memories'])
+            || in_array($channelOption, ['WIDGET', 'GUEST'], true)
+            || in_array($channelMeta, ['WIDGET', 'GUEST'], true);
+
+        // Load user entity (Message only has userId, not User object).
+        // Fail closed: if the user lookup fails for any reason, treat memories
+        // as disabled rather than risk writing to the wrong account.
         $user = $this->em->getRepository(User::class)->find($message->getUserId());
-        $memoriesEnabledForUser = $user?->isMemoriesEnabled() ?? true;
+        $memoriesEnabledForUser = $user?->isMemoriesEnabled() ?? false;
 
         if ($memoriesDisabledByRequest) {
             $this->logger->debug('ChatHandler: Memories disabled for widget request, skipping memories', [

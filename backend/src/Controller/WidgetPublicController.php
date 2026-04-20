@@ -334,6 +334,11 @@ class WidgetPublicController extends AbstractController
             $incomingMessage->setDateTime(date('YmdHis'));
             $incomingMessage->setProviderIndex('widget'); // Special provider index for widgets
 
+            // Tag channel so downstream services (memory, feedback) can refuse
+            // to read/write owner-scoped data for anonymous widget visitors.
+            $incomingMessage->setMeta('channel', 'WIDGET');
+            $incomingMessage->setMeta('widget_id', $widget->getWidgetId());
+
             $this->em->persist($incomingMessage);
             $this->em->flush();
 
@@ -657,6 +662,8 @@ class WidgetPublicController extends AbstractController
                     $outgoingMessage->setText($responseText);
                     $outgoingMessage->setDirection('OUT');
                     $outgoingMessage->setStatus('complete');
+                    $outgoingMessage->setMeta('channel', 'WIDGET');
+                    $outgoingMessage->setMeta('widget_id', $widgetId);
 
                     $this->em->persist($outgoingMessage);
                     $this->em->flush();

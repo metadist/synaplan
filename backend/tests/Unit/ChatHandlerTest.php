@@ -403,4 +403,74 @@ class ChatHandlerTest extends TestCase
             $streamCallback
         );
     }
+
+    /**
+     * Widget-tagged messages (anonymous visitors on a customer's website) must
+     * never read from or write to the owner's Qdrant memory collection. The
+     * incoming message is tagged with channel=WIDGET in WidgetPublicController;
+     * ChatHandler must honour that tag even if the caller forgets to also pass
+     * `disable_memories` in $options.
+     */
+    #[\PHPUnit\Framework\Attributes\DataProvider('publicChannelProvider')]
+    public function testHandleStreamNeverTouchesMemoriesForPublicChannelMessage(string $channel): void
+    {
+        $message = $this->createMock(Message::class);
+        $message->method('getUserId')->willReturn(1);
+        $message->method('getText')->willReturn('Hi, how much does your product cost?');
+        $message->method('getFileText')->willReturn('');
+        $message->method('getFiles')->willReturn(new \Doctrine\Common\Collections\ArrayCollection());
+        // Channel tag is the durable source of truth that the guard reads.
+        $message->method('getMeta')->willReturnMap([
+            ['channel', null, $channel],
+        ]);
+
+        $this->promptService->method('getPromptWithMetadata')->willReturn([
+            'prompt' => null,
+            'metadata' => [],
+        ]);
+        $this->promptRepository->method('findOneBy')->willReturn(null);
+        $this->modelConfigService->method('getDefaultModel')->willReturn(null);
+
+        // Memory service must never be consulted for read or write.
+        $this->userMemoryService
+            ->expects($this->never())
+            ->method('searchRelevantMemories');
+        $this->userMemoryService
+            ->expects($this->never())
+            ->method('createMemory');
+        $this->userMemoryService
+            ->expects($this->never())
+            ->method('updateMemory');
+
+        // Extraction must be skipped outright.
+        $this->memoryExtractionService
+            ->expects($this->never())
+            ->method('analyzeAndExtract');
+
+        $this->aiFacade
+            ->method('chatStream')
+            ->willReturn(['provider' => 'test', 'model' => 'test']);
+
+        $this->handler->handleStream(
+            $message,
+            [],
+            ['topic' => 'CHAT', 'language' => 'en'],
+            static function ($chunk) {}
+            // NOTE: deliberately NOT passing disable_memories in $options — the
+            // meta tag on the Message must be enough on its own.
+        );
+    }
+
+    /**
+     * @return array<string, array{0: string}>
+     */
+    public static function publicChannelProvider(): array
+    {
+        return [
+            'widget (uppercase)' => ['WIDGET'],
+            'guest (uppercase)' => ['GUEST'],
+            'widget (lowercase)' => ['widget'],
+            'guest (mixed case)' => ['Guest'],
+        ];
+    }
 }

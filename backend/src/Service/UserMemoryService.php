@@ -93,6 +93,20 @@ final readonly class UserMemoryService
         ?int $messageId = null,
         ?string $namespace = null,
     ): UserMemoryDTO {
+        // Belt-and-suspenders: refuse if the owner has memories turned off.
+        // Auto-extracted memories in widget/guest flows are already blocked
+        // upstream (MemoryExtractionService returns [] and ChatHandler never
+        // calls us), but this closes the door for any future caller too.
+        if ('auto_detected' === $source && !$user->isMemoriesEnabled()) {
+            $this->logger->info('UserMemoryService: refusing auto_detected memory, user has memories disabled', [
+                'user_id' => $user->getId(),
+                'category' => $category,
+                'key' => $key,
+            ]);
+
+            throw new \InvalidArgumentException('Memories are disabled for this user.');
+        }
+
         $this->assertAvailable('create memory', [
             'user_id' => $user->getId(),
             'category' => $category,

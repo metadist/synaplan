@@ -103,4 +103,49 @@ final class MemoryExtractionServicePromptRulesTest extends TestCase
         self::assertSame('diet', $result[1]['key']);
         self::assertSame('Prefers low-calorie meals for weight loss', $result[1]['value']);
     }
+
+    /**
+     * Widget visitors are stored under the owner's user id, so an unguarded
+     * memory extraction would pollute the owner's Qdrant memories with
+     * anonymous-visitor content. The service must refuse extraction when the
+     * message is tagged with a public channel (WIDGET / GUEST).
+     */
+    public function testAnalyzeAndExtractSkipsWidgetTaggedMessages(): void
+    {
+        foreach (['WIDGET', 'GUEST', 'widget', 'guest'] as $channel) {
+            $aiFacade = $this->createMock(AiFacade::class);
+            // Must never call the AI for a public-channel message.
+            $aiFacade->expects(self::never())->method('chat');
+
+            $message = $this->createMock(Message::class);
+            $message->method('getId')->willReturn(99);
+            $message->method('getUserId')->willReturn(1);
+            $message->method('getMeta')->with('channel')->willReturn($channel);
+
+            $service = new MemoryExtractionService(
+                $aiFacade,
+                $this->createMock(ModelConfigService::class),
+                $this->createMock(RateLimitService::class),
+                $this->createMock(PromptRepository::class),
+                $this->createMock(EntityManagerInterface::class),
+                $this->createMock(LoggerInterface::class)
+            );
+
+            $result = $service->analyzeAndExtract($message, [], []);
+
+            self::assertSame([], $result, sprintf('Expected empty result for channel %s', $channel));
+        }
+    }
+
+    public function testIsPublicChannelHelper(): void
+    {
+        self::assertTrue(MemoryExtractionService::isPublicChannel('WIDGET'));
+        self::assertTrue(MemoryExtractionService::isPublicChannel('GUEST'));
+        self::assertTrue(MemoryExtractionService::isPublicChannel('widget'));
+        self::assertTrue(MemoryExtractionService::isPublicChannel('Guest'));
+        self::assertFalse(MemoryExtractionService::isPublicChannel('WEB'));
+        self::assertFalse(MemoryExtractionService::isPublicChannel('whatsapp'));
+        self::assertFalse(MemoryExtractionService::isPublicChannel('email'));
+        self::assertFalse(MemoryExtractionService::isPublicChannel(''));
+    }
 }

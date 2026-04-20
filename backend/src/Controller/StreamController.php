@@ -474,6 +474,15 @@ class StreamController extends AbstractController
                 $incomingMessage->setDirection('IN');
                 $incomingMessage->setStatus($continueMessageId ? 'hidden' : 'processing');
 
+                // Tag channel so memory/feedback services can refuse to
+                // read/write owner-scoped data for anonymous traffic paths
+                // (widget-test from the owner UI, guest trial on synaplan.com).
+                if ($isWidgetMode) {
+                    $incomingMessage->setMeta('channel', 'WIDGET');
+                } elseif ($isGuestMode) {
+                    $incomingMessage->setMeta('channel', 'GUEST');
+                }
+
                 $this->em->persist($incomingMessage);
                 $this->em->flush(); // Flush first so message has an ID
 

@@ -41,6 +41,21 @@ final readonly class MemoryExtractionService
      */
     public function analyzeAndExtract(Message $message, array $conversationHistory, array $existingMemories = []): array
     {
+        // Defense-in-depth: never extract memories for anonymous traffic.
+        // Widget visitors and guest-trial sessions are stored under the owner's
+        // user id, so an unguarded call here would pollute the owner's Qdrant
+        // collection. The incoming message is tagged at the entry points
+        // (WidgetPublicController, StreamController).
+        $channel = $message->getMeta('channel');
+        if (null !== $channel && self::isPublicChannel($channel)) {
+            $this->logger->info('MemoryExtractionService: skipping extraction for public channel', [
+                'message_id' => $message->getId(),
+                'channel' => $channel,
+            ]);
+
+            return [];
+        }
+
         $this->logger->info('Memory extraction triggered (AI-based with update capability)', [
             'message_id' => $message->getId(),
             'user_id' => $message->getUserId(),
@@ -49,6 +64,16 @@ final readonly class MemoryExtractionService
 
         // Extract via AI (AI decides: create, update, or skip)
         return $this->extractMemoriesViaAi($message, $conversationHistory, $existingMemories);
+    }
+
+    /**
+     * Channels whose traffic must never read or write owner-scoped memories.
+     *
+     * Kept in sync with the tags set in WidgetPublicController / StreamController.
+     */
+    public static function isPublicChannel(string $channel): bool
+    {
+        return in_array(strtoupper($channel), ['WIDGET', 'GUEST'], true);
     }
 
     /**

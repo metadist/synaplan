@@ -123,6 +123,7 @@ final class UserMemoryServiceTest extends TestCase
     {
         $user = $this->createMock(User::class);
         $user->method('getId')->willReturn(123);
+        $user->method('isMemoriesEnabled')->willReturn(true);
 
         $this->qdrantClient
             ->expects($this->once())
@@ -136,6 +137,69 @@ final class UserMemoryServiceTest extends TestCase
         $this->expectException(MemoryServiceUnavailableException::class);
 
         $this->service->createMemory($user, 'personal', 'favourite_colour', 'green');
+    }
+
+    /**
+     * Auto-extracted memories must be refused when the owner has memories
+     * disabled. This is a belt-and-suspenders guard: widget/guest flows are
+     * already blocked upstream (MemoryExtractionService returns [] for public
+     * channels, ChatHandler gates both read and write), but any future caller
+     * that bypasses those layers still cannot write into a disabled user's
+     * Qdrant namespace.
+     */
+    public function testCreateMemoryRefusesAutoDetectedWhenUserHasMemoriesDisabled(): void
+    {
+        $user = $this->createMock(User::class);
+        $user->method('getId')->willReturn(42);
+        $user->method('isMemoriesEnabled')->willReturn(false);
+
+        // Must NOT reach Qdrant availability check or upsert.
+        $this->qdrantClient
+            ->expects($this->never())
+            ->method('isAvailable');
+        $this->qdrantClient
+            ->expects($this->never())
+            ->method('upsertMemory');
+
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessage('Memories are disabled');
+
+        $this->service->createMemory(
+            $user,
+            'preferences',
+            'diet',
+            'Eats halal',
+            'auto_detected',
+            99
+        );
+    }
+
+    /**
+     * User-initiated memory creation (from the Synaplan UI "Add memory" button)
+     * must still work even if the auto-extraction setting is off — the guard
+     * only targets 'auto_detected' source.
+     */
+    public function testCreateMemoryAllowsUserCreatedWhenAutoExtractionDisabled(): void
+    {
+        $user = $this->createMock(User::class);
+        $user->method('getId')->willReturn(42);
+        $user->method('isMemoriesEnabled')->willReturn(false);
+
+        $this->qdrantClient
+            ->expects($this->once())
+            ->method('isAvailable')
+            ->willReturn(false);
+
+        // Fails because Qdrant unavailable, NOT because of the memories-disabled guard.
+        $this->expectException(MemoryServiceUnavailableException::class);
+
+        $this->service->createMemory(
+            $user,
+            'preferences',
+            'diet',
+            'Eats halal',
+            'user_created'
+        );
     }
 
     public function testUpdateMemoryThrowsWhenQdrantUnavailable(): void
