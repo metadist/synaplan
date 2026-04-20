@@ -474,17 +474,20 @@ class StreamController extends AbstractController
                 $incomingMessage->setDirection('IN');
                 $incomingMessage->setStatus($continueMessageId ? 'hidden' : 'processing');
 
+                $this->em->persist($incomingMessage);
+                $this->em->flush(); // Flush first so message has an ID
+
                 // Tag channel so memory/feedback services can refuse to
                 // read/write owner-scoped data for anonymous traffic paths
                 // (widget-test from the owner UI, guest trial on synaplan.com).
+                // MUST be after the first flush so MessageMeta has a valid message ID.
                 if ($isWidgetMode) {
                     $incomingMessage->setMeta('channel', 'WIDGET');
+                    $this->em->flush();
                 } elseif ($isGuestMode) {
                     $incomingMessage->setMeta('channel', 'GUEST');
+                    $this->em->flush();
                 }
-
-                $this->em->persist($incomingMessage);
-                $this->em->flush(); // Flush first so message has an ID
 
                 // Attach multiple files if uploaded (NEW: File entities with ManyToMany)
                 if (!empty($fileIdArray)) {

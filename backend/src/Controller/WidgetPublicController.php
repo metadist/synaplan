@@ -334,12 +334,13 @@ class WidgetPublicController extends AbstractController
             $incomingMessage->setDateTime(date('YmdHis'));
             $incomingMessage->setProviderIndex('widget'); // Special provider index for widgets
 
+            $this->em->persist($incomingMessage);
+            $this->em->flush(); // MUST flush before setMeta() so the message has an ID
+
             // Tag channel so downstream services (memory, feedback) can refuse
             // to read/write owner-scoped data for anonymous widget visitors.
             $incomingMessage->setMeta('channel', 'WIDGET');
             $incomingMessage->setMeta('widget_id', $widget->getWidgetId());
-
-            $this->em->persist($incomingMessage);
             $this->em->flush();
 
             // Publish event for user message (so admin panel receives it in real-time)
@@ -662,10 +663,12 @@ class WidgetPublicController extends AbstractController
                     $outgoingMessage->setText($responseText);
                     $outgoingMessage->setDirection('OUT');
                     $outgoingMessage->setStatus('complete');
-                    $outgoingMessage->setMeta('channel', 'WIDGET');
-                    $outgoingMessage->setMeta('widget_id', $widgetId);
 
                     $this->em->persist($outgoingMessage);
+                    $this->em->flush(); // MUST flush before setMeta() so the message has an ID
+
+                    $outgoingMessage->setMeta('channel', 'WIDGET');
+                    $outgoingMessage->setMeta('widget_id', $widgetId);
                     $this->em->flush();
 
                     // Update session's last message time and preview with AI response
