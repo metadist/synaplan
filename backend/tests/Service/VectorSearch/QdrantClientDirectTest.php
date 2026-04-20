@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Tests\Service\VectorSearch;
 
 use App\Service\VectorSearch\QdrantClientDirect;
+use App\Service\VectorSearch\QdrantPointId;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
 use Symfony\Component\HttpClient\MockHttpClient;
@@ -13,264 +14,357 @@ use Symfony\Component\HttpClient\Response\MockResponse;
 /**
  * Tests for QdrantClientDirect — talks to Qdrant REST API directly.
  *
- * Uses mock HTTP responses matching Qdrant's native API format.
+ * These tests use a callback-style MockHttpClient that routes by URL path,
+ * not a fixed response list. That keeps tests robust against future internal
+ * optimisations (parallel index creation, extra health probes, caching, …)
+ * that change the exact sequence of HTTP calls but not the observable
+ * contract for any given endpoint.
  */
 final class QdrantClientDirectTest extends TestCase
 {
+    private const QDRANT_URL = 'http://localhost:6333';
+
     /**
-     * @param array<MockResponse> $responses
+     * Build a QdrantClientDirect backed by a route-based MockHttpClient.
+     *
+     * Each responder is called with no arguments; tests that need to
+     * inspect what was sent pass an array in by reference as `$calls`
+     * and assert against it after the fact. The one-call-per-responder
+     * zero-arg contract matches the `fn () => ...` form used below.
+     *
+     * @param array<string, callable():MockResponse>                                  $routes Map of path-suffix => responder callback
+     * @param list<array{method: string, path: string, query: string, body: ?string}> $calls
      */
-    private function createClient(array $responses): QdrantClientDirect
+    private function buildClient(array $routes, array &$calls = []): QdrantClientDirect
     {
-        $mockClient = new MockHttpClient($responses);
+        $factory = function (string $method, string $url, array $options) use ($routes, &$calls): MockResponse {
+            $path = (string) (parse_url($url, \PHP_URL_PATH) ?? '');
+            $query = (string) (parse_url($url, \PHP_URL_QUERY) ?? '');
+            $body = isset($options['body']) && is_string($options['body']) ? $options['body'] : null;
+            $calls[] = ['method' => $method, 'path' => $path, 'query' => $query, 'body' => $body];
+
+            foreach ($routes as $suffix => $responder) {
+                if (str_ends_with($path, $suffix)) {
+                    return $responder();
+                }
+            }
+
+            return new MockResponse('No route matched '.$method.' '.$path, ['http_code' => 599]);
+        };
 
         return new QdrantClientDirect(
-            httpClient: $mockClient,
-            qdrantUrl: 'http://localhost:6333',
+            httpClient: new MockHttpClient($factory),
+            qdrantUrl: self::QDRANT_URL,
             logger: new NullLogger(),
         );
     }
 
-    public function testUpsertMemorySuccess(): void
+    private function okEmpty(): MockResponse
     {
-        $this->expectNotToPerformAssertions();
+        return new MockResponse(
+            json_encode(['result' => ['status' => 'completed'], 'status' => 'ok']),
+            ['http_code' => 200],
+        );
+    }
 
-        $responses = [
-            // ensureMemoriesCollection -> GET /collections/user_memories
-            new MockResponse(json_encode(['result' => ['status' => 'green']]), ['http_code' => 200]),
-            // ensurePayloadIndexes -> PUT /collections/user_memories/index  x4
-            new MockResponse(json_encode(['result' => ['status' => 'acknowledged']]), ['http_code' => 200]),
-            new MockResponse(json_encode(['result' => ['status' => 'acknowledged']]), ['http_code' => 200]),
-            new MockResponse(json_encode(['result' => ['status' => 'acknowledged']]), ['http_code' => 200]),
-            new MockResponse(json_encode(['result' => ['status' => 'acknowledged']]), ['http_code' => 200]),
-            // upsertMemory -> pre-upsert POST /collections/user_memories/points/delete?wait=true
-            new MockResponse(json_encode(['result' => ['status' => 'completed']]), ['http_code' => 200]),
-            // upsertMemory -> PUT /collections/user_memories/points?wait=true
-            new MockResponse(json_encode(['result' => ['status' => 'completed']]), ['http_code' => 200]),
-        ];
-
-        $client = $this->createClient($responses);
+    public function testUpsertMemoryIssuesAtomicBatchDeleteThenUpsert(): void
+    {
+        $calls = [];
+        $client = $this->buildClient([
+            // ensureMemoriesCollection: GET collection exists
+            '/collections/user_memories' => fn () => new MockResponse(
+                json_encode(['result' => ['status' => 'green']]),
+                ['http_code' => 200]
+            ),
+            // idempotent payload-index creation (any number of calls)
+            '/collections/user_memories/index' => fn () => $this->okEmpty(),
+            // the batch endpoint — the heart of upsertMemory
+            '/collections/user_memories/points/batch' => fn () => new MockResponse(
+                json_encode(['result' => [['status' => 'completed'], ['status' => 'completed']], 'status' => 'ok']),
+                ['http_code' => 200]
+            ),
+        ], $calls);
 
         $client->upsertMemory(
             pointId: 'mem_1_123',
             vector: array_fill(0, 1024, 0.5),
-            payload: [
-                'user_id' => 1,
-                'category' => 'test',
-                'key' => 'test_key',
-                'value' => 'test_value',
-                'source' => 'test',
-                'created' => time(),
-                'updated' => time(),
-                'active' => true,
-            ]
+            payload: ['user_id' => 1, 'category' => 'test', 'key' => 'k', 'value' => 'v', 'source' => 'user_created', 'active' => true],
         );
+
+        $batchCalls = array_values(array_filter(
+            $calls,
+            static fn (array $c): bool => str_ends_with($c['path'], '/points/batch'),
+        ));
+        $this->assertCount(1, $batchCalls, 'upsertMemory must make exactly one batch request, not a sequence of delete+put');
+        $this->assertStringContainsString('wait=true', $batchCalls[0]['query']);
+
+        $body = json_decode((string) $batchCalls[0]['body'], true);
+        $this->assertIsArray($body);
+        $this->assertArrayHasKey('operations', $body);
+        $this->assertCount(2, $body['operations']);
+        $this->assertArrayHasKey('delete', $body['operations'][0]);
+        $this->assertArrayHasKey('upsert', $body['operations'][1]);
+        $this->assertSame(
+            ['must' => [['key' => '_point_id', 'match' => ['value' => 'mem_1_123']]]],
+            $body['operations'][0]['delete']['filter'],
+            'delete must be scoped by `_point_id` payload filter, not by primary ID',
+        );
+
+        $upsertedPoint = $body['operations'][1]['upsert']['points'][0];
+        $this->assertSame(QdrantPointId::uuidFor('mem_1_123'), $upsertedPoint['id']);
+        $this->assertSame('mem_1_123', $upsertedPoint['payload']['_point_id']);
     }
 
-    public function testGetMemorySuccess(): void
+    public function testGetMemoryUsesPointIdPayloadFilterNotPrimaryKey(): void
     {
-        $responses = [
-            // getMemory -> POST /collections/user_memories/points/scroll
-            // (filter on `_point_id` payload, matches both legacy int + UUID keys)
-            new MockResponse(json_encode([
-                'result' => [
-                    'points' => [
-                        [
-                            'id' => 'some-uuid',
+        $calls = [];
+        $client = $this->buildClient([
+            '/collections/user_memories/points/scroll' => fn () => new MockResponse(
+                json_encode(['result' => ['points' => [], 'next_page_offset' => null]]),
+                ['http_code' => 200],
+            ),
+        ], $calls);
+
+        $client->getMemory('mem_1_123');
+
+        $scrollCalls = array_values(array_filter(
+            $calls,
+            static fn (array $c): bool => str_ends_with($c['path'], '/points/scroll'),
+        ));
+        $this->assertCount(1, $scrollCalls);
+
+        $body = json_decode((string) $scrollCalls[0]['body'], true);
+        $this->assertArrayNotHasKey('ids', $body, 'getMemory must not lookup by primary ID');
+        $this->assertArrayHasKey('filter', $body);
+        $this->assertSame('_point_id', $body['filter']['must'][0]['key']);
+        $this->assertSame('mem_1_123', $body['filter']['must'][0]['match']['value']);
+    }
+
+    public function testGetMemoryReturnsPayloadWhenFound(): void
+    {
+        $client = $this->buildClient([
+            '/collections/user_memories/points/scroll' => fn () => new MockResponse(
+                json_encode([
+                    'result' => [
+                        'points' => [[
+                            'id' => 'anything',
                             'payload' => [
                                 '_point_id' => 'mem_1_123',
                                 'user_id' => 1,
                                 'category' => 'test',
-                                'key' => 'test_key',
-                                'value' => 'test_value',
+                                'key' => 'k',
+                                'value' => 'v',
                             ],
-                        ],
+                        ]],
+                        'next_page_offset' => null,
                     ],
-                    'next_page_offset' => null,
-                ],
-            ]), ['http_code' => 200]),
-        ];
+                ]),
+                ['http_code' => 200],
+            ),
+        ]);
 
-        $client = $this->createClient($responses);
         $result = $client->getMemory('mem_1_123');
 
         $this->assertIsArray($result);
-        $this->assertEquals(1, $result['user_id']);
-        $this->assertEquals('test', $result['category']);
+        $this->assertSame(1, $result['user_id']);
+        $this->assertSame('test', $result['category']);
     }
 
-    public function testGetMemoryNotFound(): void
+    public function testGetMemoryReturnsNullWhenNotFound(): void
     {
-        $responses = [
-            new MockResponse(json_encode([
-                'result' => ['points' => [], 'next_page_offset' => null],
-            ]), ['http_code' => 200]),
-        ];
+        $client = $this->buildClient([
+            '/collections/user_memories/points/scroll' => fn () => new MockResponse(
+                json_encode(['result' => ['points' => [], 'next_page_offset' => null]]),
+                ['http_code' => 200],
+            ),
+        ]);
 
-        $client = $this->createClient($responses);
-        $result = $client->getMemory('mem_1_nonexistent');
-
-        $this->assertNull($result);
+        $this->assertNull($client->getMemory('mem_1_missing'));
     }
 
-    /**
-     * Regression lock for issue where deleteMemory was sending the derived
-     * UUIDv5 as the primary ID, which silently no-ops on legacy points stored
-     * by the pre-v2.4.0 Rust microservice under integer IDs. The delete MUST
-     * target the point by `_point_id` payload filter so both schemes resolve.
-     */
     public function testDeleteMemoryUsesPointIdPayloadFilterNotPrimaryKey(): void
     {
-        $capturedUrl = null;
-        $capturedBody = null;
-
-        $factory = function (string $method, string $url, array $options) use (&$capturedUrl, &$capturedBody): MockResponse {
-            $capturedUrl = $url;
-            $capturedBody = $options['body'] ?? null;
-
-            return new MockResponse(json_encode(['result' => ['status' => 'completed']]), ['http_code' => 200]);
-        };
-
-        $mockClient = new MockHttpClient($factory);
-        $client = new QdrantClientDirect(
-            httpClient: $mockClient,
-            qdrantUrl: 'http://localhost:6333',
-            logger: new NullLogger(),
-        );
+        $calls = [];
+        $client = $this->buildClient([
+            '/collections/user_memories/points/delete' => fn () => $this->okEmpty(),
+        ], $calls);
 
         $client->deleteMemory('mem_1_123');
 
-        $this->assertIsString($capturedUrl);
-        $this->assertStringContainsString('/collections/user_memories/points/delete', $capturedUrl);
-        $this->assertStringContainsString('wait=true', $capturedUrl);
+        $deleteCalls = array_values(array_filter(
+            $calls,
+            static fn (array $c): bool => str_ends_with($c['path'], '/points/delete'),
+        ));
+        $this->assertCount(1, $deleteCalls);
+        $this->assertStringContainsString('wait=true', $deleteCalls[0]['query']);
 
-        $this->assertIsString($capturedBody);
-        /** @var array{filter?: array{must?: array<array{key?: string, match?: array{value?: string}}>}, points?: mixed} $decoded */
-        $decoded = json_decode($capturedBody, true);
-
-        // Must delete by payload filter, not by primary `points` ID list.
-        $this->assertArrayNotHasKey('points', $decoded, 'deleteMemory must not send primary-ID list; that breaks legacy int-keyed points');
-        $this->assertArrayHasKey('filter', $decoded);
-        $this->assertSame('_point_id', $decoded['filter']['must'][0]['key'] ?? null);
-        $this->assertSame('mem_1_123', $decoded['filter']['must'][0]['match']['value'] ?? null);
-    }
-
-    public function testDeleteMemorySuccess(): void
-    {
-        $this->expectNotToPerformAssertions();
-
-        $responses = [
-            new MockResponse(json_encode(['result' => ['status' => 'completed']]), ['http_code' => 200]),
-        ];
-
-        $client = $this->createClient($responses);
-        $client->deleteMemory('mem_1_123');
+        $body = json_decode((string) $deleteCalls[0]['body'], true);
+        $this->assertArrayNotHasKey('points', $body, 'deleteMemory must not send primary-ID list; that breaks legacy int-keyed points');
+        $this->assertArrayHasKey('filter', $body);
+        $this->assertSame('_point_id', $body['filter']['must'][0]['key']);
+        $this->assertSame('mem_1_123', $body['filter']['must'][0]['match']['value']);
     }
 
     /**
-     * Regression lock for the getMemory read path — must scroll by `_point_id`
-     * payload filter (not lookup by primary UUID).
+     * Regression test for the scroll-dedup safety net. Until the one-shot
+     * legacy migration runs, the same logical memory can exist under BOTH
+     * an integer primary and a UUID primary. Scroll must not show both.
      */
-    public function testGetMemoryUsesPointIdPayloadFilterNotPrimaryKey(): void
+    public function testScrollMemoriesDedupesDuplicateLogicalPoints(): void
     {
-        $capturedUrl = null;
-        $capturedBody = null;
+        $client = $this->buildClient([
+            '/collections/user_memories/points/scroll' => fn () => new MockResponse(
+                json_encode([
+                    'result' => [
+                        'points' => [
+                            [
+                                'id' => 82402287705672322, // legacy int
+                                'payload' => [
+                                    '_point_id' => 'mem_1_dup',
+                                    'user_id' => 1,
+                                    'category' => 'a',
+                                    'key' => 'k',
+                                    'value' => 'legacy-copy',
+                                    'active' => true,
+                                ],
+                            ],
+                            [
+                                'id' => QdrantPointId::uuidFor('mem_1_dup'), // UUID copy
+                                'payload' => [
+                                    '_point_id' => 'mem_1_dup',
+                                    'user_id' => 1,
+                                    'category' => 'a',
+                                    'key' => 'k',
+                                    'value' => 'uuid-copy',
+                                    'active' => true,
+                                ],
+                            ],
+                            [
+                                'id' => 'different-uuid',
+                                'payload' => [
+                                    '_point_id' => 'mem_1_other',
+                                    'user_id' => 1,
+                                    'category' => 'a',
+                                    'key' => 'k2',
+                                    'value' => 'other',
+                                    'active' => true,
+                                ],
+                            ],
+                        ],
+                        'next_page_offset' => null,
+                    ],
+                ]),
+                ['http_code' => 200],
+            ),
+        ]);
 
-        $factory = function (string $method, string $url, array $options) use (&$capturedUrl, &$capturedBody): MockResponse {
-            $capturedUrl = $url;
-            $capturedBody = $options['body'] ?? null;
+        $memories = $client->scrollMemories(userId: 1);
+        $logicalIds = array_map(static fn (array $m): string => $m['id'], $memories);
 
-            return new MockResponse(json_encode([
-                'result' => ['points' => [], 'next_page_offset' => null],
-            ]), ['http_code' => 200]);
-        };
-
-        $mockClient = new MockHttpClient($factory);
-        $client = new QdrantClientDirect(
-            httpClient: $mockClient,
-            qdrantUrl: 'http://localhost:6333',
-            logger: new NullLogger(),
-        );
-
-        $client->getMemory('mem_1_123');
-
-        $this->assertIsString($capturedUrl);
-        $this->assertStringContainsString('/collections/user_memories/points/scroll', $capturedUrl);
-
-        $this->assertIsString($capturedBody);
-        /** @var array{filter?: array{must?: array<array{key?: string, match?: array{value?: string}}>}, ids?: mixed} $decoded */
-        $decoded = json_decode($capturedBody, true);
-
-        $this->assertArrayNotHasKey('ids', $decoded, 'getMemory must not lookup by primary ID; that misses legacy int-keyed points');
-        $this->assertArrayHasKey('filter', $decoded);
-        $this->assertSame('_point_id', $decoded['filter']['must'][0]['key'] ?? null);
-        $this->assertSame('mem_1_123', $decoded['filter']['must'][0]['match']['value'] ?? null);
+        $this->assertCount(2, $memories, 'duplicate logical points must collapse into one entry');
+        $this->assertSame(['mem_1_dup', 'mem_1_other'], $logicalIds);
     }
 
-    public function testSearchMemoriesSuccess(): void
+    public function testSearchMemoriesDedupesAndKeepsHigherScoringCopy(): void
     {
-        $responses = [
-            new MockResponse(json_encode([
-                'result' => [
-                    [
-                        'id' => 'some-uuid',
-                        'score' => 0.95,
-                        'payload' => [
-                            '_point_id' => 'mem_1_123',
-                            'user_id' => 1,
-                            'category' => 'test',
-                            'key' => 'test_key',
-                            'value' => 'test_value',
-                            'active' => true,
+        $client = $this->buildClient([
+            '/collections/user_memories/points/search' => fn () => new MockResponse(
+                json_encode([
+                    'result' => [
+                        [
+                            'id' => 11111,
+                            'score' => 0.72,
+                            'payload' => [
+                                '_point_id' => 'mem_1_dup',
+                                'user_id' => 1, 'category' => 'a', 'key' => 'k', 'value' => 'legacy', 'active' => true,
+                            ],
+                        ],
+                        [
+                            'id' => QdrantPointId::uuidFor('mem_1_dup'),
+                            'score' => 0.91,
+                            'payload' => [
+                                '_point_id' => 'mem_1_dup',
+                                'user_id' => 1, 'category' => 'a', 'key' => 'k', 'value' => 'fresh-uuid', 'active' => true,
+                            ],
                         ],
                     ],
-                ],
-            ]), ['http_code' => 200]),
-        ];
+                ]),
+                ['http_code' => 200],
+            ),
+        ]);
 
-        $client = $this->createClient($responses);
         $results = $client->searchMemories(
             queryVector: array_fill(0, 1024, 0.5),
             userId: 1,
             category: null,
             limit: 5,
-            minScore: 0.7
+            minScore: 0.7,
         );
 
         $this->assertCount(1, $results);
-        $this->assertEquals('mem_1_123', $results[0]['id']);
-        $this->assertEquals(0.95, $results[0]['score']);
+        $this->assertSame('mem_1_dup', $results[0]['id']);
+        $this->assertSame(0.91, $results[0]['score'], 'dedup must keep the higher-scoring copy');
+        $this->assertSame('fresh-uuid', $results[0]['payload']['value']);
     }
 
-    public function testHealthCheckSuccess(): void
+    public function testUpsertDocumentIssuesAtomicBatchDeleteThenUpsert(): void
     {
-        $responses = [
-            new MockResponse('', ['http_code' => 200]),
-        ];
+        $calls = [];
+        $client = $this->buildClient([
+            '/collections/user_documents' => fn () => new MockResponse(
+                json_encode(['result' => ['status' => 'green']]),
+                ['http_code' => 200]
+            ),
+            '/collections/user_documents/index' => fn () => $this->okEmpty(),
+            '/collections/user_documents/points/batch' => fn () => new MockResponse(
+                json_encode(['result' => [['status' => 'completed'], ['status' => 'completed']], 'status' => 'ok']),
+                ['http_code' => 200]
+            ),
+        ], $calls);
 
-        $client = $this->createClient($responses);
-        $healthy = $client->healthCheck();
+        $client->upsertDocument(
+            pointId: 'doc_1_42_0',
+            vector: array_fill(0, 1024, 0.1),
+            payload: ['user_id' => 1, 'file_id' => 42, 'group_key' => 'g', 'text' => 't'],
+        );
 
-        $this->assertTrue($healthy);
+        $batchCalls = array_values(array_filter(
+            $calls,
+            static fn (array $c): bool => str_ends_with($c['path'], '/points/batch'),
+        ));
+        $this->assertCount(1, $batchCalls);
+
+        $body = json_decode((string) $batchCalls[0]['body'], true);
+        $this->assertArrayHasKey('delete', $body['operations'][0]);
+        $this->assertArrayHasKey('upsert', $body['operations'][1]);
+        $this->assertSame(
+            'doc_1_42_0',
+            $body['operations'][0]['delete']['filter']['must'][0]['match']['value'],
+        );
     }
 
-    public function testHealthCheckFailure(): void
+    public function testHealthCheckReturnsTrueOn200(): void
     {
-        $responses = [
-            new MockResponse('Service Unavailable', ['http_code' => 503]),
-        ];
+        $client = $this->buildClient([
+            '/healthz' => fn () => new MockResponse('', ['http_code' => 200]),
+        ]);
 
-        $client = $this->createClient($responses);
-        $healthy = $client->healthCheck();
-
-        $this->assertFalse($healthy);
+        $this->assertTrue($client->healthCheck());
     }
 
-    public function testHealthCheckNotConfigured(): void
+    public function testHealthCheckReturnsFalseOn503(): void
     {
-        $mockClient = new MockHttpClient([]);
+        $client = $this->buildClient([
+            '/healthz' => fn () => new MockResponse('Service Unavailable', ['http_code' => 503]),
+        ]);
+
+        $this->assertFalse($client->healthCheck());
+    }
+
+    public function testHealthCheckReturnsFalseWhenNotConfigured(): void
+    {
         $client = new QdrantClientDirect(
-            httpClient: $mockClient,
+            httpClient: new MockHttpClient([]),
             qdrantUrl: '',
             logger: new NullLogger(),
         );
@@ -279,109 +373,18 @@ final class QdrantClientDirectTest extends TestCase
         $this->assertFalse($client->isAvailable());
     }
 
-    public function testUpsertDocumentSuccess(): void
+    public function testCollectionNameGettersExposeConfiguredNames(): void
     {
-        $this->expectNotToPerformAssertions();
-
-        $responses = [
-            // ensureDocumentsCollection -> GET /collections/user_documents
-            new MockResponse(json_encode(['result' => ['status' => 'green']]), ['http_code' => 200]),
-            // ensurePayloadIndexes -> PUT /collections/user_documents/index  x4
-            new MockResponse(json_encode(['result' => ['status' => 'acknowledged']]), ['http_code' => 200]),
-            new MockResponse(json_encode(['result' => ['status' => 'acknowledged']]), ['http_code' => 200]),
-            new MockResponse(json_encode(['result' => ['status' => 'acknowledged']]), ['http_code' => 200]),
-            new MockResponse(json_encode(['result' => ['status' => 'acknowledged']]), ['http_code' => 200]),
-            // upsertDocument -> pre-upsert POST /points/delete?wait=true
-            new MockResponse(json_encode(['result' => ['status' => 'completed']]), ['http_code' => 200]),
-            // upsertDocument -> PUT /points?wait=true
-            new MockResponse(json_encode(['result' => ['status' => 'completed']]), ['http_code' => 200]),
-        ];
-
-        $client = $this->createClient($responses);
-        $client->upsertDocument(
-            pointId: 'doc_1_42_0',
-            vector: array_fill(0, 1024, 0.1),
-            payload: [
-                'user_id' => 1,
-                'file_id' => 42,
-                'group_key' => 'default',
-                'text' => 'test chunk',
-            ]
-        );
-    }
-
-    public function testSearchDocumentsSuccess(): void
-    {
-        $responses = [
-            new MockResponse(json_encode([
-                'result' => [
-                    [
-                        'id' => 'some-uuid',
-                        'score' => 0.85,
-                        'payload' => [
-                            '_point_id' => 'doc_1_42_0',
-                            'user_id' => 1,
-                            'file_id' => 42,
-                            'text' => 'matching chunk',
-                            'group_key' => 'default',
-                            'start_line' => 0,
-                            'end_line' => 10,
-                        ],
-                    ],
-                ],
-            ]), ['http_code' => 200]),
-        ];
-
-        $client = $this->createClient($responses);
-        $results = $client->searchDocuments(
-            vector: array_fill(0, 1024, 0.1),
-            userId: 1,
+        $client = new QdrantClientDirect(
+            httpClient: new MockHttpClient([]),
+            qdrantUrl: 'http://x',
+            logger: new NullLogger(),
+            memoriesCollection: 'custom_mem',
+            documentsCollection: 'custom_doc',
         );
 
-        $this->assertCount(1, $results);
-        $this->assertEquals(0.85, $results[0]['score']);
-        $this->assertEquals('matching chunk', $results[0]['payload']['text']);
-    }
-
-    public function testScrollMemoriesSuccess(): void
-    {
-        $responses = [
-            new MockResponse(json_encode([
-                'result' => [
-                    'points' => [
-                        [
-                            'id' => 'uuid-1',
-                            'payload' => [
-                                '_point_id' => 'mem_1_1',
-                                'user_id' => 1,
-                                'category' => 'general',
-                                'key' => 'name',
-                                'value' => 'Test User',
-                                'active' => true,
-                            ],
-                        ],
-                        [
-                            'id' => 'uuid-2',
-                            'payload' => [
-                                '_point_id' => 'mem_1_2',
-                                'user_id' => 1,
-                                'category' => 'preference',
-                                'key' => 'language',
-                                'value' => 'German',
-                                'active' => true,
-                            ],
-                        ],
-                    ],
-                    'next_page_offset' => null,
-                ],
-            ]), ['http_code' => 200]),
-        ];
-
-        $client = $this->createClient($responses);
-        $memories = $client->scrollMemories(userId: 1);
-
-        $this->assertCount(2, $memories);
-        $this->assertEquals('mem_1_1', $memories[0]['id']);
-        $this->assertEquals('mem_1_2', $memories[1]['id']);
+        $this->assertSame('custom_mem', $client->getMemoriesCollection());
+        $this->assertSame('custom_doc', $client->getDocumentsCollection());
+        $this->assertSame('http://x', $client->getQdrantUrl());
     }
 }
