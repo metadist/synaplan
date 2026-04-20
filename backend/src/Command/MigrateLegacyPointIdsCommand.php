@@ -85,8 +85,21 @@ final class MigrateLegacyPointIdsCommand extends Command
 
         $which = strtolower((string) $input->getOption('collection'));
         $apply = (bool) $input->getOption('apply');
-        $limitRaw = (string) $input->getOption('limit');
-        $limit = ('all' === strtolower($limitRaw) || '' === $limitRaw) ? 0 : max(0, (int) $limitRaw);
+
+        // Strict --limit parsing. A typo like `--limit=al` must NOT silently
+        // degrade to 0 (= no cap) and risk migrating every point, especially
+        // combined with --apply. Accept only "all" (case-insensitive) or a
+        // positive integer; reject everything else with a clear message.
+        $limitRaw = trim((string) $input->getOption('limit'));
+        if ('' === $limitRaw || 'all' === strtolower($limitRaw)) {
+            $limit = 0;
+        } elseif (ctype_digit($limitRaw) && (int) $limitRaw > 0) {
+            $limit = (int) $limitRaw;
+        } else {
+            $io->error(sprintf('Invalid --limit value "%s". Use "all" or a positive integer.', $limitRaw));
+
+            return Command::INVALID;
+        }
 
         $collections = match ($which) {
             'memories' => [$this->qdrantClient->getMemoriesCollection()],

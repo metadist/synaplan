@@ -46,7 +46,6 @@ final class LegacyPointIdMigrator
         $errors = 0;
 
         $offset = null;
-        $lastOffset = null; // guards against Qdrant returning the same offset twice
 
         do {
             $body = [
@@ -154,11 +153,14 @@ final class LegacyPointIdMigrator
 
             $nextOffset = $response['result']['next_page_offset'] ?? null;
 
-            // Progress guard: abort the loop if Qdrant returns the same
-            // `next_page_offset` it returned last iteration. This can only
-            // happen under a bug or a pathological race, and without the
-            // guard the loop would spin forever on the same page.
-            if (null !== $nextOffset && $nextOffset === $lastOffset) {
+            // Progress guard: abort the loop if Qdrant tells us to scroll
+            // back to the very offset we just requested, i.e. the cursor
+            // did not advance. This can only happen under a Qdrant bug
+            // or a race with a concurrent delete; without the guard the
+            // loop would spin forever on the same page. Comparing against
+            // the REQUEST offset (not against the previously returned
+            // next-offset) catches this on the first stuck iteration.
+            if (null !== $nextOffset && $nextOffset === $offset) {
                 $this->logger->warning('Scroll offset did not advance during legacy-point migration; aborting loop', [
                     'collection' => $collection,
                     'offset' => is_scalar($nextOffset) ? (string) $nextOffset : '(complex)',
@@ -166,7 +168,6 @@ final class LegacyPointIdMigrator
                 break;
             }
 
-            $lastOffset = $offset;
             $offset = $nextOffset;
         } while (null !== $offset && !empty($points));
 

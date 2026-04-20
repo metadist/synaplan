@@ -198,8 +198,9 @@ final class LegacyPointIdMigratorTest extends TestCase
     }
 
     /**
-     * Progress guard: if Qdrant returns the same `next_page_offset` twice
-     * in a row (would otherwise be an infinite loop), we abort and exit.
+     * Progress guard: if Qdrant returns a `next_page_offset` equal to the
+     * one we just sent, the cursor is stuck on the same page and the
+     * guard must abort on the very next iteration.
      */
     public function testAbortsWhenScrollOffsetDoesNotAdvance(): void
     {
@@ -207,7 +208,8 @@ final class LegacyPointIdMigratorTest extends TestCase
         $factory = function (string $method, string $url, array $options) use (&$callCount): MockResponse {
             ++$callCount;
 
-            // Always return the same next_page_offset → loop must break.
+            // Always return the same next_page_offset → loop must break
+            // the moment we ask for that offset and get it back unchanged.
             return new MockResponse(
                 json_encode([
                     'result' => [
@@ -232,10 +234,11 @@ final class LegacyPointIdMigratorTest extends TestCase
             limit: 0,
         );
 
-        // 2 scroll calls: first one (offset=null), second one (offset='stuck-offset-xyz');
-        // third iteration is blocked by the progress guard.
-        $this->assertLessThanOrEqual(3, $callCount, 'progress guard must stop the loop within 2-3 iterations');
-        $this->assertGreaterThanOrEqual(1, $callCount);
+        // Exactly 2 scroll calls expected:
+        //   Iter 1: offset=null              → returns next=stuck        (no stuckness yet)
+        //   Iter 2: offset=stuck             → returns next=stuck        (guard fires, break)
+        // A third call would indicate the guard is broken.
+        $this->assertSame(2, $callCount, 'progress guard must abort on the first iteration where next_page_offset equals the requested offset');
         $this->assertGreaterThan(0, $report->scanned);
     }
 

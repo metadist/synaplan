@@ -27,12 +27,13 @@ final class QdrantClientDirectTest extends TestCase
     /**
      * Build a QdrantClientDirect backed by a route-based MockHttpClient.
      *
-     * Callers that want to inspect the raw HTTP calls made by the client
-     * can pass an empty array in by reference as `$calls`; it will be
-     * populated with one entry per request.
+     * Each responder is called with no arguments; tests that need to
+     * inspect what was sent pass an array in by reference as `$calls`
+     * and assert against it after the fact. The one-call-per-responder
+     * zero-arg contract matches the `fn () => ...` form used below.
      *
-     * @param array<string, callable(array{method: string, path: string, query: string, body: ?string}):MockResponse> $routes Map of path-suffix => responder callback
-     * @param list<array{method: string, path: string, query: string, body: ?string}>                                 $calls
+     * @param array<string, callable():MockResponse>                                  $routes Map of path-suffix => responder callback
+     * @param list<array{method: string, path: string, query: string, body: ?string}> $calls
      */
     private function buildClient(array $routes, array &$calls = []): QdrantClientDirect
     {
@@ -40,12 +41,11 @@ final class QdrantClientDirectTest extends TestCase
             $path = (string) (parse_url($url, \PHP_URL_PATH) ?? '');
             $query = (string) (parse_url($url, \PHP_URL_QUERY) ?? '');
             $body = isset($options['body']) && is_string($options['body']) ? $options['body'] : null;
-            $call = ['method' => $method, 'path' => $path, 'query' => $query, 'body' => $body];
-            $calls[] = $call;
+            $calls[] = ['method' => $method, 'path' => $path, 'query' => $query, 'body' => $body];
 
             foreach ($routes as $suffix => $responder) {
                 if (str_ends_with($path, $suffix)) {
-                    return $responder($call);
+                    return $responder();
                 }
             }
 

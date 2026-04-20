@@ -120,8 +120,11 @@ final class QdrantClientDirect implements QdrantClientInterface
      *
      * `with_vector: false` is deliberate — memory callers only need the
      * payload (key/value/category/…) and skipping 1024 floats per request
-     * keeps this on the hot path of chat responses. Use getDocument() if
-     * you do need the vector.
+     * keeps this on the hot path of chat responses. Returns the payload
+     * only; memories do not expose a vector-returning read path because no
+     * current caller needs it. If one ever does, add a dedicated method
+     * rather than toggling `with_vector` here (the default empty-payload
+     * savings matter for latency).
      */
     public function getMemory(string $pointId, ?string $namespace = null): ?array
     {
