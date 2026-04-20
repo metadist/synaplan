@@ -87,7 +87,10 @@ final class QdrantClientDirect implements QdrantClientInterface
         $uuid = $this->generatePointUuid($pointId);
 
         try {
-            $response = $this->qdrantRequest('POST', "/collections/{$collection}/points", [
+            // consistency=majority: in a replicated cluster, read from a quorum
+            // of replicas to avoid serving stale data after a recent write/delete.
+            // No-op on single-replica deployments.
+            $response = $this->qdrantRequest('POST', "/collections/{$collection}/points?consistency=majority", [
                 'ids' => [$uuid],
                 'with_payload' => true,
                 'with_vector' => false,
@@ -137,7 +140,7 @@ final class QdrantClientDirect implements QdrantClientInterface
                 $must[] = ['key' => 'category', 'match' => ['value' => $category]];
             }
 
-            $response = $this->qdrantRequest('POST', "/collections/{$collection}/points/search", [
+            $response = $this->qdrantRequest('POST', "/collections/{$collection}/points/search?consistency=majority", [
                 'vector' => $queryVector,
                 'filter' => ['must' => $must],
                 'limit' => $limit,
@@ -183,7 +186,7 @@ final class QdrantClientDirect implements QdrantClientInterface
                 $must[] = ['key' => 'category', 'match' => ['value' => $category]];
             }
 
-            $response = $this->qdrantRequest('POST', "/collections/{$collection}/points/scroll", [
+            $response = $this->qdrantRequest('POST', "/collections/{$collection}/points/scroll?consistency=majority", [
                 'filter' => ['must' => $must],
                 'limit' => $limit,
                 'with_payload' => true,
@@ -215,7 +218,11 @@ final class QdrantClientDirect implements QdrantClientInterface
 
         try {
             $uuid = $this->generatePointUuid($pointId);
-            $this->qdrantRequest('POST', "/collections/{$collection}/points/delete?wait=true", [
+            // ordering=strong routes through the permanent leader so the delete
+            // is sequenced before subsequent majority-consistency reads from
+            // any replica. Combined with wait=true this gives read-your-writes
+            // semantics in a multi-node cluster.
+            $this->qdrantRequest('POST', "/collections/{$collection}/points/delete?wait=true&ordering=strong", [
                 'points' => [$uuid],
             ]);
 
@@ -239,7 +246,7 @@ final class QdrantClientDirect implements QdrantClientInterface
                 ],
             ];
 
-            $countResponse = $this->qdrantRequest('POST', "/collections/{$this->memoriesCollection}/points/count", [
+            $countResponse = $this->qdrantRequest('POST', "/collections/{$this->memoriesCollection}/points/count?consistency=majority", [
                 'filter' => $filter,
             ]);
             $deletedCount = (int) ($countResponse['result']['count'] ?? 0);
@@ -248,7 +255,7 @@ final class QdrantClientDirect implements QdrantClientInterface
                 return 0;
             }
 
-            $this->qdrantRequest('POST', "/collections/{$this->memoriesCollection}/points/delete?wait=true", [
+            $this->qdrantRequest('POST', "/collections/{$this->memoriesCollection}/points/delete?wait=true&ordering=strong", [
                 'filter' => $filter,
             ]);
 
@@ -351,7 +358,7 @@ final class QdrantClientDirect implements QdrantClientInterface
                 $must[] = ['key' => 'group_key', 'match' => ['value' => $groupKey]];
             }
 
-            $response = $this->qdrantRequest('POST', "/collections/{$this->documentsCollection}/points/search", [
+            $response = $this->qdrantRequest('POST', "/collections/{$this->documentsCollection}/points/search?consistency=majority", [
                 'vector' => $vector,
                 'filter' => ['must' => $must],
                 'limit' => $limit,
@@ -383,7 +390,7 @@ final class QdrantClientDirect implements QdrantClientInterface
     {
         try {
             $uuid = $this->generatePointUuid($pointId);
-            $response = $this->qdrantRequest('POST', "/collections/{$this->documentsCollection}/points", [
+            $response = $this->qdrantRequest('POST', "/collections/{$this->documentsCollection}/points?consistency=majority", [
                 'ids' => [$uuid],
                 'with_payload' => true,
                 'with_vector' => true,
@@ -415,7 +422,7 @@ final class QdrantClientDirect implements QdrantClientInterface
     {
         try {
             $uuid = $this->generatePointUuid($pointId);
-            $this->qdrantRequest('POST', "/collections/{$this->documentsCollection}/points/delete?wait=true", [
+            $this->qdrantRequest('POST', "/collections/{$this->documentsCollection}/points/delete?wait=true&ordering=strong", [
                 'points' => [$uuid],
             ]);
         } catch (\Throwable $e) {
@@ -456,7 +463,7 @@ final class QdrantClientDirect implements QdrantClientInterface
                 ],
             ];
 
-            $countResponse = $this->qdrantRequest('POST', "/collections/{$this->documentsCollection}/points/count", [
+            $countResponse = $this->qdrantRequest('POST', "/collections/{$this->documentsCollection}/points/count?consistency=majority", [
                 'filter' => $filter,
             ]);
             $count = (int) ($countResponse['result']['count'] ?? 0);
@@ -465,7 +472,7 @@ final class QdrantClientDirect implements QdrantClientInterface
                 return 0;
             }
 
-            $this->qdrantRequest('POST', "/collections/{$this->documentsCollection}/points/payload?wait=true", [
+            $this->qdrantRequest('POST', "/collections/{$this->documentsCollection}/points/payload?wait=true&ordering=strong", [
                 'payload' => ['group_key' => $newGroupKey],
                 'filter' => $filter,
             ]);
@@ -860,7 +867,7 @@ final class QdrantClientDirect implements QdrantClientInterface
      */
     private function upsertPoints(string $collection, array $points): void
     {
-        $this->qdrantRequest('PUT', "/collections/{$collection}/points?wait=true", [
+        $this->qdrantRequest('PUT', "/collections/{$collection}/points?wait=true&ordering=strong", [
             'points' => $points,
         ]);
     }
@@ -874,7 +881,7 @@ final class QdrantClientDirect implements QdrantClientInterface
             ];
             $filter = ['must' => $must];
 
-            $countResponse = $this->qdrantRequest('POST', "/collections/{$this->documentsCollection}/points/count", [
+            $countResponse = $this->qdrantRequest('POST', "/collections/{$this->documentsCollection}/points/count?consistency=majority", [
                 'filter' => $filter,
             ]);
             $count = (int) ($countResponse['result']['count'] ?? 0);
@@ -883,7 +890,7 @@ final class QdrantClientDirect implements QdrantClientInterface
                 return 0;
             }
 
-            $this->qdrantRequest('POST', "/collections/{$this->documentsCollection}/points/delete?wait=true", [
+            $this->qdrantRequest('POST', "/collections/{$this->documentsCollection}/points/delete?wait=true&ordering=strong", [
                 'filter' => $filter,
             ]);
 
@@ -926,7 +933,7 @@ final class QdrantClientDirect implements QdrantClientInterface
                 $body['offset'] = $offset;
             }
 
-            $response = $this->qdrantRequest('POST', "/collections/{$this->documentsCollection}/points/scroll", $body);
+            $response = $this->qdrantRequest('POST', "/collections/{$this->documentsCollection}/points/scroll?consistency=majority", $body);
 
             $points = $response['result']['points'] ?? [];
             foreach ($points as $point) {
