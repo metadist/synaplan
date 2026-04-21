@@ -161,8 +161,15 @@ class GoogleProvider implements ChatProviderInterface, ImageGenerationProviderIn
                 'cache_creation_tokens' => 0,
             ];
 
+            $textContent = '';
+            foreach ($data['candidates'][0]['content']['parts'] ?? [] as $part) {
+                if (isset($part['text']) && empty($part['thought'])) {
+                    $textContent .= $part['text'];
+                }
+            }
+
             return [
-                'content' => $data['candidates'][0]['content']['parts'][0]['text'] ?? '',
+                'content' => $textContent,
                 'usage' => $usage,
             ];
         } catch (ProviderException $e) {
@@ -262,8 +269,17 @@ class GoogleProvider implements ChatProviderInterface, ImageGenerationProviderIn
                         ];
                     }
 
-                    if (isset($data['candidates'][0]['content']['parts'][0]['text'])) {
-                        $callback($data['candidates'][0]['content']['parts'][0]['text']);
+                    $parts = $data['candidates'][0]['content']['parts'] ?? [];
+                    foreach ($parts as $part) {
+                        if (!isset($part['text']) || '' === $part['text']) {
+                            continue;
+                        }
+
+                        if (!empty($part['thought'])) {
+                            $callback(['type' => 'reasoning', 'content' => $part['text']]);
+                        } else {
+                            $callback($part['text']);
+                        }
                     }
                 }
             }

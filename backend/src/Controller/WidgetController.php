@@ -11,12 +11,14 @@ use App\Repository\PromptRepository;
 use App\Repository\WidgetRepository;
 use App\Service\BillingService;
 use App\Service\File\UserUploadPathBuilder;
+use App\Service\UrlContentService;
 use App\Service\UserMemoryService;
 use App\Service\WidgetService;
 use App\Service\WidgetSessionService;
 use App\Service\WidgetSetupService;
 use Doctrine\ORM\EntityManagerInterface;
 use OpenApi\Attributes as OA;
+use Psr\Cache\CacheItemPoolInterface;
 use Psr\Log\LoggerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
@@ -35,6 +37,9 @@ use Symfony\Component\Security\Http\Attribute\CurrentUser;
 #[OA\Tag(name: 'Widgets')]
 class WidgetController extends AbstractController
 {
+    private const TEST_API_RATE_LIMIT = 5;
+    private const TEST_API_RATE_WINDOW = 60;
+
     public function __construct(
         private WidgetService $widgetService,
         private WidgetSessionService $sessionService,
@@ -46,6 +51,8 @@ class WidgetController extends AbstractController
         private EntityManagerInterface $em,
         private MessageBusInterface $messageBus,
         private BillingService $billingService,
+        private UrlContentService $urlContentService,
+        private CacheItemPoolInterface $cache,
         private LoggerInterface $logger,
         private string $uploadDir,
     ) {
@@ -1092,6 +1099,182 @@ class WidgetController extends AbstractController
             'success' => true,
             'urls_queued' => \count($urls),
         ]);
+    }
+
+    /**
+     * Test external API connection for User Data Integration.
+     *
+     * Accepts apiUrl/apiToken directly so the user can test before saving.
+     * Rate limited to 5 requests per 60 seconds per user.
+     */
+    #[Route('/{widgetId}/test-api', name: 'test_api', methods: ['POST'])]
+    #[OA\Post(
+        path: '/api/v1/widgets/{widgetId}/test-api',
+        summary: 'Test external API connection for User Data Integration (rate limited: 5/min)',
+        security: [['Bearer' => []]],
+        tags: ['Widgets']
+    )]
+    #[OA\Parameter(
+        name: 'widgetId',
+        in: 'path',
+        required: true,
+        schema: new OA\Schema(type: 'string')
+    )]
+    #[OA\RequestBody(
+        required: false,
+        content: new OA\JsonContent(
+            properties: [
+                new OA\Property(property: 'testUserId', type: 'string', example: 'user-123', description: 'A sample externalUserId to test the API with'),
+                new OA\Property(property: 'apiUrl', type: 'string', example: 'https://api.example.com/users/{externalUserId}', description: 'Override: test this URL instead of the saved config'),
+                new OA\Property(property: 'apiToken', type: 'string', example: 'sk-...', description: 'Override: use this Bearer token instead of the saved config'),
+            ]
+        )
+    )]
+    #[OA\Response(
+        response: 200,
+        description: 'API test result',
+        content: new OA\JsonContent(
+            required: ['success', 'reachable'],
+            properties: [
+                new OA\Property(property: 'success', type: 'boolean'),
+                new OA\Property(property: 'reachable', type: 'boolean'),
+                new OA\Property(property: 'resolvedUrl', type: 'string'),
+                new OA\Property(property: 'responsePreview', type: 'string'),
+                new OA\Property(property: 'error', type: 'string', nullable: true),
+            ]
+        )
+    )]
+    #[OA\Response(response: 429, description: 'Rate limit exceeded')]
+    public function testApi(string $widgetId, Request $request, #[CurrentUser] ?User $user): JsonResponse
+    {
+        if (!$user) {
+            return $this->json(['error' => 'Not authenticated'], Response::HTTP_UNAUTHORIZED);
+        }
+
+        $widget = $this->widgetRepository->findByWidgetId($widgetId);
+
+        if (!$widget) {
+            return $this->json(['error' => 'Widget not found'], Response::HTTP_NOT_FOUND);
+        }
+
+        if ($widget->getOwnerId() !== $user->getId()) {
+            return $this->json(['error' => 'Access denied'], Response::HTTP_FORBIDDEN);
+        }
+
+        $rateLimitResult = $this->checkTestApiRateLimit($user->getId());
+        if (!$rateLimitResult['allowed']) {
+            return $this->json([
+                'success' => false,
+                'reachable' => false,
+                'error' => 'Rate limit exceeded. Please wait before testing again.',
+                'retryAfter' => $rateLimitResult['retry_after'],
+            ], Response::HTTP_TOO_MANY_REQUESTS);
+        }
+
+        $data = json_decode($request->getContent(), true) ?? [];
+
+        $config = $widget->getConfig();
+        $apiUrl = isset($data['apiUrl']) && \is_string($data['apiUrl']) && '' !== trim($data['apiUrl'])
+            ? trim($data['apiUrl'])
+            : (\is_string($config['externalApiUrl'] ?? null) ? trim($config['externalApiUrl']) : '');
+        $apiToken = isset($data['apiToken']) && \is_string($data['apiToken'])
+            ? $data['apiToken']
+            : (\is_string($config['externalApiToken'] ?? null) ? $config['externalApiToken'] : '');
+
+        if ('' === $apiUrl) {
+            return $this->json([
+                'success' => false,
+                'reachable' => false,
+                'error' => 'No API URL provided',
+            ], Response::HTTP_BAD_REQUEST);
+        }
+
+        if (!str_starts_with($apiUrl, 'http://') && !str_starts_with($apiUrl, 'https://')) {
+            $apiUrl = 'https://'.$apiUrl;
+        }
+
+        $testUserId = isset($data['testUserId']) && \is_string($data['testUserId']) ? trim($data['testUserId']) : '';
+
+        $resolvedUrl = $apiUrl;
+        if (str_contains($apiUrl, '{externalUserId}')) {
+            if ('' === $testUserId) {
+                return $this->json([
+                    'success' => false,
+                    'reachable' => false,
+                    'error' => 'API URL contains {externalUserId} placeholder but no test user ID was provided',
+                ], Response::HTTP_BAD_REQUEST);
+            }
+            $resolvedUrl = str_replace('{externalUserId}', rawurlencode($testUserId), $apiUrl);
+        }
+
+        $this->incrementTestApiRateLimit($user->getId());
+
+        $headers = [];
+        if ('' !== $apiToken) {
+            $headers['Authorization'] = 'Bearer '.$apiToken;
+        }
+
+        $result = $this->urlContentService->fetchApi($resolvedUrl, 'GET', $headers);
+
+        if (!$result->success) {
+            return $this->json([
+                'success' => true,
+                'reachable' => false,
+                'resolvedUrl' => $resolvedUrl,
+                'error' => $result->error ?? 'API returned an error',
+            ]);
+        }
+
+        $preview = mb_substr($result->extractedText, 0, 2000);
+
+        return $this->json([
+            'success' => true,
+            'reachable' => true,
+            'resolvedUrl' => $resolvedUrl,
+            'responsePreview' => $preview,
+        ]);
+    }
+
+    /**
+     * @return array{allowed: bool, retry_after: int}
+     */
+    private function checkTestApiRateLimit(int $userId): array
+    {
+        $key = 'widget_test_api.'.$userId;
+        $item = $this->cache->getItem($key);
+
+        if (!$item->isHit()) {
+            return ['allowed' => true, 'retry_after' => 0];
+        }
+
+        /** @var array{count: int, reset_at: int} $data */
+        $data = $item->get();
+
+        if ($data['reset_at'] <= time()) {
+            return ['allowed' => true, 'retry_after' => 0];
+        }
+
+        return [
+            'allowed' => $data['count'] < self::TEST_API_RATE_LIMIT,
+            'retry_after' => max(0, $data['reset_at'] - time()),
+        ];
+    }
+
+    private function incrementTestApiRateLimit(int $userId): void
+    {
+        $key = 'widget_test_api.'.$userId;
+        $item = $this->cache->getItem($key);
+
+        if (!$item->isHit() || $item->get()['reset_at'] <= time()) {
+            $data = ['count' => 1, 'reset_at' => time() + self::TEST_API_RATE_WINDOW];
+        } else {
+            $data = $item->get();
+            ++$data['count'];
+        }
+
+        $item->set($data);
+        $item->expiresAfter(self::TEST_API_RATE_WINDOW);
+        $this->cache->save($item);
     }
 
     /**

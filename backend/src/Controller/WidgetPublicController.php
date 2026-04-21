@@ -10,6 +10,7 @@ use App\Repository\ChatRepository;
 use App\Repository\FileRepository;
 use App\Repository\MessageRepository;
 use App\Service\BillingService;
+use App\Service\DiscordNotificationService;
 use App\Service\File\FileProcessor;
 use App\Service\File\FileStorageService;
 use App\Service\File\VectorizationService;
@@ -56,6 +57,7 @@ class WidgetPublicController extends AbstractController
         private WidgetEventCacheService $eventCache,
         private EntityManagerInterface $em,
         private LoggerInterface $logger,
+        private DiscordNotificationService $discord,
         private string $uploadDir,
     ) {
     }
@@ -151,6 +153,7 @@ class WidgetPublicController extends AbstractController
             'hideButton',
             'privacyPolicyUrl',
             'detectTheme',
+            'sessionMode',
         ];
 
         return \array_intersect_key($config, \array_flip($allowed));
@@ -754,15 +757,14 @@ class WidgetPublicController extends AbstractController
                 'line' => $e->getLine(),
             ]);
 
-            // DEBUG: Return detailed error (REMOVE IN PRODUCTION!)
+            $this->discord->notifyWidgetError($widgetId, $e->getMessage(), [
+                'session_id' => $session->getSessionId(),
+                'file' => $e->getFile(),
+                'line' => $e->getLine(),
+            ]);
+
             return $this->json([
                 'error' => 'Failed to process message',
-                'debug' => [
-                    'message' => $e->getMessage(),
-                    'file' => $e->getFile(),
-                    'line' => $e->getLine(),
-                    'trace' => explode("\n", $e->getTraceAsString()),
-                ],
             ], Response::HTTP_INTERNAL_SERVER_ERROR);
         }
     }
@@ -908,7 +910,7 @@ class WidgetPublicController extends AbstractController
             ]);
 
             return $this->json([
-                'error' => 'File upload failed: '.$e->getMessage(),
+                'error' => 'File upload failed',
             ], Response::HTTP_INTERNAL_SERVER_ERROR);
         }
     }
@@ -1157,7 +1159,6 @@ class WidgetPublicController extends AbstractController
                         'id' => $file->getId(),
                         'filename' => $file->getFileName(),
                         'fileType' => $file->getFileType(),
-                        'filePath' => $file->getFilePath(),
                         'fileSize' => $file->getFileSize(),
                         'fileMime' => $file->getFileMime(),
                     ];
@@ -1552,6 +1553,15 @@ class WidgetPublicController extends AbstractController
             return $this->json(['error' => 'Widget not found'], Response::HTTP_NOT_FOUND);
         }
 
+        if (!$this->widgetService->isWidgetActive($widget)) {
+            return $this->json(['error' => 'Widget is not active'], Response::HTTP_SERVICE_UNAVAILABLE);
+        }
+
+        $config = $widget->getConfig();
+        if ($domainError = $this->ensureDomainAllowed($config, $request, $widget->getOwnerId())) {
+            return $domainError;
+        }
+
         $data = $request->toArray();
         $sessionId = $data['sessionId'] ?? null;
         $text = $data['text'] ?? '';
@@ -1619,6 +1629,9 @@ class WidgetPublicController extends AbstractController
             ? trim($widgetConfig['externalApiUrl'])
             : '';
         if ('' !== $configApiUrl) {
+            if (!str_starts_with($configApiUrl, 'http://') && !str_starts_with($configApiUrl, 'https://')) {
+                $configApiUrl = 'https://'.$configApiUrl;
+            }
             $apiUrls[] = ['url' => $configApiUrl, 'method' => 'GET', 'label' => 'User Profile'];
         }
 
