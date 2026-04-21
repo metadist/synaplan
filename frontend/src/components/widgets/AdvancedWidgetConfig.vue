@@ -1885,21 +1885,16 @@ async function testApiConnection() {
       config.externalApiToken
     )
     apiTestResult.value = result
-    if (result.reachable) {
-      success(t('widgets.advancedConfig.userDataIntegration.testSuccess'))
-    }
     if (result.retryAfter) {
       startCooldown(result.retryAfter)
+    } else if (result.reachable) {
+      success(t('widgets.advancedConfig.userDataIntegration.testSuccess'))
     }
   } catch (e) {
-    const msg = getErrorMessage(e) ?? undefined
-    if (msg?.includes('429') || msg?.includes('Rate limit')) {
-      startCooldown(60)
-    }
     apiTestResult.value = {
       success: false,
       reachable: false,
-      error: msg,
+      error: getErrorMessage(e) ?? undefined,
     }
   } finally {
     apiTestLoading.value = false

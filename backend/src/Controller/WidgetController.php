@@ -37,6 +37,9 @@ use Symfony\Component\Security\Http\Attribute\CurrentUser;
 #[OA\Tag(name: 'Widgets')]
 class WidgetController extends AbstractController
 {
+    private const TEST_API_RATE_LIMIT = 5;
+    private const TEST_API_RATE_WINDOW = 60;
+
     public function __construct(
         private WidgetService $widgetService,
         private WidgetSessionService $sessionService,
@@ -1168,7 +1171,7 @@ class WidgetController extends AbstractController
             ], Response::HTTP_TOO_MANY_REQUESTS);
         }
 
-        $data = $request->toArray();
+        $data = json_decode($request->getContent(), true) ?? [];
 
         $config = $widget->getConfig();
         $apiUrl = isset($data['apiUrl']) && \is_string($data['apiUrl']) && '' !== trim($data['apiUrl'])
@@ -1211,18 +1214,7 @@ class WidgetController extends AbstractController
             $headers['Authorization'] = 'Bearer '.$apiToken;
         }
 
-        try {
-            $result = $this->urlContentService->fetchApi($resolvedUrl, 'GET', $headers);
-        } catch (\Exception $e) {
-            $this->logger->error('Widget API test failed', ['widgetId' => $widgetId, 'error' => $e->getMessage()]);
-
-            return $this->json([
-                'success' => true,
-                'reachable' => false,
-                'resolvedUrl' => $resolvedUrl,
-                'error' => 'Connection failed: '.$e->getMessage(),
-            ]);
-        }
+        $result = $this->urlContentService->fetchApi($resolvedUrl, 'GET', $headers);
 
         if (!$result->success) {
             return $this->json([
@@ -1242,9 +1234,6 @@ class WidgetController extends AbstractController
             'responsePreview' => $preview,
         ]);
     }
-
-    private const TEST_API_RATE_LIMIT = 5;
-    private const TEST_API_RATE_WINDOW = 60;
 
     /**
      * @return array{allowed: bool, retry_after: int}

@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { httpClient } from './httpClient'
+import { httpClient, getApiBaseUrl } from './httpClient'
 import { useConfigStore } from '@/stores/config'
 
 export class WidgetUnavailableError extends Error {
@@ -701,8 +701,23 @@ export async function testExternalApi(
   if (apiUrl) body.apiUrl = apiUrl
   if (apiToken) body.apiToken = apiToken
 
-  return await httpClient<TestApiResult>(`/api/v1/widgets/${widgetId}/test-api`, {
+  const response = await fetch(`${getApiBaseUrl()}/api/v1/widgets/${widgetId}/test-api`, {
     method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    credentials: 'include',
     body: JSON.stringify(body),
   })
+
+  const data: TestApiResult = await response.json()
+
+  if (!response.ok) {
+    return {
+      success: false,
+      reachable: false,
+      error: data.error ?? `HTTP ${response.status}`,
+      retryAfter: data.retryAfter,
+    }
+  }
+
+  return data
 }
