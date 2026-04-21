@@ -1610,7 +1610,7 @@ SynaplanWidget.init({
 
 <script setup lang="ts">
 import { getErrorMessage } from '@/utils/errorMessage'
-import { ref, reactive, computed, onMounted, watch } from 'vue'
+import { ref, reactive, computed, onMounted, onBeforeUnmount, watch } from 'vue'
 import { Icon } from '@iconify/vue'
 import { useI18n } from 'vue-i18n'
 import { useNotification } from '@/composables/useNotification'
@@ -1851,14 +1851,24 @@ const apiTestResult = ref<widgetsApi.TestApiResult | null>(null)
 const apiTestCooldown = ref(0)
 let cooldownTimer: ReturnType<typeof setInterval> | null = null
 
+function clearCooldownTimer() {
+  if (cooldownTimer) {
+    clearInterval(cooldownTimer)
+    cooldownTimer = null
+  }
+}
+
+onBeforeUnmount(() => {
+  clearCooldownTimer()
+})
+
 function startCooldown(seconds: number) {
   apiTestCooldown.value = seconds
-  if (cooldownTimer) clearInterval(cooldownTimer)
+  clearCooldownTimer()
   cooldownTimer = setInterval(() => {
     apiTestCooldown.value--
-    if (apiTestCooldown.value <= 0 && cooldownTimer) {
-      clearInterval(cooldownTimer)
-      cooldownTimer = null
+    if (apiTestCooldown.value <= 0) {
+      clearCooldownTimer()
     }
   }, 1000)
 }

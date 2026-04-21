@@ -280,7 +280,7 @@
                   }"
                 >
                   <!-- eslint-disable-next-line vue/no-v-html -- widget message markdown/linkify -->
-                  <div v-html="renderMessageContent(message.content)"></div>
+                  <div v-html="renderMessageContent(message.content, message.role)"></div>
                 </div>
               </template>
               <div v-else-if="message.type === 'file'" class="space-y-2">
@@ -335,7 +335,7 @@
                   }"
                 >
                   <!-- eslint-disable-next-line vue/no-v-html -- widget file message markdown -->
-                  <div v-html="renderMessageContent(message.content)"></div>
+                  <div v-html="renderMessageContent(message.content, message.role)"></div>
                 </div>
               </div>
               <p
@@ -1755,9 +1755,10 @@ const normalizeServerMessage = (rawUnknown: unknown): Message => {
     content = parsed.parts.map((part) => part.content).join('\n\n')
   }
 
-  content = stripThinkingBlocks(content)
-
   const role = raw.direction === 'IN' ? 'user' : 'assistant'
+  if (role === 'assistant') {
+    content = stripThinkingBlocks(content)
+  }
   const timestampSeconds = typeof raw.timestamp === 'number' ? raw.timestamp : Date.now() / 1000
 
   const rawFiles = raw.files
@@ -1962,12 +1963,14 @@ const stripThinkingBlocks = (text: string): string => {
   return result.trim()
 }
 
-const renderMessageContent = (value: string): string => {
+const renderMessageContent = (value: string, role: 'user' | 'assistant' = 'assistant'): string => {
   if (!value) {
     return ''
   }
 
-  value = stripThinkingBlocks(value)
+  if (role === 'assistant') {
+    value = stripThinkingBlocks(value)
+  }
 
   // Parse code blocks and render with copy button
   const { textParts, codeBlocks } = extractCodeBlocks(value)
