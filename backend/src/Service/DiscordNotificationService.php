@@ -586,6 +586,58 @@ final readonly class DiscordNotificationService
     }
 
     /**
+     * Notify a widget message processing error.
+     * Only fires when webhook is enabled — no admin check (system-level event).
+     *
+     * @param array<string, mixed> $metadata
+     */
+    public function notifyWidgetError(
+        string $widgetId,
+        string $error,
+        array $metadata = [],
+    ): void {
+        if (!$this->isEnabled()) {
+            return;
+        }
+
+        $fields = [
+            [
+                'name' => '🔧 Widget ID',
+                'value' => $widgetId,
+                'inline' => true,
+            ],
+            [
+                'name' => '❌ Error',
+                'value' => '```'.$this->truncate($error, self::MAX_ERROR).'```',
+                'inline' => false,
+            ],
+        ];
+
+        if (isset($metadata['session_id'])) {
+            $fields[] = [
+                'name' => '🔑 Session',
+                'value' => $this->truncate((string) $metadata['session_id'], 50),
+                'inline' => true,
+            ];
+        }
+
+        if (isset($metadata['file'], $metadata['line'])) {
+            $fields[] = [
+                'name' => '📍 Location',
+                'value' => '`'.basename((string) $metadata['file']).':'.$metadata['line'].'`',
+                'inline' => true,
+            ];
+        }
+
+        $this->sendEmbed(
+            title: '⚠️ Widget Message Error',
+            color: self::COLOR_ERROR,
+            fields: $fields,
+            footer: 'Synaplan Widget'
+        );
+    }
+
+    /**
      * Mask phone number for privacy (show last 4 digits).
      */
     private function maskPhoneNumber(string $phone): string
