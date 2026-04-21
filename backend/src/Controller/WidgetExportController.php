@@ -75,6 +75,13 @@ class WidgetExportController extends AbstractController
         description: 'Filter by session mode',
         schema: new OA\Schema(type: 'string', enum: ['ai', 'human', 'waiting', 'internal'])
     )]
+    #[OA\Parameter(
+        name: 'timezone',
+        in: 'query',
+        required: false,
+        description: 'IANA timezone for date formatting (e.g. Europe/Berlin)',
+        schema: new OA\Schema(type: 'string', default: 'UTC')
+    )]
     #[OA\Response(
         response: 200,
         description: 'Export file',
@@ -106,6 +113,8 @@ class WidgetExportController extends AbstractController
             return $this->json(['error' => 'Invalid format. Use: xlsx, csv, json'], Response::HTTP_BAD_REQUEST);
         }
 
+        $tz = WidgetExportService::resolveTimezone($request->query->getString('timezone', 'UTC'));
+
         $filters = [];
         if ($request->query->has('from')) {
             $filters['from'] = (int) $request->query->get('from');
@@ -124,9 +133,9 @@ class WidgetExportController extends AbstractController
         try {
             $baseUrl = $request->getSchemeAndHttpHost();
             $filePath = match ($format) {
-                'xlsx' => $this->exportService->exportToExcel($widget, $filters),
-                'csv' => $this->exportService->exportToCsv($widget, $filters),
-                'json' => $this->exportService->exportToJson($widget, $filters, $baseUrl),
+                'xlsx' => $this->exportService->exportToExcel($widget, $filters, $tz),
+                'csv' => $this->exportService->exportToCsv($widget, $filters, $tz),
+                'json' => $this->exportService->exportToJson($widget, $filters, $baseUrl, $tz),
             };
 
             $contentType = match ($format) {

@@ -112,7 +112,7 @@ function extractReferencedMemoryIds(content: string): number[] {
   const ids: number[] = []
   // Match [Memory:123] or [Memory:123...] (AI sometimes adds trailing dots)
   const regex = /\[Memory\s*:\s*(\d+)\.{0,3}\]/gi
-  let match: RegExpExecArray | null = null
+  let match
   while ((match = regex.exec(content)) !== null) {
     const id = parseInt(match[1] || '', 10)
     if (Number.isFinite(id) && id > 0) ids.push(id)

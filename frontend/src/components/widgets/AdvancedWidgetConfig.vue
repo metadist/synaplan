@@ -1319,7 +1319,6 @@ SynaplanWidget.init({
                         }}</span>
                       </span>
                       <input
-                        ref="fileUploadInput"
                         type="file"
                         class="hidden"
                         accept=".pdf,.doc,.docx,.txt,.md,.csv,.json"
@@ -1859,7 +1858,7 @@ const existingMetadata = ref<Record<string, unknown>>({})
 const isSystemPrompt = computed(() => promptData.isDefault && promptData.id > 0)
 
 // File upload for Knowledge Base
-const fileUploadInput = ref<HTMLInputElement | null>(null)
+
 const promptFiles = ref<{ id: number; fileName: string; chunks: number }[]>([])
 const uploadingFile = ref(false)
 const deletingFileId = ref<number | null>(null)

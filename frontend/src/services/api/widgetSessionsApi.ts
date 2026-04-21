@@ -269,6 +269,7 @@ export interface ExportParams {
   to?: number
   mode?: 'ai' | 'human' | 'waiting' | 'internal'
   sessionIds?: string[]
+  timezone?: string
 }
 
 /**
@@ -299,6 +300,9 @@ export function getExportUrl(widgetId: string, params: ExportParams = {}): strin
   if (params.sessionIds && params.sessionIds.length > 0) {
     queryParams.set('sessionIds', params.sessionIds.join(','))
   }
+
+  const timezone = params.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone
+  queryParams.set('timezone', timezone)
 
   const queryString = queryParams.toString()
   return `/api/v1/widgets/${widgetId}/export${queryString ? `?${queryString}` : ''}`

@@ -8,6 +8,7 @@ use App\AI\Service\AiFacade;
 use App\DTO\UserMemoryDTO;
 use App\Entity\User;
 use App\Repository\PromptRepository;
+use App\Service\Exception\MemoryServiceUnavailableException;
 use App\Service\RAG\VectorSearchService;
 use App\Service\Search\BraveSearchService;
 use Psr\Log\LoggerInterface;
@@ -201,29 +202,29 @@ final readonly class FeedbackExampleService
 
     /**
      * Delete a feedback example.
+     *
+     * Tries both feedback namespaces because a feedback entry lives in
+     * exactly one of them and we don't know which. Qdrant's `points/delete`
+     * endpoint is idempotent — deleting a missing point in an existing
+     * collection is a silent no-op — so the loop simply forwards both calls.
+     *
+     * Any Qdrant outage is surfaced as MemoryServiceUnavailableException so
+     * the controller can return 503 instead of masking the outage as
+     * "Feedback not found".
+     *
+     * @throws MemoryServiceUnavailableException When Qdrant is unreachable
      */
     public function deleteFeedback(User $user, int $id): void
     {
         if (!$this->memoryService->isAvailable()) {
-            throw new \RuntimeException('Memory service unavailable');
+            throw new MemoryServiceUnavailableException('Cannot delete feedback: memory service (Qdrant) is not reachable.');
         }
 
-        // Try both feedback namespaces since getMemoryById doesn't support namespaces
-        $deleted = false;
         foreach ([FeedbackConstants::NAMESPACE_FALSE_POSITIVE, FeedbackConstants::NAMESPACE_POSITIVE] as $namespace) {
-            try {
-                $this->memoryService->deleteMemory($id, $user, $namespace);
-                $deleted = true;
-            } catch (\Exception) {
-                // Not found in this namespace, try the next one
-            }
+            // Let MemoryServiceUnavailableException propagate: an outage on
+            // the second iteration must NOT be silently treated as success.
+            $this->memoryService->deleteMemory($id, $user, $namespace);
         }
-
-        if ($deleted) {
-            return;
-        }
-
-        throw new \InvalidArgumentException('Feedback not found');
     }
 
     /**

@@ -235,7 +235,8 @@ async function httpClient<T = unknown, S extends z.Schema | undefined = undefine
       const seconds = Math.round(timeout / 1000)
       throw new Error(
         `Request timeout after ${seconds}s on ${options.method || 'GET'} ${endpoint}. ` +
-          'The AI provider may be slow or unreachable. Check backend logs for details.'
+          'The AI provider may be slow or unreachable. Check backend logs for details.',
+        { cause: error }
       )
     }
     throw error

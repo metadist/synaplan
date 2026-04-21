@@ -957,6 +957,7 @@ import { ref, computed, onMounted, onUnmounted, onBeforeUnmount, nextTick, watch
 import { useRoute, useRouter } from 'vue-router'
 import { Icon } from '@iconify/vue'
 import { useI18n } from 'vue-i18n'
+import { useDateFormat } from '@/composables/useDateFormat'
 import MainLayout from '@/components/MainLayout.vue'
 import MessageText from '@/components/MessageText.vue'
 import WidgetExportDialog from '@/components/widgets/WidgetExportDialog.vue'
@@ -972,6 +973,7 @@ import { subscribeToSession, type EventSubscription, type WidgetEvent } from '@/
 const route = useRoute()
 const router = useRouter()
 const { t } = useI18n()
+const { formatRelativeTime, formatTime: formatTimeStr } = useDateFormat()
 const { success, error } = useNotification()
 const { confirm } = useDialog()
 
@@ -2083,16 +2085,11 @@ const getCountryName = (countryCode: string | null): string => {
 
 const getTimeAgo = (timestamp: number | null) => {
   if (!timestamp) return '-'
-  const now = Math.floor(Date.now() / 1000)
-  const diff = now - timestamp
-  if (diff < 60) return t('common.justNow')
-  if (diff < 3600) return t('common.minutesAgo', { count: Math.floor(diff / 60) })
-  if (diff < 86400) return t('common.hoursAgo', { count: Math.floor(diff / 3600) })
-  return t('common.daysAgo', { count: Math.floor(diff / 86400) })
+  return formatRelativeTime(new Date(timestamp * 1000))
 }
 
 const formatTime = (timestamp: number) => {
-  return new Date(timestamp * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+  return formatTimeStr(new Date(timestamp * 1000))
 }
 
 const getSenderLabel = (message: widgetSessionsApi.SessionMessage) => {

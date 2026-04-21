@@ -504,6 +504,8 @@
     "minutesAgo": "hace {count} minuto | hace {count} minutos",
     "hoursAgo": "hace {count} hora | hace {count} horas",
     "daysAgo": "hace {count} día | hace {count} días",
+    "today": "Hoy",
+    "yesterday": "Ayer",
     "previous": "Anterior",
     "error": "Error",
     "success": "Éxito",

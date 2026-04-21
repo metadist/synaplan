@@ -313,6 +313,7 @@
 import { ref, computed, onMounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
+import { useDateFormat } from '@/composables/useDateFormat'
 import MessageImage from '../components/MessageImage.vue'
 import MessageVideo from '../components/MessageVideo.vue'
 import MessageCode from '../components/MessageCode.vue'
@@ -352,6 +353,7 @@ const config = useConfigStore()
 const route = useRoute()
 const router = useRouter()
 const { locale, t } = useI18n()
+const { formatDateTime } = useDateFormat()
 
 const loading = ref(true)
 const error = ref(false)
@@ -571,7 +573,7 @@ onMounted(async () => {
 })
 
 const formatDate = (timestamp: number): string => {
-  return new Date(timestamp * 1000).toLocaleString(currentLang.value)
+  return formatDateTime(new Date(timestamp * 1000))
 }
 
 interface MessagePart {

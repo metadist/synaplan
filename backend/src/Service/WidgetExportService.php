@@ -52,29 +52,53 @@ final readonly class WidgetExportService
     ) {
     }
 
+    public static function resolveTimezone(string $timezone): \DateTimeZone
+    {
+        try {
+            return new \DateTimeZone($timezone);
+        } catch (\Exception) {
+            return new \DateTimeZone('UTC');
+        }
+    }
+
+    private function formatTimestamp(int $timestamp, \DateTimeZone $tz, string $format = 'Y-m-d H:i:s'): string
+    {
+        $dt = new \DateTime('@'.$timestamp);
+        $dt->setTimezone($tz);
+
+        return $dt->format($format);
+    }
+
+    private function formatNow(\DateTimeZone $tz, string $format = 'Y-m-d H:i:s'): string
+    {
+        $dt = new \DateTime('now', $tz);
+
+        return $dt->format($format);
+    }
+
     /**
      * Export widget sessions to Excel format.
      *
      * @param WidgetSessionExportFilters $filters
      */
-    public function exportToExcel(Widget $widget, array $filters = []): string
+    public function exportToExcel(Widget $widget, array $filters = [], \DateTimeZone $tz = new \DateTimeZone('UTC')): string
     {
         $spreadsheet = new Spreadsheet();
 
         // Sheet 1: Overview
         $overviewSheet = $spreadsheet->getActiveSheet();
         $overviewSheet->setTitle('Overview');
-        $this->createOverviewSheet($overviewSheet, $widget, $filters);
+        $this->createOverviewSheet($overviewSheet, $widget, $filters, $tz);
 
         // Sheet 2: Conversations
         $conversationsSheet = $spreadsheet->createSheet();
         $conversationsSheet->setTitle('Conversations');
-        $this->createConversationsSheet($conversationsSheet, $widget, $filters);
+        $this->createConversationsSheet($conversationsSheet, $widget, $filters, $tz);
 
         // Sheet 3: Sessions Summary
         $sessionsSheet = $spreadsheet->createSheet();
         $sessionsSheet->setTitle('Sessions');
-        $this->createSessionsSheet($sessionsSheet, $widget, $filters);
+        $this->createSessionsSheet($sessionsSheet, $widget, $filters, $tz);
 
         // Generate file
         $tempFile = tempnam(sys_get_temp_dir(), 'widget_export_').'.xlsx';
@@ -89,7 +113,7 @@ final readonly class WidgetExportService
      *
      * @param WidgetSessionExportFilters $filters
      */
-    public function exportToCsv(Widget $widget, array $filters = []): string
+    public function exportToCsv(Widget $widget, array $filters = [], \DateTimeZone $tz = new \DateTimeZone('UTC')): string
     {
         $tempFile = tempnam(sys_get_temp_dir(), 'widget_export_').'.csv';
         $handle = fopen($tempFile, 'w');
@@ -131,11 +155,11 @@ final readonly class WidgetExportService
             foreach ($messages as $message) {
                 $row = [
                     $session->getSessionId(),
-                    date('Y-m-d H:i:s', $session->getCreated()),
-                    date('Y-m-d H:i:s', $session->getLastMessage()),
+                    $this->formatTimestamp($session->getCreated(), $tz),
+                    $this->formatTimestamp($session->getLastMessage(), $tz),
                     $messageCount,
                     $session->getMode(),
-                    date('Y-m-d H:i:s', $message['timestamp']),
+                    $this->formatTimestamp($message['timestamp'], $tz),
                     $message['sender'],
                     $message['text'],
                 ];
@@ -157,7 +181,7 @@ final readonly class WidgetExportService
      *
      * @param WidgetSessionExportFilters $filters
      */
-    public function exportToJson(Widget $widget, array $filters = [], string $baseUrl = ''): string
+    public function exportToJson(Widget $widget, array $filters = [], string $baseUrl = '', \DateTimeZone $tz = new \DateTimeZone('UTC')): string
     {
         $result = $this->sessionRepository->findSessionsByWidget(
             $widget->getWidgetId(),
@@ -171,7 +195,7 @@ final readonly class WidgetExportService
         $widgetData = [
             'id' => $widget->getWidgetId(),
             'name' => $widget->getName(),
-            'exported_at' => date('c'),
+            'exported_at' => $this->formatNow($tz, 'c'),
         ];
         if (!empty($customFields)) {
             $widgetData['custom_fields'] = $customFields;
@@ -224,15 +248,15 @@ final readonly class WidgetExportService
 
             $sessionData = [
                 'session_id' => $session->getSessionId(),
-                'created' => date('c', $session->getCreated()),
-                'last_activity' => date('c', $session->getLastMessage()),
+                'created' => $this->formatTimestamp($session->getCreated(), $tz, 'c'),
+                'last_activity' => $this->formatTimestamp($session->getLastMessage(), $tz, 'c'),
                 'message_count' => $messageCount,
                 'file_count' => $fileCount,
                 'mode' => $session->getMode(),
                 'messages' => array_map(fn ($m) => [
                     'direction' => $m['direction'],
                     'text' => $m['text'],
-                    'timestamp' => date('c', $m['timestamp']),
+                    'timestamp' => $this->formatTimestamp($m['timestamp'], $tz, 'c'),
                     'sender' => $m['sender'],
                     'files' => array_map(fn ($f) => [
                         ...$f,
@@ -250,8 +274,8 @@ final readonly class WidgetExportService
         }
 
         // Set actual date range from exported sessions
-        $exportData['export_range']['from'] = $earliestCreated ? date('c', $earliestCreated) : null;
-        $exportData['export_range']['to'] = $latestActivity ? date('c', $latestActivity) : null;
+        $exportData['export_range']['from'] = $earliestCreated ? $this->formatTimestamp($earliestCreated, $tz, 'c') : null;
+        $exportData['export_range']['to'] = $latestActivity ? $this->formatTimestamp($latestActivity, $tz, 'c') : null;
 
         $exportData['statistics']['total_messages'] = $totalMessages;
         $exportData['statistics']['total_files'] = $totalFiles;
@@ -271,7 +295,7 @@ final readonly class WidgetExportService
         return $tempFile;
     }
 
-    private function createOverviewSheet(Worksheet $sheet, Widget $widget, array $filters): void
+    private function createOverviewSheet(Worksheet $sheet, Widget $widget, array $filters, \DateTimeZone $tz): void
     {
         // Title styling
         $sheet->setCellValue('A1', 'Widget Export Report');
@@ -285,12 +309,12 @@ final readonly class WidgetExportService
         $sheet->setCellValue('A4', 'Widget ID:');
         $sheet->setCellValue('B4', $widget->getWidgetId());
         $sheet->setCellValue('A5', 'Export Date:');
-        $sheet->setCellValue('B5', date('Y-m-d H:i:s'));
+        $sheet->setCellValue('B5', $this->formatNow($tz));
 
         // Filter info
         $sheet->setCellValue('A7', 'Export Range:');
-        $fromDate = isset($filters['from']) ? date('Y-m-d', $filters['from']) : 'All time';
-        $toDate = isset($filters['to']) ? date('Y-m-d', $filters['to']) : 'Present';
+        $fromDate = isset($filters['from']) ? $this->formatTimestamp($filters['from'], $tz, 'Y-m-d') : 'All time';
+        $toDate = isset($filters['to']) ? $this->formatTimestamp($filters['to'], $tz, 'Y-m-d') : 'Present';
         $sheet->setCellValue('B7', $fromDate.' to '.$toDate);
 
         $totalSessions = $this->sessionRepository->countSessionsWithFilters($widget->getWidgetId(), $filters);
@@ -339,7 +363,7 @@ final readonly class WidgetExportService
         $sheet->getColumnDimension('B')->setWidth(40);
     }
 
-    private function createConversationsSheet(Worksheet $sheet, Widget $widget, array $filters): void
+    private function createConversationsSheet(Worksheet $sheet, Widget $widget, array $filters, \DateTimeZone $tz): void
     {
         $customFields = $widget->getConfig()['customFields'] ?? [];
 
@@ -389,8 +413,8 @@ final readonly class WidgetExportService
                 }
 
                 $sheet->setCellValue('A'.$row, '#'.$sessionNum);
-                $sheet->setCellValue('B'.$row, date('Y-m-d', $message['timestamp']));
-                $sheet->setCellValue('C'.$row, date('H:i:s', $message['timestamp']));
+                $sheet->setCellValue('B'.$row, $this->formatTimestamp($message['timestamp'], $tz, 'Y-m-d'));
+                $sheet->setCellValue('C'.$row, $this->formatTimestamp($message['timestamp'], $tz, 'H:i:s'));
                 $sheet->setCellValue('D'.$row, $message['sender']);
                 $sheet->setCellValue('E'.$row, $message['text']);
 
@@ -432,7 +456,7 @@ final readonly class WidgetExportService
         $sheet->getStyle('E:E')->getAlignment()->setWrapText(true);
     }
 
-    private function createSessionsSheet(Worksheet $sheet, Widget $widget, array $filters): void
+    private function createSessionsSheet(Worksheet $sheet, Widget $widget, array $filters, \DateTimeZone $tz): void
     {
         // Header
         $headers = ['Session ID', 'Created', 'Last Activity', 'Messages', 'Files', 'Mode', 'Duration'];
@@ -464,8 +488,8 @@ final readonly class WidgetExportService
             $fileCount = $this->countFilesInMessages($messages);
 
             $sheet->setCellValue('A'.$row, substr($session->getSessionId(), 0, 12).'...');
-            $sheet->setCellValue('B'.$row, date('Y-m-d H:i', $session->getCreated()));
-            $sheet->setCellValue('C'.$row, date('Y-m-d H:i', $session->getLastMessage()));
+            $sheet->setCellValue('B'.$row, $this->formatTimestamp($session->getCreated(), $tz, 'Y-m-d H:i'));
+            $sheet->setCellValue('C'.$row, $this->formatTimestamp($session->getLastMessage(), $tz, 'Y-m-d H:i'));
             $sheet->setCellValue('D'.$row, $messageCount);
             $sheet->setCellValue('E'.$row, $fileCount);
             $sheet->setCellValue('F'.$row, ucfirst($session->getMode()));

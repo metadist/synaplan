@@ -612,11 +612,13 @@ import { useChatsStore, isDefaultChatTitle, type Chat as StoreChat } from '../st
 import { useDialog } from '../composables/useDialog'
 import { getFeaturesStatus } from '../services/featuresService'
 import { useI18n } from 'vue-i18n'
+import { useDateFormat } from '@/composables/useDateFormat'
 import MemoriesDialog from './MemoriesDialog.vue'
 import ChatShareModal from './ChatShareModal.vue'
 import GuestFeatureGateModal from './guest/GuestFeatureGateModal.vue'
 
 const { t } = useI18n()
+const { formatRelativeTime } = useDateFormat()
 const sidebarStore = useSidebarStore()
 const authStore = useAuthStore()
 const appModeStore = useAppModeStore()
@@ -997,17 +999,7 @@ const getDisplayTitle = (chat: StoreChat): string => {
 }
 
 const formatTimestamp = (dateStr: string): string => {
-  const date = new Date(dateStr)
-  const now = new Date()
-  const diffMs = now.getTime() - date.getTime()
-  const diffMins = Math.floor(diffMs / 60000)
-  const diffHours = Math.floor(diffMs / 3600000)
-  const diffDays = Math.floor(diffMs / 86400000)
-  if (diffMins < 1) return t('chat.timeNow')
-  if (diffMins < 60) return t('chat.timeMinutes', { n: diffMins })
-  if (diffHours < 24) return t('chat.timeHours', { n: diffHours })
-  if (diffDays < 7) return t('chat.timeDays', { n: diffDays })
-  return `${String(date.getMonth() + 1).padStart(2, '0')}/${String(date.getDate()).padStart(2, '0')}`
+  return formatRelativeTime(new Date(dateStr))
 }
 
 const getChannelIcon = (chat: StoreChat): string | null => {

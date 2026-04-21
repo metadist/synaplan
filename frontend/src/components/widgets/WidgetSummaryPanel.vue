@@ -587,6 +587,7 @@ import { ref, computed, watch, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { Icon } from '@iconify/vue'
 import { useI18n } from 'vue-i18n'
+import { useDateFormat } from '@/composables/useDateFormat'
 import * as widgetSessionsApi from '@/services/api/widgetSessionsApi'
 import { useNotification } from '@/composables/useNotification'
 import { useAuth } from '@/composables/useAuth'
@@ -609,6 +610,7 @@ const emit = defineEmits<{
 
 const router = useRouter()
 const { t } = useI18n()
+const { formatDate, formatDateTime } = useDateFormat()
 const { error, success } = useNotification()
 const { isTeam, isAdmin } = useAuth()
 
@@ -657,18 +659,16 @@ const dateToNumber = (dateStr: string): number | undefined => {
   return parseInt(dateStr.replace(/-/g, ''), 10)
 }
 
-// Format date from YYYYMMDD to readable string
 const formatDateNumber = (date: number): string => {
   const str = String(date)
-  const year = str.substring(0, 4)
-  const month = str.substring(4, 6)
-  const day = str.substring(6, 8)
-  return `${day}.${month}.${year}`
+  const y = parseInt(str.substring(0, 4))
+  const m = parseInt(str.substring(4, 6)) - 1
+  const d = parseInt(str.substring(6, 8))
+  return formatDate(new Date(y, m, d))
 }
 
-// Format timestamp to readable date
 const formatTimestamp = (timestamp: number): string => {
-  return new Date(timestamp * 1000).toLocaleString()
+  return formatDateTime(new Date(timestamp * 1000))
 }
 
 // Load saved summaries

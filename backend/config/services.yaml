@@ -487,6 +487,12 @@ services:
         alias: App\Service\VectorSearch\QdrantClientDirect
     # For Development without Qdrant: alias: App\Service\VectorSearch\QdrantClientMock
 
+    # Maintenance helper used by app:qdrant:migrate-legacy-point-ids
+    App\Service\VectorSearch\LegacyPointIdMigrator:
+        arguments:
+            $httpClient: '@Symfony\Contracts\HttpClient\HttpClientInterface'
+            $qdrantUrl: '%env(QDRANT_URL)%'
+
     # Monolog Formatter Factory (for env-based log format switching)
     App\Service\MonologFormatterFactory:
         arguments:

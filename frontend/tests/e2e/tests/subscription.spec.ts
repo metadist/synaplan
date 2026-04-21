@@ -124,12 +124,14 @@ test.describe('@ci @subscription Subscription', () => {
     })
 
     await test.step('Wait: poll until backend has processed webhooks', async () => {
-      await pollSubscriptionStatus(
+      const status = await pollSubscriptionStatus(
         request,
         headers,
         (s) => s.hasSubscription === true && s.plan === 'PRO' && s.status === 'active',
         'hasSubscription=true, plan=PRO, status=active'
       )
+      expect(status.nextBilling).not.toBeNull()
+      expect(typeof status.nextBilling).toBe('number')
     })
 
     await test.step('Assert: subscription page shows PRO active', async () => {
