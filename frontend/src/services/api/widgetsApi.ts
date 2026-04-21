@@ -688,14 +688,21 @@ export interface TestApiResult {
   resolvedUrl?: string
   responsePreview?: string
   error?: string
+  retryAfter?: number
 }
 
 export async function testExternalApi(
   widgetId: string,
-  testUserId: string
+  testUserId: string,
+  apiUrl?: string,
+  apiToken?: string
 ): Promise<TestApiResult> {
+  const body: Record<string, string> = { testUserId }
+  if (apiUrl) body.apiUrl = apiUrl
+  if (apiToken) body.apiToken = apiToken
+
   return await httpClient<TestApiResult>(`/api/v1/widgets/${widgetId}/test-api`, {
     method: 'POST',
-    body: JSON.stringify({ testUserId }),
+    body: JSON.stringify(body),
   })
 }

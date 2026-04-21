@@ -1958,7 +1958,7 @@
         "sessionModeUser": "User-based (recommended)",
         "sessionModeBrowserWarning": "Privacy risk: In browser mode with User Data Integration, different users on the same device can see each other's chat history and personalized AI responses containing private user data. User-based mode is strongly recommended.",
         "testTitle": "Test API Connection",
-        "testHelp": "Enter a sample user ID to verify that our server can reach your API and retrieve data correctly.",
+        "testHelp": "Enter a sample user ID to verify that our server can reach your API and retrieve data correctly. No need to save first — the current values from the form are used.",
         "testPlaceholder": "e.g. user-123",
         "testButton": "Test",
         "testSuccess": "API connection successful — data retrieved!",

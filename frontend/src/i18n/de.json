@@ -1986,7 +1986,7 @@
         "sessionModeUser": "Userbasiert (empfohlen)",
         "sessionModeBrowserWarning": "Datenschutzrisiko: Im Browser-Modus mit User Data Integration können verschiedene Nutzer am selben Gerät die Chat-Verläufe und personalisierten KI-Antworten mit privaten Nutzerdaten anderer sehen. Der userbasierte Modus wird dringend empfohlen.",
         "testTitle": "API-Verbindung testen",
-        "testHelp": "Gib eine beispielhafte User-ID ein, um zu prüfen, ob unser Server eure API erreichen und Daten abrufen kann.",
+        "testHelp": "Gib eine beispielhafte User-ID ein, um zu prüfen, ob unser Server eure API erreichen und Daten abrufen kann. Du musst vorher nicht speichern — die aktuellen Werte aus dem Formular werden verwendet.",
         "testPlaceholder": "z. B. user-123",
         "testButton": "Testen",
         "testSuccess": "API-Verbindung erfolgreich — Daten abgerufen!",

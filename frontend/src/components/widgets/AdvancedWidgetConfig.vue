@@ -725,17 +725,29 @@ SynaplanWidget.init({
                     @keydown.enter="testApiConnection"
                   />
                   <button
-                    :disabled="!auth.isPro || apiTestLoading || !config.externalApiUrl"
+                    :disabled="
+                      !auth.isPro || apiTestLoading || !config.externalApiUrl || apiTestCooldown > 0
+                    "
                     class="px-4 py-2 rounded-lg text-sm font-medium text-white bg-[var(--brand)] hover:bg-[var(--brand-dark)] disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-1.5 flex-shrink-0"
                     data-testid="btn-test-api"
                     @click="testApiConnection"
                   >
                     <Icon
-                      :icon="apiTestLoading ? 'heroicons:arrow-path' : 'heroicons:play'"
+                      :icon="
+                        apiTestLoading
+                          ? 'heroicons:arrow-path'
+                          : apiTestCooldown > 0
+                            ? 'heroicons:clock'
+                            : 'heroicons:play'
+                      "
                       class="w-4 h-4"
                       :class="{ 'animate-spin': apiTestLoading }"
                     />
-                    {{ $t('widgets.advancedConfig.userDataIntegration.testButton') }}
+                    {{
+                      apiTestCooldown > 0
+                        ? `${apiTestCooldown}s`
+                        : $t('widgets.advancedConfig.userDataIntegration.testButton')
+                    }}
                   </button>
                 </div>
 
@@ -1828,21 +1840,48 @@ const apiTestUserId = ref('')
 const apiTestLoading = ref(false)
 const apiTestResult = ref<widgetsApi.TestApiResult | null>(null)
 
+const apiTestCooldown = ref(0)
+let cooldownTimer: ReturnType<typeof setInterval> | null = null
+
+function startCooldown(seconds: number) {
+  apiTestCooldown.value = seconds
+  if (cooldownTimer) clearInterval(cooldownTimer)
+  cooldownTimer = setInterval(() => {
+    apiTestCooldown.value--
+    if (apiTestCooldown.value <= 0 && cooldownTimer) {
+      clearInterval(cooldownTimer)
+      cooldownTimer = null
+    }
+  }, 1000)
+}
+
 async function testApiConnection() {
-  if (!config.externalApiUrl) return
+  if (!config.externalApiUrl || apiTestCooldown.value > 0) return
   apiTestLoading.value = true
   apiTestResult.value = null
   try {
-    const result = await widgetsApi.testExternalApi(props.widget.widgetId, apiTestUserId.value)
+    const result = await widgetsApi.testExternalApi(
+      props.widget.widgetId,
+      apiTestUserId.value,
+      config.externalApiUrl,
+      config.externalApiToken
+    )
     apiTestResult.value = result
     if (result.reachable) {
       success(t('widgets.advancedConfig.userDataIntegration.testSuccess'))
     }
+    if (result.retryAfter) {
+      startCooldown(result.retryAfter)
+    }
   } catch (e) {
+    const msg = getErrorMessage(e) ?? undefined
+    if (msg?.includes('429') || msg?.includes('Rate limit')) {
+      startCooldown(60)
+    }
     apiTestResult.value = {
       success: false,
       reachable: false,
-      error: getErrorMessage(e) ?? undefined,
+      error: msg,
     }
   } finally {
     apiTestLoading.value = false
