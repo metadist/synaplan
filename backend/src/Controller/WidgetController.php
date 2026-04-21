@@ -1186,6 +1186,10 @@ class WidgetController extends AbstractController
             ], Response::HTTP_BAD_REQUEST);
         }
 
+        if (!str_starts_with($apiUrl, 'http://') && !str_starts_with($apiUrl, 'https://')) {
+            $apiUrl = 'https://'.$apiUrl;
+        }
+
         $testUserId = isset($data['testUserId']) && \is_string($data['testUserId']) ? trim($data['testUserId']) : '';
 
         $resolvedUrl = $apiUrl;

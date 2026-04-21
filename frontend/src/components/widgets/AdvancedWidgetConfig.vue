@@ -564,11 +564,12 @@
                     </p>
                     <input
                       v-model="config.externalApiUrl"
-                      type="url"
+                      type="text"
                       :disabled="!auth.isPro"
-                      placeholder="https://api.example.com/users/{externalUserId}/profile"
+                      placeholder="api.example.com/users/{externalUserId}/profile"
                       class="w-full px-3 py-2 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)] disabled:opacity-50 disabled:cursor-not-allowed font-mono"
                       data-testid="input-external-api-url"
+                      @blur="normalizeApiUrl"
                     />
                   </div>
                 </div>
@@ -1833,6 +1834,13 @@ const addCustomField = () => {
 
 const removeCustomField = (index: number) => {
   customFields.value.splice(index, 1)
+}
+
+function normalizeApiUrl() {
+  const url = config.externalApiUrl?.trim()
+  if (url && !url.startsWith('http://') && !url.startsWith('https://')) {
+    config.externalApiUrl = 'https://' + url
+  }
 }
 
 // API connection test

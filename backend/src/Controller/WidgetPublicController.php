@@ -1620,6 +1620,9 @@ class WidgetPublicController extends AbstractController
             ? trim($widgetConfig['externalApiUrl'])
             : '';
         if ('' !== $configApiUrl) {
+            if (!str_starts_with($configApiUrl, 'http://') && !str_starts_with($configApiUrl, 'https://')) {
+                $configApiUrl = 'https://'.$configApiUrl;
+            }
             $apiUrls[] = ['url' => $configApiUrl, 'method' => 'GET', 'label' => 'User Profile'];
         }
 
