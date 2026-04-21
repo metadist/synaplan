@@ -11,6 +11,7 @@ use App\Repository\PromptRepository;
 use App\Repository\WidgetRepository;
 use App\Service\BillingService;
 use App\Service\File\UserUploadPathBuilder;
+use App\Service\UrlContentService;
 use App\Service\UserMemoryService;
 use App\Service\WidgetService;
 use App\Service\WidgetSessionService;
@@ -46,6 +47,7 @@ class WidgetController extends AbstractController
         private EntityManagerInterface $em,
         private MessageBusInterface $messageBus,
         private BillingService $billingService,
+        private UrlContentService $urlContentService,
         private LoggerInterface $logger,
         private string $uploadDir,
     ) {
@@ -1091,6 +1093,125 @@ class WidgetController extends AbstractController
         return $this->json([
             'success' => true,
             'urls_queued' => \count($urls),
+        ]);
+    }
+
+    /**
+     * Test external API connection for User Data Integration.
+     */
+    #[Route('/{widgetId}/test-api', name: 'test_api', methods: ['POST'])]
+    #[OA\Post(
+        path: '/api/v1/widgets/{widgetId}/test-api',
+        summary: 'Test external API connection configured for User Data Integration',
+        security: [['Bearer' => []]],
+        tags: ['Widgets']
+    )]
+    #[OA\Parameter(
+        name: 'widgetId',
+        in: 'path',
+        required: true,
+        schema: new OA\Schema(type: 'string')
+    )]
+    #[OA\RequestBody(
+        required: true,
+        content: new OA\JsonContent(
+            required: ['testUserId'],
+            properties: [
+                new OA\Property(property: 'testUserId', type: 'string', example: 'user-123', description: 'A sample externalUserId to test the API with'),
+            ]
+        )
+    )]
+    #[OA\Response(
+        response: 200,
+        description: 'API test result',
+        content: new OA\JsonContent(
+            required: ['success', 'reachable'],
+            properties: [
+                new OA\Property(property: 'success', type: 'boolean'),
+                new OA\Property(property: 'reachable', type: 'boolean'),
+                new OA\Property(property: 'resolvedUrl', type: 'string'),
+                new OA\Property(property: 'responsePreview', type: 'string'),
+                new OA\Property(property: 'error', type: 'string', nullable: true),
+            ]
+        )
+    )]
+    public function testApi(string $widgetId, Request $request, #[CurrentUser] ?User $user): JsonResponse
+    {
+        if (!$user) {
+            return $this->json(['error' => 'Not authenticated'], Response::HTTP_UNAUTHORIZED);
+        }
+
+        $widget = $this->widgetRepository->findByWidgetId($widgetId);
+
+        if (!$widget) {
+            return $this->json(['error' => 'Widget not found'], Response::HTTP_NOT_FOUND);
+        }
+
+        if ($widget->getOwnerId() !== $user->getId()) {
+            return $this->json(['error' => 'Access denied'], Response::HTTP_FORBIDDEN);
+        }
+
+        $config = $widget->getConfig();
+        $apiUrl = \is_string($config['externalApiUrl'] ?? null) ? trim($config['externalApiUrl']) : '';
+        $apiToken = \is_string($config['externalApiToken'] ?? null) ? $config['externalApiToken'] : '';
+
+        if ('' === $apiUrl) {
+            return $this->json([
+                'success' => false,
+                'reachable' => false,
+                'error' => 'No external API URL configured',
+            ], Response::HTTP_BAD_REQUEST);
+        }
+
+        $data = $request->toArray();
+        $testUserId = isset($data['testUserId']) && \is_string($data['testUserId']) ? trim($data['testUserId']) : '';
+
+        $resolvedUrl = $apiUrl;
+        if (str_contains($apiUrl, '{externalUserId}')) {
+            if ('' === $testUserId) {
+                return $this->json([
+                    'success' => false,
+                    'reachable' => false,
+                    'error' => 'API URL contains {externalUserId} placeholder but no test user ID was provided',
+                ], Response::HTTP_BAD_REQUEST);
+            }
+            $resolvedUrl = str_replace('{externalUserId}', rawurlencode($testUserId), $apiUrl);
+        }
+
+        $headers = [];
+        if ('' !== $apiToken) {
+            $headers['Authorization'] = 'Bearer '.$apiToken;
+        }
+
+        try {
+            $result = $this->urlContentService->fetchApi($resolvedUrl, 'GET', $headers);
+        } catch (\Exception $e) {
+            $this->logger->error('Widget API test failed', ['widgetId' => $widgetId, 'error' => $e->getMessage()]);
+
+            return $this->json([
+                'success' => true,
+                'reachable' => false,
+                'resolvedUrl' => $resolvedUrl,
+                'error' => 'Connection failed: '.$e->getMessage(),
+            ]);
+        }
+
+        if (!$result->success) {
+            return $this->json([
+                'success' => true,
+                'reachable' => false,
+                'resolvedUrl' => $resolvedUrl,
+                'error' => $result->error ?? 'API returned an error',
+            ]);
+        }
+
+        $preview = mb_substr($result->extractedText, 0, 2000);
+
+        return $this->json([
+            'success' => true,
+            'reachable' => true,
+            'resolvedUrl' => $resolvedUrl,
+            'responsePreview' => $preview,
         ]);
     }
 

@@ -681,3 +681,21 @@ export async function triggerCrawl(
     { method: 'POST' }
   )
 }
+
+export interface TestApiResult {
+  success: boolean
+  reachable: boolean
+  resolvedUrl?: string
+  responsePreview?: string
+  error?: string
+}
+
+export async function testExternalApi(
+  widgetId: string,
+  testUserId: string
+): Promise<TestApiResult> {
+  return await httpClient<TestApiResult>(`/api/v1/widgets/${widgetId}/test-api`, {
+    method: 'POST',
+    body: JSON.stringify({ testUserId }),
+  })
+}

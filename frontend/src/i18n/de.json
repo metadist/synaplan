@@ -1983,7 +1983,15 @@
         "sessionModeTitle": "Session-Modus",
         "sessionModeHelp": "Lege fest, ob Chat-Sessions an den Browser oder an einzelne User gebunden sind. User-basierte Sessions erfordern die externalUserId im Embed-Code.",
         "sessionModeBrowser": "Browserbasiert",
-        "sessionModeUser": "Userbasiert"
+        "sessionModeUser": "Userbasiert (empfohlen)",
+        "sessionModeBrowserWarning": "Datenschutzrisiko: Im Browser-Modus mit User Data Integration können verschiedene Nutzer am selben Gerät die Chat-Verläufe und personalisierten KI-Antworten mit privaten Nutzerdaten anderer sehen. Der userbasierte Modus wird dringend empfohlen.",
+        "testTitle": "API-Verbindung testen",
+        "testHelp": "Gib eine beispielhafte User-ID ein, um zu prüfen, ob unser Server eure API erreichen und Daten abrufen kann.",
+        "testPlaceholder": "z. B. user-123",
+        "testButton": "Testen",
+        "testSuccess": "API-Verbindung erfolgreich — Daten abgerufen!",
+        "testResultSuccess": "Verbindung erfolgreich",
+        "testResultFail": "Verbindung fehlgeschlagen"
       },
       "proRequired": "PRO-Abo erforderlich",
       "saveSuccess": "Einstellungen erfolgreich gespeichert!",
