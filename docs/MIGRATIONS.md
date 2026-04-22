@@ -73,19 +73,42 @@ docker compose up -d         # entrypoint runs migrations + fixtures + seed
 `_docker/backend/docker-entrypoint.sh` does the following on every start:
 
 1. Wait for the DB.
-2. **Bootstrap migrations metadata** if the DB has app tables (`BUSER`) but no
-  `doctrine_migration_versions` table — i.e. legacy production. The entrypoint
-   creates the metadata table with the same charset/collation as the baseline schema
-   and `INSERT IGNORE`s **only the baseline migration** (currently
-   `Version20260417000000`) so its DDL is not re-executed against an existing schema:
+2. **Bootstrap migrations metadata** (self-healing) via the sourceable library
+   `_docker/backend/lib/migrations-bootstrap.sh`. On every start the bootstrap inspects
+   the DB and, if app tables (`BUSER`) exist, ensures both the `doctrine_migration_versions`
+   table and the **baseline migration row** (`Version20260417000000`) are present — so the
+   baseline DDL is never replayed against a pre-existing schema:
+    ```sql
+    CREATE TABLE IF NOT EXISTS doctrine_migration_versions (...)
+        DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci ENGINE=InnoDB;
+    INSERT IGNORE INTO doctrine_migration_versions (version, executed_at, execution_time)
+        VALUES ('DoctrineMigrations\\Version20260417000000', NOW(), 0);
+    ```
+   The bootstrap self-heals **every production-breaking state** a legacy DB can be in:
+    | State                                                              | Action taken                         |
+    |--------------------------------------------------------------------|--------------------------------------|
+    | Fresh DB (no `BUSER`)                                              | no-op, Doctrine creates everything   |
+    | Legacy schema, metadata table missing                              | create table + insert baseline row   |
+    | Legacy schema, metadata table exists but empty                     | insert baseline row                  |
+    | Legacy schema, metadata table has unrelated rows (no baseline row) | insert baseline row                  |
+    | Legacy schema, metadata table already has baseline row             | no-op (idempotent)                   |
+
    **All post-baseline migrations are deliberately left unregistered** so step 3 below
    applies them against the legacy DB just like on a fresh install. This is critical:
    pre-marking later migrations as applied would silently skip schema changes on
    upgrade.
+
    We bypass `doctrine:migrations:sync-metadata-storage` + `version --add --all` because
    the DBAL MariaDB schema comparator wrongly reports the auto-created metadata table as
    "not up to date" (column-level charset mismatch on `version`), which then breaks every
    subsequent migrations command.
+
+   The bootstrap logic is covered by `_docker/backend/tests/test-migrations-bootstrap.sh`,
+   which runs in CI (backend job) and simulates each of the five states above in-process
+   without touching a real database. Run it locally with:
+    ```bash
+    bash _docker/backend/tests/test-migrations-bootstrap.sh
+    ```
 3. Run `doctrine:migrations:migrate` (fresh DB → full schema; legacy DB → every migration newer than the baseline).
 4. Repeat steps 2 and 3 for the test DB (dev only).
 5. **Dev/test only:** load `UserFixtures` if `BUSER` is empty (this purges entity tables first).
@@ -132,6 +155,12 @@ leaves no audit trail, and can drop columns Doctrine doesn't know about.
 bootstrap step just registers the baseline as "applied".
 - Adding a new migration follows the standard flow: commit the new
 `backend/migrations/Version*.php`, deploy, and the entrypoint applies it on next start.
+- **When combining migrations via `doctrine:migrations:rollup`** (i.e. collapsing the
+existing migration history into a new single baseline), the `BASELINE_MIGRATION`
+constant in `_docker/backend/lib/migrations-bootstrap.sh` MUST be updated in the
+same commit to point at the new rolled-up version. Otherwise the self-healing
+bootstrap will try to mark a version that no longer exists as applied, and
+`doctrine:migrations:migrate` will fail on legacy DBs with "unknown version".
 
 ## Testing the Migration Path Locally
 
@@ -156,6 +185,13 @@ You should see the bootstrap message and *no* DDL changes.
 ## Files of Interest
 
 ```
+_docker/backend/
+├── docker-entrypoint.sh              # Startup orchestrator
+├── lib/
+│   └── migrations-bootstrap.sh       # Self-healing bootstrap (sourced by entrypoint + tests)
+└── tests/
+    └── test-migrations-bootstrap.sh  # Bash test suite for the bootstrap library
+
 backend/
 ├── migrations/
 │   ├── Version20260417000000.php     # Baseline — full ORM-derived schema
