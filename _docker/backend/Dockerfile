@@ -55,8 +55,9 @@ COPY plugins/ /plugins/
 RUN composer install --prefer-dist --no-interaction --no-dev --no-scripts --optimize-autoloader --classmap-authoritative --ignore-platform-req=ext-redis && \
     chown -R www-data:www-data /var/www/backend/vendor
 
-# Copy and setup entrypoint scripts
+# Copy and setup entrypoint scripts (entrypoint + sourced libraries)
 COPY _docker/backend/docker-entrypoint.sh /usr/local/bin/
+COPY _docker/backend/lib/ /usr/local/bin/lib/
 COPY _docker/backend/synaplan /usr/local/bin/
 RUN chmod +x /usr/local/bin/docker-entrypoint.sh /usr/local/bin/synaplan
 

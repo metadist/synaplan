@@ -147,6 +147,9 @@ jobs:
         working-directory: backend
         run: php bin/phpunit
 
+      - name: Run migrations-bootstrap bash tests
+        run: bash _docker/backend/tests/test-migrations-bootstrap.sh
+
       - name: Generate OpenAPI spec
         working-directory: backend
         run: php bin/console nelmio:apidoc:dump --format=json > openapi-spec.json

@@ -129,78 +129,33 @@ until php bin/console dbal:run-sql "SELECT 1" 2>&1; do
 done
 echo "✅ Database is ready!"
 
-# Run database migrations
-# Strategy:
-#  - Fresh DB: doctrine:migrations:migrate creates schema from baseline + any newer migrations.
-#  - Existing DB without migration metadata (e.g. legacy production created via SHELL/SQL):
-#    detect by checking that BUSER exists but doctrine_migration_versions does not, then mark
-#    ONLY the baseline migration as already applied. Newer migrations after the baseline are
-#    intentionally NOT pre-marked, so doctrine:migrations:migrate can apply them on top of the
-#    legacy schema. This avoids silently skipping schema changes that ship after the baseline.
+# Run database migrations.
+#
+# The bootstrap is implemented in a sourceable library so the same code runs in
+# production and in the bash-level tests under _docker/backend/tests/.
+# See lib/migrations-bootstrap.sh for the full self-healing contract.
 echo "🔄 Running database migrations..."
 
-# Baseline = the snapshot migration that captures the legacy production schema.
-# Only this version is pre-marked as applied on legacy databases; everything newer
-# runs through the normal migrate path.
-BASELINE_MIGRATION="DoctrineMigrations\\Version20260417000000"
-
-# Helper: count rows from a SELECT COUNT(*) statement (handles dbal:run-sql output noise)
-_count_sql() {
-    local _sql="$1"
-    local _env_flag="${2:-}"
-    php bin/console dbal:run-sql ${_env_flag} "$_sql" 2>/dev/null | grep -oE '[0-9]+' | tail -1
-}
-
-# Pre-create doctrine_migration_versions ourselves and INSERT each shipped migration
-# version directly. We bypass `doctrine:migrations:sync-metadata-storage` +
-# `version --add --all` because the DBAL MariaDB schema comparator wrongly reports
-# the auto-created table as "not up to date" (it attaches a column-level charset on
-# `version` that the comparator can't reconcile), which breaks every subsequent
-# migrations command.
-#
-# Charset/collation is aligned with the baseline migration (utf8mb4 +
-# utf8mb4_unicode_ci) to avoid collation drift across the database.
-_create_metadata_table() {
-    local _env_flag="${1:-}"
-    php bin/console dbal:run-sql ${_env_flag} \
-        "CREATE TABLE IF NOT EXISTS doctrine_migration_versions (
-            version VARCHAR(191) NOT NULL,
-            executed_at DATETIME DEFAULT NULL,
-            execution_time INT(11) DEFAULT NULL,
-            PRIMARY KEY(version)
-        ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci ENGINE=InnoDB" \
-        >/dev/null 2>&1 || true
-}
-
-# Mark ONLY the baseline migration as applied. Newer migrations are deliberately
-# left for doctrine:migrations:migrate to execute, so post-baseline schema changes
-# are NOT silently skipped on legacy databases.
-_register_baseline_migration() {
-    local _env_flag="${1:-}"
-    php bin/console dbal:run-sql ${_env_flag} \
-        "INSERT IGNORE INTO doctrine_migration_versions (version, executed_at, execution_time) VALUES ('${BASELINE_MIGRATION}', NOW(), 0)" \
-        >/dev/null 2>&1 || true
-}
-
-bootstrap_migrations_metadata() {
-    local _env_flag="${1:-}"
-    local _label="${2:-database}"
-    local _has_versions
-    local _has_buser
-
-    _has_versions=$(_count_sql \
-        "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = 'doctrine_migration_versions'" \
-        "$_env_flag")
-    _has_buser=$(_count_sql \
-        "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = 'BUSER'" \
-        "$_env_flag")
-
-    if [ "${_has_versions:-0}" -eq 0 ] && [ "${_has_buser:-0}" -gt 0 ]; then
-        echo "📌 [$_label] Existing schema detected without migration metadata — marking baseline (${BASELINE_MIGRATION}) as applied; post-baseline migrations will run via doctrine:migrations:migrate"
-        _create_metadata_table "$_env_flag"
-        _register_baseline_migration "$_env_flag"
+# Locate the bootstrap library regardless of how the entrypoint was invoked
+# (production: /usr/local/bin/docker-entrypoint.sh; dev/tests: from the repo).
+_MIGRATIONS_LIB=""
+for _candidate in \
+    "$(dirname "$0")/lib/migrations-bootstrap.sh" \
+    "/usr/local/bin/lib/migrations-bootstrap.sh" \
+    "/var/www/_docker/backend/lib/migrations-bootstrap.sh"; do
+    if [ -r "$_candidate" ]; then
+        _MIGRATIONS_LIB="$_candidate"
+        break
     fi
-}
+done
+
+if [ -z "$_MIGRATIONS_LIB" ]; then
+    echo "❌ ERROR: migrations-bootstrap.sh not found; aborting to avoid replaying DDL on legacy DBs"
+    exit 1
+fi
+
+# shellcheck disable=SC1090
+. "$_MIGRATIONS_LIB"
 
 bootstrap_migrations_metadata "" "main"
 php bin/console doctrine:migrations:migrate --no-interaction --allow-no-migration
