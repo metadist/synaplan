@@ -24,8 +24,8 @@ use Psr\Log\LoggerInterface;
  */
 final readonly class SynapseRouter
 {
-    private const DEFAULT_CONFIDENCE_THRESHOLD = 0.78;
-    private const STICKY_THRESHOLD = 0.65;
+    private const DEFAULT_CONFIDENCE_THRESHOLD = 0.38;
+    private const STICKY_THRESHOLD = 0.32;
     private const VECTOR_DIMENSION = 1024;
     private const SEARCH_LIMIT = 5;
     private const MIN_SCORE = 0.3;
@@ -144,6 +144,15 @@ final readonly class SynapseRouter
             }
 
             $queryVector = $this->normalizeVector($queryVector);
+
+            $vectorSum = array_sum($queryVector);
+            if (abs($vectorSum) < 0.001) {
+                $this->logger->warning('SynapseRouter: Zero/degenerate vector detected', [
+                    'vector_sum' => $vectorSum,
+                    'first_5' => array_slice($queryVector, 0, 5),
+                    'text_length' => strlen($messageText),
+                ]);
+            }
 
             $searchResults = $this->qdrantClient->searchSynapseTopics(
                 $queryVector,

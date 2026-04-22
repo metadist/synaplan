@@ -882,8 +882,18 @@ final class QdrantClientDirect implements QdrantClientInterface
                 'with_payload' => true,
             ]);
 
+            $rawResults = $response['result'] ?? [];
+
+            if (empty($rawResults)) {
+                $this->logger->warning('Synapse search returned empty from Qdrant', [
+                    'vector_length' => count($queryVector),
+                    'user_id' => $userId,
+                    'response_status' => $response['status'] ?? 'unknown',
+                ]);
+            }
+
             $results = [];
-            foreach ($response['result'] ?? [] as $hit) {
+            foreach ($rawResults as $hit) {
                 $results[] = [
                     'id' => $hit['payload']['_point_id'] ?? (string) $hit['id'],
                     'score' => $hit['score'],

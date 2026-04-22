@@ -29,12 +29,21 @@ class CloudflareProvider implements EmbeddingProviderInterface
     private const MAX_BATCH_SIZE = 100;
     private const TIMEOUT_SECONDS = 30;
 
+    private ?\CurlHandle $curlHandle = null;
+
     public function __construct(
         private readonly HttpClientInterface $httpClient,
         private readonly LoggerInterface $logger,
         private readonly ?string $accountId = null,
         private readonly ?string $apiToken = null,
     ) {
+    }
+
+    public function __destruct()
+    {
+        if (null !== $this->curlHandle) {
+            curl_close($this->curlHandle);
+        }
     }
 
     public function getName(): string
@@ -188,16 +197,26 @@ class CloudflareProvider implements EmbeddingProviderInterface
             'batch_size' => count($texts),
         ]);
 
-        $response = $this->httpClient->request('POST', $url, [
-            'headers' => [
-                'Authorization' => 'Bearer '.$this->apiToken,
-                'Content-Type' => 'application/json',
-            ],
-            'json' => ['text' => $texts],
-            'timeout' => self::TIMEOUT_SECONDS,
-        ]);
+        $ch = $this->getCurlHandle();
+        curl_setopt($ch, CURLOPT_URL, $url);
+        curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode(['text' => $texts], \JSON_THROW_ON_ERROR));
 
-        $json = $response->toArray(false);
+        $body = curl_exec($ch);
+
+        if (false === $body) {
+            throw new ProviderException('Cloudflare cURL error: '.curl_error($ch), 'cloudflare');
+        }
+
+        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        if ($httpCode < 200 || $httpCode >= 300) {
+            throw new ProviderException("Cloudflare API returned HTTP {$httpCode}: {$body}", 'cloudflare');
+        }
+
+        try {
+            $json = json_decode($body, true, 512, \JSON_THROW_ON_ERROR);
+        } catch (\JsonException $e) {
+            throw new ProviderException('Cloudflare returned invalid JSON: '.$e->getMessage(), 'cloudflare');
+        }
 
         if (!($json['success'] ?? false)) {
             $errors = $json['errors'] ?? [];
@@ -206,6 +225,30 @@ class CloudflareProvider implements EmbeddingProviderInterface
         }
 
         return $json['result'] ?? throw new ProviderException('Cloudflare API returned no result', 'cloudflare');
+    }
+
+    /**
+     * Persistent cURL handle — keeps TCP+TLS connection alive across calls.
+     */
+    private function getCurlHandle(): \CurlHandle
+    {
+        if (null === $this->curlHandle) {
+            $this->curlHandle = curl_init();
+            curl_setopt_array($this->curlHandle, [
+                CURLOPT_RETURNTRANSFER => true,
+                CURLOPT_POST => true,
+                CURLOPT_HTTPHEADER => [
+                    'Authorization: Bearer '.$this->apiToken,
+                    'Content-Type: application/json',
+                ],
+                CURLOPT_TIMEOUT => self::TIMEOUT_SECONDS,
+                CURLOPT_TCP_KEEPALIVE => 1,
+                CURLOPT_TCP_KEEPIDLE => 60,
+                CURLOPT_TCP_KEEPINTVL => 30,
+            ]);
+        }
+
+        return $this->curlHandle;
     }
 
     private function ensureAvailable(): void
