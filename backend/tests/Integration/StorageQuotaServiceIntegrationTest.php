@@ -224,7 +224,7 @@ class StorageQuotaServiceIntegrationTest extends KernelTestCase
         foreach ($defaults as $row) {
             $existing = $configRepository->findOneBy([
                 'ownerId' => 0,
-                'group'   => $row['group'],
+                'group' => $row['group'],
                 'setting' => $row['setting'],
             ]);
 
