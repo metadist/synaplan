@@ -400,6 +400,10 @@ final readonly class MessageClassifier
     {
         $value = $this->configRepository->getValue(0, 'QDRANT_SEARCH', 'SYNAPSE_ROUTING_ENABLED');
 
-        return null === $value || 'true' === $value;
+        if (null === $value) {
+            return true;
+        }
+
+        return filter_var($value, \FILTER_VALIDATE_BOOL, \FILTER_NULL_ON_FAILURE) ?? false;
     }
 }

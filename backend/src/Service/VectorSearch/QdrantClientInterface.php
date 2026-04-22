@@ -225,6 +225,11 @@ interface QdrantClientInterface
     ): array;
 
     /**
+     * Delete a single synapse topic point by its point ID.
+     */
+    public function deleteSynapseTopic(string $pointId): void;
+
+    /**
      * Delete all synapse topic embeddings for a specific owner.
      *
      * @return int Number of deleted points

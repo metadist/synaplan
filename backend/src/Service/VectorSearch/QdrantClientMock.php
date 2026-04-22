@@ -180,6 +180,11 @@ final readonly class QdrantClientMock implements QdrantClientInterface
         return [];
     }
 
+    public function deleteSynapseTopic(string $pointId): void
+    {
+        $this->logger->info('QdrantClientMock: deleteSynapseTopic', ['point_id' => $pointId]);
+    }
+
     public function deleteSynapseTopicsByOwner(int $ownerId): int
     {
         $this->logger->info('QdrantClientMock: deleteSynapseTopicsByOwner', ['owner_id' => $ownerId]);

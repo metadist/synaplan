@@ -99,8 +99,6 @@ class MessageClassifierTest extends TestCase
 
     public function testClassifyWithAiSorting(): void
     {
-        $this->markTestSkipped('AI classification test requires test AI provider setup');
-
         $message = $this->createMock(Message::class);
         $message->method('getId')->willReturn(3);
         $message->method('getUserId')->willReturn(10);
@@ -122,9 +120,9 @@ class MessageClassifierTest extends TestCase
             ->willReturn([
                 'topic' => 'CHAT',
                 'language' => 'en',
-                'model_id' => 5,
-                'provider' => 'ollama',
-                'model_name' => 'llama3',
+                'sorting_model_id' => 5,
+                'sorting_provider' => 'ollama',
+                'sorting_model_name' => 'llama3',
             ]);
 
         $result = $this->service->classify($message);
@@ -291,5 +289,42 @@ class MessageClassifierTest extends TestCase
 
         $this->assertSame('analyzefile', $result['topic']);
         $this->assertSame('file_analysis', $result['intent']);
+    }
+
+    #[\PHPUnit\Framework\Attributes\DataProvider('synapseEnabledFlagProvider')]
+    public function testIsSynapseEnabledParsesVariousValues(?string $configValue, bool $expected): void
+    {
+        $configRepo = $this->createMock(ConfigRepository::class);
+        $configRepo->method('getValue')->willReturn($configValue);
+
+        $classifier = new MessageClassifier(
+            $this->createMock(MessageSorter::class),
+            $this->createMock(SynapseRouter::class),
+            $this->createMock(MessageMetaRepository::class),
+            $this->createMock(ModelConfigService::class),
+            $configRepo,
+            $this->createMock(EntityManagerInterface::class),
+            $this->createMock(\Psr\Log\LoggerInterface::class),
+        );
+
+        $this->assertSame($expected, $classifier->isSynapseEnabled());
+    }
+
+    /**
+     * @return iterable<string, array{0: ?string, 1: bool}>
+     */
+    public static function synapseEnabledFlagProvider(): iterable
+    {
+        yield 'null defaults to enabled' => [null, true];
+        yield 'string true' => ['true', true];
+        yield 'string 1' => ['1', true];
+        yield 'string yes' => ['yes', true];
+        yield 'string on' => ['on', true];
+        yield 'string false' => ['false', false];
+        yield 'string 0' => ['0', false];
+        yield 'string no' => ['no', false];
+        yield 'string off' => ['off', false];
+        yield 'empty string' => ['', false];
+        yield 'random string' => ['banana', false];
     }
 }

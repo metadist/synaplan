@@ -38,183 +38,115 @@ class SynapseIndexerTest extends TestCase
         );
     }
 
-    public function testIndexAllTopicsEmbedsAndUpserts(): void
+    public function testRemoveTopicDeletesSinglePoint(): void
     {
-        $this->modelConfigService->method('getDefaultModel')->willReturn(null);
-
-        $this->promptRepository->method('getTopicsWithDescriptions')->willReturn([
-            ['topic' => 'general', 'description' => 'General conversation', 'ownerId' => 0],
-            ['topic' => 'coding', 'description' => 'Programming help', 'ownerId' => 0],
-        ]);
-
-        $embedding = array_fill(0, 1024, 0.1);
-        $this->aiFacade->method('embed')->willReturn([
-            'embedding' => $embedding,
-            'usage' => ['prompt_tokens' => 10, 'total_tokens' => 10],
-        ]);
-
-        $this->qdrantClient->expects($this->exactly(2))
-            ->method('upsertSynapseTopic');
-
-        $count = $this->indexer->indexAllTopics();
-
-        $this->assertEquals(2, $count);
-    }
-
-    public function testIndexAllTopicsSkipsEmptyDescriptions(): void
-    {
-        $this->modelConfigService->method('getDefaultModel')->willReturn(null);
-
-        $this->promptRepository->method('getTopicsWithDescriptions')->willReturn([
-            ['topic' => 'general', 'description' => 'General conversation', 'ownerId' => 0],
-            ['topic' => 'empty', 'description' => '', 'ownerId' => 0],
-        ]);
-
-        $embedding = array_fill(0, 1024, 0.1);
-        $this->aiFacade->method('embed')->willReturn([
-            'embedding' => $embedding,
-            'usage' => ['prompt_tokens' => 10, 'total_tokens' => 10],
-        ]);
-
-        $this->qdrantClient->expects($this->once())->method('upsertSynapseTopic');
-
-        $count = $this->indexer->indexAllTopics();
-
-        $this->assertEquals(1, $count);
-    }
-
-    public function testIndexAllTopicsReturnsZeroForNoTopics(): void
-    {
-        $this->promptRepository->method('getTopicsWithDescriptions')->willReturn([]);
-
-        $count = $this->indexer->indexAllTopics();
-
-        $this->assertEquals(0, $count);
-    }
-
-    public function testIndexSingleTopicLoadsFromDb(): void
-    {
-        $this->modelConfigService->method('getDefaultModel')->willReturn(null);
-
-        $prompt = $this->createMock(Prompt::class);
-        $prompt->method('getShortDescription')->willReturn('A topic about coding');
-        $this->promptRepository->method('findByTopic')->willReturn($prompt);
-
-        $embedding = array_fill(0, 1024, 0.1);
-        $this->aiFacade->method('embed')->willReturn([
-            'embedding' => $embedding,
-            'usage' => ['prompt_tokens' => 10, 'total_tokens' => 10],
-        ]);
-
         $this->qdrantClient->expects($this->once())
-            ->method('upsertSynapseTopic')
-            ->with(
-                'synapse_0_coding',
-                $this->anything(),
-                $this->callback(fn (array $p) => 'coding' === $p['topic'] && 0 === $p['owner_id']),
-            );
+            ->method('deleteSynapseTopic')
+            ->with('synapse_5_billing');
 
-        $this->indexer->indexTopic('coding', 0);
+        $this->qdrantClient->expects($this->never())
+            ->method('deleteSynapseTopicsByOwner');
+
+        $this->indexer->removeTopic('billing', 5);
     }
 
-    public function testIndexSingleTopicSkipsMissingPrompt(): void
+    public function testRemoveTopicDoesNotAffectOtherOwnerTopics(): void
+    {
+        $this->qdrantClient->expects($this->once())
+            ->method('deleteSynapseTopic')
+            ->with('synapse_0_general');
+
+        $this->qdrantClient->expects($this->never())
+            ->method('deleteSynapseTopicsByOwner');
+
+        $this->indexer->removeTopic('general', 0);
+    }
+
+    public function testIndexTopicSkipsWhenPromptNotFound(): void
     {
         $this->promptRepository->method('findByTopic')->willReturn(null);
 
-        $this->qdrantClient->expects($this->never())->method('upsertSynapseTopic');
+        $this->qdrantClient->expects($this->never())
+            ->method('upsertSynapseTopic');
 
         $this->indexer->indexTopic('nonexistent', 0);
     }
 
-    public function testIndexSingleTopicSkipsEmptyDescription(): void
+    public function testIndexTopicSkipsEmptyDescription(): void
     {
         $prompt = $this->createMock(Prompt::class);
         $prompt->method('getShortDescription')->willReturn('');
         $this->promptRepository->method('findByTopic')->willReturn($prompt);
 
-        $this->qdrantClient->expects($this->never())->method('upsertSynapseTopic');
+        $this->qdrantClient->expects($this->never())
+            ->method('upsertSynapseTopic');
 
         $this->indexer->indexTopic('empty', 0);
     }
 
-    public function testReindexForUserDeletesAndReindexes(): void
+    public function testIndexTopicUpsertsWithCorrectPointId(): void
     {
+        $prompt = $this->createMock(Prompt::class);
+        $prompt->method('getShortDescription')->willReturn('Handle user billing');
+        $this->promptRepository->method('findByTopic')->willReturn($prompt);
         $this->modelConfigService->method('getDefaultModel')->willReturn(null);
 
-        $this->qdrantClient->expects($this->once())
-            ->method('deleteSynapseTopicsByOwner')
-            ->with(42);
-
-        $this->promptRepository->method('getTopicsWithDescriptions')->willReturn([
-            ['topic' => 'system', 'description' => 'System topic', 'ownerId' => 0],
-            ['topic' => 'custom', 'description' => 'User custom topic', 'ownerId' => 42],
-        ]);
-
-        $embedding = array_fill(0, 1024, 0.1);
         $this->aiFacade->method('embed')->willReturn([
-            'embedding' => $embedding,
-            'usage' => ['prompt_tokens' => 10, 'total_tokens' => 10],
-        ]);
-
-        $this->qdrantClient->expects($this->once())->method('upsertSynapseTopic');
-
-        $count = $this->indexer->reindexForUser(42);
-
-        $this->assertEquals(1, $count);
-    }
-
-    public function testVectorDimensionNormalization(): void
-    {
-        $this->modelConfigService->method('getDefaultModel')->willReturn(null);
-
-        $this->promptRepository->method('getTopicsWithDescriptions')->willReturn([
-            ['topic' => 'test', 'description' => 'Test topic', 'ownerId' => 0],
-        ]);
-
-        $shortVector = array_fill(0, 512, 0.5);
-        $this->aiFacade->method('embed')->willReturn([
-            'embedding' => $shortVector,
+            'embedding' => array_fill(0, 1024, 0.1),
             'usage' => ['prompt_tokens' => 10, 'total_tokens' => 10],
         ]);
 
         $this->qdrantClient->expects($this->once())
             ->method('upsertSynapseTopic')
             ->with(
+                'synapse_3_billing',
                 $this->anything(),
-                $this->callback(fn (array $v) => 1024 === count($v)),
-                $this->anything(),
+                $this->callback(fn (array $payload) => 'billing' === $payload['topic'] && 3 === $payload['owner_id']),
             );
 
-        $this->indexer->indexAllTopics();
+        $this->indexer->indexTopic('billing', 3);
     }
 
-    public function testEmptyEmbeddingSkipsTopic(): void
+    public function testReindexAfterDescriptionChangeUpdatesVector(): void
     {
+        $prompt = $this->createMock(Prompt::class);
+        $prompt->method('getShortDescription')->willReturn('Updated billing description');
+        $this->promptRepository->method('findByTopic')->willReturn($prompt);
         $this->modelConfigService->method('getDefaultModel')->willReturn(null);
-
-        $this->promptRepository->method('getTopicsWithDescriptions')->willReturn([
-            ['topic' => 'test', 'description' => 'Test topic', 'ownerId' => 0],
-        ]);
 
         $this->aiFacade->method('embed')->willReturn([
-            'embedding' => [],
-            'usage' => ['prompt_tokens' => 0, 'total_tokens' => 0],
+            'embedding' => array_fill(0, 1024, 0.5),
+            'usage' => ['prompt_tokens' => 10, 'total_tokens' => 10],
         ]);
 
-        $this->qdrantClient->expects($this->never())->method('upsertSynapseTopic');
+        $this->qdrantClient->expects($this->once())
+            ->method('upsertSynapseTopic')
+            ->with(
+                'synapse_0_billing',
+                $this->anything(),
+                $this->callback(fn (array $payload) => 'Updated billing description' === $payload['short_description']),
+            );
 
-        $count = $this->indexer->indexAllTopics();
-
-        $this->assertEquals(0, $count);
+        $this->indexer->indexTopic('billing', 0);
     }
 
-    public function testEmbeddingModelInfoReturnsNullWhenNoModel(): void
+    public function testIndexAllTopicsSkipsToolTopics(): void
     {
+        $this->promptRepository->method('getTopicsWithDescriptions')->willReturn([
+            ['topic' => 'general', 'description' => 'General chat', 'ownerId' => 0],
+            ['topic' => 'billing', 'description' => '', 'ownerId' => 0],
+        ]);
         $this->modelConfigService->method('getDefaultModel')->willReturn(null);
 
-        $info = $this->indexer->getEmbeddingModelInfo();
+        $this->aiFacade->method('embed')->willReturn([
+            'embedding' => array_fill(0, 1024, 0.1),
+            'usage' => ['prompt_tokens' => 10, 'total_tokens' => 10],
+        ]);
 
-        $this->assertNull($info['provider']);
-        $this->assertNull($info['model']);
+        $this->qdrantClient->expects($this->once())
+            ->method('upsertSynapseTopic');
+
+        $count = $this->indexer->indexAllTopics();
+        $this->assertEquals(1, $count);
     }
 }

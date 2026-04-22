@@ -902,6 +902,20 @@ final class QdrantClientDirect implements QdrantClientInterface
         }
     }
 
+    public function deleteSynapseTopic(string $pointId): void
+    {
+        try {
+            $this->qdrantRequest('POST', "/collections/{$this->synapseCollection}/points/delete?wait=true", [
+                'filter' => QdrantPointId::payloadFilterFor($pointId),
+            ]);
+        } catch (\Throwable $e) {
+            $this->logger->error('Failed to delete synapse topic', [
+                'point_id' => $pointId,
+                'error' => $e->getMessage(),
+            ]);
+        }
+    }
+
     public function deleteSynapseTopicsByOwner(int $ownerId): int
     {
         $this->ensureSynapseCollection();

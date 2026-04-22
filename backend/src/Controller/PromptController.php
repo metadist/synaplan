@@ -975,7 +975,7 @@ class PromptController extends AbstractController
         $this->em->remove($prompt);
         $this->em->flush();
 
-        $this->reindexSynapseTopic($topic, $ownerId);
+        $this->removeSynapseTopic($topic, $ownerId);
 
         $this->logger->info('User deleted custom prompt', [
             'user_id' => $user->getId(),
@@ -1549,6 +1549,26 @@ PROMPT;
             $this->synapseIndexer->indexTopic($topic, $ownerId);
         } catch (\Throwable $e) {
             $this->logger->warning('Synapse re-index failed (non-critical)', [
+                'topic' => $topic,
+                'owner_id' => $ownerId,
+                'error' => $e->getMessage(),
+            ]);
+        }
+    }
+
+    /**
+     * Remove a topic from the Synapse Routing collection (fire-and-forget).
+     */
+    private function removeSynapseTopic(string $topic, int $ownerId): void
+    {
+        if (str_starts_with($topic, 'tools:')) {
+            return;
+        }
+
+        try {
+            $this->synapseIndexer->removeTopic($topic, $ownerId);
+        } catch (\Throwable $e) {
+            $this->logger->warning('Synapse topic removal failed (non-critical)', [
                 'topic' => $topic,
                 'owner_id' => $ownerId,
                 'error' => $e->getMessage(),

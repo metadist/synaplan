@@ -106,24 +106,18 @@ final readonly class SynapseIndexer
     }
 
     /**
-     * Remove a topic's embedding from the synapse collection.
+     * Remove a single topic's embedding from the synapse collection.
      */
     public function removeTopic(string $topic, int $ownerId): void
     {
         $pointId = $this->buildPointId($topic, $ownerId);
 
-        try {
-            $this->qdrantClient->upsertSynapseTopic($pointId, [], []);
-        } catch (\Throwable) {
-            // Point may not exist — that's fine
-        }
-
-        // Delete by filter is more reliable
-        $this->qdrantClient->deleteSynapseTopicsByOwner($ownerId);
+        $this->qdrantClient->deleteSynapseTopic($pointId);
 
         $this->logger->info('SynapseIndexer: Topic removed', [
             'topic' => $topic,
             'owner_id' => $ownerId,
+            'point_id' => $pointId,
         ]);
     }
 
