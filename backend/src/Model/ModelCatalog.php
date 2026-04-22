@@ -1369,5 +1369,26 @@ class ModelCatalog
                 'meta' => ['dimensions' => 1024, 'context_window' => '60000', 'provider' => 'cloudflare'],
             ],
         ],
+        [
+            'id' => 188,
+            'service' => 'Cloudflare',
+            'name' => 'Qwen3-Embedding-0.6B',
+            'tag' => 'vectorize',
+            'selectable' => 1,
+            'active' => 1,
+            'providerId' => '@cf/qwen/qwen3-embedding-0.6b',
+            'priceIn' => 0.012,
+            'inUnit' => 'per1M',
+            'priceOut' => 0,
+            'outUnit' => '-',
+            'quality' => 9,
+            'rating' => 1,
+            'json' => [
+                'description' => 'Qwen3 Embedding 0.6B via Cloudflare Workers AI. Instruction-aware multilingual embeddings (1024-dim). Superior cross-language retrieval for topic routing.',
+                'params' => ['model' => '@cf/qwen/qwen3-embedding-0.6b'],
+                'features' => ['embedding', 'multilingual', 'instruction-aware'],
+                'meta' => ['dimensions' => 1024, 'context_window' => '8192', 'provider' => 'cloudflare'],
+            ],
+        ],
     ];
 }

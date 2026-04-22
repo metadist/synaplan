@@ -93,7 +93,7 @@ class SynapseRouterTest extends TestCase
         $this->qdrantClient->method('searchSynapseTopics')->willReturn([
             [
                 'id' => 'synapse_0_general',
-                'score' => 0.55,
+                'score' => 0.35,
                 'payload' => ['topic' => 'general', 'owner_id' => 0],
             ],
         ]);

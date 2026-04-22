@@ -386,8 +386,10 @@ final readonly class SynapseRouter
         return $promptData['metadata'] ?? [];
     }
 
+    private const QWEN3_QUERY_INSTRUCTION = 'Given a user message, retrieve the most relevant topic category for routing';
+
     /**
-     * @return array{provider?: string, model?: string}
+     * @return array{provider?: string, model?: string, instruction?: string}
      */
     private function getEmbeddingOptions(): array
     {
@@ -405,6 +407,10 @@ final readonly class SynapseRouter
         }
         if ($model) {
             $options['model'] = $model;
+
+            if (str_contains(strtolower($model), 'qwen')) {
+                $options['instruction'] = self::QWEN3_QUERY_INSTRUCTION;
+            }
         }
 
         return $options;

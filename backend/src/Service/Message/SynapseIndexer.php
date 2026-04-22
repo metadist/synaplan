@@ -211,10 +211,12 @@ final readonly class SynapseIndexer
         return true;
     }
 
+    private const QWEN3_INDEX_INSTRUCTION = 'Represent this topic description for retrieval';
+
     /**
      * Build the embedding options from the globally configured VECTORIZE model.
      *
-     * @return array{provider?: string, model?: string}
+     * @return array{provider?: string, model?: string, instruction?: string}
      */
     private function getEmbeddingOptions(): array
     {
@@ -232,6 +234,10 @@ final readonly class SynapseIndexer
         }
         if ($model) {
             $options['model'] = $model;
+
+            if (str_contains(strtolower($model), 'qwen')) {
+                $options['instruction'] = self::QWEN3_INDEX_INSTRUCTION;
+            }
         }
 
         return $options;

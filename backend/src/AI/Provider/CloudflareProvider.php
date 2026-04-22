@@ -7,32 +7,35 @@ namespace App\AI\Provider;
 use App\AI\Exception\ProviderException;
 use App\AI\Interface\EmbeddingProviderInterface;
 use Psr\Log\LoggerInterface;
-use Symfony\Contracts\HttpClient\HttpClientInterface;
 
 /**
- * Cloudflare Workers AI — Embedding provider for bge-m3.
+ * Cloudflare Workers AI — Embedding provider for bge-m3 and Qwen3-Embedding.
  *
  * Uses the native REST API (not OpenAI-compat) for simplicity:
- *   POST /client/v4/accounts/{ACCOUNT_ID}/ai/run/@cf/baai/bge-m3
+ *   POST /client/v4/accounts/{ACCOUNT_ID}/ai/run/{model}
+ *
+ * Supported models:
+ *   - @cf/baai/bge-m3           (1024-dim, multilingual)
+ *   - @cf/qwen/qwen3-embedding-0.6b (1024-dim, instruction-aware, multilingual)
  *
  * Two use-cases:
  *  1. Local dev — fast cloud embeddings without running Ollama bge-m3
  *  2. Production fallback — auto-failover when the primary provider is down
  *
  * @see https://developers.cloudflare.com/workers-ai/models/bge-m3/
+ * @see https://developers.cloudflare.com/workers-ai/models/qwen3-embedding-0.6b/
  */
 class CloudflareProvider implements EmbeddingProviderInterface
 {
     private const API_BASE = 'https://api.cloudflare.com/client/v4/accounts';
     private const DEFAULT_MODEL = '@cf/baai/bge-m3';
-    private const BGE_M3_DIMENSIONS = 1024;
+    private const EMBEDDING_DIMENSIONS = 1024;
     private const MAX_BATCH_SIZE = 100;
     private const TIMEOUT_SECONDS = 30;
 
     private ?\CurlHandle $curlHandle = null;
 
     public function __construct(
-        private readonly HttpClientInterface $httpClient,
         private readonly LoggerInterface $logger,
         private readonly ?string $accountId = null,
         private readonly ?string $apiToken = null,
@@ -58,7 +61,7 @@ class CloudflareProvider implements EmbeddingProviderInterface
 
     public function getDescription(): string
     {
-        return 'Cloudflare Workers AI — fast, low-cost bge-m3 embeddings via edge network';
+        return 'Cloudflare Workers AI — fast, low-cost embeddings via edge network (bge-m3, Qwen3-Embedding)';
     }
 
     public function getCapabilities(): array
@@ -107,9 +110,10 @@ class CloudflareProvider implements EmbeddingProviderInterface
         $this->ensureAvailable();
 
         $model = $options['model'] ?? self::DEFAULT_MODEL;
+        $instruction = $options['instruction'] ?? null;
 
         try {
-            $data = $this->callApi($model, [$text]);
+            $data = $this->callApi($model, [$text], $instruction);
 
             $embedding = $data['data'][0] ?? [];
             if (empty($embedding)) {
@@ -147,12 +151,13 @@ class CloudflareProvider implements EmbeddingProviderInterface
         }
 
         $model = $options['model'] ?? self::DEFAULT_MODEL;
+        $instruction = $options['instruction'] ?? null;
 
         try {
             $allEmbeddings = [];
 
             foreach (array_chunk($texts, self::MAX_BATCH_SIZE) as $chunk) {
-                $data = $this->callApi($model, $chunk);
+                $data = $this->callApi($model, $chunk, $instruction);
                 foreach ($data['data'] as $embedding) {
                     $allEmbeddings[] = $embedding;
                 }
@@ -180,26 +185,33 @@ class CloudflareProvider implements EmbeddingProviderInterface
 
     public function getDimensions(string $model): int
     {
-        return self::BGE_M3_DIMENSIONS;
+        return self::EMBEDDING_DIMENSIONS;
     }
 
     /**
-     * @param string[] $texts
+     * @param string[]    $texts
+     * @param string|null $instruction Task instruction for Qwen3 models (ignored by bge-m3)
      *
      * @return array{data: array<array<float>>, shape: array<int>}
      */
-    private function callApi(string $model, array $texts): array
+    private function callApi(string $model, array $texts, ?string $instruction = null): array
     {
         $url = sprintf('%s/%s/ai/run/%s', self::API_BASE, $this->accountId, $model);
 
         $this->logger->info('Cloudflare embedding request', [
             'model' => $model,
             'batch_size' => count($texts),
+            'has_instruction' => null !== $instruction,
         ]);
+
+        $payload = ['text' => $texts];
+        if (null !== $instruction && $this->supportsInstruction($model)) {
+            $payload['instruction'] = $instruction;
+        }
 
         $ch = $this->getCurlHandle();
         curl_setopt($ch, CURLOPT_URL, $url);
-        curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode(['text' => $texts], \JSON_THROW_ON_ERROR));
+        curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($payload, \JSON_THROW_ON_ERROR));
 
         $body = curl_exec($ch);
 
@@ -249,6 +261,11 @@ class CloudflareProvider implements EmbeddingProviderInterface
         }
 
         return $this->curlHandle;
+    }
+
+    private function supportsInstruction(string $model): bool
+    {
+        return str_contains($model, 'qwen');
     }
 
     private function ensureAvailable(): void
