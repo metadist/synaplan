@@ -832,6 +832,8 @@ class PromptController extends AbstractController
             'metadata_keys' => isset($data['metadata']) ? array_keys($data['metadata']) : [],
         ]);
 
+        $oldTopic = $prompt->getTopic();
+
         // Update fields if provided
         if (isset($data['shortDescription'])) {
             $prompt->setShortDescription(trim($data['shortDescription']));
@@ -839,6 +841,13 @@ class PromptController extends AbstractController
 
         if (isset($data['prompt'])) {
             $prompt->setPrompt(trim($data['prompt']));
+        }
+
+        if (isset($data['topic'])) {
+            $newTopic = trim($data['topic']);
+            if ('' !== $newTopic) {
+                $prompt->setTopic($newTopic);
+            }
         }
 
         if (isset($data['selectionRules'])) {
@@ -858,7 +867,11 @@ class PromptController extends AbstractController
             $this->em->flush();
             $this->logger->info('Prompt entity flushed successfully', ['prompt_id' => $id]);
 
-            $this->reindexSynapseTopic($prompt->getTopic(), $prompt->getOwnerId());
+            $newTopic = $prompt->getTopic();
+            if ($oldTopic !== $newTopic) {
+                $this->removeSynapseTopic($oldTopic, $prompt->getOwnerId());
+            }
+            $this->reindexSynapseTopic($newTopic, $prompt->getOwnerId());
         } catch (\Exception $e) {
             $this->logger->error('Failed to flush prompt entity', [
                 'prompt_id' => $id,
