@@ -1346,5 +1346,28 @@ class ModelCatalog
                 'features' => ['embedding', 'multilingual'],
             ],
         ],
+
+        // ==================== CLOUDFLARE WORKERS AI ====================
+        [
+            'id' => 187,
+            'service' => 'Cloudflare',
+            'name' => 'bge-m3',
+            'tag' => 'vectorize',
+            'selectable' => 1,
+            'active' => 1,
+            'providerId' => '@cf/baai/bge-m3',
+            'priceIn' => 0.012,
+            'inUnit' => 'per1M',
+            'priceOut' => 0,
+            'outUnit' => '-',
+            'quality' => 8,
+            'rating' => 1,
+            'json' => [
+                'description' => 'BAAI/bge-m3 via Cloudflare Workers AI edge network. Fast, low-cost multilingual embeddings (1024-dim). 10k neurons/day free tier.',
+                'params' => ['model' => '@cf/baai/bge-m3'],
+                'features' => ['embedding', 'multilingual'],
+                'meta' => ['dimensions' => 1024, 'context_window' => '60000', 'provider' => 'cloudflare'],
+            ],
+        ],
     ];
 }
