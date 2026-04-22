@@ -207,9 +207,8 @@ class AiFacade
         $providerName = $options['provider'] ?? null;
         $model = $options['model'] ?? null;
 
-        // Fall back to user configuration when no provider is explicitly given
         if (!$providerName && $userId > 0) {
-            $providerName = $this->modelConfig->getDefaultProvider($userId, 'vectorize');
+            $providerName = $this->modelConfig->getDefaultProvider($userId, 'embedding');
         }
 
         $provider = $this->registry->getEmbeddingProvider($providerName);
@@ -252,7 +251,7 @@ class AiFacade
     public function embedBatch(array $texts, ?int $userId = null, ?string $providerName = null, array $options = []): array
     {
         if (!$providerName && $userId > 0) {
-            $providerName = $this->modelConfig->getDefaultProvider($userId, 'vectorize');
+            $providerName = $this->modelConfig->getDefaultProvider($userId, 'embedding');
         }
 
         $provider = $this->registry->getEmbeddingProvider($providerName);
@@ -279,7 +278,7 @@ class AiFacade
     public function analyzeImage(string $imagePath, string $prompt, ?int $userId = null, array $options = []): array
     {
         $providerWasExplicit = array_key_exists('provider', $options);
-        $requestedProvider = $options['provider'] ?? $this->modelConfig->getDefaultProvider($userId, 'pic2text');
+        $requestedProvider = $options['provider'] ?? $this->modelConfig->getDefaultProvider($userId, 'vision');
         // Don't default to 'test' - let real providers be tried first via fallback logic
         $normalizedRequested = $requestedProvider ? strtolower($requestedProvider) : null;
 

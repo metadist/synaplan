@@ -246,6 +246,8 @@ class OpenAICompatibleController extends AbstractController
                 'source' => 'OPENAI_API',
             ]);
 
+            $usage = $result['usage'] ?? [];
+
             return new JsonResponse([
                 'id' => $completionId,
                 'object' => 'chat.completion',
@@ -262,9 +264,9 @@ class OpenAICompatibleController extends AbstractController
                     ],
                 ],
                 'usage' => [
-                    'prompt_tokens' => 0,
-                    'completion_tokens' => 0,
-                    'total_tokens' => 0,
+                    'prompt_tokens' => (int) ($usage['prompt_tokens'] ?? 0),
+                    'completion_tokens' => (int) ($usage['completion_tokens'] ?? 0),
+                    'total_tokens' => (int) ($usage['total_tokens'] ?? 0),
                 ],
             ]);
         } catch (\Throwable $e) {
@@ -463,6 +465,11 @@ class OpenAICompatibleController extends AbstractController
                 ];
             }
         }
+
+        $this->logger->warning('OpenAI-compatible: No matching model found, falling back to OpenAI', [
+            'requested_model' => $modelString,
+            'user_id' => $userId,
+        ]);
 
         return [
             'provider' => 'openai',
