@@ -83,6 +83,9 @@ bootstrap_migrations_metadata() {
     if [ "${_has_versions:-0}" -eq 0 ]; then
         echo "📌 [$_label] Existing schema detected without migration metadata — creating doctrine_migration_versions"
         _create_metadata_table "$_env_flag"
+        # NOTE: `_has_baseline` stays at its init value 0 here. The table was
+        # just created and is empty by definition, so we intentionally fall
+        # through to `_register_baseline_migration` below.
     else
         _has_baseline=$(_count_sql \
             "SELECT COUNT(*) FROM doctrine_migration_versions WHERE version = '${BASELINE_MIGRATION}'" \

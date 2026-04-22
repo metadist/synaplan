@@ -155,6 +155,12 @@ leaves no audit trail, and can drop columns Doctrine doesn't know about.
 bootstrap step just registers the baseline as "applied".
 - Adding a new migration follows the standard flow: commit the new
 `backend/migrations/Version*.php`, deploy, and the entrypoint applies it on next start.
+- **When combining migrations via `doctrine:migrations:rollup`** (i.e. collapsing the
+existing migration history into a new single baseline), the `BASELINE_MIGRATION`
+constant in `_docker/backend/lib/migrations-bootstrap.sh` MUST be updated in the
+same commit to point at the new rolled-up version. Otherwise the self-healing
+bootstrap will try to mark a version that no longer exists as applied, and
+`doctrine:migrations:migrate` will fail on legacy DBs with "unknown version".
 
 ## Testing the Migration Path Locally
 

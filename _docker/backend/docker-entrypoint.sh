@@ -136,13 +136,17 @@ echo "✅ Database is ready!"
 # See lib/migrations-bootstrap.sh for the full self-healing contract.
 echo "🔄 Running database migrations..."
 
-# Locate the bootstrap library regardless of how the entrypoint was invoked
-# (production: /usr/local/bin/docker-entrypoint.sh; dev/tests: from the repo).
+# Locate the bootstrap library regardless of how the entrypoint was invoked.
+#   - Production image: `$(dirname "$0")` resolves to /usr/local/bin, where
+#     the Dockerfile copies both the entrypoint and `lib/`.
+#   - Running the entrypoint directly from a repo checkout (tests, local
+#     debugging): the library sits next to the script in `_docker/backend/lib/`.
+# The `/usr/local/bin/lib/...` fallback is kept as a belt-and-suspenders path
+# in case `$0` is a symlink or otherwise can't be resolved.
 _MIGRATIONS_LIB=""
 for _candidate in \
     "$(dirname "$0")/lib/migrations-bootstrap.sh" \
-    "/usr/local/bin/lib/migrations-bootstrap.sh" \
-    "/var/www/_docker/backend/lib/migrations-bootstrap.sh"; do
+    "/usr/local/bin/lib/migrations-bootstrap.sh"; do
     if [ -r "$_candidate" ]; then
         _MIGRATIONS_LIB="$_candidate"
         break

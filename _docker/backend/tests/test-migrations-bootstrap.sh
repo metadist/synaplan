@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # Bash-level tests for lib/migrations-bootstrap.sh.
 #
 # Covers the four production-relevant DB states the entrypoint must self-heal
@@ -15,7 +15,18 @@
 # `_count_sql` / `_register_baseline_migration` / `_create_metadata_table` are
 # redefined to update the fake state without touching a real server.
 #
+# Requirements: bash 4+ (uses associative arrays via `declare -A`). macOS ships
+# bash 3.2 at /bin/bash by default — install a newer bash via Homebrew
+# (`brew install bash`) or run with `/opt/homebrew/bin/bash` / `/usr/local/bin/bash`.
+#
 # Run:  bash _docker/backend/tests/test-migrations-bootstrap.sh
+
+if (( BASH_VERSINFO[0] < 4 )); then
+    echo "❌ This test requires bash 4+ (found ${BASH_VERSION:-unknown})." >&2
+    echo "   macOS default /bin/bash is 3.2.x and does not support associative arrays." >&2
+    echo "   Install a newer bash (e.g. \`brew install bash\`) and re-run with that binary." >&2
+    exit 2
+fi
 
 set -u
 
@@ -143,15 +154,17 @@ assert_eq 0 "${DB_STATE[CREATE_CALLS]}"   "_create_metadata_table NOT called"
 assert_eq 1 "${DB_STATE[REGISTER_CALLS]}" "_register_baseline_migration called exactly once"
 assert_eq 1 "${DB_STATE[HAS_BASELINE_ROW]}" "baseline row registered alongside unrelated rows"
 
-echo "▶ Case 5: healthy DB — bootstrap is idempotent and does nothing"
+echo "▶ Case 5: healthy DB — bootstrap is a no-op (idempotent on healthy state)"
 reset_state
 DB_STATE[HAS_BUSER]=1
 DB_STATE[HAS_VERSIONS_TABLE]=1
 DB_STATE[HAS_BASELINE_ROW]=1
 DB_STATE[VERSION_ROW_COUNT]=3
 bootstrap_migrations_metadata "" "test-healthy" >/dev/null
-assert_eq 0 "${DB_STATE[CREATE_CALLS]}"   "_create_metadata_table NOT called"
-assert_eq 0 "${DB_STATE[REGISTER_CALLS]}" "_register_baseline_migration NOT called"
+# Both assertions expect 0: the versions table already exists so we skip CREATE,
+# and the baseline row is already registered so we skip the INSERT IGNORE.
+assert_eq 0 "${DB_STATE[CREATE_CALLS]}"   "_create_metadata_table NOT called (table already exists)"
+assert_eq 0 "${DB_STATE[REGISTER_CALLS]}" "_register_baseline_migration NOT called (row already registered)"
 
 echo "▶ Case 6: double invocation on a broken DB is safe (second call is a no-op)"
 reset_state
