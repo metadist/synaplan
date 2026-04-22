@@ -693,13 +693,13 @@ parameters:
 		-
 			message: '#^Call to an undefined method App\\Repository\\MessageMetaRepository\:\:method\(\)\.$#'
 			identifier: method.notFound
-			count: 8
+			count: 9
 			path: tests/Unit/MessageClassifierTest.php
 
 		-
 			message: '#^Call to an undefined method App\\Service\\Message\\MessageSorter\:\:expects\(\)\.$#'
 			identifier: method.notFound
-			count: 3
+			count: 4
 			path: tests/Unit/MessageClassifierTest.php
 
 		-
@@ -711,12 +711,6 @@ parameters:
 		-
 			message: '#^Call to an undefined method Psr\\Log\\LoggerInterface\:\:expects\(\)\.$#'
 			identifier: method.notFound
-			count: 1
-			path: tests/Unit/MessageClassifierTest.php
-
-		-
-			message: '#^Unreachable statement \- code above always terminates\.$#'
-			identifier: deadCode.unreachable
 			count: 1
 			path: tests/Unit/MessageClassifierTest.php
 

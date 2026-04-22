@@ -304,7 +304,7 @@ class MessageClassifierTest extends TestCase
             $this->createMock(ModelConfigService::class),
             $configRepo,
             $this->createMock(EntityManagerInterface::class),
-            $this->createMock(\Psr\Log\LoggerInterface::class),
+            $this->createMock(LoggerInterface::class),
         );
 
         $this->assertSame($expected, $classifier->isSynapseEnabled());
