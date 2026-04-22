@@ -119,6 +119,15 @@ jobs:
         # a migration, CI MUST fail so we surface the gap before deploy.
         run: php bin/console doctrine:migrations:migrate --no-interaction --allow-no-migration
 
+      - name: Verify schema matches entities (no migration drift)
+        working-directory: backend
+        # Fails when an entity has been changed without a matching migration,
+        # OR when a migration drifts from the ORM mapping (column length, default,
+        # nullable, index shape, …). `--skip-sync` ignores Doctrine's own
+        # `doctrine_migration_versions` table, which the MariaDB DBAL comparator
+        # mis-reports as out-of-sync (see docs/MIGRATIONS.md "DBAL bug bypass").
+        run: php bin/console doctrine:schema:validate --skip-sync
+
       - name: Load demo fixtures
         working-directory: backend
         # Loads only dev/test demo data (admin/demo/test users). Production-essential

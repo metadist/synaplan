@@ -19,7 +19,7 @@ class MessageMeta
     #[ORM\Column(name: 'BMESSAGEID', type: 'bigint')]
     private int $messageId;
 
-    #[ORM\ManyToOne(targetEntity: Message::class)]
+    #[ORM\ManyToOne(targetEntity: Message::class, inversedBy: 'metadata')]
     #[ORM\JoinColumn(name: 'BMESSAGEID', referencedColumnName: 'BID')]
     private ?Message $message = null;
 
