@@ -256,6 +256,58 @@ final readonly class InternalEmailService
     }
 
     /**
+     * Send a warning email when the embedding fallback provider activates.
+     */
+    public function sendEmbeddingFallbackWarning(string $primaryProvider, string $fallbackProvider, string $errorMessage): void
+    {
+        $adminEmail = $_ENV['APP_ADMIN_EMAIL'] ?? $_ENV['APP_SENDER_EMAIL'] ?? null;
+        if (!$adminEmail) {
+            $this->logger->debug('No admin email configured, skipping fallback warning');
+
+            return;
+        }
+
+        $fromEmail = $_ENV['APP_SENDER_EMAIL'] ?? 'noreply@synaplan.com';
+        $fromName = $_ENV['APP_SENDER_NAME'] ?? 'Synaplan';
+        $timestamp = (new \DateTimeImmutable())->format('Y-m-d H:i:s T');
+
+        $html = <<<HTML
+            <div style="font-family: -apple-system, sans-serif; max-width: 600px; margin: 0 auto;">
+                <h2 style="color: #e65100;">Embedding Fallback Activated</h2>
+                <p>The primary embedding provider <strong>{$primaryProvider}</strong> failed.
+                   Requests are being routed to <strong>{$fallbackProvider}</strong> as fallback.</p>
+                <table style="width: 100%; border-collapse: collapse; margin: 16px 0;">
+                    <tr><td style="padding: 8px; border: 1px solid #ddd; font-weight: bold;">Primary</td>
+                        <td style="padding: 8px; border: 1px solid #ddd;">{$primaryProvider}</td></tr>
+                    <tr><td style="padding: 8px; border: 1px solid #ddd; font-weight: bold;">Fallback</td>
+                        <td style="padding: 8px; border: 1px solid #ddd;">{$fallbackProvider}</td></tr>
+                    <tr><td style="padding: 8px; border: 1px solid #ddd; font-weight: bold;">Error</td>
+                        <td style="padding: 8px; border: 1px solid #ddd; color: #c62828;">{$errorMessage}</td></tr>
+                    <tr><td style="padding: 8px; border: 1px solid #ddd; font-weight: bold;">Time</td>
+                        <td style="padding: 8px; border: 1px solid #ddd;">{$timestamp}</td></tr>
+                </table>
+                <p style="color: #666; font-size: 13px;">This is an automated alert. Please check the primary provider.</p>
+            </div>
+            HTML;
+
+        $email = (new Email())
+            ->from(sprintf('%s <%s>', $fromName, $fromEmail))
+            ->to($adminEmail)
+            ->subject('[Synaplan] Embedding Fallback Activated — '.$primaryProvider.' → '.$fallbackProvider)
+            ->html($html);
+
+        try {
+            $this->mailer->send($email);
+            $this->logger->info('Embedding fallback warning email sent', ['to' => $adminEmail]);
+        } catch (\Exception $e) {
+            $this->logger->warning('Failed to send embedding fallback warning email', [
+                'to' => $adminEmail,
+                'error' => $e->getMessage(),
+            ]);
+        }
+    }
+
+    /**
      * Render email template with locale support
      * Translates all strings before passing to template.
      */

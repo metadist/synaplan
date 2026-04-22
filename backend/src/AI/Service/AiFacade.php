@@ -3,12 +3,16 @@
 namespace App\AI\Service;
 
 use App\AI\Exception\ProviderException;
+use App\AI\Interface\EmbeddingProviderInterface;
 use App\AI\Provider\GoogleProvider;
 use App\Service\CircuitBreaker;
+use App\Service\DiscordNotificationService;
 use App\Service\File\FileHelper;
 use App\Service\File\UserUploadPathBuilder;
+use App\Service\InternalEmailService;
 use App\Service\ModelConfigService;
 use Psr\Log\LoggerInterface;
+use Symfony\Contracts\Cache\CacheInterface;
 
 class AiFacade
 {
@@ -21,7 +25,11 @@ class AiFacade
         private CircuitBreaker $circuitBreaker,
         private LoggerInterface $logger,
         private UserUploadPathBuilder $userUploadPathBuilder,
+        private DiscordNotificationService $discordNotification,
+        private InternalEmailService $emailService,
+        private CacheInterface $cache,
         private string $uploadDir = '/var/www/backend/var/uploads',
+        private string $embeddingFallbackProvider = '',
     ) {
     }
 
@@ -232,7 +240,17 @@ class AiFacade
             'text_length' => strlen($text),
         ]);
 
-        $result = $provider->embed($text, $options);
+        try {
+            $result = $provider->embed($text, $options);
+        } catch (\Throwable $primaryError) {
+            $result = $this->tryEmbeddingFallback(
+                fn ($fb, $fbOpts) => $fb->embed($text, $fbOpts),
+                $provider->getName(),
+                $primaryError,
+                $options,
+            );
+        }
+
         $this->embedCache[$cacheKey] = $result;
 
         return $result;
@@ -262,7 +280,93 @@ class AiFacade
             'count' => count($texts),
         ]);
 
-        return $provider->embedBatch($texts, $options);
+        try {
+            return $provider->embedBatch($texts, $options);
+        } catch (\Throwable $primaryError) {
+            return $this->tryEmbeddingFallback(
+                fn ($fb, $fbOpts) => $fb->embedBatch($texts, $fbOpts),
+                $provider->getName(),
+                $primaryError,
+                $options,
+            );
+        }
+    }
+
+    /**
+     * Try a fallback embedding provider when the primary fails.
+     *
+     * @template T
+     *
+     * @param callable(EmbeddingProviderInterface, array): T $operation
+     *
+     * @return T
+     */
+    private function tryEmbeddingFallback(callable $operation, string $primaryName, \Throwable $primaryError, array $options): mixed
+    {
+        $fallbackName = $this->embeddingFallbackProvider;
+
+        if ('' === $fallbackName || $fallbackName === $primaryName) {
+            throw $primaryError;
+        }
+
+        $this->logger->warning('Primary embedding provider failed, trying fallback', [
+            'primary' => $primaryName,
+            'fallback' => $fallbackName,
+            'error' => $primaryError->getMessage(),
+        ]);
+
+        try {
+            $fallback = $this->registry->getEmbeddingProvider($fallbackName);
+        } catch (\Throwable) {
+            throw $primaryError;
+        }
+
+        $fallbackOptions = $options;
+        $fallbackOptions['provider'] = $fallbackName;
+        unset($fallbackOptions['model']);
+
+        $result = $operation($fallback, $fallbackOptions);
+
+        $this->sendFallbackNotification($primaryName, $fallbackName, $primaryError->getMessage());
+
+        return $result;
+    }
+
+    /**
+     * Send a throttled warning notification when the embedding fallback activates.
+     * Max one notification per provider pair per hour to prevent spam.
+     */
+    private function sendFallbackNotification(string $primaryProvider, string $fallbackProvider, string $error): void
+    {
+        $throttleKey = 'embedding_fallback_'.md5($primaryProvider.$fallbackProvider);
+
+        try {
+            $isNewNotification = false;
+            $this->cache->get($throttleKey, function ($item) use (&$isNewNotification) {
+                $item->expiresAfter(3600);
+                $isNewNotification = true;
+
+                return true;
+            });
+
+            if (!$isNewNotification) {
+                return;
+            }
+        } catch (\Throwable $e) {
+            $this->logger->debug('Fallback throttle cache error (non-critical)', ['error' => $e->getMessage()]);
+        }
+
+        try {
+            $this->discordNotification->notifyEmbeddingFallback($primaryProvider, $fallbackProvider, $error);
+        } catch (\Throwable $e) {
+            $this->logger->debug('Discord fallback notification failed (non-critical)', ['error' => $e->getMessage()]);
+        }
+
+        try {
+            $this->emailService->sendEmbeddingFallbackWarning($primaryProvider, $fallbackProvider, $error);
+        } catch (\Throwable $e) {
+            $this->logger->debug('Email fallback notification failed (non-critical)', ['error' => $e->getMessage()]);
+        }
     }
 
     /**

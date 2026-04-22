@@ -679,6 +679,41 @@ final readonly class DiscordNotificationService
     }
 
     /**
+     * Notify when embedding fallback provider activates due to primary failure.
+     */
+    public function notifyEmbeddingFallback(string $primaryProvider, string $fallbackProvider, string $error): void
+    {
+        if (!$this->isEnabled()) {
+            return;
+        }
+
+        $fields = [
+            [
+                'name' => 'Primary Provider',
+                'value' => $primaryProvider,
+                'inline' => true,
+            ],
+            [
+                'name' => 'Fallback Provider',
+                'value' => $fallbackProvider,
+                'inline' => true,
+            ],
+            [
+                'name' => 'Error',
+                'value' => '```'.$this->truncate($error, self::MAX_ERROR).'```',
+                'inline' => false,
+            ],
+        ];
+
+        $this->sendEmbed(
+            title: 'Embedding Fallback Activated',
+            color: self::COLOR_ERROR,
+            fields: $fields,
+            footer: 'Synaplan Embedding'
+        );
+    }
+
+    /**
      * Mask phone number for privacy (show last 4 digits).
      */
     private function maskPhoneNumber(string $phone): string

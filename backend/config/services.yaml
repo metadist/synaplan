@@ -66,6 +66,9 @@ parameters:
     env(STRIPE_PAYMENT_METHODS): ''
     env(WHATSAPP_ACCESS_TOKEN): ''
     env(WHATSAPP_WEBHOOK_VERIFY_TOKEN): ''
+    env(CLOUDFLARE_ACCOUNT_ID): ''
+    env(CLOUDFLARE_API_TOKEN): ''
+    env(EMBEDDING_FALLBACK_PROVIDER): ''
 
     # Piper TTS Service default (localhost for native; Docker Compose overrides via env)
     env(SYNAPLAN_TTS_URL): ''
@@ -175,8 +178,17 @@ services:
             - { name: 'app.ai.image_generation' }
             - { name: 'app.ai.video_generation' }
 
+    App\AI\Provider\CloudflareProvider:
+        arguments:
+            $accountId: '%env(CLOUDFLARE_ACCOUNT_ID)%'
+            $apiToken: '%env(CLOUDFLARE_API_TOKEN)%'
+        tags:
+            - { name: 'app.ai.embedding' }
+
     # AI Facade
-    App\AI\Service\AiFacade: ~
+    App\AI\Service\AiFacade:
+        arguments:
+            $embeddingFallbackProvider: '%env(EMBEDDING_FALLBACK_PROVIDER)%'
 
     # Whisper Service for Audio Transcription
     App\Service\WhisperService:
