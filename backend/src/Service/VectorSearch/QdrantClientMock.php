@@ -162,6 +162,36 @@ final readonly class QdrantClientMock implements QdrantClientInterface
         return [];
     }
 
+    // --- Synapse Routing Operations ---
+
+    public function upsertSynapseTopic(string $pointId, array $vector, array $payload): void
+    {
+        $this->logger->info('QdrantClientMock: upsertSynapseTopic', ['point_id' => $pointId]);
+    }
+
+    public function searchSynapseTopics(
+        array $queryVector,
+        int $userId,
+        int $limit = 5,
+        float $minScore = 0.3,
+    ): array {
+        $this->logger->info('QdrantClientMock: searchSynapseTopics', ['user_id' => $userId]);
+
+        return [];
+    }
+
+    public function deleteSynapseTopicsByOwner(int $ownerId): int
+    {
+        $this->logger->info('QdrantClientMock: deleteSynapseTopicsByOwner', ['owner_id' => $ownerId]);
+
+        return 0;
+    }
+
+    public function getSynapseCollection(): string
+    {
+        return 'synapse_topics';
+    }
+
     // --- Health & Info ---
 
     public function healthCheck(): bool

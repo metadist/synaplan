@@ -85,6 +85,9 @@ final readonly class SystemConfigService
                 'label' => 'Vector DB',
                 'sections' => [
                     'qdrant' => ['label' => 'Qdrant', 'fields' => ['QDRANT_URL']],
+                    'synapse' => ['label' => 'Synapse Routing', 'fields' => [
+                        'SYNAPSE_ROUTING_ENABLED', 'SYNAPSE_CONFIDENCE_THRESHOLD',
+                    ]],
                     'qdrant_search' => ['label' => 'Search Thresholds', 'fields' => [
                         'MIN_CHAT_FEEDBACK_SCORE', 'MIN_CHAT_MEMORY_SCORE', 'MIN_CONTRADICTION_SCORE',
                         'MIN_RESEARCH_SCORE', 'MIN_MEMORY_RESEARCH_SCORE', 'MIN_EXTRACTION_SCORE',
@@ -805,6 +808,19 @@ final readonly class SystemConfigService
                 'tab' => 'vectordb', 'section' => 'qdrant', 'type' => 'url',
                 'sensitive' => false, 'description' => 'Qdrant REST API URL',
                 'default' => 'http://qdrant:6333',
+            ],
+            // === Synapse Routing (database-backed, no restart required) ===
+            'SYNAPSE_ROUTING_ENABLED' => [
+                'tab' => 'vectordb', 'section' => 'synapse', 'type' => 'boolean',
+                'sensitive' => false, 'description' => 'Enable Synapse Routing (embedding-based intent detection). When enabled, messages are classified via Qdrant vector similarity (~50ms) instead of a full AI sorting call (~2000ms). Falls back to AI sort automatically when confidence is low.',
+                'default' => 'true',
+                'source' => 'database',
+            ],
+            'SYNAPSE_CONFIDENCE_THRESHOLD' => [
+                'tab' => 'vectordb', 'section' => 'synapse', 'type' => 'number',
+                'sensitive' => false, 'description' => 'Min cosine similarity score for Synapse to route directly (0.0–1.0). Below this threshold, the system falls back to AI-based sorting. Default: 0.78',
+                'default' => '0.78',
+                'source' => 'database',
             ],
             // === Search Thresholds (database-backed, no restart required) ===
             'MIN_CHAT_FEEDBACK_SCORE' => [

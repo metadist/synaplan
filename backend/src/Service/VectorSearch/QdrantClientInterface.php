@@ -196,6 +196,46 @@ interface QdrantClientInterface
      */
     public function getFilesWithChunks(int $userId): array;
 
+    // --- Synapse Routing Operations ---
+
+    /**
+     * Upsert a topic embedding into the synapse_topics collection.
+     *
+     * @param string  $pointId Point ID (e.g., "synapse_{ownerId}_{topic}")
+     * @param float[] $vector  Embedding vector
+     * @param array   $payload Metadata (owner_id, topic, short_description)
+     */
+    public function upsertSynapseTopic(string $pointId, array $vector, array $payload): void;
+
+    /**
+     * Search for the most similar topics using vector similarity.
+     *
+     * @param float[] $queryVector Query embedding vector
+     * @param int     $userId      User ID (search system + user-specific topics)
+     * @param int     $limit       Max results
+     * @param float   $minScore    Minimum similarity score
+     *
+     * @return array Array of results: [['id' => string, 'score' => float, 'payload' => array], ...]
+     */
+    public function searchSynapseTopics(
+        array $queryVector,
+        int $userId,
+        int $limit = 5,
+        float $minScore = 0.3,
+    ): array;
+
+    /**
+     * Delete all synapse topic embeddings for a specific owner.
+     *
+     * @return int Number of deleted points
+     */
+    public function deleteSynapseTopicsByOwner(int $ownerId): int;
+
+    /**
+     * Get the synapse collection name.
+     */
+    public function getSynapseCollection(): string;
+
     // --- Health & Info ---
 
     /**

@@ -12,6 +12,9 @@ use Psr\Log\LoggerInterface;
 
 class AiFacade
 {
+    /** @var array<string, array{embedding: array<float>, usage: array{prompt_tokens: int, total_tokens: int}}> */
+    private array $embedCache = [];
+
     public function __construct(
         private ProviderRegistry $registry,
         private ModelConfigService $modelConfig,
@@ -210,15 +213,30 @@ class AiFacade
         }
 
         $provider = $this->registry->getEmbeddingProvider($providerName);
+        $resolvedModel = $model ?? $provider->getDefaultModels()['embedding'] ?? 'default';
+
+        $cacheKey = md5($text.'|'.$provider->getName().'|'.$resolvedModel);
+        if (isset($this->embedCache[$cacheKey])) {
+            $this->logger->debug('AI embedding cache hit', [
+                'provider' => $provider->getName(),
+                'model' => $resolvedModel,
+                'text_length' => strlen($text),
+            ]);
+
+            return $this->embedCache[$cacheKey];
+        }
 
         $this->logger->info('AI embedding request', [
             'provider' => $provider->getName(),
             'user_id' => $userId,
-            'model' => $model ?? 'default',
+            'model' => $resolvedModel,
             'text_length' => strlen($text),
         ]);
 
-        return $provider->embed($text, $options);
+        $result = $provider->embed($text, $options);
+        $this->embedCache[$cacheKey] = $result;
+
+        return $result;
     }
 
     /**

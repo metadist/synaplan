@@ -4,9 +4,11 @@ namespace App\Tests\Unit;
 
 use App\Entity\Message;
 use App\Entity\MessageMeta;
+use App\Repository\ConfigRepository;
 use App\Repository\MessageMetaRepository;
 use App\Service\Message\MessageClassifier;
 use App\Service\Message\MessageSorter;
+use App\Service\Message\SynapseRouter;
 use App\Service\ModelConfigService;
 use Doctrine\ORM\EntityManagerInterface;
 use PHPUnit\Framework\TestCase;
@@ -15,8 +17,10 @@ use Psr\Log\LoggerInterface;
 class MessageClassifierTest extends TestCase
 {
     private MessageSorter $messageSorter;
+    private SynapseRouter $synapseRouter;
     private MessageMetaRepository $messageMetaRepository;
     private ModelConfigService $modelConfigService;
+    private ConfigRepository $configRepository;
     private EntityManagerInterface $em;
     private LoggerInterface $logger;
     private MessageClassifier $service;
@@ -24,15 +28,22 @@ class MessageClassifierTest extends TestCase
     protected function setUp(): void
     {
         $this->messageSorter = $this->createMock(MessageSorter::class);
+        $this->synapseRouter = $this->createMock(SynapseRouter::class);
         $this->messageMetaRepository = $this->createMock(MessageMetaRepository::class);
         $this->modelConfigService = $this->createMock(ModelConfigService::class);
+        $this->configRepository = $this->createMock(ConfigRepository::class);
         $this->em = $this->createMock(EntityManagerInterface::class);
         $this->logger = $this->createMock(LoggerInterface::class);
 
+        // Disable Synapse Routing so tests exercise MessageSorter directly
+        $this->configRepository->method('getValue')->willReturn('0');
+
         $this->service = new MessageClassifier(
             $this->messageSorter,
+            $this->synapseRouter,
             $this->messageMetaRepository,
             $this->modelConfigService,
+            $this->configRepository,
             $this->em,
             $this->logger
         );

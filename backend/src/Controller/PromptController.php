@@ -10,6 +10,7 @@ use App\Repository\FileRepository;
 use App\Repository\MessageRepository;
 use App\Repository\PromptMetaRepository;
 use App\Repository\PromptRepository;
+use App\Service\Message\SynapseIndexer;
 use App\Service\ModelConfigService;
 use App\Service\PromptService;
 use App\Service\RAG\VectorStorage\VectorStorageFacade;
@@ -50,6 +51,7 @@ class PromptController extends AbstractController
         private FileRepository $fileRepository,
         private ModelConfigService $modelConfigService,
         private VectorStorageFacade $vectorStorageFacade,
+        private SynapseIndexer $synapseIndexer,
     ) {
     }
 
@@ -707,6 +709,9 @@ class PromptController extends AbstractController
             // Refresh to ensure ID is populated
             $this->em->refresh($prompt);
 
+            // Update Synapse Routing index
+            $this->reindexSynapseTopic($prompt->getTopic(), $prompt->getOwnerId());
+
             // Save metadata (AI model, tools)
             if (!empty($metadata)) {
                 if (!$prompt->getId()) {
@@ -852,6 +857,8 @@ class PromptController extends AbstractController
         try {
             $this->em->flush();
             $this->logger->info('Prompt entity flushed successfully', ['prompt_id' => $id]);
+
+            $this->reindexSynapseTopic($prompt->getTopic(), $prompt->getOwnerId());
         } catch (\Exception $e) {
             $this->logger->error('Failed to flush prompt entity', [
                 'prompt_id' => $id,
@@ -964,8 +971,11 @@ class PromptController extends AbstractController
         }
 
         // Now delete the prompt itself
+        $ownerId = $prompt->getOwnerId();
         $this->em->remove($prompt);
         $this->em->flush();
+
+        $this->reindexSynapseTopic($topic, $ownerId);
 
         $this->logger->info('User deleted custom prompt', [
             'user_id' => $user->getId(),
@@ -1523,6 +1533,26 @@ PROMPT;
             return $this->json([
                 'error' => 'Failed to generate summary',
             ], Response::HTTP_INTERNAL_SERVER_ERROR);
+        }
+    }
+
+    /**
+     * Re-index a topic in the Synapse Routing collection (fire-and-forget).
+     */
+    private function reindexSynapseTopic(string $topic, int $ownerId): void
+    {
+        if (str_starts_with($topic, 'tools:')) {
+            return;
+        }
+
+        try {
+            $this->synapseIndexer->indexTopic($topic, $ownerId);
+        } catch (\Throwable $e) {
+            $this->logger->warning('Synapse re-index failed (non-critical)', [
+                'topic' => $topic,
+                'owner_id' => $ownerId,
+                'error' => $e->getMessage(),
+            ]);
         }
     }
 }

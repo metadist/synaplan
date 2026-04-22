@@ -353,9 +353,50 @@ final readonly class DiscordNotificationService
             ];
         }
 
+        // Synapse Routing metrics
+        $source = $classificationResult['source'] ?? null;
+        if (null !== $source) {
+            $fields[] = [
+                'name' => '⚡ Routing Source',
+                'value' => $source,
+                'inline' => true,
+            ];
+        }
+
+        $synapseScore = $classificationResult['synapse_score'] ?? null;
+        if (null !== $synapseScore) {
+            $fields[] = [
+                'name' => '📊 Confidence',
+                'value' => sprintf('%.4f', $synapseScore),
+                'inline' => true,
+            ];
+        }
+
+        $fallbackReason = $classificationResult['synapse_fallback_reason'] ?? null;
+        if (null !== $fallbackReason) {
+            $fields[] = [
+                'name' => '🔄 Fallback Reason',
+                'value' => $fallbackReason,
+                'inline' => true,
+            ];
+        }
+
+        $synapseLatency = $classificationResult['synapse_latency_ms'] ?? null;
+        if (null !== $synapseLatency) {
+            $fields[] = [
+                'name' => '⏱️ Synapse Latency',
+                'value' => $synapseLatency.'ms',
+                'inline' => true,
+            ];
+        }
+
+        $isSynapse = str_starts_with($source ?? '', 'synapse_');
+        $emoji = $isSynapse ? '⚡' : '🔍';
+        $label = $isSynapse ? 'Synapse' : 'AI';
+
         $this->sendEmbed(
-            title: '🔍 AI Classification Result',
-            color: null !== $mediaType ? self::COLOR_SUCCESS : 0xFFA500, // Orange if no media type
+            title: "{$emoji} {$label} Classification Result",
+            color: null !== $mediaType ? self::COLOR_SUCCESS : 0xFFA500,
             fields: $fields,
             footer: 'Synaplan Classifier'
         );

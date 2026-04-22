@@ -821,6 +821,25 @@ class ConfigController extends AbstractController
             'models_available' => count($imageModels),
         ];
 
+        // Synapse Routing (embedding-based intent classification)
+        $synapseValue = $this->configRepository->getValue(0, 'QDRANT_SEARCH', 'SYNAPSE_ROUTING_ENABLED');
+        $synapseEnabled = null === $synapseValue || 'true' === $synapseValue;
+        $qdrantConfigured = !empty($_ENV['QDRANT_URL'] ?? '');
+        $synapseReady = $synapseEnabled && $qdrantConfigured;
+        $features['synapse-routing'] = [
+            'id' => 'synapse-routing',
+            'category' => 'AI Features',
+            'name' => 'Synapse Routing',
+            'enabled' => $synapseEnabled,
+            'status' => $synapseReady ? 'active' : ($synapseEnabled ? 'unhealthy' : 'disabled'),
+            'message' => $synapseReady
+                ? 'Embedding-based intent routing is active (Tier 1: ~50ms, AI fallback for low confidence)'
+                : ($synapseEnabled
+                    ? 'Synapse is enabled but Qdrant is not configured'
+                    : 'Synapse Routing is disabled — using AI-based sorting for every message'),
+            'setup_required' => !$qdrantConfigured,
+        ];
+
         // ========== AI Providers (Dynamic from ProviderRegistry) ==========
 
         $providersMetadata = $this->providerRegistry->getProvidersMetadata();

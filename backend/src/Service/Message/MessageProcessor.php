@@ -168,18 +168,25 @@ final readonly class MessageProcessor
                 ];
             } else {
                 // Normal flow: Run classification
-                // Get sorting model info to display during classification
-                $sortingModelId = $this->modelConfigService->getDefaultModel('SORT', $message->getUserId());
-                if ($sortingModelId) {
-                    $sortingProvider = $this->modelConfigService->getProviderForModel($sortingModelId);
-                    $sortingModelName = $this->modelConfigService->getModelName($sortingModelId);
-                }
+                if ($this->classifier->isSynapseEnabled()) {
+                    $this->notify($statusCallback, 'classifying', 'Synapse Routing...', [
+                        'model_id' => null,
+                        'provider' => 'synapse',
+                        'model_name' => 'Synapse Routing',
+                    ]);
+                } else {
+                    $sortingModelId = $this->modelConfigService->getDefaultModel('SORT', $message->getUserId());
+                    if ($sortingModelId) {
+                        $sortingProvider = $this->modelConfigService->getProviderForModel($sortingModelId);
+                        $sortingModelName = $this->modelConfigService->getModelName($sortingModelId);
+                    }
 
-                $this->notify($statusCallback, 'classifying', 'Analyzing message intent...', [
-                    'model_id' => $sortingModelId,
-                    'provider' => $sortingProvider,
-                    'model_name' => $sortingModelName,
-                ]);
+                    $this->notify($statusCallback, 'classifying', 'Analyzing message intent...', [
+                        'model_id' => $sortingModelId,
+                        'provider' => $sortingProvider,
+                        'model_name' => $sortingModelName,
+                    ]);
+                }
             }
 
             // Get conversation history for context - STREAMING VERSION
@@ -493,18 +500,25 @@ final readonly class MessageProcessor
             $languageOverride = $options['language'] ?? null;
 
             if (!$hasFixedPrompt && !$isAgainRequest) {
-                // Get sorting model info to display during classification
-                $sortingModelId = $this->modelConfigService->getDefaultModel('SORT', $message->getUserId());
-                if ($sortingModelId) {
-                    $sortingProvider = $this->modelConfigService->getProviderForModel($sortingModelId);
-                    $sortingModelName = $this->modelConfigService->getModelName($sortingModelId);
-                }
+                if ($this->classifier->isSynapseEnabled()) {
+                    $this->notify($statusCallback, 'classifying', 'Synapse Routing...', [
+                        'model_id' => null,
+                        'provider' => 'synapse',
+                        'model_name' => 'Synapse Routing',
+                    ]);
+                } else {
+                    $sortingModelId = $this->modelConfigService->getDefaultModel('SORT', $message->getUserId());
+                    if ($sortingModelId) {
+                        $sortingProvider = $this->modelConfigService->getProviderForModel($sortingModelId);
+                        $sortingModelName = $this->modelConfigService->getModelName($sortingModelId);
+                    }
 
-                $this->notify($statusCallback, 'classifying', 'Analyzing message intent...', [
-                    'model_id' => $sortingModelId,
-                    'provider' => $sortingProvider,
-                    'model_name' => $sortingModelName,
-                ]);
+                    $this->notify($statusCallback, 'classifying', 'Analyzing message intent...', [
+                        'model_id' => $sortingModelId,
+                        'provider' => $sortingProvider,
+                        'model_name' => $sortingModelName,
+                    ]);
+                }
             }
 
             // Get conversation history for context - NON-STREAMING VERSION

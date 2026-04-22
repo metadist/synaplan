@@ -23,6 +23,7 @@ final class QdrantClientDirect implements QdrantClientInterface
     private const DEFAULT_VECTOR_DIM = 1024;
     private const DEFAULT_MEMORIES_COLLECTION = 'user_memories';
     private const DEFAULT_DOCUMENTS_COLLECTION = 'user_documents';
+    private const DEFAULT_SYNAPSE_COLLECTION = 'synapse_topics';
     private const BATCH_LIMIT = 100;
 
     /** @var array<string, bool> tracks which collections have been verified/created */
@@ -30,6 +31,7 @@ final class QdrantClientDirect implements QdrantClientInterface
 
     private readonly string $memoriesCollection;
     private readonly string $documentsCollection;
+    private readonly string $synapseCollection;
 
     public function __construct(
         private readonly HttpClientInterface $httpClient,
@@ -40,6 +42,7 @@ final class QdrantClientDirect implements QdrantClientInterface
         ?string $memoriesCollection = null,
         ?string $documentsCollection = null,
         private readonly int $vectorDimension = self::DEFAULT_VECTOR_DIM,
+        ?string $synapseCollection = null,
     ) {
         $this->memoriesCollection = (null !== $memoriesCollection && '' !== $memoriesCollection)
             ? $memoriesCollection
@@ -47,6 +50,9 @@ final class QdrantClientDirect implements QdrantClientInterface
         $this->documentsCollection = (null !== $documentsCollection && '' !== $documentsCollection)
             ? $documentsCollection
             : self::DEFAULT_DOCUMENTS_COLLECTION;
+        $this->synapseCollection = (null !== $synapseCollection && '' !== $synapseCollection)
+            ? $synapseCollection
+            : self::DEFAULT_SYNAPSE_COLLECTION;
     }
 
     public function getMemoriesCollection(): string
@@ -818,6 +824,160 @@ final class QdrantClientDirect implements QdrantClientInterface
                 'status' => 'error',
                 'error' => $e->getMessage(),
             ];
+        }
+    }
+
+    // ──────────────────────────────────────────────
+    //  Synapse Routing Operations
+    // ──────────────────────────────────────────────
+
+    public function getSynapseCollection(): string
+    {
+        return $this->synapseCollection;
+    }
+
+    public function upsertSynapseTopic(string $pointId, array $vector, array $payload): void
+    {
+        $this->ensureSynapseCollection();
+        $payload['_point_id'] = $pointId;
+
+        try {
+            $this->pointsBatch($this->synapseCollection, [
+                ['delete' => ['filter' => QdrantPointId::payloadFilterFor($pointId)]],
+                ['upsert' => ['points' => [
+                    [
+                        'id' => QdrantPointId::uuidFor($pointId),
+                        'vector' => $vector,
+                        'payload' => $payload,
+                    ],
+                ]]],
+            ]);
+        } catch (\Throwable $e) {
+            $this->logger->error('Failed to upsert synapse topic', [
+                'point_id' => $pointId,
+                'error' => $e->getMessage(),
+            ]);
+
+            throw new \RuntimeException('Failed to upsert synapse topic: '.$e->getMessage(), 0, $e);
+        }
+    }
+
+    public function searchSynapseTopics(
+        array $queryVector,
+        int $userId,
+        int $limit = 5,
+        float $minScore = 0.3,
+    ): array {
+        try {
+            $response = $this->qdrantRequest('POST', "/collections/{$this->synapseCollection}/points/search", [
+                'vector' => $queryVector,
+                'filter' => [
+                    'should' => [
+                        ['key' => 'owner_id', 'match' => ['value' => 0]],
+                        ['key' => 'owner_id', 'match' => ['value' => $userId]],
+                    ],
+                ],
+                'limit' => $limit,
+                'score_threshold' => $minScore,
+                'with_payload' => true,
+            ]);
+
+            $results = [];
+            foreach ($response['result'] ?? [] as $hit) {
+                $results[] = [
+                    'id' => $hit['payload']['_point_id'] ?? (string) $hit['id'],
+                    'score' => $hit['score'],
+                    'payload' => $hit['payload'] ?? [],
+                ];
+            }
+
+            return $results;
+        } catch (\Throwable $e) {
+            $this->logger->error('Failed to search synapse topics', [
+                'user_id' => $userId,
+                'error' => $e->getMessage(),
+            ]);
+
+            return [];
+        }
+    }
+
+    public function deleteSynapseTopicsByOwner(int $ownerId): int
+    {
+        $this->ensureSynapseCollection();
+
+        try {
+            $filter = ['must' => [
+                ['key' => 'owner_id', 'match' => ['value' => $ownerId]],
+            ]];
+
+            $countResponse = $this->qdrantRequest('POST', "/collections/{$this->synapseCollection}/points/count", [
+                'filter' => $filter,
+            ]);
+            $count = (int) ($countResponse['result']['count'] ?? 0);
+
+            if (0 === $count) {
+                return 0;
+            }
+
+            $this->qdrantRequest('POST', "/collections/{$this->synapseCollection}/points/delete?wait=true", [
+                'filter' => $filter,
+            ]);
+
+            return $count;
+        } catch (\Throwable $e) {
+            $this->logger->error('Failed to delete synapse topics by owner', [
+                'owner_id' => $ownerId,
+                'error' => $e->getMessage(),
+            ]);
+
+            return 0;
+        }
+    }
+
+    private function ensureSynapseCollection(): void
+    {
+        $collection = $this->synapseCollection;
+
+        if (isset($this->ensuredCollections[$collection])) {
+            return;
+        }
+
+        try {
+            $this->qdrantRequest('GET', "/collections/{$collection}");
+            $this->ensurePayloadIndexes($collection, [
+                'owner_id' => 'integer',
+                'topic' => 'keyword',
+                '_point_id' => 'keyword',
+            ]);
+            $this->ensuredCollections[$collection] = true;
+
+            return;
+        } catch (\Throwable) {
+            // Collection doesn't exist, create it
+        }
+
+        try {
+            $this->qdrantRequest('PUT', "/collections/{$collection}", [
+                'vectors' => [
+                    'size' => $this->vectorDimension,
+                    'distance' => 'Cosine',
+                ],
+            ]);
+
+            $this->createPayloadIndex($collection, 'owner_id', 'integer');
+            $this->createPayloadIndex($collection, 'topic', 'keyword');
+            $this->createPayloadIndex($collection, '_point_id', 'keyword');
+
+            $this->ensuredCollections[$collection] = true;
+
+            $this->logger->info('Created Qdrant synapse collection', ['collection' => $collection]);
+        } catch (\Throwable $e) {
+            $this->logger->error('Failed to create synapse collection', [
+                'collection' => $collection,
+                'error' => $e->getMessage(),
+            ]);
+            throw $e;
         }
     }
 
