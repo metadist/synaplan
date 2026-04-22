@@ -8,23 +8,29 @@ use Doctrine\DBAL\Schema\Schema;
 use Doctrine\Migrations\AbstractMigration;
 
 /**
- * Reconcile baseline DB schema with current ORM entity definitions.
+ * Reconcile DB schema with current ORM entity definitions.
  *
- * Background: the baseline migration (Version20260417000000) was generated via
- * `dump-schema` from a legacy production database that had accumulated drift
- * over the years (missing column defaults, columns nullable when the entity
- * marks them required, JSON columns nullable when entities default to `[]`).
- * As a result, `doctrine:schema:validate` in CI had to be invoked with
- * `--skip-sync` to be useful at all.
- *
- * This migration brings every drifted column up to the entity-level definition
- * so a full `doctrine:schema:validate` (without `--skip-sync`) passes. After
- * this lands, CI can drop the `--skip-sync` flag and start failing on real
- * entity↔DB drift introduced by future PRs.
+ * Background: the dev database and legacy production databases pre-date the
+ * baseline migration (Version20260417000000). Both were created with
+ * `doctrine:schema:update --force` (or hand-maintained SQL) and have drifted
+ * from the canonical entity-level state over the years — missing column
+ * defaults, columns nullable where the entity marks them required, JSON
+ * columns nullable where entities default to `[]`. Fresh databases created via
+ * the baseline migration already have the canonical state, so for those this
+ * migration is a no-op at the SQL level; it only does real work on legacy
+ * installations.
  *
  * Each NOT NULL transition is preceded by a defensive backfill UPDATE so the
- * migration is safe to run on production databases that may have legacy NULL
- * rows. The backfill values match the entity-level defaults exactly.
+ * migration is safe to run on legacy databases that may have NULL rows. The
+ * backfill values match the entity-level defaults exactly.
+ *
+ * Note: even after this migration runs, CI cannot drop the `--skip-sync` flag
+ * on `doctrine:schema:validate` because doctrine/dbal 3.10.5 has a known
+ * MariaDB 11.x schema-comparator bug that produces phantom diffs on string
+ * defaults (the comparator does not strip MariaDB's surrounding quotes from
+ * `information_schema.COLUMNS.COLUMN_DEFAULT`). The full validate flag will
+ * become usable once DBAL is upgraded to 4.x — see issue #824 and the
+ * "Known Limitation" section in docs/MIGRATIONS.md.
  *
  * Trade-off: this migration is intentionally large (touches ~20 tables) but
  * only changes column metadata — no data is rewritten beyond NULL backfills.
@@ -230,158 +236,143 @@ final class Version20260423000000 extends AbstractMigration
 
     public function down(Schema $schema): void
     {
-        // Reverse to the baseline state. We do NOT re-NULL the rows backfilled
-        // in up() — there's no way to know which were originally NULL. We DO
-        // backfill rows that became NULL while this migration was active (i.e.
-        // for columns we made nullable in up() and now want to make NOT NULL
-        // again), otherwise MariaDB strict mode aborts the ALTER.
-        $this->addSql('ALTER TABLE messenger_messages CHANGE delivered_at delivered_at DATETIME DEFAULT NULL');
+        // Restore each touched column to its **baseline** definition
+        // (Version20260417000000). For columns where up() was a no-op against
+        // the baseline-created schema, this down() is also a no-op — but it
+        // still emits the ALTER so the migration is a faithful "round trip"
+        // against any starting state (legacy DB or canonical baseline DB).
+        //
+        // The only column where up() introduced a real change against the
+        // baseline is BAPIKEYS.BNAME (baseline has no DEFAULT; up() added
+        // DEFAULT ''). All other ALTERs here just re-assert the baseline.
+        //
+        // We do NOT re-NULL rows that up() backfilled — there's no way to
+        // know which were originally NULL, and the entity types tolerate the
+        // empty string / empty JSON values either way.
+        $this->addSql(<<<'SQL'
+            ALTER TABLE BAPIKEYS
+              CHANGE BSCOPES BSCOPES JSON         NOT NULL,
+              CHANGE BNAME   BNAME   VARCHAR(128) NOT NULL
+        SQL);
 
-        $this->addSql("UPDATE BEMAILVERIFICATION SET BIPADDRESS = '' WHERE BIPADDRESS IS NULL");
-        $this->addSql('ALTER TABLE BEMAILVERIFICATION CHANGE BIPADDRESS BIPADDRESS VARCHAR(45) NOT NULL');
+        $this->addSql(<<<'SQL'
+            ALTER TABLE BCHATS
+              CHANGE BTITLE       BTITLE       VARCHAR(255) DEFAULT NULL,
+              CHANGE BSHARETOKEN  BSHARETOKEN  VARCHAR(64)  DEFAULT NULL,
+              CHANGE BSOURCE      BSOURCE      VARCHAR(16)  DEFAULT 'web' NOT NULL,
+              CHANGE BOGIMAGEPATH BOGIMAGEPATH VARCHAR(255) DEFAULT NULL
+        SQL);
+
+        $this->addSql('ALTER TABLE BEMAILVERIFICATION CHANGE BIPADDRESS BIPADDRESS VARCHAR(45) DEFAULT NULL');
+
+        $this->addSql(<<<'SQL'
+            ALTER TABLE BFILES
+              CHANGE BSTATUS   BSTATUS   VARCHAR(32)  DEFAULT 'uploaded' NOT NULL,
+              CHANGE BGROUPKEY BGROUPKEY VARCHAR(128) DEFAULT NULL
+        SQL);
+
+        $this->addSql(<<<'SQL'
+            ALTER TABLE BGUEST_SESSIONS
+              CHANGE BIPADDRESS BIPADDRESS VARCHAR(45) DEFAULT NULL,
+              CHANGE BCOUNTRY   BCOUNTRY   VARCHAR(2)  DEFAULT NULL
+        SQL);
+
+        $this->addSql(<<<'SQL'
+            ALTER TABLE BINBOUNDEMAILHANDLER
+              CHANGE BSTATUS      BSTATUS      VARCHAR(20) DEFAULT 'inactive' NOT NULL,
+              CHANGE BDEPARTMENTS BDEPARTMENTS JSON                            NOT NULL,
+              CHANGE BLASTCHECKED BLASTCHECKED VARCHAR(20) DEFAULT NULL,
+              CHANGE BCONFIG      BCONFIG      JSON        DEFAULT NULL
+        SQL);
 
         $this->addSql(<<<'SQL'
             ALTER TABLE BMESSAGES
-              CHANGE BMESSTYPE BMESSTYPE VARCHAR(4)   NOT NULL,
-              CHANGE BTOPIC    BTOPIC    VARCHAR(255) NOT NULL,
-              CHANGE BLANG     BLANG     VARCHAR(2)   NOT NULL,
-              CHANGE BDIRECT   BDIRECT   VARCHAR(3)   NOT NULL
+              CHANGE BMESSTYPE BMESSTYPE VARCHAR(4)   DEFAULT 'WA'      NOT NULL,
+              CHANGE BTOPIC    BTOPIC    VARCHAR(255) DEFAULT 'UNKNOWN' NOT NULL,
+              CHANGE BLANG     BLANG     VARCHAR(2)   DEFAULT 'NN'      NOT NULL,
+              CHANGE BDIRECT   BDIRECT   VARCHAR(3)   DEFAULT 'OUT'     NOT NULL
         SQL);
 
-        $this->addSql("UPDATE BINBOUNDEMAILHANDLER SET BLASTCHECKED = '' WHERE BLASTCHECKED IS NULL");
-        $this->addSql('UPDATE BINBOUNDEMAILHANDLER SET BCONFIG = JSON_OBJECT() WHERE BCONFIG IS NULL');
-        $this->addSql(<<<'SQL'
-            ALTER TABLE BINBOUNDEMAILHANDLER
-              CHANGE BSTATUS      BSTATUS      VARCHAR(20) NOT NULL,
-              CHANGE BDEPARTMENTS BDEPARTMENTS JSON DEFAULT NULL,
-              CHANGE BLASTCHECKED BLASTCHECKED VARCHAR(20) NOT NULL,
-              CHANGE BCONFIG      BCONFIG      JSON NOT NULL
-        SQL);
+        $this->addSql('ALTER TABLE BMODELS CHANGE BJSON BJSON JSON NOT NULL');
 
-        $this->addSql("UPDATE BCHATS SET BTITLE       = '' WHERE BTITLE       IS NULL");
-        $this->addSql("UPDATE BCHATS SET BSHARETOKEN  = '' WHERE BSHARETOKEN  IS NULL");
-        $this->addSql("UPDATE BCHATS SET BOGIMAGEPATH = '' WHERE BOGIMAGEPATH IS NULL");
-        $this->addSql(<<<'SQL'
-            ALTER TABLE BCHATS
-              CHANGE BTITLE       BTITLE       VARCHAR(255) NOT NULL,
-              CHANGE BSHARETOKEN  BSHARETOKEN  VARCHAR(64)  NOT NULL,
-              CHANGE BSOURCE      BSOURCE      VARCHAR(16)  NOT NULL,
-              CHANGE BOGIMAGEPATH BOGIMAGEPATH VARCHAR(255) NOT NULL
-        SQL);
-
-        $this->addSql(<<<'SQL'
-            ALTER TABLE BWIDGETS
-              CHANGE BCONFIG          BCONFIG          JSON DEFAULT NULL,
-              CHANGE BALLOWED_DOMAINS BALLOWED_DOMAINS JSON DEFAULT NULL
-        SQL);
-
-        $this->addSql("UPDATE BGUEST_SESSIONS SET BIPADDRESS = '' WHERE BIPADDRESS IS NULL");
-        $this->addSql("UPDATE BGUEST_SESSIONS SET BCOUNTRY = '' WHERE BCOUNTRY IS NULL");
-        $this->addSql(<<<'SQL'
-            ALTER TABLE BGUEST_SESSIONS
-              CHANGE BIPADDRESS BIPADDRESS VARCHAR(45) NOT NULL,
-              CHANGE BCOUNTRY   BCOUNTRY   VARCHAR(2)  NOT NULL
-        SQL);
-
-        $this->addSql('UPDATE BUSELOG SET BPRICE_SNAPSHOT = JSON_OBJECT() WHERE BPRICE_SNAPSHOT IS NULL');
-        $this->addSql(<<<'SQL'
-            ALTER TABLE BUSELOG
-              CHANGE BPROVIDER       BPROVIDER       VARCHAR(32)    NOT NULL,
-              CHANGE BMODEL          BMODEL          VARCHAR(128)   NOT NULL,
-              CHANGE BPRICE_SNAPSHOT BPRICE_SNAPSHOT JSON           NOT NULL,
-              CHANGE BCOST           BCOST           NUMERIC(10, 6) NOT NULL,
-              CHANGE BSTATUS         BSTATUS         VARCHAR(16)    NOT NULL,
-              CHANGE BMETADATA       BMETADATA       JSON           DEFAULT NULL
-        SQL);
-
-        $this->addSql("UPDATE BWIDGET_SESSIONS SET BMODE = 'ai' WHERE BMODE IS NULL");
-        $this->addSql("UPDATE BWIDGET_SESSIONS SET BLAST_MESSAGE_PREVIEW = '' WHERE BLAST_MESSAGE_PREVIEW IS NULL");
-        $this->addSql("UPDATE BWIDGET_SESSIONS SET BCOUNTRY = '' WHERE BCOUNTRY IS NULL");
-        $this->addSql("UPDATE BWIDGET_SESSIONS SET BTITLE = '' WHERE BTITLE IS NULL");
-        $this->addSql('UPDATE BWIDGET_SESSIONS SET BCUSTOM_FIELD_VALUES = JSON_OBJECT() WHERE BCUSTOM_FIELD_VALUES IS NULL');
-        $this->addSql(<<<'SQL'
-            ALTER TABLE BWIDGET_SESSIONS
-              CHANGE BMODE                 BMODE                 VARCHAR(16)  NOT NULL,
-              CHANGE BLAST_MESSAGE_PREVIEW BLAST_MESSAGE_PREVIEW VARCHAR(255) NOT NULL,
-              CHANGE BCOUNTRY              BCOUNTRY              VARCHAR(2)   NOT NULL,
-              CHANGE BTITLE                BTITLE                VARCHAR(100) NOT NULL,
-              CHANGE BCUSTOM_FIELD_VALUES  BCUSTOM_FIELD_VALUES  JSON         NOT NULL
-        SQL);
-
-        $this->addSql('UPDATE BMODEL_PRICE_HISTORY SET BCACHEPRICEIN = 0 WHERE BCACHEPRICEIN IS NULL');
-        $this->addSql("UPDATE BMODEL_PRICE_HISTORY SET BVALID_TO = '1970-01-01 00:00:00' WHERE BVALID_TO IS NULL");
         $this->addSql(<<<'SQL'
             ALTER TABLE BMODEL_PRICE_HISTORY
-              CHANGE BINUNIT       BINUNIT       VARCHAR(24)    NOT NULL,
-              CHANGE BOUTUNIT      BOUTUNIT      VARCHAR(24)    NOT NULL,
-              CHANGE BCACHEPRICEIN BCACHEPRICEIN NUMERIC(10, 8) NOT NULL,
-              CHANGE BSOURCE       BSOURCE       VARCHAR(32)    NOT NULL,
-              CHANGE BVALID_TO     BVALID_TO     DATETIME       NOT NULL
+              CHANGE BINUNIT       BINUNIT       VARCHAR(24)    DEFAULT 'per1M'  NOT NULL,
+              CHANGE BOUTUNIT      BOUTUNIT      VARCHAR(24)    DEFAULT 'per1M'  NOT NULL,
+              CHANGE BCACHEPRICEIN BCACHEPRICEIN NUMERIC(10, 8) DEFAULT NULL,
+              CHANGE BSOURCE       BSOURCE       VARCHAR(32)    DEFAULT 'manual' NOT NULL,
+              CHANGE BVALID_TO     BVALID_TO     DATETIME       DEFAULT NULL
         SQL);
 
-        $this->addSql("UPDATE plugin_data SET data_key = '' WHERE data_key IS NULL");
-        $this->addSql(<<<'SQL'
-            ALTER TABLE plugin_data
-              CHANGE data_key data_key VARCHAR(255) NOT NULL,
-              CHANGE data     data     JSON         DEFAULT NULL
-        SQL);
+        $this->addSql('ALTER TABLE BPROMPTS CHANGE BLANG BLANG VARCHAR(2) DEFAULT \'en\' NOT NULL');
 
-        $this->addSql('ALTER TABLE BMODELS CHANGE BJSON BJSON JSON DEFAULT NULL');
-
-        $this->addSql("UPDATE BFILES SET BGROUPKEY = '' WHERE BGROUPKEY IS NULL");
-        $this->addSql(<<<'SQL'
-            ALTER TABLE BFILES
-              CHANGE BSTATUS   BSTATUS   VARCHAR(32)  NOT NULL,
-              CHANGE BGROUPKEY BGROUPKEY VARCHAR(128) NOT NULL
-        SQL);
-
-        $this->addSql("UPDATE BSEARCHRESULTS SET BPUBLISHED = '' WHERE BPUBLISHED IS NULL");
-        $this->addSql("UPDATE BSEARCHRESULTS SET BSOURCE = '' WHERE BSOURCE IS NULL");
-        $this->addSql('UPDATE BSEARCHRESULTS SET BEXTRASNIPPETS = JSON_OBJECT() WHERE BEXTRASNIPPETS IS NULL');
         $this->addSql(<<<'SQL'
             ALTER TABLE BSEARCHRESULTS
-              CHANGE BPUBLISHED     BPUBLISHED     VARCHAR(100) NOT NULL,
-              CHANGE BSOURCE        BSOURCE        VARCHAR(255) NOT NULL,
-              CHANGE BEXTRASNIPPETS BEXTRASNIPPETS JSON         NOT NULL
+              CHANGE BPUBLISHED     BPUBLISHED     VARCHAR(100) DEFAULT NULL,
+              CHANGE BSOURCE        BSOURCE        VARCHAR(255) DEFAULT NULL,
+              CHANGE BEXTRASNIPPETS BEXTRASNIPPETS JSON         DEFAULT NULL
         SQL);
 
         $this->addSql(<<<'SQL'
             ALTER TABLE BSESSIONS
-              CHANGE BIPADDRESS BIPADDRESS VARCHAR(45)  NOT NULL,
-              CHANGE BUSERAGENT BUSERAGENT VARCHAR(255) NOT NULL
+              CHANGE BIPADDRESS BIPADDRESS VARCHAR(45)  DEFAULT '' NOT NULL,
+              CHANGE BUSERAGENT BUSERAGENT VARCHAR(255) DEFAULT '' NOT NULL
         SQL);
 
-        $this->addSql(<<<'SQL'
-            ALTER TABLE BAPIKEYS
-              CHANGE BSCOPES BSCOPES JSON         DEFAULT NULL,
-              CHANGE BNAME   BNAME   VARCHAR(128) NOT NULL
-        SQL);
-
-        $this->addSql('ALTER TABLE BTOKENS CHANGE BIPADDRESS BIPADDRESS VARCHAR(45) NOT NULL');
-
-        $this->addSql("UPDATE BWIDGET_SUMMARIES SET BAI_MODEL = '' WHERE BAI_MODEL IS NULL");
-        $this->addSql('ALTER TABLE BWIDGET_SUMMARIES CHANGE BAI_MODEL BAI_MODEL VARCHAR(64) NOT NULL');
-
-        $this->addSql('ALTER TABLE BPROMPTS CHANGE BLANG BLANG VARCHAR(2) NOT NULL');
-
-        $this->addSql("UPDATE BSUBSCRIPTIONS SET BSTRIPE_MONTHLY_ID = '' WHERE BSTRIPE_MONTHLY_ID IS NULL");
-        $this->addSql("UPDATE BSUBSCRIPTIONS SET BSTRIPE_YEARLY_ID = '' WHERE BSTRIPE_YEARLY_ID IS NULL");
         $this->addSql(<<<'SQL'
             ALTER TABLE BSUBSCRIPTIONS
-              CHANGE BCOST_BUDGET_MONTHLY BCOST_BUDGET_MONTHLY NUMERIC(10, 2) NOT NULL,
-              CHANGE BCOST_BUDGET_YEARLY  BCOST_BUDGET_YEARLY  NUMERIC(10, 2) NOT NULL,
-              CHANGE BSTRIPE_MONTHLY_ID   BSTRIPE_MONTHLY_ID   VARCHAR(128)   NOT NULL,
-              CHANGE BSTRIPE_YEARLY_ID    BSTRIPE_YEARLY_ID    VARCHAR(128)   NOT NULL
+              CHANGE BCOST_BUDGET_MONTHLY BCOST_BUDGET_MONTHLY NUMERIC(10, 2) DEFAULT '0' NOT NULL,
+              CHANGE BCOST_BUDGET_YEARLY  BCOST_BUDGET_YEARLY  NUMERIC(10, 2) DEFAULT '0' NOT NULL,
+              CHANGE BSTRIPE_MONTHLY_ID   BSTRIPE_MONTHLY_ID   VARCHAR(128)   DEFAULT NULL,
+              CHANGE BSTRIPE_YEARLY_ID    BSTRIPE_YEARLY_ID    VARCHAR(128)   DEFAULT NULL
         SQL);
 
-        $this->addSql("UPDATE BUSER SET BPW = '' WHERE BPW IS NULL");
+        $this->addSql("ALTER TABLE BTOKENS CHANGE BIPADDRESS BIPADDRESS VARCHAR(45) DEFAULT '' NOT NULL");
+
+        $this->addSql(<<<'SQL'
+            ALTER TABLE BUSELOG
+              CHANGE BPROVIDER       BPROVIDER       VARCHAR(32)    DEFAULT ''        NOT NULL,
+              CHANGE BMODEL          BMODEL          VARCHAR(128)   DEFAULT ''        NOT NULL,
+              CHANGE BPRICE_SNAPSHOT BPRICE_SNAPSHOT JSON           DEFAULT NULL,
+              CHANGE BCOST           BCOST           NUMERIC(10, 6) DEFAULT '0'       NOT NULL,
+              CHANGE BSTATUS         BSTATUS         VARCHAR(16)    DEFAULT 'success' NOT NULL,
+              CHANGE BMETADATA       BMETADATA       JSON                             NOT NULL
+        SQL);
+
         $this->addSql(<<<'SQL'
             ALTER TABLE BUSER
-              CHANGE BINTYPE         BINTYPE         VARCHAR(16) NOT NULL,
-              CHANGE BPW             BPW             VARCHAR(64) NOT NULL,
-              CHANGE BUSERLEVEL      BUSERLEVEL      VARCHAR(32) NOT NULL,
-              CHANGE BUSERDETAILS    BUSERDETAILS    JSON DEFAULT NULL,
-              CHANGE BPAYMENTDETAILS BPAYMENTDETAILS JSON DEFAULT NULL
+              CHANGE BINTYPE         BINTYPE         VARCHAR(16) DEFAULT 'WEB' NOT NULL,
+              CHANGE BPW             BPW             VARCHAR(64) DEFAULT NULL,
+              CHANGE BUSERLEVEL      BUSERLEVEL      VARCHAR(32) DEFAULT 'NEW' NOT NULL,
+              CHANGE BUSERDETAILS    BUSERDETAILS    JSON                      NOT NULL,
+              CHANGE BPAYMENTDETAILS BPAYMENTDETAILS JSON                      NOT NULL
         SQL);
+
+        $this->addSql(<<<'SQL'
+            ALTER TABLE BWIDGETS
+              CHANGE BCONFIG          BCONFIG          JSON NOT NULL,
+              CHANGE BALLOWED_DOMAINS BALLOWED_DOMAINS JSON NOT NULL
+        SQL);
+
+        $this->addSql(<<<'SQL'
+            ALTER TABLE BWIDGET_SESSIONS
+              CHANGE BMODE                 BMODE                 VARCHAR(16)  DEFAULT 'ai',
+              CHANGE BLAST_MESSAGE_PREVIEW BLAST_MESSAGE_PREVIEW VARCHAR(255) DEFAULT NULL,
+              CHANGE BCOUNTRY              BCOUNTRY              VARCHAR(2)   DEFAULT NULL,
+              CHANGE BTITLE                BTITLE                VARCHAR(100) DEFAULT NULL,
+              CHANGE BCUSTOM_FIELD_VALUES  BCUSTOM_FIELD_VALUES  JSON         DEFAULT NULL
+        SQL);
+
+        $this->addSql('ALTER TABLE BWIDGET_SUMMARIES CHANGE BAI_MODEL BAI_MODEL VARCHAR(64) DEFAULT NULL');
+
+        $this->addSql(<<<'SQL'
+            ALTER TABLE plugin_data
+              CHANGE data_key data_key VARCHAR(255) DEFAULT NULL,
+              CHANGE data     data     JSON         NOT NULL
+        SQL);
+
+        // Drop the entity-required `(DC2Type:datetime_immutable)` comment to
+        // restore the baseline state which omitted it.
+        $this->addSql('ALTER TABLE messenger_messages CHANGE delivered_at delivered_at DATETIME DEFAULT NULL');
     }
 }

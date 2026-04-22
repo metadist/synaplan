@@ -54,9 +54,9 @@ All seeders are idempotent and safe to re-run any number of times:
 - **Models / prompts** use `INSERT … ON DUPLICATE KEY UPDATE` on **catalog-owned columns
 only** — operator toggles (e.g. `BSELECTABLE`, `BSHOWWHENFREE`) are preserved across
 re-seeds, but corrected names/prices/providerIds DO propagate to existing installs.
-- `**BCONFIG` (defaults + rate limits)** uses `INSERT IGNORE`, race-safe via the
+- **`BCONFIG`** (defaults + rate limits) uses `INSERT IGNORE`, race-safe via the
 `UNIQUE(BOWNERID, BGROUP, BSETTING)` index added in `Version20260420000000`. This
-means `**BCONFIG` defaults are bootstrap-only**: if you change a default value in
+means **`BCONFIG` defaults are bootstrap-only**: if you change a default value in
 code, existing installs keep their stored value (operator override or stale default).
 Defaults that need to be force-rolled-out across all instances must ship as a
 dedicated migration that explicitly UPDATEs the rows.
