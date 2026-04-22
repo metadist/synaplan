@@ -47,9 +47,17 @@ Don't edit migrations or fixtures — extend the catalog source of truth:
 - **Default config** → add to `App\Seed\DefaultModelConfigSeeder::PROD_MODEL_DEFAULTS` / `PROD_FLAGS` (and `TEST_DEFAULTS` for PHPUnit/E2E coverage), then `make -C backend seed-defaults`. Model bindings use `service:providerId:tag` keys resolved via `ModelCatalog::findBidByKey()`; never hard-code numeric BIDs here.
 - **Rate-limit defaults** → add to `App\Seed\RateLimitConfigSeeder::DEFAULTS`, then `make -C backend seed-ratelimits`
 
-All seeders are idempotent (`INSERT … ON DUPLICATE KEY UPDATE` for models/prompts —
-catalog-owned columns only, operator toggles are preserved; `INSERT IGNORE` for
-`BCONFIG`, race-safe via `UNIQUE(BOWNERID, BGROUP, BSETTING)`), so re-running is always safe.
+All seeders are idempotent and safe to re-run any number of times:
+
+- **Models / prompts** use `INSERT … ON DUPLICATE KEY UPDATE` on **catalog-owned columns
+  only** — operator toggles (e.g. `BSELECTABLE`, `BSHOWWHENFREE`) are preserved across
+  re-seeds, but corrected names/prices/providerIds DO propagate to existing installs.
+- **`BCONFIG` (defaults + rate limits)** uses `INSERT IGNORE`, race-safe via the
+  `UNIQUE(BOWNERID, BGROUP, BSETTING)` index added in `Version20260420000000`. This
+  means **`BCONFIG` defaults are bootstrap-only**: if you change a default value in
+  code, existing installs keep their stored value (operator override or stale default).
+  Defaults that need to be force-rolled-out across all instances must ship as a
+  dedicated migration that explicitly UPDATEs the rows.
 
 ### I want a clean dev DB
 
@@ -65,19 +73,25 @@ docker compose up -d         # entrypoint runs migrations + fixtures + seed
 1. Wait for the DB.
 2. **Bootstrap migrations metadata** if the DB has app tables (`BUSER`) but no
    `doctrine_migration_versions` table — i.e. legacy production. The entrypoint
-   manually creates the metadata table with the platform-default charset and then
-   `INSERT IGNORE`s every shipped `Version*.php` so the baseline is marked applied
-   **without** re-executing its DDL:
+   creates the metadata table with the same charset/collation as the baseline schema
+   and `INSERT IGNORE`s **only the baseline migration** (currently
+   `Version20260417000000`) so its DDL is not re-executed against an existing schema:
     ```sql
-    CREATE TABLE IF NOT EXISTS doctrine_migration_versions (...) DEFAULT CHARACTER SET utf8mb4 ...;
+    CREATE TABLE IF NOT EXISTS doctrine_migration_versions (...)
+        DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci ENGINE=InnoDB;
     INSERT IGNORE INTO doctrine_migration_versions (version, executed_at, execution_time)
-        VALUES ('DoctrineMigrations\\VersionXYZ', NOW(), 0);
+        VALUES ('DoctrineMigrations\\Version20260417000000', NOW(), 0);
     ```
+   **All post-baseline migrations are deliberately left unregistered** so step 3 below
+   applies them against the legacy DB just like on a fresh install. This is critical:
+   pre-marking later migrations as applied would silently skip schema changes on
+   upgrade.
+
    We bypass `doctrine:migrations:sync-metadata-storage` + `version --add --all` because
    the DBAL MariaDB schema comparator wrongly reports the auto-created metadata table as
    "not up to date" (column-level charset mismatch on `version`), which then breaks every
    subsequent migrations command.
-3. Run `doctrine:migrations:migrate` (fresh DB → full schema; existing DB → only newer migrations).
+3. Run `doctrine:migrations:migrate` (fresh DB → full schema; legacy DB → every migration newer than the baseline).
 4. Repeat steps 2 and 3 for the test DB (dev only).
 5. **Dev/test only:** load `UserFixtures` if `BUSER` is empty (this purges entity tables first).
 6. **Always:** run `app:seed` to (re-)populate models/prompts/config catalogs.

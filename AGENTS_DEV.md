@@ -130,7 +130,8 @@ make -C backend test
 - ❌ **NEVER** run `doctrine:fixtures:load` in prod (purges all entity tables)
 - ❌ **NEVER** put production data in `DataFixtures/` (fixtures are demo data only)
 - ✅ **ALWAYS** write seeders using INSERT-IF-NOT-EXISTS (`BConfigSeeder::insertIfMissing` — backed by `INSERT IGNORE` and the `uniq_config_owner_group_setting` UNIQUE index, race-safe) or `INSERT … ON DUPLICATE KEY UPDATE` (for tables with a unique key); for `BMODELS`, only catalog-owned fields (service/name/tag/provid/prices/units/quality/rating/json) are overwritten on UPDATE — operator-owned toggles (`BSELECTABLE`, `BACTIVE`, `BISDEFAULT`) are seeded once and never wiped on container restart
-- ✅ On first boot against a legacy prod DB (BUSER exists but `doctrine_migration_versions` does not): the entrypoint automatically registers the baseline without re-executing DDL
+- ⚠️ **`BCONFIG` defaults are bootstrap-only.** Changing a value in `DefaultModelConfigSeeder` / `RateLimitConfigSeeder` does NOT propagate to existing installs (the `INSERT IGNORE` skips rows that already exist). To force-roll-out a new default everywhere, ship a dedicated migration that explicitly UPDATEs the affected `BCONFIG` rows.
+- ✅ On first boot against a legacy prod DB (`BUSER` exists but `doctrine_migration_versions` does not): the entrypoint registers ONLY the baseline migration. Every post-baseline migration runs normally via `doctrine:migrations:migrate`, so legacy installs receive new schema changes the same way fresh installs do.
 
 ### API Documentation (Swagger UI)
 - **ALWAYS use Swagger UI** to test endpoints: `http://localhost:8000/api/doc`

@@ -26,8 +26,12 @@ final class ConfigSeedDefaultsCommand extends Command
     {
         $this->setHelp(
             "Seeds initial DEFAULTMODEL bindings (CHAT, TOOLS, TEXT2PIC, ...) plus the\n".
-            "ai.default_chat_provider flag into BCONFIG (ownerId=0). Uses insert-if-missing,\n".
-            "so operator overrides are NEVER overwritten.\n\n".
+            "ai.default_chat_provider flag into BCONFIG (ownerId=0).\n\n".
+            "Semantics: insert-if-missing only.\n".
+            "  - Operator overrides are NEVER overwritten.\n".
+            "  - Changes to default VALUES in code do NOT propagate to existing installs.\n".
+            "    To force-update an existing default across all environments, ship a\n".
+            "    dedicated migration that UPDATEs the row.\n\n".
             'In the test env, defaults are routed at TestProvider models (negative IDs from ModelSeeder).'
         );
     }

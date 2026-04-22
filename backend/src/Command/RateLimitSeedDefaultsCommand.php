@@ -26,7 +26,12 @@ final class RateLimitSeedDefaultsCommand extends Command
     {
         $this->setHelp(
             "Seeds smart rate limiting flags + per-plan limits (ANONYMOUS, NEW, PRO, TEAM, BUSINESS)\n".
-            'into BCONFIG (ownerId=0). Operator overrides are NEVER overwritten.'
+            "into BCONFIG (ownerId=0).\n\n".
+            "Semantics: insert-if-missing only.\n".
+            "  - Operator overrides are NEVER overwritten.\n".
+            "  - Changes to default values in code do NOT propagate to existing installs.\n".
+            "    To roll out a tightened/loosened default everywhere, ship a dedicated\n".
+            '    migration that UPDATEs the affected BCONFIG rows.'
         );
     }
 

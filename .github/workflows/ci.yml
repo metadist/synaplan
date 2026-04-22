@@ -114,11 +114,10 @@ jobs:
 
       - name: Setup database schema
         working-directory: backend
-        run: |
-          # Apply Doctrine migrations (baseline + future migrations).
-          php bin/console doctrine:migrations:migrate --no-interaction --allow-no-migration
-          # Defensive schema sync to catch any entity drift not yet covered by a migration.
-          php bin/console doctrine:schema:update --force
+        # Migrations are the single source of truth. We deliberately do NOT run
+        # `doctrine:schema:update --force` here — if an entity change is missing
+        # a migration, CI MUST fail so we surface the gap before deploy.
+        run: php bin/console doctrine:migrations:migrate --no-interaction --allow-no-migration
 
       - name: Load demo fixtures
         working-directory: backend
