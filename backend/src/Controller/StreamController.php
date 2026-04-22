@@ -274,6 +274,8 @@ class StreamController extends AbstractController
         $promptTopic = $request->query->get('promptTopic');
         $promptId = $request->query->get('promptId');
         $continueMessageId = $request->query->get('continueMessageId');
+        // Explicit opt-out from memory loading + extraction (used by public demo via synaplan.com/try-chat)
+        $disableMemories = '1' === $request->query->get('disableMemories', '0');
 
         // Parse fileIds (can be comma-separated string or single ID)
         $fileIdArray = [];
@@ -345,7 +347,7 @@ class StreamController extends AbstractController
         $response->headers->set('X-Accel-Buffering', 'no');
         $response->headers->set('Connection', 'keep-alive');
 
-        $response->setCallback(function () use ($user, $messageText, $trackId, $chatId, $includeReasoning, $webSearch, $modelId, $isAgain, $fileIdArray, $isWidgetMode, $isGuestMode, $fixedTaskPromptTopic, $widgetSession, $guestSession, $rateLimitError, $voiceReply, $continueMessageId) {
+        $response->setCallback(function () use ($user, $messageText, $trackId, $chatId, $includeReasoning, $webSearch, $modelId, $isAgain, $fileIdArray, $isWidgetMode, $isGuestMode, $fixedTaskPromptTopic, $widgetSession, $guestSession, $rateLimitError, $voiceReply, $continueMessageId, $disableMemories) {
             // Disable output buffering
             while (ob_get_level()) {
                 ob_end_clean();
@@ -560,7 +562,7 @@ class StreamController extends AbstractController
                     'is_continuation' => (bool) $continueMessageId,
                 ];
 
-                if ($isWidgetMode || $isGuestMode) {
+                if ($isWidgetMode || $isGuestMode || $disableMemories) {
                     $processingOptions['disable_memories'] = true;
                 }
 
