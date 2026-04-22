@@ -170,7 +170,8 @@
                     v-model="newFolderName"
                     type="text"
                     maxlength="100"
-                    class="flex-1 bg-transparent text-sm txt-primary placeholder:txt-secondary/60 focus:outline-none"
+                    :disabled="isUploading"
+                    class="flex-1 bg-transparent text-sm txt-primary placeholder:txt-secondary/60 focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed"
                     :placeholder="$t('files.newFolderInputPlaceholder')"
                     data-testid="input-new-folder-toolbar"
                     @keyup.enter="createNewFolder"
@@ -179,7 +180,7 @@
                 </div>
                 <div class="flex items-center gap-2 sm:shrink-0">
                   <button
-                    :disabled="!newFolderName.trim()"
+                    :disabled="!newFolderName.trim() || isUploading"
                     class="btn-primary px-4 py-2 rounded-lg text-sm flex items-center gap-1.5 disabled:opacity-40 disabled:cursor-not-allowed"
                     data-testid="btn-new-folder-create"
                     @click="createNewFolder"
@@ -1318,7 +1319,16 @@ const loadPendingFolders = (): string[] => {
     if (!raw) return []
     const parsed: unknown = JSON.parse(raw)
     if (!Array.isArray(parsed)) return []
-    return parsed.filter((value): value is string => typeof value === 'string' && value.trim() !== '')
+    const seen = new Set<string>()
+    const normalized: string[] = []
+    for (const value of parsed) {
+      if (typeof value !== 'string') continue
+      const trimmed = value.trim()
+      if (trimmed === '' || seen.has(trimmed)) continue
+      seen.add(trimmed)
+      normalized.push(trimmed)
+    }
+    return normalized
   } catch {
     return []
   }
@@ -1346,17 +1356,16 @@ const displayedFolders = computed<DisplayedFolder[]>(() => {
 })
 
 watch(
-  fileGroups,
-  (groups) => {
+  () => fileGroups.value.map((f) => f.name),
+  (groupNames) => {
     if (pendingFolders.value.length === 0) return
-    const realNames = new Set(groups.map((f) => f.name))
+    const realNames = new Set(groupNames)
     const remaining = pendingFolders.value.filter((name) => !realNames.has(name))
     if (remaining.length !== pendingFolders.value.length) {
       pendingFolders.value = remaining
       savePendingFolders(remaining)
     }
-  },
-  { deep: true }
+  }
 )
 
 // Inline "New folder" input in the upload toolbar
@@ -1377,6 +1386,8 @@ const cancelNewFolder = () => {
 }
 
 const createNewFolder = () => {
+  if (isUploading.value) return
+
   const name = newFolderName.value.trim()
   if (name === '') {
     showError(t('files.newFolderInvalid'))
