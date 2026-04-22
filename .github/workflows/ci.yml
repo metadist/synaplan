@@ -119,6 +119,17 @@ jobs:
         # a migration, CI MUST fail so we surface the gap before deploy.
         run: php bin/console doctrine:migrations:migrate --no-interaction --allow-no-migration
 
+      - name: Validate Doctrine mapping metadata
+        working-directory: backend
+        # Validates that ORM mapping metadata is internally consistent — catches
+        # broken `targetEntity`, mismatched `mappedBy`/`inversedBy`, missing
+        # join columns, etc. `--skip-sync` skips the database synchronization
+        # check entirely, so this step does NOT detect missing migrations or
+        # entity↔database drift; the full sync check is a known follow-up
+        # because the legacy baseline schema and current entity defaults still
+        # differ in many places (see docs/MIGRATIONS.md).
+        run: php bin/console doctrine:schema:validate --skip-sync
+
       - name: Load demo fixtures
         working-directory: backend
         # Loads only dev/test demo data (admin/demo/test users). Production-essential
