@@ -7,7 +7,7 @@ use Doctrine\ORM\Mapping as ORM;
 
 #[ORM\Entity(repositoryClass: ConfigRepository::class)]
 #[ORM\Table(name: 'BCONFIG')]
-#[ORM\Index(columns: ['BOWNERID', 'BGROUP', 'BSETTING'], name: 'idx_config_lookup')]
+#[ORM\UniqueConstraint(name: 'uniq_config_owner_group_setting', columns: ['BOWNERID', 'BGROUP', 'BSETTING'])]
 #[ORM\Index(columns: ['BGROUP'], name: 'idx_group')]
 #[ORM\Index(columns: ['BSETTING'], name: 'idx_setting')]
 class Config

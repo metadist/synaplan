@@ -379,12 +379,6 @@ parameters:
 			path: src/Service/RateLimitService.php
 
 		-
-			message: '#^Property App\\Service\\RateLimiterService\:\:\$logger is never read, only written\.$#'
-			identifier: property.onlyWritten
-			count: 1
-			path: src/Service/RateLimiterService.php
-
-		-
 			message: '#^Property App\\Service\\StorageQuotaService\:\:\$em is never read, only written\.$#'
 			identifier: property.onlyWritten
 			count: 1

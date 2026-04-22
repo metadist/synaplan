@@ -97,6 +97,20 @@ services:
             - '../src/Kernel.php'
             - '../src/Test/'
 
+    # Idempotent seeders for production-essential catalog data.
+    # Run from docker-entrypoint.sh after migrations (app:seed) and re-runnable from CLI.
+    App\Seed\ModelSeeder:
+        arguments:
+            $environment: '%kernel.environment%'
+
+    App\Seed\DefaultModelConfigSeeder:
+        arguments:
+            $environment: '%kernel.environment%'
+
+    App\Seed\DemoWidgetConfigSeeder:
+        arguments:
+            $environment: '%kernel.environment%'
+
     App\AI\Provider\AnthropicProvider:
         arguments:
             $apiKey: '%env(ANTHROPIC_API_KEY)%'
@@ -276,9 +290,6 @@ services:
 
     # Model Configuration Service
     App\Service\ModelConfigService: ~
-
-    # Rate Limiter Service
-    App\Service\RateLimiterService: ~
 
     # Internal Email Service (system emails - uses SMTP from ENV)
     App\Service\InternalEmailService: ~
