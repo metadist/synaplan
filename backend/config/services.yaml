@@ -276,9 +276,6 @@ services:
     # Model Configuration Service
     App\Service\ModelConfigService: ~
 
-    # Rate Limiter Service
-    App\Service\RateLimiterService: ~
-
     # Internal Email Service (system emails - uses SMTP from ENV)
     App\Service\InternalEmailService: ~
 
