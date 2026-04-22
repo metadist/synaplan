@@ -161,10 +161,7 @@
                 <div
                   class="flex items-center gap-2 flex-1 px-3 py-2 rounded-lg bg-black/[0.03] dark:bg-white/[0.03] border border-light-border/30 dark:border-dark-border/8 focus-within:border-[var(--brand)]/60 focus-within:ring-2 focus-within:ring-[var(--brand)]/20 transition-all"
                 >
-                  <Icon
-                    icon="heroicons:folder-plus"
-                    class="w-4 h-4 text-[var(--brand)] shrink-0"
-                  />
+                  <Icon icon="heroicons:folder-plus" class="w-4 h-4 text-[var(--brand)] shrink-0" />
                   <input
                     ref="newFolderInputRef"
                     v-model="newFolderName"
@@ -198,10 +195,7 @@
                 </div>
               </div>
               <p class="text-xs txt-secondary mt-2 flex items-start gap-1.5">
-                <Icon
-                  icon="heroicons:information-circle"
-                  class="w-3.5 h-3.5 mt-0.5 shrink-0"
-                />
+                <Icon icon="heroicons:information-circle" class="w-3.5 h-3.5 mt-0.5 shrink-0" />
                 <span>{{ $t('files.newFolderHint') }}</span>
               </p>
             </div>
