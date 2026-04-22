@@ -114,6 +114,19 @@
               {{ $t('files.addMore') }}
             </button>
 
+            <!-- New folder button (always available, no selection required) -->
+            <button
+              :disabled="isUploading"
+              class="px-4 py-2.5 rounded-lg border border-light-border/30 dark:border-dark-border/8 txt-secondary hover:txt-primary hover:border-[var(--brand)]/50 hover:bg-[var(--brand)]/5 transition-all text-sm flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent"
+              data-testid="btn-new-folder"
+              :aria-expanded="newFolderInputOpen"
+              aria-controls="new-folder-input-row"
+              @click="newFolderInputOpen ? cancelNewFolder() : openNewFolderInput()"
+            >
+              <Icon icon="heroicons:folder-plus" class="w-4 h-4" />
+              {{ $t('files.newFolder') }}
+            </button>
+
             <!-- Upload target breadcrumb -->
             <div class="flex items-center gap-2 text-xs flex-wrap">
               <span
@@ -135,6 +148,63 @@
               </p>
             </div>
           </div>
+
+          <!-- Inline "New folder" input -->
+          <Transition name="filter-slide">
+            <div
+              v-if="newFolderInputOpen"
+              id="new-folder-input-row"
+              class="mt-3 pt-3 border-t border-light-border/20 dark:border-dark-border/5"
+              data-testid="new-folder-input-row"
+            >
+              <div class="flex flex-col sm:flex-row sm:items-center gap-2">
+                <div
+                  class="flex items-center gap-2 flex-1 px-3 py-2 rounded-lg bg-black/[0.03] dark:bg-white/[0.03] border border-light-border/30 dark:border-dark-border/8 focus-within:border-[var(--brand)]/60 focus-within:ring-2 focus-within:ring-[var(--brand)]/20 transition-all"
+                >
+                  <Icon
+                    icon="heroicons:folder-plus"
+                    class="w-4 h-4 text-[var(--brand)] shrink-0"
+                  />
+                  <input
+                    ref="newFolderInputRef"
+                    v-model="newFolderName"
+                    type="text"
+                    maxlength="100"
+                    class="flex-1 bg-transparent text-sm txt-primary placeholder:txt-secondary/60 focus:outline-none"
+                    :placeholder="$t('files.newFolderInputPlaceholder')"
+                    data-testid="input-new-folder-toolbar"
+                    @keyup.enter="createNewFolder"
+                    @keyup.esc="cancelNewFolder"
+                  />
+                </div>
+                <div class="flex items-center gap-2 sm:shrink-0">
+                  <button
+                    :disabled="!newFolderName.trim()"
+                    class="btn-primary px-4 py-2 rounded-lg text-sm flex items-center gap-1.5 disabled:opacity-40 disabled:cursor-not-allowed"
+                    data-testid="btn-new-folder-create"
+                    @click="createNewFolder"
+                  >
+                    <Icon icon="heroicons:check" class="w-4 h-4" />
+                    {{ $t('files.newFolderCreate') }}
+                  </button>
+                  <button
+                    class="px-3 py-2 rounded-lg border border-light-border/30 dark:border-dark-border/8 txt-secondary hover:txt-primary hover:border-light-border/50 dark:hover:border-dark-border/15 transition-all text-sm"
+                    data-testid="btn-new-folder-cancel"
+                    @click="cancelNewFolder"
+                  >
+                    {{ $t('common.cancel') }}
+                  </button>
+                </div>
+              </div>
+              <p class="text-xs txt-secondary mt-2 flex items-start gap-1.5">
+                <Icon
+                  icon="heroicons:information-circle"
+                  class="w-3.5 h-3.5 mt-0.5 shrink-0"
+                />
+                <span>{{ $t('files.newFolderHint') }}</span>
+              </p>
+            </div>
+          </Transition>
 
           <!-- Upload Progress Bar -->
           <Transition name="fade">
@@ -207,21 +277,33 @@
                 <!-- Existing folders -->
                 <div class="space-y-1.5 max-h-60 overflow-y-auto scroll-thin">
                   <button
-                    v-for="folder in fileGroups"
+                    v-for="folder in displayedFolders"
                     :key="folder.name"
                     class="w-full flex items-center gap-3 px-4 py-3 rounded-xl border transition-all duration-150"
                     :class="
                       selectedGroup === folder.name && !groupKeyword
                         ? 'border-[var(--brand)] bg-[var(--brand)]/10 text-[var(--brand)]'
-                        : 'border-light-border/30 dark:border-dark-border/8 txt-secondary hover:border-[var(--brand)]/50 hover:bg-[var(--brand)]/5'
+                        : folder.pending
+                          ? 'border-dashed border-[var(--brand)]/40 txt-secondary hover:border-[var(--brand)]/60 hover:bg-[var(--brand)]/5'
+                          : 'border-light-border/30 dark:border-dark-border/8 txt-secondary hover:border-[var(--brand)]/50 hover:bg-[var(--brand)]/5'
                     "
                     @click="(selectExistingFolder(folder.name), (folderPickerOpen = false))"
                   >
-                    <Icon icon="heroicons:folder-solid" class="w-4 h-4 shrink-0" />
+                    <Icon
+                      :icon="folder.pending ? 'heroicons:folder-plus' : 'heroicons:folder-solid'"
+                      class="w-4 h-4 shrink-0"
+                    />
                     <span class="text-sm font-medium flex-1 text-left truncate">{{
                       folder.name
                     }}</span>
                     <span
+                      v-if="folder.pending"
+                      class="text-[10px] font-semibold uppercase tracking-wider text-[var(--brand)]/70"
+                    >
+                      {{ $t('files.newFolderEmpty') }}
+                    </span>
+                    <span
+                      v-else
                       class="text-[10px] font-semibold bg-black/5 dark:bg-white/10 px-2 py-0.5 rounded-full"
                       >{{ folder.count }}</span
                     >
@@ -443,7 +525,7 @@
 
             <!-- Empty: no folders AND no files -->
             <div
-              v-else-if="fileGroups.length === 0 && paginatedFiles.length === 0"
+              v-else-if="displayedFolders.length === 0 && paginatedFiles.length === 0"
               class="flex flex-col items-center justify-center py-20 gap-4"
               data-testid="state-empty"
             >
@@ -464,18 +546,24 @@
 
             <template v-else>
               <!-- Folder cards (with drag & drop) -->
-              <div v-if="fileGroups.length > 0" class="mb-6" data-testid="section-folder-grid">
+              <div
+                v-if="displayedFolders.length > 0"
+                class="mb-6"
+                data-testid="section-folder-grid"
+              >
                 <div
                   class="grid grid-cols-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-2 sm:gap-3"
                 >
                   <button
-                    v-for="folder in fileGroups"
+                    v-for="folder in displayedFolders"
                     :key="folder.name"
                     class="group/f flex flex-col items-center gap-2 sm:gap-3 p-3 sm:p-5 rounded-xl sm:rounded-2xl border transition-all duration-200 cursor-pointer"
                     :class="
                       folderDropTarget === folder.name
                         ? 'border-[var(--brand)] bg-[var(--brand)]/10 shadow-lg shadow-[var(--brand)]/20 scale-[1.03]'
-                        : 'border-light-border/20 dark:border-dark-border/7 hover:border-[var(--brand)]/30 hover:shadow-lg hover:shadow-[var(--brand)]/5 hover:bg-[var(--brand)]/[0.03]'
+                        : folder.pending
+                          ? 'border-dashed border-[var(--brand)]/40 hover:border-[var(--brand)]/60 hover:shadow-lg hover:shadow-[var(--brand)]/5 hover:bg-[var(--brand)]/[0.03]'
+                          : 'border-light-border/20 dark:border-dark-border/7 hover:border-[var(--brand)]/30 hover:shadow-lg hover:shadow-[var(--brand)]/5 hover:bg-[var(--brand)]/[0.03]'
                     "
                     :data-testid="`folder-card-${folder.name}`"
                     @click="enterFolder(folder.name)"
@@ -489,16 +577,21 @@
                         :icon="
                           folderDropTarget === folder.name
                             ? 'heroicons:folder-open-solid'
-                            : 'heroicons:folder-solid'
+                            : folder.pending
+                              ? 'heroicons:folder-plus'
+                              : 'heroicons:folder-solid'
                         "
                         class="w-9 h-9 sm:w-12 sm:h-12 transition-all duration-200"
                         :class="
                           folderDropTarget === folder.name
                             ? 'text-[var(--brand)] scale-110'
-                            : 'text-[var(--brand)]/50 group-hover/f:text-[var(--brand)] group-hover/f:scale-110'
+                            : folder.pending
+                              ? 'text-[var(--brand)]/40 group-hover/f:text-[var(--brand)] group-hover/f:scale-110'
+                              : 'text-[var(--brand)]/50 group-hover/f:text-[var(--brand)] group-hover/f:scale-110'
                         "
                       />
                       <span
+                        v-if="!folder.pending"
                         class="absolute -top-1 -right-2.5 inline-flex items-center justify-center min-w-[1.25rem] h-5 px-1.5 rounded-full text-[10px] font-bold transition-all duration-200"
                         :class="
                           folderDropTarget === folder.name
@@ -519,6 +612,12 @@
                     >
                       {{ folder.name }}
                     </span>
+                    <span
+                      v-if="folder.pending"
+                      class="text-[10px] uppercase tracking-wider font-semibold text-[var(--brand)]/70"
+                    >
+                      {{ $t('files.newFolderEmpty') }}
+                    </span>
                   </button>
                 </div>
               </div>
@@ -538,7 +637,7 @@
               <!-- All files table -->
               <div v-if="paginatedFiles.length > 0" data-testid="section-table">
                 <div
-                  v-if="fileGroups.length > 0"
+                  v-if="displayedFolders.length > 0"
                   class="flex items-center gap-2 mb-3 pt-2 border-t border-light-border/10 dark:border-dark-border/5"
                 >
                   <Icon icon="heroicons:document-text" class="w-4 h-4 txt-secondary" />
@@ -700,7 +799,7 @@
                         >
                           <FolderMoveMenu
                             :open="folderMenuOpen === file.id"
-                            :folders="fileGroups"
+                            :folders="displayedFolders"
                             @toggle="toggleFolderMenu(file.id)"
                             @move="moveFileToFolder(file.id, $event)"
                           />
@@ -980,7 +1079,7 @@
                       >
                         <FolderMoveMenu
                           :open="folderMenuOpen === file.id"
-                          :folders="fileGroups"
+                          :folders="displayedFolders"
                           :current-folder="openFolder"
                           @toggle="toggleFolderMenu(file.id)"
                           @move="moveFileToFolder(file.id, $event)"
@@ -1135,7 +1234,7 @@
 
 <script setup lang="ts">
 import { getErrorMessage } from '@/utils/errorMessage'
-import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { ref, computed, nextTick, onMounted, onUnmounted, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import MainLayout from '@/components/MainLayout.vue'
 import FileContentModal from '@/components/FileContentModal.vue'
@@ -1207,6 +1306,103 @@ const folderDropTarget = ref<string | null>(null)
 
 // Folder picker modal
 const folderPickerOpen = ref(false)
+
+// Pending (empty) folders — created locally before any file is uploaded into them.
+// Persisted in localStorage so they survive reloads. They are removed automatically
+// once the backend reports a real folder with the same name.
+const PENDING_FOLDERS_STORAGE_KEY = 'synaplan:files:pending-folders'
+
+const loadPendingFolders = (): string[] => {
+  try {
+    const raw = localStorage.getItem(PENDING_FOLDERS_STORAGE_KEY)
+    if (!raw) return []
+    const parsed: unknown = JSON.parse(raw)
+    if (!Array.isArray(parsed)) return []
+    return parsed.filter((value): value is string => typeof value === 'string' && value.trim() !== '')
+  } catch {
+    return []
+  }
+}
+
+const savePendingFolders = (folders: string[]): void => {
+  try {
+    localStorage.setItem(PENDING_FOLDERS_STORAGE_KEY, JSON.stringify(folders))
+  } catch (err) {
+    console.warn('Failed to persist pending folders', err)
+  }
+}
+
+const pendingFolders = ref<string[]>(loadPendingFolders())
+
+type DisplayedFolder = { name: string; count: number; pending: boolean }
+
+const displayedFolders = computed<DisplayedFolder[]>(() => {
+  const realNames = new Set(fileGroups.value.map((f) => f.name))
+  const real: DisplayedFolder[] = fileGroups.value.map((f) => ({ ...f, pending: false }))
+  const pending: DisplayedFolder[] = pendingFolders.value
+    .filter((name) => !realNames.has(name))
+    .map((name) => ({ name, count: 0, pending: true }))
+  return [...real, ...pending]
+})
+
+watch(
+  fileGroups,
+  (groups) => {
+    if (pendingFolders.value.length === 0) return
+    const realNames = new Set(groups.map((f) => f.name))
+    const remaining = pendingFolders.value.filter((name) => !realNames.has(name))
+    if (remaining.length !== pendingFolders.value.length) {
+      pendingFolders.value = remaining
+      savePendingFolders(remaining)
+    }
+  },
+  { deep: true }
+)
+
+// Inline "New folder" input in the upload toolbar
+const newFolderInputOpen = ref(false)
+const newFolderName = ref('')
+const newFolderInputRef = ref<HTMLInputElement | null>(null)
+
+const openNewFolderInput = async () => {
+  newFolderInputOpen.value = true
+  newFolderName.value = ''
+  await nextTick()
+  newFolderInputRef.value?.focus()
+}
+
+const cancelNewFolder = () => {
+  newFolderInputOpen.value = false
+  newFolderName.value = ''
+}
+
+const createNewFolder = () => {
+  const name = newFolderName.value.trim()
+  if (name === '') {
+    showError(t('files.newFolderInvalid'))
+    return
+  }
+
+  const existing = new Set<string>([
+    ...fileGroups.value.map((f) => f.name),
+    ...pendingFolders.value,
+  ])
+  if (existing.has(name)) {
+    showError(t('files.newFolderExists', { name }))
+    return
+  }
+
+  const next = [...pendingFolders.value, name]
+  pendingFolders.value = next
+  savePendingFolders(next)
+
+  selectedGroup.value = name
+  groupKeyword.value = ''
+  isCreatingNewFolder.value = false
+
+  showSuccess(t('files.newFolderCreated', { name }))
+  cancelNewFolder()
+}
 
 // Modal state
 const isModalOpen = ref(false)
