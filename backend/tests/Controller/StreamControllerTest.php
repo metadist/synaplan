@@ -2,60 +2,17 @@
 
 namespace App\Tests\Controller;
 
-use App\Entity\Chat;
-use App\Entity\User;
-use App\Service\TokenService;
-use App\Tests\Trait\AuthenticatedTestTrait;
 use Symfony\Bundle\FrameworkBundle\KernelBrowser;
 use Symfony\Bundle\FrameworkBundle\Test\WebTestCase;
 
 class StreamControllerTest extends WebTestCase
 {
-    use AuthenticatedTestTrait;
-
     private KernelBrowser $client;
-    private ?string $token = null;
 
     protected function setUp(): void
     {
         self::ensureKernelShutdown();
         $this->client = static::createClient();
-    }
-
-    private function getAuthToken(): string
-    {
-        if ($this->token) {
-            return $this->token;
-        }
-
-        // Find test user
-        $userRepository = $this->client->getContainer()->get('doctrine')->getRepository(User::class);
-        $user = $userRepository->findOneBy(['mail' => 'admin@synaplan.com']);
-
-        if (!$user) {
-            $this->markTestSkipped('Test user not found. Run fixtures first.');
-        }
-
-        // Generate access token using TokenService
-        $this->token = $this->authenticateClient($this->client, $user);
-
-        return $this->token;
-    }
-
-    private function createTestChat(): Chat
-    {
-        $em = $this->client->getContainer()->get('doctrine')->getManager();
-        $userRepository = $em->getRepository(User::class);
-        $user = $userRepository->findOneBy(['mail' => 'admin@synaplan.com']);
-
-        $chat = new Chat();
-        $chat->setUserId($user->getId());
-        $chat->setTitle('Stream Test Chat');
-
-        $em->persist($chat);
-        $em->flush();
-
-        return $chat;
     }
 
     public function testStreamRequiresAuthentication(): void
