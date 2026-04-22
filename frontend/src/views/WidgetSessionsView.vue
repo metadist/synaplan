@@ -1706,6 +1706,18 @@ const debouncedSaveCustomFields = () => {
 
   if (cfSaveTimer) clearTimeout(cfSaveTimer)
   cfSaveTimer = setTimeout(async () => {
+    // Re-check at fire time: the session could have been switched away from,
+    // taken over (mode -> human), or otherwise changed during the 800ms debounce.
+    // Without this guard the backend rejects with
+    // "Custom fields can only be set on internal sessions" (HTTP 400).
+    if (
+      !selectedSession.value ||
+      selectedSession.value.sessionId !== targetSessionId ||
+      selectedSession.value.mode !== 'internal'
+    ) {
+      return
+    }
+
     savingCustomFields.value = true
     try {
       await widgetSessionsApi.saveCustomFieldValues(widgetId.value, targetSessionId, valuesToSave)

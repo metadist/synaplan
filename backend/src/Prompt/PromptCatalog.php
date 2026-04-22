@@ -129,12 +129,14 @@ class PromptCatalog
      * Seed all built-in system prompts into the database.
      *
      * Inserts new prompts or updates existing ones matched by (ownerId=0, topic, language).
+     * User-created prompts (ownerId>0) are never touched.
      *
-     * @return string[] List of seeded topic keys
+     * @return array{inserted: list<string>, updated: list<string>} topic keys per outcome
      */
     public static function seed(Connection $connection): array
     {
-        $seeded = [];
+        $inserted = [];
+        $updated = [];
 
         foreach (self::all() as $prompt) {
             $existing = $connection->fetchOne(
@@ -147,17 +149,17 @@ class PromptCatalog
                     'UPDATE BPROMPTS SET BSHORTDESC = ?, BPROMPT = ? WHERE BID = ?',
                     [$prompt['shortDescription'], $prompt['prompt'], $existing]
                 );
+                $updated[] = $prompt['topic'];
             } else {
                 $connection->executeStatement(
                     'INSERT INTO BPROMPTS (BOWNERID, BLANG, BTOPIC, BSHORTDESC, BPROMPT) VALUES (0, ?, ?, ?, ?)',
                     [$prompt['language'], $prompt['topic'], $prompt['shortDescription'], $prompt['prompt']]
                 );
+                $inserted[] = $prompt['topic'];
             }
-
-            $seeded[] = $prompt['topic'];
         }
 
-        return $seeded;
+        return ['inserted' => $inserted, 'updated' => $updated];
     }
 
     private static function generalPrompt(): string

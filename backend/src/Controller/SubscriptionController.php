@@ -422,11 +422,14 @@ class SubscriptionController extends AbstractController
 
             $paymentDetails = $user->getPaymentDetails();
             $firstItem = $activeSubscription->items->data[0] ?? null;
+            // Stripe SDK v20 dropped the typed `current_period_start/end` properties from
+            // SubscriptionItem; the values still ship in the API response and are reachable
+            // via StripeObject's ArrayAccess, which PHPStan accepts.
             $paymentDetails['subscription'] = [
                 'stripe_subscription_id' => $activeSubscription->id,
                 'status' => $activeSubscription->status,
-                'subscription_start' => $firstItem?->current_period_start,
-                'subscription_end' => $firstItem?->current_period_end,
+                'subscription_start' => $firstItem['current_period_start'] ?? null,
+                'subscription_end' => $firstItem['current_period_end'] ?? null,
                 'plan' => $highestLevel,
                 'cancel_at_period_end' => $activeSubscription->cancel_at_period_end ?? false,
             ];
