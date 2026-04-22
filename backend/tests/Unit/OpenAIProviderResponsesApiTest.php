@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Tests\Unit;
 
 use App\AI\Provider\OpenAIProvider;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
 use Symfony\Contracts\HttpClient\HttpClientInterface;
@@ -347,6 +348,59 @@ class OpenAIProviderResponsesApiTest extends TestCase
     {
         $provider = $this->createProvider(apiKey: null);
         $this->assertFalse($provider->isAvailable());
+    }
+
+    public function testSupportsResponsesApiIncludesAllGptImageFamily(): void
+    {
+        $provider = $this->createProvider();
+        $method = new \ReflectionMethod($provider, 'supportsResponsesApi');
+
+        $this->assertTrue($method->invoke($provider, 'gpt-image-1'));
+        $this->assertTrue($method->invoke($provider, 'gpt-image-1.5'));
+        $this->assertTrue($method->invoke($provider, 'gpt-image-2'));
+    }
+
+    /**
+     * Integration-level regression test for the `/pic` bug:
+     * any `gpt-image-*` model (including the new `gpt-image-2`) must dispatch
+     * to the Image Generations endpoint, NOT the legacy DALL-E client path.
+     * Pic2pic with reference images must go through the Responses API.
+     *
+     * @param string[] $inputImages
+     */
+    #[DataProvider('imageApiRoutingProvider')]
+    public function testImageApiRoutingForAllSupportedModels(string $model, array $inputImages, string $expectedApi): void
+    {
+        $provider = $this->createProvider();
+        $method = new \ReflectionMethod($provider, 'selectImageApi');
+
+        $this->assertSame(
+            $expectedApi,
+            $method->invoke($provider, $model, $inputImages),
+            sprintf('Model "%s" with %d input image(s) must route to "%s" API', $model, \count($inputImages), $expectedApi)
+        );
+    }
+
+    /**
+     * @return array<string, array{0: string, 1: string[], 2: string}>
+     */
+    public static function imageApiRoutingProvider(): array
+    {
+        return [
+            // Text-to-image: gpt-image-* must use the Image Generations endpoint
+            'gpt-image-1 text2pic' => ['gpt-image-1',   [],                  'gpt_image'],
+            'gpt-image-1.5 text2pic' => ['gpt-image-1.5', [],                  'gpt_image'],
+            'gpt-image-2 text2pic' => ['gpt-image-2',   [],                  'gpt_image'],
+            // Pic2pic: gpt-image-* with reference images must use the Responses API
+            'gpt-image-1 pic2pic' => ['gpt-image-1',   ['/tmp/ref1.png'],   'responses'],
+            'gpt-image-1.5 pic2pic' => ['gpt-image-1.5', ['/tmp/ref1.png'],   'responses'],
+            'gpt-image-2 pic2pic' => ['gpt-image-2',   ['/tmp/ref1.png'],   'responses'],
+            // DALL-E stays on the legacy Images API client path
+            'dall-e-3 text2pic' => ['dall-e-3',      [],                  'dalle'],
+            'dall-e-2 text2pic' => ['dall-e-2',      [],                  'dalle'],
+            // DALL-E does NOT support the Responses API, so reference images still fall back to DALL-E
+            'dall-e-3 with images' => ['dall-e-3',      ['/tmp/ref1.png'],   'dalle'],
+        ];
     }
 
     private function createProvider(?string $apiKey = 'test-key', bool $storeResponses = true): OpenAIProvider

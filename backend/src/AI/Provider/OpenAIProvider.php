@@ -602,14 +602,11 @@ class OpenAIProvider implements ChatProviderInterface, EmbeddingProviderInterfac
             $model = $options['model'] ?? 'dall-e-3';
             $inputImages = $options['images'] ?? [];
 
-            // Pic2pic: use Responses API when input images are provided
-            if (!empty($inputImages) && $this->supportsResponsesApi($model)) {
-                return $this->generateImageWithResponsesApi($prompt, $inputImages, $options);
-            }
-
-            // GPT-Image-1 family uses Image Generations API with dedicated handling
-            if (str_starts_with($model, 'gpt-image-1')) {
-                return $this->generateImageWithGptImage1($prompt, $options, $model);
+            switch ($this->selectImageApi($model, $inputImages)) {
+                case 'responses':
+                    return $this->generateImageWithResponsesApi($prompt, $inputImages, $options);
+                case 'gpt_image':
+                    return $this->generateImageWithGptImage1($prompt, $options, $model);
             }
 
             // DALL-E models use Images API
@@ -655,9 +652,9 @@ class OpenAIProvider implements ChatProviderInterface, EmbeddingProviderInterfac
     }
 
     /**
-     * Generate image using gpt-image-1 family via Image Generations API.
+     * Generate image using gpt-image-* family via Image Generations API.
      *
-     * @see https://platform.openai.com/docs/guides/image-generation?image-generation-model=gpt-image-1
+     * @see https://platform.openai.com/docs/guides/image-generation
      */
     private function generateImageWithGptImage1(string $prompt, array $options, string $model): array
     {
@@ -765,9 +762,35 @@ class OpenAIProvider implements ChatProviderInterface, EmbeddingProviderInterfac
         }
     }
 
+    /**
+     * Decide which OpenAI image endpoint to dispatch a request to.
+     *
+     * - `responses`  : Responses API with the `image_generation` tool (pic2pic with reference images).
+     * - `gpt_image`  : Images Generations API for the gpt-image-* family (1, 1.5, 2, …).
+     * - `dalle`      : Legacy Images API via the OpenAI PHP client (dall-e-2, dall-e-3).
+     *
+     * @param string[] $inputImages Absolute paths to reference images, empty for text-to-image
+     */
+    private function selectImageApi(string $model, array $inputImages): string
+    {
+        if (!empty($inputImages) && $this->supportsResponsesApi($model)) {
+            return 'responses';
+        }
+
+        if (str_starts_with($model, 'gpt-image-')) {
+            return 'gpt_image';
+        }
+
+        return 'dalle';
+    }
+
     private function supportsResponsesApi(string $model): bool
     {
-        $responsesModels = ['gpt-image-1', 'gpt-image-1.5', 'gpt-5', 'gpt-5-mini', 'gpt-5.2', 'gpt-4.1', 'gpt-4o'];
+        if (str_starts_with($model, 'gpt-image-')) {
+            return true;
+        }
+
+        $responsesModels = ['gpt-5', 'gpt-5-mini', 'gpt-5.2', 'gpt-4.1', 'gpt-4o'];
 
         foreach ($responsesModels as $prefix) {
             if (str_starts_with($model, $prefix)) {
