@@ -564,11 +564,12 @@
                     </p>
                     <input
                       v-model="config.externalApiUrl"
-                      type="url"
+                      type="text"
                       :disabled="!auth.isPro"
-                      placeholder="https://api.example.com/users/{externalUserId}/profile"
+                      placeholder="api.example.com/users/{externalUserId}/profile"
                       class="w-full px-3 py-2 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)] disabled:opacity-50 disabled:cursor-not-allowed font-mono"
                       data-testid="input-external-api-url"
+                      @blur="normalizeApiUrl"
                     />
                   </div>
                 </div>
@@ -653,6 +654,163 @@ SynaplanWidget.init({
                     {{ $t('widgets.advancedConfig.userDataIntegration.howStep3') }}
                   </li>
                 </ul>
+              </div>
+
+              <!-- Session Mode -->
+              <div
+                v-if="config.externalApiUrl"
+                class="mt-3 p-3 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20"
+              >
+                <div class="flex items-center justify-between gap-3">
+                  <div>
+                    <p class="text-sm font-medium txt-primary">
+                      {{ $t('widgets.advancedConfig.userDataIntegration.sessionModeTitle') }}
+                    </p>
+                    <p class="text-xs txt-secondary mt-0.5">
+                      {{ $t('widgets.advancedConfig.userDataIntegration.sessionModeHelp') }}
+                    </p>
+                  </div>
+                  <select
+                    v-model="config.sessionMode"
+                    :disabled="!auth.isPro"
+                    class="px-3 py-1.5 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)] disabled:opacity-50 disabled:cursor-not-allowed"
+                    data-testid="select-session-mode"
+                  >
+                    <option value="browser">
+                      {{ $t('widgets.advancedConfig.userDataIntegration.sessionModeBrowser') }}
+                    </option>
+                    <option value="user">
+                      {{ $t('widgets.advancedConfig.userDataIntegration.sessionModeUser') }}
+                    </option>
+                  </select>
+                </div>
+
+                <!-- Privacy warning for browser mode with User Data Integration -->
+                <div
+                  v-if="config.sessionMode === 'browser'"
+                  class="mt-2 p-2.5 rounded-lg bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800/50"
+                >
+                  <div class="flex items-start gap-2">
+                    <Icon
+                      icon="heroicons:exclamation-triangle"
+                      class="w-4 h-4 text-amber-600 dark:text-amber-400 flex-shrink-0 mt-0.5"
+                    />
+                    <p class="text-xs text-amber-700 dark:text-amber-300">
+                      {{
+                        $t('widgets.advancedConfig.userDataIntegration.sessionModeBrowserWarning')
+                      }}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <!-- API Connection Test -->
+              <div
+                v-if="config.externalApiUrl"
+                class="mt-3 p-3 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20"
+              >
+                <p class="text-sm font-medium txt-primary mb-1">
+                  {{ $t('widgets.advancedConfig.userDataIntegration.testTitle') }}
+                </p>
+                <p class="text-xs txt-secondary mb-2.5">
+                  {{ $t('widgets.advancedConfig.userDataIntegration.testHelp') }}
+                </p>
+                <div class="flex items-center gap-2">
+                  <input
+                    v-model="apiTestUserId"
+                    type="text"
+                    :disabled="!auth.isPro || apiTestLoading"
+                    :placeholder="$t('widgets.advancedConfig.userDataIntegration.testPlaceholder')"
+                    class="flex-1 px-3 py-2 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)] disabled:opacity-50 disabled:cursor-not-allowed font-mono"
+                    data-testid="input-api-test-user-id"
+                    @keydown.enter="testApiConnection"
+                  />
+                  <button
+                    :disabled="
+                      !auth.isPro || apiTestLoading || !config.externalApiUrl || apiTestCooldown > 0
+                    "
+                    class="px-4 py-2 rounded-lg text-sm font-medium text-white bg-[var(--brand)] hover:bg-[var(--brand-dark)] disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-1.5 flex-shrink-0"
+                    data-testid="btn-test-api"
+                    @click="testApiConnection"
+                  >
+                    <Icon
+                      :icon="
+                        apiTestLoading
+                          ? 'heroicons:arrow-path'
+                          : apiTestCooldown > 0
+                            ? 'heroicons:clock'
+                            : 'heroicons:play'
+                      "
+                      class="w-4 h-4"
+                      :class="{ 'animate-spin': apiTestLoading }"
+                    />
+                    {{
+                      apiTestCooldown > 0
+                        ? `${apiTestCooldown}s`
+                        : $t('widgets.advancedConfig.userDataIntegration.testButton')
+                    }}
+                  </button>
+                </div>
+
+                <!-- Test Result -->
+                <div v-if="apiTestResult" class="mt-2.5">
+                  <!-- Success -->
+                  <div
+                    v-if="apiTestResult.reachable"
+                    class="p-2.5 rounded-lg bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800/50"
+                  >
+                    <div class="flex items-center gap-2 mb-1.5">
+                      <Icon
+                        icon="heroicons:check-circle"
+                        class="w-4 h-4 text-emerald-600 dark:text-emerald-400 flex-shrink-0"
+                      />
+                      <p class="text-sm font-medium text-emerald-700 dark:text-emerald-300">
+                        {{ $t('widgets.advancedConfig.userDataIntegration.testResultSuccess') }}
+                      </p>
+                    </div>
+                    <p
+                      v-if="apiTestResult.resolvedUrl"
+                      class="text-xs txt-secondary mb-1 font-mono break-all"
+                    >
+                      {{ apiTestResult.resolvedUrl }}
+                    </p>
+                    <pre
+                      v-if="apiTestResult.responsePreview"
+                      class="mt-1.5 px-3 py-2 rounded-lg bg-gray-900 text-green-400 text-xs font-mono whitespace-pre-wrap overflow-x-auto max-h-48 overflow-y-auto"
+                      >{{ apiTestResult.responsePreview }}</pre
+                    >
+                  </div>
+
+                  <!-- Failure -->
+                  <div
+                    v-else
+                    class="p-2.5 rounded-lg bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800/50"
+                  >
+                    <div class="flex items-start gap-2">
+                      <Icon
+                        icon="heroicons:x-circle"
+                        class="w-4 h-4 text-red-600 dark:text-red-400 flex-shrink-0 mt-0.5"
+                      />
+                      <div>
+                        <p class="text-sm font-medium text-red-700 dark:text-red-300">
+                          {{ $t('widgets.advancedConfig.userDataIntegration.testResultFail') }}
+                        </p>
+                        <p
+                          v-if="apiTestResult.resolvedUrl"
+                          class="text-xs txt-secondary mt-0.5 font-mono break-all"
+                        >
+                          {{ apiTestResult.resolvedUrl }}
+                        </p>
+                        <p
+                          v-if="apiTestResult.error"
+                          class="text-xs text-red-600 dark:text-red-400 mt-1"
+                        >
+                          {{ apiTestResult.error }}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
               </div>
 
               <p v-if="!auth.isPro" class="text-xs text-amber-600 dark:text-amber-400">
@@ -1452,7 +1610,7 @@ SynaplanWidget.init({
 
 <script setup lang="ts">
 import { getErrorMessage } from '@/utils/errorMessage'
-import { ref, reactive, computed, onMounted, watch } from 'vue'
+import { ref, reactive, computed, onMounted, onBeforeUnmount, watch } from 'vue'
 import { Icon } from '@iconify/vue'
 import { useI18n } from 'vue-i18n'
 import { useNotification } from '@/composables/useNotification'
@@ -1585,6 +1743,7 @@ const config = reactive<widgetsApi.WidgetConfig>({
   allowedDomains: [],
   externalApiToken: '',
   externalApiUrl: '',
+  sessionMode: 'browser' as 'browser' | 'user',
   privacyPolicyUrl: '',
   dataProcessingAccepted: false,
 })
@@ -1675,6 +1834,71 @@ const addCustomField = () => {
 
 const removeCustomField = (index: number) => {
   customFields.value.splice(index, 1)
+}
+
+function normalizeApiUrl() {
+  const url = config.externalApiUrl?.trim()
+  if (url && !url.startsWith('http://') && !url.startsWith('https://')) {
+    config.externalApiUrl = 'https://' + url
+  }
+}
+
+// API connection test
+const apiTestUserId = ref('')
+const apiTestLoading = ref(false)
+const apiTestResult = ref<widgetsApi.TestApiResult | null>(null)
+
+const apiTestCooldown = ref(0)
+let cooldownTimer: ReturnType<typeof setInterval> | null = null
+
+function clearCooldownTimer() {
+  if (cooldownTimer) {
+    clearInterval(cooldownTimer)
+    cooldownTimer = null
+  }
+}
+
+onBeforeUnmount(() => {
+  clearCooldownTimer()
+})
+
+function startCooldown(seconds: number) {
+  apiTestCooldown.value = seconds
+  clearCooldownTimer()
+  cooldownTimer = setInterval(() => {
+    apiTestCooldown.value--
+    if (apiTestCooldown.value <= 0) {
+      clearCooldownTimer()
+    }
+  }, 1000)
+}
+
+async function testApiConnection() {
+  if (!config.externalApiUrl || apiTestCooldown.value > 0) return
+  apiTestLoading.value = true
+  apiTestResult.value = null
+  try {
+    const result = await widgetsApi.testExternalApi(
+      props.widget.widgetId,
+      apiTestUserId.value,
+      config.externalApiUrl,
+      config.externalApiToken
+    )
+    apiTestResult.value = result
+    if (result.retryAfter) {
+      startCooldown(result.retryAfter)
+    } else if (result.reachable) {
+      success(t('widgets.advancedConfig.userDataIntegration.testSuccess'))
+    }
+  } catch (e) {
+    apiTestResult.value = {
+      success: false,
+      reachable: false,
+      error: getErrorMessage(e) ?? undefined,
+    }
+  } finally {
+    apiTestLoading.value = false
+  }
 }
 
 // Icon selection
@@ -2309,6 +2533,15 @@ watch(manualPromptContent, (value) => {
   promptData.content = value
 })
 
+watch(
+  () => config.externalApiUrl,
+  (newUrl, oldUrl) => {
+    if (newUrl && !oldUrl) {
+      config.sessionMode = 'user'
+    }
+  }
+)
+
 onMounted(async () => {
   // Set loading state immediately if we have a custom prompt to prevent flicker
   if (hasCustomPrompt.value) {
@@ -2337,6 +2570,7 @@ onMounted(async () => {
     allowedDomains: widgetConfig.allowedDomains || props.widget.allowedDomains || [],
     externalApiToken: widgetConfig.externalApiToken || '',
     externalApiUrl: widgetConfig.externalApiUrl || '',
+    sessionMode: widgetConfig.sessionMode || (widgetConfig.externalApiUrl ? 'user' : 'browser'),
     privacyPolicyUrl: widgetConfig.privacyPolicyUrl || '',
     dataProcessingAccepted: widgetConfig.dataProcessingAccepted || false,
   })

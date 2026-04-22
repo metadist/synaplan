@@ -7,6 +7,7 @@ namespace App\Controller;
 use App\AI\Exception\ProviderException;
 use App\AI\Service\AiFacade;
 use App\Entity\User;
+use App\Service\Exception\MemoryServiceUnavailableException;
 use App\Service\ModelConfigService;
 use App\Service\PromptService;
 use App\Service\RateLimitService;
@@ -72,12 +73,17 @@ class UserMemoryController extends AbstractController
                     ]
                 )
             ),
+            new OA\Response(response: 503, description: 'Memory service unavailable'),
         ]
     )]
     public function getMemories(
         Request $request,
         #[CurrentUser] User $user,
     ): JsonResponse {
+        if (null !== $response = $this->assertMemoryServiceAvailable($user)) {
+            return $response;
+        }
+
         $category = $request->query->get('category');
 
         $memories = $this->memoryService->getUserMemories($user->getId(), $category);
@@ -119,12 +125,17 @@ class UserMemoryController extends AbstractController
                 )
             ),
             new OA\Response(response: 404, description: 'Memory not found'),
+            new OA\Response(response: 503, description: 'Memory service unavailable'),
         ]
     )]
     public function getMemory(
         int $id,
         #[CurrentUser] User $user,
     ): JsonResponse {
+        if (null !== $response = $this->assertMemoryServiceAvailable($user)) {
+            return $response;
+        }
+
         $memory = $this->memoryService->getMemoryById($id, $user);
 
         if (!$memory) {
@@ -159,10 +170,15 @@ class UserMemoryController extends AbstractController
                     ]
                 )
             ),
+            new OA\Response(response: 503, description: 'Memory service unavailable'),
         ]
     )]
     public function getCategories(#[CurrentUser] User $user): JsonResponse
     {
+        if (null !== $response = $this->assertMemoryServiceAvailable($user)) {
+            return $response;
+        }
+
         $categories = $this->memoryService->getCategoriesWithCounts($user);
 
         return $this->json([
@@ -216,6 +232,7 @@ class UserMemoryController extends AbstractController
                     ]
                 )
             ),
+            new OA\Response(response: 503, description: 'Memory service unavailable'),
         ]
     )]
     public function createMemory(
@@ -250,6 +267,8 @@ class UserMemoryController extends AbstractController
             return $this->json([
                 'memory' => $memory->toArray(),
             ], Response::HTTP_CREATED);
+        } catch (MemoryServiceUnavailableException $e) {
+            return $this->memoryServiceUnavailableResponse($user, $e);
         } catch (\InvalidArgumentException $e) {
             return $this->json([
                 'error' => $e->getMessage(),
@@ -316,6 +335,7 @@ class UserMemoryController extends AbstractController
                     ]
                 )
             ),
+            new OA\Response(response: 503, description: 'Memory service unavailable'),
         ]
     )]
     public function updateMemory(
@@ -360,6 +380,8 @@ class UserMemoryController extends AbstractController
             return $this->json([
                 'memory' => $memory->toArray(),
             ]);
+        } catch (MemoryServiceUnavailableException $e) {
+            return $this->memoryServiceUnavailableResponse($user, $e);
         } catch (\InvalidArgumentException $e) {
             return $this->json([
                 'error' => $e->getMessage(),
@@ -408,6 +430,7 @@ class UserMemoryController extends AbstractController
                     ]
                 )
             ),
+            new OA\Response(response: 503, description: 'Memory service unavailable'),
         ]
     )]
     public function deleteMemory(
@@ -421,6 +444,8 @@ class UserMemoryController extends AbstractController
                 'success' => true,
                 'message' => 'Memory deleted',
             ]);
+        } catch (MemoryServiceUnavailableException $e) {
+            return $this->memoryServiceUnavailableResponse($user, $e);
         } catch (\InvalidArgumentException $e) {
             return $this->json([
                 'error' => $e->getMessage(),
@@ -466,12 +491,17 @@ class UserMemoryController extends AbstractController
                     ]
                 )
             ),
+            new OA\Response(response: 503, description: 'Memory service unavailable'),
         ]
     )]
     public function searchMemories(
         Request $request,
         #[CurrentUser] User $user,
     ): JsonResponse {
+        if (null !== $response = $this->assertMemoryServiceAvailable($user)) {
+            return $response;
+        }
+
         $data = $request->toArray();
 
         $query = $data['query'] ?? '';
@@ -528,12 +558,17 @@ class UserMemoryController extends AbstractController
                     ]
                 )
             ),
+            new OA\Response(response: 503, description: 'Memory service unavailable'),
         ]
     )]
     public function parseMemory(
         Request $request,
         #[CurrentUser] User $user,
     ): JsonResponse {
+        if (null !== $response = $this->assertMemoryServiceAvailable($user)) {
+            return $response;
+        }
+
         $data = $request->toArray();
         $input = $data['input'] ?? '';
         $suggestedCategory = $data['suggestedCategory'] ?? null;
@@ -882,6 +917,47 @@ class UserMemoryController extends AbstractController
         }
 
         return $result;
+    }
+
+    /**
+     * Guard for endpoints that require a reachable memory backend.
+     *
+     * Returns null when the service is available and the caller should
+     * continue, or a ready-to-return 503 JsonResponse otherwise. The
+     * response payload matches {@see memoryServiceUnavailableResponse}
+     * so the frontend's existing "memory service unavailable" UI triggers
+     * consistently regardless of which endpoint produced the error.
+     */
+    private function assertMemoryServiceAvailable(User $user): ?JsonResponse
+    {
+        if ($this->memoryService->isAvailable()) {
+            return null;
+        }
+
+        return $this->memoryServiceUnavailableResponse($user);
+    }
+
+    /**
+     * Build the 503 response used whenever the Qdrant backend is unreachable.
+     *
+     * Regular users see a short, neutral message. Admins additionally receive
+     * the raw technical detail in `debug`. The frontend httpClient already
+     * renders the `debug` field with a "[Debug] " prefix, so the backend must
+     * NOT add its own prefix — otherwise the user sees "[Debug] [Debug] …".
+     * Matches the convention used by the {@see ProviderException} branches
+     * in this controller.
+     */
+    private function memoryServiceUnavailableResponse(User $user, ?\Throwable $e = null): JsonResponse
+    {
+        $payload = ['error' => 'Memory service temporarily unavailable'];
+
+        if ($user->isAdmin()) {
+            $payload['debug'] = null !== $e
+                ? $e->getMessage()
+                : 'Qdrant client reports isAvailable() === false. Check QDRANT_URL and that the Qdrant container is reachable.';
+        }
+
+        return $this->json($payload, Response::HTTP_SERVICE_UNAVAILABLE);
     }
 
     /**

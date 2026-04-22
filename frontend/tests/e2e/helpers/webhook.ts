@@ -95,14 +95,14 @@ export async function sendSubscriptionCreatedWebhook(
       object: 'subscription',
       customer: opts.customerId,
       status: opts.status ?? 'active',
-      current_period_start: now,
-      current_period_end: now + 30 * 24 * 3600,
       items: {
         data: [
           {
             price: {
               id: opts.priceId ?? PRICE_PRO,
             },
+            current_period_start: now,
+            current_period_end: now + 30 * 24 * 3600,
           },
         ],
       },

@@ -295,6 +295,7 @@ final class FeedbackController extends AbstractController
             new OA\Response(response: 200, description: 'Feedback deleted'),
             new OA\Response(response: 401, description: 'Not authenticated'),
             new OA\Response(response: 404, description: 'Feedback not found'),
+            new OA\Response(response: 503, description: 'Memory service unavailable'),
         ]
     )]
     public function deleteFeedback(
@@ -311,6 +312,11 @@ final class FeedbackController extends AbstractController
             return $this->json(['success' => true]);
         } catch (\InvalidArgumentException $e) {
             return $this->json(['error' => $e->getMessage()], Response::HTTP_NOT_FOUND);
+        } catch (\RuntimeException $e) {
+            // Memory backend outage (MemoryServiceUnavailableException extends
+            // \RuntimeException). Surface as 503 so the client can distinguish
+            // "not found" from "storage temporarily down".
+            return $this->json(['error' => $e->getMessage()], Response::HTTP_SERVICE_UNAVAILABLE);
         } catch (\Throwable $e) {
             $this->logger->error('Failed to delete feedback', [
                 'user_id' => $user->getId(),

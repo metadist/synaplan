@@ -263,11 +263,12 @@ class StripeWebhookController extends AbstractController
         $user->setUserLevel($userLevel);
 
         $paymentDetails = $user->getPaymentDetails();
+        $firstItem = $subscription->items->data[0] ?? null;
         $paymentDetails['subscription'] = [
             'stripe_subscription_id' => $subscription->id,
             'status' => $subscription->status,
-            'subscription_start' => $subscription->current_period_start,
-            'subscription_end' => $subscription->current_period_end,
+            'subscription_start' => $firstItem?->current_period_start,
+            'subscription_end' => $firstItem?->current_period_end,
             'plan' => $userLevel,
         ];
         $user->setPaymentDetails($paymentDetails);
@@ -356,7 +357,8 @@ class StripeWebhookController extends AbstractController
 
         // Update subscription details
         $paymentDetails['subscription']['status'] = $subscription->status;
-        $paymentDetails['subscription']['subscription_end'] = $subscription->current_period_end;
+        $firstItem = $subscription->items->data[0] ?? null;
+        $paymentDetails['subscription']['subscription_end'] = $firstItem?->current_period_end;
         $paymentDetails['subscription']['plan'] = $newLevel;
 
         // Track cancellation at period end (user canceled but still has access until period ends)

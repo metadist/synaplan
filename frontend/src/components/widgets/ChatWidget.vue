@@ -280,7 +280,7 @@
                   }"
                 >
                   <!-- eslint-disable-next-line vue/no-v-html -- widget message markdown/linkify -->
-                  <div v-html="renderMessageContent(message.content)"></div>
+                  <div v-html="renderMessageContent(message.content, message.role)"></div>
                 </div>
               </template>
               <div v-else-if="message.type === 'file'" class="space-y-2">
@@ -335,7 +335,7 @@
                   }"
                 >
                   <!-- eslint-disable-next-line vue/no-v-html -- widget file message markdown -->
-                  <div v-html="renderMessageContent(message.content)"></div>
+                  <div v-html="renderMessageContent(message.content, message.role)"></div>
                 </div>
               </div>
               <p
@@ -670,6 +670,7 @@ interface Props {
   allowFullscreen?: boolean
   externalUserId?: string
   privacyPolicyUrl?: string
+  sessionMode?: 'browser' | 'user'
   testMode?: boolean
   internalMode?: boolean
 }
@@ -694,6 +695,7 @@ const props = withDefaults(defineProps<Props>(), {
   allowFullscreen: false,
   externalUserId: undefined,
   privacyPolicyUrl: undefined,
+  sessionMode: 'browser',
   testMode: false,
   internalMode: false,
 })
@@ -1702,8 +1704,17 @@ const downloadFileById = async (fileId: number | undefined, filename: string | u
   }
 }
 
-const getSessionStorageKey = () => `synaplan_widget_session_${props.widgetId}`
+const isUserSessionMode = computed(() => props.sessionMode === 'user' && !!props.externalUserId)
+
+const getSessionStorageKey = () => {
+  if (isUserSessionMode.value) {
+    return `synaplan_widget_session_${props.widgetId}_${props.externalUserId}`
+  }
+  return `synaplan_widget_session_${props.widgetId}`
+}
+
 const getChatStorageKeyForSession = (id: string) => `synaplan_widget_chatid_${props.widgetId}_${id}`
+
 const createSessionId = () => `sess_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`
 
 const handleOpenEvent = (event: Event) => {
@@ -1745,6 +1756,9 @@ const normalizeServerMessage = (rawUnknown: unknown): Message => {
   }
 
   const role = raw.direction === 'IN' ? 'user' : 'assistant'
+  if (role === 'assistant') {
+    content = stripThinkingBlocks(content)
+  }
   const timestampSeconds = typeof raw.timestamp === 'number' ? raw.timestamp : Date.now() / 1000
 
   const rawFiles = raw.files
@@ -1943,10 +1957,19 @@ async function handleMessagesClick(event: MouseEvent): Promise<void> {
   }
 }
 
-// Render message content with enhanced code blocks
-const renderMessageContent = (value: string): string => {
+const stripThinkingBlocks = (text: string): string => {
+  let result = text.replace(/<think>[\s\S]*?<\/think>/g, '')
+  result = result.replace(/<think>[\s\S]*$/, '')
+  return result.trim()
+}
+
+const renderMessageContent = (value: string, role: 'user' | 'assistant' = 'assistant'): string => {
   if (!value) {
     return ''
+  }
+
+  if (role === 'assistant') {
+    value = stripThinkingBlocks(value)
   }
 
   // Parse code blocks and render with copy button

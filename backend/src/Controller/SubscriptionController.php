@@ -228,12 +228,12 @@ class SubscriptionController extends AbstractController
                 'cancel_url' => $this->frontendUrl.'/subscription/cancel',
                 'client_reference_id' => (string) $user->getId(),
                 'metadata' => [
-                    'user_id' => $user->getId(),
+                    'user_id' => (string) $user->getId(),
                     'plan' => $planId,
                 ],
                 'subscription_data' => [
                     'metadata' => [
-                        'user_id' => $user->getId(),
+                        'user_id' => (string) $user->getId(),
                         'plan' => $planId,
                     ],
                 ],
@@ -421,11 +421,12 @@ class SubscriptionController extends AbstractController
             $user->setUserLevel($highestLevel);
 
             $paymentDetails = $user->getPaymentDetails();
+            $firstItem = $activeSubscription->items->data[0] ?? null;
             $paymentDetails['subscription'] = [
                 'stripe_subscription_id' => $activeSubscription->id,
                 'status' => $activeSubscription->status,
-                'subscription_start' => $activeSubscription->current_period_start,
-                'subscription_end' => $activeSubscription->current_period_end,
+                'subscription_start' => $firstItem?->current_period_start,
+                'subscription_end' => $firstItem?->current_period_end,
                 'plan' => $highestLevel,
                 'cancel_at_period_end' => $activeSubscription->cancel_at_period_end ?? false,
             ];
@@ -681,7 +682,7 @@ class SubscriptionController extends AbstractController
         $customer = \Stripe\Customer::create([
             'email' => $user->getMail(),
             'metadata' => [
-                'user_id' => $user->getId(),
+                'user_id' => (string) $user->getId(),
             ],
         ]);
 
