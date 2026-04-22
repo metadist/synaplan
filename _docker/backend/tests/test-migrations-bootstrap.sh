@@ -176,6 +176,70 @@ assert_eq 1 "${DB_STATE[CREATE_CALLS]}"   "_create_metadata_table called exactly
 assert_eq 1 "${DB_STATE[REGISTER_CALLS]}" "_register_baseline_migration called exactly once across two invocations"
 
 # ---------------------------------------------------------------------------
+# Case 7: MySQL backslash escape regression test
+#
+# Re-source the library so we get the REAL _register_baseline_migration /
+# _count_sql helpers (the earlier test cases replaced them with in-memory
+# stubs). Then shadow `php` so we can capture the SQL the bootstrap would send
+# to `bin/console dbal:run-sql` and assert that the emitted INSERT contains a
+# properly-doubled `\\Version` literal — otherwise MySQL would strip the
+# backslash while parsing the single-quoted string and Doctrine would fail to
+# recognise the stored row as the baseline migration.
+# ---------------------------------------------------------------------------
+
+echo "▶ Case 7: emitted INSERT SQL escapes the namespace separator for MySQL"
+
+# Re-source to restore the real helpers that the stubs above replaced.
+# shellcheck disable=SC1090
+. "$LIB"
+
+CAPTURED_SQL_FILE="$(mktemp)"
+trap 'rm -f "$CAPTURED_SQL_FILE"' EXIT
+
+# Stub out `php bin/console dbal:run-sql` by shadowing `php` in this shell.
+# The bootstrap library happens to only invoke `php` through this exact path.
+php() {
+    # The SQL statement is always the last positional argument we care about.
+    # `dbal:run-sql` takes either (sql) or (--env=..., sql), so capture the
+    # final arg which the bootstrap uses for the SQL string.
+    local _last
+    for _last in "$@"; do :; done
+    printf '%s\n' "$_last" >> "$CAPTURED_SQL_FILE"
+}
+export -f php
+
+: > "$CAPTURED_SQL_FILE"
+_register_baseline_migration ""
+
+# Expect two statements: the self-healing DELETE of the legacy stripped row,
+# followed by the INSERT IGNORE with properly-escaped backslashes.
+CAPTURED_SQL="$(cat "$CAPTURED_SQL_FILE")"
+
+if grep -Fq "INSERT IGNORE INTO doctrine_migration_versions" <<<"$CAPTURED_SQL" && \
+   grep -Fq "'DoctrineMigrations\\\\Version20260417000000'" <<<"$CAPTURED_SQL"; then
+    PASS=$((PASS + 1))
+    echo "   ✅ INSERT emits 'DoctrineMigrations\\\\Version...' (MySQL will store single backslash)"
+else
+    FAIL=$((FAIL + 1))
+    echo "   ❌ INSERT SQL missing doubled backslash; captured:" >&2
+    printf '      %s\n' "$CAPTURED_SQL" >&2
+fi
+
+if grep -Fq "DELETE FROM doctrine_migration_versions" <<<"$CAPTURED_SQL" && \
+   grep -Fq "'DoctrineMigrationsVersion20260417000000'" <<<"$CAPTURED_SQL"; then
+    PASS=$((PASS + 1))
+    echo "   ✅ Self-healing DELETE targets legacy stripped row"
+else
+    FAIL=$((FAIL + 1))
+    echo "   ❌ Self-healing DELETE for stripped row missing; captured:" >&2
+    printf '      %s\n' "$CAPTURED_SQL" >&2
+fi
+
+unset -f php
+rm -f "$CAPTURED_SQL_FILE"
+trap - EXIT
+
+# ---------------------------------------------------------------------------
 # Summary
 # ---------------------------------------------------------------------------
 

@@ -46,11 +46,55 @@ _create_metadata_table() {
         >/dev/null 2>&1 || true
 }
 
+# Escape backslashes for MySQL string literals.
+#
+# Why: the baseline version FQN contains a `\` (the PHP namespace separator).
+# MySQL treats backslash as an escape character inside single-quoted strings
+# (NO_BACKSLASH_ESCAPES is off by default), so `'\V'` is parsed as the unknown
+# escape sequence "V" and the backslash is silently stripped. Without doubling
+# them up, the stored version becomes `DoctrineMigrationsVersion...` (no
+# separator) and Doctrine can no longer match the row to its class — it logs
+# "not a registered migration" and happily replays the baseline DDL, which
+# blows up on `CREATE TABLE BAPIKEYS` because the table already exists.
+_mysql_escape_baseline() {
+    # Replace every single backslash with two so MySQL's parser resolves them
+    # back to a single `\` when storing / comparing. Use printf rather than
+    # echo because some echo implementations interpret backslash sequences.
+    printf '%s' "${BASELINE_MIGRATION//\\/\\\\}"
+}
+
+# Stripped form of the baseline version that matches what the previous,
+# buggy bootstrap actually wrote into `doctrine_migration_versions`
+# (backslash eaten by MySQL's escape processing). Used exclusively for
+# self-healing that legacy row.
+_mysql_legacy_stripped_baseline() {
+    printf '%s' "${BASELINE_MIGRATION//\\/}"
+}
+
 # INSERT IGNORE the baseline migration row. No-op if the row already exists.
+#
+# Also self-heals databases bootstrapped by the previous release where the
+# backslash-less "DoctrineMigrationsVersion..." row was inserted — we drop that
+# stray row before (re)inserting the correctly-escaped one, otherwise Doctrine
+# keeps warning about an unregistered migration on every subsequent start.
 _register_baseline_migration() {
     local _env_flag="${1:-}"
+    local _escaped
+    local _legacy
+    _escaped=$(_mysql_escape_baseline)
+    _legacy=$(_mysql_legacy_stripped_baseline)
+
+    # Only delete when the legacy form is actually different from the
+    # correct one (guards against a future BASELINE_MIGRATION without any
+    # backslashes deleting the very row we are about to insert).
+    if [ "$_escaped" != "$_legacy" ]; then
+        php bin/console dbal:run-sql ${_env_flag} \
+            "DELETE FROM doctrine_migration_versions WHERE version = '${_legacy}'" \
+            >/dev/null 2>&1 || true
+    fi
+
     php bin/console dbal:run-sql ${_env_flag} \
-        "INSERT IGNORE INTO doctrine_migration_versions (version, executed_at, execution_time) VALUES ('${BASELINE_MIGRATION}', NOW(), 0)" \
+        "INSERT IGNORE INTO doctrine_migration_versions (version, executed_at, execution_time) VALUES ('${_escaped}', NOW(), 0)" \
         >/dev/null 2>&1 || true
 }
 
@@ -87,9 +131,28 @@ bootstrap_migrations_metadata() {
         # just created and is empty by definition, so we intentionally fall
         # through to `_register_baseline_migration` below.
     else
+        # Same `\\` dance as in _register_baseline_migration: compare against
+        # the escaped form so MySQL resolves the literal back to a single
+        # backslash and matches the correctly-stored class FQN.
+        local _escaped_baseline
+        local _legacy_baseline
+        _escaped_baseline=$(_mysql_escape_baseline)
+        _legacy_baseline=$(_mysql_legacy_stripped_baseline)
         _has_baseline=$(_count_sql \
-            "SELECT COUNT(*) FROM doctrine_migration_versions WHERE version = '${BASELINE_MIGRATION}'" \
+            "SELECT COUNT(*) FROM doctrine_migration_versions WHERE version = '${_escaped_baseline}'" \
             "$_env_flag")
+        # Detect the legacy buggy row (no backslash). If only that form is
+        # present, force a re-register so the self-healing DELETE+INSERT path
+        # runs and replaces it with the correctly-escaped version.
+        if [ "${_has_baseline:-0}" -eq 0 ] && [ "$_escaped_baseline" != "$_legacy_baseline" ]; then
+            local _has_legacy
+            _has_legacy=$(_count_sql \
+                "SELECT COUNT(*) FROM doctrine_migration_versions WHERE version = '${_legacy_baseline}'" \
+                "$_env_flag")
+            if [ "${_has_legacy:-0}" -gt 0 ]; then
+                echo "📌 [$_label] Detected legacy baseline row with stripped namespace separator — will rewrite"
+            fi
+        fi
     fi
 
     # Register the baseline whenever the legacy schema exists but the baseline row is
