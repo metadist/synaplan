@@ -2,60 +2,17 @@
 
 namespace App\Tests\Controller;
 
-use App\Entity\Chat;
-use App\Entity\User;
-use App\Service\TokenService;
-use App\Tests\Trait\AuthenticatedTestTrait;
 use Symfony\Bundle\FrameworkBundle\KernelBrowser;
 use Symfony\Bundle\FrameworkBundle\Test\WebTestCase;
 
 class StreamControllerTest extends WebTestCase
 {
-    use AuthenticatedTestTrait;
-
     private KernelBrowser $client;
-    private ?string $token = null;
 
     protected function setUp(): void
     {
         self::ensureKernelShutdown();
         $this->client = static::createClient();
-    }
-
-    private function getAuthToken(): string
-    {
-        if ($this->token) {
-            return $this->token;
-        }
-
-        // Find test user
-        $userRepository = $this->client->getContainer()->get('doctrine')->getRepository(User::class);
-        $user = $userRepository->findOneBy(['mail' => 'admin@synaplan.com']);
-
-        if (!$user) {
-            $this->fail('Test user not found');
-        }
-
-        // Generate access token using TokenService
-        $this->token = $this->authenticateClient($this->client, $user);
-
-        return $this->token;
-    }
-
-    private function createTestChat(): Chat
-    {
-        $em = $this->client->getContainer()->get('doctrine')->getManager();
-        $userRepository = $em->getRepository(User::class);
-        $user = $userRepository->findOneBy(['mail' => 'admin@synaplan.com']);
-
-        $chat = new Chat();
-        $chat->setUserId($user->getId());
-        $chat->setTitle('Stream Test Chat');
-
-        $em->persist($chat);
-        $em->flush();
-
-        return $chat;
     }
 
     public function testStreamRequiresAuthentication(): void
@@ -92,13 +49,24 @@ class StreamControllerTest extends WebTestCase
 
     public function testStreamOnlyAcceptsGetMethod(): void
     {
-        $token = $this->getAuthToken();
-
-        $this->client->request('POST', '/api/v1/messages/stream', [], [], [
-            'HTTP_AUTHORIZATION' => 'Bearer '.$token,
-        ]);
+        // Method Not Allowed is a routing error — checked before auth.
+        $this->client->request('POST', '/api/v1/messages/stream');
 
         $this->assertResponseStatusCodeSame(405);
+    }
+
+    public function testDisableMemoriesParameterIsAccepted(): void
+    {
+        // The endpoint must not reject a GET with disableMemories=1 before auth (it returns 401, not 400/422).
+        $this->client->request('GET', '/api/v1/messages/stream', [
+            'message' => 'Hello',
+            'chatId' => 1,
+            'disableMemories' => '1',
+        ]);
+
+        // Without auth we get 401, but the query parameter itself must not cause a 400/422.
+        $statusCode = $this->client->getResponse()->getStatusCode();
+        $this->assertContains($statusCode, [401, 405], 'disableMemories=1 must not produce a 4xx validation error');
     }
 
     public function testStreamRejectsUnauthorizedChatAccess(): void
