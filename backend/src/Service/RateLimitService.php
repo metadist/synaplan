@@ -194,10 +194,16 @@ final class RateLimitService
                 default => 0.0,
             };
 
+            $resolution = isset($mediaUsage['resolution']) && is_string($mediaUsage['resolution'])
+                ? $mediaUsage['resolution']
+                : null;
+
             $costResult = $this->costCalculationService->calculateMediaCost(
                 $modelId,
                 $inputQty,
                 $outputQty,
+                null,
+                $resolution,
             );
         } else {
             $costResult = $this->costCalculationService->calculateCost(
