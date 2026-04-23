@@ -14,7 +14,15 @@ interface MediaGenerationServiceInterface
     /**
      * Generate media (image or video) from a text prompt.
      *
-     * @return array{success: true, file: array{url: string, type: string, mimeType: string}, provider: string, model: string}
+     * @param string|null $resolution For type=video: '720p', '1080p' or '4K'.
+     *                                Falls back to the model's default_resolution when omitted/unsupported.
+     *                                Ignored for type=image.
+     *
+     * The `resolution` key is only present for video generations and reflects the
+     * resolution actually used (after normalization and provider negotiation), which
+     * may differ from the caller's input.
+     *
+     * @return array{success: true, file: array{url: string, type: string, mimeType: string}, provider: string, model: string, resolution?: string}
      *
      * @throws \InvalidArgumentException  on bad input
      * @throws RateLimitExceededException when user exceeds quota
@@ -22,7 +30,7 @@ interface MediaGenerationServiceInterface
      * @throws ProviderException          on AI provider failure
      * @throws \RuntimeException          on storage failure
      */
-    public function generate(User $user, string $prompt, string $type, ?int $modelId = null): array;
+    public function generate(User $user, string $prompt, string $type, ?int $modelId = null, ?string $resolution = null): array;
 
     /**
      * Generate an image from 1-2 input images and a text prompt (pic2pic).
@@ -45,9 +53,12 @@ interface MediaGenerationServiceInterface
     /**
      * Start async video generation (returns immediately with a job ID).
      *
-     * @return array{jobId: string, status: string, provider: string, model: string}
+     * @param string|null $resolution Output resolution ('720p', '1080p', '4K').
+     *                                Falls back to the model's default_resolution when omitted/unsupported.
+     *
+     * @return array{jobId: string, status: string, provider: string, model: string, resolution?: string}
      */
-    public function startVideoGeneration(User $user, string $prompt, ?int $modelId = null): array;
+    public function startVideoGeneration(User $user, string $prompt, ?int $modelId = null, ?string $resolution = null): array;
 
     /**
      * Check status of an async video generation job.

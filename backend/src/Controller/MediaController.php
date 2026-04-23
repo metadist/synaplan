@@ -166,6 +166,14 @@ final class MediaController extends AbstractController
                     nullable: true,
                     example: 53
                 ),
+                new OA\Property(
+                    property: 'resolution',
+                    type: 'string',
+                    enum: ['720p', '1080p', '4K'],
+                    description: 'Output resolution for video generation. Falls back to the model\'s default_resolution (typically 720p) when omitted or unsupported by the chosen model. Ignored for type=image.',
+                    nullable: true,
+                    example: '720p'
+                ),
             ]
         )
     )]
@@ -202,6 +210,14 @@ final class MediaController extends AbstractController
                 ),
                 new OA\Property(property: 'provider', type: 'string', example: 'openai'),
                 new OA\Property(property: 'model', type: 'string', example: 'dall-e-3'),
+                new OA\Property(
+                    property: 'resolution',
+                    type: 'string',
+                    enum: ['720p', '1080p', '4K'],
+                    description: 'Resolution that was actually used for this generation (after normalization). Only present for type=video.',
+                    nullable: true,
+                    example: '720p'
+                ),
             ]
         )
     )]
@@ -246,9 +262,12 @@ final class MediaController extends AbstractController
         $prompt = trim((string) ($data['prompt'] ?? ''));
         $type = trim((string) ($data['type'] ?? ''));
         $modelId = isset($data['modelId']) ? (int) $data['modelId'] : null;
+        $resolution = isset($data['resolution']) && is_string($data['resolution']) && '' !== $data['resolution']
+            ? $data['resolution']
+            : null;
 
         try {
-            $result = $this->mediaService->generate($user, $prompt, $type, $modelId);
+            $result = $this->mediaService->generate($user, $prompt, $type, $modelId, $resolution);
 
             return $this->json($result);
         } catch (\InvalidArgumentException $e) {
@@ -292,6 +311,14 @@ final class MediaController extends AbstractController
             properties: [
                 new OA\Property(property: 'prompt', type: 'string', description: 'Text description of the video to generate'),
                 new OA\Property(property: 'modelId', type: 'integer', description: 'Specific model ID (uses default TEXT2VID if omitted)', nullable: true),
+                new OA\Property(
+                    property: 'resolution',
+                    type: 'string',
+                    enum: ['720p', '1080p', '4K'],
+                    description: 'Output resolution. Falls back to the model\'s default_resolution (typically 720p) when omitted or unsupported.',
+                    nullable: true,
+                    example: '720p'
+                ),
             ]
         )
     )]
@@ -304,6 +331,7 @@ final class MediaController extends AbstractController
                 new OA\Property(property: 'status', type: 'string', example: 'processing'),
                 new OA\Property(property: 'provider', type: 'string'),
                 new OA\Property(property: 'model', type: 'string'),
+                new OA\Property(property: 'resolution', type: 'string', example: '720p'),
             ]
         )
     )]
@@ -323,9 +351,12 @@ final class MediaController extends AbstractController
         $data = json_decode($request->getContent(), true);
         $prompt = trim((string) ($data['prompt'] ?? ''));
         $modelId = isset($data['modelId']) ? (int) $data['modelId'] : null;
+        $resolution = isset($data['resolution']) && is_string($data['resolution']) && '' !== $data['resolution']
+            ? $data['resolution']
+            : null;
 
         try {
-            $result = $this->mediaService->startVideoGeneration($user, $prompt, $modelId);
+            $result = $this->mediaService->startVideoGeneration($user, $prompt, $modelId, $resolution);
 
             return $this->json($result, Response::HTTP_ACCEPTED);
         } catch (\InvalidArgumentException $e) {

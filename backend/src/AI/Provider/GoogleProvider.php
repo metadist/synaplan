@@ -667,6 +667,7 @@ class GoogleProvider implements ChatProviderInterface, ImageGenerationProviderIn
                 'url' => $videoDataUrl,
                 'revised_prompt' => $prompt,
                 'duration' => $operationData['duration'],
+                'resolution' => $operationData['resolution'],
             ]];
         } catch (ProviderException $e) {
             throw $e;
@@ -691,7 +692,7 @@ class GoogleProvider implements ChatProviderInterface, ImageGenerationProviderIn
     /**
      * Start a Veo video generation operation without blocking.
      *
-     * @return array{operationName: string, model: string, duration: int}
+     * @return array{operationName: string, model: string, duration: int, resolution: string}
      */
     public function startVideoOperation(string $prompt, array $options = []): array
     {
@@ -707,12 +708,22 @@ class GoogleProvider implements ChatProviderInterface, ImageGenerationProviderIn
         $durationSeconds = $this->mapToValidVeoDuration($requestedDuration);
         $aspectRatio = $options['aspect_ratio'] ?? '16:9';
 
+        $modelConfig = isset($options['modelConfig']) && is_array($options['modelConfig'])
+            ? $options['modelConfig']
+            : [];
+        $requestedResolution = isset($options['resolution']) && is_string($options['resolution'])
+            ? $options['resolution']
+            : null;
+        $resolution = $this->resolveVeoResolution($requestedResolution, $modelConfig);
+
         $this->logger->info('Google Veo: Starting video generation', [
             'model' => $model,
             'prompt_length' => strlen($prompt),
             'requested_duration' => $requestedDuration,
             'actual_duration' => $durationSeconds,
             'aspect_ratio' => $aspectRatio,
+            'requested_resolution' => $requestedResolution,
+            'actual_resolution' => $resolution,
         ]);
 
         $url = self::API_BASE."/models/{$model}:predictLongRunning";
@@ -724,6 +735,7 @@ class GoogleProvider implements ChatProviderInterface, ImageGenerationProviderIn
             'parameters' => [
                 'durationSeconds' => $durationSeconds,
                 'aspectRatio' => $aspectRatio,
+                'resolution' => $resolution,
             ],
         ];
 
@@ -761,6 +773,7 @@ class GoogleProvider implements ChatProviderInterface, ImageGenerationProviderIn
             'operationName' => $operationName,
             'model' => $model,
             'duration' => $durationSeconds,
+            'resolution' => $resolution,
         ];
     }
 
@@ -914,6 +927,40 @@ class GoogleProvider implements ChatProviderInterface, ImageGenerationProviderIn
         }
 
         return 8;
+    }
+
+    /**
+     * Pick the resolution to send to the Veo API.
+     *
+     * Honors the request when it is in the model's allowed_resolutions list,
+     * otherwise falls back to default_resolution, then to '720p' (cheapest universal default).
+     *
+     * @param array<string, mixed> $modelConfig
+     */
+    private function resolveVeoResolution(?string $requested, array $modelConfig): string
+    {
+        $allowed = is_array($modelConfig['allowed_resolutions'] ?? null)
+            ? array_values(array_filter($modelConfig['allowed_resolutions'], 'is_string'))
+            : [];
+
+        if (null !== $requested && [] !== $allowed && !in_array($requested, $allowed, true)) {
+            $this->logger->warning('Google Veo: Requested resolution not allowed for model, falling back', [
+                'requested' => $requested,
+                'allowed' => $allowed,
+            ]);
+            $requested = null;
+        }
+
+        if (null !== $requested && '' !== $requested) {
+            return $requested;
+        }
+
+        $default = $modelConfig['default_resolution'] ?? null;
+        if (is_string($default) && '' !== $default) {
+            return $default;
+        }
+
+        return [] !== $allowed ? $allowed[0] : '720p';
     }
 
     public function editImage(string $imageUrl, string $maskUrl, string $prompt): string

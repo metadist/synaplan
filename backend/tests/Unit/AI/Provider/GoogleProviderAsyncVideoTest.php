@@ -40,6 +40,41 @@ class GoogleProviderAsyncVideoTest extends TestCase
         $this->assertSame('operations/12345', $result['operationName']);
         $this->assertSame('veo-3.1', $result['model']);
         $this->assertSame(8, $result['duration']);
+        $this->assertSame('720p', $result['resolution']);
+    }
+
+    public function testStartVideoOperationHonorsAllowedResolution(): void
+    {
+        $provider = $this->createProviderWithMockResponse(['name' => 'operations/abc']);
+
+        $result = $provider->startVideoOperation('prompt', [
+            'model' => 'veo-3.1',
+            'duration' => 4,
+            'resolution' => '4K',
+            'modelConfig' => [
+                'allowed_resolutions' => ['720p', '1080p', '4K'],
+                'default_resolution' => '720p',
+            ],
+        ]);
+
+        $this->assertSame('4K', $result['resolution']);
+    }
+
+    public function testStartVideoOperationFallsBackWhenResolutionDisallowed(): void
+    {
+        $provider = $this->createProviderWithMockResponse(['name' => 'operations/abc']);
+
+        $result = $provider->startVideoOperation('prompt', [
+            'model' => 'veo-3.1-lite-generate-preview',
+            'duration' => 4,
+            'resolution' => '4K',
+            'modelConfig' => [
+                'allowed_resolutions' => ['720p', '1080p'],
+                'default_resolution' => '720p',
+            ],
+        ]);
+
+        $this->assertSame('720p', $result['resolution']);
     }
 
     public function testStartVideoOperationMissingApiKey(): void

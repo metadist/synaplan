@@ -207,6 +207,91 @@ class CostCalculationServiceTest extends TestCase
         $this->assertGreaterThanOrEqual(0, (float) $result->totalCost);
     }
 
+    public function testCalculateMediaCostUsesFlatPriceWhenNoResolutionPrices(): void
+    {
+        $model = $this->createModelMock('google', 0.0, 0.40, '-', 'persec', [
+            'pricing_mode' => 'per_second',
+        ]);
+
+        // @phpstan-ignore-next-line
+        $this->modelRepository->method('find')->willReturn($model);
+        // @phpstan-ignore-next-line
+        $this->priceHistoryRepository->method('findPriceAtTimestamp')->willReturn(null);
+
+        $result = $this->service->calculateMediaCost(45, 0, 8.0);
+
+        // 8 seconds * $0.40 = $3.20
+        $this->assertSame('3.200000', $result->totalCost);
+        $this->assertSame('3.200000', $result->outputCost);
+    }
+
+    public function testCalculateMediaCostUsesResolutionSpecificPrice(): void
+    {
+        $model = $this->createModelMock('google', 0.0, 0.40, '-', 'persec', [
+            'pricing_mode' => 'per_second',
+            'allowed_resolutions' => ['720p', '1080p', '4K'],
+            'default_resolution' => '720p',
+            'resolution_prices' => [
+                '720p' => 0.40,
+                '1080p' => 0.40,
+                '4K' => 0.60,
+            ],
+        ]);
+
+        // @phpstan-ignore-next-line
+        $this->modelRepository->method('find')->willReturn($model);
+        // @phpstan-ignore-next-line
+        $this->priceHistoryRepository->method('findPriceAtTimestamp')->willReturn(null);
+
+        $result = $this->service->calculateMediaCost(45, 0, 8.0, null, '4K');
+
+        // 8 seconds * $0.60 (4K) = $4.80
+        $this->assertSame('4.800000', $result->totalCost);
+        $this->assertSame('4.800000', $result->outputCost);
+        $this->assertSame('4K', $result->priceSnapshot['resolution']);
+        $this->assertSame('0.60000000', $result->priceSnapshot['price_out_resolution']);
+    }
+
+    public function testCalculateMediaCostFallsBackToDefaultResolutionForUnknownResolution(): void
+    {
+        $model = $this->createModelMock('google', 0.0, 0.10, '-', 'persec', [
+            'pricing_mode' => 'per_second',
+            'allowed_resolutions' => ['720p', '1080p', '4K'],
+            'default_resolution' => '720p',
+            'resolution_prices' => [
+                '720p' => 0.10,
+                '1080p' => 0.12,
+                '4K' => 0.30,
+            ],
+        ]);
+
+        // @phpstan-ignore-next-line
+        $this->modelRepository->method('find')->willReturn($model);
+        // @phpstan-ignore-next-line
+        $this->priceHistoryRepository->method('findPriceAtTimestamp')->willReturn(null);
+
+        // Caller asked for an unsupported resolution; service must fall back to default_resolution.
+        $result = $this->service->calculateMediaCost(195, 0, 6.0, null, '8K');
+
+        // 6 * $0.10 (default 720p) = $0.60
+        $this->assertSame('0.600000', $result->totalCost);
+        $this->assertSame('720p', $result->priceSnapshot['resolution']);
+    }
+
+    public function testCalculateMediaCostReturnsZeroForPerTokenModel(): void
+    {
+        $model = $this->createModelMock('openai', 3.0, 15.0, 'per1M', 'per1M', [
+            'pricing_mode' => 'per_token',
+        ]);
+
+        // @phpstan-ignore-next-line
+        $this->modelRepository->method('find')->willReturn($model);
+
+        $result = $this->service->calculateMediaCost(1, 100, 50);
+
+        $this->assertSame('0.000000', $result->totalCost);
+    }
+
     public function testCostResultDtoStructure(): void
     {
         $result = new CostResult(
