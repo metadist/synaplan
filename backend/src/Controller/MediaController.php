@@ -210,6 +210,14 @@ final class MediaController extends AbstractController
                 ),
                 new OA\Property(property: 'provider', type: 'string', example: 'openai'),
                 new OA\Property(property: 'model', type: 'string', example: 'dall-e-3'),
+                new OA\Property(
+                    property: 'resolution',
+                    type: 'string',
+                    enum: ['720p', '1080p', '4K'],
+                    description: 'Resolution that was actually used for this generation (after normalization). Only present for type=video.',
+                    nullable: true,
+                    example: '720p'
+                ),
             ]
         )
     )]

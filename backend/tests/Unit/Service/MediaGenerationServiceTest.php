@@ -210,6 +210,44 @@ class MediaGenerationServiceTest extends TestCase
         $this->assertSame('4K', $result['resolution']);
     }
 
+    public function testStartVideoGenerationRejectsUnsupportedResolutionWhenModelDoesNotDeclareAllowedList(): void
+    {
+        $user = $this->createUser(1);
+        $this->allowRateLimit();
+
+        // Model has neither allowed_resolutions nor default_resolution. The
+        // service must still reject values outside the global supported enum
+        // (720p/1080p/4K) instead of forwarding "8K" verbatim to the provider.
+        $model = $this->createModel('Google', 'veo-3.1-experimental', 'Veo 3.1 Experimental');
+        $this->setUpModelResolution(900, $model);
+
+        $this->aiFacade->expects($this->once())
+            ->method('startVideoGeneration')
+            ->with(
+                'a clip',
+                1,
+                $this->callback(fn (array $opts): bool => '720p' === $opts['resolution']),
+            )
+            ->willReturn([
+                'operationName' => 'ops/exp',
+                'provider' => 'google',
+                'model' => 'veo-3.1-experimental',
+                'duration' => 8,
+                'resolution' => '720p',
+            ]);
+
+        $cacheItem = $this->createMock(\Psr\Cache\CacheItemInterface::class);
+        $cacheItem->expects($this->once())->method('set');
+        $cacheItem->expects($this->once())->method('expiresAfter')->with(1200);
+
+        $this->cache->method('getItem')->willReturn($cacheItem);
+        $this->cache->expects($this->once())->method('save');
+
+        $result = $this->service->startVideoGeneration($user, 'a clip', 900, '8K');
+
+        $this->assertSame('720p', $result['resolution']);
+    }
+
     public function testStartVideoGenerationFallsBackToDefaultWhenResolutionUnsupported(): void
     {
         $user = $this->createUser(1);
@@ -631,6 +669,57 @@ class MediaGenerationServiceTest extends TestCase
 
         self::assertTrue($result['success']);
         self::assertSame('video', $result['file']['type']);
+    }
+
+    public function testGenerateVideoExposesUsedResolutionInResponseEvenWhenVideosArrayIsStringUrl(): void
+    {
+        // Regression for Copilot review: $result['videos'][0] can be a plain URL
+        // string. We must not array-index it for resolution; the top-level
+        // $result['resolution'] from AiFacade::generateVideo() is the source of
+        // truth. The endpoint must surface the actually-used resolution back to
+        // the client.
+        $this->allowRateLimit();
+        $model = $this->createMock(Model::class);
+        $model->method('getService')->willReturn('Google');
+        $model->method('getProviderId')->willReturn('veo-3.1');
+        $model->method('getName')->willReturn('Veo 3.1 Standard');
+        $model->method('getJson')->willReturn([
+            'pricing_mode' => 'per_second',
+            'allowed_resolutions' => ['720p', '1080p', '4K'],
+            'default_resolution' => '720p',
+        ]);
+        $this->setUpModelResolution(45, $model);
+
+        $mp4Data = str_repeat("\0", 100);
+        $b64 = base64_encode($mp4Data);
+        $this->aiFacade->expects(self::once())
+            ->method('generateVideo')
+            ->willReturn([
+                'videos' => ['data:video/mp4;base64,'.$b64],
+                'provider' => 'google',
+                'model' => 'veo-3.1',
+                'resolution' => '1080p',
+            ]);
+
+        $result = $this->service->generate($this->createUser(), 'a wide shot', 'video', 45, '1080p');
+
+        self::assertSame('1080p', $result['resolution']);
+    }
+
+    public function testGenerateImageDoesNotIncludeResolutionInResponse(): void
+    {
+        $this->allowRateLimit();
+        $model = $this->createModel();
+        $this->setUpModelResolution(42, $model);
+
+        $pngData = "\x89PNG\r\n\x1a\n".str_repeat("\0", 100);
+        $this->aiFacade->method('generateImage')->willReturn([
+            'images' => ['data:image/png;base64,'.base64_encode($pngData)],
+        ]);
+
+        $result = $this->service->generate($this->createUser(), 'sunset', 'image', 42);
+
+        self::assertArrayNotHasKey('resolution', $result);
     }
 
     public function testRecordsUsageAfterSuccess(): void

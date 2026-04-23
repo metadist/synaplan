@@ -182,6 +182,10 @@ final class RateLimitService
         $mediaUsage = $metadata['media_usage'] ?? [];
         $pricingMode = $this->costCalculationService->getPricingMode($modelId);
 
+        // Capture a single timestamp so the price-history lookup, the stored
+        // price snapshot and the BUNIXTIMES column on BUSELOG all line up.
+        $timestamp = time();
+
         if ('per_token' !== $pricingMode && !empty($mediaUsage)) {
             $inputQty = match ($pricingMode) {
                 'per_character' => (float) ($mediaUsage['characters'] ?? 0),
@@ -202,7 +206,7 @@ final class RateLimitService
                 $modelId,
                 $inputQty,
                 $outputQty,
-                null,
+                $timestamp,
                 $resolution,
             );
         } else {
@@ -212,6 +216,7 @@ final class RateLimitService
                 $cachedTokens,
                 $cacheCreationTokens,
                 $modelId,
+                $timestamp,
             );
         }
 
@@ -237,7 +242,7 @@ final class RateLimitService
              :cost, :latency, :status, :error, :metadata)',
             [
                 'user_id' => $user->getId(),
-                'timestamp' => time(),
+                'timestamp' => $timestamp,
                 'action' => $action,
                 'provider' => $metadata['provider'] ?? '',
                 'model' => $metadata['model'] ?? '',

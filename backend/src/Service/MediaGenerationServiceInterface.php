@@ -18,7 +18,11 @@ interface MediaGenerationServiceInterface
      *                                Falls back to the model's default_resolution when omitted/unsupported.
      *                                Ignored for type=image.
      *
-     * @return array{success: true, file: array{url: string, type: string, mimeType: string}, provider: string, model: string}
+     * The `resolution` key is only present for video generations and reflects the
+     * resolution actually used (after normalization and provider negotiation), which
+     * may differ from the caller's input.
+     *
+     * @return array{success: true, file: array{url: string, type: string, mimeType: string}, provider: string, model: string, resolution?: string}
      *
      * @throws \InvalidArgumentException  on bad input
      * @throws RateLimitExceededException when user exceeds quota

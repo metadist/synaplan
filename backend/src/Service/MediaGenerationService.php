@@ -28,6 +28,15 @@ final readonly class MediaGenerationService implements MediaGenerationServiceInt
      * 720p is Google's cheapest tier across all Veo variants.
      */
     private const DEFAULT_VIDEO_RESOLUTION_FALLBACK = '720p';
+
+    /**
+     * Globally supported video resolutions. Mirrors the public OpenAPI enum on
+     * /api/v1/media/generate and /api/v1/media/video/start. Used as the
+     * fallback validation set when a model does not declare its own
+     * `allowed_resolutions`, so we never forward arbitrary caller input
+     * (e.g. "8K") to a provider.
+     */
+    private const SUPPORTED_VIDEO_RESOLUTIONS = ['720p', '1080p', '4K'];
     private const VIDEO_JOB_TTL_SECONDS = 1200;
 
     public function __construct(
@@ -45,7 +54,7 @@ final readonly class MediaGenerationService implements MediaGenerationServiceInt
     /**
      * Generate media (image or video) from a text prompt.
      *
-     * @return array{success: true, file: array{url: string, type: string, mimeType: string}, provider: string, model: string}
+     * @return array{success: true, file: array{url: string, type: string, mimeType: string}, provider: string, model: string, resolution?: string}
      *
      * @throws \InvalidArgumentException  on bad input
      * @throws RateLimitExceededException when user exceeds quota
@@ -95,12 +104,12 @@ final readonly class MediaGenerationService implements MediaGenerationServiceInt
         $mimeType = $this->guessMimeType($localPath, $type);
 
         $usedResolution = 'video' === $type
-            ? ($result['videos'][0]['resolution'] ?? $resolution)
+            ? ($this->extractResolutionFromResult($result) ?? $resolution)
             : null;
 
         $this->recordUsage($user, $type, $provider, $modelName, $resolvedModelId, null, $usedResolution);
 
-        return [
+        $response = [
             'success' => true,
             'file' => [
                 'url' => '/api/v1/files/uploads/'.$localPath,
@@ -110,6 +119,12 @@ final readonly class MediaGenerationService implements MediaGenerationServiceInt
             'provider' => $result['provider'] ?? $provider ?? 'unknown',
             'model' => $result['model'] ?? $modelName ?? 'unknown',
         ];
+
+        if (null !== $usedResolution) {
+            $response['resolution'] = $usedResolution;
+        }
+
+        return $response;
     }
 
     public function generateFromImages(User $user, string $prompt, array $imagePaths, ?int $modelId = null): array
@@ -445,8 +460,13 @@ final readonly class MediaGenerationService implements MediaGenerationServiceInt
     }
 
     /**
-     * Validate a caller-supplied resolution against the model's allowed list and
-     * fall back to the model's default (or the global fallback) when invalid/missing.
+     * Validate a caller-supplied resolution and fall back to the model's
+     * default (or the global fallback) when invalid/missing.
+     *
+     * Validation enum:
+     *   - When the model declares `allowed_resolutions`, that list is authoritative.
+     *   - Otherwise the global SUPPORTED_VIDEO_RESOLUTIONS set is used so that
+     *     arbitrary values (e.g. "8K") are never forwarded to providers.
      *
      * @param array<string, mixed> $modelConfig
      */
@@ -456,10 +476,13 @@ final readonly class MediaGenerationService implements MediaGenerationServiceInt
             ? array_values(array_filter($modelConfig['allowed_resolutions'], 'is_string'))
             : [];
 
-        if (null !== $requested && '' !== $requested && [] !== $allowed && !in_array($requested, $allowed, true)) {
-            $this->logger->warning('Requested video resolution not allowed for model, falling back', [
+        $effectiveAllowed = [] !== $allowed ? $allowed : self::SUPPORTED_VIDEO_RESOLUTIONS;
+
+        if (null !== $requested && '' !== $requested && !in_array($requested, $effectiveAllowed, true)) {
+            $this->logger->warning('Requested video resolution not allowed, falling back', [
                 'requested' => $requested,
-                'allowed' => $allowed,
+                'allowed' => $effectiveAllowed,
+                'model_specific' => [] !== $allowed,
             ]);
             $requested = null;
         }
@@ -469,11 +492,39 @@ final readonly class MediaGenerationService implements MediaGenerationServiceInt
         }
 
         $default = $modelConfig['default_resolution'] ?? null;
-        if (is_string($default) && '' !== $default) {
+        if (is_string($default) && '' !== $default && in_array($default, $effectiveAllowed, true)) {
             return $default;
         }
 
         return [] !== $allowed ? $allowed[0] : self::DEFAULT_VIDEO_RESOLUTION_FALLBACK;
+    }
+
+    /**
+     * Pull the effective resolution out of a video provider result.
+     *
+     * AiFacade::generateVideo() exposes the resolution at the top level, but some
+     * provider payloads also nest it inside the first videos[] item. The first
+     * videos[] entry can also legitimately be a plain URL string (see
+     * extractMediaUrl), so we must guard before indexing it.
+     *
+     * @param array<string, mixed> $result
+     */
+    private function extractResolutionFromResult(array $result): ?string
+    {
+        $top = $result['resolution'] ?? null;
+        if (\is_string($top) && '' !== $top) {
+            return $top;
+        }
+
+        $first = $result['videos'][0] ?? null;
+        if (\is_array($first)) {
+            $nested = $first['resolution'] ?? null;
+            if (\is_string($nested) && '' !== $nested) {
+                return $nested;
+            }
+        }
+
+        return null;
     }
 
     private function extractMediaUrl(array $result, string $type): ?string

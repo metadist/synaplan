@@ -498,9 +498,8 @@ final readonly class MediaGenerationHandler implements MessageHandlerInterface
                 $mediaUsage['images'] = $result['image_count'] ?? 1;
             } elseif ('video' === $mediaType) {
                 $mediaUsage['duration_seconds'] = $result['duration_seconds'] ?? null;
-                $videoResolution = $result['resolution']
-                    ?? ($result['videos'][0]['resolution'] ?? null);
-                if (is_string($videoResolution) && '' !== $videoResolution) {
+                $videoResolution = $this->extractVideoResolution($result);
+                if (null !== $videoResolution) {
                     $mediaUsage['resolution'] = $videoResolution;
                 }
             }
@@ -789,5 +788,33 @@ final readonly class MediaGenerationHandler implements MessageHandlerInterface
                 'timestamp' => time(),
             ]);
         }
+    }
+
+    /**
+     * Pull the effective resolution from a video provider result.
+     *
+     * AiFacade::generateVideo() exposes the resolution at the top level, but some
+     * provider payloads only nest it inside the first videos[] item. The first
+     * videos[] entry can also legitimately be a plain URL string, so we must
+     * guard before indexing it.
+     *
+     * @param array<string, mixed> $result
+     */
+    private function extractVideoResolution(array $result): ?string
+    {
+        $top = $result['resolution'] ?? null;
+        if (is_string($top) && '' !== $top) {
+            return $top;
+        }
+
+        $first = $result['videos'][0] ?? null;
+        if (is_array($first)) {
+            $nested = $first['resolution'] ?? null;
+            if (is_string($nested) && '' !== $nested) {
+                return $nested;
+            }
+        }
+
+        return null;
     }
 }
