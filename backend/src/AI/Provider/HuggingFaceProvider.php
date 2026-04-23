@@ -663,10 +663,7 @@ class HuggingFaceProvider implements ChatProviderInterface, EmbeddingProviderInt
         } catch (\Throwable) {
         }
 
-        throw new ProviderException(
-            sprintf('HuggingFace streaming chat failed (HTTP %d): %s', $statusCode, '' !== $body ? $body : 'no response body'),
-            self::PROVIDER_NAME,
-        );
+        throw new ProviderException(sprintf('HuggingFace streaming chat failed (HTTP %d): %s', $statusCode, '' !== $body ? $body : 'no response body'), self::PROVIDER_NAME);
     }
 
     // ==================== CHAT HELPERS ====================
