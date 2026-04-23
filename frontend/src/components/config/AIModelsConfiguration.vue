@@ -594,9 +594,7 @@ const selectedModelInfo = computed<Record<string, { label: string; service: stri
     const selectedId = defaultConfig.value[purpose as Capability]
     const selected = selectedId ? models.find((m) => m.id === selectedId) : null
     info[purpose] = {
-      label: selected
-        ? `${selected.providerId || selected.name} (${selected.service})`
-        : '-- Select Model --',
+      label: selected ? selected.name : t('config.aiModels.selectModel'),
       service: selected?.service || 'unknown',
     }
   }
@@ -608,7 +606,7 @@ const getSelectedModelService = (purpose: Capability): string => {
 }
 
 const getSelectedModelLabel = (purpose: Capability): string => {
-  return selectedModelInfo.value[purpose]?.label || '-- Select Model --'
+  return selectedModelInfo.value[purpose]?.label || t('config.aiModels.selectModel')
 }
 
 const getSelectedModelObj = (purpose: Capability): AIModel | null => {

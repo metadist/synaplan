@@ -26,6 +26,58 @@ class GoogleProvider implements ChatProviderInterface, ImageGenerationProviderIn
     private const API_BASE = 'https://generativelanguage.googleapis.com/v1beta';
     private const VERTEX_BASE = 'https://{region}-aiplatform.googleapis.com/v1';
 
+    /**
+     * Last-resort default resolution used when neither the caller nor the
+     * model JSON declares one. Mirrors
+     * MediaGenerationService::DEFAULT_VIDEO_RESOLUTION_FALLBACK so the
+     * product-wide default ("1080p") stays consistent end-to-end.
+     */
+    private const DEFAULT_VEO_RESOLUTION = '1080p';
+
+    /**
+     * Maps our canonical (display-friendly) resolution values to the exact
+     * strings Google's Veo API expects in the request payload.
+     *
+     * We keep "4K" (capital K) internally for nice UI/billing/logging, but
+     * Google's `predictLongRunning` endpoint only accepts the lowercase
+     * "4k" – any other casing returns HTTP 400 INVALID_ARGUMENT.
+     *
+     * @see https://ai.google.dev/gemini-api/docs/video#control_the_resolution
+     *
+     * @var array<string, string>
+     */
+    private const VEO_API_RESOLUTION_MAP = [
+        '4K' => '4k',
+    ];
+
+    /**
+     * Polling cadence for {@see pollVideoUntilComplete()}. Each attempt sleeps
+     * for this many seconds before checking the long-running operation again.
+     */
+    private const VEO_POLL_INTERVAL_SECONDS = 5;
+
+    /**
+     * Maximum total wall-clock time (in seconds) we wait for Veo to finish a
+     * generation before giving up. Higher resolutions take noticeably longer
+     * (Google explicitly warns that 4K has higher latency), so we tier the
+     * timeout to avoid bailing out on healthy long-running 4K jobs while
+     * keeping fast 720p/1080p paths from hanging on real failures.
+     *
+     * @see https://ai.google.dev/gemini-api/docs/video#control_the_resolution
+     *
+     * @var array<string, int>
+     */
+    private const VEO_POLL_TIMEOUTS_SECONDS = [
+        '720p' => 300,
+        '1080p' => 300,
+        '4K' => 900,
+    ];
+
+    /**
+     * Fallback wall-clock budget when the resolution is missing or unknown.
+     */
+    private const VEO_POLL_TIMEOUT_DEFAULT_SECONDS = 300;
+
     public function __construct(
         private LoggerInterface $logger,
         private HttpClientInterface $httpClient,
@@ -659,6 +711,7 @@ class GoogleProvider implements ChatProviderInterface, ImageGenerationProviderIn
             $videoUri = $this->pollVideoUntilComplete(
                 $operationData['operationName'],
                 $progressCallback,
+                $operationData['resolution'],
             );
 
             $videoDataUrl = $this->downloadVideoContent($videoUri);
@@ -715,6 +768,7 @@ class GoogleProvider implements ChatProviderInterface, ImageGenerationProviderIn
             ? $options['resolution']
             : null;
         $resolution = $this->resolveVeoResolution($requestedResolution, $modelConfig);
+        $apiResolution = self::mapResolutionForVeoApi($resolution);
 
         $this->logger->info('Google Veo: Starting video generation', [
             'model' => $model,
@@ -724,6 +778,7 @@ class GoogleProvider implements ChatProviderInterface, ImageGenerationProviderIn
             'aspect_ratio' => $aspectRatio,
             'requested_resolution' => $requestedResolution,
             'actual_resolution' => $resolution,
+            'api_resolution' => $apiResolution,
         ]);
 
         $url = self::API_BASE."/models/{$model}:predictLongRunning";
@@ -735,7 +790,7 @@ class GoogleProvider implements ChatProviderInterface, ImageGenerationProviderIn
             'parameters' => [
                 'durationSeconds' => $durationSeconds,
                 'aspectRatio' => $aspectRatio,
-                'resolution' => $resolution,
+                'resolution' => $apiResolution,
             ],
         ];
 
@@ -865,15 +920,20 @@ class GoogleProvider implements ChatProviderInterface, ImageGenerationProviderIn
     /**
      * Poll until the Veo operation completes, calling progressCallback each iteration.
      *
+     * The total wait budget is chosen per resolution via
+     * {@see self::VEO_POLL_TIMEOUTS_SECONDS} – 4K legitimately takes longer
+     * than 720p/1080p, so a single 5-minute ceiling caused false timeouts.
+     *
      * @return string The video URI to download
      */
-    private function pollVideoUntilComplete(string $operationName, ?callable $progressCallback): string
+    private function pollVideoUntilComplete(string $operationName, ?callable $progressCallback, ?string $resolution = null): string
     {
-        $maxAttempts = 60;
+        $timeoutSeconds = $this->resolvePollTimeoutSeconds($resolution);
+        $maxAttempts = (int) ceil($timeoutSeconds / self::VEO_POLL_INTERVAL_SECONDS);
         $startTime = time();
 
         for ($attempt = 1; $attempt <= $maxAttempts; ++$attempt) {
-            sleep(5);
+            sleep(self::VEO_POLL_INTERVAL_SECONDS);
 
             $elapsed = time() - $startTime;
 
@@ -883,6 +943,8 @@ class GoogleProvider implements ChatProviderInterface, ImageGenerationProviderIn
                     'attempt' => $attempt,
                     'max_attempts' => $maxAttempts,
                     'elapsed_seconds' => $elapsed,
+                    'timeout_seconds' => $timeoutSeconds,
+                    'resolution' => $resolution,
                 ]);
             }
 
@@ -890,6 +952,8 @@ class GoogleProvider implements ChatProviderInterface, ImageGenerationProviderIn
                 'attempt' => $attempt,
                 'max_attempts' => $maxAttempts,
                 'elapsed' => $elapsed,
+                'timeout_seconds' => $timeoutSeconds,
+                'resolution' => $resolution,
             ]);
 
             $result = $this->pollVideoOperationOnce($operationName);
@@ -905,7 +969,21 @@ class GoogleProvider implements ChatProviderInterface, ImageGenerationProviderIn
             return $result['videoUri'];
         }
 
-        throw new ProviderException('Video generation timed out after '.($maxAttempts * 5).' seconds', 'google');
+        throw new ProviderException(sprintf('Video generation timed out after %d seconds (resolution: %s)', $timeoutSeconds, $resolution ?? 'unknown'), 'google');
+    }
+
+    /**
+     * Pick the polling wall-clock budget for the given canonical resolution.
+     * Falls back to {@see self::VEO_POLL_TIMEOUT_DEFAULT_SECONDS} for unknown
+     * or missing values so we never lose the safety net.
+     */
+    private function resolvePollTimeoutSeconds(?string $resolution): int
+    {
+        if (null === $resolution || '' === $resolution) {
+            return self::VEO_POLL_TIMEOUT_DEFAULT_SECONDS;
+        }
+
+        return self::VEO_POLL_TIMEOUTS_SECONDS[$resolution] ?? self::VEO_POLL_TIMEOUT_DEFAULT_SECONDS;
     }
 
     /**
@@ -933,7 +1011,9 @@ class GoogleProvider implements ChatProviderInterface, ImageGenerationProviderIn
      * Pick the resolution to send to the Veo API.
      *
      * Honors the request when it is in the model's allowed_resolutions list,
-     * otherwise falls back to default_resolution, then to '720p' (cheapest universal default).
+     * otherwise falls back to default_resolution, then to the model's first
+     * allowed value, then finally to {@see DEFAULT_VEO_RESOLUTION} (1080p),
+     * which is the product-wide default chosen in MediaGenerationService.
      *
      * @param array<string, mixed> $modelConfig
      */
@@ -960,7 +1040,20 @@ class GoogleProvider implements ChatProviderInterface, ImageGenerationProviderIn
             return $default;
         }
 
-        return [] !== $allowed ? $allowed[0] : '720p';
+        return [] !== $allowed ? $allowed[0] : self::DEFAULT_VEO_RESOLUTION;
+    }
+
+    /**
+     * Translate our canonical resolution label into the exact string the Veo
+     * API accepts in its request payload.
+     *
+     * Anything not present in {@see self::VEO_API_RESOLUTION_MAP} is returned
+     * unchanged, so already-compatible values like "720p"/"1080p" pass
+     * through and only "4K" is rewritten to "4k".
+     */
+    private static function mapResolutionForVeoApi(string $canonical): string
+    {
+        return self::VEO_API_RESOLUTION_MAP[$canonical] ?? $canonical;
     }
 
     public function editImage(string $imageUrl, string $maskUrl, string $prompt): string

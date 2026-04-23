@@ -257,7 +257,7 @@ class CostCalculationServiceTest extends TestCase
         $model = $this->createModelMock('google', 0.0, 0.10, '-', 'persec', [
             'pricing_mode' => 'per_second',
             'allowed_resolutions' => ['720p', '1080p', '4K'],
-            'default_resolution' => '720p',
+            'default_resolution' => '1080p',
             'resolution_prices' => [
                 '720p' => 0.10,
                 '1080p' => 0.12,
@@ -273,9 +273,9 @@ class CostCalculationServiceTest extends TestCase
         // Caller asked for an unsupported resolution; service must fall back to default_resolution.
         $result = $this->service->calculateMediaCost(195, 0, 6.0, null, '8K');
 
-        // 6 * $0.10 (default 720p) = $0.60
-        $this->assertSame('0.600000', $result->totalCost);
-        $this->assertSame('720p', $result->priceSnapshot['resolution']);
+        // 6 * $0.12 (default 1080p) = $0.72
+        $this->assertSame('0.720000', $result->totalCost);
+        $this->assertSame('1080p', $result->priceSnapshot['resolution']);
     }
 
     public function testCalculateMediaCostReturnsZeroForPerTokenModel(): void

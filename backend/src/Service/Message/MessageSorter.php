@@ -32,6 +32,42 @@ final readonly class MessageSorter
      */
     private const SUPPORTED_LANGUAGES = ['de', 'en', 'it', 'es', 'fr', 'nl', 'pt', 'ru', 'sv', 'tr'];
 
+    /**
+     * Canonical video resolutions accepted downstream by MediaGenerationService
+     * and the Veo provider. Keep in sync with
+     * MediaGenerationService::SUPPORTED_VIDEO_RESOLUTIONS so the AI never
+     * leaks an unsupported value (e.g. "8K", "1440p") into the pipeline.
+     */
+    private const SUPPORTED_VIDEO_RESOLUTIONS = ['720p', '1080p', '4K'];
+
+    /**
+     * Common aliases the AI (or user) might emit, mapped to the canonical
+     * values above. Lookup is case-insensitive after normalization.
+     */
+    private const RESOLUTION_ALIASES = [
+        '720' => '720p',
+        '720p' => '720p',
+        'hd' => '720p',
+        'readyhd' => '720p',
+        '1080' => '1080p',
+        '1080p' => '1080p',
+        'fhd' => '1080p',
+        'fullhd' => '1080p',
+        '4k' => '4K',
+        'uhd' => '4K',
+        'ultrahd' => '4K',
+        '2160' => '4K',
+        '2160p' => '4K',
+        // Tiers we cannot fulfil: clamp UP-tier requests to 4K (highest we
+        // support) and DOWN-tier hints to 1080p so we never forward them raw.
+        '8k' => '4K',
+        '5k' => '4K',
+        '1440' => '1080p',
+        '1440p' => '1080p',
+        'qhd' => '1080p',
+        '2k' => '1080p',
+    ];
+
     public function __construct(
         private AiFacade $aiFacade,
         private PromptRepository $promptRepository,
@@ -196,6 +232,7 @@ final readonly class MessageSorter
                 'web_search' => $parsed['web_search'] ?? false,
                 'media_type' => $parsed['media_type'] ?? null,
                 'duration' => $parsed['duration'] ?? null,
+                'resolution' => $parsed['resolution'] ?? null,
                 'input_mode' => $parsed['input_mode'] ?? null,
                 'raw_ai_response' => $aiResponse,
             ]);
@@ -208,6 +245,7 @@ final readonly class MessageSorter
                     'language' => $parsed['language'],
                     'media_type' => $parsed['media_type'] ?? null,
                     'duration' => $parsed['duration'] ?? null,
+                    'resolution' => $parsed['resolution'] ?? null,
                     'input_mode' => $parsed['input_mode'] ?? null,
                     'raw_response' => $aiResponse,
                 ],
@@ -233,6 +271,7 @@ final readonly class MessageSorter
                 'web_search' => $webSearch ?? false,
                 'media_type' => $parsed['media_type'] ?? null,
                 'duration' => $parsed['duration'] ?? null,
+                'resolution' => $parsed['resolution'] ?? null,
                 'input_mode' => $parsed['input_mode'] ?? null,
                 'raw_response' => $aiResponse,
                 'prompt_metadata' => $promptMetadata,
@@ -368,12 +407,23 @@ final readonly class MessageSorter
                 }
             }
 
+            // Parse BRESOLUTION for video generation. Accept the canonical
+            // values directly and translate common aliases (e.g. "uhd",
+            // "fullhd", "8k") so we never forward unsupported strings to the
+            // provider. Anything we cannot map is dropped (returns null) so
+            // downstream code falls back to the configured default.
+            $resolution = null;
+            if (isset($data['BRESOLUTION']) && (is_string($data['BRESOLUTION']) || is_int($data['BRESOLUTION']))) {
+                $resolution = $this->normalizeResolution((string) $data['BRESOLUTION']);
+            }
+
             return [
                 'topic' => $data['BTOPIC'] ?? $originalData['BTOPIC'] ?? 'general',
                 'language' => $data['BLANG'] ?? $originalData['BLANG'] ?? 'en',
                 'web_search' => $webSearch,
                 'media_type' => $mediaType,
                 'duration' => $duration,
+                'resolution' => $resolution,
                 'input_mode' => $inputMode,
             ];
         } catch (\JsonException $e) {
@@ -389,9 +439,36 @@ final readonly class MessageSorter
                 'web_search' => false,
                 'media_type' => null,
                 'duration' => null,
+                'resolution' => null,
                 'input_mode' => null,
             ];
         }
+    }
+
+    /**
+     * Normalize a free-form resolution string into one of the
+     * canonical SUPPORTED_VIDEO_RESOLUTIONS values, or null when unknown.
+     *
+     * Strips spaces and dashes ("4 K" / "4-K" → "4k"), folds case, and
+     * resolves aliases via RESOLUTION_ALIASES.
+     */
+    private function normalizeResolution(string $raw): ?string
+    {
+        $value = trim($raw);
+        if ('' === $value) {
+            return null;
+        }
+
+        if (in_array($value, self::SUPPORTED_VIDEO_RESOLUTIONS, true)) {
+            return $value;
+        }
+
+        $key = preg_replace('/[\s\-_]+/', '', strtolower($value));
+        if (!is_string($key) || '' === $key) {
+            return null;
+        }
+
+        return self::RESOLUTION_ALIASES[$key] ?? null;
     }
 
     /**

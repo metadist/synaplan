@@ -133,7 +133,10 @@ class MediaGenerationServiceTest extends TestCase
                 'provider' => 'google',
                 'model' => 'veo-3.1',
                 'duration' => 8,
-                'resolution' => '720p',
+                // Mock model has no `default_resolution`, so the service must
+                // apply the product-wide fallback (1080p) — see
+                // MediaGenerationService::DEFAULT_VIDEO_RESOLUTION_FALLBACK.
+                'resolution' => '1080p',
             ]);
 
         $cacheItem = $this->createMock(\Psr\Cache\CacheItemInterface::class);
@@ -142,7 +145,7 @@ class MediaGenerationServiceTest extends TestCase
                 && 1 === $data['userId']
                 && 'test prompt' === $data['prompt']
                 && 45 === $data['modelId']
-                && '720p' === $data['resolution'];
+                && '1080p' === $data['resolution'];
         }));
         $cacheItem->expects($this->once())->method('expiresAfter')->with(1200);
 
@@ -159,7 +162,7 @@ class MediaGenerationServiceTest extends TestCase
         $this->assertSame('processing', $result['status']);
         $this->assertSame('google', $result['provider']);
         $this->assertSame('veo-3.1', $result['model']);
-        $this->assertSame('720p', $result['resolution']);
+        $this->assertSame('1080p', $result['resolution']);
     }
 
     public function testStartVideoGenerationForwardsResolutionToProvider(): void
@@ -217,7 +220,8 @@ class MediaGenerationServiceTest extends TestCase
 
         // Model has neither allowed_resolutions nor default_resolution. The
         // service must still reject values outside the global supported enum
-        // (720p/1080p/4K) instead of forwarding "8K" verbatim to the provider.
+        // (720p/1080p/4K) instead of forwarding "8K" verbatim to the provider,
+        // and fall back to the product-wide default (1080p).
         $model = $this->createModel('Google', 'veo-3.1-experimental', 'Veo 3.1 Experimental');
         $this->setUpModelResolution(900, $model);
 
@@ -226,14 +230,14 @@ class MediaGenerationServiceTest extends TestCase
             ->with(
                 'a clip',
                 1,
-                $this->callback(fn (array $opts): bool => '720p' === $opts['resolution']),
+                $this->callback(fn (array $opts): bool => '1080p' === $opts['resolution']),
             )
             ->willReturn([
                 'operationName' => 'ops/exp',
                 'provider' => 'google',
                 'model' => 'veo-3.1-experimental',
                 'duration' => 8,
-                'resolution' => '720p',
+                'resolution' => '1080p',
             ]);
 
         $cacheItem = $this->createMock(\Psr\Cache\CacheItemInterface::class);
@@ -245,7 +249,7 @@ class MediaGenerationServiceTest extends TestCase
 
         $result = $this->service->startVideoGeneration($user, 'a clip', 900, '8K');
 
-        $this->assertSame('720p', $result['resolution']);
+        $this->assertSame('1080p', $result['resolution']);
     }
 
     public function testStartVideoGenerationFallsBackToDefaultWhenResolutionUnsupported(): void
@@ -253,6 +257,8 @@ class MediaGenerationServiceTest extends TestCase
         $user = $this->createUser(1);
         $this->allowRateLimit();
 
+        // Veo Lite does not support 4K — when the caller requests it, the
+        // service must fall back to the model's `default_resolution` (1080p).
         $model = $this->createMock(Model::class);
         $model->method('getService')->willReturn('Google');
         $model->method('getProviderId')->willReturn('veo-3.1-lite-generate-preview');
@@ -260,7 +266,7 @@ class MediaGenerationServiceTest extends TestCase
         $model->method('getJson')->willReturn([
             'pricing_mode' => 'per_second',
             'allowed_resolutions' => ['720p', '1080p'],
-            'default_resolution' => '720p',
+            'default_resolution' => '1080p',
         ]);
         $this->setUpModelResolution(196, $model);
 
@@ -269,14 +275,14 @@ class MediaGenerationServiceTest extends TestCase
             ->with(
                 'a clip',
                 1,
-                $this->callback(fn (array $opts): bool => '720p' === $opts['resolution']),
+                $this->callback(fn (array $opts): bool => '1080p' === $opts['resolution']),
             )
             ->willReturn([
                 'operationName' => 'ops/lite',
                 'provider' => 'google',
                 'model' => 'veo-3.1-lite-generate-preview',
                 'duration' => 8,
-                'resolution' => '720p',
+                'resolution' => '1080p',
             ]);
 
         $cacheItem = $this->createMock(\Psr\Cache\CacheItemInterface::class);
@@ -288,7 +294,7 @@ class MediaGenerationServiceTest extends TestCase
 
         $result = $this->service->startVideoGeneration($user, 'a clip', 196, '4K');
 
-        $this->assertSame('720p', $result['resolution']);
+        $this->assertSame('1080p', $result['resolution']);
     }
 
     public function testCheckVideoJobProcessing(): void
