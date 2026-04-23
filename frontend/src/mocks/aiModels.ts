@@ -208,6 +208,7 @@ export const serviceColors: Record<string, string> = {
   Groq: 'bg-cyan-500',
   OpenAI: 'bg-green-500',
   Ollama: 'bg-purple-500',
+  HuggingFace: 'bg-yellow-400',
   Stability: 'bg-pink-500',
   ElevenLabs: 'bg-indigo-500',
   RunwayML: 'bg-yellow-500',

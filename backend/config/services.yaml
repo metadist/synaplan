@@ -184,6 +184,7 @@ services:
             $uploadDir: '%kernel.project_dir%/var/uploads'
         tags:
             - { name: 'app.ai.chat' }
+            - { name: 'app.ai.vision' }
             - { name: 'app.ai.embedding' }
             - { name: 'app.ai.image_generation' }
             - { name: 'app.ai.video_generation' }
