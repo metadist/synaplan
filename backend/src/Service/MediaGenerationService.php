@@ -25,9 +25,13 @@ final readonly class MediaGenerationService implements MediaGenerationServiceInt
     private const DEFAULT_VIDEO_ASPECT_RATIO = '16:9';
     /**
      * Fallback resolution when neither caller nor model JSON specifies one.
-     * 720p is Google's cheapest tier across all Veo variants.
+     *
+     * 1080p is the product-wide default: it matches what most users expect
+     * when they say "make a video" without naming a resolution, and on Veo
+     * 3.1 Standard it is priced identically to 720p ($0.40/sec) so the
+     * default carries no extra cost for that flagship tier.
      */
-    private const DEFAULT_VIDEO_RESOLUTION_FALLBACK = '720p';
+    private const DEFAULT_VIDEO_RESOLUTION_FALLBACK = '1080p';
 
     /**
      * Globally supported video resolutions. Mirrors the public OpenAPI enum on

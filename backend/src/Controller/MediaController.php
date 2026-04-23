@@ -170,9 +170,9 @@ final class MediaController extends AbstractController
                     property: 'resolution',
                     type: 'string',
                     enum: ['720p', '1080p', '4K'],
-                    description: 'Output resolution for video generation. Falls back to the model\'s default_resolution (typically 720p) when omitted or unsupported by the chosen model. Ignored for type=image.',
+                    description: 'Output resolution for video generation. Falls back to the model\'s default_resolution (1080p for current Veo 3.1 tiers) when omitted or unsupported by the chosen model. Ignored for type=image.',
                     nullable: true,
-                    example: '720p'
+                    example: '1080p'
                 ),
             ]
         )
@@ -315,9 +315,9 @@ final class MediaController extends AbstractController
                     property: 'resolution',
                     type: 'string',
                     enum: ['720p', '1080p', '4K'],
-                    description: 'Output resolution. Falls back to the model\'s default_resolution (typically 720p) when omitted or unsupported.',
+                    description: 'Output resolution. Falls back to the model\'s default_resolution (1080p for current Veo 3.1 tiers) when omitted or unsupported.',
                     nullable: true,
-                    example: '720p'
+                    example: '1080p'
                 ),
             ]
         )
@@ -331,7 +331,7 @@ final class MediaController extends AbstractController
                 new OA\Property(property: 'status', type: 'string', example: 'processing'),
                 new OA\Property(property: 'provider', type: 'string'),
                 new OA\Property(property: 'model', type: 'string'),
-                new OA\Property(property: 'resolution', type: 'string', example: '720p'),
+                new OA\Property(property: 'resolution', type: 'string', example: '1080p'),
             ]
         )
     )]

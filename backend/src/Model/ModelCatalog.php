@@ -861,8 +861,11 @@ class ModelCatalog
             'providerId' => 'veo-3.1-generate-preview',
             'priceIn' => 0,
             'inUnit' => '-',
-            // priceOut = price for the cheapest supported resolution (default).
-            // Resolution-specific prices live in json.resolution_prices and override priceOut at billing time.
+            // priceOut = headline / fallback per-second rate. Resolution-specific
+            // prices in json.resolution_prices override priceOut at billing time
+            // (see CostCalculationService::lookupResolutionPrice). The headline
+            // matches the cheapest supported tier so list views show the
+            // best-case price; actual cost depends on default_resolution.
             'priceOut' => 0.40,
             'outUnit' => 'persec',
             'quality' => 10,
@@ -872,7 +875,7 @@ class ModelCatalog
                 'params' => ['model' => 'veo-3.1-generate-preview'],
                 'pricing_mode' => 'per_second',
                 'allowed_resolutions' => ['720p', '1080p', '4K'],
-                'default_resolution' => '720p',
+                'default_resolution' => '1080p',
                 'resolution_prices' => [
                     '720p' => 0.40,
                     '1080p' => 0.40,
@@ -899,7 +902,7 @@ class ModelCatalog
                 'params' => ['model' => 'veo-3.1-fast-generate-preview'],
                 'pricing_mode' => 'per_second',
                 'allowed_resolutions' => ['720p', '1080p', '4K'],
-                'default_resolution' => '720p',
+                'default_resolution' => '1080p',
                 'resolution_prices' => [
                     '720p' => 0.10,
                     '1080p' => 0.12,
@@ -926,7 +929,7 @@ class ModelCatalog
                 'params' => ['model' => 'veo-3.1-lite-generate-preview'],
                 'pricing_mode' => 'per_second',
                 'allowed_resolutions' => ['720p', '1080p'],
-                'default_resolution' => '720p',
+                'default_resolution' => '1080p',
                 'resolution_prices' => [
                     '720p' => 0.05,
                     '1080p' => 0.08,
