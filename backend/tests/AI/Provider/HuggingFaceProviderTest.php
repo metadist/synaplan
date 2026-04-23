@@ -293,6 +293,65 @@ class HuggingFaceProviderTest extends TestCase
         $this->assertSame(3, $result['usage']['total_tokens']);
     }
 
+    /**
+     * Regression: a 402 during streaming must surface as a billing
+     * ProviderException BEFORE we touch the SSE body. Otherwise the empty
+     * body would yield a phantom successful "finish" callback and silently
+     * mask the real billing error from the caller.
+     */
+    public function testChatStream402PreservesBillingMessageAndDoesNotEmitFinish(): void
+    {
+        $client = new MockHttpClient(static fn () => new MockResponse('payment required', ['http_code' => 402]));
+
+        $invocations = [];
+        $callback = static function (mixed $chunk) use (&$invocations): void {
+            $invocations[] = $chunk;
+        };
+
+        try {
+            $this->makeProvider(httpClient: $client)->chatStream(
+                [['role' => 'user', 'content' => 'hi']],
+                $callback,
+                ['model' => 'moonshotai/Kimi-K2.6'],
+            );
+            $this->fail('Expected ProviderException');
+        } catch (ProviderException $e) {
+            $this->assertStringContainsString('prepaid credits', $e->getMessage());
+            $this->assertStringContainsString('huggingface.co/settings/billing', $e->getMessage());
+        }
+
+        $this->assertSame([], $invocations, 'Callback must NOT receive any chunks or a phantom finish on 402');
+    }
+
+    /**
+     * Regression: any non-2xx (5xx, 401, etc.) during streaming must surface
+     * as a ProviderException with the HTTP status, not be swallowed as an
+     * empty stream that emits a phantom finish event.
+     */
+    public function testChatStream500PreservesHttpStatusAndDoesNotEmitFinish(): void
+    {
+        $client = new MockHttpClient(static fn () => new MockResponse('upstream exploded', ['http_code' => 500]));
+
+        $invocations = [];
+        $callback = static function (mixed $chunk) use (&$invocations): void {
+            $invocations[] = $chunk;
+        };
+
+        try {
+            $this->makeProvider(httpClient: $client)->chatStream(
+                [['role' => 'user', 'content' => 'hi']],
+                $callback,
+                ['model' => 'moonshotai/Kimi-K2.6'],
+            );
+            $this->fail('Expected ProviderException');
+        } catch (ProviderException $e) {
+            $this->assertStringContainsString('HTTP 500', $e->getMessage());
+            $this->assertStringContainsString('upstream exploded', $e->getMessage());
+        }
+
+        $this->assertSame([], $invocations, 'Callback must NOT receive any chunks or a phantom finish on 5xx');
+    }
+
     // ==================== EMBEDDING URL ROUTING ====================
 
     public function testEmbedRoutesThroughDefaultSubProviderAndIncludesNormalize(): void

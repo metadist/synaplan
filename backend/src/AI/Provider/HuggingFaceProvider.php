@@ -201,6 +201,13 @@ class HuggingFaceProvider implements ChatProviderInterface, EmbeddingProviderInt
                 'timeout' => self::TIMEOUT_CHAT_SECONDS,
             ]);
 
+            // Symfony's HttpClient is lazy: request() returns before headers are received.
+            // We must assert success BEFORE consuming the SSE stream, otherwise a non-2xx
+            // (e.g. 402 Payment Required, 401 Unauthorized, 5xx) yields zero `data:` lines
+            // and the method would emit a phantom `finish` event with empty usage,
+            // masking the real error from the caller.
+            $this->assertChatResponseHttpOk($response);
+
             [$usage, $finishReason, $chunkCount] = $this->consumeChatStream($response, $callback);
 
             $this->logger->info('HuggingFace streaming COMPLETE', [
@@ -628,6 +635,38 @@ class HuggingFaceProvider implements ChatProviderInterface, EmbeddingProviderInt
         if (402 === $response->getStatusCode()) {
             throw new ProviderException(sprintf('HuggingFace %s requires prepaid credits. Add credits at %s', $action, self::BILLING_URL), self::PROVIDER_NAME);
         }
+    }
+
+    /**
+     * Assert the HTTP response from a streaming chat request is healthy
+     * BEFORE we start consuming its SSE body.
+     *
+     * Symfony's HttpClient is lazy – calling getStatusCode() forces the
+     * request to actually fly so we can detect 402/4xx/5xx upfront. Without
+     * this check, errors would surface as empty SSE streams and the caller
+     * would see a phantom successful completion with no content.
+     */
+    private function assertChatResponseHttpOk(ResponseInterface $response): void
+    {
+        $this->assertNotPaymentRequired($response, 'streaming chat');
+
+        $statusCode = $response->getStatusCode();
+        if ($statusCode >= 200 && $statusCode < 300) {
+            return;
+        }
+
+        // Best-effort: read the error body for a useful message. Fail open
+        // if the body cannot be read so we never mask the original failure.
+        $body = '';
+        try {
+            $body = $response->getContent(false);
+        } catch (\Throwable) {
+        }
+
+        throw new ProviderException(
+            sprintf('HuggingFace streaming chat failed (HTTP %d): %s', $statusCode, '' !== $body ? $body : 'no response body'),
+            self::PROVIDER_NAME,
+        );
     }
 
     // ==================== CHAT HELPERS ====================
