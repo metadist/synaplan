@@ -71,8 +71,41 @@ watch(
   }
 )
 
+/**
+ * Synchronously persist any pending edits when the panel unmounts (e.g. operator
+ * closes the internal-chat overlay before the debounce fires). We use fetch with
+ * `keepalive` so the request survives the surrounding teardown / page unload —
+ * `navigator.sendBeacon` cannot be used here because it only emits POST requests
+ * and the custom fields endpoint is PUT.
+ */
+const persistDirtyOnUnload = () => {
+  if (!dirty.value) return
+  if (!props.sessionId) return
+  if (!props.widgetId) return
+
+  try {
+    const url = `/api/v1/widgets/${encodeURIComponent(props.widgetId)}/sessions/${encodeURIComponent(props.sessionId)}/custom-fields`
+    const body = JSON.stringify({ values: values.value })
+    void fetch(url, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body,
+      credentials: 'include',
+      keepalive: true,
+    })
+    dirty.value = false
+  } catch {
+    // Best-effort — the regular debounced save would have surfaced any
+    // structural error already; nothing actionable to report at unmount time.
+  }
+}
+
 onUnmounted(() => {
-  if (saveTimer) clearTimeout(saveTimer)
+  if (saveTimer) {
+    clearTimeout(saveTimer)
+    saveTimer = null
+  }
+  persistDirtyOnUnload()
 })
 </script>
 

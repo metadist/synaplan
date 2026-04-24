@@ -2039,6 +2039,12 @@ onMounted(() => {
   // In test/internal mode, create a temporary session without localStorage persistence
   if (isTestEnvironment.value) {
     sessionId.value = createSessionId()
+    // Emit session-created immediately so dependent panels (e.g. custom fields in
+    // internal mode) can persist before the user sends the first message.
+    if (!sessionCreatedEmitted.value) {
+      sessionCreatedEmitted.value = true
+      emit('session-created', sessionId.value)
+    }
     loadConversationHistory()
     return
   }

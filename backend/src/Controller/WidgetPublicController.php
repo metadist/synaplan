@@ -233,16 +233,23 @@ class WidgetPublicController extends AbstractController
         // Check if session is in human takeover mode
         $isHumanMode = 'human' === $session->getMode() || 'waiting' === $session->getMode();
 
-        // Check session limits
-        $messageLimit = (int) ($config['messageLimit'] ?? WidgetSessionService::DEFAULT_MAX_MESSAGES);
-        $limitCheck = $this->sessionService->checkSessionLimit($session, $messageLimit);
-        if (!$limitCheck['allowed']) {
-            return $this->json([
-                'error' => 'Rate limit exceeded',
-                'reason' => $limitCheck['reason'],
-                'remaining' => $limitCheck['remaining'],
-                'retryAfter' => $limitCheck['retry_after'],
-            ], Response::HTTP_TOO_MANY_REQUESTS);
+        // Internal mode = widget owner chatting with their own widget from the dashboard.
+        // Skip end-user limits (messageLimit, per-minute throttle) for these sessions —
+        // they would otherwise block legitimate internal usage.
+        $isInternalSession = $session->isInternalMode();
+
+        // Check session limits (skipped for internal owner sessions)
+        if (!$isInternalSession) {
+            $messageLimit = (int) ($config['messageLimit'] ?? WidgetSessionService::DEFAULT_MAX_MESSAGES);
+            $limitCheck = $this->sessionService->checkSessionLimit($session, $messageLimit);
+            if (!$limitCheck['allowed']) {
+                return $this->json([
+                    'error' => 'Rate limit exceeded',
+                    'reason' => $limitCheck['reason'],
+                    'remaining' => $limitCheck['remaining'],
+                    'retryAfter' => $limitCheck['retry_after'],
+                ], Response::HTTP_TOO_MANY_REQUESTS);
+            }
         }
 
         // Check owner's limits
@@ -380,10 +387,16 @@ class WidgetPublicController extends AbstractController
             }
 
             // Increment session message count and update last message preview
-            // Only increment message count for AI mode (human messages don't count against limits)
-            if (!$isHumanMode) {
+            // Skipped for human takeover (already covered by operator workflow) and
+            // for internal owner sessions (no end-user limits apply).
+            if (!$isHumanMode && !$isInternalSession) {
                 $this->sessionService->incrementMessageCount($session);
                 // Save user message as last message preview
+                $session->setLastMessagePreview($data['text']);
+                $this->em->flush();
+            } elseif ($isInternalSession) {
+                // Still keep last-message tracking up to date so the dashboard preview stays useful.
+                $session->setLastMessage(time());
                 $session->setLastMessagePreview($data['text']);
                 $this->em->flush();
             }
@@ -459,7 +472,8 @@ class WidgetPublicController extends AbstractController
                 $chat,
                 $fileIds,
                 $widgetId,
-                $session
+                $session,
+                $isInternalSession
             ) {
                 $responseText = '';
                 $reasoningBuffer = '';
@@ -724,8 +738,11 @@ class WidgetPublicController extends AbstractController
                         $incomingMessage->setStatus('failed');
                         $this->em->flush();
 
-                        // Decrement session message count on failure so user can retry
-                        $this->sessionService->decrementMessageCount($session);
+                        // Decrement session message count on failure so user can retry.
+                        // Skipped for internal sessions where we never incremented in the first place.
+                        if (!$isInternalSession) {
+                            $this->sessionService->decrementMessageCount($session);
+                        }
                     } catch (\Throwable $flushException) {
                         // EntityManager might be closed after database error
                         $this->logger->warning('Could not update message status after error', [
@@ -746,8 +763,11 @@ class WidgetPublicController extends AbstractController
 
             return $response;
         } catch (\Exception $e) {
-            // Decrement session message count on failure so user can retry
-            $this->sessionService->decrementMessageCount($session);
+            // Decrement session message count on failure so user can retry.
+            // Skipped for internal sessions where we never incremented in the first place.
+            if (!$isInternalSession) {
+                $this->sessionService->decrementMessageCount($session);
+            }
 
             $this->logger->error('Widget message failed', [
                 'error' => $e->getMessage(),
@@ -1520,6 +1540,9 @@ class WidgetPublicController extends AbstractController
 
         if ($isInternalMode && $session->isAiMode()) {
             $session->setMode(WidgetSession::MODE_INTERNAL);
+            // Persist immediately so the mode is durable even if the request aborts
+            // before the next flush (rate limit, owner lookup, file processing failure).
+            $this->em->flush();
         }
 
         return $session;
