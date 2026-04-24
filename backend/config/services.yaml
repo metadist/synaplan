@@ -19,6 +19,11 @@ parameters:
     # OIDC scopes requested during login (space-separated)
     env(OIDC_SCOPES): 'openid email profile offline_access'
 
+    # Health monitoring defaults (so autowiring works when env not set)
+    env(HEALTH_MONITOR_TOKEN): ''
+    env(HEALTH_MONITOR_USER_EMAIL): ''
+    env(HEALTH_MONITOR_USER_PASSWORD): ''
+
     # Logging
     # LOG_FORMAT: json (default) or line (human-readable)
     # LOG_LEVEL: debug, info, notice, warning, error (see monolog.yaml)
