@@ -61,10 +61,12 @@ class ModelCatalog
      *     BSERVICE, BNAME, BTAG, BPROVID, BPRICEIN, BINUNIT, BPRICEOUT, BOUTUNIT,
      *     BQUALITY, BRATING, BJSON. Truth lives in this class; deploy = update.
      *   - **Operator-owned** (only set on INSERT, NEVER overwritten):
-     *     BSELECTABLE, BACTIVE, BISDEFAULT. These can be toggled by admins via
-     *     the AdminModelsService UI; container restarts must not wipe those choices.
-     *     Test fixtures that need to force a value should issue an explicit UPDATE
-     *     after the upsert (see ModelSeeder::seed()).
+     *     BSELECTABLE, BACTIVE, BISDEFAULT, BSHOWWHENFREE. These can be toggled
+     *     by admins via the AdminModelsService UI; container restarts must not
+     *     wipe those choices. BSHOWWHENFREE is not part of this statement at all
+     *     (no INSERT column / no UPDATE clause) — it is managed exclusively by
+     *     the admin UI and migrations. Test fixtures that need to force a value
+     *     should issue an explicit UPDATE after the upsert (see ModelSeeder::seed()).
      *
      * Every write embeds the catalog fingerprint into BJSON under
      * self::FINGERPRINT_KEY. ModelSeeder reads this back to detect manual UI edits

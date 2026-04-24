@@ -13,15 +13,19 @@ use PHPUnit\Framework\TestCase;
  * Drives ModelSeeder's per-row decision logic against a mocked Connection so we
  * can assert which BMODELS rows actually get touched in each scenario.
  *
- * The four branches exercised here mirror the table in ModelSeeder's class
- * docblock:
- *   - row missing             → INSERT
+ * The scenarios exercised here mirror ModelSeeder's full decision table,
+ * including both fingerprinted rows and legacy rows with no stored fingerprint:
+ *   - row missing                       → INSERT
  *   - fingerprint matches,
- *     catalog code changed    → UPDATE
+ *     catalog code changed              → UPDATE
  *   - row was UI-edited
- *     (fingerprint mismatch)  → PRESERVE (no write)
+ *     (fingerprint mismatch)            → PRESERVE (no write)
  *   - row matches catalog and
- *     fingerprint identical   → SKIP (no write)
+ *     fingerprint identical             → SKIP (no write)
+ *   - legacy row matches catalog
+ *     (no fingerprint)                  → adopt via UPDATE
+ *   - legacy row diverges from catalog
+ *     (no fingerprint)                  → PRESERVE (no write)
  *
  * The mock counts each executeStatement() invocation so we can verify both the
  * SeedResult counters AND that no surprise writes leak through.
