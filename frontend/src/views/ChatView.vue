@@ -1035,10 +1035,25 @@ const handleSendMessage = async (
   await streamAIResponse(backendContent, options)
 }
 
-/** Same clickable model footer live as after reload (sets aiModels.chat). */
+/**
+ * Populate the clickable model footer live so it matches what a page reload
+ * would show.
+ *
+ * Prefers the nested `aiModels` payload (chat + sorting) when the backend
+ * sends it on the SSE `complete` event — this is what makes the sorting-model
+ * badge appear without a refresh (issue #603). Falls back to synthesising
+ * `aiModels.chat` from the flat `provider`/`model` fields for backward
+ * compatibility with older backends / error paths that don't ship a nested
+ * shape.
+ */
 function applyAssistantChatModelFooter(
   message: Message,
-  data: { provider?: string; model?: string; model_id?: number | null },
+  data: {
+    provider?: string
+    model?: string
+    model_id?: number | null
+    aiModels?: Message['aiModels'] | null
+  },
   streamFallback: { provider?: string; model?: string; model_id?: number | null }
 ) {
   const isBadModelToken = (m: unknown) =>
@@ -1058,15 +1073,24 @@ function applyAssistantChatModelFooter(
       ? data.model_id
       : (streamFallback.model_id ?? null)
 
+  const nestedChat = data.aiModels?.chat
+  const nestedSorting = data.aiModels?.sorting
+
   if (resolvedModel && resolvedProvider) {
     message.modelLabel = resolvedModel
     message.provider = resolvedProvider
     message.aiModels = {
-      chat: {
+      chat: nestedChat ?? {
         provider: resolvedProvider,
         model: resolvedModel,
         model_id: resolvedId,
       },
+      ...(nestedSorting ? { sorting: nestedSorting } : {}),
+    }
+  } else if (nestedChat || nestedSorting) {
+    message.aiModels = {
+      ...(nestedChat ? { chat: nestedChat } : {}),
+      ...(nestedSorting ? { sorting: nestedSorting } : {}),
     }
   }
 }
@@ -1265,6 +1289,7 @@ const streamAIResponse = async (
                   provider: data.provider,
                   model: data.model,
                   model_id: data.model_id ?? null,
+                  aiModels: data.aiModels ?? null,
                 },
                 { provider, model: modelLabel, model_id: currentModel?.id ?? null }
               )
@@ -1810,6 +1835,7 @@ const streamAIResponse = async (
                   provider: data.provider,
                   model: data.model,
                   model_id: data.model_id ?? null,
+                  aiModels: data.aiModels ?? null,
                 },
                 { provider, model: modelLabel, model_id: currentModel?.id ?? null }
               )
@@ -1893,6 +1919,7 @@ const streamAIResponse = async (
                     provider: data.provider,
                     model: data.model,
                     model_id: data.model_id ?? null,
+                    aiModels: data.aiModels ?? null,
                   },
                   { provider, model: modelLabel, model_id: currentModel?.id ?? null }
                 )

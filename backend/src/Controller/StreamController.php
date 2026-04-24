@@ -883,6 +883,9 @@ class StreamController extends AbstractController
 
                     $chat->updateTimestamp();
                     $this->em->flush();
+                    // Include the nested aiModels shape so the error message
+                    // row shows correct model/sorting badges live instead of
+                    // only after a page refresh — see issue #603.
                     $completePayload = [
                         'messageId' => $outgoingMessage->getId(),
                         'trackId' => $trackId,
@@ -893,6 +896,7 @@ class StreamController extends AbstractController
                         'originalTopic' => $originalTopic,
                         'originalMediaType' => $originalMediaType,
                         'language' => 'en',
+                        'aiModels' => $this->buildAiModelsPayload($outgoingMessage),
                     ];
 
                     if (isset($result['error_hint'])) {
@@ -1193,14 +1197,19 @@ class StreamController extends AbstractController
                 }
 
                 // Send complete event (WITHOUT againData - frontend handles this)
+                // aiModels mirrors the nested shape returned by the history
+                // endpoint so badges (chat + sorting) populate live instead of
+                // only after a page refresh — see issue #603.
                 $completeData = [
                     'messageId' => $outgoingMessage->getId(),
                     'trackId' => $trackId,
                     'provider' => $response['metadata']['provider'] ?? 'test',
                     'model' => $response['metadata']['model'] ?? 'unknown',
+                    'model_id' => $response['metadata']['model_id'] ?? $modelId ?? null,
                     'topic' => $classification['topic'],
                     'language' => $classification['language'],
                     'searchResults' => $searchResults,
+                    'aiModels' => $this->buildAiModelsPayload($outgoingMessage),
                 ];
 
                 if ('length' === $finishReason) {
@@ -1507,12 +1516,28 @@ class StreamController extends AbstractController
                 ]);
             }
 
-            // Send complete event
+            // Send complete event. The non-streaming path (o1-style models)
+            // doesn't classify/sort, so only the chat sub-model is populated;
+            // still using the nested shape for consistency with the history
+            // endpoint — see issue #603.
+            $chatAiModel = null;
+            if (!empty($metadata['provider']) || !empty($metadata['model'])) {
+                $chatAiModel = [
+                    'chat' => [
+                        'provider' => $metadata['provider'] ?? null,
+                        'model' => $metadata['model'] ?? null,
+                        'model_id' => isset($metadata['model_id']) ? (int) $metadata['model_id'] : null,
+                    ],
+                ];
+            }
+
             $this->sendSSE('complete', [
                 'messageId' => $message->getId(),
                 'provider' => $metadata['provider'] ?? 'unknown',
                 'model' => $metadata['model'] ?? 'unknown',
+                'model_id' => $metadata['model_id'] ?? null,
                 'trackId' => $_GET['trackId'] ?? time(),
+                'aiModels' => $chatAiModel,
             ]);
         } catch (\Exception $e) {
             $this->logger->error('Non-streaming processing failed', [
@@ -1521,6 +1546,50 @@ class StreamController extends AbstractController
             ]);
             $this->sendSSE('error', ['error' => 'Failed to process: '.$e->getMessage()]);
         }
+    }
+
+    /**
+     * Build the nested aiModels payload mirroring the ChatController
+     * /api/v1/chats/{id}/messages response shape.
+     *
+     * Issue #603: the SSE 'complete' event used to carry only flat
+     * provider/model fields for the CHAT model, so the sorting-model badge
+     * (and any other non-chat metadata) only appeared after a page refresh
+     * triggered a fresh history fetch. By shipping the same nested shape the
+     * REST endpoint returns, the frontend can populate all badges live.
+     *
+     * @return array{
+     *   chat?: array{provider: ?string, model: ?string, model_id: ?int},
+     *   sorting?: array{provider: ?string, model: ?string, model_id: ?int},
+     * }|null
+     */
+    private function buildAiModelsPayload(Message $message): ?array
+    {
+        $aiModels = [];
+
+        $chatProvider = $message->getMeta('ai_chat_provider');
+        $chatModel = $message->getMeta('ai_chat_model');
+        $chatModelId = $message->getMeta('ai_chat_model_id');
+        if ($chatProvider || $chatModel) {
+            $aiModels['chat'] = [
+                'provider' => $chatProvider,
+                'model' => $chatModel,
+                'model_id' => $chatModelId ? (int) $chatModelId : null,
+            ];
+        }
+
+        $sortingProvider = $message->getMeta('ai_sorting_provider');
+        $sortingModel = $message->getMeta('ai_sorting_model');
+        $sortingModelId = $message->getMeta('ai_sorting_model_id');
+        if ($sortingProvider || $sortingModel) {
+            $aiModels['sorting'] = [
+                'provider' => $sortingProvider,
+                'model' => $sortingModel,
+                'model_id' => $sortingModelId ? (int) $sortingModelId : null,
+            ];
+        }
+
+        return [] === $aiModels ? null : $aiModels;
     }
 
     private function sendSSE(string $status, array $data): void
