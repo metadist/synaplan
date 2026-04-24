@@ -561,12 +561,16 @@ const sendMessage = () => {
         audioRecorder.value.stopRecording()
       }
       isRecording.value = false
-
-      // Clear speech tracking to prevent onEnd from restoring text
-      speechBaseMessage.value = ''
-      speechFinalTranscript.value = ''
-      interimTranscript.value = ''
     }
+
+    // Always clear speech tracking to prevent onEnd from restoring text
+    // (handles race condition when user stops recording then quickly sends)
+    speechBaseMessage.value = ''
+    speechFinalTranscript.value = ''
+    interimTranscript.value = ''
+    clearSilenceTimer()
+    autoSendPending.value = false
+
     const hasWebSearch = activeCommand.value === 'search'
 
     // Send the full message with command to backend (it needs it for /pic and /vid)

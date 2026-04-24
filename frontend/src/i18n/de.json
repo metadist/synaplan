@@ -310,7 +310,11 @@
     "again": "Nochmal",
     "againWith": "Nochmal mit",
     "regenerateWith": "Neu generieren mit",
-    "copy": "Nachricht kopieren"
+    "copy": "Nachricht kopieren",
+    "messageDetails": "Nachrichtendetails",
+    "infoTopic": "Thema",
+    "infoModel": "Modell",
+    "infoProvider": "Anbieter"
   },
   "commands": {
     "noResults": "Keine Befehle gefunden",

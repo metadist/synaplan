@@ -315,7 +315,11 @@
     "again": "Again",
     "againWith": "Again with",
     "regenerateWith": "Regenerate with",
-    "copy": "Copy message"
+    "copy": "Copy message",
+    "messageDetails": "Message details",
+    "infoTopic": "Topic",
+    "infoModel": "Model",
+    "infoProvider": "Provider"
   },
   "commands": {
     "noResults": "No commands found",

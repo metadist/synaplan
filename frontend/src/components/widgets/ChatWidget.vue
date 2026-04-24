@@ -860,7 +860,7 @@ const isEmbeddedMode = computed(() => props.testMode || props.internalMode)
 
 const chatWindowClasses = computed(() => {
   if (isMobile.value && !props.isPreview && !isEmbeddedMode.value) {
-    return ['fixed inset-0 rounded-none w-screen h-screen']
+    return ['fixed inset-0 rounded-none w-screen h-dvh']
   }
   if (isEmbeddedMode.value) {
     return ['rounded-2xl w-full h-full']
@@ -875,7 +875,7 @@ const chatWindowStyle = computed(() => {
   if (isMobile.value && !props.isPreview && !isEmbeddedMode.value) {
     return {
       width: '100vw',
-      height: '100vh',
+      height: '100dvh',
     }
   }
 
@@ -889,13 +889,13 @@ const chatWindowStyle = computed(() => {
   if (isFullscreen.value) {
     return {
       width: 'min(95vw, 1100px)',
-      height: 'min(92vh, 900px)',
+      height: 'min(92dvh, 900px)',
     }
   }
 
   return {
     width: props.isPreview ? 'min(100%, 380px)' : 'min(90vw, 420px)',
-    height: props.isPreview ? 'min(80vh, 520px)' : 'min(80vh, 640px)',
+    height: props.isPreview ? 'min(80dvh, 520px)' : 'min(80dvh, 640px)',
   }
 })
 
@@ -2026,6 +2026,10 @@ onMounted(() => {
     window.addEventListener('resize', updateIsMobile)
     window.addEventListener('orientationchange', updateIsMobile)
     window.addEventListener('beforeunload', handleBeforeUnload)
+    // visualViewport fires when mobile browser chrome shows/hides
+    if (window.visualViewport) {
+      window.visualViewport.addEventListener('resize', updateIsMobile)
+    }
   }
 
   window.addEventListener('synaplan-widget-open', handleOpenEvent)
@@ -2070,6 +2074,9 @@ onBeforeUnmount(() => {
     window.removeEventListener('resize', updateIsMobile)
     window.removeEventListener('orientationchange', updateIsMobile)
     window.removeEventListener('beforeunload', handleBeforeUnload)
+    if (window.visualViewport) {
+      window.visualViewport.removeEventListener('resize', updateIsMobile)
+    }
   }
 
   window.removeEventListener('synaplan-widget-open', handleOpenEvent)
