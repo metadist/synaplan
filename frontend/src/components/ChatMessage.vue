@@ -513,92 +513,113 @@
         <!-- Footer with separator line and responsive layout -->
         <div
           :class="[
-            'px-3 md:px-4 py-2 border-t md:min-h-[46px] flex flex-col md:flex-row md:items-center justify-between gap-2 md:gap-3',
+            'px-3 md:px-4 py-2 border-t md:min-h-[46px] flex items-center justify-between gap-2',
             role === 'user'
               ? 'border-white/20'
               : 'border-light-border/30 dark:border-dark-border/20',
           ]"
         >
-          <!-- Left: AI Model Badges + timestamp -->
-          <div class="flex items-center gap-1 min-w-0">
-            <!-- Topic Badge (assistant only) - Ultra compact + Clickable -->
-            <template v-if="role === 'assistant' && topic">
-              <router-link
-                :to="`/config/task-prompts?topic=${topic}`"
-                :data-testid="topic === 'ERROR' ? 'message-topic-error' : 'message-topic-badge'"
-                class="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-medium bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/20 transition-colors leading-tight cursor-pointer max-w-[9rem]"
-                :title="`Topic: ${topic} - Click to view prompt`"
-              >
-                <Icon icon="mdi:tag" class="w-2.5 h-2.5" />
-                <span class="uppercase tracking-tight truncate">{{ topic }}</span>
-              </router-link>
-              <span v-if="aiModels" class="text-txt-secondary/40 text-xs mx-0.5">·</span>
-            </template>
-
-            <!-- AI Model Badges (assistant only) -->
-            <template v-if="role === 'assistant' && aiModels">
-              <!-- Chat/Image/Video Model Badge (dynamic based on content type) -->
-              <button
-                v-if="aiModels.chat"
-                type="button"
-                class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-xs font-medium bg-brand-alpha-light hover:bg-brand-alpha transition-colors cursor-pointer min-w-0"
-                :title="getModelTypeTitle"
-                data-testid="btn-message-model-chat"
-                @click="showModelDetails('chat')"
-              >
-                <Icon :icon="getModelTypeIcon" class="w-3.5 h-3.5 flex-shrink-0" />
-                <span class="hidden sm:inline flex-shrink-0">{{ getModelTypeLabel }}:</span>
-                <span class="font-semibold truncate min-w-0">{{
-                  shortenModel(aiModels.chat.model)
-                }}</span>
-              </button>
-
-              <!-- Sorting Model Badge -->
-              <button
-                v-if="aiModels.sorting"
-                type="button"
-                class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-xs font-medium bg-purple-500/10 hover:bg-purple-500/20 text-purple-600 dark:text-purple-400 transition-colors cursor-pointer min-w-0"
-                :title="`${$t('config.aiModels.messageClassification')}: ${aiModels.sorting.model}`"
-                data-testid="btn-message-model-sorting"
-                @click="showModelDetails('sorting')"
-              >
-                <Icon icon="mdi:sort" class="w-3.5 h-3.5 flex-shrink-0" />
-                <span class="hidden sm:inline flex-shrink-0"
-                  >{{ $t('config.aiModels.sorting') }}:</span
-                >
-                <span class="font-semibold truncate min-w-0">{{
-                  shortenModel(aiModels.sorting.model)
-                }}</span>
-              </button>
-
-              <span
-                v-if="aiModels.chat || aiModels.sorting"
-                class="mx-1 opacity-50 hidden md:inline"
-                >·</span
-              >
-            </template>
-
-            <div
+          <!-- Left: Timestamp + Info icon -->
+          <div class="flex items-center gap-1.5 min-w-0">
+            <span
               :class="[
-                'text-xs',
-                aiModels ? 'flex-shrink-0 whitespace-nowrap' : 'truncate',
+                'text-xs flex-shrink-0 whitespace-nowrap',
                 role === 'user' ? 'text-white/80' : 'txt-secondary',
               ]"
             >
-              <!-- Hide model info during processing states (classifying, analyzing, etc.) -->
-              <template
-                v-if="role === 'assistant' && modelLabel && provider && !aiModels && !isProcessing"
+              {{ formattedTime }}
+            </span>
+
+            <!-- Info popover trigger (assistant only, when metadata is available) -->
+            <div
+              v-if="role === 'assistant' && hasMessageMetadata && !isProcessing"
+              class="relative"
+            >
+              <button
+                type="button"
+                class="inline-flex items-center justify-center w-6 h-6 rounded-full text-xs transition-colors bg-black/5 dark:bg-white/10 hover:bg-black/10 dark:hover:bg-white/20 txt-tertiary hover:txt-primary"
+                :aria-label="t('chatMessage.messageDetails')"
+                data-testid="btn-message-info"
+                @click.stop="infoPopoverOpen = !infoPopoverOpen"
               >
-                <span class="font-medium hidden md:inline">{{ modelLabel }}</span>
-                <span class="mx-1.5 opacity-50 hidden md:inline">·</span>
-                <span class="hidden md:inline">{{ provider }}</span>
-                <span class="mx-1.5 opacity-50 hidden md:inline">·</span>
-              </template>
-              <span>{{ formattedTime }}</span>
-              <template v-if="role === 'assistant' && modelLabel && !aiModels && !isProcessing">
-                <span class="mx-1.5 opacity-50 md:hidden">·</span>
-                <span class="md:hidden">{{ modelLabel }}</span>
-              </template>
+                <Icon icon="mdi:lightbulb-outline" class="w-3.5 h-3.5" />
+              </button>
+
+              <Transition
+                enter-active-class="transition ease-out duration-150"
+                enter-from-class="transform opacity-0 scale-95 -translate-y-1"
+                enter-to-class="transform opacity-100 scale-100 translate-y-0"
+                leave-active-class="transition ease-in duration-100"
+                leave-from-class="transform opacity-100 scale-100 translate-y-0"
+                leave-to-class="transform opacity-0 scale-95 -translate-y-1"
+              >
+                <div
+                  v-if="infoPopoverOpen"
+                  v-click-outside="closeInfoPopover"
+                  class="absolute bottom-full left-0 mb-2 min-w-[16rem] max-w-[20rem] rounded-xl shadow-xl border border-light-border/30 dark:border-dark-border/30 bg-white dark:bg-gray-800 z-[100] overflow-hidden"
+                  data-testid="popover-message-info"
+                  @keydown.escape="closeInfoPopover"
+                >
+                  <div class="px-4 py-3 space-y-2.5">
+                    <!-- Topic -->
+                    <div v-if="topic" class="flex items-center justify-between gap-2">
+                      <span class="text-xs txt-tertiary">{{ t('chatMessage.infoTopic') }}</span>
+                      <router-link
+                        :to="`/config/task-prompts?topic=${topic}`"
+                        class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-medium bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/20 transition-colors"
+                        @click="closeInfoPopover"
+                      >
+                        <Icon icon="mdi:tag" class="w-3 h-3" />
+                        <span class="uppercase">{{ topic }}</span>
+                      </router-link>
+                    </div>
+
+                    <!-- Chat Model -->
+                    <div v-if="aiModels?.chat" class="flex items-center justify-between gap-2">
+                      <span class="text-xs txt-tertiary">{{ getModelTypeLabel }}</span>
+                      <button
+                        type="button"
+                        class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-xs font-medium bg-brand-alpha-light hover:bg-brand-alpha transition-colors cursor-pointer"
+                        @click="handleInfoModelClick('chat')"
+                      >
+                        <Icon :icon="getModelTypeIcon" class="w-3.5 h-3.5" />
+                        <span class="font-semibold truncate max-w-[10rem]">{{
+                          shortenModel(aiModels.chat.model)
+                        }}</span>
+                      </button>
+                    </div>
+
+                    <!-- Sorting Model -->
+                    <div v-if="aiModels?.sorting" class="flex items-center justify-between gap-2">
+                      <span class="text-xs txt-tertiary">{{ $t('config.aiModels.sorting') }}</span>
+                      <button
+                        type="button"
+                        class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-xs font-medium bg-purple-500/10 hover:bg-purple-500/20 text-purple-600 dark:text-purple-400 transition-colors cursor-pointer"
+                        @click="handleInfoModelClick('sorting')"
+                      >
+                        <Icon icon="mdi:sort" class="w-3.5 h-3.5" />
+                        <span class="font-semibold truncate max-w-[10rem]">{{
+                          shortenModel(aiModels.sorting.model)
+                        }}</span>
+                      </button>
+                    </div>
+
+                    <!-- Legacy model/provider (when aiModels not available) -->
+                    <template v-if="!aiModels && modelLabel && provider">
+                      <div class="flex items-center justify-between gap-2">
+                        <span class="text-xs txt-tertiary">{{ t('chatMessage.infoModel') }}</span>
+                        <span class="text-xs font-medium txt-primary">{{ modelLabel }}</span>
+                      </div>
+                      <div class="flex items-center justify-between gap-2">
+                        <span class="text-xs txt-tertiary">{{
+                          t('chatMessage.infoProvider')
+                        }}</span>
+                        <span class="text-xs txt-secondary">{{ provider }}</span>
+                      </div>
+                    </template>
+                  </div>
+                </div>
+              </Transition>
             </div>
           </div>
 
@@ -1136,23 +1157,6 @@ const getModelTypeIcon = computed(() => {
   }
 })
 
-// Dynamic title for model badge
-const getModelTypeTitle = computed(() => {
-  if (isFileAnalysisResponse.value) return 'Text Analytics (Document/Audio → Text)'
-  switch (mediaHint.value) {
-    case 'vision':
-      return 'Vision (Image → Text)'
-    case 'image':
-      return 'Image Generation (Text → Image)'
-    case 'video':
-      return 'Video Generation (Text → Video)'
-    case 'audio':
-      return 'Audio Generation (Text → Audio)'
-    default:
-      return 'Chat Generation'
-  }
-})
-
 const formattedTime = computed(() => formatTime(props.timestamp))
 
 // Check if we're in a processing state (hide model info during these states)
@@ -1208,6 +1212,23 @@ const emit = defineEmits<{
 
 const router = useRouter()
 const modelDropdownOpen = ref(false)
+const infoPopoverOpen = ref(false)
+
+const hasMessageMetadata = computed(() => {
+  if (props.topic) return true
+  if (props.aiModels?.chat || props.aiModels?.sorting) return true
+  if (props.modelLabel && props.provider) return true
+  return false
+})
+
+const closeInfoPopover = () => {
+  infoPopoverOpen.value = false
+}
+
+const handleInfoModelClick = (modelType: 'chat' | 'sorting') => {
+  showModelDetails(modelType)
+  closeInfoPopover()
+}
 
 const shortenModel = (name: string): string => {
   const stripped = name.replace(/^[^/]+\//, '')
