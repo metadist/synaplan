@@ -580,10 +580,7 @@
                       <button
                         type="button"
                         class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-xs font-medium bg-brand-alpha-light hover:bg-brand-alpha transition-colors cursor-pointer"
-                        @click="
-                          showModelDetails('chat')
-                          closeInfoPopover()
-                        "
+                        @click="handleInfoModelClick('chat')"
                       >
                         <Icon :icon="getModelTypeIcon" class="w-3.5 h-3.5" />
                         <span class="font-semibold truncate max-w-[10rem]">{{
@@ -598,10 +595,7 @@
                       <button
                         type="button"
                         class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-xs font-medium bg-purple-500/10 hover:bg-purple-500/20 text-purple-600 dark:text-purple-400 transition-colors cursor-pointer"
-                        @click="
-                          showModelDetails('sorting')
-                          closeInfoPopover()
-                        "
+                        @click="handleInfoModelClick('sorting')"
                       >
                         <Icon icon="mdi:sort" class="w-3.5 h-3.5" />
                         <span class="font-semibold truncate max-w-[10rem]">{{
@@ -1229,6 +1223,11 @@ const hasMessageMetadata = computed(() => {
 
 const closeInfoPopover = () => {
   infoPopoverOpen.value = false
+}
+
+const handleInfoModelClick = (modelType: 'chat' | 'sorting') => {
+  showModelDetails(modelType)
+  closeInfoPopover()
 }
 
 const shortenModel = (name: string): string => {
