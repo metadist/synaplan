@@ -82,21 +82,21 @@ final class HealthMonitorController extends AbstractController
         }
 
         try {
-            $token = $this->tokenService->generateAccessToken($user);
+            // JWT-only, no DB write — generateRefreshToken() would write,
+            // but we intentionally only test access token generation here.
+            $accessToken = $this->tokenService->generateAccessToken($user);
         } catch (\Throwable $e) {
             $this->logger->error('Health login: token generation failed', ['error' => $e->getMessage()]);
 
             return self::status('STATUS:ERROR', Response::HTTP_SERVICE_UNAVAILABLE);
         }
 
-        if ('' === $token) {
+        if ('' === $accessToken) {
             $this->logger->error('Health login: empty access token');
 
             return self::status('STATUS:ERROR', Response::HTTP_SERVICE_UNAVAILABLE);
         }
 
-        // Token generated successfully but NOT returned — we only verify
-        // that the auth pipeline works end-to-end.
         return self::status('STATUS:OK', Response::HTTP_OK);
     }
 
@@ -113,8 +113,13 @@ final class HealthMonitorController extends AbstractController
         }
 
         $candidate = (string) $request->query->get('monitor', '');
+        if ('' !== $candidate && hash_equals($expected, $candidate)) {
+            $this->logger->warning('Health login: token passed via query param — prefer X-Health-Monitor-Token header');
 
-        return '' !== $candidate && hash_equals($expected, $candidate);
+            return true;
+        }
+
+        return false;
     }
 
     private static function status(string $status, int $httpCode): JsonResponse

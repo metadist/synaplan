@@ -50,14 +50,14 @@ final class HealthMonitorControllerTest extends WebTestCase
             ['HTTP_X_HEALTH_MONITOR_TOKEN' => self::TOKEN],
         );
 
-        self::assertNotSame(Response::HTTP_UNAUTHORIZED, $this->client->getResponse()->getStatusCode());
+        self::assertSame(Response::HTTP_SERVICE_UNAVAILABLE, $this->client->getResponse()->getStatusCode());
     }
 
     public function testAcceptsTokenViaQueryParam(): void
     {
         $this->client->request('GET', '/api/health/login?monitor='.self::TOKEN);
 
-        self::assertNotSame(Response::HTTP_UNAUTHORIZED, $this->client->getResponse()->getStatusCode());
+        self::assertSame(Response::HTTP_SERVICE_UNAVAILABLE, $this->client->getResponse()->getStatusCode());
     }
 
     public function testResponseLeaksNoDetails(): void
