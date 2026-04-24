@@ -240,6 +240,21 @@ export async function sendOperatorTyping(
 }
 
 /**
+ * Eagerly create or pin an internal-mode session for the widget owner.
+ * Must be called before any dashboard-only session endpoint (e.g. custom fields)
+ * is hit, so the session row exists server-side and is flagged as `internal`.
+ */
+export async function initInternalSession(
+  widgetId: string,
+  sessionId: string
+): Promise<{ success: boolean; sessionId: string; mode: WidgetSession['mode'] }> {
+  return await httpClient<{ success: boolean; sessionId: string; mode: WidgetSession['mode'] }>(
+    `/api/v1/widgets/${widgetId}/sessions/${sessionId}/init-internal`,
+    { method: 'POST' }
+  )
+}
+
+/**
  * Save custom field values for a session
  */
 export async function saveCustomFieldValues(

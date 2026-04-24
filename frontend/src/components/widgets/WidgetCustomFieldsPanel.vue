@@ -72,32 +72,40 @@ watch(
 )
 
 /**
- * Synchronously persist any pending edits when the panel unmounts (e.g. operator
- * closes the internal-chat overlay before the debounce fires). We use fetch with
- * `keepalive` so the request survives the surrounding teardown / page unload —
- * `navigator.sendBeacon` cannot be used here because it only emits POST requests
- * and the custom fields endpoint is PUT.
+ * Best-effort persist any pending edits immediately when the panel unmounts
+ * (e.g. operator closes the internal-chat overlay before the debounce fires).
+ * The request is fired via fetch with `keepalive` so it can survive the
+ * surrounding teardown / page unload, but it remains asynchronous —
+ * `navigator.sendBeacon` cannot be used here because it only emits POST
+ * requests and the custom fields endpoint is PUT.
+ *
+ * `dirty` is only cleared after the response confirms a 2xx status so we
+ * never silently swallow a 404/400 (e.g. session not yet promoted to
+ * internal mode, or backend rejecting the payload).
  */
-const persistDirtyOnUnload = () => {
+const persistDirtyOnUnload = (): void => {
   if (!dirty.value) return
   if (!props.sessionId) return
   if (!props.widgetId) return
 
-  try {
-    const url = `/api/v1/widgets/${encodeURIComponent(props.widgetId)}/sessions/${encodeURIComponent(props.sessionId)}/custom-fields`
-    const body = JSON.stringify({ values: values.value })
-    void fetch(url, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body,
-      credentials: 'include',
-      keepalive: true,
+  const url = `/api/v1/widgets/${encodeURIComponent(props.widgetId)}/sessions/${encodeURIComponent(props.sessionId)}/custom-fields`
+  const body = JSON.stringify({ values: values.value })
+
+  fetch(url, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body,
+    credentials: 'include',
+    keepalive: true,
+  })
+    .then((response) => {
+      if (response.ok) {
+        dirty.value = false
+      }
     })
-    dirty.value = false
-  } catch {
-    // Best-effort — the regular debounced save would have surfaced any
-    // structural error already; nothing actionable to report at unmount time.
-  }
+    .catch(() => {
+      // Best-effort — nothing actionable after the component is gone.
+    })
 }
 
 onUnmounted(() => {
