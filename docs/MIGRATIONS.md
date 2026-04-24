@@ -51,9 +51,30 @@ Don't edit migrations or fixtures — extend the catalog source of truth:
 
 All seeders are idempotent and safe to re-run any number of times:
 
-- **Models / prompts** use `INSERT … ON DUPLICATE KEY UPDATE` on **catalog-owned columns
-only** — operator toggles (e.g. `BSELECTABLE`, `BSHOWWHENFREE`) are preserved across
-re-seeds, but corrected names/prices/providerIds DO propagate to existing installs.
+- **Models** use a **content-fingerprint protection** scheme on top of
+`INSERT … ON DUPLICATE KEY UPDATE` (see `App\Model\ModelCatalog::fingerprint()`).
+Every successful write embeds the SHA-256 of the row's catalog-owned fields into
+`BJSON.__catalog_fingerprint`. On the next seed run, `App\Seed\ModelSeeder` decides
+per row:
+
+  | DB state                                         | Action     | Why |
+  | ------------------------------------------------ | ---------- | --- |
+  | Row missing                                      | INSERT     | New model in code |
+  | Stored fingerprint matches row, code unchanged   | SKIP       | Already in sync, no write |
+  | Stored fingerprint matches row, code changed     | UPDATE     | Roll out catalog update to a row nobody touched |
+  | Stored fingerprint mismatches row                | PRESERVE   | Admin edited the row via `/config/ai-models`; never overwrite |
+  | Legacy row with no fingerprint, matches catalog  | UPDATE     | Silently adopt as catalog-managed |
+  | Legacy row with no fingerprint, diverges         | PRESERVE   | Could be a forgotten manual edit; err on safety |
+
+  This means **container restarts no longer overwrite manual UI edits** to model
+prices, names, JSON, etc. — admin changes survive forever (until the admin
+deletes them or re-aligns the row with the catalog values exactly). Operator
+toggles (`BSELECTABLE`, `BACTIVE`, `BISDEFAULT`, `BSHOWWHENFREE`) are still
+excluded from the upsert UPDATE clause as a second layer of defence.
+
+- **Prompts** use `INSERT … ON DUPLICATE KEY UPDATE` on catalog-owned columns
+only — operator toggles are preserved across re-seeds, but corrected
+names/contents DO propagate to existing installs.
 - **`BCONFIG`** (defaults + rate limits) uses `INSERT IGNORE`, race-safe via the
 `UNIQUE(BOWNERID, BGROUP, BSETTING)` index added in `Version20260420000000`. This
 means **`BCONFIG` defaults are bootstrap-only**: if you change a default value in

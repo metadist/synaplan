@@ -25,9 +25,14 @@ final class ModelSeedCommand extends Command
     protected function configure(): void
     {
         $this->setHelp(
-            "Upserts every model from App\\Model\\ModelCatalog into BMODELS.\n".
-            "In dev/test, also upserts mock TestProvider models with negative IDs.\n\n".
-            'Safe to run on every deploy — uses INSERT ... ON DUPLICATE KEY UPDATE.'
+            "Reconciles BMODELS with App\\Model\\ModelCatalog.\n".
+            "In dev/test, also adds mock TestProvider models with negative IDs.\n\n".
+            "Per row the seeder either INSERTs (new model), UPDATEs (catalog code\n".
+            "changed and the row was untouched), SKIPs (already in sync) or\n".
+            "PRESERVEs (admin edited the row via the /config/ai-models UI — manual\n".
+            "changes are detected via a content fingerprint stored in BJSON and are\n".
+            "never overwritten by container restarts).\n\n".
+            'Safe to run on every deploy.'
         );
     }
 
@@ -35,7 +40,13 @@ final class ModelSeedCommand extends Command
     {
         $io = new SymfonyStyle($input, $output);
         $result = $this->seeder->seed();
-        $io->success(sprintf('Upserted %d models.', $result->inserted));
+        $io->success(sprintf(
+            'Models reconciled: inserted=%d, updated=%d, skipped=%d, preserved=%d.',
+            $result->inserted,
+            $result->updated,
+            $result->skipped,
+            $result->preserved,
+        ));
 
         return Command::SUCCESS;
     }
