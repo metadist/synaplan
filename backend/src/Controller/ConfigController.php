@@ -262,9 +262,13 @@ class ConfigController extends AbstractController
             }
         }
 
-        // Build information for debugging deployments (minimal: version + internal IP only)
+        // Build information for debugging deployments (minimal: version + internal IP only).
+        // Version comes from APP_VERSION, which is set by the build/release pipeline. The
+        // fallback is deliberately neutral ('dev') rather than a hard-coded release number
+        // — hard-coding inevitably drifts behind reality and creates misleading debug output
+        // (PR #833 review).
         $buildInfo = [
-            'version' => $_ENV['APP_VERSION'] ?? '2.7.0',
+            'version' => $_ENV['APP_VERSION'] ?? 'dev',
             'ip' => $this->getInternalIp(),
         ];
 

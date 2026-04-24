@@ -1203,11 +1203,12 @@ class StreamController extends AbstractController
                 // Normalise model_id to int|null so the flat SSE field matches
                 // the shape of the history endpoint and the nested aiModels
                 // payload (PR #833 review, Copilot #1). $modelId comes straight
-                // from Request::query->get() and can be a numeric string.
+                // from Request::query->get() and can be a numeric string, or
+                // junk like "abc"; `normalizeModelId()` refuses to cast
+                // non-numeric input to 0 and logs it instead of silently
+                // corrupting downstream data.
                 $rawChatModelId = $response['metadata']['model_id'] ?? $modelId ?? null;
-                $completeChatModelId = null !== $rawChatModelId && '' !== $rawChatModelId
-                    ? (int) $rawChatModelId
-                    : null;
+                $completeChatModelId = $this->normalizeModelId($rawChatModelId, 'streaming_complete');
 
                 $completeData = [
                     'messageId' => $outgoingMessage->getId(),
@@ -1530,23 +1531,23 @@ class StreamController extends AbstractController
             // still using the nested shape for consistency with the history
             // endpoint — see issue #603.
             //
-            // $metadata['model_id'] provenance varies per provider (some emit
-            // string, some int), so coerce once here to keep the flat and
-            // nested fields perfectly in sync (PR #833 review, Copilot #2).
-            $nonStreamingModelId = isset($metadata['model_id']) && '' !== $metadata['model_id']
-                ? (int) $metadata['model_id']
-                : null;
-
-            $chatAiModel = null;
+            // Persist the chat model metadata on the message first, then let
+            // `buildAiModelsPayload()` emit the nested shape. Single source of
+            // truth with the streaming path (PR #833 review: "SSE logic —
+            // duplication creeping in").
             if (!empty($metadata['provider']) || !empty($metadata['model'])) {
-                $chatAiModel = [
-                    'chat' => [
-                        'provider' => $metadata['provider'] ?? null,
-                        'model' => $metadata['model'] ?? null,
-                        'model_id' => $nonStreamingModelId,
-                    ],
-                ];
+                $message->setMeta('ai_chat_provider', (string) ($metadata['provider'] ?? ''));
+                $message->setMeta('ai_chat_model', (string) ($metadata['model'] ?? ''));
+                if (isset($metadata['model_id']) && '' !== $metadata['model_id']) {
+                    $message->setMeta('ai_chat_model_id', (string) $metadata['model_id']);
+                }
             }
+
+            // $metadata['model_id'] provenance varies per provider (some emit
+            // string, some int, occasionally non-numeric junk). Coerce once
+            // so the flat SSE field and the nested payload stay in sync
+            // (PR #833 review, Copilot #2).
+            $nonStreamingModelId = $this->normalizeModelId($metadata['model_id'] ?? null, 'non_streaming_complete');
 
             $this->sendSSE('complete', [
                 'messageId' => $message->getId(),
@@ -1554,7 +1555,7 @@ class StreamController extends AbstractController
                 'model' => $metadata['model'] ?? 'unknown',
                 'model_id' => $nonStreamingModelId,
                 'trackId' => $_GET['trackId'] ?? time(),
-                'aiModels' => $chatAiModel,
+                'aiModels' => $this->buildAiModelsPayload($message),
             ]);
         } catch (\Exception $e) {
             $this->logger->error('Non-streaming processing failed', [
@@ -1563,6 +1564,42 @@ class StreamController extends AbstractController
             ]);
             $this->sendSSE('error', ['error' => 'Failed to process: '.$e->getMessage()]);
         }
+    }
+
+    /**
+     * Normalise a raw model_id (from query string, provider metadata, or
+     * message meta) to an int or null.
+     *
+     * Providers are inconsistent: some emit ints, some numeric strings, and
+     * some occasionally ship non-numeric junk. A blind `(int)` cast turns
+     * `"abc"` into `0`, which silently corrupts the SSE `model_id` field and
+     * any downstream consumer — PR #833 review flagged this explicitly. We
+     * accept only numeric input and log the rest so we see it in monitoring
+     * instead of manifesting as mystery rows in the history endpoint.
+     *
+     * @param mixed $raw raw value from request/query/metadata
+     */
+    private function normalizeModelId(mixed $raw, string $context): ?int
+    {
+        if (null === $raw || '' === $raw) {
+            return null;
+        }
+
+        if (is_int($raw)) {
+            return $raw;
+        }
+
+        if (is_string($raw) && is_numeric($raw)) {
+            return (int) $raw;
+        }
+
+        $this->logger->warning('StreamController: non-numeric model_id received, discarding', [
+            'context' => $context,
+            'type' => get_debug_type($raw),
+            'value' => is_scalar($raw) ? (string) $raw : null,
+        ]);
+
+        return null;
     }
 
     /**
@@ -1591,7 +1628,7 @@ class StreamController extends AbstractController
             $aiModels['chat'] = [
                 'provider' => $chatProvider,
                 'model' => $chatModel,
-                'model_id' => $chatModelId ? (int) $chatModelId : null,
+                'model_id' => $this->normalizeModelId($chatModelId, 'aiModels_chat'),
             ];
         }
 
@@ -1602,7 +1639,7 @@ class StreamController extends AbstractController
             $aiModels['sorting'] = [
                 'provider' => $sortingProvider,
                 'model' => $sortingModel,
-                'model_id' => $sortingModelId ? (int) $sortingModelId : null,
+                'model_id' => $this->normalizeModelId($sortingModelId, 'aiModels_sorting'),
             ];
         }
 
