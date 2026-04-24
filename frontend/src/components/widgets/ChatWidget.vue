@@ -2039,6 +2039,31 @@ onMounted(() => {
   // In test/internal mode, create a temporary session without localStorage persistence
   if (isTestEnvironment.value) {
     sessionId.value = createSessionId()
+
+    if (props.internalMode) {
+      // Eagerly create the internal session server-side BEFORE notifying parent
+      // panels. Without this round-trip, dependent panels (e.g. custom fields)
+      // would persist against a session id the API cannot resolve yet (404 /
+      // "Custom fields can only be set on internal sessions"). On init failure
+      // we deliberately suppress the emit — the late emit in sendMessage()
+      // will re-attempt once the first message creates the session row.
+      void (async () => {
+        try {
+          const { initInternalSession } = await import('@/services/api/widgetSessionsApi')
+          await initInternalSession(props.widgetId, sessionId.value)
+          if (!sessionCreatedEmitted.value) {
+            sessionCreatedEmitted.value = true
+            emit('session-created', sessionId.value)
+          }
+        } catch (err) {
+          console.warn('[ChatWidget] internal session init failed', err)
+        }
+      })()
+    } else if (!sessionCreatedEmitted.value) {
+      sessionCreatedEmitted.value = true
+      emit('session-created', sessionId.value)
+    }
+
     loadConversationHistory()
     return
   }
