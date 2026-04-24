@@ -43,6 +43,7 @@ class SubscriptionController extends AbstractController
         private string $frontendUrl,
         private string $stripePaymentMethods,
         private BillingService $billingService,
+        private bool $stripeAutomaticTaxEnabled = false,
     ) {
     }
 
@@ -213,7 +214,29 @@ class SubscriptionController extends AbstractController
             // Create or get Stripe customer
             $customerId = $this->getOrCreateStripeCustomer($user);
 
-            // Create checkout session
+            // Create checkout session with tax-compliance-ready collection:
+            //
+            //   - billing_address_collection: 'required'
+            //       Forces Stripe Checkout to collect full name + billing
+            //       address incl. ISO country code. Strictly required for a
+            //       tax-compliant invoice.
+            //
+            //   - customer_update.{name, address}: 'auto'
+            //       Syncs the collected name + address back onto the Stripe
+            //       Customer so every future subscription invoice reuses it.
+            //
+            //   - tax_id_collection.enabled: true
+            //       Lets B2B customers enter their VAT ID / EIN / ABN. Stripe
+            //       validates EU VAT IDs against VIES in real time. Required
+            //       for EU B2B reverse-charge invoices.
+            //
+            //   - automatic_tax.enabled: env-toggled
+            //       When true, Stripe Tax (https://stripe.com/tax) calculates
+            //       the correct VAT/GST from the collected address and
+            //       generates tax-compliant invoices. Requires activation in
+            //       the Stripe Dashboard and tax codes on each Product; off
+            //       by default so setups without Stripe Tax keep working.
+            //
             // Note: Can't use both 'customer' and 'customer_email' - Stripe only allows one
             $paymentMethods = array_filter(array_map('trim', explode(',', $this->stripePaymentMethods)));
             $session = \Stripe\Checkout\Session::create([
@@ -224,6 +247,18 @@ class SubscriptionController extends AbstractController
                     'quantity' => 1,
                 ]],
                 'mode' => 'subscription',
+                'billing_address_collection' => 'required',
+                'customer_update' => [
+                    'name' => 'auto',
+                    'address' => 'auto',
+                ],
+                'tax_id_collection' => [
+                    'enabled' => true,
+                ],
+                'automatic_tax' => [
+                    'enabled' => $this->stripeAutomaticTaxEnabled,
+                ],
+                'allow_promotion_codes' => true,
                 'success_url' => $this->frontendUrl.'/subscription/success?session_id={CHECKOUT_SESSION_ID}',
                 'cancel_url' => $this->frontendUrl.'/subscription/cancel',
                 'client_reference_id' => (string) $user->getId(),
@@ -681,13 +716,11 @@ class SubscriptionController extends AbstractController
             }
         }
 
-        // Create new Stripe customer
-        $customer = \Stripe\Customer::create([
-            'email' => $user->getMail(),
-            'metadata' => [
-                'user_id' => (string) $user->getId(),
-            ],
-        ]);
+        // Create new Stripe customer, pre-filled with whatever tax-relevant
+        // data the profile already has. Checkout's billing_address_collection
+        // + customer_update will normalise and overwrite these during the
+        // first paid checkout, so anything we send here is a best-effort seed.
+        $customer = \Stripe\Customer::create($this->buildStripeCustomerPayload($user));
 
         // Save customer ID to paymentDetails JSON
         $user->setStripeCustomerId($customer->id);
@@ -699,5 +732,64 @@ class SubscriptionController extends AbstractController
         ]);
 
         return $customer->id;
+    }
+
+    /**
+     * Build a Stripe Customer create-payload from the user profile.
+     *
+     * Populates `email`, `name`, and (only when the profile's country is
+     * already a 2-letter ISO 3166-1 alpha-2 code) an `address`. Free-text
+     * country names are deliberately skipped — Stripe would reject them, and
+     * Checkout's required billing_address_collection will normalise the user
+     * input into an ISO-coded address on the first paid checkout.
+     *
+     * @return array{
+     *   email: string,
+     *   name?: string,
+     *   address?: array<string, string>,
+     *   metadata: array{user_id: string},
+     * }
+     */
+    private function buildStripeCustomerPayload(User $user): array
+    {
+        $payload = [
+            'email' => $user->getMail(),
+            'metadata' => [
+                'user_id' => (string) $user->getId(),
+            ],
+        ];
+
+        $details = $user->getUserDetails();
+
+        $firstName = trim((string) ($details['firstName'] ?? $details['first_name'] ?? ''));
+        $lastName = trim((string) ($details['lastName'] ?? $details['last_name'] ?? ''));
+        $companyName = trim((string) ($details['companyName'] ?? ''));
+
+        $personalName = trim($firstName.' '.$lastName);
+        if ('' !== $personalName) {
+            $payload['name'] = $personalName;
+        } elseif ('' !== $companyName) {
+            $payload['name'] = $companyName;
+        }
+
+        $country = trim((string) ($details['country'] ?? ''));
+        if (1 === preg_match('/^[A-Za-z]{2}$/', $country)) {
+            $address = ['country' => strtoupper($country)];
+            $street = trim((string) ($details['street'] ?? ''));
+            $zip = trim((string) ($details['zipCode'] ?? ''));
+            $city = trim((string) ($details['city'] ?? ''));
+            if ('' !== $street) {
+                $address['line1'] = $street;
+            }
+            if ('' !== $zip) {
+                $address['postal_code'] = $zip;
+            }
+            if ('' !== $city) {
+                $address['city'] = $city;
+            }
+            $payload['address'] = $address;
+        }
+
+        return $payload;
     }
 }

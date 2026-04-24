@@ -360,6 +360,7 @@ services:
             $stripePriceBusiness: '%env(STRIPE_PRICE_BUSINESS)%'
             $frontendUrl: '%env(FRONTEND_URL)%'
             $stripePaymentMethods: '%env(STRIPE_PAYMENT_METHODS)%'
+            $stripeAutomaticTaxEnabled: '%env(bool:STRIPE_AUTOMATIC_TAX)%'
             $cache: '@cache.app'
 
     App\Controller\StripeWebhookController:
