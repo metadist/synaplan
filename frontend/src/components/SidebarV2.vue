@@ -18,7 +18,7 @@
 
   <aside
     :class="[
-      'v2-sidebar-rail flex flex-col h-screen',
+      'v2-sidebar-rail flex flex-col',
       'fixed md:relative z-50 md:z-auto',
       'transition-transform duration-300 ease-in-out',
       sidebarStore.isMobileOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0',

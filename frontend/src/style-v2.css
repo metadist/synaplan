@@ -508,6 +508,19 @@
    ---------------------------------------------------------- */
 
 .design-v2 .v2-sidebar-rail {
+  /* iOS Safari < 15.4 does not support dvh; declare 100vh first as a
+     fallback, then override with 100dvh on supporting browsers. This prevents
+     the bottom avatar button from being pushed behind the browser chrome on
+     mobile Safari, matching the MainLayout h-dvh fix from PR #832. */
+  height: 100vh;
+  height: 100dvh;
+  /* Respect the iOS home-indicator bar so the avatar stays tappable. */
+  padding-bottom: env(safe-area-inset-bottom);
+  /* Hint the compositor so the mobile slide-in animation stays smooth on
+     older iPhones, where fixed + backdrop-filter + transform can otherwise
+     produce a half-painted first frame. */
+  will-change: transform;
+
   background: var(--bg-sidebar);
   backdrop-filter: blur(var(--v2-blur-lg));
   -webkit-backdrop-filter: blur(var(--v2-blur-lg));
