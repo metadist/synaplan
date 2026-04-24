@@ -179,4 +179,91 @@ class ModelCatalogTest extends TestCase
     {
         $this->assertNull(ModelCatalog::findBidByKey('nonexistent:provider:chat'));
     }
+
+    public function testFingerprintIsDeterministic(): void
+    {
+        $model = ModelCatalog::find('groq:llama-3.3-70b-versatile')[0];
+
+        $this->assertSame(ModelCatalog::fingerprint($model), ModelCatalog::fingerprint($model));
+    }
+
+    public function testFingerprintIgnoresOperatorOwnedFields(): void
+    {
+        $model = ModelCatalog::find('groq:llama-3.3-70b-versatile')[0];
+        $expected = ModelCatalog::fingerprint($model);
+
+        $toggled = array_merge($model, [
+            'selectable' => 0,
+            'active' => 0,
+            'showWhenFree' => 1,
+        ]);
+
+        $this->assertSame($expected, ModelCatalog::fingerprint($toggled));
+    }
+
+    public function testFingerprintIgnoresEmbeddedFingerprintKey(): void
+    {
+        $model = ModelCatalog::find('groq:llama-3.3-70b-versatile')[0];
+        $expected = ModelCatalog::fingerprint($model);
+
+        $stamped = $model;
+        $stamped['json'][ModelCatalog::FINGERPRINT_KEY] = 'previously-stored-hash';
+
+        $this->assertSame($expected, ModelCatalog::fingerprint($stamped));
+    }
+
+    public function testFingerprintChangesWhenCatalogValueChanges(): void
+    {
+        $model = ModelCatalog::find('groq:llama-3.3-70b-versatile')[0];
+        $original = ModelCatalog::fingerprint($model);
+
+        $model['priceIn'] = 0.99;
+
+        $this->assertNotSame($original, ModelCatalog::fingerprint($model));
+    }
+
+    public function testFingerprintIsStableAcrossFloatRoundTrip(): void
+    {
+        // Doctrine DBAL hands floats back as native floats; the identity should
+        // survive a string round-trip equivalent to what (float) $row['BPRICEIN']
+        // produces after JSON encode/decode in the actual seed flow.
+        $model = ModelCatalog::find('groq:llama-3.3-70b-versatile')[0];
+        $original = ModelCatalog::fingerprint($model);
+
+        $roundTripped = $model;
+        $roundTripped['priceIn'] = (float) (string) $model['priceIn'];
+        $roundTripped['priceOut'] = (float) (string) $model['priceOut'];
+        $roundTripped['quality'] = (float) (string) $model['quality'];
+        $roundTripped['rating'] = (float) (string) $model['rating'];
+
+        $this->assertSame($original, ModelCatalog::fingerprint($roundTripped));
+    }
+
+    public function testUpsertEmbedsFingerprintInJsonPayload(): void
+    {
+        $connection = $this->createMock(Connection::class);
+        $model = ModelCatalog::find('groq:llama-3.3-70b-versatile')[0];
+        $expectedFingerprint = ModelCatalog::fingerprint($model);
+
+        // @phpstan-ignore-next-line
+        $connection
+            ->expects($this->once())
+            ->method('executeStatement')
+            ->with(
+                $this->anything(),
+                $this->callback(static function (array $params) use ($expectedFingerprint): bool {
+                    $jsonPayload = end($params);
+                    if (!is_string($jsonPayload)) {
+                        return false;
+                    }
+
+                    $decoded = json_decode($jsonPayload, true);
+
+                    return is_array($decoded)
+                        && ($decoded[ModelCatalog::FINGERPRINT_KEY] ?? null) === $expectedFingerprint;
+                }),
+            );
+
+        ModelCatalog::upsert($connection, $model);
+    }
 }

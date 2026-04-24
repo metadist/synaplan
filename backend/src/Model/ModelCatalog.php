@@ -39,6 +39,21 @@ class ModelCatalog
     ];
 
     /**
+     * BJSON key that stores the catalog fingerprint of the last successful seed
+     * write. ModelSeeder uses it to detect manual UI edits and skip them on
+     * future runs (see fingerprint() and ModelSeeder::seed()).
+     */
+    public const FINGERPRINT_KEY = '__catalog_fingerprint';
+
+    /**
+     * Number of decimals used to normalise float fields before fingerprinting.
+     * Catalog prices are authored with at most 4 decimals (e.g. 0.092); 6 leaves
+     * comfortable headroom and shields the hash from float-string round-trips
+     * via Doctrine DBAL.
+     */
+    private const FINGERPRINT_FLOAT_PRECISION = 6;
+
+    /**
      * Insert or update a model row via `INSERT … ON DUPLICATE KEY UPDATE`.
      *
      * Field ownership rules:
@@ -46,10 +61,17 @@ class ModelCatalog
      *     BSERVICE, BNAME, BTAG, BPROVID, BPRICEIN, BINUNIT, BPRICEOUT, BOUTUNIT,
      *     BQUALITY, BRATING, BJSON. Truth lives in this class; deploy = update.
      *   - **Operator-owned** (only set on INSERT, NEVER overwritten):
-     *     BSELECTABLE, BACTIVE, BISDEFAULT. These can be toggled by admins via
-     *     the AdminModelsService UI; container restarts must not wipe those choices.
-     *     Test fixtures that need to force a value should issue an explicit UPDATE
-     *     after the upsert (see ModelSeeder::seed()).
+     *     BSELECTABLE, BACTIVE, BISDEFAULT, BSHOWWHENFREE. These can be toggled
+     *     by admins via the AdminModelsService UI; container restarts must not
+     *     wipe those choices. BSHOWWHENFREE is not part of this statement at all
+     *     (no INSERT column / no UPDATE clause) — it is managed exclusively by
+     *     the admin UI and migrations. Test fixtures that need to force a value
+     *     should issue an explicit UPDATE after the upsert (see ModelSeeder::seed()).
+     *
+     * Every write embeds the catalog fingerprint into BJSON under
+     * self::FINGERPRINT_KEY. ModelSeeder reads this back to detect manual UI edits
+     * and only re-applies catalog values to rows whose values still match the
+     * previously-seeded fingerprint.
      *
      * Returns the MySQL/MariaDB affected-rows value so callers can distinguish
      * inserts from updates:
@@ -59,6 +81,9 @@ class ModelCatalog
      */
     public static function upsert(Connection $connection, array $model, bool $system = false): int
     {
+        $json = is_array($model['json'] ?? null) ? $model['json'] : [];
+        $json[self::FINGERPRINT_KEY] = self::fingerprint($model);
+
         return (int) $connection->executeStatement(
             'INSERT INTO BMODELS (BID, BSERVICE, BNAME, BTAG, BSELECTABLE, BACTIVE, BPROVID, BPRICEIN, BINUNIT, BPRICEOUT, BOUTUNIT, BQUALITY, BRATING, BISDEFAULT, BJSON)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
@@ -75,8 +100,47 @@ class ModelCatalog
                 $model['priceIn'], $model['inUnit'], $model['priceOut'],
                 $model['outUnit'], $model['quality'], $model['rating'],
                 $system ? 1 : 0,
-                json_encode($model['json']),
+                json_encode($json, \JSON_UNESCAPED_SLASHES | \JSON_UNESCAPED_UNICODE),
             ]
+        );
+    }
+
+    /**
+     * Compute a stable fingerprint of a model's catalog-owned fields.
+     *
+     * The hash deliberately ignores operator-owned columns (BSELECTABLE, BACTIVE,
+     * BISDEFAULT, BSHOWWHENFREE) and the fingerprint key itself, so that:
+     *   - admins toggling enabled/active flags do NOT shift the fingerprint, and
+     *   - the value we write into BJSON.__catalog_fingerprint can be regenerated
+     *     deterministically from the row we read back later.
+     *
+     * Floats are rounded to FINGERPRINT_FLOAT_PRECISION decimals to neutralise the
+     * float→string→float round trip performed by the DBAL float type.
+     *
+     * @param array<string, mixed> $row catalog or DB-shaped row (see ModelSeeder::loadExistingRowsById)
+     */
+    public static function fingerprint(array $row): string
+    {
+        $json = is_array($row['json'] ?? null) ? $row['json'] : [];
+        unset($json[self::FINGERPRINT_KEY]);
+
+        $payload = [
+            'service' => (string) ($row['service'] ?? ''),
+            'name' => (string) ($row['name'] ?? ''),
+            'tag' => (string) ($row['tag'] ?? ''),
+            'providerId' => (string) ($row['providerId'] ?? ''),
+            'priceIn' => round((float) ($row['priceIn'] ?? 0.0), self::FINGERPRINT_FLOAT_PRECISION),
+            'inUnit' => (string) ($row['inUnit'] ?? ''),
+            'priceOut' => round((float) ($row['priceOut'] ?? 0.0), self::FINGERPRINT_FLOAT_PRECISION),
+            'outUnit' => (string) ($row['outUnit'] ?? ''),
+            'quality' => round((float) ($row['quality'] ?? 0.0), self::FINGERPRINT_FLOAT_PRECISION),
+            'rating' => round((float) ($row['rating'] ?? 0.0), self::FINGERPRINT_FLOAT_PRECISION),
+            'json' => $json,
+        ];
+
+        return hash(
+            'sha256',
+            (string) json_encode($payload, \JSON_UNESCAPED_SLASHES | \JSON_UNESCAPED_UNICODE | \JSON_THROW_ON_ERROR)
         );
     }
 
