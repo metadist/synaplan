@@ -173,7 +173,7 @@ class ConfigController extends AbstractController
                         new OA\Property(
                             property: 'version',
                             type: 'string',
-                            example: '2.1.0',
+                            example: '2.7.0',
                             description: 'Application version'
                         ),
                         new OA\Property(
@@ -264,7 +264,7 @@ class ConfigController extends AbstractController
 
         // Build information for debugging deployments (minimal: version + internal IP only)
         $buildInfo = [
-            'version' => $_ENV['APP_VERSION'] ?? '2.1.0',
+            'version' => $_ENV['APP_VERSION'] ?? '2.7.0',
             'ip' => $this->getInternalIp(),
         ];
 
