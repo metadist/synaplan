@@ -19,6 +19,7 @@ security:
             pattern: ^/v1
             stateless: true
             provider: app_user_provider
+            entry_point: App\Security\ApiAuthenticationEntryPoint
             custom_authenticators:
                 - App\Security\ApiKeyAuthenticator
 
@@ -26,6 +27,11 @@ security:
             pattern: ^/api
             stateless: true
             provider: app_user_provider
+            # Returns a clean JSON 401 instead of letting the security
+            # ExceptionListener escalate anonymous requests into uncaught
+            # HttpExceptions (which otherwise spam the request channel with
+            # ERROR-level stack traces for every unauthenticated call).
+            entry_point: App\Security\ApiAuthenticationEntryPoint
             custom_authenticators:
                 - App\Security\CookieTokenAuthenticator
                 - App\Security\OidcBearerAuthenticator

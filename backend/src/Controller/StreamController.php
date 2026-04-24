@@ -883,6 +883,9 @@ class StreamController extends AbstractController
 
                     $chat->updateTimestamp();
                     $this->em->flush();
+                    // Include the nested aiModels shape so the error message
+                    // row shows correct model/sorting badges live instead of
+                    // only after a page refresh — see issue #603.
                     $completePayload = [
                         'messageId' => $outgoingMessage->getId(),
                         'trackId' => $trackId,
@@ -893,6 +896,7 @@ class StreamController extends AbstractController
                         'originalTopic' => $originalTopic,
                         'originalMediaType' => $originalMediaType,
                         'language' => 'en',
+                        'aiModels' => $this->buildAiModelsPayload($outgoingMessage),
                     ];
 
                     if (isset($result['error_hint'])) {
@@ -1193,14 +1197,29 @@ class StreamController extends AbstractController
                 }
 
                 // Send complete event (WITHOUT againData - frontend handles this)
+                // aiModels mirrors the nested shape returned by the history
+                // endpoint so badges (chat + sorting) populate live instead of
+                // only after a page refresh — see issue #603.
+                // Normalise model_id to int|null so the flat SSE field matches
+                // the shape of the history endpoint and the nested aiModels
+                // payload (PR #833 review, Copilot #1). $modelId comes straight
+                // from Request::query->get() and can be a numeric string, or
+                // junk like "abc"; `normalizeModelId()` refuses to cast
+                // non-numeric input to 0 and logs it instead of silently
+                // corrupting downstream data.
+                $rawChatModelId = $response['metadata']['model_id'] ?? $modelId ?? null;
+                $completeChatModelId = $this->normalizeModelId($rawChatModelId, 'streaming_complete');
+
                 $completeData = [
                     'messageId' => $outgoingMessage->getId(),
                     'trackId' => $trackId,
                     'provider' => $response['metadata']['provider'] ?? 'test',
                     'model' => $response['metadata']['model'] ?? 'unknown',
+                    'model_id' => $completeChatModelId,
                     'topic' => $classification['topic'],
                     'language' => $classification['language'],
                     'searchResults' => $searchResults,
+                    'aiModels' => $this->buildAiModelsPayload($outgoingMessage),
                 ];
 
                 if ('length' === $finishReason) {
@@ -1507,12 +1526,36 @@ class StreamController extends AbstractController
                 ]);
             }
 
-            // Send complete event
+            // Send complete event. The non-streaming path (o1-style models)
+            // doesn't classify/sort, so only the chat sub-model is populated;
+            // still using the nested shape for consistency with the history
+            // endpoint — see issue #603.
+            //
+            // Persist the chat model metadata on the message first, then let
+            // `buildAiModelsPayload()` emit the nested shape. Single source of
+            // truth with the streaming path (PR #833 review: "SSE logic —
+            // duplication creeping in").
+            if (!empty($metadata['provider']) || !empty($metadata['model'])) {
+                $message->setMeta('ai_chat_provider', (string) ($metadata['provider'] ?? ''));
+                $message->setMeta('ai_chat_model', (string) ($metadata['model'] ?? ''));
+                if (isset($metadata['model_id']) && '' !== $metadata['model_id']) {
+                    $message->setMeta('ai_chat_model_id', (string) $metadata['model_id']);
+                }
+            }
+
+            // $metadata['model_id'] provenance varies per provider (some emit
+            // string, some int, occasionally non-numeric junk). Coerce once
+            // so the flat SSE field and the nested payload stay in sync
+            // (PR #833 review, Copilot #2).
+            $nonStreamingModelId = $this->normalizeModelId($metadata['model_id'] ?? null, 'non_streaming_complete');
+
             $this->sendSSE('complete', [
                 'messageId' => $message->getId(),
                 'provider' => $metadata['provider'] ?? 'unknown',
                 'model' => $metadata['model'] ?? 'unknown',
+                'model_id' => $nonStreamingModelId,
                 'trackId' => $_GET['trackId'] ?? time(),
+                'aiModels' => $this->buildAiModelsPayload($message),
             ]);
         } catch (\Exception $e) {
             $this->logger->error('Non-streaming processing failed', [
@@ -1521,6 +1564,86 @@ class StreamController extends AbstractController
             ]);
             $this->sendSSE('error', ['error' => 'Failed to process: '.$e->getMessage()]);
         }
+    }
+
+    /**
+     * Normalise a raw model_id (from query string, provider metadata, or
+     * message meta) to an int or null.
+     *
+     * Providers are inconsistent: some emit ints, some numeric strings, and
+     * some occasionally ship non-numeric junk. A blind `(int)` cast turns
+     * `"abc"` into `0`, which silently corrupts the SSE `model_id` field and
+     * any downstream consumer — PR #833 review flagged this explicitly. We
+     * accept only numeric input and log the rest so we see it in monitoring
+     * instead of manifesting as mystery rows in the history endpoint.
+     *
+     * @param mixed $raw raw value from request/query/metadata
+     */
+    private function normalizeModelId(mixed $raw, string $context): ?int
+    {
+        if (null === $raw || '' === $raw) {
+            return null;
+        }
+
+        if (is_int($raw)) {
+            return $raw;
+        }
+
+        if (is_string($raw) && is_numeric($raw)) {
+            return (int) $raw;
+        }
+
+        $this->logger->warning('StreamController: non-numeric model_id received, discarding', [
+            'context' => $context,
+            'type' => get_debug_type($raw),
+            'value' => is_scalar($raw) ? (string) $raw : null,
+        ]);
+
+        return null;
+    }
+
+    /**
+     * Build the nested aiModels payload mirroring the ChatController
+     * /api/v1/chats/{id}/messages response shape.
+     *
+     * Issue #603: the SSE 'complete' event used to carry only flat
+     * provider/model fields for the CHAT model, so the sorting-model badge
+     * (and any other non-chat metadata) only appeared after a page refresh
+     * triggered a fresh history fetch. By shipping the same nested shape the
+     * REST endpoint returns, the frontend can populate all badges live.
+     *
+     * @return array{
+     *   chat?: array{provider: ?string, model: ?string, model_id: ?int},
+     *   sorting?: array{provider: ?string, model: ?string, model_id: ?int},
+     * }|null
+     */
+    private function buildAiModelsPayload(Message $message): ?array
+    {
+        $aiModels = [];
+
+        $chatProvider = $message->getMeta('ai_chat_provider');
+        $chatModel = $message->getMeta('ai_chat_model');
+        $chatModelId = $message->getMeta('ai_chat_model_id');
+        if ($chatProvider || $chatModel) {
+            $aiModels['chat'] = [
+                'provider' => $chatProvider,
+                'model' => $chatModel,
+                'model_id' => $this->normalizeModelId($chatModelId, 'aiModels_chat'),
+            ];
+        }
+
+        $sortingProvider = $message->getMeta('ai_sorting_provider');
+        $sortingModel = $message->getMeta('ai_sorting_model');
+        $sortingModelId = $message->getMeta('ai_sorting_model_id');
+        if ($sortingProvider || $sortingModel) {
+            $aiModels['sorting'] = [
+                'provider' => $sortingProvider,
+                'model' => $sortingModel,
+                'model_id' => $this->normalizeModelId($sortingModelId, 'aiModels_sorting'),
+            ];
+        }
+
+        return [] === $aiModels ? null : $aiModels;
     }
 
     private function sendSSE(string $status, array $data): void
