@@ -1200,12 +1200,21 @@ class StreamController extends AbstractController
                 // aiModels mirrors the nested shape returned by the history
                 // endpoint so badges (chat + sorting) populate live instead of
                 // only after a page refresh — see issue #603.
+                // Normalise model_id to int|null so the flat SSE field matches
+                // the shape of the history endpoint and the nested aiModels
+                // payload (PR #833 review, Copilot #1). $modelId comes straight
+                // from Request::query->get() and can be a numeric string.
+                $rawChatModelId = $response['metadata']['model_id'] ?? $modelId ?? null;
+                $completeChatModelId = null !== $rawChatModelId && '' !== $rawChatModelId
+                    ? (int) $rawChatModelId
+                    : null;
+
                 $completeData = [
                     'messageId' => $outgoingMessage->getId(),
                     'trackId' => $trackId,
                     'provider' => $response['metadata']['provider'] ?? 'test',
                     'model' => $response['metadata']['model'] ?? 'unknown',
-                    'model_id' => $response['metadata']['model_id'] ?? $modelId ?? null,
+                    'model_id' => $completeChatModelId,
                     'topic' => $classification['topic'],
                     'language' => $classification['language'],
                     'searchResults' => $searchResults,
@@ -1520,13 +1529,21 @@ class StreamController extends AbstractController
             // doesn't classify/sort, so only the chat sub-model is populated;
             // still using the nested shape for consistency with the history
             // endpoint — see issue #603.
+            //
+            // $metadata['model_id'] provenance varies per provider (some emit
+            // string, some int), so coerce once here to keep the flat and
+            // nested fields perfectly in sync (PR #833 review, Copilot #2).
+            $nonStreamingModelId = isset($metadata['model_id']) && '' !== $metadata['model_id']
+                ? (int) $metadata['model_id']
+                : null;
+
             $chatAiModel = null;
             if (!empty($metadata['provider']) || !empty($metadata['model'])) {
                 $chatAiModel = [
                     'chat' => [
                         'provider' => $metadata['provider'] ?? null,
                         'model' => $metadata['model'] ?? null,
-                        'model_id' => isset($metadata['model_id']) ? (int) $metadata['model_id'] : null,
+                        'model_id' => $nonStreamingModelId,
                     ],
                 ];
             }
@@ -1535,7 +1552,7 @@ class StreamController extends AbstractController
                 'messageId' => $message->getId(),
                 'provider' => $metadata['provider'] ?? 'unknown',
                 'model' => $metadata['model'] ?? 'unknown',
-                'model_id' => $metadata['model_id'] ?? null,
+                'model_id' => $nonStreamingModelId,
                 'trackId' => $_GET['trackId'] ?? time(),
                 'aiModels' => $chatAiModel,
             ]);
