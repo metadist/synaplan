@@ -782,6 +782,7 @@ class ModelCatalog
                 'prompt' => 'Describe the image in detail. Extract any text you see.',
                 'params' => ['model' => 'gpt-5.5-pro'],
                 'features' => ['reasoning', 'vision'],
+                'supportsStreaming' => false,
                 'meta' => [
                     'api' => 'responses',
                     'supports_images' => true,

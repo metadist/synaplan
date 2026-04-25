@@ -815,8 +815,6 @@ final readonly class MessageProcessor
                 'context' => $e->getContext(),
             ]);
 
-            error_log('🔴 AI PROVIDER FAILED: '.$e->getMessage());
-
             $this->notify($statusCallback, 'error', $e->getMessage());
 
             $errorResult = [
@@ -842,10 +840,6 @@ final readonly class MessageProcessor
             ];
 
             $this->logger->error('Message processing failed', $errorDetails);
-
-            // Also dump to stderr for immediate visibility
-            error_log('🔴 MESSAGE PROCESSING FAILED: '.$e->getMessage());
-            error_log('File: '.$e->getFile().':'.$e->getLine());
 
             $this->notify($statusCallback, 'error', $e->getMessage());
 

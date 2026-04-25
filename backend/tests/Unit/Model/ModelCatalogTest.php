@@ -191,11 +191,13 @@ class ModelCatalogTest extends TestCase
         $this->assertSame(['chat', 'pic2text'], array_column($gpt55Pro, 'tag'));
     }
 
-    public function testGpt55ProChatIsMarkedAsNonStreaming(): void
+    public function testGpt55ProModelsAreMarkedAsNonStreaming(): void
     {
-        $model = ModelCatalog::find('openai:gpt-5.5-pro:chat')[0];
+        $chat = ModelCatalog::find('openai:gpt-5.5-pro:chat')[0];
+        $vision = ModelCatalog::find('openai:gpt-5.5-pro:pic2text')[0];
 
-        $this->assertFalse($model['json']['supportsStreaming']);
+        $this->assertFalse($chat['json']['supportsStreaming']);
+        $this->assertFalse($vision['json']['supportsStreaming']);
     }
 
     public function testFingerprintIsDeterministic(): void

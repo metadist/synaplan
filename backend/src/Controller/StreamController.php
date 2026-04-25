@@ -605,7 +605,10 @@ class StreamController extends AbstractController
                 $supportsStreaming = true;
                 if ($streamModelId) {
                     $supportsStreaming = $this->modelConfigService->supportsStreaming((int) $streamModelId);
-                    error_log('🔍 Model supports streaming: '.($supportsStreaming ? 'YES' : 'NO'));
+                    $this->logger->debug('StreamController: Resolved streaming support', [
+                        'model_id' => $streamModelId,
+                        'supports_streaming' => $supportsStreaming,
+                    ]);
                 }
 
                 // Route to streaming or non-streaming handler
@@ -617,7 +620,8 @@ class StreamController extends AbstractController
                         $user,
                         $chat,
                         $trackId,
-                        $isWidgetMode ? 'WIDGET' : ($isGuestMode ? 'GUEST' : 'WEB')
+                        $isWidgetMode ? 'WIDGET' : ($isGuestMode ? 'GUEST' : 'WEB'),
+                        null !== $streamModelId ? (int) $streamModelId : null
                     );
 
                     return; // Exit callback early
@@ -1186,19 +1190,8 @@ class StreamController extends AbstractController
                 }
 
                 // Get search results if available
-                $searchResults = null;
-                if (isset($result['search_results']) && !empty($result['search_results']['results'])) {
-                    $searchResults = array_map(function ($result) {
-                        return [
-                            'title' => $result['title'] ?? '',
-                            'url' => $result['url'] ?? '',
-                            'description' => $result['description'] ?? '',
-                            'published' => $result['age'] ?? null,
-                            'source' => $result['profile']['name'] ?? null,
-                            'thumbnail' => $result['thumbnail'] ?? null,
-                        ];
-                    }, $result['search_results']['results']);
-
+                $searchResults = $this->formatSearchResultsForSse($result['search_results'] ?? null);
+                if (null !== $searchResults) {
                     $this->logger->info('StreamController: Including search results', [
                         'results_count' => count($searchResults),
                         'query' => $result['search_results']['query'],
@@ -1475,6 +1468,7 @@ class StreamController extends AbstractController
         Chat $chat,
         int|string $trackId,
         string $source,
+        ?int $intendedModelId,
     ): void {
         try {
             // Send processing status
@@ -1498,18 +1492,76 @@ class StreamController extends AbstractController
             );
 
             if (!$result['success']) {
-                $errorPayload = ['error' => $result['error']];
+                $errorMessage = (string) ($result['error'] ?? 'Failed to process message');
                 $failedClassification = $result['classification'] ?? null;
+                $originalTopic = null;
+                $originalMediaType = null;
                 if (is_array($failedClassification)) {
                     if (isset($failedClassification['topic']) && is_string($failedClassification['topic'])) {
-                        $errorPayload['originalTopic'] = $failedClassification['topic'];
+                        $originalTopic = $failedClassification['topic'];
                     }
                     if (isset($failedClassification['media_type']) && is_string($failedClassification['media_type'])
                         && '' !== trim($failedClassification['media_type'])) {
-                        $errorPayload['originalMediaType'] = trim($failedClassification['media_type']);
+                        $originalMediaType = trim($failedClassification['media_type']);
                     }
                 }
-                $this->sendSSE('error', $errorPayload);
+
+                $outgoingMessage = new Message();
+                $outgoingMessage->setUserId($user->getId());
+                $outgoingMessage->setChat($chat);
+                $outgoingMessage->setTrackingId((int) $trackId);
+                $outgoingMessage->setProviderIndex($message->getProviderIndex());
+                $outgoingMessage->setUnixTimestamp(time());
+                $outgoingMessage->setDateTime(date('YmdHis'));
+                $outgoingMessage->setMessageType('WEB');
+                $outgoingMessage->setFile(0);
+                $outgoingMessage->setTopic('ERROR');
+                $outgoingMessage->setLanguage('en');
+                $outgoingMessage->setText($errorMessage);
+                $outgoingMessage->setDirection('OUT');
+                $outgoingMessage->setStatus('complete');
+
+                $this->em->persist($outgoingMessage);
+                $this->em->flush();
+
+                $displayProvider = $intendedModelId
+                    ? ($this->modelConfigService->getProviderForModel($intendedModelId) ?? ($result['provider'] ?? 'system'))
+                    : ($result['provider'] ?? 'system');
+                $displayModel = $intendedModelId
+                    ? ($this->modelConfigService->getModelName($intendedModelId) ?? 'unknown')
+                    : 'unknown';
+
+                $outgoingMessage->setMeta('ai_chat_provider', $displayProvider);
+                $outgoingMessage->setMeta('ai_chat_model', $displayModel);
+                if (null !== $intendedModelId) {
+                    $outgoingMessage->setMeta('ai_chat_model_id', (string) $intendedModelId);
+                }
+                $outgoingMessage->setMeta('error_type', $errorMessage);
+                if (null !== $originalTopic) {
+                    $outgoingMessage->setMeta('original_topic', $originalTopic);
+                }
+                if (null !== $originalMediaType) {
+                    $outgoingMessage->setMeta('original_media_type', $originalMediaType);
+                }
+
+                $message->setTopic('ERROR');
+                $message->setStatus('error');
+                $chat->updateTimestamp();
+                $this->em->flush();
+
+                $this->sendSSE('data', ['chunk' => $errorMessage]);
+                $this->sendSSE('complete', [
+                    'messageId' => $outgoingMessage->getId(),
+                    'trackId' => $trackId,
+                    'provider' => $displayProvider,
+                    'model' => $displayModel,
+                    'model_id' => $intendedModelId,
+                    'topic' => 'ERROR',
+                    'originalTopic' => $originalTopic,
+                    'originalMediaType' => $originalMediaType,
+                    'language' => 'en',
+                    'aiModels' => $this->buildAiModelsPayload($outgoingMessage),
+                ]);
 
                 return;
             }
@@ -1602,11 +1654,30 @@ class StreamController extends AbstractController
                 $outgoingMessage->setMeta('ai_sorting_model_id', (string) $classification['sorting_model_id']);
             }
 
+            if (!empty($options['web_search'])) {
+                $message->setMeta('web_search_enabled', 'true');
+            }
+
+            $hasSearchResults = isset($result['search_results']) && !empty($result['search_results']['results']);
+            if ($hasSearchResults) {
+                $searchQuery = $result['search_results']['query'] ?? '';
+                $searchCount = count($result['search_results']['results']);
+
+                $message->setMeta('web_search_query', $searchQuery);
+                $message->setMeta('web_search_results_count', (string) $searchCount);
+                $outgoingMessage->setMeta('web_search_query', $searchQuery);
+                $outgoingMessage->setMeta('web_search_results_count', (string) $searchCount);
+            }
+
             $message->setTopic((string) ($classification['topic'] ?? $message->getTopic()));
             $message->setLanguage((string) ($classification['language'] ?? $message->getLanguage()));
             $message->setStatus('complete');
             $chat->updateTimestamp();
             $this->em->flush();
+
+            if ('WEB' === $source) {
+                $this->messageForwardingService->forwardIfNeeded($chat, $content);
+            }
 
             $this->rateLimitService->recordUsage($user, 'MESSAGES', [
                 'provider' => $metadata['provider'] ?? 'unknown',
@@ -1622,11 +1693,10 @@ class StreamController extends AbstractController
 
             // $metadata['model_id'] provenance varies per provider (some emit
             // string, some int, occasionally non-numeric junk). Coerce once
-            // so the flat SSE field and the nested payload stay in sync
-            // (PR #833 review, Copilot #2).
+            // so the flat SSE field and the nested payload stay in sync.
             $nonStreamingModelId = $this->normalizeModelId($metadata['model_id'] ?? null, 'non_streaming_complete');
 
-            $this->sendSSE('complete', [
+            $completeData = [
                 'messageId' => $outgoingMessage->getId(),
                 'provider' => $metadata['provider'] ?? 'unknown',
                 'model' => $metadata['model'] ?? 'unknown',
@@ -1634,8 +1704,22 @@ class StreamController extends AbstractController
                 'trackId' => $trackId,
                 'topic' => $classification['topic'] ?? null,
                 'language' => $classification['language'] ?? null,
+                'searchResults' => $this->formatSearchResultsForSse($result['search_results'] ?? null),
                 'aiModels' => $this->buildAiModelsPayload($outgoingMessage),
-            ]);
+            ];
+
+            if (isset($metadata['memories']) && is_array($metadata['memories'])) {
+                $completeData['memoryIds'] = array_map(fn ($memory) => $memory['id'], $metadata['memories']);
+            }
+
+            if (isset($metadata['feedbacks']) && is_array($metadata['feedbacks'])) {
+                $completeData['feedbackIds'] = array_filter(
+                    array_map(fn ($feedback) => $feedback['id'] ?? null, $metadata['feedbacks']),
+                    fn ($id) => null !== $id
+                );
+            }
+
+            $this->sendSSE('complete', $completeData);
         } catch (\Exception $e) {
             $this->logger->error('Non-streaming processing failed', [
                 'error' => $e->getMessage(),
@@ -1643,6 +1727,29 @@ class StreamController extends AbstractController
             ]);
             $this->sendSSE('error', ['error' => 'Failed to process: '.$e->getMessage()]);
         }
+    }
+
+    /**
+     * @param array<string, mixed>|null $rawSearchResults
+     *
+     * @return array<int, array<string, mixed>>|null
+     */
+    private function formatSearchResultsForSse(?array $rawSearchResults): ?array
+    {
+        if (empty($rawSearchResults['results']) || !is_array($rawSearchResults['results'])) {
+            return null;
+        }
+
+        return array_map(static function (array $result): array {
+            return [
+                'title' => $result['title'] ?? '',
+                'url' => $result['url'] ?? '',
+                'description' => $result['description'] ?? '',
+                'published' => $result['age'] ?? null,
+                'source' => $result['profile']['name'] ?? null,
+                'thumbnail' => $result['thumbnail'] ?? null,
+            ];
+        }, $rawSearchResults['results']);
     }
 
     /**
