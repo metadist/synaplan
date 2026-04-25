@@ -600,11 +600,18 @@ class StreamController extends AbstractController
                     ]);
                 }
 
-                // Check if the explicit or default chat model supports streaming.
-                $streamModelId = $modelId ? (int) $modelId : ($intendedChat['id'] ?? null);
+                // Resolve the chat model that ChatHandler will eventually pick. We mirror its
+                // priority order (Again → override → fixed-prompt metadata → DB default) so the
+                // streaming/non-streaming routing decision matches the model that actually runs.
+                $streamModelId = $this->resolveEffectiveChatModelId(
+                    $modelId ? (int) $modelId : null,
+                    $processingOptions['fixed_task_prompt'] ?? null,
+                    (int) $user->getId(),
+                    $intendedChat['id'] ?? null
+                );
                 $supportsStreaming = true;
                 if ($streamModelId) {
-                    $supportsStreaming = $this->modelConfigService->supportsStreaming((int) $streamModelId);
+                    $supportsStreaming = $this->modelConfigService->supportsStreaming($streamModelId);
                     $this->logger->debug('StreamController: Resolved streaming support', [
                         'model_id' => $streamModelId,
                         'supports_streaming' => $supportsStreaming,
@@ -621,7 +628,7 @@ class StreamController extends AbstractController
                         $chat,
                         $trackId,
                         $isWidgetMode ? 'WIDGET' : ($isGuestMode ? 'GUEST' : 'WEB'),
-                        null !== $streamModelId ? (int) $streamModelId : null
+                        $streamModelId
                     );
 
                     return; // Exit callback early
@@ -1456,6 +1463,53 @@ class StreamController extends AbstractController
             'name' => $this->modelConfigService->getModelName($id),
             'provider' => $this->modelConfigService->getProviderForModel($id),
         ];
+    }
+
+    /**
+     * Predict which chat model ChatHandler will pick for this request.
+     *
+     * Priority mirrors {@see ChatHandler::handle()} / {@see ChatHandler::handleStream()}:
+     *   1. Explicit query-param model (`Again` or override).
+     *   2. `aiModel` metadata of a fixed task prompt (widget / API `promptTopic`).
+     *   3. The user's DB default chat model.
+     *
+     * Used to decide before classification whether the streaming or the
+     * non-streaming SSE path should run.
+     */
+    private function resolveEffectiveChatModelId(
+        ?int $explicitModelId,
+        ?string $fixedTaskPromptTopic,
+        int $userId,
+        mixed $defaultChatModelId,
+    ): ?int {
+        if (null !== $explicitModelId && $explicitModelId > 0) {
+            return $explicitModelId;
+        }
+
+        if (null !== $fixedTaskPromptTopic && '' !== $fixedTaskPromptTopic) {
+            try {
+                $promptData = $this->promptService->getPromptWithMetadata($fixedTaskPromptTopic, $userId);
+                $promptModelId = (int) ($promptData['metadata']['aiModel'] ?? 0);
+                if ($promptModelId > 0) {
+                    return $promptModelId;
+                }
+            } catch (\Throwable $e) {
+                // Prompt resolution is best-effort here; fall through to the default.
+                $this->logger->debug('StreamController: Could not pre-resolve prompt model for streaming routing', [
+                    'topic' => $fixedTaskPromptTopic,
+                    'error' => $e->getMessage(),
+                ]);
+            }
+        }
+
+        if (is_int($defaultChatModelId) && $defaultChatModelId > 0) {
+            return $defaultChatModelId;
+        }
+        if (is_string($defaultChatModelId) && ctype_digit($defaultChatModelId) && (int) $defaultChatModelId > 0) {
+            return (int) $defaultChatModelId;
+        }
+
+        return null;
     }
 
     /**

@@ -216,7 +216,7 @@ final readonly class ChatHandler implements MessageHandlerInterface
             if ($model) {
                 $modelMaxTokens = $model->getMaxTokens();
                 $json = $model->getJson();
-                if (isset($json['supportsSystemMessages']) && false === $json['supportsSystemMessages']) {
+                if (!$this->modelSupportsSystemMessages($json)) {
                     $systemPrompt = null;
                 }
             }
@@ -792,8 +792,7 @@ final readonly class ChatHandler implements MessageHandlerInterface
             $model = $this->modelRepository->find($modelId);
             if ($model) {
                 $json = $model->getJson();
-                // Some older reasoning models don't support system messages.
-                if (isset($json['supportsSystemMessages']) && false === $json['supportsSystemMessages']) {
+                if (!$this->modelSupportsSystemMessages($json)) {
                     // Don't use system message - it will be prepended to first user message instead
                     $systemPrompt = null;
                 }
@@ -1328,6 +1327,30 @@ final readonly class ChatHandler implements MessageHandlerInterface
                 'timestamp' => time(),
             ]);
         }
+    }
+
+    /**
+     * Decide whether the model accepts a `system` role message.
+     *
+     * Resolution order:
+     *   1. Honour an explicit `supportsSystemMessages` flag in the model JSON.
+     *   2. Fall back to the legacy convention where `supportsStreaming === false`
+     *      also implied "no system messages" (true for OpenAI o1 reasoning models).
+     *   3. Default to `true` so well-behaved providers keep working unchanged.
+     *
+     * @param array<string, mixed> $modelJson Raw model JSON config from `Model::getJson()`
+     */
+    private function modelSupportsSystemMessages(array $modelJson): bool
+    {
+        if (array_key_exists('supportsSystemMessages', $modelJson)) {
+            return false !== $modelJson['supportsSystemMessages'];
+        }
+
+        if (array_key_exists('supportsStreaming', $modelJson) && false === $modelJson['supportsStreaming']) {
+            return false;
+        }
+
+        return true;
     }
 
     /**
