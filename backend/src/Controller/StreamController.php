@@ -3,6 +3,7 @@
 namespace App\Controller;
 
 use App\AI\Service\AiFacade;
+use App\Entity\Chat;
 use App\Entity\File;
 use App\Entity\Message;
 use App\Entity\Prompt;
@@ -422,7 +423,7 @@ class StreamController extends AbstractController
 
             try {
                 // Load chat
-                $chat = $this->em->getRepository(\App\Entity\Chat::class)->find((int) $chatId);
+                $chat = $this->em->getRepository(Chat::class)->find((int) $chatId);
                 if (!$chat || $chat->getUserId() !== $user->getId()) {
                     $this->sendSSE('error', ['error' => 'Chat not found or access denied']);
 
@@ -526,7 +527,7 @@ class StreamController extends AbstractController
 
                         // Reload chat to avoid cascade persist error
                         if ($chatId) {
-                            $chat = $this->em->getRepository(\App\Entity\Chat::class)->find($chatId);
+                            $chat = $this->em->getRepository(Chat::class)->find($chatId);
                             if ($chat) {
                                 $incomingMessage->setChat($chat);
                             }
@@ -599,17 +600,25 @@ class StreamController extends AbstractController
                     ]);
                 }
 
-                // Check if selected model supports streaming
+                // Check if the explicit or default chat model supports streaming.
+                $streamModelId = $modelId ? (int) $modelId : ($intendedChat['id'] ?? null);
                 $supportsStreaming = true;
-                if ($modelId) {
-                    $supportsStreaming = $this->modelConfigService->supportsStreaming((int) $modelId);
+                if ($streamModelId) {
+                    $supportsStreaming = $this->modelConfigService->supportsStreaming((int) $streamModelId);
                     error_log('🔍 Model supports streaming: '.($supportsStreaming ? 'YES' : 'NO'));
                 }
 
                 // Route to streaming or non-streaming handler
                 if (!$supportsStreaming) {
                     // Non-streaming models (e.g., o1-preview, o1-mini)
-                    $this->handleNonStreamingRequest($incomingMessage, $processingOptions);
+                    $this->handleNonStreamingRequest(
+                        $incomingMessage,
+                        $processingOptions,
+                        $user,
+                        $chat,
+                        $trackId,
+                        $isWidgetMode ? 'WIDGET' : ($isGuestMode ? 'GUEST' : 'WEB')
+                    );
 
                     return; // Exit callback early
                 }
@@ -1459,14 +1468,34 @@ class StreamController extends AbstractController
     /**
      * Handle non-streaming requests for models that don't support streaming (e.g., o1-preview).
      */
-    private function handleNonStreamingRequest(Message $message, array $options): void
-    {
+    private function handleNonStreamingRequest(
+        Message $message,
+        array $options,
+        User $user,
+        Chat $chat,
+        int|string $trackId,
+        string $source,
+    ): void {
         try {
             // Send processing status
             $this->sendSSE('status', ['message' => 'Processing with non-streaming model...']);
 
             // Process message without streaming
-            $result = $this->messageProcessor->process($message, $options);
+            $result = $this->messageProcessor->process(
+                $message,
+                $options,
+                function (array $statusUpdate): void {
+                    if ('complete' === $statusUpdate['status']) {
+                        return;
+                    }
+
+                    $this->sendSSE($statusUpdate['status'], [
+                        'message' => $statusUpdate['message'],
+                        'metadata' => $statusUpdate['metadata'] ?? [],
+                        'timestamp' => $statusUpdate['timestamp'],
+                    ]);
+                }
+            );
 
             if (!$result['success']) {
                 $errorPayload = ['error' => $result['error']];
@@ -1502,6 +1531,7 @@ class StreamController extends AbstractController
 
             $content = $response['content'] ?? $result['content'] ?? '';
             $metadata = $response['metadata'] ?? $result['metadata'] ?? [];
+            $classification = $result['classification'] ?? [];
 
             // Extract reasoning if present (for o1 models)
             $reasoning = null;
@@ -1526,22 +1556,69 @@ class StreamController extends AbstractController
                 ]);
             }
 
-            // Send complete event. The non-streaming path (o1-style models)
-            // doesn't classify/sort, so only the chat sub-model is populated;
-            // still using the nested shape for consistency with the history
-            // endpoint — see issue #603.
-            //
-            // Persist the chat model metadata on the message first, then let
-            // `buildAiModelsPayload()` emit the nested shape. Single source of
-            // truth with the streaming path (PR #833 review: "SSE logic —
-            // duplication creeping in").
+            $outgoingMessage = new Message();
+            $outgoingMessage->setUserId($user->getId());
+            $outgoingMessage->setChat($chat);
+            $outgoingMessage->setTrackingId((int) $trackId);
+            $outgoingMessage->setProviderIndex($message->getProviderIndex());
+            $outgoingMessage->setUnixTimestamp(time());
+            $outgoingMessage->setDateTime(date('YmdHis'));
+            $outgoingMessage->setMessageType('WEB');
+            $outgoingMessage->setFile(isset($metadata['file']) ? 1 : 0);
+            $outgoingMessage->setFilePath($metadata['file']['path'] ?? '');
+            $outgoingMessage->setFileType($metadata['file']['type'] ?? '');
+            $outgoingMessage->setTopic((string) ($classification['topic'] ?? $message->getTopic()));
+            $outgoingMessage->setLanguage((string) ($classification['language'] ?? $message->getLanguage()));
+            $outgoingMessage->setText($content);
+            $outgoingMessage->setDirection('OUT');
+            $outgoingMessage->setStatus('complete');
+
+            $this->em->persist($outgoingMessage);
+            $this->em->flush();
+
             if (!empty($metadata['provider']) || !empty($metadata['model'])) {
-                $message->setMeta('ai_chat_provider', (string) ($metadata['provider'] ?? ''));
-                $message->setMeta('ai_chat_model', (string) ($metadata['model'] ?? ''));
+                $outgoingMessage->setMeta('ai_chat_provider', (string) ($metadata['provider'] ?? ''));
+                $outgoingMessage->setMeta('ai_chat_model', (string) ($metadata['model'] ?? ''));
                 if (isset($metadata['model_id']) && '' !== $metadata['model_id']) {
-                    $message->setMeta('ai_chat_model_id', (string) $metadata['model_id']);
+                    $outgoingMessage->setMeta('ai_chat_model_id', (string) $metadata['model_id']);
                 }
             }
+
+            if (!empty($metadata['usage'])) {
+                $outgoingMessage->setMeta('ai_chat_usage', json_encode($metadata['usage']));
+            }
+
+            if (!empty($metadata['response_id'])) {
+                $outgoingMessage->setMeta('openai_response_id', $metadata['response_id']);
+            }
+
+            if (!empty($classification['sorting_provider'])) {
+                $outgoingMessage->setMeta('ai_sorting_provider', $classification['sorting_provider']);
+            }
+            if (!empty($classification['sorting_model_name'])) {
+                $outgoingMessage->setMeta('ai_sorting_model', $classification['sorting_model_name']);
+            }
+            if (!empty($classification['sorting_model_id'])) {
+                $outgoingMessage->setMeta('ai_sorting_model_id', (string) $classification['sorting_model_id']);
+            }
+
+            $message->setTopic((string) ($classification['topic'] ?? $message->getTopic()));
+            $message->setLanguage((string) ($classification['language'] ?? $message->getLanguage()));
+            $message->setStatus('complete');
+            $chat->updateTimestamp();
+            $this->em->flush();
+
+            $this->rateLimitService->recordUsage($user, 'MESSAGES', [
+                'provider' => $metadata['provider'] ?? 'unknown',
+                'model' => $metadata['model'] ?? 'unknown',
+                'model_id' => $metadata['model_id'] ?? null,
+                'usage' => $metadata['usage'] ?? [],
+                'latency' => $metadata['latency'] ?? 0,
+                'chat_id' => $chat->getId(),
+                'source' => $source,
+                'response_text' => $content,
+                'input_text' => $message->getText(),
+            ]);
 
             // $metadata['model_id'] provenance varies per provider (some emit
             // string, some int, occasionally non-numeric junk). Coerce once
@@ -1550,12 +1627,14 @@ class StreamController extends AbstractController
             $nonStreamingModelId = $this->normalizeModelId($metadata['model_id'] ?? null, 'non_streaming_complete');
 
             $this->sendSSE('complete', [
-                'messageId' => $message->getId(),
+                'messageId' => $outgoingMessage->getId(),
                 'provider' => $metadata['provider'] ?? 'unknown',
                 'model' => $metadata['model'] ?? 'unknown',
                 'model_id' => $nonStreamingModelId,
-                'trackId' => $_GET['trackId'] ?? time(),
-                'aiModels' => $this->buildAiModelsPayload($message),
+                'trackId' => $trackId,
+                'topic' => $classification['topic'] ?? null,
+                'language' => $classification['language'] ?? null,
+                'aiModels' => $this->buildAiModelsPayload($outgoingMessage),
             ]);
         } catch (\Exception $e) {
             $this->logger->error('Non-streaming processing failed', [
@@ -1844,7 +1923,7 @@ class StreamController extends AbstractController
 
         try {
             // Load chat
-            $chat = $this->em->getRepository(\App\Entity\Chat::class)->find((int) $chatId);
+            $chat = $this->em->getRepository(Chat::class)->find((int) $chatId);
             if (!$chat || $chat->getUserId() !== $user->getId()) {
                 return $this->json(['error' => 'Chat not found or access denied'], Response::HTTP_FORBIDDEN);
             }

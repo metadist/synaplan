@@ -216,7 +216,7 @@ final readonly class ChatHandler implements MessageHandlerInterface
             if ($model) {
                 $modelMaxTokens = $model->getMaxTokens();
                 $json = $model->getJson();
-                if (isset($json['supportsStreaming']) && false === $json['supportsStreaming']) {
+                if (isset($json['supportsSystemMessages']) && false === $json['supportsSystemMessages']) {
                     $systemPrompt = null;
                 }
             }
@@ -792,8 +792,8 @@ final readonly class ChatHandler implements MessageHandlerInterface
             $model = $this->modelRepository->find($modelId);
             if ($model) {
                 $json = $model->getJson();
-                // o1 models (non-streaming) don't support system messages
-                if (isset($json['supportsStreaming']) && false === $json['supportsStreaming']) {
+                // Some older reasoning models don't support system messages.
+                if (isset($json['supportsSystemMessages']) && false === $json['supportsSystemMessages']) {
                     // Don't use system message - it will be prepended to first user message instead
                     $systemPrompt = null;
                 }

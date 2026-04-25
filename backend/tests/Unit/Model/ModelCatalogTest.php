@@ -180,6 +180,24 @@ class ModelCatalogTest extends TestCase
         $this->assertNull(ModelCatalog::findBidByKey('nonexistent:provider:chat'));
     }
 
+    public function testGpt55ModelsAreAvailableWithExpectedApiIds(): void
+    {
+        $gpt55 = ModelCatalog::find('openai:gpt-5.5');
+        $gpt55Pro = ModelCatalog::find('openai:gpt-5.5-pro');
+
+        $this->assertCount(2, $gpt55);
+        $this->assertCount(2, $gpt55Pro);
+        $this->assertSame(['chat', 'pic2text'], array_column($gpt55, 'tag'));
+        $this->assertSame(['chat', 'pic2text'], array_column($gpt55Pro, 'tag'));
+    }
+
+    public function testGpt55ProChatIsMarkedAsNonStreaming(): void
+    {
+        $model = ModelCatalog::find('openai:gpt-5.5-pro:chat')[0];
+
+        $this->assertFalse($model['json']['supportsStreaming']);
+    }
+
     public function testFingerprintIsDeterministic(): void
     {
         $model = ModelCatalog::find('groq:llama-3.3-70b-versatile')[0];

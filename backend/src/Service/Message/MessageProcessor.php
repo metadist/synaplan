@@ -612,6 +612,15 @@ final readonly class MessageProcessor
             } else {
                 $classification = $this->classifier->classify($message, $conversationHistory);
 
+                // IMPORTANT: Save sorting model info separately (don't pass to ChatHandler).
+                $sortingModelId = $classification['model_id'] ?? null;
+                $sortingProvider = $classification['provider'] ?? null;
+                $sortingModelName = $classification['model_name'] ?? null;
+
+                unset($classification['model_id']);
+                unset($classification['provider']);
+                unset($classification['model_name']);
+
                 // User-selected model from dropdown → pass through as override_model_id
                 if (!empty($options['override_model_id'])) {
                     $classification['override_model_id'] = (int) $options['override_model_id'];
@@ -626,9 +635,9 @@ final readonly class MessageProcessor
                     'topic' => $classification['topic'],
                     'language' => $classification['language'],
                     'source' => $classification['source'],
-                    'model_id' => $classification['model_id'] ?? null,
-                    'provider' => $classification['provider'] ?? null,
-                    'model_name' => $classification['model_name'] ?? null,
+                    'sorting_model_id' => $sortingModelId,
+                    'sorting_provider' => $sortingProvider,
+                    'sorting_model_name' => $sortingModelName,
                 ]);
             }
 
@@ -767,6 +776,10 @@ final readonly class MessageProcessor
                 'provider' => $response['metadata']['provider'] ?? 'unknown',
                 'model' => $response['metadata']['model'] ?? 'unknown',
             ]);
+
+            $classification['sorting_model_id'] = $sortingModelId;
+            $classification['sorting_provider'] = $sortingProvider;
+            $classification['sorting_model_name'] = $sortingModelName;
 
             if (isset($classification['search_results'])) {
                 unset($classification['search_results']);
