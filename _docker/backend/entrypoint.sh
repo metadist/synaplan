@@ -13,7 +13,7 @@ if [ ! -f "/var/www/backend/.env" ] || [ ! -s "/var/www/backend/.env" ]; then
         cat > /var/www/backend/.env << 'EOF'
 APP_ENV=dev
 APP_SECRET=change_me_in_production_12345678901234567890
-DATABASE_URL=mysql://synaplan_user:synaplan_password@db:3306/synaplan?serverVersion=mariadb-11.8.2&charset=utf8mb4
+DATABASE_URL=mysql://synaplan_user:synaplan_password@db:3306/synaplan?serverVersion=mariadb-12.2.2&charset=utf8mb4
 EOF
         echo "✅ Minimal .env created"
     fi

@@ -57,7 +57,7 @@ if [ -z "${DATABASE_WRITE_URL:-}" ] && [ -n "${DB_HOST:-}" ]; then
     # Default to MariaDB platform identifier ("mariadb-" prefix) so DBAL picks
     # MariaDBPlatform and applies the MariaDB-specific schema introspection
     # (string default quote-stripping etc.). See docs/MIGRATIONS.md for why.
-    export DATABASE_WRITE_URL="mysql://${DB_USER:-synaplan}:${DB_PASSWORD_ENCODED}@${DB_HOST}:${DB_PORT:-3306}/${DB_NAME:-synaplan}?serverVersion=${DB_SERVER_VERSION:-mariadb-11.8.2}&charset=utf8mb4"
+    export DATABASE_WRITE_URL="mysql://${DB_USER:-synaplan}:${DB_PASSWORD_ENCODED}@${DB_HOST}:${DB_PORT:-3306}/${DB_NAME:-synaplan}?serverVersion=${DB_SERVER_VERSION:-mariadb-12.2.2}&charset=utf8mb4"
     export DATABASE_READ_URL="${DATABASE_WRITE_URL}"
     echo "✅ Built DATABASE URLs from environment variables"
 fi

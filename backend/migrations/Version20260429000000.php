@@ -14,7 +14,7 @@ use Doctrine\Migrations\AbstractMigration;
  * SQL schema with `COMMENT '(DC2Type:…)'`. DBAL 4.x no longer emits those comments and
  * treats them as drift when introspecting an existing database.
  *
- * Combined with `doctrine.yaml` now declaring `server_version: 'mariadb-11.8.2'` (which
+ * Combined with `doctrine.yaml` now declaring `server_version: 'mariadb-12.2.2'` (which
  * finally routes introspection through `MariaDBPlatform` and kills the string-default
  * phantom diffs described in #824), this migration closes the last bit of drift so
  * `doctrine:schema:validate` can run without `--skip-sync` in CI.

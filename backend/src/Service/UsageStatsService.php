@@ -346,7 +346,16 @@ final readonly class UsageStatsService
         }
 
         // NEW plan with no Stripe record — free, not "inactive".
-        return 'NEW' === $level ? 'free' : 'inactive';
+        if ('NEW' === $level) {
+            return 'free';
+        }
+
+        // Paid effective level (PRO/TEAM/BUSINESS) without a Stripe record is the
+        // admin-override path in `User::getRateLimitLevel()` (see lines 369-371) —
+        // admins can set BUSERLEVEL directly via fixtures or the admin panel. The
+        // user has the capabilities of that plan, so the status should reflect
+        // that rather than showing "Inactive" next to e.g. "Pro Plan".
+        return 'active';
     }
 
     /**

@@ -91,8 +91,8 @@ APP_URL=http://localhost/synaplan/backend
 FRONTEND_URL=http://localhost/synaplan/frontend
 
 # Database (adjust credentials as needed)
-DATABASE_WRITE_URL=mysql://synaplan:password@127.0.0.1:3306/synaplan?serverVersion=mariadb-11.8.2&charset=utf8mb4
-DATABASE_READ_URL=mysql://synaplan:password@127.0.0.1:3306/synaplan?serverVersion=mariadb-11.8.2&charset=utf8mb4
+DATABASE_WRITE_URL=mysql://synaplan:password@127.0.0.1:3306/synaplan?serverVersion=mariadb-12.2.2&charset=utf8mb4
+DATABASE_READ_URL=mysql://synaplan:password@127.0.0.1:3306/synaplan?serverVersion=mariadb-12.2.2&charset=utf8mb4
 
 # AI Services (adjust hosts as needed)
 OLLAMA_BASE_URL=http://127.0.0.1:11434

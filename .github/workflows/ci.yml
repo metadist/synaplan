@@ -47,8 +47,8 @@ jobs:
     runs-on: ubuntu-latest
 
     env:
-      DATABASE_WRITE_URL: mysql://synaplan_test:synaplan_test@127.0.0.1:3306/synaplan?serverVersion=mariadb-11.8.2&charset=utf8mb4
-      DATABASE_READ_URL: mysql://synaplan_test:synaplan_test@127.0.0.1:3306/synaplan?serverVersion=mariadb-11.8.2&charset=utf8mb4
+      DATABASE_WRITE_URL: mysql://synaplan_test:synaplan_test@127.0.0.1:3306/synaplan?serverVersion=mariadb-12.2.2&charset=utf8mb4
+      DATABASE_READ_URL: mysql://synaplan_test:synaplan_test@127.0.0.1:3306/synaplan?serverVersion=mariadb-12.2.2&charset=utf8mb4
 
     services:
       mysql:

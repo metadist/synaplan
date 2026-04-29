@@ -150,7 +150,7 @@ removed:
 1. **doctrine/dbal 4.x upgrade** (#781). DBAL 4's schema comparator is the
    baseline for how column metadata is compared; DBAL 3 still works, but the
    new migrations-diff workflow assumes 4.x semantics.
-2. **`server_version: 'mariadb-11.8.2'`** in `backend/config/packages/doctrine.yaml`
+2. **`server_version: 'mariadb-12.2.2'`** in `backend/config/packages/doctrine.yaml`
    (and the `serverVersion=mariadb-…` query string on every `DATABASE_*_URL`).
    DBAL detects MariaDB by a simple `stripos($version, 'mariadb') !== false`
    check (`AbstractMySQLDriver::getDatabasePlatform`). The previous value
@@ -169,7 +169,7 @@ removed:
 
 - The `serverVersion=mariadb-…` prefix matters for **every** tool that reads
   the DSN — containers, CI workflow env, local `.env` files. If you add a new
-  compose service, set `serverVersion=mariadb-11.8.2` (not bare `11.8`).
+  compose service, set `serverVersion=mariadb-12.2.2` (not bare `11.8`).
 - For `decimal` columns with a zero default, write the default as a string
   that matches MariaDB's `information_schema` representation, e.g.
   `options: ['default' => '0.000000']` for `decimal(10,6)`. Writing

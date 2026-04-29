@@ -14,7 +14,7 @@ doctrine:
                 # MariaDB >= 10.2.7 wraps around string defaults in information_schema.
                 # That single missing detection was the real cause of the phantom diffs
                 # that previously forced `doctrine:schema:validate --skip-sync` (see #824).
-                server_version: 'mariadb-11.8.2'
+                server_version: 'mariadb-12.2.2'
                 charset: utf8mb4
                 profiling_collect_backtrace: '%kernel.debug%'
                 use_savepoints: true
@@ -34,7 +34,7 @@ doctrine:
             read:
                 url: '%env(resolve:DATABASE_READ_URL)%'
                 driver: 'pdo_mysql'
-                server_version: 'mariadb-11.8.2'
+                server_version: 'mariadb-12.2.2'
                 charset: utf8mb4
                 profiling_collect_backtrace: '%kernel.debug%'
                 use_savepoints: true

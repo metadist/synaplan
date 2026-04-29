@@ -186,7 +186,7 @@
               {{ $t('config.usage.totalMessages') }}
             </p>
             <p class="text-sm font-medium txt-primary">
-              {{ stats.total_messages.toLocaleString() }}
+              {{ totalMessages.toLocaleString() }}
               <span class="txt-secondary font-normal">
                 ({{ $t('config.usage.totalRequestsShort') }}:
                 {{ stats.total_requests.toLocaleString() }})
@@ -640,6 +640,14 @@ const subscriptionStatus = computed<SubscriptionStatus>(() => {
   if (sub.level === 'ANONYMOUS') return 'anonymous'
   if (sub.level === 'NEW') return 'free'
   return 'inactive'
+})
+
+// Safe fallback for when an older backend doesn't return `total_messages` yet.
+// Falls back to the MESSAGES-action counter in `usage`, then to zero.
+const totalMessages = computed(() => {
+  const s = stats.value
+  if (!s) return 0
+  return s.total_messages ?? s.usage?.MESSAGES?.used ?? 0
 })
 
 const getSubscriptionStatusLabel = (status: SubscriptionStatus) => {

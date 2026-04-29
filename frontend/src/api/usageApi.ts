@@ -15,7 +15,13 @@ export interface UsageStats {
   subscription: {
     level: string
     active: boolean
-    status: SubscriptionStatus
+    /**
+     * Optional — older backend deployments may not return this field yet. The
+     * UI derives a fallback from `level` + `active` (see `UsageStatistics.vue
+     * :: subscriptionStatus` computed) so a frontend deployed ahead of the
+     * backend does not show a blank status.
+     */
+    status?: SubscriptionStatus
     plan_name: string
     expires_at: number | null
     stripe_customer_id: string | null
@@ -72,8 +78,14 @@ export interface UsageStats {
    * limit (50/50) surfaced in LimitReachedModal.
    */
   total_requests: number
-  /** Chat messages consumed (BACTION = 'MESSAGES'); same counter gated by the rate limit. */
-  total_messages: number
+  /**
+   * Chat messages consumed (BACTION = 'MESSAGES'); same counter gated by the rate limit.
+   *
+   * Optional — older backend deployments may not return this field yet. The UI
+   * falls back to `usage.MESSAGES.used` so a frontend rolled out ahead of the
+   * backend still renders the right number.
+   */
+  total_messages?: number
   cost_budget: {
     used: number
     budget: number

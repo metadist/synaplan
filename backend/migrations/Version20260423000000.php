@@ -31,7 +31,7 @@ use Doctrine\Migrations\AbstractMigration;
  * necessary but not sufficient — the real root cause was `doctrine.yaml`
  * declaring `server_version: '11.8'`, which DBAL's MariaDB-detection regex
  * does not match, so introspection ran through the MySQL platform instead of
- * the MariaDB platform. Setting `server_version: 'mariadb-11.8.2'` plus the
+ * the MariaDB platform. Setting `server_version: 'mariadb-12.2.2'` plus the
  * follow-up reconciliation `Version20260429000000` (stale `DC2Type` column
  * comments) closed the gap, and CI now runs `doctrine:schema:validate`
  * without `--skip-sync`. See #824 for the full post-mortem.
