@@ -1,12 +1,21 @@
 import { httpClient } from '@/services/api/httpClient'
 import { useConfigStore } from '@/stores/config'
 
+export type SubscriptionStatus =
+  | 'active'
+  | 'free'
+  | 'past_due'
+  | 'cancelled'
+  | 'anonymous'
+  | 'inactive'
+
 export interface UsageStats {
   user_level: string
   phone_verified: boolean
   subscription: {
     level: string
     active: boolean
+    status: SubscriptionStatus
     plan_name: string
     expires_at: number | null
     stripe_customer_id: string | null
@@ -56,7 +65,15 @@ export interface UsageStats {
     latency: number
     status: string
   }>
+  /**
+   * Sum across all six tracked action types (MESSAGES + IMAGES + VIDEOS + AUDIOS
+   * + FILE_ANALYSIS + EMBEDDINGS). Do NOT use for the headline "chat messages
+   * used" number — use `total_messages` instead so it matches the free-tier
+   * limit (50/50) surfaced in LimitReachedModal.
+   */
   total_requests: number
+  /** Chat messages consumed (BACTION = 'MESSAGES'); same counter gated by the rate limit. */
+  total_messages: number
   cost_budget: {
     used: number
     budget: number

@@ -116,7 +116,12 @@ final readonly class UsageStatsService
                 'by_time' => $timeBreakdown,
             ],
             'recent_usage' => $recentUsage,
+            // Sum across all six tracked action types (MESSAGES + IMAGES + VIDEOS +
+            // AUDIOS + FILE_ANALYSIS + EMBEDDINGS). Kept for back-compat; the UI should
+            // prefer `total_messages` for the headline "chat messages used" number, as
+            // that is what the free-tier limit (50/50) actually gates.
             'total_requests' => array_sum(array_column($usage, 'used')),
+            'total_messages' => $usage['MESSAGES']['used'] ?? 0,
             'cost_budget' => [
                 'used' => (float) $costBudget['used_cost'],
                 'budget' => (float) $costBudget['budget'],
@@ -273,19 +278,75 @@ final readonly class UsageStatsService
 
     /**
      * Get subscription info.
+     *
+     * The returned `status` field describes the user's plan state in a single,
+     * user-facing-ready enum so the frontend does not need to derive it from
+     * the `active` boolean + plan name and mislabel free users as "Inactive".
+     *
+     * Values:
+     *   - 'free'       — free/NEW plan, no paid subscription (NOT a failure state)
+     *   - 'anonymous'  — unverified/guest
+     *   - 'active'     — paid subscription, currently within billing period
+     *   - 'past_due'   — paid subscription exists but `subscription_end` elapsed
+     *                    or Stripe status is 'past_due'
+     *   - 'cancelled'  — paid subscription explicitly cancelled
+     *   - 'inactive'   — catch-all for any other unknown-but-non-active state
+     *
+     * The legacy `active` boolean is preserved for back-compat but its semantics
+     * ("has an active PAID subscription") stay unchanged — it is NOT equivalent
+     * to "the account is usable".
      */
     private function getSubscriptionInfo(User $user): array
     {
         $subscriptionData = $user->getSubscriptionData();
-        $effectiveLevel = $user->getRateLimitLevel(); // Use effective level, not raw userLevel
+        $effectiveLevel = $user->getRateLimitLevel();
 
         return [
             'level' => $effectiveLevel,
             'active' => $user->hasActiveSubscription(),
+            'status' => $this->deriveSubscriptionStatus($user, $subscriptionData),
             'plan_name' => $this->getPlanName($effectiveLevel),
             'expires_at' => $subscriptionData['subscription_end'] ?? null,
             'stripe_customer_id' => $user->getStripeCustomerId(),
         ];
+    }
+
+    /**
+     * @param array<string, mixed> $subscriptionData raw `paymentDetails.subscription` JSON
+     */
+    private function deriveSubscriptionStatus(User $user, array $subscriptionData): string
+    {
+        $level = $user->getRateLimitLevel();
+
+        if ('ANONYMOUS' === $level) {
+            return 'anonymous';
+        }
+
+        if ($user->hasActiveSubscription()) {
+            return 'active';
+        }
+
+        $stripeStatus = isset($subscriptionData['status']) && is_string($subscriptionData['status'])
+            ? strtolower($subscriptionData['status'])
+            : '';
+
+        if ('past_due' === $stripeStatus || 'unpaid' === $stripeStatus) {
+            return 'past_due';
+        }
+
+        if ('canceled' === $stripeStatus || 'cancelled' === $stripeStatus) {
+            return 'cancelled';
+        }
+
+        // If the user has an expired paid subscription (had a subscription_end at some
+        // point), surface that as "past_due" so the UI can nudge them to renew.
+        $expiresAt = $subscriptionData['subscription_end'] ?? null;
+        if (is_int($expiresAt) && $expiresAt > 0 && $expiresAt <= time()) {
+            return 'past_due';
+        }
+
+        // NEW plan with no Stripe record — free, not "inactive".
+        return 'NEW' === $level ? 'free' : 'inactive';
     }
 
     /**

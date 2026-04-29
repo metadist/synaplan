@@ -174,18 +174,23 @@
             </p>
           </div>
           <div>
-            <p class="text-xs txt-secondary mb-1">{{ $t('config.usage.subscriptionActive') }}</p>
-            <p
-              class="text-sm font-medium"
-              :class="stats.subscription.active ? 'text-green-600' : 'text-gray-600'"
-            >
-              {{ stats.subscription.active ? $t('common.active') : $t('common.inactive') }}
+            <p class="text-xs txt-secondary mb-1">
+              {{ $t('config.usage.subscriptionStatusLabel') }}
+            </p>
+            <p class="text-sm font-medium" :class="getSubscriptionStatusClass(subscriptionStatus)">
+              {{ getSubscriptionStatusLabel(subscriptionStatus) }}
             </p>
           </div>
           <div>
-            <p class="text-xs txt-secondary mb-1">{{ $t('config.usage.totalRequests') }}</p>
+            <p class="text-xs txt-secondary mb-1" :title="$t('config.usage.totalMessagesTooltip')">
+              {{ $t('config.usage.totalMessages') }}
+            </p>
             <p class="text-sm font-medium txt-primary">
-              {{ stats.total_requests.toLocaleString() }}
+              {{ stats.total_messages.toLocaleString() }}
+              <span class="txt-secondary font-normal">
+                ({{ $t('config.usage.totalRequestsShort') }}:
+                {{ stats.total_requests.toLocaleString() }})
+              </span>
             </p>
           </div>
         </div>
@@ -234,9 +239,12 @@
 
         <!-- Breakdown by Time -->
         <div class="surface-card p-6" data-testid="section-breakdown-time">
-          <h3 class="text-lg font-semibold txt-primary mb-4">
+          <h3 class="text-lg font-semibold txt-primary mb-1">
             {{ $t('config.usage.byTime') }}
           </h3>
+          <p class="text-xs txt-secondary mb-4">
+            {{ $t('config.usage.byTimeDescription') }}
+          </p>
 
           <div class="space-y-3">
             <div
@@ -493,6 +501,7 @@ import {
   getActivityLog,
   type UsageStats,
   type ActivityEntry,
+  type SubscriptionStatus,
 } from '@/api/usageApi'
 import { useNotification } from '@/composables/useNotification'
 import { useI18n } from 'vue-i18n'
@@ -619,6 +628,38 @@ const getSubscriptionBadgeClass = (level: string) => {
       return 'bg-orange-500/10 text-orange-600 dark:text-orange-400'
     default:
       return 'bg-gray-500/10 text-gray-600 dark:text-gray-400'
+  }
+}
+
+// Fallback derivation: old API responses may not include the `status` field yet.
+const subscriptionStatus = computed<SubscriptionStatus>(() => {
+  const sub = stats.value?.subscription
+  if (!sub) return 'inactive'
+  if (sub.status) return sub.status
+  if (sub.active) return 'active'
+  if (sub.level === 'ANONYMOUS') return 'anonymous'
+  if (sub.level === 'NEW') return 'free'
+  return 'inactive'
+})
+
+const getSubscriptionStatusLabel = (status: SubscriptionStatus) => {
+  return t(`config.usage.subscriptionStatus.${status}`)
+}
+
+const getSubscriptionStatusClass = (status: SubscriptionStatus) => {
+  switch (status) {
+    case 'active':
+      return 'text-green-600'
+    case 'free':
+      return 'txt-primary'
+    case 'past_due':
+      return 'text-orange-600'
+    case 'cancelled':
+      return 'text-red-600'
+    case 'anonymous':
+      return 'text-orange-600'
+    default:
+      return 'text-gray-600'
   }
 }
 

@@ -104,7 +104,11 @@ class MessageController extends AbstractController
                 'remaining' => $rateLimitCheck['remaining'],
                 'reset_at' => $rateLimitCheck['reset_at'] ?? null,
                 'user_level' => $user->getUserLevel(),
-                'phone_verified' => $user->isEmailVerified(), // Using email verification as proxy
+                // LimitReachedModal offers a "Verify phone" secondary action for
+                // ANONYMOUS users, so this flag MUST reflect actual phone
+                // verification — not email verification (see #839).
+                'phone_verified' => $user->hasVerifiedPhone(),
+                'email_verified' => $user->isEmailVerified(),
             ], Response::HTTP_TOO_MANY_REQUESTS);
         }
 
