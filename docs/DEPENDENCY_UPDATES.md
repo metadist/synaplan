@@ -15,9 +15,10 @@ For each open Renovate PR, work through these steps **in order**. Stop at the fi
 5. **Majors — peers OK against each other?** → if not, coordinate (§4)
 6. **Conflict analysis:** shared files? lockfile? overlapping hunks? → decide parallel vs. sequential (§3)
 7. **CI green?** → if not, don't merge
-8. **Security fix?** → prioritize (§5)
-9. **What does it affect?** → CI-infra / test-infra → merge directly. Build / runtime → test locally (§6)
-10. **Merge order:** security first, then independent, then sequential hotspots, blocked last (§5)
+8. **Security fix?** → prioritize (§6)
+9. **What does it affect?** → CI-infra / test-infra → merge directly. Build / runtime → test locally (§7)
+10. **Major?** → check manual steps beyond Renovate (§5)
+11. **Merge order:** security first, then independent, then sequential hotspots, blocked last (§6)
 
 ---
 
@@ -92,7 +93,22 @@ For each major PR:
 - **Node.js:** Only **LTS** lines (even numbers). Odd-numbered releases → close. Current: **Node 22 LTS**.
 - **PHP:** Check tool majors against `composer.json` minimum PHP version (currently `>=8.3`).
 
-## 5. Merge Order
+## 5. Major Upgrades: Manual Steps Beyond Renovate
+
+Renovate only bumps version numbers — it does not fix code, configuration, CI pipelines, or Docker images. For every major upgrade, check and fix these manually:
+
+- **Deprecated/removed APIs:** Search for symbols the new version removes (read the UPGRADE guide). Create a backward-compatible compatibility PR first if possible.
+- **Removed config keys:** Framework config files may reference options that no longer exist in the new major.
+- **CI runtime version:** Workflows may pin a PHP/Node version that the new major no longer supports.
+- **Dockerfile base image:** If the upgrade requires a newer runtime, the base image must be rebuilt, retagged, and the Dockerfile updated (tag + digest).
+- **Framework meta-constraints:** Some tools use extra config fields to restrict versions globally (e.g. Symfony Flex's `extra.symfony.require`). Renovate does not update these.
+- **Lockfile consistency:** After rebasing across other merges, the lockfile can become inconsistent. Regenerate with `composer update --with-all-dependencies` or `npm install` in the correct runtime version.
+- **Security advisories:** Composer/npm may block packages with known CVEs. Check audit config if dependency resolution fails unexpectedly.
+- **Polyfill replace section:** When bumping the minimum PHP/Node version, add the corresponding polyfill to the `replace` section.
+
+**Strategy:** Create a backward-compatible compatibility PR first (code changes that work on both old and new version), then push infrastructure fixes (CI, Dockerfile, config) directly into the Renovate PR branch.
+
+## 6. Merge Order
 
 Goal: minimize rebase cycles.
 
@@ -103,7 +119,7 @@ Goal: minimize rebase cycles.
 
 **Always rebase** when updating a branch, not merge — keeps history linear, especially for single-commit Renovate PRs.
 
-## 6. Local Testing vs. Direct Merge
+## 7. Local Testing vs. Direct Merge
 
 Decide based on **what the update affects**, not just whether it's a major.
 
