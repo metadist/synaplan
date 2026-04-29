@@ -78,16 +78,14 @@ when@test:
             connections:
                 default:
                     dbname_suffix: '_test%env(default::TEST_TOKEN)%'
-                    # Required by dama/doctrine-test-bundle (registered as a PHPUnit
-                    # extension in phpunit.xml.dist). The bundle wraps every test in a
-                    # nested transaction so changes are rolled back automatically; that
-                    # nesting needs SAVEPOINTs on MariaDB/MySQL. Without this flag,
-                    # every KernelTestCase-based test fails at boot with
-                    # "This bundle relies on savepoints for nested database transactions".
-                    use_savepoints: true
                 read:
                     dbname_suffix: '_test%env(default::TEST_TOKEN)%'
-                    use_savepoints: true
+        # NOTE: Nested-transaction savepoints (required by dama/doctrine-test-bundle
+        # to roll back per-test changes) are wired up by
+        # App\DependencyInjection\Compiler\EnableTestSavepointsPass — registered in
+        # App\Kernel for `test` env. The doctrine-bundle YAML key `use_savepoints`
+        # is only available with DBAL 4.x and would fail config validation on the
+        # DBAL 3.x line we currently ship against.
 
 when@prod:
     doctrine:
