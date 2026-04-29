@@ -23,7 +23,7 @@ jobs:
       - name: Setup PHP
         uses: shivammathur/setup-php@accd6127cb78bee3e8082180cb391013d204ef9f # v2
         with:
-          php-version: "8.3"
+          php-version: "8.4"
           extensions: mbstring, xml, ctype, iconv, intl
           coverage: none
 
@@ -73,7 +73,7 @@ jobs:
       - name: Setup PHP
         uses: shivammathur/setup-php@accd6127cb78bee3e8082180cb391013d204ef9f # v2
         with:
-          php-version: "8.3"
+          php-version: "8.4"
           extensions: mbstring, xml, ctype, iconv, intl, pdo, pdo_mysql, zip, gd, curl, bcmath, exif, pcntl, opcache, readline, soap, sodium, ffi, imagick, grpc
           coverage: none
 
