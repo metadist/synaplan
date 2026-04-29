@@ -63,7 +63,9 @@ class UseLog
     #[ORM\Column(name: 'BPRICE_SNAPSHOT', type: 'json', nullable: true)]
     private ?array $priceSnapshot = null;
 
-    #[ORM\Column(name: 'BCOST', type: 'decimal', precision: 10, scale: 6, options: ['default' => 0])]
+    // default literal matches MariaDB's information_schema COLUMN_DEFAULT format
+    // for decimal(10,6), so doctrine:schema:validate does not flag a diff.
+    #[ORM\Column(name: 'BCOST', type: 'decimal', precision: 10, scale: 6, options: ['default' => '0.000000'])]
     private string $cost = '0.000000';
 
     #[ORM\Column(name: 'BLATENCY', type: 'integer', options: ['default' => 0])]
@@ -72,7 +74,10 @@ class UseLog
     #[ORM\Column(name: 'BSTATUS', length: 16, options: ['default' => 'success'])]
     private string $status = 'success';
 
-    #[ORM\Column(name: 'BERROR', type: 'text', options: ['default' => ''])]
+    // no DB-level default: MariaDB 11.x InnoDB silently normalizes `LONGTEXT DEFAULT ''`
+    // and `doctrine:schema:validate` cannot compare the two representations; all writers
+    // pass an explicit value (see RateLimitService::recordUsage).
+    #[ORM\Column(name: 'BERROR', type: 'text')]
     private string $error = '';
 
     #[ORM\Column(name: 'BMETADATA', type: 'json')]

@@ -32,8 +32,8 @@ services:
       APP_URL: http://localhost:8001
       FRONTEND_URL: http://localhost:8001
       PLUGINS_DIR: /plugins
-      DATABASE_WRITE_URL: mysql://synaplan_test:synaplan_test@db_test:3306/synaplan?serverVersion=11.8&charset=utf8mb4
-      DATABASE_READ_URL: mysql://synaplan_test:synaplan_test@db_test:3306/synaplan?serverVersion=11.8&charset=utf8mb4
+      DATABASE_WRITE_URL: mysql://synaplan_test:synaplan_test@db_test:3306/synaplan?serverVersion=mariadb-11.8.2&charset=utf8mb4
+      DATABASE_READ_URL: mysql://synaplan_test:synaplan_test@db_test:3306/synaplan?serverVersion=mariadb-11.8.2&charset=utf8mb4
       OLLAMA_BASE_URL: http://ollama-stub:11434
       TIKA_BASE_URL: http://tika_test:9998
       AI_DEFAULT_PROVIDER: test

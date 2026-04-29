@@ -24,13 +24,17 @@ use Doctrine\Migrations\AbstractMigration;
  * migration is safe to run on legacy databases that may have NULL rows. The
  * backfill values match the entity-level defaults exactly.
  *
- * Note: even after this migration runs, CI cannot drop the `--skip-sync` flag
- * on `doctrine:schema:validate` because doctrine/dbal 3.10.5 has a known
- * MariaDB 11.x schema-comparator bug that produces phantom diffs on string
- * defaults (the comparator does not strip MariaDB's surrounding quotes from
- * `information_schema.COLUMNS.COLUMN_DEFAULT`). The full validate flag will
- * become usable once DBAL is upgraded to 4.x — see issue #824 and the
- * "Known Limitation" section in docs/MIGRATIONS.md.
+ * Historical note: when this migration first landed, CI still ran
+ * `doctrine:schema:validate --skip-sync` because the "phantom diff" problem on
+ * string defaults was assumed to be a DBAL 3.x comparator bug that required a
+ * DBAL 4.x upgrade to fix. The DBAL 4.x upgrade (#781) turned out to be
+ * necessary but not sufficient — the real root cause was `doctrine.yaml`
+ * declaring `server_version: '11.8'`, which DBAL's MariaDB-detection regex
+ * does not match, so introspection ran through the MySQL platform instead of
+ * the MariaDB platform. Setting `server_version: 'mariadb-11.8.2'` plus the
+ * follow-up reconciliation `Version20260429000000` (stale `DC2Type` column
+ * comments) closed the gap, and CI now runs `doctrine:schema:validate`
+ * without `--skip-sync`. See #824 for the full post-mortem.
  *
  * Trade-off: this migration is intentionally large (touches ~20 tables) but
  * only changes column metadata — no data is rewritten beyond NULL backfills.

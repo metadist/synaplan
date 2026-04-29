@@ -289,8 +289,8 @@ output_var "MYSQL_USER" "synaplan_user"
 output_var "MYSQL_PASSWORD" "synaplan_password"
 output_var "MYSQL_ROOT_PASSWORD" "root_password"
 echo ""
-output_var "DATABASE_WRITE_URL" "mysql://synaplan_user:synaplan_password@db:3306/synaplan?serverVersion=11.8&charset=utf8mb4"
-output_var "DATABASE_READ_URL" "mysql://synaplan_user:synaplan_password@db:3306/synaplan?serverVersion=11.8&charset=utf8mb4"
+output_var "DATABASE_WRITE_URL" "mysql://synaplan_user:synaplan_password@db:3306/synaplan?serverVersion=mariadb-11.8.2&charset=utf8mb4"
+output_var "DATABASE_READ_URL" "mysql://synaplan_user:synaplan_password@db:3306/synaplan?serverVersion=mariadb-11.8.2&charset=utf8mb4"
 
 
 # Output any remaining unknown/custom variables

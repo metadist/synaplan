@@ -7,7 +7,14 @@ doctrine:
             default:
                 url: '%env(resolve:DATABASE_WRITE_URL)%'
                 driver: 'pdo_mysql'
-                server_version: '11.8'
+                # IMPORTANT: the "mariadb-" prefix is what makes DBAL pick MariaDBPlatform
+                # (AbstractMySQLDriver::getDatabasePlatform uses stripos($version, 'mariadb')).
+                # Without the prefix, DBAL falls through to MySQL84Platform, whose MySQL
+                # schema introspection path does NOT strip the surrounding quotes that
+                # MariaDB >= 10.2.7 wraps around string defaults in information_schema.
+                # That single missing detection was the real cause of the phantom diffs
+                # that previously forced `doctrine:schema:validate --skip-sync` (see #824).
+                server_version: 'mariadb-11.8.2'
                 charset: utf8mb4
                 profiling_collect_backtrace: '%kernel.debug%'
                 use_savepoints: true
@@ -17,7 +24,7 @@ doctrine:
             read:
                 url: '%env(resolve:DATABASE_READ_URL)%'
                 driver: 'pdo_mysql'
-                server_version: '11.8'
+                server_version: 'mariadb-11.8.2'
                 charset: utf8mb4
                 profiling_collect_backtrace: '%kernel.debug%'
                 use_savepoints: true

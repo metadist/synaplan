@@ -135,37 +135,51 @@ docker compose up -d         # entrypoint runs migrations + fixtures + seed
 5. **Dev/test only:** load `UserFixtures` if `BUSER` is empty (this purges entity tables first).
 6. **Always:** run `app:seed` to (re-)populate models/prompts/config catalogs.
 
-## Known Limitation: DBAL 3.x Schema Comparator
+## Schema Validation in CI
 
-`doctrine:schema:validate` (without `--skip-sync`) reports the database as "not in
-sync" with the entity mapping even when the DB is **objectively correct** (verified
-via `SHOW CREATE TABLE`). The drift list looks roughly like this:
+CI runs `php bin/console doctrine:schema:validate` (without `--skip-sync`) on a
+freshly migrated database. It fails any PR that changes an entity without also
+shipping a matching Doctrine migration — no more silent drift, no more "closed by
+code review".
 
-```
-ALTER TABLE BMESSAGES CHANGE BMESSTYPE BMESSTYPE VARCHAR(4) DEFAULT 'WA' NOT NULL …
-```
+### What finally unblocked full validation
 
-Applying that ALTER changes nothing — `SHOW CREATE TABLE` already shows
-`varchar(4) NOT NULL DEFAULT 'WA'` — but the comparator keeps proposing it on
-every run. This is a known [doctrine/dbal 3.x bug](https://github.com/doctrine/dbal)
-caused by MariaDB 11.x returning string defaults with surrounding quotes in
-`information_schema.COLUMNS.COLUMN_DEFAULT` (`'WA'` instead of `WA`), which the 3.x
-schema comparator does not normalize.
+Three independent fixes had to land before the `--skip-sync` gate could be
+removed:
 
-We are pinned to DBAL 3.x because `nesbot/carbon → carbonphp/carbon-doctrine-types 2.x` conflicts with DBAL 4.x. A targeted upgrade would cascade into Stripe v20+,
-PHPUnit 12.5.23+ and ~25 Symfony 7.4.x bumps — out of scope for a schema-cleanup
-PR.
+1. **doctrine/dbal 4.x upgrade** (#781). DBAL 4's schema comparator is the
+   baseline for how column metadata is compared; DBAL 3 still works, but the
+   new migrations-diff workflow assumes 4.x semantics.
+2. **`server_version: 'mariadb-11.8.2'`** in `backend/config/packages/doctrine.yaml`
+   (and the `serverVersion=mariadb-…` query string on every `DATABASE_*_URL`).
+   DBAL detects MariaDB by a simple `stripos($version, 'mariadb') !== false`
+   check (`AbstractMySQLDriver::getDatabasePlatform`). The previous value
+   `'11.8'` did not contain the literal string `mariadb`, so DBAL routed all
+   introspection through `MySQL84Platform`, whose string-default parsing does
+   not strip the surrounding quotes that MariaDB >= 10.2.7 wraps around
+   `information_schema.COLUMNS.COLUMN_DEFAULT`. That single config mismatch
+   was the real cause of the "phantom diffs" that previously forced
+   `--skip-sync` — not a DBAL bug.
+3. **`Version20260423000000` + `Version20260429000000`** reconcile legacy
+   drift in the live schema: column defaults / NOT NULL / JSON nullability
+   (20260423), and the stale `DC2Type` column comments that DBAL 3 used to
+   emit and DBAL 4 no longer expects (20260429).
 
-**Practical consequence:** CI runs `doctrine:schema:validate --skip-sync`. This
-catches broken ORM mappings (wrong `targetEntity`, mismatched `mappedBy`/`inversedBy`,
-missing join columns) but cannot detect entity↔DB drift introduced by a future PR
-that forgets to ship a migration. Until DBAL is upgraded, that gap is closed by
-**code review** — every entity change MUST land with a matching migration.
+### Gotchas when generating new migrations
 
-`Version20260423000000` brings the live schema to the canonical entity-defined
-state at the SQL layer (defaults, NOT NULL, JSON nullability, comments) so that
-once DBAL is upgraded the validate step can be flipped to full mode without
-generating a wall of phantom ALTERs.
+- The `serverVersion=mariadb-…` prefix matters for **every** tool that reads
+  the DSN — containers, CI workflow env, local `.env` files. If you add a new
+  compose service, set `serverVersion=mariadb-11.8.2` (not bare `11.8`).
+- For `decimal` columns with a zero default, write the default as a string
+  that matches MariaDB's `information_schema` representation, e.g.
+  `options: ['default' => '0.000000']` for `decimal(10,6)`. Writing
+  `'default' => 0` will round-trip to `'0.000000'` in the DB and the
+  comparator will flag a diff. See `Entity/UseLog::$cost` and
+  `Entity/Subscription::$costBudgetMonthly` for the pattern.
+- `LONGTEXT` cannot meaningfully carry a DB-level default in MariaDB's InnoDB
+  without the comparator disagreeing about it. Prefer entity-level
+  initialisation (`private string $field = ''`) and omit the `options.default`
+  in the attribute.
 
 ## Production Notes
 
