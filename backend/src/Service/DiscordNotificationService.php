@@ -107,12 +107,11 @@ final readonly class DiscordNotificationService
             ],
             [
                 'name' => '📤 Response',
-                'value' => $this->truncate($responseText, self::MAX_RESPONSE),
+                'value' => $this->truncate(AiResponseSanitizer::stripForDisplay($responseText), self::MAX_RESPONSE),
                 'inline' => false,
             ],
         ];
 
-        // Add metadata fields
         if (!empty($metadata['provider'])) {
             $fields[] = [
                 'name' => '🤖 Provider',
@@ -202,12 +201,11 @@ final readonly class DiscordNotificationService
             ],
             [
                 'name' => '⚠️ Error',
-                'value' => "```\n{$this->truncate($error, self::MAX_ERROR)}\n```",
+                'value' => "```\n{$this->truncate(AiResponseSanitizer::stripForDisplay($error), self::MAX_ERROR)}\n```",
                 'inline' => false,
             ],
         ];
 
-        // Add metadata fields
         if (!empty($metadata['message_type'])) {
             $fields[] = [
                 'name' => '📁 Message Type',
@@ -468,7 +466,7 @@ final readonly class DiscordNotificationService
             ],
             [
                 'name' => '📤 AI Response',
-                'value' => $this->truncate($responseText, self::MAX_RESPONSE),
+                'value' => $this->truncate(AiResponseSanitizer::stripForDisplay($responseText), self::MAX_RESPONSE),
                 'inline' => false,
             ],
         ];
@@ -564,7 +562,7 @@ final readonly class DiscordNotificationService
             ],
             [
                 'name' => '⚠️ Error',
-                'value' => "```\n{$this->truncate($error, self::MAX_ERROR)}\n```",
+                'value' => "```\n{$this->truncate(AiResponseSanitizer::stripForDisplay($error), self::MAX_ERROR)}\n```",
                 'inline' => false,
             ],
         ];
@@ -608,7 +606,7 @@ final readonly class DiscordNotificationService
             ],
             [
                 'name' => '❌ Error',
-                'value' => '```'.$this->truncate($error, self::MAX_ERROR).'```',
+                'value' => '```'.$this->truncate(AiResponseSanitizer::stripForDisplay($error), self::MAX_ERROR).'```',
                 'inline' => false,
             ],
         ];

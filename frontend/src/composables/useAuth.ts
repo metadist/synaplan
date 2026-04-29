@@ -8,6 +8,7 @@ export function useAuth() {
   return {
     // State
     user: computed(() => authStore.user),
+    impersonator: computed(() => authStore.impersonator),
     loading: computed(() => authStore.loading),
     error: computed(() => authStore.error),
     isAuthenticated: computed(() => authStore.isAuthenticated),
@@ -15,6 +16,7 @@ export function useAuth() {
     isPro: computed(() => authStore.isPro),
     isTeam: computed(() => authStore.isTeam),
     isAdmin: computed(() => authStore.isAdmin),
+    isImpersonating: computed(() => authStore.isImpersonating),
 
     // Actions
     login: authStore.login,
@@ -22,6 +24,8 @@ export function useAuth() {
     logout: authStore.logout,
     refreshUser: authStore.refreshUser,
     checkAuth: authStore.checkAuth,
+    startImpersonation: authStore.startImpersonation,
+    stopImpersonation: authStore.stopImpersonation,
     clearError: authStore.clearError,
   }
 }

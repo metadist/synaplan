@@ -152,6 +152,25 @@
       "levelUpdated": "Nivel de usuario actualizado a {level}",
       "levelUpdateFailed": "Error al actualizar nivel de usuario"
     },
+    "impersonate": {
+      "button": "Ver como usuario",
+      "buttonTitle": "Suplantar a este usuario",
+      "confirmTitle": "¿Suplantar a {email}?",
+      "confirmMessage": "Iniciarás sesión como {email}. Toda acción y cambio se atribuirá a esta cuenta. Usa el banner superior para finalizar.",
+      "confirmAction": "Iniciar sesión",
+      "started": "Ahora ves la aplicación como {email}.",
+      "startFailed": "No se pudo iniciar la suplantación",
+      "cannotImpersonateAdmin": "No puedes suplantar a otros administradores.",
+      "cannotImpersonateSelf": "No puedes suplantarte a ti mismo.",
+      "banner": {
+        "viewing": "Viendo como {email}",
+        "adminLabel": "Sesión de admin: {email}",
+        "exitButton": "Salir",
+        "exitButtonTitle": "Restaurar tu sesión de administrador"
+      },
+      "stopped": "Sesión de administrador restaurada.",
+      "stopFailed": "No se pudo finalizar la suplantación"
+    },
     "prompts": {
       "shortDesc": "Descripción Corta",
       "prompt": "Prompt",
@@ -886,14 +905,28 @@
     "description": "Encontramos un error inesperado. No te preocupes, nuestro equipo ha sido notificado y está trabajando en ello.",
     "details": "Detalles del Error",
     "statusCode": "Código de Estado",
+    "source": "Fuente",
+    "reason": "Motivo",
     "showStack": "Mostrar traza de pila",
     "hideStack": "Ocultar traza de pila",
     "reload": "Recargar Página",
+    "retry": "Reintentar",
     "goHome": "Ir al Inicio",
     "needHelp": "¿Necesitas Ayuda?",
     "contactSupport": "Si este problema persiste, por favor contacta a nuestro equipo de soporte con los detalles del error a continuación.",
     "copyError": "Copiar Info del Error",
-    "copied": "¡Copiado!"
+    "copied": "¡Copiado!",
+    "adminOnly": "Solo admin",
+    "reasons": {
+      "redirectLoop": {
+        "title": "Bucle de Redirección Detectado",
+        "description": "No pudimos llevarte allí porque se solicitó la misma página varias veces seguidas. Inténtalo de nuevo o borra las cookies de este sitio."
+      },
+      "authTimeout": {
+        "title": "El Inicio de Sesión Está Tardando Demasiado",
+        "description": "La verificación de tu sesión con el servidor agotó el tiempo de espera. Comprueba tu conexión a internet e inténtalo de nuevo."
+      }
+    }
   },
   "loading": {
     "default": "Cargando...",

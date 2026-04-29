@@ -7,8 +7,10 @@ import {
 import { useAuth } from '@/composables/useAuth'
 import { useConfigStore } from '@/stores/config'
 import { authReady } from '@/stores/auth'
+import { useGlobalErrorStore } from '@/stores/globalError'
 import { useGuestStore, GUEST_STORAGE_KEY } from '@/stores/guest'
 import { i18n } from '@/i18n'
+import { getErrorMessage } from '@/utils/errorMessage'
 import LoadingView from '@/views/LoadingView.vue'
 
 const guardSubscription = (
@@ -115,13 +117,10 @@ const router = createRouter({
       meta: { requiresAuth: false, public: true },
     },
 
-    // Error pages (always accessible)
-    {
-      path: '/error',
-      name: 'error',
-      component: () => import('@/views/ErrorView.vue'),
-      meta: { requiresAuth: false, titleKey: 'pageTitles.error' },
-    },
+    // NOTE: There is intentionally no '/error' route.
+    // Errors are surfaced inline by ErrorBoundary via the globalError Pinia
+    // store, which keeps the URL stable and lets us recover without a full
+    // navigation (see components/ErrorBoundary.vue + stores/globalError.ts).
     {
       path: '/loading',
       name: 'loading',
@@ -394,12 +393,6 @@ function mapPathToFeatureKey(path: string): string {
 // Global navigation guard for authentication
 // With cookie-based auth, we wait for auth check then verify session
 router.beforeEach(async (to, from, next) => {
-  // Skip guard for error page to prevent loops
-  if (to.name === 'error') {
-    next()
-    return
-  }
-
   // Wait for initial auth check with timeout to prevent hanging
   try {
     await Promise.race([
@@ -417,7 +410,13 @@ router.beforeEach(async (to, from, next) => {
     if (!detectRedirectLoop('/login')) {
       next({ name: 'login', query: { reason: 'auth_timeout' } })
     } else {
-      next({ name: 'error' })
+      useGlobalErrorStore().setError({
+        message: getErrorMessage(err) ?? 'Auth initialization failed',
+        reason: 'auth_timeout',
+        source: 'router:beforeEach',
+        stack: err instanceof Error ? (err.stack ?? '') : '',
+      })
+      next(false)
     }
     return
   }
@@ -434,7 +433,13 @@ router.beforeEach(async (to, from, next) => {
     const targetPath = `/login?redirect=${encodeURIComponent(to.fullPath)}&reason=auth_required`
     if (detectRedirectLoop(targetPath)) {
       console.error('🛑 Breaking redirect loop - staying on current page')
-      next({ name: 'error', query: { reason: 'redirect_loop' } })
+      useGlobalErrorStore().setError({
+        message: 'Redirect loop detected while resolving authentication',
+        reason: 'redirect_loop',
+        source: 'router:beforeEach',
+        statusCode: 508,
+      })
+      next(false)
       return
     }
 
@@ -476,12 +481,15 @@ router.onError((error) => {
   // Handle chunk load failures (e.g., after deployment)
   if (error.message.includes('Failed to fetch dynamically imported module')) {
     window.location.reload()
-  } else {
-    router.push({
-      name: 'error',
-      params: { error: error.message },
-    })
+    return
   }
+
+  useGlobalErrorStore().setError({
+    message: error.message,
+    reason: 'router_navigation',
+    source: 'router:onError',
+    stack: error.stack ?? '',
+  })
 })
 
 export default router

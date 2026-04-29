@@ -1,5 +1,14 @@
 <template>
   <div class="min-h-screen bg-app txt-primary text-[16px] leading-6" :data-build="buildInfo">
+    <!--
+      Impersonation indicator sits ABOVE the ErrorBoundary on purpose: the
+      admin must always be able to exit impersonation, even if the
+      underlying route throws and the boundary swaps in ErrorView. The
+      indicator itself is layout-neutral (a fixed inset ring + a fixed
+      floating pill), so it does not push the navbar or any other content
+      down — the page stays scroll-free.
+    -->
+    <ImpersonationBanner />
     <ErrorBoundary>
       <Suspense>
         <template #default>
@@ -27,6 +36,7 @@ import { APP_NAME } from '@/router'
 import NotificationContainer from '@/components/NotificationContainer.vue'
 import Dialog from '@/components/Dialog.vue'
 import ErrorBoundary from '@/components/ErrorBoundary.vue'
+import ImpersonationBanner from '@/components/ImpersonationBanner.vue'
 import LoadingView from '@/views/LoadingView.vue'
 import CookieConsent from '@/components/CookieConsent.vue'
 import { useGoogleTag } from '@/composables/useGoogleTag'
@@ -35,7 +45,13 @@ import type { CookieConsent as CookieConsentType } from '@/composables/useCookie
 useTheme()
 
 if ('serviceWorker' in navigator) {
-  navigator.serviceWorker.register('/sw.js')
+  // The new global unhandledrejection handler (installGlobalErrorHandlers)
+  // would otherwise turn a missing /sw.js or a registration failure into a
+  // full-screen ErrorView for end users. SW failures are non-fatal — log
+  // and continue.
+  navigator.serviceWorker.register('/sw.js').catch((err: unknown) => {
+    console.error('Service worker registration failed:', err)
+  })
 }
 
 const { injectGoogleTag, trackPageView } = useGoogleTag()
@@ -67,9 +83,15 @@ legacyKeys.forEach((key) => {
   }
 })
 
-// Initialize auth state on app start (validates cookies via /me endpoint)
+// Initialize auth state on app start (validates cookies via /me endpoint).
+// We deliberately do not await — render must not block on the /me round-trip.
+// A .catch() guard turns the otherwise-silent rejection into a console error;
+// the global unhandledrejection listener (installGlobalErrorHandlers) would
+// also pick it up, but the explicit catch keeps the message context-rich.
 const authStore = useAuthStore()
-authStore.checkAuth()
+authStore.checkAuth().catch((err: unknown) => {
+  console.error('Initial auth check failed:', err)
+})
 
 // Update page title when language changes
 const route = useRoute()
