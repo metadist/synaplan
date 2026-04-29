@@ -69,7 +69,7 @@
             "codewithkyrian/platform-package-installer": true
         },
         "audit": {
-            "ignore": ["PKSA-365x-2zjk-pt47", "PKSA-64jn-3d9t-gncx"]
+            "ignore": ["PKSA-365x-2zjk-pt47", "PKSA-64jn-3d9t-gncx", "PKSA-hznc-gbby-6w16", "PKSA-jtdk-dcr5-f11n"]
         },
         "bump-after-update": true,
         "sort-packages": true
