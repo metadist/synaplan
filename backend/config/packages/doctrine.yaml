@@ -18,6 +18,16 @@ doctrine:
                 charset: utf8mb4
                 profiling_collect_backtrace: '%kernel.debug%'
                 use_savepoints: true
+                # Exclude framework-managed tables that are NOT ORM entities from schema
+                # diffing / validation. `messenger_messages` is created and maintained by
+                # Symfony Messenger's Doctrine transport and has no matching entity; in
+                # `APP_ENV=test` the messenger transports are overridden to `in-memory://`
+                # (see config/packages/messenger.yaml `when@test`), which means
+                # `doctrine:schema:validate` would otherwise see the table as orphaned
+                # and propose DROPping it. The filter is a plain regex applied to table
+                # names by DBAL's comparator — migrations still run normally because
+                # they use raw `addSql(...)`, not schema diff.
+                schema_filter: '~^(?!messenger_messages$).*$~'
                 mapping_types:
                     vector: vector
 
@@ -28,6 +38,7 @@ doctrine:
                 charset: utf8mb4
                 profiling_collect_backtrace: '%kernel.debug%'
                 use_savepoints: true
+                schema_filter: '~^(?!messenger_messages$).*$~'
                 mapping_types:
                     vector: vector
 
