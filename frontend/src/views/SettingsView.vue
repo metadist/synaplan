@@ -130,8 +130,14 @@
             </div>
           </div>
 
-          <!-- Logout -->
-          <div class="surface-card p-6" data-testid="section-logout">
+          <!--
+            Logout is intentionally hidden while impersonating: clicking it
+            would clear the admin's session entirely (cookies + stash)
+            instead of just ending the impersonation, which is almost never
+            what the operator means. The "Exit" button on the floating
+            impersonation pill is the correct action here.
+          -->
+          <div v-if="!isImpersonating" class="surface-card p-6" data-testid="section-logout">
             <button
               class="btn-primary px-6 py-2.5 rounded-lg w-full"
               data-testid="btn-logout"
@@ -148,6 +154,7 @@
 
 <script setup lang="ts">
 import { useRouter } from 'vue-router'
+import { useAuth } from '@/composables/useAuth'
 import { useAuthStore } from '@/stores/auth'
 import { useAppModeStore } from '@/stores/appMode'
 import { useTheme } from '@/composables/useTheme'
@@ -158,6 +165,7 @@ const router = useRouter()
 const authStore = useAuthStore()
 const appModeStore = useAppModeStore()
 const { theme, setTheme } = useTheme()
+const { isImpersonating } = useAuth()
 
 const handleLogout = async () => {
   await authStore.logout()

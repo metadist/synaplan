@@ -179,10 +179,15 @@ class ProfileController extends AbstractController
             return $this->json(['error' => 'Invalid JSON'], Response::HTTP_BAD_REQUEST);
         }
 
-        // Get current details
+        // We collect all mutations on a single local $details array and
+        // write it back once at the end. Going through entity setters in
+        // between (e.g. $user->setMemoriesEnabled(...) or
+        // EmailChatService::setUserEmailKeyword(...)) would cause those
+        // setters to read $user->getUserDetails() — which is still the
+        // pre-update DB state — and silently overwrite our pending
+        // firstName/lastName/etc. when we later persist $details.
         $details = $user->getUserDetails();
 
-        // Update allowed fields
         $allowedFields = [
             'firstName', 'lastName', 'phone', 'companyName', 'vatId',
             'street', 'zipCode', 'city', 'country', 'language', 'timezone', 'invoiceEmail',
@@ -195,26 +200,21 @@ class ProfileController extends AbstractController
         }
 
         if (array_key_exists('memoriesEnabled', $data)) {
-            $user->setMemoriesEnabled((bool) $data['memoriesEnabled']);
-            // Ensure details are in sync for this request
-            $details = $user->getUserDetails();
+            $details['memories_enabled'] = (bool) $data['memoriesEnabled'];
         }
 
-        // Handle email keyword separately (uses EmailChatService)
         if (isset($data['emailKeyword'])) {
             $keyword = $data['emailKeyword'];
             if (empty($keyword) || '' === trim($keyword)) {
-                // Remove keyword if empty
                 $details['email_keyword'] = null;
-                $user->setUserDetails($details);
             } else {
-                try {
-                    $this->emailChatService->setUserEmailKeyword($user, $keyword);
-                } catch (\InvalidArgumentException $e) {
+                $sanitized = preg_replace('/[^a-z0-9\-_]/', '', strtolower($keyword));
+                if (empty($sanitized)) {
                     return $this->json([
                         'error' => 'Invalid email keyword format. Only lowercase letters, numbers, hyphens, and underscores are allowed.',
                     ], Response::HTTP_BAD_REQUEST);
                 }
+                $details['email_keyword'] = $sanitized;
             }
         }
 

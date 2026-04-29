@@ -3,6 +3,7 @@
 namespace App\Entity;
 
 use App\Repository\MessageRepository;
+use App\Service\AiResponseSanitizer;
 use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\Common\Collections\Collection;
 use Doctrine\ORM\Mapping as ORM;
@@ -17,6 +18,7 @@ use Doctrine\ORM\Mapping as ORM;
 #[ORM\Index(columns: ['BLANG'], name: 'BLANG')]
 #[ORM\Index(columns: ['BTOPIC'], name: 'BTOPIC')]
 #[ORM\Index(columns: ['BCHATID'], name: 'idx_message_chat')]
+#[ORM\HasLifecycleCallbacks]
 class Message
 {
     #[ORM\Id]
@@ -509,5 +511,39 @@ class Message
         $this->removeMeta('file.share_created_at');
 
         return $this;
+    }
+
+    /**
+     * Sanitize outgoing AI text before persistence.
+     *
+     * Some local / smaller LLMs leak system-prompt instructions back into
+     * their visible response (e.g. "[Please reply in German]"). These are
+     * always internal artifacts and must never reach the user. We strip
+     * them centrally here so every outgoing message — no matter which
+     * controller created it — gets the same treatment.
+     *
+     * `<think>` reasoning blocks are intentionally NOT removed: the chat
+     * UI renders them as a separate, collapsible "Reasoning" panel and
+     * losing them would break that UX. Surfaces that show plain text
+     * instead (Discord embeds, …) call `AiResponseSanitizer::stripForDisplay()`
+     * themselves.
+     *
+     * Incoming user messages (`BDIRECT = 'IN'`) are left untouched so
+     * users can quote/discuss bracketed strings without the platform
+     * rewriting their input.
+     */
+    #[ORM\PrePersist]
+    #[ORM\PreUpdate]
+    public function sanitizeOutgoingText(): void
+    {
+        if ('OUT' !== $this->direction) {
+            return;
+        }
+
+        if ('' === $this->text) {
+            return;
+        }
+
+        $this->text = AiResponseSanitizer::stripLeakedInstructions($this->text);
     }
 }

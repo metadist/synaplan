@@ -8,8 +8,14 @@ import './style-v2.css'
 import './assets/markdown.css'
 import App from './App.vue'
 import { useConfigStore } from './stores/config'
+import { useGlobalErrorStore } from './stores/globalError'
+import { installGlobalErrorHandlers } from './utils/installGlobalErrorHandlers'
 
-// Bootstrap app - load config before mounting
+// Bootstrap app - load config before mounting.
+// We MUST install global error handlers and mount the app even when bootstrap
+// fails, otherwise the user is left staring at a blank page with no recovery
+// affordance. Errors raised here are pushed into the globalError store so the
+// already-mounted ErrorBoundary can render the inline ErrorView immediately.
 ;(async () => {
   const app = createApp(App)
 
@@ -17,8 +23,22 @@ import { useConfigStore } from './stores/config'
   app.use(router)
   app.use(i18n)
 
+  // Pinia is now installed → safe to wire global handlers that depend on stores.
+  installGlobalErrorHandlers(app)
+
   const config = useConfigStore()
-  await config.init()
+
+  try {
+    await config.init()
+  } catch (err) {
+    console.error('Bootstrap failed: config.init() threw', err)
+    useGlobalErrorStore().setError({
+      message: err instanceof Error ? err.message : 'Failed to load runtime configuration',
+      reason: 'unknown',
+      source: 'bootstrap:config.init',
+      stack: err instanceof Error ? (err.stack ?? '') : '',
+    })
+  }
 
   const recaptchaEnabled = config.recaptcha.enabled
   const recaptchaSiteKey = config.recaptcha.siteKey

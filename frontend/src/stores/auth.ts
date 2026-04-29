@@ -2,10 +2,11 @@
 // Cookie-based authentication store
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
-import { authService, type AuthUser } from '@/services/authService'
+import { authService, type AuthUser, type ImpersonatorInfo } from '@/services/authService'
 import { useConfigStore } from '@/stores/config'
 
 export type User = AuthUser
+export type { ImpersonatorInfo } from '@/services/authService'
 
 // Promise that resolves when initial auth check is complete
 let authReadyResolve: (() => void) | null = null
@@ -16,6 +17,7 @@ export const authReady = new Promise<void>((resolve) => {
 export const useAuthStore = defineStore('auth', () => {
   // State
   const user = ref<User | null>(null)
+  const impersonator = ref<ImpersonatorInfo | null>(null)
   const loading = ref(false)
   const error = ref<string | null>(null)
   const initialized = ref(false)
@@ -23,7 +25,18 @@ export const useAuthStore = defineStore('auth', () => {
   // Computed
   const isAuthenticated = computed(() => !!user.value)
   const userLevel = computed(() => user.value?.level || 'NEW')
+  /**
+   * The CURRENT principal's admin flag. While impersonating, this reflects
+   * the IMPERSONATED user (typically false), so route guards correctly stop
+   * the admin from navigating to /admin while in another user's shoes.
+   */
   const isAdmin = computed(() => user.value?.isAdmin === true || user.value?.level === 'ADMIN')
+  /**
+   * True whenever an admin is operating as another user. Drives the
+   * impersonation banner and unlocks admin-level error diagnostics in
+   * ErrorView so the real admin always sees the full failure context.
+   */
+  const isImpersonating = computed(() => impersonator.value !== null)
   const isPro = computed(() => {
     const config = useConfigStore()
     return (
@@ -39,6 +52,15 @@ export const useAuthStore = defineStore('auth', () => {
     )
   })
 
+  /**
+   * Mirror the authService's in-memory state onto the Pinia store.
+   * Centralised so we can't accidentally update one and forget the other.
+   */
+  function syncFromAuthService(): void {
+    user.value = authService.getUser().value
+    impersonator.value = authService.getImpersonator().value
+  }
+
   // Actions
   async function login(email: string, password: string, recaptchaToken?: string): Promise<boolean> {
     loading.value = true
@@ -48,7 +70,7 @@ export const useAuthStore = defineStore('auth', () => {
       const result = await authService.login(email, password, recaptchaToken)
 
       if (result.success) {
-        user.value = authService.getUser().value
+        syncFromAuthService()
         const { useGuestStore } = await import('./guest')
         useGuestStore().$reset()
         await useConfigStore().reload()
@@ -93,6 +115,7 @@ export const useAuthStore = defineStore('auth', () => {
   async function logout(): Promise<void> {
     // Clear user immediately to prevent any auth checks during logout
     user.value = null
+    impersonator.value = null
     loading.value = true
 
     try {
@@ -108,14 +131,16 @@ export const useAuthStore = defineStore('auth', () => {
     try {
       const currentUser = await authService.getCurrentUser()
       if (currentUser) {
-        user.value = currentUser
+        syncFromAuthService()
       } else {
         // Session invalid
         user.value = null
+        impersonator.value = null
       }
     } catch (err) {
       console.error('Failed to refresh user:', err)
       user.value = null
+      impersonator.value = null
     } finally {
       loading.value = false
     }
@@ -129,13 +154,14 @@ export const useAuthStore = defineStore('auth', () => {
       loading.value = true
       const currentUser = await authService.getCurrentUser()
       if (currentUser) {
-        user.value = currentUser
+        syncFromAuthService()
         // Reload config to get user-specific data like plugins
         await useConfigStore().reload()
       }
     } catch {
       // Not authenticated or network error - that's fine, just stay logged out
       user.value = null
+      impersonator.value = null
     } finally {
       loading.value = false
       initialized.value = true
@@ -158,7 +184,7 @@ export const useAuthStore = defineStore('auth', () => {
       const result = await authService.handleOAuthCallback()
 
       if (result.success) {
-        user.value = authService.getUser().value
+        syncFromAuthService()
         initialized.value = true
         // Also resolve authReady if not already done
         if (authReadyResolve) {
@@ -188,6 +214,7 @@ export const useAuthStore = defineStore('auth', () => {
       const result = await authService.revokeAllSessions()
       if (result.success) {
         user.value = null
+        impersonator.value = null
       }
       return result
     } finally {
@@ -199,9 +226,61 @@ export const useAuthStore = defineStore('auth', () => {
     error.value = null
   }
 
+  /**
+   * Start impersonating another user. Delegates to the backend, then refreshes
+   * the auth state from /auth/me so all reactive consumers (banner, route
+   * guards, sidebar) flip atomically. Returns a typed result so the caller
+   * can show success / error notifications.
+   */
+  async function startImpersonation(userId: number): Promise<{ success: boolean; error?: string }> {
+    const { impersonationApi } = await import('@/services/api/impersonationApi')
+    const result = await impersonationApi.start(userId)
+
+    if (!result.success) {
+      return { success: false, error: result.error }
+    }
+
+    // Re-fetch /auth/me so user + impersonator + level + isAdmin all reflect
+    // the post-swap session in one consistent step. We also reload the config
+    // store, since plugin/feature visibility is user-scoped.
+    await refreshUser()
+    try {
+      await useConfigStore().reload()
+    } catch (err) {
+      // Non-fatal: the auth state is already correct, config will reload on
+      // the next route navigation.
+      console.warn('Config reload after impersonation start failed:', err)
+    }
+
+    return { success: true }
+  }
+
+  /**
+   * Exit the active impersonation and restore the admin session. Same
+   * refresh pattern as `startImpersonation`.
+   */
+  async function stopImpersonation(): Promise<{ success: boolean; error?: string }> {
+    const { impersonationApi } = await import('@/services/api/impersonationApi')
+    const result = await impersonationApi.stop()
+
+    if (!result.success) {
+      return { success: false, error: result.error }
+    }
+
+    await refreshUser()
+    try {
+      await useConfigStore().reload()
+    } catch (err) {
+      console.warn('Config reload after impersonation stop failed:', err)
+    }
+
+    return { success: true }
+  }
+
   // Reset store to initial state
   function $reset(): void {
     user.value = null
+    impersonator.value = null
     loading.value = false
     error.value = null
     initialized.value = false
@@ -210,6 +289,7 @@ export const useAuthStore = defineStore('auth', () => {
   return {
     // State
     user,
+    impersonator,
     loading,
     error,
     initialized,
@@ -219,6 +299,7 @@ export const useAuthStore = defineStore('auth', () => {
     isPro,
     isTeam,
     isAdmin,
+    isImpersonating,
     // Actions
     login,
     register,
@@ -227,6 +308,8 @@ export const useAuthStore = defineStore('auth', () => {
     checkAuth,
     handleOAuthCallback,
     revokeAllSessions,
+    startImpersonation,
+    stopImpersonation,
     clearError,
     $reset,
   }

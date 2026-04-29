@@ -95,9 +95,9 @@
       </p>
       <router-link
         to="/config/api-documentation"
-        class="btn-primary inline-flex items-center gap-2"
+        class="btn-primary px-6 py-3 rounded-lg font-medium inline-flex items-center gap-2"
       >
-        <BookOpenIcon class="w-4 h-4" />
+        <CommandLineIcon class="w-4 h-4" />
         {{ $t('config.apiKeys.docsTitle') }}
       </router-link>
     </div>
@@ -377,7 +377,7 @@ import {
   KeyIcon,
   ClipboardDocumentIcon,
   CheckIcon,
-  BookOpenIcon,
+  CommandLineIcon,
 } from '@heroicons/vue/24/outline'
 import {
   listApiKeys,

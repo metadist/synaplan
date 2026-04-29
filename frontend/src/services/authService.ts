@@ -29,9 +29,21 @@ export interface AuthUser {
   memoriesEnabled?: boolean
 }
 
+/**
+ * Slim user payload identifying the original admin while impersonation is
+ * active. Only ever populated by the backend's /auth/me response when the
+ * server-side stash cookie verifies as a still-admin user.
+ */
+export interface ImpersonatorInfo {
+  id: number
+  email: string
+  level: string
+}
+
 // Auth State - only in memory, never in localStorage
 // This prevents manipulation of isAdmin, level, etc.
 const user = ref<AuthUser | null>(null)
+const impersonator = ref<ImpersonatorInfo | null>(null)
 const isRefreshing = ref(false)
 const isLoggingOut = ref(false) // Prevent auth checks during logout
 let refreshPromise: Promise<boolean> | null = null
@@ -96,6 +108,7 @@ export const authService = {
 
       // Store user info only in memory (not localStorage for security)
       user.value = data.user
+      impersonator.value = (data.impersonator as ImpersonatorInfo | null | undefined) ?? null
       setSessionHint()
 
       return { success: true }
@@ -165,6 +178,7 @@ export const authService = {
       // Ignore errors during logout - session might already be expired
     } finally {
       user.value = null
+      impersonator.value = null
       clearSseToken()
       clearSessionHint()
       isLoggingOut.value = false
@@ -226,6 +240,7 @@ export const authService = {
           if (retryResponse.ok) {
             const data = await retryResponse.json()
             user.value = data.user
+            impersonator.value = (data.impersonator as ImpersonatorInfo | null | undefined) ?? null
             return data.user
           }
         }
@@ -240,6 +255,7 @@ export const authService = {
 
       const data = await response.json()
       user.value = data.user
+      impersonator.value = (data.impersonator as ImpersonatorInfo | null | undefined) ?? null
       setSessionHint()
 
       return data.user
@@ -293,6 +309,7 @@ export const authService = {
       // Update user info if provided (memory only)
       if (data.user) {
         user.value = data.user
+        impersonator.value = (data.impersonator as ImpersonatorInfo | null | undefined) ?? null
       }
 
       setSessionHint()
@@ -325,6 +342,14 @@ export const authService = {
    */
   getUser(): Ref<AuthUser | null> {
     return user
+  },
+
+  /**
+   * Get current impersonator, reactive. `null` whenever the admin is not
+   * currently impersonating another user.
+   */
+  getImpersonator(): Ref<ImpersonatorInfo | null> {
+    return impersonator
   },
 
   /**
@@ -368,6 +393,7 @@ export const authService = {
 
       // Clear local state (memory only)
       user.value = null
+      impersonator.value = null
       clearSessionHint()
 
       return { success: true, sessionsRevoked: data.sessions_revoked }

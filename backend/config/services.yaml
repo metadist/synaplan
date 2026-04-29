@@ -396,6 +396,11 @@ services:
         arguments:
             $appEnv: '%kernel.environment%'
 
+    # Impersonation Service (admin → user cookie-stash session swap)
+    App\Service\ImpersonationService:
+        arguments:
+            $appEnv: '%kernel.environment%'
+
     # reCAPTCHA Service
     App\Service\RecaptchaService:
         arguments:

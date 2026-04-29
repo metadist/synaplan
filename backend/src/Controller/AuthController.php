@@ -8,6 +8,7 @@ use App\Entity\User;
 use App\Repository\EmailVerificationAttemptRepository;
 use App\Repository\UserRepository;
 use App\Repository\VerificationTokenRepository;
+use App\Service\ImpersonationService;
 use App\Service\InternalEmailService;
 use App\Service\OidcTokenService;
 use App\Service\RecaptchaService;
@@ -44,6 +45,7 @@ class AuthController extends AbstractController
         private RecaptchaService $recaptchaService,
         private ValidatorInterface $validator,
         private LoggerInterface $logger,
+        private ImpersonationService $impersonationService,
     ) {
         $this->resendCooldownMinutes = (int) ($_ENV['EMAIL_VERIFICATION_COOLDOWN_MINUTES'] ?? 2);
         $this->maxResendAttempts = (int) ($_ENV['EMAIL_VERIFICATION_MAX_ATTEMPTS'] ?? 5);
@@ -254,15 +256,21 @@ class AuthController extends AbstractController
             ],
         ]);
 
-        // Add HttpOnly cookies
-        return $this->tokenService->addAuthCookies($response, $accessToken, $refreshToken);
+        // Add HttpOnly cookies. Defensive: also wipe any orphan impersonation
+        // stash that survived from a previous user on this browser, so the
+        // freshly logged-in account never inherits a banner pointing at
+        // someone else's session.
+        $this->tokenService->addAuthCookies($response, $accessToken, $refreshToken);
+        $this->impersonationService->attachClearStashCookies($response);
+
+        return $response;
     }
 
     #[Route('/refresh', name: 'refresh', methods: ['POST'])]
     #[OA\Post(
         path: '/api/v1/auth/refresh',
         summary: 'Refresh access token',
-        description: 'Use refresh token cookie to get a new access token. For OIDC users, refreshes against the identity provider.',
+        description: 'Use refresh token cookie to get a new access token. For OIDC users, refreshes against the identity provider. While impersonating, the impersonation-aware path mints a fresh impersonation access token for the target user without rotating any refresh token.',
         tags: ['Authentication']
     )]
     #[OA\Response(
@@ -291,6 +299,16 @@ class AuthController extends AbstractController
             $this->logger->debug('OIDC user has no refresh token, falling back to internal app token refresh', [
                 'provider' => $oidcProvider,
             ]);
+        }
+
+        // Impersonation refresh path: when an admin is acting as another user
+        // we have intentionally cleared the regular refresh cookie at start
+        // time, so the only legitimate way to mint a fresh access token is
+        // through the stash. The service re-issues an `impersonator_id`-
+        // claimed access token for the target user without ever touching the
+        // refresh token (the admin's original is left intact in the stash).
+        if ($this->impersonationService->isImpersonating($request)) {
+            return $this->refreshImpersonatedSession($request);
         }
 
         // Regular user - use our internal refresh token
@@ -324,6 +342,58 @@ class AuthController extends AbstractController
                 'level' => $result['user']->getUserLevel(),
                 'emailVerified' => $result['user']->isEmailVerified(),
                 'isAdmin' => $result['user']->isAdmin(),
+            ],
+        ]);
+
+        $response->headers->setCookie(
+            $this->tokenService->createAccessCookie($result['access_token'])
+        );
+
+        return $response;
+    }
+
+    /**
+     * Refresh the access token for an active impersonation session.
+     *
+     * Delegates to {@see ImpersonationService::issueRefreshedImpersonationAccessToken},
+     * which validates the admin's stashed refresh token (DB-backed, 7d TTL),
+     * recovers the impersonation target from the existing access cookie's
+     * payload (signature-only verification — expiry is expected), and mints a
+     * fresh impersonation access token. On failure we conservatively clear
+     * both the auth cookies and the stash so the browser ends up in a clean
+     * "logged out" state rather than half-authenticated.
+     */
+    private function refreshImpersonatedSession(Request $request): Response
+    {
+        $result = $this->impersonationService->issueRefreshedImpersonationAccessToken($request);
+
+        if (!$result) {
+            $response = new JsonResponse([
+                'error' => 'Impersonation session expired',
+                'code' => 'IMPERSONATION_EXPIRED',
+            ], Response::HTTP_UNAUTHORIZED);
+
+            $this->tokenService->clearAuthCookies($response);
+            $this->impersonationService->attachClearStashCookies($response);
+
+            return $response;
+        }
+
+        /** @var User $target */
+        $target = $result['user'];
+
+        $this->logger->info('Impersonation token refreshed', [
+            'target_user_id' => $target->getId(),
+        ]);
+
+        $response = new JsonResponse([
+            'success' => true,
+            'user' => [
+                'id' => $target->getId(),
+                'email' => $target->getMail(),
+                'level' => $target->getUserLevel(),
+                'emailVerified' => $target->isEmailVerified(),
+                'isAdmin' => $target->isAdmin(),
             ],
         ]);
 
@@ -475,10 +545,13 @@ class AuthController extends AbstractController
 
         $this->logger->info('User logged out');
 
-        // Clear all auth cookies
+        // Clear all auth cookies, including any leftover impersonation stash
+        // so the next user signing in on this browser never inherits a half-
+        // dropped admin session.
         $response = new JsonResponse($responseData);
         $this->tokenService->clearAuthCookies($response);
         $this->oidcTokenService->clearOidcCookies($response);
+        $this->impersonationService->attachClearStashCookies($response);
 
         return $response;
     }
@@ -713,11 +786,56 @@ class AuthController extends AbstractController
     }
 
     #[Route('/me', name: 'me', methods: ['GET'])]
-    public function me(#[CurrentUser] ?User $user): JsonResponse
+    #[OA\Get(
+        path: '/api/v1/auth/me',
+        summary: 'Get current authenticated user',
+        description: 'Returns the principal attached to the current session. While impersonating, `user` is the impersonated (target) user and `impersonator` is set to the original admin so the UI can render the impersonation banner and unlock admin-level diagnostics.',
+        tags: ['Authentication']
+    )]
+    #[OA\Response(
+        response: 200,
+        description: 'Current user',
+        content: new OA\JsonContent(
+            required: ['success', 'user', 'impersonator'],
+            properties: [
+                new OA\Property(property: 'success', type: 'boolean', example: true),
+                new OA\Property(
+                    property: 'user',
+                    type: 'object',
+                    required: ['id', 'email', 'level', 'emailVerified', 'created', 'isAdmin', 'memoriesEnabled'],
+                    properties: [
+                        new OA\Property(property: 'id', type: 'integer', example: 42),
+                        new OA\Property(property: 'email', type: 'string', example: 'user@example.com'),
+                        new OA\Property(property: 'level', type: 'string', example: 'PRO'),
+                        new OA\Property(property: 'emailVerified', type: 'boolean', example: true),
+                        new OA\Property(property: 'created', type: 'string', example: '2024-01-15 10:30:00'),
+                        new OA\Property(property: 'isAdmin', type: 'boolean', example: false),
+                        new OA\Property(property: 'memoriesEnabled', type: 'boolean', example: true),
+                    ]
+                ),
+                new OA\Property(
+                    property: 'impersonator',
+                    type: 'object',
+                    nullable: true,
+                    description: 'The original admin when impersonating; null otherwise.',
+                    required: ['id', 'email', 'level'],
+                    properties: [
+                        new OA\Property(property: 'id', type: 'integer', example: 1),
+                        new OA\Property(property: 'email', type: 'string', example: 'admin@example.com'),
+                        new OA\Property(property: 'level', type: 'string', example: 'ADMIN'),
+                    ]
+                ),
+            ]
+        )
+    )]
+    #[OA\Response(response: 401, description: 'Not authenticated')]
+    public function me(#[CurrentUser] ?User $user, Request $request): JsonResponse
     {
         if (!$user) {
             return $this->json(['error' => 'Not authenticated'], Response::HTTP_UNAUTHORIZED);
         }
+
+        $impersonator = $this->impersonationService->resolveImpersonatorFromActiveSession($request);
 
         return $this->json([
             'success' => true,
@@ -730,6 +848,11 @@ class AuthController extends AbstractController
                 'isAdmin' => $user->isAdmin(),
                 'memoriesEnabled' => $user->isMemoriesEnabled(),
             ],
+            'impersonator' => $impersonator ? [
+                'id' => $impersonator->getId(),
+                'email' => $impersonator->getMail(),
+                'level' => $impersonator->getUserLevel(),
+            ] : null,
         ]);
     }
 
@@ -755,8 +878,17 @@ class AuthController extends AbstractController
             return $this->json(['error' => 'Not authenticated'], Response::HTTP_UNAUTHORIZED);
         }
 
-        // Generate a fresh access token for SSE usage
-        $accessToken = $this->tokenService->generateAccessToken($user);
+        // Preserve the impersonation marker on tokens minted for SSE use.
+        // Without this, an SSE-driven UI refresh would receive a "regular"
+        // access token for the target user and the impersonation banner
+        // would silently disappear on the next /auth/me poll.
+        $impersonatorId = null;
+        if ($this->impersonationService->isImpersonating($request)) {
+            $admin = $this->impersonationService->resolveImpersonatorFromActiveSession($request);
+            $impersonatorId = $admin?->getId();
+        }
+
+        $accessToken = $this->tokenService->generateAccessToken($user, $impersonatorId);
 
         return $this->json([
             'token' => $accessToken,
@@ -789,6 +921,11 @@ class AuthController extends AbstractController
             'sessions_revoked' => $count,
         ]);
 
-        return $this->tokenService->clearAuthCookies($response);
+        $this->tokenService->clearAuthCookies($response);
+        // Same rationale as logout(): never leave an orphaned impersonation
+        // stash behind when killing every session for this account.
+        $this->impersonationService->attachClearStashCookies($response);
+
+        return $response;
     }
 }

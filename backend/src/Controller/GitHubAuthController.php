@@ -4,6 +4,7 @@ namespace App\Controller;
 
 use App\Entity\User;
 use App\Repository\UserRepository;
+use App\Service\ImpersonationService;
 use App\Service\OAuthStateService;
 use App\Service\TokenService;
 use Doctrine\ORM\EntityManagerInterface;
@@ -30,6 +31,7 @@ class GitHubAuthController extends AbstractController
         private EntityManagerInterface $em,
         private TokenService $tokenService,
         private OAuthStateService $oauthStateService,
+        private ImpersonationService $impersonationService,
         private LoggerInterface $logger,
         private string $githubClientId,
         private string $githubClientSecret,
@@ -185,8 +187,13 @@ class GitHubAuthController extends AbstractController
 
             $response = new RedirectResponse($callbackUrl);
 
-            // Add auth cookies
+            // Set fresh auth cookies and defensively wipe any orphan
+            // impersonation stash that survived from a prior session on this
+            // browser. Same rationale as in GoogleAuthController and the
+            // regular login path: a leftover stash must never let the new
+            // signed-in user resurrect a previous admin's session.
             $this->tokenService->addAuthCookies($response, $accessToken, $refreshToken);
+            $this->impersonationService->attachClearStashCookies($response);
 
             $this->logger->info('GitHub OAuth successful, redirecting with cookies', [
                 'user_id' => $user->getId(),
