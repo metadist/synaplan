@@ -90,8 +90,8 @@ services:
       APP_URL: http://localhost:8000
       PLUGINS_DIR: /plugins
       FRONTEND_URL: http://localhost:5173
-      DATABASE_WRITE_URL: mysql://synaplan_user:synaplan_password@db:3306/synaplan?serverVersion=11.8&charset=utf8mb4
-      DATABASE_READ_URL: mysql://synaplan_user:synaplan_password@db:3306/synaplan?serverVersion=11.8&charset=utf8mb4
+      DATABASE_WRITE_URL: mysql://synaplan_user:synaplan_password@db:3306/synaplan?serverVersion=mariadb-12.2.2&charset=utf8mb4
+      DATABASE_READ_URL: mysql://synaplan_user:synaplan_password@db:3306/synaplan?serverVersion=mariadb-12.2.2&charset=utf8mb4
       OLLAMA_BASE_URL: http://ollama:11434
       TRITON_SERVER_URL: ${TRITON_SERVER_URL:-}
       TIKA_BASE_URL: http://tika:9998
@@ -131,6 +131,11 @@ services:
     restart: unless-stopped
     extra_hosts:
       - "host.docker.internal:host-gateway"
+      # Platform-compatible alias so the same `QDRANT_URL=http://docker-host:6333`
+      # that production uses also resolves in dev. Lets the dev backend talk to
+      # either the synaplan-memories Qdrant (if running via its own compose) or
+      # any other host-bound service without changing backend/.env.
+      - "docker-host:host-gateway"
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost/api/health"]
       interval: 30s

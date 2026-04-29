@@ -32,12 +32,19 @@ class UsageStatsController extends AbstractController
      * GET /api/v1/usage/stats
      *
      * Returns:
-     * - Current user level and subscription info
+     * - Current user level and subscription info (level, active, status, plan_name, expires_at, stripe_customer_id)
      * - Usage per action type (Messages, Images, Videos, etc.)
      * - Limits and remaining quota
      * - Breakdown by source (WhatsApp, Email, Web)
      * - Breakdown by time period (today, this week, this month)
      * - Recent usage history
+     * - total_requests (sum across all actions) and total_messages (BACTION=MESSAGES only)
+     * - cost_budget and cost_summary
+     *
+     * TODO: the OpenAPI schema for the `data` property is currently `object`, which
+     *       prevents generating Zod schemas on the frontend. Schematise the full
+     *       response once the payload shape stabilises so frontend/src/api/usageApi.ts
+     *       can be auto-generated instead of hand-maintained.
      */
     #[Route('/stats', name: 'stats', methods: ['GET'])]
     #[OA\Get(

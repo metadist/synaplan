@@ -87,8 +87,8 @@ services:
       APP_URL: http://localhost:8000
       PLUGINS_DIR: /plugins
       FRONTEND_URL: http://localhost:5173
-      DATABASE_WRITE_URL: mysql://synaplan_user:synaplan_password@db:3306/synaplan?serverVersion=11.8&charset=utf8mb4
-      DATABASE_READ_URL: mysql://synaplan_user:synaplan_password@db:3306/synaplan?serverVersion=11.8&charset=utf8mb4
+      DATABASE_WRITE_URL: mysql://synaplan_user:synaplan_password@db:3306/synaplan?serverVersion=mariadb-12.2.2&charset=utf8mb4
+      DATABASE_READ_URL: mysql://synaplan_user:synaplan_password@db:3306/synaplan?serverVersion=mariadb-12.2.2&charset=utf8mb4
       # No Ollama - use external AI providers
       OLLAMA_BASE_URL: ""
       TRITON_SERVER_URL: ${TRITON_SERVER_URL:-}
