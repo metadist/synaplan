@@ -131,6 +131,11 @@ services:
     restart: unless-stopped
     extra_hosts:
       - "host.docker.internal:host-gateway"
+      # Platform-compatible alias so the same `QDRANT_URL=http://docker-host:6333`
+      # that production uses also resolves in dev. Lets the dev backend talk to
+      # either the synaplan-memories Qdrant (if running via its own compose) or
+      # any other host-bound service without changing backend/.env.
+      - "docker-host:host-gateway"
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost/api/health"]
       interval: 30s
