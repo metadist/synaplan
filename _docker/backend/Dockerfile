@@ -1,4 +1,4 @@
-FROM ghcr.io/metadist/synaplan-base-php:0.1.0@sha256:249bd3e891846105cb18e4f9d1cfc353844da29294683c6f607809ed521bcb36
+FROM ghcr.io/metadist/synaplan-base-php:0.2.0@sha256:016436cf38cc38ecaa80c1f836deaffce9ee23dd747543d2fcf5706ac9d0ce4a
 
 WORKDIR /var/www/backend
 
