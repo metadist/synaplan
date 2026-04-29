@@ -14,12 +14,23 @@ use Psr\Log\LoggerInterface;
 /**
  * Widget Session Management Service.
  *
- * Handles anonymous user sessions for chat widgets
+ * Handles anonymous user sessions for chat widgets.
+ *
+ * Counter semantics
+ * -----------------
+ * {@see WidgetSession::$messageCount} is the *true* total of persisted messages on the
+ * session's chat (visitor + AI + operator + system + welcome). It is incremented at every
+ * persist site and never decremented or reset. The visitor-facing rate quota
+ * ({@see DEFAULT_MAX_MESSAGES}) is enforced separately by {@see checkSessionLimit()},
+ * which counts visitor messages live from {@see MessageRepository::countByChatId()}
+ * within a sliding window of {@see SESSION_EXPIRY_HOURS}. This split fixes a long-standing
+ * data-quality bug where the counter showed 0 for human-takeover, internal-mode, expired-
+ * resumed, and stream-failed sessions even though messages existed in the database.
  */
 final class WidgetSessionService
 {
     // Session limits (from BCONFIG table, but with defaults)
-    public const DEFAULT_MAX_MESSAGES = 50;         // Total messages per session
+    public const DEFAULT_MAX_MESSAGES = 50;         // Visitor messages allowed per quota window
     public const DEFAULT_MAX_PER_MINUTE = 10;       // Messages per minute
     public const DEFAULT_MAX_FILES = 3;             // File uploads per session
     public const SESSION_EXPIRY_HOURS = 24;         // Session expires after 24h of inactivity
@@ -71,15 +82,18 @@ final class WidgetSessionService
                 'is_test' => $session->isTest(),
             ]);
         } elseif ($session->isExpired()) {
-            // Reset expired session
-            $session->setMessageCount(0);
-            $session->setFileCount(0);
+            // Resume expired session: only extend the expiry window. The chat (BCHATID)
+            // and its history live on, so we MUST NOT reset BMESSAGECOUNT/BFILECOUNT —
+            // doing so would drop the cached total to 0 while the underlying BMESSAGES
+            // rows remain, which is the exact data-quality bug fixed in this revision.
+            // The visitor quota is windowed live by checkSessionLimit() instead.
             $session->setExpires(time() + (self::SESSION_EXPIRY_HOURS * 3600));
             $this->em->flush();
 
-            $this->logger->info('Widget session reset after expiry', [
+            $this->logger->info('Widget session resumed after expiry', [
                 'widget_id' => $widgetId,
                 'session_id' => substr($effectiveSessionId, 0, 12).'...',
+                'message_count' => $session->getMessageCount(),
             ]);
         }
 
@@ -87,15 +101,25 @@ final class WidgetSessionService
     }
 
     /**
-     * Check if session can send a message (rate limits).
+     * Check if session can send another visitor message (rate limits).
+     *
+     * Counts visitor messages live from {@see MessageRepository::countByChatId()} within a
+     * sliding window of {@see SESSION_EXPIRY_HOURS}, rather than reading the cached
+     * `BMESSAGECOUNT`. This is what makes the cache safe to repurpose as a "true total
+     * messages" metric without breaking the quota: the quota only counts visitor IN
+     * messages from the current 24h window, not operator/AI/system replies.
+     *
+     * @return array{allowed: bool, reason: string|null, remaining: int, retry_after: int|null, max_messages?: int, max_per_minute?: int}
      */
     public function checkSessionLimit(WidgetSession $session, ?int $maxMessages = null, ?int $maxPerMinute = null): array
     {
         $maxMessages = $maxMessages ?? $this->maxMessages;
         $maxPerMinute = $maxPerMinute ?? $this->maxPerMinute;
 
+        $visitorMessages = $this->countVisitorMessagesInQuotaWindow($session);
+
         // Check total message limit
-        if ($session->getMessageCount() >= $maxMessages) {
+        if ($visitorMessages >= $maxMessages) {
             return [
                 'allowed' => false,
                 'reason' => 'total_limit_reached',
@@ -125,7 +149,7 @@ final class WidgetSessionService
             }
         }
 
-        $remaining = max(0, $maxMessages - $session->getMessageCount());
+        $remaining = max(0, $maxMessages - $visitorMessages);
 
         return [
             'allowed' => true,
@@ -137,7 +161,34 @@ final class WidgetSessionService
     }
 
     /**
-     * Increment message count and update last message time.
+     * Count visitor IN messages within the current quota window (last
+     * {@see SESSION_EXPIRY_HOURS}). Failed messages are excluded so a stream error
+     * does not consume quota — historically achieved via decrementMessageCount(),
+     * which we have now removed.
+     */
+    private function countVisitorMessagesInQuotaWindow(WidgetSession $session): int
+    {
+        $chatId = $session->getChatId();
+        if (null === $chatId) {
+            return 0;
+        }
+
+        $windowStart = time() - (self::SESSION_EXPIRY_HOURS * 3600);
+
+        return $this->messageRepository->countByChatId(
+            $chatId,
+            'IN',
+            $windowStart,
+            true,
+        );
+    }
+
+    /**
+     * Increment the cached total-message counter and refresh last-message time.
+     *
+     * Must be called at every successful message-persist site (visitor flow, AI stream
+     * completion, human takeover, internal mode, system messages, welcome message).
+     * Does NOT enforce quota — that is decoupled into {@see checkSessionLimit()}.
      */
     public function incrementMessageCount(WidgetSession $session): void
     {
@@ -278,6 +329,11 @@ PROMPT;
 
     /**
      * Decrement message count (e.g. on failure).
+     *
+     * @deprecated Since the counter now reflects persisted messages 1:1 and the quota
+     *             window excludes failed messages live, callers should leave the counter
+     *             alone on failure. Kept for backward compatibility with callers we have
+     *             not yet migrated; will be removed in a follow-up.
      */
     public function decrementMessageCount(WidgetSession $session): void
     {

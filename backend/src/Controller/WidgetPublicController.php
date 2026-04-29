@@ -315,6 +315,11 @@ class WidgetPublicController extends AbstractController
                     $this->em->persist($welcomeMessage);
                     $this->em->flush();
 
+                    // Welcome message counts toward the persisted total so the dashboard
+                    // and exports show the right conversation length from message #1.
+                    $session->incrementMessageCount();
+                    $this->em->flush();
+
                     $this->logger->info('Widget welcome message created', [
                         'widget_id' => $widget->getWidgetId(),
                         'chat_id' => $chat->getId(),
@@ -386,20 +391,15 @@ class WidgetPublicController extends AbstractController
                 }
             }
 
-            // Increment session message count and update last message preview
-            // Skipped for human takeover (already covered by operator workflow) and
-            // for internal owner sessions (no end-user limits apply).
-            if (!$isHumanMode && !$isInternalSession) {
-                $this->sessionService->incrementMessageCount($session);
-                // Save user message as last message preview
-                $session->setLastMessagePreview($data['text']);
-                $this->em->flush();
-            } elseif ($isInternalSession) {
-                // Still keep last-message tracking up to date so the dashboard preview stays useful.
-                $session->setLastMessage(time());
-                $session->setLastMessagePreview($data['text']);
-                $this->em->flush();
-            }
+            // Always count the persisted visitor message and refresh the preview.
+            // The visitor quota is enforced separately by checkSessionLimit() above
+            // (live count of visitor messages within the quota window), so this counter
+            // is now safe to advance unconditionally — including for internal/human/
+            // waiting sessions that previously left BMESSAGECOUNT untouched and caused
+            // dashboard/export "messageCount = 0" reports for sessions with real history.
+            $this->sessionService->incrementMessageCount($session);
+            $session->setLastMessagePreview($data['text']);
+            $this->em->flush();
             $this->sessionService->attachChat($session, $chat);
 
             // If in human takeover mode, just save the message and return success (no AI processing)
@@ -472,8 +472,7 @@ class WidgetPublicController extends AbstractController
                 $chat,
                 $fileIds,
                 $widgetId,
-                $session,
-                $isInternalSession
+                $session
             ) {
                 $responseText = '';
                 $reasoningBuffer = '';
@@ -738,11 +737,12 @@ class WidgetPublicController extends AbstractController
                         $incomingMessage->setStatus('failed');
                         $this->em->flush();
 
-                        // Decrement session message count on failure so user can retry.
-                        // Skipped for internal sessions where we never incremented in the first place.
-                        if (!$isInternalSession) {
-                            $this->sessionService->decrementMessageCount($session);
-                        }
+                        // No counter rollback: the visitor quota is computed live from
+                        // BMESSAGES with status != 'failed' (see WidgetSessionService::
+                        // countVisitorMessagesInQuotaWindow), so a failed message neither
+                        // consumes quota nor needs to be removed from the cached counter.
+                        // Keeping BMESSAGECOUNT in sync with persisted rows is what allows
+                        // the dashboard / export to show accurate conversation lengths.
                     } catch (\Throwable $flushException) {
                         // EntityManager might be closed after database error
                         $this->logger->warning('Could not update message status after error', [
@@ -763,12 +763,9 @@ class WidgetPublicController extends AbstractController
 
             return $response;
         } catch (\Exception $e) {
-            // Decrement session message count on failure so user can retry.
-            // Skipped for internal sessions where we never incremented in the first place.
-            if (!$isInternalSession) {
-                $this->sessionService->decrementMessageCount($session);
-            }
-
+            // See note in the inner catch above: failed messages stay in BMESSAGES with
+            // status='failed' and are excluded from the quota window live, so the cached
+            // counter no longer needs to be rolled back here.
             $this->logger->error('Widget message failed', [
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString(),

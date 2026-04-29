@@ -29,6 +29,15 @@ class WidgetSession
     #[ORM\Column(name: 'BSESSIONID', length: 64)]
     private string $sessionId;
 
+    /**
+     * Total persisted messages on this session's chat (visitor IN, AI OUT, operator OUT,
+     * system OUT, welcome OUT). Maintained by {@see \App\Service\WidgetSessionService::incrementMessageCount()}
+     * at every successful persist site (widget public flow, human takeover, internal mode,
+     * AI stream completion). The visitor-quota check is decoupled from this counter and
+     * computed live from {@see \App\Repository\MessageRepository::countByChatId()}, so this
+     * value can be safely treated as a true conversation-length metric for the dashboard
+     * and exports — independent of mode, expiry resets, or stream failures.
+     */
     #[ORM\Column(name: 'BMESSAGECOUNT', type: 'integer')]
     private int $messageCount = 0;
 

@@ -118,7 +118,13 @@ final readonly class HumanTakeoverService
 
     /**
      * Send a message as human operator.
-     * Does NOT increment message count (human messages are free).
+     *
+     * Operator messages do not consume the visitor quota (the quota is computed live
+     * over IN-direction messages only — see {@see WidgetSessionService::checkSessionLimit()}),
+     * but they MUST advance {@see WidgetSession::$messageCount} so the cached total
+     * stays in sync with persisted BMESSAGES rows. Without this the dashboard /
+     * Excel export reports `messageCount = 0` for sessions that consist mostly of
+     * operator replies — which was the symptom that triggered the data-quality fix.
      *
      * @param array<int> $fileIds Optional array of file IDs to attach
      */
@@ -192,7 +198,9 @@ final readonly class HumanTakeoverService
             }
         }
 
-        // Update session's last message time and preview (but NOT message count)
+        // Update session's last message time, preview, and the persisted-message
+        // counter so dashboard/export totals reflect operator activity.
+        $session->incrementMessageCount();
         $session->setLastMessage(time());
         $session->setLastMessagePreview($text);
         $session->updateLastHumanActivity();
@@ -304,6 +312,9 @@ final readonly class HumanTakeoverService
 
     /**
      * Create a system message in the chat (for takeover/handback notifications).
+     *
+     * The system message is a real persisted BMESSAGES row, so the cached session
+     * counter is advanced as well to keep dashboard / export totals in sync.
      */
     private function createSystemMessage(WidgetSession $session, User $operator, string $text): ?Message
     {
@@ -330,6 +341,7 @@ final readonly class HumanTakeoverService
         $message->setProviderIndex('SYSTEM');
 
         $this->em->persist($message);
+        $session->incrementMessageCount();
         $this->em->flush();
 
         return $message;
