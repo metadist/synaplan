@@ -1,6 +1,6 @@
 # Administration Guide
 
-Operations reference for self-hosted and enterprise deployments.
+Operations reference for self-hosted deployments.
 
 ---
 
