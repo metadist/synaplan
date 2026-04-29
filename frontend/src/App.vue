@@ -45,7 +45,13 @@ import type { CookieConsent as CookieConsentType } from '@/composables/useCookie
 useTheme()
 
 if ('serviceWorker' in navigator) {
-  navigator.serviceWorker.register('/sw.js')
+  // The new global unhandledrejection handler (installGlobalErrorHandlers)
+  // would otherwise turn a missing /sw.js or a registration failure into a
+  // full-screen ErrorView for end users. SW failures are non-fatal — log
+  // and continue.
+  navigator.serviceWorker.register('/sw.js').catch((err: unknown) => {
+    console.error('Service worker registration failed:', err)
+  })
 }
 
 const { injectGoogleTag, trackPageView } = useGoogleTag()

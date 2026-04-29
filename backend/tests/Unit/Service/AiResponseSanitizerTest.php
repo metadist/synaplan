@@ -30,7 +30,7 @@ class AiResponseSanitizerTest extends TestCase
 
         $this->assertSame(
             'Hallo, wie kann ich helfen?',
-            trim(AiResponseSanitizer::stripLeakedInstructions($input))
+            AiResponseSanitizer::stripLeakedInstructions($input)
         );
     }
 
@@ -40,7 +40,7 @@ class AiResponseSanitizerTest extends TestCase
 
         $this->assertSame(
             'Antwort folgt.',
-            trim(AiResponseSanitizer::stripLeakedInstructions($input))
+            AiResponseSanitizer::stripLeakedInstructions($input)
         );
     }
 
@@ -50,8 +50,59 @@ class AiResponseSanitizerTest extends TestCase
 
         $this->assertSame(
             'Hallo!',
-            trim(AiResponseSanitizer::stripLeakedInstructions($input))
+            AiResponseSanitizer::stripLeakedInstructions($input)
         );
+    }
+
+    public function testStripLeakedInstructionsRemovesGermanBitteAntwortenSie(): void
+    {
+        $input = '[Bitte antworten Sie auf Englisch] Hello there.';
+
+        $this->assertSame(
+            'Hello there.',
+            AiResponseSanitizer::stripLeakedInstructions($input)
+        );
+    }
+
+    public function testStripLeakedInstructionsKeepsLegitimateGermanBracketedText(): void
+    {
+        // Without the language-directive anchor a previous version stripped
+        // any `[Bitte ...]` annotation, including legitimate UI copy a model
+        // might produce.
+        $input = '[Bitte hier klicken für Details] Dann öffnet sich der Dialog.';
+
+        $this->assertSame($input, AiResponseSanitizer::stripLeakedInstructions($input));
+    }
+
+    public function testStripLeakedInstructionsTrimsWhitespaceLeftBehindByLeadingDirective(): void
+    {
+        // Persisted via Message::sanitizeOutgoingText() — a leading directive
+        // would otherwise persist a stray leading space in the message body.
+        $input = '[Please reply in German] Hallo, wie kann ich helfen?';
+
+        $this->assertSame(
+            'Hallo, wie kann ich helfen?',
+            AiResponseSanitizer::stripLeakedInstructions($input)
+        );
+    }
+
+    public function testStripLeakedInstructionsTrimsWhitespaceLeftBehindByTrailingDirective(): void
+    {
+        $input = "Antwort folgt.\n[Please respond in English]";
+
+        $this->assertSame(
+            'Antwort folgt.',
+            AiResponseSanitizer::stripLeakedInstructions($input)
+        );
+    }
+
+    public function testStripLeakedInstructionsPreservesOriginalWhitespaceWhenNothingMatches(): void
+    {
+        // Pure no-op pass: the persisted text might contain meaningful
+        // leading/trailing whitespace (markdown indentation, code fences).
+        $input = "  ```php\n  echo 'hi';\n  ```  ";
+
+        $this->assertSame($input, AiResponseSanitizer::stripLeakedInstructions($input));
     }
 
     public function testStripLeakedInstructionsRemovesBareLanguageDirective(): void
@@ -60,7 +111,7 @@ class AiResponseSanitizerTest extends TestCase
 
         $this->assertSame(
             'Hallo.',
-            trim(AiResponseSanitizer::stripLeakedInstructions($input))
+            AiResponseSanitizer::stripLeakedInstructions($input)
         );
     }
 
@@ -88,7 +139,7 @@ class AiResponseSanitizerTest extends TestCase
 
         $this->assertSame(
             'Hallo',
-            trim(AiResponseSanitizer::stripLeakedInstructions($input))
+            AiResponseSanitizer::stripLeakedInstructions($input)
         );
     }
 

@@ -39,16 +39,22 @@ final readonly class AiResponseSanitizer
      *
      * Each pattern is anchored to a square-bracketed annotation that
      * starts with a known instructional verb in EN/DE and references a
-     * language. The 1..120 char body limit avoids accidentally eating
+     * language. The character-class body limit avoids accidentally eating
      * legitimate user content.
+     *
+     * The German `Bitte ...` variant is intentionally narrow: it must
+     * additionally contain a language-directive keyword (`auf`, `in`,
+     * `antworte(n)`, `beantworte(n)`, …) so that legitimate bracketed
+     * UI copy like `[Bitte hier klicken]` is left untouched.
      */
     private const LEAKED_INSTRUCTION_PATTERNS = [
         // English: [Please reply in German], [Please respond in English], ...
         '/\[\s*Please\s+(?:reply|respond|answer|write)\s+in\s+[^\]]{1,80}\]/i',
         // English: [Reply in German], [Respond in English], [Answer in French], ...
         '/\[\s*(?:Reply|Respond|Answer|Write)\s+in\s+[^\]]{1,80}\]/i',
-        // German: [Bitte auf Deutsch antworten], [Bitte antworten Sie auf Englisch], ...
-        '/\[\s*Bitte[^\]]{1,120}\]/iu',
+        // German: [Bitte auf Deutsch antworten], [Bitte antworten Sie auf Englisch],
+        // [Bitte in Deutsch antworten], [Bitte beantworte auf Englisch], ...
+        '/\[\s*Bitte\s+(?:auf|in|antworte|antworten|beantworte|beantworten)\b[^\]]{0,120}\]/iu',
         // Bare bracketed language directive: [Language: German], [LANG: en], ...
         '/\[\s*(?:Language|Lang)\s*:\s*[^\]]{1,40}\]/i',
     ];
@@ -92,11 +98,22 @@ final readonly class AiResponseSanitizer
             return '';
         }
 
+        $patternHit = false;
+
         foreach (self::LEAKED_INSTRUCTION_PATTERNS as $pattern) {
             $stripped = preg_replace($pattern, '', $text);
-            if (null !== $stripped) {
+            if (null !== $stripped && $stripped !== $text) {
                 $text = $stripped;
+                $patternHit = true;
             }
+        }
+
+        // No leaked instruction matched — preserve the caller's text
+        // verbatim. Some markdown documents legitimately rely on leading
+        // spaces or trailing newlines, and a pure no-op pass must not
+        // touch them.
+        if (!$patternHit) {
+            return $text;
         }
 
         // Tidy up the gap left behind by a stripped annotation without
@@ -104,6 +121,6 @@ final readonly class AiResponseSanitizer
         $text = preg_replace('/[ \t]{2,}/', ' ', $text) ?? $text;
         $text = preg_replace('/\n{3,}/', "\n\n", $text) ?? $text;
 
-        return $text;
+        return trim($text);
     }
 }
