@@ -482,8 +482,15 @@ final readonly class WidgetExportService
         // Resolve real per-chat message counts in a single bulk query so the export
         // never depends on the cached BMESSAGECOUNT (which historically drifted to
         // zero in human/internal/expired-resume scenarios) and never triggers an
-        // N+1 query pattern. Messages with status='failed' are excluded so the
-        // export reports the same numbers the dashboard quota sees.
+        // N+1 query pattern.
+        //
+        // This is an all-time, all-direction count of every persisted message on the
+        // chat (visitor IN, AI/operator/system/welcome OUT) with status != 'failed' —
+        // i.e. the true conversation length, NOT the sliding visitor-quota window
+        // computed by WidgetSessionService::checkSessionLimit() (which is IN-only and
+        // last-{SESSION_EXPIRY_HOURS}-only). The two views agree on the failed-row
+        // exclusion, so a stream error never inflates the export over the cached
+        // counter (which is rolled back at the same site — see WidgetPublicController).
         $chatIds = array_values(array_filter(array_map(
             static fn ($session) => $session->getChatId(),
             $result['sessions']

@@ -163,8 +163,10 @@ final class WidgetSessionService
     /**
      * Count visitor IN messages within the current quota window (last
      * {@see SESSION_EXPIRY_HOURS}). Failed messages are excluded so a stream error
-     * does not consume quota — historically achieved via decrementMessageCount(),
-     * which we have now removed.
+     * does not consume quota; the cached counter is kept consistent with this view
+     * by the streaming error handler in {@see \App\Controller\WidgetPublicController::message()},
+     * which calls {@see decrementMessageCount()} when the visitor message is marked
+     * status='failed'.
      */
     private function countVisitorMessagesInQuotaWindow(WidgetSession $session): int
     {
@@ -189,12 +191,18 @@ final class WidgetSessionService
      * Must be called at every successful message-persist site (visitor flow, AI stream
      * completion, human takeover, internal mode, system messages, welcome message).
      * Does NOT enforce quota — that is decoupled into {@see checkSessionLimit()}.
+     *
+     * @param bool $flush When false, the caller is responsible for flushing the
+     *                    EntityManager. Use this on hot paths that already perform
+     *                    other entity updates so all changes flush in one round-trip.
      */
-    public function incrementMessageCount(WidgetSession $session): void
+    public function incrementMessageCount(WidgetSession $session, bool $flush = true): void
     {
         $session->incrementMessageCount();
         $session->updateLastMessage();
-        $this->em->flush();
+        if ($flush) {
+            $this->em->flush();
+        }
     }
 
     /**
@@ -328,17 +336,25 @@ PROMPT;
     }
 
     /**
-     * Decrement message count (e.g. on failure).
+     * Roll back the cached total when a previously-counted persisted message is
+     * marked as 'failed' downstream (currently the stream-error path in
+     * {@see \App\Controller\WidgetPublicController::message()}).
      *
-     * @deprecated Since the counter now reflects persisted messages 1:1 and the quota
-     *             window excludes failed messages live, callers should leave the counter
-     *             alone on failure. Kept for backward compatibility with callers we have
-     *             not yet migrated; will be removed in a follow-up.
+     * Required for cache consistency: the live quota window
+     * ({@see countVisitorMessagesInQuotaWindow()}) and the export's bulk count
+     * ({@see \App\Repository\MessageRepository::countByChatIds()}) both exclude
+     * status='failed', so the cached BMESSAGECOUNT must do the same — otherwise
+     * dashboard and export drift apart again.
+     *
+     * @param bool $flush when false, the caller is responsible for flushing the
+     *                    EntityManager (used to consolidate writes on the hot path)
      */
-    public function decrementMessageCount(WidgetSession $session): void
+    public function decrementMessageCount(WidgetSession $session, bool $flush = true): void
     {
         $session->setMessageCount(max(0, $session->getMessageCount() - 1));
-        $this->em->flush();
+        if ($flush) {
+            $this->em->flush();
+        }
     }
 
     public function checkFileUploadLimit(WidgetSession $session, ?int $maxFiles = null): array
@@ -387,12 +403,17 @@ PROMPT;
 
     /**
      * Attach a chat to the session if not already linked.
+     *
+     * @param bool $flush when false, the caller is responsible for flushing the
+     *                    EntityManager (used to consolidate writes on the hot path)
      */
-    public function attachChat(WidgetSession $session, Chat $chat): void
+    public function attachChat(WidgetSession $session, Chat $chat, bool $flush = true): void
     {
         if ($session->getChatId() !== $chat->getId()) {
             $session->setChatId($chat->getId());
-            $this->em->flush();
+            if ($flush) {
+                $this->em->flush();
+            }
         }
     }
 

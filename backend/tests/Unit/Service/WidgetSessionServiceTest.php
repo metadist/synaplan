@@ -187,4 +187,72 @@ class WidgetSessionServiceTest extends TestCase
         $this->assertSame(6, $session->getMessageCount());
         $this->assertGreaterThanOrEqual($previousLastMessage, $session->getLastMessage());
     }
+
+    public function testIncrementMessageCountSkipsFlushWhenCallerOptsOut(): void
+    {
+        $session = new WidgetSession();
+        $session->setWidgetId('widget-1');
+        $session->setSessionId('session-1');
+        $session->setMessageCount(0);
+
+        // Hot-path callers (e.g. WidgetPublicController::message) batch multiple
+        // session-level mutations into a single flush. The service must respect that.
+        $em = $this->createMock(EntityManagerInterface::class);
+        $em->expects($this->never())->method('flush');
+
+        $service = $this->createService(['em' => $em]);
+        $service->incrementMessageCount($session, false);
+
+        $this->assertSame(1, $session->getMessageCount(), 'Counter must still advance');
+    }
+
+    public function testDecrementMessageCountRollsBackForFailedMessage(): void
+    {
+        // Drift guard: when a visitor message ends up status='failed', both the live
+        // quota window and the export's bulk count exclude it — the cached counter
+        // must drop by 1 too so dashboard (cached) and export (DB-derived) stay in sync.
+        $session = new WidgetSession();
+        $session->setWidgetId('widget-1');
+        $session->setSessionId('session-1');
+        $session->setMessageCount(7);
+
+        $em = $this->createMock(EntityManagerInterface::class);
+        $em->expects($this->once())->method('flush');
+
+        $service = $this->createService(['em' => $em]);
+        $service->decrementMessageCount($session);
+
+        $this->assertSame(6, $session->getMessageCount());
+    }
+
+    public function testDecrementMessageCountNeverDropsBelowZero(): void
+    {
+        $session = new WidgetSession();
+        $session->setWidgetId('widget-1');
+        $session->setSessionId('session-1');
+        $session->setMessageCount(0);
+
+        $service = $this->createService();
+        $service->decrementMessageCount($session);
+
+        $this->assertSame(0, $session->getMessageCount(), 'Counter floor is zero');
+    }
+
+    public function testDecrementMessageCountSkipsFlushWhenCallerOptsOut(): void
+    {
+        $session = new WidgetSession();
+        $session->setWidgetId('widget-1');
+        $session->setSessionId('session-1');
+        $session->setMessageCount(3);
+
+        // The streaming error handler combines setStatus('failed') and the rollback
+        // into a single flush — the service must not pre-empt that.
+        $em = $this->createMock(EntityManagerInterface::class);
+        $em->expects($this->never())->method('flush');
+
+        $service = $this->createService(['em' => $em]);
+        $service->decrementMessageCount($session, false);
+
+        $this->assertSame(2, $session->getMessageCount());
+    }
 }
