@@ -23,6 +23,7 @@ describe('UsageStats interface', () => {
       subscription: {
         level: 'PRO',
         active: true,
+        status: 'active',
         plan_name: 'Pro Plan',
         expires_at: null,
         stripe_customer_id: null,
@@ -66,6 +67,7 @@ describe('UsageStats interface', () => {
         },
       ],
       total_requests: 10,
+      total_messages: 10,
       cost_budget: {
         used: 2.5,
         budget: 15.0,

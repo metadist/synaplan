@@ -336,7 +336,10 @@ class StreamController extends AbstractController
                     'remaining' => $rateLimitCheck['remaining'],
                     'reset_at' => $rateLimitCheck['reset_at'] ?? null,
                     'user_level' => $user->getUserLevel(),
-                    'phone_verified' => $user->isEmailVerified(),
+                    // LimitReachedModal offers a "Verify phone" secondary action for
+                    // ANONYMOUS users, so this flag MUST reflect actual phone
+                    // verification — not email verification (see #839).
+                    'phone_verified' => $user->hasVerifiedPhone(),
                 ];
             }
         }

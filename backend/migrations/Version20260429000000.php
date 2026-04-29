@@ -8,90 +8,114 @@ use Doctrine\DBAL\Schema\Schema;
 use Doctrine\Migrations\AbstractMigration;
 
 /**
- * Retire the deprecated OpenAI GPT-5.3 catalog entries (BIDs 193 chat + 194 pic2text).
+ * Remove legacy `DC2Type` column comments and reconcile BUSELOG.BERROR default so the
+ * schema matches DBAL 4.x expectations on both fresh and legacy databases.
  *
- * Background: GPT-5.3 has been superseded by GPT-5.4 (BIDs 180 chat + 181 pic2text)
- * and is being removed from {@see \App\Model\ModelCatalog}. The seeder never deletes
- * BMODELS rows on its own — and we cannot delete them here either, because BMESSAGES
- * still references BMODELS via FK. We therefore:
+ * Background: DBAL 3.x annotated mapped types (vector, datetime_immutable, etc.) in the
+ * SQL schema with `COMMENT '(DC2Type:…)'`. DBAL 4.x no longer emits those comments and
+ * treats them as drift when introspecting an existing database.
  *
- *   1. Flip the rows to BACTIVE=0 / BSELECTABLE=0 / BISDEFAULT=0 so they disappear
- *      from the admin UI and provider routing while historical message rows stay
- *      referentially intact.
- *   2. Repoint any BCONFIG DEFAULTMODEL bindings (operator overrides) that still
- *      target the deprecated BIDs at the GPT-5.4 successor of the matching tag, so
- *      no environment ends up with a default routed at a deactivated model. The
- *      UPDATE is guarded by a sub-SELECT that only touches rows whose successor is
- *      actually present — safety against partially-seeded test fixtures.
+ * Combined with `doctrine.yaml` now declaring `server_version: 'mariadb-12.2.2'` (which
+ * finally routes introspection through `MariaDBPlatform` and kills the string-default
+ * phantom diffs described in #824), this migration closes the last bit of drift so
+ * `doctrine:schema:validate` can run without `--skip-sync` in CI.
  *
- * No-ops on environments that never had GPT-5.3 seeded (UPDATEs simply match zero rows).
+ * Columns touched:
+ *   - BRAG.BEMBED                                              (strip DC2Type:vector)
+ *   - plugin_data.created_at/updated_at                        (strip DC2Type:datetime_immutable)
+ *   - messenger_messages.{created,available,delivered}_at      (strip DC2Type:datetime_immutable)
+ *   - BUSELOG.BERROR                                           (drop `DEFAULT ''` if present on legacy DBs)
+ *
+ * Idempotency: every statement uses `ALTER TABLE ... CHANGE col col <full-def>`, which
+ * MariaDB treats as absolute — re-running the migration after it has already been
+ * applied is a no-op at the SQL layer. The table / column existence checks below also
+ * skip statements whose targets don't exist (e.g. the messenger_messages block is a
+ * no-op on an install that disabled the doctrine transport before this migration).
+ *
+ * Failure mode: since the migration cannot run in a transaction on MariaDB, a partial
+ * failure in statement N leaves statements 1..N-1 applied. That's not an integrity
+ * problem because each statement is itself idempotent (see above) — re-running the
+ * migration converges to the target state regardless of where it stopped.
+ *
+ * No data is touched; only column metadata.
  */
 final class Version20260429000000 extends AbstractMigration
 {
-    private const DEPRECATED_CHAT_BID = 193;
-    private const DEPRECATED_VISION_BID = 194;
-    private const SUCCESSOR_CHAT_BID = 180;
-    private const SUCCESSOR_VISION_BID = 181;
-
     public function getDescription(): string
     {
-        return 'Deactivate deprecated GPT-5.3 BMODELS rows (BID 193, 194) and migrate operator DEFAULTMODEL overrides to GPT-5.4 (BID 180, 181).';
+        return 'Strip legacy DC2Type column comments + drop legacy BUSELOG.BERROR default (closes #824)';
+    }
+
+    public function isTransactional(): bool
+    {
+        // MariaDB does not support DDL inside transactions.
+        return false;
     }
 
     public function up(Schema $schema): void
     {
-        // Repoint operator-overridden DEFAULTMODEL bindings BEFORE deactivating the
-        // rows, so we never leave BCONFIG pointing at an inactive model — even if
-        // the migration were to be aborted between statements.
-        $this->addSql(<<<'SQL'
-            UPDATE BCONFIG
-               SET BVALUE = :successor
-             WHERE BGROUP = 'DEFAULTMODEL'
-               AND BVALUE = :deprecated
-               AND EXISTS (SELECT 1 FROM BMODELS WHERE BID = :successor)
-        SQL, [
-            'deprecated' => (string) self::DEPRECATED_CHAT_BID,
-            'successor' => (string) self::SUCCESSOR_CHAT_BID,
-        ]);
+        // BRAG.BEMBED — strip vector DC2Type comment
+        if ($schema->hasTable('BRAG') && $schema->getTable('BRAG')->hasColumn('BEMBED')) {
+            $this->addSql("ALTER TABLE BRAG CHANGE BEMBED BEMBED VECTOR(1024) NOT NULL COMMENT ''");
+        }
 
-        $this->addSql(<<<'SQL'
-            UPDATE BCONFIG
-               SET BVALUE = :successor
-             WHERE BGROUP = 'DEFAULTMODEL'
-               AND BVALUE = :deprecated
-               AND EXISTS (SELECT 1 FROM BMODELS WHERE BID = :successor)
-        SQL, [
-            'deprecated' => (string) self::DEPRECATED_VISION_BID,
-            'successor' => (string) self::SUCCESSOR_VISION_BID,
-        ]);
+        // plugin_data — strip datetime_immutable DC2Type comments
+        if ($schema->hasTable('plugin_data')) {
+            $this->addSql(<<<'SQL'
+                ALTER TABLE plugin_data
+                  CHANGE created_at created_at DATETIME NOT NULL COMMENT '',
+                  CHANGE updated_at updated_at DATETIME NOT NULL COMMENT ''
+            SQL);
+        }
 
-        // Hide the deprecated rows from the UI / provider routing without deleting
-        // them: BMESSAGES.BMODEL_ID still has FK references to historical entries.
-        $this->addSql(<<<'SQL'
-            UPDATE BMODELS
-               SET BACTIVE = 0,
-                   BSELECTABLE = 0,
-                   BISDEFAULT = 0
-             WHERE BID IN (:chat, :vision)
-        SQL, [
-            'chat' => self::DEPRECATED_CHAT_BID,
-            'vision' => self::DEPRECATED_VISION_BID,
-        ]);
+        // messenger_messages — strip datetime_immutable DC2Type comments. Guarded
+        // so the migration is a no-op for installs that provision messenger via a
+        // different transport (e.g. redis) and therefore never created the table.
+        if ($schema->hasTable('messenger_messages')) {
+            $this->addSql(<<<'SQL'
+                ALTER TABLE messenger_messages
+                  CHANGE created_at   created_at   DATETIME NOT NULL      COMMENT '',
+                  CHANGE available_at available_at DATETIME NOT NULL      COMMENT '',
+                  CHANGE delivered_at delivered_at DATETIME DEFAULT NULL  COMMENT ''
+            SQL);
+        }
+
+        // BUSELOG.BERROR — some legacy hand-crafted DBs have `LONGTEXT DEFAULT ''`
+        // (baseline 20260417 correctly has no default). The entity no longer declares
+        // a default, so `schema:validate` would flag drift on those installs. Dropping
+        // the default is a metadata-only change with no effect on existing rows —
+        // writers always pass an explicit value (see RateLimitService::recordUsage).
+        if ($schema->hasTable('BUSELOG') && $schema->getTable('BUSELOG')->hasColumn('BERROR')) {
+            $this->addSql('ALTER TABLE BUSELOG CHANGE BERROR BERROR LONGTEXT NOT NULL');
+        }
     }
 
     public function down(Schema $schema): void
     {
-        // Reactivate the rows so they reappear in the admin UI. We intentionally
-        // do NOT undo the BCONFIG repoint: GPT-5.4 is a strict superset and we have
-        // no way of knowing which operators had explicitly chosen GPT-5.3.
-        $this->addSql(<<<'SQL'
-            UPDATE BMODELS
-               SET BACTIVE = 1,
-                   BSELECTABLE = 1
-             WHERE BID IN (:chat, :vision)
-        SQL, [
-            'chat' => self::DEPRECATED_CHAT_BID,
-            'vision' => self::DEPRECATED_VISION_BID,
-        ]);
+        // Restore the DBAL 3.x-era comments so a rollback reaches the state that a
+        // DBAL 3.x app would have generated. Down is a no-op on a fresh DBAL 4.x-
+        // created DB or on installs that never ran DBAL 3.x. BUSELOG.BERROR's
+        // default is intentionally NOT restored — baseline 20260417 has no default
+        // and that's the correct target for a rollback.
+        if ($schema->hasTable('BRAG') && $schema->getTable('BRAG')->hasColumn('BEMBED')) {
+            $this->addSql("ALTER TABLE BRAG CHANGE BEMBED BEMBED VECTOR(1024) NOT NULL COMMENT '(DC2Type:vector)'");
+        }
+
+        if ($schema->hasTable('plugin_data')) {
+            $this->addSql(<<<'SQL'
+                ALTER TABLE plugin_data
+                  CHANGE created_at created_at DATETIME NOT NULL COMMENT '(DC2Type:datetime_immutable)',
+                  CHANGE updated_at updated_at DATETIME NOT NULL COMMENT '(DC2Type:datetime_immutable)'
+            SQL);
+        }
+
+        if ($schema->hasTable('messenger_messages')) {
+            $this->addSql(<<<'SQL'
+                ALTER TABLE messenger_messages
+                  CHANGE created_at   created_at   DATETIME NOT NULL      COMMENT '(DC2Type:datetime_immutable)',
+                  CHANGE available_at available_at DATETIME NOT NULL      COMMENT '(DC2Type:datetime_immutable)',
+                  CHANGE delivered_at delivered_at DATETIME DEFAULT NULL  COMMENT '(DC2Type:datetime_immutable)'
+            SQL);
+        }
     }
 }

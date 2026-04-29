@@ -14,7 +14,7 @@ use App\AI\Interface\VisionProviderInterface;
 use App\Repository\ModelRepository;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\DependencyInjection\Attribute\Autowire;
-use Symfony\Component\DependencyInjection\Attribute\TaggedIterator;
+use Symfony\Component\DependencyInjection\Attribute\AutowireIterator;
 
 /**
  * Provider Registry with DB-driven Capabilities.
@@ -28,21 +28,21 @@ class ProviderRegistry
     private ?array $dbCapabilities = null;
 
     public function __construct(
-        #[TaggedIterator('app.ai.chat')]
+        #[AutowireIterator('app.ai.chat')]
         iterable $chatProviders = [],
-        #[TaggedIterator('app.ai.embedding')]
+        #[AutowireIterator('app.ai.embedding')]
         iterable $embeddingProviders = [],
-        #[TaggedIterator('app.ai.vision')]
+        #[AutowireIterator('app.ai.vision')]
         iterable $visionProviders = [],
-        #[TaggedIterator('app.ai.image_generation')]
+        #[AutowireIterator('app.ai.image_generation')]
         iterable $imageGenerationProviders = [],
-        #[TaggedIterator('app.ai.video_generation')]
+        #[AutowireIterator('app.ai.video_generation')]
         iterable $videoGenerationProviders = [],
-        #[TaggedIterator('app.ai.speech_to_text')]
+        #[AutowireIterator('app.ai.speech_to_text')]
         iterable $speechToTextProviders = [],
-        #[TaggedIterator('app.ai.text_to_speech')]
+        #[AutowireIterator('app.ai.text_to_speech')]
         iterable $textToSpeechProviders = [],
-        #[TaggedIterator('app.ai.file_analysis')]
+        #[AutowireIterator('app.ai.file_analysis')]
         iterable $fileAnalysisProviders = [],
         private ModelRepository $modelRepository,
         private LoggerInterface $logger,

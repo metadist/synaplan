@@ -16,7 +16,7 @@
 services:
   # Vue.js Frontend
   frontend:
-    image: node:22@sha256:ca462bbec44520af20ef37f6007a62e2f652889796fcc1c070c614fce06eed6c
+    image: node:22@sha256:9059d9d7db987b86299e052ff6630cd95e5a770336967c21110e53289a877433
     container_name: synaplan-frontend
     working_dir: /app
     entrypoint: ["/usr/local/bin/docker-entrypoint.sh"]
@@ -41,7 +41,7 @@ services:
   # Memory-limited to prevent unbounded growth from Chokidar polling (#515).
   # Container auto-restarts on OOM thanks to restart policy.
   frontend-widgets:
-    image: node:22@sha256:ca462bbec44520af20ef37f6007a62e2f652889796fcc1c070c614fce06eed6c
+    image: node:22@sha256:9059d9d7db987b86299e052ff6630cd95e5a770336967c21110e53289a877433
     container_name: synaplan-frontend-widgets
     working_dir: /app
     command: sh -c "npm ci && npm run build:widget -- --watch"
@@ -87,8 +87,8 @@ services:
       APP_URL: http://localhost:8000
       PLUGINS_DIR: /plugins
       FRONTEND_URL: http://localhost:5173
-      DATABASE_WRITE_URL: mysql://synaplan_user:synaplan_password@db:3306/synaplan?serverVersion=11.8&charset=utf8mb4
-      DATABASE_READ_URL: mysql://synaplan_user:synaplan_password@db:3306/synaplan?serverVersion=11.8&charset=utf8mb4
+      DATABASE_WRITE_URL: mysql://synaplan_user:synaplan_password@db:3306/synaplan?serverVersion=mariadb-12.2.2&charset=utf8mb4
+      DATABASE_READ_URL: mysql://synaplan_user:synaplan_password@db:3306/synaplan?serverVersion=mariadb-12.2.2&charset=utf8mb4
       # No Ollama - use external AI providers
       OLLAMA_BASE_URL: ""
       TRITON_SERVER_URL: ${TRITON_SERVER_URL:-}
