@@ -22,7 +22,7 @@ class ModelListCommandTest extends TestCase
         $command = new ModelListCommand($this->connection);
 
         $application = new Application();
-        $application->add($command);
+        $application->addCommand($command);
 
         $this->commandTester = new CommandTester($application->find('app:model:list'));
     }
