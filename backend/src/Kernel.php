@@ -2,7 +2,9 @@
 
 namespace App;
 
+use App\DependencyInjection\Compiler\EnableTestSavepointsPass;
 use Symfony\Bundle\FrameworkBundle\Kernel\MicroKernelTrait;
+use Symfony\Component\DependencyInjection\ContainerBuilder;
 use Symfony\Component\DependencyInjection\Loader\Configurator\ContainerConfigurator;
 use Symfony\Component\HttpKernel\Kernel as BaseKernel;
 use Symfony\Component\Routing\Loader\Configurator\RoutingConfigurator;
@@ -37,6 +39,20 @@ class Kernel extends BaseKernel
         }
 
         $this->loadPluginServices($container);
+    }
+
+    protected function build(ContainerBuilder $container): void
+    {
+        parent::build($container);
+
+        // Nested-transaction savepoints are required by dama/doctrine-test-bundle
+        // on MariaDB/MySQL. We register the compiler pass conditionally because
+        // the doctrine-bundle YAML key `use_savepoints` is only available with
+        // DBAL 4.x, and we currently ship against DBAL 3.x. See the pass's
+        // class docblock for the full rationale.
+        if ('test' === $this->environment) {
+            $container->addCompilerPass(new EnableTestSavepointsPass());
+        }
     }
 
     protected function configureRoutes(RoutingConfigurator $routes): void

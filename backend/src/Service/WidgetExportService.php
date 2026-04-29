@@ -479,13 +479,36 @@ final readonly class WidgetExportService
             $filters
         );
 
+        // Resolve real per-chat message counts in a single bulk query so the export
+        // never depends on the cached BMESSAGECOUNT (which historically drifted to
+        // zero in human/internal/expired-resume scenarios) and never triggers an
+        // N+1 query pattern.
+        //
+        // This is an all-time, all-direction count of every persisted message on the
+        // chat (visitor IN, AI/operator/system/welcome OUT) with status != 'failed' —
+        // i.e. the true conversation length, NOT the sliding visitor-quota window
+        // computed by WidgetSessionService::checkSessionLimit() (which is IN-only and
+        // last-{SESSION_EXPIRY_HOURS}-only). The two views agree on the failed-row
+        // exclusion, so a stream error never inflates the export over the cached
+        // counter (which is rolled back at the same site — see WidgetPublicController).
+        $chatIds = array_values(array_filter(array_map(
+            static fn ($session) => $session->getChatId(),
+            $result['sessions']
+        )));
+        $messageCountsByChat = [] !== $chatIds
+            ? $this->messageRepository->countByChatIds($chatIds)
+            : [];
+
         $row = 2;
         foreach ($result['sessions'] as $session) {
             $duration = $session->getLastMessage() - $session->getCreated();
             $durationStr = $this->formatDuration($duration);
-            $messages = $this->getSessionMessages($session);
-            $messageCount = count($messages);
-            $fileCount = $this->countFilesInMessages($messages);
+            $chatId = $session->getChatId();
+            $messageCount = null !== $chatId ? ($messageCountsByChat[$chatId] ?? 0) : 0;
+            // File counts still derive from the loaded message slice — see
+            // getSessionMessages() for the (separate, pre-existing) limit. Tracked as
+            // a follow-up; not in scope for the BMESSAGECOUNT data-quality fix.
+            $fileCount = $this->countFilesInMessages($this->getSessionMessages($session));
 
             $sheet->setCellValue('A'.$row, substr($session->getSessionId(), 0, 12).'...');
             $sheet->setCellValue('B'.$row, $this->formatTimestamp($session->getCreated(), $tz, 'Y-m-d H:i'));

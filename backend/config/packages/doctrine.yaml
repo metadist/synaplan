@@ -80,6 +80,12 @@ when@test:
                     dbname_suffix: '_test%env(default::TEST_TOKEN)%'
                 read:
                     dbname_suffix: '_test%env(default::TEST_TOKEN)%'
+        # NOTE: Nested-transaction savepoints (required by dama/doctrine-test-bundle
+        # to roll back per-test changes) are wired up by
+        # App\DependencyInjection\Compiler\EnableTestSavepointsPass — registered in
+        # App\Kernel for `test` env. The doctrine-bundle YAML key `use_savepoints`
+        # is only available with DBAL 4.x and would fail config validation on the
+        # DBAL 3.x line we currently ship against.
 
 when@prod:
     doctrine:
