@@ -90,12 +90,13 @@ final class Version20260429120000 extends AbstractMigration
         // do NOT undo the BCONFIG repoint: GPT-5.4 is a strict superset and we have
         // no way of knowing which operators had explicitly chosen GPT-5.3.
         //
-        // We intentionally do NOT restore BISDEFAULT either: only one model per
-        // tag may be default, and the seeder / a later migration may have
-        // promoted GPT-5.4 to default in the meantime. Reinstating BISDEFAULT=1
-        // here would risk two-defaults-per-tag drift. Operators rolling back
-        // who actually want GPT-5.3 as default again can flip BISDEFAULT
-        // explicitly via the admin UI.
+        // BISDEFAULT is intentionally NOT restored here either:
+        //   - The seeder owns the "default model" assignment and will re-apply it
+        //     on the next `app:seed` run if the catalog still ships these BIDs.
+        //   - If the seeder no longer ships them (the deprecation has gone all the
+        //     way through), restoring BISDEFAULT=1 would leave a non-default model
+        //     advertised as default. Better to leave it 0 and let an operator set
+        //     it explicitly if they really want the deprecated model back.
         $this->addSql(<<<'SQL'
             UPDATE BMODELS
                SET BACTIVE = 1,

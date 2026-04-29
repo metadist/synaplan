@@ -78,8 +78,14 @@ when@test:
             connections:
                 default:
                     dbname_suffix: '_test%env(default::TEST_TOKEN)%'
+                    # Required by dama/doctrine-test-bundle (>=8.6) for the
+                    # nested-transaction wrapping it puts around every test
+                    # method. Safe on MariaDB/MySQL — DBAL emulates nested
+                    # transactions as savepoints when supported by the driver.
+                    use_savepoints: true
                 read:
                     dbname_suffix: '_test%env(default::TEST_TOKEN)%'
+                    use_savepoints: true
 
 when@prod:
     doctrine:

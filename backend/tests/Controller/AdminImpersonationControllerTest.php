@@ -138,4 +138,18 @@ class AdminImpersonationControllerTest extends WebTestCase
         }
         $em->flush();
     }
+
+    public function testStartReturns401WhenNoSessionIsAttached(): void
+    {
+        // The route sits behind the cookie-token authenticator, so an
+        // anonymous request must be rejected at the firewall — never reach
+        // the controller's role gate. This guards against accidental future
+        // weakening of `security.access_control` for the admin namespace.
+        self::ensureKernelShutdown();
+        $client = static::createClient();
+
+        $client->request('POST', '/api/v1/admin/impersonate/1');
+
+        $this->assertResponseStatusCodeSame(401);
+    }
 }
