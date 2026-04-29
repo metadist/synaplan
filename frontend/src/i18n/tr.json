@@ -1425,7 +1425,6 @@
       "subscription": "Abonelik",
       "userLevel": "Kullanıcı Seviyesi",
       "phoneVerified": "Telefon Doğrulandı",
-      "subscriptionActive": "Durum",
       "subscriptionStatusLabel": "Plan durumu",
       "subscriptionStatus": {
         "active": "Aktif",

@@ -1084,7 +1084,6 @@
       "subscription": "Abonnement",
       "userLevel": "Benutzerebene",
       "phoneVerified": "Telefon verifiziert",
-      "subscriptionActive": "Status",
       "subscriptionStatusLabel": "Planstatus",
       "subscriptionStatus": {
         "active": "Aktiv",

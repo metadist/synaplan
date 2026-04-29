@@ -108,7 +108,6 @@ class MessageController extends AbstractController
                 // ANONYMOUS users, so this flag MUST reflect actual phone
                 // verification — not email verification (see #839).
                 'phone_verified' => $user->hasVerifiedPhone(),
-                'email_verified' => $user->isEmailVerified(),
             ], Response::HTTP_TOO_MANY_REQUESTS);
         }
 

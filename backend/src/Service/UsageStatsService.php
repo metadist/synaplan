@@ -312,6 +312,27 @@ final readonly class UsageStatsService
     }
 
     /**
+     * Derive a user-facing subscription status label from the user's effective plan
+     * and their stored Stripe subscription payload.
+     *
+     * Semantic note: this intentionally may diverge from `subscription.active` in
+     * the response. `active` (legacy boolean) always means "has a paid Stripe
+     * subscription currently within billing period". `status` is the UX label and
+     * reflects what the user can DO — which includes admin-granted plans where
+     * `active` is false but capabilities are fully granted.
+     *
+     * Mapping:
+     *   ANONYMOUS level                           → 'anonymous'
+     *   hasActiveSubscription()                   → 'active'
+     *   Stripe status past_due/unpaid             → 'past_due'
+     *   Stripe status incomplete/incomplete_expired → 'past_due'
+     *   Stripe status canceled/cancelled          → 'cancelled'
+     *   Stripe status paused                      → 'inactive'
+     *   Stripe status trialing                    → 'active'   (user still has access)
+     *   subscription_end elapsed                  → 'past_due'
+     *   NEW level w/ no Stripe record             → 'free'
+     *   PRO/TEAM/BUSINESS w/ no Stripe record     → 'active'   (admin-granted plan)
+     *
      * @param array<string, mixed> $subscriptionData raw `paymentDetails.subscription` JSON
      */
     private function deriveSubscriptionStatus(User $user, array $subscriptionData): string
@@ -330,18 +351,33 @@ final readonly class UsageStatsService
             ? strtolower($subscriptionData['status'])
             : '';
 
-        if ('past_due' === $stripeStatus || 'unpaid' === $stripeStatus) {
-            return 'past_due';
-        }
-
-        if ('canceled' === $stripeStatus || 'cancelled' === $stripeStatus) {
-            return 'cancelled';
+        // Full map of Stripe subscription statuses we recognise. See:
+        // https://docs.stripe.com/api/subscriptions/object#subscription_object-status
+        switch ($stripeStatus) {
+            case 'active':
+            case 'trialing':
+                // Stripe says active/trialing but User::hasActiveSubscription() above
+                // was false — probably means subscription_end is in the past locally.
+                // Still report as active since the upstream source-of-truth says so.
+                return 'active';
+            case 'past_due':
+            case 'unpaid':
+            case 'incomplete':
+            case 'incomplete_expired':
+                return 'past_due';
+            case 'canceled':
+            case 'cancelled':
+                return 'cancelled';
+            case 'paused':
+                return 'inactive';
         }
 
         // If the user has an expired paid subscription (had a subscription_end at some
         // point), surface that as "past_due" so the UI can nudge them to renew.
+        // is_numeric() accepts both integer (native JSON) and string ("1735689600" from
+        // Stripe webhook payloads) representations of the unix timestamp.
         $expiresAt = $subscriptionData['subscription_end'] ?? null;
-        if (is_int($expiresAt) && $expiresAt > 0 && $expiresAt <= time()) {
+        if (is_numeric($expiresAt) && (int) $expiresAt > 0 && (int) $expiresAt <= time()) {
             return 'past_due';
         }
 
@@ -354,7 +390,9 @@ final readonly class UsageStatsService
         // admin-override path in `User::getRateLimitLevel()` (see lines 369-371) —
         // admins can set BUSERLEVEL directly via fixtures or the admin panel. The
         // user has the capabilities of that plan, so the status should reflect
-        // that rather than showing "Inactive" next to e.g. "Pro Plan".
+        // that rather than showing "Inactive" next to e.g. "Pro Plan". This is
+        // why `status` can disagree with the legacy `active` boolean — see the
+        // docblock semantic note above.
         return 'active';
     }
 

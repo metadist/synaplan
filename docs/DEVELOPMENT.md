@@ -20,6 +20,32 @@ docker compose restart backend
 docker compose restart frontend
 ```
 
+### Connecting to services on the host
+
+The backend container exposes **two** aliases for the Docker host (via `extra_hosts` in `docker-compose.yml`):
+
+- `host.docker.internal` — Docker's standard cross-platform alias.
+- `docker-host` — platform-compatible alias matching `synaplan-platform/docker-compose.yml`, so production-style env vars like `QDRANT_URL=http://docker-host:6333` work unchanged in dev.
+
+Both resolve to the host gateway (`host-gateway`). Use `docker-host` in `backend/.env` if you want the same value to work in both dev and prod; use `host.docker.internal` if you're copy-pasting from generic Docker docs.
+
+### Running the Qdrant vector database
+
+Qdrant can run in two ways depending on what you're testing:
+
+```bash
+# Option A (simplest): use the embedded qdrant service from the main compose.
+# Nothing to do — it starts with `docker compose up -d` and binds to :6333.
+
+# Option B (production-parity): use the synaplan-memories compose as the "canonical"
+# qdrant source-of-truth, the same way production does. First stop the embedded one
+# to free port 6333, then bring up memories:
+docker compose stop qdrant
+cd ../synaplan-memories && docker compose up -d
+```
+
+Either way the backend reaches it via `QDRANT_URL=http://docker-host:6333` (or `http://qdrant:6333` for the internal-network route when using Option A).
+
 ---
 
 ## Code Quality

@@ -979,7 +979,6 @@
       "subscription": "Subscription",
       "userLevel": "User Level",
       "phoneVerified": "Phone Verified",
-      "subscriptionActive": "Status",
       "subscriptionStatusLabel": "Plan status",
       "subscriptionStatus": {
         "active": "Active",
@@ -990,7 +989,7 @@
         "inactive": "Inactive"
       },
       "totalRequests": "Total Requests",
-      "totalRequestsShort": "all",
+      "totalRequestsShort": "total",
       "totalMessages": "Chat messages",
       "totalMessagesTooltip": "Only BACTION=MESSAGES rows — this is what the plan limit (e.g. 50/50) actually gates.",
       "usageByType": "Usage by Type",

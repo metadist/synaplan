@@ -1424,7 +1424,6 @@
       "subscription": "Suscripción",
       "userLevel": "Nivel de Usuario",
       "phoneVerified": "Teléfono Verificado",
-      "subscriptionActive": "Estado",
       "subscriptionStatusLabel": "Estado del plan",
       "subscriptionStatus": {
         "active": "Activo",

@@ -1,6 +1,14 @@
 import { httpClient } from '@/services/api/httpClient'
 import { useConfigStore } from '@/stores/config'
 
+// NOTE: this interface is hand-maintained because UsageStatsController's
+// OpenAPI annotation currently types the `data` field as a generic `object`.
+// Schematising the full usage-stats response (usage map, breakdowns,
+// cost_budget, cost_summary, recent_usage items, …) so Zod is auto-generated
+// from the spec is a larger follow-up; tracked via the TODO in
+// UsageStatsController::getStats(). Keep this interface in sync with the
+// backend response shape until that happens.
+
 export type SubscriptionStatus =
   | 'active'
   | 'free'

@@ -654,20 +654,24 @@ const getSubscriptionStatusLabel = (status: SubscriptionStatus) => {
   return t(`config.usage.subscriptionStatus.${status}`)
 }
 
+// Stays consistent with the color palette used everywhere else in this file
+// (subscription-badge switch at line ~620, recent-activity cached_tokens badge,
+// etc.). A broader sweep to move the file off direct Tailwind classes onto the
+// CSS-variable utilities in style.css is a separate cleanup.
 const getSubscriptionStatusClass = (status: SubscriptionStatus) => {
   switch (status) {
     case 'active':
-      return 'text-green-600'
+      return 'text-green-600 dark:text-green-400'
     case 'free':
-      return 'txt-primary'
+      return 'text-gray-600 dark:text-gray-400'
     case 'past_due':
-      return 'text-orange-600'
+      return 'text-orange-600 dark:text-orange-400'
     case 'cancelled':
-      return 'text-red-600'
+      return 'text-red-600 dark:text-red-400'
     case 'anonymous':
-      return 'text-orange-600'
+      return 'text-orange-600 dark:text-orange-400'
     default:
-      return 'text-gray-600'
+      return 'text-gray-600 dark:text-gray-400'
   }
 }
 
