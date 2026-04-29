@@ -29,7 +29,6 @@ doctrine:
                 server_version: 'mariadb-12.2.2'
                 charset: utf8mb4
                 profiling_collect_backtrace: '%kernel.debug%'
-                use_savepoints: true
                 schema_filter: '%app.doctrine.schema_filter%'
                 mapping_types:
                     vector: vector
@@ -40,15 +39,12 @@ doctrine:
                 server_version: 'mariadb-12.2.2'
                 charset: utf8mb4
                 profiling_collect_backtrace: '%kernel.debug%'
-                use_savepoints: true
                 schema_filter: '%app.doctrine.schema_filter%'
                 mapping_types:
                     vector: vector
 
     orm:
         default_entity_manager: default
-        auto_generate_proxy_classes: true
-        enable_lazy_ghost_objects: true
         
         entity_managers:
             default:
@@ -88,8 +84,6 @@ when@test:
 when@prod:
     doctrine:
         orm:
-            auto_generate_proxy_classes: false
-            proxy_dir: '%kernel.build_dir%/doctrine/orm/Proxies'
             query_cache_driver:
                 type: pool
                 pool: doctrine.system_cache_pool
