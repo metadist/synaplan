@@ -342,7 +342,7 @@ PROMPT;
      *
      * Required for cache consistency: the live quota window
      * ({@see countVisitorMessagesInQuotaWindow()}) and the export's bulk count
-     * ({@see \App\Repository\MessageRepository::countByChatIds()}) both exclude
+     * ({@see MessageRepository::countByChatIds()}) both exclude
      * status='failed', so the cached BMESSAGECOUNT must do the same — otherwise
      * dashboard and export drift apart again.
      *
