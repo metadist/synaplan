@@ -2,7 +2,6 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { mount } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import { createMemoryHistory, createRouter } from 'vue-router'
-import { createI18n } from 'vue-i18n'
 
 import ImpersonationBanner from '@/components/ImpersonationBanner.vue'
 import { useAuthStore } from '@/stores/auth'
@@ -61,28 +60,10 @@ const buildRouter = () =>
     ],
   })
 
-const buildI18n = () =>
-  createI18n({
-    legacy: false,
-    locale: 'en',
-    messages: {
-      en: {
-        admin: {
-          impersonate: {
-            stopFailed: 'stop failed',
-            stopped: 'admin restored',
-            banner: {
-              viewing: 'Viewing as {email}',
-              adminLabel: 'Signed in as {email}',
-              exitButton: 'Exit',
-              exitButtonTitle: 'Restore your admin session',
-            },
-          },
-        },
-      },
-    },
-  })
-
+// i18n is provided globally via `tests/unit/setup.ts` (which registers the
+// real `@/i18n` plugin on `config.global.plugins`). All other specs in this
+// suite rely on the same global setup — building a local stub here would
+// duplicate that wiring and risk drifting from the real translation keys.
 const mountBanner = async () => {
   const router = buildRouter()
   await router.push('/')
@@ -90,7 +71,7 @@ const mountBanner = async () => {
 
   return mount(ImpersonationBanner, {
     global: {
-      plugins: [router, buildI18n()],
+      plugins: [router],
       stubs: { Icon: true },
     },
   })
@@ -154,7 +135,7 @@ describe('ImpersonationBanner', () => {
     await new Promise((resolve) => setTimeout(resolve, 0))
 
     expect(stopImpersonationMock).toHaveBeenCalledTimes(1)
-    expect(successMock).toHaveBeenCalledWith('admin restored')
+    expect(successMock).toHaveBeenCalledWith('Admin session restored.')
   })
 
   it('shows the server-supplied error when Exit fails', async () => {

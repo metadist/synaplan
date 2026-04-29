@@ -225,7 +225,10 @@ const canSeeDebugDetails = computed(() => isAdmin.value || isImpersonating.value
 
 const stackExpanded = ref(false)
 const copied = ref(false)
-const previousTitle = ref<string>('')
+// Nullable so we can distinguish "never mounted" (null) from "mounted but the
+// host page legitimately had an empty title" (''). Without this, an empty
+// original title would never be restored on unmount.
+const previousTitle = ref<string | null>(null)
 
 /**
  * Map "infrastructure" errors raised by router guards or auth bootstrap to a
@@ -326,7 +329,7 @@ onMounted(() => {
 })
 
 onBeforeUnmount(() => {
-  if (previousTitle.value) {
+  if (previousTitle.value !== null) {
     document.title = previousTitle.value
   }
 })

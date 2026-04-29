@@ -45,7 +45,7 @@ function toPayload(
 /**
  * Centralised error handlers that route every "escapes the component tree"
  * failure into the globalError Pinia store, which in turn renders the inline
- * ErrorView via ErrorBoundary. Covers four orthogonal channels:
+ * ErrorView via ErrorBoundary. Covers three orthogonal channels:
  *
  *   1. Vue's app.config.errorHandler  — backstop for everything onErrorCaptured
  *      lets through (rare, but real for some async lifecycle bugs).
@@ -56,10 +56,15 @@ function toPayload(
  *      (the most common modern source of silent failures).
  *
  * MUST be called *after* the Pinia plugin has been registered on the app, so
- * the store is reachable. Idempotent: safe to call multiple times in dev with
- * Vite HMR — duplicate listeners would still be deduplicated by the browser
- * because we pass the same function reference (we keep them as module-scoped
- * variables that survive HMR boundaries).
+ * the store is reachable.
+ *
+ * Idempotent: safe to call multiple times in dev with Vite HMR. We track the
+ * previously installed listener in a module-scoped variable and explicitly
+ * `removeEventListener()` it before binding a new one, so each install ends
+ * up with exactly one active handler per channel — even though every install
+ * creates a fresh closure (so the browser's "same function reference"
+ * deduplication does NOT apply here). The Vue handler is just an assignment
+ * (no listener bookkeeping) and is therefore naturally idempotent.
  */
 let windowErrorHandler: ((event: ErrorEvent) => void) | null = null
 let windowRejectionHandler: ((event: PromiseRejectionEvent) => void) | null = null
