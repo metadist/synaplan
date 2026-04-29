@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "96c247f0ff4d2b701ac0bdc787ac61e6",
+    "content-hash": "343d647e9bbdad14616e709b62920821",
     "packages": [
         {
             "name": "api-platform/doctrine-common",
@@ -5526,16 +5526,16 @@
         },
         {
             "name": "netflie/whatsapp-cloud-api",
-            "version": "3.1.0",
+            "version": "4.0.0",
             "source": {
                 "type": "git",
                 "url": "https://github.com/netflie/whatsapp-cloud-api.git",
-                "reference": "c618fe96202e1cfd077f06328d758712e6f16d6c"
+                "reference": "acdabf30c5838afaa46c98a671dc38c0c77593dc"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/netflie/whatsapp-cloud-api/zipball/c618fe96202e1cfd077f06328d758712e6f16d6c",
-                "reference": "c618fe96202e1cfd077f06328d758712e6f16d6c",
+                "url": "https://api.github.com/repos/netflie/whatsapp-cloud-api/zipball/acdabf30c5838afaa46c98a671dc38c0c77593dc",
+                "reference": "acdabf30c5838afaa46c98a671dc38c0c77593dc",
                 "shasum": ""
             },
             "require": {
@@ -5575,7 +5575,7 @@
             "description": "The first PHP SDK to send and receive messages using a cloud-hosted version of the WhatsApp Business Platform",
             "support": {
                 "issues": "https://github.com/netflie/whatsapp-cloud-api/issues",
-                "source": "https://github.com/netflie/whatsapp-cloud-api/tree/3.1.0"
+                "source": "https://github.com/netflie/whatsapp-cloud-api/tree/4.0.0"
             },
             "funding": [
                 {
@@ -5583,7 +5583,7 @@
                     "type": "github"
                 }
             ],
-            "time": "2026-03-23T15:49:02+00:00"
+            "time": "2026-04-14T17:12:07+00:00"
         },
         {
             "name": "nikic/php-parser",
