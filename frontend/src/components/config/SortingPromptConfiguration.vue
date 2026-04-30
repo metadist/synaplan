@@ -26,6 +26,95 @@
       </div>
     </div>
 
+    <!-- Beta toggle (admin only) -->
+    <div v-if="isAdmin" class="surface-card overflow-hidden" data-testid="section-routing-beta">
+      <div class="p-6 border-b border-light-border/30 dark:border-dark-border/20">
+        <div class="flex items-start gap-4 flex-wrap">
+          <div class="p-2 rounded-lg bg-amber-500/10 flex-shrink-0">
+            <Icon icon="heroicons:beaker" class="w-5 h-5 text-amber-600 dark:text-amber-400" />
+          </div>
+          <div class="flex-1 min-w-0">
+            <div class="flex items-center gap-2 flex-wrap mb-1">
+              <h3 class="text-lg font-semibold txt-primary">
+                {{ $t('config.routing.betaTitle') }}
+              </h3>
+              <span
+                class="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-amber-500/15 text-amber-700 dark:text-amber-300"
+                data-testid="badge-beta"
+              >
+                {{ $t('config.routing.betaBadge') }}
+              </span>
+            </div>
+            <p class="text-sm txt-secondary">
+              {{ $t('config.routing.betaSubtitle') }}
+            </p>
+          </div>
+          <label
+            class="inline-flex items-center gap-3 cursor-pointer flex-shrink-0"
+            data-testid="toggle-synapse-enabled"
+          >
+            <span class="text-sm font-medium txt-primary">
+              {{ synapseEnabled ? $t('config.routing.betaOn') : $t('config.routing.betaOff') }}
+            </span>
+            <span class="relative inline-flex">
+              <input
+                type="checkbox"
+                class="sr-only peer"
+                :checked="synapseEnabled"
+                :disabled="togglingSynapse"
+                data-testid="toggle-synapse-input"
+                @change="onToggleSynapse(($event.target as HTMLInputElement).checked)"
+              />
+              <span
+                class="w-11 h-6 bg-gray-300 dark:bg-gray-700 rounded-full peer-checked:bg-amber-500 peer-disabled:opacity-50 transition-colors"
+              ></span>
+              <span
+                class="absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform peer-checked:translate-x-5"
+              ></span>
+            </span>
+          </label>
+        </div>
+      </div>
+
+      <div
+        v-if="synapseEnabled"
+        class="p-5 bg-amber-500/5 border-t border-amber-500/20 flex items-start gap-3"
+        data-testid="banner-beta-warning"
+      >
+        <Icon
+          icon="heroicons:exclamation-triangle"
+          class="w-5 h-5 text-amber-600 dark:text-amber-400 flex-shrink-0 mt-0.5"
+        />
+        <div class="text-sm">
+          <p class="font-medium text-amber-700 dark:text-amber-300 mb-1">
+            {{ $t('config.routing.betaWarningTitle') }}
+          </p>
+          <p class="text-amber-700/90 dark:text-amber-300/90 leading-relaxed">
+            {{ $t('config.routing.betaWarningBody') }}
+          </p>
+          <ul class="mt-2 ml-4 list-disc text-amber-700/80 dark:text-amber-300/80 space-y-1">
+            <li>{{ $t('config.routing.betaIssueSticky') }}</li>
+            <li>{{ $t('config.routing.betaIssueGranular') }}</li>
+            <li>{{ $t('config.routing.betaIssueStale') }}</li>
+          </ul>
+        </div>
+      </div>
+
+      <div
+        v-else
+        class="p-5 bg-emerald-500/5 border-t border-emerald-500/20 flex items-start gap-3"
+        data-testid="banner-ai-default"
+      >
+        <Icon
+          icon="heroicons:check-circle"
+          class="w-5 h-5 text-emerald-600 dark:text-emerald-400 flex-shrink-0 mt-0.5"
+        />
+        <p class="text-sm text-emerald-700/90 dark:text-emerald-300/90 leading-relaxed">
+          {{ $t('config.routing.aiDefaultBody') }}
+        </p>
+      </div>
+    </div>
+
     <!-- Live status (admin) -->
     <div v-if="isAdmin" class="surface-card p-6" data-testid="section-routing-status">
       <div class="flex items-center justify-between mb-4 flex-wrap gap-3">
@@ -602,6 +691,7 @@ import { promptsApi } from '@/services/api/promptsApi'
 import type { SortingPromptPayload, RoutingTestResult } from '@/services/api/promptsApi'
 import { adminSynapseApi } from '@/services/api/adminSynapseApi'
 import type { SynapseStatusResponse } from '@/services/api/adminSynapseApi'
+import { getConfigValues, updateConfigValue } from '@/services/api/adminConfigApi'
 import { useNotification } from '@/composables/useNotification'
 import { useDialog } from '@/composables/useDialog'
 import { useAuthStore } from '@/stores/auth'
@@ -613,6 +703,10 @@ const status = ref<SynapseStatusResponse | null>(null)
 const loadingStatus = ref(false)
 const reindexing = ref(false)
 const topicSearch = ref('')
+
+// --- Beta toggle state ------------------------------------------------------
+const synapseEnabled = ref(false)
+const togglingSynapse = ref(false)
 
 // --- Test-box state ---------------------------------------------------------
 const testInput = ref('')
@@ -862,6 +956,57 @@ const loadStatus = async () => {
   }
 }
 
+// --- Beta toggle loading + persistence -------------------------------------
+const loadSynapseEnabled = async () => {
+  if (!isAdmin.value) return
+  try {
+    const values = await getConfigValues()
+    const raw = values['SYNAPSE_ROUTING_ENABLED']?.value ?? 'false'
+    synapseEnabled.value = ['true', '1', 'yes', 'on'].includes(raw.toLowerCase())
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Failed to load Synapse routing state'
+    showError(message)
+  }
+}
+
+const onToggleSynapse = async (next: boolean) => {
+  if (!isAdmin.value) return
+
+  // Confirmation when enabling — surface the beta caveat one more time
+  if (next) {
+    const confirmed = await dialog.confirm({
+      title: t('config.routing.confirmEnableTitle'),
+      message: t('config.routing.confirmEnableBody'),
+      confirmText: t('config.routing.confirmEnableConfirm'),
+      cancelText: t('config.routing.confirmEnableCancel'),
+      danger: true,
+    })
+    if (!confirmed) return
+  }
+
+  togglingSynapse.value = true
+  const previous = synapseEnabled.value
+  synapseEnabled.value = next
+  try {
+    const result = await updateConfigValue('SYNAPSE_ROUTING_ENABLED', next ? 'true' : 'false')
+    if (!result.success) {
+      throw new Error(result.error || 'Failed to update Synapse routing state')
+    }
+    success(
+      next ? t('config.routing.toggleEnabledNotice') : t('config.routing.toggleDisabledNotice')
+    )
+    if (next) {
+      await loadStatus()
+    }
+  } catch (err) {
+    synapseEnabled.value = previous
+    const message = err instanceof Error ? err.message : 'Failed to update Synapse routing state'
+    showError(message)
+  } finally {
+    togglingSynapse.value = false
+  }
+}
+
 const reindex = async (opts: { force?: boolean; recreate?: boolean }) => {
   if (!isAdmin.value) {
     warning('Admin access required.')
@@ -924,6 +1069,7 @@ watch(locale, () => {
 onMounted(() => {
   loadSortingPrompt()
   if (isAdmin.value) {
+    loadSynapseEnabled()
     loadStatus()
   }
 })

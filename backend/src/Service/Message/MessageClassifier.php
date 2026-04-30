@@ -406,12 +406,25 @@ final readonly class MessageClassifier
             || in_array($ext, MessagePreProcessor::AUDIO_EXTENSIONS, true);
     }
 
+    /**
+     * Synapse Routing is currently a BETA feature and OFF by default.
+     *
+     * Why off-by-default:
+     *   - The embedding-based router can mis-route in edge cases (sticky topic
+     *     after a file analysis turn, granular vs canonical topics, models
+     *     with mismatched dimensions, ...).
+     *   - Operators must explicitly opt-in via the admin UI / system config.
+     *
+     * The proven AI-sorter (`MessageSorter`) remains the default routing
+     * path. The toggle is read from BCONFIG group `QDRANT_SEARCH`, key
+     * `SYNAPSE_ROUTING_ENABLED`.
+     */
     public function isSynapseEnabled(): bool
     {
         $value = $this->configRepository->getValue(0, 'QDRANT_SEARCH', 'SYNAPSE_ROUTING_ENABLED');
 
         if (null === $value) {
-            return true;
+            return false;
         }
 
         return filter_var($value, \FILTER_VALIDATE_BOOL, \FILTER_NULL_ON_FAILURE) ?? false;

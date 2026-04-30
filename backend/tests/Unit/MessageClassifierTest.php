@@ -315,7 +315,9 @@ class MessageClassifierTest extends TestCase
      */
     public static function synapseEnabledFlagProvider(): iterable
     {
-        yield 'null defaults to enabled' => [null, true];
+        // BETA: Synapse Routing is OFF by default. Operators must opt-in via
+        // the admin UI / system config (`SYNAPSE_ROUTING_ENABLED` = 'true').
+        yield 'null defaults to disabled (beta)' => [null, false];
         yield 'string true' => ['true', true];
         yield 'string 1' => ['1', true];
         yield 'string yes' => ['yes', true];

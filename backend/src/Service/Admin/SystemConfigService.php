@@ -812,8 +812,8 @@ final readonly class SystemConfigService
             // === Synapse Routing (database-backed, no restart required) ===
             'SYNAPSE_ROUTING_ENABLED' => [
                 'tab' => 'vectordb', 'section' => 'synapse', 'type' => 'boolean',
-                'sensitive' => false, 'description' => 'Enable Synapse Routing (embedding-based intent detection). When enabled, messages are classified via Qdrant vector similarity (~50ms) instead of a full AI sorting call (~2000ms). Falls back to AI sort automatically when confidence is low.',
-                'default' => 'true',
+                'sensitive' => false, 'description' => '[BETA — disabled by default] Enable embedding-based intent routing via Qdrant vector similarity (~50ms vs ~2000ms AI sort). Known issues in this beta: sticky-topic carry-over after file analysis turns may mis-route follow-ups; granular topics may bypass intent guards; stale embeddings after model changes need manual re-index. Falls back to the AI sorter on low confidence. Keep OFF for production until the beta phase ends.',
+                'default' => 'false',
                 'source' => 'database',
             ],
             'SYNAPSE_CONFIDENCE_THRESHOLD' => [
