@@ -9,6 +9,8 @@ use App\Entity\User;
 use App\Repository\ConfigRepository;
 use App\Repository\ModelRepository;
 use App\Service\BillingService;
+use App\Service\Embedding\EmbeddingModelChangeGuard;
+use App\Service\Embedding\Exception\PremiumRequiredException;
 use App\Service\Plugin\PluginManager;
 use App\Service\Search\BraveSearchService;
 use App\Service\UserMemoryService;
@@ -37,6 +39,7 @@ class ConfigController extends AbstractController
         private PluginManager $pluginManager,
         private BillingService $billingService,
         private UserMemoryService $memoryService,
+        private EmbeddingModelChangeGuard $embeddingChangeGuard,
         #[Autowire('%env(string:default::QDRANT_URL)%')]
         private readonly string $qdrantUrl,
     ) {
@@ -554,6 +557,25 @@ class ConfigController extends AbstractController
 
         $ownerId = $global ? 0 : $user->getId();
         $validCapabilities = ['SORT', 'CHAT', 'VECTORIZE', 'PIC2TEXT', 'TEXT2PIC', 'PIC2PIC', 'TEXT2VID', 'SOUND2TEXT', 'TEXT2SOUND', 'ANALYZE'];
+
+        // Premium gate for VECTORIZE: switching the embedding model is
+        // a paid feature even at the per-user scope, because every
+        // search the user runs afterwards burns embedding API credit on
+        // the new model, AND because we want to keep this consistent
+        // with the global path (AdminEmbeddingController::switch).
+        // Admins always pass the guard.
+        if (isset($data['defaults']['VECTORIZE'])) {
+            try {
+                $this->embeddingChangeGuard->assertCanChange($user);
+            } catch (PremiumRequiredException $e) {
+                return $this->json([
+                    'error' => 'requires_premium',
+                    'capability' => 'VECTORIZE',
+                    'message' => $e->getMessage(),
+                    'currentLevel' => $e->currentLevel,
+                ], Response::HTTP_FORBIDDEN);
+            }
+        }
 
         $skipped = [];
 

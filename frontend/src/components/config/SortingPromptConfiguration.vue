@@ -30,8 +30,15 @@
     <div v-if="isAdmin" class="surface-card overflow-hidden" data-testid="section-routing-beta">
       <div class="p-6 border-b border-light-border/30 dark:border-dark-border/20">
         <div class="flex items-start gap-4 flex-wrap">
-          <div class="p-2 rounded-lg bg-amber-500/10 flex-shrink-0">
-            <Icon icon="heroicons:beaker" class="w-5 h-5 text-amber-600 dark:text-amber-400" />
+          <div
+            class="p-2 rounded-lg bg-[var(--brand)]/10 flex-shrink-0 flex items-center justify-center w-10 h-10"
+          >
+            <img
+              :src="synaplanLogoSrc"
+              alt="Synaplan"
+              class="w-6 h-6"
+              data-testid="img-synapse-logo"
+            />
           </div>
           <div class="flex-1 min-w-0">
             <div class="flex items-center gap-2 flex-wrap mb-1">
@@ -697,6 +704,7 @@ import { useDialog } from '@/composables/useDialog'
 import { useAuthStore } from '@/stores/auth'
 import { getMarkdownRenderer } from '@/composables/useMarkdown'
 import { useDateFormat } from '@/composables/useDateFormat'
+import { useTheme } from '@/composables/useTheme'
 
 // --- Routing-status state ---------------------------------------------------
 const status = ref<SynapseStatusResponse | null>(null)
@@ -730,6 +738,19 @@ const dialog = useDialog()
 const { t, locale } = useI18n()
 const { formatRelativeTime } = useDateFormat()
 const markdownRenderer = getMarkdownRenderer()
+const { theme } = useTheme()
+
+// Synapse Routing is a Synaplan-native feature — show the brand logo
+// instead of a generic icon. Resolve the variant from the active theme so
+// the logo stays readable on both light and dark backgrounds.
+const isDark = computed(() => {
+  if (theme.value === 'dark') return true
+  if (theme.value === 'light') return false
+  return matchMedia('(prefers-color-scheme: dark)').matches
+})
+const synaplanLogoSrc = computed(
+  () => `${import.meta.env.BASE_URL}${isDark.value ? 'synaplan-light.svg' : 'synaplan-dark.svg'}`
+)
 
 const getPromptLink = (topic: string) => `/config/task-prompts?topic=${encodeURIComponent(topic)}`
 const formatIndexedAt = (iso: string): string => {

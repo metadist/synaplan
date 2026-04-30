@@ -846,6 +846,81 @@
         "showing": "Showing {start}–{end} of {total}"
       }
     },
+    "embeddingSwitch": {
+      "title": "Switch Embedding Model",
+      "subtitle": "All vectors will be regenerated using the new model.",
+      "fromLabel": "From",
+      "toLabel": "To",
+      "unknown": "Unknown",
+      "estimating": "Calculating cost estimate…",
+      "estimateError": "Failed to load cost estimate.",
+      "switchError": "Switch failed. Please try again later.",
+      "queued": "Re-vectorize queued (run #{runId}).",
+      "cancel": "Cancel",
+      "confirm": "Switch & Re-vectorize",
+      "confirmCritical": "I understand that this is a large re-vectorization run and will take significant time and embedding-API credit.",
+      "total": "Total",
+      "chunks": "chunks",
+      "tokens": "tokens",
+      "scopes": {
+        "documents": "Documents (RAG)",
+        "memories": "User Memories",
+        "synapse": "Routing Topics",
+        "all": "All Embeddings"
+      },
+      "breakdown": {
+        "title": "Per-scope breakdown"
+      },
+      "severity": {
+        "info": {
+          "title": "Quick re-vectorize",
+          "body": "This switch is small enough to finish in under a minute and costs less than one cent."
+        },
+        "warning": {
+          "title": "Medium-sized re-vectorize",
+          "body": "This switch processes a noticeable amount of data. It will run in the background; you can keep working in the meantime."
+        },
+        "critical": {
+          "title": "Large re-vectorize — please confirm",
+          "body": "This switch processes a very large amount of data and may take several minutes plus a non-trivial amount of embedding-API credit. Please confirm before proceeding."
+        }
+      },
+      "premium": {
+        "title": "Premium feature",
+        "body": "Switching the embedding model is available on PRO and higher plans. Your current level: {level}.",
+        "upgradeCta": "Upgrade to PRO",
+        "badge": "Premium",
+        "lockTooltip": "Embedding-model switching requires a paid plan."
+      },
+      "cooldown": {
+        "title": "Cooldown active",
+        "body": "Another switch was started recently. The next switch is possible in approx. {minutes} minutes."
+      }
+    },
+    "embeddingRuns": {
+      "title": "Re-vectorize Runs",
+      "subtitle": "Audit and live progress for embedding-model switches.",
+      "refresh": "Refresh",
+      "empty": "No re-vectorize runs yet.",
+      "runningHint": "Updates automatically every few seconds.",
+      "chunks": "chunks",
+      "tokens": "tokens",
+      "col": {
+        "when": "When",
+        "scope": "Scope",
+        "status": "Status",
+        "chunks": "Chunks",
+        "tokens": "Tokens",
+        "cost": "Est. Cost"
+      },
+      "status": {
+        "queued": "Queued",
+        "running": "Running",
+        "completed": "Completed",
+        "failed": "Failed",
+        "cancelled": "Cancelled"
+      }
+    },
     "taskPrompts": {
       "title": "Prompt Management",
       "subtitle": "Manage and customize AI prompts for different tasks",

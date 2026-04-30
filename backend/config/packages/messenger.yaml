@@ -35,6 +35,7 @@ framework:
             'App\Message\ProcessMessageCommand': async_ai_high
             'App\Message\ProvisionDefaultUserPluginsMessage': async_index
             'App\Message\CrawlWidgetUrlMessage': async_index
+            'App\Message\ReVectorizeMessage': async_index
 
 when@test:
     framework:

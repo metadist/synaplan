@@ -982,6 +982,81 @@
         "showing": "Zeige {start}–{end} von {total}"
       }
     },
+    "embeddingSwitch": {
+      "title": "Embedding-Modell wechseln",
+      "subtitle": "Alle Vektoren werden mit dem neuen Modell neu erzeugt.",
+      "fromLabel": "Von",
+      "toLabel": "Nach",
+      "unknown": "Unbekannt",
+      "estimating": "Kostenschätzung wird berechnet…",
+      "estimateError": "Kostenschätzung konnte nicht geladen werden.",
+      "switchError": "Wechsel fehlgeschlagen. Bitte später erneut versuchen.",
+      "queued": "Re-Vektorisierung in der Warteschlange (Lauf #{runId}).",
+      "cancel": "Abbrechen",
+      "confirm": "Wechseln & neu vektorisieren",
+      "confirmCritical": "Mir ist bewusst, dass dies ein großer Re-Vektorisierungs-Lauf ist und erhebliche Zeit sowie Embedding-API-Guthaben verbraucht.",
+      "total": "Gesamt",
+      "chunks": "Chunks",
+      "tokens": "Tokens",
+      "scopes": {
+        "documents": "Dokumente (RAG)",
+        "memories": "Nutzer-Erinnerungen",
+        "synapse": "Routing-Topics",
+        "all": "Alle Embeddings"
+      },
+      "breakdown": {
+        "title": "Aufschlüsselung pro Bereich"
+      },
+      "severity": {
+        "info": {
+          "title": "Schnelle Re-Vektorisierung",
+          "body": "Dieser Wechsel ist klein genug, um in unter einer Minute fertig zu sein und kostet weniger als einen Cent."
+        },
+        "warning": {
+          "title": "Mittelgroße Re-Vektorisierung",
+          "body": "Dieser Wechsel verarbeitet eine spürbare Datenmenge. Er läuft im Hintergrund — Sie können in der Zwischenzeit weiterarbeiten."
+        },
+        "critical": {
+          "title": "Große Re-Vektorisierung — bitte bestätigen",
+          "body": "Dieser Wechsel verarbeitet sehr viele Daten und kann mehrere Minuten dauern sowie nennenswertes Embedding-API-Guthaben verbrauchen. Bitte vor dem Fortfahren bestätigen."
+        }
+      },
+      "premium": {
+        "title": "Premium-Funktion",
+        "body": "Das Wechseln des Embedding-Modells ist in den Plänen PRO und höher verfügbar. Aktuelles Level: {level}.",
+        "upgradeCta": "Auf PRO upgraden",
+        "badge": "Premium",
+        "lockTooltip": "Embedding-Modell-Wechsel erfordert ein bezahltes Abo."
+      },
+      "cooldown": {
+        "title": "Cooldown aktiv",
+        "body": "Ein anderer Wechsel wurde kürzlich gestartet. Der nächste Wechsel ist in ca. {minutes} Minuten möglich."
+      }
+    },
+    "embeddingRuns": {
+      "title": "Re-Vektorisierungs-Läufe",
+      "subtitle": "Audit und Live-Fortschritt für Embedding-Modell-Wechsel.",
+      "refresh": "Aktualisieren",
+      "empty": "Noch keine Re-Vektorisierungs-Läufe.",
+      "runningHint": "Aktualisiert sich automatisch alle paar Sekunden.",
+      "chunks": "Chunks",
+      "tokens": "Tokens",
+      "col": {
+        "when": "Wann",
+        "scope": "Bereich",
+        "status": "Status",
+        "chunks": "Chunks",
+        "tokens": "Tokens",
+        "cost": "Gesch. Kosten"
+      },
+      "status": {
+        "queued": "In Warteschlange",
+        "running": "Läuft",
+        "completed": "Abgeschlossen",
+        "failed": "Fehlgeschlagen",
+        "cancelled": "Abgebrochen"
+      }
+    },
     "taskPrompts": {
       "title": "Prompt-Verwaltung",
       "description": "Verwalten Sie Ihre Prompts",
