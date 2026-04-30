@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "343d647e9bbdad14616e709b62920821",
+    "content-hash": "6e97ce1797b31e01859bcc33c850c72e",
     "packages": [
         {
             "name": "api-platform/doctrine-common",
@@ -98,16 +98,16 @@
         },
         {
             "name": "api-platform/doctrine-orm",
-            "version": "v4.3.3",
+            "version": "v4.3.4",
             "source": {
                 "type": "git",
                 "url": "https://github.com/api-platform/doctrine-orm.git",
-                "reference": "553f7fe120c840a8db08d8e970860e209f40ebc2"
+                "reference": "3dc88ee48ffcdb6eee45ec1d3e9f25ea2aad4eaa"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/api-platform/doctrine-orm/zipball/553f7fe120c840a8db08d8e970860e209f40ebc2",
-                "reference": "553f7fe120c840a8db08d8e970860e209f40ebc2",
+                "url": "https://api.github.com/repos/api-platform/doctrine-orm/zipball/3dc88ee48ffcdb6eee45ec1d3e9f25ea2aad4eaa",
+                "reference": "3dc88ee48ffcdb6eee45ec1d3e9f25ea2aad4eaa",
                 "shasum": ""
             },
             "require": {
@@ -122,7 +122,7 @@
             "require-dev": {
                 "doctrine/doctrine-bundle": "^2.11 || ^3.1",
                 "phpspec/prophecy-phpunit": "^2.2",
-                "phpunit/phpunit": "^12.2",
+                "phpunit/phpunit": "^11.5 || ^12.2",
                 "ramsey/uuid": "^4.7",
                 "ramsey/uuid-doctrine": "^2.0",
                 "symfony/cache": "^6.4 || ^7.0 || ^8.0",
@@ -181,9 +181,9 @@
                 "rest"
             ],
             "support": {
-                "source": "https://github.com/api-platform/doctrine-orm/tree/v4.3.3"
+                "source": "https://github.com/api-platform/doctrine-orm/tree/v4.3.4"
             },
-            "time": "2026-03-27T06:51:10+00:00"
+            "time": "2026-04-30T12:21:24+00:00"
         },
         {
             "name": "api-platform/documentation",
@@ -958,16 +958,16 @@
         },
         {
             "name": "api-platform/symfony",
-            "version": "v4.3.3",
+            "version": "v4.3.4",
             "source": {
                 "type": "git",
                 "url": "https://github.com/api-platform/symfony.git",
-                "reference": "69070b33f11ed7c163ba75ecfea192e460b89ce0"
+                "reference": "532063884e3f91a8a831322a572220cc55501a2f"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/api-platform/symfony/zipball/69070b33f11ed7c163ba75ecfea192e460b89ce0",
-                "reference": "69070b33f11ed7c163ba75ecfea192e460b89ce0",
+                "url": "https://api.github.com/repos/api-platform/symfony/zipball/532063884e3f91a8a831322a572220cc55501a2f",
+                "reference": "532063884e3f91a8a831322a572220cc55501a2f",
                 "shasum": ""
             },
             "require": {
@@ -998,7 +998,7 @@
                 "api-platform/graphql": "^4.3",
                 "api-platform/hal": "^4.3",
                 "phpspec/prophecy-phpunit": "^2.2",
-                "phpunit/phpunit": "^12.2",
+                "phpunit/phpunit": "^11.5 || ^12.2",
                 "symfony/expression-language": "^6.4 || ^7.0 || ^8.0",
                 "symfony/intl": "^6.4 || ^7.0 || ^8.0",
                 "symfony/mercure-bundle": "*",
@@ -1080,9 +1080,9 @@
                 "symfony"
             ],
             "support": {
-                "source": "https://github.com/api-platform/symfony/tree/v4.3.3"
+                "source": "https://github.com/api-platform/symfony/tree/v4.3.4"
             },
-            "time": "2026-03-27T06:51:10+00:00"
+            "time": "2026-04-30T12:21:24+00:00"
         },
         {
             "name": "api-platform/validator",
