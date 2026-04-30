@@ -11,6 +11,7 @@ use App\Entity\Prompt;
 use App\Entity\User;
 use App\Entity\Widget;
 use App\Repository\PromptRepository;
+use App\Service\Prompt\LanguageDirectiveBuilder;
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;
 
@@ -117,24 +118,10 @@ final readonly class WidgetSetupService
             'language' => $language,
         ]);
 
-        // Inject language instruction at the start of the system prompt
-        $languageNames = [
-            'en' => 'English',
-            'de' => 'German',
-            'fr' => 'French',
-            'es' => 'Spanish',
-            'it' => 'Italian',
-            'pt' => 'Portuguese',
-            'nl' => 'Dutch',
-            'pl' => 'Polish',
-            'ru' => 'Russian',
-            'ja' => 'Japanese',
-            'zh' => 'Chinese',
-            'ko' => 'Korean',
-        ];
-        $languageName = $languageNames[$language] ?? 'English';
-        $languageInstruction = "**CRITICAL LANGUAGE RULE**: You MUST detect the language the user writes in and ALWAYS respond in that same language. If the user writes in German, respond in German. If the user writes in French, respond in French. The application language is {$languageName}, so start in {$languageName}, but IMMEDIATELY switch to whatever language the user uses. This rule overrides everything else.\n\n";
-        $systemPromptWithLanguage = $languageInstruction.$systemPrompt;
+        // Inject language instruction at the start of the system prompt.
+        // The builder includes the anti-echo clause that stops smaller LLMs
+        // from leaking the directive back into the visible response.
+        $systemPromptWithLanguage = LanguageDirectiveBuilder::buildWidgetPreamble($language).$systemPrompt;
 
         $enrichedText = $this->enrichWithWebsiteContent($text);
         $messages = $this->buildConversationMessagesFromHistory($history, $systemPromptWithLanguage, $enrichedText);
@@ -199,14 +186,7 @@ final readonly class WidgetSetupService
         $modelConfig = $this->resolveAiModelConfig($user);
         $modelId = $modelConfig['model_id'];
 
-        $languageNames = [
-            'en' => 'English', 'de' => 'German', 'fr' => 'French',
-            'es' => 'Spanish', 'it' => 'Italian', 'pt' => 'Portuguese',
-            'nl' => 'Dutch', 'pl' => 'Polish', 'ru' => 'Russian',
-            'ja' => 'Japanese', 'zh' => 'Chinese', 'ko' => 'Korean',
-        ];
-        $languageName = $languageNames[$language] ?? 'English';
-        $languageInstruction = "**CRITICAL LANGUAGE RULE**: You MUST detect the language the user writes in and ALWAYS respond in that same language. The application language is {$languageName}, so start in {$languageName}. This rule overrides everything else.\n\n";
+        $languageInstruction = LanguageDirectiveBuilder::buildWidgetPreamble($language);
 
         $flowContext = '';
         if ($currentFlow && (\count($currentFlow['triggers'] ?? []) > 0 || \count($currentFlow['responses'] ?? []) > 0)) {

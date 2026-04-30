@@ -305,9 +305,14 @@ final readonly class MediaGenerationHandler implements MessageHandlerInterface
                     $duration = 8; // Default to 8 seconds
                 }
 
-                $this->logger->info('MediaGenerationHandler: Video duration from AI classification', [
+                $resolutionOption = isset($options['resolution']) && is_string($options['resolution'])
+                    ? $options['resolution']
+                    : (isset($classification['resolution']) && is_string($classification['resolution']) ? $classification['resolution'] : null);
+
+                $this->logger->info('MediaGenerationHandler: Video parameters from AI classification', [
                     'duration' => $duration,
-                    'source' => isset($options['duration']) ? 'options' : (isset($classification['duration']) ? 'ai_classification' : 'default'),
+                    'duration_source' => isset($options['duration']) ? 'options' : (isset($classification['duration']) ? 'ai_classification' : 'default'),
+                    'resolution' => $resolutionOption,
                 ]);
 
                 $result = $this->aiFacade->generateVideo(
@@ -316,8 +321,10 @@ final readonly class MediaGenerationHandler implements MessageHandlerInterface
                     [
                         'provider' => $provider,
                         'model' => $modelName,
+                        'modelConfig' => $modelConfig,
                         'duration' => $duration,
                         'aspect_ratio' => $options['aspect_ratio'] ?? '16:9',
+                        'resolution' => $resolutionOption,
                         'progress_callback' => function (array $progress) use ($progressCallback): void {
                             $elapsed = $progress['elapsed_seconds'] ?? 0;
                             $this->notify($progressCallback, 'generating', "Generating video... ({$elapsed}s)");
@@ -491,6 +498,10 @@ final readonly class MediaGenerationHandler implements MessageHandlerInterface
                 $mediaUsage['images'] = $result['image_count'] ?? 1;
             } elseif ('video' === $mediaType) {
                 $mediaUsage['duration_seconds'] = $result['duration_seconds'] ?? null;
+                $videoResolution = $this->extractVideoResolution($result);
+                if (null !== $videoResolution) {
+                    $mediaUsage['resolution'] = $videoResolution;
+                }
             }
 
             return [
@@ -777,5 +788,33 @@ final readonly class MediaGenerationHandler implements MessageHandlerInterface
                 'timestamp' => time(),
             ]);
         }
+    }
+
+    /**
+     * Pull the effective resolution from a video provider result.
+     *
+     * AiFacade::generateVideo() exposes the resolution at the top level, but some
+     * provider payloads only nest it inside the first videos[] item. The first
+     * videos[] entry can also legitimately be a plain URL string, so we must
+     * guard before indexing it.
+     *
+     * @param array<string, mixed> $result
+     */
+    private function extractVideoResolution(array $result): ?string
+    {
+        $top = $result['resolution'] ?? null;
+        if (is_string($top) && '' !== $top) {
+            return $top;
+        }
+
+        $first = $result['videos'][0] ?? null;
+        if (is_array($first)) {
+            $nested = $first['resolution'] ?? null;
+            if (is_string($nested) && '' !== $nested) {
+                return $nested;
+            }
+        }
+
+        return null;
     }
 }

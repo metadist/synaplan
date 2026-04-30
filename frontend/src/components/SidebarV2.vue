@@ -18,7 +18,7 @@
 
   <aside
     :class="[
-      'v2-sidebar-rail flex flex-col h-screen',
+      'v2-sidebar-rail flex flex-col',
       'fixed md:relative z-50 md:z-auto',
       'transition-transform duration-300 ease-in-out',
       sidebarStore.isMobileOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0',
@@ -222,7 +222,17 @@
                 <span>{{ $t('nav.subscription') }}</span>
               </button>
             </div>
-            <div class="border-t border-light-border/10 dark:border-dark-border/10">
+            <!--
+              Logout is intentionally hidden while impersonating: clicking
+              it would clear the admin's session entirely (cookies + stash)
+              instead of just ending the impersonation, which is almost
+              never what the operator means. The "Exit" button on the
+              floating impersonation pill is the correct action here.
+            -->
+            <div
+              v-if="!isImpersonating"
+              class="border-t border-light-border/10 dark:border-dark-border/10"
+            >
               <button
                 role="menuitem"
                 class="dropdown-item text-red-500 dark:text-red-400"
@@ -625,7 +635,7 @@ const appModeStore = useAppModeStore()
 const configStore = useConfigStore()
 const chatsStore = useChatsStore()
 const dialog = useDialog()
-const { logout } = useAuth()
+const { logout, isImpersonating } = useAuth()
 const { theme } = useTheme()
 const route = useRoute()
 const router = useRouter()

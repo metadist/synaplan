@@ -63,7 +63,15 @@
             class="w-4 h-4 animate-spin ml-auto"
           />
         </button>
+        <!--
+          Logout is intentionally hidden while impersonating: clicking it
+          would clear the admin's session entirely (cookies + stash) instead
+          of just ending the impersonation, which is almost never what the
+          operator means. The "Exit" button on the floating impersonation
+          pill is the correct action here.
+        -->
         <button
+          v-if="!isImpersonating"
           role="menuitem"
           class="dropdown-item"
           data-testid="btn-user-logout"
@@ -108,7 +116,7 @@ const props = withDefaults(defineProps<Props>(), {
 const emit = defineEmits<Emits>()
 
 const router = useRouter()
-const { logout } = useAuth()
+const { logout, isImpersonating } = useAuth()
 const authStore = useAuthStore()
 const configStore = useConfigStore()
 const memoriesStore = useMemoriesStore()

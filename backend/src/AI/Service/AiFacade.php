@@ -612,8 +612,10 @@ class AiFacade
         }
 
         $durationSeconds = null;
+        $resolution = null;
         if (is_array($videos) && !empty($videos)) {
             $durationSeconds = $videos[0]['duration'] ?? $videos[0]['duration_seconds'] ?? null;
+            $resolution = $videos[0]['resolution'] ?? null;
         }
 
         return [
@@ -621,13 +623,14 @@ class AiFacade
             'provider' => $provider->getName(),
             'model' => $options['model'] ?? 'unknown',
             'duration_seconds' => $durationSeconds,
+            'resolution' => $resolution,
         ];
     }
 
     /**
      * Start an async video generation operation (non-blocking).
      *
-     * @return array{operationName: string, provider: string, model: string, duration: int}
+     * @return array{operationName: string, provider: string, model: string, duration: int, resolution: string}
      */
     public function startVideoGeneration(string $prompt, ?int $userId = null, array $options = []): array
     {

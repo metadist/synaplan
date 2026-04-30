@@ -19,6 +19,11 @@ parameters:
     # OIDC scopes requested during login (space-separated)
     env(OIDC_SCOPES): 'openid email profile offline_access'
 
+    # Health monitoring defaults (so autowiring works when env not set)
+    env(HEALTH_MONITOR_TOKEN): ''
+    env(HEALTH_MONITOR_USER_EMAIL): ''
+    env(HEALTH_MONITOR_USER_PASSWORD): ''
+
     # Logging
     # LOG_FORMAT: json (default) or line (human-readable)
     # LOG_LEVEL: debug, info, notice, warning, error (see monolog.yaml)
@@ -188,6 +193,7 @@ services:
             $uploadDir: '%kernel.project_dir%/var/uploads'
         tags:
             - { name: 'app.ai.chat' }
+            - { name: 'app.ai.vision' }
             - { name: 'app.ai.embedding' }
             - { name: 'app.ai.image_generation' }
             - { name: 'app.ai.video_generation' }
@@ -374,6 +380,7 @@ services:
             $stripePriceBusiness: '%env(STRIPE_PRICE_BUSINESS)%'
             $frontendUrl: '%env(FRONTEND_URL)%'
             $stripePaymentMethods: '%env(STRIPE_PAYMENT_METHODS)%'
+            $stripeAutomaticTaxEnabled: '%env(bool:STRIPE_AUTOMATIC_TAX)%'
             $cache: '@cache.app'
 
     App\Controller\StripeWebhookController:
@@ -406,6 +413,11 @@ services:
 
     # Token Service (Access/Refresh Tokens)
     App\Service\TokenService:
+        arguments:
+            $appEnv: '%kernel.environment%'
+
+    # Impersonation Service (admin → user cookie-stash session swap)
+    App\Service\ImpersonationService:
         arguments:
             $appEnv: '%kernel.environment%'
 

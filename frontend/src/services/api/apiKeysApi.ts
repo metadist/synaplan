@@ -1,6 +1,11 @@
-import { getApiBaseUrl } from './httpClient'
+/**
+ * API Keys API - User-owned API key management
+ *
+ * Uses the shared httpClient so that expired session access-tokens are
+ * transparently refreshed and requests retried (see httpClient.ts).
+ */
 
-const API_BASE_URL = getApiBaseUrl()
+import { httpClient } from './httpClient'
 
 export interface ApiKey {
   id: number
@@ -43,44 +48,30 @@ export interface UpdateApiKeyRequest {
   scopes?: string[]
 }
 
-/**
- * Helper function to make authenticated API calls
- * Uses cookie-based authentication
- */
-async function apiFetch<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
-  const headers: Record<string, string> = {
-    'Content-Type': 'application/json',
-  }
+export interface UpdateApiKeyResponse {
+  success: boolean
+  api_key: ApiKey
+}
 
-  const response = await fetch(`${API_BASE_URL}${endpoint}`, {
-    ...options,
-    credentials: 'include', // Use cookies for auth
-    headers: {
-      ...headers,
-      ...options.headers,
-    },
-  })
-
-  if (!response.ok) {
-    const errorData = await response.json().catch(() => ({ error: response.statusText }))
-    throw new Error(errorData.error || `HTTP ${response.status}`)
-  }
-
-  return response.json()
+export interface RevokeApiKeyResponse {
+  success: boolean
+  message: string
 }
 
 /**
  * Get all API keys for the current user
  */
 export async function listApiKeys(): Promise<ListApiKeysResponse> {
-  return apiFetch<ListApiKeysResponse>('/api/v1/apikeys')
+  return httpClient<ListApiKeysResponse>('/api/v1/apikeys', {
+    method: 'GET',
+  })
 }
 
 /**
  * Create a new API key
  */
 export async function createApiKey(data: CreateApiKeyRequest): Promise<CreateApiKeyResponse> {
-  return apiFetch<CreateApiKeyResponse>('/api/v1/apikeys', {
+  return httpClient<CreateApiKeyResponse>('/api/v1/apikeys', {
     method: 'POST',
     body: JSON.stringify(data),
   })
@@ -92,8 +83,8 @@ export async function createApiKey(data: CreateApiKeyRequest): Promise<CreateApi
 export async function updateApiKey(
   id: number,
   data: UpdateApiKeyRequest
-): Promise<{ success: boolean; api_key: ApiKey }> {
-  return apiFetch(`/api/v1/apikeys/${id}`, {
+): Promise<UpdateApiKeyResponse> {
+  return httpClient<UpdateApiKeyResponse>(`/api/v1/apikeys/${id}`, {
     method: 'PATCH',
     body: JSON.stringify(data),
   })
@@ -102,8 +93,8 @@ export async function updateApiKey(
 /**
  * Revoke (delete) an API key
  */
-export async function revokeApiKey(id: number): Promise<{ success: boolean; message: string }> {
-  return apiFetch(`/api/v1/apikeys/${id}`, {
+export async function revokeApiKey(id: number): Promise<RevokeApiKeyResponse> {
+  return httpClient<RevokeApiKeyResponse>(`/api/v1/apikeys/${id}`, {
     method: 'DELETE',
   })
 }

@@ -2,6 +2,7 @@
 
 namespace App\Controller;
 
+use App\Service\ImpersonationService;
 use App\Service\OAuthStateService;
 use App\Service\OidcTokenService;
 use App\Service\OidcUserService;
@@ -12,7 +13,7 @@ use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\RedirectResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
-use Symfony\Component\Routing\Annotation\Route;
+use Symfony\Component\Routing\Attribute\Route;
 use Symfony\Contracts\HttpClient\HttpClientInterface;
 
 /**
@@ -39,6 +40,7 @@ class KeycloakAuthController extends AbstractController
         private OidcTokenService $oidcTokenService,
         private OidcUserService $oidcUserService,
         private OAuthStateService $oauthStateService,
+        private ImpersonationService $impersonationService,
         private LoggerInterface $logger,
         private string $oidcClientId,
         private string $oidcClientSecret,
@@ -243,10 +245,15 @@ class KeycloakAuthController extends AbstractController
                 $idToken,
             );
 
-            // Also generate our app tokens for internal use
+            // Also generate our app tokens for internal use, and defensively
+            // wipe any orphan impersonation stash that survived from a prior
+            // session on this browser (same rationale as the regular login
+            // path — never let a fresh sign-in inherit somebody else's
+            // suspended admin session).
             $appAccessToken = $this->tokenService->generateAccessToken($user);
             $appRefreshToken = $this->tokenService->generateRefreshToken($user, $request->getClientIp());
             $this->tokenService->addAuthCookies($response, $appAccessToken, $appRefreshToken);
+            $this->impersonationService->attachClearStashCookies($response);
 
             $this->logger->info('Keycloak OAuth successful', [
                 'user_id' => $user->getId(),

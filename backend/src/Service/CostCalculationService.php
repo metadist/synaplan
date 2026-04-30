@@ -140,14 +140,19 @@ final readonly class CostCalculationService
     /**
      * Calculate cost for non-token-based models (TTS, image gen, video gen, transcription).
      *
-     * @param float $inputQuantity  Input quantity (characters for TTS, seconds for transcription)
-     * @param float $outputQuantity Output quantity (images for image gen, seconds for video gen)
+     * @param float       $inputQuantity  Input quantity (characters for TTS, seconds for transcription)
+     * @param float       $outputQuantity Output quantity (images for image gen, seconds for video gen)
+     * @param string|null $resolution     Optional output resolution (e.g. '720p', '1080p', '4K').
+     *                                    When the model defines `json.resolution_prices`, the matching
+     *                                    per-second price overrides `priceOut`. Falls back to default
+     *                                    pricing when omitted or unknown.
      */
     public function calculateMediaCost(
         ?int $modelId,
         float $inputQuantity = 0,
         float $outputQuantity = 0,
         ?int $timestamp = null,
+        ?string $resolution = null,
     ): CostResult {
         if (!$modelId) {
             return $this->zeroCostResult();
@@ -170,6 +175,14 @@ final readonly class CostCalculationService
         $priceIn = (float) $priceSnapshot['price_in'];
         $priceOut = (float) $priceSnapshot['price_out'];
 
+        $resolvedResolution = $this->resolveResolution($model, $resolution);
+        $resolutionPrice = $this->lookupResolutionPrice($model, $resolvedResolution);
+        if (null !== $resolutionPrice) {
+            $priceOut = $resolutionPrice;
+            $priceSnapshot['resolution'] = $resolvedResolution;
+            $priceSnapshot['price_out_resolution'] = number_format($resolutionPrice, 8, '.', '');
+        }
+
         $inputCost = $inputQuantity * $priceIn;
         $outputCost = $outputQuantity * $priceOut;
         $totalCost = $inputCost + $outputCost;
@@ -182,6 +195,49 @@ final readonly class CostCalculationService
             priceSnapshot: $priceSnapshot,
             billedInputTokens: 0,
         );
+    }
+
+    /**
+     * Pick the effective resolution for a model.
+     *
+     * Priority:
+     *   1. Caller-provided resolution (if it appears in `allowed_resolutions`)
+     *   2. Model's `default_resolution`
+     *   3. null (caller didn't ask, model didn't say -> use flat priceOut)
+     */
+    private function resolveResolution(Model $model, ?string $resolution): ?string
+    {
+        $json = $model->getJson();
+        $allowed = is_array($json['allowed_resolutions'] ?? null) ? $json['allowed_resolutions'] : [];
+
+        if (null !== $resolution && in_array($resolution, $allowed, true)) {
+            return $resolution;
+        }
+
+        $default = $json['default_resolution'] ?? null;
+        if (is_string($default) && '' !== $default) {
+            return $default;
+        }
+
+        return null;
+    }
+
+    /**
+     * Look up the per-unit price for a specific resolution from the model JSON.
+     * Returns null when the model does not define resolution-aware pricing.
+     */
+    private function lookupResolutionPrice(Model $model, ?string $resolution): ?float
+    {
+        if (null === $resolution) {
+            return null;
+        }
+
+        $prices = $model->getJson()['resolution_prices'] ?? null;
+        if (!is_array($prices) || !isset($prices[$resolution])) {
+            return null;
+        }
+
+        return (float) $prices[$resolution];
     }
 
     /**

@@ -16,6 +16,7 @@ use App\Service\File\UserUploadPathBuilder;
 use App\Service\MemoryExtractionService;
 use App\Service\ModelConfigService;
 use App\Service\Plugin\PluginContextProviderInterface;
+use App\Service\Prompt\LanguageDirectiveBuilder;
 use App\Service\PromptService;
 use App\Service\RAG\VectorSearchService;
 use App\Service\RateLimitService;
@@ -195,20 +196,13 @@ final readonly class ChatHandler implements MessageHandlerInterface
         }
 
         // Append explicit language directive based on detected language from classification.
-        if ('auto' === $language) {
-            $systemPrompt .= "\n\n**IMPORTANT: You MUST respond in the SAME language the user writes in. Detect their language from the message and match it exactly.**";
-        } else {
-            $languageNames = [
-                'en' => 'English', 'de' => 'German', 'fr' => 'French', 'es' => 'Spanish',
-                'it' => 'Italian', 'pt' => 'Portuguese', 'nl' => 'Dutch', 'pl' => 'Polish',
-                'ru' => 'Russian', 'ja' => 'Japanese', 'ko' => 'Korean', 'zh' => 'Chinese',
-                'ar' => 'Arabic', 'tr' => 'Turkish', 'sv' => 'Swedish', 'da' => 'Danish',
-                'no' => 'Norwegian', 'fi' => 'Finnish', 'cs' => 'Czech', 'ro' => 'Romanian',
-                'hu' => 'Hungarian', 'uk' => 'Ukrainian', 'hi' => 'Hindi', 'th' => 'Thai',
-            ];
-            $languageName = $languageNames[$language] ?? $language;
-            $systemPrompt .= "\n\n**IMPORTANT: The user's current message is in {$languageName}. You MUST respond in {$languageName}.**";
-        }
+        // Built via LanguageDirectiveBuilder so the wording stays consistent
+        // across handlers and includes the anti-echo clause that prevents
+        // smaller LLMs from leaking the directive back into the response
+        // (e.g. "[Please reply in German]").
+        $systemPrompt .= 'auto' === $language
+            ? LanguageDirectiveBuilder::buildAutoDirective()
+            : LanguageDirectiveBuilder::buildForLanguage($language);
 
         $modelMaxTokens = null;
         if ($modelId) {
@@ -216,7 +210,7 @@ final readonly class ChatHandler implements MessageHandlerInterface
             if ($model) {
                 $modelMaxTokens = $model->getMaxTokens();
                 $json = $model->getJson();
-                if (isset($json['supportsStreaming']) && false === $json['supportsStreaming']) {
+                if (!$this->modelSupportsSystemMessages($json)) {
                     $systemPrompt = null;
                 }
             }
@@ -761,21 +755,11 @@ final readonly class ChatHandler implements MessageHandlerInterface
         // The sort prompt detects the user's language (BLANG), but the system prompt only says
         // "answer in the user's language" without specifying WHICH language was detected.
         // When conversation history contains mixed languages, the AI may default to the wrong one.
+        // Anti-echo clause inside the builder also prevents leakage like "[Please reply in German]".
         $detectedLanguage = $classification['language'] ?? 'en';
-        if ('auto' === $detectedLanguage) {
-            $systemPrompt .= "\n\n**IMPORTANT: You MUST respond in the SAME language the user writes in. Detect their language from the message and match it exactly.**";
-        } else {
-            $languageNames = [
-                'en' => 'English', 'de' => 'German', 'fr' => 'French', 'es' => 'Spanish',
-                'it' => 'Italian', 'pt' => 'Portuguese', 'nl' => 'Dutch', 'pl' => 'Polish',
-                'ru' => 'Russian', 'ja' => 'Japanese', 'ko' => 'Korean', 'zh' => 'Chinese',
-                'ar' => 'Arabic', 'tr' => 'Turkish', 'sv' => 'Swedish', 'da' => 'Danish',
-                'no' => 'Norwegian', 'fi' => 'Finnish', 'cs' => 'Czech', 'ro' => 'Romanian',
-                'hu' => 'Hungarian', 'uk' => 'Ukrainian', 'hi' => 'Hindi', 'th' => 'Thai',
-            ];
-            $languageName = $languageNames[$detectedLanguage] ?? $detectedLanguage;
-            $systemPrompt .= "\n\n**IMPORTANT: The user's current message is in {$languageName}. You MUST respond in {$languageName}.**";
-        }
+        $systemPrompt .= 'auto' === $detectedLanguage
+            ? LanguageDirectiveBuilder::buildAutoDirective()
+            : LanguageDirectiveBuilder::buildForLanguage($detectedLanguage);
 
         // Continuation mode: instruct the model to continue from where it left off
         if (!empty($options['is_continuation'])) {
@@ -792,8 +776,7 @@ final readonly class ChatHandler implements MessageHandlerInterface
             $model = $this->modelRepository->find($modelId);
             if ($model) {
                 $json = $model->getJson();
-                // o1 models (non-streaming) don't support system messages
-                if (isset($json['supportsStreaming']) && false === $json['supportsStreaming']) {
+                if (!$this->modelSupportsSystemMessages($json)) {
                     // Don't use system message - it will be prepended to first user message instead
                     $systemPrompt = null;
                 }
@@ -1328,6 +1311,30 @@ final readonly class ChatHandler implements MessageHandlerInterface
                 'timestamp' => time(),
             ]);
         }
+    }
+
+    /**
+     * Decide whether the model accepts a `system` role message.
+     *
+     * Resolution order:
+     *   1. Honour an explicit `supportsSystemMessages` flag in the model JSON.
+     *   2. Fall back to the legacy convention where `supportsStreaming === false`
+     *      also implied "no system messages" (true for OpenAI o1 reasoning models).
+     *   3. Default to `true` so well-behaved providers keep working unchanged.
+     *
+     * @param array<string, mixed> $modelJson Raw model JSON config from `Model::getJson()`
+     */
+    private function modelSupportsSystemMessages(array $modelJson): bool
+    {
+        if (array_key_exists('supportsSystemMessages', $modelJson)) {
+            return false !== $modelJson['supportsSystemMessages'];
+        }
+
+        if (array_key_exists('supportsStreaming', $modelJson) && false === $modelJson['supportsStreaming']) {
+            return false;
+        }
+
+        return true;
     }
 
     /**

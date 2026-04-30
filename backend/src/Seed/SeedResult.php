@@ -17,11 +17,18 @@ final readonly class SeedResult
         public int $inserted,
         public int $updated = 0,
         public int $skipped = 0,
+        /**
+         * Rows the seeder intentionally left untouched because they look
+         * operator-customised (e.g. the admin edited prices via the UI and we
+         * detected the divergence via a content fingerprint). Distinct from
+         * `$skipped`, which means "row already in sync, nothing to do".
+         */
+        public int $preserved = 0,
     ) {
     }
 
     public function total(): int
     {
-        return $this->inserted + $this->updated + $this->skipped;
+        return $this->inserted + $this->updated + $this->skipped + $this->preserved;
     }
 }

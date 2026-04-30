@@ -23,7 +23,7 @@ jobs:
       - name: Setup PHP
         uses: shivammathur/setup-php@accd6127cb78bee3e8082180cb391013d204ef9f # v2
         with:
-          php-version: "8.3"
+          php-version: "8.4"
           extensions: mbstring, xml, ctype, iconv, intl
           coverage: none
 
@@ -47,8 +47,8 @@ jobs:
     runs-on: ubuntu-latest
 
     env:
-      DATABASE_WRITE_URL: mysql://synaplan_test:synaplan_test@127.0.0.1:3306/synaplan?serverVersion=11.8&charset=utf8mb4
-      DATABASE_READ_URL: mysql://synaplan_test:synaplan_test@127.0.0.1:3306/synaplan?serverVersion=11.8&charset=utf8mb4
+      DATABASE_WRITE_URL: mysql://synaplan_test:synaplan_test@127.0.0.1:3306/synaplan?serverVersion=mariadb-12.2.2&charset=utf8mb4
+      DATABASE_READ_URL: mysql://synaplan_test:synaplan_test@127.0.0.1:3306/synaplan?serverVersion=mariadb-12.2.2&charset=utf8mb4
 
     services:
       mysql:
@@ -73,7 +73,7 @@ jobs:
       - name: Setup PHP
         uses: shivammathur/setup-php@accd6127cb78bee3e8082180cb391013d204ef9f # v2
         with:
-          php-version: "8.3"
+          php-version: "8.4"
           extensions: mbstring, xml, ctype, iconv, intl, pdo, pdo_mysql, zip, gd, curl, bcmath, exif, pcntl, opcache, readline, soap, sodium, ffi, imagick, grpc
           coverage: none
 
@@ -119,16 +119,16 @@ jobs:
         # a migration, CI MUST fail so we surface the gap before deploy.
         run: php bin/console doctrine:migrations:migrate --no-interaction --allow-no-migration
 
-      - name: Validate Doctrine mapping metadata
+      - name: Verify schema matches entities (no migration drift)
         working-directory: backend
-        # Validates that ORM mapping metadata is internally consistent — catches
-        # broken `targetEntity`, mismatched `mappedBy`/`inversedBy`, missing
-        # join columns, etc. `--skip-sync` skips the database synchronization
-        # check entirely, so this step does NOT detect missing migrations or
-        # entity↔database drift; the full sync check is a known follow-up
-        # because the legacy baseline schema and current entity defaults still
-        # differ in many places (see docs/MIGRATIONS.md).
-        run: php bin/console doctrine:schema:validate --skip-sync
+        # Full schema validation: catches broken ORM mapping AND any entity↔DB
+        # drift. Fails any PR that changes an entity without shipping a matching
+        # Doctrine migration. Unblocked by:
+        #   - doctrine/dbal 4.x upgrade (#781)
+        #   - `server_version: mariadb-*` in doctrine.yaml (correct platform routing)
+        #   - Version20260423000000 + Version20260429000000 (schema reconciliation)
+        # See docs/MIGRATIONS.md for details.
+        run: php bin/console doctrine:schema:validate
 
       - name: Load demo fixtures
         working-directory: backend
@@ -146,6 +146,9 @@ jobs:
       - name: Run PHPUnit tests
         working-directory: backend
         run: php bin/phpunit
+
+      - name: Run migrations-bootstrap bash tests
+        run: bash _docker/backend/tests/test-migrations-bootstrap.sh
 
       - name: Generate OpenAPI spec
         working-directory: backend

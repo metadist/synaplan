@@ -39,6 +39,21 @@ class ModelCatalog
     ];
 
     /**
+     * BJSON key that stores the catalog fingerprint of the last successful seed
+     * write. ModelSeeder uses it to detect manual UI edits and skip them on
+     * future runs (see fingerprint() and ModelSeeder::seed()).
+     */
+    public const FINGERPRINT_KEY = '__catalog_fingerprint';
+
+    /**
+     * Number of decimals used to normalise float fields before fingerprinting.
+     * Catalog prices are authored with at most 4 decimals (e.g. 0.092); 6 leaves
+     * comfortable headroom and shields the hash from float-string round-trips
+     * via Doctrine DBAL.
+     */
+    private const FINGERPRINT_FLOAT_PRECISION = 6;
+
+    /**
      * Insert or update a model row via `INSERT … ON DUPLICATE KEY UPDATE`.
      *
      * Field ownership rules:
@@ -46,10 +61,17 @@ class ModelCatalog
      *     BSERVICE, BNAME, BTAG, BPROVID, BPRICEIN, BINUNIT, BPRICEOUT, BOUTUNIT,
      *     BQUALITY, BRATING, BJSON. Truth lives in this class; deploy = update.
      *   - **Operator-owned** (only set on INSERT, NEVER overwritten):
-     *     BSELECTABLE, BACTIVE, BISDEFAULT. These can be toggled by admins via
-     *     the AdminModelsService UI; container restarts must not wipe those choices.
-     *     Test fixtures that need to force a value should issue an explicit UPDATE
-     *     after the upsert (see ModelSeeder::seed()).
+     *     BSELECTABLE, BACTIVE, BISDEFAULT, BSHOWWHENFREE. These can be toggled
+     *     by admins via the AdminModelsService UI; container restarts must not
+     *     wipe those choices. BSHOWWHENFREE is not part of this statement at all
+     *     (no INSERT column / no UPDATE clause) — it is managed exclusively by
+     *     the admin UI and migrations. Test fixtures that need to force a value
+     *     should issue an explicit UPDATE after the upsert (see ModelSeeder::seed()).
+     *
+     * Every write embeds the catalog fingerprint into BJSON under
+     * self::FINGERPRINT_KEY. ModelSeeder reads this back to detect manual UI edits
+     * and only re-applies catalog values to rows whose values still match the
+     * previously-seeded fingerprint.
      *
      * Returns the MySQL/MariaDB affected-rows value so callers can distinguish
      * inserts from updates:
@@ -59,6 +81,9 @@ class ModelCatalog
      */
     public static function upsert(Connection $connection, array $model, bool $system = false): int
     {
+        $json = is_array($model['json'] ?? null) ? $model['json'] : [];
+        $json[self::FINGERPRINT_KEY] = self::fingerprint($model);
+
         return (int) $connection->executeStatement(
             'INSERT INTO BMODELS (BID, BSERVICE, BNAME, BTAG, BSELECTABLE, BACTIVE, BPROVID, BPRICEIN, BINUNIT, BPRICEOUT, BOUTUNIT, BQUALITY, BRATING, BISDEFAULT, BJSON)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
@@ -75,8 +100,47 @@ class ModelCatalog
                 $model['priceIn'], $model['inUnit'], $model['priceOut'],
                 $model['outUnit'], $model['quality'], $model['rating'],
                 $system ? 1 : 0,
-                json_encode($model['json']),
+                json_encode($json, \JSON_UNESCAPED_SLASHES | \JSON_UNESCAPED_UNICODE),
             ]
+        );
+    }
+
+    /**
+     * Compute a stable fingerprint of a model's catalog-owned fields.
+     *
+     * The hash deliberately ignores operator-owned columns (BSELECTABLE, BACTIVE,
+     * BISDEFAULT, BSHOWWHENFREE) and the fingerprint key itself, so that:
+     *   - admins toggling enabled/active flags do NOT shift the fingerprint, and
+     *   - the value we write into BJSON.__catalog_fingerprint can be regenerated
+     *     deterministically from the row we read back later.
+     *
+     * Floats are rounded to FINGERPRINT_FLOAT_PRECISION decimals to neutralise the
+     * float→string→float round trip performed by the DBAL float type.
+     *
+     * @param array<string, mixed> $row catalog or DB-shaped row (see ModelSeeder::loadExistingRowsById)
+     */
+    public static function fingerprint(array $row): string
+    {
+        $json = is_array($row['json'] ?? null) ? $row['json'] : [];
+        unset($json[self::FINGERPRINT_KEY]);
+
+        $payload = [
+            'service' => (string) ($row['service'] ?? ''),
+            'name' => (string) ($row['name'] ?? ''),
+            'tag' => (string) ($row['tag'] ?? ''),
+            'providerId' => (string) ($row['providerId'] ?? ''),
+            'priceIn' => round((float) ($row['priceIn'] ?? 0.0), self::FINGERPRINT_FLOAT_PRECISION),
+            'inUnit' => (string) ($row['inUnit'] ?? ''),
+            'priceOut' => round((float) ($row['priceOut'] ?? 0.0), self::FINGERPRINT_FLOAT_PRECISION),
+            'outUnit' => (string) ($row['outUnit'] ?? ''),
+            'quality' => round((float) ($row['quality'] ?? 0.0), self::FINGERPRINT_FLOAT_PRECISION),
+            'rating' => round((float) ($row['rating'] ?? 0.0), self::FINGERPRINT_FLOAT_PRECISION),
+            'json' => $json,
+        ];
+
+        return hash(
+            'sha256',
+            (string) json_encode($payload, \JSON_UNESCAPED_SLASHES | \JSON_UNESCAPED_UNICODE | \JSON_THROW_ON_ERROR)
         );
     }
 
@@ -615,46 +679,117 @@ class ModelCatalog
             ],
         ],
         [
-            'id' => 193,
+            'id' => 204,
             'service' => 'OpenAI',
-            'name' => 'GPT-5.3',
+            'name' => 'GPT-5.5',
             'tag' => 'chat',
             'selectable' => 1,
             'active' => 1,
-            'providerId' => 'gpt-5.3',
-            'priceIn' => 1.75,
+            'providerId' => 'gpt-5.5',
+            'priceIn' => 5,
             'inUnit' => 'per1M',
-            'priceOut' => 14,
+            'priceOut' => 30,
             'outUnit' => 'per1M',
             'quality' => 10,
             'rating' => 1,
             'json' => [
-                'description' => 'OpenAI GPT-5.3 - complex multi-step problem solving where accuracy matters more than speed. 128K context, vision, function calling, web search.',
-                'max_tokens' => 16000,
-                'params' => ['model' => 'gpt-5.3'],
+                'description' => 'OpenAI GPT-5.5 - frontier model for complex professional work, coding, long-context retrieval, and tool-heavy agents. 1.05M context, 128K max output, configurable reasoning effort.',
+                'max_tokens' => 128000,
+                'params' => ['model' => 'gpt-5.5'],
                 'features' => ['reasoning', 'vision'],
-                'meta' => ['context_window' => '128000', 'max_output' => '16000'],
+                'meta' => [
+                    'api' => 'responses',
+                    'context_window' => '1050000',
+                    'max_output' => '128000',
+                    'knowledge_cutoff' => '2025-12-01',
+                    'reasoning_effort_default' => 'medium',
+                ],
             ],
         ],
         [
-            'id' => 194,
+            'id' => 205,
             'service' => 'OpenAI',
-            'name' => 'GPT-5.3 (Vision)',
+            'name' => 'GPT-5.5 (Vision)',
             'tag' => 'pic2text',
             'selectable' => 1,
             'active' => 1,
-            'providerId' => 'gpt-5.3',
-            'priceIn' => 1.75,
+            'providerId' => 'gpt-5.5',
+            'priceIn' => 5,
             'inUnit' => 'per1M',
-            'priceOut' => 14,
+            'priceOut' => 30,
             'outUnit' => 'per1M',
             'quality' => 10,
             'rating' => 1,
             'json' => [
-                'description' => 'OpenAI GPT-5.3 for image analysis and vision tasks.',
+                'description' => 'OpenAI GPT-5.5 for image analysis and vision tasks. Preserves high visual detail by default and supports large multimodal contexts.',
                 'prompt' => 'Describe the image in detail. Extract any text you see.',
-                'params' => ['model' => 'gpt-5.3'],
-                'meta' => ['supports_images' => true],
+                'params' => ['model' => 'gpt-5.5'],
+                'features' => ['reasoning', 'vision'],
+                'meta' => [
+                    'api' => 'responses',
+                    'supports_images' => true,
+                    'context_window' => '1050000',
+                    'max_output' => '128000',
+                    'knowledge_cutoff' => '2025-12-01',
+                ],
+            ],
+        ],
+        [
+            'id' => 206,
+            'service' => 'OpenAI',
+            'name' => 'GPT-5.5 Pro',
+            'tag' => 'chat',
+            'selectable' => 1,
+            'active' => 1,
+            'providerId' => 'gpt-5.5-pro',
+            'priceIn' => 30,
+            'inUnit' => 'per1M',
+            'priceOut' => 180,
+            'outUnit' => 'per1M',
+            'quality' => 10,
+            'rating' => 1,
+            'json' => [
+                'description' => 'OpenAI GPT-5.5 Pro - deeper-compute variant for the hardest professional, coding, and reasoning tasks. 1.05M context, 128K max output. Streaming is not supported by the API.',
+                'max_tokens' => 128000,
+                'params' => ['model' => 'gpt-5.5-pro'],
+                'features' => ['reasoning', 'vision'],
+                'supportsStreaming' => false,
+                'meta' => [
+                    'api' => 'responses',
+                    'context_window' => '1050000',
+                    'max_output' => '128000',
+                    'knowledge_cutoff' => '2025-12-01',
+                    'reasoning_effort_default' => 'medium',
+                ],
+            ],
+        ],
+        [
+            'id' => 207,
+            'service' => 'OpenAI',
+            'name' => 'GPT-5.5 Pro (Vision)',
+            'tag' => 'pic2text',
+            'selectable' => 1,
+            'active' => 1,
+            'providerId' => 'gpt-5.5-pro',
+            'priceIn' => 30,
+            'inUnit' => 'per1M',
+            'priceOut' => 180,
+            'outUnit' => 'per1M',
+            'quality' => 10,
+            'rating' => 1,
+            'json' => [
+                'description' => 'OpenAI GPT-5.5 Pro for difficult image analysis and vision tasks that benefit from deeper reasoning.',
+                'prompt' => 'Describe the image in detail. Extract any text you see.',
+                'params' => ['model' => 'gpt-5.5-pro'],
+                'features' => ['reasoning', 'vision'],
+                'supportsStreaming' => false,
+                'meta' => [
+                    'api' => 'responses',
+                    'supports_images' => true,
+                    'context_window' => '1050000',
+                    'max_output' => '128000',
+                    'knowledge_cutoff' => '2025-12-01',
+                ],
             ],
         ],
         [
@@ -854,20 +989,86 @@ class ModelCatalog
         [
             'id' => 45,
             'service' => 'Google',
-            'name' => 'Veo 3.1',
+            'name' => 'Veo 3.1 Standard',
             'tag' => 'text2vid',
             'selectable' => 1,
             'active' => 1,
             'providerId' => 'veo-3.1-generate-preview',
             'priceIn' => 0,
             'inUnit' => '-',
-            'priceOut' => 0.35,
+            // priceOut = headline / fallback per-second rate. Resolution-specific
+            // prices in json.resolution_prices override priceOut at billing time
+            // (see CostCalculationService::lookupResolutionPrice). The headline
+            // matches the cheapest supported tier so list views show the
+            // best-case price; actual cost depends on default_resolution.
+            'priceOut' => 0.40,
             'outUnit' => 'persec',
             'quality' => 10,
             'rating' => 1,
             'json' => [
-                'description' => 'Google Video Generation model Veo 3.1 - 8 second videos with audio',
+                'description' => 'Google Veo 3.1 Standard - highest-quality 4/6/8 second videos with audio. 720p/1080p: $0.40/sec, 4K: $0.60/sec.',
                 'params' => ['model' => 'veo-3.1-generate-preview'],
+                'pricing_mode' => 'per_second',
+                'allowed_resolutions' => ['720p', '1080p', '4K'],
+                'default_resolution' => '1080p',
+                'resolution_prices' => [
+                    '720p' => 0.40,
+                    '1080p' => 0.40,
+                    '4K' => 0.60,
+                ],
+            ],
+        ],
+        [
+            'id' => 195,
+            'service' => 'Google',
+            'name' => 'Veo 3.1 Fast',
+            'tag' => 'text2vid',
+            'selectable' => 1,
+            'active' => 1,
+            'providerId' => 'veo-3.1-fast-generate-preview',
+            'priceIn' => 0,
+            'inUnit' => '-',
+            'priceOut' => 0.10,
+            'outUnit' => 'persec',
+            'quality' => 8,
+            'rating' => 1,
+            'json' => [
+                'description' => 'Google Veo 3.1 Fast - quicker generations with audio. 720p: $0.10/sec, 1080p: $0.12/sec, 4K: $0.30/sec.',
+                'params' => ['model' => 'veo-3.1-fast-generate-preview'],
+                'pricing_mode' => 'per_second',
+                'allowed_resolutions' => ['720p', '1080p', '4K'],
+                'default_resolution' => '1080p',
+                'resolution_prices' => [
+                    '720p' => 0.10,
+                    '1080p' => 0.12,
+                    '4K' => 0.30,
+                ],
+            ],
+        ],
+        [
+            'id' => 196,
+            'service' => 'Google',
+            'name' => 'Veo 3.1 Lite',
+            'tag' => 'text2vid',
+            'selectable' => 1,
+            'active' => 1,
+            'providerId' => 'veo-3.1-lite-generate-preview',
+            'priceIn' => 0,
+            'inUnit' => '-',
+            'priceOut' => 0.05,
+            'outUnit' => 'persec',
+            'quality' => 7,
+            'rating' => 1,
+            'json' => [
+                'description' => 'Google Veo 3.1 Lite - cheapest tier with audio. 720p: $0.05/sec, 1080p: $0.08/sec. 4K not supported.',
+                'params' => ['model' => 'veo-3.1-lite-generate-preview'],
+                'pricing_mode' => 'per_second',
+                'allowed_resolutions' => ['720p', '1080p'],
+                'default_resolution' => '1080p',
+                'resolution_prices' => [
+                    '720p' => 0.05,
+                    '1080p' => 0.08,
+                ],
             ],
         ],
         [
@@ -1163,6 +1364,92 @@ class ModelCatalog
                 'max_tokens' => 8192,
                 'params' => ['model' => 'claude-sonnet-4-5-20250929'],
                 'meta' => ['context_window' => '200000', 'max_output' => '8192'],
+            ],
+        ],
+        [
+            'id' => 200,
+            'service' => 'HuggingFace',
+            'name' => 'Kimi K2.5',
+            'tag' => 'chat',
+            'selectable' => 1,
+            'active' => 1,
+            'providerId' => 'moonshotai/Kimi-K2.5',
+            'priceIn' => 0.383,
+            'inUnit' => 'per1M',
+            'priceOut' => 1.72,
+            'outUnit' => 'per1M',
+            'quality' => 9,
+            'rating' => 1,
+            'json' => [
+                'description' => 'Kimi K2.5 via HuggingFace - multimodal MoE model with 256K context, native vision, and thinking/non-thinking modes. Routed through HF Inference Providers.',
+                'max_tokens' => 16384,
+                'params' => ['model' => 'moonshotai/Kimi-K2.5'],
+                'features' => ['vision', 'reasoning', 'tool_use'],
+                'meta' => ['context_window' => '262144', 'max_output' => '16384', 'routed_via' => 'huggingface'],
+            ],
+        ],
+        [
+            'id' => 201,
+            'service' => 'HuggingFace',
+            'name' => 'Kimi K2.5 (Vision)',
+            'tag' => 'pic2text',
+            'selectable' => 1,
+            'active' => 1,
+            'providerId' => 'moonshotai/Kimi-K2.5',
+            'priceIn' => 0.383,
+            'inUnit' => 'per1M',
+            'priceOut' => 1.72,
+            'outUnit' => 'per1M',
+            'quality' => 9,
+            'rating' => 1,
+            'json' => [
+                'description' => 'Kimi K2.5 via HuggingFace for image analysis and vision tasks. Native multimodal with strong OCR and chart reading.',
+                'prompt' => 'Describe the image in detail. Extract any text you see.',
+                'params' => ['model' => 'moonshotai/Kimi-K2.5'],
+                'meta' => ['supports_images' => true, 'routed_via' => 'huggingface'],
+            ],
+        ],
+        [
+            'id' => 202,
+            'service' => 'HuggingFace',
+            'name' => 'Kimi K2.6',
+            'tag' => 'chat',
+            'selectable' => 1,
+            'active' => 1,
+            'providerId' => 'moonshotai/Kimi-K2.6',
+            'priceIn' => 0.60,
+            'inUnit' => 'per1M',
+            'priceOut' => 3.00,
+            'outUnit' => 'per1M',
+            'quality' => 10,
+            'rating' => 1,
+            'json' => [
+                'description' => 'Kimi K2.6 via HuggingFace - 1T parameter MoE (32B active) flagship for long-horizon coding, agentic workflows, and reasoning. 262K context. Routed through HF Inference Providers.',
+                'max_tokens' => 16384,
+                'params' => ['model' => 'moonshotai/Kimi-K2.6'],
+                'features' => ['vision', 'reasoning', 'tool_use'],
+                'meta' => ['context_window' => '262144', 'max_output' => '16384', 'routed_via' => 'huggingface'],
+            ],
+        ],
+        [
+            'id' => 203,
+            'service' => 'HuggingFace',
+            'name' => 'Kimi K2.6 (Vision)',
+            'tag' => 'pic2text',
+            'selectable' => 1,
+            'active' => 1,
+            'providerId' => 'moonshotai/Kimi-K2.6',
+            'priceIn' => 0.60,
+            'inUnit' => 'per1M',
+            'priceOut' => 3.00,
+            'outUnit' => 'per1M',
+            'quality' => 10,
+            'rating' => 1,
+            'json' => [
+                'description' => 'Kimi K2.6 via HuggingFace for image analysis and vision tasks. Flagship multimodal Kimi model.',
+                'prompt' => 'Describe the image in detail. Extract any text you see.',
+                'params' => ['model' => 'moonshotai/Kimi-K2.6'],
+                'meta' => ['supports_images' => true, 'routed_via' => 'huggingface'],
             ],
         ],
         // ==================== THEHIVE MODELS ====================

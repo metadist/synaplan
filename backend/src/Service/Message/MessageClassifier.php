@@ -171,8 +171,10 @@ final readonly class MessageClassifier
             'web_search' => $result['web_search'] ?? false,
             'media_type' => $result['media_type'] ?? null,
             'duration' => $result['duration'] ?? null,
+            'resolution' => $result['resolution'] ?? null,
             'source' => $source,
             'synapse_score' => $result['synapse_score'] ?? null,
+            'raw_ai_response' => $result['raw_response'] ?? 'N/A',
         ]);
 
         $classification = [
@@ -201,6 +203,14 @@ final readonly class MessageClassifier
         $duration = $result['duration'] ?? null;
         if (null !== $duration) {
             $classification['duration'] = $duration;
+        }
+
+        // Pass through resolution if detected (for video generation).
+        // Already validated by MessageSorter against the supported enum, so the
+        // handler can forward it to the provider as-is.
+        $resolution = $result['resolution'] ?? null;
+        if (is_string($resolution) && '' !== $resolution) {
+            $classification['resolution'] = $resolution;
         }
 
         return $classification;

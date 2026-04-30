@@ -155,6 +155,25 @@
       "levelUpdated": "Benutzer-Level auf {level} aktualisiert",
       "levelUpdateFailed": "Fehler beim Aktualisieren des Benutzer-Levels"
     },
+    "impersonate": {
+      "button": "Als Benutzer ansehen",
+      "buttonTitle": "In diesen Benutzer einloggen",
+      "confirmTitle": "Als {email} einloggen?",
+      "confirmMessage": "Du wirst als {email} angemeldet. Jede Aktion und jede Änderung wird diesem Konto zugeordnet. Verwende das Banner oben, um die Sitzung zu beenden.",
+      "confirmAction": "Sitzung starten",
+      "started": "Du siehst die Anwendung jetzt als {email}.",
+      "startFailed": "Impersonation konnte nicht gestartet werden",
+      "cannotImpersonateAdmin": "Andere Administratoren können nicht impersoniert werden.",
+      "cannotImpersonateSelf": "Du kannst dich nicht selbst impersonieren.",
+      "banner": {
+        "viewing": "Angemeldet als {email}",
+        "adminLabel": "Eigentlich angemeldet als {email}",
+        "exitButton": "Beenden",
+        "exitButtonTitle": "Admin-Sitzung wiederherstellen"
+      },
+      "stopped": "Admin-Sitzung wiederhergestellt.",
+      "stopFailed": "Impersonation konnte nicht beendet werden"
+    },
     "prompts": {
       "shortDesc": "Kurzbeschreibung",
       "prompt": "Prompt",
@@ -310,7 +329,11 @@
     "again": "Nochmal",
     "againWith": "Nochmal mit",
     "regenerateWith": "Neu generieren mit",
-    "copy": "Nachricht kopieren"
+    "copy": "Nachricht kopieren",
+    "messageDetails": "Nachrichtendetails",
+    "infoTopic": "Thema",
+    "infoModel": "Modell",
+    "infoProvider": "Anbieter"
   },
   "commands": {
     "noResults": "Keine Befehle gefunden",
@@ -584,14 +607,28 @@
     "description": "Wir sind auf einen unerwarteten Fehler gestoßen. Keine Sorge, unser Team wurde benachrichtigt und arbeitet daran.",
     "details": "Fehlerdetails",
     "statusCode": "Statuscode",
+    "source": "Quelle",
+    "reason": "Grund",
     "showStack": "Stack-Trace anzeigen",
     "hideStack": "Stack-Trace ausblenden",
     "reload": "Seite neu laden",
+    "retry": "Erneut versuchen",
     "goHome": "Zur Startseite",
     "needHelp": "Brauchst du Hilfe?",
     "contactSupport": "Wenn dieses Problem weiterhin besteht, kontaktiere bitte unser Support-Team mit den folgenden Fehlerdetails.",
     "copyError": "Fehlerinfo kopieren",
-    "copied": "Kopiert!"
+    "copied": "Kopiert!",
+    "adminOnly": "Nur Admin",
+    "reasons": {
+      "redirectLoop": {
+        "title": "Weiterleitungsschleife erkannt",
+        "description": "Wir konnten dich nicht weiterleiten, weil dieselbe Seite mehrfach hintereinander angefragt wurde. Bitte versuche es erneut oder lösche die Cookies dieser Seite."
+      },
+      "authTimeout": {
+        "title": "Anmeldung dauert zu lange",
+        "description": "Die Sitzungsprüfung beim Server hat zu lange gedauert. Bitte prüfe deine Internetverbindung und versuche es erneut."
+      }
+    }
   },
   "loading": {
     "default": "Lädt...",
@@ -1080,11 +1117,23 @@
       "subscription": "Abonnement",
       "userLevel": "Benutzerebene",
       "phoneVerified": "Telefon verifiziert",
-      "subscriptionActive": "Status",
+      "subscriptionStatusLabel": "Planstatus",
+      "subscriptionStatus": {
+        "active": "Aktiv",
+        "free": "Kostenloser Plan",
+        "past_due": "Überfällig",
+        "cancelled": "Gekündigt",
+        "anonymous": "Anonym",
+        "inactive": "Inaktiv"
+      },
       "totalRequests": "Gesamtanfragen",
+      "totalRequestsShort": "gesamt",
+      "totalMessages": "Chat-Nachrichten",
+      "totalMessagesTooltip": "Nur BACTION=MESSAGES – dieser Zähler wird tatsächlich vom Plan-Limit (z. B. 50/50) gesteuert.",
       "usageByType": "Nutzung nach Typ",
       "bySource": "Nach Quelle",
       "byTime": "Nach Zeitraum",
+      "byTimeDescription": "Alle Nutzungsereignisse im Kalenderzeitraum (Nachrichten, Embeddings, Klassifizierung, Memory-Extraktion, …). Nicht identisch mit dem Zeitfenster oder Umfang des Plan-Limit-Zählers.",
       "recentActivity": "Letzte Aktivitäten",
       "lifetime": "lebenslang",
       "remaining": "Verbleibend",

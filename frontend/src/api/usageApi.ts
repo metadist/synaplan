@@ -1,12 +1,35 @@
 import { httpClient } from '@/services/api/httpClient'
 import { useConfigStore } from '@/stores/config'
 
+// NOTE: this interface is hand-maintained because UsageStatsController's
+// OpenAPI annotation currently types the `data` field as a generic `object`.
+// Schematising the full usage-stats response (usage map, breakdowns,
+// cost_budget, cost_summary, recent_usage items, …) so Zod is auto-generated
+// from the spec is a larger follow-up; tracked via the TODO in
+// UsageStatsController::getStats(). Keep this interface in sync with the
+// backend response shape until that happens.
+
+export type SubscriptionStatus =
+  | 'active'
+  | 'free'
+  | 'past_due'
+  | 'cancelled'
+  | 'anonymous'
+  | 'inactive'
+
 export interface UsageStats {
   user_level: string
   phone_verified: boolean
   subscription: {
     level: string
     active: boolean
+    /**
+     * Optional — older backend deployments may not return this field yet. The
+     * UI derives a fallback from `level` + `active` (see `UsageStatistics.vue
+     * :: subscriptionStatus` computed) so a frontend deployed ahead of the
+     * backend does not show a blank status.
+     */
+    status?: SubscriptionStatus
     plan_name: string
     expires_at: number | null
     stripe_customer_id: string | null
@@ -56,7 +79,21 @@ export interface UsageStats {
     latency: number
     status: string
   }>
+  /**
+   * Sum across all six tracked action types (MESSAGES + IMAGES + VIDEOS + AUDIOS
+   * + FILE_ANALYSIS + EMBEDDINGS). Do NOT use for the headline "chat messages
+   * used" number — use `total_messages` instead so it matches the free-tier
+   * limit (50/50) surfaced in LimitReachedModal.
+   */
   total_requests: number
+  /**
+   * Chat messages consumed (BACTION = 'MESSAGES'); same counter gated by the rate limit.
+   *
+   * Optional — older backend deployments may not return this field yet. The UI
+   * falls back to `usage.MESSAGES.used` so a frontend rolled out ahead of the
+   * backend still renders the right number.
+   */
+  total_messages?: number
   cost_budget: {
     used: number
     budget: number

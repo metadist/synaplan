@@ -257,15 +257,28 @@
                         {{ formatDate(user.created) }}
                       </td>
                       <td class="py-3 px-4 text-right">
-                        <button
+                        <div
                           v-if="user.id !== currentUserId"
-                          class="text-red-500 hover:text-red-600 dark:text-red-400 dark:hover:text-red-300 p-2 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20"
-                          :title="$t('admin.users.delete')"
-                          :data-testid="`btn-delete-user-${user.id}`"
-                          @click="confirmDeleteUser(user)"
+                          class="flex items-center justify-end gap-1"
                         >
-                          <Icon icon="mdi:delete" class="w-5 h-5" />
-                        </button>
+                          <button
+                            v-if="user.level !== 'ADMIN'"
+                            class="p-2 rounded-lg text-amber-600 hover:text-amber-700 dark:text-amber-400 dark:hover:text-amber-300 hover:bg-amber-50 dark:hover:bg-amber-900/20"
+                            :title="$t('admin.impersonate.buttonTitle')"
+                            :data-testid="`btn-impersonate-user-${user.id}`"
+                            @click="confirmImpersonate(user)"
+                          >
+                            <Icon icon="mdi:incognito" class="w-5 h-5" />
+                          </button>
+                          <button
+                            class="text-red-500 hover:text-red-600 dark:text-red-400 dark:hover:text-red-300 p-2 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20"
+                            :title="$t('admin.users.delete')"
+                            :data-testid="`btn-delete-user-${user.id}`"
+                            @click="confirmDeleteUser(user)"
+                          >
+                            <Icon icon="mdi:delete" class="w-5 h-5" />
+                          </button>
+                        </div>
                         <span v-else class="text-sm txt-secondary italic">{{
                           $t('admin.users.currentUser')
                         }}</span>
@@ -701,10 +714,12 @@ const AdminSubscriptionsPanel = defineAsyncComponent(
   () => import('@/components/admin/AdminSubscriptionsPanel.vue')
 )
 
+import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { useConfigStore } from '@/stores/config'
 import { useI18n } from 'vue-i18n'
 import { useDateFormat } from '@/composables/useDateFormat'
+import { useDialog } from '@/composables/useDialog'
 import { useNotification } from '@/composables/useNotification'
 
 const { t } = useI18n()
@@ -712,6 +727,8 @@ const { formatDateTime } = useDateFormat()
 const authStore = useAuthStore()
 const config = useConfigStore()
 const { success, error: showError } = useNotification()
+const { confirm } = useDialog()
+const router = useRouter()
 
 type TabId = 'overview' | 'users' | 'prompts' | 'usage' | 'subscriptions'
 interface AdminTab {
@@ -943,6 +960,46 @@ async function deleteUser() {
     console.error('Failed to delete user:', error)
     showError(error instanceof Error ? error.message : t('admin.users.userDeleteFailed'))
   }
+}
+
+/**
+ * Start an impersonation session for the given user.
+ * UX flow:
+ *   1. Inline guard rails (mirror what the backend enforces): no self, no admin.
+ *   2. Confirmation dialog so this never happens by accident — the admin is
+ *      effectively logging in as someone else.
+ *   3. On success: success notification + navigate to / (the impersonated
+ *      user's home), where the impersonation banner takes over.
+ *   4. On failure: error notification with the server's message verbatim.
+ */
+async function confirmImpersonate(targetUser: AdminUser) {
+  const targetEmail = targetUser.email ?? `#${targetUser.id}`
+
+  if (targetUser.id === currentUserId.value) {
+    showError(t('admin.impersonate.cannotImpersonateSelf'))
+    return
+  }
+  if (targetUser.level === 'ADMIN') {
+    showError(t('admin.impersonate.cannotImpersonateAdmin'))
+    return
+  }
+
+  const confirmed = await confirm({
+    title: t('admin.impersonate.confirmTitle', { email: targetEmail }),
+    message: t('admin.impersonate.confirmMessage', { email: targetEmail }),
+    confirmText: t('admin.impersonate.confirmAction'),
+    danger: true,
+  })
+  if (!confirmed) return
+
+  const result = await authStore.startImpersonation(targetUser.id)
+  if (!result.success) {
+    showError(result.error ?? t('admin.impersonate.startFailed'))
+    return
+  }
+
+  success(t('admin.impersonate.started', { email: targetEmail }))
+  await router.push('/').catch(() => {})
 }
 
 // Prompt actions

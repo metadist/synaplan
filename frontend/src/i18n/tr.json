@@ -152,6 +152,25 @@
       "levelUpdated": "Kullanıcı seviyesi {level} olarak güncellendi",
       "levelUpdateFailed": "Kullanıcı seviyesi güncellenemedi"
     },
+    "impersonate": {
+      "button": "Kullanıcı olarak görüntüle",
+      "buttonTitle": "Bu kullanıcı olarak oturum aç",
+      "confirmTitle": "{email} olarak oturum açılsın mı?",
+      "confirmMessage": "{email} olarak oturum açacaksın. Yapılan tüm eylemler ve değişiklikler bu hesaba atfedilecektir. Bittiğinde üstteki bandı kullanarak çıkabilirsin.",
+      "confirmAction": "Oturumu başlat",
+      "started": "Uygulamayı şimdi {email} olarak görüntülüyorsun.",
+      "startFailed": "Kimliğe bürünme başlatılamadı",
+      "cannotImpersonateAdmin": "Diğer yöneticilerin kimliğine bürünülemez.",
+      "cannotImpersonateSelf": "Kendi kimliğine bürünemezsin.",
+      "banner": {
+        "viewing": "{email} olarak görüntüleniyor",
+        "adminLabel": "Yönetici oturumu: {email}",
+        "exitButton": "Çık",
+        "exitButtonTitle": "Yönetici oturumunu geri yükle"
+      },
+      "stopped": "Yönetici oturumu geri yüklendi.",
+      "stopFailed": "Kimliğe bürünme sonlandırılamadı"
+    },
     "prompts": {
       "shortDesc": "Kısa Açıklama",
       "prompt": "Prompt",
@@ -886,14 +905,28 @@
     "description": "Beklenmeyen bir hatayla karşılaştık. Endişelenmeyin, ekibimiz bilgilendirildi ve üzerinde çalışıyor.",
     "details": "Hata Detayları",
     "statusCode": "Durum Kodu",
+    "source": "Kaynak",
+    "reason": "Sebep",
     "showStack": "Yığın izini göster",
     "hideStack": "Yığın izini gizle",
     "reload": "Sayfayı Yenile",
+    "retry": "Tekrar Dene",
     "goHome": "Ana Sayfaya Git",
     "needHelp": "Yardıma mı İhtiyacınız Var?",
     "contactSupport": "Bu sorun devam ederse, lütfen aşağıdaki hata detaylarıyla destek ekibimizle iletişime geçin.",
     "copyError": "Hata Bilgisini Kopyala",
-    "copied": "Kopyalandı!"
+    "copied": "Kopyalandı!",
+    "adminOnly": "Yalnızca yönetici",
+    "reasons": {
+      "redirectLoop": {
+        "title": "Yönlendirme Döngüsü Tespit Edildi",
+        "description": "Aynı sayfa arka arkaya birkaç kez istendiği için sizi yönlendiremedik. Lütfen tekrar deneyin veya bu sitenin çerezlerini temizleyin."
+      },
+      "authTimeout": {
+        "title": "Oturum Açma Çok Uzun Sürüyor",
+        "description": "Sunucuyla oturum doğrulaması zaman aşımına uğradı. Lütfen internet bağlantınızı kontrol edip tekrar deneyin."
+      }
+    }
   },
   "loading": {
     "default": "Yükleniyor...",
@@ -1425,11 +1458,23 @@
       "subscription": "Abonelik",
       "userLevel": "Kullanıcı Seviyesi",
       "phoneVerified": "Telefon Doğrulandı",
-      "subscriptionActive": "Durum",
+      "subscriptionStatusLabel": "Plan durumu",
+      "subscriptionStatus": {
+        "active": "Aktif",
+        "free": "Ücretsiz plan",
+        "past_due": "Vadesi geçmiş",
+        "cancelled": "İptal edildi",
+        "anonymous": "Anonim",
+        "inactive": "Pasif"
+      },
       "totalRequests": "Toplam İstek",
+      "totalRequestsShort": "toplam",
+      "totalMessages": "Sohbet mesajı",
+      "totalMessagesTooltip": "Yalnızca BACTION=MESSAGES satırları — plan limitini (ör. 50/50) fiilen sınırlayan sayaç budur.",
       "usageByType": "Türe Göre Kullanım",
       "bySource": "Kaynağa Göre",
       "byTime": "Zaman Dilimine Göre",
+      "byTimeDescription": "Takvim aralığındaki tüm kullanım olayları (mesajlar, embedding'ler, sınıflandırma, bellek çıkarımı, …). Plan limiti sayacının zaman penceresi veya kapsamı ile aynı değildir.",
       "recentActivity": "Son Aktivite",
       "lifetime": "ömür boyu",
       "remaining": "Kalan",

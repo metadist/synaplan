@@ -160,6 +160,25 @@
       "levelUpdated": "User level updated to {level}",
       "levelUpdateFailed": "Failed to update user level"
     },
+    "impersonate": {
+      "button": "View as user",
+      "buttonTitle": "Impersonate this user",
+      "confirmTitle": "Impersonate {email}?",
+      "confirmMessage": "You will be signed in as {email}. Every action you take and every change you make will be attributed to this account. Use the banner at the top to exit when you are done.",
+      "confirmAction": "Start session",
+      "started": "You are now viewing the application as {email}.",
+      "startFailed": "Could not start impersonation",
+      "cannotImpersonateAdmin": "Other administrators cannot be impersonated.",
+      "cannotImpersonateSelf": "You cannot impersonate yourself.",
+      "banner": {
+        "viewing": "Viewing as {email}",
+        "adminLabel": "Signed in as {email}",
+        "exitButton": "Exit",
+        "exitButtonTitle": "Restore your admin session"
+      },
+      "stopped": "Admin session restored.",
+      "stopFailed": "Could not exit impersonation"
+    },
     "prompts": {
       "shortDesc": "Short Description",
       "prompt": "Prompt",
@@ -315,7 +334,11 @@
     "again": "Again",
     "againWith": "Again with",
     "regenerateWith": "Regenerate with",
-    "copy": "Copy message"
+    "copy": "Copy message",
+    "messageDetails": "Message details",
+    "infoTopic": "Topic",
+    "infoModel": "Model",
+    "infoProvider": "Provider"
   },
   "commands": {
     "noResults": "No commands found",
@@ -975,11 +998,23 @@
       "subscription": "Subscription",
       "userLevel": "User Level",
       "phoneVerified": "Phone Verified",
-      "subscriptionActive": "Status",
+      "subscriptionStatusLabel": "Plan status",
+      "subscriptionStatus": {
+        "active": "Active",
+        "free": "Free plan",
+        "past_due": "Past due",
+        "cancelled": "Cancelled",
+        "anonymous": "Anonymous",
+        "inactive": "Inactive"
+      },
       "totalRequests": "Total Requests",
+      "totalRequestsShort": "total",
+      "totalMessages": "Chat messages",
+      "totalMessagesTooltip": "Only BACTION=MESSAGES rows — this is what the plan limit (e.g. 50/50) actually gates.",
       "usageByType": "Usage by Type",
       "bySource": "By Source",
       "byTime": "By Time Period",
+      "byTimeDescription": "All usage events in the calendar window (messages, embeddings, classification, memory extraction, …). Not the same window or scope as the plan limit counter.",
       "recentActivity": "Recent Activity",
       "lifetime": "lifetime",
       "remaining": "Remaining",
@@ -2278,14 +2313,28 @@
     "description": "We encountered an unexpected error. Don't worry, our team has been notified and is working on it.",
     "details": "Error Details",
     "statusCode": "Status Code",
+    "source": "Source",
+    "reason": "Reason",
     "showStack": "Show stack trace",
     "hideStack": "Hide stack trace",
     "reload": "Reload Page",
+    "retry": "Try Again",
     "goHome": "Go to Home",
     "needHelp": "Need Help?",
     "contactSupport": "If this problem persists, please contact our support team with the error details below.",
     "copyError": "Copy Error Info",
-    "copied": "Copied!"
+    "copied": "Copied!",
+    "adminOnly": "Admin only",
+    "reasons": {
+      "redirectLoop": {
+        "title": "Redirect Loop Detected",
+        "description": "We couldn't navigate you because the same page was requested several times in a row. Please try again or clear this site's cookies."
+      },
+      "authTimeout": {
+        "title": "Sign-in is Taking Too Long",
+        "description": "Verifying your session with the server timed out. Please check your internet connection and try again."
+      }
+    }
   },
   "loading": {
     "default": "Loading...",

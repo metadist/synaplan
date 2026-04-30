@@ -37,12 +37,19 @@ class KeycloakAuthControllerTest extends TestCase
     private function createController(
         string $oidcScopes = 'openid email profile offline_access',
     ): KeycloakAuthController {
+        // ImpersonationService is only consulted on successful logins to
+        // wipe orphan stash cookies — we mock it as a no-op so the existing
+        // test cases stay focused on the OIDC PKCE / token-exchange paths
+        // they were written for.
+        $impersonationService = $this->createMock(\App\Service\ImpersonationService::class);
+
         return new KeycloakAuthController(
             $this->httpClient,
             $this->tokenService,
             $this->oidcTokenService,
             $this->oidcUserService,
             $this->oauthStateService,
+            $impersonationService,
             $this->logger,
             'test-client-id',
             'test-client-secret',

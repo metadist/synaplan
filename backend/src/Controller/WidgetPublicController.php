@@ -233,16 +233,23 @@ class WidgetPublicController extends AbstractController
         // Check if session is in human takeover mode
         $isHumanMode = 'human' === $session->getMode() || 'waiting' === $session->getMode();
 
-        // Check session limits
-        $messageLimit = (int) ($config['messageLimit'] ?? WidgetSessionService::DEFAULT_MAX_MESSAGES);
-        $limitCheck = $this->sessionService->checkSessionLimit($session, $messageLimit);
-        if (!$limitCheck['allowed']) {
-            return $this->json([
-                'error' => 'Rate limit exceeded',
-                'reason' => $limitCheck['reason'],
-                'remaining' => $limitCheck['remaining'],
-                'retryAfter' => $limitCheck['retry_after'],
-            ], Response::HTTP_TOO_MANY_REQUESTS);
+        // Internal mode = widget owner chatting with their own widget from the dashboard.
+        // Skip end-user limits (messageLimit, per-minute throttle) for these sessions —
+        // they would otherwise block legitimate internal usage.
+        $isInternalSession = $session->isInternalMode();
+
+        // Check session limits (skipped for internal owner sessions)
+        if (!$isInternalSession) {
+            $messageLimit = (int) ($config['messageLimit'] ?? WidgetSessionService::DEFAULT_MAX_MESSAGES);
+            $limitCheck = $this->sessionService->checkSessionLimit($session, $messageLimit);
+            if (!$limitCheck['allowed']) {
+                return $this->json([
+                    'error' => 'Rate limit exceeded',
+                    'reason' => $limitCheck['reason'],
+                    'remaining' => $limitCheck['remaining'],
+                    'retryAfter' => $limitCheck['retry_after'],
+                ], Response::HTTP_TOO_MANY_REQUESTS);
+            }
         }
 
         // Check owner's limits
@@ -306,6 +313,11 @@ class WidgetPublicController extends AbstractController
                     $welcomeMessage->setDateTime(date('YmdHis', $welcomeTimestamp));
                     $welcomeMessage->setProviderIndex('widget');
                     $this->em->persist($welcomeMessage);
+                    $this->em->flush();
+
+                    // Welcome message counts toward the persisted total so the dashboard
+                    // and exports show the right conversation length from message #1.
+                    $session->incrementMessageCount();
                     $this->em->flush();
 
                     $this->logger->info('Widget welcome message created', [
@@ -379,15 +391,20 @@ class WidgetPublicController extends AbstractController
                 }
             }
 
-            // Increment session message count and update last message preview
-            // Only increment message count for AI mode (human messages don't count against limits)
-            if (!$isHumanMode) {
-                $this->sessionService->incrementMessageCount($session);
-                // Save user message as last message preview
-                $session->setLastMessagePreview($data['text']);
-                $this->em->flush();
-            }
-            $this->sessionService->attachChat($session, $chat);
+            // Always count the persisted visitor message and refresh the preview.
+            // The visitor quota is enforced separately by checkSessionLimit() above
+            // (live count of visitor messages within the quota window), so this counter
+            // is now safe to advance unconditionally — including for internal/human/
+            // waiting sessions that previously left BMESSAGECOUNT untouched and caused
+            // dashboard/export "messageCount = 0" reports for sessions with real history.
+            //
+            // All session-level mutations (counter, preview, chat link) are batched into
+            // a single flush below so this hot path issues one DB round-trip instead of
+            // three (counter flush + preview flush + attachChat flush).
+            $this->sessionService->incrementMessageCount($session, false);
+            $session->setLastMessagePreview($data['text']);
+            $this->sessionService->attachChat($session, $chat, false);
+            $this->em->flush();
 
             // If in human takeover mode, just save the message and return success (no AI processing)
             if ($isHumanMode) {
@@ -721,11 +738,17 @@ class WidgetPublicController extends AbstractController
                     ]);
 
                     try {
+                        // Mark the visitor message as failed and roll the cached counter
+                        // back in a single flush. Both the live quota window
+                        // (WidgetSessionService::countVisitorMessagesInQuotaWindow) and the
+                        // export's bulk count (MessageRepository::countByChatIds) exclude
+                        // status='failed', so the cached BMESSAGECOUNT must drop by 1 too —
+                        // otherwise the dashboard (cached) and the export (DB-derived) drift
+                        // apart for sessions that hit a stream error, which is exactly the
+                        // class of bug this PR is meant to eliminate.
                         $incomingMessage->setStatus('failed');
+                        $this->sessionService->decrementMessageCount($session, false);
                         $this->em->flush();
-
-                        // Decrement session message count on failure so user can retry
-                        $this->sessionService->decrementMessageCount($session);
                     } catch (\Throwable $flushException) {
                         // EntityManager might be closed after database error
                         $this->logger->warning('Could not update message status after error', [
@@ -746,9 +769,13 @@ class WidgetPublicController extends AbstractController
 
             return $response;
         } catch (\Exception $e) {
-            // Decrement session message count on failure so user can retry
-            $this->sessionService->decrementMessageCount($session);
-
+            // Outer safety-net: catches anything thrown before the StreamedResponse takes
+            // over (validation, AI setup, persist failures, etc.). The cached counter
+            // rollback for stream-failures is handled inside the StreamedResponse closure
+            // (see inner catch above). Errors that throw before $incomingMessage is
+            // persisted leave nothing to clean up; errors that throw after persist but
+            // before streaming starts leave the row with status='processing' — rare
+            // enough that a follow-up sweep is preferable to a partial rollback here.
             $this->logger->error('Widget message failed', [
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString(),
@@ -1520,6 +1547,9 @@ class WidgetPublicController extends AbstractController
 
         if ($isInternalMode && $session->isAiMode()) {
             $session->setMode(WidgetSession::MODE_INTERNAL);
+            // Persist immediately so the mode is durable even if the request aborts
+            // before the next flush (rate limit, owner lookup, file processing failure).
+            $this->em->flush();
         }
 
         return $session;

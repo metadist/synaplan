@@ -27,6 +27,8 @@ export const getProviderIcon = (provider: string): string => {
     return 'simple-icons:cohere'
   } else if (providerLower.includes('mistral')) {
     return 'simple-icons:mistral'
+  } else if (providerLower.includes('huggingface') || providerLower.includes('hugging face')) {
+    return 'simple-icons:huggingface'
   }
 
   return 'mdi:robot'

@@ -222,9 +222,9 @@ interface ImageToImageProviderInterface extends ProviderMetadataInterface
 }
 ```
 
-### Phase 3: Model Configuration (BMODELS.sql)
+### Phase 3: Model Configuration (ModelCatalog.php)
 
-We will add 5 high-value models from HuggingFace to the `BMODELS` table. These models introduce new capabilities or offer significant performance/cost benefits.
+We will add 5 high-value models from HuggingFace to `backend/src/Model/ModelCatalog.php` (applied to the live `BMODELS` table via `php bin/console app:seed`). The SQL examples below are kept for reference only; the actual implementation must extend `ModelCatalog::models()` instead of editing any SQL file. These models introduce new capabilities or offer significant performance/cost benefits.
 
 **Provider Name (BSERVICE)**: `HuggingFace`
 

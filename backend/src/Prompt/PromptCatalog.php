@@ -304,6 +304,23 @@ This is the list, use only this:
    - "Create a 3 second video" → BDURATION: 4 (rounded up to min)
    - "Generate a video of a cat" → (no BDURATION, use default)
 
+11. **Detect video resolution (BRESOLUTION)**: If BTOPIC is "mediamaker" AND BMEDIA is "video", extract the requested output resolution from the user's text.
+   - Supported values: **"720p"**, **"1080p"**, **"4K"** (case-sensitive, exactly as written)
+   - Map common aliases to one of those three values:
+     - "720", "720p", "hd", "ready hd" → "720p"
+     - "1080", "1080p", "fhd", "full hd", "fullhd" → "1080p"
+     - "4k", "4 k", "uhd", "ultra hd", "ultrahd", "2160p", "2160" → "4K"
+   - 8K, 5K, 1440p (QHD/2K) and any other value are NOT supported. Map them to the nearest lower supported tier ("4K") so we never forward an unsupported value.
+   - If no resolution is mentioned at all, do NOT include BRESOLUTION (system uses 1080p as default).
+   Examples:
+   - "Create a video of a BMW in 4K" → BRESOLUTION: "4K"
+   - "Erstelle ein Video von einem BMW in 4k" → BRESOLUTION: "4K"
+   - "Make a 720p video" → BRESOLUTION: "720p"
+   - "Generate a Full HD clip" → BRESOLUTION: "1080p"
+   - "Render this in UHD" → BRESOLUTION: "4K"
+   - "Make an 8K video" → BRESOLUTION: "4K" (highest supported tier)
+   - "Create a video of a cat" → (no BRESOLUTION, use default)
+
 # Answer format
 
 You must respond with the **same JSON object as received**, modifying only:
@@ -314,6 +331,7 @@ You must respond with the **same JSON object as received**, modifying only:
 * "BMEDIA": "image" | "video" | "audio" (only when BTOPIC is "mediamaker")
 * "BINPUTMODE": "text_only" | "reference_images" (only when BTOPIC is "mediamaker" AND BMEDIA is "image")
 * "BDURATION": integer (only when BMEDIA is "video" AND user specified a duration)
+* "BRESOLUTION": "720p" | "1080p" | "4K" (only when BMEDIA is "video" AND user specified a resolution)
 
 If you cannot define the language from the text, leave "BLANG" as "en".
 If you cannot define the topic, leave "BTOPIC" as "general".
@@ -324,7 +342,7 @@ If BTEXT is empty, but BFILETEXT is set, use BFILETEXT primarily to define the t
 If the user changes topics mid-conversation, update BTOPIC to match the new topic in your next response.
 
 Do not change any other fields.
-Do not add any new fields beyond BTOPIC, BLANG, BWEBSEARCH, BMEDIA, BINPUTMODE, and BDURATION.
+Do not add any new fields beyond BTOPIC, BLANG, BWEBSEARCH, BMEDIA, BINPUTMODE, BDURATION, and BRESOLUTION.
 Do not add any additional text beyond the JSON.
 **Do not answer the question of the user.**
 Only send the JSON object.

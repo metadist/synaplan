@@ -74,10 +74,16 @@ final class SeedAllCommand extends Command
         $rows = [];
         foreach ($steps as [$label, $callable]) {
             $result = $this->runStep($io, $label, $callable);
-            $rows[] = [$label, (string) $result->inserted, (string) $result->updated, (string) $result->skipped];
+            $rows[] = [
+                $label,
+                (string) $result->inserted,
+                (string) $result->updated,
+                (string) $result->skipped,
+                (string) $result->preserved,
+            ];
         }
 
-        $io->table(['Step', 'Inserted', 'Updated', 'Skipped'], $rows);
+        $io->table(['Step', 'Inserted', 'Updated', 'Skipped', 'Preserved'], $rows);
 
         $io->success('All seed steps completed.');
 
@@ -92,10 +98,11 @@ final class SeedAllCommand extends Command
         $io->section("Seeding: $label");
         $result = $step();
         $io->writeln(sprintf(
-            '  → inserted=%d, updated=%d, skipped=%d',
+            '  → inserted=%d, updated=%d, skipped=%d, preserved=%d',
             $result->inserted,
             $result->updated,
-            $result->skipped
+            $result->skipped,
+            $result->preserved,
         ));
 
         return $result;
