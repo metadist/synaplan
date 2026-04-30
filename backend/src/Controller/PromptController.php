@@ -11,6 +11,7 @@ use App\Repository\MessageRepository;
 use App\Repository\PromptMetaRepository;
 use App\Repository\PromptRepository;
 use App\Service\Message\SynapseIndexer;
+use App\Service\Message\SynapseRouter;
 use App\Service\ModelConfigService;
 use App\Service\PromptService;
 use App\Service\RAG\VectorStorage\VectorStorageFacade;
@@ -52,6 +53,7 @@ class PromptController extends AbstractController
         private ModelConfigService $modelConfigService,
         private VectorStorageFacade $vectorStorageFacade,
         private SynapseIndexer $synapseIndexer,
+        private SynapseRouter $synapseRouter,
     ) {
     }
 
@@ -146,18 +148,7 @@ class PromptController extends AbstractController
         foreach ($systemPrompts as $prompt) {
             $metadata = $this->promptService->loadMetadataForPrompt($prompt->getId());
 
-            $promptsMap[$prompt->getTopic()] = [
-                'id' => $prompt->getId(),
-                'topic' => $prompt->getTopic(),
-                'name' => $this->formatPromptName($prompt->getTopic(), $prompt->getShortDescription()),
-                'shortDescription' => $prompt->getShortDescription(),
-                'prompt' => $prompt->getPrompt(),
-                'selectionRules' => $prompt->getSelectionRules(),
-                'language' => $prompt->getLanguage(),
-                'isDefault' => true,
-                'isUserOverride' => false,
-                'metadata' => $metadata,
-            ];
+            $promptsMap[$prompt->getTopic()] = $this->serializePrompt($prompt, isDefault: true, isUserOverride: false, metadata: $metadata);
         }
 
         // Then override with user prompts
@@ -166,24 +157,45 @@ class PromptController extends AbstractController
             $hasSystemVersion = isset($promptsMap[$topic]);
             $metadata = $this->promptService->loadMetadataForPrompt($prompt->getId());
 
-            $promptsMap[$topic] = [
-                'id' => $prompt->getId(),
-                'topic' => $topic,
-                'name' => $this->formatPromptName($topic, $prompt->getShortDescription(), false),
-                'shortDescription' => $prompt->getShortDescription(),
-                'prompt' => $prompt->getPrompt(),
-                'selectionRules' => $prompt->getSelectionRules(),
-                'language' => $prompt->getLanguage(),
-                'isDefault' => false,
-                'isUserOverride' => $hasSystemVersion,
-                'metadata' => $metadata,
-            ];
+            $promptsMap[$topic] = $this->serializePrompt($prompt, isDefault: false, isUserOverride: $hasSystemVersion, metadata: $metadata);
         }
 
         return $this->json([
             'success' => true,
             'prompts' => array_values($promptsMap),
         ]);
+    }
+
+    /**
+     * Serialise a Prompt entity into the API response shape used by both
+     * the list endpoint and the single-get endpoint. Centralised so the
+     * shape stays in sync (keywords, enabled, embeddingPreview, ...).
+     *
+     * @param array<string, mixed> $metadata
+     *
+     * @return array<string, mixed>
+     */
+    private function serializePrompt(
+        Prompt $prompt,
+        bool $isDefault,
+        bool $isUserOverride,
+        array $metadata = [],
+    ): array {
+        return [
+            'id' => $prompt->getId(),
+            'topic' => $prompt->getTopic(),
+            'name' => $this->formatPromptName($prompt->getTopic(), $prompt->getShortDescription(), $isDefault),
+            'shortDescription' => $prompt->getShortDescription(),
+            'prompt' => $prompt->getPrompt(),
+            'selectionRules' => $prompt->getSelectionRules(),
+            'keywords' => $prompt->getKeywords(),
+            'enabled' => $prompt->isEnabled(),
+            'language' => $prompt->getLanguage(),
+            'isDefault' => $isDefault,
+            'isUserOverride' => $isUserOverride,
+            'metadata' => $metadata,
+            'embeddingPreview' => $this->synapseIndexer->buildEmbeddingText($prompt),
+        ];
     }
 
     /**
@@ -369,6 +381,96 @@ class PromptController extends AbstractController
                 'prompt' => $sortingPrompt->getPrompt(),
             ],
         ]);
+    }
+
+    /**
+     * Dry-run the Synapse Router for a given message text.
+     *
+     * Returns the Top-K topic candidates with raw cosine scores, the active
+     * embedding model and per-candidate stale-flag. Used by the admin "Test
+     * Routing" box and CLI debugging — does NOT actually route or persist
+     * anything.
+     *
+     * IMPORTANT: This route must be BEFORE /{id} route to avoid conflicts!
+     *
+     * POST /api/v1/prompts/test
+     * Body: { "text": "How do I write a PHP function?", "limit": 5 }
+     */
+    #[Route('/test', name: 'test_routing', methods: ['POST'])]
+    #[OA\Post(
+        path: '/api/v1/prompts/test',
+        summary: 'Dry-run the Synapse Router for a given message',
+        description: 'Embeds the provided text with the active VECTORIZE model and returns the Top-K matching topics with raw cosine scores. Does not affect any state.',
+        security: [['Bearer' => []]],
+        tags: ['Task Prompts'],
+        requestBody: new OA\RequestBody(
+            required: true,
+            content: new OA\JsonContent(
+                required: ['text'],
+                properties: [
+                    new OA\Property(property: 'text', type: 'string', example: 'Wie schreibe ich eine Schleife in Python?'),
+                    new OA\Property(property: 'limit', type: 'integer', example: 5, minimum: 1, maximum: 20),
+                ]
+            )
+        ),
+        responses: [
+            new OA\Response(
+                response: 200,
+                description: 'Routing dry-run result',
+                content: new OA\JsonContent(
+                    properties: [
+                        new OA\Property(property: 'success', type: 'boolean'),
+                        new OA\Property(property: 'query', type: 'string'),
+                        new OA\Property(
+                            property: 'model',
+                            type: 'object',
+                            properties: [
+                                new OA\Property(property: 'provider', type: 'string', nullable: true),
+                                new OA\Property(property: 'model', type: 'string', nullable: true),
+                                new OA\Property(property: 'model_id', type: 'integer', nullable: true),
+                            ]
+                        ),
+                        new OA\Property(
+                            property: 'candidates',
+                            type: 'array',
+                            items: new OA\Items(
+                                properties: [
+                                    new OA\Property(property: 'topic', type: 'string'),
+                                    new OA\Property(property: 'score', type: 'number', format: 'float'),
+                                    new OA\Property(property: 'stale', type: 'boolean'),
+                                    new OA\Property(property: 'alias_target', type: 'string', nullable: true),
+                                    new OA\Property(property: 'payload', type: 'object'),
+                                ]
+                            )
+                        ),
+                        new OA\Property(property: 'latency_ms', type: 'number', format: 'float'),
+                        new OA\Property(property: 'error', type: 'string', nullable: true),
+                    ]
+                )
+            ),
+            new OA\Response(response: 400, description: 'Missing text field'),
+            new OA\Response(response: 401, description: 'Not authenticated'),
+        ]
+    )]
+    public function testRouting(
+        Request $request,
+        #[CurrentUser] ?User $user,
+    ): JsonResponse {
+        if (!$user) {
+            return $this->json(['error' => 'Not authenticated'], Response::HTTP_UNAUTHORIZED);
+        }
+
+        $data = json_decode($request->getContent(), true);
+        if (!is_array($data) || empty($data['text']) || !is_string($data['text'])) {
+            return $this->json(['error' => 'Missing required field: text'], Response::HTTP_BAD_REQUEST);
+        }
+
+        $text = trim($data['text']);
+        $limit = isset($data['limit']) ? max(1, min(20, (int) $data['limit'])) : 5;
+
+        $result = $this->synapseRouter->dryRun($text, $user->getId(), $limit);
+
+        return $this->json(['success' => true] + $result);
     }
 
     /**
@@ -587,15 +689,12 @@ class PromptController extends AbstractController
 
         return $this->json([
             'success' => true,
-            'prompt' => [
-                'id' => $prompt->getId(),
-                'topic' => $prompt->getTopic(),
-                'name' => $this->formatPromptName($prompt->getTopic(), $prompt->getShortDescription(), 0 === $prompt->getOwnerId()),
-                'shortDescription' => $prompt->getShortDescription(),
-                'prompt' => $prompt->getPrompt(),
-                'language' => $prompt->getLanguage(),
-                'isDefault' => 0 === $prompt->getOwnerId(),
-            ],
+            'prompt' => $this->serializePrompt(
+                $prompt,
+                isDefault: 0 === $prompt->getOwnerId(),
+                isUserOverride: false,
+                metadata: $this->promptService->loadMetadataForPrompt($prompt->getId()),
+            ),
         ]);
     }
 
@@ -677,6 +776,8 @@ class PromptController extends AbstractController
             $promptContent = trim($data['prompt']);
             $language = $data['language'] ?? 'en';
             $selectionRules = isset($data['selectionRules']) ? trim($data['selectionRules']) : null;
+            $keywords = isset($data['keywords']) ? trim((string) $data['keywords']) : null;
+            $enabled = isset($data['enabled']) ? (bool) $data['enabled'] : true;
             $metadata = $data['metadata'] ?? [];
 
             // Prevent creating tool prompts (reserved for system)
@@ -702,6 +803,8 @@ class PromptController extends AbstractController
             $prompt->setPrompt($promptContent);
             $prompt->setLanguage($language);
             $prompt->setSelectionRules($selectionRules);
+            $prompt->setKeywords('' === $keywords ? null : $keywords);
+            $prompt->setEnabled($enabled);
 
             $this->em->persist($prompt);
             $this->em->flush();
@@ -729,15 +832,7 @@ class PromptController extends AbstractController
             return $this->json([
                 'success' => true,
                 'message' => 'Prompt created successfully',
-                'prompt' => [
-                    'id' => $prompt->getId(),
-                    'topic' => $prompt->getTopic(),
-                    'name' => $this->formatPromptName($topic, $shortDescription, false),
-                    'shortDescription' => $prompt->getShortDescription(),
-                    'prompt' => $prompt->getPrompt(),
-                    'language' => $prompt->getLanguage(),
-                    'isDefault' => false,
-                ],
+                'prompt' => $this->serializePrompt($prompt, isDefault: false, isUserOverride: false),
             ], Response::HTTP_CREATED);
         } catch (\Throwable $e) {
             $this->logger->error('❌ PromptController::create - Exception', [
@@ -854,6 +949,15 @@ class PromptController extends AbstractController
             $prompt->setSelectionRules(trim($data['selectionRules']) ?: null);
         }
 
+        if (array_key_exists('keywords', $data)) {
+            $kw = is_string($data['keywords']) ? trim($data['keywords']) : '';
+            $prompt->setKeywords('' === $kw ? null : $kw);
+        }
+
+        if (array_key_exists('enabled', $data)) {
+            $prompt->setEnabled((bool) $data['enabled']);
+        }
+
         // Only update language for user-owned prompts (not system prompts)
         // System prompts (ownerId=0) should keep their original language to prevent corruption
         if (isset($data['language']) && 0 !== $prompt->getOwnerId()) {
@@ -910,15 +1014,12 @@ class PromptController extends AbstractController
         return $this->json([
             'success' => true,
             'message' => 'Prompt updated successfully',
-            'prompt' => [
-                'id' => $prompt->getId(),
-                'topic' => $prompt->getTopic(),
-                'name' => $this->formatPromptName($prompt->getTopic(), $prompt->getShortDescription(), $isSystemPrompt),
-                'shortDescription' => $prompt->getShortDescription(),
-                'prompt' => $prompt->getPrompt(),
-                'language' => $prompt->getLanguage(),
-                'isDefault' => $isSystemPrompt,
-            ],
+            'prompt' => $this->serializePrompt(
+                $prompt,
+                isDefault: $isSystemPrompt,
+                isUserOverride: false,
+                metadata: $this->promptService->loadMetadataForPrompt($prompt->getId()),
+            ),
         ]);
     }
 

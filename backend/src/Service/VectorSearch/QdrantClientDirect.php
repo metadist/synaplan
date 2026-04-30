@@ -959,6 +959,167 @@ final class QdrantClientDirect implements QdrantClientInterface
         }
     }
 
+    public function getSynapseTopic(string $pointId): ?array
+    {
+        try {
+            $response = $this->qdrantRequest('POST', "/collections/{$this->synapseCollection}/points/scroll", [
+                'filter' => QdrantPointId::payloadFilterFor($pointId),
+                'limit' => 1,
+                'with_payload' => true,
+                'with_vector' => false,
+            ]);
+
+            $points = $response['result']['points'] ?? [];
+            if (empty($points)) {
+                return null;
+            }
+
+            $point = $points[0];
+
+            return [
+                'id' => $point['payload']['_point_id'] ?? (string) ($point['id'] ?? $pointId),
+                'payload' => $point['payload'] ?? [],
+            ];
+        } catch (\Throwable $e) {
+            // Missing collection is an expected first-run state, not an error
+            $this->logger->debug('getSynapseTopic: lookup failed (likely missing collection)', [
+                'point_id' => $pointId,
+                'error' => $e->getMessage(),
+            ]);
+
+            return null;
+        }
+    }
+
+    public function scrollSynapseTopics(?int $ownerId = null, int $limit = 1000): array
+    {
+        try {
+            $body = [
+                'limit' => $limit,
+                'with_payload' => true,
+                'with_vector' => false,
+            ];
+
+            if (null !== $ownerId) {
+                $body['filter'] = ['must' => [
+                    ['key' => 'owner_id', 'match' => ['value' => $ownerId]],
+                ]];
+            }
+
+            $points = [];
+            $offset = null;
+
+            do {
+                if (null !== $offset) {
+                    $body['offset'] = $offset;
+                }
+
+                $response = $this->qdrantRequest(
+                    'POST',
+                    "/collections/{$this->synapseCollection}/points/scroll",
+                    $body,
+                );
+
+                $batch = $response['result']['points'] ?? [];
+                foreach ($batch as $point) {
+                    $points[] = [
+                        'id' => $point['payload']['_point_id'] ?? (string) ($point['id'] ?? ''),
+                        'payload' => $point['payload'] ?? [],
+                    ];
+                }
+
+                $offset = $response['result']['next_page_offset'] ?? null;
+            } while (null !== $offset && count($points) < $limit);
+
+            return $points;
+        } catch (\Throwable $e) {
+            $this->logger->debug('scrollSynapseTopics: scroll failed (likely missing collection)', [
+                'owner_id' => $ownerId,
+                'error' => $e->getMessage(),
+            ]);
+
+            return [];
+        }
+    }
+
+    public function getSynapseCollectionInfo(): array
+    {
+        $defaults = [
+            'exists' => false,
+            'vector_dim' => null,
+            'points_count' => null,
+            'distance' => null,
+        ];
+
+        try {
+            $response = $this->qdrantRequest('GET', "/collections/{$this->synapseCollection}");
+            $result = $response['result'] ?? [];
+
+            $vectorsConfig = $result['config']['params']['vectors'] ?? [];
+
+            return [
+                'exists' => true,
+                'vector_dim' => isset($vectorsConfig['size']) ? (int) $vectorsConfig['size'] : null,
+                'points_count' => isset($result['points_count']) ? (int) $result['points_count'] : null,
+                'distance' => $vectorsConfig['distance'] ?? null,
+            ];
+        } catch (\Throwable $e) {
+            $this->logger->debug('getSynapseCollectionInfo: collection missing or unreachable', [
+                'error' => $e->getMessage(),
+            ]);
+
+            return $defaults;
+        }
+    }
+
+    public function recreateSynapseCollection(int $vectorDimension): void
+    {
+        $collection = $this->synapseCollection;
+
+        try {
+            $this->qdrantRequest('DELETE', "/collections/{$collection}");
+            unset($this->ensuredCollections[$collection]);
+            $this->logger->info('Dropped existing synapse collection', [
+                'collection' => $collection,
+            ]);
+        } catch (\Throwable $e) {
+            // Missing collection is fine — we're about to (re)create it
+            $this->logger->debug('recreateSynapseCollection: drop skipped', [
+                'collection' => $collection,
+                'error' => $e->getMessage(),
+            ]);
+        }
+
+        try {
+            $this->qdrantRequest('PUT', "/collections/{$collection}", [
+                'vectors' => [
+                    'size' => $vectorDimension,
+                    'distance' => 'Cosine',
+                ],
+            ]);
+
+            $this->createPayloadIndex($collection, 'owner_id', 'integer');
+            $this->createPayloadIndex($collection, 'topic', 'keyword');
+            $this->createPayloadIndex($collection, '_point_id', 'keyword');
+            $this->createPayloadIndex($collection, 'embedding_model_id', 'integer');
+
+            $this->ensuredCollections[$collection] = true;
+
+            $this->logger->info('Recreated Qdrant synapse collection', [
+                'collection' => $collection,
+                'vector_dim' => $vectorDimension,
+            ]);
+        } catch (\Throwable $e) {
+            $this->logger->error('Failed to recreate synapse collection', [
+                'collection' => $collection,
+                'vector_dim' => $vectorDimension,
+                'error' => $e->getMessage(),
+            ]);
+
+            throw $e;
+        }
+    }
+
     private function ensureSynapseCollection(): void
     {
         $collection = $this->synapseCollection;
@@ -973,6 +1134,7 @@ final class QdrantClientDirect implements QdrantClientInterface
                 'owner_id' => 'integer',
                 'topic' => 'keyword',
                 '_point_id' => 'keyword',
+                'embedding_model_id' => 'integer',
             ]);
             $this->ensuredCollections[$collection] = true;
 
@@ -992,6 +1154,7 @@ final class QdrantClientDirect implements QdrantClientInterface
             $this->createPayloadIndex($collection, 'owner_id', 'integer');
             $this->createPayloadIndex($collection, 'topic', 'keyword');
             $this->createPayloadIndex($collection, '_point_id', 'keyword');
+            $this->createPayloadIndex($collection, 'embedding_model_id', 'integer');
 
             $this->ensuredCollections[$collection] = true;
 

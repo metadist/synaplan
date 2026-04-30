@@ -41,10 +41,17 @@ final readonly class SynapseRouter
             'vertone', 'vertonen', 'wav'],
     ];
 
+    /**
+     * Keywords that strongly indicate the user needs live/current data.
+     *
+     * Intentionally excludes deictic time markers like "jetzt" / "now" which
+     * are extremely common in follow-up requests ("jetzt das in blau", "jetzt
+     * ein video davon", "now make it 4K") and almost never imply a web search.
+     */
     private const WEB_SEARCH_KEYWORDS = [
         'aktuell', 'current', 'heute', 'today', 'news', 'nachrichten',
         'wetter', 'weather', 'preis', 'price', 'kosten', 'cost',
-        'neueste', 'latest', 'kürzlich', 'recently', 'jetzt', 'now',
+        'neueste', 'latest', 'kürzlich', 'recently',
         'live', 'echtzeit', 'realtime', 'real-time',
         'öffnungszeiten', 'opening hours', 'restaurant', 'geschäft', 'store',
         'aktienk', 'stock price', 'börse', 'exchange',
@@ -52,6 +59,27 @@ final readonly class SynapseRouter
 
     /** Year patterns that indicate need for current information */
     private const YEAR_PATTERN = '/\b(202[4-9]|203\d)\b/';
+
+    /**
+     * Topics where automatic web-search heuristics are nonsensical because
+     * the handler purely generates assets (image/video/audio/document) and
+     * does not consume web context. Web search for these topics is only
+     * activated when a prompt explicitly opts in via `tool_internet`.
+     *
+     * Includes both canonical legacy topics and the granular Synapse-v2
+     * topics, so this stays correct even if `TopicAliasResolver` is bypassed.
+     */
+    private const NON_WEB_SEARCH_TOPICS = [
+        'mediamaker',
+        'image-generation',
+        'video-generation',
+        'audio-generation',
+        'text2pic',
+        'text2vid',
+        'text2sound',
+        'officemaker',
+        'text2doc',
+    ];
 
     /**
      * Common language-specific words for n-gram-free detection.
@@ -80,8 +108,95 @@ final readonly class SynapseRouter
         private PromptRepository $promptRepository,
         private ModelConfigService $modelConfigService,
         private ConfigRepository $configRepository,
+        private TopicAliasResolver $topicAliasResolver,
         private LoggerInterface $logger,
     ) {
+    }
+
+    /**
+     * Public entry point used by routing test/dry-run endpoints.
+     *
+     * Returns the Top-K candidate topics with raw Qdrant scores, **before**
+     * any confidence threshold or sticky logic is applied. Useful for the
+     * admin "Test Routing" box and CLI debugging.
+     *
+     * @return array{
+     *     query: string,
+     *     model: array{provider: ?string, model: ?string, model_id: ?int},
+     *     candidates: list<array{topic: string, score: float, payload: array, stale: bool, alias_target: ?string}>,
+     *     latency_ms: float,
+     *     error: ?string,
+     * }
+     */
+    public function dryRun(string $messageText, ?int $userId = null, int $limit = 5): array
+    {
+        $startTime = microtime(true);
+        $modelInfo = $this->getCurrentModelInfo();
+
+        $base = [
+            'query' => $messageText,
+            'model' => $modelInfo,
+            'candidates' => [],
+            'latency_ms' => 0.0,
+            'error' => null,
+        ];
+
+        if ('' === trim($messageText)) {
+            return ['error' => 'empty_message'] + $base;
+        }
+
+        try {
+            $embeddingOptions = $this->getEmbeddingOptions();
+            $result = $this->aiFacade->embed($messageText, $userId, $embeddingOptions);
+            /** @var float[] $vector */
+            $vector = $result['embedding'];
+
+            if (empty($vector)) {
+                return ['error' => 'empty_embedding', 'latency_ms' => $this->elapsed($startTime)] + $base;
+            }
+
+            $vector = $this->normalizeVector($vector);
+
+            $hits = $this->qdrantClient->searchSynapseTopics(
+                $vector,
+                $userId ?? 0,
+                $limit,
+                self::MIN_SCORE,
+            );
+
+            $candidates = [];
+            $currentModelId = $modelInfo['model_id'];
+            foreach ($hits as $hit) {
+                $payload = $hit['payload'] ?? [];
+                $topic = (string) ($payload['topic'] ?? '');
+                $alias = $this->topicAliasResolver->resolve($topic);
+
+                $candidates[] = [
+                    'topic' => $topic,
+                    'score' => (float) $hit['score'],
+                    'payload' => $payload,
+                    'stale' => $this->isStaleEntry($payload, $currentModelId),
+                    'alias_target' => null !== $alias['alias_source'] ? $alias['topic'] : null,
+                ];
+            }
+
+            return [
+                'query' => $messageText,
+                'model' => $modelInfo,
+                'candidates' => $candidates,
+                'latency_ms' => $this->elapsed($startTime),
+                'error' => null,
+            ];
+        } catch (\Throwable $e) {
+            $this->logger->error('SynapseRouter::dryRun failed', [
+                'error' => $e->getMessage(),
+            ]);
+
+            return [
+                'error' => 'exception: '.$e->getMessage(),
+                'latency_ms' => $this->elapsed($startTime),
+            ] + $base;
+        }
     }
 
     /**
@@ -165,6 +280,36 @@ final readonly class SynapseRouter
                 return $this->fallbackToAi($messageData, $conversationHistory, $userId, 'no_search_results');
             }
 
+            $currentModelId = $this->getCurrentModelInfo()['model_id'];
+            $freshResults = [];
+            $staleHits = 0;
+
+            foreach ($searchResults as $hit) {
+                if ($this->isStaleEntry($hit['payload'] ?? [], $currentModelId)) {
+                    ++$staleHits;
+                    continue;
+                }
+                $freshResults[] = $hit;
+            }
+
+            if ($staleHits > 0) {
+                $this->logger->info('SynapseRouter: Filtered stale-index hits', [
+                    'stale_hits' => $staleHits,
+                    'fresh_hits' => count($freshResults),
+                    'current_model_id' => $currentModelId,
+                ]);
+            }
+
+            if (empty($freshResults)) {
+                return $this->fallbackToAi(
+                    $messageData,
+                    $conversationHistory,
+                    $userId,
+                    'stale_index',
+                );
+            }
+
+            $searchResults = $freshResults;
             $topResult = $searchResults[0];
             $topScore = $topResult['score'];
             $topTopic = $topResult['payload']['topic'] ?? 'general';
@@ -209,12 +354,29 @@ final readonly class SynapseRouter
                 );
             }
 
+            // Resolve granular Synapse-v2 topic to canonical legacy topic
+            // (e.g. coding -> general, image-generation -> mediamaker).
+            // The granular topic stays in the synapse payload for analytics;
+            // downstream handlers only ever see the canonical topic.
+            $alias = $this->topicAliasResolver->resolve($topTopic);
+            $canonicalTopic = $alias['topic'];
+            $impliedMedia = $alias['media'];
+            $aliasSource = $alias['alias_source'];
+
             // Tier 1 success: classify with heuristics
             $language = $this->detectLanguage($messageText, $messageData['BLANG'] ?? null);
-            $webSearch = $this->detectWebSearchIntent($messageText);
-            $mediaType = ('mediamaker' === $topTopic) ? $this->detectMediaType($messageText) : null;
+            $mediaType = $impliedMedia ?? ('mediamaker' === $canonicalTopic ? $this->detectMediaType($messageText) : null);
 
-            $promptMetadata = $this->loadPromptMetadata($topTopic, $userId ?? 0);
+            $promptMetadata = $this->loadPromptMetadata($canonicalTopic, $userId ?? 0);
+
+            // Web-search activation:
+            //   - For pure asset/document generation topics, the heuristic is
+            //     meaningless (the handler does not consume web context). We
+            //     only honor the explicit `tool_internet` opt-in there.
+            //   - For all other topics we run the keyword/year heuristic and
+            //     additionally honor the prompt's `tool_internet` flag.
+            $skipHeuristic = $this->isNonWebSearchTopic($canonicalTopic) || $this->isNonWebSearchTopic($aliasSource ?? '');
+            $webSearch = $skipHeuristic ? false : $this->detectWebSearchIntent($messageText);
 
             if (!$webSearch && ($promptMetadata['tool_internet'] ?? false)) {
                 $webSearch = true;
@@ -223,23 +385,26 @@ final readonly class SynapseRouter
             $latencyMs = $this->elapsed($startTime);
 
             $this->logger->info('SynapseRouter: Tier 1 classification', [
-                'topic' => $topTopic,
+                'topic' => $canonicalTopic,
+                'granular_topic' => $aliasSource,
                 'score' => round($topScore, 4),
                 'language' => $language,
                 'web_search' => $webSearch,
+                'web_search_heuristic_skipped' => $skipHeuristic,
                 'media_type' => $mediaType,
                 'source' => 'synapse_embedding',
                 'latency_ms' => $latencyMs,
             ]);
 
             return [
-                'topic' => $topTopic,
+                'topic' => $canonicalTopic,
+                'granular_topic' => $aliasSource,
                 'language' => $language,
                 'web_search' => $webSearch,
                 'media_type' => $mediaType,
                 'raw_response' => sprintf('Synapse: %.4f confidence', $topScore),
                 'prompt_metadata' => $promptMetadata,
-                'source' => $lastTopic === $topTopic ? 'synapse_sticky' : 'synapse_embedding',
+                'source' => $lastTopic === $canonicalTopic ? 'synapse_sticky' : 'synapse_embedding',
                 'synapse_score' => $topScore,
                 'synapse_latency_ms' => $latencyMs,
                 'model_id' => null,
@@ -257,6 +422,9 @@ final readonly class SynapseRouter
 
     /**
      * Fall back to the traditional AI-based MessageSorter.
+     *
+     * Also resolves any granular topic the AI may emit (`coding`, `image-generation`, ...)
+     * down to the canonical legacy topic so downstream handlers see a stable name.
      */
     private function fallbackToAi(
         array $messageData,
@@ -280,7 +448,61 @@ final readonly class SynapseRouter
             $result['synapse_best_score'] = $bestScore;
         }
 
+        $rawTopic = (string) ($result['topic'] ?? '');
+        if ('' !== $rawTopic) {
+            $alias = $this->topicAliasResolver->resolve($rawTopic);
+            if (null !== $alias['alias_source']) {
+                $result['granular_topic'] = $alias['alias_source'];
+                $result['topic'] = $alias['topic'];
+                if (null !== $alias['media'] && empty($result['media_type'])) {
+                    $result['media_type'] = $alias['media'];
+                }
+            }
+        }
+
         return $result;
+    }
+
+    /**
+     * @return array{provider: ?string, model: ?string, model_id: ?int}
+     */
+    private function getCurrentModelInfo(): array
+    {
+        $modelId = $this->modelConfigService->getDefaultModel('VECTORIZE', null);
+        if (!$modelId) {
+            return ['provider' => null, 'model' => null, 'model_id' => null];
+        }
+
+        return [
+            'provider' => $this->modelConfigService->getProviderForModel($modelId),
+            'model' => $this->modelConfigService->getModelName($modelId),
+            'model_id' => $modelId,
+        ];
+    }
+
+    /**
+     * A Synapse hit is "stale" when its payload was indexed under a different
+     * embedding model than the one currently configured. Without this check,
+     * cross-model cosine scores are meaningless and would produce silent
+     * mis-routing whenever an admin swaps the VECTORIZE default model.
+     *
+     * Backwards compatible: payloads without `embedding_model_id` (legacy
+     * v1 indexing) are treated as fresh — they will be re-indexed lazily
+     * the next time the topic content changes or the operator runs
+     * `synapse:index --force`.
+     */
+    private function isStaleEntry(array $payload, ?int $currentModelId): bool
+    {
+        $indexedModelId = $payload['embedding_model_id'] ?? null;
+        if (null === $indexedModelId) {
+            return false;
+        }
+
+        if (null === $currentModelId) {
+            return false;
+        }
+
+        return (int) $indexedModelId !== (int) $currentModelId;
     }
 
     private function checkRuleBasedRouting(string $messageText, array $conversationHistory, int $userId): ?string
@@ -359,6 +581,16 @@ final readonly class SynapseRouter
         }
 
         return 1 === preg_match(self::YEAR_PATTERN, $text);
+    }
+
+    /**
+     * True when the topic is a pure asset/document generation topic where
+     * the web-search heuristic must not run automatically (only explicit
+     * `tool_internet` opt-in is honored).
+     */
+    private function isNonWebSearchTopic(string $topic): bool
+    {
+        return '' !== $topic && in_array($topic, self::NON_WEB_SEARCH_TOPICS, true);
     }
 
     private function detectMediaType(string $text): string

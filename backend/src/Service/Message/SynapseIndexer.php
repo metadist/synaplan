@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Service\Message;
 
 use App\AI\Service\AiFacade;
+use App\Entity\Prompt;
 use App\Repository\PromptRepository;
 use App\Service\ModelConfigService;
 use App\Service\VectorSearch\QdrantClientInterface;
@@ -13,13 +14,21 @@ use Psr\Log\LoggerInterface;
 /**
  * Synapse Indexer — manages topic embeddings in the synapse_topics Qdrant collection.
  *
- * Embeds each topic's shortDescription and stores the resulting vector so
- * SynapseRouter can classify messages via vector similarity instead of
- * an expensive LLM sorting call.
+ * Embeds each topic's description (plus optional keywords) and stores the
+ * resulting vector together with rich payload metadata (model id/provider/name,
+ * vector dim, source hash, indexed timestamp) so SynapseRouter can:
+ *
+ *   1. classify messages via vector similarity instead of an expensive LLM call;
+ *   2. detect stale entries when the embedding model is swapped at runtime
+ *      (different model_id) or its dimensions change (different vector_dim).
+ *
+ * The indexer is idempotent: when neither keywords/description nor the embedding
+ * model changed since the last run, a content-addressable `source_hash` short-
+ * circuits the embedding call. Use `force: true` to bypass the hash check.
  */
 final readonly class SynapseIndexer
 {
-    private const VECTOR_DIMENSION = 1024;
+    private const DEFAULT_VECTOR_DIMENSION = 1024;
 
     public function __construct(
         private QdrantClientInterface $qdrantClient,
@@ -31,40 +40,38 @@ final readonly class SynapseIndexer
     }
 
     /**
-     * Index all non-tool topics for a given owner (0 = system).
+     * Index all enabled, non-tool topics for a given owner (0 = system).
      * When $userId is provided, also indexes that user's custom topics.
      *
-     * @return int Number of topics indexed
+     * @return array{indexed: int, skipped: int, errors: int}
      */
-    public function indexAllTopics(?int $userId = null): int
+    public function indexAllTopics(?int $userId = null, bool $force = false): array
     {
-        $topicsWithDesc = $this->promptRepository->getTopicsWithDescriptions(0, '', $userId, excludeTools: true);
+        $prompts = $this->loadIndexablePrompts($userId);
 
-        if (empty($topicsWithDesc)) {
+        if (empty($prompts)) {
             $this->logger->warning('SynapseIndexer: No topics found to index');
 
-            return 0;
+            return ['indexed' => 0, 'skipped' => 0, 'errors' => 0];
         }
 
         $indexed = 0;
-        foreach ($topicsWithDesc as $item) {
-            $topic = $item['topic'];
-            $description = $item['description'] ?? '';
-            $ownerId = $item['ownerId'] ?? 0;
+        $skipped = 0;
+        $errors = 0;
 
-            if ('' === $description) {
-                $this->logger->debug('SynapseIndexer: Skipping topic without description', ['topic' => $topic]);
-                continue;
-            }
-
+        foreach ($prompts as $prompt) {
             try {
-                if ($this->indexTopicWithData($topic, $ownerId, $description)) {
+                $result = $this->indexPrompt($prompt, $force);
+                if ('indexed' === $result) {
                     ++$indexed;
+                } elseif ('skipped' === $result) {
+                    ++$skipped;
                 }
             } catch (\Throwable $e) {
+                ++$errors;
                 $this->logger->error('SynapseIndexer: Failed to index topic', [
-                    'topic' => $topic,
-                    'owner_id' => $ownerId,
+                    'topic' => $prompt->getTopic(),
+                    'owner_id' => $prompt->getOwnerId(),
                     'error' => $e->getMessage(),
                 ]);
             }
@@ -72,17 +79,22 @@ final readonly class SynapseIndexer
 
         $this->logger->info('SynapseIndexer: Indexing complete', [
             'indexed' => $indexed,
-            'total_topics' => count($topicsWithDesc),
+            'skipped' => $skipped,
+            'errors' => $errors,
+            'total_topics' => count($prompts),
             'user_id' => $userId,
+            'force' => $force,
         ]);
 
-        return $indexed;
+        return ['indexed' => $indexed, 'skipped' => $skipped, 'errors' => $errors];
     }
 
     /**
      * Index or re-index a single topic by loading it from the database.
+     *
+     * @return string 'indexed', 'skipped' or 'missing'
      */
-    public function indexTopic(string $topic, int $ownerId): void
+    public function indexTopic(string $topic, int $ownerId, bool $force = false): string
     {
         $prompt = $this->promptRepository->findByTopic($topic, $ownerId);
 
@@ -92,17 +104,34 @@ final readonly class SynapseIndexer
                 'owner_id' => $ownerId,
             ]);
 
-            return;
+            return 'missing';
         }
 
-        $description = $prompt->getShortDescription();
-        if ('' === $description) {
-            $this->logger->debug('SynapseIndexer: Topic has no description, skipping', ['topic' => $topic]);
+        if (!$prompt->isEnabled()) {
+            $this->logger->debug('SynapseIndexer: Topic is disabled, removing from index', [
+                'topic' => $topic,
+                'owner_id' => $ownerId,
+            ]);
+            $this->removeTopic($topic, $ownerId);
 
-            return;
+            return 'skipped';
         }
 
-        $this->indexTopicWithData($topic, $ownerId, $description);
+        if (str_starts_with($prompt->getTopic(), 'tools:')) {
+            return 'skipped';
+        }
+
+        // Same guard as loadIndexablePrompts: a topic without any
+        // description AND without keywords carries no signal for the
+        // embedding model — skip it instead of upserting noise.
+        if (
+            '' === trim($prompt->getShortDescription())
+            && '' === trim((string) $prompt->getKeywords())
+        ) {
+            return 'skipped';
+        }
+
+        return $this->indexPrompt($prompt, $force);
     }
 
     /**
@@ -123,92 +152,212 @@ final readonly class SynapseIndexer
 
     /**
      * Re-index all topics for a specific user (deletes old ones first).
+     *
+     * @return array{indexed: int, skipped: int, errors: int}
      */
-    public function reindexForUser(int $userId): int
+    public function reindexForUser(int $userId, bool $force = false): array
     {
         $this->qdrantClient->deleteSynapseTopicsByOwner($userId);
 
-        $topicsWithDesc = $this->promptRepository->getTopicsWithDescriptions(0, '', $userId, excludeTools: true);
+        $userPrompts = array_filter(
+            $this->loadIndexablePrompts($userId),
+            fn (Prompt $p) => $p->getOwnerId() === $userId,
+        );
 
         $indexed = 0;
-        foreach ($topicsWithDesc as $item) {
-            $ownerId = $item['ownerId'] ?? 0;
-            if ($ownerId !== $userId) {
-                continue;
-            }
+        $skipped = 0;
+        $errors = 0;
 
-            $description = $item['description'] ?? '';
-            if ('' === $description) {
-                continue;
-            }
-
+        foreach ($userPrompts as $prompt) {
             try {
-                if ($this->indexTopicWithData($item['topic'], $ownerId, $description)) {
+                $result = $this->indexPrompt($prompt, $force);
+                if ('indexed' === $result) {
                     ++$indexed;
+                } elseif ('skipped' === $result) {
+                    ++$skipped;
                 }
             } catch (\Throwable $e) {
+                ++$errors;
                 $this->logger->error('SynapseIndexer: Failed to re-index user topic', [
-                    'topic' => $item['topic'],
+                    'topic' => $prompt->getTopic(),
                     'user_id' => $userId,
                     'error' => $e->getMessage(),
                 ]);
             }
         }
 
-        return $indexed;
+        return ['indexed' => $indexed, 'skipped' => $skipped, 'errors' => $errors];
     }
 
     /**
      * Get the embedding provider/model info used for indexing (for status display).
      *
-     * @return array{provider: ?string, model: ?string}
+     * @return array{provider: ?string, model: ?string, model_id: ?int, vector_dim: int}
      */
     public function getEmbeddingModelInfo(): array
     {
         $modelId = $this->modelConfigService->getDefaultModel('VECTORIZE', null);
         if (!$modelId) {
-            return ['provider' => null, 'model' => null];
+            return [
+                'provider' => null,
+                'model' => null,
+                'model_id' => null,
+                'vector_dim' => self::DEFAULT_VECTOR_DIMENSION,
+            ];
         }
 
         return [
             'provider' => $this->modelConfigService->getProviderForModel($modelId),
             'model' => $this->modelConfigService->getModelName($modelId),
+            'model_id' => $modelId,
+            'vector_dim' => self::DEFAULT_VECTOR_DIMENSION,
         ];
     }
 
     /**
-     * @return bool True if the topic was successfully indexed
+     * Build the canonical text that gets embedded for a topic.
+     *
+     * Combines topic name, short description and (optional) keywords into a
+     * single multi-line string. Exposed publicly so the admin UI can render
+     * a "this is what gets embedded" preview.
      */
-    private function indexTopicWithData(string $topic, int $ownerId, string $description): bool
+    public function buildEmbeddingText(Prompt $prompt): string
     {
+        $parts = [
+            sprintf('Topic: %s', $prompt->getTopic()),
+        ];
+
+        $description = trim($prompt->getShortDescription());
+        if ('' !== $description) {
+            $parts[] = sprintf('Description: %s', $description);
+        }
+
+        $keywords = trim((string) $prompt->getKeywords());
+        if ('' !== $keywords) {
+            $parts[] = sprintf('Keywords: %s', $keywords);
+        }
+
+        return implode("\n", $parts);
+    }
+
+    /**
+     * Compute the deterministic source hash that drives skip-when-unchanged.
+     *
+     * Includes the embedding text plus the active model id and target dim so
+     * any change to the topic content OR the embedding stack invalidates the
+     * cached vector. Returned as an URL-safe SHA-256 hex digest.
+     */
+    public function computeSourceHash(string $embeddingText, ?int $modelId, int $vectorDim): string
+    {
+        return hash('sha256', sprintf(
+            'v2|model=%s|dim=%d|text=%s',
+            (string) ($modelId ?? '0'),
+            $vectorDim,
+            $embeddingText,
+        ));
+    }
+
+    // ──────────────────────────────────────────────
+    //  Internal helpers
+    // ──────────────────────────────────────────────
+
+    /**
+     * @return list<Prompt>
+     */
+    private function loadIndexablePrompts(?int $userId): array
+    {
+        $prompts = $this->promptRepository->findAllForUser($userId ?? 0);
+
+        $indexable = [];
+        foreach ($prompts as $prompt) {
+            if (!$prompt->isEnabled()) {
+                continue;
+            }
+            if (str_starts_with($prompt->getTopic(), 'tools:')) {
+                continue;
+            }
+            if ('' === trim($prompt->getShortDescription()) && '' === trim((string) $prompt->getKeywords())) {
+                continue;
+            }
+            $indexable[] = $prompt;
+        }
+
+        return $indexable;
+    }
+
+    /**
+     * @return string 'indexed' on a successful upsert, 'skipped' when the source
+     *                hash matches and `force` is false
+     */
+    private function indexPrompt(Prompt $prompt, bool $force): string
+    {
+        $modelInfo = $this->getEmbeddingModelInfo();
+        $modelId = $modelInfo['model_id'];
+        $provider = $modelInfo['provider'];
+        $modelName = $modelInfo['model'];
+        $vectorDim = $modelInfo['vector_dim'];
+
+        $embeddingText = $this->buildEmbeddingText($prompt);
+        if ('' === trim($embeddingText)) {
+            return 'skipped';
+        }
+
+        $sourceHash = $this->computeSourceHash($embeddingText, $modelId, $vectorDim);
+        $pointId = $this->buildPointId($prompt->getTopic(), $prompt->getOwnerId());
+
+        if (!$force) {
+            $existing = $this->qdrantClient->getSynapseTopic($pointId);
+            $existingHash = $existing['payload']['source_hash'] ?? null;
+            if (null !== $existingHash && $existingHash === $sourceHash) {
+                $this->logger->debug('SynapseIndexer: Topic unchanged, skipping', [
+                    'topic' => $prompt->getTopic(),
+                    'owner_id' => $prompt->getOwnerId(),
+                    'source_hash' => $sourceHash,
+                ]);
+
+                return 'skipped';
+            }
+        }
+
         $embeddingOptions = $this->getEmbeddingOptions();
-        $result = $this->aiFacade->embed($description, null, $embeddingOptions);
+        $result = $this->aiFacade->embed($embeddingText, null, $embeddingOptions);
         /** @var float[] $vector */
         $vector = $result['embedding'];
 
         if (empty($vector)) {
-            $this->logger->warning('SynapseIndexer: Empty embedding returned', ['topic' => $topic]);
+            $this->logger->warning('SynapseIndexer: Empty embedding returned', [
+                'topic' => $prompt->getTopic(),
+            ]);
 
-            return false;
+            throw new \RuntimeException(sprintf('Empty embedding returned for topic "%s"', $prompt->getTopic()));
         }
 
-        $vector = $this->normalizeVector($vector);
-
-        $pointId = $this->buildPointId($topic, $ownerId);
+        $vector = $this->normalizeVector($vector, $vectorDim);
 
         $this->qdrantClient->upsertSynapseTopic($pointId, $vector, [
-            'owner_id' => $ownerId,
-            'topic' => $topic,
-            'short_description' => $description,
+            'owner_id' => $prompt->getOwnerId(),
+            'topic' => $prompt->getTopic(),
+            'short_description' => $prompt->getShortDescription(),
+            'keywords' => $prompt->getKeywords(),
+            'embedding_model_id' => $modelId,
+            'embedding_provider' => $provider,
+            'embedding_model' => $modelName,
+            'vector_dim' => $vectorDim,
+            'source_hash' => $sourceHash,
+            'indexed_at' => date(\DATE_ATOM),
         ]);
 
         $this->logger->debug('SynapseIndexer: Topic indexed', [
-            'topic' => $topic,
-            'owner_id' => $ownerId,
+            'topic' => $prompt->getTopic(),
+            'owner_id' => $prompt->getOwnerId(),
             'vector_dim' => count($vector),
+            'model_id' => $modelId,
+            'provider' => $provider,
+            'model' => $modelName,
+            'force' => $force,
         ]);
 
-        return true;
+        return 'indexed';
     }
 
     private const QWEN3_INDEX_INSTRUCTION = 'Represent this topic description for retrieval';
@@ -248,18 +397,18 @@ final readonly class SynapseIndexer
      *
      * @return float[]
      */
-    private function normalizeVector(array $vector): array
+    private function normalizeVector(array $vector, int $targetDim): array
     {
         $len = count($vector);
-        if (self::VECTOR_DIMENSION === $len) {
+        if ($targetDim === $len) {
             return $vector;
         }
 
-        if ($len > self::VECTOR_DIMENSION) {
-            return array_slice($vector, 0, self::VECTOR_DIMENSION);
+        if ($len > $targetDim) {
+            return array_slice($vector, 0, $targetDim);
         }
 
-        return array_pad($vector, self::VECTOR_DIMENSION, 0.0);
+        return array_pad($vector, $targetDim, 0.0);
     }
 
     private function buildPointId(string $topic, int $ownerId): string
