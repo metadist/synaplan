@@ -11,18 +11,23 @@ use App\Service\Message\MessageSorter;
 use App\Service\Message\SynapseRouter;
 use App\Service\ModelConfigService;
 use Doctrine\ORM\EntityManagerInterface;
+use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
 
 class MessageClassifierTest extends TestCase
 {
-    private MessageSorter $messageSorter;
-    private SynapseRouter $synapseRouter;
-    private MessageMetaRepository $messageMetaRepository;
-    private ModelConfigService $modelConfigService;
-    private ConfigRepository $configRepository;
-    private EntityManagerInterface $em;
-    private LoggerInterface $logger;
+    // Intersection types let PHPStan know these properties expose both the
+    // collaborator's API and PHPUnit's mock API (`expects()`, `method()`).
+    // Without this PHPStan emits `method.notFound` for every `->method()`
+    // / `->expects()` call, forcing baseline bumps on every new test case.
+    private MessageSorter&MockObject $messageSorter;
+    private SynapseRouter&MockObject $synapseRouter;
+    private MessageMetaRepository&MockObject $messageMetaRepository;
+    private ModelConfigService&MockObject $modelConfigService;
+    private ConfigRepository&MockObject $configRepository;
+    private EntityManagerInterface&MockObject $em;
+    private LoggerInterface&MockObject $logger;
     private MessageClassifier $service;
 
     protected function setUp(): void
@@ -294,6 +299,7 @@ class MessageClassifierTest extends TestCase
     #[\PHPUnit\Framework\Attributes\DataProvider('synapseEnabledFlagProvider')]
     public function testIsSynapseEnabledParsesVariousValues(?string $configValue, bool $expected): void
     {
+        /** @var ConfigRepository&MockObject $configRepo */
         $configRepo = $this->createMock(ConfigRepository::class);
         $configRepo->method('getValue')->willReturn($configValue);
 

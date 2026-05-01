@@ -8,22 +8,23 @@ use Doctrine\DBAL\Schema\Schema;
 use Doctrine\Migrations\AbstractMigration;
 
 /**
- * Add Qwen3-Embedding-0.6B via Cloudflare Workers AI to BMODELS.
+ * No-op placeholder kept for migration history.
  *
- * Instruction-aware multilingual embedding model (1024-dim).
- * Provides superior cross-language retrieval for topic routing/sorting.
+ * Earlier revisions of this migration INSERTed the Qwen3 catalog row into
+ * BMODELS with a hard-coded BID (188). See `Version20260422100000` for the
+ * full rationale — TL;DR: catalog data is owned by `App\Model\ModelCatalog`
+ * and seeded by `ModelSeeder` (`app:seed`, runs on every container boot),
+ * and hard-coded BIDs can collide on operator-customised installs.
  *
- * Renamed from Version20260423000000 to Version20260423120000 during the
- * merge with main (April 2026): main introduced its own
- * Version20260423000000 for the schema-reconcile work, so this migration
- * was bumped 12 hours later to keep both changes and preserve a stable
- * deterministic order.
+ * The Qwen3-Embedding-0.6B entry now lives in `ModelCatalog::MODELS`. We keep
+ * the migration shell so already-migrated installs stay registered in
+ * `doctrine_migration_versions` instead of warning about an unknown version.
  */
 final class Version20260423120000 extends AbstractMigration
 {
     public function getDescription(): string
     {
-        return 'Add Cloudflare Qwen3-Embedding-0.6B model';
+        return 'No-op — Cloudflare Qwen3-Embedding-0.6B catalog row moved to ModelCatalog (seed-driven)';
     }
 
     public function isTransactional(): bool
@@ -33,22 +34,9 @@ final class Version20260423120000 extends AbstractMigration
 
     public function up(Schema $schema): void
     {
-        $json = json_encode([
-            'description' => 'Qwen3 Embedding 0.6B via Cloudflare Workers AI. Instruction-aware multilingual embeddings (1024-dim). Superior cross-language retrieval for topic routing.',
-            'params' => ['model' => '@cf/qwen/qwen3-embedding-0.6b'],
-            'features' => ['embedding', 'multilingual', 'instruction-aware'],
-            'meta' => ['dimensions' => 1024, 'context_window' => '8192', 'provider' => 'cloudflare'],
-        ]);
-
-        $this->addSql(<<<SQL
-            INSERT INTO BMODELS (BID, BSERVICE, BNAME, BTAG, BSELECTABLE, BPROVID, BPRICEIN, BINUNIT, BPRICEOUT, BOUTUNIT, BQUALITY, BRATING, BISDEFAULT, BACTIVE, BDESCRIPTION, BJSON)
-            VALUES (188, 'Cloudflare', 'Qwen3-Embedding-0.6B', 'vectorize', 1, '@cf/qwen/qwen3-embedding-0.6b', 0.012, 'per1M', 0, '-', 9, 1, 0, 1, NULL, '{$json}')
-            ON DUPLICATE KEY UPDATE BSERVICE = 'Cloudflare', BNAME = 'Qwen3-Embedding-0.6B', BPROVID = '@cf/qwen/qwen3-embedding-0.6b', BJSON = '{$json}'
-        SQL);
     }
 
     public function down(Schema $schema): void
     {
-        $this->addSql('DELETE FROM BMODELS WHERE BID = 188');
     }
 }

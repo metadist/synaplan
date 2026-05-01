@@ -44,27 +44,32 @@ final class Version20260430120000 extends AbstractMigration
 
     public function up(Schema $schema): void
     {
+        // NOTE: SQL formatting matches what Doctrine's `SchemaTool::getCreateSchemaSql()`
+        // emits for the matching `RevectorizeRun` entity (e.g. `DEFAULT 'queued' NOT NULL`,
+        // `NUMERIC(10, 4)`). Keeping it 1:1 lets `doctrine:schema:validate` stay green in CI
+        // — any deviation (e.g. `DECIMAL` vs `NUMERIC`, `NOT NULL DEFAULT` vs `DEFAULT … NOT NULL`)
+        // shows up as schema drift on a freshly-migrated DB.
         $this->addSql(<<<'SQL'
             CREATE TABLE BREVECTORIZE_RUNS (
               BID BIGINT AUTO_INCREMENT NOT NULL,
               BUSERID INT NOT NULL,
               BSCOPE VARCHAR(32) NOT NULL,
-              BMODEL_FROM_ID INT NULL,
+              BMODEL_FROM_ID INT DEFAULT NULL,
               BMODEL_TO_ID INT NOT NULL,
-              BSTATUS VARCHAR(16) NOT NULL DEFAULT 'queued',
-              BCHUNKS_TOTAL INT NULL,
-              BCHUNKS_PROCESSED INT NOT NULL DEFAULT 0,
-              BCHUNKS_FAILED INT NOT NULL DEFAULT 0,
-              BTOKENS_ESTIMATED BIGINT NULL,
-              BTOKENS_PROCESSED BIGINT NOT NULL DEFAULT 0,
-              BCOST_ESTIMATED_USD DECIMAL(10,4) NULL,
-              BCOST_ACTUAL_USD DECIMAL(10,4) NOT NULL DEFAULT 0,
-              BSEVERITY VARCHAR(16) NOT NULL DEFAULT 'info',
-              BSTARTED_AT BIGINT NULL,
-              BFINISHED_AT BIGINT NULL,
+              BSTATUS VARCHAR(16) DEFAULT 'queued' NOT NULL,
+              BCHUNKS_TOTAL INT DEFAULT NULL,
+              BCHUNKS_PROCESSED INT DEFAULT 0 NOT NULL,
+              BCHUNKS_FAILED INT DEFAULT 0 NOT NULL,
+              BTOKENS_ESTIMATED BIGINT DEFAULT NULL,
+              BTOKENS_PROCESSED BIGINT DEFAULT 0 NOT NULL,
+              BCOST_ESTIMATED_USD NUMERIC(10, 4) DEFAULT NULL,
+              BCOST_ACTUAL_USD NUMERIC(10, 4) DEFAULT '0.0000' NOT NULL,
+              BSEVERITY VARCHAR(16) DEFAULT 'info' NOT NULL,
+              BSTARTED_AT BIGINT DEFAULT NULL,
+              BFINISHED_AT BIGINT DEFAULT NULL,
               BCREATED BIGINT NOT NULL,
               BUPDATED BIGINT NOT NULL,
-              BERROR LONGTEXT NULL,
+              BERROR LONGTEXT DEFAULT NULL,
               INDEX idx_revectorize_user (BUSERID),
               INDEX idx_revectorize_status (BSTATUS),
               INDEX idx_revectorize_scope_created (BSCOPE, BCREATED),

@@ -309,10 +309,17 @@ class AiFacade
             throw $primaryError;
         }
 
-        $this->logger->warning('Primary embedding provider failed, trying fallback', [
+        // Use `error` (not `warning`) so this shows up in the same log
+        // bucket as production incidents — silent failovers were called
+        // out as a risk in the Synapse Routing v2 review. The success
+        // path further down logs `notice` so on-call can correlate
+        // "primary failed" with "fallback succeeded" without grepping
+        // two channels.
+        $this->logger->error('Embedding primary provider failed; attempting fallback', [
             'primary' => $primaryName,
             'fallback' => $fallbackName,
             'error' => $primaryError->getMessage(),
+            'event' => 'embedding.fallback.attempt',
         ]);
 
         try {
@@ -326,6 +333,12 @@ class AiFacade
         unset($fallbackOptions['model']);
 
         $result = $operation($fallback, $fallbackOptions);
+
+        $this->logger->notice('Embedding fallback succeeded', [
+            'primary' => $primaryName,
+            'fallback' => $fallbackName,
+            'event' => 'embedding.fallback.success',
+        ]);
 
         $this->sendFallbackNotification($primaryName, $fallbackName, $primaryError->getMessage());
 
