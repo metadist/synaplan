@@ -76,15 +76,47 @@ final class ImpersonationServiceTest extends TestCase
         $this->service->startImpersonation($admin, $admin, $this->requestWithAppTokens(), new Response());
     }
 
-    public function testStartImpersonationRefusesAnotherAdmin(): void
+    public function testStartImpersonationAllowsAnotherAdminTarget(): void
     {
+        // Admin-on-admin impersonation is intentionally permitted: handover,
+        // peer debugging, etc. The audit log captures both ids so the action
+        // remains attributable. The only guard against cross-admin abuse is
+        // the start/stop warning log + the hard self-impersonation refusal.
         $admin = $this->makeUser(id: 1, level: 'ADMIN');
         $otherAdmin = $this->makeUser(id: 2, level: 'ADMIN');
 
-        $this->expectException(AccessDeniedException::class);
-        $this->expectExceptionMessage('another administrator');
+        $request = $this->requestWithAppTokens([
+            TokenService::REFRESH_COOKIE => 'admin-refresh',
+        ]);
+        $response = new Response();
 
-        $this->service->startImpersonation($admin, $otherAdmin, $this->requestWithAppTokens(), new Response());
+        $this->tokenService
+            ->expects(self::once())
+            ->method('generateAccessToken')
+            ->with($otherAdmin, 1)
+            ->willReturn('other-admin-impersonation-access');
+
+        $this->tokenService
+            ->method('createAccessCookie')
+            ->willReturn(Cookie::create(TokenService::ACCESS_COOKIE)->withValue('other-admin-impersonation-access'));
+
+        $this->tokenService
+            ->expects(self::once())
+            ->method('createClearRefreshCookie')
+            ->willReturn(Cookie::create(TokenService::REFRESH_COOKIE)->withValue(''));
+
+        $this->service->startImpersonation($admin, $otherAdmin, $request, $response);
+
+        $cookies = $this->indexCookies($response);
+        self::assertSame(
+            'admin-refresh',
+            $cookies[ImpersonationService::ADMIN_REFRESH_STASH_COOKIE]->getValue(),
+            'admin refresh token must still be stashed when impersonating another admin'
+        );
+        self::assertSame(
+            'other-admin-impersonation-access',
+            $cookies[TokenService::ACCESS_COOKIE]->getValue()
+        );
     }
 
     public function testStartImpersonationRefusesNestedImpersonation(): void
@@ -430,13 +462,15 @@ final class ImpersonationServiceTest extends TestCase
         );
     }
 
-    public function testRefreshReturnsNullWhenTargetWasPromotedToAdmin(): void
+    public function testRefreshSucceedsWhenTargetIsAdmin(): void
     {
-        // Mid-impersonation the target was promoted to admin. We must stop
-        // refreshing impersonation access tokens for them — otherwise a
-        // legitimate admin's session would be silently downgraded.
+        // Admin-on-admin impersonation is allowed at start time, so the
+        // refresh path must keep the session alive for an admin target —
+        // including one that was promoted mid-session. The impersonator
+        // claim plus stash refresh token still uniquely identify the
+        // operating admin, so attribution is not lost.
         $admin = $this->makeUser(id: 1, level: 'ADMIN');
-        $promotedTarget = $this->makeUser(id: 7, level: 'ADMIN');
+        $adminTarget = $this->makeUser(id: 7, level: 'ADMIN');
 
         $request = $this->requestWithAppTokens([
             ImpersonationService::ADMIN_REFRESH_STASH_COOKIE => 'stashed-refresh',
@@ -460,15 +494,19 @@ final class ImpersonationServiceTest extends TestCase
 
         $this->userRepository
             ->method('find')
-            ->willReturn($promotedTarget);
+            ->willReturn($adminTarget);
 
         $this->tokenService
-            ->expects(self::never())
-            ->method('generateAccessToken');
+            ->expects(self::once())
+            ->method('generateAccessToken')
+            ->with($adminTarget, 1)
+            ->willReturn('refreshed-admin-target-access');
 
-        self::assertNull(
-            $this->service->issueRefreshedImpersonationAccessToken($request)
-        );
+        $result = $this->service->issueRefreshedImpersonationAccessToken($request);
+
+        self::assertNotNull($result);
+        self::assertSame('refreshed-admin-target-access', $result['access_token']);
+        self::assertSame($adminTarget, $result['user']);
     }
 
     // ---------------------------------------------------------------------

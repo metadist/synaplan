@@ -160,7 +160,6 @@
       "confirmAction": "Oturumu başlat",
       "started": "Uygulamayı şimdi {email} olarak görüntülüyorsun.",
       "startFailed": "Kimliğe bürünme başlatılamadı",
-      "cannotImpersonateAdmin": "Diğer yöneticilerin kimliğine bürünülemez.",
       "cannotImpersonateSelf": "Kendi kimliğine bürünemezsin.",
       "banner": {
         "viewing": "{email} olarak görüntüleniyor",

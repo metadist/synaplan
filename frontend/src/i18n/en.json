@@ -168,7 +168,6 @@
       "confirmAction": "Start session",
       "started": "You are now viewing the application as {email}.",
       "startFailed": "Could not start impersonation",
-      "cannotImpersonateAdmin": "Other administrators cannot be impersonated.",
       "cannotImpersonateSelf": "You cannot impersonate yourself.",
       "banner": {
         "viewing": "Viewing as {email}",
