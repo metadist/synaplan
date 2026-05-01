@@ -36,6 +36,16 @@ final readonly class EmbeddingReindexService
     private const DOCUMENTS_BATCH = 50;
     private const MEMORIES_BATCH = 25;
 
+    /**
+     * Target vector dimension for the documents collection. Mirrors
+     * `App\Service\File\VectorizationService::VECTOR_DIMENSION` —
+     * Qdrant collections are created with a fixed dimension at install
+     * time and cannot accept points of any other size, so a re-index
+     * that pulls embeddings from a model with a different native
+     * width must slice/zero-pad to this value.
+     */
+    private const DOC_VECTOR_DIMENSION = 1024;
+
     public function __construct(
         private QdrantClientInterface $qdrantClient,
         private AiFacade $aiFacade,
@@ -113,8 +123,21 @@ final readonly class EmbeddingReindexService
         }
 
         while (true) {
+            // Derive a stable per-(BUID,BMID) chunk index in the same way
+            // `VectorMigrationService` does (ORDER BY BSTART ASC). Without
+            // this every BRAG row collapsed to point id `doc_{u}_{f}_0`,
+            // which silently overwrites all but the last chunk of every
+            // multi-chunk file (raised by Copilot review on PR #853). The
+            // tiebreaker on BID makes the ordering deterministic for rows
+            // that happen to share BSTART.
             $rows = $this->connection->fetchAllAssociative(
-                'SELECT BID, BUID, BMID, BGROUPKEY, BTYPE, BSTART, BEND, BTEXT FROM BRAG ORDER BY BID LIMIT :limit OFFSET :offset',
+                <<<'SQL'
+                    SELECT BID, BUID, BMID, BGROUPKEY, BTYPE, BSTART, BEND, BTEXT,
+                        (ROW_NUMBER() OVER (PARTITION BY BUID, BMID ORDER BY BSTART ASC, BID ASC) - 1) AS chunk_idx
+                    FROM BRAG
+                    ORDER BY BID
+                    LIMIT :limit OFFSET :offset
+                    SQL,
                 ['limit' => self::DOCUMENTS_BATCH, 'offset' => $offset],
                 ['limit' => ParameterType::INTEGER, 'offset' => ParameterType::INTEGER],
             );
@@ -151,16 +174,29 @@ final readonly class EmbeddingReindexService
                     continue;
                 }
 
-                $pointId = sprintf('doc_%d_%d_0', (int) $row['BUID'], (int) $row['BMID']);
+                // Mirror `VectorizationService::VECTOR_DIMENSION` handling:
+                // the synapse_documents collection is created with a fixed
+                // dimension at install time, so any new model whose native
+                // output is wider/narrower must be sliced or zero-padded
+                // before upsert — otherwise Qdrant rejects the point and
+                // we end up with chunks-failed climbing instead of a clean
+                // re-index (raised by Copilot review on PR #853).
+                $vector = $this->normalizeVectorDimension(
+                    array_map('floatval', $vector),
+                    self::DOC_VECTOR_DIMENSION,
+                );
+
+                $chunkIndex = (int) $row['chunk_idx'];
+                $pointId = sprintf('doc_%d_%d_%d', (int) $row['BUID'], (int) $row['BMID'], $chunkIndex);
                 $this->qdrantClient->upsertDocument(
                     $pointId,
-                    array_map('floatval', $vector),
+                    $vector,
                     [
                         'user_id' => (int) $row['BUID'],
                         'file_id' => (int) $row['BMID'],
                         'group_key' => (string) $row['BGROUPKEY'],
                         'file_type' => (int) $row['BTYPE'],
-                        'chunk_index' => 0,
+                        'chunk_index' => $chunkIndex,
                         'start_line' => (int) $row['BSTART'],
                         'end_line' => (int) $row['BEND'],
                         'text' => (string) $row['BTEXT'],
@@ -168,7 +204,7 @@ final readonly class EmbeddingReindexService
                         'embedding_model_id' => $modelId,
                         'embedding_provider' => $provider,
                         'embedding_model' => $modelName,
-                        'vector_dim' => count($vector),
+                        'vector_dim' => self::DOC_VECTOR_DIMENSION,
                         'indexed_at' => date(\DATE_ATOM),
                     ],
                 );
@@ -178,6 +214,36 @@ final readonly class EmbeddingReindexService
             $this->runRepository->save($run);
             $offset += self::DOCUMENTS_BATCH;
         }
+    }
+
+    /**
+     * Slice or zero-pad an embedding to the target dimension.
+     *
+     * Kept intentionally small and identical in behaviour to
+     * `VectorizationService::vectorize()` so re-indexed points end up
+     * byte-for-byte compatible with newly vectorized ones.
+     *
+     * @param list<float> $vector
+     *
+     * @return list<float>
+     */
+    private function normalizeVectorDimension(array $vector, int $targetDim): array
+    {
+        $actual = count($vector);
+        if ($actual === $targetDim) {
+            return $vector;
+        }
+
+        $this->logger->warning('EmbeddingReindex: embedding dimension mismatch — coercing', [
+            'expected' => $targetDim,
+            'actual' => $actual,
+        ]);
+
+        if ($actual > $targetDim) {
+            return array_slice($vector, 0, $targetDim);
+        }
+
+        return array_pad($vector, $targetDim, 0.0);
     }
 
     /**
@@ -247,6 +313,13 @@ final readonly class EmbeddingReindexService
                     continue;
                 }
 
+                // Same dimension-coercion as the documents path —
+                // synapse_memories also has a fixed collection dim.
+                $vector = $this->normalizeVectorDimension(
+                    array_map('floatval', $vector),
+                    self::DOC_VECTOR_DIMENSION,
+                );
+
                 $pointId = (string) ($payload['_id'] ?? '');
                 if ('' === $pointId) {
                     $userId = (int) ($payload['user_id'] ?? 0);
@@ -258,10 +331,10 @@ final readonly class EmbeddingReindexService
                 $payload['embedding_model_id'] = $modelId;
                 $payload['embedding_provider'] = $provider;
                 $payload['embedding_model'] = $modelName;
-                $payload['vector_dim'] = count($vector);
+                $payload['vector_dim'] = self::DOC_VECTOR_DIMENSION;
                 $payload['indexed_at'] = date(\DATE_ATOM);
 
-                $this->qdrantClient->upsertMemory($pointId, array_map('floatval', $vector), $payload);
+                $this->qdrantClient->upsertMemory($pointId, $vector, $payload);
                 $run->incrementChunksProcessed();
             }
 

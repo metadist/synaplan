@@ -605,30 +605,18 @@ class ConfigController extends AbstractController
                 continue;
             }
 
-            // VECTORIZE is conceptually a SYSTEM-WIDE setting:
-            // every incoming message is classified through the same
-            // synapse_topics Qdrant collection (one collection, one
-            // dimension, one model). Letting individual users override
-            // it produces the silent skew this code path used to ship
-            // — the per-user row was saved but `SynapseIndexer` and
-            // `SynapseRouter` always read the global row, so the UI
-            // showed "qwen3" while routing actually ran on bge-m3.
+            // VECTORIZE controls how the user's OWN files/memories get
+            // embedded — explicitly user-scoped now that Synapse Routing
+            // has its own admin-only system-wide setting (see
+            // `DEFAULTMODEL.SYNAPSE_VECTORIZE`, managed via
+            // `AdminEmbeddingController`). Routing therefore can no longer
+            // disagree with a per-user VECTORIZE choice, and we must NOT
+            // silently escalate a user-scoped write into a global config
+            // change (raised by Copilot review on PR #853).
             //
-            // Force-write to ownerId=0 here AND clear any orphan
-            // per-user row for VECTORIZE so the read path can never
-            // disagree with the index.
-            $targetOwnerId = ('VECTORIZE' === $capability) ? 0 : $ownerId;
-
-            if ('VECTORIZE' === $capability) {
-                $orphan = $this->configRepository->findOneBy([
-                    'ownerId' => $user->getId(),
-                    'group' => 'DEFAULTMODEL',
-                    'setting' => 'VECTORIZE',
-                ]);
-                if ($orphan && 0 !== $orphan->getOwnerId()) {
-                    $this->em->remove($orphan);
-                }
-            }
+            // The only path that may write to ownerId=0 is the `global`
+            // flag above, which already requires `ROLE_ADMIN`.
+            $targetOwnerId = $ownerId;
 
             $config = $this->configRepository->findOneBy([
                 'ownerId' => $targetOwnerId,
@@ -894,9 +882,19 @@ class ConfigController extends AbstractController
             'models_available' => count($imageModels),
         ];
 
-        // Synapse Routing (embedding-based intent classification)
+        // Synapse Routing (embedding-based intent classification).
+        //
+        // Off-by-default: Synapse is a beta feature. The `null` (no row)
+        // case used to be reported as enabled here, which contradicted
+        // `MessageClassifier::isSynapseEnabled()` and would have caused
+        // `/features/status` to lie about the runtime classifier (raised
+        // by Copilot review on PR #853). We mirror MessageClassifier's
+        // parser exactly so this endpoint and the actual routing path
+        // never disagree.
         $synapseValue = $this->configRepository->getValue(0, 'QDRANT_SEARCH', 'SYNAPSE_ROUTING_ENABLED');
-        $synapseEnabled = null === $synapseValue || 'true' === $synapseValue;
+        $synapseEnabled = null !== $synapseValue
+            && '' !== $synapseValue
+            && true === filter_var($synapseValue, FILTER_VALIDATE_BOOL, FILTER_NULL_ON_FAILURE);
         $qdrantConfigured = !empty($_ENV['QDRANT_URL'] ?? '');
         $synapseReady = $synapseEnabled && $qdrantConfigured;
         $features['synapse-routing'] = [

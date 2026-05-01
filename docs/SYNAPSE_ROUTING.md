@@ -171,12 +171,12 @@ php bin/console synapse:index --user=42
 
 ## Configuration
 
-Synapse Routing is **enabled by default**. You can manage it in the Admin panel under **Config → Routing Configuration** or via Admin API:
+Synapse Routing is a **beta feature and is OFF by default** — every install ships with the proven AI sorter as the active classifier. Operators must explicitly opt-in via the Admin panel under **Config → Routing Configuration** or by toggling the BCONFIG row directly.
 
 | Setting                       | Default | Description |
 | ----------------------------- | ------- | ----------- |
-| `SYNAPSE_ROUTING_ENABLED`     | `true`  | Enable/disable Synapse Routing entirely. |
-| `SYNAPSE_CONFIDENCE_THRESHOLD`| `0.38`  | Minimum cosine similarity for Tier-1 to win over the AI fallback. |
+| `SYNAPSE_ROUTING_ENABLED`     | `false` | Enable/disable Synapse Routing entirely. While off, every message goes through `MessageSorter` (AI sort). |
+| `SYNAPSE_CONFIDENCE_THRESHOLD`| `0.78`  | Minimum cosine similarity for Tier-1 to win over the AI fallback. Kept conservative on purpose so beta installs only short-circuit on high-confidence hits; lower carefully if you want more Tier-1 wins at the cost of accuracy. |
 
 Changes take effect immediately — no restart required.
 

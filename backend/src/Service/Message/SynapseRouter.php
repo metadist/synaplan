@@ -24,7 +24,15 @@ use Psr\Log\LoggerInterface;
  */
 final readonly class SynapseRouter
 {
-    private const DEFAULT_CONFIDENCE_THRESHOLD = 0.38;
+    /**
+     * Code-side fallback for the Tier-1 confidence threshold, used only
+     * when no `QDRANT_SEARCH.SYNAPSE_CONFIDENCE_THRESHOLD` row is present
+     * in BCONFIG. Kept in lockstep with `SystemConfigService`'s UI default
+     * (`0.78`) so the runtime behaviour does not change depending on
+     * whether an admin has touched the setting (raised by Copilot review
+     * on PR #853).
+     */
+    private const DEFAULT_CONFIDENCE_THRESHOLD = 0.78;
     private const STICKY_THRESHOLD = 0.32;
     private const VECTOR_DIMENSION = 1024;
     private const SEARCH_LIMIT = 5;
