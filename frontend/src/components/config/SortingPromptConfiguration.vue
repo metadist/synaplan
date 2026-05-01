@@ -122,30 +122,57 @@
       </div>
     </div>
 
-    <!-- Embedding model picker (admin only) -->
-    <div v-if="isAdmin" class="surface-card p-6" data-testid="section-routing-embedding-model">
-      <div class="flex items-start gap-3 mb-4">
-        <div class="p-2 rounded-lg bg-[var(--brand)]/10 flex-shrink-0">
-          <Icon icon="heroicons:cpu-chip" class="w-5 h-5 text-[var(--brand)]" />
+    <!--
+      Embedding-model picker — admin-only. The whole card is wrapped in
+      `v-if="isAdmin"` so non-admin users never receive the markup, not
+      even disabled. The amber accents and ADMIN pill make it visually
+      obvious that this is operator surface area, not a per-user setting.
+    -->
+    <div
+      v-if="isAdmin"
+      class="surface-card p-6 ring-1 ring-amber-500/20 border-l-4 border-l-amber-500/70"
+      data-testid="section-routing-embedding-model"
+    >
+      <div class="flex items-start gap-3 mb-5">
+        <div class="p-2 rounded-lg bg-amber-500/10 flex-shrink-0">
+          <Icon icon="heroicons:cpu-chip" class="w-5 h-5 text-amber-600 dark:text-amber-400" />
         </div>
         <div class="flex-1 min-w-0">
-          <h3 class="text-lg font-semibold txt-primary mb-1">
-            {{ $t('config.routing.embeddingTitle') }}
-          </h3>
+          <div class="flex items-center gap-2 flex-wrap mb-1">
+            <h3 class="text-lg font-semibold txt-primary">
+              {{ $t('config.routing.embeddingTitle') }}
+            </h3>
+            <span
+              class="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-amber-500/15 text-amber-700 dark:text-amber-300"
+              data-testid="badge-admin-only"
+            >
+              {{ $t('config.routing.embeddingAdminBadge') }}
+            </span>
+          </div>
           <p class="text-sm txt-secondary">
             {{ $t('config.routing.embeddingSubtitle') }}
           </p>
         </div>
       </div>
 
-      <div v-if="synapseEmbeddingStatus" class="flex flex-col md:flex-row md:items-end gap-3">
-        <div class="flex-1 min-w-0">
-          <label class="block text-xs txt-secondary uppercase tracking-wide mb-1">
-            {{ $t('config.routing.embeddingActive') }}
-          </label>
+      <div v-if="synapseEmbeddingStatus" class="space-y-2">
+        <label
+          for="select-synapse-embedding-model"
+          class="block text-xs txt-secondary uppercase tracking-wide"
+        >
+          {{ $t('config.routing.embeddingActive') }}
+        </label>
+        <!--
+          Select + button must share the row so they stay vertically
+          aligned regardless of helper text below; using items-end on a
+          parent with a label / hint of different heights misaligned
+          the button when the column wrapped its label.
+        -->
+        <div class="flex flex-col sm:flex-row gap-2">
           <select
+            id="select-synapse-embedding-model"
             v-model.number="synapseEmbeddingSelection"
-            class="w-full px-3 py-2 rounded-lg surface-chip border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)] disabled:opacity-50"
+            class="flex-1 min-w-0 px-3 py-2 rounded-lg surface-chip border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-amber-500 disabled:opacity-50"
             :disabled="switchingSynapseEmbedding || !!synapseActiveRun"
             data-testid="select-synapse-embedding-model"
           >
@@ -157,44 +184,44 @@
               {{ model.name }} · {{ model.service }}
             </option>
           </select>
-          <p class="mt-1 text-xs txt-secondary">
-            {{
-              $t('config.routing.embeddingCurrent', {
-                model: synapseEmbeddingStatus.currentModel.model || '—',
-                provider: synapseEmbeddingStatus.currentModel.provider || '—',
-                dim: synapseEmbeddingStatus.currentModel.vectorDim,
-              })
-            }}
-          </p>
-        </div>
-        <button
-          class="px-4 py-2 rounded-lg bg-[var(--brand)] text-white text-sm font-medium hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-          data-testid="btn-synapse-embedding-switch"
-          :disabled="
-            switchingSynapseEmbedding ||
-            !!synapseActiveRun ||
-            synapseEmbeddingSelection === synapseEmbeddingStatus.currentModel.modelId
-          "
-          @click="switchSynapseEmbedding"
-        >
-          <Icon
-            :icon="
-              switchingSynapseEmbedding ? 'heroicons:arrow-path' : 'heroicons:arrows-right-left'
+          <button
+            class="px-4 py-2 rounded-lg bg-amber-500 text-white text-sm font-medium hover:bg-amber-600 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 whitespace-nowrap"
+            data-testid="btn-synapse-embedding-switch"
+            :disabled="
+              switchingSynapseEmbedding ||
+              !!synapseActiveRun ||
+              synapseEmbeddingSelection === synapseEmbeddingStatus.currentModel.modelId
             "
-            :class="['w-4 h-4', switchingSynapseEmbedding && 'animate-spin']"
-          />
-          {{ $t('config.routing.embeddingSwitch') }}
-        </button>
+            @click="switchSynapseEmbedding"
+          >
+            <Icon
+              :icon="
+                switchingSynapseEmbedding ? 'heroicons:arrow-path' : 'heroicons:arrows-right-left'
+              "
+              :class="['w-4 h-4', switchingSynapseEmbedding && 'animate-spin']"
+            />
+            {{ $t('config.routing.embeddingSwitch') }}
+          </button>
+        </div>
+        <p class="text-xs txt-secondary">
+          {{
+            $t('config.routing.embeddingCurrent', {
+              model: synapseEmbeddingStatus.currentModel.model || '—',
+              provider: synapseEmbeddingStatus.currentModel.provider || '—',
+              dim: synapseEmbeddingStatus.currentModel.vectorDim,
+            })
+          }}
+        </p>
       </div>
 
       <div
         v-if="synapseActiveRun"
-        class="mt-4 p-3 rounded-lg bg-[var(--brand)]/5 border border-[var(--brand)]/20 flex items-center gap-3"
+        class="mt-4 p-3 rounded-lg bg-amber-500/5 border border-amber-500/20 flex items-center gap-3"
         data-testid="banner-synapse-embedding-running"
       >
         <Icon
           icon="heroicons:arrow-path"
-          class="w-5 h-5 text-[var(--brand)] animate-spin flex-shrink-0"
+          class="w-5 h-5 text-amber-600 dark:text-amber-400 animate-spin flex-shrink-0"
         />
         <div class="text-sm flex-1">
           <p class="font-medium txt-primary">

@@ -1213,6 +1213,7 @@
       "reindexForce": "Force-Reindex",
       "reindexRecreate": "Collection neu anlegen",
       "reindexResult": "Reindex erledigt. Indexiert: {indexed}, übersprungen: {skipped}, Fehler: {errors}.",
+      "embeddingAdminBadge": "Nur Admin",
       "embeddingTitle": "Routing-Embedding-Modell",
       "embeddingSubtitle": "Wähle das Embedding-Modell, mit dem Topic-Beschreibungen für die Ähnlichkeitssuche vektorisiert werden. Ein Wechsel legt die synapse_topics-Collection neu an und embeddet alle Topics im Hintergrund neu.",
       "embeddingActive": "Aktives Routing-Modell",

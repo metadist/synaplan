@@ -1077,6 +1077,7 @@
       "reindexForce": "Force Reindex",
       "reindexRecreate": "Recreate Collection",
       "reindexResult": "Reindex done. Indexed: {indexed}, skipped: {skipped}, errors: {errors}.",
+      "embeddingAdminBadge": "Admin Only",
       "embeddingTitle": "Routing Embedding Model",
       "embeddingSubtitle": "Select the embedding model used to vectorise topic descriptions for similarity routing. Switching the model recreates the synapse_topics collection and re-embeds every topic in the background.",
       "embeddingActive": "Active Routing Model",
