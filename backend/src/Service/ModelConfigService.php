@@ -395,7 +395,6 @@ final readonly class ModelConfigService
         return $model->getTag();
     }
 
-
     /**
      * Get effective user ID for model selection based on message channel.
      *

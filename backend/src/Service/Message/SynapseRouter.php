@@ -575,12 +575,12 @@ final readonly class SynapseRouter
         $bestCount = 0;
 
         foreach (self::LANGUAGE_MARKERS as $lang => $markers) {
-            $count = 0;
-            foreach ($markers as $marker) {
-                if (isset($wordSet[$marker])) {
-                    ++$count;
-                }
-            }
+            // array_intersect_key returns the matched markers; counting
+            // them sidesteps a PHPStan narrowing on PHP 8.4 that infers
+            // a manual `++$count` inside `if (isset(…))` as a 0|1 bool
+            // instead of the unbounded int it actually is. Net behaviour
+            // is identical — both forms count distinct marker hits.
+            $count = count(array_intersect_key($wordSet, array_flip($markers)));
 
             if ($count > $bestCount) {
                 $bestCount = $count;
