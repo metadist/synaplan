@@ -2700,6 +2700,10 @@
       "dark": "Dark",
       "system": "System"
     },
+    "language": {
+      "title": "Language",
+      "description": "Pick the language used across the interface"
+    },
     "account": {
       "title": "Account",
       "email": "Email",

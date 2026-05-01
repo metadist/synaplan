@@ -30,10 +30,27 @@ export const selectors = {
   },
   header: {
     appHeader: '[data-testid="comp-app-header"]',
-    modeToggle: '[data-testid="btn-mode-toggle"]',
+    /**
+     * Header itself no longer hosts mode/theme/language toggles —
+     * those moved to the Settings page.
+     * `themeToggle` + `languageToggle` are still rendered on the
+     * unauthenticated Register/VerifyEmail pages.
+     */
     themeToggle: '[data-testid="btn-theme-toggle"]',
     languageToggle: '[data-testid="btn-language-toggle"]',
-    languageMenu: '[data-testid="dropdown-language-menu"]',
+  },
+  settings: {
+    page: '[data-testid="page-settings"]',
+    appModeSection: '[data-testid="section-app-mode"]',
+    btnModeEasy: '[data-testid="btn-mode-easy"]',
+    btnModeAdvanced: '[data-testid="btn-mode-advanced"]',
+    languageSection: '[data-testid="section-language-settings"]',
+    languageGrid: '[data-testid="grid-language-options"]',
+    btnLanguage: (lang: string) => `[data-testid="btn-language-${lang}"]`,
+    themeSection: '[data-testid="section-theme-settings"]',
+    btnThemeLight: '[data-testid="btn-theme-light"]',
+    btnThemeDark: '[data-testid="btn-theme-dark"]',
+    btnThemeSystem: '[data-testid="btn-theme-system"]',
   },
   nav: {
     sidebar: '[data-testid="comp-sidebar-v2"]',
@@ -173,6 +190,7 @@ export const selectors = {
     button: '[data-testid="btn-sidebar-v2-user"]',
     dropdown: '[data-testid="dropdown-sidebar-v2-user"]',
     profileBtn: '[data-testid="btn-sidebar-v2-profile"]',
+    settingsBtn: '[data-testid="btn-sidebar-v2-settings"]',
     statisticsBtn: '[data-testid="btn-sidebar-v2-statistics"]',
     subscriptionBtn: '[data-testid="btn-sidebar-v2-subscription"]',
     upgradeBtn: '[data-testid="btn-sidebar-v2-upgrade"]',

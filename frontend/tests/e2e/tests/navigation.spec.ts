@@ -5,27 +5,33 @@ import { CREDENTIALS } from '../config/credentials'
 import { TIMEOUTS } from '../config/config'
 
 const NAV = selectors.nav
-const HDR = selectors.header
+const SET = selectors.settings
 const USR = selectors.userMenu
 
+/**
+ * Mode is persisted in localStorage (`app_mode`) by the appMode store.
+ * Setting it directly + reloading is the fastest, most robust way to
+ * arrange the desired mode for tests that don't specifically exercise
+ * the Settings UI itself (those tests live below and click through
+ * the Settings page).
+ */
 async function ensureEasyMode(page: Page) {
-  const toggle = page.locator(HDR.modeToggle)
-  try {
-    await expect(toggle).toHaveAttribute('data-mode', 'easy', { timeout: TIMEOUTS.SHORT })
-  } catch {
-    await toggle.click()
-    await expect(toggle).toHaveAttribute('data-mode', 'easy', { timeout: TIMEOUTS.SHORT })
-  }
+  await page.evaluate(() => localStorage.setItem('app_mode', 'easy'))
+  await page.reload()
+  await expect(page.locator(NAV.sidebar)).toBeVisible({ timeout: TIMEOUTS.STANDARD })
 }
 
 async function ensureAdvancedMode(page: Page) {
-  const toggle = page.locator(HDR.modeToggle)
-  try {
-    await expect(toggle).toHaveAttribute('data-mode', 'advanced', { timeout: TIMEOUTS.SHORT })
-  } catch {
-    await toggle.click()
-    await expect(toggle).toHaveAttribute('data-mode', 'advanced', { timeout: TIMEOUTS.SHORT })
-  }
+  await page.evaluate(() => localStorage.setItem('app_mode', 'advanced'))
+  await page.reload()
+  await expect(page.locator(NAV.sidebarV2Settings)).toBeVisible({ timeout: TIMEOUTS.STANDARD })
+}
+
+async function openSettings(page: Page) {
+  await page.locator(USR.button).click()
+  await expect(page.locator(USR.dropdown)).toBeVisible({ timeout: TIMEOUTS.SHORT })
+  await page.locator(USR.dropdown).locator(USR.settingsBtn).click()
+  await expect(page.locator(SET.page)).toBeVisible({ timeout: TIMEOUTS.STANDARD })
 }
 
 test.describe('Navigation: Sidebar basics (non-admin, easy mode)', () => {
@@ -87,21 +93,23 @@ test.describe('Navigation: Sidebar basics (non-admin, easy mode)', () => {
 })
 
 test.describe('Navigation: Advanced mode (non-admin)', () => {
-  test('@ci Mode toggle switches between easy and advanced', async ({ page, credentials }) => {
+  test('@ci Mode toggle (Settings) switches between easy and advanced', async ({
+    page,
+    credentials,
+  }) => {
     await test.step('Arrange: login and switch to easy mode', async () => {
       await login(page, credentials)
       await ensureEasyMode(page)
     })
 
-    await test.step('Act: toggle to advanced mode', async () => {
-      await page.locator(HDR.modeToggle).click()
+    await test.step('Act: open Settings and pick Advanced', async () => {
+      await openSettings(page)
+      await page.locator(SET.btnModeAdvanced).click()
     })
 
-    await test.step('Assert: toggle shows advanced state and Settings appears', async () => {
-      await expect(page.locator(HDR.modeToggle)).toHaveAttribute('data-mode', 'advanced', {
-        timeout: TIMEOUTS.SHORT,
-      })
-      await expect(page.locator(NAV.sidebarV2Settings)).toBeVisible({ timeout: TIMEOUTS.SHORT })
+    await test.step('Assert: Settings nav becomes visible after going back', async () => {
+      await page.goto('/')
+      await expect(page.locator(NAV.sidebarV2Settings)).toBeVisible({ timeout: TIMEOUTS.STANDARD })
     })
   })
 
@@ -278,28 +286,29 @@ test.describe('Navigation: User menu', () => {
   })
 })
 
-test.describe('Navigation: Header controls', () => {
-  test('@ci Language switch changes active language', async ({ page, credentials }) => {
-    await test.step('Arrange: login', async () => {
+test.describe('Navigation: Settings page controls', () => {
+  test('@ci Language switch (Settings) changes active language', async ({ page, credentials }) => {
+    await test.step('Arrange: login and open Settings', async () => {
       await login(page, credentials)
+      await openSettings(page)
     })
 
-    const initialLang = await page.locator(HDR.languageToggle).getAttribute('data-language')
-    expect(initialLang).toMatch(/^(de|en)$/)
-
+    const initialLang =
+      (await page.evaluate(() => localStorage.getItem('language'))) ??
+      (await page.evaluate(() => document.documentElement.lang)) ??
+      'en'
     const targetLang = initialLang === 'de' ? 'en' : 'de'
 
-    await test.step('Act: open menu and select a different language', async () => {
-      await page.locator(HDR.languageToggle).click()
-      const menu = page.locator(HDR.languageMenu)
-      await expect(menu).toBeVisible({ timeout: TIMEOUTS.SHORT })
-      await menu.locator(`[data-language="${targetLang}"]`).click()
+    await test.step('Act: pick a different language card', async () => {
+      await page.locator(SET.btnLanguage(targetLang)).click()
     })
 
-    await test.step('Assert: toggle reflects the new language', async () => {
-      await expect(page.locator(HDR.languageToggle)).toHaveAttribute('data-language', targetLang, {
-        timeout: TIMEOUTS.SHORT,
-      })
+    await test.step('Assert: localStorage reflects the new language', async () => {
+      await expect
+        .poll(() => page.evaluate(() => localStorage.getItem('language')), {
+          timeout: TIMEOUTS.SHORT,
+        })
+        .toBe(targetLang)
     })
   })
 })
