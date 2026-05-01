@@ -105,16 +105,20 @@ describe('useAuthStore — impersonation', () => {
   })
 
   it('startImpersonation surfaces a server error verbatim and leaves state untouched', async () => {
+    // Use a refusal that is still actually thrown by the backend — self
+    // impersonation is the one inline guard the UI also enforces. The point
+    // here is that the server message is propagated verbatim and the store
+    // is not mutated on failure, regardless of which rule fired.
     startApiMock.mockResolvedValueOnce({
       success: false,
-      error: 'You cannot impersonate another administrator.',
+      error: 'You cannot impersonate yourself.',
     })
 
     const store = useAuthStore()
     const result = await store.startImpersonation(2)
 
     expect(result.success).toBe(false)
-    expect(result.error).toBe('You cannot impersonate another administrator.')
+    expect(result.error).toBe('You cannot impersonate yourself.')
     expect(store.isImpersonating).toBe(false)
     expect(refreshUserMock).not.toHaveBeenCalled()
   })

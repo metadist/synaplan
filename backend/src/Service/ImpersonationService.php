@@ -39,12 +39,17 @@ use Symfony\Component\Security\Core\Exception\AccessDeniedException;
  *
  * Constraints (enforced server-side; the UI only mirrors them):
  *   - Only ROLE_ADMIN users may impersonate.
- *   - You cannot impersonate yourself.
- *   - You cannot impersonate another admin (privilege-escalation guard).
+ *   - You cannot impersonate yourself (the resulting session would be a
+ *     no-op and only confuse the audit trail).
  *   - You cannot nest impersonations — exit first.
  *   - OIDC/Keycloak sessions are not supported, since we have no app-token
  *     refresh to stash. The caller gets a clean error and the impersonation
  *     is refused without mutating cookies.
+ *
+ * Note: Impersonating another admin IS allowed. Admins legitimately need to
+ * walk into a peer's account (handover, debugging an admin-only flow, etc.).
+ * Every start/stop is logged at warning level with both ids so the audit
+ * trail stays attributable to the original admin.
  */
 final readonly class ImpersonationService
 {
@@ -225,12 +230,6 @@ final readonly class ImpersonationService
         if (!$target instanceof User) {
             return null;
         }
-        // Targets that have since been promoted to admin must not continue to
-        // be impersonated — the privilege-escalation guard at start-time only
-        // checks the initial state.
-        if ($target->isAdmin()) {
-            return null;
-        }
 
         $freshAccess = $this->tokenService->generateAccessToken(
             $target,
@@ -312,10 +311,6 @@ final readonly class ImpersonationService
 
         if ($admin->getId() === $target->getId()) {
             throw new AccessDeniedException('You cannot impersonate yourself.');
-        }
-
-        if ($target->isAdmin()) {
-            throw new AccessDeniedException('You cannot impersonate another administrator.');
         }
 
         if ($this->isImpersonating($request)) {

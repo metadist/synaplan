@@ -160,7 +160,6 @@
       "confirmAction": "Iniciar sesión",
       "started": "Ahora ves la aplicación como {email}.",
       "startFailed": "No se pudo iniciar la suplantación",
-      "cannotImpersonateAdmin": "No puedes suplantar a otros administradores.",
       "cannotImpersonateSelf": "No puedes suplantarte a ti mismo.",
       "banner": {
         "viewing": "Viendo como {email}",
