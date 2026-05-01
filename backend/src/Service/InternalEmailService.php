@@ -273,27 +273,35 @@ final readonly class InternalEmailService
 
         $html = <<<HTML
             <div style="font-family: -apple-system, sans-serif; max-width: 600px; margin: 0 auto;">
-                <h2 style="color: #e65100;">Embedding Fallback Activated</h2>
+                <div style="background: #c62828; color: #fff; padding: 12px 16px; border-radius: 6px; margin-bottom: 16px;">
+                    <strong style="font-size: 18px;">🚨 INCIDENT — Embedding Fallback Activated</strong>
+                </div>
                 <p>The primary embedding provider <strong>{$primaryProvider}</strong> failed.
-                   Requests are being routed to <strong>{$fallbackProvider}</strong> as fallback.</p>
+                   Requests are now routed to the fallback provider <strong>{$fallbackProvider}</strong>.</p>
+                <p><strong>Action required:</strong> verify the primary provider's health and capacity.
+                   Every embedding request hitting the fallback consumes paid quota.</p>
                 <table style="width: 100%; border-collapse: collapse; margin: 16px 0;">
-                    <tr><td style="padding: 8px; border: 1px solid #ddd; font-weight: bold;">Primary</td>
+                    <tr><td style="padding: 8px; border: 1px solid #ddd; font-weight: bold;">Primary (DOWN)</td>
                         <td style="padding: 8px; border: 1px solid #ddd;">{$primaryProvider}</td></tr>
-                    <tr><td style="padding: 8px; border: 1px solid #ddd; font-weight: bold;">Fallback</td>
+                    <tr><td style="padding: 8px; border: 1px solid #ddd; font-weight: bold;">Fallback (active)</td>
                         <td style="padding: 8px; border: 1px solid #ddd;">{$fallbackProvider}</td></tr>
                     <tr><td style="padding: 8px; border: 1px solid #ddd; font-weight: bold;">Error</td>
-                        <td style="padding: 8px; border: 1px solid #ddd; color: #c62828;">{$errorMessage}</td></tr>
+                        <td style="padding: 8px; border: 1px solid #ddd; color: #c62828; font-family: monospace;">{$errorMessage}</td></tr>
                     <tr><td style="padding: 8px; border: 1px solid #ddd; font-weight: bold;">Time</td>
                         <td style="padding: 8px; border: 1px solid #ddd;">{$timestamp}</td></tr>
                 </table>
-                <p style="color: #666; font-size: 13px;">This is an automated alert. Please check the primary provider.</p>
+                <p style="color: #666; font-size: 13px;">Throttled to one alert per hour per provider pair.
+                   Discord channel was notified with @everyone in parallel.</p>
             </div>
             HTML;
 
         $email = (new Email())
             ->from(sprintf('%s <%s>', $fromName, $fromEmail))
             ->to($adminEmail)
-            ->subject('[Synaplan] Embedding Fallback Activated — '.$primaryProvider.' → '.$fallbackProvider)
+            // Subject prefix is intentionally [INCIDENT] so inbox rules
+            // / pagers can match on it without parsing the body.
+            ->subject('[INCIDENT][Synaplan] Embedding Fallback Activated — '.$primaryProvider.' → '.$fallbackProvider)
+            ->priority(Email::PRIORITY_HIGH)
             ->html($html);
 
         try {

@@ -240,6 +240,14 @@ final readonly class DiscordNotificationService
 
     /**
      * Send a Discord embed message.
+     *
+     * Set `mentionEveryone = true` to ping the channel via `@everyone`.
+     * Discord requires both:
+     *   1. the literal `@everyone` token in the message `content`
+     *   2. an `allowed_mentions.parse: ['everyone']` entry, otherwise
+     *      the webhook silently strips the mention.
+     * Use this sparingly — only for incidents that on-call has to ack
+     * within minutes (primary embedding provider outage, etc.).
      */
     private function sendEmbed(
         string $title,
@@ -247,6 +255,7 @@ final readonly class DiscordNotificationService
         array $fields,
         string $footer = '',
         ?string $description = null,
+        bool $mentionEveryone = false,
     ): void {
         $embed = [
             'title' => $title,
@@ -266,6 +275,11 @@ final readonly class DiscordNotificationService
         $payload = [
             'embeds' => [$embed],
         ];
+
+        if ($mentionEveryone) {
+            $payload['content'] = '@everyone';
+            $payload['allowed_mentions'] = ['parse' => ['everyone']];
+        }
 
         try {
             $this->httpClient->request('POST', $this->webhookUrl, [
@@ -677,7 +691,20 @@ final readonly class DiscordNotificationService
     }
 
     /**
-     * Notify when embedding fallback provider activates due to primary failure.
+     * Notify when the embedding fallback provider activates due to a
+     * primary-provider failure.
+     *
+     * This is treated as a P1 incident — the primary embedding stack
+     * (e.g. local Ollama / OpenAI) is down and the system is now
+     * burning Cloudflare quota for every RAG/Memory/Synapse request.
+     * Operators MUST ack this fast, so we:
+     *   - mention `@everyone` (requires `allowed_mentions.parse`,
+     *     handled in `sendEmbed`),
+     *   - prepend a 🚨 emoji + clear `[INCIDENT]` tag for at-a-glance
+     *     scanning in mobile notifications,
+     *   - keep the same throttling discipline (1/h per provider pair)
+     *     in the caller (`AiFacade`) so the channel does not get
+     *     spammed by burst failures.
      */
     public function notifyEmbeddingFallback(string $primaryProvider, string $fallbackProvider, string $error): void
     {
@@ -687,12 +714,12 @@ final readonly class DiscordNotificationService
 
         $fields = [
             [
-                'name' => 'Primary Provider',
+                'name' => 'Primary Provider (DOWN)',
                 'value' => $primaryProvider,
                 'inline' => true,
             ],
             [
-                'name' => 'Fallback Provider',
+                'name' => 'Fallback Provider (active)',
                 'value' => $fallbackProvider,
                 'inline' => true,
             ],
@@ -701,13 +728,19 @@ final readonly class DiscordNotificationService
                 'value' => '```'.$this->truncate($error, self::MAX_ERROR).'```',
                 'inline' => false,
             ],
+            [
+                'name' => 'Action required',
+                'value' => 'Verify primary provider health and capacity. Fallback traffic is billable.',
+                'inline' => false,
+            ],
         ];
 
         $this->sendEmbed(
-            title: 'Embedding Fallback Activated',
+            title: '🚨 [INCIDENT] Embedding Fallback Activated',
             color: self::COLOR_ERROR,
             fields: $fields,
-            footer: 'Synaplan Embedding'
+            footer: 'Synaplan Embedding · throttled to 1/hour per provider pair',
+            mentionEveryone: true,
         );
     }
 

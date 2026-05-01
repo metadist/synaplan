@@ -44,27 +44,35 @@ final class Version20260430120000 extends AbstractMigration
 
     public function up(Schema $schema): void
     {
+        // Column shapes mirror what Doctrine's `SchemaTool::getCreateSchemaSql()`
+        // emits for the `RevectorizeRun` entity (see `App\Entity\RevectorizeRun`).
+        // Keeping this 1:1 keeps `doctrine:schema:validate` green on a freshly
+        // migrated DB. Any deviation (e.g. `DECIMAL` vs `NUMERIC`,
+        // `NOT NULL DEFAULT …` vs `DEFAULT … NOT NULL`) shows up as drift in CI.
+        // For installations that already executed an earlier (drifty) revision
+        // of this migration, `Version20260501000000` ships the same shape as
+        // an idempotent `ALTER TABLE … MODIFY COLUMN …` sequence.
         $this->addSql(<<<'SQL'
             CREATE TABLE BREVECTORIZE_RUNS (
               BID BIGINT AUTO_INCREMENT NOT NULL,
               BUSERID INT NOT NULL,
               BSCOPE VARCHAR(32) NOT NULL,
-              BMODEL_FROM_ID INT NULL,
+              BMODEL_FROM_ID INT DEFAULT NULL,
               BMODEL_TO_ID INT NOT NULL,
-              BSTATUS VARCHAR(16) NOT NULL DEFAULT 'queued',
-              BCHUNKS_TOTAL INT NULL,
-              BCHUNKS_PROCESSED INT NOT NULL DEFAULT 0,
-              BCHUNKS_FAILED INT NOT NULL DEFAULT 0,
-              BTOKENS_ESTIMATED BIGINT NULL,
-              BTOKENS_PROCESSED BIGINT NOT NULL DEFAULT 0,
-              BCOST_ESTIMATED_USD DECIMAL(10,4) NULL,
-              BCOST_ACTUAL_USD DECIMAL(10,4) NOT NULL DEFAULT 0,
-              BSEVERITY VARCHAR(16) NOT NULL DEFAULT 'info',
-              BSTARTED_AT BIGINT NULL,
-              BFINISHED_AT BIGINT NULL,
+              BSTATUS VARCHAR(16) DEFAULT 'queued' NOT NULL,
+              BCHUNKS_TOTAL INT DEFAULT NULL,
+              BCHUNKS_PROCESSED INT DEFAULT 0 NOT NULL,
+              BCHUNKS_FAILED INT DEFAULT 0 NOT NULL,
+              BTOKENS_ESTIMATED BIGINT DEFAULT NULL,
+              BTOKENS_PROCESSED BIGINT DEFAULT 0 NOT NULL,
+              BCOST_ESTIMATED_USD NUMERIC(10, 4) DEFAULT NULL,
+              BCOST_ACTUAL_USD NUMERIC(10, 4) DEFAULT '0.0000' NOT NULL,
+              BSEVERITY VARCHAR(16) DEFAULT 'info' NOT NULL,
+              BSTARTED_AT BIGINT DEFAULT NULL,
+              BFINISHED_AT BIGINT DEFAULT NULL,
               BCREATED BIGINT NOT NULL,
               BUPDATED BIGINT NOT NULL,
-              BERROR LONGTEXT NULL,
+              BERROR LONGTEXT DEFAULT NULL,
               INDEX idx_revectorize_user (BUSERID),
               INDEX idx_revectorize_status (BSTATUS),
               INDEX idx_revectorize_scope_created (BSCOPE, BCREATED),
