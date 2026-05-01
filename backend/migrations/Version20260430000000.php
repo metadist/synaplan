@@ -33,7 +33,7 @@ final class Version20260430000000 extends AbstractMigration
     {
         $this->addSql(<<<'SQL'
             ALTER TABLE BPROMPTS
-                ADD COLUMN BKEYWORDS LONGTEXT NULL AFTER BSELECTION_RULES,
+                ADD COLUMN BKEYWORDS TEXT NULL AFTER BSELECTION_RULES,
                 ADD COLUMN BENABLED TINYINT(1) NOT NULL DEFAULT 1 AFTER BKEYWORDS
         SQL);
     }
