@@ -9,6 +9,7 @@ use App\Entity\User;
 use App\Repository\ConfigRepository;
 use App\Repository\ModelRepository;
 use App\Service\BillingService;
+use App\Service\Embedding\EmbeddingMetadataService;
 use App\Service\Embedding\EmbeddingModelChangeGuard;
 use App\Service\Embedding\Exception\PremiumRequiredException;
 use App\Service\Plugin\PluginManager;
@@ -40,6 +41,7 @@ class ConfigController extends AbstractController
         private BillingService $billingService,
         private UserMemoryService $memoryService,
         private EmbeddingModelChangeGuard $embeddingChangeGuard,
+        private EmbeddingMetadataService $embeddingMetadata,
         #[Autowire('%env(string:default::QDRANT_URL)%')]
         private readonly string $qdrantUrl,
     ) {
@@ -497,20 +499,33 @@ class ConfigController extends AbstractController
         $defaults = [];
 
         foreach ($capabilities as $capability) {
-            // Try user-specific config first
-            $config = $this->configRepository->findOneBy([
-                'ownerId' => $userId,
-                'group' => 'DEFAULTMODEL',
-                'setting' => $capability,
-            ]);
-
-            // Fall back to global config
-            if (!$config) {
+            // VECTORIZE is system-wide (single Qdrant collection,
+            // single dimension). Skip the per-user lookup entirely so
+            // the dropdown can never disagree with what the indexer
+            // actually uses — see saveDefaultModels for the matching
+            // write-side guard.
+            if ('VECTORIZE' === $capability) {
                 $config = $this->configRepository->findOneBy([
                     'ownerId' => 0,
                     'group' => 'DEFAULTMODEL',
+                    'setting' => 'VECTORIZE',
+                ]);
+            } else {
+                // Try user-specific config first
+                $config = $this->configRepository->findOneBy([
+                    'ownerId' => $userId,
+                    'group' => 'DEFAULTMODEL',
                     'setting' => $capability,
                 ]);
+
+                // Fall back to global config
+                if (!$config) {
+                    $config = $this->configRepository->findOneBy([
+                        'ownerId' => 0,
+                        'group' => 'DEFAULTMODEL',
+                        'setting' => $capability,
+                    ]);
+                }
             }
 
             if ($config) {
@@ -590,15 +605,40 @@ class ConfigController extends AbstractController
                 continue;
             }
 
+            // VECTORIZE is conceptually a SYSTEM-WIDE setting:
+            // every incoming message is classified through the same
+            // synapse_topics Qdrant collection (one collection, one
+            // dimension, one model). Letting individual users override
+            // it produces the silent skew this code path used to ship
+            // — the per-user row was saved but `SynapseIndexer` and
+            // `SynapseRouter` always read the global row, so the UI
+            // showed "qwen3" while routing actually ran on bge-m3.
+            //
+            // Force-write to ownerId=0 here AND clear any orphan
+            // per-user row for VECTORIZE so the read path can never
+            // disagree with the index.
+            $targetOwnerId = ('VECTORIZE' === $capability) ? 0 : $ownerId;
+
+            if ('VECTORIZE' === $capability) {
+                $orphan = $this->configRepository->findOneBy([
+                    'ownerId' => $user->getId(),
+                    'group' => 'DEFAULTMODEL',
+                    'setting' => 'VECTORIZE',
+                ]);
+                if ($orphan && 0 !== $orphan->getOwnerId()) {
+                    $this->em->remove($orphan);
+                }
+            }
+
             $config = $this->configRepository->findOneBy([
-                'ownerId' => $ownerId,
+                'ownerId' => $targetOwnerId,
                 'group' => 'DEFAULTMODEL',
                 'setting' => $capability,
             ]);
 
             if (!$config) {
                 $config = new Config();
-                $config->setOwnerId($ownerId);
+                $config->setOwnerId($targetOwnerId);
                 $config->setGroup('DEFAULTMODEL');
                 $config->setSetting($capability);
             }
@@ -608,6 +648,13 @@ class ConfigController extends AbstractController
         }
 
         $this->em->flush();
+
+        // Drop cached active-model snapshot so the very next read
+        // (Synapse status, RAG search, /admin/embedding/status) sees
+        // the new VECTORIZE model immediately.
+        if (array_key_exists('VECTORIZE', $data['defaults'])) {
+            $this->embeddingMetadata->invalidate();
+        }
 
         $response = [
             'success' => true,

@@ -468,7 +468,7 @@ final readonly class SynapseRouter
      */
     private function getCurrentModelInfo(): array
     {
-        $modelId = $this->modelConfigService->getDefaultModel('VECTORIZE', null);
+        $modelId = $this->resolveSynapseModelId();
         if (!$modelId) {
             return ['provider' => null, 'model' => null, 'model_id' => null];
         }
@@ -478,6 +478,27 @@ final readonly class SynapseRouter
             'model' => $this->modelConfigService->getModelName($modelId),
             'model_id' => $modelId,
         ];
+    }
+
+    /**
+     * Resolve the BMODELS row id for the embedding model used by
+     * Synapse Routing.
+     *
+     * Reads the global SYNAPSE_VECTORIZE binding so indexer and search
+     * side stay on the same vector space. Falls back to the VECTORIZE
+     * default for fresh installs that have not seeded the dedicated
+     * binding yet.
+     */
+    private function resolveSynapseModelId(): ?int
+    {
+        $synapseId = $this->modelConfigService->getDefaultModel(SynapseIndexer::SYNAPSE_CAPABILITY, null);
+        if ($synapseId) {
+            return $synapseId;
+        }
+
+        $this->logger->warning('SynapseRouter: SYNAPSE_VECTORIZE binding missing, falling back to VECTORIZE default');
+
+        return $this->modelConfigService->getDefaultModel('VECTORIZE', null);
     }
 
     /**
@@ -625,7 +646,7 @@ final readonly class SynapseRouter
      */
     private function getEmbeddingOptions(): array
     {
-        $modelId = $this->modelConfigService->getDefaultModel('VECTORIZE', null);
+        $modelId = $this->resolveSynapseModelId();
         if (!$modelId) {
             return [];
         }

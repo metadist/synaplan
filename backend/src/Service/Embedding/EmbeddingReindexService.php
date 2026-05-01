@@ -80,13 +80,16 @@ final readonly class EmbeddingReindexService
     }
 
     /**
-     * Synapse re-index is a single SynapseIndexer call — it already
-     * handles the per-topic dimension/model bookkeeping.
+     * Synapse re-index uses the dedicated SYNAPSE_VECTORIZE binding
+     * (read via SynapseIndexer) — *not* the global VECTORIZE default
+     * which only governs documents/memories. Without this distinction
+     * the collection would be recreated with the wrong vector dim
+     * whenever Routing and RAG are pinned to different models.
      */
     private function reindexSynapse(RevectorizeRun $run): void
     {
-        $modelInfo = $this->embeddingMetadata->getCurrentModel();
-        $this->qdrantClient->recreateSynapseCollection($modelInfo['vector_dim']);
+        $synapseInfo = $this->synapseIndexer->getEmbeddingModelInfo();
+        $this->qdrantClient->recreateSynapseCollection($synapseInfo['vector_dim']);
         $result = $this->synapseIndexer->indexAllTopics(null, true);
         $run->incrementChunksProcessed($result['indexed']);
         $run->incrementChunksFailed($result['errors']);

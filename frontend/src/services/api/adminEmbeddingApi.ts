@@ -160,6 +160,48 @@ class AdminEmbeddingApi {
       method: 'GET',
     })
   }
+
+  /**
+   * Synapse Routing has its own embedding-model binding — separate
+   * from the user-facing VECTORIZE setting — so the highest-quality
+   * model can be pinned for short multilingual prompt classification
+   * without forcing every user's RAG to re-embed.
+   */
+  async getSynapseStatus(): Promise<SynapseEmbeddingStatusResponse> {
+    return await httpClient<SynapseEmbeddingStatusResponse>(
+      '/api/v1/admin/embedding/synapse/status',
+      { method: 'GET' }
+    )
+  }
+
+  async switchSynapse(toModelId: number): Promise<SynapseEmbeddingSwitchResponse> {
+    return await httpClient<SynapseEmbeddingSwitchResponse>(
+      '/api/v1/admin/embedding/synapse/switch',
+      { method: 'POST', body: JSON.stringify({ toModelId }) }
+    )
+  }
+}
+
+export interface SynapseAvailableModel {
+  id: number
+  name: string
+  service: string
+  providerId: string
+}
+
+export interface SynapseEmbeddingStatusResponse {
+  success: boolean
+  currentModel: EmbeddingCurrentModel
+  availableModels: SynapseAvailableModel[]
+  latestRun: EmbeddingRun | null
+  activeRun: EmbeddingRun | null
+}
+
+export interface SynapseEmbeddingSwitchResponse {
+  success: boolean
+  runId: number
+  fromModelId: number | null
+  toModelId: number
 }
 
 export const adminEmbeddingApi = new AdminEmbeddingApi()

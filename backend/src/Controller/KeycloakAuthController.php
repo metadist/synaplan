@@ -3,6 +3,7 @@
 namespace App\Controller;
 
 use App\Service\ImpersonationService;
+use App\Service\Message\SynapseAutoIndexService;
 use App\Service\OAuthStateService;
 use App\Service\OidcTokenService;
 use App\Service\OidcUserService;
@@ -41,6 +42,7 @@ class KeycloakAuthController extends AbstractController
         private OidcUserService $oidcUserService,
         private OAuthStateService $oauthStateService,
         private ImpersonationService $impersonationService,
+        private SynapseAutoIndexService $synapseAutoIndex,
         private LoggerInterface $logger,
         private string $oidcClientId,
         private string $oidcClientSecret,
@@ -254,6 +256,9 @@ class KeycloakAuthController extends AbstractController
             $appRefreshToken = $this->tokenService->generateRefreshToken($user, $request->getClientIp());
             $this->tokenService->addAuthCookies($response, $appAccessToken, $appRefreshToken);
             $this->impersonationService->attachClearStashCookies($response);
+
+            // Best-effort: refresh Synapse Routing topics for this user.
+            $this->synapseAutoIndex->scheduleForUser($user);
 
             $this->logger->info('Keycloak OAuth successful', [
                 'user_id' => $user->getId(),

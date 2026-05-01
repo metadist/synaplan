@@ -5,6 +5,7 @@ namespace App\Controller;
 use App\Entity\User;
 use App\Repository\UserRepository;
 use App\Service\ImpersonationService;
+use App\Service\Message\SynapseAutoIndexService;
 use App\Service\OAuthStateService;
 use App\Service\TokenService;
 use Doctrine\ORM\EntityManagerInterface;
@@ -31,6 +32,7 @@ class GoogleAuthController extends AbstractController
         private TokenService $tokenService,
         private OAuthStateService $oauthStateService,
         private ImpersonationService $impersonationService,
+        private SynapseAutoIndexService $synapseAutoIndex,
         private LoggerInterface $logger,
         private string $googleClientId,
         private string $googleClientSecret,
@@ -153,6 +155,9 @@ class GoogleAuthController extends AbstractController
             // Generate our tokens
             $accessToken = $this->tokenService->generateAccessToken($user);
             $refreshToken = $this->tokenService->generateRefreshToken($user, $request->getClientIp());
+
+            // Best-effort: refresh Synapse Routing topics for this user.
+            $this->synapseAutoIndex->scheduleForUser($user);
 
             // Create redirect response with cookies
             $callbackUrl = $this->frontendUrl.'/auth/callback?'.http_build_query([

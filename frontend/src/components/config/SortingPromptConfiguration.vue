@@ -122,6 +122,100 @@
       </div>
     </div>
 
+    <!-- Embedding model picker (admin only) -->
+    <div v-if="isAdmin" class="surface-card p-6" data-testid="section-routing-embedding-model">
+      <div class="flex items-start gap-3 mb-4">
+        <div class="p-2 rounded-lg bg-[var(--brand)]/10 flex-shrink-0">
+          <Icon icon="heroicons:cpu-chip" class="w-5 h-5 text-[var(--brand)]" />
+        </div>
+        <div class="flex-1 min-w-0">
+          <h3 class="text-lg font-semibold txt-primary mb-1">
+            {{ $t('config.routing.embeddingTitle') }}
+          </h3>
+          <p class="text-sm txt-secondary">
+            {{ $t('config.routing.embeddingSubtitle') }}
+          </p>
+        </div>
+      </div>
+
+      <div v-if="synapseEmbeddingStatus" class="flex flex-col md:flex-row md:items-end gap-3">
+        <div class="flex-1 min-w-0">
+          <label class="block text-xs txt-secondary uppercase tracking-wide mb-1">
+            {{ $t('config.routing.embeddingActive') }}
+          </label>
+          <select
+            v-model.number="synapseEmbeddingSelection"
+            class="w-full px-3 py-2 rounded-lg surface-chip border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)] disabled:opacity-50"
+            :disabled="switchingSynapseEmbedding || !!synapseActiveRun"
+            data-testid="select-synapse-embedding-model"
+          >
+            <option
+              v-for="model in synapseEmbeddingStatus.availableModels"
+              :key="model.id"
+              :value="model.id"
+            >
+              {{ model.name }} · {{ model.service }}
+            </option>
+          </select>
+          <p class="mt-1 text-xs txt-secondary">
+            {{
+              $t('config.routing.embeddingCurrent', {
+                model: synapseEmbeddingStatus.currentModel.model || '—',
+                provider: synapseEmbeddingStatus.currentModel.provider || '—',
+                dim: synapseEmbeddingStatus.currentModel.vectorDim,
+              })
+            }}
+          </p>
+        </div>
+        <button
+          class="px-4 py-2 rounded-lg bg-[var(--brand)] text-white text-sm font-medium hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+          data-testid="btn-synapse-embedding-switch"
+          :disabled="
+            switchingSynapseEmbedding ||
+            !!synapseActiveRun ||
+            synapseEmbeddingSelection === synapseEmbeddingStatus.currentModel.modelId
+          "
+          @click="switchSynapseEmbedding"
+        >
+          <Icon
+            :icon="
+              switchingSynapseEmbedding ? 'heroicons:arrow-path' : 'heroicons:arrows-right-left'
+            "
+            :class="['w-4 h-4', switchingSynapseEmbedding && 'animate-spin']"
+          />
+          {{ $t('config.routing.embeddingSwitch') }}
+        </button>
+      </div>
+
+      <div
+        v-if="synapseActiveRun"
+        class="mt-4 p-3 rounded-lg bg-[var(--brand)]/5 border border-[var(--brand)]/20 flex items-center gap-3"
+        data-testid="banner-synapse-embedding-running"
+      >
+        <Icon
+          icon="heroicons:arrow-path"
+          class="w-5 h-5 text-[var(--brand)] animate-spin flex-shrink-0"
+        />
+        <div class="text-sm flex-1">
+          <p class="font-medium txt-primary">
+            {{ $t('config.routing.embeddingRunningTitle') }}
+          </p>
+          <p class="txt-secondary">
+            {{
+              $t('config.routing.embeddingRunningBody', {
+                processed: synapseActiveRun.chunksProcessed,
+                status: synapseActiveRun.status,
+              })
+            }}
+          </p>
+        </div>
+      </div>
+
+      <p v-if="!synapseEmbeddingStatus && !loadingSynapseEmbedding" class="text-sm txt-secondary">
+        {{ $t('config.routing.embeddingLoadFailed') }}
+      </p>
+    </div>
+
     <!-- Live status (admin) -->
     <div v-if="isAdmin" class="surface-card p-6" data-testid="section-routing-status">
       <div class="flex items-center justify-between mb-4 flex-wrap gap-3">
@@ -688,7 +782,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, computed, watch } from 'vue'
+import { ref, onMounted, onBeforeUnmount, computed, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { Icon } from '@iconify/vue'
 import { PencilIcon, EyeIcon, CheckIcon, InformationCircleIcon } from '@heroicons/vue/24/outline'
@@ -698,6 +792,8 @@ import { promptsApi } from '@/services/api/promptsApi'
 import type { SortingPromptPayload, RoutingTestResult } from '@/services/api/promptsApi'
 import { adminSynapseApi } from '@/services/api/adminSynapseApi'
 import type { SynapseStatusResponse } from '@/services/api/adminSynapseApi'
+import { adminEmbeddingApi } from '@/services/api/adminEmbeddingApi'
+import type { SynapseEmbeddingStatusResponse, EmbeddingRun } from '@/services/api/adminEmbeddingApi'
 import { getConfigValues, updateConfigValue } from '@/services/api/adminConfigApi'
 import { useNotification } from '@/composables/useNotification'
 import { useDialog } from '@/composables/useDialog'
@@ -715,6 +811,19 @@ const topicSearch = ref('')
 // --- Beta toggle state ------------------------------------------------------
 const synapseEnabled = ref(false)
 const togglingSynapse = ref(false)
+
+// --- Synapse embedding-model state -----------------------------------------
+const synapseEmbeddingStatus = ref<SynapseEmbeddingStatusResponse | null>(null)
+const synapseEmbeddingSelection = ref<number | null>(null)
+const loadingSynapseEmbedding = ref(false)
+const switchingSynapseEmbedding = ref(false)
+let synapseEmbeddingPollHandle: number | null = null
+
+const synapseActiveRun = computed<EmbeddingRun | null>(() => {
+  const run = synapseEmbeddingStatus.value?.activeRun
+  if (!run) return null
+  return run.scope === 'synapse' || run.scope === 'all' ? run : null
+})
 
 // --- Test-box state ---------------------------------------------------------
 const testInput = ref('')
@@ -1087,11 +1196,91 @@ watch(locale, () => {
   loadSortingPrompt()
 })
 
-onMounted(() => {
+const loadSynapseEmbedding = async () => {
+  loadingSynapseEmbedding.value = true
+  try {
+    const response = await adminEmbeddingApi.getSynapseStatus()
+    synapseEmbeddingStatus.value = response
+    if (synapseEmbeddingSelection.value === null) {
+      synapseEmbeddingSelection.value = response.currentModel.modelId
+    }
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Failed to load Synapse embedding state'
+    showError(message)
+  } finally {
+    loadingSynapseEmbedding.value = false
+  }
+}
+
+const switchSynapseEmbedding = async () => {
+  if (!synapseEmbeddingStatus.value || synapseEmbeddingSelection.value === null) return
+  const target = synapseEmbeddingSelection.value
+  if (target === synapseEmbeddingStatus.value.currentModel.modelId) return
+
+  const targetModel = synapseEmbeddingStatus.value.availableModels.find((m) => m.id === target)
+  const confirmed = await dialog.confirm({
+    title: t('config.routing.embeddingConfirmTitle'),
+    message: t('config.routing.embeddingConfirmBody', {
+      from: synapseEmbeddingStatus.value.currentModel.model || '—',
+      to: targetModel?.name || '—',
+    }),
+    confirmText: t('config.routing.embeddingConfirmAction'),
+    cancelText: t('config.routing.embeddingConfirmCancel'),
+    danger: true,
+  })
+  if (!confirmed) return
+
+  switchingSynapseEmbedding.value = true
+  try {
+    await adminEmbeddingApi.switchSynapse(target)
+    success(t('config.routing.embeddingSwitchQueued'))
+    await loadSynapseEmbedding()
+    startSynapseEmbeddingPolling()
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Switch failed'
+    showError(message)
+    if (synapseEmbeddingStatus.value) {
+      synapseEmbeddingSelection.value = synapseEmbeddingStatus.value.currentModel.modelId
+    }
+  } finally {
+    switchingSynapseEmbedding.value = false
+  }
+}
+
+// Poll while a synapse re-index is active so the UI clears the
+// switching banner the moment the worker finishes — without forcing
+// the admin to refresh manually. Stops itself on completion.
+const startSynapseEmbeddingPolling = () => {
+  if (synapseEmbeddingPollHandle !== null) return
+  synapseEmbeddingPollHandle = window.setInterval(async () => {
+    await loadSynapseEmbedding()
+    if (!synapseActiveRun.value) {
+      stopSynapseEmbeddingPolling()
+      await loadStatus()
+    }
+  }, 2000)
+}
+
+const stopSynapseEmbeddingPolling = () => {
+  if (synapseEmbeddingPollHandle !== null) {
+    window.clearInterval(synapseEmbeddingPollHandle)
+    synapseEmbeddingPollHandle = null
+  }
+}
+
+onMounted(async () => {
   loadSortingPrompt()
   if (isAdmin.value) {
     loadSynapseEnabled()
     loadStatus()
+    await loadSynapseEmbedding()
+    if (synapseActiveRun.value) {
+      startSynapseEmbeddingPolling()
+    }
   }
+})
+
+onBeforeUnmount(() => {
+  stopSynapseEmbeddingPolling()
 })
 </script>

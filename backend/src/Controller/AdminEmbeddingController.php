@@ -16,6 +16,7 @@ use App\Service\Embedding\EmbeddingMetadataService;
 use App\Service\Embedding\EmbeddingModelChangeGuard;
 use App\Service\Embedding\Exception\CooldownActiveException;
 use App\Service\Embedding\Exception\PremiumRequiredException;
+use App\Service\Message\SynapseIndexer;
 use Doctrine\ORM\EntityManagerInterface;
 use OpenApi\Attributes as OA;
 use Psr\Log\LoggerInterface;
@@ -55,6 +56,7 @@ final class AdminEmbeddingController extends AbstractController
         private readonly RevectorizeRunRepository $runRepository,
         private readonly ModelRepository $modelRepository,
         private readonly ConfigRepository $configRepository,
+        private readonly SynapseIndexer $synapseIndexer,
         private readonly EntityManagerInterface $em,
         private readonly MessageBusInterface $messageBus,
         private readonly LoggerInterface $logger,
@@ -283,6 +285,114 @@ final class AdminEmbeddingController extends AbstractController
         ]);
     }
 
+    #[Route('/synapse/status', name: 'admin_embedding_synapse_status', methods: ['GET'])]
+    #[OA\Get(
+        path: '/api/v1/admin/embedding/synapse/status',
+        summary: 'Synapse Routing embedding-model status (admin only)',
+        description: 'Returns the model currently bound to DEFAULTMODEL.SYNAPSE_VECTORIZE, the catalog of selectable embedding models, and the most recent synapse re-index run for progress display.',
+        security: [['Bearer' => []]],
+        tags: ['Admin Embedding']
+    )]
+    #[OA\Response(response: 200, description: 'Synapse status snapshot', content: new OA\JsonContent(type: 'object'))]
+    public function synapseStatus(): JsonResponse
+    {
+        $synapseInfo = $this->synapseIndexer->getEmbeddingModelInfo();
+        $available = $this->modelRepository->findBy(['tag' => 'vectorize', 'active' => 1, 'selectable' => 1]);
+        $latestSynapseRun = $this->runRepository->findLatestForScope(RevectorizeRun::SCOPE_SYNAPSE);
+        $activeRun = $this->runRepository->findActive();
+
+        return $this->json([
+            'success' => true,
+            'currentModel' => [
+                'modelId' => $synapseInfo['model_id'],
+                'provider' => $synapseInfo['provider'],
+                'model' => $synapseInfo['model'],
+                'vectorDim' => $synapseInfo['vector_dim'],
+            ],
+            'availableModels' => array_map(static fn ($m) => [
+                'id' => $m->getId(),
+                'name' => $m->getName(),
+                'service' => $m->getService(),
+                'providerId' => $m->getProviderId(),
+            ], $available),
+            'latestRun' => null !== $latestSynapseRun ? $this->serializeRun($latestSynapseRun) : null,
+            'activeRun' => null !== $activeRun ? $this->serializeRun($activeRun) : null,
+        ]);
+    }
+
+    #[Route('/synapse/switch', name: 'admin_embedding_synapse_switch', methods: ['POST'])]
+    #[OA\Post(
+        path: '/api/v1/admin/embedding/synapse/switch',
+        summary: 'Switch the Synapse Routing embedding model and trigger a topic re-index (admin only)',
+        description: 'Updates DEFAULTMODEL.SYNAPSE_VECTORIZE, recreates synapse_topics with the new model dimension, and dispatches a ReVectorizeMessage with scope=synapse so all topics get re-embedded with the new model. Cheap by design — topic counts are tiny compared to documents/memories — so no premium gating or cooldown applies.',
+        security: [['Bearer' => []]],
+        tags: ['Admin Embedding'],
+        requestBody: new OA\RequestBody(
+            required: true,
+            content: new OA\JsonContent(
+                required: ['toModelId'],
+                properties: [new OA\Property(property: 'toModelId', type: 'integer')]
+            )
+        )
+    )]
+    #[OA\Response(response: 200, description: 'Switch queued', content: new OA\JsonContent(type: 'object'))]
+    #[OA\Response(response: 400, description: 'Invalid request')]
+    #[OA\Response(response: 404, description: 'Model not found')]
+    public function synapseSwitch(Request $request, #[CurrentUser] ?User $user): JsonResponse
+    {
+        if (!$user) {
+            return $this->json(['error' => 'Not authenticated'], Response::HTTP_UNAUTHORIZED);
+        }
+
+        $body = json_decode((string) $request->getContent(), true) ?: [];
+        $toModelId = (int) ($body['toModelId'] ?? 0);
+        if ($toModelId <= 0) {
+            return $this->json(['error' => 'Invalid field: toModelId'], Response::HTTP_BAD_REQUEST);
+        }
+
+        $model = $this->modelRepository->find($toModelId);
+        if (!$model || 'vectorize' !== strtolower($model->getTag())) {
+            return $this->json(['error' => 'Model not found or not a vectorize model'], Response::HTTP_NOT_FOUND);
+        }
+
+        $currentBefore = $this->synapseIndexer->getEmbeddingModelInfo();
+        $fromModelId = $currentBefore['model_id'];
+
+        // Persist the new binding BEFORE dispatching so the worker
+        // sees the new active model when it boots; doing it the other
+        // way around lets fresh writes during the switch window land
+        // in the OLD vector space and get marked stale immediately.
+        $this->setSynapseDefault($toModelId);
+
+        $run = (new RevectorizeRun())
+            ->setUserId($user->getId() ?? 0)
+            ->setScope(RevectorizeRun::SCOPE_SYNAPSE)
+            ->setModelFromId($fromModelId)
+            ->setModelToId($toModelId)
+            ->setStatus(RevectorizeRun::STATUS_QUEUED)
+            ->setChunksTotal(0)
+            ->setTokensEstimated(0)
+            ->setCostEstimatedUsd('0')
+            ->setSeverity('info');
+
+        $this->runRepository->save($run);
+        $this->messageBus->dispatch(new ReVectorizeMessage($run->getId() ?? 0));
+
+        $this->logger->info('Admin: SYNAPSE_VECTORIZE model switched, re-vectorize queued', [
+            'user_id' => $user->getId(),
+            'from' => $fromModelId,
+            'to' => $toModelId,
+            'run_id' => $run->getId(),
+        ]);
+
+        return $this->json([
+            'success' => true,
+            'runId' => $run->getId(),
+            'fromModelId' => $fromModelId,
+            'toModelId' => $toModelId,
+        ]);
+    }
+
     /**
      * @return array<string, mixed>
      */
@@ -324,6 +434,26 @@ final class AdminEmbeddingController extends AbstractController
             $config->setOwnerId(0);
             $config->setGroup('DEFAULTMODEL');
             $config->setSetting('VECTORIZE');
+        }
+
+        $config->setValue((string) $modelId);
+        $this->em->persist($config);
+        $this->em->flush();
+    }
+
+    private function setSynapseDefault(int $modelId): void
+    {
+        $config = $this->configRepository->findOneBy([
+            'ownerId' => 0,
+            'group' => 'DEFAULTMODEL',
+            'setting' => SynapseIndexer::SYNAPSE_CAPABILITY,
+        ]);
+
+        if (!$config) {
+            $config = new Config();
+            $config->setOwnerId(0);
+            $config->setGroup('DEFAULTMODEL');
+            $config->setSetting(SynapseIndexer::SYNAPSE_CAPABILITY);
         }
 
         $config->setValue((string) $modelId);

@@ -30,6 +30,19 @@ final readonly class SynapseIndexer
 {
     private const DEFAULT_VECTOR_DIMENSION = 1024;
 
+    /**
+     * Synapse Routing reads its embedding-model binding from this
+     * dedicated capability key — separate from VECTORIZE so admins can
+     * pin Routing to the highest-quality model for short multilingual
+     * prompt classification (Qwen3 by default) while every user keeps
+     * their own VECTORIZE choice for files / memories.
+     *
+     * Stored in BCONFIG with ownerId=0; managed by AdminEmbedding
+     * endpoints; SynapseRouter reads the same key so indexer and
+     * search side stay in lockstep.
+     */
+    public const SYNAPSE_CAPABILITY = 'SYNAPSE_VECTORIZE';
+
     public function __construct(
         private QdrantClientInterface $qdrantClient,
         private AiFacade $aiFacade,
@@ -159,10 +172,7 @@ final readonly class SynapseIndexer
     {
         $this->qdrantClient->deleteSynapseTopicsByOwner($userId);
 
-        $userPrompts = array_filter(
-            $this->loadIndexablePrompts($userId),
-            fn (Prompt $p) => $p->getOwnerId() === $userId,
-        );
+        $userPrompts = $this->collectUserOwnedPrompts($userId);
 
         $indexed = 0;
         $skipped = 0;
@@ -190,13 +200,56 @@ final readonly class SynapseIndexer
     }
 
     /**
+     * Lazy "self-healing" reindex used by the post-login auto-index
+     * hook: walks every owned prompt and calls indexPrompt() with
+     * force=false, so the per-topic source-hash check skips anything
+     * that is already up-to-date with the current SYNAPSE_VECTORIZE
+     * model. Cheap when nothing changed (zero embed calls), correct
+     * when the user edited a prompt or the active model changed.
+     *
+     * Unlike reindexForUser() this does NOT pre-delete; that would
+     * defeat the source-hash skip path and burn API tokens on every
+     * single login.
+     *
+     * @return array{indexed: int, skipped: int, errors: int}
+     */
+    public function ensureUserTopicsFresh(int $userId): array
+    {
+        $userPrompts = $this->collectUserOwnedPrompts($userId);
+
+        $indexed = 0;
+        $skipped = 0;
+        $errors = 0;
+
+        foreach ($userPrompts as $prompt) {
+            try {
+                $result = $this->indexPrompt($prompt, false);
+                if ('indexed' === $result) {
+                    ++$indexed;
+                } elseif ('skipped' === $result) {
+                    ++$skipped;
+                }
+            } catch (\Throwable $e) {
+                ++$errors;
+                $this->logger->warning('SynapseIndexer: ensureUserTopicsFresh failed for topic', [
+                    'topic' => $prompt->getTopic(),
+                    'user_id' => $userId,
+                    'error' => $e->getMessage(),
+                ]);
+            }
+        }
+
+        return ['indexed' => $indexed, 'skipped' => $skipped, 'errors' => $errors];
+    }
+
+    /**
      * Get the embedding provider/model info used for indexing (for status display).
      *
      * @return array{provider: ?string, model: ?string, model_id: ?int, vector_dim: int}
      */
     public function getEmbeddingModelInfo(): array
     {
-        $modelId = $this->modelConfigService->getDefaultModel('VECTORIZE', null);
+        $modelId = $this->resolveSynapseModelId();
         if (!$modelId) {
             return [
                 'provider' => null,
@@ -212,6 +265,27 @@ final readonly class SynapseIndexer
             'model_id' => $modelId,
             'vector_dim' => self::DEFAULT_VECTOR_DIMENSION,
         ];
+    }
+
+    /**
+     * Resolve the BMODELS row id for the Synapse Routing embedding
+     * model.
+     *
+     * Reads the global SYNAPSE_VECTORIZE binding (admin-managed) and
+     * silently falls back to the VECTORIZE default when no Synapse-
+     * specific binding has been seeded yet — keeps fresh deployments
+     * working until the seeder runs.
+     */
+    private function resolveSynapseModelId(): ?int
+    {
+        $synapseId = $this->modelConfigService->getDefaultModel(self::SYNAPSE_CAPABILITY, null);
+        if ($synapseId) {
+            return $synapseId;
+        }
+
+        $this->logger->warning('SynapseIndexer: SYNAPSE_VECTORIZE binding missing, falling back to VECTORIZE default');
+
+        return $this->modelConfigService->getDefaultModel('VECTORIZE', null);
     }
 
     /**
@@ -260,6 +334,22 @@ final readonly class SynapseIndexer
     // ──────────────────────────────────────────────
     //  Internal helpers
     // ──────────────────────────────────────────────
+
+    /**
+     * Restrict loadIndexablePrompts() to prompts the user actually
+     * owns. Avoids re-indexing the global system prompts every time a
+     * user logs in — those are the responsibility of the global index
+     * and an admin-triggered reindex, not the per-user auto path.
+     *
+     * @return list<Prompt>
+     */
+    private function collectUserOwnedPrompts(int $userId): array
+    {
+        return array_values(array_filter(
+            $this->loadIndexablePrompts($userId),
+            fn (Prompt $p) => $p->getOwnerId() === $userId,
+        ));
+    }
 
     /**
      * @return list<Prompt>
@@ -363,13 +453,19 @@ final readonly class SynapseIndexer
     private const QWEN3_INDEX_INSTRUCTION = 'Represent this topic description for retrieval';
 
     /**
-     * Build the embedding options from the globally configured VECTORIZE model.
+     * Build the embedding options for the pinned Synapse model.
+     *
+     * Synapse Routing always uses the model identified by
+     * SYNAPSE_MODEL_NAME / SYNAPSE_MODEL_SERVICE, regardless of the
+     * VECTORIZE default. When the model is unavailable we fall back
+     * to the VECTORIZE default so indexing still produces something
+     * usable instead of crashing.
      *
      * @return array{provider?: string, model?: string, instruction?: string}
      */
     private function getEmbeddingOptions(): array
     {
-        $modelId = $this->modelConfigService->getDefaultModel('VECTORIZE', null);
+        $modelId = $this->resolveSynapseModelId();
         if (!$modelId) {
             return [];
         }

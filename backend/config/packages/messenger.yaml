@@ -36,6 +36,7 @@ framework:
             'App\Message\ProvisionDefaultUserPluginsMessage': async_index
             'App\Message\CrawlWidgetUrlMessage': async_index
             'App\Message\ReVectorizeMessage': async_index
+            'App\Message\SynapseUserReindexMessage': async_index
 
 when@test:
     framework:
