@@ -4,6 +4,7 @@ namespace App\Service\Message;
 
 use App\Entity\File;
 use App\Entity\Message;
+use App\Repository\ConfigRepository;
 use App\Repository\MessageMetaRepository;
 use App\Service\ModelConfigService;
 use Doctrine\ORM\EntityManagerInterface;
@@ -39,8 +40,10 @@ final readonly class MessageClassifier
 
     public function __construct(
         private MessageSorter $messageSorter,
+        private SynapseRouter $synapseRouter,
         private MessageMetaRepository $messageMetaRepository,
         private ModelConfigService $modelConfigService,
+        private ConfigRepository $configRepository,
         private EntityManagerInterface $em,
         private LoggerInterface $logger,
     ) {
@@ -153,11 +156,15 @@ final readonly class MessageClassifier
             ];
         }
 
-        // 4. Use AI-based sorting
+        // 4. Use Synapse Routing (embedding-based with AI fallback)
         $messageData = $this->buildMessageData($message);
-        $result = $this->messageSorter->classify($messageData, $conversationHistory, $userId);
+        $result = $this->isSynapseEnabled()
+            ? $this->synapseRouter->route($messageData, $conversationHistory, $userId)
+            : $this->messageSorter->classify($messageData, $conversationHistory, $userId);
 
-        $this->logger->info('MessageClassifier: AI classification complete', [
+        $source = $result['source'] ?? 'ai_sorting';
+
+        $this->logger->info('MessageClassifier: Classification complete', [
             'message_id' => $messageId,
             'topic' => $result['topic'],
             'language' => $result['language'],
@@ -165,6 +172,8 @@ final readonly class MessageClassifier
             'media_type' => $result['media_type'] ?? null,
             'duration' => $result['duration'] ?? null,
             'resolution' => $result['resolution'] ?? null,
+            'source' => $source,
+            'synapse_score' => $result['synapse_score'] ?? null,
             'raw_ai_response' => $result['raw_response'] ?? 'N/A',
         ]);
 
@@ -172,7 +181,7 @@ final readonly class MessageClassifier
             'topic' => $result['topic'],
             'language' => $result['language'],
             'web_search' => $result['web_search'] ?? false,
-            'source' => 'ai_sorting',
+            'source' => $source,
             'skip_sorting' => false,
             'intent' => $this->mapTopicToIntent($result['topic']),
             'model_id' => $result['sorting_model_id'] ?? null,
@@ -395,5 +404,29 @@ final readonly class MessageClassifier
 
         return in_array($ext, MessagePreProcessor::DOCUMENT_EXTENSIONS, true)
             || in_array($ext, MessagePreProcessor::AUDIO_EXTENSIONS, true);
+    }
+
+    /**
+     * Synapse Routing is currently a BETA feature and OFF by default.
+     *
+     * Why off-by-default:
+     *   - The embedding-based router can mis-route in edge cases (sticky topic
+     *     after a file analysis turn, granular vs canonical topics, models
+     *     with mismatched dimensions, ...).
+     *   - Operators must explicitly opt-in via the admin UI / system config.
+     *
+     * The proven AI-sorter (`MessageSorter`) remains the default routing
+     * path. The toggle is read from BCONFIG group `QDRANT_SEARCH`, key
+     * `SYNAPSE_ROUTING_ENABLED`.
+     */
+    public function isSynapseEnabled(): bool
+    {
+        $value = $this->configRepository->getValue(0, 'QDRANT_SEARCH', 'SYNAPSE_ROUTING_ENABLED');
+
+        if (null === $value) {
+            return false;
+        }
+
+        return filter_var($value, \FILTER_VALIDATE_BOOL, \FILTER_NULL_ON_FAILURE) ?? false;
     }
 }

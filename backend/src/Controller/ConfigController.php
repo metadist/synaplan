@@ -9,6 +9,9 @@ use App\Entity\User;
 use App\Repository\ConfigRepository;
 use App\Repository\ModelRepository;
 use App\Service\BillingService;
+use App\Service\Embedding\EmbeddingMetadataService;
+use App\Service\Embedding\EmbeddingModelChangeGuard;
+use App\Service\Embedding\Exception\PremiumRequiredException;
 use App\Service\Plugin\PluginManager;
 use App\Service\Search\BraveSearchService;
 use App\Service\UserMemoryService;
@@ -37,6 +40,8 @@ class ConfigController extends AbstractController
         private PluginManager $pluginManager,
         private BillingService $billingService,
         private UserMemoryService $memoryService,
+        private EmbeddingModelChangeGuard $embeddingChangeGuard,
+        private EmbeddingMetadataService $embeddingMetadata,
         #[Autowire('%env(string:default::QDRANT_URL)%')]
         private readonly string $qdrantUrl,
     ) {
@@ -494,20 +499,33 @@ class ConfigController extends AbstractController
         $defaults = [];
 
         foreach ($capabilities as $capability) {
-            // Try user-specific config first
-            $config = $this->configRepository->findOneBy([
-                'ownerId' => $userId,
-                'group' => 'DEFAULTMODEL',
-                'setting' => $capability,
-            ]);
-
-            // Fall back to global config
-            if (!$config) {
+            // VECTORIZE is system-wide (single Qdrant collection,
+            // single dimension). Skip the per-user lookup entirely so
+            // the dropdown can never disagree with what the indexer
+            // actually uses — see saveDefaultModels for the matching
+            // write-side guard.
+            if ('VECTORIZE' === $capability) {
                 $config = $this->configRepository->findOneBy([
                     'ownerId' => 0,
                     'group' => 'DEFAULTMODEL',
+                    'setting' => 'VECTORIZE',
+                ]);
+            } else {
+                // Try user-specific config first
+                $config = $this->configRepository->findOneBy([
+                    'ownerId' => $userId,
+                    'group' => 'DEFAULTMODEL',
                     'setting' => $capability,
                 ]);
+
+                // Fall back to global config
+                if (!$config) {
+                    $config = $this->configRepository->findOneBy([
+                        'ownerId' => 0,
+                        'group' => 'DEFAULTMODEL',
+                        'setting' => $capability,
+                    ]);
+                }
             }
 
             if ($config) {
@@ -555,6 +573,25 @@ class ConfigController extends AbstractController
         $ownerId = $global ? 0 : $user->getId();
         $validCapabilities = ['SORT', 'CHAT', 'VECTORIZE', 'PIC2TEXT', 'TEXT2PIC', 'PIC2PIC', 'TEXT2VID', 'SOUND2TEXT', 'TEXT2SOUND', 'ANALYZE'];
 
+        // Premium gate for VECTORIZE: switching the embedding model is
+        // a paid feature even at the per-user scope, because every
+        // search the user runs afterwards burns embedding API credit on
+        // the new model, AND because we want to keep this consistent
+        // with the global path (AdminEmbeddingController::switch).
+        // Admins always pass the guard.
+        if (isset($data['defaults']['VECTORIZE'])) {
+            try {
+                $this->embeddingChangeGuard->assertCanChange($user);
+            } catch (PremiumRequiredException $e) {
+                return $this->json([
+                    'error' => 'requires_premium',
+                    'capability' => 'VECTORIZE',
+                    'message' => $e->getMessage(),
+                    'currentLevel' => $e->currentLevel,
+                ], Response::HTTP_FORBIDDEN);
+            }
+        }
+
         $skipped = [];
 
         foreach ($data['defaults'] as $capability => $modelId) {
@@ -568,15 +605,28 @@ class ConfigController extends AbstractController
                 continue;
             }
 
+            // VECTORIZE controls how the user's OWN files/memories get
+            // embedded — explicitly user-scoped now that Synapse Routing
+            // has its own admin-only system-wide setting (see
+            // `DEFAULTMODEL.SYNAPSE_VECTORIZE`, managed via
+            // `AdminEmbeddingController`). Routing therefore can no longer
+            // disagree with a per-user VECTORIZE choice, and we must NOT
+            // silently escalate a user-scoped write into a global config
+            // change (raised by Copilot review on PR #853).
+            //
+            // The only path that may write to ownerId=0 is the `global`
+            // flag above, which already requires `ROLE_ADMIN`.
+            $targetOwnerId = $ownerId;
+
             $config = $this->configRepository->findOneBy([
-                'ownerId' => $ownerId,
+                'ownerId' => $targetOwnerId,
                 'group' => 'DEFAULTMODEL',
                 'setting' => $capability,
             ]);
 
             if (!$config) {
                 $config = new Config();
-                $config->setOwnerId($ownerId);
+                $config->setOwnerId($targetOwnerId);
                 $config->setGroup('DEFAULTMODEL');
                 $config->setSetting($capability);
             }
@@ -586,6 +636,13 @@ class ConfigController extends AbstractController
         }
 
         $this->em->flush();
+
+        // Drop cached active-model snapshot so the very next read
+        // (Synapse status, RAG search, /admin/embedding/status) sees
+        // the new VECTORIZE model immediately.
+        if (array_key_exists('VECTORIZE', $data['defaults'])) {
+            $this->embeddingMetadata->invalidate();
+        }
 
         $response = [
             'success' => true,
@@ -823,6 +880,35 @@ class ConfigController extends AbstractController
                 : 'No image generation models configured',
             'setup_required' => !$hasImageModels,
             'models_available' => count($imageModels),
+        ];
+
+        // Synapse Routing (embedding-based intent classification).
+        //
+        // Off-by-default: Synapse is a beta feature. The `null` (no row)
+        // case used to be reported as enabled here, which contradicted
+        // `MessageClassifier::isSynapseEnabled()` and would have caused
+        // `/features/status` to lie about the runtime classifier (raised
+        // by Copilot review on PR #853). We mirror MessageClassifier's
+        // parser exactly so this endpoint and the actual routing path
+        // never disagree.
+        $synapseValue = $this->configRepository->getValue(0, 'QDRANT_SEARCH', 'SYNAPSE_ROUTING_ENABLED');
+        $synapseEnabled = null !== $synapseValue
+            && '' !== $synapseValue
+            && true === filter_var($synapseValue, FILTER_VALIDATE_BOOL, FILTER_NULL_ON_FAILURE);
+        $qdrantConfigured = !empty($_ENV['QDRANT_URL'] ?? '');
+        $synapseReady = $synapseEnabled && $qdrantConfigured;
+        $features['synapse-routing'] = [
+            'id' => 'synapse-routing',
+            'category' => 'AI Features',
+            'name' => 'Synapse Routing',
+            'enabled' => $synapseEnabled,
+            'status' => $synapseReady ? 'active' : ($synapseEnabled ? 'unhealthy' : 'disabled'),
+            'message' => $synapseReady
+                ? 'Embedding-based intent routing is active (Tier 1: ~50ms, AI fallback for low confidence)'
+                : ($synapseEnabled
+                    ? 'Synapse is enabled but Qdrant is not configured'
+                    : 'Synapse Routing is disabled — using AI-based sorting for every message'),
+            'setup_required' => !$qdrantConfigured,
         ];
 
         // ========== AI Providers (Dynamic from ProviderRegistry) ==========

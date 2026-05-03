@@ -38,6 +38,15 @@
           <label class="flex flex-wrap items-center gap-2 text-sm font-semibold txt-primary">
             <CpuChipIcon class="w-4 h-4 text-[var(--brand)]" />
             <span class="flex-1 min-w-0">{{ purposeLabels[capability as Capability] }}</span>
+            <span
+              v-if="capability === 'VECTORIZE' && !canSwitchEmbedding"
+              class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wide bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/30"
+              :title="$t('config.embeddingSwitch.premium.lockTooltip')"
+              data-testid="badge-embedding-premium"
+            >
+              <LockClosedIcon class="w-3 h-3" />
+              {{ $t('config.embeddingSwitch.premium.badge') }}
+            </span>
           </label>
           <div class="relative">
             <button
@@ -361,7 +370,21 @@
       </div>
     </div>
 
+    <EmbeddingRunsPanel v-if="authStore.isAdmin" ref="runsPanelRef" />
+
     <AIModelsAdminPanel v-if="authStore.isAdmin" />
+
+    <EmbeddingSwitchModal
+      :open="switchModalOpen"
+      :to-model-id="switchModalTargetId"
+      :target-model-name="switchModalTargetName"
+      :target-model-provider="switchModalTargetProvider"
+      :guard-reason="switchModalGuardReason"
+      :guard-current-level="embeddingGuard?.currentLevel ?? authStore.userLevel"
+      :cooldown-ends-at="embeddingGuard?.cooldownEndsAt ?? null"
+      @cancel="onEmbeddingSwitchCancel"
+      @switched="onEmbeddingSwitchSuccess"
+    />
   </div>
 </template>
 
@@ -369,9 +392,17 @@
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { ChevronLeftIcon, ChevronRightIcon } from '@heroicons/vue/20/solid'
 import { useRoute } from 'vue-router'
-import { ChevronDownIcon, CpuChipIcon, FunnelIcon, ListBulletIcon } from '@heroicons/vue/24/outline'
+import {
+  ChevronDownIcon,
+  CpuChipIcon,
+  FunnelIcon,
+  ListBulletIcon,
+  LockClosedIcon,
+} from '@heroicons/vue/24/outline'
 import { Icon } from '@iconify/vue'
 import AIModelsAdminPanel from '@/components/config/AIModelsAdminPanel.vue'
+import EmbeddingRunsPanel from '@/components/config/EmbeddingRunsPanel.vue'
+import EmbeddingSwitchModal from '@/components/config/EmbeddingSwitchModal.vue'
 import SortIndicator from '@/components/config/SortIndicator.vue'
 import GroqIcon from '@/components/icons/GroqIcon.vue'
 import ModelCostBadge from '@/components/ModelCostBadge.vue'
@@ -383,6 +414,7 @@ import {
   saveDefaultModels,
   checkModelAvailability,
 } from '@/services/api/configApi'
+import { adminEmbeddingApi, type EmbeddingGuardStatus } from '@/services/api/adminEmbeddingApi'
 import { useAuthStore } from '@/stores/auth'
 import type { AIModel, Capability } from '@/types/ai-models'
 import { getProviderIcon } from '@/utils/providerIcons'
@@ -435,6 +467,18 @@ const sortDirection = ref<'asc' | 'desc'>('asc')
 const modelsPage = ref(1)
 const MODELS_PER_PAGE = 20
 
+// Embedding (VECTORIZE) switch — Premium gate + cost-estimate modal.
+// Status is fetched on mount when the user is admin so the dropdown
+// can show a lock badge for free users without an extra round-trip
+// when they click. For non-admin users the guard server-side is the
+// source of truth; the UI stays optimistic.
+const embeddingGuard = ref<EmbeddingGuardStatus | null>(null)
+const switchModalOpen = ref(false)
+const switchModalTargetId = ref<number | null>(null)
+const switchModalTargetName = ref('')
+const switchModalTargetProvider = ref('')
+const switchModalGuardReason = ref<'requires_premium' | 'cooldown_active' | null>(null)
+
 const { success, error: showError, warning } = useNotification()
 
 // Map URL parameter to actual capability name
@@ -465,8 +509,17 @@ const normalizeHighlight = (highlight: string): Capability | 'ALL' | null => {
   return aliasMap[highlight] || null
 }
 
+// Optimistic UI flag for the VECTORIZE Premium-Lock badge: free users
+// see the badge immediately, paid users only see it if the backend
+// guard explicitly says no (e.g. cooldown). The badge is purely
+// informational — the modal re-confirms the gate before any switch.
+const canSwitchEmbedding = computed(() => {
+  if (embeddingGuard.value) return embeddingGuard.value.canChange
+  return authStore.isPro || authStore.isAdmin
+})
+
 onMounted(async () => {
-  await loadData()
+  await Promise.all([loadData(), loadEmbeddingGuard()])
   document.addEventListener('click', handleClickOutside)
   document.addEventListener('keydown', handleKeydown)
 
@@ -622,15 +675,35 @@ const toggleDropdown = (capability: Capability) => {
 const selectModel = async (capability: Capability, modelId: number | null) => {
   openDropdown.value = null
   const previousModelId = defaultConfig.value[capability]
+
+  // VECTORIZE swaps require pre-flight cost confirmation + paid plan,
+  // so we route through the dedicated EmbeddingSwitchModal instead of
+  // the auto-save path. The modal calls /admin/embedding/switch on
+  // confirm, which atomically updates the BCONFIG row AND queues the
+  // re-vectorize job — replacing what saveDefaultModels would do for
+  // this single capability. Skip routing if the user picked the same
+  // model (no-op) or the "(none)" option.
+  if (capability === 'VECTORIZE' && modelId !== null && modelId !== previousModelId) {
+    const target = getModelsByPurpose(capability).find((m) => m.id === modelId)
+    if (target) {
+      switchModalTargetId.value = modelId
+      switchModalTargetName.value = target.name
+      switchModalTargetProvider.value = target.service
+      switchModalGuardReason.value = embeddingGuard.value?.canChange
+        ? null
+        : (embeddingGuard.value?.reason ?? null)
+      switchModalOpen.value = true
+    }
+    return
+  }
+
   defaultConfig.value[capability] = modelId
 
-  // Check availability if a model was selected
   if (modelId !== null) {
     try {
       const check = await checkModelAvailability(modelId)
 
       if (!check.available) {
-        // Revert selection — model cannot be used
         defaultConfig.value[capability] = previousModelId
         const modelName =
           getModelsByPurpose(capability).find((m) => m.id === modelId)?.name || `ID ${modelId}`
@@ -651,8 +724,40 @@ const selectModel = async (capability: Capability, modelId: number | null) => {
     }
   }
 
-  // Auto-save after selection
   await saveConfiguration()
+}
+
+const onEmbeddingSwitchCancel = () => {
+  switchModalOpen.value = false
+  switchModalTargetId.value = null
+  switchModalGuardReason.value = null
+}
+
+const runsPanelRef = ref<InstanceType<typeof EmbeddingRunsPanel> | null>(null)
+
+const onEmbeddingSwitchSuccess = async (runId: number) => {
+  switchModalOpen.value = false
+  if (switchModalTargetId.value !== null) {
+    defaultConfig.value.VECTORIZE = switchModalTargetId.value
+    originalConfig.value = { ...defaultConfig.value }
+  }
+  switchModalTargetId.value = null
+  success(t('config.embeddingSwitch.queued', { runId }))
+  await loadEmbeddingGuard()
+  await runsPanelRef.value?.refresh()
+}
+
+const loadEmbeddingGuard = async () => {
+  if (!authStore.isAdmin) {
+    embeddingGuard.value = null
+    return
+  }
+  try {
+    const status = await adminEmbeddingApi.getStatus()
+    embeddingGuard.value = status.guard
+  } catch (err) {
+    console.error('Failed to load embedding guard status:', err)
+  }
 }
 
 const handleClickOutside = (event: MouseEvent) => {

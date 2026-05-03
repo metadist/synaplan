@@ -118,9 +118,9 @@ final readonly class MessageSorter
                     'web_search' => $promptMetadata['tool_internet'] ?? false,
                     'raw_response' => 'Rule-based routing',
                     'prompt_metadata' => $promptMetadata,
-                    'model_id' => null,
-                    'provider' => null,
-                    'model_name' => null,
+                    'sorting_model_id' => null,
+                    'sorting_provider' => null,
+                    'sorting_model_name' => null,
                 ];
             }
         }

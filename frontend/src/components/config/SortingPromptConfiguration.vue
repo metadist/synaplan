@@ -1,190 +1,805 @@
 <template>
-  <div class="space-y-6" data-testid="page-config-sorting-prompt">
-    <div class="surface-card p-6" data-testid="section-overview">
-      <h2 class="text-2xl font-semibold txt-primary mb-3">
-        {{ $t('config.sortingPrompt.title') }}
-      </h2>
-      <p class="txt-secondary text-sm mb-2">
-        {{ $t('config.sortingPrompt.description') }}
-      </p>
-      <p class="text-sm txt-secondary">
-        See the
-        <router-link
-          to="/config/task-prompts"
-          class="text-[var(--brand)] hover:underline font-medium"
+  <div class="space-y-6" data-testid="page-config-routing">
+    <!-- Header -->
+    <div class="surface-card p-6" data-testid="section-routing-overview">
+      <div class="flex items-start gap-3">
+        <div class="p-2 rounded-lg bg-[var(--brand)]/10">
+          <Icon icon="heroicons:share" class="w-6 h-6 text-[var(--brand)]" />
+        </div>
+        <div class="flex-1">
+          <h2 class="text-2xl font-semibold txt-primary mb-1">
+            {{ $t('config.routing.title') }}
+          </h2>
+          <p class="txt-secondary text-sm">
+            {{ $t('config.routing.subtitle') }}
+          </p>
+          <p class="text-xs txt-secondary mt-2">
+            {{ $t('config.routing.editPromptsHint') }}
+            <router-link
+              to="/config/task-prompts"
+              class="text-[var(--brand)] hover:underline font-medium"
+            >
+              {{ $t('config.routing.editPromptsLink') }}
+            </router-link>
+          </p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Beta toggle (admin only) -->
+    <div v-if="isAdmin" class="surface-card overflow-hidden" data-testid="section-routing-beta">
+      <div class="p-6 border-b border-light-border/30 dark:border-dark-border/20">
+        <div class="flex items-start gap-4 flex-wrap">
+          <div
+            class="p-2 rounded-lg bg-[var(--brand)]/10 flex-shrink-0 flex items-center justify-center w-10 h-10"
+          >
+            <img
+              :src="synaplanLogoSrc"
+              alt="Synaplan"
+              class="w-6 h-6"
+              data-testid="img-synapse-logo"
+            />
+          </div>
+          <div class="flex-1 min-w-0">
+            <div class="flex items-center gap-2 flex-wrap mb-1">
+              <h3 class="text-lg font-semibold txt-primary">
+                {{ $t('config.routing.betaTitle') }}
+              </h3>
+              <span
+                class="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-amber-500/15 text-amber-700 dark:text-amber-300"
+                data-testid="badge-beta"
+              >
+                {{ $t('config.routing.betaBadge') }}
+              </span>
+            </div>
+            <p class="text-sm txt-secondary">
+              {{ $t('config.routing.betaSubtitle') }}
+            </p>
+          </div>
+          <label
+            class="inline-flex items-center gap-3 cursor-pointer flex-shrink-0"
+            data-testid="toggle-synapse-enabled"
+          >
+            <span class="text-sm font-medium txt-primary">
+              {{ synapseEnabled ? $t('config.routing.betaOn') : $t('config.routing.betaOff') }}
+            </span>
+            <span class="relative inline-flex">
+              <input
+                type="checkbox"
+                class="sr-only peer"
+                :checked="synapseEnabled"
+                :disabled="togglingSynapse"
+                data-testid="toggle-synapse-input"
+                @change="onToggleSynapse(($event.target as HTMLInputElement).checked)"
+              />
+              <span
+                class="w-11 h-6 bg-gray-300 dark:bg-gray-700 rounded-full peer-checked:bg-amber-500 peer-disabled:opacity-50 transition-colors"
+              ></span>
+              <span
+                class="absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform peer-checked:translate-x-5"
+              ></span>
+            </span>
+          </label>
+        </div>
+      </div>
+
+      <div
+        v-if="synapseEnabled"
+        class="p-5 bg-amber-500/5 border-t border-amber-500/20 flex items-start gap-3"
+        data-testid="banner-beta-warning"
+      >
+        <Icon
+          icon="heroicons:exclamation-triangle"
+          class="w-5 h-5 text-amber-600 dark:text-amber-400 flex-shrink-0 mt-0.5"
+        />
+        <div class="text-sm">
+          <p class="font-medium text-amber-700 dark:text-amber-300 mb-1">
+            {{ $t('config.routing.betaWarningTitle') }}
+          </p>
+          <p class="text-amber-700/90 dark:text-amber-300/90 leading-relaxed">
+            {{ $t('config.routing.betaWarningBody') }}
+          </p>
+          <ul class="mt-2 ml-4 list-disc text-amber-700/80 dark:text-amber-300/80 space-y-1">
+            <li>{{ $t('config.routing.betaIssueSticky') }}</li>
+            <li>{{ $t('config.routing.betaIssueGranular') }}</li>
+            <li>{{ $t('config.routing.betaIssueStale') }}</li>
+          </ul>
+        </div>
+      </div>
+
+      <div
+        v-else
+        class="p-5 bg-emerald-500/5 border-t border-emerald-500/20 flex items-start gap-3"
+        data-testid="banner-ai-default"
+      >
+        <Icon
+          icon="heroicons:check-circle"
+          class="w-5 h-5 text-emerald-600 dark:text-emerald-400 flex-shrink-0 mt-0.5"
+        />
+        <p class="text-sm text-emerald-700/90 dark:text-emerald-300/90 leading-relaxed">
+          {{ $t('config.routing.aiDefaultBody') }}
+        </p>
+      </div>
+    </div>
+
+    <!--
+      Embedding-model picker — admin-only. The whole card is wrapped in
+      `v-if="isAdmin"` so non-admin users never receive the markup, not
+      even disabled. The amber accents and ADMIN pill make it visually
+      obvious that this is operator surface area, not a per-user setting.
+    -->
+    <div
+      v-if="isAdmin"
+      class="surface-card p-6 ring-1 ring-amber-500/20 border-l-4 border-l-amber-500/70"
+      data-testid="section-routing-embedding-model"
+    >
+      <div class="flex items-start gap-3 mb-5">
+        <div class="p-2 rounded-lg bg-amber-500/10 flex-shrink-0">
+          <Icon icon="heroicons:cpu-chip" class="w-5 h-5 text-amber-600 dark:text-amber-400" />
+        </div>
+        <div class="flex-1 min-w-0">
+          <div class="flex items-center gap-2 flex-wrap mb-1">
+            <h3 class="text-lg font-semibold txt-primary">
+              {{ $t('config.routing.embeddingTitle') }}
+            </h3>
+            <span
+              class="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-amber-500/15 text-amber-700 dark:text-amber-300"
+              data-testid="badge-admin-only"
+            >
+              {{ $t('config.routing.embeddingAdminBadge') }}
+            </span>
+          </div>
+          <p class="text-sm txt-secondary">
+            {{ $t('config.routing.embeddingSubtitle') }}
+          </p>
+        </div>
+      </div>
+
+      <div v-if="synapseEmbeddingStatus" class="space-y-2">
+        <label
+          for="select-synapse-embedding-model"
+          class="block text-xs txt-secondary uppercase tracking-wide"
         >
-          Prompt Editor
-        </router-link>
-        {{ $t('config.sortingPrompt.promptEditorLink') }}.
+          {{ $t('config.routing.embeddingActive') }}
+        </label>
+        <!--
+          Select + button must share the row so they stay vertically
+          aligned regardless of helper text below; using items-end on a
+          parent with a label / hint of different heights misaligned
+          the button when the column wrapped its label.
+        -->
+        <div class="flex flex-col sm:flex-row gap-2">
+          <select
+            id="select-synapse-embedding-model"
+            v-model.number="synapseEmbeddingSelection"
+            class="flex-1 min-w-0 px-3 py-2 rounded-lg surface-chip border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-amber-500 disabled:opacity-50"
+            :disabled="switchingSynapseEmbedding || !!synapseActiveRun"
+            data-testid="select-synapse-embedding-model"
+          >
+            <option
+              v-for="model in synapseEmbeddingStatus.availableModels"
+              :key="model.id"
+              :value="model.id"
+            >
+              {{ model.name }} · {{ model.service }}
+            </option>
+          </select>
+          <button
+            class="px-4 py-2 rounded-lg bg-amber-500 text-white text-sm font-medium hover:bg-amber-600 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 whitespace-nowrap"
+            data-testid="btn-synapse-embedding-switch"
+            :disabled="
+              switchingSynapseEmbedding ||
+              !!synapseActiveRun ||
+              synapseEmbeddingSelection === synapseEmbeddingStatus.currentModel.modelId
+            "
+            @click="switchSynapseEmbedding"
+          >
+            <Icon
+              :icon="
+                switchingSynapseEmbedding ? 'heroicons:arrow-path' : 'heroicons:arrows-right-left'
+              "
+              :class="['w-4 h-4', switchingSynapseEmbedding && 'animate-spin']"
+            />
+            {{ $t('config.routing.embeddingSwitch') }}
+          </button>
+        </div>
+        <p class="text-xs txt-secondary">
+          {{
+            $t('config.routing.embeddingCurrent', {
+              model: synapseEmbeddingStatus.currentModel.model || '—',
+              provider: synapseEmbeddingStatus.currentModel.provider || '—',
+              dim: synapseEmbeddingStatus.currentModel.vectorDim,
+            })
+          }}
+        </p>
+      </div>
+
+      <div
+        v-if="synapseActiveRun"
+        class="mt-4 p-3 rounded-lg bg-amber-500/5 border border-amber-500/20 flex items-center gap-3"
+        data-testid="banner-synapse-embedding-running"
+      >
+        <Icon
+          icon="heroicons:arrow-path"
+          class="w-5 h-5 text-amber-600 dark:text-amber-400 animate-spin flex-shrink-0"
+        />
+        <div class="text-sm flex-1">
+          <p class="font-medium txt-primary">
+            {{ $t('config.routing.embeddingRunningTitle') }}
+          </p>
+          <p class="txt-secondary">
+            {{
+              $t('config.routing.embeddingRunningBody', {
+                processed: synapseActiveRun.chunksProcessed,
+                status: synapseActiveRun.status,
+              })
+            }}
+          </p>
+        </div>
+      </div>
+
+      <p v-if="!synapseEmbeddingStatus && !loadingSynapseEmbedding" class="text-sm txt-secondary">
+        {{ $t('config.routing.embeddingLoadFailed') }}
       </p>
     </div>
 
-    <div class="surface-card overflow-hidden" data-testid="section-tabs">
-      <div class="flex border-b border-light-border/30 dark:border-dark-border/20">
-        <button
-          v-for="tab in tabs"
-          :key="tab.id"
-          :class="[
-            'px-6 py-3 text-sm font-medium transition-colors relative',
-            activeTab === tab.id
-              ? 'txt-primary bg-[var(--brand)]/5 border-b-2 border-[var(--brand)]'
-              : 'txt-secondary hover:bg-black/5 dark:hover:bg-white/5',
-          ]"
-          data-testid="btn-tab"
-          @click="activeTab = tab.id"
+    <!-- Live status (admin) -->
+    <div v-if="isAdmin" class="surface-card p-6" data-testid="section-routing-status">
+      <div class="flex items-center justify-between mb-4 flex-wrap gap-3">
+        <h3 class="text-lg font-semibold txt-primary flex items-center gap-2">
+          <Icon icon="heroicons:signal" class="w-5 h-5 text-[var(--brand)]" />
+          {{ $t('config.routing.statusTitle') }}
+        </h3>
+        <div class="flex items-center gap-2">
+          <button
+            class="px-3 py-2 rounded-lg surface-chip txt-secondary hover:txt-primary text-sm flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
+            data-testid="btn-status-refresh"
+            :disabled="loadingStatus"
+            @click="loadStatus"
+          >
+            <Icon
+              :icon="loadingStatus ? 'heroicons:arrow-path' : 'heroicons:arrow-path'"
+              :class="['w-4 h-4', loadingStatus && 'animate-spin']"
+            />
+            {{ $t('config.routing.refresh') }}
+          </button>
+          <button
+            class="px-3 py-2 rounded-lg bg-[var(--brand)]/10 text-[var(--brand)] hover:bg-[var(--brand)]/20 text-sm font-medium flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
+            data-testid="btn-reindex-force"
+            :disabled="reindexing"
+            @click="reindex({ force: true })"
+          >
+            <Icon icon="heroicons:bolt" class="w-4 h-4" />
+            {{ $t('config.routing.reindexForce') }}
+          </button>
+          <button
+            class="px-3 py-2 rounded-lg bg-amber-500/10 text-amber-600 dark:text-amber-400 hover:bg-amber-500/20 text-sm font-medium flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
+            data-testid="btn-reindex-recreate"
+            :disabled="reindexing"
+            @click="confirmRecreate"
+          >
+            <Icon icon="heroicons:arrow-uturn-left" class="w-4 h-4" />
+            {{ $t('config.routing.reindexRecreate') }}
+          </button>
+        </div>
+      </div>
+
+      <!-- Dim mismatch warning -->
+      <div
+        v-if="status?.dimensionMismatch"
+        class="p-3 mb-4 bg-amber-500/10 border border-amber-500/30 rounded-lg flex items-start gap-2"
+        data-testid="banner-dim-mismatch"
+      >
+        <Icon
+          icon="heroicons:exclamation-triangle"
+          class="w-5 h-5 text-amber-600 dark:text-amber-400 flex-shrink-0 mt-0.5"
+        />
+        <div class="text-sm">
+          <p class="font-medium text-amber-700 dark:text-amber-300">
+            {{ $t('config.routing.dimMismatchTitle') }}
+          </p>
+          <p class="text-amber-700/80 dark:text-amber-300/80 mt-1">
+            {{
+              $t('config.routing.dimMismatchBody', {
+                collectionDim: status?.collection.vectorDim ?? '?',
+                modelDim: status?.activeModel.vectorDim ?? '?',
+              })
+            }}
+          </p>
+        </div>
+      </div>
+
+      <!-- Stat cards -->
+      <div v-if="status" class="grid grid-cols-2 md:grid-cols-4 gap-3">
+        <div class="surface-chip rounded-lg p-3" data-testid="stat-active-model">
+          <p class="text-xs txt-secondary uppercase tracking-wide mb-1">
+            {{ $t('config.routing.activeModel') }}
+          </p>
+          <p class="text-sm font-semibold txt-primary truncate">
+            {{ status.activeModel.model || '—' }}
+          </p>
+          <p class="text-xs txt-secondary">
+            {{ status.activeModel.provider || '—' }}
+            ·
+            {{ $t('config.routing.dim', { dim: status.activeModel.vectorDim }) }}
+          </p>
+        </div>
+
+        <div class="surface-chip rounded-lg p-3" data-testid="stat-indexed">
+          <p class="text-xs txt-secondary uppercase tracking-wide mb-1">
+            {{ $t('config.routing.indexed') }}
+          </p>
+          <p class="text-2xl font-semibold txt-primary">{{ status.totalIndexed }}</p>
+          <p class="text-xs txt-secondary">
+            {{ $t('config.routing.collection', { name: status.collection.name }) }}
+          </p>
+        </div>
+
+        <div class="surface-chip rounded-lg p-3" data-testid="stat-stale">
+          <p class="text-xs txt-secondary uppercase tracking-wide mb-1">
+            {{ $t('config.routing.stale') }}
+          </p>
+          <p
+            class="text-2xl font-semibold"
+            :class="status.staleCount > 0 ? 'text-amber-600 dark:text-amber-400' : 'txt-primary'"
+          >
+            {{ status.staleCount }}
+          </p>
+          <p class="text-xs txt-secondary">
+            {{ $t('config.routing.staleHint') }}
+          </p>
+        </div>
+
+        <div class="surface-chip rounded-lg p-3" data-testid="stat-disabled">
+          <p class="text-xs txt-secondary uppercase tracking-wide mb-1">
+            {{ $t('config.routing.disabled') }}
+          </p>
+          <p class="text-2xl font-semibold txt-primary">{{ disabledTopicsCount }}</p>
+          <p class="text-xs txt-secondary">
+            {{ $t('config.routing.disabledHint') }}
+          </p>
+        </div>
+      </div>
+
+      <!-- Per-model breakdown -->
+      <div v-if="status && status.perModel.length > 0" class="mt-4">
+        <p class="text-xs txt-secondary uppercase tracking-wide mb-2">
+          {{ $t('config.routing.perModelBreakdown') }}
+        </p>
+        <div class="flex flex-wrap gap-2">
+          <span
+            v-for="(entry, idx) in status.perModel"
+            :key="`pm-${idx}`"
+            class="px-3 py-1.5 rounded-full text-xs surface-chip txt-primary flex items-center gap-1.5"
+            data-testid="chip-per-model"
+          >
+            <Icon
+              :icon="
+                entry.modelId === status.activeModel.modelId
+                  ? 'heroicons:check-circle'
+                  : 'heroicons:exclamation-triangle'
+              "
+              :class="[
+                'w-3.5 h-3.5',
+                entry.modelId === status.activeModel.modelId
+                  ? 'text-emerald-500'
+                  : 'text-amber-500',
+              ]"
+            />
+            {{ entry.model || $t('config.routing.unknownModel') }}
+            <span class="txt-secondary">({{ entry.vectorDim ?? '?' }}d)</span>
+            <span class="font-semibold">×{{ entry.count }}</span>
+          </span>
+        </div>
+      </div>
+
+      <p
+        v-if="!status && !loadingStatus"
+        class="text-sm txt-secondary mt-2"
+        data-testid="text-status-empty"
+      >
+        {{ $t('config.routing.statusEmpty') }}
+      </p>
+    </div>
+
+    <!-- Topic cards -->
+    <div
+      v-if="isAdmin && status && status.topics.length > 0"
+      class="surface-card p-6"
+      data-testid="section-routing-topics"
+    >
+      <div class="flex items-center justify-between mb-4 flex-wrap gap-2">
+        <h3 class="text-lg font-semibold txt-primary flex items-center gap-2">
+          <Icon icon="heroicons:rectangle-group" class="w-5 h-5 text-[var(--brand)]" />
+          {{ $t('config.routing.topicsTitle') }}
+        </h3>
+        <div class="relative w-full sm:w-72">
+          <Icon
+            icon="heroicons:magnifying-glass"
+            class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 txt-secondary"
+          />
+          <input
+            v-model="topicSearch"
+            type="text"
+            class="w-full pl-9 pr-3 py-2 rounded-lg surface-chip border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
+            :placeholder="$t('config.routing.topicSearchPlaceholder')"
+            data-testid="input-topic-search"
+          />
+        </div>
+      </div>
+
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+        <router-link
+          v-for="topic in filteredTopics"
+          :key="`${topic.ownerId}-${topic.topic}`"
+          :to="`/config/task-prompts?topic=${encodeURIComponent(topic.topic)}`"
+          class="surface-chip rounded-lg p-3 flex items-start justify-between gap-3 hover:bg-[var(--brand)]/5 transition-colors"
+          data-testid="card-topic"
         >
-          {{ tab.label }}
+          <div class="flex-1 min-w-0">
+            <div class="flex items-center gap-2 flex-wrap mb-1">
+              <span class="font-mono text-sm font-semibold txt-primary truncate">
+                {{ topic.topic }}
+              </span>
+              <span
+                v-if="!topic.enabled"
+                class="px-1.5 py-0.5 rounded text-[10px] font-medium uppercase bg-gray-500/10 text-gray-500 dark:text-gray-400"
+                data-testid="badge-disabled"
+              >
+                {{ $t('config.routing.badgeDisabled') }}
+              </span>
+              <span
+                v-if="topic.stale"
+                class="px-1.5 py-0.5 rounded text-[10px] font-medium uppercase bg-amber-500/10 text-amber-600 dark:text-amber-400"
+                data-testid="badge-stale"
+              >
+                {{ $t('config.routing.badgeStale') }}
+              </span>
+              <span
+                v-if="!topic.indexed && topic.enabled"
+                class="px-1.5 py-0.5 rounded text-[10px] font-medium uppercase bg-rose-500/10 text-rose-600 dark:text-rose-400"
+                data-testid="badge-not-indexed"
+              >
+                {{ $t('config.routing.badgeNotIndexed') }}
+              </span>
+              <span
+                v-if="topic.indexed && !topic.stale"
+                class="px-1.5 py-0.5 rounded text-[10px] font-medium uppercase bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
+                data-testid="badge-indexed"
+              >
+                {{ $t('config.routing.badgeIndexed') }}
+              </span>
+            </div>
+            <p class="text-xs txt-secondary truncate">
+              <template v-if="topic.indexed">
+                {{ topic.embeddingModel || '—' }}
+                · {{ topic.vectorDim ?? '?' }}d
+                <span v-if="topic.indexedAt" class="opacity-75">
+                  · {{ formatIndexedAt(topic.indexedAt) }}
+                </span>
+              </template>
+              <template v-else>
+                {{ $t('config.routing.notIndexedHint') }}
+              </template>
+            </p>
+          </div>
+          <Icon icon="heroicons:chevron-right" class="w-4 h-4 txt-secondary flex-shrink-0" />
+        </router-link>
+      </div>
+
+      <p
+        v-if="filteredTopics.length === 0"
+        class="text-sm txt-secondary mt-2"
+        data-testid="text-topics-empty"
+      >
+        {{ $t('config.routing.topicsEmpty') }}
+      </p>
+    </div>
+
+    <!-- Test box -->
+    <div class="surface-card p-6" data-testid="section-routing-test">
+      <h3 class="text-lg font-semibold txt-primary mb-2 flex items-center gap-2">
+        <Icon icon="heroicons:beaker" class="w-5 h-5 text-[var(--brand)]" />
+        {{ $t('config.routing.testTitle') }}
+      </h3>
+      <p class="text-xs txt-secondary mb-4">
+        {{ $t('config.routing.testSubtitle') }}
+      </p>
+
+      <div class="flex flex-col sm:flex-row gap-2 mb-3">
+        <input
+          v-model="testInput"
+          type="text"
+          class="flex-1 px-4 py-2.5 rounded-lg surface-chip border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
+          :placeholder="$t('config.routing.testPlaceholder')"
+          data-testid="input-test-text"
+          @keydown.enter="runTest"
+        />
+        <button
+          class="px-5 py-2.5 rounded-lg bg-[var(--brand)] text-white hover:bg-[var(--brand)]/90 text-sm font-medium flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+          data-testid="btn-test-run"
+          :disabled="testRunning || !testInput.trim()"
+          @click="runTest"
+        >
+          <Icon
+            :icon="testRunning ? 'heroicons:arrow-path' : 'heroicons:play'"
+            :class="['w-4 h-4', testRunning && 'animate-spin']"
+          />
+          {{ $t('config.routing.testRun') }}
         </button>
       </div>
 
-      <div class="p-6">
-        <div v-if="activeTab === 'rendered'" data-testid="section-rendered">
-          <div class="space-y-6">
-            <div>
-              <h3 class="text-xl font-semibold txt-primary mb-3">
-                {{ introTitle }}
-              </h3>
-              <!-- eslint-disable-next-line vue/no-v-html -->
-              <div class="markdown-content txt-secondary text-sm" v-html="introHtml"></div>
-            </div>
+      <!-- Result -->
+      <div
+        v-if="testResult"
+        class="border border-light-border/30 dark:border-dark-border/20 rounded-lg overflow-hidden"
+        data-testid="section-test-result"
+      >
+        <div
+          class="surface-chip px-4 py-3 border-b border-light-border/30 dark:border-dark-border/20"
+        >
+          <div class="flex items-center justify-between gap-3">
+            <p class="text-xs txt-secondary">
+              {{ $t('config.routing.testQuery') }}:
+              <span class="font-mono txt-primary">"{{ testResult.query }}"</span>
+            </p>
+            <p class="text-xs txt-secondary">
+              {{ $t('config.routing.testLatency', { ms: testResult.latency_ms }) }}
+            </p>
+          </div>
+          <p class="text-xs txt-secondary mt-1">
+            {{ $t('config.routing.testModel') }}:
+            <span class="font-mono txt-primary">
+              {{ testResult.model.model || '—' }}
+            </span>
+            <span class="opacity-75">({{ testResult.model.provider || '—' }})</span>
+          </p>
+        </div>
 
-            <div>
-              <h4 class="text-lg font-semibold txt-primary mb-3">
-                {{ $t('config.sortingPrompt.yourTasks') }}
-              </h4>
-              <!-- eslint-disable-next-line vue/no-v-html -->
-              <div class="markdown-content txt-secondary text-sm" v-html="tasksHtml"></div>
-            </div>
+        <div
+          v-if="testResult.error"
+          class="p-4 bg-rose-500/5 text-rose-600 dark:text-rose-400 text-sm"
+        >
+          {{ testResult.error }}
+        </div>
 
-            <div>
-              <h4 class="text-lg font-semibold txt-primary mb-3">
-                Your tasks in every new message are to:
-              </h4>
-              <ol class="space-y-4 txt-secondary text-sm">
-                <li
-                  v-for="(instructionHtml, index) in instructionHtmls"
-                  :key="`instruction-${index}`"
-                  class="flex gap-3"
+        <div v-else-if="testResult.candidates.length === 0" class="p-4 text-sm txt-secondary">
+          {{ $t('config.routing.testNoCandidates') }}
+        </div>
+
+        <ul v-else class="divide-y divide-light-border/30 dark:divide-dark-border/20">
+          <li
+            v-for="(c, idx) in testResult.candidates"
+            :key="`cand-${idx}`"
+            class="px-4 py-3 flex items-center justify-between gap-3"
+            data-testid="item-test-candidate"
+          >
+            <div class="flex-1 min-w-0">
+              <div class="flex items-center gap-2 flex-wrap">
+                <span class="text-xs txt-secondary">#{{ idx + 1 }}</span>
+                <span class="font-mono text-sm font-semibold txt-primary">
+                  {{ c.topic }}
+                </span>
+                <span
+                  v-if="c.alias_target && c.alias_target !== c.topic"
+                  class="text-xs txt-secondary inline-flex items-center gap-1"
+                  data-testid="text-alias-target"
                 >
-                  <span class="font-semibold txt-primary">{{ index + 1 }}.</span>
-                  <div>
-                    <!-- eslint-disable-next-line vue/no-v-html -->
-                    <div class="markdown-content" v-html="instructionHtml"></div>
-                    <ul v-if="index === 1" class="space-y-3 ml-4 mt-3">
-                      <li
-                        v-for="category in sortingPrompt.categories"
-                        :key="category.name"
-                        class="pl-4 border-l-2 border-[var(--brand)]/30"
-                      >
-                        <div class="flex items-center gap-2 mb-1">
-                          <router-link
-                            :to="getPromptLink(category.name)"
-                            class="font-semibold txt-primary hover:underline"
-                          >
-                            {{ category.name }}
-                          </router-link>
-                          <span v-if="category.type === 'default'" class="text-xs txt-secondary"
-                            >(default)</span
-                          >
-                          <span v-else class="text-xs text-purple-500">(custom)</span>
-                        </div>
-                        <p class="text-sm txt-secondary">{{ category.description }}</p>
-                      </li>
-                    </ul>
-                  </div>
-                </li>
-              </ol>
+                  <Icon icon="heroicons:arrow-right" class="w-3 h-3" />
+                  <span class="font-mono">{{ c.alias_target }}</span>
+                </span>
+                <span
+                  v-if="c.stale"
+                  class="px-1.5 py-0.5 rounded text-[10px] font-medium uppercase bg-amber-500/10 text-amber-600 dark:text-amber-400"
+                >
+                  {{ $t('config.routing.badgeStale') }}
+                </span>
+              </div>
             </div>
-            <hr class="border-light-border/30 dark:border-dark-border/20" />
+            <div class="text-right flex-shrink-0">
+              <p class="text-sm font-mono font-semibold" :class="scoreColor(c.score)">
+                {{ c.score.toFixed(3) }}
+              </p>
+              <p class="text-[10px] txt-secondary uppercase tracking-wide">
+                {{ $t('config.routing.score') }}
+              </p>
+            </div>
+          </li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- AI Fallback Prompt (collapsed accordion) -->
+    <div class="surface-card overflow-hidden" data-testid="section-routing-fallback">
+      <button
+        type="button"
+        class="w-full px-6 py-4 flex items-center justify-between hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
+        data-testid="btn-fallback-toggle"
+        @click="fallbackOpen = !fallbackOpen"
+      >
+        <div class="flex items-start gap-3 text-left">
+          <Icon icon="heroicons:cpu-chip" class="w-5 h-5 text-[var(--brand)] mt-0.5" />
+          <div>
+            <h3 class="text-lg font-semibold txt-primary">
+              {{ $t('config.routing.fallbackTitle') }}
+            </h3>
+            <p class="text-xs txt-secondary mt-0.5">
+              {{ $t('config.routing.fallbackSubtitle') }}
+            </p>
           </div>
         </div>
+        <Icon
+          :icon="fallbackOpen ? 'heroicons:chevron-up' : 'heroicons:chevron-down'"
+          class="w-5 h-5 txt-secondary flex-shrink-0"
+        />
+      </button>
 
-        <div v-else-if="activeTab === 'source'" data-testid="section-source">
-          <div class="space-y-4">
-            <div class="flex justify-between items-center">
-              <h3 class="text-lg font-semibold txt-primary">
-                {{ $t('config.sortingPrompt.tabSource') }}
-              </h3>
-              <button
-                class="px-4 py-2 rounded-lg border border-[var(--brand)] text-[var(--brand)] hover:bg-[var(--brand)]/10 transition-colors text-sm disabled:opacity-50 disabled:cursor-not-allowed"
-                data-testid="btn-toggle-mode"
-                :disabled="!canEdit || loading"
-                @click="toggleEditMode"
-              >
-                <PencilIcon v-if="!editMode" class="w-4 h-4 inline mr-1" />
-                <EyeIcon v-else class="w-4 h-4 inline mr-1" />
-                {{ editMode ? 'View Mode' : 'Edit Mode' }}
-              </button>
-            </div>
-
-            <div
-              v-if="!editMode"
-              class="surface-chip p-6 rounded border border-light-border/30 dark:border-dark-border/20"
-              data-testid="section-prompt-preview"
-            >
-              <pre class="whitespace-pre-wrap font-mono text-xs txt-primary leading-relaxed">{{
-                sortingPrompt.promptContent
-              }}</pre>
-            </div>
-
-            <textarea
-              v-else
-              v-model="sortingPrompt.promptContent"
-              rows="25"
-              class="w-full px-4 py-3 rounded surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)] resize-none font-mono"
-              data-testid="input-prompt"
-            />
-
-            <div v-if="editMode" class="flex gap-3">
-              <button
-                class="btn-primary px-6 py-2.5 rounded-lg flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
-                data-testid="btn-save"
-                :disabled="saving || loading"
-                @click="savePrompt"
-              >
-                <CheckIcon class="w-5 h-5" />
-                {{ $t('config.sortingPrompt.savePrompt') }}
-              </button>
-              <button
-                class="px-6 py-2.5 rounded-lg border border-light-border/30 dark:border-dark-border/20 txt-primary hover:bg-black/5 dark:hover:bg-white/5 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                data-testid="btn-reset"
-                :disabled="saving || loading"
-                @click="resetPrompt"
-              >
-                {{ $t('config.sortingPrompt.resetPrompt') }}
-              </button>
-            </div>
-          </div>
+      <div v-if="fallbackOpen" class="border-t border-light-border/30 dark:border-dark-border/20">
+        <div class="flex border-b border-light-border/30 dark:border-dark-border/20">
+          <button
+            v-for="tab in tabs"
+            :key="tab.id"
+            :class="[
+              'px-6 py-3 text-sm font-medium transition-colors relative',
+              activeTab === tab.id
+                ? 'txt-primary bg-[var(--brand)]/5 border-b-2 border-[var(--brand)]'
+                : 'txt-secondary hover:bg-black/5 dark:hover:bg-white/5',
+            ]"
+            data-testid="btn-tab"
+            @click="activeTab = tab.id"
+          >
+            {{ tab.label }}
+          </button>
         </div>
 
-        <div v-else-if="activeTab === 'json'" data-testid="section-json">
-          <div class="space-y-4">
-            <div>
-              <h3 class="text-lg font-semibold txt-primary mb-2">
-                {{ $t('config.sortingPrompt.tabJson') }}
-              </h3>
-              <p class="txt-secondary text-sm mb-3">
-                {{ $t('config.sortingPrompt.jsonDescription') }}
-              </p>
-              <p class="txt-secondary text-sm mb-3">
-                {{ $t('config.sortingPrompt.jsonNote') }}
-              </p>
-              <p class="txt-secondary text-sm font-medium mb-4">
-                {{ $t('config.sortingPrompt.jsonExample') }}
-              </p>
-            </div>
+        <div class="p-6">
+          <div v-if="activeTab === 'rendered'" data-testid="section-rendered">
+            <div class="space-y-6">
+              <div>
+                <h3 class="text-xl font-semibold txt-primary mb-3">
+                  {{ introTitle }}
+                </h3>
+                <!-- eslint-disable-next-line vue/no-v-html -->
+                <div class="markdown-content txt-secondary text-sm" v-html="introHtml"></div>
+              </div>
 
-            <div
-              class="bg-black/90 dark:bg-black/50 rounded-lg p-4 font-mono text-sm text-green-400 overflow-x-auto"
-            >
-              <pre>{{ sortingPrompt.jsonExample }}</pre>
-            </div>
+              <div>
+                <h4 class="text-lg font-semibold txt-primary mb-3">
+                  {{ $t('config.sortingPrompt.yourTasks') }}
+                </h4>
+                <!-- eslint-disable-next-line vue/no-v-html -->
+                <div class="markdown-content txt-secondary text-sm" v-html="tasksHtml"></div>
+              </div>
 
-            <div class="p-4 bg-cyan-500/5 border border-cyan-500/20 rounded-lg">
-              <p class="text-sm txt-primary">
-                <InformationCircleIcon class="w-5 h-5 text-cyan-500 inline mr-2" />
-                {{ $t('config.sortingPrompt.btopicNote') }}
-              </p>
+              <div>
+                <h4 class="text-lg font-semibold txt-primary mb-3">
+                  Your tasks in every new message are to:
+                </h4>
+                <ol class="space-y-4 txt-secondary text-sm">
+                  <li
+                    v-for="(instructionHtml, index) in instructionHtmls"
+                    :key="`instruction-${index}`"
+                    class="flex gap-3"
+                  >
+                    <span class="font-semibold txt-primary">{{ index + 1 }}.</span>
+                    <div>
+                      <!-- eslint-disable-next-line vue/no-v-html -->
+                      <div class="markdown-content" v-html="instructionHtml"></div>
+                      <ul v-if="index === 1" class="space-y-3 ml-4 mt-3">
+                        <li
+                          v-for="category in sortingPrompt.categories"
+                          :key="category.name"
+                          class="pl-4 border-l-2 border-[var(--brand)]/30"
+                        >
+                          <div class="flex items-center gap-2 mb-1">
+                            <router-link
+                              :to="getPromptLink(category.name)"
+                              class="font-semibold txt-primary hover:underline"
+                            >
+                              {{ category.name }}
+                            </router-link>
+                            <span v-if="category.type === 'default'" class="text-xs txt-secondary"
+                              >(default)</span
+                            >
+                            <span v-else class="text-xs text-purple-500">(custom)</span>
+                          </div>
+                          <p class="text-sm txt-secondary">{{ category.description }}</p>
+                        </li>
+                      </ul>
+                    </div>
+                  </li>
+                </ol>
+              </div>
+            </div>
+          </div>
+
+          <div v-else-if="activeTab === 'source'" data-testid="section-source">
+            <div class="space-y-4">
+              <div class="flex justify-between items-center">
+                <h3 class="text-lg font-semibold txt-primary">
+                  {{ $t('config.sortingPrompt.tabSource') }}
+                </h3>
+                <button
+                  class="px-4 py-2 rounded-lg border border-[var(--brand)] text-[var(--brand)] hover:bg-[var(--brand)]/10 transition-colors text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                  data-testid="btn-toggle-mode"
+                  :disabled="!canEdit || loading"
+                  @click="toggleEditMode"
+                >
+                  <PencilIcon v-if="!editMode" class="w-4 h-4 inline mr-1" />
+                  <EyeIcon v-else class="w-4 h-4 inline mr-1" />
+                  {{ editMode ? 'View Mode' : 'Edit Mode' }}
+                </button>
+              </div>
+
+              <div
+                v-if="!editMode"
+                class="surface-chip p-6 rounded border border-light-border/30 dark:border-dark-border/20"
+                data-testid="section-prompt-preview"
+              >
+                <pre class="whitespace-pre-wrap font-mono text-xs txt-primary leading-relaxed">{{
+                  sortingPrompt.promptContent
+                }}</pre>
+              </div>
+
+              <textarea
+                v-else
+                v-model="sortingPrompt.promptContent"
+                rows="25"
+                class="w-full px-4 py-3 rounded surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)] resize-none font-mono"
+                data-testid="input-prompt"
+              />
+
+              <div v-if="editMode" class="flex gap-3">
+                <button
+                  class="btn-primary px-6 py-2.5 rounded-lg flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                  data-testid="btn-save"
+                  :disabled="saving || loading"
+                  @click="savePrompt"
+                >
+                  <CheckIcon class="w-5 h-5" />
+                  {{ $t('config.sortingPrompt.savePrompt') }}
+                </button>
+                <button
+                  class="px-6 py-2.5 rounded-lg border border-light-border/30 dark:border-dark-border/20 txt-primary hover:bg-black/5 dark:hover:bg-white/5 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  data-testid="btn-reset"
+                  :disabled="saving || loading"
+                  @click="resetPrompt"
+                >
+                  {{ $t('config.sortingPrompt.resetPrompt') }}
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div v-else-if="activeTab === 'json'" data-testid="section-json">
+            <div class="space-y-4">
+              <div>
+                <h3 class="text-lg font-semibold txt-primary mb-2">
+                  {{ $t('config.sortingPrompt.tabJson') }}
+                </h3>
+                <p class="txt-secondary text-sm mb-3">
+                  {{ $t('config.sortingPrompt.jsonDescription') }}
+                </p>
+                <p class="txt-secondary text-sm mb-3">
+                  {{ $t('config.sortingPrompt.jsonNote') }}
+                </p>
+                <p class="txt-secondary text-sm font-medium mb-4">
+                  {{ $t('config.sortingPrompt.jsonExample') }}
+                </p>
+              </div>
+
+              <div
+                class="bg-black/90 dark:bg-black/50 rounded-lg p-4 font-mono text-sm text-green-400 overflow-x-auto"
+              >
+                <pre>{{ sortingPrompt.jsonExample }}</pre>
+              </div>
+
+              <div class="p-4 bg-cyan-500/5 border border-cyan-500/20 rounded-lg">
+                <p class="text-sm txt-primary">
+                  <InformationCircleIcon class="w-5 h-5 text-cyan-500 inline mr-2" />
+                  {{ $t('config.sortingPrompt.btopicNote') }}
+                </p>
+              </div>
             </div>
           </div>
         </div>
@@ -194,17 +809,56 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, computed, watch } from 'vue'
+import { ref, onMounted, onBeforeUnmount, computed, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { Icon } from '@iconify/vue'
 import { PencilIcon, EyeIcon, CheckIcon, InformationCircleIcon } from '@heroicons/vue/24/outline'
 import { mockSortingPrompt } from '@/mocks/sortingPrompt'
 import type { SortingPromptData } from '@/mocks/sortingPrompt'
 import { promptsApi } from '@/services/api/promptsApi'
-import type { SortingPromptPayload } from '@/services/api/promptsApi'
+import type { SortingPromptPayload, RoutingTestResult } from '@/services/api/promptsApi'
+import { adminSynapseApi } from '@/services/api/adminSynapseApi'
+import type { SynapseStatusResponse } from '@/services/api/adminSynapseApi'
+import { adminEmbeddingApi } from '@/services/api/adminEmbeddingApi'
+import type { SynapseEmbeddingStatusResponse, EmbeddingRun } from '@/services/api/adminEmbeddingApi'
+import { getConfigValues, updateConfigValue } from '@/services/api/adminConfigApi'
 import { useNotification } from '@/composables/useNotification'
+import { useDialog } from '@/composables/useDialog'
 import { useAuthStore } from '@/stores/auth'
 import { getMarkdownRenderer } from '@/composables/useMarkdown'
+import { useDateFormat } from '@/composables/useDateFormat'
+import { useTheme } from '@/composables/useTheme'
 
+// --- Routing-status state ---------------------------------------------------
+const status = ref<SynapseStatusResponse | null>(null)
+const loadingStatus = ref(false)
+const reindexing = ref(false)
+const topicSearch = ref('')
+
+// --- Beta toggle state ------------------------------------------------------
+const synapseEnabled = ref(false)
+const togglingSynapse = ref(false)
+
+// --- Synapse embedding-model state -----------------------------------------
+const synapseEmbeddingStatus = ref<SynapseEmbeddingStatusResponse | null>(null)
+const synapseEmbeddingSelection = ref<number | null>(null)
+const loadingSynapseEmbedding = ref(false)
+const switchingSynapseEmbedding = ref(false)
+let synapseEmbeddingPollHandle: number | null = null
+
+const synapseActiveRun = computed<EmbeddingRun | null>(() => {
+  const run = synapseEmbeddingStatus.value?.activeRun
+  if (!run) return null
+  return run.scope === 'synapse' || run.scope === 'all' ? run : null
+})
+
+// --- Test-box state ---------------------------------------------------------
+const testInput = ref('')
+const testRunning = ref(false)
+const testResult = ref<RoutingTestResult | null>(null)
+
+// --- AI-fallback prompt state (legacy) -------------------------------------
+const fallbackOpen = ref(false)
 const activeTab = ref('rendered')
 const editMode = ref(false)
 const sortingPrompt = ref<SortingPromptData>({ ...mockSortingPrompt })
@@ -213,12 +867,61 @@ const loading = ref(false)
 const saving = ref(false)
 
 const authStore = useAuthStore()
+const isAdmin = computed(() => authStore.isAdmin)
 const canEdit = computed(() => authStore.isAdmin)
 const { success, error: showError, warning } = useNotification()
-const { locale } = useI18n()
+const dialog = useDialog()
+const { t, locale } = useI18n()
+const { formatRelativeTime } = useDateFormat()
 const markdownRenderer = getMarkdownRenderer()
-const getPromptLink = (topic: string) => `/config/task-prompts?topic=${encodeURIComponent(topic)}`
+const { theme } = useTheme()
 
+// Synapse Routing is a Synaplan-native feature — show the brand logo
+// instead of a generic icon. Resolve the variant from the active theme so
+// the logo stays readable on both light and dark backgrounds.
+const isDark = computed(() => {
+  if (theme.value === 'dark') return true
+  if (theme.value === 'light') return false
+  return matchMedia('(prefers-color-scheme: dark)').matches
+})
+const synaplanLogoSrc = computed(
+  () => `${import.meta.env.BASE_URL}${isDark.value ? 'synaplan-light.svg' : 'synaplan-dark.svg'}`
+)
+
+const getPromptLink = (topic: string) => `/config/task-prompts?topic=${encodeURIComponent(topic)}`
+const formatIndexedAt = (iso: string): string => {
+  try {
+    return formatRelativeTime(new Date(iso))
+  } catch {
+    return iso
+  }
+}
+
+// --- Computed ---------------------------------------------------------------
+const disabledTopicsCount = computed(() => {
+  if (!status.value) return 0
+  return status.value.topics.filter((t) => !t.enabled).length
+})
+
+const filteredTopics = computed(() => {
+  if (!status.value) return []
+  const search = topicSearch.value.trim().toLowerCase()
+  if (!search) return status.value.topics
+  return status.value.topics.filter((topic) =>
+    [topic.topic, topic.embeddingModel ?? '', topic.embeddingProvider ?? '']
+      .join(' ')
+      .toLowerCase()
+      .includes(search)
+  )
+})
+
+const scoreColor = (score: number): string => {
+  if (score >= 0.7) return 'text-emerald-600 dark:text-emerald-400'
+  if (score >= 0.55) return 'text-amber-600 dark:text-amber-400'
+  return 'text-rose-600 dark:text-rose-400'
+}
+
+// --- AI-fallback markdown rendering (kept verbatim from previous component) -
 const renderedPromptText = computed(
   () => sortingPrompt.value.renderedPrompt || sortingPrompt.value.promptContent || ''
 )
@@ -353,8 +1056,8 @@ const loadSortingPrompt = async () => {
     const mapped = mapSortingPrompt(prompt)
     sortingPrompt.value = { ...mapped }
     originalPrompt.value = { ...mapped }
-  } catch (error) {
-    const message = error instanceof Error ? error.message : 'Failed to load sorting prompt'
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Failed to load sorting prompt'
     showError(message)
     sortingPrompt.value = { ...mockSortingPrompt }
     originalPrompt.value = { ...mockSortingPrompt }
@@ -383,8 +1086,8 @@ const savePrompt = async () => {
     success('Sorting prompt saved.')
     await loadSortingPrompt()
     editMode.value = false
-  } catch (error) {
-    const message = error instanceof Error ? error.message : 'Failed to save sorting prompt'
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Failed to save sorting prompt'
     showError(message)
   } finally {
     saving.value = false
@@ -396,11 +1099,215 @@ const resetPrompt = () => {
   editMode.value = false
 }
 
+// --- Status loading ---------------------------------------------------------
+const loadStatus = async () => {
+  if (!isAdmin.value) return
+  loadingStatus.value = true
+  try {
+    status.value = await adminSynapseApi.getStatus()
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Failed to load Synapse status'
+    showError(message)
+  } finally {
+    loadingStatus.value = false
+  }
+}
+
+// --- Beta toggle loading + persistence -------------------------------------
+const loadSynapseEnabled = async () => {
+  if (!isAdmin.value) return
+  try {
+    const values = await getConfigValues()
+    const raw = values['SYNAPSE_ROUTING_ENABLED']?.value ?? 'false'
+    synapseEnabled.value = ['true', '1', 'yes', 'on'].includes(raw.toLowerCase())
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Failed to load Synapse routing state'
+    showError(message)
+  }
+}
+
+const onToggleSynapse = async (next: boolean) => {
+  if (!isAdmin.value) return
+
+  // Confirmation when enabling — surface the beta caveat one more time
+  if (next) {
+    const confirmed = await dialog.confirm({
+      title: t('config.routing.confirmEnableTitle'),
+      message: t('config.routing.confirmEnableBody'),
+      confirmText: t('config.routing.confirmEnableConfirm'),
+      cancelText: t('config.routing.confirmEnableCancel'),
+      danger: true,
+    })
+    if (!confirmed) return
+  }
+
+  togglingSynapse.value = true
+  const previous = synapseEnabled.value
+  synapseEnabled.value = next
+  try {
+    const result = await updateConfigValue('SYNAPSE_ROUTING_ENABLED', next ? 'true' : 'false')
+    if (!result.success) {
+      throw new Error(result.error || 'Failed to update Synapse routing state')
+    }
+    success(
+      next ? t('config.routing.toggleEnabledNotice') : t('config.routing.toggleDisabledNotice')
+    )
+    if (next) {
+      await loadStatus()
+    }
+  } catch (err) {
+    synapseEnabled.value = previous
+    const message = err instanceof Error ? err.message : 'Failed to update Synapse routing state'
+    showError(message)
+  } finally {
+    togglingSynapse.value = false
+  }
+}
+
+const reindex = async (opts: { force?: boolean; recreate?: boolean }) => {
+  if (!isAdmin.value) {
+    warning('Admin access required.')
+    return
+  }
+  reindexing.value = true
+  try {
+    const result = await adminSynapseApi.reindex(opts)
+    success(
+      t('config.routing.reindexResult', {
+        indexed: result.indexed,
+        skipped: result.skipped,
+        errors: result.errors,
+      })
+    )
+    await loadStatus()
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Re-index failed'
+    showError(message)
+  } finally {
+    reindexing.value = false
+  }
+}
+
+const confirmRecreate = async () => {
+  const confirmed = await dialog.confirm({
+    title: t('config.routing.confirmRecreateTitle'),
+    message: t('config.routing.confirmRecreateBody'),
+    confirmText: t('config.routing.confirmRecreateConfirm'),
+    cancelText: t('config.routing.confirmRecreateCancel'),
+    danger: true,
+  })
+  if (!confirmed) return
+  await reindex({ recreate: true, force: true })
+}
+
+// --- Test box ---------------------------------------------------------------
+const runTest = async () => {
+  const text = testInput.value.trim()
+  if (!text) return
+  testRunning.value = true
+  try {
+    if (isAdmin.value) {
+      testResult.value = await adminSynapseApi.dryRun(text, 5)
+    } else {
+      testResult.value = await promptsApi.testRouting(text, 5)
+    }
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Test routing failed'
+    showError(message)
+  } finally {
+    testRunning.value = false
+  }
+}
+
 watch(locale, () => {
   loadSortingPrompt()
 })
 
-onMounted(() => {
+const loadSynapseEmbedding = async () => {
+  loadingSynapseEmbedding.value = true
+  try {
+    const response = await adminEmbeddingApi.getSynapseStatus()
+    synapseEmbeddingStatus.value = response
+    if (synapseEmbeddingSelection.value === null) {
+      synapseEmbeddingSelection.value = response.currentModel.modelId
+    }
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Failed to load Synapse embedding state'
+    showError(message)
+  } finally {
+    loadingSynapseEmbedding.value = false
+  }
+}
+
+const switchSynapseEmbedding = async () => {
+  if (!synapseEmbeddingStatus.value || synapseEmbeddingSelection.value === null) return
+  const target = synapseEmbeddingSelection.value
+  if (target === synapseEmbeddingStatus.value.currentModel.modelId) return
+
+  const targetModel = synapseEmbeddingStatus.value.availableModels.find((m) => m.id === target)
+  const confirmed = await dialog.confirm({
+    title: t('config.routing.embeddingConfirmTitle'),
+    message: t('config.routing.embeddingConfirmBody', {
+      from: synapseEmbeddingStatus.value.currentModel.model || '—',
+      to: targetModel?.name || '—',
+    }),
+    confirmText: t('config.routing.embeddingConfirmAction'),
+    cancelText: t('config.routing.embeddingConfirmCancel'),
+    danger: true,
+  })
+  if (!confirmed) return
+
+  switchingSynapseEmbedding.value = true
+  try {
+    await adminEmbeddingApi.switchSynapse(target)
+    success(t('config.routing.embeddingSwitchQueued'))
+    await loadSynapseEmbedding()
+    startSynapseEmbeddingPolling()
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Switch failed'
+    showError(message)
+    if (synapseEmbeddingStatus.value) {
+      synapseEmbeddingSelection.value = synapseEmbeddingStatus.value.currentModel.modelId
+    }
+  } finally {
+    switchingSynapseEmbedding.value = false
+  }
+}
+
+// Poll while a synapse re-index is active so the UI clears the
+// switching banner the moment the worker finishes — without forcing
+// the admin to refresh manually. Stops itself on completion.
+const startSynapseEmbeddingPolling = () => {
+  if (synapseEmbeddingPollHandle !== null) return
+  synapseEmbeddingPollHandle = window.setInterval(async () => {
+    await loadSynapseEmbedding()
+    if (!synapseActiveRun.value) {
+      stopSynapseEmbeddingPolling()
+      await loadStatus()
+    }
+  }, 2000)
+}
+
+const stopSynapseEmbeddingPolling = () => {
+  if (synapseEmbeddingPollHandle !== null) {
+    window.clearInterval(synapseEmbeddingPollHandle)
+    synapseEmbeddingPollHandle = null
+  }
+}
+
+onMounted(async () => {
   loadSortingPrompt()
+  if (isAdmin.value) {
+    loadSynapseEnabled()
+    loadStatus()
+    await loadSynapseEmbedding()
+    if (synapseActiveRun.value) {
+      startSynapseEmbeddingPolling()
+    }
+  }
+})
+
+onBeforeUnmount(() => {
+  stopSynapseEmbeddingPolling()
 })
 </script>

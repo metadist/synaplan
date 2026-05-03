@@ -39,13 +39,14 @@ class PromptRepository extends ServiceEntityRepository
      * Get all available topics for sorting
      * Includes both system (ownerId=0) AND user-specific prompts.
      *
-     * @param int      $ownerId      Owner ID (0 for system only)
-     * @param int|null $userId       User ID for including user-specific prompts
-     * @param bool     $excludeTools Exclude tool topics (tools:*) from result
+     * @param int      $ownerId         Owner ID (0 for system only)
+     * @param int|null $userId          User ID for including user-specific prompts
+     * @param bool     $excludeTools    Exclude tool topics (tools:*) from result
+     * @param bool     $excludeDisabled Exclude soft-disabled topics (BENABLED=0); default true
      *
      * @return array Array of topic strings
      */
-    public function getAllTopics(int $ownerId = 0, ?int $userId = null, bool $excludeTools = true): array
+    public function getAllTopics(int $ownerId = 0, ?int $userId = null, bool $excludeTools = true, bool $excludeDisabled = true): array
     {
         $qb = $this->createQueryBuilder('p')
             ->select('DISTINCT p.topic');
@@ -65,6 +66,11 @@ class PromptRepository extends ServiceEntityRepository
                 ->setParameter('toolsPrefix', 'tools:%');
         }
 
+        if ($excludeDisabled) {
+            $qb->andWhere('p.enabled = :enabled')
+                ->setParameter('enabled', true);
+        }
+
         $results = $qb->getQuery()->getScalarResult();
 
         return array_map(fn ($r) => $r['topic'], $results);
@@ -75,14 +81,15 @@ class PromptRepository extends ServiceEntityRepository
      * Neither system nor user prompts are filtered by language.
      * The $lang parameter is kept for backward compatibility but ignored.
      *
-     * @param int      $ownerId      Owner ID (0 for system)
-     * @param string   $lang         Language code (kept for API compat, not used)
-     * @param int|null $userId       User ID for including user-specific prompts
-     * @param bool     $excludeTools Exclude tool topics (tools:*) from result
+     * @param int      $ownerId         Owner ID (0 for system)
+     * @param string   $lang            Language code (kept for API compat, not used)
+     * @param int|null $userId          User ID for including user-specific prompts
+     * @param bool     $excludeTools    Exclude tool topics (tools:*) from result
+     * @param bool     $excludeDisabled Exclude soft-disabled topics (BENABLED=0); default true
      *
-     * @return array Array of ['topic' => string, 'description' => string]
+     * @return array Array of ['topic' => string, 'description' => string, 'ownerId' => int]
      */
-    public function getTopicsWithDescriptions(int $ownerId = 0, string $lang = 'en', ?int $userId = null, bool $excludeTools = true): array
+    public function getTopicsWithDescriptions(int $ownerId = 0, string $lang = 'en', ?int $userId = null, bool $excludeTools = true, bool $excludeDisabled = true): array
     {
         $sysQb = $this->createQueryBuilder('p')
             ->select('p.topic', 'p.shortDescription', 'p.ownerId')
@@ -92,6 +99,10 @@ class PromptRepository extends ServiceEntityRepository
         if ($excludeTools) {
             $sysQb->andWhere('p.topic NOT LIKE :toolsPrefix')
                 ->setParameter('toolsPrefix', 'tools:%');
+        }
+        if ($excludeDisabled) {
+            $sysQb->andWhere('p.enabled = :enabled')
+                ->setParameter('enabled', true);
         }
 
         $systemPrompts = $sysQb->getQuery()->getResult();
@@ -107,6 +118,10 @@ class PromptRepository extends ServiceEntityRepository
                 $userQb->andWhere('p.topic NOT LIKE :toolsPrefix')
                     ->setParameter('toolsPrefix', 'tools:%');
             }
+            if ($excludeDisabled) {
+                $userQb->andWhere('p.enabled = :enabled')
+                    ->setParameter('enabled', true);
+            }
 
             $userPrompts = $userQb->getQuery()->getResult();
         }
@@ -120,6 +135,7 @@ class PromptRepository extends ServiceEntityRepository
                 $result[] = [
                     'topic' => $p['topic'],
                     'description' => $p['shortDescription'],
+                    'ownerId' => (int) $p['ownerId'],
                 ];
                 $seen[$p['topic']] = true;
             }
@@ -130,6 +146,7 @@ class PromptRepository extends ServiceEntityRepository
                 $result[] = [
                     'topic' => $p['topic'],
                     'description' => $p['shortDescription'],
+                    'ownerId' => (int) $p['ownerId'],
                 ];
                 $seen[$p['topic']] = true;
             }
@@ -166,29 +183,40 @@ class PromptRepository extends ServiceEntityRepository
      * User prompts are NOT filtered by language -- an override applies regardless of UI language.
      * The $lang parameter is kept for backward compatibility but ignored.
      *
-     * @param int    $userId User ID
-     * @param string $lang   Language code (kept for API compat, not used for filtering)
+     * @param int    $userId          User ID
+     * @param string $lang            Language code (kept for API compat, not used for filtering)
+     * @param bool   $excludeDisabled Exclude soft-disabled topics (BENABLED=0); default true
      *
      * @return Prompt[]
      */
-    public function findAllForUser(int $userId, string $lang = 'en'): array
+    public function findAllForUser(int $userId, string $lang = 'en', bool $excludeDisabled = true): array
     {
-        $systemPrompts = $this->createQueryBuilder('p')
+        $systemQb = $this->createQueryBuilder('p')
             ->where('p.ownerId = 0')
             ->andWhere('p.topic NOT LIKE :toolsPrefix')
             ->setParameter('toolsPrefix', 'tools:%')
-            ->orderBy('p.topic', 'ASC')
-            ->getQuery()
-            ->getResult();
+            ->orderBy('p.topic', 'ASC');
 
-        $userPrompts = $this->createQueryBuilder('p')
+        if ($excludeDisabled) {
+            $systemQb->andWhere('p.enabled = :enabled')
+                ->setParameter('enabled', true);
+        }
+
+        $systemPrompts = $systemQb->getQuery()->getResult();
+
+        $userQb = $this->createQueryBuilder('p')
             ->where('p.ownerId = :userId')
             ->andWhere('p.topic NOT LIKE :toolsPrefix')
             ->setParameter('userId', $userId)
             ->setParameter('toolsPrefix', 'tools:%')
-            ->orderBy('p.topic', 'ASC')
-            ->getQuery()
-            ->getResult();
+            ->orderBy('p.topic', 'ASC');
+
+        if ($excludeDisabled) {
+            $userQb->andWhere('p.enabled = :enabled')
+                ->setParameter('enabled', true);
+        }
+
+        $userPrompts = $userQb->getQuery()->getResult();
 
         // Merge: user prompts override system prompts for the same topic
         $map = [];
@@ -219,8 +247,10 @@ class PromptRepository extends ServiceEntityRepository
             ->andWhere('p.topic NOT LIKE :toolsPrefix')
             ->andWhere('p.selectionRules IS NOT NULL')
             ->andWhere('p.selectionRules != :empty')
+            ->andWhere('p.enabled = :enabled')
             ->setParameter('toolsPrefix', 'tools:%')
             ->setParameter('empty', '')
+            ->setParameter('enabled', true)
             ->getQuery()
             ->getResult();
 
@@ -229,9 +259,11 @@ class PromptRepository extends ServiceEntityRepository
             ->andWhere('p.topic NOT LIKE :toolsPrefix')
             ->andWhere('p.selectionRules IS NOT NULL')
             ->andWhere('p.selectionRules != :empty')
+            ->andWhere('p.enabled = :enabled')
             ->setParameter('userId', $userId)
             ->setParameter('toolsPrefix', 'tools:%')
             ->setParameter('empty', '')
+            ->setParameter('enabled', true)
             ->getQuery()
             ->getResult();
 

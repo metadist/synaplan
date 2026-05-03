@@ -8,11 +8,14 @@ use App\AI\Provider\GoogleProvider;
 use App\AI\Service\AiFacade;
 use App\AI\Service\ProviderRegistry;
 use App\Service\CircuitBreaker;
+use App\Service\DiscordNotificationService;
 use App\Service\File\UserUploadPathBuilder;
+use App\Service\InternalEmailService;
 use App\Service\ModelConfigService;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
+use Symfony\Contracts\Cache\CacheInterface;
 
 class AiFacadeAsyncVideoTest extends TestCase
 {
@@ -35,6 +38,9 @@ class AiFacadeAsyncVideoTest extends TestCase
             $this->circuitBreaker,
             new NullLogger(),
             $this->pathBuilder,
+            $this->createMock(DiscordNotificationService::class),
+            $this->createMock(InternalEmailService::class),
+            $this->createMock(CacheInterface::class),
             '/tmp'
         );
     }

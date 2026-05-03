@@ -4,16 +4,20 @@ declare(strict_types=1);
 
 namespace App\Service\RAG\VectorStorage;
 
+use App\Service\Embedding\EmbeddingMetadataService;
 use App\Service\RAG\VectorStorage\DTO\SearchQuery;
 use App\Service\RAG\VectorStorage\DTO\SearchResult;
 use App\Service\RAG\VectorStorage\DTO\StorageStats;
 use App\Service\RAG\VectorStorage\DTO\VectorChunk;
 use App\Service\VectorSearch\QdrantClientInterface;
+use Psr\Log\LoggerInterface;
 
 final readonly class QdrantVectorStorage implements VectorStorageInterface
 {
     public function __construct(
         private QdrantClientInterface $qdrantClient,
+        private EmbeddingMetadataService $embeddingMetadata,
+        private LoggerInterface $logger,
     ) {
     }
 
@@ -21,19 +25,7 @@ final readonly class QdrantVectorStorage implements VectorStorageInterface
     {
         $pointId = $chunk->getPointId();
 
-        $payload = [
-            'user_id' => $chunk->userId,
-            'file_id' => $chunk->fileId,
-            'group_key' => $chunk->groupKey,
-            'file_type' => $chunk->fileType,
-            'chunk_index' => $chunk->chunkIndex,
-            'start_line' => $chunk->startLine,
-            'end_line' => $chunk->endLine,
-            'text' => $chunk->text,
-            'created' => $chunk->getCreatedTimestamp(),
-        ];
-
-        $this->qdrantClient->upsertDocument($pointId, $chunk->vector, $payload);
+        $this->qdrantClient->upsertDocument($pointId, $chunk->vector, $this->buildPayload($chunk));
 
         return $pointId;
     }
@@ -47,22 +39,53 @@ final readonly class QdrantVectorStorage implements VectorStorageInterface
         $points = array_map(fn (VectorChunk $chunk) => [
             'point_id' => $chunk->getPointId(),
             'vector' => $chunk->vector,
-            'payload' => [
-                'user_id' => $chunk->userId,
-                'file_id' => $chunk->fileId,
-                'group_key' => $chunk->groupKey,
-                'file_type' => $chunk->fileType,
-                'chunk_index' => $chunk->chunkIndex,
-                'start_line' => $chunk->startLine,
-                'end_line' => $chunk->endLine,
-                'text' => $chunk->text,
-                'created' => $chunk->getCreatedTimestamp(),
-            ],
+            'payload' => $this->buildPayload($chunk),
         ], $chunks);
 
         $result = $this->qdrantClient->batchUpsertDocuments($points);
 
         return $result['success_count'] ?? count($chunks);
+    }
+
+    /**
+     * Build the Qdrant payload for a chunk, including embedding-stack
+     * metadata (model id/provider/name + vector_dim + indexed_at) when the
+     * caller supplied it. Legacy chunks without metadata still work — the
+     * extra keys are simply omitted.
+     *
+     * @return array<string, mixed>
+     */
+    private function buildPayload(VectorChunk $chunk): array
+    {
+        $payload = [
+            'user_id' => $chunk->userId,
+            'file_id' => $chunk->fileId,
+            'group_key' => $chunk->groupKey,
+            'file_type' => $chunk->fileType,
+            'chunk_index' => $chunk->chunkIndex,
+            'start_line' => $chunk->startLine,
+            'end_line' => $chunk->endLine,
+            'text' => $chunk->text,
+            'created' => $chunk->getCreatedTimestamp(),
+        ];
+
+        if (null !== $chunk->embeddingModelId) {
+            $payload['embedding_model_id'] = $chunk->embeddingModelId;
+        }
+        if (null !== $chunk->embeddingProvider) {
+            $payload['embedding_provider'] = $chunk->embeddingProvider;
+        }
+        if (null !== $chunk->embeddingModelName) {
+            $payload['embedding_model'] = $chunk->embeddingModelName;
+        }
+        if (null !== $chunk->vectorDim) {
+            $payload['vector_dim'] = $chunk->vectorDim;
+        }
+        if (null !== $chunk->embeddingModelId || null !== $chunk->embeddingProvider) {
+            $payload['indexed_at'] = date(\DATE_ATOM);
+        }
+
+        return $payload;
     }
 
     public function deleteByFile(int $userId, int $fileId): int
@@ -82,13 +105,30 @@ final readonly class QdrantVectorStorage implements VectorStorageInterface
 
     public function search(SearchQuery $query): array
     {
-        $results = $this->qdrantClient->searchDocuments(
+        // Ask Qdrant for 2× the requested limit so the post-search stale
+        // filter doesn't short-change the caller right after a model swap.
+        // The stale-filter ratio is bounded by how much of the index was
+        // re-vectorized; in steady state, fresh ≫ stale and overhead is
+        // negligible.
+        $rawHits = $this->qdrantClient->searchDocuments(
             vector: $query->vector,
             userId: $query->userId,
             groupKey: $query->groupKey,
-            limit: $query->limit,
+            limit: $query->limit * 2,
             minScore: $query->minScore,
         );
+
+        $filtered = $this->embeddingMetadata->filterStaleHits($rawHits);
+        if ($filtered['stale_count'] > 0) {
+            $this->logger->info('QdrantVectorStorage: Filtered stale RAG hits', [
+                'user_id' => $query->userId,
+                'stale_count' => $filtered['stale_count'],
+                'fresh_count' => count($filtered['fresh']),
+                'current_model_id' => $this->embeddingMetadata->getCurrentModelId(),
+            ]);
+        }
+
+        $hits = array_slice($filtered['fresh'], 0, $query->limit);
 
         return array_map(
             fn (array $result) => new SearchResult(
@@ -102,7 +142,7 @@ final readonly class QdrantVectorStorage implements VectorStorageInterface
                 fileName: $result['payload']['file_name'] ?? null,
                 mimeType: $result['payload']['mime_type'] ?? null,
             ),
-            $results
+            $hits
         );
     }
 

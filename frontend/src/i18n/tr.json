@@ -1119,6 +1119,10 @@
       "dark": "Koyu",
       "system": "Sistem"
     },
+    "language": {
+      "title": "Dil",
+      "description": "Arayüz dilini seçin"
+    },
     "account": {
       "title": "Hesap",
       "email": "E-posta",

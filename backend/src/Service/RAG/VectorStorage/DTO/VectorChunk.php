@@ -18,6 +18,16 @@ final readonly class VectorChunk
         /** @var float[] */
         public array $vector,
         public ?int $createdAt = null,
+        // Embedding-stack metadata so SafeModelChange can:
+        //   1. detect stale chunks when the active VECTORIZE model changes
+        //      (different model_id or vector_dim → re-vectorize required);
+        //   2. show in the admin UI which model produced which chunks.
+        // Nullable for backward compatibility with legacy chunks that were
+        // stored before this metadata existed.
+        public ?int $embeddingModelId = null,
+        public ?string $embeddingProvider = null,
+        public ?string $embeddingModelName = null,
+        public ?int $vectorDim = null,
     ) {
     }
 

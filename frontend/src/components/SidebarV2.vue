@@ -205,6 +205,15 @@
               <button
                 role="menuitem"
                 class="dropdown-item"
+                data-testid="btn-sidebar-v2-settings"
+                @click="handleNavigate('/settings')"
+              >
+                <Cog6ToothIcon class="w-4 h-4" />
+                <span>{{ $t('nav.settings') }}</span>
+              </button>
+              <button
+                role="menuitem"
+                class="dropdown-item"
                 data-testid="btn-sidebar-v2-statistics"
                 @click="handleNavigate('/statistics')"
               >

@@ -129,6 +129,7 @@ const getProviderIcon = (provider: string): string => {
   if (p.includes('anthropic')) return 'mdi:robot-outline'
   if (p.includes('google')) return 'mdi:google'
   if (p.includes('ollama')) return 'mdi:server'
+  if (p.includes('cloudflare')) return 'simple-icons:cloudflare'
   if (p.includes('groq')) return 'mdi:lightning-bolt'
   return 'mdi:robot-outline'
 }
