@@ -30,6 +30,30 @@ final class EmbeddingMetadataServiceTest extends TestCase
         self::assertSame(EmbeddingMetadataService::DEFAULT_VECTOR_DIM, $info['vector_dim']);
     }
 
+    public function testCurrentModelReadsVectorDimFromCatalog(): void
+    {
+        $this->modelConfigService->method('getDefaultModel')->willReturn(88);
+        $this->modelConfigService->method('getProviderForModel')->willReturn('openai');
+        $this->modelConfigService->method('getModelName')->willReturn('text-embedding-3-large');
+        $this->modelConfigService->method('getVectorDimForModel')->willReturn(3072);
+
+        $info = $this->service->getCurrentModel();
+
+        self::assertSame(3072, $info['vector_dim']);
+    }
+
+    public function testCurrentModelFallsBackToDefaultWhenCatalogMissingDimension(): void
+    {
+        $this->modelConfigService->method('getDefaultModel')->willReturn(13);
+        $this->modelConfigService->method('getProviderForModel')->willReturn('ollama');
+        $this->modelConfigService->method('getModelName')->willReturn('bge-m3');
+        $this->modelConfigService->method('getVectorDimForModel')->willReturn(null);
+
+        $info = $this->service->getCurrentModel();
+
+        self::assertSame(EmbeddingMetadataService::DEFAULT_VECTOR_DIM, $info['vector_dim']);
+    }
+
     public function testStaleWhenIndexedModelDiffers(): void
     {
         $this->modelConfigService->method('getDefaultModel')->willReturn(42);

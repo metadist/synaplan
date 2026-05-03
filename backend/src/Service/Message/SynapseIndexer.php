@@ -28,6 +28,12 @@ use Psr\Log\LoggerInterface;
  */
 final readonly class SynapseIndexer
 {
+    /**
+     * Fallback vector dimension used only when the bound model has no
+     * `meta.dimensions` entry in the catalog (legacy/local Ollama rows).
+     * Matches the historical default used to create existing collections,
+     * so installs without metadata keep working without re-indexing.
+     */
     private const DEFAULT_VECTOR_DIMENSION = 1024;
 
     /**
@@ -245,6 +251,13 @@ final readonly class SynapseIndexer
     /**
      * Get the embedding provider/model info used for indexing (for status display).
      *
+     * `vector_dim` is read from the bound model's catalog metadata
+     * (`BJSON.meta.dimensions` via Model::getVectorDim()) so the
+     * Qdrant collection can be (re)created with the correct native
+     * dimension when an admin switches the SYNAPSE_VECTORIZE binding.
+     * This is the fix for the "1024 hard-coded → silent slice/pad of
+     * 768/1536/3072-dim embeddings" issue raised in PR #853 review.
+     *
      * @return array{provider: ?string, model: ?string, model_id: ?int, vector_dim: int}
      */
     public function getEmbeddingModelInfo(): array
@@ -263,7 +276,8 @@ final readonly class SynapseIndexer
             'provider' => $this->modelConfigService->getProviderForModel($modelId),
             'model' => $this->modelConfigService->getModelName($modelId),
             'model_id' => $modelId,
-            'vector_dim' => self::DEFAULT_VECTOR_DIMENSION,
+            'vector_dim' => $this->modelConfigService->getVectorDimForModel($modelId)
+                ?? self::DEFAULT_VECTOR_DIMENSION,
         ];
     }
 
@@ -489,6 +503,20 @@ final readonly class SynapseIndexer
     }
 
     /**
+     * Coerce an embedding vector to the target dimension.
+     *
+     * In the happy path this is a no-op: the bound model's
+     * `meta.dimensions` is read in `getEmbeddingModelInfo()` and the
+     * Qdrant collection is created with that exact dim, so the provider
+     * and the collection agree and the vector arrives at the right
+     * length already.
+     *
+     * Slice/zero-pad is kept as a last-resort safety net (so a provider
+     * regression cannot crash the whole indexing run) but is logged as
+     * a warning — semantically it is NOT a clean cross-model bridge,
+     * just a way to keep retrieval running until the catalog metadata
+     * is fixed.
+     *
      * @param float[] $vector
      *
      * @return float[]
@@ -499,6 +527,15 @@ final readonly class SynapseIndexer
         if ($targetDim === $len) {
             return $vector;
         }
+
+        // Catalog metadata and the model's actual output disagree.
+        // Most likely cause: a wrong `meta.dimensions` entry for this
+        // model in ModelCatalog. The result is semantically degraded
+        // routing — log loudly so the operator can correct it.
+        $this->logger->warning('SynapseIndexer: embedding dimension mismatch — coercing (catalog metadata likely wrong)', [
+            'expected' => $targetDim,
+            'actual' => $len,
+        ]);
 
         if ($len > $targetDim) {
             return array_slice($vector, 0, $targetDim);

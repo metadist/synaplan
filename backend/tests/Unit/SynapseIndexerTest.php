@@ -406,6 +406,30 @@ class SynapseIndexerTest extends TestCase
         $this->assertSame('@cf/baai/bge-m3', $info['model']);
     }
 
+    public function testEmbeddingModelInfoReadsVectorDimFromCatalog(): void
+    {
+        $this->modelConfigService->method('getDefaultModel')->willReturn(88);
+        $this->modelConfigService->method('getProviderForModel')->willReturn('openai');
+        $this->modelConfigService->method('getModelName')->willReturn('text-embedding-3-large');
+        $this->modelConfigService->method('getVectorDimForModel')->willReturn(3072);
+
+        $info = $this->indexer->getEmbeddingModelInfo();
+
+        $this->assertSame(3072, $info['vector_dim']);
+    }
+
+    public function testEmbeddingModelInfoFallsBackToDefaultDimWhenCatalogMissingMetadata(): void
+    {
+        $this->modelConfigService->method('getDefaultModel')->willReturn(42);
+        $this->modelConfigService->method('getProviderForModel')->willReturn('ollama');
+        $this->modelConfigService->method('getModelName')->willReturn('bge-m3');
+        $this->modelConfigService->method('getVectorDimForModel')->willReturn(null);
+
+        $info = $this->indexer->getEmbeddingModelInfo();
+
+        $this->assertSame(1024, $info['vector_dim']);
+    }
+
     // ── buildEmbeddingText / computeSourceHash contract ─────────────────
 
     public function testBuildEmbeddingTextIncludesTopicDescriptionAndKeywords(): void

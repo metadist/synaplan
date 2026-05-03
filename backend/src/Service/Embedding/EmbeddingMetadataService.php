@@ -42,6 +42,15 @@ final class EmbeddingMetadataService
     }
 
     /**
+     * Snapshot of the active VECTORIZE model.
+     *
+     * `vector_dim` is read from the catalog (`BJSON.meta.dimensions`)
+     * so the stale-hit filter correctly invalidates points indexed
+     * under a wider/narrower model when the operator switches the
+     * VECTORIZE default. Falls back to the historical 1024 only when
+     * the model row is missing or has no metadata, which keeps
+     * legacy/local Ollama deployments working unchanged (PR #853 review).
+     *
      * @return array{provider: ?string, model: ?string, model_id: ?int, vector_dim: int}
      */
     public function getCurrentModel(): array
@@ -64,7 +73,8 @@ final class EmbeddingMetadataService
             'provider' => $this->modelConfigService->getProviderForModel($modelId),
             'model' => $this->modelConfigService->getModelName($modelId),
             'model_id' => $modelId,
-            'vector_dim' => self::DEFAULT_VECTOR_DIM,
+            'vector_dim' => $this->modelConfigService->getVectorDimForModel($modelId)
+                ?? self::DEFAULT_VECTOR_DIM,
         ];
     }
 

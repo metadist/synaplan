@@ -34,7 +34,14 @@ final readonly class SynapseRouter
      */
     private const DEFAULT_CONFIDENCE_THRESHOLD = 0.78;
     private const STICKY_THRESHOLD = 0.32;
-    private const VECTOR_DIMENSION = 1024;
+    /**
+     * Fallback target dimension used only when the bound SYNAPSE_VECTORIZE
+     * model has no `meta.dimensions` in the catalog — matches the
+     * historical default the synapse_topics collection was created with.
+     * The real dimension is resolved per-request from the model row, see
+     * `getCurrentModelInfo()` (PR #853 review).
+     */
+    private const DEFAULT_VECTOR_DIMENSION = 1024;
     private const SEARCH_LIMIT = 5;
     private const MIN_SCORE = 0.3;
 
@@ -163,7 +170,7 @@ final readonly class SynapseRouter
                 return ['error' => 'empty_embedding', 'latency_ms' => $this->elapsed($startTime)] + $base;
             }
 
-            $vector = $this->normalizeVector($vector);
+            $vector = $this->normalizeVector($vector, $modelInfo['vector_dim']);
 
             $hits = $this->qdrantClient->searchSynapseTopics(
                 $vector,
@@ -266,7 +273,8 @@ final readonly class SynapseRouter
                 return $this->fallbackToAi($messageData, $conversationHistory, $userId, 'empty_embedding');
             }
 
-            $queryVector = $this->normalizeVector($queryVector);
+            $currentModelInfo = $this->getCurrentModelInfo();
+            $queryVector = $this->normalizeVector($queryVector, $currentModelInfo['vector_dim']);
 
             $vectorSum = array_sum($queryVector);
             if (abs($vectorSum) < 0.001) {
@@ -288,7 +296,7 @@ final readonly class SynapseRouter
                 return $this->fallbackToAi($messageData, $conversationHistory, $userId, 'no_search_results');
             }
 
-            $currentModelId = $this->getCurrentModelInfo()['model_id'];
+            $currentModelId = $currentModelInfo['model_id'];
             $freshResults = [];
             $staleHits = 0;
 
@@ -472,19 +480,34 @@ final readonly class SynapseRouter
     }
 
     /**
-     * @return array{provider: ?string, model: ?string, model_id: ?int}
+     * Snapshot of the embedding model currently bound to Synapse Routing.
+     *
+     * `vector_dim` is read from the catalog (`BJSON.meta.dimensions`)
+     * so the router and indexer agree on the target dimension when the
+     * bound model is not 1024-wide, instead of slice/zero-padding the
+     * query vector down to 1024 and then searching a collection that
+     * was created with the model's native size (PR #853 review).
+     *
+     * @return array{provider: ?string, model: ?string, model_id: ?int, vector_dim: int}
      */
     private function getCurrentModelInfo(): array
     {
         $modelId = $this->resolveSynapseModelId();
         if (!$modelId) {
-            return ['provider' => null, 'model' => null, 'model_id' => null];
+            return [
+                'provider' => null,
+                'model' => null,
+                'model_id' => null,
+                'vector_dim' => self::DEFAULT_VECTOR_DIMENSION,
+            ];
         }
 
         return [
             'provider' => $this->modelConfigService->getProviderForModel($modelId),
             'model' => $this->modelConfigService->getModelName($modelId),
             'model_id' => $modelId,
+            'vector_dim' => $this->modelConfigService->getVectorDimForModel($modelId)
+                ?? self::DEFAULT_VECTOR_DIMENSION,
         ];
     }
 
@@ -678,22 +701,36 @@ final readonly class SynapseRouter
     }
 
     /**
+     * Coerce a query embedding to the target collection dimension.
+     *
+     * Happy path: the bound model returns its native dim (read from
+     * catalog metadata), the collection was created with the same dim,
+     * and this is a no-op. Slice/zero-pad is a last-resort safety net
+     * for catalog/provider mismatches; it is logged as a warning
+     * because cosine similarity across coerced dims is semantically
+     * weaker than across native ones (PR #853 review).
+     *
      * @param float[] $vector
      *
      * @return float[]
      */
-    private function normalizeVector(array $vector): array
+    private function normalizeVector(array $vector, int $targetDim): array
     {
         $len = count($vector);
-        if (self::VECTOR_DIMENSION === $len) {
+        if ($targetDim === $len) {
             return $vector;
         }
 
-        if ($len > self::VECTOR_DIMENSION) {
-            return array_slice($vector, 0, self::VECTOR_DIMENSION);
+        $this->logger->warning('SynapseRouter: query embedding dimension mismatch — coercing (catalog metadata likely wrong)', [
+            'expected' => $targetDim,
+            'actual' => $len,
+        ]);
+
+        if ($len > $targetDim) {
+            return array_slice($vector, 0, $targetDim);
         }
 
-        return array_pad($vector, self::VECTOR_DIMENSION, 0.0);
+        return array_pad($vector, $targetDim, 0.0);
     }
 
     private function getConfidenceThreshold(): float
