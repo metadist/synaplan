@@ -14,17 +14,6 @@ import {
 
 const API_URL = getApiUrl()
 
-export interface SubscriptionStatus {
-  hasSubscription?: boolean
-  plan?: string
-  status?: string
-  nextBilling?: number | null
-  cancelAt?: number | null
-  paymentFailed?: boolean
-  stripeSubscriptionId?: string | null
-  [key: string]: unknown
-}
-
 export interface AuthBundle {
   headers: { Cookie: string }
   userId: string
@@ -39,37 +28,6 @@ export function expectWebhookSuccess(result: WebhookResult, label: string): void
   if (result.body.success !== true) {
     throw new Error(`Webhook ${label} did not return success: body: ${JSON.stringify(result.body)}`)
   }
-}
-
-export async function getSubscriptionStatus(
-  request: APIRequestContext,
-  headers: { Cookie: string }
-): Promise<SubscriptionStatus> {
-  const res = await request.get(`${API_URL}/api/v1/subscription/status`, { headers })
-  return (await res.json()) as SubscriptionStatus
-}
-
-export async function pollSubscriptionStatus(
-  request: APIRequestContext,
-  headers: { Cookie: string },
-  predicate: (status: SubscriptionStatus) => boolean,
-  label: string
-): Promise<SubscriptionStatus> {
-  let lastStatus: SubscriptionStatus = {}
-  await expect
-    .poll(
-      async () => {
-        lastStatus = await getSubscriptionStatus(request, headers)
-        return predicate(lastStatus)
-      },
-      {
-        message: `Polling subscription status for: ${label}. Last status: ${JSON.stringify(lastStatus)}`,
-        intervals: INTERVALS.FAST(),
-        timeout: TIMEOUTS.STANDARD,
-      }
-    )
-    .toBe(true)
-  return lastStatus
 }
 
 /**
@@ -180,15 +138,18 @@ export interface ProSubscription {
 }
 
 /**
- * Activate (or refresh) a PRO subscription for the test user via mock webhooks.
- * Sends checkout.session.completed → customer.subscription.created and polls
- * until the backend reports the subscription as active PRO.
+ * Activate a PRO subscription for the test user via mock webhooks. Sends
+ * checkout.session.completed → customer.subscription.created and asserts a
+ * 2xx body with `success: true` for each. The webhook handlers flush
+ * Doctrine synchronously, so a 200 response IS the persistence sync point —
+ * no separate /status poll is needed; the calling test's UI assertions
+ * cover any remaining Vue render delay via Playwright's auto-retrying
+ * matchers.
  *
  * Use this as the "Arrange" step for tests that need a known active baseline.
  */
 export async function activateProSubscription(
   request: APIRequestContext,
-  headers: { Cookie: string },
   opts: { userId: string; customerId: string; subscriptionId: string }
 ): Promise<ProSubscription> {
   const checkoutResult = await sendCheckoutCompletedWebhook(request, opts)
@@ -196,13 +157,6 @@ export async function activateProSubscription(
 
   const createdResult = await sendSubscriptionCreatedWebhook(request, opts)
   expectWebhookSuccess(createdResult, 'customer.subscription.created')
-
-  await pollSubscriptionStatus(
-    request,
-    headers,
-    (s) => s.hasSubscription === true && s.plan === 'PRO' && s.status === 'active',
-    'PRO active after activateProSubscription'
-  )
 
   return { customerId: opts.customerId, subscriptionId: opts.subscriptionId }
 }

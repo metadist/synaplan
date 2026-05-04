@@ -26,7 +26,6 @@ import {
   authBundle,
   expectWebhookSuccess,
   navigateToSubscriptionViaUI,
-  pollSubscriptionStatus,
 } from '../helpers/billing'
 
 interface BaselineContext {
@@ -44,7 +43,7 @@ async function loginAndActivatePro(
   const bundle = await authBundle(request, credentials)
   const customerId = `cus_${randomUUID()}`
   const subscriptionId = `sub_${randomUUID()}`
-  await activateProSubscription(request, bundle.headers, {
+  await activateProSubscription(request, {
     userId: bundle.userId,
     customerId,
     subscriptionId,
@@ -71,22 +70,19 @@ test.describe('@ci @subscription Subscription Lifecycle', () => {
         userId: ctx.bundle.userId,
       })
       expectWebhookSuccess(result, 'customer.subscription.deleted')
-
-      await pollSubscriptionStatus(
-        request,
-        ctx.bundle.headers,
-        (s) => s.plan === 'NEW' && s.status === 'canceled',
-        'plan=NEW, status=canceled'
-      )
     })
 
     await test.step('Assert: subscription page shows plan picker, no current-plan section', async () => {
+      // Webhook handler flushes synchronously → 200 response IS the sync point.
+      // Reload re-fetches /status; the plan-picker becoming visible is the
+      // user-observable proof that the deletion was processed end-to-end.
       await page.reload({ waitUntil: 'domcontentloaded' })
       await navigateToSubscriptionViaUI(page)
 
-      await page.waitForSelector(selectors.subscription.cardPlan, { timeout: TIMEOUTS.STANDARD })
+      await expect(page.locator(selectors.subscription.btnSelectPro)).toBeVisible({
+        timeout: TIMEOUTS.STANDARD,
+      })
       await expect(page.locator(selectors.subscription.sectionCurrentPlan)).not.toBeVisible()
-      await expect(page.locator(selectors.subscription.btnSelectPro)).toBeVisible()
     })
   })
 
@@ -112,13 +108,6 @@ test.describe('@ci @subscription Subscription Lifecycle', () => {
         status: 'active',
       })
       expectWebhookSuccess(result, 'customer.subscription.updated')
-
-      await pollSubscriptionStatus(
-        request,
-        ctx.bundle.headers,
-        (s) => s.cancelAt === cancelAt,
-        'cancelAt persisted'
-      )
     })
 
     await test.step('Assert: UI shows the cancel-date warning instead of next-billing', async () => {
@@ -130,9 +119,12 @@ test.describe('@ci @subscription Subscription Lifecycle', () => {
 
       // The user-observable difference: amber warning paragraph appears, regular
       // next-billing paragraph disappears. We don't assert the formatted date text
-      // (locale-dependent) but we do require the paragraph to be non-empty.
+      // (locale-dependent) but we do require the paragraph to be non-empty. The
+      // cancel-date locator only renders when subscriptionStatus.cancelAt is truthy
+      // (see SubscriptionView.vue), so its visibility transitively asserts the
+      // backend persisted cancelAt.
       const cancelDate = page.locator(selectors.subscription.textCancelDate)
-      await expect(cancelDate).toBeVisible()
+      await expect(cancelDate).toBeVisible({ timeout: TIMEOUTS.STANDARD })
       await expect(cancelDate).not.toBeEmpty()
       await expect(page.locator(selectors.subscription.textNextBilling)).not.toBeVisible()
 
@@ -147,21 +139,16 @@ test.describe('@ci @subscription Subscription Lifecycle', () => {
         userId: ctx.bundle.userId,
       })
       expectWebhookSuccess(result, 'customer.subscription.deleted')
-
-      await pollSubscriptionStatus(
-        request,
-        ctx.bundle.headers,
-        (s) => s.plan === 'NEW',
-        'plan=NEW after period-end deletion'
-      )
     })
 
     await test.step('Assert: after deletion, current-plan section disappears', async () => {
       await page.reload({ waitUntil: 'domcontentloaded' })
       await navigateToSubscriptionViaUI(page)
 
+      await expect(page.locator(selectors.subscription.btnSelectPro)).toBeVisible({
+        timeout: TIMEOUTS.STANDARD,
+      })
       await expect(page.locator(selectors.subscription.sectionCurrentPlan)).not.toBeVisible()
-      await expect(page.locator(selectors.subscription.btnSelectPro)).toBeVisible()
     })
   })
 
@@ -184,16 +171,11 @@ test.describe('@ci @subscription Subscription Lifecycle', () => {
         priceId: TEST_PRICE_IDS.BUSINESS,
       })
       expectWebhookSuccess(result, 'customer.subscription.updated')
-
-      await pollSubscriptionStatus(
-        request,
-        ctx.bundle.headers,
-        (s) => s.plan === 'BUSINESS' && s.status === 'active',
-        'plan=BUSINESS'
-      )
     })
 
     await test.step('Assert: subscription page shows BUSINESS level badge', async () => {
+      // toHaveText auto-retries until the badge text matches, covering the
+      // small Vue render delay after the post-reload /status fetch.
       await page.reload({ waitUntil: 'domcontentloaded' })
       await navigateToSubscriptionViaUI(page)
 

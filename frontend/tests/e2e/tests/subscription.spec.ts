@@ -17,7 +17,6 @@ import {
   authBundle,
   expectWebhookSuccess,
   navigateToSubscriptionViaUI,
-  pollSubscriptionStatus,
   registerFreshUser,
 } from '../helpers/billing'
 
@@ -26,7 +25,6 @@ test.describe('@ci @subscription Subscription', () => {
     const customerId = `cus_${randomUUID()}`
     const subscriptionId = `sub_${randomUUID()}`
     let userId: string
-    let headers: { Cookie: string }
 
     // Single-test user: this scenario asserts "no active plan" as its baseline,
     // and the worker-scoped fixture would carry state from earlier lifecycle tests.
@@ -35,7 +33,6 @@ test.describe('@ci @subscription Subscription', () => {
       await test.step('Arrange: login as fresh user (no prior subscription state)', async () => {
         await login(page, fresh.credentials)
         const bundle = await authBundle(request, fresh.credentials)
-        headers = bundle.headers
         userId = bundle.userId
       })
 
@@ -91,26 +88,23 @@ test.describe('@ci @subscription Subscription', () => {
         expectWebhookSuccess(subResult, 'customer.subscription.created')
       })
 
-      await test.step('Wait: poll until backend has processed webhooks', async () => {
-        const status = await pollSubscriptionStatus(
-          request,
-          headers!,
-          (s) => s.hasSubscription === true && s.plan === 'PRO' && s.status === 'active',
-          'hasSubscription=true, plan=PRO, status=active'
-        )
-        expect(status.nextBilling).not.toBeNull()
-        expect(typeof status.nextBilling).toBe('number')
-      })
-
       await test.step('Assert: subscription page shows PRO active with next-billing line', async () => {
+        // Webhook handlers flush synchronously, so the 200 from the POST above is the
+        // sync point. Reload triggers a fresh /status fetch; the toBeVisible/toHaveText
+        // timeouts cover the small Vue mount + render delay without a separate API poll.
         await page.reload({ waitUntil: 'domcontentloaded' })
         await navigateToSubscriptionViaUI(page)
 
         const currentPlanSection = page.locator(selectors.subscription.sectionCurrentPlan)
         await expect(currentPlanSection).toBeVisible({ timeout: TIMEOUTS.STANDARD })
 
-        await expect(page.locator(selectors.subscription.badgeCurrentLevel)).toHaveText('PRO')
+        await expect(page.locator(selectors.subscription.badgeCurrentLevel)).toHaveText('PRO', {
+          timeout: TIMEOUTS.STANDARD,
+        })
         await expect(page.locator(selectors.subscription.badgeStatus)).toBeVisible()
+        // text-next-billing only renders when subscriptionStatus.nextBilling is truthy
+        // (see SubscriptionView.vue's v-else-if), so its visibility transitively asserts
+        // the API contract.
         await expect(page.locator(selectors.subscription.textNextBilling)).toBeVisible()
         await expect(page.locator(selectors.subscription.textCancelDate)).not.toBeVisible()
       })
