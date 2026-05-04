@@ -138,25 +138,82 @@ export interface ProSubscription {
 }
 
 /**
- * Activate a PRO subscription for the test user via mock webhooks. Sends
- * checkout.session.completed → customer.subscription.created and asserts a
- * 2xx body with `success: true` for each. The webhook handlers flush
- * Doctrine synchronously, so a 200 response IS the persistence sync point —
- * no separate /status poll is needed; the calling test's UI assertions
- * cover any remaining Vue render delay via Playwright's auto-retrying
- * matchers.
+ * Activate PRO via the full user-driven UI flow:
  *
- * Use this as the "Arrange" step for tests that need a known active baseline.
+ *   1. Navigate to /subscription via the sidebar.
+ *   2. Verify the FREE baseline is rendered (plan-picker visible, no
+ *      current-plan section). Catches regressions where the picker
+ *      disappears for new users.
+ *   3. Intercept POST /api/v1/subscription/checkout and click the PRO
+ *      plan button. Asserts the intercept fired so a silently-renamed
+ *      endpoint or accidentally redirected click is caught.
+ *   4. Send the Stripe webhooks Stripe would have fired post-checkout
+ *      (checkout.session.completed + customer.subscription.created).
+ *      These remain API-driven because Stripe outbound is policy-banned
+ *      in CI; everything user-observable is still driven by the UI.
+ *   5. Reload + verify the rendered subscription page reflects PRO
+ *      active.
+ *
+ * Use as the Arrange step for any test that needs a freshly-bought PRO
+ * user. The user must start FREE — pair this with `registerFreshUser` to
+ * guarantee a clean baseline.
  */
-export async function activateProSubscription(
+export async function activateProViaUi(
+  page: Page,
   request: APIRequestContext,
-  opts: { userId: string; customerId: string; subscriptionId: string }
+  bundle: AuthBundle,
+  opts: { customerId: string; subscriptionId: string }
 ): Promise<ProSubscription> {
-  const checkoutResult = await sendCheckoutCompletedWebhook(request, opts)
+  await navigateToSubscriptionViaUI(page)
+  await page.waitForSelector(selectors.subscription.cardPlan, { timeout: TIMEOUTS.STANDARD })
+
+  await expect(page.locator(selectors.subscription.btnSelectPro)).toBeVisible()
+  await expect(page.locator(selectors.subscription.sectionCurrentPlan)).not.toBeVisible()
+
+  let checkoutIntercepted = false
+  await page.route('**/api/v1/subscription/checkout', (route) => {
+    checkoutIntercepted = true
+    return route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        sessionId: 'cs_test_mock',
+        url: '/subscription?checkout_intercepted=true',
+      }),
+    })
+  })
+
+  try {
+    await page.locator(selectors.subscription.btnSelectPro).click()
+    await page.waitForSelector(selectors.subscription.cardPlan, { timeout: TIMEOUTS.STANDARD })
+    expect(checkoutIntercepted).toBe(true)
+  } finally {
+    await page.unroute('**/api/v1/subscription/checkout')
+  }
+
+  const checkoutResult = await sendCheckoutCompletedWebhook(request, {
+    customerId: opts.customerId,
+    subscriptionId: opts.subscriptionId,
+    userId: bundle.userId,
+  })
   expectWebhookSuccess(checkoutResult, 'checkout.session.completed')
 
-  const createdResult = await sendSubscriptionCreatedWebhook(request, opts)
-  expectWebhookSuccess(createdResult, 'customer.subscription.created')
+  const subResult = await sendSubscriptionCreatedWebhook(request, {
+    customerId: opts.customerId,
+    subscriptionId: opts.subscriptionId,
+    userId: bundle.userId,
+  })
+  expectWebhookSuccess(subResult, 'customer.subscription.created')
+
+  await page.reload({ waitUntil: 'domcontentloaded' })
+  await navigateToSubscriptionViaUI(page)
+
+  await expect(page.locator(selectors.subscription.sectionCurrentPlan)).toBeVisible({
+    timeout: TIMEOUTS.STANDARD,
+  })
+  await expect(page.locator(selectors.subscription.badgeCurrentLevel)).toHaveText('PRO', {
+    timeout: TIMEOUTS.STANDARD,
+  })
 
   return { customerId: opts.customerId, subscriptionId: opts.subscriptionId }
 }
