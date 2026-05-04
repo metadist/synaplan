@@ -38,7 +38,7 @@ final class AdminImpersonationController extends AbstractController
     #[OA\Post(
         path: '/api/v1/admin/impersonate/{userId}',
         summary: 'Start impersonating a user',
-        description: 'Admin-only. Mints a fresh access token scoped to the target user with an `impersonator_id` claim, moves the admin\'s refresh token aside into a single HttpOnly stash cookie, and clears the regular refresh cookie. No additional refresh token is persisted for the target. The original admin session is restored via `/exit`. Refused for self-impersonation, other admins, OIDC sessions, and nested impersonations.',
+        description: 'Admin-only. Mints a fresh access token scoped to the target user with an `impersonator_id` claim, moves the admin\'s refresh token aside into a single HttpOnly stash cookie, and clears the regular refresh cookie. No additional refresh token is persisted for the target. The original admin session is restored via `/exit`. Admins may impersonate any other user, including other admins. Refused for self-impersonation, OIDC sessions, and nested impersonations.',
         security: [['Bearer' => []]],
         tags: ['Admin']
     )]
@@ -81,7 +81,7 @@ final class AdminImpersonationController extends AbstractController
             ]
         )
     )]
-    #[OA\Response(response: 403, description: 'Caller is not an admin, or rule violated (self/admin/nested/OIDC)')]
+    #[OA\Response(response: 403, description: 'Caller is not an admin, or rule violated (self/nested/OIDC)')]
     #[OA\Response(response: 404, description: 'Target user not found')]
     public function start(
         int $userId,

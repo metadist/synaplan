@@ -163,7 +163,6 @@
       "confirmAction": "Sitzung starten",
       "started": "Du siehst die Anwendung jetzt als {email}.",
       "startFailed": "Impersonation konnte nicht gestartet werden",
-      "cannotImpersonateAdmin": "Andere Administratoren können nicht impersoniert werden.",
       "cannotImpersonateSelf": "Du kannst dich nicht selbst impersonieren.",
       "banner": {
         "viewing": "Angemeldet als {email}",

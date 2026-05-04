@@ -262,7 +262,6 @@
                           class="flex items-center justify-end gap-1"
                         >
                           <button
-                            v-if="user.level !== 'ADMIN'"
                             class="p-2 rounded-lg text-amber-600 hover:text-amber-700 dark:text-amber-400 dark:hover:text-amber-300 hover:bg-amber-50 dark:hover:bg-amber-900/20"
                             :title="$t('admin.impersonate.buttonTitle')"
                             :data-testid="`btn-impersonate-user-${user.id}`"
@@ -964,8 +963,11 @@ async function deleteUser() {
 
 /**
  * Start an impersonation session for the given user.
+ *
  * UX flow:
- *   1. Inline guard rails (mirror what the backend enforces): no self, no admin.
+ *   1. Inline self-check (mirrors the backend's only hard refusal that the UI
+ *      can see ahead of time — admin-on-admin is intentionally allowed, and
+ *      nesting/OIDC are session-scoped checks that only the server can make).
  *   2. Confirmation dialog so this never happens by accident — the admin is
  *      effectively logging in as someone else.
  *   3. On success: success notification + navigate to / (the impersonated
@@ -977,10 +979,6 @@ async function confirmImpersonate(targetUser: AdminUser) {
 
   if (targetUser.id === currentUserId.value) {
     showError(t('admin.impersonate.cannotImpersonateSelf'))
-    return
-  }
-  if (targetUser.level === 'ADMIN') {
-    showError(t('admin.impersonate.cannotImpersonateAdmin'))
     return
   }
 
