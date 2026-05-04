@@ -33,6 +33,27 @@ class Prompt
     #[ORM\Column(name: 'BSELECTION_RULES', type: 'text', nullable: true)]
     private ?string $selectionRules = null;
 
+    /**
+     * Comma- or newline-separated keywords/synonyms.
+     *
+     * Used together with `shortDescription` when the topic is embedded into
+     * the synapse_topics Qdrant collection. Adding domain-specific synonyms
+     * here improves recall for the SynapseRouter without bloating the
+     * AI fallback sort prompt.
+     */
+    #[ORM\Column(name: 'BKEYWORDS', type: 'text', nullable: true)]
+    private ?string $keywords = null;
+
+    /**
+     * Soft-disable flag.
+     *
+     * When false, the topic is hidden from the routing pool (both Synapse
+     * embedding search and the AI fallback DYNAMICLIST). Existing messages
+     * that reference the topic remain unaffected.
+     */
+    #[ORM\Column(name: 'BENABLED', type: 'boolean', options: ['default' => true])]
+    private bool $enabled = true;
+
     public function getId(): ?int
     {
         return $this->id;
@@ -106,6 +127,30 @@ class Prompt
     public function setSelectionRules(?string $selectionRules): self
     {
         $this->selectionRules = $selectionRules;
+
+        return $this;
+    }
+
+    public function getKeywords(): ?string
+    {
+        return $this->keywords;
+    }
+
+    public function setKeywords(?string $keywords): self
+    {
+        $this->keywords = $keywords;
+
+        return $this;
+    }
+
+    public function isEnabled(): bool
+    {
+        return $this->enabled;
+    }
+
+    public function setEnabled(bool $enabled): self
+    {
+        $this->enabled = $enabled;
 
         return $this;
     }

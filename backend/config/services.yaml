@@ -52,6 +52,7 @@ parameters:
     env(QDRANT_URL): ''
     env(QDRANT_MEMORIES_COLLECTION): ''
     env(QDRANT_DOCUMENTS_COLLECTION): ''
+    env(QDRANT_SYNAPSE_COLLECTION): ''
     env(TRITON_SERVER_URL): ''
     env(GOOGLE_CLIENT_ID): ''
     env(GITHUB_CLIENT_ID): ''
@@ -70,6 +71,9 @@ parameters:
     env(STRIPE_PAYMENT_METHODS): ''
     env(WHATSAPP_ACCESS_TOKEN): ''
     env(WHATSAPP_WEBHOOK_VERIFY_TOKEN): ''
+    env(CLOUDFLARE_ACCOUNT_ID): ''
+    env(CLOUDFLARE_API_TOKEN): ''
+    env(EMBEDDING_FALLBACK_PROVIDER): ''
 
     # Piper TTS Service default (localhost for native; Docker Compose overrides via env)
     env(SYNAPLAN_TTS_URL): ''
@@ -194,8 +198,17 @@ services:
             - { name: 'app.ai.image_generation' }
             - { name: 'app.ai.video_generation' }
 
+    App\AI\Provider\CloudflareProvider:
+        arguments:
+            $accountId: '%env(CLOUDFLARE_ACCOUNT_ID)%'
+            $apiToken: '%env(CLOUDFLARE_API_TOKEN)%'
+        tags:
+            - { name: 'app.ai.embedding' }
+
     # AI Facade
-    App\AI\Service\AiFacade: ~
+    App\AI\Service\AiFacade:
+        arguments:
+            $embeddingFallbackProvider: '%env(EMBEDDING_FALLBACK_PROVIDER)%'
 
     # Whisper Service for Audio Transcription
     App\Service\WhisperService:
@@ -245,6 +258,8 @@ services:
             $uploadsDir: '%kernel.project_dir%/var/uploads'
     App\Service\Message\MessageSorter: ~
     App\Service\Message\MessageClassifier: ~
+    App\Service\Message\SynapseRouter: ~
+    App\Service\Message\SynapseIndexer: ~
     App\Service\Message\InferenceRouter: ~
     App\Service\Message\MessageProcessor: ~
 
@@ -505,6 +520,7 @@ services:
             $qdrantUrl: '%env(QDRANT_URL)%'
             $memoriesCollection: '%env(default::QDRANT_MEMORIES_COLLECTION)%'
             $documentsCollection: '%env(default::QDRANT_DOCUMENTS_COLLECTION)%'
+            $synapseCollection: '%env(default::QDRANT_SYNAPSE_COLLECTION)%'
 
     App\Service\VectorSearch\QdrantClientInterface:
         alias: App\Service\VectorSearch\QdrantClientDirect

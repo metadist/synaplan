@@ -322,4 +322,32 @@ class Model
 
         return $intValue > 0 ? $intValue : null;
     }
+
+    /**
+     * Native output dimension for embedding/vectorize models.
+     *
+     * Read from `BJSON.meta.dimensions` (the catalog field) so the
+     * Synapse indexer/router can configure the Qdrant collection with
+     * the correct vector size instead of hard-coding 1024 and silently
+     * slice/zero-padding mismatched outputs (PR #853 review).
+     *
+     * Falls back to 1024 — the historical default for installed
+     * collections — only when no metadata is present, so legacy/local
+     * Ollama rows without a `meta.dimensions` field keep working.
+     * Non-embedding models will return the same fallback; callers are
+     * responsible for invoking this method only on `tag = vectorize`
+     * rows.
+     */
+    public function getVectorDim(): int
+    {
+        $value = $this->json['meta']['dimensions'] ?? null;
+
+        if (null === $value || !is_numeric($value)) {
+            return 1024;
+        }
+
+        $intValue = (int) $value;
+
+        return $intValue > 0 ? $intValue : 1024;
+    }
 }

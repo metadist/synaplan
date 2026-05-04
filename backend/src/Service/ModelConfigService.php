@@ -396,6 +396,24 @@ final readonly class ModelConfigService
     }
 
     /**
+     * Native vector dimension for an embedding model.
+     *
+     * Pulled from `BJSON.meta.dimensions` via Model::getVectorDim().
+     * Returns null when the model row is missing so callers can decide
+     * whether to fall back to a sensible default or raise an error.
+     */
+    public function getVectorDimForModel(int $modelId): ?int
+    {
+        $model = $this->modelRepository->find($modelId);
+
+        if (!$model) {
+            return null;
+        }
+
+        return $model->getVectorDim();
+    }
+
+    /**
      * Get effective user ID for model selection based on message channel.
      *
      * For Email messages:

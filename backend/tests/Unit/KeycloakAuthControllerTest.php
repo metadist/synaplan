@@ -43,6 +43,8 @@ class KeycloakAuthControllerTest extends TestCase
         // they were written for.
         $impersonationService = $this->createMock(\App\Service\ImpersonationService::class);
 
+        $synapseAutoIndex = $this->createMock(\App\Service\Message\SynapseAutoIndexService::class);
+
         return new KeycloakAuthController(
             $this->httpClient,
             $this->tokenService,
@@ -50,6 +52,7 @@ class KeycloakAuthControllerTest extends TestCase
             $this->oidcUserService,
             $this->oauthStateService,
             $impersonationService,
+            $synapseAutoIndex,
             $this->logger,
             'test-client-id',
             'test-client-secret',

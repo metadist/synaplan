@@ -1,63 +1,68 @@
 <template>
   <div class="space-y-6" data-testid="page-config-task-prompts">
-    <!-- Header Card with Dropdown -->
-    <div class="surface-card p-6" data-testid="section-selector">
-      <div class="flex items-start justify-between mb-6">
-        <div>
-          <h2 class="text-2xl font-semibold txt-primary flex items-center gap-3">
-            <Icon icon="heroicons:document-text" class="w-7 h-7 text-[var(--brand)]" />
-            {{ $t('config.taskPrompts.title') }}
-          </h2>
-          <p class="txt-secondary text-sm mt-1">{{ $t('config.taskPrompts.subtitle') }}</p>
-        </div>
-      </div>
-
-      <!-- Language Indicator Banner -->
-      <div
-        class="p-3 mb-4 bg-[var(--brand)]/5 border border-[var(--brand)]/20 rounded-lg"
-        data-testid="section-language-indicator"
-      >
-        <div class="flex items-center gap-2">
-          <Icon icon="heroicons:language" class="w-5 h-5 text-[var(--brand)]" />
-          <div>
-            <p class="text-sm font-medium text-[var(--brand)]">
-              {{ $t('config.taskPrompts.workingLanguage', { language: currentLanguageLabel }) }}
-            </p>
-            <p class="text-xs txt-secondary mt-0.5">
-              {{ $t('config.taskPrompts.workingLanguageHint') }}
-            </p>
+    <!-- Header / overview card -->
+    <div class="surface-card p-6" data-testid="section-task-prompts-overview">
+      <div class="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4">
+        <div class="flex items-start gap-3 flex-1 min-w-0">
+          <div class="p-2 rounded-lg bg-[var(--brand)]/10 flex-shrink-0">
+            <Icon icon="heroicons:document-text" class="w-6 h-6 text-[var(--brand)]" />
+          </div>
+          <div class="flex-1 min-w-0">
+            <h2 class="text-2xl font-semibold txt-primary">{{ $t('config.taskPrompts.title') }}</h2>
+            <p class="txt-secondary text-sm mt-1">{{ $t('config.taskPrompts.subtitle') }}</p>
+            <div class="flex items-center gap-2 mt-3 text-xs flex-wrap">
+              <span
+                class="px-2 py-1 rounded-full bg-[var(--brand)]/10 text-[var(--brand)] flex items-center gap-1.5"
+                data-testid="badge-language"
+              >
+                <Icon icon="heroicons:language" class="w-3.5 h-3.5" />
+                {{ $t('config.taskPrompts.workingLanguage', { language: currentLanguageLabel }) }}
+              </span>
+              <span class="txt-secondary">{{ $t('config.taskPrompts.workingLanguageHint') }}</span>
+            </div>
           </div>
         </div>
-      </div>
 
-      <!-- Prompt Selector with New Button -->
-      <div class="flex flex-col sm:flex-row sm:items-start gap-3">
-        <div class="flex-1 w-full">
-          <label class="block text-sm font-semibold txt-primary mb-2 flex items-center gap-2">
-            <Icon icon="heroicons:list-bullet" class="w-4 h-4" />
-            {{ $t('config.taskPrompts.selectPrompt') }}
-          </label>
-          <select
-            v-model="selectedPromptId"
-            class="w-full px-4 py-3 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)] transition-all"
-            data-testid="input-prompt-select"
-            @change="onPromptSelect"
-          >
-            <option :value="null" disabled>Select a task prompt...</option>
-            <option v-for="prompt in prompts" :key="prompt.id" :value="prompt.id">
-              {{ prompt.name }}
-            </option>
-          </select>
-          <p class="text-xs txt-secondary mt-1.5 flex items-center gap-1">
-            <Icon icon="heroicons:information-circle" class="w-3.5 h-3.5" />
-            {{ $t('config.taskPrompts.selectPromptHelp') }}
-          </p>
-        </div>
+        <div class="flex flex-col sm:flex-row sm:items-center gap-3 lg:flex-shrink-0">
+          <!-- Stat pills -->
+          <div class="flex flex-wrap items-center gap-2" data-testid="section-task-prompts-stats">
+            <div
+              class="px-3 py-2 rounded-lg surface-chip flex items-center gap-2"
+              data-testid="stat-total"
+            >
+              <Icon icon="heroicons:rectangle-stack" class="w-4 h-4 text-[var(--brand)]" />
+              <span class="text-sm font-semibold txt-primary">{{ prompts.length }}</span>
+              <span class="text-xs txt-secondary">{{ $t('config.taskPrompts.statTotal') }}</span>
+            </div>
+            <div
+              class="px-3 py-2 rounded-lg surface-chip flex items-center gap-2"
+              data-testid="stat-system"
+            >
+              <Icon icon="heroicons:shield-check" class="w-4 h-4 text-blue-500" />
+              <span class="text-sm font-semibold txt-primary">{{ systemPromptCount }}</span>
+              <span class="text-xs txt-secondary">{{ $t('config.taskPrompts.statSystem') }}</span>
+            </div>
+            <div
+              class="px-3 py-2 rounded-lg surface-chip flex items-center gap-2"
+              data-testid="stat-custom"
+            >
+              <Icon icon="heroicons:user" class="w-4 h-4 text-purple-500" />
+              <span class="text-sm font-semibold txt-primary">{{ customPromptCount }}</span>
+              <span class="text-xs txt-secondary">{{ $t('config.taskPrompts.statCustom') }}</span>
+            </div>
+            <div
+              v-if="disabledPromptCount > 0"
+              class="px-3 py-2 rounded-lg surface-chip flex items-center gap-2"
+              data-testid="stat-disabled"
+            >
+              <Icon icon="heroicons:eye-slash" class="w-4 h-4 text-gray-500" />
+              <span class="text-sm font-semibold txt-primary">{{ disabledPromptCount }}</span>
+              <span class="text-xs txt-secondary">{{ $t('config.taskPrompts.statDisabled') }}</span>
+            </div>
+          </div>
 
-        <!-- New Prompt Button -->
-        <div class="pt-0 sm:pt-7 w-full sm:w-auto">
           <button
-            class="w-full sm:w-auto px-5 py-3 rounded-lg bg-[var(--brand)] text-white hover:bg-[var(--brand)]/90 transition-colors font-medium text-sm flex items-center justify-center gap-2 whitespace-nowrap"
+            class="px-4 py-2.5 rounded-lg bg-[var(--brand)] text-white hover:bg-[var(--brand)]/90 transition-colors font-medium text-sm flex items-center justify-center gap-2 whitespace-nowrap"
             data-testid="btn-create-prompt"
             @click="showCreateModal = true"
           >
@@ -68,427 +73,960 @@
       </div>
     </div>
 
-    <!-- Prompt Details (only shown when a prompt is selected) -->
-    <template v-if="currentPrompt">
-      <!-- Prompt Details Card -->
-      <div class="surface-card p-6" data-testid="section-prompt-details">
-        <h3 class="text-lg font-semibold txt-primary mb-4 flex items-center gap-2">
-          <Icon icon="heroicons:cog-6-tooth" class="w-5 h-5 text-[var(--brand)]" />
-          {{ $t('config.taskPrompts.promptDetails') }}
-        </h3>
-
-        <div class="space-y-5">
-          <!-- System Prompt Badge (if default) -->
-          <div
-            v-if="currentPrompt.isDefault && !currentPrompt.isUserOverride && !isAdmin"
-            class="p-3 bg-blue-500/10 border border-blue-500/30 rounded-lg"
-          >
-            <div class="flex items-center gap-2">
+    <!-- Two-pane layout: list + editor -->
+    <div class="grid grid-cols-1 lg:grid-cols-[minmax(0,320px)_minmax(0,1fr)] gap-6">
+      <!-- LEFT: Topic list -->
+      <aside
+        class="surface-card p-0 lg:sticky lg:top-4 lg:self-start lg:max-h-[calc(100vh-2rem)] flex flex-col overflow-hidden"
+        :class="[currentPrompt && !listVisibleMobile && 'hidden lg:flex']"
+        data-testid="section-task-prompts-list"
+      >
+        <!-- Sticky list header -->
+        <div
+          class="p-4 border-b border-light-border/30 dark:border-dark-border/20 space-y-3 flex-shrink-0"
+        >
+          <!-- Search + density toggle row -->
+          <div class="flex items-center gap-2">
+            <div class="relative flex-1">
               <Icon
-                icon="heroicons:information-circle"
-                class="w-5 h-5 text-blue-600 dark:text-blue-400"
+                icon="heroicons:magnifying-glass"
+                class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 txt-secondary pointer-events-none"
               />
-              <div>
-                <p class="text-sm font-medium text-blue-600 dark:text-blue-400">System Prompt</p>
-                <p class="text-xs text-blue-600/70 dark:text-blue-400/70">
-                  This is a default system prompt. Any changes you make will be saved as your own
-                  custom override.
-                </p>
-              </div>
-            </div>
-          </div>
-          <div
-            v-else-if="currentPrompt.isDefault && isAdmin"
-            class="p-3 bg-amber-500/10 border border-amber-500/30 rounded-lg"
-          >
-            <div class="flex items-center gap-2">
-              <Icon
-                icon="heroicons:shield-check"
-                class="w-5 h-5 text-amber-600 dark:text-amber-400"
+              <input
+                v-model="promptListSearch"
+                type="text"
+                :placeholder="$t('config.taskPrompts.searchPlaceholder')"
+                class="w-full pl-9 pr-9 py-2 rounded-lg surface-chip border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
+                data-testid="input-prompt-search"
               />
-              <div>
-                <p class="text-sm font-medium text-amber-600 dark:text-amber-400">
-                  {{ $t('config.taskPrompts.systemPromptAdminTitle') }}
-                </p>
-                <p class="text-xs text-amber-600/70 dark:text-amber-400/70">
-                  {{ $t('config.taskPrompts.systemPromptAdminDesc') }}
-                </p>
-                <p class="text-xs text-amber-600/70 dark:text-amber-400/70 mt-1">
-                  {{ $t('config.taskPrompts.selectPromptHelpAdmin') }}
-                </p>
-              </div>
-            </div>
-          </div>
-
-          <!-- Rules / Description -->
-          <div>
-            <label class="block text-sm font-semibold txt-primary mb-2 flex items-center gap-2">
-              <Icon icon="heroicons:clipboard-document-list" class="w-4 h-4" />
-              {{ $t('config.taskPrompts.rulesForSelection') }}
-            </label>
-            <textarea
-              v-model="formData.rules"
-              rows="3"
-              class="w-full px-4 py-3 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)] resize-none disabled:opacity-50 disabled:cursor-not-allowed"
-              :placeholder="$t('config.taskPrompts.rulesHelp')"
-              data-testid="input-rules"
-            />
-          </div>
-
-          <!-- Language Selection -->
-          <div>
-            <label class="block text-sm font-semibold txt-primary mb-2 flex items-center gap-2">
-              <Icon icon="heroicons:language" class="w-4 h-4" />
-              {{ $t('config.taskPrompts.language', 'Language') }}
-            </label>
-            <select
-              v-model="formData.language"
-              class="w-full px-4 py-3 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)] disabled:opacity-50 disabled:cursor-not-allowed"
-              data-testid="input-language"
-            >
-              <option v-for="lang in PROMPT_LANGUAGES" :key="lang.value" :value="lang.value">
-                {{ lang.label }}
-              </option>
-            </select>
-            <p
-              v-if="currentPrompt.isDefault && isAdmin"
-              class="text-xs text-amber-600 dark:text-amber-400 mt-1.5 flex items-center gap-1"
-            >
-              <Icon icon="heroicons:lock-closed" class="w-3.5 h-3.5" />
-              {{ $t('config.taskPrompts.systemPromptLanguageFixed') }}
-            </p>
-            <p v-else class="text-xs txt-secondary mt-1.5 flex items-center gap-1">
-              <Icon icon="heroicons:information-circle" class="w-3.5 h-3.5" />
-              {{ $t('config.taskPrompts.customPromptLanguageNote') }}
-            </p>
-          </div>
-
-          <!-- AI Model Selection -->
-          <div>
-            <label class="block text-sm font-semibold txt-primary mb-2 flex items-center gap-2">
-              <Icon icon="heroicons:cpu-chip" class="w-4 h-4" />
-              {{ $t('config.taskPrompts.aiModel') }}
-            </label>
-            <ModelSelectDropdown
-              :model-value="formData.aiModel ?? 'default'"
-              :groups="groupedModels"
-              :loading="loadingModels"
-              default-option="Default Model (Auto-selected based on capability)"
-              data-testid="input-ai-model"
-              @update:model-value="
-                (v: string | number | null) => (formData.aiModel = String(v ?? 'default'))
-              "
-            />
-            <p class="text-xs txt-secondary mt-1.5 flex items-center gap-1">
-              <Icon icon="heroicons:information-circle" class="w-3.5 h-3.5" />
-              {{ $t('config.taskPrompts.aiModelHelp') }}
-            </p>
-          </div>
-
-          <!-- Available Tools -->
-          <div>
-            <label class="block text-sm font-semibold txt-primary mb-3 flex items-center gap-2">
-              <Icon icon="heroicons:wrench-screwdriver" class="w-4 h-4" />
-              {{ $t('config.taskPrompts.availableTools') }}
-            </label>
-            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <label
-                v-for="tool in availableTools"
-                :key="tool.value"
-                class="flex items-center gap-3 p-3 rounded-lg surface-chip cursor-pointer hover:bg-[var(--brand)]/5 transition-colors"
-                data-testid="item-tool"
+              <button
+                v-if="promptListSearch"
+                class="absolute right-2 top-1/2 -translate-y-1/2 p-1 rounded txt-secondary hover:txt-primary"
+                :title="$t('config.taskPrompts.clearFilters')"
+                data-testid="btn-clear-search"
+                @click="promptListSearch = ''"
               >
-                <input
-                  v-model="formData.availableTools"
-                  type="checkbox"
-                  :value="tool.value"
-                  class="w-5 h-5 rounded border-light-border/30 dark:border-dark-border/20 text-[var(--brand)] focus:ring-2 focus:ring-[var(--brand)]"
-                />
-                <Icon :icon="tool.icon" class="w-5 h-5 txt-secondary" />
-                <span class="text-sm txt-primary">{{ tool.label }}</span>
-              </label>
+                <Icon icon="heroicons:x-mark" class="w-3.5 h-3.5" />
+              </button>
             </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- Prompt Content Card -->
-      <div class="surface-card p-6" data-testid="section-prompt-content">
-        <div class="flex items-center justify-between mb-4">
-          <h3 class="text-lg font-semibold txt-primary flex items-center gap-2">
-            <Icon icon="heroicons:code-bracket" class="w-5 h-5 text-[var(--brand)]" />
-            {{ $t('config.taskPrompts.promptContent') }}
-          </h3>
-
-          <!-- Markdown Toolbar -->
-          <div class="flex items-center gap-1 p-1 surface-chip rounded-lg">
             <button
-              v-for="tool in markdownTools"
-              :key="tool.label"
-              class="p-2 rounded hover:bg-[var(--brand)]/10 txt-secondary hover:txt-primary transition-colors"
-              :title="tool.label"
-              data-testid="btn-markdown-tool"
-              @click="insertMarkdown(tool.before, tool.after)"
+              type="button"
+              class="p-2 rounded-lg surface-chip txt-secondary hover:txt-primary transition-colors"
+              :title="
+                viewDensity === 'compact'
+                  ? $t('config.taskPrompts.densityDetailed')
+                  : $t('config.taskPrompts.densityCompact')
+              "
+              data-testid="btn-density-toggle"
+              @click="viewDensity = viewDensity === 'compact' ? 'detailed' : 'compact'"
             >
-              <Icon :icon="tool.icon" class="w-4 h-4" />
+              <Icon
+                :icon="
+                  viewDensity === 'compact'
+                    ? 'heroicons:bars-3-bottom-left'
+                    : 'heroicons:queue-list'
+                "
+                class="w-4 h-4"
+              />
+            </button>
+          </div>
+
+          <!-- Filter chips -->
+          <div class="flex gap-1.5 overflow-x-auto pb-1 -mx-1 px-1">
+            <button
+              v-for="filter in promptListFilters"
+              :key="filter.value"
+              type="button"
+              class="px-2.5 py-1 rounded-full text-xs font-medium whitespace-nowrap transition-colors flex items-center gap-1.5"
+              :class="
+                promptListFilter === filter.value
+                  ? 'bg-[var(--brand)] text-white'
+                  : 'surface-chip txt-secondary hover:txt-primary'
+              "
+              :data-testid="`filter-${filter.value}`"
+              @click="promptListFilter = filter.value"
+            >
+              <span>{{ filter.label }}</span>
+              <span
+                class="px-1.5 rounded-full text-[10px] font-semibold leading-none py-0.5"
+                :class="
+                  promptListFilter === filter.value
+                    ? 'bg-white/20'
+                    : 'bg-light-border/30 dark:bg-dark-border/20'
+                "
+              >
+                {{ filter.count }}
+              </span>
+            </button>
+          </div>
+
+          <!-- Result count + collapse-all toggle -->
+          <div class="flex items-center justify-between text-[11px] txt-secondary">
+            <span data-testid="text-list-count">
+              {{ $t('config.taskPrompts.listCount', { n: filteredPrompts.length }) }}
+            </span>
+            <button
+              type="button"
+              class="hover:txt-primary transition-colors"
+              data-testid="btn-toggle-all-groups"
+              @click="toggleAllGroups"
+            >
+              {{
+                allGroupsCollapsed
+                  ? $t('config.taskPrompts.expandAll')
+                  : $t('config.taskPrompts.collapseAll')
+              }}
             </button>
           </div>
         </div>
 
-        <textarea
-          ref="contentTextarea"
-          v-model="formData.content"
-          rows="16"
-          class="w-full px-4 py-3 surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)] resize-none font-mono disabled:opacity-50 disabled:cursor-not-allowed"
-          :placeholder="$t('config.taskPrompts.contentPlaceholder')"
-          data-testid="input-content"
-        />
-
-        <p class="text-xs txt-secondary mt-2 flex items-center gap-1">
-          <Icon icon="heroicons:information-circle" class="w-3.5 h-3.5" />
-          {{ $t('config.taskPrompts.contentHelp') }}
-        </p>
-      </div>
-
-      <!-- Knowledge Base Files Card -->
-      <div
-        v-if="!currentPrompt.isDefault || isAdmin"
-        class="surface-card p-6"
-        data-testid="section-knowledge-base"
-      >
-        <div class="flex items-center justify-between mb-4">
-          <div>
-            <h3 class="text-lg font-semibold txt-primary flex items-center gap-2">
-              <Icon icon="heroicons:document-text" class="w-5 h-5 text-[var(--brand)]" />
-              Knowledge Base Files
-            </h3>
-            <p class="text-xs txt-secondary mt-1">
-              Upload files or link existing files that provide context for this task prompt
-            </p>
-          </div>
-        </div>
-
-        <!-- Upload Files Button (redirect to File Manager) -->
-        <div class="mb-4">
-          <router-link
-            to="/files"
-            class="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg bg-[var(--brand)]/10 text-[var(--brand)] hover:bg-[var(--brand)]/20 transition-colors text-sm font-medium"
-            data-testid="link-upload-files"
-          >
-            <Icon icon="heroicons:cloud-arrow-up" class="w-5 h-5" />
-            Upload Files in File Manager
-            <Icon icon="heroicons:arrow-right" class="w-4 h-4" />
-          </router-link>
-        </div>
-
-        <!-- Linked Files Section -->
-        <div class="mb-6">
-          <div class="flex items-center justify-between mb-3">
-            <h4 class="text-sm font-semibold txt-primary flex items-center gap-2">
-              <Icon icon="heroicons:link" class="w-4 h-4" />
-              Linked Files ({{ promptFiles.length }})
-            </h4>
-          </div>
-
-          <!-- Linked Files List -->
-          <div
-            v-if="promptFiles.length > 0"
-            class="space-y-2 p-3 surface-chip rounded-lg max-h-[250px] overflow-y-auto"
-            data-testid="section-linked-files"
-          >
-            <div
-              v-for="file in promptFiles"
-              :key="file.messageId"
-              class="flex items-center justify-between p-2.5 bg-green-500/5 border border-green-500/20 rounded-lg group hover:bg-green-500/10 transition-colors"
-              data-testid="item-linked-file"
-            >
-              <div class="flex items-center gap-2.5 flex-1 min-w-0">
+        <!-- Scrollable category groups -->
+        <div class="flex-1 overflow-y-auto py-2" data-testid="section-task-prompt-cards">
+          <template v-for="group in categorizedPrompts" :key="group.id">
+            <div v-if="group.prompts.length > 0" class="px-2 mb-1">
+              <button
+                type="button"
+                class="w-full flex items-center gap-2 px-2 py-1.5 rounded-md txt-secondary hover:txt-primary hover:bg-light-border/10 dark:hover:bg-dark-border/10 transition-colors text-[11px] uppercase tracking-wide font-semibold"
+                :data-testid="`group-${group.id}`"
+                @click="toggleGroup(group.id)"
+              >
                 <Icon
-                  icon="heroicons:check-circle"
-                  class="w-5 h-5 text-green-600 dark:text-green-400 flex-shrink-0"
+                  :icon="
+                    isGroupCollapsed(group.id)
+                      ? 'heroicons:chevron-right'
+                      : 'heroicons:chevron-down'
+                  "
+                  class="w-3.5 h-3.5"
                 />
-                <div class="flex-1 min-w-0">
-                  <p class="text-sm font-medium txt-primary truncate">{{ file.fileName }}</p>
-                  <p class="text-xs text-green-600/70 dark:text-green-400/70">
-                    {{ file.chunks }} chunks •
-                    {{ file.uploadedAt ? formatDate(file.uploadedAt) : 'Unknown date' }}
-                  </p>
+                <Icon :icon="group.icon" class="w-3.5 h-3.5" />
+                <span class="flex-1 text-left">{{ group.label }}</span>
+                <span
+                  class="px-1.5 rounded-full text-[10px] font-semibold leading-none py-0.5 bg-light-border/30 dark:bg-dark-border/20"
+                >
+                  {{ group.prompts.length }}
+                </span>
+              </button>
+
+              <ul v-if="!isGroupCollapsed(group.id)" class="space-y-0.5 mt-1">
+                <li v-for="prompt in group.prompts" :key="prompt.id">
+                  <button
+                    type="button"
+                    class="w-full text-left px-2 rounded-md transition-all group flex items-center gap-2"
+                    :class="[
+                      viewDensity === 'compact' ? 'py-1.5' : 'py-2.5',
+                      selectedPromptId === prompt.id
+                        ? 'bg-[var(--brand)]/10 text-[var(--brand)]'
+                        : 'hover:bg-light-border/10 dark:hover:bg-dark-border/10 txt-primary',
+                      prompt.enabled === false && 'opacity-60',
+                    ]"
+                    :data-testid="`card-prompt-${prompt.topic}`"
+                    :title="prompt.shortDescription || prompt.topic"
+                    @click="onCardSelect(prompt.id)"
+                  >
+                    <!-- Active indicator stripe -->
+                    <span
+                      class="w-0.5 self-stretch rounded-full transition-all"
+                      :class="
+                        selectedPromptId === prompt.id ? 'bg-[var(--brand)]' : 'bg-transparent'
+                      "
+                    />
+
+                    <Icon
+                      :icon="topicIcon(prompt.topic)"
+                      class="w-4 h-4 flex-shrink-0"
+                      :class="
+                        selectedPromptId === prompt.id
+                          ? 'text-[var(--brand)]'
+                          : 'txt-secondary group-hover:text-[var(--brand)]'
+                      "
+                    />
+
+                    <div class="flex-1 min-w-0">
+                      <div class="flex items-center gap-1.5">
+                        <span class="text-sm font-medium truncate">{{ prompt.name }}</span>
+
+                        <!-- Inline mini-badges (always visible) -->
+                        <span
+                          v-if="prompt.isUserOverride"
+                          class="px-1 py-0.5 rounded text-[9px] font-medium uppercase bg-amber-500/10 text-amber-600 dark:text-amber-400 leading-none flex-shrink-0"
+                          :title="$t('config.taskPrompts.badgeOverride')"
+                          data-testid="badge-override"
+                        >
+                          {{ $t('config.taskPrompts.badgeOverride') }}
+                        </span>
+                      </div>
+                      <p
+                        v-if="viewDensity === 'detailed' && prompt.shortDescription"
+                        class="text-[11px] txt-secondary line-clamp-1 mt-0.5"
+                      >
+                        {{ prompt.shortDescription }}
+                      </p>
+                      <p
+                        v-else-if="viewDensity === 'detailed'"
+                        class="text-[10px] txt-secondary font-mono truncate mt-0.5"
+                      >
+                        {{ prompt.topic }}
+                      </p>
+                    </div>
+
+                    <!-- Status dots (right side, always visible) -->
+                    <span
+                      v-if="prompt.enabled === false"
+                      class="w-1.5 h-1.5 rounded-full bg-gray-400 flex-shrink-0"
+                      :title="$t('config.taskPrompts.badgeDisabled')"
+                      data-testid="dot-disabled"
+                    />
+                    <template v-else-if="topicStatusFor(prompt.topic)">
+                      <span
+                        v-if="
+                          topicStatusFor(prompt.topic)?.indexed &&
+                          !topicStatusFor(prompt.topic)?.stale
+                        "
+                        class="w-1.5 h-1.5 rounded-full bg-emerald-500 flex-shrink-0"
+                        :title="$t('config.taskPrompts.indexedTooltip')"
+                        data-testid="dot-indexed"
+                      />
+                      <span
+                        v-else-if="
+                          topicStatusFor(prompt.topic)?.indexed &&
+                          topicStatusFor(prompt.topic)?.stale
+                        "
+                        class="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse flex-shrink-0"
+                        :title="$t('config.taskPrompts.staleTooltip')"
+                        data-testid="dot-stale"
+                      />
+                      <span
+                        v-else
+                        class="w-1.5 h-1.5 rounded-full bg-rose-500 flex-shrink-0"
+                        :title="$t('config.taskPrompts.notIndexedTooltip')"
+                        data-testid="dot-not-indexed"
+                      />
+                    </template>
+                  </button>
+                </li>
+              </ul>
+            </div>
+          </template>
+
+          <div
+            v-if="filteredPrompts.length === 0"
+            class="text-center py-12 px-4"
+            data-testid="text-no-prompts-match"
+          >
+            <Icon icon="heroicons:funnel" class="w-10 h-10 mx-auto mb-2 txt-secondary opacity-30" />
+            <p class="text-sm txt-secondary">{{ $t('config.taskPrompts.noPromptsMatch') }}</p>
+            <button
+              v-if="promptListSearch || promptListFilter !== 'all'"
+              class="text-xs text-[var(--brand)] hover:underline mt-2"
+              data-testid="btn-clear-filters"
+              @click="clearFilters"
+            >
+              {{ $t('config.taskPrompts.clearFilters') }}
+            </button>
+          </div>
+        </div>
+
+        <!-- Status legend (admin only) -->
+        <div
+          v-if="isAdmin && synapseStatus && filteredPrompts.length > 0"
+          class="px-4 py-2 border-t border-light-border/30 dark:border-dark-border/20 flex items-center gap-3 text-[10px] txt-secondary flex-shrink-0"
+          data-testid="section-list-legend"
+        >
+          <span class="flex items-center gap-1">
+            <span class="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+            {{ $t('config.taskPrompts.statusIndexed') }}
+          </span>
+          <span class="flex items-center gap-1">
+            <span class="w-1.5 h-1.5 rounded-full bg-amber-500" />
+            {{ $t('config.taskPrompts.statusStale') }}
+          </span>
+          <span class="flex items-center gap-1">
+            <span class="w-1.5 h-1.5 rounded-full bg-rose-500" />
+            {{ $t('config.taskPrompts.statusNotIndexed') }}
+          </span>
+        </div>
+
+        <!-- Hidden compat select for legacy automation tools -->
+        <select
+          v-model="selectedPromptId"
+          class="sr-only"
+          aria-hidden="true"
+          tabindex="-1"
+          data-testid="input-prompt-select"
+          @change="onPromptSelect"
+        >
+          <option :value="null" disabled>{{ $t('config.taskPrompts.selectPlaceholder') }}</option>
+          <option v-for="prompt in filteredPrompts" :key="prompt.id" :value="prompt.id">
+            {{ prompt.name }}
+          </option>
+        </select>
+      </aside>
+
+      <!-- RIGHT: Editor or empty state -->
+      <section class="min-w-0" :class="[!currentPrompt && listVisibleMobile && 'hidden lg:block']">
+        <template v-if="currentPrompt">
+          <!-- Sticky breadcrumb header -->
+          <div
+            class="surface-card p-4 mb-4 flex items-center gap-3"
+            data-testid="section-prompt-header"
+          >
+            <button
+              class="lg:hidden p-2 rounded-lg hover:bg-light-border/10 dark:hover:bg-dark-border/10"
+              :title="$t('config.taskPrompts.backToList')"
+              data-testid="btn-back-to-list"
+              @click="backToListMobile"
+            >
+              <Icon icon="heroicons:arrow-left" class="w-5 h-5 txt-secondary" />
+            </button>
+            <div class="p-2 rounded-lg bg-[var(--brand)]/10 text-[var(--brand)] flex-shrink-0">
+              <Icon :icon="topicIcon(currentPrompt.topic)" class="w-5 h-5" />
+            </div>
+            <div class="flex-1 min-w-0">
+              <div class="flex items-center gap-2 flex-wrap">
+                <h3 class="text-lg font-semibold txt-primary truncate">
+                  {{ currentPrompt.name }}
+                </h3>
+                <span
+                  v-if="currentPrompt.isDefault && !currentPrompt.isUserOverride"
+                  class="px-1.5 py-0.5 rounded text-[10px] font-medium uppercase bg-blue-500/10 text-blue-600 dark:text-blue-400 leading-none"
+                >
+                  {{ $t('config.taskPrompts.badgeSystem') }}
+                </span>
+                <span
+                  v-else-if="!currentPrompt.isDefault"
+                  class="px-1.5 py-0.5 rounded text-[10px] font-medium uppercase bg-purple-500/10 text-purple-600 dark:text-purple-400 leading-none"
+                >
+                  {{ $t('config.taskPrompts.badgeCustom') }}
+                </span>
+                <span
+                  v-if="formData.enabled === false"
+                  class="px-1.5 py-0.5 rounded text-[10px] font-medium uppercase bg-gray-500/10 text-gray-500 leading-none"
+                >
+                  {{ $t('config.taskPrompts.badgeDisabled') }}
+                </span>
+              </div>
+              <p class="text-xs txt-secondary font-mono truncate">{{ currentPrompt.topic }}</p>
+            </div>
+          </div>
+
+          <!-- System prompt info banner -->
+          <div
+            v-if="currentPrompt.isDefault && !currentPrompt.isUserOverride && !isAdmin"
+            class="p-3 mb-4 bg-blue-500/10 border border-blue-500/30 rounded-lg flex items-start gap-2"
+            data-testid="banner-system-prompt"
+          >
+            <Icon
+              icon="heroicons:information-circle"
+              class="w-5 h-5 text-blue-600 dark:text-blue-400 flex-shrink-0 mt-0.5"
+            />
+            <div class="text-sm">
+              <p class="font-medium text-blue-700 dark:text-blue-300">
+                {{ $t('config.taskPrompts.systemPromptUserTitle') }}
+              </p>
+              <p class="text-blue-700/80 dark:text-blue-300/80 text-xs mt-0.5">
+                {{ $t('config.taskPrompts.systemPromptUserDesc') }}
+              </p>
+            </div>
+          </div>
+          <div
+            v-else-if="currentPrompt.isDefault && isAdmin"
+            class="p-3 mb-4 bg-amber-500/10 border border-amber-500/30 rounded-lg flex items-start gap-2"
+            data-testid="banner-system-admin"
+          >
+            <Icon
+              icon="heroicons:shield-check"
+              class="w-5 h-5 text-amber-600 dark:text-amber-400 flex-shrink-0 mt-0.5"
+            />
+            <div class="text-sm">
+              <p class="font-medium text-amber-700 dark:text-amber-300">
+                {{ $t('config.taskPrompts.systemPromptAdminTitle') }}
+              </p>
+              <p class="text-amber-700/80 dark:text-amber-300/80 text-xs mt-0.5">
+                {{ $t('config.taskPrompts.systemPromptAdminDesc') }}
+              </p>
+            </div>
+          </div>
+
+          <!-- Tab nav -->
+          <div
+            class="surface-card p-1 mb-4 flex gap-1 overflow-x-auto"
+            role="tablist"
+            data-testid="section-prompt-tabs"
+          >
+            <button
+              v-for="tab in editorTabs"
+              :key="tab.id"
+              type="button"
+              role="tab"
+              :aria-selected="activeTab === tab.id"
+              class="flex-1 min-w-fit px-3 py-2 rounded-md text-sm font-medium transition-colors flex items-center justify-center gap-1.5 whitespace-nowrap"
+              :class="
+                activeTab === tab.id
+                  ? 'bg-[var(--brand)]/10 text-[var(--brand)]'
+                  : 'txt-secondary hover:txt-primary hover:bg-light-border/10 dark:hover:bg-dark-border/10'
+              "
+              :data-testid="`tab-${tab.id}`"
+              @click="activeTab = tab.id"
+            >
+              <Icon :icon="tab.icon" class="w-4 h-4" />
+              <span>{{ tab.label }}</span>
+              <span
+                v-if="tab.id === 'danger' && (currentPrompt.isDefault ? !isAdmin : false)"
+                class="hidden"
+                aria-hidden="true"
+              />
+            </button>
+          </div>
+
+          <!-- TAB: Routing -->
+          <div
+            v-show="activeTab === 'routing'"
+            class="surface-card p-6 space-y-5"
+            data-testid="section-prompt-details"
+            role="tabpanel"
+            aria-labelledby="tab-routing"
+          >
+            <!-- Description -->
+            <div>
+              <label class="block text-sm font-semibold txt-primary mb-2 flex items-center gap-2">
+                <Icon icon="heroicons:document-text" class="w-4 h-4" />
+                {{ $t('config.taskPrompts.descriptionLabel') }}
+              </label>
+              <textarea
+                v-model="formData.shortDescription"
+                rows="3"
+                class="w-full px-4 py-3 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)] resize-none disabled:opacity-50"
+                :placeholder="$t('config.taskPrompts.descriptionPlaceholder')"
+                data-testid="input-description"
+              />
+              <p class="text-xs txt-secondary mt-1.5 flex items-center gap-1">
+                <Icon icon="heroicons:information-circle" class="w-3.5 h-3.5" />
+                {{ $t('config.taskPrompts.descriptionHelp') }}
+              </p>
+            </div>
+
+            <!-- Routing rules -->
+            <div>
+              <label class="block text-sm font-semibold txt-primary mb-2 flex items-center gap-2">
+                <Icon icon="heroicons:bolt" class="w-4 h-4" />
+                {{ $t('config.taskPrompts.rulesForSelection') }}
+              </label>
+              <textarea
+                v-model="formData.selectionRules"
+                rows="3"
+                class="w-full px-4 py-3 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)] resize-none disabled:opacity-50"
+                :placeholder="$t('config.taskPrompts.rulesPlaceholder')"
+                data-testid="input-rules"
+              />
+              <p class="text-xs txt-secondary mt-1.5 flex items-center gap-1">
+                <Icon icon="heroicons:information-circle" class="w-3.5 h-3.5" />
+                {{ $t('config.taskPrompts.rulesHelp') }}
+              </p>
+            </div>
+
+            <!-- Keywords -->
+            <div>
+              <label class="block text-sm font-semibold txt-primary mb-2 flex items-center gap-2">
+                <Icon icon="heroicons:tag" class="w-4 h-4" />
+                {{ $t('config.taskPrompts.keywordsLabel') }}
+              </label>
+              <textarea
+                v-model="formData.keywords"
+                rows="2"
+                class="w-full px-4 py-3 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)] resize-none disabled:opacity-50"
+                :placeholder="$t('config.taskPrompts.keywordsPlaceholder')"
+                data-testid="input-keywords"
+              />
+              <div class="flex items-center justify-between mt-1.5 flex-wrap gap-2">
+                <p class="text-xs txt-secondary flex items-center gap-1">
+                  <Icon icon="heroicons:information-circle" class="w-3.5 h-3.5" />
+                  {{ $t('config.taskPrompts.keywordsHelp') }}
+                </p>
+                <span
+                  v-if="keywordCount > 0"
+                  class="text-[10px] txt-secondary"
+                  data-testid="text-keyword-count"
+                >
+                  {{ $t('config.taskPrompts.keywordCount', { n: keywordCount }) }}
+                </span>
+              </div>
+            </div>
+
+            <!-- Embedding preview -->
+            <div
+              class="surface-chip rounded-lg p-3 border border-dashed border-light-border/30 dark:border-dark-border/20"
+              data-testid="section-embedding-preview"
+            >
+              <div class="flex items-center justify-between gap-2 mb-2">
+                <span
+                  class="text-xs font-semibold txt-primary uppercase tracking-wide flex items-center gap-1.5"
+                >
+                  <Icon icon="heroicons:eye" class="w-4 h-4 text-[var(--brand)]" />
+                  {{ $t('config.taskPrompts.embeddingPreviewTitle') }}
+                </span>
+                <button
+                  class="text-[10px] uppercase tracking-wide txt-secondary hover:txt-primary flex items-center gap-1 px-2 py-1 rounded hover:bg-light-border/10 dark:hover:bg-dark-border/10"
+                  :title="$t('config.taskPrompts.copyToClipboard')"
+                  data-testid="btn-copy-embedding"
+                  @click="copyToClipboard(embeddingPreview)"
+                >
+                  <Icon icon="heroicons:clipboard" class="w-3.5 h-3.5" />
+                  {{ $t('config.taskPrompts.copy') }}
+                </button>
+              </div>
+              <pre
+                class="text-xs txt-secondary whitespace-pre-wrap font-mono leading-relaxed"
+                data-testid="text-embedding-preview"
+                >{{ embeddingPreview }}</pre
+              >
+              <p class="text-[11px] txt-secondary mt-2 flex items-center gap-1">
+                <Icon icon="heroicons:information-circle" class="w-3 h-3" />
+                {{ $t('config.taskPrompts.embeddingPreviewHelp') }}
+              </p>
+            </div>
+
+            <!-- Enabled + language -->
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <label
+                for="prompt-enabled-toggle"
+                class="flex items-start gap-3 surface-chip rounded-lg p-3 cursor-pointer hover:bg-[var(--brand)]/5 transition-colors"
+              >
+                <input
+                  id="prompt-enabled-toggle"
+                  v-model="formData.enabled"
+                  type="checkbox"
+                  class="mt-0.5 w-5 h-5 rounded border-light-border/30 dark:border-dark-border/20 text-[var(--brand)] focus:ring-2 focus:ring-[var(--brand)]"
+                  data-testid="input-enabled"
+                />
+                <span class="flex-1">
+                  <span class="block text-sm font-semibold txt-primary">
+                    {{ $t('config.taskPrompts.enabledLabel') }}
+                  </span>
+                  <span class="block text-xs txt-secondary mt-0.5">
+                    {{ $t('config.taskPrompts.enabledHelp') }}
+                  </span>
+                </span>
+              </label>
+
+              <div>
+                <label class="block text-sm font-semibold txt-primary mb-2 flex items-center gap-2">
+                  <Icon icon="heroicons:language" class="w-4 h-4" />
+                  {{ $t('config.taskPrompts.language') }}
+                </label>
+                <select
+                  v-model="formData.language"
+                  :disabled="currentPrompt.isDefault && isAdmin"
+                  class="w-full px-4 py-3 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)] disabled:opacity-50 disabled:cursor-not-allowed"
+                  data-testid="input-language"
+                >
+                  <option v-for="lang in PROMPT_LANGUAGES" :key="lang.value" :value="lang.value">
+                    {{ lang.label }}
+                  </option>
+                </select>
+                <p
+                  v-if="currentPrompt.isDefault && isAdmin"
+                  class="text-xs text-amber-600 dark:text-amber-400 mt-1.5 flex items-center gap-1"
+                >
+                  <Icon icon="heroicons:lock-closed" class="w-3.5 h-3.5" />
+                  {{ $t('config.taskPrompts.systemPromptLanguageFixed') }}
+                </p>
+                <p v-else class="text-xs txt-secondary mt-1.5 flex items-center gap-1">
+                  <Icon icon="heroicons:information-circle" class="w-3.5 h-3.5" />
+                  {{ $t('config.taskPrompts.customPromptLanguageNote') }}
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <!-- TAB: Prompt content + AI -->
+          <div
+            v-show="activeTab === 'prompt'"
+            class="space-y-4"
+            role="tabpanel"
+            aria-labelledby="tab-prompt"
+          >
+            <!-- Model + tools -->
+            <div class="surface-card p-6 space-y-5" data-testid="section-prompt-config">
+              <div>
+                <label class="block text-sm font-semibold txt-primary mb-2 flex items-center gap-2">
+                  <Icon icon="heroicons:cpu-chip" class="w-4 h-4" />
+                  {{ $t('config.taskPrompts.aiModel') }}
+                </label>
+                <ModelSelectDropdown
+                  :model-value="formData.aiModel ?? 'default'"
+                  :groups="groupedModels"
+                  :loading="loadingModels"
+                  default-option="Default Model (Auto-selected based on capability)"
+                  data-testid="input-ai-model"
+                  @update:model-value="
+                    (v: string | number | null) => (formData.aiModel = String(v ?? 'default'))
+                  "
+                />
+                <p class="text-xs txt-secondary mt-1.5 flex items-center gap-1">
+                  <Icon icon="heroicons:information-circle" class="w-3.5 h-3.5" />
+                  {{ $t('config.taskPrompts.aiModelHelp') }}
+                </p>
+              </div>
+
+              <div>
+                <label class="block text-sm font-semibold txt-primary mb-3 flex items-center gap-2">
+                  <Icon icon="heroicons:wrench-screwdriver" class="w-4 h-4" />
+                  {{ $t('config.taskPrompts.availableTools') }}
+                </label>
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <label
+                    v-for="tool in availableTools"
+                    :key="tool.value"
+                    class="flex items-center gap-3 p-3 rounded-lg surface-chip cursor-pointer hover:bg-[var(--brand)]/5 transition-colors"
+                    data-testid="item-tool"
+                  >
+                    <input
+                      v-model="formData.availableTools"
+                      type="checkbox"
+                      :value="tool.value"
+                      class="w-5 h-5 rounded border-light-border/30 dark:border-dark-border/20 text-[var(--brand)] focus:ring-2 focus:ring-[var(--brand)]"
+                    />
+                    <Icon :icon="tool.icon" class="w-5 h-5 txt-secondary" />
+                    <span class="text-sm txt-primary">{{ tool.label }}</span>
+                  </label>
                 </div>
               </div>
+            </div>
+
+            <!-- Prompt content -->
+            <div class="surface-card p-6" data-testid="section-prompt-content">
+              <div class="flex items-center justify-between mb-4 flex-wrap gap-2">
+                <div>
+                  <h3 class="text-lg font-semibold txt-primary flex items-center gap-2">
+                    <Icon icon="heroicons:code-bracket" class="w-5 h-5 text-[var(--brand)]" />
+                    {{ $t('config.taskPrompts.promptContent') }}
+                  </h3>
+                  <p class="text-xs txt-secondary mt-0.5">
+                    {{ $t('config.taskPrompts.promptContentSubtitle') }}
+                  </p>
+                </div>
+
+                <!-- Markdown toolbar -->
+                <div class="flex items-center gap-1 p-1 surface-chip rounded-lg">
+                  <button
+                    v-for="tool in markdownTools"
+                    :key="tool.label"
+                    class="p-2 rounded hover:bg-[var(--brand)]/10 txt-secondary hover:txt-primary transition-colors"
+                    :title="tool.label"
+                    data-testid="btn-markdown-tool"
+                    @click="insertMarkdown(tool.before, tool.after)"
+                  >
+                    <Icon :icon="tool.icon" class="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+
+              <textarea
+                ref="contentTextarea"
+                v-model="formData.content"
+                rows="18"
+                class="w-full px-4 py-3 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)] resize-y font-mono leading-relaxed"
+                :placeholder="$t('config.taskPrompts.contentPlaceholder')"
+                data-testid="input-content"
+              />
+
+              <div class="flex items-center justify-between mt-2 flex-wrap gap-2">
+                <p class="text-xs txt-secondary flex items-center gap-1">
+                  <Icon icon="heroicons:information-circle" class="w-3.5 h-3.5" />
+                  {{ $t('config.taskPrompts.contentHelp') }}
+                </p>
+                <span class="text-[10px] txt-secondary" data-testid="text-content-stats">
+                  {{
+                    $t('config.taskPrompts.contentStats', {
+                      chars: contentLength,
+                      words: contentWordCount,
+                    })
+                  }}
+                </span>
+              </div>
+            </div>
+          </div>
+
+          <!-- TAB: Knowledge base -->
+          <div
+            v-show="activeTab === 'knowledge'"
+            class="surface-card p-6"
+            data-testid="section-knowledge-base"
+            role="tabpanel"
+            aria-labelledby="tab-knowledge"
+          >
+            <div class="flex items-center justify-between mb-4 flex-wrap gap-2">
+              <div>
+                <h3 class="text-lg font-semibold txt-primary flex items-center gap-2">
+                  <Icon icon="heroicons:document-text" class="w-5 h-5 text-[var(--brand)]" />
+                  {{ $t('config.taskPrompts.knowledgeTitle') }}
+                </h3>
+                <p class="text-xs txt-secondary mt-0.5">
+                  {{ $t('config.taskPrompts.knowledgeSubtitle') }}
+                </p>
+              </div>
+              <router-link
+                to="/files"
+                class="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-[var(--brand)]/10 text-[var(--brand)] hover:bg-[var(--brand)]/20 transition-colors text-sm font-medium"
+                data-testid="link-upload-files"
+              >
+                <Icon icon="heroicons:cloud-arrow-up" class="w-4 h-4" />
+                {{ $t('config.taskPrompts.openFileManager') }}
+                <Icon icon="heroicons:arrow-top-right-on-square" class="w-3.5 h-3.5" />
+              </router-link>
+            </div>
+
+            <!-- Linked files -->
+            <div class="mb-6">
+              <h4 class="text-sm font-semibold txt-primary mb-3 flex items-center gap-2">
+                <Icon icon="heroicons:link" class="w-4 h-4" />
+                {{ $t('config.taskPrompts.linkedFiles', { n: promptFiles.length }) }}
+              </h4>
+
+              <div
+                v-if="promptFiles.length > 0"
+                class="space-y-2 p-3 surface-chip rounded-lg max-h-[280px] overflow-y-auto"
+                data-testid="section-linked-files"
+              >
+                <div
+                  v-for="file in promptFiles"
+                  :key="file.messageId"
+                  class="flex items-center justify-between p-2.5 bg-emerald-500/5 border border-emerald-500/20 rounded-lg group hover:bg-emerald-500/10 transition-colors"
+                  data-testid="item-linked-file"
+                >
+                  <div class="flex items-center gap-2.5 flex-1 min-w-0">
+                    <Icon
+                      icon="heroicons:check-circle"
+                      class="w-5 h-5 text-emerald-600 dark:text-emerald-400 flex-shrink-0"
+                    />
+                    <div class="flex-1 min-w-0">
+                      <p class="text-sm font-medium txt-primary truncate">{{ file.fileName }}</p>
+                      <p class="text-xs text-emerald-600/70 dark:text-emerald-400/70">
+                        {{
+                          $t('config.taskPrompts.fileMeta', {
+                            chunks: file.chunks,
+                            date: file.uploadedAt
+                              ? formatDate(file.uploadedAt)
+                              : $t('config.taskPrompts.unknownDate'),
+                          })
+                        }}
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    :disabled="loading"
+                    class="w-7 h-7 rounded-lg hover:bg-rose-500/10 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
+                    :title="$t('config.taskPrompts.unlinkFile')"
+                    data-testid="btn-unlink"
+                    @click="handleDeleteFile(file.messageId)"
+                  >
+                    <Icon icon="heroicons:x-mark" class="w-4 h-4 text-rose-500" />
+                  </button>
+                </div>
+              </div>
+
+              <div
+                v-else
+                class="text-center py-6 surface-chip rounded-lg border-2 border-dashed border-light-border/30 dark:border-dark-border/20"
+                data-testid="section-linked-empty"
+              >
+                <Icon
+                  icon="heroicons:folder-open"
+                  class="w-10 h-10 mx-auto mb-2 txt-secondary opacity-30"
+                />
+                <p class="text-sm txt-secondary">{{ $t('config.taskPrompts.noFilesLinked') }}</p>
+                <p class="text-xs txt-secondary mt-1">
+                  {{ $t('config.taskPrompts.noFilesLinkedHint') }}
+                </p>
+              </div>
+            </div>
+
+            <!-- Link existing files -->
+            <div class="space-y-4 pt-4 border-t border-light-border/30 dark:border-dark-border/20">
+              <h4 class="text-sm font-semibold txt-primary flex items-center gap-2">
+                <Icon icon="heroicons:magnifying-glass" class="w-4 h-4" />
+                {{ $t('config.taskPrompts.linkExistingFiles') }}
+              </h4>
+
+              <div class="relative">
+                <Icon
+                  icon="heroicons:magnifying-glass"
+                  class="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 txt-secondary pointer-events-none"
+                />
+                <input
+                  v-model="availableFilesSearch"
+                  type="text"
+                  :placeholder="$t('config.taskPrompts.searchFilesPlaceholder')"
+                  class="w-full pl-10 pr-4 py-2.5 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
+                  data-testid="input-file-search"
+                  @input="loadAvailableFiles"
+                />
+              </div>
+
+              <div
+                v-if="loadingAvailableFiles"
+                class="text-center py-8"
+                data-testid="section-files-loading"
+              >
+                <Icon
+                  icon="heroicons:arrow-path"
+                  class="w-8 h-8 mx-auto mb-2 txt-secondary animate-spin"
+                />
+                <p class="text-sm txt-secondary">{{ $t('config.taskPrompts.loadingFiles') }}</p>
+              </div>
+
+              <div
+                v-else-if="availableFiles.length > 0"
+                class="space-y-2 max-h-[320px] overflow-y-auto"
+                data-testid="section-available-files"
+              >
+                <div
+                  v-for="file in availableFiles"
+                  :key="file.messageId"
+                  class="flex items-center justify-between p-3 surface-chip rounded-lg hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
+                  data-testid="item-available-file"
+                >
+                  <div class="flex items-center gap-3 flex-1 min-w-0">
+                    <Icon
+                      icon="heroicons:document-text"
+                      class="w-5 h-5 txt-secondary flex-shrink-0"
+                    />
+                    <div class="flex-1 min-w-0">
+                      <p class="text-sm font-medium txt-primary truncate">{{ file.fileName }}</p>
+                      <p class="text-xs txt-secondary">
+                        {{ $t('config.taskPrompts.chunksCount', { n: file.chunks }) }}
+                        <template v-if="file.currentGroupKey !== 'DEFAULT'">
+                          ·
+                          {{
+                            $t('config.taskPrompts.currentlyLinkedTo', {
+                              key: file.currentGroupKey,
+                            })
+                          }}
+                        </template>
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    :disabled="loading || isFileLinked(file.messageId)"
+                    :class="[
+                      'px-3 py-1.5 rounded-lg text-xs font-medium transition-colors flex items-center gap-1.5',
+                      isFileLinked(file.messageId)
+                        ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 cursor-default'
+                        : 'bg-[var(--brand)]/10 text-[var(--brand)] hover:bg-[var(--brand)]/20',
+                    ]"
+                    data-testid="btn-link-file"
+                    @click="handleLinkFile(file.messageId)"
+                  >
+                    <Icon
+                      :icon="
+                        isFileLinked(file.messageId) ? 'heroicons:check-circle' : 'heroicons:link'
+                      "
+                      class="w-3.5 h-3.5"
+                    />
+                    {{
+                      isFileLinked(file.messageId)
+                        ? $t('config.taskPrompts.linked')
+                        : $t('config.taskPrompts.linkFile')
+                    }}
+                  </button>
+                </div>
+              </div>
+
+              <div v-else class="text-center py-8" data-testid="section-files-empty">
+                <Icon
+                  icon="heroicons:document-magnifying-glass"
+                  class="w-12 h-12 mx-auto mb-2 txt-secondary opacity-30"
+                />
+                <p class="text-sm txt-secondary">
+                  {{
+                    availableFilesSearch
+                      ? $t('config.taskPrompts.noFilesMatch')
+                      : $t('config.taskPrompts.noVectorizedFiles')
+                  }}
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <!-- TAB: Danger -->
+          <div
+            v-show="activeTab === 'danger'"
+            class="surface-card p-6 border-2 border-rose-500/20"
+            data-testid="section-danger"
+            role="tabpanel"
+            aria-labelledby="tab-danger"
+          >
+            <h3
+              class="text-lg font-semibold text-rose-600 dark:text-rose-400 mb-2 flex items-center gap-2"
+            >
+              <Icon icon="heroicons:exclamation-triangle" class="w-5 h-5" />
+              {{ $t('config.taskPrompts.dangerZone') }}
+            </h3>
+
+            <div
+              v-if="currentPrompt.isDefault && !isAdmin"
+              class="p-3 surface-chip rounded-lg flex items-start gap-2"
+            >
+              <Icon icon="heroicons:lock-closed" class="w-5 h-5 txt-secondary mt-0.5" />
+              <div class="text-sm txt-secondary">
+                {{ $t('config.taskPrompts.dangerLockedForUser') }}
+              </div>
+            </div>
+
+            <template v-else>
+              <p
+                v-if="currentPrompt.isDefault && isAdmin"
+                class="text-sm text-rose-500 mb-4 font-medium"
+              >
+                {{ $t('config.taskPrompts.dangerSystemWarning') }}
+              </p>
+              <p v-else class="text-sm txt-secondary mb-4">
+                {{ $t('config.taskPrompts.deleteWarning') }}
+              </p>
               <button
                 :disabled="loading"
-                class="w-7 h-7 rounded-lg hover:bg-red-500/10 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
-                title="Unlink file from this prompt"
-                data-testid="btn-unlink"
-                @click="handleDeleteFile(file.messageId)"
+                class="px-5 py-2.5 rounded-lg text-rose-600 dark:text-rose-400 hover:bg-rose-500/10 border border-rose-500/30 font-medium flex items-center gap-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                data-testid="btn-delete"
+                @click="handleDelete"
               >
-                <Icon icon="heroicons:x-mark" class="w-4 h-4 text-red-500" />
+                <Icon icon="heroicons:trash" class="w-5 h-5" />
+                {{ $t('config.taskPrompts.deletePrompt') }}
               </button>
-            </div>
+            </template>
           </div>
+        </template>
 
+        <!-- Empty state -->
+        <template v-else>
           <div
-            v-else
-            class="text-center py-6 surface-chip rounded-lg border-2 border-dashed border-light-border/30 dark:border-dark-border/20"
-            data-testid="section-linked-empty"
-          >
-            <Icon
-              icon="heroicons:folder-open"
-              class="w-10 h-10 mx-auto mb-2 txt-secondary opacity-30"
-            />
-            <p class="text-sm txt-secondary">No files linked yet</p>
-            <p class="text-xs txt-secondary mt-1">
-              Link files below to add them to this prompt's knowledge base
-            </p>
-          </div>
-        </div>
-
-        <!-- Link Existing Files Section -->
-        <div class="space-y-4 pt-4 border-t border-light-border/30 dark:border-dark-border/20">
-          <h4 class="text-sm font-semibold txt-primary flex items-center gap-2">
-            <Icon icon="heroicons:magnifying-glass" class="w-4 h-4" />
-            Link Existing Files
-          </h4>
-
-          <!-- Search Filter -->
-          <div class="relative">
-            <Icon
-              icon="heroicons:magnifying-glass"
-              class="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 txt-secondary"
-            />
-            <input
-              v-model="availableFilesSearch"
-              type="text"
-              placeholder="Search files by name..."
-              class="w-full pl-10 pr-4 py-2.5 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
-              data-testid="input-file-search"
-              @input="loadAvailableFiles"
-            />
-          </div>
-
-          <!-- Loading -->
-          <div
-            v-if="loadingAvailableFiles"
-            class="text-center py-8"
-            data-testid="section-files-loading"
-          >
-            <Icon
-              icon="heroicons:arrow-path"
-              class="w-8 h-8 mx-auto mb-2 txt-secondary animate-spin"
-            />
-            <p class="text-sm txt-secondary">Loading files...</p>
-          </div>
-
-          <!-- Available Files List -->
-          <div
-            v-else-if="availableFiles.length > 0"
-            class="space-y-2 max-h-[300px] overflow-y-auto"
-            data-testid="section-available-files"
+            class="surface-card p-10 text-center rounded-lg"
+            data-testid="section-no-prompt-selected"
           >
             <div
-              v-for="file in availableFiles"
-              :key="file.messageId"
-              class="flex items-center justify-between p-3 surface-chip rounded-lg hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
-              data-testid="item-available-file"
+              class="w-16 h-16 mx-auto mb-4 rounded-full bg-[var(--brand)]/10 flex items-center justify-center"
             >
-              <div class="flex items-center gap-3 flex-1 min-w-0">
-                <Icon icon="heroicons:document-text" class="w-5 h-5 txt-secondary flex-shrink-0" />
-                <div class="flex-1 min-w-0">
-                  <p class="text-sm font-medium txt-primary truncate">{{ file.fileName }}</p>
-                  <p class="text-xs txt-secondary">
-                    {{ file.chunks }} chunks
-                    <template v-if="file.currentGroupKey !== 'DEFAULT'">
-                      • Currently linked to:
-                      <span class="font-mono">{{ file.currentGroupKey }}</span>
-                    </template>
-                  </p>
-                </div>
-              </div>
-              <button
-                :disabled="loading || isFileLinked(file.messageId)"
-                :class="[
-                  'px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-2',
-                  isFileLinked(file.messageId)
-                    ? 'bg-green-500/10 text-green-600 dark:text-green-400 cursor-default'
-                    : 'bg-[var(--brand)]/10 text-[var(--brand)] hover:bg-[var(--brand)]/20',
-                ]"
-                data-testid="btn-link-file"
-                @click="handleLinkFile(file.messageId)"
-              >
-                <Icon
-                  :icon="isFileLinked(file.messageId) ? 'heroicons:check-circle' : 'heroicons:link'"
-                  class="w-4 h-4"
-                />
-                {{ isFileLinked(file.messageId) ? 'Linked' : 'Link' }}
-              </button>
+              <Icon icon="heroicons:cursor-arrow-ripple" class="w-8 h-8 text-[var(--brand)]" />
             </div>
-          </div>
-
-          <!-- Empty State -->
-          <div v-else class="text-center py-8" data-testid="section-files-empty">
-            <Icon
-              icon="heroicons:document-magnifying-glass"
-              class="w-12 h-12 mx-auto mb-2 txt-secondary opacity-30"
-            />
-            <p class="text-sm txt-secondary">
-              {{
-                availableFilesSearch
-                  ? 'No files found matching your search'
-                  : 'No vectorized files available. Upload files in the Files page first.'
-              }}
+            <h3 class="text-lg font-semibold txt-primary mb-2">
+              {{ $t('config.taskPrompts.selectPromptTitle') }}
+            </h3>
+            <p class="text-sm txt-secondary max-w-xl mx-auto mb-6">
+              {{ $t('config.taskPrompts.selectPromptDescription') }}
             </p>
+            <button
+              class="px-5 py-2.5 rounded-lg bg-[var(--brand)] text-white hover:bg-[var(--brand)]/90 transition-colors font-medium text-sm inline-flex items-center gap-2"
+              data-testid="btn-create-prompt-empty"
+              @click="showCreateModal = true"
+            >
+              <Icon icon="heroicons:plus-circle" class="w-5 h-5" />
+              {{ $t('config.taskPrompts.createNew') }}
+            </button>
           </div>
-        </div>
-      </div>
+        </template>
+      </section>
+    </div>
 
-      <!-- Delete Prompt (custom prompts or admin for system prompts) -->
-      <div
-        v-if="!currentPrompt.isDefault || isAdmin"
-        class="surface-card p-6 border-2 border-red-500/20"
-        data-testid="section-danger"
-      >
-        <h3
-          class="text-lg font-semibold text-red-600 dark:text-red-400 mb-2 flex items-center gap-2"
-        >
-          <Icon icon="heroicons:trash" class="w-5 h-5" />
-          {{ $t('config.taskPrompts.dangerZone') }}
-        </h3>
-        <p v-if="currentPrompt.isDefault && isAdmin" class="text-sm text-red-500 mb-4 font-medium">
-          Warning: Deleting a system prompt affects ALL users!
-        </p>
-        <p v-else class="text-sm txt-secondary mb-4">
-          {{ $t('config.taskPrompts.deleteWarning') }}
-        </p>
-        <button
-          :disabled="loading"
-          class="btn-secondary px-6 py-2.5 rounded-lg text-red-600 dark:text-red-400 hover:bg-red-500/10 border-red-500/30 font-medium flex items-center gap-2"
-          data-testid="btn-delete"
-          @click="handleDelete"
-        >
-          <Icon icon="heroicons:trash" class="w-5 h-5" />
-          {{ $t('config.taskPrompts.deletePrompt') }}
-        </button>
-      </div>
-    </template>
-    <template v-else>
-      <div
-        class="surface-card p-10 text-center rounded-lg"
-        data-testid="section-no-prompt-selected"
-      >
-        <Icon
-          icon="heroicons:cursor-arrow-ripple"
-          class="w-12 h-12 mx-auto mb-4 txt-secondary opacity-50"
-        />
-        <h3 class="text-lg font-semibold txt-primary mb-2">
-          {{ $t('config.taskPrompts.selectPromptTitle') }}
-        </h3>
-        <p class="text-sm txt-secondary max-w-xl mx-auto">
-          {{ $t('config.taskPrompts.selectPromptDescription') }}
-        </p>
-      </div>
-    </template>
-
-    <!-- Create New Prompt Modal -->
+    <!-- Create modal -->
     <div
       v-if="showCreateModal"
       class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm"
@@ -506,7 +1044,7 @@
           </h3>
           <button
             class="p-2 rounded-lg hover:bg-light-border/10 dark:hover:bg-dark-border/10 transition-colors"
-            title="Close"
+            :title="$t('common.close', 'Close')"
             data-testid="btn-close"
             @click="showCreateModal = false"
           >
@@ -515,16 +1053,14 @@
         </div>
 
         <div class="space-y-4">
-          <!-- Load Template Button -->
           <div v-if="newPromptContent === '' && newPromptRules === ''" class="flex justify-end">
             <button
               class="text-xs px-3 py-1.5 rounded-lg bg-[var(--brand)]/10 text-[var(--brand)] hover:bg-[var(--brand)]/20 transition-colors flex items-center gap-1.5"
-              title="Load template text"
               data-testid="btn-load-template"
               @click="loadTemplates"
             >
               <Icon icon="heroicons:document-duplicate" class="w-3.5 h-3.5" />
-              Load Template
+              {{ $t('config.taskPrompts.loadTemplate') }}
             </button>
           </div>
 
@@ -558,7 +1094,7 @@
             <div>
               <label class="block text-sm font-semibold txt-primary mb-2 flex items-center gap-2">
                 <Icon icon="heroicons:language" class="w-4 h-4" />
-                {{ $t('config.taskPrompts.language', 'Language') }}
+                {{ $t('config.taskPrompts.language') }}
               </label>
               <select
                 v-model="newPromptLanguage"
@@ -572,10 +1108,26 @@
             </div>
           </div>
 
-          <!-- Selection Rules Textarea for New Prompt -->
           <div>
             <label class="block text-sm font-semibold txt-primary mb-2 flex items-center gap-2">
-              <Icon icon="heroicons:funnel" class="w-4 h-4" />
+              <Icon icon="heroicons:document-text" class="w-4 h-4" />
+              {{ $t('config.taskPrompts.descriptionLabel') }}
+            </label>
+            <textarea
+              v-model="newPromptDescription"
+              rows="2"
+              class="w-full px-4 py-2.5 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)] resize-y"
+              :placeholder="$t('config.taskPrompts.descriptionPlaceholder')"
+              data-testid="input-new-description"
+            ></textarea>
+            <p class="text-xs txt-secondary mt-1.5">
+              {{ $t('config.taskPrompts.descriptionHelp') }}
+            </p>
+          </div>
+
+          <div>
+            <label class="block text-sm font-semibold txt-primary mb-2 flex items-center gap-2">
+              <Icon icon="heroicons:bolt" class="w-4 h-4" />
               {{ $t('config.taskPrompts.rulesForSelection') }}
             </label>
             <textarea
@@ -585,12 +1137,24 @@
               :placeholder="SELECTION_RULES_TEMPLATE"
               data-testid="input-new-rules"
             ></textarea>
-            <p class="text-xs txt-secondary mt-1.5">
-              {{ $t('config.taskPrompts.rulesHelp') }}
-            </p>
+            <p class="text-xs txt-secondary mt-1.5">{{ $t('config.taskPrompts.rulesHelp') }}</p>
           </div>
 
-          <!-- Prompt Content Textarea for New Prompt -->
+          <div>
+            <label class="block text-sm font-semibold txt-primary mb-2 flex items-center gap-2">
+              <Icon icon="heroicons:tag" class="w-4 h-4" />
+              {{ $t('config.taskPrompts.keywordsLabel') }}
+            </label>
+            <textarea
+              v-model="newPromptKeywords"
+              rows="2"
+              class="w-full px-4 py-2.5 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)] resize-y"
+              :placeholder="$t('config.taskPrompts.keywordsPlaceholder')"
+              data-testid="input-new-keywords"
+            ></textarea>
+            <p class="text-xs txt-secondary mt-1.5">{{ $t('config.taskPrompts.keywordsHelp') }}</p>
+          </div>
+
           <div>
             <label class="block text-sm font-semibold txt-primary mb-2 flex items-center gap-2">
               <Icon icon="heroicons:document-text" class="w-4 h-4" />
@@ -608,58 +1172,53 @@
               class="text-xs text-amber-600 dark:text-amber-400 mt-1.5 flex items-center gap-1"
             >
               <Icon icon="heroicons:exclamation-triangle" class="w-3.5 h-3.5" />
-              Please customize the template text (remove all [PLACEHOLDER] values) before creating
-              the prompt.
+              {{ $t('config.taskPrompts.templatePlaceholderHint') }}
             </p>
           </div>
 
-          <!-- Optional: Link Files to New Prompt -->
           <div
             class="border-t border-light-border/30 dark:border-dark-border/20 pt-4"
             data-testid="section-new-files"
           >
             <label class="block text-sm font-semibold txt-primary mb-2 flex items-center gap-2">
               <Icon icon="heroicons:document-plus" class="w-4 h-4" />
-              Knowledge Base Files (Optional)
+              {{ $t('config.taskPrompts.knowledgeOptional') }}
             </label>
             <p class="text-xs txt-secondary mb-3">
-              Link vectorized files to provide context for this prompt. Files can be linked to
-              multiple prompts.
+              {{ $t('config.taskPrompts.knowledgeOptionalHint') }}
             </p>
 
-            <!-- Search for files -->
             <div class="mb-3">
               <input
                 v-model="newPromptFilesSearch"
                 type="text"
-                placeholder="Search files by name or keyword..."
+                :placeholder="$t('config.taskPrompts.searchFilesPlaceholderShort')"
                 class="w-full px-3 py-2 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-xs focus:outline-none focus:ring-1 focus:ring-[var(--brand)]"
                 data-testid="input-new-file-search"
               />
             </div>
 
-            <!-- Selected files for new prompt -->
             <div
               v-if="newPromptSelectedFiles.length > 0"
               class="mb-3 space-y-1.5"
               data-testid="section-new-selected-files"
             >
               <p class="text-xs font-medium txt-primary">
-                Selected ({{ newPromptSelectedFiles.length }}):
+                {{ $t('config.taskPrompts.selectedCount', { n: newPromptSelectedFiles.length }) }}
               </p>
               <div class="space-y-1">
                 <div
                   v-for="fileId in newPromptSelectedFiles"
                   :key="fileId"
-                  class="flex items-center justify-between p-2 bg-green-500/5 border border-green-500/20 rounded text-xs"
+                  class="flex items-center justify-between p-2 bg-emerald-500/5 border border-emerald-500/20 rounded text-xs"
                   data-testid="item-new-selected-file"
                 >
                   <span class="txt-primary flex-1 min-w-0 truncate">
                     {{ availableFiles.find((f) => f.messageId === fileId)?.fileName || 'Unknown' }}
                   </span>
                   <button
-                    class="ml-2 text-red-500 hover:text-red-600"
-                    title="Remove"
+                    class="ml-2 text-rose-500 hover:text-rose-600"
+                    :title="$t('common.remove', 'Remove')"
                     data-testid="btn-remove-selected-file"
                     @click="removeFileFromNewPrompt(fileId)"
                   >
@@ -669,7 +1228,6 @@
               </div>
             </div>
 
-            <!-- Available files list -->
             <div
               class="max-h-[200px] overflow-y-auto space-y-1"
               data-testid="section-new-available-files"
@@ -685,12 +1243,14 @@
                 <div class="flex-1 min-w-0">
                   <p class="txt-primary font-medium truncate">{{ file.fileName }}</p>
                   <p class="txt-secondary text-[10px]">
-                    {{ file.chunks }} chunks
+                    {{ $t('config.taskPrompts.chunksCount', { n: file.chunks }) }}
                     <span
                       v-if="file.currentGroupKey"
                       class="ml-1 text-amber-600 dark:text-amber-400"
                     >
-                      (Used in: {{ file.currentGroupKey }})
+                      ({{
+                        $t('config.taskPrompts.currentlyUsedIn', { key: file.currentGroupKey })
+                      }})
                     </span>
                   </p>
                 </div>
@@ -705,12 +1265,15 @@
                 class="text-center py-4 txt-secondary text-xs"
                 data-testid="section-new-files-empty"
               >
-                {{ newPromptFilesSearch ? 'No files found' : 'No vectorized files available' }}
+                {{
+                  newPromptFilesSearch
+                    ? $t('config.taskPrompts.noFilesMatch')
+                    : $t('config.taskPrompts.noVectorizedFiles')
+                }}
               </div>
             </div>
           </div>
 
-          <!-- Modal Actions -->
           <div
             class="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 pt-4 border-t border-light-border/30 dark:border-dark-border/20"
           >
@@ -719,16 +1282,11 @@
               data-testid="btn-cancel-create"
               @click="showCreateModal = false"
             >
-              Cancel
+              {{ $t('common.cancel', 'Cancel') }}
             </button>
             <button
               :disabled="!canCreatePrompt"
               class="w-full sm:flex-1 px-6 py-3 rounded-lg bg-[var(--brand)] text-white hover:bg-[var(--brand)]/90 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-              :title="
-                hasTemplateText
-                  ? 'Please customize the template text before creating'
-                  : 'Create new prompt'
-              "
               data-testid="btn-confirm-create"
               @click="handleCreateNew"
             >
@@ -740,7 +1298,6 @@
       </div>
     </div>
 
-    <!-- Unsaved Changes Bar -->
     <UnsavedChangesBar
       :show="hasUnsavedChanges"
       data-testid="comp-unsaved-bar"
@@ -765,6 +1322,11 @@ import {
   type UpdatePromptRequest,
 } from '@/services/api/promptsApi'
 import { configApi } from '@/services/api/configApi'
+import {
+  adminSynapseApi,
+  type SynapseStatusResponse,
+  type SynapseTopicEntry,
+} from '@/services/api/adminSynapseApi'
 import type { AIModel, Capability } from '@/types/ai-models'
 import { findModelIdByString } from '@/utils/aiModelDefaults'
 import { useNotification } from '@/composables/useNotification'
@@ -774,7 +1336,6 @@ import ModelSelectDropdown from '@/components/ModelSelectDropdown.vue'
 import { useAuthStore } from '@/stores/auth'
 import UnsavedChangesBar from '@/components/UnsavedChangesBar.vue'
 
-// Template texts for new prompt creation
 const SELECTION_RULES_TEMPLATE =
   'When the user mentions [TOPIC_NAME] or asks about [SPECIFIC_KEYWORDS], route to this prompt.'
 const PROMPT_CONTENT_TEMPLATE = `You are an AI assistant specialized in [YOUR_SPECIALTY].
@@ -793,7 +1354,6 @@ When responding:
 
 Remember to always [IMPORTANT_REMINDER].`
 
-// Extended TaskPrompt interface with UI fields
 interface TaskPrompt extends ApiTaskPrompt {
   rules?: string
   aiModel?: string
@@ -801,12 +1361,13 @@ interface TaskPrompt extends ApiTaskPrompt {
   content: string
 }
 
-// Tool definition
 interface ToolOption {
   value: string
   label: string
   icon: string
 }
+
+type EditorTabId = 'routing' | 'prompt' | 'knowledge' | 'danger'
 
 const { success, error: showError } = useNotification()
 const dialog = useDialog()
@@ -822,7 +1383,6 @@ const PROMPT_LANGUAGES = [
   { value: 'tr', label: 'Türkçe' },
 ]
 
-// Readable label for the current locale
 const currentLanguageLabel = computed(() => {
   const currentLang = locale.value || 'en'
   const found = PROMPT_LANGUAGES.find((l) => l.value === currentLang)
@@ -838,10 +1398,277 @@ const newPromptName = ref('')
 const newPromptTopic = ref('')
 const newPromptContent = ref('')
 const newPromptRules = ref('')
+const newPromptKeywords = ref('')
+const newPromptDescription = ref('')
 const newPromptLanguage = ref(locale.value || 'en')
 const newPromptSelectedFiles = ref<number[]>([])
 const newPromptFilesSearch = ref('')
 const showCreateModal = ref(false)
+const promptListSearch = ref('')
+const promptListFilter = ref<'all' | 'system' | 'custom' | 'disabled'>('all')
+const activeTab = ref<EditorTabId>('routing')
+const synapseStatus = ref<SynapseStatusResponse | null>(null)
+const viewDensity = ref<'compact' | 'detailed'>('compact')
+const collapsedGroups = ref<Set<string>>(new Set())
+// Mobile: when an editor is open, the list slides out of view; the back button
+// brings it back. On `lg+` both panes are always visible side by side.
+const listVisibleMobile = ref(true)
+
+// Categorise prompts so the filter chips can show counts inline
+const systemPromptCount = computed(
+  () => prompts.value.filter((p) => p.isDefault && !p.isUserOverride).length
+)
+const customPromptCount = computed(() => prompts.value.filter((p) => !p.isDefault).length)
+const disabledPromptCount = computed(() => prompts.value.filter((p) => p.enabled === false).length)
+
+const promptListFilters = computed(() => [
+  {
+    value: 'all' as const,
+    label: t('config.taskPrompts.filterAll'),
+    count: prompts.value.length,
+  },
+  {
+    value: 'system' as const,
+    label: t('config.taskPrompts.filterSystem'),
+    count: systemPromptCount.value,
+  },
+  {
+    value: 'custom' as const,
+    label: t('config.taskPrompts.filterCustom'),
+    count: customPromptCount.value,
+  },
+  {
+    value: 'disabled' as const,
+    label: t('config.taskPrompts.filterDisabled'),
+    count: disabledPromptCount.value,
+  },
+])
+
+/**
+ * Live preview of the exact text that gets embedded for Synapse Routing.
+ * Mirrors `SynapseIndexer::buildEmbeddingText()` on the backend.
+ */
+const embeddingPreview = computed(() => {
+  const topic = currentPrompt.value?.topic || ''
+  const desc = (formData.value.shortDescription || '').trim()
+  const keywords = (formData.value.keywords || '').trim()
+  const lines: string[] = [`Topic: ${topic}`]
+  if (desc) lines.push(`Description: ${desc}`)
+  if (keywords) lines.push(`Keywords: ${keywords}`)
+  return lines.join('\n')
+})
+
+const keywordCount = computed(() => {
+  const raw = (formData.value.keywords || '').trim()
+  if (!raw) return 0
+  return raw
+    .split(/[\n,]+/)
+    .map((k) => k.trim())
+    .filter(Boolean).length
+})
+
+const contentLength = computed(() => (formData.value.content || '').length)
+const contentWordCount = computed(() => {
+  const text = (formData.value.content || '').trim()
+  if (!text) return 0
+  return text.split(/\s+/).length
+})
+
+const filteredPrompts = computed(() => {
+  const search = promptListSearch.value.trim().toLowerCase()
+  return prompts.value.filter((p) => {
+    if (promptListFilter.value === 'system' && !(p.isDefault && !p.isUserOverride)) {
+      return false
+    }
+    if (promptListFilter.value === 'custom' && p.isDefault && !p.isUserOverride) {
+      return false
+    }
+    if (promptListFilter.value === 'disabled' && p.enabled !== false) {
+      return false
+    }
+    if (search === '') return true
+    const haystack = [p.name, p.topic, p.shortDescription, p.keywords ?? ''].join(' ').toLowerCase()
+    return haystack.includes(search)
+  })
+})
+
+/**
+ * Map a prompt to a display category. Disabled topics live in their own bucket
+ * so they always sink to the bottom and stay out of the way until the user
+ * specifically wants to see them.
+ */
+type CategoryId =
+  | 'conversation'
+  | 'code'
+  | 'generation'
+  | 'productivity'
+  | 'other-system'
+  | 'custom'
+  | 'disabled'
+
+interface CategoryDef {
+  id: CategoryId
+  label: string
+  icon: string
+}
+
+function topicCategory(prompt: TaskPrompt): CategoryId {
+  if (prompt.enabled === false) return 'disabled'
+  if (!prompt.isDefault) return 'custom'
+  const t = prompt.topic.toLowerCase()
+  if (
+    t.includes('image') ||
+    t.includes('video') ||
+    t.includes('audio') ||
+    t.includes('media') ||
+    t.includes('voice') ||
+    t.includes('sound')
+  ) {
+    return 'generation'
+  }
+  if (t.includes('code') || t.includes('coding') || t.includes('dev')) {
+    return 'code'
+  }
+  if (
+    t.includes('office') ||
+    t.includes('summary') ||
+    t.includes('translate') ||
+    t.includes('mail') ||
+    t.includes('email') ||
+    t.includes('docs')
+  ) {
+    return 'productivity'
+  }
+  if (t.includes('chat') || t === 'general' || t === 'general-chat' || t.includes('smalltalk')) {
+    return 'conversation'
+  }
+  return 'other-system'
+}
+
+const categorizedPrompts = computed(() => {
+  const order: CategoryDef[] = [
+    {
+      id: 'conversation',
+      label: t('config.taskPrompts.categoryConversation'),
+      icon: 'heroicons:chat-bubble-left-right',
+    },
+    {
+      id: 'code',
+      label: t('config.taskPrompts.categoryCode'),
+      icon: 'heroicons:code-bracket-square',
+    },
+    {
+      id: 'generation',
+      label: t('config.taskPrompts.categoryGeneration'),
+      icon: 'heroicons:sparkles',
+    },
+    {
+      id: 'productivity',
+      label: t('config.taskPrompts.categoryProductivity'),
+      icon: 'heroicons:briefcase',
+    },
+    {
+      id: 'other-system',
+      label: t('config.taskPrompts.categoryOther'),
+      icon: 'heroicons:rectangle-stack',
+    },
+    {
+      id: 'custom',
+      label: t('config.taskPrompts.categoryCustom'),
+      icon: 'heroicons:user',
+    },
+    {
+      id: 'disabled',
+      label: t('config.taskPrompts.categoryDisabled'),
+      icon: 'heroicons:eye-slash',
+    },
+  ]
+
+  const buckets: Record<CategoryId, TaskPrompt[]> = {
+    conversation: [],
+    code: [],
+    generation: [],
+    productivity: [],
+    'other-system': [],
+    custom: [],
+    disabled: [],
+  }
+
+  for (const prompt of filteredPrompts.value) {
+    buckets[topicCategory(prompt)].push(prompt)
+  }
+
+  // Stable name sort within each bucket
+  for (const id of Object.keys(buckets) as CategoryId[]) {
+    buckets[id].sort((a, b) => a.name.localeCompare(b.name))
+  }
+
+  return order.map((cat) => ({ ...cat, prompts: buckets[cat.id] }))
+})
+
+const allGroupsCollapsed = computed(() => {
+  const visibleGroups = categorizedPrompts.value.filter((g) => g.prompts.length > 0)
+  if (visibleGroups.length === 0) return false
+  return visibleGroups.every((g) => collapsedGroups.value.has(g.id))
+})
+
+/**
+ * Treat any group that holds a search hit as forced-open so the user never
+ * has to expand a category just to see why their search matched. Manual
+ * collapse-state still applies once the search field is empty again.
+ */
+const isGroupCollapsed = (id: string) => {
+  if (promptListSearch.value.trim() !== '') return false
+  return collapsedGroups.value.has(id)
+}
+
+const toggleGroup = (id: string) => {
+  const next = new Set(collapsedGroups.value)
+  if (next.has(id)) {
+    next.delete(id)
+  } else {
+    next.add(id)
+  }
+  collapsedGroups.value = next
+}
+
+const toggleAllGroups = () => {
+  if (allGroupsCollapsed.value) {
+    collapsedGroups.value = new Set()
+  } else {
+    collapsedGroups.value = new Set(
+      categorizedPrompts.value.filter((g) => g.prompts.length > 0).map((g) => g.id)
+    )
+  }
+}
+
+const editorTabs = computed(() => {
+  const tabs: { id: EditorTabId; label: string; icon: string }[] = [
+    {
+      id: 'routing',
+      label: t('config.taskPrompts.tabRouting'),
+      icon: 'heroicons:share',
+    },
+    {
+      id: 'prompt',
+      label: t('config.taskPrompts.tabPrompt'),
+      icon: 'heroicons:code-bracket',
+    },
+  ]
+  if (currentPrompt.value && (!currentPrompt.value.isDefault || isAdmin.value)) {
+    tabs.push({
+      id: 'knowledge',
+      label: t('config.taskPrompts.tabKnowledge'),
+      icon: 'heroicons:book-open',
+    })
+    tabs.push({
+      id: 'danger',
+      label: t('config.taskPrompts.tabDanger'),
+      icon: 'heroicons:exclamation-triangle',
+    })
+  }
+  return tabs
+})
 
 useEscapeKey(() => (showCreateModal.value = false), showCreateModal)
 
@@ -849,26 +1676,20 @@ const contentTextarea = ref<HTMLTextAreaElement | null>(null)
 const loading = ref(false)
 const error = ref<string | null>(null)
 
-// Files for current prompt
 const promptFiles = ref<PromptFile[]>([])
-
-// Available files for linking
 const availableFiles = ref<AvailableFile[]>([])
 const availableFilesSearch = ref('')
 const loadingAvailableFiles = ref(false)
 
-// Models from API
 const allModels = ref<Partial<Record<Capability, AIModel[]>>>({})
 const loadingModels = ref(false)
 
-// Available tools with icons (removed image/video generation as they're not clickable tools)
 const availableTools: ToolOption[] = [
   { value: 'internet-search', label: 'Internet Search', icon: 'heroicons:magnifying-glass' },
   { value: 'files-search', label: 'Files Search', icon: 'heroicons:document-magnifying-glass' },
   { value: 'url-screenshot', label: 'URL Content', icon: 'heroicons:globe-alt' },
 ]
 
-// Group models by capability for dropdown
 const groupedModels = computed(() => {
   const groups: { label: string; models: AIModel[]; capability: Capability }[] = []
 
@@ -885,7 +1706,6 @@ const groupedModels = computed(() => {
     VECTORIZE: 'Embedding / RAG',
   }
 
-  // Order of capabilities in dropdown
   const orderedCapabilities: Capability[] = [
     'CHAT',
     'TEXT2PIC',
@@ -910,7 +1730,6 @@ const groupedModels = computed(() => {
   return groups
 })
 
-// Check if template texts are still present (user must customize them)
 const hasTemplateText = computed(() => {
   const rulesHasTemplate =
     newPromptRules.value.includes('[TOPIC_NAME]') ||
@@ -924,7 +1743,6 @@ const hasTemplateText = computed(() => {
   return rulesHasTemplate || contentHasTemplate
 })
 
-// Check if create button should be enabled
 const canCreatePrompt = computed(() => {
   return (
     !loading.value &&
@@ -935,7 +1753,6 @@ const canCreatePrompt = computed(() => {
   )
 })
 
-// Filtered files for new prompt creation
 const filteredNewPromptFiles = computed(() => {
   if (!newPromptFilesSearch.value.trim()) {
     return availableFiles.value
@@ -957,7 +1774,44 @@ const markdownTools = [
   { icon: 'heroicons:link', label: 'Link', before: '[', after: '](url)' },
 ]
 
-// Unsaved changes tracking
+/**
+ * Map a topic slug to a heroicon. Falls back to a generic chat icon.
+ * Synapse-routed topics (general-chat, coding, image-generation, ...)
+ * get distinct visuals so the list scans well at a glance.
+ */
+function topicIcon(topic: string): string {
+  const t = topic.toLowerCase()
+  if (t.includes('image')) return 'heroicons:photo'
+  if (t.includes('video')) return 'heroicons:film'
+  if (t.includes('audio') || t.includes('sound') || t.includes('voice')) {
+    return 'heroicons:musical-note'
+  }
+  if (t.includes('code') || t.includes('coding') || t.includes('dev')) {
+    return 'heroicons:code-bracket-square'
+  }
+  if (t.includes('office') || t.includes('excel') || t.includes('word') || t.includes('ppt')) {
+    return 'heroicons:table-cells'
+  }
+  if (t.includes('summary') || t.includes('docsummary') || t.includes('summarize')) {
+    return 'heroicons:document-arrow-down'
+  }
+  if (t.includes('search') || t.includes('rag') || t.includes('knowledge')) {
+    return 'heroicons:magnifying-glass-circle'
+  }
+  if (t.includes('mail') || t.includes('email')) return 'heroicons:envelope'
+  if (t.includes('translate') || t.includes('language')) return 'heroicons:language'
+  if (t.startsWith('w_')) return 'heroicons:rectangle-group'
+  if (t.includes('chat') || t === 'general' || t === 'general-chat') {
+    return 'heroicons:chat-bubble-left-right'
+  }
+  return 'heroicons:sparkles'
+}
+
+const topicStatusFor = (topic: string): SynapseTopicEntry | undefined => {
+  if (!isAdmin.value || !synapseStatus.value) return undefined
+  return synapseStatus.value.topics.find((entry) => entry.topic === topic)
+}
+
 const { hasUnsavedChanges, saveChanges, discardChanges, setupNavigationGuard } = useUnsavedChanges(
   formData,
   originalData
@@ -965,9 +1819,6 @@ const { hasUnsavedChanges, saveChanges, discardChanges, setupNavigationGuard } =
 
 let cleanupGuard: (() => void) | undefined
 
-/**
- * Load AI models from API
- */
 const loadAIModels = async () => {
   loadingModels.value = true
   try {
@@ -982,9 +1833,16 @@ const loadAIModels = async () => {
   }
 }
 
-/**
- * Load all prompts from API
- */
+const loadSynapseStatus = async () => {
+  if (!isAdmin.value) return
+  try {
+    synapseStatus.value = await adminSynapseApi.getStatus()
+  } catch (err) {
+    // Status enrichment is optional — never block the page on it
+    console.warn('Failed to load Synapse status:', err)
+  }
+}
+
 const loadPrompts = async () => {
   loading.value = true
   error.value = null
@@ -1009,21 +1867,19 @@ const loadPrompts = async () => {
         }
       }
 
-      const availableTools: string[] = []
-      if (metadata.tool_internet_search) availableTools.push('internet-search')
-      if (metadata.tool_files_search) availableTools.push('files-search')
-      if (metadata.tool_url_screenshot) availableTools.push('url-screenshot')
+      const tools: string[] = []
+      if (metadata.tool_internet_search) tools.push('internet-search')
+      if (metadata.tool_files_search) tools.push('files-search')
+      if (metadata.tool_url_screenshot) tools.push('url-screenshot')
 
       return {
         ...p,
         content: p.prompt,
-        rules: p.selectionRules || p.shortDescription || '',
+        rules: p.selectionRules || '',
         aiModel: aiModelString,
-        availableTools,
+        availableTools: tools,
       }
     })
-
-    // Don't auto-select any prompt - let user choose or use URL parameter
   } catch (err: unknown) {
     const errorMessage = err instanceof Error ? err.message : 'Failed to load prompts'
     error.value = errorMessage
@@ -1033,37 +1889,33 @@ const loadPrompts = async () => {
   }
 }
 
-/**
- * Load selected prompt
- */
 const loadPrompt = () => {
   const prompt = prompts.value.find((p) => p.id === selectedPromptId.value)
   if (prompt) {
     currentPrompt.value = { ...prompt }
     formData.value = {
-      rules: prompt.rules,
+      shortDescription: prompt.shortDescription || '',
+      selectionRules: prompt.selectionRules || '',
+      keywords: prompt.keywords || '',
+      enabled: prompt.enabled !== false,
       aiModel: prompt.aiModel,
       availableTools: prompt.availableTools,
       content: prompt.content,
       language: prompt.language || 'en',
     }
     originalData.value = { ...formData.value }
-
-    // Load files for this prompt
+    activeTab.value = 'routing'
     loadPromptFiles()
   }
 }
 
-/**
- * Handle prompt selection
- */
 const onPromptSelect = async () => {
   if (hasUnsavedChanges.value) {
     const confirmed = await dialog.confirm({
-      title: 'Unsaved Changes',
-      message: 'You have unsaved changes. Do you want to discard them?',
-      confirmText: 'Discard',
-      cancelText: 'Cancel',
+      title: t('config.taskPrompts.unsavedTitle'),
+      message: t('config.taskPrompts.unsavedMessage'),
+      confirmText: t('config.taskPrompts.unsavedDiscard'),
+      cancelText: t('common.cancel', 'Cancel'),
       danger: true,
     })
 
@@ -1075,9 +1927,49 @@ const onPromptSelect = async () => {
   loadPrompt()
 }
 
+const onCardSelect = async (id: number) => {
+  if (selectedPromptId.value === id) {
+    // Same topic: just hide the mobile sidebar (lg+ ignores this)
+    listVisibleMobile.value = false
+    return
+  }
+  if (hasUnsavedChanges.value) {
+    const confirmed = await dialog.confirm({
+      title: t('config.taskPrompts.unsavedTitle'),
+      message: t('config.taskPrompts.unsavedMessage'),
+      confirmText: t('config.taskPrompts.unsavedDiscard'),
+      cancelText: t('common.cancel', 'Cancel'),
+      danger: true,
+    })
+    if (!confirmed) return
+  }
+  selectedPromptId.value = id
+  loadPrompt()
+  listVisibleMobile.value = false
+}
+
+const closeEditor = () => {
+  selectedPromptId.value = null
+  currentPrompt.value = null
+  formData.value = {}
+  originalData.value = {}
+}
+
 /**
- * Insert markdown formatting
+ * Mobile-only navigation: when the editor is open and the viewport is narrow,
+ * the topic list is hidden behind it. The back button restores the list view
+ * without dropping the current selection (so reopening keeps state intact).
  */
+const backToListMobile = () => {
+  listVisibleMobile.value = true
+  closeEditor()
+}
+
+const clearFilters = () => {
+  promptListSearch.value = ''
+  promptListFilter.value = 'all'
+}
+
 const insertMarkdown = (before: string, after: string) => {
   const textarea = contentTextarea.value
   if (!textarea || !formData.value.content) return
@@ -1096,14 +1988,19 @@ const insertMarkdown = (before: string, after: string) => {
   }, 0)
 }
 
-/**
- * Handle save
- */
+const copyToClipboard = async (text: string) => {
+  try {
+    await navigator.clipboard.writeText(text)
+    success(t('config.taskPrompts.copySuccess'))
+  } catch {
+    showError(t('config.taskPrompts.copyError'))
+  }
+}
+
 const handleSave = saveChanges(async () => {
   if (!currentPrompt.value) return
 
   try {
-    // Build metadata object
     const metadata: PromptMetadata = {}
 
     if (formData.value.aiModel === 'default' || !formData.value.aiModel) {
@@ -1112,34 +2009,30 @@ const handleSave = saveChanges(async () => {
       metadata.aiModel = findModelIdByString(allModels.value, formData.value.aiModel)
     }
 
-    // Set tool flags (for SAVE)
     metadata.tool_internet_search = (formData.value.availableTools || []).includes(
       'internet-search'
     )
     metadata.tool_files_search = (formData.value.availableTools || []).includes('files-search')
     metadata.tool_url_screenshot = (formData.value.availableTools || []).includes('url-screenshot')
 
-    // If it's a system prompt (isDefault=true and no user override):
-    // - Admins: update the system prompt directly
-    // - Regular users: create a user override instead of updating
     if (currentPrompt.value.isDefault && !currentPrompt.value.isUserOverride && !isAdmin.value) {
-      // Create user override (non-admin flow)
       const newPrompt = await promptsApi.createPrompt({
         topic: currentPrompt.value.topic,
-        shortDescription: currentPrompt.value.shortDescription,
+        shortDescription: formData.value.shortDescription || currentPrompt.value.shortDescription,
         prompt: formData.value.content || '',
         language: formData.value.language || locale.value || 'en',
-        selectionRules: formData.value.rules || null,
+        selectionRules: formData.value.selectionRules ?? null,
+        keywords: formData.value.keywords ?? null,
+        enabled: formData.value.enabled !== false,
         metadata,
       })
 
-      // Update local state - replace system prompt with user override
       const index = prompts.value.findIndex((p) => p.id === currentPrompt.value!.id)
       if (index !== -1) {
         prompts.value[index] = {
           ...newPrompt,
           content: newPrompt.prompt,
-          rules: newPrompt.selectionRules || newPrompt.shortDescription || '',
+          rules: newPrompt.selectionRules || '',
           aiModel: formData.value.aiModel,
           availableTools: formData.value.availableTools,
           isUserOverride: true,
@@ -1149,14 +2042,13 @@ const handleSave = saveChanges(async () => {
         originalData.value = { ...formData.value }
       }
     } else {
-      // Update existing user prompt (or system prompt for admins)
-      // For system prompts: do NOT send language (backend will preserve original)
-      // For custom prompts: send the language from the form
       const isSystemPrompt = currentPrompt.value.isDefault
       const updatePayload: UpdatePromptRequest = {
-        shortDescription: currentPrompt.value.shortDescription, // Keep original name
+        shortDescription: formData.value.shortDescription || currentPrompt.value.shortDescription,
         prompt: formData.value.content || '',
-        selectionRules: formData.value.rules || null,
+        selectionRules: formData.value.selectionRules ?? null,
+        keywords: formData.value.keywords ?? null,
+        enabled: formData.value.enabled !== false,
         metadata,
       }
       if (!isSystemPrompt) {
@@ -1164,13 +2056,12 @@ const handleSave = saveChanges(async () => {
       }
       const updated = await promptsApi.updatePrompt(currentPrompt.value.id, updatePayload)
 
-      // Update local state
       const index = prompts.value.findIndex((p) => p.id === currentPrompt.value!.id)
       if (index !== -1) {
         prompts.value[index] = {
           ...updated,
           content: updated.prompt,
-          rules: updated.selectionRules || updated.shortDescription || '',
+          rules: updated.selectionRules || '',
           aiModel: formData.value.aiModel,
           availableTools: formData.value.availableTools,
         }
@@ -1181,7 +2072,6 @@ const handleSave = saveChanges(async () => {
   } catch (err: unknown) {
     let errorMessage = err instanceof Error ? err.message : 'Failed to save prompt'
 
-    // Handle specific errors
     if (errorMessage.includes('Validation failed')) {
       errorMessage = 'Validation failed. Please check all fields and try again.'
     } else if (errorMessage.includes('Not authenticated')) {
@@ -1195,29 +2085,20 @@ const handleSave = saveChanges(async () => {
   }
 })
 
-/**
- * Handle discard
- */
 const handleDiscard = () => {
   discardChanges()
 }
 
-/**
- * Load template texts for new prompt and replace placeholders with user input
- */
 const loadTemplates = () => {
-  // Get the topic name from input (convert to readable format)
   const topicName = newPromptTopic.value.trim()
   const displayName = newPromptName.value.trim()
 
-  // Replace placeholders in Selection Rules
   let rules = SELECTION_RULES_TEMPLATE
   if (topicName) {
     rules = rules.replace(/\[TOPIC_NAME\]/g, displayName || topicName)
     rules = rules.replace(/\[SPECIFIC_KEYWORDS\]/g, topicName.replace(/-/g, ' '))
   }
 
-  // Replace placeholders in Prompt Content
   let content = PROMPT_CONTENT_TEMPLATE
   if (displayName || topicName) {
     const specialty = displayName || topicName.replace(/-/g, ' ')
@@ -1229,11 +2110,6 @@ const loadTemplates = () => {
   newPromptContent.value = content
 }
 
-/**
- * Toggle file selection for new prompt.
- * Uses array replacement (instead of in-place splice/push) to ensure
- * Vue reactivity is triggered reliably for all dependent computed/template bindings.
- */
 const toggleFileForNewPrompt = (fileId: number) => {
   if (newPromptSelectedFiles.value.includes(fileId)) {
     newPromptSelectedFiles.value = newPromptSelectedFiles.value.filter((id) => id !== fileId)
@@ -1242,16 +2118,10 @@ const toggleFileForNewPrompt = (fileId: number) => {
   }
 }
 
-/**
- * Remove file from new prompt selection
- */
 const removeFileFromNewPrompt = (fileId: number) => {
   newPromptSelectedFiles.value = newPromptSelectedFiles.value.filter((id) => id !== fileId)
 }
 
-/**
- * Create a new custom prompt
- */
 const handleCreateNew = async () => {
   if (
     !newPromptName.value.trim() ||
@@ -1259,45 +2129,42 @@ const handleCreateNew = async () => {
     !newPromptContent.value.trim() ||
     loading.value
   ) {
-    showError('Please enter topic, name, and prompt content')
+    showError(t('config.taskPrompts.createValidation'))
     return
   }
 
-  // Check if template text is still present
   if (hasTemplateText.value) {
-    showError('Please customize the template text before creating the prompt')
+    showError(t('config.taskPrompts.templatePlaceholderHint'))
     return
   }
 
   loading.value = true
 
   try {
-    // Build metadata object
     const metadata: PromptMetadata = {}
 
-    metadata.aiModel = 0 // Default to 0 for new prompts
-    metadata.tool_internet_search = true // Enable by default
-    metadata.tool_files_search = true // Enable by default
-    metadata.tool_url_screenshot = false // Disable by default
+    metadata.aiModel = 0
+    metadata.tool_internet_search = true
+    metadata.tool_files_search = true
+    metadata.tool_url_screenshot = false
 
     const requestPayload = {
       topic: newPromptTopic.value.trim().toLowerCase().replace(/\s+/g, '-'),
-      shortDescription: newPromptName.value.trim(),
+      shortDescription: newPromptDescription.value.trim() || newPromptName.value.trim(),
       prompt: newPromptContent.value.trim(),
       language: newPromptLanguage.value || locale.value || 'en',
       selectionRules: newPromptRules.value.trim() || null,
+      keywords: newPromptKeywords.value.trim() || null,
+      enabled: true,
       metadata,
     }
 
-    console.log('🔵 Creating prompt with payload:', requestPayload)
-
     const newPrompt = await promptsApi.createPrompt(requestPayload)
 
-    // Add to local state
     const mappedPrompt: TaskPrompt = {
       ...newPrompt,
       content: newPrompt.prompt,
-      rules: newPrompt.selectionRules || newPrompt.shortDescription || '',
+      rules: newPrompt.selectionRules || '',
       aiModel: 'default',
       availableTools: formData.value.availableTools || [],
     }
@@ -1306,27 +2173,26 @@ const handleCreateNew = async () => {
     selectedPromptId.value = newPrompt.id
     currentPrompt.value = { ...mappedPrompt }
     formData.value = {
-      rules: mappedPrompt.rules,
+      shortDescription: mappedPrompt.shortDescription || '',
+      selectionRules: mappedPrompt.selectionRules || '',
+      keywords: mappedPrompt.keywords || '',
+      enabled: mappedPrompt.enabled !== false,
       aiModel: mappedPrompt.aiModel,
       availableTools: mappedPrompt.availableTools,
       content: mappedPrompt.content,
+      language: mappedPrompt.language || 'en',
     }
     originalData.value = { ...formData.value }
+    activeTab.value = 'routing'
 
-    // Link selected files to the new prompt (if any)
     if (newPromptSelectedFiles.value.length > 0) {
       let linkedCount = 0
       const failedFiles: number[] = []
 
-      // Link each file individually so one failure doesn't abort the rest
       for (const fileId of newPromptSelectedFiles.value) {
         try {
           const result = await promptsApi.linkFileToPrompt(newPrompt.topic, fileId)
-          // Check if chunks were actually linked (0 chunks = file not vectorized yet)
           if (result && result.chunksLinked === 0) {
-            console.warn(
-              `File ${fileId} linked but 0 chunks updated - file may not be vectorized yet`
-            )
             failedFiles.push(fileId)
           } else {
             linkedCount++
@@ -1350,33 +2216,30 @@ const handleCreateNew = async () => {
         success(t('config.taskPrompts.createSuccessNoFilesLinked'))
       }
     } else {
-      success('Custom prompt created successfully!')
+      success(t('config.taskPrompts.createSuccess'))
     }
 
-    // Clear form
     newPromptName.value = ''
     newPromptTopic.value = ''
     newPromptContent.value = ''
     newPromptRules.value = ''
+    newPromptKeywords.value = ''
+    newPromptDescription.value = ''
     newPromptLanguage.value = locale.value || 'en'
     newPromptSelectedFiles.value = []
     newPromptFilesSearch.value = ''
-
-    // Close modal
     showCreateModal.value = false
 
-    // Reload files for the new prompt
     await loadPromptFiles()
   } catch (err: unknown) {
     let errorMessage = err instanceof Error ? err.message : 'Failed to create prompt'
 
-    // Handle specific errors
     if (errorMessage.includes('already have a prompt with this topic')) {
-      errorMessage = 'A prompt with this topic already exists. Please choose a different topic.'
+      errorMessage = t('config.taskPrompts.errorTopicExists')
     } else if (errorMessage.includes('tools:')) {
-      errorMessage = 'Cannot create prompts with "tools:" prefix - reserved for system.'
+      errorMessage = t('config.taskPrompts.errorToolsPrefix')
     } else if (errorMessage.includes('Missing required fields')) {
-      errorMessage = 'Please fill in all required fields: Topic, Name, and Prompt Content.'
+      errorMessage = t('config.taskPrompts.errorMissingFields')
     }
 
     showError(errorMessage)
@@ -1385,29 +2248,20 @@ const handleCreateNew = async () => {
   }
 }
 
-/**
- * Delete a custom prompt
- */
 const handleDelete = async () => {
-  if (!currentPrompt.value || loading.value) {
-    return
-  }
-
-  // Non-admins cannot delete system prompts
-  if (currentPrompt.value.isDefault && !isAdmin.value) {
-    return
-  }
+  if (!currentPrompt.value || loading.value) return
+  if (currentPrompt.value.isDefault && !isAdmin.value) return
 
   const isSystemPrompt = currentPrompt.value.isDefault
-  const confirmMessage = isSystemPrompt
-    ? `WARNING: You are about to delete the system prompt "${currentPrompt.value.name}". This affects ALL users and cannot be undone!`
-    : `Are you sure you want to delete "${currentPrompt.value.name}"? This action cannot be undone.`
-
   const confirmed = await dialog.confirm({
-    title: isSystemPrompt ? 'Delete System Prompt' : 'Delete Prompt',
-    message: confirmMessage,
-    confirmText: 'Delete',
-    cancelText: 'Cancel',
+    title: isSystemPrompt
+      ? t('config.taskPrompts.deleteSystemTitle')
+      : t('config.taskPrompts.deleteTitle'),
+    message: isSystemPrompt
+      ? t('config.taskPrompts.deleteSystemConfirm', { name: currentPrompt.value.name })
+      : t('config.taskPrompts.deleteConfirm', { name: currentPrompt.value.name }),
+    confirmText: t('config.taskPrompts.deletePrompt'),
+    cancelText: t('common.cancel', 'Cancel'),
     danger: true,
   })
 
@@ -1418,20 +2272,14 @@ const handleDelete = async () => {
   try {
     await promptsApi.deletePrompt(currentPrompt.value.id)
 
-    // Remove from local state
     const index = prompts.value.findIndex((p) => p.id === currentPrompt.value!.id)
     if (index !== -1) {
       prompts.value.splice(index, 1)
-      if (prompts.value.length > 0) {
-        selectedPromptId.value = prompts.value[0].id
-        loadPrompt()
-      } else {
-        selectedPromptId.value = null
-        currentPrompt.value = null
-      }
+      selectedPromptId.value = null
+      currentPrompt.value = null
     }
 
-    success('Prompt deleted successfully!')
+    success(t('config.taskPrompts.deleteSuccess'))
   } catch (err: unknown) {
     const errorMessage = err instanceof Error ? err.message : 'Failed to delete prompt'
     showError(errorMessage)
@@ -1440,9 +2288,6 @@ const handleDelete = async () => {
   }
 }
 
-/**
- * Load files for current prompt
- */
 const loadPromptFiles = async () => {
   if (!currentPrompt.value?.topic) {
     promptFiles.value = []
@@ -1457,18 +2302,14 @@ const loadPromptFiles = async () => {
   }
 }
 
-/**
- * Delete file from prompt
- */
 const handleDeleteFile = async (messageId: number) => {
   if (!currentPrompt.value?.topic) return
 
   const confirmed = await dialog.confirm({
-    title: 'Delete File',
-    message:
-      'Are you sure you want to remove this file from the knowledge base? This action cannot be undone.',
-    confirmText: 'Delete',
-    cancelText: 'Cancel',
+    title: t('config.taskPrompts.deleteFileTitle'),
+    message: t('config.taskPrompts.deleteFileConfirm'),
+    confirmText: t('config.taskPrompts.deletePrompt'),
+    cancelText: t('common.cancel', 'Cancel'),
     danger: true,
   })
 
@@ -1476,9 +2317,7 @@ const handleDeleteFile = async (messageId: number) => {
 
   try {
     await promptsApi.deletePromptFile(currentPrompt.value.topic, messageId)
-    success('File removed from knowledge base')
-
-    // Reload files list
+    success(t('config.taskPrompts.deleteFileSuccess'))
     await loadPromptFiles()
   } catch (err: unknown) {
     const errorMessage = err instanceof Error ? err.message : 'Failed to delete file'
@@ -1490,9 +2329,6 @@ const formatDate = (dateString: string): string => {
   return formatRelativeTime(new Date(dateString))
 }
 
-/**
- * Load available files for linking
- */
 const loadAvailableFiles = async () => {
   loadingAvailableFiles.value = true
   try {
@@ -1505,16 +2341,10 @@ const loadAvailableFiles = async () => {
   }
 }
 
-/**
- * Check if file is already linked to current prompt
- */
 const isFileLinked = (messageId: number): boolean => {
   return promptFiles.value.some((f) => f.messageId === messageId)
 }
 
-/**
- * Link existing file to current prompt
- */
 const handleLinkFile = async (messageId: number) => {
   if (!currentPrompt.value?.topic) return
 
@@ -1527,7 +2357,6 @@ const handleLinkFile = async (messageId: number) => {
       success(t('config.taskPrompts.fileLinkSuccess', { count: result.chunksLinked }))
     }
 
-    // Reload both lists
     await Promise.all([loadPromptFiles(), loadAvailableFiles()])
   } catch (err: unknown) {
     const errorMessage = err instanceof Error ? err.message : 'Failed to link file'
@@ -1541,25 +2370,36 @@ watch(locale, () => {
 
 onMounted(() => {
   cleanupGuard = setupNavigationGuard()
-  Promise.all([
-    loadAIModels(),
-    loadPrompts(),
-    loadAvailableFiles(), // Load available files on mount
-  ]).then(() => {
-    // Check if there's a topic query parameter to auto-select
-    const urlParams = new URLSearchParams(window.location.search)
-    const topicParam = urlParams.get('topic')
-    if (topicParam) {
-      const prompt = prompts.value.find((p) => p.topic === topicParam)
-      if (prompt) {
-        selectedPromptId.value = prompt.id
-        loadPrompt()
+  // Disabled topics are demoted to a separate group that is collapsed by default
+  // — they only matter when actively triaging the routing pool.
+  collapsedGroups.value = new Set(['disabled'])
+  Promise.all([loadAIModels(), loadPrompts(), loadAvailableFiles(), loadSynapseStatus()]).then(
+    () => {
+      const urlParams = new URLSearchParams(window.location.search)
+      const topicParam = urlParams.get('topic')
+      if (topicParam) {
+        const prompt = prompts.value.find((p) => p.topic === topicParam)
+        if (prompt) {
+          selectedPromptId.value = prompt.id
+          loadPrompt()
+          // Deep link from another page: open the editor and stash the list (mobile)
+          listVisibleMobile.value = false
+        }
       }
     }
-  })
+  )
 })
 
 onUnmounted(() => {
   cleanupGuard?.()
 })
 </script>
+
+<style scoped>
+.line-clamp-2 {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+</style>

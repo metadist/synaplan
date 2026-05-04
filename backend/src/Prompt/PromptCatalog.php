@@ -21,17 +21,97 @@ class PromptCatalog
     /**
      * Return all built-in system prompt definitions.
      *
-     * @return array<array{topic: string, language: string, shortDescription: string, prompt: string}>
+     * Topic taxonomy (Synapse Routing v2):
+     *
+     *  Granular routing topics (preferred for embedding-based Tier-1):
+     *    - general-chat        ← smalltalk, lifestyle, travel, health
+     *    - coding              ← programming languages, code review, debugging
+     *    - image-generation    ← create/edit images, photos, illustrations
+     *    - video-generation    ← create video clips, animations
+     *    - audio-generation    ← TTS, voice output, audio synthesis
+     *    - docsummary          ← summarize a document or attached file text
+     *    - officemaker         ← generate XLSX/DOCX/PPTX/CSV documents
+     *
+     *  Legacy canonical topics (still used by downstream handlers; the
+     *  TopicAliasResolver maps the granular topics back to these for
+     *  intent routing and groupKey backwards compatibility):
+     *    - general             ← canonical for general-chat + coding
+     *    - mediamaker          ← canonical for *-generation
+     *
+     *  Internal helper prompts (excluded from the routing pool):
+     *    - tools:sort          ← AI fallback classifier (DYNAMICLIST template)
+     *    - tools:enhance       ← message rewriter
+     *    - tools:search        ← search query optimizer
+     *    - tools:mailhandler   ← email routing
+     *    - tools:widget-*      ← widget setup
+     *    - tools:memory_*      ← memory extraction/parsing
+     *    - tools:feedback_*    ← feedback contradiction checks
+     *
+     * @return array<array{topic: string, language: string, shortDescription: string, prompt: string, keywords?: string, enabled?: bool}>
      */
     public static function all(): array
     {
         return [
+            // ──────────────────────────────────────────────
+            //  Legacy canonical topics (kept for backward compat)
+            // ──────────────────────────────────────────────
             [
                 'topic' => 'general',
                 'language' => 'en',
-                'shortDescription' => 'All requests by users go here by default. Send the user question here for text creation, poems, health tips, programming or coding examples, travel infos and the like.',
+                'shortDescription' => 'Catch-all topic for everyday questions, smalltalk, advice, opinions and any request that does not fit a more specific topic. Used as a routing fallback when no granular topic matches.',
+                'keywords' => 'fallback, default, catch-all, allgemein, frage, question',
                 'prompt' => self::generalPrompt(),
             ],
+            [
+                'topic' => 'mediamaker',
+                'language' => 'en',
+                'shortDescription' => 'Canonical media-generation topic that handles all create/edit requests for images, videos and audio. Prefer the more specific image-generation, video-generation or audio-generation topics for routing; this entry stays as a catch-all and downstream handler key.',
+                'keywords' => 'media generation, mediengenerierung, bild, video, audio, image, picture, photo, sound, voice',
+                'prompt' => self::mediaMakerPrompt(),
+            ],
+
+            // ──────────────────────────────────────────────
+            //  Granular routing topics (Synapse v2)
+            // ──────────────────────────────────────────────
+            [
+                'topic' => 'general-chat',
+                'language' => 'en',
+                'shortDescription' => 'Casual conversation, smalltalk, opinions, lifestyle questions and everyday advice. Use this for chit-chat, greetings, travel and health tips, recipes, recommendations and similar non-technical requests.',
+                'keywords' => 'chat, smalltalk, hello, hi, hallo, talk, conversation, opinion, advice, tip, lifestyle, travel, reise, health, gesundheit, recipe, rezept, recommendation, empfehlung, frage, question',
+                'prompt' => self::generalPrompt(),
+            ],
+            [
+                'topic' => 'coding',
+                'language' => 'en',
+                'shortDescription' => 'Programming, code review, debugging, refactoring, architecture and technical software questions. Use this whenever the user asks about source code, frameworks, libraries, errors, stack traces or wants help writing/explaining a snippet.',
+                'keywords' => 'code, programming, programmieren, php, python, javascript, typescript, java, kotlin, swift, go, rust, c++, c#, ruby, sql, query, html, css, vue, react, angular, svelte, node, nodejs, npm, composer, function, class, method, variable, error, fehler, exception, traceback, stack trace, bug, debug, refactor, refactoring, architecture, framework, library, api, rest, graphql, regex, algorithm, datastructure, leetcode, snippet, script, terminal, shell, bash, docker, kubernetes',
+                'prompt' => self::generalPrompt(),
+            ],
+            [
+                'topic' => 'image-generation',
+                'language' => 'en',
+                'shortDescription' => 'User wants to CREATE or EDIT an image, picture, illustration, drawing or photo from a text description and/or reference images. Includes background replacement, style transfer, image composition, retouching and any other image-to-image transformation.',
+                'keywords' => 'image, picture, photo, foto, bild, illustration, draw, draw me, zeichne, malen, paint, design, render, generate image, generiere bild, create image, erstelle bild, make a picture, picture of, foto von, bild von, edit image, retouch, replace background, style transfer, composition, composite, combine images, merge images, hintergrund ersetzen, photorealistic, painting, sketch',
+                'prompt' => self::mediaMakerPrompt(),
+            ],
+            [
+                'topic' => 'video-generation',
+                'language' => 'en',
+                'shortDescription' => 'User wants to CREATE a video, film, clip, animation or moving image. Examples: short cinematic clips, product videos, animated scenes. Duration and resolution may be specified.',
+                'keywords' => 'video, film, clip, animation, animate, motion, bewegt, moving image, generate video, create video, make a video, erstelle video, mache video, video von, kurzfilm, animation erstellen, cinemagraph, gif, motion picture, render video',
+                'prompt' => self::mediaMakerPrompt(),
+            ],
+            [
+                'topic' => 'audio-generation',
+                'language' => 'en',
+                'shortDescription' => 'User wants AUDIO output: text-to-speech, voice synthesis, narration or any spoken-audio rendering of text. Use this for "read this aloud", "convert to speech", "create an audio", "lies vor".',
+                'keywords' => 'audio, sound, voice, stimme, speech, sprache, tts, text to speech, text-to-speech, narration, narrate, read aloud, lies vor, vorlesen, sprich, speak, voiceover, voice-over, mp3, wav, podcast, audio version, vertonen, vertone, audio aus text, audio generieren',
+                'prompt' => self::mediaMakerPrompt(),
+            ],
+
+            // ──────────────────────────────────────────────
+            //  Internal helper prompts (excluded from routing pool)
+            // ──────────────────────────────────────────────
             [
                 'topic' => 'tools:sort',
                 'language' => 'en',
@@ -42,13 +122,8 @@ class PromptCatalog
                 'topic' => 'docsummary',
                 'language' => 'en',
                 'shortDescription' => 'The user asks for document summarization with specific options (abstractive, extractive, bullet-points). Direct here when user wants a summary of text or document content.',
+                'keywords' => 'summary, summarize, summarise, zusammenfassung, zusammenfassen, fasse zusammen, abstract, bullet points, key points, executive summary, kurzfassung, tldr, tl;dr, document summary, dokument zusammenfassen',
                 'prompt' => self::docSummaryPrompt(),
-            ],
-            [
-                'topic' => 'mediamaker',
-                'language' => 'en',
-                'shortDescription' => 'The user asks for generation of an image, video or audio/speech. Examples: "create an image", "make a video", "generate a picture", "read this aloud", "text to speech", "convert to audio". User wants to CREATE visual or audio media, not analyze it. This prompt enhances the user request for better AI generation results.',
-                'prompt' => self::mediaMakerPrompt(),
             ],
             [
                 'topic' => 'tools:mediamaker_audio_extract',
@@ -60,6 +135,7 @@ class PromptCatalog
                 'topic' => 'officemaker',
                 'language' => 'en',
                 'shortDescription' => 'The user asks for the generation of an Excel, Powerpoint or Word document. Not for any other format. This prompt can only handle the generation of ONE document with a clear prompt.',
+                'keywords' => 'excel, xlsx, spreadsheet, tabellenkalkulation, csv, word, docx, document, dokument, powerpoint, pptx, presentation, praesentation, slide, folie, sheet, tabelle, office document, office datei, generate excel, erstelle excel, create spreadsheet, create document, dokument erstellen',
                 'prompt' => self::officeMakerPrompt(),
             ],
             [
@@ -131,10 +207,17 @@ class PromptCatalog
      * Inserts new prompts or updates existing ones matched by (ownerId=0, topic, language).
      * User-created prompts (ownerId>0) are never touched.
      *
+     * Idempotent: re-running the seed updates BSHORTDESC, BPROMPT, BKEYWORDS and
+     * BENABLED for existing system prompts but never touches BSELECTION_RULES so
+     * admins can keep their custom rule overrides.
+     *
      * @return array{inserted: list<string>, updated: list<string>} topic keys per outcome
      */
     public static function seed(Connection $connection): array
     {
+        $hasKeywordColumn = self::columnExists($connection, 'BPROMPTS', 'BKEYWORDS');
+        $hasEnabledColumn = self::columnExists($connection, 'BPROMPTS', 'BENABLED');
+
         $inserted = [];
         $updated = [];
 
@@ -144,22 +227,75 @@ class PromptCatalog
                 [$prompt['topic'], $prompt['language']]
             );
 
+            $keywords = $prompt['keywords'] ?? null;
+            $enabled = (bool) ($prompt['enabled'] ?? true);
+
             if (false !== $existing) {
-                $connection->executeStatement(
-                    'UPDATE BPROMPTS SET BSHORTDESC = ?, BPROMPT = ? WHERE BID = ?',
-                    [$prompt['shortDescription'], $prompt['prompt'], $existing]
-                );
+                $sql = 'UPDATE BPROMPTS SET BSHORTDESC = ?, BPROMPT = ?';
+                $params = [$prompt['shortDescription'], $prompt['prompt']];
+
+                if ($hasKeywordColumn) {
+                    $sql .= ', BKEYWORDS = ?';
+                    $params[] = $keywords;
+                }
+                if ($hasEnabledColumn) {
+                    $sql .= ', BENABLED = ?';
+                    $params[] = $enabled ? 1 : 0;
+                }
+
+                $sql .= ' WHERE BID = ?';
+                $params[] = $existing;
+
+                $connection->executeStatement($sql, $params);
                 $updated[] = $prompt['topic'];
             } else {
-                $connection->executeStatement(
-                    'INSERT INTO BPROMPTS (BOWNERID, BLANG, BTOPIC, BSHORTDESC, BPROMPT) VALUES (0, ?, ?, ?, ?)',
-                    [$prompt['language'], $prompt['topic'], $prompt['shortDescription'], $prompt['prompt']]
+                $columns = ['BOWNERID', 'BLANG', 'BTOPIC', 'BSHORTDESC', 'BPROMPT'];
+                $placeholders = ['0', '?', '?', '?', '?'];
+                $params = [$prompt['language'], $prompt['topic'], $prompt['shortDescription'], $prompt['prompt']];
+
+                if ($hasKeywordColumn) {
+                    $columns[] = 'BKEYWORDS';
+                    $placeholders[] = '?';
+                    $params[] = $keywords;
+                }
+                if ($hasEnabledColumn) {
+                    $columns[] = 'BENABLED';
+                    $placeholders[] = '?';
+                    $params[] = $enabled ? 1 : 0;
+                }
+
+                $sql = sprintf(
+                    'INSERT INTO BPROMPTS (%s) VALUES (%s)',
+                    implode(', ', $columns),
+                    implode(', ', $placeholders)
                 );
+
+                $connection->executeStatement($sql, $params);
                 $inserted[] = $prompt['topic'];
             }
         }
 
         return ['inserted' => $inserted, 'updated' => $updated];
+    }
+
+    private static function columnExists(Connection $connection, string $table, string $column): bool
+    {
+        try {
+            $sm = $connection->createSchemaManager();
+            if (!$sm->tablesExist([$table])) {
+                return false;
+            }
+
+            foreach ($sm->listTableColumns($table) as $col) {
+                if (0 === strcasecmp($col->getName(), $column)) {
+                    return true;
+                }
+            }
+        } catch (\Throwable) {
+            // Fall through to false
+        }
+
+        return false;
     }
 
     private static function generalPrompt(): string

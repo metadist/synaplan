@@ -179,6 +179,10 @@ final readonly class VectorizationService
                     endLine: $chunk['end_line'],
                     text: $chunk['content'],
                     vector: array_map('floatval', $embedding),
+                    embeddingModelId: $embeddingModelId,
+                    embeddingProvider: $provider,
+                    embeddingModelName: $modelName,
+                    vectorDim: self::VECTOR_DIMENSION,
                 );
 
                 ++$chunksCreated;

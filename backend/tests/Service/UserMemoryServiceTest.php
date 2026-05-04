@@ -6,6 +6,7 @@ namespace App\Tests\Service;
 
 use App\AI\Service\AiFacade;
 use App\Entity\User;
+use App\Service\Embedding\EmbeddingMetadataService;
 use App\Service\Exception\MemoryServiceUnavailableException;
 use App\Service\ModelConfigService;
 use App\Service\RateLimitService;
@@ -27,6 +28,7 @@ final class UserMemoryServiceTest extends TestCase
     private AiFacade $aiFacade;
     private ModelConfigService $modelConfigService;
     private RateLimitService $rateLimitService;
+    private EmbeddingMetadataService $embeddingMetadata;
     private LoggerInterface $logger;
     private UserMemoryService $service;
 
@@ -37,7 +39,13 @@ final class UserMemoryServiceTest extends TestCase
         $this->aiFacade = $this->createMock(AiFacade::class);
         $this->modelConfigService = $this->createMock(ModelConfigService::class);
         $this->rateLimitService = $this->createMock(RateLimitService::class);
+        $this->embeddingMetadata = $this->createMock(EmbeddingMetadataService::class);
         $this->logger = $this->createMock(LoggerInterface::class);
+
+        // Default: stale-filter pass-through so legacy tests behave as before.
+        $this->embeddingMetadata->method('filterStaleHits')->willReturnCallback(
+            static fn (array $hits) => ['fresh' => $hits, 'stale_count' => 0]
+        );
 
         $this->service = new UserMemoryService(
             $this->em,
@@ -45,6 +53,7 @@ final class UserMemoryServiceTest extends TestCase
             $this->aiFacade,
             $this->modelConfigService,
             $this->rateLimitService,
+            $this->embeddingMetadata,
             $this->logger
         );
     }

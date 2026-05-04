@@ -39,6 +39,15 @@
           <span>{{ $t('nav.profile') }}</span>
         </button>
         <button
+          role="menuitem"
+          class="dropdown-item"
+          data-testid="btn-user-settings"
+          @click="handleSettings"
+        >
+          <Cog6ToothIcon class="w-5 h-5" />
+          <span>{{ $t('nav.settings') }}</span>
+        </button>
+        <button
           v-if="isMemoryServiceAvailable"
           role="menuitem"
           class="dropdown-item"
@@ -92,6 +101,7 @@ import {
   UserCircleIcon,
   ArrowRightOnRectangleIcon,
   ChevronDownIcon,
+  Cog6ToothIcon,
 } from '@heroicons/vue/24/outline'
 import { Icon } from '@iconify/vue'
 import { useAuth } from '@/composables/useAuth'
@@ -145,6 +155,11 @@ const initials = computed(() => {
 const handleProfileSettings = () => {
   isOpen.value = false
   router.push('/profile')
+}
+
+const handleSettings = () => {
+  isOpen.value = false
+  router.push('/settings')
 }
 
 const handleOpenMemories = () => {

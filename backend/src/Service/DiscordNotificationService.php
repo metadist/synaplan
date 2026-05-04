@@ -240,6 +240,14 @@ final readonly class DiscordNotificationService
 
     /**
      * Send a Discord embed message.
+     *
+     * Set `mentionEveryone = true` to ping the channel via `@everyone`.
+     * Discord requires both:
+     *   1. the literal `@everyone` token in the message `content`
+     *   2. an `allowed_mentions.parse: ['everyone']` entry, otherwise
+     *      the webhook silently strips the mention.
+     * Use this sparingly — only for incidents that on-call has to ack
+     * within minutes (primary embedding provider outage, etc.).
      */
     private function sendEmbed(
         string $title,
@@ -247,6 +255,7 @@ final readonly class DiscordNotificationService
         array $fields,
         string $footer = '',
         ?string $description = null,
+        bool $mentionEveryone = false,
     ): void {
         $embed = [
             'title' => $title,
@@ -266,6 +275,11 @@ final readonly class DiscordNotificationService
         $payload = [
             'embeds' => [$embed],
         ];
+
+        if ($mentionEveryone) {
+            $payload['content'] = '@everyone';
+            $payload['allowed_mentions'] = ['parse' => ['everyone']];
+        }
 
         try {
             $this->httpClient->request('POST', $this->webhookUrl, [
@@ -351,9 +365,50 @@ final readonly class DiscordNotificationService
             ];
         }
 
+        // Synapse Routing metrics
+        $source = $classificationResult['source'] ?? null;
+        if (null !== $source) {
+            $fields[] = [
+                'name' => '⚡ Routing Source',
+                'value' => $source,
+                'inline' => true,
+            ];
+        }
+
+        $synapseScore = $classificationResult['synapse_score'] ?? null;
+        if (null !== $synapseScore) {
+            $fields[] = [
+                'name' => '📊 Confidence',
+                'value' => sprintf('%.4f', $synapseScore),
+                'inline' => true,
+            ];
+        }
+
+        $fallbackReason = $classificationResult['synapse_fallback_reason'] ?? null;
+        if (null !== $fallbackReason) {
+            $fields[] = [
+                'name' => '🔄 Fallback Reason',
+                'value' => $fallbackReason,
+                'inline' => true,
+            ];
+        }
+
+        $synapseLatency = $classificationResult['synapse_latency_ms'] ?? null;
+        if (null !== $synapseLatency) {
+            $fields[] = [
+                'name' => '⏱️ Synapse Latency',
+                'value' => $synapseLatency.'ms',
+                'inline' => true,
+            ];
+        }
+
+        $isSynapse = str_starts_with($source ?? '', 'synapse_');
+        $emoji = $isSynapse ? '⚡' : '🔍';
+        $label = $isSynapse ? 'Synapse' : 'AI';
+
         $this->sendEmbed(
-            title: '🔍 AI Classification Result',
-            color: null !== $mediaType ? self::COLOR_SUCCESS : 0xFFA500, // Orange if no media type
+            title: "{$emoji} {$label} Classification Result",
+            color: null !== $mediaType ? self::COLOR_SUCCESS : 0xFFA500,
             fields: $fields,
             footer: 'Synaplan Classifier'
         );
@@ -632,6 +687,60 @@ final readonly class DiscordNotificationService
             color: self::COLOR_ERROR,
             fields: $fields,
             footer: 'Synaplan Widget'
+        );
+    }
+
+    /**
+     * Notify when the embedding fallback provider activates due to a
+     * primary-provider failure.
+     *
+     * This is treated as a P1 incident — the primary embedding stack
+     * (e.g. local Ollama / OpenAI) is down and the system is now
+     * burning Cloudflare quota for every RAG/Memory/Synapse request.
+     * Operators MUST ack this fast, so we:
+     *   - mention `@everyone` (requires `allowed_mentions.parse`,
+     *     handled in `sendEmbed`),
+     *   - prepend a 🚨 emoji + clear `[INCIDENT]` tag for at-a-glance
+     *     scanning in mobile notifications,
+     *   - keep the same throttling discipline (1/h per provider pair)
+     *     in the caller (`AiFacade`) so the channel does not get
+     *     spammed by burst failures.
+     */
+    public function notifyEmbeddingFallback(string $primaryProvider, string $fallbackProvider, string $error): void
+    {
+        if (!$this->isEnabled()) {
+            return;
+        }
+
+        $fields = [
+            [
+                'name' => 'Primary Provider (DOWN)',
+                'value' => $primaryProvider,
+                'inline' => true,
+            ],
+            [
+                'name' => 'Fallback Provider (active)',
+                'value' => $fallbackProvider,
+                'inline' => true,
+            ],
+            [
+                'name' => 'Error',
+                'value' => '```'.$this->truncate($error, self::MAX_ERROR).'```',
+                'inline' => false,
+            ],
+            [
+                'name' => 'Action required',
+                'value' => 'Verify primary provider health and capacity. Fallback traffic is billable.',
+                'inline' => false,
+            ],
+        ];
+
+        $this->sendEmbed(
+            title: '🚨 [INCIDENT] Embedding Fallback Activated',
+            color: self::COLOR_ERROR,
+            fields: $fields,
+            footer: 'Synaplan Embedding · throttled to 1/hour per provider pair',
+            mentionEveryone: true,
         );
     }
 

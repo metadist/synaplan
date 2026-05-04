@@ -196,6 +196,86 @@ interface QdrantClientInterface
      */
     public function getFilesWithChunks(int $userId): array;
 
+    // --- Synapse Routing Operations ---
+
+    /**
+     * Upsert a topic embedding into the synapse_topics collection.
+     *
+     * @param string  $pointId Point ID (e.g., "synapse_{ownerId}_{topic}")
+     * @param float[] $vector  Embedding vector
+     * @param array   $payload Metadata (owner_id, topic, short_description)
+     */
+    public function upsertSynapseTopic(string $pointId, array $vector, array $payload): void;
+
+    /**
+     * Search for the most similar topics using vector similarity.
+     *
+     * @param float[] $queryVector Query embedding vector
+     * @param int     $userId      User ID (search system + user-specific topics)
+     * @param int     $limit       Max results
+     * @param float   $minScore    Minimum similarity score
+     *
+     * @return array Array of results: [['id' => string, 'score' => float, 'payload' => array], ...]
+     */
+    public function searchSynapseTopics(
+        array $queryVector,
+        int $userId,
+        int $limit = 5,
+        float $minScore = 0.3,
+    ): array;
+
+    /**
+     * Delete a single synapse topic point by its point ID.
+     */
+    public function deleteSynapseTopic(string $pointId): void;
+
+    /**
+     * Delete all synapse topic embeddings for a specific owner.
+     *
+     * @return int Number of deleted points
+     */
+    public function deleteSynapseTopicsByOwner(int $ownerId): int;
+
+    /**
+     * Fetch a single synapse topic point by its logical ID.
+     *
+     * @return array{id: string, payload: array}|null
+     */
+    public function getSynapseTopic(string $pointId): ?array;
+
+    /**
+     * Scroll through synapse topic points (no vector similarity).
+     *
+     * Used by the admin status endpoint to count per-model entries and detect
+     * stale indexes without doing a vector search.
+     *
+     * @param int|null $ownerId Optional owner_id filter (null = all)
+     *
+     * @return list<array{id: string, payload: array}>
+     */
+    public function scrollSynapseTopics(?int $ownerId = null, int $limit = 1000): array;
+
+    /**
+     * Get information about the synapse collection (vector size, point count, status).
+     *
+     * @return array{exists: bool, vector_dim: ?int, points_count: ?int, distance: ?string}
+     */
+    public function getSynapseCollectionInfo(): array;
+
+    /**
+     * Drop the synapse collection (if present) and recreate it with the given
+     * vector dimension. Used when the embedding model is swapped to one with
+     * a different output dimension (e.g. 1024 ─► 1536).
+     *
+     * Idempotent — safe to call when the collection does not yet exist.
+     */
+    public function recreateSynapseCollection(int $vectorDimension): void;
+
+    /**
+     * Get the synapse collection name.
+     */
+    public function getSynapseCollection(): string;
+
     // --- Health & Info ---
 
     /**

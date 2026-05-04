@@ -37,14 +37,17 @@ export class ChatHelper {
     return (await answerBody.innerText()).trim().toLowerCase()
   }
 
+  /**
+   * App-mode selection moved from the header into Settings. We persist it
+   * directly via localStorage and reload — fastest, race-free, and matches
+   * exactly what the appMode store reads on init.
+   */
   async ensureAdvancedMode(): Promise<void> {
-    const modeToggle = this.page.locator(selectors.header.modeToggle)
-    await modeToggle.waitFor({ state: 'visible' })
-    const modeLabel = (await modeToggle.innerText()).toLowerCase()
-    if (modeLabel.includes('easy')) {
-      await modeToggle.click()
-      await expect(modeToggle).toContainText(/advanced/i)
-    }
+    await this.page.evaluate(() => localStorage.setItem('app_mode', 'advanced'))
+    await this.page.reload()
+    await this.page
+      .locator(selectors.nav.sidebarV2Settings)
+      .waitFor({ state: 'visible', timeout: TIMEOUTS.STANDARD })
   }
 
   /**

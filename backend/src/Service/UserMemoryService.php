@@ -7,6 +7,7 @@ namespace App\Service;
 use App\AI\Service\AiFacade;
 use App\DTO\UserMemoryDTO;
 use App\Entity\User;
+use App\Service\Embedding\EmbeddingMetadataService;
 use App\Service\Exception\MemoryServiceUnavailableException;
 use App\Service\VectorSearch\QdrantClientInterface;
 use Doctrine\ORM\EntityManagerInterface;
@@ -35,6 +36,7 @@ final readonly class UserMemoryService
         private AiFacade $aiFacade,
         private ModelConfigService $modelConfigService,
         private RateLimitService $rateLimitService,
+        private EmbeddingMetadataService $embeddingMetadata,
         private LoggerInterface $logger,
     ) {
     }
@@ -554,15 +556,33 @@ final readonly class UserMemoryService
                 return [];
             }
 
-            // Search in Qdrant
+            // Search in Qdrant. Ask for 2x to leave room for the stale-
+            // filter pass below — see QdrantVectorStorage::search() for
+            // the rationale.
             $results = $this->qdrantClient->searchMemories(
                 $queryVector,
                 $userId,
                 $category,
-                $limit,
+                $limit * 2,
                 $minScore,
                 $namespace
             );
+
+            // Filter out hits embedded with a different model than the
+            // currently active one. Cross-model cosine scores are
+            // physically meaningless — including them would silently
+            // corrupt the assistant's answers right after a model swap,
+            // until the user re-vectorizes their memories.
+            $filtered = $this->embeddingMetadata->filterStaleHits($results);
+            if ($filtered['stale_count'] > 0) {
+                $this->logger->info('🧪 Filtered stale memory hits', [
+                    'userId' => $userId,
+                    'stale_count' => $filtered['stale_count'],
+                    'fresh_count' => count($filtered['fresh']),
+                    'current_model_id' => $this->embeddingMetadata->getCurrentModelId(),
+                ]);
+            }
+            $results = array_slice($filtered['fresh'], 0, $limit);
 
             $this->logger->info('🎯 Qdrant search results', [
                 'userId' => $userId,
@@ -638,7 +658,14 @@ final readonly class UserMemoryService
             // Generate point ID
             $pointId = "mem_{$user->getId()}_{$memoryId}";
 
-            // Store in Qdrant
+            // Store in Qdrant. Embedding-stack metadata (model id/provider/
+            // name + vector dim + indexed_at) is written alongside the
+            // semantic payload so SafeModelChange can:
+            //   1. detect stale memories when the active VECTORIZE model
+            //      changes (different model_id or vector_dim → trigger
+            //      re-vectorize);
+            //   2. surface in the admin UI which model produced which
+            //      memories.
             $this->qdrantClient->upsertMemory(
                 $pointId,
                 $embedding,
@@ -652,6 +679,11 @@ final readonly class UserMemoryService
                     'created' => $dto->created,
                     'updated' => $dto->updated,
                     'active' => $dto->active,
+                    'embedding_model_id' => $embeddingModelId,
+                    'embedding_provider' => $provider,
+                    'embedding_model' => $modelName,
+                    'vector_dim' => count($embedding),
+                    'indexed_at' => date(\DATE_ATOM),
                 ],
                 $namespace
             );

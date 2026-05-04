@@ -3,22 +3,33 @@
 namespace App\AI\Service;
 
 use App\AI\Exception\ProviderException;
+use App\AI\Interface\EmbeddingProviderInterface;
 use App\AI\Provider\GoogleProvider;
 use App\Service\CircuitBreaker;
+use App\Service\DiscordNotificationService;
 use App\Service\File\FileHelper;
 use App\Service\File\UserUploadPathBuilder;
+use App\Service\InternalEmailService;
 use App\Service\ModelConfigService;
 use Psr\Log\LoggerInterface;
+use Symfony\Contracts\Cache\CacheInterface;
 
 class AiFacade
 {
+    /** @var array<string, array{embedding: array<float>, usage: array{prompt_tokens: int, total_tokens: int}}> */
+    private array $embedCache = [];
+
     public function __construct(
         private ProviderRegistry $registry,
         private ModelConfigService $modelConfig,
         private CircuitBreaker $circuitBreaker,
         private LoggerInterface $logger,
         private UserUploadPathBuilder $userUploadPathBuilder,
+        private DiscordNotificationService $discordNotification,
+        private InternalEmailService $emailService,
+        private CacheInterface $cache,
         private string $uploadDir = '/var/www/backend/var/uploads',
+        private string $embeddingFallbackProvider = '',
     ) {
     }
 
@@ -204,21 +215,45 @@ class AiFacade
         $providerName = $options['provider'] ?? null;
         $model = $options['model'] ?? null;
 
-        // Fall back to user configuration when no provider is explicitly given
         if (!$providerName && $userId > 0) {
-            $providerName = $this->modelConfig->getDefaultProvider($userId, 'vectorize');
+            $providerName = $this->modelConfig->getDefaultProvider($userId, 'embedding');
         }
 
         $provider = $this->registry->getEmbeddingProvider($providerName);
+        $resolvedModel = $model ?? $provider->getDefaultModels()['embedding'] ?? 'default';
+
+        $cacheKey = md5($text.'|'.$provider->getName().'|'.$resolvedModel);
+        if (isset($this->embedCache[$cacheKey])) {
+            $this->logger->debug('AI embedding cache hit', [
+                'provider' => $provider->getName(),
+                'model' => $resolvedModel,
+                'text_length' => strlen($text),
+            ]);
+
+            return $this->embedCache[$cacheKey];
+        }
 
         $this->logger->info('AI embedding request', [
             'provider' => $provider->getName(),
             'user_id' => $userId,
-            'model' => $model ?? 'default',
+            'model' => $resolvedModel,
             'text_length' => strlen($text),
         ]);
 
-        return $provider->embed($text, $options);
+        try {
+            $result = $provider->embed($text, $options);
+        } catch (\Throwable $primaryError) {
+            $result = $this->tryEmbeddingFallback(
+                fn ($fb, $fbOpts) => $fb->embed($text, $fbOpts),
+                $provider->getName(),
+                $primaryError,
+                $options,
+            );
+        }
+
+        $this->embedCache[$cacheKey] = $result;
+
+        return $result;
     }
 
     /**
@@ -234,7 +269,7 @@ class AiFacade
     public function embedBatch(array $texts, ?int $userId = null, ?string $providerName = null, array $options = []): array
     {
         if (!$providerName && $userId > 0) {
-            $providerName = $this->modelConfig->getDefaultProvider($userId, 'vectorize');
+            $providerName = $this->modelConfig->getDefaultProvider($userId, 'embedding');
         }
 
         $provider = $this->registry->getEmbeddingProvider($providerName);
@@ -245,7 +280,106 @@ class AiFacade
             'count' => count($texts),
         ]);
 
-        return $provider->embedBatch($texts, $options);
+        try {
+            return $provider->embedBatch($texts, $options);
+        } catch (\Throwable $primaryError) {
+            return $this->tryEmbeddingFallback(
+                fn ($fb, $fbOpts) => $fb->embedBatch($texts, $fbOpts),
+                $provider->getName(),
+                $primaryError,
+                $options,
+            );
+        }
+    }
+
+    /**
+     * Try a fallback embedding provider when the primary fails.
+     *
+     * @template T
+     *
+     * @param callable(EmbeddingProviderInterface, array): T $operation
+     *
+     * @return T
+     */
+    private function tryEmbeddingFallback(callable $operation, string $primaryName, \Throwable $primaryError, array $options): mixed
+    {
+        $fallbackName = $this->embeddingFallbackProvider;
+
+        if ('' === $fallbackName || $fallbackName === $primaryName) {
+            throw $primaryError;
+        }
+
+        // Use `error` (not `warning`) so this shows up in the same log
+        // bucket as production incidents — silent failovers were called
+        // out as a risk in the Synapse Routing v2 review. The success
+        // path further down logs `notice` so on-call can correlate
+        // "primary failed" with "fallback succeeded" without grepping
+        // two channels.
+        $this->logger->error('Embedding primary provider failed; attempting fallback', [
+            'primary' => $primaryName,
+            'fallback' => $fallbackName,
+            'error' => $primaryError->getMessage(),
+            'event' => 'embedding.fallback.attempt',
+        ]);
+
+        try {
+            $fallback = $this->registry->getEmbeddingProvider($fallbackName);
+        } catch (\Throwable) {
+            throw $primaryError;
+        }
+
+        $fallbackOptions = $options;
+        $fallbackOptions['provider'] = $fallbackName;
+        unset($fallbackOptions['model']);
+
+        $result = $operation($fallback, $fallbackOptions);
+
+        $this->logger->notice('Embedding fallback succeeded', [
+            'primary' => $primaryName,
+            'fallback' => $fallbackName,
+            'event' => 'embedding.fallback.success',
+        ]);
+
+        $this->sendFallbackNotification($primaryName, $fallbackName, $primaryError->getMessage());
+
+        return $result;
+    }
+
+    /**
+     * Send a throttled warning notification when the embedding fallback activates.
+     * Max one notification per provider pair per hour to prevent spam.
+     */
+    private function sendFallbackNotification(string $primaryProvider, string $fallbackProvider, string $error): void
+    {
+        $throttleKey = 'embedding_fallback_'.md5($primaryProvider.$fallbackProvider);
+
+        try {
+            $isNewNotification = false;
+            $this->cache->get($throttleKey, function ($item) use (&$isNewNotification) {
+                $item->expiresAfter(3600);
+                $isNewNotification = true;
+
+                return true;
+            });
+
+            if (!$isNewNotification) {
+                return;
+            }
+        } catch (\Throwable $e) {
+            $this->logger->debug('Fallback throttle cache error (non-critical)', ['error' => $e->getMessage()]);
+        }
+
+        try {
+            $this->discordNotification->notifyEmbeddingFallback($primaryProvider, $fallbackProvider, $error);
+        } catch (\Throwable $e) {
+            $this->logger->debug('Discord fallback notification failed (non-critical)', ['error' => $e->getMessage()]);
+        }
+
+        try {
+            $this->emailService->sendEmbeddingFallbackWarning($primaryProvider, $fallbackProvider, $error);
+        } catch (\Throwable $e) {
+            $this->logger->debug('Email fallback notification failed (non-critical)', ['error' => $e->getMessage()]);
+        }
     }
 
     /**
@@ -261,7 +395,7 @@ class AiFacade
     public function analyzeImage(string $imagePath, string $prompt, ?int $userId = null, array $options = []): array
     {
         $providerWasExplicit = array_key_exists('provider', $options);
-        $requestedProvider = $options['provider'] ?? $this->modelConfig->getDefaultProvider($userId, 'pic2text');
+        $requestedProvider = $options['provider'] ?? $this->modelConfig->getDefaultProvider($userId, 'vision');
         // Don't default to 'test' - let real providers be tried first via fallback logic
         $normalizedRequested = $requestedProvider ? strtolower($requestedProvider) : null;
 

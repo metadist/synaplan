@@ -23,6 +23,12 @@ export interface TaskPrompt {
   isDefault: boolean
   isUserOverride?: boolean
   selectionRules?: string | null
+  /** Comma/newline-separated synonyms folded into the Synapse embedding text. */
+  keywords?: string | null
+  /** Soft-disable flag — disabled topics are filtered out of the routing pool. */
+  enabled?: boolean
+  /** Server-side preview of the exact text that gets embedded for this topic. */
+  embeddingPreview?: string
   metadata?: PromptMetadata
 }
 
@@ -32,6 +38,8 @@ export interface CreatePromptRequest {
   prompt: string
   language?: string
   selectionRules?: string | null
+  keywords?: string | null
+  enabled?: boolean
   metadata?: PromptMetadata
 }
 
@@ -40,7 +48,26 @@ export interface UpdatePromptRequest {
   prompt?: string
   language?: string
   selectionRules?: string | null
+  keywords?: string | null
+  enabled?: boolean
   metadata?: PromptMetadata
+}
+
+export interface RoutingTestCandidate {
+  topic: string
+  score: number
+  stale: boolean
+  alias_target?: string | null
+  payload?: Record<string, unknown>
+}
+
+export interface RoutingTestResult {
+  success: boolean
+  query: string
+  model: { provider: string | null; model: string | null; model_id: number | null }
+  candidates: RoutingTestCandidate[]
+  latency_ms: number
+  error: string | null
 }
 
 export interface PromptFile {
@@ -275,6 +302,20 @@ class PromptsApi {
    */
   async listPrompts(language: string = 'en'): Promise<TaskPrompt[]> {
     return this.getPrompts(language)
+  }
+
+  /**
+   * Dry-run the SynapseRouter for the given message text.
+   *
+   * Used by the in-app "Test Routing" widget. Embeds the message with the
+   * active VECTORIZE model and returns the Top-K topic matches with raw
+   * cosine scores. Does NOT mutate any state.
+   */
+  async testRouting(text: string, limit: number = 5): Promise<RoutingTestResult> {
+    return await httpClient<RoutingTestResult>('/api/v1/prompts/test', {
+      method: 'POST',
+      body: JSON.stringify({ text, limit }),
+    })
   }
 }
 

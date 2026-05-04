@@ -30,10 +30,27 @@ export const selectors = {
   },
   header: {
     appHeader: '[data-testid="comp-app-header"]',
-    modeToggle: '[data-testid="btn-mode-toggle"]',
+    /**
+     * Header itself no longer hosts mode/theme/language toggles —
+     * those moved to the Settings page.
+     * `themeToggle` + `languageToggle` are still rendered on the
+     * unauthenticated Register/VerifyEmail pages.
+     */
     themeToggle: '[data-testid="btn-theme-toggle"]',
     languageToggle: '[data-testid="btn-language-toggle"]',
-    languageMenu: '[data-testid="dropdown-language-menu"]',
+  },
+  settings: {
+    page: '[data-testid="page-settings"]',
+    appModeSection: '[data-testid="section-app-mode"]',
+    btnModeEasy: '[data-testid="btn-mode-easy"]',
+    btnModeAdvanced: '[data-testid="btn-mode-advanced"]',
+    languageSection: '[data-testid="section-language-settings"]',
+    languageGrid: '[data-testid="grid-language-options"]',
+    btnLanguage: (lang: string) => `[data-testid="btn-language-${lang}"]`,
+    themeSection: '[data-testid="section-theme-settings"]',
+    btnThemeLight: '[data-testid="btn-theme-light"]',
+    btnThemeDark: '[data-testid="btn-theme-dark"]',
+    btnThemeSystem: '[data-testid="btn-theme-system"]',
   },
   nav: {
     sidebar: '[data-testid="comp-sidebar-v2"]',
@@ -173,6 +190,7 @@ export const selectors = {
     button: '[data-testid="btn-sidebar-v2-user"]',
     dropdown: '[data-testid="dropdown-sidebar-v2-user"]',
     profileBtn: '[data-testid="btn-sidebar-v2-profile"]',
+    settingsBtn: '[data-testid="btn-sidebar-v2-settings"]',
     statisticsBtn: '[data-testid="btn-sidebar-v2-statistics"]',
     subscriptionBtn: '[data-testid="btn-sidebar-v2-subscription"]',
     upgradeBtn: '[data-testid="btn-sidebar-v2-upgrade"]',
@@ -290,11 +308,37 @@ export const selectors = {
   },
   taskPrompts: {
     page: '[data-testid="page-config-task-prompts"]',
+    overview: '[data-testid="section-task-prompts-overview"]',
+    list: '[data-testid="section-task-prompts-list"]',
+    cards: '[data-testid="section-task-prompt-cards"]',
+    cardAny: '[data-testid^="card-prompt-"]',
+    /** @deprecated retained as a hidden compat element for legacy automation; prefer `cardAny`. */
     promptSelect: '[data-testid="input-prompt-select"]',
+    promptSearch: '[data-testid="input-prompt-search"]',
+    filterAll: '[data-testid="filter-all"]',
+    filterSystem: '[data-testid="filter-system"]',
+    filterCustom: '[data-testid="filter-custom"]',
+    filterDisabled: '[data-testid="filter-disabled"]',
+    statTotal: '[data-testid="stat-total"]',
+    statSystem: '[data-testid="stat-system"]',
+    statCustom: '[data-testid="stat-custom"]',
+    promptHeader: '[data-testid="section-prompt-header"]',
+    tabRouting: '[data-testid="tab-routing"]',
+    tabPrompt: '[data-testid="tab-prompt"]',
+    tabKnowledge: '[data-testid="tab-knowledge"]',
+    tabDanger: '[data-testid="tab-danger"]',
     promptDetails: '[data-testid="section-prompt-details"]',
+    promptConfig: '[data-testid="section-prompt-config"]',
+    embeddingPreview: '[data-testid="text-embedding-preview"]',
     aiModel: '[data-testid="input-ai-model"]',
     rules: '[data-testid="input-rules"]',
+    keywords: '[data-testid="input-keywords"]',
+    description: '[data-testid="input-description"]',
+    enabled: '[data-testid="input-enabled"]',
     content: '[data-testid="input-content"]',
+    btnCreate: '[data-testid="btn-create-prompt"]',
+    btnDelete: '[data-testid="btn-delete"]',
+    cardForTopic: (topic: string) => `[data-testid="card-prompt-${topic}"]`,
   },
   pages: {
     chat: '[data-testid="page-chat"]',

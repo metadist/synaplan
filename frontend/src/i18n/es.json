@@ -1118,6 +1118,10 @@
       "dark": "Oscuro",
       "system": "Sistema"
     },
+    "language": {
+      "title": "Idioma",
+      "description": "Elige el idioma de la interfaz"
+    },
     "account": {
       "title": "Cuenta",
       "email": "Correo",
