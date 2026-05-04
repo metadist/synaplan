@@ -280,6 +280,10 @@ export const selectors = {
     btnSelectPro: '[data-testid="btn-select-pro"]',
     btnSelectTeam: '[data-testid="btn-select-team"]',
     btnSelectBusiness: '[data-testid="btn-select-business"]',
+    /** Visible inside section-current-plan when subscription is scheduled to cancel at period end */
+    textCancelDate: '[data-testid="text-cancel-date"]',
+    /** Visible inside section-current-plan during normal active periods (mutually exclusive with textCancelDate) */
+    textNextBilling: '[data-testid="text-next-billing"]',
   },
   subscriptionSuccess: {
     page: '[data-testid="page-subscription-success"]',
