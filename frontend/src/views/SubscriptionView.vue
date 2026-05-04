@@ -48,12 +48,20 @@
                       {{ getStatusText(subscriptionStatus.status || 'active') }}
                     </span>
                   </div>
-                  <p v-if="subscriptionStatus?.cancelAt" class="text-amber-500 text-sm font-medium">
+                  <p
+                    v-if="subscriptionStatus?.cancelAt"
+                    data-testid="text-cancel-date"
+                    class="text-amber-500 text-sm font-medium"
+                  >
                     <Icon icon="mdi:alert" class="w-4 h-4 inline mr-1" />
                     {{ $t('subscription.manage.cancelDate') }}:
                     {{ formatDate(subscriptionStatus.cancelAt) }}
                   </p>
-                  <p v-else-if="subscriptionStatus?.nextBilling" class="txt-secondary text-sm">
+                  <p
+                    v-else-if="subscriptionStatus?.nextBilling"
+                    data-testid="text-next-billing"
+                    class="txt-secondary text-sm"
+                  >
                     {{ $t('subscription.manage.nextBilling') }}:
                     {{ formatDate(subscriptionStatus.nextBilling) }}
                   </p>
