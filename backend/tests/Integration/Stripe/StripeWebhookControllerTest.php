@@ -262,6 +262,129 @@ class StripeWebhookControllerTest extends WebTestCase
         $this->assertIsInt($sub['payment_failed_at']);
     }
 
+    public function testCheckoutSessionCompletedPersistsCustomerAndSessionIds(): void
+    {
+        // checkout.session.completed runs before customer.subscription.created
+        // in the typical Stripe sequence; here it's the only event we send.
+        // The handler must persist the customer + session id from the event,
+        // looking up the user via client_reference_id (set during checkout
+        // creation as the user's database id).
+        $sessionId = 'cs_test_'.bin2hex(random_bytes(8));
+        $newCustomerId = 'cus_checkout_'.bin2hex(random_bytes(6));
+
+        // Important: we deliberately do NOT pre-set stripeCustomerId on the
+        // user — this proves the handler writes it, rather than just leaving
+        // an existing one in place.
+        $details = $this->user->getPaymentDetails();
+        unset($details['stripe_customer_id']);
+        $this->user->setPaymentDetails($details);
+        $this->em->flush();
+
+        $payload = $this->buildEventPayload('checkout.session.completed', [
+            'id' => $sessionId,
+            'object' => 'checkout.session',
+            'customer' => $newCustomerId,
+            'client_reference_id' => (string) $this->user->getId(),
+            'customer_email' => $this->user->getMail(),
+            'mode' => 'subscription',
+        ]);
+        $this->postWebhook($payload, StripeSignatureHelper::header($payload, self::WEBHOOK_SECRET));
+        $this->assertResponseIsSuccessful();
+
+        $this->em->refresh($this->user);
+        $this->assertSame($newCustomerId, $this->user->getStripeCustomerId());
+        $this->assertSame($sessionId, $this->user->getPaymentDetails()['stripe_session_id']);
+        // Level is set later by customer.subscription.created — checkout.session.completed
+        // alone must not promote the user. This protects the upgrade flow:
+        // a stray checkout-completed without a paid subscription must not unlock features.
+        $this->assertSame('NEW', $this->user->getUserLevel());
+    }
+
+    public function testSubscriptionUpdatedForOldSubscriptionIdIsIgnored(): void
+    {
+        // This protects against a Stripe race / replay where an UPDATE for a
+        // stale subscription (e.g. one already replaced during an upgrade)
+        // arrives after the new subscription is already current. Without the
+        // guard we'd overwrite the live subscription's status / period with
+        // stale data. See StripeWebhookController::handleSubscriptionUpdated
+        // — the "Only process updates for the current subscription" branch.
+        $currentSubId = 'sub_current_'.bin2hex(random_bytes(4));
+        $staleSubId = 'sub_stale_'.bin2hex(random_bytes(4));
+        $this->seedActiveSubscription($currentSubId);
+
+        $payload = $this->buildEventPayload(
+            'customer.subscription.updated',
+            $this->subscriptionObject([
+                'id' => $staleSubId,
+                'status' => 'canceled',
+                'cancel_at_period_end' => true,
+                'cancel_at' => time() - 86400,
+            ]),
+        );
+        $this->postWebhook($payload, StripeSignatureHelper::header($payload, self::WEBHOOK_SECRET));
+        $this->assertResponseIsSuccessful();
+
+        $this->em->refresh($this->user);
+        $sub = $this->user->getPaymentDetails()['subscription'];
+        // None of the stale event's fields may leak into our state.
+        $this->assertSame('PRO', $this->user->getUserLevel());
+        $this->assertSame($currentSubId, $sub['stripe_subscription_id']);
+        $this->assertSame('active', $sub['status']);
+        $this->assertArrayNotHasKey('cancel_at', $sub);
+        $this->assertArrayNotHasKey('cancel_at_period_end', $sub);
+    }
+
+    public function testSubscriptionDeletedDowngradesUserAndClearsSubscriptionData(): void
+    {
+        $subscriptionId = 'sub_del_'.bin2hex(random_bytes(4));
+        $this->seedActiveSubscription($subscriptionId);
+
+        // Sanity: user starts as PRO with an active subscription.
+        $this->assertSame('PRO', $this->user->getUserLevel());
+        $this->assertSame('active', $this->user->getPaymentDetails()['subscription']['status']);
+
+        $payload = $this->buildEventPayload(
+            'customer.subscription.deleted',
+            $this->subscriptionObject(['id' => $subscriptionId, 'status' => 'canceled']),
+        );
+        $this->postWebhook($payload, StripeSignatureHelper::header($payload, self::WEBHOOK_SECRET));
+        $this->assertResponseIsSuccessful();
+
+        $this->em->refresh($this->user);
+        $this->assertSame('NEW', $this->user->getUserLevel(), 'User must be downgraded to NEW after subscription.deleted');
+        $sub = $this->user->getPaymentDetails()['subscription'];
+        $this->assertSame('canceled', $sub['status']);
+        $this->assertArrayHasKey('canceled_at', $sub);
+        $this->assertIsInt($sub['canceled_at']);
+        $this->assertSame($subscriptionId, $sub['stripe_subscription_id'], 'Subscription ID must be preserved for audit trail');
+    }
+
+    public function testSubscriptionDeletedForOldSubscriptionIdDoesNotDowngrade(): void
+    {
+        // Same race-window protection for the .deleted event: a delayed
+        // delete for an OLD subscription (already superseded by an upgrade)
+        // must NOT downgrade the user back to NEW. The handler explicitly
+        // documents this with "// This prevents race conditions where old
+        // subscription deletions reset the level".
+        $currentSubId = 'sub_current_'.bin2hex(random_bytes(4));
+        $staleSubId = 'sub_stale_'.bin2hex(random_bytes(4));
+        $this->seedActiveSubscription($currentSubId);
+
+        $payload = $this->buildEventPayload(
+            'customer.subscription.deleted',
+            $this->subscriptionObject(['id' => $staleSubId, 'status' => 'canceled']),
+        );
+        $this->postWebhook($payload, StripeSignatureHelper::header($payload, self::WEBHOOK_SECRET));
+        $this->assertResponseIsSuccessful();
+
+        $this->em->refresh($this->user);
+        $sub = $this->user->getPaymentDetails()['subscription'];
+        $this->assertSame('PRO', $this->user->getUserLevel(), 'Stale .deleted must not downgrade the user');
+        $this->assertSame($currentSubId, $sub['stripe_subscription_id']);
+        $this->assertSame('active', $sub['status']);
+        $this->assertArrayNotHasKey('canceled_at', $sub);
+    }
+
     public function testSubscriptionCreatedActivatesUserAndCancelsOtherSubscriptions(): void
     {
         // The handler calls Stripe\Subscription::all(...) to find subs to
