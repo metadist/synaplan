@@ -12,100 +12,39 @@ import { test, expect } from '../test-setup'
 import { selectors } from '../helpers/selectors'
 import { login } from '../helpers/auth'
 import { TIMEOUTS } from '../config/config'
-import { sendCheckoutCompletedWebhook, sendSubscriptionCreatedWebhook } from '../helpers/webhook'
-import {
-  authBundle,
-  expectWebhookSuccess,
-  navigateToSubscriptionViaUI,
-  registerFreshUser,
-} from '../helpers/billing'
+import { activateProViaUi, authBundle, registerFreshUser } from '../helpers/billing'
 
 test.describe('@ci @subscription Subscription', () => {
   test('happy path: checkout PRO via mock webhook', async ({ page, request }) => {
     const customerId = `cus_${randomUUID()}`
     const subscriptionId = `sub_${randomUUID()}`
-    let userId: string
 
-    // Single-test user: this scenario asserts "no active plan" as its baseline,
-    // and the worker-scoped fixture would carry state from earlier lifecycle tests.
     const fresh = await registerFreshUser()
     try {
       await test.step('Arrange: login as fresh user (no prior subscription state)', async () => {
         await login(page, fresh.credentials)
+      })
+
+      await test.step('Act: select PRO plan via UI + send post-checkout webhooks', async () => {
         const bundle = await authBundle(request, fresh.credentials)
-        userId = bundle.userId
+        await activateProViaUi(page, request, bundle, { customerId, subscriptionId })
       })
 
-      await test.step('Arrange: navigate to subscription and verify no active plan', async () => {
-        await navigateToSubscriptionViaUI(page)
-        await page.waitForSelector(selectors.subscription.cardPlan, {
+      await test.step('Assert: happy-path-specific render (next-billing line, no cancel date)', async () => {
+        // activateProViaUi already verified PRO badge + current-plan section.
+        // This step covers the assertions that are unique to a freshly-bought
+        // PRO subscription (vs. e.g. one that was just downgraded):
+        //   - subscription status badge is rendered
+        //   - next-billing line is visible (transitively asserts that
+        //     subscriptionStatus.nextBilling is truthy on the API response,
+        //     since text-next-billing only renders under that v-else-if)
+        //   - cancel-date marker is NOT yet visible (no scheduled cancellation)
+        await expect(page.locator(selectors.subscription.badgeStatus)).toBeVisible({
           timeout: TIMEOUTS.STANDARD,
         })
-
-        await expect(page.locator(selectors.subscription.sectionCurrentPlan)).not.toBeVisible()
-        await expect(page.locator(selectors.subscription.btnSelectPro)).toBeVisible()
-      })
-
-      let checkoutIntercepted = false
-      await test.step('Act: intercept checkout and click PRO plan', async () => {
-        try {
-          await page.route('**/api/v1/subscription/checkout', (route) => {
-            checkoutIntercepted = true
-            return route.fulfill({
-              status: 200,
-              contentType: 'application/json',
-              body: JSON.stringify({
-                sessionId: 'cs_test_mock',
-                url: '/subscription?checkout_intercepted=true',
-              }),
-            })
-          })
-
-          await page.locator(selectors.subscription.btnSelectPro).click()
-
-          await page.waitForSelector(selectors.subscription.cardPlan, {
-            timeout: TIMEOUTS.STANDARD,
-          })
-          expect(checkoutIntercepted).toBe(true)
-        } finally {
-          await page.unroute('**/api/v1/subscription/checkout')
-        }
-      })
-
-      await test.step('Act: send mock webhooks (checkout completed + subscription created)', async () => {
-        const checkoutResult = await sendCheckoutCompletedWebhook(request, {
-          customerId,
-          subscriptionId,
-          userId: userId!,
-        })
-        expectWebhookSuccess(checkoutResult, 'checkout.session.completed')
-
-        const subResult = await sendSubscriptionCreatedWebhook(request, {
-          customerId,
-          subscriptionId,
-          userId: userId!,
-        })
-        expectWebhookSuccess(subResult, 'customer.subscription.created')
-      })
-
-      await test.step('Assert: subscription page shows PRO active with next-billing line', async () => {
-        // Webhook handlers flush synchronously, so the 200 from the POST above is the
-        // sync point. Reload triggers a fresh /status fetch; the toBeVisible/toHaveText
-        // timeouts cover the small Vue mount + render delay without a separate API poll.
-        await page.reload({ waitUntil: 'domcontentloaded' })
-        await navigateToSubscriptionViaUI(page)
-
-        const currentPlanSection = page.locator(selectors.subscription.sectionCurrentPlan)
-        await expect(currentPlanSection).toBeVisible({ timeout: TIMEOUTS.STANDARD })
-
-        await expect(page.locator(selectors.subscription.badgeCurrentLevel)).toHaveText('PRO', {
+        await expect(page.locator(selectors.subscription.textNextBilling)).toBeVisible({
           timeout: TIMEOUTS.STANDARD,
         })
-        await expect(page.locator(selectors.subscription.badgeStatus)).toBeVisible()
-        // text-next-billing only renders when subscriptionStatus.nextBilling is truthy
-        // (see SubscriptionView.vue's v-else-if), so its visibility transitively asserts
-        // the API contract.
-        await expect(page.locator(selectors.subscription.textNextBilling)).toBeVisible()
         await expect(page.locator(selectors.subscription.textCancelDate)).not.toBeVisible()
       })
     } finally {
