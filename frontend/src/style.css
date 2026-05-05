@@ -8,14 +8,21 @@
 /* Base */
 @layer base {
   body {
-    @apply m-0 font-sans text-base leading-relaxed antialiased;
+    @apply m-0 text-base leading-relaxed antialiased;
+    font-family:
+      'Plus Jakarta Sans',
+      -apple-system,
+      BlinkMacSystemFont,
+      'Segoe UI',
+      system-ui,
+      sans-serif;
     -moz-osx-font-smoothing: grayscale;
   }
 
   :root {
-    --brand: #00b79d;
-    --brand-light: #00f0d3;
-    --brand-hover: #00a08a;
+    --brand: #003fc7;
+    --brand-light: #6b8fd6;
+    --brand-hover: #0035b0;
 
     --bg-app: #f2f2f2;
     --bg-sidebar: #ebebeb;
@@ -27,7 +34,7 @@
     --txt-secondary: #6b6b6b;
 
     --border-light: rgba(0, 0, 0, 0.06);
-    --brand-alpha-light: rgba(0, 183, 157, 0.08);
+    --brand-alpha-light: rgba(0, 63, 199, 0.08);
 
     --status-success: #16a34a;
     --status-success-muted: #dcfce7;
@@ -42,9 +49,9 @@
   }
 
   .dark {
-    --brand: #00b79d;
-    --brand-light: #00f0d3;
-    --brand-hover: #00d4bc;
+    --brand: #6d9ae0;
+    --brand-light: #93b8e8;
+    --brand-hover: #83b0e8;
 
     --bg-app: #0a0e1a;
     --bg-sidebar: #0d1525;
@@ -55,8 +62,8 @@
     --txt-primary: #fff;
     --txt-secondary: #a1a1a3;
 
-    --border-light: rgba(0, 183, 157, 0.12);
-    --brand-alpha-light: rgba(0, 183, 157, 0.15);
+    --border-light: rgba(109, 154, 224, 0.15);
+    --brand-alpha-light: rgba(109, 154, 224, 0.18);
 
     --status-success: #4ade80;
     --status-success-muted: rgba(34, 197, 94, 0.15);
@@ -154,9 +161,9 @@
   .nav-item {
     background: rgba(0, 0, 0, 0.02);
     border-radius: 0.75rem;
-    color: #444;
+    color: #2d2d2d;
     box-shadow:
-      inset 0 0 0 1px rgba(0, 183, 157, 0.08),
+      inset 0 0 0 1px rgba(0, 63, 199, 0.08),
       inset 0 0 0 1px rgba(0, 0, 0, 0.06),
       0 1px 2px rgba(0, 0, 0, 0.04);
     transition:
@@ -164,9 +171,9 @@
       box-shadow 0.15s;
   }
   .nav-item:hover {
-    background: rgba(0, 183, 157, 0.03);
+    background: rgba(0, 63, 199, 0.03);
     box-shadow:
-      inset 0 0 0 1px rgba(0, 183, 157, 0.12),
+      inset 0 0 0 1px rgba(0, 63, 199, 0.12),
       inset 0 0 0 1px rgba(0, 0, 0, 0.06),
       0 4px 12px rgba(0, 0, 0, 0.06);
   }
@@ -174,27 +181,27 @@
     background: var(--brand-alpha-light);
     color: var(--brand);
     box-shadow:
-      inset 0 0 0 2px rgba(0, 183, 157, 0.28),
+      inset 0 0 0 2px rgba(0, 63, 199, 0.28),
       inset 0 0 0 1px rgba(0, 0, 0, 0.06);
   }
   .dark .nav-item {
     background: transparent !important;
     color: #d7dae0;
     box-shadow:
-      inset 0 0 0 1px rgba(0, 183, 157, 0.15),
+      inset 0 0 0 1px rgba(0, 63, 199, 0.15),
       inset 0 0 0 1px rgba(255, 255, 255, 0.04);
   }
   .dark .nav-item:hover {
-    background: rgba(0, 240, 211, 0.05) !important;
+    background: rgba(107, 143, 214, 0.05) !important;
     box-shadow:
-      inset 0 0 0 1px rgba(0, 240, 211, 0.25),
+      inset 0 0 0 1px rgba(107, 143, 214, 0.25),
       inset 0 0 0 1px rgba(255, 255, 255, 0.06);
   }
   .dark .nav-item--active {
-    background: rgba(0, 240, 211, 0.08) !important;
+    background: rgba(107, 143, 214, 0.08) !important;
     color: var(--brand-light);
     box-shadow:
-      inset 0 0 0 2px rgba(0, 240, 211, 0.4),
+      inset 0 0 0 2px rgba(107, 143, 214, 0.4),
       inset 0 0 0 1px rgba(255, 255, 255, 0.08) !important;
   }
 
@@ -345,7 +352,7 @@
   }
   .dark .dropdown-panel {
     box-shadow:
-      inset 0 0 0 1px rgba(0, 183, 157, 0.2),
+      inset 0 0 0 1px rgba(0, 63, 199, 0.2),
       0 1px 2px rgb(0 0 0 / 0.05);
   }
 
@@ -364,10 +371,10 @@
     color: #a1a1a3;
   }
   .dropdown-trigger:hover {
-    background: rgba(0, 183, 157, 0.06);
+    background: rgba(0, 63, 199, 0.06);
   }
   .dark .dropdown-trigger:hover {
-    background: rgba(0, 240, 211, 0.12);
+    background: rgba(107, 143, 214, 0.12);
   }
   .dropdown-trigger:focus-visible {
     outline: 2px solid var(--brand);
@@ -391,10 +398,10 @@
     color: #fff;
   }
   .dropdown-item:hover {
-    background: rgba(0, 183, 157, 0.06);
+    background: rgba(0, 63, 199, 0.06);
   }
   .dark .dropdown-item:hover {
-    background: rgba(0, 240, 211, 0.12);
+    background: rgba(107, 143, 214, 0.12);
   }
   .dropdown-item:focus-visible {
     outline: 2px solid var(--brand);
@@ -402,11 +409,11 @@
   }
 
   .dropdown-item--active {
-    background: rgba(0, 183, 157, 0.1);
+    background: rgba(0, 63, 199, 0.1);
     color: var(--brand);
   }
   .dropdown-item--active:hover {
-    background: rgba(0, 183, 157, 0.15);
+    background: rgba(0, 63, 199, 0.15);
   }
 
   .dropdown-item--danger {
@@ -424,10 +431,10 @@
 
   /* Globaler Hover (optional als Utility) */
   .hover-surface:hover {
-    background: rgba(0, 183, 157, 0.06) !important;
+    background: rgba(0, 63, 199, 0.06) !important;
   }
   .dark .hover-surface:hover {
-    background: rgba(0, 240, 211, 0.12) !important;
+    background: rgba(107, 143, 214, 0.12) !important;
   }
 
   /* Light overlay backgrounds */
@@ -603,7 +610,7 @@
   }
   .dark .icon-ghost:hover,
   .dark .icon-ghost:focus-visible {
-    background: rgba(0, 240, 211, 0.15);
+    background: rgba(107, 143, 214, 0.15);
     color: var(--brand-light);
     opacity: 1;
   }
@@ -690,21 +697,21 @@
     color: #a1a1a3;
   }
   .pill:hover {
-    background: rgba(0, 183, 157, 0.06);
+    background: rgba(0, 63, 199, 0.06);
   }
   .dark .pill:hover {
-    background: rgba(0, 240, 211, 0.12);
+    background: rgba(107, 143, 214, 0.12);
   }
 
   .pill--active {
-    background: rgba(0, 183, 157, 0.12);
+    background: rgba(0, 63, 199, 0.12);
     color: var(--brand);
-    box-shadow: inset 0 0 0 2px rgba(0, 183, 157, 0.25);
+    box-shadow: inset 0 0 0 2px rgba(0, 63, 199, 0.25);
   }
   .dark .pill--active {
-    background: rgba(0, 240, 211, 0.12);
+    background: rgba(107, 143, 214, 0.12);
     color: var(--brand-light);
-    box-shadow: inset 0 0 0 2px rgba(0, 240, 211, 0.35);
+    box-shadow: inset 0 0 0 2px rgba(107, 143, 214, 0.35);
   }
 
   .pill--loading {
@@ -745,7 +752,7 @@
   }
   .dark .dropdown-up {
     box-shadow:
-      inset 0 0 0 1px rgba(0, 183, 157, 0.2),
+      inset 0 0 0 1px rgba(0, 63, 199, 0.2),
       0 8px 24px rgb(0 0 0 / 0.6);
   }
   @keyframes dropup {

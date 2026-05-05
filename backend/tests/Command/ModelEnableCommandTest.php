@@ -22,7 +22,7 @@ class ModelEnableCommandTest extends TestCase
         $command = new ModelEnableCommand($this->connection);
 
         $application = new Application();
-        $application->add($command);
+        $application->addCommand($command);
 
         $this->commandTester = new CommandTester($application->find('app:model:enable'));
     }

@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { httpClient } from './httpClient'
+import { httpClient, getApiBaseUrl } from './httpClient'
 import { useConfigStore } from '@/stores/config'
 
 export class WidgetUnavailableError extends Error {
@@ -74,6 +74,7 @@ export interface WidgetConfig {
   customFields?: CustomFieldDef[]
   externalApiToken?: string
   externalApiUrl?: string
+  sessionMode?: 'browser' | 'user'
   privacyPolicyUrl?: string
   dataProcessingAccepted?: boolean
 }
@@ -679,4 +680,44 @@ export async function triggerCrawl(
     `/api/v1/widgets/${widgetId}/crawl`,
     { method: 'POST' }
   )
+}
+
+export interface TestApiResult {
+  success: boolean
+  reachable: boolean
+  resolvedUrl?: string
+  responsePreview?: string
+  error?: string
+  retryAfter?: number
+}
+
+export async function testExternalApi(
+  widgetId: string,
+  testUserId: string,
+  apiUrl?: string,
+  apiToken?: string
+): Promise<TestApiResult> {
+  const body: Record<string, string> = { testUserId }
+  if (apiUrl) body.apiUrl = apiUrl
+  if (apiToken) body.apiToken = apiToken
+
+  const response = await fetch(`${getApiBaseUrl()}/api/v1/widgets/${widgetId}/test-api`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    credentials: 'include',
+    body: JSON.stringify(body),
+  })
+
+  const data: TestApiResult = await response.json()
+
+  if (!response.ok) {
+    return {
+      success: false,
+      reachable: false,
+      error: data.error ?? `HTTP ${response.status}`,
+      retryAfter: data.retryAfter,
+    }
+  }
+
+  return data
 }

@@ -2,6 +2,9 @@
 # This file configures the setup for CI by:
 #   1. Using a pre-built Docker image (via APP_IMAGE env var)
 #   2. Removing volume mounts: no backend/plugins mounts (baked into image)
+#   3. Keeping ollama_test out of CI: in docker-compose.test.yml it shares the
+#      `integration` profile with Tika. app_test uses ollama-stub; the service
+#      below overrides profiles so the ollama/ollama image is not pulled here.
 #
 # app_test reaches whatsapp-stub at http://whatsapp-stub:3999 via backend/.env.test (WHATSAPP_GRAPH_API_BASE_URL).
 # app_test reaches ollama-stub at http://ollama-stub:11434 via OLLAMA_BASE_URL in compose environment.
@@ -11,7 +14,12 @@
 
 services:
   app_test:
-    # Use pre-built image from CI (e.g., synaplan-test:ci)
+    # Use pre-built image from CI (loaded via `docker load` from build artifact)
     image: ${APP_IMAGE:-}
- 
+    pull_policy: never
+
     volumes: !reset []
+
+  ollama_test:
+    profiles: !override
+      - disabled

@@ -129,7 +129,7 @@ final readonly class MariaDBVectorStorage implements VectorStorageInterface
         $stmt->bindValue('vector', $vectorStr);
         $stmt->bindValue('userId', $query->userId);
         $stmt->bindValue('maxDistance', $maxDistance);
-        $stmt->bindValue('limit', $query->limit, \PDO::PARAM_INT);
+        $stmt->bindValue('limit', $query->limit, \Doctrine\DBAL\ParameterType::INTEGER);
 
         if (null !== $query->groupKey) {
             $stmt->bindValue('groupKey', $query->groupKey);

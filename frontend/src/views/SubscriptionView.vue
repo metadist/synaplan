@@ -48,12 +48,20 @@
                       {{ getStatusText(subscriptionStatus.status || 'active') }}
                     </span>
                   </div>
-                  <p v-if="subscriptionStatus?.cancelAt" class="text-amber-500 text-sm font-medium">
+                  <p
+                    v-if="subscriptionStatus?.cancelAt"
+                    data-testid="text-cancel-date"
+                    class="text-amber-500 text-sm font-medium"
+                  >
                     <Icon icon="mdi:alert" class="w-4 h-4 inline mr-1" />
                     {{ $t('subscription.manage.cancelDate') }}:
                     {{ formatDate(subscriptionStatus.cancelAt) }}
                   </p>
-                  <p v-else-if="subscriptionStatus?.nextBilling" class="txt-secondary text-sm">
+                  <p
+                    v-else-if="subscriptionStatus?.nextBilling"
+                    data-testid="text-next-billing"
+                    class="txt-secondary text-sm"
+                  >
                     {{ $t('subscription.manage.nextBilling') }}:
                     {{ formatDate(subscriptionStatus.nextBilling) }}
                   </p>
@@ -203,6 +211,7 @@ import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { Icon } from '@iconify/vue'
 import { useI18n } from 'vue-i18n'
+import { useDateFormat } from '@/composables/useDateFormat'
 import {
   subscriptionApi,
   type SubscriptionPlan,
@@ -214,6 +223,7 @@ import { useDialog } from '@/composables/useDialog'
 import MainLayout from '@/components/MainLayout.vue'
 
 const { t } = useI18n()
+const { formatDateTime } = useDateFormat()
 const router = useRouter()
 const authStore = useAuthStore()
 const config = useConfigStore()
@@ -361,11 +371,7 @@ function capitalize(str: string): string {
 function formatDate(timestamp: string | number): string {
   try {
     const date = typeof timestamp === 'number' ? new Date(timestamp * 1000) : new Date(timestamp)
-    return (
-      date.toLocaleDateString() +
-      ' ' +
-      date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-    )
+    return formatDateTime(date)
   } catch {
     return String(timestamp)
   }

@@ -23,7 +23,7 @@ class PromptSeedCommandTest extends TestCase
         $command = new PromptSeedCommand($this->connection);
 
         $application = new Application();
-        $application->add($command);
+        $application->addCommand($command);
 
         $this->commandTester = new CommandTester($application->find('app:prompt:seed'));
     }

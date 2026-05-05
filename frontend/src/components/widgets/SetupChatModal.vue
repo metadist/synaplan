@@ -342,8 +342,12 @@ const sendMessage = async () => {
     await scrollToBottom()
   } catch (err: unknown) {
     console.error('Failed to send message:', err)
-    showError(getErrorMessage(err) || t('widgets.setupChat.sendError'))
-    // Remove the user message from history on error
+    const errorMsg = getErrorMessage(err)
+    if (errorMsg === 'model_not_configured') {
+      showError(t('widgets.setupChat.modelNotConfigured'))
+    } else {
+      showError(errorMsg || t('widgets.setupChat.sendError'))
+    }
     conversationHistory.value.pop()
   } finally {
     isSending.value = false
@@ -425,7 +429,12 @@ const startInterview = async () => {
     await scrollToBottom()
   } catch (err: unknown) {
     console.error('Failed to start interview:', err)
-    showError(getErrorMessage(err) || t('widgets.setupChat.startError'))
+    const errorMsg = getErrorMessage(err)
+    if (errorMsg === 'model_not_configured') {
+      showError(t('widgets.setupChat.modelNotConfigured'))
+    } else {
+      showError(errorMsg || t('widgets.setupChat.startError'))
+    }
   } finally {
     isTyping.value = false
 

@@ -12,15 +12,39 @@ use App\Repository\WidgetSessionRepository;
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
 use PhpOffice\PhpSpreadsheet\Style\Alignment;
 use PhpOffice\PhpSpreadsheet\Style\Fill;
+use PhpOffice\PhpSpreadsheet\Worksheet\Worksheet;
 use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
 
 /**
  * Service for exporting widget chat data in various formats.
  *
  * Supports: Excel (primary), CSV, JSON
+ *
+ * Matches {@see WidgetSessionRepository::findSessionsByWidget()} filter keys.
+ *
+ * @phpstan-type WidgetSessionExportFilters array{
+ *     from?: int,
+ *     to?: int,
+ *     mode?: string,
+ *     sessionIds?: array<string>,
+ *     status?: string,
+ *     favorite?: bool,
+ *     sort?: string,
+ *     order?: string
+ * }
  */
 final readonly class WidgetExportService
 {
+    /**
+     * Max sessions loaded per Excel detail sheet (Conversations, Sessions); matches sort order of the API export.
+     */
+    private const EXCEL_DETAIL_SHEET_SESSION_LIMIT = 500;
+
+    /**
+     * Max sessions loaded per CSV/JSON export iteration (single page).
+     */
+    private const CSV_JSON_SESSION_LIMIT = 1000;
+
     public function __construct(
         private WidgetSessionRepository $sessionRepository,
         private ChatRepository $chatRepository,
@@ -28,29 +52,53 @@ final readonly class WidgetExportService
     ) {
     }
 
+    public static function resolveTimezone(string $timezone): \DateTimeZone
+    {
+        try {
+            return new \DateTimeZone($timezone);
+        } catch (\Exception) {
+            return new \DateTimeZone('UTC');
+        }
+    }
+
+    private function formatTimestamp(int $timestamp, \DateTimeZone $tz, string $format = 'Y-m-d H:i:s'): string
+    {
+        $dt = new \DateTime('@'.$timestamp);
+        $dt->setTimezone($tz);
+
+        return $dt->format($format);
+    }
+
+    private function formatNow(\DateTimeZone $tz, string $format = 'Y-m-d H:i:s'): string
+    {
+        $dt = new \DateTime('now', $tz);
+
+        return $dt->format($format);
+    }
+
     /**
      * Export widget sessions to Excel format.
      *
-     * @param array{from?: int, to?: int, mode?: string} $filters
+     * @param WidgetSessionExportFilters $filters
      */
-    public function exportToExcel(Widget $widget, array $filters = []): string
+    public function exportToExcel(Widget $widget, array $filters = [], \DateTimeZone $tz = new \DateTimeZone('UTC')): string
     {
         $spreadsheet = new Spreadsheet();
 
         // Sheet 1: Overview
         $overviewSheet = $spreadsheet->getActiveSheet();
         $overviewSheet->setTitle('Overview');
-        $this->createOverviewSheet($overviewSheet, $widget, $filters);
+        $this->createOverviewSheet($overviewSheet, $widget, $filters, $tz);
 
         // Sheet 2: Conversations
         $conversationsSheet = $spreadsheet->createSheet();
         $conversationsSheet->setTitle('Conversations');
-        $this->createConversationsSheet($conversationsSheet, $widget, $filters);
+        $this->createConversationsSheet($conversationsSheet, $widget, $filters, $tz);
 
         // Sheet 3: Sessions Summary
         $sessionsSheet = $spreadsheet->createSheet();
         $sessionsSheet->setTitle('Sessions');
-        $this->createSessionsSheet($sessionsSheet, $widget, $filters);
+        $this->createSessionsSheet($sessionsSheet, $widget, $filters, $tz);
 
         // Generate file
         $tempFile = tempnam(sys_get_temp_dir(), 'widget_export_').'.xlsx';
@@ -63,9 +111,9 @@ final readonly class WidgetExportService
     /**
      * Export widget sessions to CSV format.
      *
-     * @param array{from?: int, to?: int, mode?: string} $filters
+     * @param WidgetSessionExportFilters $filters
      */
-    public function exportToCsv(Widget $widget, array $filters = []): string
+    public function exportToCsv(Widget $widget, array $filters = [], \DateTimeZone $tz = new \DateTimeZone('UTC')): string
     {
         $tempFile = tempnam(sys_get_temp_dir(), 'widget_export_').'.csv';
         $handle = fopen($tempFile, 'w');
@@ -94,7 +142,7 @@ final readonly class WidgetExportService
         // Get sessions
         $result = $this->sessionRepository->findSessionsByWidget(
             $widget->getWidgetId(),
-            1000,
+            self::CSV_JSON_SESSION_LIMIT,
             0,
             $filters
         );
@@ -107,11 +155,11 @@ final readonly class WidgetExportService
             foreach ($messages as $message) {
                 $row = [
                     $session->getSessionId(),
-                    date('Y-m-d H:i:s', $session->getCreated()),
-                    date('Y-m-d H:i:s', $session->getLastMessage()),
+                    $this->formatTimestamp($session->getCreated(), $tz),
+                    $this->formatTimestamp($session->getLastMessage(), $tz),
                     $messageCount,
                     $session->getMode(),
-                    date('Y-m-d H:i:s', $message['timestamp']),
+                    $this->formatTimestamp($message['timestamp'], $tz),
                     $message['sender'],
                     $message['text'],
                 ];
@@ -131,13 +179,13 @@ final readonly class WidgetExportService
     /**
      * Export widget sessions to JSON format.
      *
-     * @param array{from?: int, to?: int, mode?: string} $filters
+     * @param WidgetSessionExportFilters $filters
      */
-    public function exportToJson(Widget $widget, array $filters = [], string $baseUrl = ''): string
+    public function exportToJson(Widget $widget, array $filters = [], string $baseUrl = '', \DateTimeZone $tz = new \DateTimeZone('UTC')): string
     {
         $result = $this->sessionRepository->findSessionsByWidget(
             $widget->getWidgetId(),
-            1000,
+            self::CSV_JSON_SESSION_LIMIT,
             0,
             $filters
         );
@@ -147,7 +195,7 @@ final readonly class WidgetExportService
         $widgetData = [
             'id' => $widget->getWidgetId(),
             'name' => $widget->getName(),
-            'exported_at' => date('c'),
+            'exported_at' => $this->formatNow($tz, 'c'),
         ];
         if (!empty($customFields)) {
             $widgetData['custom_fields'] = $customFields;
@@ -200,15 +248,15 @@ final readonly class WidgetExportService
 
             $sessionData = [
                 'session_id' => $session->getSessionId(),
-                'created' => date('c', $session->getCreated()),
-                'last_activity' => date('c', $session->getLastMessage()),
+                'created' => $this->formatTimestamp($session->getCreated(), $tz, 'c'),
+                'last_activity' => $this->formatTimestamp($session->getLastMessage(), $tz, 'c'),
                 'message_count' => $messageCount,
                 'file_count' => $fileCount,
                 'mode' => $session->getMode(),
                 'messages' => array_map(fn ($m) => [
                     'direction' => $m['direction'],
                     'text' => $m['text'],
-                    'timestamp' => date('c', $m['timestamp']),
+                    'timestamp' => $this->formatTimestamp($m['timestamp'], $tz, 'c'),
                     'sender' => $m['sender'],
                     'files' => array_map(fn ($f) => [
                         ...$f,
@@ -226,8 +274,8 @@ final readonly class WidgetExportService
         }
 
         // Set actual date range from exported sessions
-        $exportData['export_range']['from'] = $earliestCreated ? date('c', $earliestCreated) : null;
-        $exportData['export_range']['to'] = $latestActivity ? date('c', $latestActivity) : null;
+        $exportData['export_range']['from'] = $earliestCreated ? $this->formatTimestamp($earliestCreated, $tz, 'c') : null;
+        $exportData['export_range']['to'] = $latestActivity ? $this->formatTimestamp($latestActivity, $tz, 'c') : null;
 
         $exportData['statistics']['total_messages'] = $totalMessages;
         $exportData['statistics']['total_files'] = $totalFiles;
@@ -247,7 +295,7 @@ final readonly class WidgetExportService
         return $tempFile;
     }
 
-    private function createOverviewSheet($sheet, Widget $widget, array $filters): void
+    private function createOverviewSheet(Worksheet $sheet, Widget $widget, array $filters, \DateTimeZone $tz): void
     {
         // Title styling
         $sheet->setCellValue('A1', 'Widget Export Report');
@@ -261,50 +309,68 @@ final readonly class WidgetExportService
         $sheet->setCellValue('A4', 'Widget ID:');
         $sheet->setCellValue('B4', $widget->getWidgetId());
         $sheet->setCellValue('A5', 'Export Date:');
-        $sheet->setCellValue('B5', date('Y-m-d H:i:s'));
+        $sheet->setCellValue('B5', $this->formatNow($tz));
 
         // Filter info
         $sheet->setCellValue('A7', 'Export Range:');
-        $fromDate = isset($filters['from']) ? date('Y-m-d', $filters['from']) : 'All time';
-        $toDate = isset($filters['to']) ? date('Y-m-d', $filters['to']) : 'Present';
+        $fromDate = isset($filters['from']) ? $this->formatTimestamp($filters['from'], $tz, 'Y-m-d') : 'All time';
+        $toDate = isset($filters['to']) ? $this->formatTimestamp($filters['to'], $tz, 'Y-m-d') : 'Present';
         $sheet->setCellValue('B7', $fromDate.' to '.$toDate);
 
-        // Statistics
-        $result = $this->sessionRepository->findSessionsByWidget($widget->getWidgetId(), 1000, 0, $filters);
-        $modeStats = $this->sessionRepository->countSessionsByMode($widget->getWidgetId());
+        $totalSessions = $this->sessionRepository->countSessionsWithFilters($widget->getWidgetId(), $filters);
+        $modeStats = $this->sessionRepository->countSessionsByModeWithFilters($widget->getWidgetId(), $filters);
+        $totalMessages = $this->sessionRepository->sumMessageCountWithFilters($widget->getWidgetId(), $filters);
 
         $sheet->setCellValue('A9', 'Statistics');
         $sheet->getStyle('A9')->getFont()->setBold(true)->setSize(12);
 
-        $totalMessages = 0;
-        foreach ($result['sessions'] as $session) {
-            $totalMessages += count($this->getSessionMessages($session));
-        }
-
         $sheet->setCellValue('A10', 'Total Sessions:');
-        $sheet->setCellValue('B10', $result['total']);
+        $sheet->setCellValue('B10', $totalSessions);
         $sheet->setCellValue('A11', 'Total Messages:');
         $sheet->setCellValue('B11', $totalMessages);
-        $sheet->setCellValue('A12', 'AI Sessions:');
-        $sheet->setCellValue('B12', $modeStats['ai']);
-        $sheet->setCellValue('A13', 'Human Sessions:');
-        $sheet->setCellValue('B13', $modeStats['human']);
-        $sheet->setCellValue('A14', 'Waiting Sessions:');
-        $sheet->setCellValue('B14', $modeStats['waiting']);
+
+        $sheet->setCellValue('A13', 'Session modes (export scope)');
+        $sheet->mergeCells('A13:B13');
+        $sheet->getStyle('A13')->getFont()->setBold(true)->setSize(11);
+
+        $sheet->setCellValue('A14', 'Mode');
+        $sheet->setCellValue('B14', 'Count');
+        foreach (['A14', 'B14'] as $headerCell) {
+            $sheet->getStyle($headerCell)->getFont()->setBold(true);
+            $sheet->getStyle($headerCell)->getFill()
+                ->setFillType(Fill::FILL_SOLID)
+                ->getStartColor()->setRGB('E2E8F0');
+        }
+
+        $sheet->setCellValue('A15', 'AI');
+        $sheet->setCellValue('B15', $modeStats[WidgetSession::MODE_AI]);
+        $sheet->setCellValue('A16', 'Human');
+        $sheet->setCellValue('B16', $modeStats[WidgetSession::MODE_HUMAN]);
+        $sheet->setCellValue('A17', 'Waiting');
+        $sheet->setCellValue('B17', $modeStats[WidgetSession::MODE_WAITING]);
+        $sheet->setCellValue('A18', 'Internal');
+        $sheet->setCellValue('B18', $modeStats[WidgetSession::MODE_INTERNAL]);
+
+        $sheet->setCellValue(
+            'A20',
+            'Note: Conversations and Sessions sheets list at most '.self::EXCEL_DETAIL_SHEET_SESSION_LIMIT.' sessions (last activity, descending). Overview totals include all sessions matching the export filters.'
+        );
+        $sheet->mergeCells('A20:D22');
+        $sheet->getStyle('A20')->getAlignment()->setWrapText(true)->setVertical(Alignment::VERTICAL_TOP);
 
         // Auto-size columns
-        $sheet->getColumnDimension('A')->setWidth(20);
+        $sheet->getColumnDimension('A')->setWidth(28);
         $sheet->getColumnDimension('B')->setWidth(40);
     }
 
-    private function createConversationsSheet($sheet, Widget $widget, array $filters): void
+    private function createConversationsSheet(Worksheet $sheet, Widget $widget, array $filters, \DateTimeZone $tz): void
     {
         $customFields = $widget->getConfig()['customFields'] ?? [];
 
-        // Header
-        $headers = ['Session', 'Time', 'From', 'Message'];
+        // Header: fixed columns end at E (Message); custom fields follow
+        $headers = ['Session', 'Date', 'Time', 'From', 'Message'];
         foreach ($customFields as $field) {
-            $headers[] = $field['name'];
+            $headers[] = $this->sanitizeCellValue((string) ($field['name'] ?? ''));
         }
 
         $col = 'A';
@@ -317,10 +383,15 @@ final readonly class WidgetExportService
             ++$col;
         }
 
-        $lastCol = chr(ord('D') + count($customFields));
+        $lastCol = chr(ord('E') + count($customFields));
 
         // Get sessions and messages
-        $result = $this->sessionRepository->findSessionsByWidget($widget->getWidgetId(), 500, 0, $filters);
+        $result = $this->sessionRepository->findSessionsByWidget(
+            $widget->getWidgetId(),
+            self::EXCEL_DETAIL_SHEET_SESSION_LIMIT,
+            0,
+            $filters
+        );
 
         $row = 2;
         $sessionNum = 1;
@@ -342,12 +413,13 @@ final readonly class WidgetExportService
                 }
 
                 $sheet->setCellValue('A'.$row, '#'.$sessionNum);
-                $sheet->setCellValue('B'.$row, date('H:i:s', $message['timestamp']));
-                $sheet->setCellValue('C'.$row, $message['sender']);
-                $sheet->setCellValue('D'.$row, $message['text']);
+                $sheet->setCellValue('B'.$row, $this->formatTimestamp($message['timestamp'], $tz, 'Y-m-d'));
+                $sheet->setCellValue('C'.$row, $this->formatTimestamp($message['timestamp'], $tz, 'H:i:s'));
+                $sheet->setCellValue('D'.$row, $message['sender']);
+                $sheet->setCellValue('E'.$row, $message['text']);
 
                 if (!empty($customFields)) {
-                    $cfCol = chr(ord('D') + 1);
+                    $cfCol = chr(ord('E') + 1);
                     foreach ($customFields as $field) {
                         $val = $cfValues[$field['id']] ?? ('boolean' === $field['type'] ? false : '');
                         $displayVal = is_bool($val) ? ($val ? 'Yes' : 'No') : $this->sanitizeCellValue((string) $val);
@@ -371,19 +443,20 @@ final readonly class WidgetExportService
         // Auto-size columns
         $sheet->getColumnDimension('A')->setWidth(10);
         $sheet->getColumnDimension('B')->setWidth(12);
-        $sheet->getColumnDimension('C')->setWidth(14);
-        $sheet->getColumnDimension('D')->setWidth(80);
-        $cfCol = chr(ord('D') + 1);
+        $sheet->getColumnDimension('C')->setWidth(10);
+        $sheet->getColumnDimension('D')->setWidth(14);
+        $sheet->getColumnDimension('E')->setWidth(80);
+        $cfCol = chr(ord('E') + 1);
         foreach ($customFields as $field) {
             $sheet->getColumnDimension($cfCol)->setAutoSize(true);
             ++$cfCol;
         }
 
         // Wrap text in message column
-        $sheet->getStyle('D:D')->getAlignment()->setWrapText(true);
+        $sheet->getStyle('E:E')->getAlignment()->setWrapText(true);
     }
 
-    private function createSessionsSheet($sheet, Widget $widget, array $filters): void
+    private function createSessionsSheet(Worksheet $sheet, Widget $widget, array $filters, \DateTimeZone $tz): void
     {
         // Header
         $headers = ['Session ID', 'Created', 'Last Activity', 'Messages', 'Files', 'Mode', 'Duration'];
@@ -399,19 +472,47 @@ final readonly class WidgetExportService
         }
 
         // Get sessions
-        $result = $this->sessionRepository->findSessionsByWidget($widget->getWidgetId(), 500, 0, $filters);
+        $result = $this->sessionRepository->findSessionsByWidget(
+            $widget->getWidgetId(),
+            self::EXCEL_DETAIL_SHEET_SESSION_LIMIT,
+            0,
+            $filters
+        );
+
+        // Resolve real per-chat message counts in a single bulk query so the export
+        // never depends on the cached BMESSAGECOUNT (which historically drifted to
+        // zero in human/internal/expired-resume scenarios) and never triggers an
+        // N+1 query pattern.
+        //
+        // This is an all-time, all-direction count of every persisted message on the
+        // chat (visitor IN, AI/operator/system/welcome OUT) with status != 'failed' —
+        // i.e. the true conversation length, NOT the sliding visitor-quota window
+        // computed by WidgetSessionService::checkSessionLimit() (which is IN-only and
+        // last-{SESSION_EXPIRY_HOURS}-only). The two views agree on the failed-row
+        // exclusion, so a stream error never inflates the export over the cached
+        // counter (which is rolled back at the same site — see WidgetPublicController).
+        $chatIds = array_values(array_filter(array_map(
+            static fn ($session) => $session->getChatId(),
+            $result['sessions']
+        )));
+        $messageCountsByChat = [] !== $chatIds
+            ? $this->messageRepository->countByChatIds($chatIds)
+            : [];
 
         $row = 2;
         foreach ($result['sessions'] as $session) {
             $duration = $session->getLastMessage() - $session->getCreated();
             $durationStr = $this->formatDuration($duration);
-            $messages = $this->getSessionMessages($session);
-            $messageCount = count($messages);
-            $fileCount = $this->countFilesInMessages($messages);
+            $chatId = $session->getChatId();
+            $messageCount = null !== $chatId ? ($messageCountsByChat[$chatId] ?? 0) : 0;
+            // File counts still derive from the loaded message slice — see
+            // getSessionMessages() for the (separate, pre-existing) limit. Tracked as
+            // a follow-up; not in scope for the BMESSAGECOUNT data-quality fix.
+            $fileCount = $this->countFilesInMessages($this->getSessionMessages($session));
 
             $sheet->setCellValue('A'.$row, substr($session->getSessionId(), 0, 12).'...');
-            $sheet->setCellValue('B'.$row, date('Y-m-d H:i', $session->getCreated()));
-            $sheet->setCellValue('C'.$row, date('Y-m-d H:i', $session->getLastMessage()));
+            $sheet->setCellValue('B'.$row, $this->formatTimestamp($session->getCreated(), $tz, 'Y-m-d H:i'));
+            $sheet->setCellValue('C'.$row, $this->formatTimestamp($session->getLastMessage(), $tz, 'Y-m-d H:i'));
             $sheet->setCellValue('D'.$row, $messageCount);
             $sheet->setCellValue('E'.$row, $fileCount);
             $sheet->setCellValue('F'.$row, ucfirst($session->getMode()));

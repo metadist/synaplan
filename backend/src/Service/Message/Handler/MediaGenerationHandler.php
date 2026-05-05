@@ -142,6 +142,10 @@ final readonly class MediaGenerationHandler implements MessageHandlerInterface
             $mediaType = 'video';
             $isSlashCommand = true;
             $this->logger->info('MediaGenerationHandler: Detected /vid command, forcing video generation');
+        } elseif ('tools:tts' === $topic) {
+            $mediaType = 'audio';
+            $isSlashCommand = true;
+            $this->logger->info('MediaGenerationHandler: Detected /tts command, forcing audio generation');
         }
 
         // Priority: Again model_id > Task-prompt aiModel > DB default
@@ -168,6 +172,8 @@ final readonly class MediaGenerationHandler implements MessageHandlerInterface
             if ($isSlashCommand) {
                 if ('video' === $mediaType) {
                     $modelId = $this->modelConfigService->getDefaultModel('TEXT2VID', $effectiveUserId);
+                } elseif ('audio' === $mediaType) {
+                    $modelId = $this->modelConfigService->getDefaultModel('TEXT2SOUND', $effectiveUserId);
                 } else {
                     $modelId = $this->modelConfigService->getDefaultModel('TEXT2PIC', $effectiveUserId);
                 }
@@ -195,13 +201,24 @@ final readonly class MediaGenerationHandler implements MessageHandlerInterface
                 $mediaType = 'image';
                 $this->logger->info('MediaGenerationHandler: Using media type hint from extractor (image)');
             } else {
-                $modelId = $this->modelConfigService->getDefaultModel('TEXT2PIC', $effectiveUserId);
-                $mediaType = 'image';
-
-                $this->logger->warning('MediaGenerationHandler: Media type not determined from extractor, defaulting to image', [
-                    'model_id' => $modelId,
+                $this->logger->warning('MediaGenerationHandler: Media type not determined from extractor, asking user to clarify', [
                     'prompt_preview' => substr($prompt, 0, 100),
                 ]);
+
+                $lang = $classification['language'] ?? 'en';
+                $clarification = 'de' === $lang
+                    ? 'Ich konnte nicht erkennen, welche Art von Medium du erstellen möchtest. '
+                        .'Bitte verwende einen der folgenden Befehle: `/pic` für Bilder, `/vid` für Videos, `/tts` für Audio.'
+                    : 'I couldn\'t determine what type of media you want to generate. '
+                        .'Please use one of the following commands: `/pic` for images, `/vid` for videos, `/tts` for audio.';
+
+                $streamCallback($clarification);
+
+                return [
+                    'metadata' => [
+                        'error' => 'media_type_not_determined',
+                    ],
+                ];
             }
         }
 
@@ -288,9 +305,14 @@ final readonly class MediaGenerationHandler implements MessageHandlerInterface
                     $duration = 8; // Default to 8 seconds
                 }
 
-                $this->logger->info('MediaGenerationHandler: Video duration from AI classification', [
+                $resolutionOption = isset($options['resolution']) && is_string($options['resolution'])
+                    ? $options['resolution']
+                    : (isset($classification['resolution']) && is_string($classification['resolution']) ? $classification['resolution'] : null);
+
+                $this->logger->info('MediaGenerationHandler: Video parameters from AI classification', [
                     'duration' => $duration,
-                    'source' => isset($options['duration']) ? 'options' : (isset($classification['duration']) ? 'ai_classification' : 'default'),
+                    'duration_source' => isset($options['duration']) ? 'options' : (isset($classification['duration']) ? 'ai_classification' : 'default'),
+                    'resolution' => $resolutionOption,
                 ]);
 
                 $result = $this->aiFacade->generateVideo(
@@ -299,8 +321,10 @@ final readonly class MediaGenerationHandler implements MessageHandlerInterface
                     [
                         'provider' => $provider,
                         'model' => $modelName,
+                        'modelConfig' => $modelConfig,
                         'duration' => $duration,
                         'aspect_ratio' => $options['aspect_ratio'] ?? '16:9',
+                        'resolution' => $resolutionOption,
                         'progress_callback' => function (array $progress) use ($progressCallback): void {
                             $elapsed = $progress['elapsed_seconds'] ?? 0;
                             $this->notify($progressCallback, 'generating', "Generating video... ({$elapsed}s)");
@@ -474,6 +498,10 @@ final readonly class MediaGenerationHandler implements MessageHandlerInterface
                 $mediaUsage['images'] = $result['image_count'] ?? 1;
             } elseif ('video' === $mediaType) {
                 $mediaUsage['duration_seconds'] = $result['duration_seconds'] ?? null;
+                $videoResolution = $this->extractVideoResolution($result);
+                if (null !== $videoResolution) {
+                    $mediaUsage['resolution'] = $videoResolution;
+                }
             }
 
             return [
@@ -760,5 +788,33 @@ final readonly class MediaGenerationHandler implements MessageHandlerInterface
                 'timestamp' => time(),
             ]);
         }
+    }
+
+    /**
+     * Pull the effective resolution from a video provider result.
+     *
+     * AiFacade::generateVideo() exposes the resolution at the top level, but some
+     * provider payloads only nest it inside the first videos[] item. The first
+     * videos[] entry can also legitimately be a plain URL string, so we must
+     * guard before indexing it.
+     *
+     * @param array<string, mixed> $result
+     */
+    private function extractVideoResolution(array $result): ?string
+    {
+        $top = $result['resolution'] ?? null;
+        if (is_string($top) && '' !== $top) {
+            return $top;
+        }
+
+        $first = $result['videos'][0] ?? null;
+        if (is_array($first)) {
+            $nested = $first['resolution'] ?? null;
+            if (is_string($nested) && '' !== $nested) {
+                return $nested;
+            }
+        }
+
+        return null;
     }
 }

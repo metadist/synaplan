@@ -14,7 +14,7 @@ class FileControllerTest extends WebTestCase
 
     private $client;
     private $em;
-    private User $testUser;
+    private ?User $testUser = null;
     private string $authToken;
 
     protected function setUp(): void

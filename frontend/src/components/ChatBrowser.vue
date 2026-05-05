@@ -477,12 +477,14 @@ import { useChatsStore } from '@/stores/chats'
 import { useDialog } from '@/composables/useDialog'
 import { useNotification } from '@/composables/useNotification'
 import { useI18n } from 'vue-i18n'
+import { useDateFormat } from '@/composables/useDateFormat'
 
 const chatsStore = useChatsStore()
 const router = useRouter()
 const dialog = useDialog()
 const { success: showSuccess } = useNotification()
 const { t } = useI18n()
+const { formatRelativeTime } = useDateFormat()
 
 // Filter states
 const searchQuery = ref('')
@@ -596,28 +598,10 @@ const handleBulkDelete = async () => {
   }
 }
 
-// Format date helper
 const formatDate = (timestamp: number | string | undefined): string => {
   if (!timestamp) return t('common.unknown')
-
   const date = typeof timestamp === 'number' ? new Date(timestamp * 1000) : new Date(timestamp)
-  const now = new Date()
-  const diffInSeconds = Math.floor((now.getTime() - date.getTime()) / 1000)
-
-  if (diffInSeconds < 60) return t('common.justNow')
-  if (diffInSeconds < 3600) {
-    const minutes = Math.floor(diffInSeconds / 60)
-    return t('common.minutesAgo', { count: minutes })
-  }
-  if (diffInSeconds < 86400) {
-    const hours = Math.floor(diffInSeconds / 3600)
-    return t('common.hoursAgo', { count: hours })
-  }
-  if (diffInSeconds < 604800) {
-    const days = Math.floor(diffInSeconds / 86400)
-    return t('common.daysAgo', { count: days })
-  }
-  return date.toLocaleDateString()
+  return formatRelativeTime(date)
 }
 
 // Get date range filter

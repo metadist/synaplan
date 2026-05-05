@@ -136,10 +136,21 @@ make -C frontend help
 ## Boundaries
 
 ### Ask First Before
-- Changing database schema (migrations required)
+- Changing database schema (always via Doctrine Migrations — see `docs/MIGRATIONS.md`)
 - Adding dependencies (npm/composer)
 - Modifying Docker/CI/build configs
 - Adding new AI provider integrations
+
+### Database Schema & Seed Data
+
+- **Schema** belongs to **Doctrine Migrations** (`backend/migrations/`). Generate with
+  `make -C backend migrate-diff`, never use `doctrine:schema:update --force` against any
+  shared/production DB.
+- **Production-essential catalog data** (AI models, system prompts, default config, rate
+  limits) belongs to idempotent seed services in `backend/src/Seed/` and the `app:seed`
+  command. Re-runnable safely in any environment.
+- **Demo data** (admin/demo/test users, example widget) belongs to `backend/src/DataFixtures/`
+  and `App\Seed\DemoWidgetConfigSeeder`. Only loaded in `dev`/`test`.
 
 ### Never Do
 - Commit secrets or `.env` files with credentials
@@ -155,6 +166,7 @@ For comprehensive guides, see:
 - `docs/PHP_CONVENTIONS.md` - PHP code style, examples, patterns
 - `docs/FRONTEND_CONVENTIONS.md` - TypeScript, Vue, styling, i18n
 - `docs/API_PATTERNS.md` - Zod schemas, OpenAPI, httpClient usage
+- `docs/MIGRATIONS.md` - Doctrine migrations + idempotent seed workflow
 - `docs/E2E_TESTING.md` - Playwright E2E test guidelines
 - `docs/DEVELOPMENT.md` - Development setup
 - `backend/.env.example` - Environment variables

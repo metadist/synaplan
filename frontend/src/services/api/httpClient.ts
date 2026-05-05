@@ -447,10 +447,11 @@ async function httpClient<T = unknown, S extends z.Schema | undefined = undefine
           console.error('Zod errors:', errors)
         }
         throw new Error(
-          `Invalid API response format: ${errors.map((e) => `${e.path.join('.')}: ${e.message}`).join(', ')}`
+          `Invalid API response format: ${errors.map((e) => `${e.path.join('.')}: ${e.message}`).join(', ')}`,
+          { cause: error }
         )
       }
-      throw new Error('Invalid API response format')
+      throw new Error('Invalid API response format', { cause: error })
     }
   }
 

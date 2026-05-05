@@ -34,6 +34,10 @@
         <env name="BRAVE_SEARCH_SEARCH_LANG" value="en" />
         <!-- Qdrant (defaults for testing — empty = disabled) -->
         <env name="QDRANT_URL" value="" />
+        <!-- Health monitoring -->
+        <env name="HEALTH_MONITOR_TOKEN" value="test-monitor-token" force="true" />
+        <env name="HEALTH_MONITOR_USER_EMAIL" value="" />
+        <env name="HEALTH_MONITOR_USER_PASSWORD" value="" />
         <!-- Stripe / Billing (force valid-looking keys so BillingService::isEnabled()=true in tests) -->
         <env name="STRIPE_SECRET_KEY" value="sk_test_fakeKeyForTestSuite000000000000" force="true" />
         <env name="STRIPE_PRICE_PRO" value="price_1TestSuitePro" force="true" />

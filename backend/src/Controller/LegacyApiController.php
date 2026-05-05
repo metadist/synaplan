@@ -89,9 +89,9 @@ class LegacyApiController extends AbstractController
     {
         try {
             // Legacy Parameters
-            $userId = $request->get('user_id') ?? $request->getSession()->get('USERPROFILE')['BID'] ?? 1;
-            $messageText = $request->get('message') ?? $request->get('text') ?? '';
-            $widgetId = $request->get('widget_id') ?? $request->getSession()->get('widget_id');
+            $userId = $request->query->get('user_id') ?? $request->request->get('user_id') ?? $request->getSession()->get('USERPROFILE')['BID'] ?? 1;
+            $messageText = $request->query->get('message') ?? $request->request->get('message') ?? $request->query->get('text') ?? $request->request->get('text') ?? '';
+            $widgetId = $request->query->get('widget_id') ?? $request->request->get('widget_id') ?? $request->getSession()->get('widget_id');
 
             if (empty($messageText)) {
                 return $this->error('Message text cannot be empty', 400);
@@ -144,8 +144,8 @@ class LegacyApiController extends AbstractController
      */
     private function messageGet(Request $request): JsonResponse
     {
-        $messageId = $request->get('message_id') ?? $request->get('id');
-        $trackingId = $request->get('tracking_id');
+        $messageId = $request->query->get('message_id') ?? $request->request->get('message_id') ?? $request->query->get('id') ?? $request->request->get('id');
+        $trackingId = $request->query->get('tracking_id') ?? $request->request->get('tracking_id');
 
         try {
             if ($trackingId) {
@@ -186,7 +186,7 @@ class LegacyApiController extends AbstractController
      */
     private function againOptions(Request $request): JsonResponse
     {
-        $messageId = $request->get('in_id') ?? $request->get('message_id');
+        $messageId = $request->query->get('in_id') ?? $request->request->get('in_id') ?? $request->query->get('message_id') ?? $request->request->get('message_id');
 
         try {
             $message = $this->messageRepository->find($messageId);
@@ -215,7 +215,7 @@ class LegacyApiController extends AbstractController
      */
     private function getProfile(Request $request): JsonResponse
     {
-        $userId = $request->get('user_id') ?? $request->getSession()->get('USERPROFILE')['BID'] ?? null;
+        $userId = $request->query->get('user_id') ?? $request->request->get('user_id') ?? $request->getSession()->get('USERPROFILE')['BID'] ?? null;
 
         if (!$userId) {
             return $this->error('User not authenticated', 401);
@@ -249,7 +249,7 @@ class LegacyApiController extends AbstractController
      */
     private function chatStream(Request $request): Response
     {
-        $messageId = $request->get('message_id');
+        $messageId = $request->query->get('message_id') ?? $request->request->get('message_id');
 
         // Redirect to new streaming endpoint
         return $this->redirectToRoute('api_messages_stream', [
@@ -515,7 +515,7 @@ class LegacyApiController extends AbstractController
         }
 
         // Check request parameter
-        $userId = $request->get('user_id');
+        $userId = $request->query->get('user_id') ?? $request->request->get('user_id');
         if ($userId) {
             return (int) $userId;
         }

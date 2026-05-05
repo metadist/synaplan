@@ -293,6 +293,7 @@ class MessageSorterTest extends TestCase
         $this->assertSame('video', $result['media_type']);
         $this->assertSame(8, $result['duration']);
         $this->assertNull($result['input_mode']);
+        $this->assertNull($result['resolution']);
     }
 
     public function testParseResponseFallsBackToOriginalOnInvalidJson(): void
@@ -307,6 +308,7 @@ class MessageSorterTest extends TestCase
         $this->assertNull($result['media_type']);
         $this->assertNull($result['duration']);
         $this->assertNull($result['input_mode']);
+        $this->assertNull($result['resolution']);
     }
 
     // ===========================================
@@ -334,12 +336,128 @@ class MessageSorterTest extends TestCase
     }
 
     // ===========================================
+    // parseResponse BRESOLUTION tests
+    // ===========================================
+
+    /**
+     * @return array<string, array{0: string, 1: string}>
+     */
+    public static function canonicalResolutionProvider(): array
+    {
+        return [
+            '720p exact' => ['720p', '720p'],
+            '1080p exact' => ['1080p', '1080p'],
+            '4K exact' => ['4K', '4K'],
+        ];
+    }
+
+    #[DataProvider('canonicalResolutionProvider')]
+    public function testParseResponseAcceptsCanonicalResolution(string $input, string $expected): void
+    {
+        $response = sprintf('{"BTOPIC": "mediamaker", "BLANG": "en", "BMEDIA": "video", "BRESOLUTION": "%s"}', $input);
+        $originalData = ['BTOPIC' => 'general', 'BLANG' => 'en'];
+
+        $result = $this->parseResponseMethod->invoke($this->sorter, $response, $originalData);
+
+        $this->assertSame($expected, $result['resolution']);
+    }
+
+    /**
+     * @return array<string, array{0: string, 1: string}>
+     */
+    public static function resolutionAliasProvider(): array
+    {
+        return [
+            // 4K family
+            'lowercase 4k' => ['4k', '4K'],
+            'with space 4 k' => ['4 k', '4K'],
+            'uhd' => ['uhd', '4K'],
+            'UHD uppercase' => ['UHD', '4K'],
+            'ultra hd' => ['ultra hd', '4K'],
+            'ultrahd' => ['ultrahd', '4K'],
+            'res 2160p' => ['2160p', '4K'],
+            'res 2160' => ['2160', '4K'],
+            // 1080p family
+            'fhd' => ['fhd', '1080p'],
+            'full hd' => ['full hd', '1080p'],
+            'fullhd' => ['fullhd', '1080p'],
+            'res 1080' => ['1080', '1080p'],
+            // 720p family
+            'hd' => ['hd', '720p'],
+            'res 720' => ['720', '720p'],
+            // Unsupported tiers must clamp to a supported value
+            '8k clamps up to 4K' => ['8k', '4K'],
+            '5k clamps up to 4K' => ['5k', '4K'],
+            '1440p clamps to 1080p' => ['1440p', '1080p'],
+            'qhd clamps to 1080p' => ['qhd', '1080p'],
+            '2k clamps to 1080p' => ['2k', '1080p'],
+            // Whitespace tolerance
+            'leading and trailing whitespace' => [' 4K ', '4K'],
+        ];
+    }
+
+    #[DataProvider('resolutionAliasProvider')]
+    public function testParseResponseNormalizesResolutionAliases(string $input, string $expected): void
+    {
+        $response = sprintf('{"BTOPIC": "mediamaker", "BLANG": "en", "BMEDIA": "video", "BRESOLUTION": "%s"}', $input);
+        $originalData = ['BTOPIC' => 'general', 'BLANG' => 'en'];
+
+        $result = $this->parseResponseMethod->invoke($this->sorter, $response, $originalData);
+
+        $this->assertSame($expected, $result['resolution']);
+    }
+
+    public function testParseResponseReturnsNullResolutionWhenMissing(): void
+    {
+        $response = '{"BTOPIC": "mediamaker", "BLANG": "en", "BMEDIA": "video"}';
+        $originalData = ['BTOPIC' => 'general', 'BLANG' => 'en'];
+
+        $result = $this->parseResponseMethod->invoke($this->sorter, $response, $originalData);
+
+        $this->assertNull($result['resolution']);
+    }
+
+    public function testParseResponseReturnsNullResolutionForUnknownAlias(): void
+    {
+        $response = '{"BTOPIC": "mediamaker", "BLANG": "en", "BMEDIA": "video", "BRESOLUTION": "potato"}';
+        $originalData = ['BTOPIC' => 'general', 'BLANG' => 'en'];
+
+        $result = $this->parseResponseMethod->invoke($this->sorter, $response, $originalData);
+
+        // Unrecognised value drops to null so MediaGenerationService applies
+        // the configured default (1080p) instead of forwarding garbage.
+        $this->assertNull($result['resolution']);
+    }
+
+    public function testParseResponseReturnsNullResolutionForEmptyString(): void
+    {
+        $response = '{"BTOPIC": "mediamaker", "BLANG": "en", "BMEDIA": "video", "BRESOLUTION": ""}';
+        $originalData = ['BTOPIC' => 'general', 'BLANG' => 'en'];
+
+        $result = $this->parseResponseMethod->invoke($this->sorter, $response, $originalData);
+
+        $this->assertNull($result['resolution']);
+    }
+
+    public function testParseResponseAcceptsIntegerResolutionShortcut(): void
+    {
+        $response = '{"BTOPIC": "mediamaker", "BLANG": "en", "BMEDIA": "video", "BRESOLUTION": 1080}';
+        $originalData = ['BTOPIC' => 'general', 'BLANG' => 'en'];
+
+        $result = $this->parseResponseMethod->invoke($this->sorter, $response, $originalData);
+
+        // Some models emit the resolution as a bare integer (1080, 2160…); we
+        // still want it to resolve to the canonical string.
+        $this->assertSame('1080p', $result['resolution']);
+    }
+
+    // ===========================================
     // Combined classification test
     // ===========================================
 
     public function testParseResponseHandlesCompleteClassification(): void
     {
-        $response = '{"BTOPIC": "mediamaker", "BLANG": "de", "BWEBSEARCH": 0, "BMEDIA": "video", "BDURATION": 6, "BINPUTMODE": "text_only"}';
+        $response = '{"BTOPIC": "mediamaker", "BLANG": "de", "BWEBSEARCH": 0, "BMEDIA": "video", "BDURATION": 6, "BRESOLUTION": "4K", "BINPUTMODE": "text_only"}';
         $originalData = ['BTOPIC' => 'general', 'BLANG' => 'en'];
 
         $result = $this->parseResponseMethod->invoke($this->sorter, $response, $originalData);
@@ -349,6 +467,7 @@ class MessageSorterTest extends TestCase
         $this->assertFalse($result['web_search']);
         $this->assertSame('video', $result['media_type']);
         $this->assertSame(6, $result['duration']);
+        $this->assertSame('4K', $result['resolution']);
         $this->assertSame('text_only', $result['input_mode']);
     }
 }

@@ -5,16 +5,16 @@ namespace App\Tests\Unit;
 use App\AI\Service\AiFacade;
 use App\Entity\Message;
 use App\Repository\MessageRepository;
+use App\Service\File\TikaClient;
 use App\Service\Message\MessagePreProcessor;
 use App\Service\WhisperService;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
-use Symfony\Contracts\HttpClient\HttpClientInterface;
 
 class MessagePreProcessorTest extends TestCase
 {
     private MessageRepository $messageRepository;
-    private HttpClientInterface $httpClient;
+    private TikaClient $tikaClient;
     private WhisperService $whisperService;
     private AiFacade $aiFacade;
     private LoggerInterface $logger;
@@ -23,18 +23,17 @@ class MessagePreProcessorTest extends TestCase
     protected function setUp(): void
     {
         $this->messageRepository = $this->createMock(MessageRepository::class);
-        $this->httpClient = $this->createMock(HttpClientInterface::class);
+        $this->tikaClient = $this->createMock(TikaClient::class);
         $this->whisperService = $this->createMock(WhisperService::class);
         $this->aiFacade = $this->createMock(AiFacade::class);
         $this->logger = $this->createMock(LoggerInterface::class);
 
         $this->service = new MessagePreProcessor(
             $this->messageRepository,
-            $this->httpClient,
+            $this->tikaClient,
             $this->whisperService,
             $this->aiFacade,
             $this->logger,
-            'http://tika:9998',
             '/var/www/backend/uploads'
         );
     }
@@ -133,11 +132,10 @@ class MessagePreProcessorTest extends TestCase
             // Create service with temp directory
             $service = new MessagePreProcessor(
                 $this->messageRepository,
-                $this->httpClient,
+                $this->tikaClient,
                 $this->whisperService,
                 $this->aiFacade,
                 $this->logger,
-                'http://tika:9998',
                 $tempDir
             );
 
@@ -178,11 +176,10 @@ class MessagePreProcessorTest extends TestCase
         try {
             $service = new MessagePreProcessor(
                 $this->messageRepository,
-                $this->httpClient,
+                $this->tikaClient,
                 $this->whisperService,
                 $this->aiFacade,
                 $this->logger,
-                'http://tika:9998',
                 $tempDir
             );
 

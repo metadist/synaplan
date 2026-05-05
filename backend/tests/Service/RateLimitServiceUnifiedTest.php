@@ -183,6 +183,72 @@ class RateLimitServiceUnifiedTest extends TestCase
         ]);
     }
 
+    public function testRecordUsagePassesSameTimestampToCostCalcAndBuselog(): void
+    {
+        // Regression for Copilot review: the timestamp persisted into
+        // BUSELOG.BUNIXTIMES must be the exact same value passed into
+        // CostCalculationService so any time-based price-history lookup and
+        // the stored price snapshot align with the log entry's timestamp.
+        $user = $this->createMock(User::class);
+        $user->method('getId')->willReturn(1);
+
+        $costCalculationService = $this->createMock(CostCalculationService::class);
+        $costCalculationService->method('getPricingMode')->willReturn('per_token');
+
+        $capturedTimestamp = null;
+        $costCalculationService->expects($this->once())
+            ->method('calculateCost')
+            ->with(
+                $this->anything(),
+                $this->anything(),
+                $this->anything(),
+                $this->anything(),
+                $this->anything(),
+                $this->callback(function ($timestamp) use (&$capturedTimestamp) {
+                    $capturedTimestamp = $timestamp;
+
+                    return is_int($timestamp) && $timestamp > 0;
+                }),
+            )
+            ->willReturn(new \App\DTO\CostResult(
+                totalCost: '0.000000',
+                inputCost: '0.000000',
+                outputCost: '0.000000',
+                cacheSavings: '0.000000',
+                priceSnapshot: [],
+                billedInputTokens: 0,
+            ));
+
+        $service = new RateLimitService(
+            $this->configRepository,
+            $this->em,
+            $this->logger,
+            new BillingService('sk_test_valid_key', 'price_1RealProId'),
+            $costCalculationService,
+            $this->createMock(SubscriptionRepository::class),
+        );
+
+        $this->connection->expects($this->once())
+            ->method('executeStatement')
+            ->with(
+                $this->stringContains('INSERT INTO BUSELOG'),
+                $this->callback(function ($params) use (&$capturedTimestamp) {
+                    return $params['timestamp'] === $capturedTimestamp;
+                }),
+            );
+
+        $service->recordUsage($user, 'MESSAGES', [
+            'provider' => 'openai',
+            'model' => 'gpt-4',
+            'model_id' => 99,
+            'usage' => [
+                'prompt_tokens' => 10,
+                'completion_tokens' => 5,
+                'total_tokens' => 15,
+            ],
+        ]);
+    }
+
     public function testUnifiedLimitScenarioWhatsAppThenEmail(): void
     {
         $user = $this->createMock(User::class);

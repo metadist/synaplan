@@ -82,11 +82,11 @@ class ProfileController extends AbstractController
         // Get external auth info if applicable
         $externalAuthInfo = null;
         if ($user->isExternalAuth()) {
-            $type = $user->getType();
-            $lastLoginKey = match ($type) {
-                'GOOGLE' => 'google_last_login',
-                'GITHUB' => 'github_last_login',
-                'OIDC' => 'oidc_last_login',
+            $provider = $user->getProviderId();
+            $lastLoginKey = match ($provider) {
+                'google' => 'google_last_login',
+                'github' => 'github_last_login',
+                'keycloak', 'oidc' => 'oidc_last_login',
                 default => null,
             };
 
@@ -179,10 +179,15 @@ class ProfileController extends AbstractController
             return $this->json(['error' => 'Invalid JSON'], Response::HTTP_BAD_REQUEST);
         }
 
-        // Get current details
+        // We collect all mutations on a single local $details array and
+        // write it back once at the end. Going through entity setters in
+        // between (e.g. $user->setMemoriesEnabled(...) or
+        // EmailChatService::setUserEmailKeyword(...)) would cause those
+        // setters to read $user->getUserDetails() — which is still the
+        // pre-update DB state — and silently overwrite our pending
+        // firstName/lastName/etc. when we later persist $details.
         $details = $user->getUserDetails();
 
-        // Update allowed fields
         $allowedFields = [
             'firstName', 'lastName', 'phone', 'companyName', 'vatId',
             'street', 'zipCode', 'city', 'country', 'language', 'timezone', 'invoiceEmail',
@@ -195,26 +200,21 @@ class ProfileController extends AbstractController
         }
 
         if (array_key_exists('memoriesEnabled', $data)) {
-            $user->setMemoriesEnabled((bool) $data['memoriesEnabled']);
-            // Ensure details are in sync for this request
-            $details = $user->getUserDetails();
+            $details['memories_enabled'] = (bool) $data['memoriesEnabled'];
         }
 
-        // Handle email keyword separately (uses EmailChatService)
         if (isset($data['emailKeyword'])) {
             $keyword = $data['emailKeyword'];
             if (empty($keyword) || '' === trim($keyword)) {
-                // Remove keyword if empty
                 $details['email_keyword'] = null;
-                $user->setUserDetails($details);
             } else {
-                try {
-                    $this->emailChatService->setUserEmailKeyword($user, $keyword);
-                } catch (\InvalidArgumentException $e) {
+                $sanitized = preg_replace('/[^a-z0-9\-_]/', '', strtolower($keyword));
+                if (empty($sanitized)) {
                     return $this->json([
                         'error' => 'Invalid email keyword format. Only lowercase letters, numbers, hyphens, and underscores are allowed.',
                     ], Response::HTTP_BAD_REQUEST);
                 }
+                $details['email_keyword'] = $sanitized;
             }
         }
 
@@ -268,12 +268,16 @@ class ProfileController extends AbstractController
             return $this->json(['error' => 'Not authenticated'], Response::HTTP_UNAUTHORIZED);
         }
 
-        // Block password change for external authentication users (OAuth, OIDC)
-        if (!$user->canChangePassword()) {
-            $provider = $user->getAuthProviderName();
-
+        if ($user->isManagedExternally()) {
             return $this->json([
-                'error' => "Password cannot be changed for {$provider} accounts. Please manage your password through {$provider}.",
+                'error' => 'This account is managed by your organization. Password changes are not allowed.',
+            ], Response::HTTP_FORBIDDEN);
+        }
+
+        // Block password change for users without a password
+        if (!$user->canChangePassword()) {
+            return $this->json([
+                'error' => 'You do not have a password set. Please use the "Forgot password" link on the login page to create one.',
             ], Response::HTTP_FORBIDDEN);
         }
 
@@ -473,6 +477,12 @@ class ProfileController extends AbstractController
             return $this->json(['error' => 'Not authenticated'], Response::HTTP_UNAUTHORIZED);
         }
 
+        if ($user->isManagedExternally()) {
+            return $this->json([
+                'error' => 'This account is managed by your organization and cannot be deleted here.',
+            ], Response::HTTP_FORBIDDEN);
+        }
+
         $data = json_decode($request->getContent(), true);
         $password = $data['password'] ?? '';
 
@@ -495,8 +505,6 @@ class ProfileController extends AbstractController
         } else {
             // Verify password for local auth users
             if (!$this->passwordHasher->isPasswordValid($user, $password)) {
-                usleep(100000); // Timing attack prevention
-
                 return $this->json([
                     'error' => 'Incorrect password',
                 ], Response::HTTP_FORBIDDEN);

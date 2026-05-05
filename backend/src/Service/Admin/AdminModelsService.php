@@ -240,7 +240,7 @@ final readonly class AdminModelsService
 
     private function createPriceHistoryEntry(Model $model, array $data): void
     {
-        $now = new \DateTimeImmutable();
+        $now = new \DateTime();
 
         // Close current price entry
         $this->priceHistoryRepository->closeCurrentPrice($model, $now);

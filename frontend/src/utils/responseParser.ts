@@ -23,7 +23,6 @@ const CODE_BLOCK_REGEX = /```(\w+)?\n([\s\S]*?)```/g
 
 export function parseAIResponse(content: string): ParsedResponse {
   const parts: ParsedResponsePart[] = []
-  let hasLinks = false
   let hasCode = false
   let hasJson = false
   let jsonPayload: Record<string, unknown> | null = null
@@ -95,8 +94,7 @@ export function parseAIResponse(content: string): ParsedResponse {
     parseTextContent(textContent, parts)
   }
 
-  // Check if we found links in the text
-  hasLinks = parts.some((p) => p.type === 'link' || p.type === 'links')
+  const hasLinks = parts.some((p) => p.type === 'link' || p.type === 'links')
 
   return {
     parts,

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Tests\Integration\Service;
 
 use App\Entity\User;
+use App\Service\Exception\MemoryServiceUnavailableException;
 use App\Service\UserMemoryService;
 use App\Service\VectorSearch\QdrantClientInterface;
 use Symfony\Bundle\FrameworkBundle\Test\KernelTestCase;
@@ -48,28 +49,27 @@ final class UserMemoryServiceIntegrationTest extends KernelTestCase
         $this->assertSame($this->qdrantClient, $client);
     }
 
-    public function testDeleteMemoryDoesNotThrowWhenServiceUnavailable(): void
+    public function testDeleteMemoryThrowsWhenServiceUnavailable(): void
     {
-        // Even if Qdrant is unavailable, delete should not throw
-        // (it logs and continues)
+        // When Qdrant is unavailable, user-initiated deletes must fail loudly
+        // so the controller surfaces a 503 instead of silently confirming a
+        // delete that never reached storage.
 
-        // Create a real user entity using proper setters
+        if ($this->service->isAvailable()) {
+            $this->markTestSkipped('Qdrant is reachable in this environment; skipping unavailable-path test.');
+        }
+
         $user = new User();
-        // User entity might use different setter name
-        // Just test with reflection to avoid dependency on exact setter
-
         $reflection = new \ReflectionClass($user);
 
-        // Set email via property
         try {
             $emailProperty = $reflection->getProperty('email');
             $emailProperty->setAccessible(true);
             $emailProperty->setValue($user, 'test@example.com');
-        } catch (\ReflectionException $e) {
-            // If property doesn't exist, skip this part
+        } catch (\ReflectionException) {
+            // Property layout differs — acceptable for this test.
         }
 
-        // Set ID via reflection (entity not persisted)
         try {
             $idProperty = $reflection->getProperty('id');
             $idProperty->setAccessible(true);
@@ -78,7 +78,8 @@ final class UserMemoryServiceIntegrationTest extends KernelTestCase
             $this->markTestSkipped('Could not set user ID via reflection');
         }
 
+        $this->expectException(MemoryServiceUnavailableException::class);
+
         $this->service->deleteMemory(1768900000, $user);
-        $this->addToAssertionCount(1);
     }
 }

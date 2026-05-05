@@ -4,12 +4,14 @@ declare(strict_types=1);
 
 namespace App\Service;
 
+use App\AI\Exception\ModelNotConfiguredException;
 use App\AI\Service\AiFacade;
 use App\DTO\UserMemoryDTO;
 use App\Entity\Prompt;
 use App\Entity\User;
 use App\Entity\Widget;
 use App\Repository\PromptRepository;
+use App\Service\Prompt\LanguageDirectiveBuilder;
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;
 
@@ -46,6 +48,40 @@ final readonly class WidgetSetupService
     }
 
     /**
+     * Resolve AI model configuration with multi-level fallback.
+     *
+     * Priority: preferredModelId → DEFAULT_SETUP_MODEL_ID → user default CHAT → global default CHAT.
+     *
+     * @return array{provider: string, model: string, model_id: int}
+     *
+     * @throws ModelNotConfiguredException when no usable AI model can be found
+     */
+    private function resolveAiModelConfig(User $user, ?int $preferredModelId = null): array
+    {
+        $candidates = array_filter([
+            $preferredModelId,
+            self::DEFAULT_SETUP_MODEL_ID,
+            $this->modelConfigService->getDefaultModel('CHAT', $user->getId()),
+            $this->modelConfigService->getDefaultModel('CHAT', 0),
+        ]);
+
+        foreach ($candidates as $modelId) {
+            if ($modelId <= 0) {
+                continue;
+            }
+
+            $provider = $this->modelConfigService->getProviderForModel($modelId);
+            $modelName = $this->modelConfigService->getModelName($modelId);
+
+            if ($provider && $modelName) {
+                return ['provider' => $provider, 'model' => $modelName, 'model_id' => $modelId];
+            }
+        }
+
+        throw new ModelNotConfiguredException('No AI model configured for widget setup. Please configure a default CHAT model in settings.');
+    }
+
+    /**
      * Parse the model ID stored in a setup prompt's shortDescription field.
      */
     public static function parseModelId(Prompt $prompt): int
@@ -72,60 +108,30 @@ final readonly class WidgetSetupService
 
         $setupConfig = $this->resolveSetupConfig($widget);
         $systemPrompt = $setupConfig['prompt'];
-        $modelId = $setupConfig['modelId'];
 
-        $provider = $this->modelConfigService->getProviderForModel($modelId);
-        $modelName = $this->modelConfigService->getModelName($modelId);
-
-        if (!$provider || !$modelName) {
-            $fallbackId = $this->modelConfigService->getDefaultModel('CHAT', $user->getId());
-            if ($fallbackId && $fallbackId > 0) {
-                $modelId = $fallbackId;
-                $provider = $this->modelConfigService->getProviderForModel($fallbackId);
-                $modelName = $this->modelConfigService->getModelName($fallbackId);
-            }
-        }
+        $modelConfig = $this->resolveAiModelConfig($user, $setupConfig['modelId']);
+        $modelId = $modelConfig['model_id'];
 
         $this->logger->info('Widget setup using AI model', [
-            'provider' => $provider,
-            'model' => $modelName,
+            'provider' => $modelConfig['provider'],
+            'model' => $modelConfig['model'],
             'language' => $language,
         ]);
 
-        // Inject language instruction at the start of the system prompt
-        $languageNames = [
-            'en' => 'English',
-            'de' => 'German',
-            'fr' => 'French',
-            'es' => 'Spanish',
-            'it' => 'Italian',
-            'pt' => 'Portuguese',
-            'nl' => 'Dutch',
-            'pl' => 'Polish',
-            'ru' => 'Russian',
-            'ja' => 'Japanese',
-            'zh' => 'Chinese',
-            'ko' => 'Korean',
-        ];
-        $languageName = $languageNames[$language] ?? 'English';
-        $languageInstruction = "**CRITICAL LANGUAGE RULE**: You MUST detect the language the user writes in and ALWAYS respond in that same language. If the user writes in German, respond in German. If the user writes in French, respond in French. The application language is {$languageName}, so start in {$languageName}, but IMMEDIATELY switch to whatever language the user uses. This rule overrides everything else.\n\n";
-        $systemPromptWithLanguage = $languageInstruction.$systemPrompt;
+        // Inject language instruction at the start of the system prompt.
+        // The builder includes the anti-echo clause that stops smaller LLMs
+        // from leaking the directive back into the visible response.
+        $systemPromptWithLanguage = LanguageDirectiveBuilder::buildWidgetPreamble($language).$systemPrompt;
 
         $enrichedText = $this->enrichWithWebsiteContent($text);
         $messages = $this->buildConversationMessagesFromHistory($history, $systemPromptWithLanguage, $enrichedText);
 
-        // Build AI options
         $aiOptions = [
             'temperature' => 0.7,
+            'provider' => $modelConfig['provider'],
+            'model' => $modelConfig['model'],
         ];
-        if ($provider) {
-            $aiOptions['provider'] = $provider;
-        }
-        if ($modelName) {
-            $aiOptions['model'] = $modelName;
-        }
 
-        // Call AI
         $response = $this->aiFacade->chat(
             $messages,
             $user->getId(),
@@ -177,28 +183,10 @@ final readonly class WidgetSetupService
     private function sendFlowBuilderMessage(Widget $widget, User $user, string $text, array $history, string $language, ?array $currentFlow = null): array
     {
         $systemPrompt = self::getFlowBuilderPromptText($widget->getName());
-        $modelId = self::DEFAULT_SETUP_MODEL_ID;
+        $modelConfig = $this->resolveAiModelConfig($user);
+        $modelId = $modelConfig['model_id'];
 
-        $provider = $this->modelConfigService->getProviderForModel($modelId);
-        $modelName = $this->modelConfigService->getModelName($modelId);
-
-        if (!$provider || !$modelName) {
-            $fallbackId = $this->modelConfigService->getDefaultModel('CHAT', $user->getId());
-            if ($fallbackId && $fallbackId > 0) {
-                $modelId = $fallbackId;
-                $provider = $this->modelConfigService->getProviderForModel($fallbackId);
-                $modelName = $this->modelConfigService->getModelName($fallbackId);
-            }
-        }
-
-        $languageNames = [
-            'en' => 'English', 'de' => 'German', 'fr' => 'French',
-            'es' => 'Spanish', 'it' => 'Italian', 'pt' => 'Portuguese',
-            'nl' => 'Dutch', 'pl' => 'Polish', 'ru' => 'Russian',
-            'ja' => 'Japanese', 'zh' => 'Chinese', 'ko' => 'Korean',
-        ];
-        $languageName = $languageNames[$language] ?? 'English';
-        $languageInstruction = "**CRITICAL LANGUAGE RULE**: You MUST detect the language the user writes in and ALWAYS respond in that same language. The application language is {$languageName}, so start in {$languageName}. This rule overrides everything else.\n\n";
+        $languageInstruction = LanguageDirectiveBuilder::buildWidgetPreamble($language);
 
         $flowContext = '';
         if ($currentFlow && (\count($currentFlow['triggers'] ?? []) > 0 || \count($currentFlow['responses'] ?? []) > 0)) {
@@ -213,18 +201,14 @@ final readonly class WidgetSetupService
         }
 
         $isStart = self::FLOW_BUILDER_START_MARKER === trim($text);
-        if (!$isStart) {
-            $enrichedText = $this->enrichWithWebsiteContent($text);
-            $messages[] = ['role' => 'user', 'content' => $enrichedText];
-        }
+        $inputText = $isStart ? 'Start' : $this->enrichWithWebsiteContent($text);
+        $messages[] = ['role' => 'user', 'content' => $inputText];
 
-        $aiOptions = ['temperature' => 0.7];
-        if ($provider) {
-            $aiOptions['provider'] = $provider;
-        }
-        if ($modelName) {
-            $aiOptions['model'] = $modelName;
-        }
+        $aiOptions = [
+            'temperature' => 0.7,
+            'provider' => $modelConfig['provider'],
+            'model' => $modelConfig['model'],
+        ];
 
         $response = $this->aiFacade->chat($messages, $user->getId(), $aiOptions);
         $aiResponse = $response['content'] ?? '';
@@ -235,7 +219,7 @@ final readonly class WidgetSetupService
             'model_id' => $modelId,
             'usage' => $response['usage'] ?? [],
             'response_text' => $aiResponse,
-            'input_text' => $isStart ? '' : $enrichedText,
+            'input_text' => $inputText,
         ]);
 
         $this->logger->info('Widget flow-builder message processed', [
@@ -288,26 +272,13 @@ PROMPT;
 
         $userMessage = "User memories:\n".implode("\n", $memoryLines);
 
-        $modelId = self::DEFAULT_SETUP_MODEL_ID;
-        $provider = $this->modelConfigService->getProviderForModel($modelId);
-        $modelName = $this->modelConfigService->getModelName($modelId);
+        $modelConfig = $this->resolveAiModelConfig($user);
 
-        if (!$provider || !$modelName) {
-            $fallbackId = $this->modelConfigService->getDefaultModel('CHAT', $user->getId());
-            if ($fallbackId && $fallbackId > 0) {
-                $modelId = $fallbackId;
-                $provider = $this->modelConfigService->getProviderForModel($fallbackId);
-                $modelName = $this->modelConfigService->getModelName($fallbackId);
-            }
-        }
-
-        $aiOptions = ['temperature' => 0.1];
-        if ($provider) {
-            $aiOptions['provider'] = $provider;
-        }
-        if ($modelName) {
-            $aiOptions['model'] = $modelName;
-        }
+        $aiOptions = [
+            'temperature' => 0.1,
+            'provider' => $modelConfig['provider'],
+            'model' => $modelConfig['model'],
+        ];
 
         try {
             $response = $this->aiFacade->chat([
@@ -320,7 +291,7 @@ PROMPT;
             $this->rateLimitService->recordUsage($user, 'WIDGET_SETUP', [
                 'provider' => $response['provider'] ?? 'unknown',
                 'model' => $response['model'] ?? 'unknown',
-                'model_id' => $modelId,
+                'model_id' => $modelConfig['model_id'],
                 'usage' => $response['usage'] ?? [],
                 'response_text' => $content,
                 'input_text' => $userMessage,
@@ -481,14 +452,12 @@ Generate a JSON response with EXACTLY this format (no markdown, just JSON):
 IMPORTANT: Respond ONLY with valid JSON, no explanations.
 PROMPT;
 
-                $aiOptions = ['temperature' => 0.3];
-                $metaModelId = self::DEFAULT_SETUP_MODEL_ID;
-                $metaProvider = $this->modelConfigService->getProviderForModel($metaModelId);
-                $metaModel = $this->modelConfigService->getModelName($metaModelId);
-                if ($metaProvider && $metaModel) {
-                    $aiOptions['provider'] = $metaProvider;
-                    $aiOptions['model'] = $metaModel;
-                }
+                $metaModelConfig = $this->resolveAiModelConfig($user);
+                $aiOptions = [
+                    'temperature' => 0.3,
+                    'provider' => $metaModelConfig['provider'],
+                    'model' => $metaModelConfig['model'],
+                ];
 
                 $response = $this->aiFacade->chat(
                     [['role' => 'user', 'content' => $metadataPrompt]],
@@ -501,7 +470,7 @@ PROMPT;
                 $this->rateLimitService->recordUsage($user, 'WIDGET_SETUP', [
                     'provider' => $response['provider'] ?? 'unknown',
                     'model' => $response['model'] ?? 'unknown',
-                    'model_id' => $metaModelId,
+                    'model_id' => $metaModelConfig['model_id'],
                     'usage' => $response['usage'] ?? [],
                     'response_text' => $content,
                     'input_text' => $metadataPrompt,
@@ -565,13 +534,10 @@ PROMPT;
             ];
         }
 
-        // Add new user message (unless it's the start marker)
-        if (self::START_MARKER !== $newUserMessage) {
-            $messages[] = [
-                'role' => 'user',
-                'content' => $newUserMessage,
-            ];
-        }
+        $messages[] = [
+            'role' => 'user',
+            'content' => $this->isStartMarker($newUserMessage) ? 'Start' : $newUserMessage,
+        ];
 
         return $messages;
     }

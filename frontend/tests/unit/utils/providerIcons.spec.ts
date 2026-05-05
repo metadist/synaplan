@@ -37,6 +37,12 @@ describe('Provider Icons Utility', () => {
     expect(getProviderIcon('runway')).toBe('mdi:runway')
   })
 
+  it('should return HuggingFace icon for huggingface service', () => {
+    expect(getProviderIcon('huggingface')).toBe('simple-icons:huggingface')
+    expect(getProviderIcon('HuggingFace')).toBe('simple-icons:huggingface')
+    expect(getProviderIcon('Hugging Face')).toBe('simple-icons:huggingface')
+  })
+
   it('should return default robot icon for unknown service', () => {
     expect(getProviderIcon('unknown')).toBe('mdi:robot')
     expect(getProviderIcon('')).toBe('mdi:robot')

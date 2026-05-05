@@ -152,6 +152,8 @@ export function clearSseToken(): void {
 
 export type { StreamUpdatePayload }
 
+export type GuestStreamCallback = (data: StreamUpdatePayload) => void
+
 export const chatApi = {
   async sendMessage(userId: number, message: string, trackId?: number): Promise<unknown> {
     // Mock data temporarily disabled - direct backend communication
@@ -187,6 +189,7 @@ export const chatApi = {
     fileIds?: number[]
     voiceReply?: boolean
     isAgain?: boolean
+    continueMessageId?: number
   }): () => void {
     const paramsObj: Record<string, string> = {
       message: opts.message,
@@ -200,6 +203,7 @@ export const chatApi = {
     if (opts.modelId) paramsObj.modelId = opts.modelId.toString()
     if (opts.voiceReply) paramsObj.voiceReply = '1'
     if (opts.isAgain) paramsObj.isAgain = '1'
+    if (opts.continueMessageId) paramsObj.continueMessageId = opts.continueMessageId.toString()
 
     if (opts.fileIds && opts.fileIds.length > 0) {
       paramsObj.fileIds = opts.fileIds.join(',')
@@ -409,6 +413,78 @@ export const chatApi = {
     } catch (error) {
       console.error('📡 chatApi.stopStream error:', error)
       throw error
+    }
+  },
+
+  /**
+   * Stream a guest message (no auth token, uses guestSession query param).
+   */
+  streamGuestMessage(opts: {
+    guestSessionId: string
+    message: string
+    chatId: number
+    trackId?: number
+    onUpdate: (data: StreamUpdatePayload) => void
+  }): () => void {
+    const paramsObj: Record<string, string> = {
+      message: opts.message,
+      chatId: opts.chatId.toString(),
+      guestSession: opts.guestSessionId,
+    }
+
+    if (opts.trackId) paramsObj.trackId = opts.trackId.toString()
+
+    const params = new URLSearchParams(paramsObj)
+    const url = `${getApiBaseUrl()}/api/v1/messages/stream?${params}`
+
+    let eventSource: EventSource | null = null
+    let completionReceived = false
+    let isStopped = false
+
+    eventSource = new EventSource(url)
+
+    eventSource.onmessage = (event) => {
+      if (isStopped) return
+
+      try {
+        const data = JSON.parse(event.data) as StreamUpdatePayload
+        completionReceived = data.status === 'complete'
+        opts.onUpdate(data)
+
+        if (data.status === 'complete' || data.status === 'error') {
+          eventSource?.close()
+        }
+      } catch (error) {
+        console.error('Failed to parse guest SSE data:', error)
+      }
+    }
+
+    eventSource.onerror = () => {
+      if (isStopped) return
+
+      if (completionReceived) {
+        eventSource?.close()
+        return
+      }
+
+      if (
+        eventSource?.readyState === EventSource.CLOSED ||
+        eventSource?.readyState === EventSource.CONNECTING
+      ) {
+        eventSource?.close()
+        opts.onUpdate({ status: 'complete', message: 'Response complete', metadata: {} })
+        return
+      }
+
+      if (eventSource?.readyState === EventSource.OPEN) {
+        eventSource?.close()
+        opts.onUpdate({ status: 'error', error: 'Connection interrupted' })
+      }
+    }
+
+    return () => {
+      isStopped = true
+      eventSource?.close()
     }
   },
 }

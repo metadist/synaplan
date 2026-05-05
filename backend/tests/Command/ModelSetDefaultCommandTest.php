@@ -22,7 +22,7 @@ class ModelSetDefaultCommandTest extends TestCase
         $command = new ModelSetDefaultCommand($this->connection);
 
         $application = new Application();
-        $application->add($command);
+        $application->addCommand($command);
 
         $this->commandTester = new CommandTester($application->find('app:model:set-default'));
     }

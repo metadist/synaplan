@@ -19,6 +19,11 @@ parameters:
     # OIDC scopes requested during login (space-separated)
     env(OIDC_SCOPES): 'openid email profile offline_access'
 
+    # Health monitoring defaults (so autowiring works when env not set)
+    env(HEALTH_MONITOR_TOKEN): ''
+    env(HEALTH_MONITOR_USER_EMAIL): ''
+    env(HEALTH_MONITOR_USER_PASSWORD): ''
+
     # Logging
     # LOG_FORMAT: json (default) or line (human-readable)
     # LOG_LEVEL: debug, info, notice, warning, error (see monolog.yaml)
@@ -47,6 +52,7 @@ parameters:
     env(QDRANT_URL): ''
     env(QDRANT_MEMORIES_COLLECTION): ''
     env(QDRANT_DOCUMENTS_COLLECTION): ''
+    env(QDRANT_SYNAPSE_COLLECTION): ''
     env(TRITON_SERVER_URL): ''
     env(GOOGLE_CLIENT_ID): ''
     env(GITHUB_CLIENT_ID): ''
@@ -65,6 +71,9 @@ parameters:
     env(STRIPE_PAYMENT_METHODS): ''
     env(WHATSAPP_ACCESS_TOKEN): ''
     env(WHATSAPP_WEBHOOK_VERIFY_TOKEN): ''
+    env(CLOUDFLARE_ACCOUNT_ID): ''
+    env(CLOUDFLARE_API_TOKEN): ''
+    env(EMBEDDING_FALLBACK_PROVIDER): ''
 
     # Piper TTS Service default (localhost for native; Docker Compose overrides via env)
     env(SYNAPLAN_TTS_URL): ''
@@ -92,6 +101,20 @@ services:
             - '../src/Entity/'
             - '../src/Kernel.php'
             - '../src/Test/'
+
+    # Idempotent seeders for production-essential catalog data.
+    # Run from docker-entrypoint.sh after migrations (app:seed) and re-runnable from CLI.
+    App\Seed\ModelSeeder:
+        arguments:
+            $environment: '%kernel.environment%'
+
+    App\Seed\DefaultModelConfigSeeder:
+        arguments:
+            $environment: '%kernel.environment%'
+
+    App\Seed\DemoWidgetConfigSeeder:
+        arguments:
+            $environment: '%kernel.environment%'
 
     App\AI\Provider\AnthropicProvider:
         arguments:
@@ -170,12 +193,22 @@ services:
             $uploadDir: '%kernel.project_dir%/var/uploads'
         tags:
             - { name: 'app.ai.chat' }
+            - { name: 'app.ai.vision' }
             - { name: 'app.ai.embedding' }
             - { name: 'app.ai.image_generation' }
             - { name: 'app.ai.video_generation' }
 
+    App\AI\Provider\CloudflareProvider:
+        arguments:
+            $accountId: '%env(CLOUDFLARE_ACCOUNT_ID)%'
+            $apiToken: '%env(CLOUDFLARE_API_TOKEN)%'
+        tags:
+            - { name: 'app.ai.embedding' }
+
     # AI Facade
-    App\AI\Service\AiFacade: ~
+    App\AI\Service\AiFacade:
+        arguments:
+            $embeddingFallbackProvider: '%env(EMBEDDING_FALLBACK_PROVIDER)%'
 
     # Whisper Service for Audio Transcription
     App\Service\WhisperService:
@@ -222,10 +255,11 @@ services:
     # Message Processing Services
     App\Service\Message\MessagePreProcessor:
         arguments:
-            $tikaBaseUrl: '%env(TIKA_BASE_URL)%'
             $uploadsDir: '%kernel.project_dir%/var/uploads'
     App\Service\Message\MessageSorter: ~
     App\Service\Message\MessageClassifier: ~
+    App\Service\Message\SynapseRouter: ~
+    App\Service\Message\SynapseIndexer: ~
     App\Service\Message\InferenceRouter: ~
     App\Service\Message\MessageProcessor: ~
 
@@ -262,9 +296,6 @@ services:
 
     # Model Configuration Service
     App\Service\ModelConfigService: ~
-
-    # Rate Limiter Service
-    App\Service\RateLimiterService: ~
 
     # Internal Email Service (system emails - uses SMTP from ENV)
     App\Service\InternalEmailService: ~
@@ -349,6 +380,7 @@ services:
             $stripePriceBusiness: '%env(STRIPE_PRICE_BUSINESS)%'
             $frontendUrl: '%env(FRONTEND_URL)%'
             $stripePaymentMethods: '%env(STRIPE_PAYMENT_METHODS)%'
+            $stripeAutomaticTaxEnabled: '%env(bool:STRIPE_AUTOMATIC_TAX)%'
             $cache: '@cache.app'
 
     App\Controller\StripeWebhookController:
@@ -381,6 +413,11 @@ services:
 
     # Token Service (Access/Refresh Tokens)
     App\Service\TokenService:
+        arguments:
+            $appEnv: '%kernel.environment%'
+
+    # Impersonation Service (admin → user cookie-stash session swap)
+    App\Service\ImpersonationService:
         arguments:
             $appEnv: '%kernel.environment%'
 
@@ -483,10 +520,17 @@ services:
             $qdrantUrl: '%env(QDRANT_URL)%'
             $memoriesCollection: '%env(default::QDRANT_MEMORIES_COLLECTION)%'
             $documentsCollection: '%env(default::QDRANT_DOCUMENTS_COLLECTION)%'
+            $synapseCollection: '%env(default::QDRANT_SYNAPSE_COLLECTION)%'
 
     App\Service\VectorSearch\QdrantClientInterface:
         alias: App\Service\VectorSearch\QdrantClientDirect
     # For Development without Qdrant: alias: App\Service\VectorSearch\QdrantClientMock
+
+    # Maintenance helper used by app:qdrant:migrate-legacy-point-ids
+    App\Service\VectorSearch\LegacyPointIdMigrator:
+        arguments:
+            $httpClient: '@Symfony\Contracts\HttpClient\HttpClientInterface'
+            $qdrantUrl: '%env(QDRANT_URL)%'
 
     # Monolog Formatter Factory (for env-based log format switching)
     App\Service\MonologFormatterFactory:

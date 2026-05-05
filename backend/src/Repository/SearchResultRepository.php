@@ -33,6 +33,35 @@ class SearchResultRepository extends ServiceEntityRepository
     }
 
     /**
+     * Batch-load search results for multiple messages in a single query.
+     *
+     * @param Message[] $messages
+     *
+     * @return array<int, SearchResult[]> keyed by message ID
+     */
+    public function findByMessages(array $messages): array
+    {
+        if ([] === $messages) {
+            return [];
+        }
+
+        $results = $this->createQueryBuilder('sr')
+            ->where('sr.message IN (:messages)')
+            ->setParameter('messages', $messages)
+            ->orderBy('sr.position', 'ASC')
+            ->getQuery()
+            ->getResult();
+
+        $grouped = [];
+        foreach ($results as $sr) {
+            $msgId = $sr->getMessage()->getId();
+            $grouped[$msgId][] = $sr;
+        }
+
+        return $grouped;
+    }
+
+    /**
      * Save search results for a message.
      *
      * @param array  $searchResults Parsed search results from BraveSearchService

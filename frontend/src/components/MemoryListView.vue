@@ -259,6 +259,7 @@
 import { ref, computed } from 'vue'
 import { Icon } from '@iconify/vue'
 import type { UserMemory } from '@/services/api/userMemoriesApi'
+import { useDateFormat } from '@/composables/useDateFormat'
 
 interface Props {
   memories: UserMemory[]
@@ -274,6 +275,8 @@ interface Emits {
 
 const props = defineProps<Props>()
 const emit = defineEmits<Emits>()
+
+const { formatDateTime } = useDateFormat()
 
 const searchQuery = ref('')
 const filterValue = ref('') // Format: 'category:xyz' or 'key:xyz'
@@ -374,12 +377,7 @@ function bulkDelete() {
 }
 
 function formatTimestamp(timestamp: number) {
-  const date = new Date(timestamp * 1000)
-  return (
-    date.toLocaleDateString() +
-    ' ' +
-    date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-  )
+  return formatDateTime(new Date(timestamp * 1000))
 }
 
 const categoryColors: Record<string, string> = {

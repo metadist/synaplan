@@ -40,8 +40,15 @@ final readonly class TokenService
 
     /**
      * Generate Access Token (short-lived, signed).
+     *
+     * The optional `$impersonatorId` argument embeds an `impersonator_id`
+     * claim into the token payload, signalling that this access token was
+     * minted as part of an admin impersonation session. The claim is the
+     * single source of truth for the impersonation banner and for the
+     * `/auth/refresh` impersonation-aware path — we never persist a separate
+     * refresh token for the impersonated user, so this stays the only marker.
      */
-    public function generateAccessToken(User $user): string
+    public function generateAccessToken(User $user, ?int $impersonatorId = null): string
     {
         $payload = [
             'user_id' => $user->getId(),
@@ -52,6 +59,10 @@ final readonly class TokenService
             'iat' => time(),
             'type' => self::TYPE_ACCESS,
         ];
+
+        if (null !== $impersonatorId) {
+            $payload['impersonator_id'] = $impersonatorId;
+        }
 
         return $this->encodeToken($payload);
     }
@@ -100,6 +111,36 @@ final readonly class TokenService
         }
 
         // Check type
+        if (!isset($payload['type']) || self::TYPE_ACCESS !== $payload['type']) {
+            return null;
+        }
+
+        return $payload;
+    }
+
+    /**
+     * Decode and HMAC-verify an access token WITHOUT checking expiry.
+     *
+     * Returns the payload if the signature is intact and the token is of
+     * type `access`; null otherwise.
+     *
+     * RESTRICTED USE: only the impersonation lifecycle is allowed to call
+     * this. It is needed to (a) read the `impersonator_id` claim for the UI
+     * banner after the access token has aged past its 5-minute TTL and (b)
+     * recover the impersonation target during `/auth/refresh` precisely
+     * because the access token is expired at that point. Authorising any
+     * mutation off this method's return value is a bug — always combine it
+     * with a fresh check against the DB-backed refresh token (which is the
+     * actual authority for whether the session is still alive).
+     */
+    public function decodeAccessTokenIgnoringExpiry(string $token): ?array
+    {
+        $payload = $this->decodeToken($token);
+
+        if (!$payload) {
+            return null;
+        }
+
         if (!isset($payload['type']) || self::TYPE_ACCESS !== $payload['type']) {
             return null;
         }

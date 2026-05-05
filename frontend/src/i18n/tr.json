@@ -152,6 +152,24 @@
       "levelUpdated": "Kullanıcı seviyesi {level} olarak güncellendi",
       "levelUpdateFailed": "Kullanıcı seviyesi güncellenemedi"
     },
+    "impersonate": {
+      "button": "Kullanıcı olarak görüntüle",
+      "buttonTitle": "Bu kullanıcı olarak oturum aç",
+      "confirmTitle": "{email} olarak oturum açılsın mı?",
+      "confirmMessage": "{email} olarak oturum açacaksın. Yapılan tüm eylemler ve değişiklikler bu hesaba atfedilecektir. Bittiğinde üstteki bandı kullanarak çıkabilirsin.",
+      "confirmAction": "Oturumu başlat",
+      "started": "Uygulamayı şimdi {email} olarak görüntülüyorsun.",
+      "startFailed": "Kimliğe bürünme başlatılamadı",
+      "cannotImpersonateSelf": "Kendi kimliğine bürünemezsin.",
+      "banner": {
+        "viewing": "{email} olarak görüntüleniyor",
+        "adminLabel": "Yönetici oturumu: {email}",
+        "exitButton": "Çık",
+        "exitButtonTitle": "Yönetici oturumunu geri yükle"
+      },
+      "stopped": "Yönetici oturumu geri yüklendi.",
+      "stopFailed": "Kimliğe bürünme sonlandırılamadı"
+    },
     "prompts": {
       "shortDesc": "Kısa Açıklama",
       "prompt": "Prompt",
@@ -332,7 +350,52 @@
     "noContent": "Bu sayfa için yardım içeriği mevcut değil"
   },
   "summary": {
-    "title": "Özet Yapılandırması",
+    "title": "AI Özeti",
+    "generate": "Oluştur",
+    "generateFirst": "İlk özeti oluştur",
+    "generateSuccess": "Analiz başarıyla tamamlandı",
+    "generateAI": "AI analizi oluştur",
+    "regenerate": "Analizi yeniden oluştur",
+    "aiAnalyzing": "AI konuşmaları analiz ediyor...",
+    "noSummary": "Analiz mevcut değil",
+    "selectDateOrChats": "Analiz etmek için bir dönem veya belirli sohbetler seçin",
+    "history": "Geçmiş",
+    "savedSummaries": "Kayıtlı analizler",
+    "newAnalysis": "Yeni analiz",
+    "analyzingSelected": "{count} seçili sohbet analiz ediliyor",
+    "from": "Başlangıç",
+    "to": "Bitiş",
+    "yesterday": "Dün",
+    "sessions": "Oturumlar",
+    "messages": "Mesajlar",
+    "visitorMessages": "Ziyaretçi mesajları",
+    "aiModel": "AI Modeli",
+    "sentiment": "Duygu Analizi",
+    "positive": "Pozitif",
+    "negative": "Negatif",
+    "executiveSummary": "Yönetici özeti",
+    "mainTopics": "Ana konular",
+    "frequentQuestions": "Sık sorulan sorular",
+    "issues": "Tespit edilen sorunlar",
+    "recommendations": "Öneriler",
+    "promptSuggestions": "Prompt iyileştirme önerileri",
+    "editPrompt": "Promptu düzenle",
+    "addInfo": "Ekle",
+    "improveInfo": "İyileştir",
+    "neutral": "Nötr",
+    "negativeMessages": "Negatif mesajlar",
+    "neutralMessages": "Nötr mesajlar",
+    "visitor": "Ziyaretçi",
+    "response": "Yanıt",
+    "noSentimentMessages": "Bu kategoride mesaj yok",
+    "teamRequired": "Team planı gerekli",
+    "teamRequiredDescription": "AI destekli konuşma özetleri ve içgörüleri Team ve Business planlarında kullanılabilir. Bu özelliği açmak için yükseltin.",
+    "upgrade": "Planı yükselt",
+    "modelNotConfigured": "AI modeli yapılandırılmamış. Lütfen Ayarlar → AI Promptları → Özet Promptu altından bir model seçin.",
+    "generateError": "Analiz oluşturulamadı",
+    "existingFound": "Mevcut analiz bulundu",
+    "existingFoundInfo": "Bu tam dönem için zaten bir analiz mevcut. Daha önce oluşturulan özeti görüntülüyorsunuz.",
+    "regenerateAnyway": "Yine de yeniden oluştur",
     "description": "Bu, gönderilen metni özetlemek için yapılandırılmış AI modeli için bir prompt oluşturur.",
     "summaryType": "Özet Türü:",
     "summaryTypeHelp": "Oluşturulacak özet türü",
@@ -459,6 +522,8 @@
     "minutesAgo": "{count} dakika önce",
     "hoursAgo": "{count} saat önce",
     "daysAgo": "{count} gün önce",
+    "today": "Bugün",
+    "yesterday": "Dün",
     "previous": "Önceki",
     "error": "Hata",
     "success": "Başarılı",
@@ -572,6 +637,7 @@
     "fileUploadFailed": "Dosya yükleme başarısız. Lütfen tekrar deneyin.",
     "fileUploadDefaultMessage": "Lütfen ekli dosyayı inceleyin.",
     "sendFailed": "Üzgünüz, bir hatayla karşılaştık. Lütfen tekrar deneyin.",
+    "continueFailed": "Yanıt sürdürülemedi. Lütfen tekrar deneyin.",
     "defaultAssistantReply": "Mesajınız için teşekkürler! Hemen size döneceğim.",
     "previewWidget": "Widget Önizlemesi",
     "configuration": "Widget Yapılandırması",
@@ -725,6 +791,23 @@
       "robot": "Robot",
       "message": "Mesaj",
       "support": "Destek"
+    },
+    "setupChat": {
+      "title": "AI Kurulum Asistanı",
+      "subtitle": "Widget'ınızı birlikte yapılandıralım",
+      "progressLabel": "Görüşme ilerlemesi",
+      "inputPlaceholder": "Cevabınızı yazın...",
+      "skipButton": "Şimdilik atla",
+      "completeTitle": "Kurulum Tamamlandı!",
+      "completeDescription": "Özel asistan yapılandırmanız oluşturuldu. Kaydetmek için aşağıya tıklayın.",
+      "saveButton": "Yapılandırmayı Kaydet",
+      "saveSuccess": "Widget yapılandırması başarıyla kaydedildi!",
+      "saveError": "Yapılandırma kaydedilemedi",
+      "sendError": "Mesaj gönderilemedi",
+      "startError": "Görüşme başlatılamadı",
+      "modelNotConfigured": "AI modeli yapılandırılmamış. Lütfen Ayarlar → AI Promptları → AI Kurulum Görüşmesi altından bir model seçin.",
+      "editHintTitle": "Asistanınızı ince ayar yapmak ister misiniz?",
+      "editHintDescription": "Kaydettikten sonra, AI asistan yapılandırmasını gelişmiş ayarlarda 'AI Asistanı' sekmesinden istediğiniz zaman düzenleyebilirsiniz."
     }
   },
   "profile": {
@@ -821,14 +904,28 @@
     "description": "Beklenmeyen bir hatayla karşılaştık. Endişelenmeyin, ekibimiz bilgilendirildi ve üzerinde çalışıyor.",
     "details": "Hata Detayları",
     "statusCode": "Durum Kodu",
+    "source": "Kaynak",
+    "reason": "Sebep",
     "showStack": "Yığın izini göster",
     "hideStack": "Yığın izini gizle",
     "reload": "Sayfayı Yenile",
+    "retry": "Tekrar Dene",
     "goHome": "Ana Sayfaya Git",
     "needHelp": "Yardıma mı İhtiyacınız Var?",
     "contactSupport": "Bu sorun devam ederse, lütfen aşağıdaki hata detaylarıyla destek ekibimizle iletişime geçin.",
     "copyError": "Hata Bilgisini Kopyala",
-    "copied": "Kopyalandı!"
+    "copied": "Kopyalandı!",
+    "adminOnly": "Yalnızca yönetici",
+    "reasons": {
+      "redirectLoop": {
+        "title": "Yönlendirme Döngüsü Tespit Edildi",
+        "description": "Aynı sayfa arka arkaya birkaç kez istendiği için sizi yönlendiremedik. Lütfen tekrar deneyin veya bu sitenin çerezlerini temizleyin."
+      },
+      "authTimeout": {
+        "title": "Oturum Açma Çok Uzun Sürüyor",
+        "description": "Sunucuyla oturum doğrulaması zaman aşımına uğradı. Lütfen internet bağlantınızı kontrol edip tekrar deneyin."
+      }
+    }
   },
   "loading": {
     "default": "Yükleniyor...",
@@ -876,7 +973,8 @@
     "fileGenerated": "Sizin için '{filename}' dosyasını oluşturdum. Şimdi indirebilirsiniz.",
     "fileGenerationFailed": "Dosya oluşturulurken bir sorun oluştu. Lütfen tekrar deneyin.",
     "cancelledByUser": "⚠️ Kullanıcı tarafından iptal edildi",
-    "truncated": "Bu yanıt, model token sınırına ulaştığı için kesildi. Daha odaklı bir soru sormayı veya yanıtı parçalar halinde istemeyi deneyin."
+    "truncated": "Bu yanıt, model token sınırına ulaştığı için kesildi.",
+    "continueButton": "Yanıtı sürdür"
   },
   "subscription": {
     "serviceNotAvailable": "Hizmet Kullanılamıyor",
@@ -1019,6 +1117,10 @@
       "light": "Açık",
       "dark": "Koyu",
       "system": "Sistem"
+    },
+    "language": {
+      "title": "Dil",
+      "description": "Arayüz dilini seçin"
     },
     "account": {
       "title": "Hesap",
@@ -1359,11 +1461,23 @@
       "subscription": "Abonelik",
       "userLevel": "Kullanıcı Seviyesi",
       "phoneVerified": "Telefon Doğrulandı",
-      "subscriptionActive": "Durum",
+      "subscriptionStatusLabel": "Plan durumu",
+      "subscriptionStatus": {
+        "active": "Aktif",
+        "free": "Ücretsiz plan",
+        "past_due": "Vadesi geçmiş",
+        "cancelled": "İptal edildi",
+        "anonymous": "Anonim",
+        "inactive": "Pasif"
+      },
       "totalRequests": "Toplam İstek",
+      "totalRequestsShort": "toplam",
+      "totalMessages": "Sohbet mesajı",
+      "totalMessagesTooltip": "Yalnızca BACTION=MESSAGES satırları — plan limitini (ör. 50/50) fiilen sınırlayan sayaç budur.",
       "usageByType": "Türe Göre Kullanım",
       "bySource": "Kaynağa Göre",
       "byTime": "Zaman Dilimine Göre",
+      "byTimeDescription": "Takvim aralığındaki tüm kullanım olayları (mesajlar, embedding'ler, sınıflandırma, bellek çıkarımı, …). Plan limiti sayacının zaman penceresi veya kapsamı ile aynı değildir.",
       "recentActivity": "Son Aktivite",
       "lifetime": "ömür boyu",
       "remaining": "Kalan",

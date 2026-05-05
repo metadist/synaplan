@@ -280,7 +280,7 @@
                   }"
                 >
                   <!-- eslint-disable-next-line vue/no-v-html -- widget message markdown/linkify -->
-                  <div v-html="renderMessageContent(message.content)"></div>
+                  <div v-html="renderMessageContent(message.content, message.role)"></div>
                 </div>
               </template>
               <div v-else-if="message.type === 'file'" class="space-y-2">
@@ -335,7 +335,7 @@
                   }"
                 >
                   <!-- eslint-disable-next-line vue/no-v-html -- widget file message markdown -->
-                  <div v-html="renderMessageContent(message.content)"></div>
+                  <div v-html="renderMessageContent(message.content, message.role)"></div>
                 </div>
               </div>
               <p
@@ -641,6 +641,7 @@ import {
   WidgetUnavailableError,
 } from '@/services/api/widgetsApi'
 import { useI18n } from 'vue-i18n'
+import { useDateFormat } from '@/composables/useDateFormat'
 import { parseAIResponse } from '@/utils/responseParser'
 import { getMarkdownRenderer } from '@/composables/useMarkdown'
 import { subscribeToSession, type EventSubscription, type WidgetEvent } from '@/services/sseClient'
@@ -669,6 +670,7 @@ interface Props {
   allowFullscreen?: boolean
   externalUserId?: string
   privacyPolicyUrl?: string
+  sessionMode?: 'browser' | 'user'
   testMode?: boolean
   internalMode?: boolean
 }
@@ -693,6 +695,7 @@ const props = withDefaults(defineProps<Props>(), {
   allowFullscreen: false,
   externalUserId: undefined,
   privacyPolicyUrl: undefined,
+  sessionMode: 'browser',
   testMode: false,
   internalMode: false,
 })
@@ -805,6 +808,7 @@ let operatorTypingTimer: ReturnType<typeof setTimeout> | null = null
 
 const isMobile = ref(false)
 const { t } = useI18n()
+const { formatTime, formatDateTime } = useDateFormat()
 
 const allowFileUploads = computed(
   () => !!props.allowFileUpload && (!props.isPreview || props.testMode || props.internalMode)
@@ -856,7 +860,7 @@ const isEmbeddedMode = computed(() => props.testMode || props.internalMode)
 
 const chatWindowClasses = computed(() => {
   if (isMobile.value && !props.isPreview && !isEmbeddedMode.value) {
-    return ['fixed inset-0 rounded-none w-screen h-screen']
+    return ['fixed inset-0 rounded-none w-screen h-dvh']
   }
   if (isEmbeddedMode.value) {
     return ['rounded-2xl w-full h-full']
@@ -871,7 +875,7 @@ const chatWindowStyle = computed(() => {
   if (isMobile.value && !props.isPreview && !isEmbeddedMode.value) {
     return {
       width: '100vw',
-      height: '100vh',
+      height: '100dvh',
     }
   }
 
@@ -885,13 +889,13 @@ const chatWindowStyle = computed(() => {
   if (isFullscreen.value) {
     return {
       width: 'min(95vw, 1100px)',
-      height: 'min(92vh, 900px)',
+      height: 'min(92dvh, 900px)',
     }
   }
 
   return {
     width: props.isPreview ? 'min(100%, 380px)' : 'min(90vw, 420px)',
-    height: props.isPreview ? 'min(80vh, 520px)' : 'min(80vh, 640px)',
+    height: props.isPreview ? 'min(80dvh, 520px)' : 'min(80dvh, 640px)',
   }
 })
 
@@ -980,15 +984,8 @@ const toggleFullscreen = () => {
   isFullscreen.value = !isFullscreen.value
 }
 
-// Format a date for the export
 const formatExportDate = (date: Date): string => {
-  return date.toLocaleString(undefined, {
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-  })
+  return formatDateTime(date)
 }
 
 // Escape HTML special characters
@@ -1645,10 +1642,6 @@ const scrollToBottom = async () => {
   }
 }
 
-const formatTime = (date: Date): string => {
-  return date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })
-}
-
 const getSenderLabel = (message: Message): string => {
   switch (message.sender) {
     case 'user':
@@ -1711,8 +1704,17 @@ const downloadFileById = async (fileId: number | undefined, filename: string | u
   }
 }
 
-const getSessionStorageKey = () => `synaplan_widget_session_${props.widgetId}`
+const isUserSessionMode = computed(() => props.sessionMode === 'user' && !!props.externalUserId)
+
+const getSessionStorageKey = () => {
+  if (isUserSessionMode.value) {
+    return `synaplan_widget_session_${props.widgetId}_${props.externalUserId}`
+  }
+  return `synaplan_widget_session_${props.widgetId}`
+}
+
 const getChatStorageKeyForSession = (id: string) => `synaplan_widget_chatid_${props.widgetId}_${id}`
+
 const createSessionId = () => `sess_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`
 
 const handleOpenEvent = (event: Event) => {
@@ -1754,6 +1756,9 @@ const normalizeServerMessage = (rawUnknown: unknown): Message => {
   }
 
   const role = raw.direction === 'IN' ? 'user' : 'assistant'
+  if (role === 'assistant') {
+    content = stripThinkingBlocks(content)
+  }
   const timestampSeconds = typeof raw.timestamp === 'number' ? raw.timestamp : Date.now() / 1000
 
   const rawFiles = raw.files
@@ -1952,10 +1957,19 @@ async function handleMessagesClick(event: MouseEvent): Promise<void> {
   }
 }
 
-// Render message content with enhanced code blocks
-const renderMessageContent = (value: string): string => {
+const stripThinkingBlocks = (text: string): string => {
+  let result = text.replace(/<think>[\s\S]*?<\/think>/g, '')
+  result = result.replace(/<think>[\s\S]*$/, '')
+  return result.trim()
+}
+
+const renderMessageContent = (value: string, role: 'user' | 'assistant' = 'assistant'): string => {
   if (!value) {
     return ''
+  }
+
+  if (role === 'assistant') {
+    value = stripThinkingBlocks(value)
   }
 
   // Parse code blocks and render with copy button
@@ -2012,6 +2026,10 @@ onMounted(() => {
     window.addEventListener('resize', updateIsMobile)
     window.addEventListener('orientationchange', updateIsMobile)
     window.addEventListener('beforeunload', handleBeforeUnload)
+    // visualViewport fires when mobile browser chrome shows/hides
+    if (window.visualViewport) {
+      window.visualViewport.addEventListener('resize', updateIsMobile)
+    }
   }
 
   window.addEventListener('synaplan-widget-open', handleOpenEvent)
@@ -2021,6 +2039,31 @@ onMounted(() => {
   // In test/internal mode, create a temporary session without localStorage persistence
   if (isTestEnvironment.value) {
     sessionId.value = createSessionId()
+
+    if (props.internalMode) {
+      // Eagerly create the internal session server-side BEFORE notifying parent
+      // panels. Without this round-trip, dependent panels (e.g. custom fields)
+      // would persist against a session id the API cannot resolve yet (404 /
+      // "Custom fields can only be set on internal sessions"). On init failure
+      // we deliberately suppress the emit — the late emit in sendMessage()
+      // will re-attempt once the first message creates the session row.
+      void (async () => {
+        try {
+          const { initInternalSession } = await import('@/services/api/widgetSessionsApi')
+          await initInternalSession(props.widgetId, sessionId.value)
+          if (!sessionCreatedEmitted.value) {
+            sessionCreatedEmitted.value = true
+            emit('session-created', sessionId.value)
+          }
+        } catch (err) {
+          console.warn('[ChatWidget] internal session init failed', err)
+        }
+      })()
+    } else if (!sessionCreatedEmitted.value) {
+      sessionCreatedEmitted.value = true
+      emit('session-created', sessionId.value)
+    }
+
     loadConversationHistory()
     return
   }
@@ -2056,6 +2099,9 @@ onBeforeUnmount(() => {
     window.removeEventListener('resize', updateIsMobile)
     window.removeEventListener('orientationchange', updateIsMobile)
     window.removeEventListener('beforeunload', handleBeforeUnload)
+    if (window.visualViewport) {
+      window.visualViewport.removeEventListener('resize', updateIsMobile)
+    }
   }
 
   window.removeEventListener('synaplan-widget-open', handleOpenEvent)

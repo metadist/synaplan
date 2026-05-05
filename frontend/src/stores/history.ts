@@ -68,6 +68,7 @@ export interface Message {
   timestamp: Date
   isSuperseded?: boolean
   isStreaming?: boolean
+  truncated?: boolean
   provider?: string
   modelLabel?: string
   topic?: string // Topic from message classification (e.g., 'general', 'mediamaker')
@@ -162,7 +163,7 @@ interface ApiLoadedMessageRow {
  * Parse content to extract thinking blocks, code blocks, and regular text.
  * This ensures consistent rendering between streaming and loaded messages.
  */
-function parseContentWithThinking(
+export function parseContentWithThinking(
   content: string,
   role: 'user' | 'assistant' = 'assistant'
 ): Part[] {

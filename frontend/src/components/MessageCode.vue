@@ -45,7 +45,7 @@
     </div>
     <pre class="p-4 overflow-x-auto text-sm scroll-thin">
       <!-- eslint-disable-next-line vue/no-v-html -- trusted HTML from syntax highlighter -->
-      <code ref="codeRef" class="hljs font-mono" v-html="highlightedCode"></code>
+      <code class="hljs font-mono" v-html="highlightedCode"></code>
     </pre>
   </div>
 </template>
@@ -63,7 +63,6 @@ interface Props {
 const props = defineProps<Props>()
 
 const copied = ref(false)
-const codeRef = ref<HTMLElement | null>(null)
 const hljsReady = ref(false)
 
 // Load highlight.js and trigger re-render when ready

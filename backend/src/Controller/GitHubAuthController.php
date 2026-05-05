@@ -4,6 +4,8 @@ namespace App\Controller;
 
 use App\Entity\User;
 use App\Repository\UserRepository;
+use App\Service\ImpersonationService;
+use App\Service\Message\SynapseAutoIndexService;
 use App\Service\OAuthStateService;
 use App\Service\TokenService;
 use Doctrine\ORM\EntityManagerInterface;
@@ -13,7 +15,7 @@ use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\RedirectResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
-use Symfony\Component\Routing\Annotation\Route;
+use Symfony\Component\Routing\Attribute\Route;
 use Symfony\Contracts\HttpClient\HttpClientInterface;
 
 #[Route('/api/v1/auth/github')]
@@ -30,6 +32,8 @@ class GitHubAuthController extends AbstractController
         private EntityManagerInterface $em,
         private TokenService $tokenService,
         private OAuthStateService $oauthStateService,
+        private ImpersonationService $impersonationService,
+        private SynapseAutoIndexService $synapseAutoIndex,
         private LoggerInterface $logger,
         private string $githubClientId,
         private string $githubClientSecret,
@@ -177,6 +181,9 @@ class GitHubAuthController extends AbstractController
             $accessToken = $this->tokenService->generateAccessToken($user);
             $refreshToken = $this->tokenService->generateRefreshToken($user, $request->getClientIp());
 
+            // Best-effort: refresh Synapse Routing topics for this user.
+            $this->synapseAutoIndex->scheduleForUser($user);
+
             // Create redirect response with cookies
             $callbackUrl = $this->frontendUrl.'/auth/callback?'.http_build_query([
                 'success' => 'true',
@@ -185,8 +192,13 @@ class GitHubAuthController extends AbstractController
 
             $response = new RedirectResponse($callbackUrl);
 
-            // Add auth cookies
+            // Set fresh auth cookies and defensively wipe any orphan
+            // impersonation stash that survived from a prior session on this
+            // browser. Same rationale as in GoogleAuthController and the
+            // regular login path: a leftover stash must never let the new
+            // signed-in user resurrect a previous admin's session.
             $this->tokenService->addAuthCookies($response, $accessToken, $refreshToken);
+            $this->impersonationService->attachClearStashCookies($response);
 
             $this->logger->info('GitHub OAuth successful, redirecting with cookies', [
                 'user_id' => $user->getId(),
@@ -237,14 +249,18 @@ class GitHubAuthController extends AbstractController
         }
 
         if ($user) {
-            // User exists - verify they registered with GitHub
-            if ('github' !== $user->getProviderId()) {
-                throw new \Exception(sprintf('This email is already registered using %s. Please use the same login method.', $user->getAuthProviderName()));
+            if ($user->isManagedExternally()) {
+                $this->logger->warning('GitHub OAuth blocked for Keycloak-managed user', [
+                    'user_id' => $user->getId(),
+                    'email' => $email,
+                ]);
+                throw new \Exception('GitHub OAuth not allowed for organization-managed account');
             }
 
-            $this->logger->info('Existing GitHub user logging in', [
+            $this->logger->info('Existing user logging in via GitHub', [
                 'user_id' => $user->getId(),
                 'email' => $email,
+                'original_provider' => $user->getProviderId(),
             ]);
         } else {
             // Create new user

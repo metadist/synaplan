@@ -423,7 +423,7 @@ if (!$apiKey->hasScope($requiredScope) && !$apiKey->hasScope('outlook:*')) {
 
 The Outlook add-in could generate many requests depending on usage patterns (e.g., relationship summary may summarize multiple emails). Consider:
 
-- Per-endpoint rate limits in `RateLimiterService`
+- Per-endpoint rate limits in `RateLimitService` (BCONFIG-backed, see `RateLimitConfigSeeder`)
 - Add `outlook_summarize` and `outlook_translate` as rate limit scopes
 - Configurable limits based on user tier/subscription
 
@@ -643,7 +643,7 @@ Add-in HTML/JS/CSS must be hosted on HTTPS. Options:
 |-----------|-----------|
 | `ApiKeyAuthenticator` | Existing auth - extend with outlook scopes |
 | `AiFacade` | Use for summarization and translation |
-| `RateLimiterService` | Add outlook-specific rate limits |
+| `RateLimitService` | Add outlook-specific rate limits (BCONFIG `RATELIMITS_*` rows) |
 | CORS configuration | Update for Office domains |
 | OpenAPI/Swagger | Document new endpoints |
 

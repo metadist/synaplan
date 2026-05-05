@@ -53,6 +53,35 @@
             </div>
           </div>
 
+          <!-- Language -->
+          <div class="surface-card p-6" data-testid="section-language-settings">
+            <h2 class="text-lg font-semibold txt-primary mb-2">
+              {{ $t('settings.language.title') }}
+            </h2>
+            <p class="txt-secondary text-sm mb-4">
+              {{ $t('settings.language.description') }}
+            </p>
+
+            <div class="grid grid-cols-2 sm:grid-cols-4 gap-3" data-testid="grid-language-options">
+              <button
+                v-for="lang in languages"
+                :key="lang.value"
+                :class="[
+                  'p-4 rounded-lg border-2 transition-all flex flex-col items-center gap-2',
+                  selectedLanguage === lang.value
+                    ? 'border-[var(--brand)] bg-[var(--brand-alpha-light)]'
+                    : 'border-light-border/30 dark:border-dark-border/20 hover-surface',
+                ]"
+                :data-testid="`btn-language-${lang.value}`"
+                :data-language="lang.value"
+                @click="selectLanguage(lang.value)"
+              >
+                <span class="text-2xl" aria-hidden="true">{{ lang.flag }}</span>
+                <span class="text-sm font-medium txt-primary">{{ lang.label }}</span>
+              </button>
+            </div>
+          </div>
+
           <!-- Theme Settings -->
           <div class="surface-card p-6" data-testid="section-theme-settings">
             <h2 class="text-lg font-semibold txt-primary mb-2">{{ $t('settings.theme.title') }}</h2>
@@ -130,8 +159,14 @@
             </div>
           </div>
 
-          <!-- Logout -->
-          <div class="surface-card p-6" data-testid="section-logout">
+          <!--
+            Logout is intentionally hidden while impersonating: clicking it
+            would clear the admin's session entirely (cookies + stash)
+            instead of just ending the impersonation, which is almost never
+            what the operator means. The "Exit" button on the floating
+            impersonation pill is the correct action here.
+          -->
+          <div v-if="!isImpersonating" class="surface-card p-6" data-testid="section-logout">
             <button
               class="btn-primary px-6 py-2.5 rounded-lg w-full"
               data-testid="btn-logout"
@@ -147,7 +182,10 @@
 </template>
 
 <script setup lang="ts">
+import { computed } from 'vue'
 import { useRouter } from 'vue-router'
+import { useI18n } from 'vue-i18n'
+import { useAuth } from '@/composables/useAuth'
 import { useAuthStore } from '@/stores/auth'
 import { useAppModeStore } from '@/stores/appMode'
 import { useTheme } from '@/composables/useTheme'
@@ -158,6 +196,27 @@ const router = useRouter()
 const authStore = useAuthStore()
 const appModeStore = useAppModeStore()
 const { theme, setTheme } = useTheme()
+const { isImpersonating } = useAuth()
+const { locale } = useI18n()
+
+const languages = [
+  { value: 'de', label: 'Deutsch', flag: '🇩🇪' },
+  { value: 'en', label: 'English', flag: '🇬🇧' },
+  { value: 'es', label: 'Español', flag: '🇪🇸' },
+  { value: 'tr', label: 'Türkçe', flag: '🇹🇷' },
+]
+
+const selectedLanguage = computed({
+  get: () => locale.value,
+  set: (value: string) => {
+    locale.value = value
+    localStorage.setItem('language', value)
+  },
+})
+
+const selectLanguage = (value: string) => {
+  selectedLanguage.value = value
+}
 
 const handleLogout = async () => {
   await authStore.logout()

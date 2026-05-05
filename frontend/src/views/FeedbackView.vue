@@ -397,12 +397,14 @@
 import { ref, computed, onMounted, watch, nextTick } from 'vue'
 import { useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
+import { useDateFormat } from '@/composables/useDateFormat'
 import { Icon } from '@iconify/vue'
 import MainLayout from '@/components/MainLayout.vue'
 import { useFeedbackStore } from '@/stores/userFeedback'
 import type { Feedback } from '@/services/api/userFeedbackApi'
 
 const { t } = useI18n()
+const { formatDateTime } = useDateFormat()
 const route = useRoute()
 const feedbackStore = useFeedbackStore()
 
@@ -532,17 +534,9 @@ watch(
   { immediate: true }
 )
 
-// ── Helpers ────────────────────────────────────────────
 function formatDate(timestamp: number): string {
   if (!timestamp) return ''
-  const date = new Date(timestamp * 1000)
-  return date.toLocaleDateString(undefined, {
-    year: 'numeric',
-    month: 'short',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  })
+  return formatDateTime(new Date(timestamp * 1000))
 }
 
 function highlightSearch(text: string): string {

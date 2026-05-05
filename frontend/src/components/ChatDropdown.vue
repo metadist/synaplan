@@ -150,6 +150,7 @@
 import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
 import { useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
+import { useDateFormat } from '@/composables/useDateFormat'
 import {
   ChatBubbleLeftRightIcon,
   ChevronDownIcon,
@@ -174,6 +175,7 @@ const router = useRouter()
 const chatsStore = useChatsStore()
 const dialog = useDialog()
 const { t } = useI18n()
+const { formatRelativeTime } = useDateFormat()
 
 const isOpen = ref(false)
 const openMenuChatId = ref<number | null>(null)
@@ -224,24 +226,8 @@ const isActive = computed(() => route.path === '/')
 // Active chat ID
 const activeChat = computed(() => chatsStore.activeChatId)
 
-// Format a date as relative or compact timestamp
 const formatTimestamp = (dateStr: string): string => {
-  const date = new Date(dateStr)
-  const now = new Date()
-  const diffMs = now.getTime() - date.getTime()
-  const diffMins = Math.floor(diffMs / 60000)
-  const diffHours = Math.floor(diffMs / 3600000)
-  const diffDays = Math.floor(diffMs / 86400000)
-
-  if (diffMins < 1) return 'just now'
-  if (diffMins < 60) return `${diffMins}m ago`
-  if (diffHours < 24) return `${diffHours}h ago`
-  if (diffDays < 7) return `${diffDays}d ago`
-
-  // Fallback to compact date
-  const month = String(date.getMonth() + 1).padStart(2, '0')
-  const day = String(date.getDate()).padStart(2, '0')
-  return `${month}/${day}`
+  return formatRelativeTime(new Date(dateStr))
 }
 
 const getDisplayTitle = (chat: {

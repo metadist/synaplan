@@ -71,8 +71,49 @@ watch(
   }
 )
 
+/**
+ * Best-effort persist any pending edits immediately when the panel unmounts
+ * (e.g. operator closes the internal-chat overlay before the debounce fires).
+ * The request is fired via fetch with `keepalive` so it can survive the
+ * surrounding teardown / page unload, but it remains asynchronous —
+ * `navigator.sendBeacon` cannot be used here because it only emits POST
+ * requests and the custom fields endpoint is PUT.
+ *
+ * `dirty` is only cleared after the response confirms a 2xx status so we
+ * never silently swallow a 404/400 (e.g. session not yet promoted to
+ * internal mode, or backend rejecting the payload).
+ */
+const persistDirtyOnUnload = (): void => {
+  if (!dirty.value) return
+  if (!props.sessionId) return
+  if (!props.widgetId) return
+
+  const url = `/api/v1/widgets/${encodeURIComponent(props.widgetId)}/sessions/${encodeURIComponent(props.sessionId)}/custom-fields`
+  const body = JSON.stringify({ values: values.value })
+
+  fetch(url, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body,
+    credentials: 'include',
+    keepalive: true,
+  })
+    .then((response) => {
+      if (response.ok) {
+        dirty.value = false
+      }
+    })
+    .catch(() => {
+      // Best-effort — nothing actionable after the component is gone.
+    })
+}
+
 onUnmounted(() => {
-  if (saveTimer) clearTimeout(saveTimer)
+  if (saveTimer) {
+    clearTimeout(saveTimer)
+    saveTimer = null
+  }
+  persistDirtyOnUnload()
 })
 </script>
 

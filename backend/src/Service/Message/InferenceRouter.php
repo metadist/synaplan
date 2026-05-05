@@ -7,7 +7,7 @@ use App\Service\Message\Handler\ChatHandler;
 use App\Service\Message\Handler\CodeGenerationHandler;
 use App\Service\Message\Handler\MediaGenerationHandler;
 use Psr\Log\LoggerInterface;
-use Symfony\Component\DependencyInjection\Attribute\TaggedIterator;
+use Symfony\Component\DependencyInjection\Attribute\AutowireIterator;
 
 /**
  * Router for Message Processing based on Intent/BTAG.
@@ -24,7 +24,7 @@ final class InferenceRouter
     private array $handlers = [];
 
     public function __construct(
-        #[TaggedIterator('app.message.handler')]
+        #[AutowireIterator('app.message.handler')]
         iterable $handlers,
         private LoggerInterface $logger,
     ) {

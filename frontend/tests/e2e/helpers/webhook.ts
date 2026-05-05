@@ -5,6 +5,14 @@ import { getApiUrl } from '../config/config'
 
 const WEBHOOK_SECRET = 'whsec_fakeWebhookSecretForTests'
 const PRICE_PRO = 'price_1TestSuitePro'
+const PRICE_TEAM = 'price_1TestSuiteTeam'
+const PRICE_BUSINESS = 'price_1TestSuiteBusiness'
+
+export const TEST_PRICE_IDS = {
+  PRO: PRICE_PRO,
+  TEAM: PRICE_TEAM,
+  BUSINESS: PRICE_BUSINESS,
+} as const
 
 function signPayload(payload: string, secret: string): string {
   const timestamp = Math.floor(Date.now() / 1000)
@@ -64,11 +72,12 @@ interface SubscriptionWebhookData {
 
 export async function sendCheckoutCompletedWebhook(
   request: APIRequestContext,
-  opts: SubscriptionWebhookData
+  opts: SubscriptionWebhookData & { eventId?: string }
 ): Promise<WebhookResult> {
   return sendStripeWebhook({
     request,
     eventType: 'checkout.session.completed',
+    eventId: opts.eventId,
     data: {
       id: `cs_${randomUUID()}`,
       object: 'checkout.session',
@@ -84,25 +93,26 @@ export async function sendCheckoutCompletedWebhook(
 
 export async function sendSubscriptionCreatedWebhook(
   request: APIRequestContext,
-  opts: SubscriptionWebhookData
+  opts: SubscriptionWebhookData & { eventId?: string }
 ): Promise<WebhookResult> {
   const now = Math.floor(Date.now() / 1000)
   return sendStripeWebhook({
     request,
     eventType: 'customer.subscription.created',
+    eventId: opts.eventId,
     data: {
       id: opts.subscriptionId,
       object: 'subscription',
       customer: opts.customerId,
       status: opts.status ?? 'active',
-      current_period_start: now,
-      current_period_end: now + 30 * 24 * 3600,
       items: {
         data: [
           {
             price: {
               id: opts.priceId ?? PRICE_PRO,
             },
+            current_period_start: now,
+            current_period_end: now + 30 * 24 * 3600,
           },
         ],
       },
@@ -112,13 +122,104 @@ export async function sendSubscriptionCreatedWebhook(
   })
 }
 
+interface SubscriptionUpdatedOptions {
+  customerId: string
+  subscriptionId: string
+  userId: string
+  priceId?: string
+  status?: string
+  cancelAtPeriodEnd?: boolean
+  /** Unix seconds; only meaningful when cancelAtPeriodEnd is true */
+  cancelAt?: number
+  eventId?: string
+}
+
+export async function sendSubscriptionUpdatedWebhook(
+  request: APIRequestContext,
+  opts: SubscriptionUpdatedOptions
+): Promise<WebhookResult> {
+  const now = Math.floor(Date.now() / 1000)
+  const cancelAtPeriodEnd = opts.cancelAtPeriodEnd ?? false
+  const cancelAt = cancelAtPeriodEnd ? (opts.cancelAt ?? now + 30 * 24 * 3600) : null
+
+  return sendStripeWebhook({
+    request,
+    eventType: 'customer.subscription.updated',
+    eventId: opts.eventId,
+    data: {
+      id: opts.subscriptionId,
+      object: 'subscription',
+      customer: opts.customerId,
+      status: opts.status ?? 'active',
+      items: {
+        data: [
+          {
+            price: {
+              id: opts.priceId ?? PRICE_PRO,
+            },
+            current_period_start: now,
+            current_period_end: now + 30 * 24 * 3600,
+          },
+        ],
+      },
+      cancel_at_period_end: cancelAtPeriodEnd,
+      cancel_at: cancelAt,
+      metadata: { user_id: opts.userId },
+    },
+  })
+}
+
+export async function sendSubscriptionDeletedWebhook(
+  request: APIRequestContext,
+  opts: {
+    customerId: string
+    subscriptionId: string
+    userId: string
+    eventId?: string
+  }
+): Promise<WebhookResult> {
+  const now = Math.floor(Date.now() / 1000)
+  return sendStripeWebhook({
+    request,
+    eventType: 'customer.subscription.deleted',
+    eventId: opts.eventId,
+    data: {
+      id: opts.subscriptionId,
+      object: 'subscription',
+      customer: opts.customerId,
+      status: 'canceled',
+      canceled_at: now,
+      ended_at: now,
+      items: {
+        data: [
+          {
+            price: { id: PRICE_PRO },
+            current_period_start: now - 30 * 24 * 3600,
+            current_period_end: now,
+          },
+        ],
+      },
+      cancel_at_period_end: false,
+      metadata: { user_id: opts.userId },
+    },
+  })
+}
+
+/**
+ * Send invoice.payment_failed for a customer.
+ *
+ * Currently no E2E test consumes this — the user-facing paymentFailed UI is
+ * tracked as a separate issue ("Subscription UI shows no warning when payment
+ * fails"). Helper kept here so the future E2E test can use it directly.
+ */
 export async function sendPaymentFailedWebhook(
   request: APIRequestContext,
-  opts: { customerId: string }
+  opts: { customerId: string; eventId?: string }
 ): Promise<WebhookResult> {
   return sendStripeWebhook({
     request,
     eventType: 'invoice.payment_failed',
+    eventId: opts.eventId,
     data: {
       id: `in_${randomUUID()}`,
       object: 'invoice',

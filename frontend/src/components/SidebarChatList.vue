@@ -84,6 +84,7 @@
 import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
+import { useDateFormat } from '@/composables/useDateFormat'
 import { ChevronRightIcon, PuzzlePieceIcon } from '@heroicons/vue/24/outline'
 import SidebarChatListItem from './SidebarChatListItem.vue'
 import ChatShareModal from './ChatShareModal.vue'
@@ -93,6 +94,7 @@ import { useNotification } from '@/composables/useNotification'
 import type { Chat } from '@/mocks/chats'
 
 const { t } = useI18n()
+const { formatRelativeTime } = useDateFormat()
 const chatsStore = useChatsStore()
 const router = useRouter()
 const dialog = useDialog()
@@ -103,17 +105,9 @@ const sections = ref({
   widgetArchived: false,
 })
 
-// Helper to format dates
 const formatDate = (value: string | number): string => {
   const date = typeof value === 'number' ? new Date(value * 1000) : new Date(value)
-  const now = new Date()
-  const diffInSeconds = Math.floor((now.getTime() - date.getTime()) / 1000)
-
-  if (diffInSeconds < 60) return 'Just now'
-  if (diffInSeconds < 3600) return `${Math.floor(diffInSeconds / 60)}m ago`
-  if (diffInSeconds < 86400) return `${Math.floor(diffInSeconds / 3600)}h ago`
-  if (diffInSeconds < 604800) return `${Math.floor(diffInSeconds / 86400)}d ago`
-  return date.toLocaleDateString()
+  return formatRelativeTime(date)
 }
 
 // Generate default widget title from session info

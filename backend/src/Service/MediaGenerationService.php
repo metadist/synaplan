@@ -23,6 +23,24 @@ final readonly class MediaGenerationService implements MediaGenerationServiceInt
     private const DEFAULT_IMAGE_SIZE = '1024x1024';
     private const DEFAULT_VIDEO_DURATION = 8;
     private const DEFAULT_VIDEO_ASPECT_RATIO = '16:9';
+    /**
+     * Fallback resolution when neither caller nor model JSON specifies one.
+     *
+     * 1080p is the product-wide default: it matches what most users expect
+     * when they say "make a video" without naming a resolution, and on Veo
+     * 3.1 Standard it is priced identically to 720p ($0.40/sec) so the
+     * default carries no extra cost for that flagship tier.
+     */
+    private const DEFAULT_VIDEO_RESOLUTION_FALLBACK = '1080p';
+
+    /**
+     * Globally supported video resolutions. Mirrors the public OpenAPI enum on
+     * /api/v1/media/generate and /api/v1/media/video/start. Used as the
+     * fallback validation set when a model does not declare its own
+     * `allowed_resolutions`, so we never forward arbitrary caller input
+     * (e.g. "8K") to a provider.
+     */
+    private const SUPPORTED_VIDEO_RESOLUTIONS = ['720p', '1080p', '4K'];
     private const VIDEO_JOB_TTL_SECONDS = 1200;
 
     public function __construct(
@@ -40,7 +58,7 @@ final readonly class MediaGenerationService implements MediaGenerationServiceInt
     /**
      * Generate media (image or video) from a text prompt.
      *
-     * @return array{success: true, file: array{url: string, type: string, mimeType: string}, provider: string, model: string}
+     * @return array{success: true, file: array{url: string, type: string, mimeType: string}, provider: string, model: string, resolution?: string}
      *
      * @throws \InvalidArgumentException  on bad input
      * @throws RateLimitExceededException when user exceeds quota
@@ -48,7 +66,7 @@ final readonly class MediaGenerationService implements MediaGenerationServiceInt
      * @throws ProviderException          on AI provider failure
      * @throws \RuntimeException          on storage failure
      */
-    public function generate(User $user, string $prompt, string $type, ?int $modelId = null): array
+    public function generate(User $user, string $prompt, string $type, ?int $modelId = null, ?string $resolution = null): array
     {
         $this->validateInput($prompt, $type);
         $this->checkRateLimit($user, $type);
@@ -59,15 +77,22 @@ final readonly class MediaGenerationService implements MediaGenerationServiceInt
         $modelConfig = $resolved['modelConfig'];
         $resolvedModelId = $resolved['modelId'];
 
+        if ('video' === $type) {
+            $resolution = $this->normalizeResolution($resolution, $modelConfig);
+        } else {
+            $resolution = null;
+        }
+
         $this->logger->info('Media generation request', [
             'user_id' => $user->getId(),
             'type' => $type,
             'provider' => $provider,
             'model' => $modelName,
             'prompt_length' => strlen($prompt),
+            'resolution' => $resolution,
         ]);
 
-        $result = $this->callProvider($prompt, $type, $user, $provider, $modelName, $modelConfig);
+        $result = $this->callProvider($prompt, $type, $user, $provider, $modelName, $modelConfig, $resolution);
         $mediaUrl = $this->extractMediaUrl($result, $type);
 
         if (null === $mediaUrl) {
@@ -82,9 +107,13 @@ final readonly class MediaGenerationService implements MediaGenerationServiceInt
 
         $mimeType = $this->guessMimeType($localPath, $type);
 
-        $this->recordUsage($user, $type, $provider, $modelName, $resolvedModelId);
+        $usedResolution = 'video' === $type
+            ? ($this->extractResolutionFromResult($result) ?? $resolution)
+            : null;
 
-        return [
+        $this->recordUsage($user, $type, $provider, $modelName, $resolvedModelId, null, $usedResolution);
+
+        $response = [
             'success' => true,
             'file' => [
                 'url' => '/api/v1/files/uploads/'.$localPath,
@@ -94,6 +123,12 @@ final readonly class MediaGenerationService implements MediaGenerationServiceInt
             'provider' => $result['provider'] ?? $provider ?? 'unknown',
             'model' => $result['model'] ?? $modelName ?? 'unknown',
         ];
+
+        if (null !== $usedResolution) {
+            $response['resolution'] = $usedResolution;
+        }
+
+        return $response;
     }
 
     public function generateFromImages(User $user, string $prompt, array $imagePaths, ?int $modelId = null): array
@@ -172,7 +207,7 @@ final readonly class MediaGenerationService implements MediaGenerationServiceInt
         ];
     }
 
-    public function startVideoGeneration(User $user, string $prompt, ?int $modelId = null): array
+    public function startVideoGeneration(User $user, string $prompt, ?int $modelId = null, ?string $resolution = null): array
     {
         if ('' === trim($prompt)) {
             throw new \InvalidArgumentException('Prompt is required');
@@ -183,19 +218,25 @@ final readonly class MediaGenerationService implements MediaGenerationServiceInt
         $resolved = $this->resolveModel($user, 'video', $modelId);
         $provider = $resolved['provider'];
         $modelName = $resolved['modelName'];
+        $modelConfig = $resolved['modelConfig'];
         $resolvedModelId = $resolved['modelId'];
+
+        $effectiveResolution = $this->normalizeResolution($resolution, $modelConfig);
 
         $this->logger->info('Starting async video generation', [
             'user_id' => $user->getId(),
             'provider' => $provider,
             'model' => $modelName,
+            'resolution' => $effectiveResolution,
         ]);
 
         $operationData = $this->aiFacade->startVideoGeneration($prompt, $user->getId(), [
             'provider' => $provider,
             'model' => $modelName,
+            'modelConfig' => $modelConfig,
             'duration' => self::DEFAULT_VIDEO_DURATION,
             'aspect_ratio' => self::DEFAULT_VIDEO_ASPECT_RATIO,
+            'resolution' => $effectiveResolution,
         ]);
 
         $jobId = bin2hex(random_bytes(16));
@@ -207,6 +248,7 @@ final readonly class MediaGenerationService implements MediaGenerationServiceInt
             'provider' => $operationData['provider'],
             'model' => $operationData['model'],
             'duration' => $operationData['duration'],
+            'resolution' => $operationData['resolution'],
             'userId' => $user->getId(),
             'prompt' => $prompt,
             'startedAt' => time(),
@@ -220,6 +262,7 @@ final readonly class MediaGenerationService implements MediaGenerationServiceInt
             'status' => 'processing',
             'provider' => $operationData['provider'],
             'model' => $operationData['model'],
+            'resolution' => $operationData['resolution'],
         ];
     }
 
@@ -318,7 +361,15 @@ final readonly class MediaGenerationService implements MediaGenerationServiceInt
             throw new \RuntimeException('Failed to save generated video to disk');
         }
 
-        $this->recordUsage($user, 'video', $jobData['provider'], $jobData['model'], $jobData['modelId'] ?? null, (float) ($jobData['duration'] ?? self::DEFAULT_VIDEO_DURATION));
+        $this->recordUsage(
+            $user,
+            'video',
+            $jobData['provider'],
+            $jobData['model'],
+            $jobData['modelId'] ?? null,
+            (float) ($jobData['duration'] ?? self::DEFAULT_VIDEO_DURATION),
+            isset($jobData['resolution']) && is_string($jobData['resolution']) ? $jobData['resolution'] : null,
+        );
         $completedResult = $this->buildCompletedVideoJobResult($jobData['provider'], $jobData['model'], $localPath, $elapsed);
         $jobData['status'] = 'completed';
         $jobData['result'] = $completedResult;
@@ -389,13 +440,16 @@ final readonly class MediaGenerationService implements MediaGenerationServiceInt
         ?string $provider,
         ?string $modelName,
         array $modelConfig,
+        ?string $resolution = null,
     ): array {
         if ('video' === $type) {
             return $this->aiFacade->generateVideo($prompt, $user->getId(), [
                 'provider' => $provider,
                 'model' => $modelName,
+                'modelConfig' => $modelConfig,
                 'duration' => self::DEFAULT_VIDEO_DURATION,
                 'aspect_ratio' => self::DEFAULT_VIDEO_ASPECT_RATIO,
+                'resolution' => $resolution,
             ]);
         }
 
@@ -407,6 +461,74 @@ final readonly class MediaGenerationService implements MediaGenerationServiceInt
             'style' => 'vivid',
             'size' => self::DEFAULT_IMAGE_SIZE,
         ]);
+    }
+
+    /**
+     * Validate a caller-supplied resolution and fall back to the model's
+     * default (or the global fallback) when invalid/missing.
+     *
+     * Validation enum:
+     *   - When the model declares `allowed_resolutions`, that list is authoritative.
+     *   - Otherwise the global SUPPORTED_VIDEO_RESOLUTIONS set is used so that
+     *     arbitrary values (e.g. "8K") are never forwarded to providers.
+     *
+     * @param array<string, mixed> $modelConfig
+     */
+    private function normalizeResolution(?string $requested, array $modelConfig): string
+    {
+        $allowed = is_array($modelConfig['allowed_resolutions'] ?? null)
+            ? array_values(array_filter($modelConfig['allowed_resolutions'], 'is_string'))
+            : [];
+
+        $effectiveAllowed = [] !== $allowed ? $allowed : self::SUPPORTED_VIDEO_RESOLUTIONS;
+
+        if (null !== $requested && '' !== $requested && !in_array($requested, $effectiveAllowed, true)) {
+            $this->logger->warning('Requested video resolution not allowed, falling back', [
+                'requested' => $requested,
+                'allowed' => $effectiveAllowed,
+                'model_specific' => [] !== $allowed,
+            ]);
+            $requested = null;
+        }
+
+        if (null !== $requested && '' !== $requested) {
+            return $requested;
+        }
+
+        $default = $modelConfig['default_resolution'] ?? null;
+        if (is_string($default) && '' !== $default && in_array($default, $effectiveAllowed, true)) {
+            return $default;
+        }
+
+        return [] !== $allowed ? $allowed[0] : self::DEFAULT_VIDEO_RESOLUTION_FALLBACK;
+    }
+
+    /**
+     * Pull the effective resolution out of a video provider result.
+     *
+     * AiFacade::generateVideo() exposes the resolution at the top level, but some
+     * provider payloads also nest it inside the first videos[] item. The first
+     * videos[] entry can also legitimately be a plain URL string (see
+     * extractMediaUrl), so we must guard before indexing it.
+     *
+     * @param array<string, mixed> $result
+     */
+    private function extractResolutionFromResult(array $result): ?string
+    {
+        $top = $result['resolution'] ?? null;
+        if (\is_string($top) && '' !== $top) {
+            return $top;
+        }
+
+        $first = $result['videos'][0] ?? null;
+        if (\is_array($first)) {
+            $nested = $first['resolution'] ?? null;
+            if (\is_string($nested) && '' !== $nested) {
+                return $nested;
+            }
+        }
+
+        return null;
     }
 
     private function extractMediaUrl(array $result, string $type): ?string
@@ -600,12 +722,27 @@ final readonly class MediaGenerationService implements MediaGenerationServiceInt
         };
     }
 
-    private function recordUsage(User $user, string $type, ?string $provider, ?string $modelName, ?int $modelId = null, ?float $durationSeconds = null): void
-    {
+    private function recordUsage(
+        User $user,
+        string $type,
+        ?string $provider,
+        ?string $modelName,
+        ?int $modelId = null,
+        ?float $durationSeconds = null,
+        ?string $resolution = null,
+    ): void {
         $action = 'image' === $type ? 'IMAGES' : 'VIDEOS';
-        $mediaUsage = 'image' === $type
-            ? ['images' => 1.0]
-            : ['duration_seconds' => $durationSeconds ?? (float) self::DEFAULT_VIDEO_DURATION];
+
+        if ('image' === $type) {
+            $mediaUsage = ['images' => 1.0];
+        } else {
+            $mediaUsage = [
+                'duration_seconds' => $durationSeconds ?? (float) self::DEFAULT_VIDEO_DURATION,
+            ];
+            if (null !== $resolution && '' !== $resolution) {
+                $mediaUsage['resolution'] = $resolution;
+            }
+        }
 
         $this->rateLimitService->recordUsage($user, $action, [
             'provider' => $provider ?? 'unknown',

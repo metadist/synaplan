@@ -171,8 +171,8 @@ FRONTEND_URL=http://localhost/synaplan/frontend
 # -----------------------------------------------------------------------------
 # Database (REQUIRED)
 # -----------------------------------------------------------------------------
-DATABASE_WRITE_URL=mysql://synaplan:password@127.0.0.1:3306/synaplan?serverVersion=11.8&charset=utf8mb4
-DATABASE_READ_URL=mysql://synaplan:password@127.0.0.1:3306/synaplan?serverVersion=11.8&charset=utf8mb4
+DATABASE_WRITE_URL=mysql://synaplan:password@127.0.0.1:3306/synaplan?serverVersion=mariadb-12.2.2&charset=utf8mb4
+DATABASE_READ_URL=mysql://synaplan:password@127.0.0.1:3306/synaplan?serverVersion=mariadb-12.2.2&charset=utf8mb4
 
 # -----------------------------------------------------------------------------
 # AI Services (REQUIRED - at minimum set OLLAMA_BASE_URL)

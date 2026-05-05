@@ -1,4 +1,4 @@
-.PHONY: help lint format phpstan phpstan-baseline audit deps migrate fixtures schema-update schema-diff console cache-clear shell test
+.PHONY: help lint format phpstan phpstan-baseline audit deps migrate migrate-status migrate-diff migrate-generate seed seed-models seed-prompts seed-defaults seed-ratelimits fixtures schema-update schema-diff console cache-clear shell test
 
 help: ## Show this help
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-20s\033[0m %s\n", $$1, $$2}'
@@ -23,17 +23,46 @@ audit: ## Run security audit
 deps: ## Install composer dependencies
 	docker compose -f ../docker-compose.yml exec -T backend composer install
 
-## Database
-migrate: ## Run migrations
-	docker compose -f ../docker-compose.yml exec -T backend php bin/console doctrine:migrations:migrate --no-interaction
+## Database — Migrations (preferred)
+migrate: ## Apply pending Doctrine migrations
+	docker compose -f ../docker-compose.yml exec -T backend php bin/console doctrine:migrations:migrate --no-interaction --allow-no-migration
 
-fixtures: ## Load fixtures (users get IDs 1,2,3)
+migrate-status: ## Show migration status
+	docker compose -f ../docker-compose.yml exec -T backend php bin/console doctrine:migrations:status
+
+migrate-diff: ## Generate a new migration from ORM ↔ DB diff
+	docker compose -f ../docker-compose.yml exec -T backend php bin/console doctrine:migrations:diff --no-interaction
+
+migrate-generate: ## Create an empty migration skeleton
+	docker compose -f ../docker-compose.yml exec -T backend php bin/console doctrine:migrations:generate
+
+## Database — Seeding (idempotent, prod-safe)
+seed: ## Run all idempotent seeders (models, prompts, defaults, rate-limits, demo)
+	docker compose -f ../docker-compose.yml exec -T backend php bin/console app:seed --no-interaction
+
+seed-models: ## Seed AI model catalog (BMODELS)
+	docker compose -f ../docker-compose.yml exec -T backend php bin/console app:model:seed --no-interaction
+
+seed-prompts: ## Seed system prompts (BPROMPTS)
+	docker compose -f ../docker-compose.yml exec -T backend php bin/console app:prompt:seed --no-interaction
+
+seed-defaults: ## Seed DEFAULTMODEL config (BCONFIG)
+	docker compose -f ../docker-compose.yml exec -T backend php bin/console app:config:seed-defaults --no-interaction
+
+seed-ratelimits: ## Seed rate-limit config (BCONFIG)
+	docker compose -f ../docker-compose.yml exec -T backend php bin/console app:ratelimit:seed-defaults --no-interaction
+
+## Database — Demo data
+fixtures: ## Load demo user fixtures (PURGES entity tables — dev/test only)
 	docker compose -f ../docker-compose.yml exec -T backend php bin/console doctrine:fixtures:load --purge-with-truncate --no-interaction
 
-schema-update: ## Update database schema (dev only!)
+## Database — Emergency only (do NOT use in production)
+schema-update: ## ⚠️  Emergency dev-only: force schema sync. Prefer 'make migrate-diff && make migrate'.
+	@echo "⚠️  schema-update bypasses migrations and can corrupt prod state."
+	@echo "   Generate a migration instead: make migrate-diff && make migrate"
 	docker compose -f ../docker-compose.yml exec -T backend php bin/console doctrine:schema:update --force
 
-schema-diff: ## Show schema differences
+schema-diff: ## Show schema differences (debugging only — for migrations use migrate-diff)
 	docker compose -f ../docker-compose.yml exec -T backend php bin/console doctrine:schema:update --dump-sql
 
 ## Symfony Console

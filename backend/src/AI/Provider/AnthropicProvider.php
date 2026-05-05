@@ -25,8 +25,6 @@ class AnthropicProvider implements ChatProviderInterface, VisionProviderInterfac
     private const BASE_URL = 'https://api.anthropic.com/v1';
     private const DEFAULT_MAX_TOKENS = 4096;
 
-    // Extended Thinking models (Claude 3.5 Sonnet and later with thinking support)
-    // Note: Extended thinking is a feature that may require specific API access
     private const THINKING_MODELS = [
         'claude-3-5-sonnet',
         'claude-3-5-sonnet-20241022',
@@ -38,6 +36,28 @@ class AnthropicProvider implements ChatProviderInterface, VisionProviderInterfac
         'claude-opus-4-1-20250805',
         'claude-opus-4-5',
         'claude-opus-4-5-20251101',
+        'claude-opus-4-6',
+        'claude-opus-4-7',
+        'claude-sonnet-4-6',
+        'claude-haiku-4-5',
+    ];
+
+    /** Models that require adaptive thinking format instead of manual budget_tokens. */
+    private const ADAPTIVE_THINKING_MODELS = [
+        'claude-opus-4-6',
+        'claude-opus-4-7',
+        'claude-sonnet-4-6',
+    ];
+
+    /**
+     * Models that no longer accept the `temperature` parameter.
+     *
+     * Anthropic removed `temperature` for Opus 4.7+ — sampling is now driven
+     * by `output_config.effort` and (for thinking) the adaptive thinking
+     * budget. Sending temperature returns HTTP 400 invalid_request_error.
+     */
+    private const TEMPERATURE_DEPRECATED_MODELS = [
+        'claude-opus-4-7',
     ];
 
     public function __construct(
@@ -140,32 +160,30 @@ class AnthropicProvider implements ChatProviderInterface, VisionProviderInterfac
                 }
             }
 
+            $conversationMessages = $this->mergeConsecutiveRoles($conversationMessages);
+
+            $thinkingEnabled = $reasoning && $this->supportsThinking($model);
+
             $requestBody = [
                 'model' => $model,
                 'max_tokens' => $options['max_tokens'] ?? self::DEFAULT_MAX_TOKENS,
                 'messages' => $conversationMessages,
             ];
 
-            // Add system message if present
             if ($systemMessage) {
                 $requestBody['system'] = $systemMessage;
             }
 
-            // Add temperature if specified
-            if (isset($options['temperature'])) {
+            if ($this->shouldSendTemperature($model, $thinkingEnabled, $options)) {
                 $requestBody['temperature'] = $options['temperature'];
             }
 
-            // Enable extended thinking if requested and model supports it
-            if ($reasoning && $this->supportsThinking($model)) {
-                $requestBody['thinking'] = [
-                    'type' => 'enabled',
-                    'budget_tokens' => 5000, // Configurable thinking budget
-                ];
+            if ($thinkingEnabled) {
+                $requestBody['thinking'] = $this->buildThinkingConfig($model);
 
-                $this->logger->info('🧠 Anthropic: Extended Thinking enabled', [
+                $this->logger->info('Anthropic: Extended Thinking enabled', [
                     'model' => $model,
-                    'budget_tokens' => 5000,
+                    'thinking' => $requestBody['thinking'],
                 ]);
             }
 
@@ -173,7 +191,7 @@ class AnthropicProvider implements ChatProviderInterface, VisionProviderInterfac
                 'model' => $model,
                 'message_count' => count($conversationMessages),
                 'has_system' => null !== $systemMessage,
-                'thinking' => $reasoning && $this->supportsThinking($model),
+                'thinking' => $thinkingEnabled,
             ]);
 
             $response = $this->httpClient->request('POST', self::BASE_URL.'/messages', [
@@ -222,12 +240,29 @@ class AnthropicProvider implements ChatProviderInterface, VisionProviderInterfac
                 'usage' => $usage,
             ];
         } catch (\Exception $e) {
+            $errorMessage = $e->getMessage();
+
+            if (method_exists($e, 'getResponse')) {
+                try {
+                    $errorBody = $e->getResponse()->toArray(false);
+                    if (isset($errorBody['error'])) {
+                        $errorMessage = sprintf(
+                            'Anthropic API Error: %s (type: %s)',
+                            $errorBody['error']['message'] ?? 'Unknown error',
+                            $errorBody['error']['type'] ?? 'unknown'
+                        );
+                    }
+                } catch (\Exception) {
+                    // Response body unavailable
+                }
+            }
+
             $this->logger->error('Anthropic chat error', [
-                'error' => $e->getMessage(),
+                'error' => $errorMessage,
                 'model' => $options['model'] ?? 'unknown',
             ]);
 
-            throw new ProviderException('Anthropic chat error: '.$e->getMessage(), 'anthropic');
+            throw new ProviderException($errorMessage, 'anthropic');
         }
     }
 
@@ -260,6 +295,10 @@ class AnthropicProvider implements ChatProviderInterface, VisionProviderInterfac
                 }
             }
 
+            $conversationMessages = $this->mergeConsecutiveRoles($conversationMessages);
+
+            $thinkingEnabled = $reasoning && $this->supportsThinking($model);
+
             $requestBody = [
                 'model' => $model,
                 'max_tokens' => $options['max_tokens'] ?? self::DEFAULT_MAX_TOKENS,
@@ -267,39 +306,28 @@ class AnthropicProvider implements ChatProviderInterface, VisionProviderInterfac
                 'stream' => true,
             ];
 
-            // Add system message if present
             if ($systemMessage) {
                 $requestBody['system'] = $systemMessage;
             }
 
-            // Add temperature if specified
-            if (isset($options['temperature'])) {
+            if ($this->shouldSendTemperature($model, $thinkingEnabled, $options)) {
                 $requestBody['temperature'] = $options['temperature'];
             }
 
-            // Enable extended thinking if requested and model supports it
-            if ($reasoning && $this->supportsThinking($model)) {
-                $requestBody['thinking'] = [
-                    'type' => 'enabled',
-                    'budget_tokens' => 5000,
-                ];
+            if ($thinkingEnabled) {
+                $requestBody['thinking'] = $this->buildThinkingConfig($model);
 
-                $this->logger->info('🧠 Anthropic: Extended Thinking enabled for streaming', [
+                $this->logger->info('Anthropic: Extended Thinking enabled for streaming', [
                     'model' => $model,
-                    'budget_tokens' => 5000,
+                    'thinking' => $requestBody['thinking'],
                 ]);
             }
 
-            $this->logger->info('🔵 Anthropic: Starting streaming chat', [
+            $this->logger->info('Anthropic: Starting streaming chat', [
                 'model' => $model,
                 'message_count' => count($conversationMessages),
                 'has_system' => null !== $systemMessage,
-                'thinking' => $reasoning && $this->supportsThinking($model),
-            ]);
-
-            // Debug: Log request body
-            $this->logger->info('🔍 Anthropic: Request body', [
-                'request' => $requestBody,
+                'thinking' => $thinkingEnabled,
             ]);
 
             $response = $this->httpClient->request('POST', self::BASE_URL.'/messages', [
@@ -320,26 +348,40 @@ class AnthropicProvider implements ChatProviderInterface, VisionProviderInterfac
         } catch (\Exception $e) {
             $errorMessage = $e->getMessage();
 
-            // Try to extract Anthropic error details
+            // Extract Anthropic error details from the response body.
+            // For streaming requests (buffer: false), toArray() may fail,
+            // so also try getContent(false) and manual JSON decoding.
             if (method_exists($e, 'getResponse')) {
                 try {
-                    $response = $e->getResponse();
-                    $errorData = $response->toArray(false);
+                    $errorResponse = $e->getResponse();
+                    $errorBody = null;
 
-                    if (isset($errorData['error'])) {
-                        $anthropicError = $errorData['error'];
+                    try {
+                        $errorBody = $errorResponse->toArray(false);
+                    } catch (\Exception) {
+                        try {
+                            $rawBody = $errorResponse->getContent(false);
+                            $errorBody = json_decode($rawBody, true);
+                        } catch (\Exception) {
+                            // Response body unavailable
+                        }
+                    }
+
+                    if (isset($errorBody['error'])) {
+                        $anthropicError = $errorBody['error'];
                         $errorMessage = sprintf(
                             'Anthropic API Error: %s (type: %s)',
                             $anthropicError['message'] ?? 'Unknown error',
                             $anthropicError['type'] ?? 'unknown'
                         );
 
-                        $this->logger->error('🔴 Anthropic API Error Details', [
+                        $this->logger->error('Anthropic API Error Details', [
                             'error' => $anthropicError,
+                            'model' => $options['model'] ?? 'unknown',
                         ]);
                     }
-                } catch (\Exception $parseError) {
-                    // Ignore parse errors
+                } catch (\Exception) {
+                    // Exhausted all extraction attempts
                 }
             }
 
@@ -494,9 +536,6 @@ class AnthropicProvider implements ChatProviderInterface, VisionProviderInterfac
         ];
     }
 
-    /**
-     * Check if model supports extended thinking.
-     */
     private function supportsThinking(string $model): bool
     {
         foreach (self::THINKING_MODELS as $thinkingModel) {
@@ -506,6 +545,95 @@ class AnthropicProvider implements ChatProviderInterface, VisionProviderInterfac
         }
 
         return false;
+    }
+
+    /**
+     * Returns true when the model still accepts the `temperature` parameter.
+     *
+     * Anthropic dropped temperature in Opus 4.7. Sending it produces an
+     * `invalid_request_error`, so we silently strip it for those models.
+     */
+    private function isTemperatureSupported(string $model): bool
+    {
+        foreach (self::TEMPERATURE_DEPRECATED_MODELS as $deprecatedModel) {
+            if (str_starts_with($model, $deprecatedModel)) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    /**
+     * Decide whether to attach `temperature` to the Anthropic request body.
+     *
+     * Anthropic forbids `temperature` in two cases:
+     *  - extended thinking is enabled, or
+     *  - the model itself has deprecated the parameter (Opus 4.7+).
+     */
+    private function shouldSendTemperature(string $model, bool $thinkingEnabled, array $options): bool
+    {
+        if (!isset($options['temperature'])) {
+            return false;
+        }
+
+        if ($thinkingEnabled) {
+            return false;
+        }
+
+        if (!$this->isTemperatureSupported($model)) {
+            $this->logger->debug('Anthropic: dropping temperature for model that no longer accepts it', [
+                'model' => $model,
+            ]);
+
+            return false;
+        }
+
+        return true;
+    }
+
+    /**
+     * Build the thinking configuration for the request.
+     * Newer models (4.6+) use adaptive format; older models use manual budget.
+     */
+    private function buildThinkingConfig(string $model): array
+    {
+        foreach (self::ADAPTIVE_THINKING_MODELS as $adaptiveModel) {
+            if (str_starts_with($model, $adaptiveModel)) {
+                return ['type' => 'adaptive'];
+            }
+        }
+
+        return ['type' => 'enabled', 'budget_tokens' => 5000];
+    }
+
+    /**
+     * Merge consecutive messages with the same role.
+     * Anthropic requires strictly alternating user/assistant turns.
+     */
+    private function mergeConsecutiveRoles(array $messages): array
+    {
+        if (count($messages) < 2) {
+            return $messages;
+        }
+
+        $merged = [$messages[0]];
+
+        for ($i = 1, $count = count($messages); $i < $count; ++$i) {
+            $last = &$merged[count($merged) - 1];
+
+            if ($messages[$i]['role'] === $last['role']) {
+                $prevContent = is_string($last['content']) ? $last['content'] : json_encode($last['content']);
+                $curContent = is_string($messages[$i]['content']) ? $messages[$i]['content'] : json_encode($messages[$i]['content']);
+                $last['content'] = $prevContent."\n\n".$curContent;
+            } else {
+                $merged[] = $messages[$i];
+            }
+
+            unset($last);
+        }
+
+        return $merged;
     }
 
     /**

@@ -37,19 +37,30 @@ export class ChatHelper {
     return (await answerBody.innerText()).trim().toLowerCase()
   }
 
+  /**
+   * App-mode selection moved from the header into Settings. We persist it
+   * directly via localStorage and reload — fastest, race-free, and matches
+   * exactly what the appMode store reads on init.
+   */
   async ensureAdvancedMode(): Promise<void> {
-    const modeToggle = this.page.locator(selectors.header.modeToggle)
-    await modeToggle.waitFor({ state: 'visible' })
-    const modeLabel = (await modeToggle.innerText()).toLowerCase()
-    if (modeLabel.includes('easy')) {
-      await modeToggle.click()
-      await expect(modeToggle).toContainText(/advanced/i)
-    }
+    await this.page.evaluate(() => localStorage.setItem('app_mode', 'advanced'))
+    await this.page.reload()
+    await this.page
+      .locator(selectors.nav.sidebarV2Settings)
+      .waitFor({ state: 'visible', timeout: TIMEOUTS.STANDARD })
   }
 
   /**
    * Start a new chat. Supports V2 (sidebar plus button) and V1 (chat toggle + dropdown).
-   * Waits for the new chat input to be visible, empty, and enabled.
+   *
+   * Waits for the new chat to be fully committed by asserting the empty-state
+   * marker (`state-empty`) is visible. This is required to avoid a race with
+   * `historyStore.loadMessages()` which is triggered asynchronously by the
+   * `activeChatId` watcher in ChatView: if we sample `conversationBubbles().count()`
+   * before that async call replaces `messages.value = []`, the count picks up
+   * DOM residue from the previously active chat, and any later bubbles added
+   * optimistically by `sendMessage` get wiped by the delayed replacement —
+   * leaving `waitForAnswer(previousCount)` stuck on a non-existent `nth(N)` bubble.
    */
   async startNewChat(): Promise<void> {
     const v2NewChatBtn = this.page.locator(selectors.nav.sidebarV2NewChat)
@@ -67,6 +78,10 @@ export class ChatHelper {
     await textInput.waitFor({ state: 'visible', timeout: TIMEOUTS.STANDARD })
     await expect(textInput).toHaveValue('', { timeout: TIMEOUTS.SHORT })
     await expect(textInput).toBeEnabled()
+
+    await this.page
+      .locator(selectors.chat.stateEmpty)
+      .waitFor({ state: 'visible', timeout: TIMEOUTS.STANDARD })
   }
 
   async attachFile(file: { name: string; mimeType: string; buffer: Buffer }): Promise<void> {

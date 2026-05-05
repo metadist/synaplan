@@ -95,9 +95,9 @@
       </p>
       <router-link
         to="/config/api-documentation"
-        class="btn-primary inline-flex items-center gap-2"
+        class="btn-primary px-6 py-3 rounded-lg font-medium inline-flex items-center gap-2"
       >
-        <BookOpenIcon class="w-4 h-4" />
+        <CommandLineIcon class="w-4 h-4" />
         {{ $t('config.apiKeys.docsTitle') }}
       </router-link>
     </div>
@@ -377,7 +377,7 @@ import {
   KeyIcon,
   ClipboardDocumentIcon,
   CheckIcon,
-  BookOpenIcon,
+  CommandLineIcon,
 } from '@heroicons/vue/24/outline'
 import {
   listApiKeys,
@@ -388,10 +388,12 @@ import {
 import { useDialog } from '@/composables/useDialog'
 import { useNotification } from '@/composables/useNotification'
 import { useI18n } from 'vue-i18n'
+import { useDateFormat } from '@/composables/useDateFormat'
 
 const dialog = useDialog()
 const { success, error: showError } = useNotification()
 const { t } = useI18n()
+const { formatDateTime } = useDateFormat()
 
 interface UIApiKey {
   id: number
@@ -588,14 +590,7 @@ const deleteAPIKey = async (keyId: number) => {
 }
 
 const formatDate = (timestamp: number): string => {
-  const date = new Date(timestamp * 1000) // Convert Unix timestamp to milliseconds
-  return new Intl.DateTimeFormat('en-US', {
-    year: 'numeric',
-    month: 'short',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  }).format(date)
+  return formatDateTime(new Date(timestamp * 1000))
 }
 
 onMounted(() => {

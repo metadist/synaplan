@@ -7,6 +7,8 @@ namespace App\Service;
 use App\AI\Service\AiFacade;
 use App\DTO\UserMemoryDTO;
 use App\Entity\User;
+use App\Service\Embedding\EmbeddingMetadataService;
+use App\Service\Exception\MemoryServiceUnavailableException;
 use App\Service\VectorSearch\QdrantClientInterface;
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;
@@ -34,6 +36,7 @@ final readonly class UserMemoryService
         private AiFacade $aiFacade,
         private ModelConfigService $modelConfigService,
         private RateLimitService $rateLimitService,
+        private EmbeddingMetadataService $embeddingMetadata,
         private LoggerInterface $logger,
     ) {
     }
@@ -45,6 +48,30 @@ final readonly class UserMemoryService
     public function isAvailable(): bool
     {
         return $this->qdrantClient->isAvailable();
+    }
+
+    /**
+     * Ensure Qdrant is available before performing a write-like operation.
+     *
+     * Read paths intentionally soft-fail (return empty/null) so message
+     * processing can continue without memory context. Write paths call this
+     * helper so a storage outage cannot silently masquerade as success.
+     *
+     * @param array<string, mixed> $logContext Extra fields for the warning log entry
+     *
+     * @throws MemoryServiceUnavailableException
+     */
+    private function assertAvailable(string $operation, array $logContext = []): void
+    {
+        if ($this->qdrantClient->isAvailable()) {
+            return;
+        }
+
+        $this->logger->warning('Memory service unavailable - {operation} rejected', [
+            'operation' => $operation,
+        ] + $logContext);
+
+        throw new MemoryServiceUnavailableException(sprintf('Cannot %s: memory service (Qdrant) is not reachable.', $operation));
     }
 
     /**
@@ -68,6 +95,12 @@ final readonly class UserMemoryService
         ?int $messageId = null,
         ?string $namespace = null,
     ): UserMemoryDTO {
+        $this->assertAvailable('create memory', [
+            'user_id' => $user->getId(),
+            'category' => $category,
+            'key' => $key,
+        ]);
+
         // Validate
         if (mb_strlen($key) < 3) {
             throw new \InvalidArgumentException('Memory key must be at least 3 characters');
@@ -102,8 +135,21 @@ final readonly class UserMemoryService
             messageId: $messageId,
         );
 
-        // Store in Qdrant
-        $pointId = $this->storeInQdrant($dto, $user, $memoryId, $namespace);
+        try {
+            $pointId = $this->storeInQdrant($dto, $user, $memoryId, $namespace);
+        } catch (\RuntimeException $e) {
+            // Qdrant network/HTTP failure after the availability check passed
+            // (e.g. health check cached as OK but Qdrant went down since).
+            // Treat as a 503 so the user sees "temporarily unavailable" instead
+            // of a generic 500 or a misleading 400.
+            $this->logger->error('Failed to store memory in Qdrant', [
+                'memory_id' => $memoryId,
+                'user_id' => $user->getId(),
+                'error' => $e->getMessage(),
+            ]);
+
+            throw new MemoryServiceUnavailableException('Failed to create memory: '.$e->getMessage(), $e);
+        }
 
         $this->logger->info('Memory created', [
             'memory_id' => $memoryId,
@@ -127,6 +173,11 @@ final readonly class UserMemoryService
         ?string $category = null,
         ?string $namespace = null,
     ): UserMemoryDTO {
+        $this->assertAvailable('update memory', [
+            'memory_id' => $memoryId,
+            'user_id' => $user->getId(),
+        ]);
+
         if (mb_strlen($value) < 1) {
             throw new \InvalidArgumentException('Memory value must be at least 1 character');
         }
@@ -168,34 +219,55 @@ final readonly class UserMemoryService
             $this->logger->info('Memory updated', ['memory_id' => $memoryId]);
 
             return $dto;
-        } catch (\Throwable $e) {
-            $this->logger->error('Failed to update memory', ['error' => $e->getMessage()]);
-            throw new \InvalidArgumentException('Failed to update memory: '.$e->getMessage());
+        } catch (\InvalidArgumentException $e) {
+            // Domain errors (e.g. "Memory not found", "Key must be at least 3 characters")
+            // — surface as 400 via the controller.
+            throw $e;
+        } catch (\RuntimeException $e) {
+            // Qdrant transport/HTTP failure after the availability check passed.
+            // Surface as 503 so the user can distinguish "wrong input" from
+            // "storage temporarily down".
+            $this->logger->error('Failed to update memory in Qdrant', [
+                'memory_id' => $memoryId,
+                'user_id' => $user->getId(),
+                'error' => $e->getMessage(),
+            ]);
+
+            throw new MemoryServiceUnavailableException('Failed to update memory: '.$e->getMessage(), $e);
         }
     }
 
     /**
      * Delete memory from Qdrant.
+     *
+     * @throws MemoryServiceUnavailableException When Qdrant is not configured or not reachable.
+     *                                           Callers that explicitly allow best-effort deletion
+     *                                           (e.g. account deletion) must use {@see deleteAllForUser}
+     *                                           or catch this exception.
      */
     public function deleteMemory(int $memoryId, User $user, ?string $namespace = null): void
     {
-        if (!$this->qdrantClient->isAvailable()) {
-            $this->logger->warning('Memory service unavailable - skipping delete', [
-                'memory_id' => $memoryId,
-                'user_id' => $user->getId(),
-            ]);
-
-            return;
-        }
+        $this->assertAvailable('delete memory', [
+            'memory_id' => $memoryId,
+            'user_id' => $user->getId(),
+        ]);
 
         $pointId = "mem_{$user->getId()}_{$memoryId}";
 
         try {
             $this->qdrantClient->deleteMemory($pointId, $namespace);
             $this->logger->info('Memory deleted', ['memory_id' => $memoryId]);
-        } catch (\Throwable $e) {
-            $this->logger->error('Failed to delete memory', ['error' => $e->getMessage()]);
-            throw new \InvalidArgumentException('Failed to delete memory: '.$e->getMessage());
+        } catch (\RuntimeException $e) {
+            // Qdrant transport/HTTP failure (network error, 5xx, etc.) after
+            // the availability check passed. Surface as 503 so the user sees
+            // "temporarily unavailable" rather than a misleading 400.
+            $this->logger->error('Failed to delete memory in Qdrant', [
+                'memory_id' => $memoryId,
+                'user_id' => $user->getId(),
+                'error' => $e->getMessage(),
+            ]);
+
+            throw new MemoryServiceUnavailableException('Failed to delete memory: '.$e->getMessage(), $e);
         }
     }
 
@@ -269,7 +341,21 @@ final readonly class UserMemoryService
         }
 
         $pointId = "mem_{$user->getId()}_{$memoryId}";
-        $payload = $this->qdrantClient->getMemory($pointId);
+
+        try {
+            $payload = $this->qdrantClient->getMemory($pointId);
+        } catch (\RuntimeException $e) {
+            // Read-side soft-fail: the caller (chat flows, memory-tag resolution,
+            // MessageForwardingService, …) must keep working without memory context
+            // when Qdrant blips. Write paths do NOT go through here.
+            $this->logger->warning('getMemoryById failed, returning null', [
+                'memory_id' => $memoryId,
+                'user_id' => $user->getId(),
+                'error' => $e->getMessage(),
+            ]);
+
+            return null;
+        }
 
         if (!$payload) {
             return null;
@@ -470,15 +556,33 @@ final readonly class UserMemoryService
                 return [];
             }
 
-            // Search in Qdrant
+            // Search in Qdrant. Ask for 2x to leave room for the stale-
+            // filter pass below — see QdrantVectorStorage::search() for
+            // the rationale.
             $results = $this->qdrantClient->searchMemories(
                 $queryVector,
                 $userId,
                 $category,
-                $limit,
+                $limit * 2,
                 $minScore,
                 $namespace
             );
+
+            // Filter out hits embedded with a different model than the
+            // currently active one. Cross-model cosine scores are
+            // physically meaningless — including them would silently
+            // corrupt the assistant's answers right after a model swap,
+            // until the user re-vectorizes their memories.
+            $filtered = $this->embeddingMetadata->filterStaleHits($results);
+            if ($filtered['stale_count'] > 0) {
+                $this->logger->info('🧪 Filtered stale memory hits', [
+                    'userId' => $userId,
+                    'stale_count' => $filtered['stale_count'],
+                    'fresh_count' => count($filtered['fresh']),
+                    'current_model_id' => $this->embeddingMetadata->getCurrentModelId(),
+                ]);
+            }
+            $results = array_slice($filtered['fresh'], 0, $limit);
 
             $this->logger->info('🎯 Qdrant search results', [
                 'userId' => $userId,
@@ -554,7 +658,14 @@ final readonly class UserMemoryService
             // Generate point ID
             $pointId = "mem_{$user->getId()}_{$memoryId}";
 
-            // Store in Qdrant
+            // Store in Qdrant. Embedding-stack metadata (model id/provider/
+            // name + vector dim + indexed_at) is written alongside the
+            // semantic payload so SafeModelChange can:
+            //   1. detect stale memories when the active VECTORIZE model
+            //      changes (different model_id or vector_dim → trigger
+            //      re-vectorize);
+            //   2. surface in the admin UI which model produced which
+            //      memories.
             $this->qdrantClient->upsertMemory(
                 $pointId,
                 $embedding,
@@ -568,6 +679,11 @@ final readonly class UserMemoryService
                     'created' => $dto->created,
                     'updated' => $dto->updated,
                     'active' => $dto->active,
+                    'embedding_model_id' => $embeddingModelId,
+                    'embedding_provider' => $provider,
+                    'embedding_model' => $modelName,
+                    'vector_dim' => count($embedding),
+                    'indexed_at' => date(\DATE_ATOM),
                 ],
                 $namespace
             );

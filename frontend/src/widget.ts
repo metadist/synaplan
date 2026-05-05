@@ -46,6 +46,7 @@ interface WidgetConfig {
   detectTheme?: boolean
   externalUserId?: string
   privacyPolicyUrl?: string
+  sessionMode?: 'browser' | 'user'
 }
 
 const DEFAULT_VUE_CDN = 'https://cdn.jsdelivr.net/npm/vue@3/dist/vue.global.prod.js'
@@ -424,6 +425,7 @@ class SynaplanWidget {
         allowFullscreen: this.config!.allowFullscreen,
         externalUserId: this.config!.externalUserId,
         privacyPolicyUrl: this.config!.privacyPolicyUrl,
+        sessionMode: this.config!.sessionMode,
         isPreview: false,
       })
 

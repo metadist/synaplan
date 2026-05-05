@@ -16,7 +16,13 @@ parameters:
             identifiers:
                 - if.alwaysFalse
                 - varTag.misplaced
+                - unset.possiblyHookedProperty
             path: lib/grpc/*
+        -
+            identifiers:
+                - method.alreadyNarrowedType
+            path: tests/*
+            reportUnmatched: false
         -
             identifiers:
                 - property.unresolvableNativeType

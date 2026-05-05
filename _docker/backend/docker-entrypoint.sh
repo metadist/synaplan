@@ -54,7 +54,10 @@ fi
 if [ -z "${DATABASE_WRITE_URL:-}" ] && [ -n "${DB_HOST:-}" ]; then
     # URL-encode the password to handle special characters (using jq)
     DB_PASSWORD_ENCODED=$(printf %s "${DB_PASSWORD:-}" | jq -sRr @uri)
-    export DATABASE_WRITE_URL="mysql://${DB_USER:-synaplan}:${DB_PASSWORD_ENCODED}@${DB_HOST}:${DB_PORT:-3306}/${DB_NAME:-synaplan}?serverVersion=${DB_SERVER_VERSION:-11.8}&charset=utf8mb4"
+    # Default to MariaDB platform identifier ("mariadb-" prefix) so DBAL picks
+    # MariaDBPlatform and applies the MariaDB-specific schema introspection
+    # (string default quote-stripping etc.). See docs/MIGRATIONS.md for why.
+    export DATABASE_WRITE_URL="mysql://${DB_USER:-synaplan}:${DB_PASSWORD_ENCODED}@${DB_HOST}:${DB_PORT:-3306}/${DB_NAME:-synaplan}?serverVersion=${DB_SERVER_VERSION:-mariadb-12.2.2}&charset=utf8mb4"
     export DATABASE_READ_URL="${DATABASE_WRITE_URL}"
     echo "✅ Built DATABASE URLs from environment variables"
 fi
@@ -129,19 +132,54 @@ until php bin/console dbal:run-sql "SELECT 1" 2>&1; do
 done
 echo "✅ Database is ready!"
 
-# Run database schema update (until we have proper migrations)
-echo "🔄 Running database schema update..."
-php bin/console doctrine:schema:update --force
-echo "✅ Database schema ready!"
+# Run database migrations.
+#
+# The bootstrap is implemented in a sourceable library so the same code runs in
+# production and in the bash-level tests under _docker/backend/tests/.
+# See lib/migrations-bootstrap.sh for the full self-healing contract.
+echo "🔄 Running database migrations..."
 
-# Create test database schema (for PHPUnit with DAMA transaction rollback)
-if [ "$APP_ENV" = "dev" ]; then
-    echo "🔄 Updating test database schema..."
-    php bin/console doctrine:schema:update --force --env=test 2>/dev/null || true
-    echo "✅ Test database schema ready!"
+# Locate the bootstrap library regardless of how the entrypoint was invoked.
+#   - Production image: `$(dirname "$0")` resolves to /usr/local/bin, where
+#     the Dockerfile copies both the entrypoint and `lib/`.
+#   - Running the entrypoint directly from a repo checkout (tests, local
+#     debugging): the library sits next to the script in `_docker/backend/lib/`.
+# The `/usr/local/bin/lib/...` fallback is kept as a belt-and-suspenders path
+# in case `$0` is a symlink or otherwise can't be resolved.
+_MIGRATIONS_LIB=""
+for _candidate in \
+    "$(dirname "$0")/lib/migrations-bootstrap.sh" \
+    "/usr/local/bin/lib/migrations-bootstrap.sh"; do
+    if [ -r "$_candidate" ]; then
+        _MIGRATIONS_LIB="$_candidate"
+        break
+    fi
+done
+
+if [ -z "$_MIGRATIONS_LIB" ]; then
+    echo "❌ ERROR: migrations-bootstrap.sh not found; aborting to avoid replaying DDL on legacy DBs"
+    exit 1
 fi
 
-# Load fixtures on first run (dev/test only)
+# shellcheck disable=SC1090
+. "$_MIGRATIONS_LIB"
+
+bootstrap_migrations_metadata "" "main"
+php bin/console doctrine:migrations:migrate --no-interaction --allow-no-migration
+echo "✅ Database migrations applied!"
+
+# Same flow for the test database (PHPUnit + DAMA transaction rollback)
+if [ "$APP_ENV" = "dev" ]; then
+    echo "🔄 Migrating test database..."
+    bootstrap_migrations_metadata "--env=test" "test"
+    php bin/console doctrine:migrations:migrate --no-interaction --allow-no-migration --env=test 2>/dev/null || true
+    echo "✅ Test database migrations applied!"
+fi
+
+# Load demo user fixtures FIRST (dev/test only, when DB is fresh).
+# Important: doctrine:fixtures:load purges ALL entity tables before reloading.
+# We therefore run fixtures BEFORE app:seed so the idempotent seed step can
+# re-populate models/prompts/config/rate-limits afterwards.
 FIXTURES_MARKER="/var/www/backend/var/.fixtures_loaded"
 
 if [ "$APP_ENV" = "dev" ] || [ "$APP_ENV" = "test" ]; then
@@ -154,34 +192,24 @@ if [ "$APP_ENV" = "dev" ] || [ "$APP_ENV" = "test" ]; then
     fi
 
     if [ -f "$FIXTURES_MARKER" ]; then
-        echo "✅ Fixtures already loaded (marker present)"
+        echo "✅ Demo user fixtures already loaded (marker present)"
         echo "   👤 Login: admin@synaplan.com / admin123"
         echo "   💡 To reload: rm backend/var/.fixtures_loaded && docker compose restart backend"
     else
         # Check if users actually exist in database (not just marker file)
-        # If table doesn't exist, command will fail and we get 0
         USER_COUNT=$(php bin/console dbal:run-sql "SELECT COUNT(*) as count FROM BUSER" 2>/dev/null | grep -oE '[0-9]+' | tail -1)
-        USER_COUNT=${USER_COUNT:-0}  # Default to 0 if empty
+        USER_COUNT=${USER_COUNT:-0}
 
         if [ "$USER_COUNT" -eq 0 ]; then
-            echo "🌱 Loading test data (current users: $USER_COUNT)..."
-
-            # Ensure schema is complete
-            echo "   Updating database schema..."
-            php bin/console doctrine:schema:update --force --complete || true
-
-            # Load fixtures
+            echo "🌱 Loading demo user fixtures (current users: $USER_COUNT)..."
             # Note: Not using --purge-with-truncate because TRUNCATE fails with foreign key constraints
-            # Even on empty tables, MariaDB/MySQL blocks TRUNCATE if FK constraints exist
-            echo "   Loading fixtures..."
             if php bin/console doctrine:fixtures:load --no-interaction 2>&1 | tee /tmp/fixtures.log; then
                 if grep -q "loading App" /tmp/fixtures.log; then
                     touch "$FIXTURES_MARKER"
-                    echo ""
-                    echo "✅ Fixtures loaded successfully!"
+                    echo "✅ Demo user fixtures loaded!"
                     echo "   👤 Admin: admin@synaplan.com / admin123"
-                    echo "   👤 Demo: demo@synaplan.com / demo123"
-                    echo "   👤 Test: test@example.com / test123"
+                    echo "   👤 Demo:  demo@synaplan.com / demo123"
+                    echo "   👤 Test:  test@example.com / test123"
                 else
                     echo "⚠️  Fixtures might have failed - check logs"
                 fi
@@ -191,12 +219,20 @@ if [ "$APP_ENV" = "dev" ] || [ "$APP_ENV" = "test" ]; then
             fi
         else
             touch "$FIXTURES_MARKER"
-            echo "✅ Fixtures already loaded ($USER_COUNT users)"
+            echo "✅ Demo user fixtures already present ($USER_COUNT users)"
             echo "   👤 Login: admin@synaplan.com / admin123"
             echo "   💡 To reload: rm backend/var/.fixtures_loaded && docker compose restart backend"
         fi
     fi
 fi
+
+# Seed production-essential catalogs (idempotent, safe in dev + prod).
+# Runs AFTER fixtures so a fresh dev DB ends up with both demo users and full
+# model/prompt/config catalogs. In prod this is the sole data-initialisation step.
+echo "🌱 Seeding catalogs (idempotent)..."
+php bin/console app:seed --no-interaction || {
+    echo "⚠️  app:seed failed — see logs above. Continuing startup."
+}
 
 # Ollama model downloads (optional, only if AUTO_DOWNLOAD_MODELS=true)
 if [ -n "${OLLAMA_BASE_URL:-}" ] && [ "${AUTO_DOWNLOAD_MODELS:-false}" = "true" ]; then

@@ -152,6 +152,24 @@
       "levelUpdated": "Nivel de usuario actualizado a {level}",
       "levelUpdateFailed": "Error al actualizar nivel de usuario"
     },
+    "impersonate": {
+      "button": "Ver como usuario",
+      "buttonTitle": "Suplantar a este usuario",
+      "confirmTitle": "¿Suplantar a {email}?",
+      "confirmMessage": "Iniciarás sesión como {email}. Toda acción y cambio se atribuirá a esta cuenta. Usa el banner superior para finalizar.",
+      "confirmAction": "Iniciar sesión",
+      "started": "Ahora ves la aplicación como {email}.",
+      "startFailed": "No se pudo iniciar la suplantación",
+      "cannotImpersonateSelf": "No puedes suplantarte a ti mismo.",
+      "banner": {
+        "viewing": "Viendo como {email}",
+        "adminLabel": "Sesión de admin: {email}",
+        "exitButton": "Salir",
+        "exitButtonTitle": "Restaurar tu sesión de administrador"
+      },
+      "stopped": "Sesión de administrador restaurada.",
+      "stopFailed": "No se pudo finalizar la suplantación"
+    },
     "prompts": {
       "shortDesc": "Descripción Corta",
       "prompt": "Prompt",
@@ -332,7 +350,52 @@
     "noContent": "No hay ayuda disponible para esta página"
   },
   "summary": {
-    "title": "Configuración de Resumen",
+    "title": "Resumen de IA",
+    "generate": "Generar",
+    "generateFirst": "Crear primer resumen",
+    "generateSuccess": "Análisis completado exitosamente",
+    "generateAI": "Generar análisis de IA",
+    "regenerate": "Regenerar análisis",
+    "aiAnalyzing": "IA analizando conversaciones...",
+    "noSummary": "No hay análisis disponible",
+    "selectDateOrChats": "Selecciona un período o chats específicos para analizar",
+    "history": "Historial",
+    "savedSummaries": "Análisis guardados",
+    "newAnalysis": "Nuevo análisis",
+    "analyzingSelected": "Analizando {count} chat(s) seleccionado(s)",
+    "from": "Desde",
+    "to": "Hasta",
+    "yesterday": "Ayer",
+    "sessions": "Sesiones",
+    "messages": "Mensajes",
+    "visitorMessages": "Mensajes de visitantes",
+    "aiModel": "Modelo de IA",
+    "sentiment": "Sentimiento",
+    "positive": "Positivo",
+    "negative": "Negativo",
+    "executiveSummary": "Resumen ejecutivo",
+    "mainTopics": "Temas principales",
+    "frequentQuestions": "Preguntas frecuentes",
+    "issues": "Problemas identificados",
+    "recommendations": "Recomendaciones",
+    "promptSuggestions": "Sugerencias de mejora del prompt",
+    "editPrompt": "Editar prompt",
+    "addInfo": "Añadir",
+    "improveInfo": "Mejorar",
+    "neutral": "Neutral",
+    "negativeMessages": "Mensajes negativos",
+    "neutralMessages": "Mensajes neutrales",
+    "visitor": "Visitante",
+    "response": "Respuesta",
+    "noSentimentMessages": "No hay mensajes en esta categoría",
+    "teamRequired": "Plan Team requerido",
+    "teamRequiredDescription": "Los resúmenes e insights de conversaciones impulsados por IA están disponibles para los planes Team y Business. Actualiza para desbloquear esta función.",
+    "upgrade": "Actualizar plan",
+    "modelNotConfigured": "No hay modelo de IA configurado. Selecciona un modelo en Configuración → Prompts de IA → Prompt de Resumen.",
+    "generateError": "No se pudo generar el análisis",
+    "existingFound": "Análisis existente encontrado",
+    "existingFoundInfo": "Ya existe un análisis para este período exacto. Estás viendo el resumen generado anteriormente.",
+    "regenerateAnyway": "Regenerar de todos modos",
     "description": "Esto construye un prompt para el modelo de IA configurado para resumir el texto enviado.",
     "summaryType": "Tipo de Resumen:",
     "summaryTypeHelp": "Tipo de resumen a generar",
@@ -459,6 +522,8 @@
     "minutesAgo": "hace {count} minuto | hace {count} minutos",
     "hoursAgo": "hace {count} hora | hace {count} horas",
     "daysAgo": "hace {count} día | hace {count} días",
+    "today": "Hoy",
+    "yesterday": "Ayer",
     "previous": "Anterior",
     "error": "Error",
     "success": "Éxito",
@@ -572,6 +637,7 @@
     "fileUploadFailed": "Error al subir archivo. Por favor intenta de nuevo.",
     "fileUploadDefaultMessage": "Por favor revisa el archivo adjunto.",
     "sendFailed": "Lo siento, ocurrió un error. Por favor intenta de nuevo.",
+    "continueFailed": "No se pudo continuar la respuesta. Por favor intenta de nuevo.",
     "defaultAssistantReply": "¡Gracias por tu mensaje! Te responderé de inmediato.",
     "previewWidget": "Vista Previa del Widget",
     "configuration": "Configuración del Widget",
@@ -725,6 +791,23 @@
       "robot": "Robot",
       "message": "Mensaje",
       "support": "Soporte"
+    },
+    "setupChat": {
+      "title": "Asistente de Configuración IA",
+      "subtitle": "Configuremos tu widget juntos",
+      "progressLabel": "Progreso de la entrevista",
+      "inputPlaceholder": "Escribe tu respuesta...",
+      "skipButton": "Omitir por ahora",
+      "completeTitle": "¡Configuración Completa!",
+      "completeDescription": "Se ha generado la configuración personalizada de tu asistente. Haz clic abajo para guardarla.",
+      "saveButton": "Guardar Configuración",
+      "saveSuccess": "¡Configuración del widget guardada exitosamente!",
+      "saveError": "No se pudo guardar la configuración",
+      "sendError": "No se pudo enviar el mensaje",
+      "startError": "No se pudo iniciar la entrevista",
+      "modelNotConfigured": "No hay modelo de IA configurado. Selecciona un modelo en Configuración → Prompts de IA → Entrevista de Configuración IA.",
+      "editHintTitle": "¿Quieres afinar tu asistente?",
+      "editHintDescription": "Después de guardar, puedes editar la configuración del asistente IA en cualquier momento en la pestaña 'Asistente IA' de la configuración avanzada."
     }
   },
   "profile": {
@@ -821,14 +904,28 @@
     "description": "Encontramos un error inesperado. No te preocupes, nuestro equipo ha sido notificado y está trabajando en ello.",
     "details": "Detalles del Error",
     "statusCode": "Código de Estado",
+    "source": "Fuente",
+    "reason": "Motivo",
     "showStack": "Mostrar traza de pila",
     "hideStack": "Ocultar traza de pila",
     "reload": "Recargar Página",
+    "retry": "Reintentar",
     "goHome": "Ir al Inicio",
     "needHelp": "¿Necesitas Ayuda?",
     "contactSupport": "Si este problema persiste, por favor contacta a nuestro equipo de soporte con los detalles del error a continuación.",
     "copyError": "Copiar Info del Error",
-    "copied": "¡Copiado!"
+    "copied": "¡Copiado!",
+    "adminOnly": "Solo admin",
+    "reasons": {
+      "redirectLoop": {
+        "title": "Bucle de Redirección Detectado",
+        "description": "No pudimos llevarte allí porque se solicitó la misma página varias veces seguidas. Inténtalo de nuevo o borra las cookies de este sitio."
+      },
+      "authTimeout": {
+        "title": "El Inicio de Sesión Está Tardando Demasiado",
+        "description": "La verificación de tu sesión con el servidor agotó el tiempo de espera. Comprueba tu conexión a internet e inténtalo de nuevo."
+      }
+    }
   },
   "loading": {
     "default": "Cargando...",
@@ -876,7 +973,8 @@
     "fileGenerated": "He creado el archivo '{filename}' para ti. Ahora puedes descargarlo.",
     "fileGenerationFailed": "Hubo un problema al crear el archivo. Por favor intenta de nuevo.",
     "cancelledByUser": "⚠️ Cancelado por el usuario",
-    "truncated": "Esta respuesta fue cortada porque el modelo alcanzó su límite de tokens. Intenta hacer una pregunta más específica o pide la respuesta en partes."
+    "truncated": "Esta respuesta fue cortada porque el modelo alcanzó su límite de tokens.",
+    "continueButton": "Continuar respuesta"
   },
   "subscription": {
     "serviceNotAvailable": "Servicio No Disponible",
@@ -1018,6 +1116,10 @@
       "light": "Claro",
       "dark": "Oscuro",
       "system": "Sistema"
+    },
+    "language": {
+      "title": "Idioma",
+      "description": "Elige el idioma de la interfaz"
     },
     "account": {
       "title": "Cuenta",
@@ -1358,11 +1460,23 @@
       "subscription": "Suscripción",
       "userLevel": "Nivel de Usuario",
       "phoneVerified": "Teléfono Verificado",
-      "subscriptionActive": "Estado",
+      "subscriptionStatusLabel": "Estado del plan",
+      "subscriptionStatus": {
+        "active": "Activo",
+        "free": "Plan gratuito",
+        "past_due": "Pago pendiente",
+        "cancelled": "Cancelado",
+        "anonymous": "Anónimo",
+        "inactive": "Inactivo"
+      },
       "totalRequests": "Solicitudes Totales",
+      "totalRequestsShort": "total",
+      "totalMessages": "Mensajes de chat",
+      "totalMessagesTooltip": "Solo filas con BACTION=MESSAGES — es el contador que controla realmente el límite del plan (p. ej. 50/50).",
       "usageByType": "Uso por Tipo",
       "bySource": "Por Fuente",
       "byTime": "Por Período de Tiempo",
+      "byTimeDescription": "Todos los eventos de uso en la ventana del calendario (mensajes, embeddings, clasificación, extracción de memoria, …). No coincide con la ventana o el alcance del contador del límite del plan.",
       "recentActivity": "Actividad Reciente",
       "lifetime": "de por vida",
       "remaining": "Restante",

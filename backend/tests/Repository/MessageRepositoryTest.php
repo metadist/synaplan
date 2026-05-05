@@ -427,24 +427,152 @@ class MessageRepositoryTest extends KernelTestCase
         $this->assertNull($found);
     }
 
+    public function testCountByChatIdReturnsZeroForNullChat(): void
+    {
+        $this->assertSame(0, $this->repository->countByChatId(null));
+    }
+
+    public function testCountByChatIdReturnsTotalForChat(): void
+    {
+        $this->createTestMessage('A', 100);
+        $this->createTestMessage('B', 200);
+        $this->createTestMessage('C', 300);
+
+        $this->assertSame(3, $this->repository->countByChatId($this->testChat->getId()));
+    }
+
+    public function testCountByChatIdExcludesFailedMessagesByDefault(): void
+    {
+        $this->createTestMessage('Complete 1', 100);
+        $this->createCustomTestMessage('Failed', 150, 'IN', 'failed');
+        $this->createTestMessage('Complete 2', 200);
+
+        $this->assertSame(2, $this->repository->countByChatId($this->testChat->getId()));
+    }
+
+    public function testCountByChatIdCanIncludeFailedMessages(): void
+    {
+        $this->createTestMessage('Complete', 100);
+        $this->createCustomTestMessage('Failed', 150, 'IN', 'failed');
+
+        $this->assertSame(
+            2,
+            $this->repository->countByChatId($this->testChat->getId(), null, null, false)
+        );
+    }
+
+    public function testCountByChatIdFiltersByDirection(): void
+    {
+        $this->createCustomTestMessage('Visitor 1', 100, 'IN', 'complete');
+        $this->createCustomTestMessage('AI reply', 110, 'OUT', 'complete');
+        $this->createCustomTestMessage('Visitor 2', 200, 'IN', 'complete');
+        $this->createCustomTestMessage('Operator', 210, 'OUT', 'complete');
+
+        $this->assertSame(
+            2,
+            $this->repository->countByChatId($this->testChat->getId(), 'IN'),
+            'should count only IN-direction messages'
+        );
+        $this->assertSame(
+            2,
+            $this->repository->countByChatId($this->testChat->getId(), 'OUT'),
+            'should count only OUT-direction messages'
+        );
+    }
+
+    public function testCountByChatIdFiltersByTimestampLowerBound(): void
+    {
+        $this->createTestMessage('Old', 100);
+        $this->createTestMessage('Recent1', 200);
+        $this->createTestMessage('Recent2', 300);
+
+        // Inclusive lower bound: 200 should still match.
+        $this->assertSame(
+            2,
+            $this->repository->countByChatId($this->testChat->getId(), null, 200)
+        );
+    }
+
+    public function testCountByChatIdsBulkReturnsMapKeyedByChatId(): void
+    {
+        $this->createTestMessage('A1', 100);
+        $this->createTestMessage('A2', 200);
+
+        $secondChat = new Chat();
+        $secondChat->setUserId($this->testUser->getId());
+        $secondChat->setTitle('Second Chat');
+        $this->em->persist($secondChat);
+        $this->em->flush();
+
+        $secondMessage = new Message();
+        $secondMessage->setUserId($this->testUser->getId());
+        $secondMessage->setChat($secondChat);
+        $secondMessage->setTrackingId(time());
+        $secondMessage->setUnixTimestamp(500);
+        $secondMessage->setDateTime(date('YmdHis', 500));
+        $secondMessage->setText('B1');
+        $secondMessage->setDirection('IN');
+        $secondMessage->setProviderIndex('WEB');
+        $secondMessage->setMessageType('TEST');
+        $secondMessage->setTopic('CHAT');
+        $secondMessage->setLanguage('en');
+        $secondMessage->setStatus('complete');
+        $this->em->persist($secondMessage);
+        $this->em->flush();
+
+        $counts = $this->repository->countByChatIds([
+            $this->testChat->getId(),
+            $secondChat->getId(),
+            999999, // does not exist; must be absent from the map (NOT keyed with 0)
+        ]);
+
+        $this->assertSame(2, $counts[$this->testChat->getId()] ?? null);
+        $this->assertSame(1, $counts[$secondChat->getId()] ?? null);
+        $this->assertArrayNotHasKey(999999, $counts);
+
+        // Cleanup
+        $this->em->remove($secondMessage);
+        $this->em->remove($secondChat);
+        $this->em->flush();
+    }
+
+    public function testCountByChatIdsReturnsEmptyMapForEmptyInput(): void
+    {
+        $this->assertSame([], $this->repository->countByChatIds([]));
+    }
+
     /**
      * Helper to create test message.
      */
     private function createTestMessage(string $text, int $timestamp): Message
     {
+        return $this->createCustomTestMessage($text, $timestamp, 'IN', 'complete');
+    }
+
+    /**
+     * Helper to create a test message with explicit direction/status — used by the
+     * countByChatId() tests which need to exercise direction filtering and the
+     * "exclude failed" code path.
+     */
+    private function createCustomTestMessage(
+        string $text,
+        int $timestamp,
+        string $direction,
+        string $status,
+    ): Message {
         $message = new Message();
         $message->setUserId($this->testUser->getId());
-        $message->setChat($this->testChat); // Use setChat() instead of setChatId()
+        $message->setChat($this->testChat);
         $message->setTrackingId(time());
         $message->setUnixTimestamp($timestamp);
         $message->setDateTime(date('YmdHis', $timestamp));
         $message->setText($text);
-        $message->setDirection('IN');
+        $message->setDirection($direction);
         $message->setProviderIndex('WEB');
         $message->setMessageType('TEST');
         $message->setTopic('CHAT');
         $message->setLanguage('en');
-        $message->setStatus('complete');
+        $message->setStatus($status);
 
         $this->em->persist($message);
         $this->em->flush();

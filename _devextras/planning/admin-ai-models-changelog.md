@@ -8,7 +8,7 @@ This file documents the implementation added for an **administrator-only** AI mo
 - **Frontend admin UI** under existing `/config/ai-models` route:
   - **Add Models (Import)**: paste URLs and/or provider text dumps → generate SQL → validate → apply
   - **Edit Models**: create/update/delete models directly
-- **Live-table only**: the tool edits the live `BMODELS` table in the current installation. `_devextras/db-loadfiles/BMODELS.sql` is not used by this tool.
+- **Live-table only**: the tool edits the live `BMODELS` table in the current installation. The canonical seed source is `backend/src/Model/ModelCatalog.php` (applied via `php bin/console app:seed`).
 
 ## Backend
 

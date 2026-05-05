@@ -63,13 +63,6 @@ export const mockAvailableModels: AIModel[] = [
     description: 'Fast API service via groq',
   },
   {
-    id: 49,
-    purpose: 'chat',
-    service: 'Groq',
-    name: 'llama-4-maverick-17b-128e-instruct',
-    description: 'Groq Llama4 128e processing and text extraction',
-  },
-  {
     id: 1,
     purpose: 'chat',
     service: 'OpenAI',
@@ -215,6 +208,7 @@ export const serviceColors: Record<string, string> = {
   Groq: 'bg-cyan-500',
   OpenAI: 'bg-green-500',
   Ollama: 'bg-purple-500',
+  HuggingFace: 'bg-yellow-400',
   Stability: 'bg-pink-500',
   ElevenLabs: 'bg-indigo-500',
   RunwayML: 'bg-yellow-500',

@@ -174,18 +174,23 @@
             </p>
           </div>
           <div>
-            <p class="text-xs txt-secondary mb-1">{{ $t('config.usage.subscriptionActive') }}</p>
-            <p
-              class="text-sm font-medium"
-              :class="stats.subscription.active ? 'text-green-600' : 'text-gray-600'"
-            >
-              {{ stats.subscription.active ? $t('common.active') : $t('common.inactive') }}
+            <p class="text-xs txt-secondary mb-1">
+              {{ $t('config.usage.subscriptionStatusLabel') }}
+            </p>
+            <p class="text-sm font-medium" :class="getSubscriptionStatusClass(subscriptionStatus)">
+              {{ getSubscriptionStatusLabel(subscriptionStatus) }}
             </p>
           </div>
           <div>
-            <p class="text-xs txt-secondary mb-1">{{ $t('config.usage.totalRequests') }}</p>
+            <p class="text-xs txt-secondary mb-1" :title="$t('config.usage.totalMessagesTooltip')">
+              {{ $t('config.usage.totalMessages') }}
+            </p>
             <p class="text-sm font-medium txt-primary">
-              {{ stats.total_requests.toLocaleString() }}
+              {{ totalMessages.toLocaleString() }}
+              <span class="txt-secondary font-normal">
+                ({{ $t('config.usage.totalRequestsShort') }}:
+                {{ stats.total_requests.toLocaleString() }})
+              </span>
             </p>
           </div>
         </div>
@@ -234,9 +239,12 @@
 
         <!-- Breakdown by Time -->
         <div class="surface-card p-6" data-testid="section-breakdown-time">
-          <h3 class="text-lg font-semibold txt-primary mb-4">
+          <h3 class="text-lg font-semibold txt-primary mb-1">
             {{ $t('config.usage.byTime') }}
           </h3>
+          <p class="text-xs txt-secondary mb-4">
+            {{ $t('config.usage.byTimeDescription') }}
+          </p>
 
           <div class="space-y-3">
             <div
@@ -357,7 +365,7 @@
                 data-testid="item-activity"
               >
                 <td class="px-3 py-3 txt-secondary whitespace-nowrap">
-                  {{ formatDateTime(entry.timestamp) }}
+                  {{ getTimeAgo(entry.timestamp) }}
                 </td>
                 <td class="px-3 py-3">
                   <span class="px-2 py-1 rounded-full text-xs font-medium surface-chip">
@@ -493,13 +501,16 @@ import {
   getActivityLog,
   type UsageStats,
   type ActivityEntry,
+  type SubscriptionStatus,
 } from '@/api/usageApi'
 import { useNotification } from '@/composables/useNotification'
 import { useI18n } from 'vue-i18n'
+import { useDateFormat } from '@/composables/useDateFormat'
 import { authService } from '@/services/authService'
 
 const { success, error: showError } = useNotification()
 const { t } = useI18n()
+const { formatDate: formatDateStr, formatRelativeTime } = useDateFormat()
 
 const loading = ref(false)
 const exporting = ref(false)
@@ -620,6 +631,50 @@ const getSubscriptionBadgeClass = (level: string) => {
   }
 }
 
+// Fallback derivation: old API responses may not include the `status` field yet.
+const subscriptionStatus = computed<SubscriptionStatus>(() => {
+  const sub = stats.value?.subscription
+  if (!sub) return 'inactive'
+  if (sub.status) return sub.status
+  if (sub.active) return 'active'
+  if (sub.level === 'ANONYMOUS') return 'anonymous'
+  if (sub.level === 'NEW') return 'free'
+  return 'inactive'
+})
+
+// Safe fallback for when an older backend doesn't return `total_messages` yet.
+// Falls back to the MESSAGES-action counter in `usage`, then to zero.
+const totalMessages = computed(() => {
+  const s = stats.value
+  if (!s) return 0
+  return s.total_messages ?? s.usage?.MESSAGES?.used ?? 0
+})
+
+const getSubscriptionStatusLabel = (status: SubscriptionStatus) => {
+  return t(`config.usage.subscriptionStatus.${status}`)
+}
+
+// Stays consistent with the color palette used everywhere else in this file
+// (subscription-badge switch at line ~620, recent-activity cached_tokens badge,
+// etc.). A broader sweep to move the file off direct Tailwind classes onto the
+// CSS-variable utilities in style.css is a separate cleanup.
+const getSubscriptionStatusClass = (status: SubscriptionStatus) => {
+  switch (status) {
+    case 'active':
+      return 'text-green-600 dark:text-green-400'
+    case 'free':
+      return 'text-gray-600 dark:text-gray-400'
+    case 'past_due':
+      return 'text-orange-600 dark:text-orange-400'
+    case 'cancelled':
+      return 'text-red-600 dark:text-red-400'
+    case 'anonymous':
+      return 'text-orange-600 dark:text-orange-400'
+    default:
+      return 'text-gray-600 dark:text-gray-400'
+  }
+}
+
 const getActionLabel = (action: string) => {
   return t(`config.usage.actions.${action.toLowerCase()}`, action)
 }
@@ -679,33 +734,11 @@ const getBudgetBarClass = (percent: number) => {
 }
 
 const formatDate = (timestamp: number) => {
-  return new Date(timestamp * 1000).toLocaleDateString()
+  return formatDateStr(new Date(timestamp * 1000))
 }
 
-const formatDateTime = (timestamp: number) => {
-  const date = new Date(timestamp * 1000)
-  const now = new Date()
-  const diff = now.getTime() - date.getTime()
-
-  // Less than 1 minute
-  if (diff < 60000) {
-    return t('common.justNow')
-  }
-
-  // Less than 1 hour
-  if (diff < 3600000) {
-    const minutes = Math.floor(diff / 60000)
-    return t('common.minutesAgo', { count: minutes })
-  }
-
-  // Less than 24 hours
-  if (diff < 86400000) {
-    const hours = Math.floor(diff / 3600000)
-    return t('common.hoursAgo', { count: hours })
-  }
-
-  // More than 24 hours - show full date
-  return date.toLocaleString()
+const getTimeAgo = (timestamp: number) => {
+  return formatRelativeTime(new Date(timestamp * 1000))
 }
 
 onMounted(() => {

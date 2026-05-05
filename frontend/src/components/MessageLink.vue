@@ -22,6 +22,7 @@
 
 <script setup lang="ts">
 import { computed } from 'vue'
+import { useDateFormat } from '@/composables/useDateFormat'
 
 interface Props {
   url: string
@@ -29,9 +30,9 @@ interface Props {
 }
 
 const props = defineProps<Props>()
+const { formatDateTime } = useDateFormat()
 
 const formattedExpiry = computed(() => {
-  const date = new Date(props.expiresAt)
-  return date.toLocaleString()
+  return formatDateTime(new Date(props.expiresAt))
 })
 </script>

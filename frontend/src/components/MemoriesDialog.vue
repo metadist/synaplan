@@ -205,6 +205,7 @@
 <script setup lang="ts">
 import { ref, computed, watch, nextTick } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { useDateFormat } from '@/composables/useDateFormat'
 import { useRouter } from 'vue-router'
 import { Icon } from '@iconify/vue'
 import { useMemoriesStore } from '@/stores/userMemories'
@@ -235,7 +236,8 @@ const props = withDefaults(defineProps<Props>(), {
 })
 const emit = defineEmits<Emits>()
 
-const { t, locale } = useI18n()
+const { t } = useI18n()
+const { formatDateTime } = useDateFormat()
 const router = useRouter()
 const memoriesStore = useMemoriesStore()
 const { confirm } = useDialog()
@@ -437,23 +439,13 @@ async function handleSaveMultiple(actions: ParsedAction[]) {
 }
 
 function formatDate(date: Date | number | string): string {
-  // Backend returns unix timestamps in SECONDS (e.g. 1705234567)
-  // JS Date expects milliseconds, so convert when needed.
   const d =
     typeof date === 'number'
       ? new Date(date < 10_000_000_000 ? date * 1000 : date)
       : typeof date === 'string'
         ? new Date(date)
         : date
-  const browserLocale = typeof navigator !== 'undefined' ? navigator.language : 'en'
-  const activeLocale = (locale?.value || browserLocale) as string
-  return new Intl.DateTimeFormat(activeLocale, {
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-  }).format(d)
+  return formatDateTime(d)
 }
 
 function viewAllMemories() {

@@ -23,12 +23,12 @@ jobs:
       - name: Setup PHP
         uses: shivammathur/setup-php@accd6127cb78bee3e8082180cb391013d204ef9f # v2
         with:
-          php-version: "8.3"
+          php-version: "8.4"
           extensions: mbstring, xml, ctype, iconv, intl
           coverage: none
 
       - name: Cache composer dependencies
-        uses: actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7 # v5
+        uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5
         with:
           path: backend/vendor
           key: ${{ runner.os }}-composer-${{ hashFiles('backend/composer.lock') }}
@@ -47,12 +47,12 @@ jobs:
     runs-on: ubuntu-latest
 
     env:
-      DATABASE_WRITE_URL: mysql://synaplan_test:synaplan_test@127.0.0.1:3306/synaplan?serverVersion=11.8&charset=utf8mb4
-      DATABASE_READ_URL: mysql://synaplan_test:synaplan_test@127.0.0.1:3306/synaplan?serverVersion=11.8&charset=utf8mb4
+      DATABASE_WRITE_URL: mysql://synaplan_test:synaplan_test@127.0.0.1:3306/synaplan?serverVersion=mariadb-12.2.2&charset=utf8mb4
+      DATABASE_READ_URL: mysql://synaplan_test:synaplan_test@127.0.0.1:3306/synaplan?serverVersion=mariadb-12.2.2&charset=utf8mb4
 
     services:
       mysql:
-        image: mariadb:11.8@sha256:f5644a292224cdf4b6514aca38b3b4436f0b0443d54170a472cd14261f31402d
+        image: mariadb:12.2@sha256:e0236fc6386e7eacd9359e59d0a078bd7aa0d18280d36d13061121bedeaee903
         env:
           MYSQL_ROOT_PASSWORD: root
           MYSQL_DATABASE: synaplan_test
@@ -73,12 +73,12 @@ jobs:
       - name: Setup PHP
         uses: shivammathur/setup-php@accd6127cb78bee3e8082180cb391013d204ef9f # v2
         with:
-          php-version: "8.3"
+          php-version: "8.4"
           extensions: mbstring, xml, ctype, iconv, intl, pdo, pdo_mysql, zip, gd, curl, bcmath, exif, pcntl, opcache, readline, soap, sodium, ffi, imagick, grpc
           coverage: none
 
       - name: Cache composer dependencies
-        uses: actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7 # v5
+        uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5
         with:
           path: backend/vendor
           key: ${{ runner.os }}-composer-${{ hashFiles('backend/composer.lock') }}
@@ -114,26 +114,48 @@ jobs:
 
       - name: Setup database schema
         working-directory: backend
-        run: |
-          # Run migrations (won't fail if none exist due to --allow-no-migration)
-          php bin/console doctrine:migrations:migrate --no-interaction --allow-no-migration
-          # Always run schema update to ensure all tables exist (idempotent)
-          php bin/console doctrine:schema:update --force
+        # Migrations are the single source of truth. We deliberately do NOT run
+        # `doctrine:schema:update --force` here — if an entity change is missing
+        # a migration, CI MUST fail so we surface the gap before deploy.
+        run: php bin/console doctrine:migrations:migrate --no-interaction --allow-no-migration
 
-      - name: Load fixtures
+      - name: Verify schema matches entities (no migration drift)
         working-directory: backend
+        # Full schema validation: catches broken ORM mapping AND any entity↔DB
+        # drift. Fails any PR that changes an entity without shipping a matching
+        # Doctrine migration. Unblocked by:
+        #   - doctrine/dbal 4.x upgrade (#781)
+        #   - `server_version: mariadb-*` in doctrine.yaml (correct platform routing)
+        #   - Version20260423000000 + Version20260429000000 (schema reconciliation)
+        # See docs/MIGRATIONS.md for details.
+        run: php bin/console doctrine:schema:validate
+
+      - name: Load demo fixtures
+        working-directory: backend
+        # Loads only dev/test demo data (admin/demo/test users). Production-essential
+        # catalog data (models, prompts, defaults, rate limits) is handled by app:seed below.
         run: php bin/console doctrine:fixtures:load --no-interaction
+
+      - name: Seed catalogs (models, prompts, defaults, rate limits)
+        working-directory: backend
+        # Idempotent seeders that populate BCONFIG with rate limits, default model bindings,
+        # AI model catalog and system prompts. Required for integration tests that exercise
+        # StorageQuotaService, MessageController, SummaryController, etc.
+        run: php bin/console app:seed --no-interaction
 
       - name: Run PHPUnit tests
         working-directory: backend
         run: php bin/phpunit
+
+      - name: Run migrations-bootstrap bash tests
+        run: bash _docker/backend/tests/test-migrations-bootstrap.sh
 
       - name: Generate OpenAPI spec
         working-directory: backend
         run: php bin/console nelmio:apidoc:dump --format=json > openapi-spec.json
 
       - name: Upload OpenAPI spec artifact
-        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: openapi-spec
           path: backend/openapi-spec.json
@@ -149,9 +171,9 @@ jobs:
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
 
       - name: Setup Node.js
-        uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
         with:
-          node-version: "20"
+          node-version: "22"
           cache: "npm"
           cache-dependency-path: frontend/package-lock.json
 
@@ -200,14 +222,14 @@ jobs:
         run: npm run build:widget
 
       - name: Upload frontend build artifact
-        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: frontend-dist
           path: frontend/dist/
           retention-days: 1
 
       - name: Upload widget build artifact
-        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: widget-dist
           path: frontend/dist-widget/
@@ -238,11 +260,11 @@ jobs:
           path: frontend/dist-widget/
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
+        uses: docker/setup-buildx-action@4d04d5d9486b7bd6fa91e7baf45bbb4f8b9deedd # v4
 
       - name: Extract metadata (tags, labels)
         id: meta
-        uses: docker/metadata-action@c299e40c65443455700f0fdfc63efafe5b349051 # v5
+        uses: docker/metadata-action@030e881283bb7a6894de51c315a6bfe6a94e05cf # v6
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
           tags: |
@@ -257,7 +279,7 @@ jobs:
 
       - name: Build Docker image
         id: build
-        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6
+        uses: docker/build-push-action@bcafcacb16a39f128d818304e6c9c0c18556b85f # v7
         with:
           context: .
           file: _docker/backend/Dockerfile
@@ -270,7 +292,7 @@ jobs:
           outputs: type=docker,dest=/tmp/docker-image.tar
 
       - name: Upload Docker image artifact
-        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: docker-image
           path: /tmp/docker-image.tar
@@ -343,6 +365,7 @@ jobs:
         run: |
           COMPOSE="docker compose -f docker-compose.test.yml -f docker-compose.test.ci.yml"
           PROFILE="${{ matrix.compose_profiles }}"
+          n=0; until $COMPOSE $PROFILE pull; do n=$((n+1)); [ "$n" -ge 4 ] && exit 1; sleep $((n*15)); done
 
           # app_test entrypoint loads fixtures on first run (APP_ENV=test, empty DB)
           # so TestProvider model (-1 > -7) and admin user exist for E2E.
@@ -376,9 +399,9 @@ jobs:
           $COMPOSE $PROFILE ps
 
       - name: Setup Node.js
-        uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
         with:
-          node-version: "20"
+          node-version: "22"
           cache: "npm"
           cache-dependency-path: frontend/package-lock.json
 
@@ -388,7 +411,7 @@ jobs:
 
       - name: Cache Playwright browsers
         id: playwright-cache
-        uses: actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7 # v5
+        uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5
         with:
           path: ~/.cache/ms-playwright
           key: ${{ runner.os }}-playwright-${{ matrix.browser }}-${{ hashFiles('frontend/package-lock.json') }}
@@ -397,12 +420,16 @@ jobs:
       - name: Install Playwright browsers
         if: steps.playwright-cache.outputs.cache-hit != 'true'
         working-directory: frontend
-        run: npx playwright install --with-deps ${{ matrix.browser }}
+        run: |
+          sudo sed -i '/azure\.archive\.ubuntu\.com/d' /etc/apt/apt-mirrors.txt
+          npx playwright install --with-deps ${{ matrix.browser }}
 
       - name: Install Playwright system dependencies
         if: steps.playwright-cache.outputs.cache-hit == 'true'
         working-directory: frontend
-        run: npx playwright install-deps ${{ matrix.browser }}
+        run: |
+          sudo sed -i '/azure\.archive\.ubuntu\.com/d' /etc/apt/apt-mirrors.txt
+          npx playwright install-deps ${{ matrix.browser }}
 
       - name: Run E2E tests
         working-directory: frontend
@@ -419,7 +446,7 @@ jobs:
 
       - name: Upload Playwright test results
         if: always()
-        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: playwright-results-${{ matrix.browser }}-${{ matrix.auth_method }}
           path: |
@@ -459,7 +486,7 @@ jobs:
           docker images
 
       - name: Log in to the Container registry
-        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
+        uses: docker/login-action@4907a6ddec9925e35a0a9e82d7399ccc52663121 # v4
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
@@ -485,9 +512,9 @@ jobs:
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
 
       - name: Setup Node.js
-        uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
         with:
-          node-version: "20"
+          node-version: "22"
 
       - name: Install dependencies
         working-directory: cloudflare

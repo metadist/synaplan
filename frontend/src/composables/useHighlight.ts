@@ -20,6 +20,12 @@
  */
 
 import type { HLJSApi } from 'highlight.js'
+// Static import so Rolldown (Vite 8) emits it as a plain CSS asset.
+// A dynamic import() causes Rolldown to generate an undeclared
+// `atom_one_dark_exports` binding that crashes at runtime.
+// This file is only imported by lazy-loaded components, so the CSS
+// still stays out of the initial bundle.
+import 'highlight.js/styles/atom-one-dark.css'
 
 let hljsInstance: HLJSApi | null = null
 let loadPromise: Promise<HLJSApi> | null = null
@@ -39,8 +45,6 @@ export function escapeHtml(text: string): string {
 async function doLoad(): Promise<HLJSApi> {
   try {
     const [
-      ,
-      // CSS side-effect import (no export)
       { default: hljs },
       { default: javascript },
       { default: typescript },
@@ -61,7 +65,6 @@ async function doLoad(): Promise<HLJSApi> {
       { default: markdown },
       { default: plaintext },
     ] = await Promise.all([
-      import('highlight.js/styles/atom-one-dark.css'),
       import('highlight.js/lib/core'),
       import('highlight.js/lib/languages/javascript'),
       import('highlight.js/lib/languages/typescript'),

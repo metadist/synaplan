@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Service;
 
+use App\AI\Exception\ModelNotConfiguredException;
 use App\AI\Service\AiFacade;
 use App\Entity\Prompt;
 use App\Entity\Widget;
@@ -72,6 +73,40 @@ final readonly class WidgetSummaryService
         $model = $this->modelRepository->find($modelId);
 
         return $model ? $model->getName() : null;
+    }
+
+    /**
+     * Resolve AI model configuration with multi-level fallback.
+     *
+     * Priority: preferredModelId → DEFAULT_SUMMARY_MODEL_ID → owner default CHAT → global default CHAT.
+     *
+     * @return array{provider: string, model: string, model_id: int}
+     *
+     * @throws ModelNotConfiguredException when no usable AI model can be found
+     */
+    private function resolveAiModelConfig(int $ownerId, ?int $preferredModelId = null): array
+    {
+        $candidates = array_filter([
+            $preferredModelId,
+            self::DEFAULT_SUMMARY_MODEL_ID,
+            $this->modelConfigService->getDefaultModel('CHAT', $ownerId),
+            $this->modelConfigService->getDefaultModel('CHAT', 0),
+        ]);
+
+        foreach ($candidates as $modelId) {
+            if ($modelId <= 0) {
+                continue;
+            }
+
+            $provider = $this->modelConfigService->getProviderForModel($modelId);
+            $modelName = $this->modelConfigService->getModelName($modelId);
+
+            if ($provider && $modelName) {
+                return ['provider' => $provider, 'model' => $modelName, 'model_id' => $modelId];
+            }
+        }
+
+        throw new ModelNotConfiguredException('No AI model configured for chat summary. Please configure a default CHAT model in settings.');
     }
 
     /**
@@ -504,19 +539,16 @@ PROMPT;
 
         $summaryConfig = $this->resolveSummaryConfig($widget, $conversationText, $systemPrompt);
         $analysisPrompt = $summaryConfig['prompt'];
-        $modelId = $summaryConfig['modelId'];
+
+        $modelConfig = $this->resolveAiModelConfig($widget->getOwnerId(), $summaryConfig['modelId']);
 
         try {
             $aiOptions = [
                 'temperature' => 0.3,
                 'max_tokens' => 4000,
+                'provider' => $modelConfig['provider'],
+                'model' => $modelConfig['model'],
             ];
-            $provider = $this->modelConfigService->getProviderForModel($modelId);
-            $modelName = $this->modelConfigService->getModelName($modelId);
-            if ($provider && $modelName) {
-                $aiOptions['provider'] = $provider;
-                $aiOptions['model'] = $modelName;
-            }
 
             $result = $this->aiFacade->chat([
                 ['role' => 'user', 'content' => $analysisPrompt],
@@ -529,7 +561,7 @@ PROMPT;
                 $this->rateLimitService->recordUsage($owner, 'WIDGET_SUMMARY', [
                     'provider' => $result['provider'] ?? 'unknown',
                     'model' => $result['model'] ?? 'unknown',
-                    'model_id' => $modelId,
+                    'model_id' => $modelConfig['model_id'],
                     'usage' => $result['usage'] ?? [],
                     'response_text' => $responseText,
                     'input_text' => $analysisPrompt,

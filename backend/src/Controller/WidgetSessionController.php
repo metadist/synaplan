@@ -12,6 +12,7 @@ use App\Repository\WidgetRepository;
 use App\Repository\WidgetSessionRepository;
 use App\Service\WidgetEventCacheService;
 use App\Service\WidgetService;
+use App\Service\WidgetSessionService;
 use Doctrine\ORM\EntityManagerInterface;
 use OpenApi\Attributes as OA;
 use Psr\Log\LoggerInterface;
@@ -40,6 +41,7 @@ class WidgetSessionController extends AbstractController
         private WidgetEventCacheService $eventCache,
         private EntityManagerInterface $em,
         private WidgetService $widgetService,
+        private WidgetSessionService $sessionService,
     ) {
     }
 
@@ -724,6 +726,74 @@ class WidgetSessionController extends AbstractController
                 'error' => 'Failed to delete sessions',
             ], Response::HTTP_INTERNAL_SERVER_ERROR);
         }
+    }
+
+    /**
+     * Initialize an internal-mode session for the widget owner.
+     *
+     * Eagerly creates the WidgetSession (or reuses an existing one) and pins it
+     * to MODE_INTERNAL so that dashboard panels (custom fields, etc.) can call
+     * authenticated session endpoints before the first chat message is sent.
+     */
+    #[Route('/{sessionId}/init-internal', name: 'init_internal', methods: ['POST'])]
+    #[OA\Post(
+        path: '/api/v1/widgets/{widgetId}/sessions/{sessionId}/init-internal',
+        summary: 'Create or pin an internal-mode session for the widget owner',
+        security: [['Bearer' => []]],
+        tags: ['Widget Sessions']
+    )]
+    #[OA\Parameter(name: 'widgetId', in: 'path', required: true, schema: new OA\Schema(type: 'string'))]
+    #[OA\Parameter(name: 'sessionId', in: 'path', required: true, schema: new OA\Schema(type: 'string'))]
+    #[OA\Response(
+        response: 200,
+        description: 'Internal session ready',
+        content: new OA\JsonContent(
+            properties: [
+                new OA\Property(property: 'success', type: 'boolean'),
+                new OA\Property(property: 'sessionId', type: 'string'),
+                new OA\Property(property: 'mode', type: 'string', enum: ['ai', 'human', 'waiting', 'internal']),
+            ]
+        )
+    )]
+    #[OA\Response(response: 401, description: 'Not authenticated')]
+    #[OA\Response(response: 403, description: 'Access denied')]
+    #[OA\Response(response: 404, description: 'Widget not found')]
+    public function initInternalSession(
+        string $widgetId,
+        string $sessionId,
+        #[CurrentUser] ?User $user,
+    ): JsonResponse {
+        if (!$user) {
+            return $this->json(['error' => 'Not authenticated'], Response::HTTP_UNAUTHORIZED);
+        }
+
+        $widget = $this->widgetRepository->findByWidgetId($widgetId);
+        if (!$widget) {
+            return $this->json(['error' => 'Widget not found'], Response::HTTP_NOT_FOUND);
+        }
+
+        if ($widget->getOwnerId() !== $user->getId()) {
+            return $this->json(['error' => 'Access denied'], Response::HTTP_FORBIDDEN);
+        }
+
+        if ('' === trim($sessionId)) {
+            return $this->json(['error' => 'sessionId required'], Response::HTTP_BAD_REQUEST);
+        }
+
+        $session = $this->sessionService->getOrCreateSession($widget->getWidgetId(), $sessionId, false);
+
+        // Only promote AI-mode sessions to internal — never downgrade an active
+        // human-takeover or already-internal session.
+        if ($session->isAiMode()) {
+            $session->setMode(WidgetSession::MODE_INTERNAL);
+            $this->em->flush();
+        }
+
+        return $this->json([
+            'success' => true,
+            'sessionId' => $session->getSessionId(),
+            'mode' => $session->getMode(),
+        ]);
     }
 
     /**

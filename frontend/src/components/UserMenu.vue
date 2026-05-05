@@ -39,6 +39,15 @@
           <span>{{ $t('nav.profile') }}</span>
         </button>
         <button
+          role="menuitem"
+          class="dropdown-item"
+          data-testid="btn-user-settings"
+          @click="handleSettings"
+        >
+          <Cog6ToothIcon class="w-5 h-5" />
+          <span>{{ $t('nav.settings') }}</span>
+        </button>
+        <button
           v-if="isMemoryServiceAvailable"
           role="menuitem"
           class="dropdown-item"
@@ -63,7 +72,15 @@
             class="w-4 h-4 animate-spin ml-auto"
           />
         </button>
+        <!--
+          Logout is intentionally hidden while impersonating: clicking it
+          would clear the admin's session entirely (cookies + stash) instead
+          of just ending the impersonation, which is almost never what the
+          operator means. The "Exit" button on the floating impersonation
+          pill is the correct action here.
+        -->
         <button
+          v-if="!isImpersonating"
           role="menuitem"
           class="dropdown-item"
           data-testid="btn-user-logout"
@@ -84,6 +101,7 @@ import {
   UserCircleIcon,
   ArrowRightOnRectangleIcon,
   ChevronDownIcon,
+  Cog6ToothIcon,
 } from '@heroicons/vue/24/outline'
 import { Icon } from '@iconify/vue'
 import { useAuth } from '@/composables/useAuth'
@@ -108,7 +126,7 @@ const props = withDefaults(defineProps<Props>(), {
 const emit = defineEmits<Emits>()
 
 const router = useRouter()
-const { logout } = useAuth()
+const { logout, isImpersonating } = useAuth()
 const authStore = useAuthStore()
 const configStore = useConfigStore()
 const memoriesStore = useMemoriesStore()
@@ -137,6 +155,11 @@ const initials = computed(() => {
 const handleProfileSettings = () => {
   isOpen.value = false
   router.push('/profile')
+}
+
+const handleSettings = () => {
+  isOpen.value = false
+  router.push('/settings')
 }
 
 const handleOpenMemories = () => {

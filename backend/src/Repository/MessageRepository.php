@@ -162,6 +162,88 @@ class MessageRepository extends ServiceEntityRepository
             ->getResult();
     }
 
+    /**
+     * Count messages in a chat with optional direction / time / status filters.
+     *
+     * Used by the widget session quota check (visitor-only, time-windowed) and by
+     * the export service to derive ground-truth message counts independently of
+     * the {@see \App\Entity\WidgetSession::$messageCount} cache.
+     *
+     * @param int|null    $chatId         Chat ID; returns 0 when null (no chat attached yet)
+     * @param string|null $direction      Filter by 'IN' or 'OUT' (null = all)
+     * @param int|null    $sinceTimestamp Inclusive lower bound on `BUNIXTIMES` (null = no lower bound)
+     * @param bool        $excludeFailed  Exclude messages with `BSTATUS = 'failed'` (default true)
+     */
+    public function countByChatId(
+        ?int $chatId,
+        ?string $direction = null,
+        ?int $sinceTimestamp = null,
+        bool $excludeFailed = true,
+    ): int {
+        if (null === $chatId) {
+            return 0;
+        }
+
+        $qb = $this->createQueryBuilder('m')
+            ->select('COUNT(m.id)')
+            ->where('m.chatId = :chatId')
+            ->setParameter('chatId', $chatId);
+
+        if (null !== $direction) {
+            $qb->andWhere('m.direction = :direction')
+                ->setParameter('direction', $direction);
+        }
+
+        if (null !== $sinceTimestamp) {
+            $qb->andWhere('m.unixTimestamp >= :since')
+                ->setParameter('since', $sinceTimestamp);
+        }
+
+        if ($excludeFailed) {
+            $qb->andWhere('m.status <> :failed')
+                ->setParameter('failed', 'failed');
+        }
+
+        return (int) $qb->getQuery()->getSingleScalarResult();
+    }
+
+    /**
+     * Bulk variant of {@see countByChatId()} for use in list/export views.
+     *
+     * Returns a map of chatId => count so callers can avoid the N+1 query pattern
+     * when annotating a list of sessions with their real message counts.
+     *
+     * @param int[] $chatIds
+     *
+     * @return array<int, int>
+     */
+    public function countByChatIds(array $chatIds, bool $excludeFailed = true): array
+    {
+        if ([] === $chatIds) {
+            return [];
+        }
+
+        $qb = $this->createQueryBuilder('m')
+            ->select('IDENTITY(m.chat) AS chat_id, COUNT(m.id) AS cnt')
+            ->where('m.chatId IN (:chatIds)')
+            ->setParameter('chatIds', $chatIds)
+            ->groupBy('m.chatId');
+
+        if ($excludeFailed) {
+            $qb->andWhere('m.status <> :failed')
+                ->setParameter('failed', 'failed');
+        }
+
+        $rows = $qb->getQuery()->getArrayResult();
+
+        $counts = [];
+        foreach ($rows as $row) {
+            $counts[(int) $row['chat_id']] = (int) $row['cnt'];
+        }
+
+        return $counts;
+    }
+
     public function findUserFileMessage(int $messageId, int $userId): ?Message
     {
         return $this->findOneBy([

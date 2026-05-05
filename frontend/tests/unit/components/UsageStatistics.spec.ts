@@ -8,6 +8,7 @@ const mockStats = {
   subscription: {
     level: 'PRO',
     active: true,
+    status: 'active',
     plan_name: 'Pro Plan',
     expires_at: null,
     stripe_customer_id: null,
@@ -67,6 +68,7 @@ const mockStats = {
     },
   ],
   total_requests: 50,
+  total_messages: 50,
   cost_budget: {
     used: 5.25,
     budget: 15.0,

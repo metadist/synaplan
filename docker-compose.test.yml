@@ -32,8 +32,8 @@ services:
       APP_URL: http://localhost:8001
       FRONTEND_URL: http://localhost:8001
       PLUGINS_DIR: /plugins
-      DATABASE_WRITE_URL: mysql://synaplan_test:synaplan_test@db_test:3306/synaplan?serverVersion=11.8&charset=utf8mb4
-      DATABASE_READ_URL: mysql://synaplan_test:synaplan_test@db_test:3306/synaplan?serverVersion=11.8&charset=utf8mb4
+      DATABASE_WRITE_URL: mysql://synaplan_test:synaplan_test@db_test:3306/synaplan?serverVersion=mariadb-12.2.2&charset=utf8mb4
+      DATABASE_READ_URL: mysql://synaplan_test:synaplan_test@db_test:3306/synaplan?serverVersion=mariadb-12.2.2&charset=utf8mb4
       OLLAMA_BASE_URL: http://ollama-stub:11434
       TIKA_BASE_URL: http://tika_test:9998
       AI_DEFAULT_PROVIDER: test
@@ -75,7 +75,7 @@ services:
 
   # MariaDB Test Database
   db_test:
-    image: mariadb:11.8.6@sha256:f5644a292224cdf4b6514aca38b3b4436f0b0443d54170a472cd14261f31402d
+    image: mariadb:12.2.2@sha256:e0236fc6386e7eacd9359e59d0a078bd7aa0d18280d36d13061121bedeaee903
     container_name: synaplan-db-test
     command: --max-allowed-packet=256M --innodb-buffer-pool-size=256M
     environment:
@@ -99,7 +99,7 @@ services:
 
   # Ollama Test (Optional - Integration Profile)
   ollama_test:
-    image: ollama/ollama:latest@sha256:87d71eb588a28c747094ca5d011392a3790f6ea9bd9c87594780ad7c65cc7ed1
+    image: ollama/ollama:latest@sha256:5600a652d1081050f398152127c584222546354491f27fe47ccbc6351bc870bd
     container_name: synaplan-ollama-test
     ports:
       - "11436:11434"
@@ -115,7 +115,7 @@ services:
 
   # Apache Tika Test (Optional - Integration Profile)
   tika_test:
-    image: apache/tika:2.9.2.1@sha256:2be134745fcb59826c54041489946c66218b948ea0c0be3a37cb7919ecc845ba
+    image: apache/tika:3.3.0.0@sha256:2a565f1ea1290bdcb74a7d35957d16a989ed44ef98790dcdcc28121d728fa583
     container_name: synaplan-tika-test
     command: -h 0.0.0.0 -p 9998
     ports:
@@ -127,11 +127,17 @@ services:
       - synaplan-test-network
 
   # Ollama API stub (deterministic responses for OllamaProvider integration tests).
+  # Same pattern as whatsapp-stub: pinned node:22-alpine + bind mount so CI `docker compose pull` retries cover it.
   ollama-stub:
-    build:
-      context: frontend/tests/e2e/stub-servers/ollama
-      dockerfile: Dockerfile
+    image: node:22-alpine@sha256:8ea2348b068a9544dae7317b4f3aafcdc032df1647bb7d768a05a5cad1a7683f
     container_name: synaplan-ollama-stub
+    user: node
+    working_dir: /app
+    volumes:
+      - ./frontend/tests/e2e/stub-servers/ollama/ollama-stub-server.ts:/app/ollama-stub-server.ts:ro
+    environment:
+      PORT: "11434"
+    command: ["node", "ollama-stub-server.ts"]
     ports:
       - "11434:11434"
     init: true
@@ -140,11 +146,19 @@ services:
       - synaplan-test-network
 
   # WhatsApp Graph API stub (starts by default for all E2E jobs).
+  # Uses node:22-alpine directly instead of a Dockerfile build so that
+  # `docker compose pull` (with retry) covers this image too.
   whatsapp-stub:
-    build:
-      context: frontend/tests/e2e/stub-servers/whatsapp
-      dockerfile: Dockerfile
+    image: node:22-alpine@sha256:8ea2348b068a9544dae7317b4f3aafcdc032df1647bb7d768a05a5cad1a7683f
     container_name: synaplan-whatsapp-stub
+    user: node
+    working_dir: /app
+    volumes:
+      - ./frontend/tests/e2e/stub-servers/whatsapp/whatsapp-stub-server.ts:/app/whatsapp-stub-server.ts:ro
+    environment:
+      PORT: "3999"
+      STUB_HOST: whatsapp-stub
+    command: ["node", "whatsapp-stub-server.ts"]
     ports:
       - "3999:3999"
     init: true
@@ -165,7 +179,7 @@ services:
 
   # Generates a self-signed TLS certificate for Keycloak HTTPS (runs once)
   keycloak_certs:
-    image: alpine:3.23@sha256:25109184c71bdad752c8312a8623239686a9a2071e8825f20acb8f2198c3f659
+    image: alpine:3.23@sha256:5b10f432ef3da1b8d4c7eb6c487f2f5a8f096bc91145e68878dd4a5019afde11
     container_name: synaplan-keycloak-certs-test
     command: sh -c 'if [ -f /certs/cert.pem ]; then echo "Keycloak TLS cert exists"; exit 0; fi && apk add --no-cache openssl && openssl req -x509 -newkey rsa:2048 -keyout /certs/key.pem -out /certs/cert.pem -days 3650 -nodes -subj "/CN=host.docker.internal" -addext "subjectAltName=DNS:host.docker.internal,DNS:keycloak_test,DNS:localhost" && chmod 644 /certs/*.pem && echo "Keycloak TLS cert generated"'
     volumes:
@@ -177,7 +191,7 @@ services:
 
   # Keycloak OIDC Identity Provider (optional - activated with --profile oidc)
   keycloak_test:
-    image: quay.io/keycloak/keycloak:26.5@sha256:45ae20191531eb608ddb0b775d012b40d3e4f942697f3214694887dd7c108d13
+    image: quay.io/keycloak/keycloak:26.6@sha256:26ae26445475f7fac5f90ee138b1bdb64324f5815fb16133ffdbdb122d97c4d8
     container_name: synaplan-keycloak-test
     depends_on:
       keycloak_certs:
@@ -210,7 +224,7 @@ services:
       - synaplan-test-network
 
   keycloak_setup:
-    image: quay.io/keycloak/keycloak:26.5@sha256:45ae20191531eb608ddb0b775d012b40d3e4f942697f3214694887dd7c108d13
+    image: quay.io/keycloak/keycloak:26.6@sha256:26ae26445475f7fac5f90ee138b1bdb64324f5815fb16133ffdbdb122d97c4d8
     container_name: synaplan-keycloak-setup-test
     depends_on:
       keycloak_test:

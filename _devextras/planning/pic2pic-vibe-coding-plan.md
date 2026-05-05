@@ -193,7 +193,7 @@ Update `MediaGenerationService` and database seeds to support a dedicated `PIC2P
 
 Target behavior:
 - `MediaGenerationService::generateFromImages()` requests `pic2pic` capability instead of `image` when resolving the model.
-- `BCONFIG.sql` includes `(57,0,'DEFAULTMODEL','PIC2PIC','190')` (Nano Banana 2).
+- The `app:seed` config seeder writes `(GROUP=DEFAULTMODEL, SETTING=PIC2PIC, VAL=190)` (Nano Banana 2) into `BCONFIG`.
 - `synaplan-platform/scripts/pic2pic-models-update.sql` inserts this config for the live DB.
 
 ### Step 3: Extend sorting metadata (✅ COMPLETED)

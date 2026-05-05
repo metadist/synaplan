@@ -34,10 +34,12 @@ class Subscription
     #[ORM\Column(name: 'BACTIVE', type: 'boolean', options: ['default' => true])]
     private bool $active = true;
 
-    #[ORM\Column(name: 'BCOST_BUDGET_MONTHLY', type: 'decimal', precision: 10, scale: 2, options: ['default' => 0])]
+    // default literals match MariaDB's information_schema COLUMN_DEFAULT format
+    // for decimal(10,2), so doctrine:schema:validate does not flag a diff.
+    #[ORM\Column(name: 'BCOST_BUDGET_MONTHLY', type: 'decimal', precision: 10, scale: 2, options: ['default' => '0.00'])]
     private string $costBudgetMonthly = '0.00';
 
-    #[ORM\Column(name: 'BCOST_BUDGET_YEARLY', type: 'decimal', precision: 10, scale: 2, options: ['default' => 0])]
+    #[ORM\Column(name: 'BCOST_BUDGET_YEARLY', type: 'decimal', precision: 10, scale: 2, options: ['default' => '0.00'])]
     private string $costBudgetYearly = '0.00';
 
     #[ORM\Column(name: 'BSTRIPE_MONTHLY_ID', length: 128, nullable: true)]

@@ -4,6 +4,8 @@ namespace App\Controller;
 
 use App\Entity\User;
 use App\Repository\UserRepository;
+use App\Service\ImpersonationService;
+use App\Service\Message\SynapseAutoIndexService;
 use App\Service\OAuthStateService;
 use App\Service\TokenService;
 use Doctrine\ORM\EntityManagerInterface;
@@ -13,7 +15,7 @@ use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\RedirectResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
-use Symfony\Component\Routing\Annotation\Route;
+use Symfony\Component\Routing\Attribute\Route;
 use Symfony\Contracts\HttpClient\HttpClientInterface;
 
 #[Route('/api/v1/auth/google')]
@@ -29,6 +31,8 @@ class GoogleAuthController extends AbstractController
         private EntityManagerInterface $em,
         private TokenService $tokenService,
         private OAuthStateService $oauthStateService,
+        private ImpersonationService $impersonationService,
+        private SynapseAutoIndexService $synapseAutoIndex,
         private LoggerInterface $logger,
         private string $googleClientId,
         private string $googleClientSecret,
@@ -152,6 +156,9 @@ class GoogleAuthController extends AbstractController
             $accessToken = $this->tokenService->generateAccessToken($user);
             $refreshToken = $this->tokenService->generateRefreshToken($user, $request->getClientIp());
 
+            // Best-effort: refresh Synapse Routing topics for this user.
+            $this->synapseAutoIndex->scheduleForUser($user);
+
             // Create redirect response with cookies
             $callbackUrl = $this->frontendUrl.'/auth/callback?'.http_build_query([
                 'success' => 'true',
@@ -160,8 +167,13 @@ class GoogleAuthController extends AbstractController
 
             $response = new RedirectResponse($callbackUrl);
 
-            // Add auth cookies
+            // Set fresh auth cookies and defensively wipe any orphan
+            // impersonation stash that survived from a prior session on this
+            // browser. Without this, a user signing in via Google could
+            // inherit a stash pointing at a previous admin's refresh token,
+            // which would let them resurrect that admin session via "Exit".
             $this->tokenService->addAuthCookies($response, $accessToken, $refreshToken);
+            $this->impersonationService->attachClearStashCookies($response);
 
             $this->logger->info('Google OAuth successful, redirecting with cookies', [
                 'user_id' => $user->getId(),
@@ -197,14 +209,18 @@ class GoogleAuthController extends AbstractController
         $user = $this->userRepository->findOneBy(['mail' => $email]);
 
         if ($user) {
-            // User exists - verify they registered with Google
-            if ('google' !== $user->getProviderId()) {
-                throw new \Exception(sprintf('This email is already registered using %s. Please use the same login method.', $user->getAuthProviderName()));
+            if ($user->isManagedExternally()) {
+                $this->logger->warning('Google OAuth blocked for Keycloak-managed user', [
+                    'user_id' => $user->getId(),
+                    'email' => $email,
+                ]);
+                throw new \Exception('Google OAuth not allowed for organization-managed account');
             }
 
-            $this->logger->info('Existing Google user logging in', [
+            $this->logger->info('Existing user logging in via Google', [
                 'user_id' => $user->getId(),
                 'email' => $email,
+                'original_provider' => $user->getProviderId(),
             ]);
         } else {
             // Create new user

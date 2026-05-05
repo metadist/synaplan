@@ -188,10 +188,12 @@
 import { ref, computed, watch } from 'vue'
 import * as filesService from '@/services/filesService'
 import { useNotification } from '@/composables/useNotification'
+import { useDateFormat } from '@/composables/useDateFormat'
 import { useConfigStore } from '@/stores/config'
 import { getErrorMessage } from '@/utils/errorMessage'
 
 const { success: showSuccess, error: showError } = useNotification()
+const { formatDateTime } = useDateFormat()
 const config = useConfigStore()
 
 interface Props {
@@ -324,7 +326,7 @@ const copyLink = async () => {
 }
 
 const formatDate = (timestamp: number): string => {
-  return new Date(timestamp * 1000).toLocaleString()
+  return formatDateTime(new Date(timestamp * 1000))
 }
 
 const close = () => {
