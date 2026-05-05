@@ -3,7 +3,10 @@ framework:
     secret: '%env(APP_SECRET)%'
 
     # Note that the session will be started ONLY if you read or write from it.
-    session: true
+    # Stored in Redis (REDIS_DSN) for multi-backend deployments; PHPUnit uses mock file storage (see test/framework.yaml).
+    session:
+        handler_id: Symfony\Component\HttpFoundation\Session\Storage\Handler\RedisSessionHandler
+        gc_maxlifetime: 604800
 
     #esi: true
     #fragments: true

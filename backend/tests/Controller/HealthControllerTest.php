@@ -36,6 +36,13 @@ class HealthControllerTest extends WebTestCase
 
         $this->assertArrayHasKey('providers', $responseData);
         $this->assertIsArray($responseData['providers']);
+
+        $this->assertArrayHasKey('redis', $responseData);
+        $this->assertIsArray($responseData['redis']);
+        $this->assertTrue($responseData['redis']['available']);
+
+        $this->assertArrayHasKey('whisper', $responseData);
+        $this->assertIsArray($responseData['whisper']);
     }
 
     public function testHealthEndpointReturnsProviderStatus(): void

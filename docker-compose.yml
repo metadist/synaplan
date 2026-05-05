@@ -98,7 +98,8 @@ services:
       AI_DEFAULT_PROVIDER: ollama
       # Token Configuration
       TOKEN_SECRET: 'change_me_in_production_use_openssl_rand_hex_32'
-      LOCK_DSN: ${LOCK_DSN:-flock}
+      REDIS_DSN: ${REDIS_DSN:-redis://redis:6379}
+      LOCK_DSN: ${LOCK_DSN:-redis://redis:6379}
       # Mailer (Mailhog for development)
       MAILER_DSN: smtp://mailhog:1025
       # External API Keys loaded from backend/.env via env_file
@@ -127,6 +128,8 @@ services:
       SYNAPLAN_TTS_URL: ${SYNAPLAN_TTS_URL:-http://host.docker.internal:10200}
     depends_on:
       db:
+        condition: service_healthy
+      redis:
         condition: service_healthy
     restart: unless-stopped
     extra_hosts:
@@ -166,6 +169,23 @@ services:
       timeout: 10s
       retries: 5
       start_period: 60s
+    restart: unless-stopped
+    networks:
+      - synaplan-network
+
+  # Redis — shared Symfony Cache + Lock (distributed dedupe/cron exclusion)
+  redis:
+    image: redis:7-alpine
+    container_name: synaplan-redis
+    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
     restart: unless-stopped
     networks:
       - synaplan-network
@@ -345,6 +365,7 @@ volumes:
   whisper_models:
   qdrant_storage:
   keycloak_certs:
+  redis_data:
 
 networks:
   synaplan-network:

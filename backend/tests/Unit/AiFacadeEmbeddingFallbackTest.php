@@ -30,6 +30,13 @@ class AiFacadeEmbeddingFallbackTest extends TestCase
     private InternalEmailService&MockObject $emailService;
     private CacheInterface&MockObject $cache;
 
+    /**
+     * Mimics Symfony Redis cache hits in unit tests (embedding fallback throttle keys must hit after first store).
+     *
+     * @var array<string, mixed>
+     */
+    private array $simulatedPersistedCache = [];
+
     protected function setUp(): void
     {
         $this->registry = $this->createMock(ProviderRegistry::class);
@@ -40,6 +47,21 @@ class AiFacadeEmbeddingFallbackTest extends TestCase
         $this->discord = $this->createMock(DiscordNotificationService::class);
         $this->emailService = $this->createMock(InternalEmailService::class);
         $this->cache = $this->createMock(CacheInterface::class);
+
+        $this->simulatedPersistedCache = [];
+
+        $this->cache->method('get')->willReturnCallback(
+            function (string $key, callable $callback) {
+                if (array_key_exists($key, $this->simulatedPersistedCache)) {
+                    return $this->simulatedPersistedCache[$key];
+                }
+
+                $item = $this->createMock(ItemInterface::class);
+                $item->method('expiresAfter')->willReturnSelf();
+
+                return $this->simulatedPersistedCache[$key] = $callback($item);
+            },
+        );
     }
 
     public function testEmbedSucceedsWithPrimaryProvider(): void
@@ -79,11 +101,6 @@ class AiFacadeEmbeddingFallbackTest extends TestCase
                 'cloudflare' => $fallback,
                 default => throw new ProviderException("Unknown: $name", 'test'),
             });
-
-        // Cache miss: callback is invoked, so we simulate that
-        $this->cache->method('get')->willReturnCallback(function (string $key, callable $callback) {
-            return $callback($this->createMock(ItemInterface::class));
-        });
 
         $this->discord->expects($this->once())->method('notifyEmbeddingFallback')
             ->with('ollama', 'cloudflare', 'Connection refused');
@@ -153,10 +170,6 @@ class AiFacadeEmbeddingFallbackTest extends TestCase
                 default => throw new ProviderException("Unknown: $name", 'test'),
             });
 
-        $this->cache->method('get')->willReturnCallback(function (string $key, callable $callback) {
-            return $callback($this->createMock(ItemInterface::class));
-        });
-
         $facade = $this->createFacade('cloudflare');
         $result = $facade->embedBatch(['text1', 'text2']);
 
@@ -182,18 +195,6 @@ class AiFacadeEmbeddingFallbackTest extends TestCase
                 'cloudflare' => $fallback,
                 default => throw new ProviderException("Unknown: $name", 'test'),
             });
-
-        $callCount = 0;
-        $this->cache->method('get')->willReturnCallback(
-            function (string $key, callable $callback) use (&$callCount) {
-                ++$callCount;
-                if ($callCount <= 1) {
-                    return $callback($this->createMock(ItemInterface::class));
-                }
-
-                return true;
-            }
-        );
 
         $this->discord->expects($this->once())->method('notifyEmbeddingFallback');
         $this->emailService->expects($this->once())->method('sendEmbeddingFallbackWarning');

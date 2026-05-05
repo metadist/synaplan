@@ -11,6 +11,13 @@ RUN mkdir -p /var/www/uploads && chmod 777 /var/www/uploads && \
     printf "display_errors=Off\ndisplay_startup_errors=Off\nlog_errors=On\nerror_reporting=E_ALL & ~E_DEPRECATED & ~E_STRICT\n" \
     > /usr/local/etc/php/conf.d/production.ini
 
+# phpredis — required by Symfony Messenger Redis transport (symfony/redis-messenger). Cache/sessions use Predis separately.
+RUN apt-get update && apt-get install -y --no-install-recommends $PHPIZE_DEPS \
+    && pecl install redis \
+    && docker-php-ext-enable redis \
+    && apt-get purge -y --auto-remove -o APT::AutoRemove::RecommendsImportant=false $PHPIZE_DEPS \
+    && rm -rf /var/lib/apt/lists/*
+
 # Set default environment variables for paths and constants
 # These are baked into the image since they reference local filesystem paths
 ENV BRAVE_SEARCH_API_URL=https://api.search.brave.com/res/v1 \
@@ -52,7 +59,7 @@ COPY plugins/ /plugins/
 #   This is safe for Symfony apps where all classes are autoloaded via composer
 #   Provides significant performance improvement by eliminating file_exists() calls
 # Cache is cleared on container startup anyway via docker-entrypoint.sh
-RUN composer install --prefer-dist --no-interaction --no-dev --no-scripts --optimize-autoloader --classmap-authoritative --ignore-platform-req=ext-redis && \
+RUN composer install --prefer-dist --no-interaction --no-dev --no-scripts --optimize-autoloader --classmap-authoritative && \
     chown -R www-data:www-data /var/www/backend/vendor
 
 # Copy and setup entrypoint scripts (entrypoint + sourced migrations-bootstrap library)

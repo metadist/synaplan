@@ -13,6 +13,7 @@
         "codewithkyrian/whisper.php": "^1.1",
         "doctrine/dbal": "^4.4.3",
         "doctrine/doctrine-bundle": "^3.2.2",
+        "doctrine/doctrine-fixtures-bundle": "^4.3.1",
         "doctrine/doctrine-migrations-bundle": "^4.0",
         "doctrine/orm": "^3.6.3",
         "erusev/parsedown": "^1.8.0",
@@ -33,6 +34,7 @@
         "phpoffice/phpspreadsheet": "^4.5.0",
         "phpoffice/phpword": "^1.4",
         "phpstan/phpdoc-parser": "^2.3.2",
+        "predis/predis": "^2.4",
         "smalot/pdfparser": "^2.12.5",
         "stripe/stripe-php": "^20.1",
         "symfony/asset": "8.0.*",
@@ -51,6 +53,7 @@
         "symfony/property-access": "8.0.*",
         "symfony/property-info": "8.0.*",
         "symfony/rate-limiter": "8.0.*",
+        "symfony/redis-messenger": "^8.0",
         "symfony/runtime": "8.0.*",
         "symfony/security-bundle": "8.0.*",
         "symfony/serializer": "8.0.*",
@@ -58,8 +61,7 @@
         "symfony/validator": "8.0.*",
         "symfony/yaml": "8.0.*",
         "web-token/jwt-library": "^4.1.6",
-        "webklex/php-imap": "^6.2",
-        "doctrine/doctrine-fixtures-bundle": "^4.3.1"
+        "webklex/php-imap": "^6.2"
     },
     "config": {
         "allow-plugins": {

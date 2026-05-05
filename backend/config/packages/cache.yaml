@@ -1,29 +1,43 @@
 framework:
     cache:
         prefix_seed: synaplan_sf
-        
-        # Filesystem cache (Redis removed)
-        app: cache.adapter.filesystem
-        
+
+        # Shared ephemeral state (Stripe idempotency, WhatsApp dedupe markers, CircuitBreaker, JWKS,
+        # Qdrant health, rate-limit windows, …). Requires REDIS_DSN (see Docker Compose).
+        app: cache.adapter.redis
+        default_redis_provider: '%env(REDIS_DSN)%'
+
         pools:
             # Provider status cache (short TTL)
             cache.provider_status:
-                adapter: cache.adapter.filesystem
+                adapter: cache.adapter.redis
                 default_lifetime: 60
-                
+
             # Model configuration cache
             cache.model_config:
-                adapter: cache.adapter.filesystem
+                adapter: cache.adapter.redis
                 default_lifetime: 3600
-                
+
             # User config cache
             cache.user_config:
-                adapter: cache.adapter.filesystem
+                adapter: cache.adapter.redis
                 default_lifetime: 1800
-            
-            # Widget events cache (replaces BWIDGET_EVENTS table)
-            # All real-time events (takeover, handback, message, typing, notification)
-            # Events auto-expire after 10 minutes (enough for reconnects)
+
+            # Widget real-time SSE events — stays filesystem until the widget backlog is migrated to Redis.
             cache.widget_events:
                 adapter: cache.adapter.filesystem
                 default_lifetime: 600
+
+when@test:
+    framework:
+        cache:
+            app: cache.adapter.array
+            pools:
+                cache.provider_status:
+                    adapter: cache.adapter.array
+                cache.model_config:
+                    adapter: cache.adapter.array
+                cache.user_config:
+                    adapter: cache.adapter.array
+                cache.widget_events:
+                    adapter: cache.adapter.array

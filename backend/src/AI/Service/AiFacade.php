@@ -13,9 +13,14 @@ use App\Service\InternalEmailService;
 use App\Service\ModelConfigService;
 use Psr\Log\LoggerInterface;
 use Symfony\Contracts\Cache\CacheInterface;
+use Symfony\Contracts\Cache\ItemInterface;
 
 class AiFacade
 {
+    private const EMBEDDING_SHARED_CACHE_TTL_SECONDS = 604800; // 7 days — model+text defines the vector; bump version prefix if format changes
+
+    private const EMBEDDING_SHARED_CACHE_KEY_PREFIX = 'embed.v1.';
+
     /** @var array<string, array{embedding: array<float>, usage: array{prompt_tokens: int, total_tokens: int}}> */
     private array $embedCache = [];
 
@@ -222,38 +227,79 @@ class AiFacade
         $provider = $this->registry->getEmbeddingProvider($providerName);
         $resolvedModel = $model ?? $provider->getDefaultModels()['embedding'] ?? 'default';
 
-        $cacheKey = md5($text.'|'.$provider->getName().'|'.$resolvedModel);
-        if (isset($this->embedCache[$cacheKey])) {
-            $this->logger->debug('AI embedding cache hit', [
+        $inProcessKey = $this->embeddingInProcessCacheKey($text, $provider->getName(), $resolvedModel, $options);
+        if (isset($this->embedCache[$inProcessKey])) {
+            $this->logger->debug('AI embedding in-process cache hit', [
                 'provider' => $provider->getName(),
                 'model' => $resolvedModel,
                 'text_length' => strlen($text),
             ]);
 
-            return $this->embedCache[$cacheKey];
+            return $this->embedCache[$inProcessKey];
         }
 
-        $this->logger->info('AI embedding request', [
-            'provider' => $provider->getName(),
-            'user_id' => $userId,
-            'model' => $resolvedModel,
-            'text_length' => strlen($text),
-        ]);
+        $sharedKey = $this->embeddingSharedCacheKey($text, $provider->getName(), $resolvedModel, $options);
 
         try {
-            $result = $provider->embed($text, $options);
-        } catch (\Throwable $primaryError) {
-            $result = $this->tryEmbeddingFallback(
+            return $this->embedCache[$inProcessKey] = $this->cache->get(
+                $sharedKey,
+                function (ItemInterface $item) use ($text, $provider, $options, $userId, $resolvedModel): array {
+                    $item->expiresAfter(self::EMBEDDING_SHARED_CACHE_TTL_SECONDS);
+                    $this->logger->info('AI embedding request', [
+                        'provider' => $provider->getName(),
+                        'user_id' => $userId,
+                        'model' => $resolvedModel,
+                        'text_length' => strlen($text),
+                    ]);
+
+                    return $provider->embed($text, $options);
+                }
+            );
+        } catch (ProviderException $e) {
+            $fresh = $this->tryEmbeddingFallback(
                 fn ($fb, $fbOpts) => $fb->embed($text, $fbOpts),
                 $provider->getName(),
-                $primaryError,
+                $e,
                 $options,
             );
+            $this->embedCache[$inProcessKey] = $fresh;
+
+            return $fresh;
         }
+    }
 
-        $this->embedCache[$cacheKey] = $result;
+    /**
+     * Options that can change the embedding vector for the same text+model+provider.
+     *
+     * @return array<string, mixed>
+     */
+    private function embeddingOptionsForCacheKey(array $options): array
+    {
+        $slice = array_intersect_key($options, array_flip(['dimensions', 'encoding_format']));
+        ksort($slice);
 
-        return $result;
+        return $slice;
+    }
+
+    private function embeddingInProcessCacheKey(string $text, string $providerName, string $resolvedModel, array $options): string
+    {
+        return md5($text.'|'.$providerName.'|'.$resolvedModel.'|'.$this->embeddingOptionsJson($options));
+    }
+
+    private function embeddingSharedCacheKey(string $text, string $providerName, string $resolvedModel, array $options): string
+    {
+        return self::EMBEDDING_SHARED_CACHE_KEY_PREFIX.md5(
+            $text.'|'.$providerName.'|'.$resolvedModel.'|'.$this->embeddingOptionsJson($options)
+        );
+    }
+
+    private function embeddingOptionsJson(array $options): string
+    {
+        try {
+            return json_encode($this->embeddingOptionsForCacheKey($options), JSON_THROW_ON_ERROR);
+        } catch (\Throwable) {
+            return '';
+        }
     }
 
     /**

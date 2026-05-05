@@ -20,6 +20,22 @@ docker compose restart backend
 docker compose restart frontend
 ```
 
+### Redis
+
+The backend uses **Redis** (`redis` service in Compose) for shared Symfony Cache (`cache.app`), distributed **`LOCK_DSN`** (WhatsApp dedupe overlap, cron-style commands), idempotency and rate-window keys, **native PHP sessions** (`symfony` session handler), and **async Messenger transports** (Redis Streams: `async_ai_high`, `async_extract`, `async_index`, `failed` — same host as `REDIS_DSN`). Compose sets `REDIS_DSN` and `LOCK_DSN` to `redis://redis:6379` by default; the backend waits until Redis passes its healthcheck. **Embedding** (`AiFacade::embed`) also stores successful primary-path vectors in `cache.app` under keys `embed.v1.*` (7-day TTL); fallback results are not cached there. `embedBatch()` does not use that shared pool yet.
+
+**Messenger workers** need the **phpredis** PHP extension (`ext-redis`; `symfony/redis-messenger`). The backend Docker image enables it (`pecl`). After pulling Dockerfile changes, **rebuild** the backend image (`docker compose build backend`) so dev containers pick up phpredis before running `composer install` or `messenger:consume`. For PHP on the host, install Redis support (e.g. `pecl install redis`) before `messenger:consume`, or temporarily run `composer install --ignore-platform-req=ext-redis` only if you will not consume from Redis locally.
+
+```bash
+# Quick check inside the stack
+docker compose exec redis redis-cli ping   # expects PONG
+
+# Public API probe (live Redis ping in dev/prod — skipped in PHPUnit / APP_ENV=test)
+curl -sf http://localhost:8000/api/health | jq .redis
+```
+
+If you run PHP on the host without Compose, keep Redis on `6379` and set **`REDIS_DSN=redis://127.0.0.1:6379`** (sessions use the same DSN). PHPUnit uses mock file sessions (no Redis).
+
 ### Connecting to services on the host
 
 The backend container exposes **two** aliases for the Docker host (via `extra_hosts` in `docker-compose.yml`):

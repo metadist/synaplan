@@ -1,13 +1,9 @@
 parameters:
     # Tables that are NOT ORM entities and must be excluded from schema diffing /
-    # validation. Each table listed here is framework-managed (e.g. Symfony Messenger's
-    # Doctrine transport creates `messenger_messages` on demand). In APP_ENV=test the
-    # messenger transports are overridden to `in-memory://` (see
-    # config/packages/messenger.yaml `when@test`), which means
-    # `doctrine:schema:validate` would otherwise see the table as orphaned and
-    # propose DROPping it. The filter is a regex applied to table names by DBAL's
-    # comparator — migrations still run normally because they use raw
-    # `addSql(...)`, not schema diff. Keep the list in sync across ADD events.
+    # validation. `messenger_messages` was created by historical Doctrine Messenger
+    # migrations — production transports now use Redis Streams on REDIS_DSN. The table
+    # may remain in existing databases; excluding it avoids noise from schema tooling.
+    # In APP_ENV=test, messenger transports are `in-memory://` (see messenger.yaml).
     app.doctrine.schema_filter: '~^(?!messenger_messages$).*$~'
 
 doctrine:

@@ -3,9 +3,9 @@ framework:
         failure_transport: failed
 
         transports:
-            # High Priority: AI Processing
+            # High Priority: AI Processing — Redis Streams (path = stream name, same REDIS_DSN as cache/sessions).
             async_ai_high:
-                dsn: 'doctrine://default?queue_name=async_ai_high'
+                dsn: '%env(resolve:REDIS_DSN)%/async_ai_high'
                 retry_strategy:
                     max_retries: 3
                     delay: 1000
@@ -14,21 +14,21 @@ framework:
 
             # Medium Priority: File Extraction
             async_extract:
-                dsn: 'doctrine://default?queue_name=async_extract'
+                dsn: '%env(resolve:REDIS_DSN)%/async_extract'
                 retry_strategy:
                     max_retries: 2
                     delay: 2000
 
             # Low Priority: Indexing
             async_index:
-                dsn: 'doctrine://default?queue_name=async_index'
+                dsn: '%env(resolve:REDIS_DSN)%/async_index'
                 retry_strategy:
                     max_retries: 5
                     delay: 5000
 
             # Failed Messages (Dead-Letter-Queue)
             failed:
-                dsn: 'doctrine://default?queue_name=failed'
+                dsn: '%env(resolve:REDIS_DSN)%/failed'
 
         routing:
             # Route your messages to the transports

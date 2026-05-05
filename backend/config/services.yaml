@@ -89,6 +89,20 @@ services:
         autowire: true
         autoconfigure: true
 
+    # Redis-backed native PHP sessions (Predis client; TTL matches framework.session.gc_maxlifetime).
+    session.handler.redis_connection:
+        class: Predis\Client
+        arguments:
+            - '%env(REDIS_DSN)%'
+        lazy: true
+
+    Symfony\Component\HttpFoundation\Session\Storage\Handler\RedisSessionHandler:
+        autowire: false
+        autoconfigure: false
+        arguments:
+            - '@session.handler.redis_connection'
+            - { prefix: synaplan_sess_, ttl: 604800 }
+
     # Plugin Context Providers — plugins can inject context into chat system prompts
     _instanceof:
         App\Service\Plugin\PluginContextProviderInterface:
@@ -295,7 +309,9 @@ services:
         alias: App\Service\MediaGenerationService
 
     # Model Configuration Service
-    App\Service\ModelConfigService: ~
+    App\Service\ModelConfigService:
+        arguments:
+            $cache: '@cache.model_config'
 
     # Internal Email Service (system emails - uses SMTP from ENV)
     App\Service\InternalEmailService: ~
