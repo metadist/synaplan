@@ -347,6 +347,81 @@ async function streamMessage(
 }
 
 // ---------------------------------------------------------------------------
+// File validation — verify generated files are actually accessible
+// ---------------------------------------------------------------------------
+
+async function validateFileUrl(
+  request: import('@playwright/test').APIRequestContext,
+  _cookie: string,
+  fileUrl: string,
+  expectedMimePrefix?: string
+): Promise<{ ok: boolean; error?: string }> {
+  const url = fileUrl.startsWith('http') ? fileUrl : `${api()}${fileUrl}`
+  try {
+    // No Cookie header: the /api/v1/files/uploads/ endpoint has PUBLIC_ACCESS
+    // in security.yaml. Sending an expired access_token cookie would cause
+    // CookieTokenAuthenticator to return 401 before the access_control rule
+    // is even evaluated (Symfony authenticator failure bypasses access_control).
+    const res = await request.get(url, {
+      timeout: 15_000,
+    })
+    if (!res.ok()) {
+      return { ok: false, error: `File URL returned HTTP ${res.status()}: ${url}` }
+    }
+    const body = await res.body()
+    if (body.length === 0) {
+      return { ok: false, error: `File URL returned empty body: ${url}` }
+    }
+    if (expectedMimePrefix) {
+      const ct = res.headers()['content-type'] ?? ''
+      if (!ct.toLowerCase().startsWith(expectedMimePrefix)) {
+        return {
+          ok: false,
+          error: `File content-type "${ct}" does not match expected "${expectedMimePrefix}*": ${url}`,
+        }
+      }
+    }
+    return { ok: true }
+  } catch (e) {
+    return { ok: false, error: `File URL fetch failed: ${e instanceof Error ? e.message : e}` }
+  }
+}
+
+// ---------------------------------------------------------------------------
+// TTS streaming endpoint validation — /api/v1/tts/stream
+// ---------------------------------------------------------------------------
+
+async function validateTtsEndpoint(
+  request: import('@playwright/test').APIRequestContext,
+  cookie: string,
+  text: string = 'Hello, this is a test.'
+): Promise<{ ok: boolean; provider?: string; contentType?: string; bytes: number; error?: string }> {
+  const url = `${api()}/api/v1/tts/stream?${new URLSearchParams({ text })}`
+  try {
+    const res = await request.get(url, {
+      headers: { Cookie: cookie },
+      timeout: 30_000,
+    })
+    if (!res.ok()) {
+      const body = await res.text()
+      return { ok: false, bytes: 0, error: `TTS endpoint HTTP ${res.status()}: ${body.slice(0, 200)}` }
+    }
+    const body = await res.body()
+    const ct = res.headers()['content-type'] ?? ''
+    const provider = res.headers()['x-tts-provider'] ?? 'unknown'
+    if (body.length === 0) {
+      return { ok: false, bytes: 0, error: 'TTS endpoint returned empty audio body' }
+    }
+    if (!ct.startsWith('audio/')) {
+      return { ok: false, bytes: body.length, error: `TTS endpoint content-type "${ct}" is not audio/*` }
+    }
+    return { ok: true, provider, contentType: ct, bytes: body.length }
+  } catch (e) {
+    return { ok: false, bytes: 0, error: `TTS endpoint failed: ${e instanceof Error ? e.message : e}` }
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Stream timeouts per capability
 // ---------------------------------------------------------------------------
 
@@ -368,6 +443,8 @@ interface CapabilityConfig {
   message: string
   needsFile?: { path: string; name: string; mime: string }
   requireFile?: boolean
+  /** Expected MIME type prefix for the generated file (e.g. 'audio/', 'image/', 'video/'). */
+  expectedFileMime?: string
   // When true, the model is selected via the `modelId` query param on the
   // stream endpoint (override_model_id path in ChatHandler — priority 2).
   // This avoids mutating the user's DB defaults entirely.
@@ -484,6 +561,18 @@ async function runCapability(
           throw new Error(`Expected file event for ${config.capability} but none received${hint}`)
         }
 
+        if (config.requireFile && stream.hasFile && stream.fileUrl) {
+          const fileCheck = await validateFileUrl(
+            request,
+            cookie,
+            stream.fileUrl,
+            config.expectedFileMime
+          )
+          if (!fileCheck.ok) {
+            throw new Error(`File generated but not accessible: ${fileCheck.error}`)
+          }
+        }
+
         if (!config.requireFile) {
           if (fullText.trim().length === 0 && !stream.hasFile) {
             throw new Error('Response has no text and no file — empty result')
@@ -543,13 +632,20 @@ const DAILY_CAPABILITIES: CapabilityConfig[] = [
   },
   {
     capability: 'TEXT2PIC',
-    message: '/pic a small blue square on white background',
+    message: '/pic a friendly cartoon robot standing in a sunny meadow, digital art style',
     requireFile: true,
+    expectedFileMime: 'image/',
   },
   {
+    // /tts slash command bypasses AI classification entirely (MessageClassifier
+    // maps it to topic tools:tts → MediaGenerationHandler forces audio).
+    // This eliminates false negatives from the sorter misclassifying a natural
+    // language request as chat, and false positives from getting a text answer
+    // instead of actual TTS audio.
     capability: 'TEXT2SOUND',
-    message: 'Generate an audio voice note saying: Hello, this is a test.',
+    message: '/tts Hello, this is a test of the text to speech system.',
     requireFile: true,
+    expectedFileMime: 'audio/',
   },
   {
     capability: 'PIC2TEXT',
@@ -569,6 +665,7 @@ const VIDEO_CAPABILITY: CapabilityConfig = {
   capability: 'TEXT2VID',
   message: '/vid short clip of a robot waving hello',
   requireFile: true,
+  expectedFileMime: 'video/',
 }
 
 // ---------------------------------------------------------------------------
@@ -673,5 +770,81 @@ test.describe('@noci @local AI models — API health check', () => {
 
     const failures = allResults.filter((r) => r.status === 'FAIL')
     expect(failures, `${failures.length} model(s) failed — see report for details`).toHaveLength(0)
+  })
+
+  test('TTS streaming endpoint — /api/v1/tts/stream', async ({ request }, testInfo) => {
+    testInfo.setTimeout(120_000)
+
+    const cookie = await loginAndGetCookie(request, ADMIN)
+    const allModels = await fetchModelsByCapability(request, cookie)
+    const ttsModels = allModels['TEXT2SOUND'] ?? []
+    const shouldTest = (m: ModelInfo) => INCLUDE_LOCAL || isCloudProvider(m)
+    const testable = ttsModels.filter(shouldTest)
+
+    if (testable.length === 0) {
+      console.log('  (no testable TEXT2SOUND models — skipping TTS endpoint test)')
+      return
+    }
+
+    const originalDefaults = await getDefaultModels(request, cookie)
+    const originalTtsDefault = originalDefaults['TEXT2SOUND'] ?? null
+
+    const results: ModelResult[] = []
+
+    try {
+      for (const model of testable) {
+        const start = Date.now()
+        try {
+          await setDefaultModel(request, cookie, 'TEXT2SOUND', model.id)
+          const tts = await validateTtsEndpoint(request, cookie)
+          if (!tts.ok) {
+            throw new Error(tts.error ?? 'TTS endpoint returned failure')
+          }
+
+          const expectedService = model.service.toLowerCase()
+          if (expectedService !== 'test' && tts.provider && tts.provider !== 'unknown') {
+            if (tts.provider.toLowerCase() !== expectedService) {
+              throw new Error(
+                `TTS provider mismatch: expected "${model.service}" but got "${tts.provider}" — wrong model used?`
+              )
+            }
+          }
+
+          results.push({
+            capability: 'TTS_ENDPOINT',
+            service: model.service,
+            modelName: model.name,
+            modelId: model.id,
+            status: 'PASS',
+            durationMs: Date.now() - start,
+            providerReported: tts.provider,
+          })
+        } catch (error) {
+          const msg = error instanceof Error ? error.message : String(error)
+          results.push({
+            capability: 'TTS_ENDPOINT',
+            service: model.service,
+            modelName: model.name,
+            modelId: model.id,
+            status: 'FAIL',
+            durationMs: Date.now() - start,
+            errorType: classifyError(msg),
+            errorMessage: msg,
+          })
+        }
+      }
+    } finally {
+      if (originalTtsDefault !== null) {
+        await setDefaultModel(request, cookie, 'TEXT2SOUND', originalTtsDefault).catch(() => {})
+      }
+    }
+
+    printConsoleSummary(results)
+
+    const failures = results.filter((r) => r.status === 'FAIL')
+    expect(
+      failures,
+      `${failures.length} TTS model(s) failed on /api/v1/tts/stream — see console output`
+    ).toHaveLength(0)
   })
 })
