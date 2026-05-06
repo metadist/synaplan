@@ -34,7 +34,6 @@
         "phpoffice/phpspreadsheet": "^4.5.0",
         "phpoffice/phpword": "^1.4",
         "phpstan/phpdoc-parser": "^2.3.2",
-        "runtime/frankenphp-symfony": "^1.0",
         "smalot/pdfparser": "^2.12.5",
         "stripe/stripe-php": "^20.1",
         "symfony/asset": "8.0.*",
