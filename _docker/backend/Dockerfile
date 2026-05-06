@@ -8,11 +8,11 @@
 # Sizing overrides are surfaced as PHP_*/FRANKENPHP_* env vars; see the
 # base image README at /usr/local/share/synaplan-base-php/README.md.
 #
-# Pin to an immutable digest once the 1.0.0 build settles:
-#   docker buildx imagetools inspect ghcr.io/metadist/synaplan-base-php:1.0.0
-# then append `@sha256:...` here so reproducible builds aren't at the
-# mercy of a moving floating tag.
-FROM ghcr.io/metadist/synaplan-base-php:1.0.0
+# Pinned to an immutable digest so reproducible builds don't depend on a
+# moving floating tag. To bump:
+#   docker buildx imagetools inspect ghcr.io/metadist/synaplan-base-php:<new>
+# and replace the @sha256:... below.
+FROM ghcr.io/metadist/synaplan-base-php:1.0.0@sha256:48d69f9c29357f49bb03e101b02eb304453117e79dfc65f398b8a11ae8ad141a
 
 WORKDIR /var/www/backend
 
