@@ -1,7 +1,5 @@
 <template>
   <MainLayout>
-    <template #header> </template>
-
     <div
       class="flex flex-col h-full min-h-0 overflow-hidden relative"
       data-testid="page-chat"

@@ -26,12 +26,14 @@
     style="width: 64px; min-width: 64px"
     data-testid="comp-sidebar-v2"
   >
-    <!-- Top section — height-synced with Header (px-6 py-4 = 76px) -->
+    <!--
+      Top section: height-synced with the mobile Header on small screens
+      (h-12 = 48px) so the close button sits exactly where the burger was,
+      and taller on desktop where it hosts the brand logo.
+    -->
     <div
-      class="flex flex-col items-center justify-center flex-shrink-0 border-b border-white/[0.04]"
-      style="height: 76px"
+      class="flex flex-col items-center justify-center flex-shrink-0 border-b border-white/[0.04] h-12 md:h-[76px]"
     >
-      <!-- Close button on mobile, logo on desktop -->
       <button
         class="md:hidden v2-rail-icon w-10 h-10 flex items-center justify-center"
         aria-label="Close sidebar"

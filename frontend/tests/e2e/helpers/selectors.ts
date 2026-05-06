@@ -28,14 +28,13 @@ export const selectors = {
     successState: '[data-testid="state-success"]',
     goToLoginLink: '[data-testid="link-success-login"]',
   },
-  header: {
-    appHeader: '[data-testid="comp-app-header"]',
-    /**
-     * Header itself no longer hosts mode/theme/language toggles —
-     * those moved to the Settings page.
-     * `themeToggle` + `languageToggle` are still rendered on the
-     * unauthenticated Register/VerifyEmail pages.
-     */
+  /**
+   * The in-app header used to host mode/theme/language toggles, but those
+   * moved to the Settings page and the header is now mobile-only with just
+   * a sidebar burger. The toggles below still render on the unauthenticated
+   * Register/VerifyEmail pages.
+   */
+  authPageToggles: {
     themeToggle: '[data-testid="btn-theme-toggle"]',
     languageToggle: '[data-testid="btn-language-toggle"]',
   },

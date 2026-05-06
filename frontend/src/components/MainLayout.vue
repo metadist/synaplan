@@ -3,11 +3,7 @@
     <SidebarV2 />
 
     <div class="flex-1 flex flex-col min-w-0" data-testid="section-main-shell">
-      <Header>
-        <template #left>
-          <slot name="header" />
-        </template>
-      </Header>
+      <Header />
       <main class="flex-1 min-h-0 overflow-y-auto" data-testid="section-primary-content">
         <slot />
       </main>

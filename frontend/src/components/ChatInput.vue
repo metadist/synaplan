@@ -550,55 +550,72 @@ const sendMessage = () => {
     return
   }
 
-  if (canSend.value) {
-    if (isRecording.value) {
-      if (webSpeechService.value) {
-        webSpeechService.value.stop()
-        webSpeechService.value = null
-      }
-      if (audioRecorder.value) {
-        discardNextRecording.value = true
-        audioRecorder.value.stopRecording()
-      }
-      isRecording.value = false
+  // If dictation is active, stop it FIRST and absorb any pending speech
+  // (final + interim) into message.value before we evaluate canSend / send.
+  // We use abort() (not stop()) on the Web Speech service so that any
+  // late native onresult event cannot write transcribed text back into
+  // message.value after we've cleared it below.
+  if (isRecording.value) {
+    const base = speechBaseMessage.value
+    const finals = speechFinalTranscript.value
+    const interim = interimTranscript.value
+    const separator = base && (finals || interim) ? ' ' : ''
+    const finalSeparator = finals && interim ? ' ' : ''
+    const absorbed = base + separator + finals + finalSeparator + interim
+    if (absorbed) {
+      message.value = absorbed
     }
 
-    // Always clear speech tracking to prevent onEnd from restoring text
-    // (handles race condition when user stops recording then quickly sends)
-    speechBaseMessage.value = ''
-    speechFinalTranscript.value = ''
-    interimTranscript.value = ''
-    clearSilenceTimer()
-    autoSendPending.value = false
-
-    const hasWebSearch = activeCommand.value === 'search'
-
-    // Send the full message with command to backend (it needs it for /pic and /vid)
-    // The UI cleanup will happen in ChatView before adding to history
-    const messageToSend = message.value
-
-    const options = {
-      includeReasoning: thinkingEnabled.value,
-      webSearch: hasWebSearch,
-      fileIds: uploadedFiles.value.filter((f) => !f.processing).map((f) => f.file_id),
-      voiceReply: voiceReply.value,
-      modelId: selectedModelId.value || undefined,
+    if (webSpeechService.value) {
+      webSpeechService.value.abort()
+      webSpeechService.value = null
     }
-    emit('send', messageToSend, options)
-    message.value = ''
-    uploadedFiles.value = []
-    paletteVisible.value = false
-    mentionPaletteVisible.value = false
-    mentionQuery.value = ''
-    activeCommand.value = null
-    voiceReply.value = false
-    // Reset enhance state after sending
-    enhanceEnabled.value = false
-    originalMessage.value = ''
-    enhancedMessage.value = ''
-    // Clear persisted input after successful send
-    clearPersistedInput()
+    if (audioRecorder.value) {
+      discardNextRecording.value = true
+      audioRecorder.value.stopRecording()
+    }
+    isRecording.value = false
   }
+
+  // Always clear speech tracking to prevent any late onEnd / onResult from
+  // restoring text (handles race conditions around stop/abort).
+  speechBaseMessage.value = ''
+  speechFinalTranscript.value = ''
+  interimTranscript.value = ''
+  clearSilenceTimer()
+  autoSendPending.value = false
+
+  if (!canSend.value) {
+    return
+  }
+
+  const hasWebSearch = activeCommand.value === 'search'
+
+  // Send the full message with command to backend (it needs it for /pic and /vid)
+  // The UI cleanup will happen in ChatView before adding to history
+  const messageToSend = message.value
+
+  const options = {
+    includeReasoning: thinkingEnabled.value,
+    webSearch: hasWebSearch,
+    fileIds: uploadedFiles.value.filter((f) => !f.processing).map((f) => f.file_id),
+    voiceReply: voiceReply.value,
+    modelId: selectedModelId.value || undefined,
+  }
+  emit('send', messageToSend, options)
+  message.value = ''
+  uploadedFiles.value = []
+  paletteVisible.value = false
+  mentionPaletteVisible.value = false
+  mentionQuery.value = ''
+  activeCommand.value = null
+  voiceReply.value = false
+  // Reset enhance state after sending
+  enhanceEnabled.value = false
+  originalMessage.value = ''
+  enhancedMessage.value = ''
+  // Clear persisted input after successful send
+  clearPersistedInput()
 }
 
 const toggleThinking = () => {
