@@ -1,8 +1,6 @@
 # Environment files (auto-generated or local overrides)
 .env
-.env.docker
-.env.local
-.env.*.local
+.env.*
 .cursorignore
 
 .fixtures_loaded
