@@ -181,12 +181,28 @@ services:
     environment:
       OLLAMA_HOST: 0.0.0.0
     # GPU support should be configured via an override file if needed
+    # Healthcheck uses bash /dev/tcp + HTTP probe (the ollama/ollama image has
+    # no curl/wget/nc). Measures the round-trip and treats anything slower than
+    # 3000 ms as not-yet-ready — protects against the warm-up window where the
+    # API socket is open but the runtime is still loading models.
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:11434/api/tags"]
+      test:
+        - "CMD"
+        - "bash"
+        - "-c"
+        - |
+          T0=$$EPOCHREALTIME
+          exec 3<>/dev/tcp/localhost/11434 || exit 1
+          printf 'GET /api/tags HTTP/1.0\r\nHost: localhost\r\nConnection: close\r\n\r\n' >&3
+          read -r status <&3
+          ms=$$(awk -v a="$$T0" -v b="$$EPOCHREALTIME" 'BEGIN{printf "%.0f",(b-a)*1000}')
+          echo "ollama probe: $${status%$$'\r'} ($${ms} ms)"
+          [[ "$$status" == *"200 OK"* ]] || exit 1
+          [ "$$ms" -lt 3000 ] || exit 1
       interval: 30s
       timeout: 10s
       retries: 5
-      start_period: 60s
+      start_period: 90s
     restart: unless-stopped
     networks:
       - synaplan-network
@@ -198,12 +214,28 @@ services:
     command: -h 0.0.0.0 -p 9998
     ports:
       - "9999:9998"
+    # Healthcheck uses bash /dev/tcp + HTTP probe (the apache/tika image has no
+    # curl/wget). Measures the round-trip on /version and treats anything
+    # slower than 3000 ms as not-yet-ready — Tika's JVM warm-up can keep the
+    # port open long before the parser registry is actually responsive.
     healthcheck:
-      test: ["CMD", "sh", "-c", "wget -qO- http://localhost:9998/version >/dev/null 2>&1 || exit 1"]
+      test:
+        - "CMD"
+        - "bash"
+        - "-c"
+        - |
+          T0=$$EPOCHREALTIME
+          exec 3<>/dev/tcp/localhost/9998 || exit 1
+          printf 'GET /version HTTP/1.0\r\nHost: localhost\r\nConnection: close\r\n\r\n' >&3
+          read -r status <&3
+          ms=$$(awk -v a="$$T0" -v b="$$EPOCHREALTIME" 'BEGIN{printf "%.0f",(b-a)*1000}')
+          echo "tika probe: $${status%$$'\r'} ($${ms} ms)"
+          [[ "$$status" == *"200 OK"* ]] || exit 1
+          [ "$$ms" -lt 3000 ] || exit 1
       interval: 30s
       timeout: 10s
       retries: 5
-      start_period: 20s
+      start_period: 60s
     restart: unless-stopped
     networks:
       - synaplan-network
