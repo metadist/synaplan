@@ -241,6 +241,34 @@ final class AdminSynapseController extends AbstractController
                 new OA\Property(property: 'indexed', type: 'integer'),
                 new OA\Property(property: 'skipped', type: 'integer'),
                 new OA\Property(property: 'errors', type: 'integer'),
+                new OA\Property(
+                    property: 'failures',
+                    type: 'array',
+                    description: 'Per-topic failure list with stable error code + sanitized hint. Sensitive provider details (URLs, account ids, tokens) are stripped before transport.',
+                    items: new OA\Items(
+                        properties: [
+                            new OA\Property(property: 'topic', type: 'string'),
+                            new OA\Property(property: 'ownerId', type: 'integer'),
+                            new OA\Property(
+                                property: 'code',
+                                type: 'string',
+                                enum: [
+                                    'provider_auth_failed',
+                                    'model_not_available',
+                                    'provider_rate_limited',
+                                    'provider_unavailable',
+                                    'provider_timeout',
+                                    'provider_error',
+                                    'qdrant_unreachable',
+                                    'dimension_mismatch',
+                                    'embedding_empty',
+                                    'unknown',
+                                ],
+                            ),
+                            new OA\Property(property: 'hint', type: 'string'),
+                        ]
+                    ),
+                ),
             ]
         )
     )]
@@ -276,12 +304,26 @@ final class AdminSynapseController extends AbstractController
                 'indexed' => 'indexed' === $result ? 1 : 0,
                 'skipped' => 'skipped' === $result ? 1 : 0,
                 'errors' => 0,
+                'failures' => [],
                 'topic' => $topic,
                 'topicResult' => $result,
             ]);
         }
 
         $result = $this->synapseIndexer->indexAllTopics(null, $force);
+
+        // Rename the indexer's snake_case `owner_id` to camelCase `ownerId`
+        // for the public API contract (the rest of /admin/synapse/* uses
+        // camelCase). The shape itself is guaranteed by indexAllTopics().
+        $failures = array_map(
+            static fn (array $f): array => [
+                'topic' => $f['topic'],
+                'ownerId' => $f['owner_id'],
+                'code' => $f['code'],
+                'hint' => $f['hint'],
+            ],
+            $result['failures'],
+        );
 
         return $this->json([
             'success' => true,
@@ -290,6 +332,7 @@ final class AdminSynapseController extends AbstractController
             'indexed' => $result['indexed'],
             'skipped' => $result['skipped'],
             'errors' => $result['errors'],
+            'failures' => $failures,
         ]);
     }
 

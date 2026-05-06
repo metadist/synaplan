@@ -818,7 +818,11 @@ import type { SortingPromptData } from '@/mocks/sortingPrompt'
 import { promptsApi } from '@/services/api/promptsApi'
 import type { SortingPromptPayload, RoutingTestResult } from '@/services/api/promptsApi'
 import { adminSynapseApi } from '@/services/api/adminSynapseApi'
-import type { SynapseStatusResponse } from '@/services/api/adminSynapseApi'
+import type {
+  SynapseStatusResponse,
+  SynapseReindexFailure,
+  SynapseReindexFailureCode,
+} from '@/services/api/adminSynapseApi'
 import { adminEmbeddingApi } from '@/services/api/adminEmbeddingApi'
 import type { SynapseEmbeddingStatusResponse, EmbeddingRun } from '@/services/api/adminEmbeddingApi'
 import { getConfigValues, updateConfigValue } from '@/services/api/adminConfigApi'
@@ -1172,20 +1176,115 @@ const reindex = async (opts: { force?: boolean; recreate?: boolean }) => {
   reindexing.value = true
   try {
     const result = await adminSynapseApi.reindex(opts)
-    success(
-      t('config.routing.reindexResult', {
-        indexed: result.indexed,
-        skipped: result.skipped,
-        errors: result.errors,
-      })
-    )
+
+    const counts = {
+      indexed: result.indexed,
+      skipped: result.skipped,
+      errors: result.errors,
+    }
+
+    if (result.errors > 0 && result.failures && result.failures.length > 0) {
+      logReindexFailures(result.failures, opts)
+    }
+
+    // Pick severity from the counts so a "0 indexed / N errors" run does not
+    // get reported as success (#issue: green toast for failed reindex).
+    if (result.errors > 0 && result.indexed === 0) {
+      // Total failure: every topic errored. Surface as error + keep the toast
+      // visible long enough to read (default 5 s is too short for an actionable
+      // diagnostic), and append the hint pointing at the backend logs.
+      showError(t('config.routing.reindexResultAllFailed', counts), 12000)
+    } else if (result.errors > 0) {
+      // Partial: some topics indexed, some failed. Warning is the right level —
+      // routing will work for the indexed subset, the failed ones fall back to
+      // the AI sorter at runtime.
+      warning(t('config.routing.reindexResultPartial', counts), 8000)
+    } else if (result.indexed === 0 && result.skipped === 0) {
+      // Nothing to do: usually means there are no enabled non-tool topics with
+      // a description / keywords. Not a success in any meaningful sense.
+      warning(t('config.routing.reindexResultEmpty'))
+    } else {
+      success(t('config.routing.reindexResult', counts))
+    }
+
     await loadStatus()
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Re-index failed'
     showError(message)
+    // Surface the raw error in devtools so the operator gets a useful
+    // stack trace + URL when the request itself fails (not just the
+    // per-topic case where `failures` arrives in the 200 response).
+    console.error('[Synapse Reindex] Request failed', err)
   } finally {
     reindexing.value = false
   }
+}
+
+/**
+ * Per-failure-code action hint shown next to the sanitized backend hint
+ * in the JS console. Codes are the stable contract from the backend
+ * (`SynapseIndexer::classifyIndexError()`) so the mapping survives
+ * future refactors.
+ */
+const FAILURE_ACTION_HINTS: Record<SynapseReindexFailureCode, string> = {
+  provider_auth_failed:
+    'Action: Open admin → Providers, re-enter the API key for the embedding provider.',
+  model_not_available:
+    "Action: Pick a different routing model in 'Routing Embedding Model' above. The current slug is rejected by the provider.",
+  provider_rate_limited: 'Action: Wait a minute and retry, or upgrade the provider plan.',
+  provider_unavailable:
+    'Action: Provider returned a 5xx — usually transient. Retry; if it persists, switch provider.',
+  provider_timeout:
+    'Action: Check network/proxy/firewall to the provider, or pick a closer region.',
+  provider_error:
+    'Action: Check backend logs for the raw provider response — the error did not match a known shape.',
+  qdrant_unreachable:
+    'Action: Verify QDRANT_URL and that the synaplan-qdrant container is healthy.',
+  dimension_mismatch:
+    'Action: Click "Recreate Collection" — the active model emits a different vector size than the existing collection.',
+  embedding_empty:
+    'Action: The provider returned a zero-length vector. Try a different routing model.',
+  unknown:
+    'Action: Check the backend logs (synaplan-backend) for the full exception — this code path is not specifically handled.',
+}
+
+/**
+ * Render the per-topic failure list into the browser devtools as a
+ * collapsed group. Sanitization is the backend's job (see
+ * SynapseIndexer::sanitizeMessageForUi); the frontend just renders.
+ */
+const logReindexFailures = (
+  failures: SynapseReindexFailure[],
+  opts: { force?: boolean; recreate?: boolean }
+): void => {
+  // Group by code so an admin can spot "all 10 failures are the same auth
+  // problem" at a glance instead of scrolling per-topic noise.
+  const byCode = failures.reduce<Record<string, SynapseReindexFailure[]>>((acc, f) => {
+    ;(acc[f.code] ||= []).push(f)
+    return acc
+  }, {})
+
+  console.groupCollapsed(
+    `[Synapse Reindex] ${failures.length} topic(s) failed — expand for details`
+  )
+  console.info('Run options:', opts)
+  console.table(
+    failures.map((f) => ({
+      topic: f.topic,
+      ownerId: f.ownerId,
+      code: f.code,
+      hint: f.hint,
+    }))
+  )
+  for (const [code, list] of Object.entries(byCode)) {
+    const action =
+      FAILURE_ACTION_HINTS[code as SynapseReindexFailureCode] ?? FAILURE_ACTION_HINTS.unknown
+    const topics = list.map((f) => f.topic).join(', ')
+    console.warn(
+      `${list.length}× ${code}\n  Affected topics: ${topics}\n  ${list[0].hint}\n  ${action}`
+    )
+  }
+  console.groupEnd()
 }
 
 const confirmRecreate = async () => {

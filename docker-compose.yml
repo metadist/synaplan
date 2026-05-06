@@ -145,6 +145,103 @@ services:
     networks:
       - synaplan-network
 
+  # Symfony Messenger Worker
+  #
+  # Consumes the three async transports defined in
+  # backend/config/packages/messenger.yaml so async jobs (chat
+  # ProcessMessageCommand, embedding ReVectorize, plugin install,
+  # widget crawling, ...) actually run in local dev. Without this the
+  # Doctrine queue (`messenger_messages` table) just grows forever and
+  # the UI hangs on any "queued / running in background" flow.
+  #
+  # Runs in `APP_ENV=prod` on purpose: the dev-mode TraceableEventDispatcher
+  # has a long-standing bug where `messenger:consume` triggers
+  #   Warning: Undefined array key "Symfony\Component\Messenger\Event\WorkerRunningEvent"
+  # which kills the consumer on the first message. The web container stays
+  # in `dev` so the profiler / debug toolbar still work for HTTP traffic.
+  #
+  # `--time-limit=3600` + `--memory-limit=512M` cooperate with `restart:
+  # unless-stopped` to recycle the worker hourly, which is the standard
+  # Symfony pattern to bound Doctrine EM growth on long-lived consumers.
+  worker:
+    image: ghcr.io/metadist/synaplan:latest
+    build:
+      context: .
+      dockerfile: _docker/backend/Dockerfile
+    container_name: synaplan-worker
+    env_file:
+      - path: backend/.env
+        required: false
+    volumes:
+      - ./backend:/var/www/backend
+      - ./plugins:/plugins:ro
+      - whisper_models:/var/www/backend/var/whisper:ro
+    environment:
+      APP_ENV: prod
+      APP_DEBUG: "0"
+      APP_URL: http://backend
+      PLUGINS_DIR: /plugins
+      DATABASE_WRITE_URL: mysql://synaplan_user:synaplan_password@db:3306/synaplan?serverVersion=mariadb-12.2.2&charset=utf8mb4
+      DATABASE_READ_URL: mysql://synaplan_user:synaplan_password@db:3306/synaplan?serverVersion=mariadb-12.2.2&charset=utf8mb4
+      OLLAMA_BASE_URL: http://ollama:11434
+      TIKA_BASE_URL: http://tika:9998
+      AI_DEFAULT_PROVIDER: ollama
+      TOKEN_SECRET: 'change_me_in_production_use_openssl_rand_hex_32'
+      LOCK_DSN: ${LOCK_DSN:-flock}
+      MAILER_DSN: smtp://mailhog:1025
+      AUTO_DOWNLOAD_MODELS: "false"
+      ENABLE_LOCAL_GPT_OSS: ${ENABLE_LOCAL_GPT_OSS:-false}
+      WHISPER_BINARY: /usr/local/bin/whisper
+      WHISPER_MODELS_PATH: /var/www/backend/var/whisper
+      WHISPER_DEFAULT_MODEL: tiny
+      WHISPER_ENABLED: "true"
+      FFMPEG_BINARY: /usr/bin/ffmpeg
+      SYNAPLAN_TTS_URL: ${SYNAPLAN_TTS_URL:-http://host.docker.internal:10200}
+    entrypoint: ["bash", "-c"]
+    command:
+      - |
+        # Wait for the backend container to finish migrations / cache warmup,
+        # otherwise the first consume cycle races against schema and crashes
+        # with "Table doctrine_migration_versions doesn't exist".
+        until php bin/console --env=prod doctrine:query:sql 'SELECT 1' >/dev/null 2>&1; do
+          echo "[worker] waiting for db schema..."; sleep 3;
+        done
+
+        # Clear the prod cache on every restart. The cache lives under
+        # var/cache/prod/ on the bind-mounted backend volume, so it
+        # otherwise survives across container rebuilds and pins the
+        # compiled DI container to whatever code revision happened to
+        # boot it first. Symptom: ArgumentCountError /
+        # "Too few arguments to function ::__construct()" after any
+        # service constructor changes. Clearing on boot is a few
+        # seconds and matches what every Symfony deploy does anyway.
+        echo "[worker] clearing prod cache..."
+        rm -rf var/cache/prod
+        php bin/console --env=prod cache:warmup
+
+        echo "[worker] db + cache ready, starting messenger:consume"
+        exec php bin/console --env=prod messenger:consume \
+          async_ai_high async_extract async_index \
+          --time-limit=3600 --memory-limit=512M -v
+    depends_on:
+      db:
+        condition: service_healthy
+      backend:
+        condition: service_started
+    restart: unless-stopped
+    # Override the FrankenPHP HTTP healthcheck inherited from the base image —
+    # the worker process doesn't bind to port 80, so the inherited probe would
+    # always report unhealthy and cause noisy `docker compose ps` output. The
+    # liveness signal we actually care about is "is messenger:consume still
+    # processing?" which is observable via the messenger_messages table.
+    healthcheck:
+      disable: true
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+      - "docker-host:host-gateway"
+    networks:
+      - synaplan-network
+
   # MariaDB 11.8 Database
   db:
     image: mariadb:12.2.2@sha256:e0236fc6386e7eacd9359e59d0a078bd7aa0d18280d36d13061121bedeaee903
