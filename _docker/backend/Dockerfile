@@ -75,6 +75,14 @@ COPY frontend/dist-widget /var/www/widgets
 # Copy Caddyfile for production routing (API vs SPA)
 COPY _docker/backend/Caddyfile /etc/caddy/Caddyfile
 
+# Override the base-image FrankenPHP worker-mode template so APP_RUNTIME points
+# at our inlined App\Runtime\FrankenPhpRuntime class. The base image still
+# handles the dev/prod toggle via synaplan-php-configure; it just renders OUR
+# template into /etc/caddy/synaplan-worker-mode.Caddyfile when APP_ENV=prod.
+# Required because runtime/frankenphp-symfony does not yet support Symfony 8.
+COPY _docker/backend/synaplan-worker-mode.Caddyfile \
+    /usr/local/etc/php/templates/synaplan-worker-mode.Caddyfile
+
 EXPOSE 80
 
 ENTRYPOINT ["docker-entrypoint.sh"]
