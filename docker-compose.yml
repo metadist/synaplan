@@ -203,7 +203,7 @@ services:
         # Wait for the backend container to finish migrations / cache warmup,
         # otherwise the first consume cycle races against schema and crashes
         # with "Table doctrine_migration_versions doesn't exist".
-        until php bin/console --env=prod doctrine:query:sql 'SELECT 1' >/dev/null 2>&1; do
+        until php bin/console --env=prod dbal:run-sql 'SELECT 1' >/dev/null 2>&1; do
           echo "[worker] waiting for db schema..."; sleep 3;
         done
 
