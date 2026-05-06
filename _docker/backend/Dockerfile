@@ -1,15 +1,20 @@
-FROM ghcr.io/metadist/synaplan-base-php:0.2.0@sha256:016436cf38cc38ecaa80c1f836deaffce9ee23dd747543d2fcf5706ac9d0ce4a
+# synaplan-base-php 1.0.0 ships fully-tuned PHP ini files under
+# /usr/local/etc/php/conf.d/ (10-runtime, 20-opcache+JIT, 25-realpath,
+# 27-grpc, 28-apcu, 30-errors, 40-security) and an entrypoint shim at
+# /usr/local/bin/synaplan-php-configure that handles APP_ENV=dev override
+# + FrankenPHP worker-mode activation. Anything you'd previously written
+# to conf.d/ from this Dockerfile is now baked into the base image.
+#
+# Sizing overrides are surfaced as PHP_*/FRANKENPHP_* env vars; see the
+# base image README at /usr/local/share/synaplan-base-php/README.md.
+#
+# Pinned to an immutable digest so reproducible builds don't depend on a
+# moving floating tag. To bump:
+#   docker buildx imagetools inspect ghcr.io/metadist/synaplan-base-php:<new>
+# and replace the @sha256:... below.
+FROM ghcr.io/metadist/synaplan-base-php:1.0.0@sha256:48d69f9c29357f49bb03e101b02eb304453117e79dfc65f398b8a11ae8ad141a
 
 WORKDIR /var/www/backend
-
-# PHP Configuration
-RUN mkdir -p /var/www/uploads && chmod 777 /var/www/uploads && \
-    printf "upload_max_filesize=512M\npost_max_size=512M\nmax_file_uploads=50\nmemory_limit=512M\nupload_tmp_dir=/var/www/uploads\nsys_temp_dir=/var/www/uploads\nmax_execution_time=300\n" \
-    > /usr/local/etc/php/conf.d/uploads.ini && \
-    printf "opcache.enable=1\nopcache.memory_consumption=256\nopcache.max_accelerated_files=20000\n" \
-    > /usr/local/etc/php/conf.d/opcache.ini && \
-    printf "display_errors=Off\ndisplay_startup_errors=Off\nlog_errors=On\nerror_reporting=E_ALL & ~E_DEPRECATED & ~E_STRICT\n" \
-    > /usr/local/etc/php/conf.d/production.ini
 
 # Set default environment variables for paths and constants
 # These are baked into the image since they reference local filesystem paths
@@ -69,6 +74,14 @@ COPY frontend/dist-widget /var/www/widgets
 
 # Copy Caddyfile for production routing (API vs SPA)
 COPY _docker/backend/Caddyfile /etc/caddy/Caddyfile
+
+# Override the base-image FrankenPHP worker-mode template so APP_RUNTIME points
+# at our inlined App\Runtime\FrankenPhpRuntime class. The base image still
+# handles the dev/prod toggle via synaplan-php-configure; it just renders OUR
+# template into /etc/caddy/synaplan-worker-mode.Caddyfile when APP_ENV=prod.
+# Required because runtime/frankenphp-symfony does not yet support Symfony 8.
+COPY _docker/backend/synaplan-worker-mode.Caddyfile \
+    /usr/local/etc/php/templates/synaplan-worker-mode.Caddyfile
 
 EXPOSE 80
 

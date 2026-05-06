@@ -153,7 +153,14 @@ final class AdminSynapseControllerTest extends TestCase
         $this->indexer->expects($this->once())
             ->method('indexAllTopics')
             ->with(null, false)
-            ->willReturn(['indexed' => 5, 'skipped' => 2, 'errors' => 1]);
+            ->willReturn([
+                'indexed' => 5,
+                'skipped' => 2,
+                'errors' => 1,
+                'failures' => [
+                    ['topic' => 'coding', 'owner_id' => 0, 'code' => 'model_not_available', 'hint' => "Model 'foo' is not available on provider 'cloudflare'."],
+                ],
+            ]);
 
         $request = Request::create('/api/v1/admin/synapse/reindex', 'POST', content: json_encode([]));
         $response = $this->controller->reindex($request);
@@ -166,6 +173,10 @@ final class AdminSynapseControllerTest extends TestCase
         self::assertSame(5, $body['indexed']);
         self::assertSame(2, $body['skipped']);
         self::assertSame(1, $body['errors']);
+        self::assertCount(1, $body['failures']);
+        self::assertSame('coding', $body['failures'][0]['topic']);
+        self::assertSame(0, $body['failures'][0]['ownerId']);
+        self::assertSame('model_not_available', $body['failures'][0]['code']);
     }
 
     public function testReindexWithRecreateDropsCollectionFirst(): void
@@ -184,7 +195,7 @@ final class AdminSynapseControllerTest extends TestCase
         $this->indexer->expects($this->once())
             ->method('indexAllTopics')
             ->with(null, true) // recreate implies force
-            ->willReturn(['indexed' => 7, 'skipped' => 0, 'errors' => 0]);
+            ->willReturn(['indexed' => 7, 'skipped' => 0, 'errors' => 0, 'failures' => []]);
 
         $request = Request::create(
             '/api/v1/admin/synapse/reindex',
@@ -197,6 +208,7 @@ final class AdminSynapseControllerTest extends TestCase
         self::assertTrue($body['recreated']);
         self::assertTrue($body['force']);
         self::assertSame(7, $body['indexed']);
+        self::assertSame([], $body['failures']);
     }
 
     public function testReindexSingleTopicReturnsTopicResult(): void

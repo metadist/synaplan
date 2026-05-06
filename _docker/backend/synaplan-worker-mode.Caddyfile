@@ -1,0 +1,26 @@
+# =============================================================================
+# synaplan :: FrankenPHP worker-mode Caddy snippet (PROD)
+# -----------------------------------------------------------------------------
+# This file overrides the synaplan-base-php template at
+#   /usr/local/etc/php/templates/synaplan-worker-mode.Caddyfile
+# at app build time (see _docker/backend/Dockerfile). The base image's
+# synaplan-php-configure shim still handles the dev/prod toggle and
+# materializes the active file at /etc/caddy/synaplan-worker-mode.Caddyfile.
+#
+# Only one line differs from the upstream template: APP_RUNTIME points at the
+# inlined App\Runtime\FrankenPhpRuntime class (see backend/src/Runtime/) instead
+# of Runtime\FrankenPhpSymfony\Runtime, because the upstream Composer package
+# does not yet support Symfony 8 (the synaplan stack is on symfony/* 8.0.*).
+# Revert this file once the upstream package widens its constraints.
+# =============================================================================
+
+frankenphp {
+	worker {
+		# The Symfony app's standard public/index.php IS the worker entrypoint.
+		# Worker behavior is selected via APP_RUNTIME below — no separate
+		# worker.php needed.
+		file "/var/www/backend/public/index.php"
+		num  {$FRANKENPHP_WORKER_NUM:16}
+		env  APP_RUNTIME "App\\Runtime\\FrankenPhpRuntime"
+	}
+}

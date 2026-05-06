@@ -1,5 +1,6 @@
 # Environment files (auto-generated or local overrides)
 .env
+.env.bak.*
 .env.docker
 .env.local
 .env.*.local

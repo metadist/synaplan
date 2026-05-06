@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit;
 
+use App\AI\Exception\ProviderException;
 use App\AI\Service\AiFacade;
 use App\Entity\Prompt;
 use App\Repository\PromptRepository;
@@ -158,7 +159,81 @@ class SynapseIndexerTest extends TestCase
 
         $result = $this->indexer->indexAllTopics();
 
-        $this->assertSame(['indexed' => 0, 'skipped' => 0, 'errors' => 0], $result);
+        $this->assertSame(
+            ['indexed' => 0, 'skipped' => 0, 'errors' => 0, 'failures' => []],
+            $result,
+        );
+    }
+
+    /**
+     * The error-classifier branch matters because it's what feeds the
+     * admin-UI devtools console (raw exception text would otherwise leak
+     * provider URLs and account ids).
+     */
+    public function testIndexAllTopicsClassifiesProviderHttp404AsModelNotAvailable(): void
+    {
+        $this->modelConfigService->method('getDefaultModel')->willReturn(7);
+        $this->modelConfigService->method('getProviderForModel')->willReturn('cloudflare');
+        $this->modelConfigService->method('getModelName')->willReturn('@cf/qwen/qwen3-embedding-0.6b');
+        $this->modelConfigService->method('getVectorDimForModel')->willReturn(1024);
+
+        $this->promptRepository->method('findAllForUser')->willReturn([
+            $this->makePrompt('coding', 'Programming help'),
+        ]);
+
+        // Mimic CloudflareProvider's actual exception shape, which embeds the
+        // account id in the URL — a regression test for the sanitizer.
+        $this->aiFacade->method('embed')->willThrowException(new ProviderException(
+            'Cloudflare API returned HTTP 404: {"errors":[{"message":"Could not route to /client/v4/accounts/d081325a0a307453a27f9f97569275d4d/ai/run/@cf/qwen/qwen3-embedding-0.6b, perhaps your object identifier is invalid?"}]}',
+            'cloudflare',
+        ));
+
+        $result = $this->indexer->indexAllTopics();
+
+        $this->assertSame(0, $result['indexed']);
+        $this->assertSame(1, $result['errors']);
+        $this->assertCount(1, $result['failures']);
+
+        $failure = $result['failures'][0];
+        $this->assertSame('coding', $failure['topic']);
+        $this->assertSame(0, $failure['owner_id']);
+        $this->assertSame('model_not_available', $failure['code']);
+        $this->assertStringContainsString('cloudflare', $failure['hint']);
+        $this->assertStringContainsString('@cf/qwen/qwen3-embedding-0.6b', $failure['hint']);
+
+        // Critical: the sanitized hint must NOT carry the account id from the
+        // raw Cloudflare response. Anyone reading the API response (admin UI,
+        // browser console, audit logs) sees a clean message instead.
+        $this->assertStringNotContainsString('d081325a0a307453a27f9f97569275d4d', $failure['hint']);
+        $this->assertStringNotContainsString('client/v4/accounts', $failure['hint']);
+    }
+
+    public function testIndexAllTopicsClassifiesProviderHttp401AsAuthFailed(): void
+    {
+        $this->modelConfigService->method('getDefaultModel')->willReturn(7);
+        $this->modelConfigService->method('getProviderForModel')->willReturn('openai');
+        $this->modelConfigService->method('getModelName')->willReturn('text-embedding-3-large');
+        $this->modelConfigService->method('getVectorDimForModel')->willReturn(3072);
+
+        $this->promptRepository->method('findAllForUser')->willReturn([
+            $this->makePrompt('coding', 'Programming help'),
+        ]);
+
+        $this->aiFacade->method('embed')->willThrowException(new ProviderException(
+            'OpenAI API returned HTTP 401: invalid api key sk-1234567890abcdef',
+            'openai',
+        ));
+
+        $result = $this->indexer->indexAllTopics();
+
+        $failure = $result['failures'][0];
+        $this->assertSame('provider_auth_failed', $failure['code']);
+        // The auth-failed branch never echoes the raw message at all
+        // (only the provider name + HTTP code), so the API key shape
+        // can't reach the API consumer no matter what the provider
+        // included in its response body.
+        $this->assertStringNotContainsString('sk-1234567890abcdef', $failure['hint']);
+        $this->assertStringContainsString('openai', $failure['hint']);
     }
 
     // ── source_hash skip-when-unchanged ─────────────────────────────────

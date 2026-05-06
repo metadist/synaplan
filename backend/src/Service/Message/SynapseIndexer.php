@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Service\Message;
 
+use App\AI\Exception\ProviderException;
 use App\AI\Service\AiFacade;
 use App\Entity\Prompt;
 use App\Repository\PromptRepository;
@@ -62,7 +63,18 @@ final readonly class SynapseIndexer
      * Index all enabled, non-tool topics for a given owner (0 = system).
      * When $userId is provided, also indexes that user's custom topics.
      *
-     * @return array{indexed: int, skipped: int, errors: int}
+     * `failures` carries one entry per failed topic with a stable `code`
+     * (machine-friendly, see {@see classifyIndexError()}) and a `hint`
+     * (human-friendly, sanitized — safe for the admin UI to surface in
+     * the JS devtools console). Raw exception messages are intentionally
+     * NOT included so we don't leak provider URLs / account IDs / tokens.
+     *
+     * @return array{
+     *     indexed: int,
+     *     skipped: int,
+     *     errors: int,
+     *     failures: list<array{topic: string, owner_id: int, code: string, hint: string}>
+     * }
      */
     public function indexAllTopics(?int $userId = null, bool $force = false): array
     {
@@ -71,12 +83,14 @@ final readonly class SynapseIndexer
         if (empty($prompts)) {
             $this->logger->warning('SynapseIndexer: No topics found to index');
 
-            return ['indexed' => 0, 'skipped' => 0, 'errors' => 0];
+            return ['indexed' => 0, 'skipped' => 0, 'errors' => 0, 'failures' => []];
         }
 
         $indexed = 0;
         $skipped = 0;
         $errors = 0;
+        $failures = [];
+        $modelInfo = $this->getEmbeddingModelInfo();
 
         foreach ($prompts as $prompt) {
             try {
@@ -88,11 +102,25 @@ final readonly class SynapseIndexer
                 }
             } catch (\Throwable $e) {
                 ++$errors;
+                $classified = $this->classifyIndexError($e, $modelInfo);
+
                 $this->logger->error('SynapseIndexer: Failed to index topic', [
                     'topic' => $prompt->getTopic(),
                     'owner_id' => $prompt->getOwnerId(),
+                    'code' => $classified['code'],
+                    'hint' => $classified['hint'],
+                    // Full message stays in the server log only — never returned
+                    // to the API caller, so admin UIs / browser consoles never
+                    // see raw provider URLs, account ids or HTTP bodies.
                     'error' => $e->getMessage(),
                 ]);
+
+                $failures[] = [
+                    'topic' => $prompt->getTopic(),
+                    'owner_id' => $prompt->getOwnerId(),
+                    'code' => $classified['code'],
+                    'hint' => $classified['hint'],
+                ];
             }
         }
 
@@ -105,7 +133,12 @@ final readonly class SynapseIndexer
             'force' => $force,
         ]);
 
-        return ['indexed' => $indexed, 'skipped' => $skipped, 'errors' => $errors];
+        return [
+            'indexed' => $indexed,
+            'skipped' => $skipped,
+            'errors' => $errors,
+            'failures' => $failures,
+        ];
     }
 
     /**
@@ -547,5 +580,187 @@ final readonly class SynapseIndexer
     private function buildPointId(string $topic, int $ownerId): string
     {
         return "synapse_{$ownerId}_{$topic}";
+    }
+
+    /**
+     * Map an indexing failure to a stable error code + sanitized hint.
+     *
+     * The pair is what gets surfaced in the API response (and from there
+     * into the admin UI's JS console) so admins can self-diagnose
+     * misconfigured providers without us echoing raw exception
+     * messages — those still go to the server log via `error => …`,
+     * but they often contain provider URLs, account ids, HTTP bodies
+     * with internal hostnames, or even an `Authorization: Bearer …`
+     * header in pathological cases. None of that belongs in a browser
+     * console of a multi-tenant install.
+     *
+     * Codes are stable across versions so the frontend can branch on
+     * them when it eventually grows action buttons ("Open provider
+     * settings", "Switch model" etc.). Today the frontend just renders
+     * `hint` and groups the failures by `code`.
+     *
+     * @param array{provider: ?string, model: ?string, model_id: ?int, vector_dim: int} $modelInfo
+     *
+     * @return array{code: string, hint: string}
+     */
+    private function classifyIndexError(\Throwable $e, array $modelInfo): array
+    {
+        $rawMessage = $e->getMessage();
+        $modelLabel = $this->describeModel($modelInfo);
+        $providerName = $this->describeProvider($e, $modelInfo);
+
+        // Most embedding failures bubble up as ProviderException from one
+        // of the AI providers. Branch on the HTTP code embedded in the
+        // message because the provider classes today don't expose a
+        // dedicated httpStatus property — that's a separate refactor.
+        if ($e instanceof ProviderException) {
+            if (preg_match('/HTTP (4\d{2}|5\d{2})/', $rawMessage, $m)) {
+                $http = (int) $m[1];
+
+                return match (true) {
+                    401 === $http, 403 === $http => [
+                        'code' => 'provider_auth_failed',
+                        'hint' => sprintf(
+                            "Provider '%s' rejected the credentials (HTTP %d). Verify the API key in admin settings.",
+                            $providerName,
+                            $http,
+                        ),
+                    ],
+                    404 === $http => [
+                        'code' => 'model_not_available',
+                        'hint' => sprintf(
+                            "Model %s is not available on provider '%s' (HTTP 404). Check the model slug or pick a different model.",
+                            $modelLabel,
+                            $providerName,
+                        ),
+                    ],
+                    429 === $http => [
+                        'code' => 'provider_rate_limited',
+                        'hint' => sprintf(
+                            "Provider '%s' rate-limited the request (HTTP 429). Wait a bit or upgrade the plan, then retry.",
+                            $providerName,
+                        ),
+                    ],
+                    $http >= 500 => [
+                        'code' => 'provider_unavailable',
+                        'hint' => sprintf(
+                            "Provider '%s' returned HTTP %d (server-side error). Retry later or switch provider.",
+                            $providerName,
+                            $http,
+                        ),
+                    ],
+                    default => [
+                        'code' => 'provider_error',
+                        'hint' => sprintf("Provider '%s' rejected the embedding request (HTTP %d).", $providerName, $http),
+                    ],
+                };
+            }
+
+            if (preg_match('/timed out|timeout/i', $rawMessage)) {
+                return [
+                    'code' => 'provider_timeout',
+                    'hint' => sprintf("Provider '%s' did not respond in time. Check network/proxy or pick a closer region.", $providerName),
+                ];
+            }
+
+            if (preg_match('/api key|missing.*key|not configured/i', $rawMessage)) {
+                return [
+                    'code' => 'provider_auth_failed',
+                    'hint' => sprintf("API key for provider '%s' is missing. Configure it in admin settings.", $providerName),
+                ];
+            }
+
+            return [
+                'code' => 'provider_error',
+                'hint' => sprintf("Provider '%s' could not embed the topic — see backend logs for details.", $providerName),
+            ];
+        }
+
+        // Non-provider failures. Match a few well-known signatures so the
+        // operator gets something actionable; everything else falls through
+        // to a sanitized first-line preview.
+        if (preg_match('/qdrant/i', $rawMessage)) {
+            return [
+                'code' => 'qdrant_unreachable',
+                'hint' => 'Qdrant collection could not be written. Verify QDRANT_URL and that the qdrant container is healthy.',
+            ];
+        }
+
+        if (preg_match('/dimension|vector size|expected.*\d+.*got.*\d+/i', $rawMessage)) {
+            return [
+                'code' => 'dimension_mismatch',
+                'hint' => sprintf(
+                    'Embedding vector size disagrees with the synapse_topics collection. Use "Recreate Collection" so it is rebuilt at the active model dimension (%d).',
+                    $modelInfo['vector_dim'],
+                ),
+            ];
+        }
+
+        if (preg_match('/empty (embedding|vector)/i', $rawMessage)) {
+            return [
+                'code' => 'embedding_empty',
+                'hint' => sprintf("Provider '%s' returned an empty vector. The model %s may be misconfigured.", $providerName, $modelLabel),
+            ];
+        }
+
+        return [
+            'code' => 'unknown',
+            'hint' => sprintf(
+                'Unexpected error while embedding the topic via %s on %s — see backend logs (%s).',
+                $modelLabel,
+                $providerName,
+                $this->sanitizeMessageForUi($rawMessage),
+            ),
+        ];
+    }
+
+    private function describeProvider(\Throwable $e, array $modelInfo): string
+    {
+        if ($e instanceof ProviderException) {
+            $name = $e->getProviderName();
+            if ('' !== $name && 'unknown' !== $name) {
+                return $name;
+            }
+        }
+
+        return $modelInfo['provider'] ?? 'unknown';
+    }
+
+    private function describeModel(array $modelInfo): string
+    {
+        $name = $modelInfo['model'] ?? null;
+
+        return null !== $name && '' !== $name ? sprintf("'%s'", $name) : '(unbound)';
+    }
+
+    /**
+     * Strip identifiers / URLs / tokens from a free-form exception message
+     * so a fragment of it can safely be embedded in the API response.
+     *
+     * Conservative on purpose: we cap the result at 120 chars (one line in
+     * the browser console) and prefer over-redacting to leaking. Anyone
+     * who needs the full text reads the structured server log entry that
+     * `indexAllTopics()` emits in lockstep.
+     */
+    private function sanitizeMessageForUi(string $message): string
+    {
+        $patterns = [
+            '/Bearer\s+[A-Za-z0-9_\-.]+/i' => 'Bearer <redacted>',
+            '/sk-[A-Za-z0-9]{16,}/' => '<api_key>',
+            '/https?:\/\/\S+/' => '<url>',
+            '/\b[a-f0-9]{32}\b/i' => '<account>',
+            '/\b[A-Fa-f0-9]{40,}\b/' => '<hex>',
+            '/\/[\w.\-]+\/[\w.\-\/]+/' => '<path>',
+        ];
+
+        $cleaned = preg_replace(array_keys($patterns), array_values($patterns), $message) ?? $message;
+        $cleaned = preg_replace('/\s+/', ' ', $cleaned) ?? $cleaned;
+        $cleaned = trim($cleaned);
+
+        if (strlen($cleaned) > 120) {
+            $cleaned = substr($cleaned, 0, 117).'...';
+        }
+
+        return $cleaned;
     }
 }

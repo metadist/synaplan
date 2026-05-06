@@ -556,7 +556,7 @@
                 <div
                   v-if="infoPopoverOpen"
                   v-click-outside="closeInfoPopover"
-                  class="absolute bottom-full left-0 mb-2 min-w-[16rem] max-w-[20rem] rounded-xl shadow-xl border border-light-border/30 dark:border-dark-border/30 bg-white dark:bg-gray-800 z-[100] overflow-hidden"
+                  class="absolute bottom-full left-0 mb-2 min-w-[16rem] max-w-[20rem] surface-elevated shadow-xl z-[100] overflow-hidden"
                   data-testid="popover-message-info"
                   @keydown.escape="closeInfoPopover"
                 >

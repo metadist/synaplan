@@ -239,10 +239,24 @@ export class WebSpeechService {
 
   /**
    * Abort recognition immediately (discards pending results).
+   *
+   * Detaches all native event handlers BEFORE aborting so that any
+   * in-flight result/end events do not invoke user callbacks. This is
+   * essential when the caller wants to take ownership of the textbox
+   * state (e.g. on send) and not have a late `onresult` write text back.
    */
   abort(): void {
     if (this.recognition) {
-      this.recognition.abort()
+      this.recognition.onresult = null
+      this.recognition.onend = null
+      this.recognition.onerror = null
+      this.recognition.onstart = null
+      try {
+        this.recognition.abort()
+      } catch {
+        // abort() can throw if recognition was never started; ignore.
+      }
+      this.recognition = null
       this.isListening = false
     }
   }

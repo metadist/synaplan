@@ -55,6 +55,31 @@ export interface SynapseReindexRequest {
   topic?: string
 }
 
+/**
+ * Stable error codes returned per failed topic. Frontend can branch on
+ * these for UX (e.g. "Open provider settings" CTA) — kept aligned with
+ * `SynapseIndexer::classifyIndexError()` on the backend.
+ */
+export type SynapseReindexFailureCode =
+  | 'provider_auth_failed'
+  | 'model_not_available'
+  | 'provider_rate_limited'
+  | 'provider_unavailable'
+  | 'provider_timeout'
+  | 'provider_error'
+  | 'qdrant_unreachable'
+  | 'dimension_mismatch'
+  | 'embedding_empty'
+  | 'unknown'
+
+export interface SynapseReindexFailure {
+  topic: string
+  ownerId: number
+  code: SynapseReindexFailureCode
+  /** Sanitized — safe to render in toasts / console / UI without leaking secrets. */
+  hint: string
+}
+
 export interface SynapseReindexResponse {
   success: boolean
   recreated: boolean
@@ -62,6 +87,7 @@ export interface SynapseReindexResponse {
   indexed: number
   skipped: number
   errors: number
+  failures?: SynapseReindexFailure[]
   topic?: string
   topicResult?: string
 }
