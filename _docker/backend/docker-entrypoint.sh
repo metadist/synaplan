@@ -1,6 +1,15 @@
 #!/bin/bash
 set -euo pipefail
 
+# Materialize PHP runtime config from the synaplan-base-php image:
+#   - render PHP_*/FRANKENPHP_* env-var overrides into 99-synaplan-env.ini
+#   - activate the dev override (templates/synaplan-dev.ini) when APP_ENV=dev
+#   - write /etc/caddy/synaplan-worker-mode.Caddyfile (real snippet in prod,
+#     empty stub in dev) so the Caddyfile `import` is always safe
+# Source (don't exec) so we keep the parent shell's set -euo pipefail.
+# shellcheck source=/dev/null
+source /usr/local/bin/synaplan-php-configure
+
 echo "🚀 Starting Synaplan Backend..."
 
 # Create empty .env file if it doesn't exist

@@ -1,15 +1,18 @@
-FROM ghcr.io/metadist/synaplan-base-php:0.2.0@sha256:016436cf38cc38ecaa80c1f836deaffce9ee23dd747543d2fcf5706ac9d0ce4a
+# synaplan-base-php 0.3.0+ ships fully-tuned PHP ini files under
+# /usr/local/etc/php/conf.d/ (10-runtime, 20-opcache+JIT, 25-realpath,
+# 27-grpc, 28-apcu, 30-errors, 40-security) and an entrypoint shim at
+# /usr/local/bin/synaplan-php-configure that handles APP_ENV=dev override
+# + FrankenPHP worker-mode activation. Anything you'd previously written
+# to conf.d/ from this Dockerfile is now baked into the base image.
+#
+# Sizing overrides are surfaced as PHP_*/FRANKENPHP_* env vars; see the
+# base image README at /usr/local/share/synaplan-base-php/README.md.
+#
+# After the next base image build is published, bump the SHA digest below
+# (`docker buildx imagetools inspect ghcr.io/metadist/synaplan-base-php:0.3.0`).
+FROM ghcr.io/metadist/synaplan-base-php:0.3.0
 
 WORKDIR /var/www/backend
-
-# PHP Configuration
-RUN mkdir -p /var/www/uploads && chmod 777 /var/www/uploads && \
-    printf "upload_max_filesize=512M\npost_max_size=512M\nmax_file_uploads=50\nmemory_limit=512M\nupload_tmp_dir=/var/www/uploads\nsys_temp_dir=/var/www/uploads\nmax_execution_time=300\n" \
-    > /usr/local/etc/php/conf.d/uploads.ini && \
-    printf "opcache.enable=1\nopcache.memory_consumption=256\nopcache.max_accelerated_files=20000\n" \
-    > /usr/local/etc/php/conf.d/opcache.ini && \
-    printf "display_errors=Off\ndisplay_startup_errors=Off\nlog_errors=On\nerror_reporting=E_ALL & ~E_DEPRECATED & ~E_STRICT\n" \
-    > /usr/local/etc/php/conf.d/production.ini
 
 # Set default environment variables for paths and constants
 # These are baked into the image since they reference local filesystem paths

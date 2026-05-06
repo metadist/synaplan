@@ -1,6 +1,17 @@
 {
 	# Global options
-	frankenphp
+	#
+	# FrankenPHP bootstrap. The synaplan-base-php image's
+	# /usr/local/bin/synaplan-php-configure shim materializes
+	# /etc/caddy/synaplan-worker-mode.Caddyfile on container startup:
+	#   - APP_ENV=prod (and FRANKENPHP_WORKER_ENABLED!=0) -> the worker block
+	#     (`frankenphp { worker { ... } }`, boots backend/public/worker.php
+	#     once per worker process for ~3-10x throughput on Symfony)
+	#   - APP_ENV=dev (or worker mode disabled)           -> a classic-SAPI
+	#     stub containing only the bare `frankenphp` directive
+	# Either flavor enables PHP processing, so this `import` always works.
+	import /etc/caddy/synaplan-worker-mode.Caddyfile
+
 	order php_server before file_server
 }
 
