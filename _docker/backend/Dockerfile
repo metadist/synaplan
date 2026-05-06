@@ -1,4 +1,4 @@
-# synaplan-base-php 0.3.0+ ships fully-tuned PHP ini files under
+# synaplan-base-php 1.0.0 ships fully-tuned PHP ini files under
 # /usr/local/etc/php/conf.d/ (10-runtime, 20-opcache+JIT, 25-realpath,
 # 27-grpc, 28-apcu, 30-errors, 40-security) and an entrypoint shim at
 # /usr/local/bin/synaplan-php-configure that handles APP_ENV=dev override
@@ -8,9 +8,11 @@
 # Sizing overrides are surfaced as PHP_*/FRANKENPHP_* env vars; see the
 # base image README at /usr/local/share/synaplan-base-php/README.md.
 #
-# After the next base image build is published, bump the SHA digest below
-# (`docker buildx imagetools inspect ghcr.io/metadist/synaplan-base-php:0.3.0`).
-FROM ghcr.io/metadist/synaplan-base-php:0.3.0
+# Pin to an immutable digest once the 1.0.0 build settles:
+#   docker buildx imagetools inspect ghcr.io/metadist/synaplan-base-php:1.0.0
+# then append `@sha256:...` here so reproducible builds aren't at the
+# mercy of a moving floating tag.
+FROM ghcr.io/metadist/synaplan-base-php:1.0.0
 
 WORKDIR /var/www/backend
 

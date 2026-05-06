@@ -13,6 +13,7 @@
         "codewithkyrian/whisper.php": "^1.1",
         "doctrine/dbal": "^4.4.3",
         "doctrine/doctrine-bundle": "^3.2.2",
+        "doctrine/doctrine-fixtures-bundle": "^4.3.1",
         "doctrine/doctrine-migrations-bundle": "^4.0",
         "doctrine/orm": "^3.6.3",
         "erusev/parsedown": "^1.8.0",
@@ -59,8 +60,7 @@
         "symfony/validator": "8.0.*",
         "symfony/yaml": "8.0.*",
         "web-token/jwt-library": "^4.1.6",
-        "webklex/php-imap": "^6.2",
-        "doctrine/doctrine-fixtures-bundle": "^4.3.1"
+        "webklex/php-imap": "^6.2"
     },
     "config": {
         "allow-plugins": {
