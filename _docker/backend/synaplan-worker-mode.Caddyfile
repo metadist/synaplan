@@ -21,6 +21,6 @@ frankenphp {
 		# worker.php needed.
 		file "/var/www/backend/public/index.php"
 		num  {$FRANKENPHP_WORKER_NUM:16}
-		env  APP_RUNTIME "App\\Runtime\\FrankenPhpRuntime"
+		env  APP_RUNTIME App\Runtime\FrankenPhpRuntime
 	}
 }
