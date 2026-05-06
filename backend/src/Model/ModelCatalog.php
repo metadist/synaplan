@@ -235,23 +235,31 @@ class ModelCatalog
         [
             'id' => 13,
             'service' => 'Ollama',
-            'name' => 'bge-m3',
+            'name' => 'bge-m3 (Ollama, self-hosted)',
             'tag' => 'vectorize',
-            'selectable' => 0,
+            // Selectable in the admin "switch embedding model" dropdown so
+            // operators running a private Ollama / GPU server can pin RAG and
+            // Synapse routing to their own bge-m3 deployment instead of paying
+            // per-token to Cloudflare or OpenAI. Same 1024-dim vector space as
+            // the Cloudflare bge-m3 (BID 187), so switching between the two
+            // is a "free" change from the collection's point of view.
+            'selectable' => 1,
             'active' => 1,
             'providerId' => 'bge-m3',
-            'priceIn' => 0.19,
-            'inUnit' => 'per1M',
+            'priceIn' => 0,
+            'inUnit' => 'free',
             'priceOut' => 0,
             'outUnit' => '-',
-            'quality' => 6,
+            'quality' => 8,
             'rating' => 1,
             'json' => [
-                'description' => 'Vectorize text into synaplans MariaDB vector DB (local) for RAG',
+                'description' => 'BAAI/bge-m3 multilingual embeddings (1024-dim) running on the operator\'s own Ollama server. Free at point of use - ideal when a local GPU is available. Same vector space as Cloudflare bge-m3 (BID 187).',
                 'params' => [
                     'model' => 'bge-m3',
                     'input' => [],
                 ],
+                'features' => ['embedding', 'multilingual'],
+                'meta' => ['dimensions' => 1024, 'context_window' => '8192', 'provider' => 'ollama'],
             ],
         ],
         [

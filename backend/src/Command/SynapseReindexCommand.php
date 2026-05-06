@@ -47,13 +47,18 @@ final class SynapseReindexCommand extends Command
     {
         $io = new SymfonyStyle($input, $output);
 
+        // SynapseIndexer::getEmbeddingModelInfo() declares
+        //   array{provider: ?string, model: ?string, model_id: ?int, vector_dim: int}
+        // so the three identity fields are nullable (when SYNAPSE_VECTORIZE is unbound)
+        // but vector_dim always has a sane fallback. Keep the printed lines aligned
+        // with that contract — PHPStan rejects a null-coalesce on the non-null fields.
         $info = $this->synapseIndexer->getEmbeddingModelInfo();
         $io->section('SYNAPSE_VECTORIZE active model');
         $io->definitionList(
-            ['modelId' => (string) ($info['model_id'] ?? 'null')],
-            ['provider' => (string) ($info['provider'] ?? 'null')],
-            ['model' => (string) ($info['model'] ?? 'null')],
-            ['vectorDim' => (string) ($info['vector_dim'] ?? 'null')],
+            ['modelId' => null === $info['model_id'] ? '<unbound>' : (string) $info['model_id']],
+            ['provider' => $info['provider'] ?? '<unbound>'],
+            ['model' => $info['model'] ?? '<unbound>'],
+            ['vectorDim' => (string) $info['vector_dim']],
         );
 
         $userOpt = $input->getOption('user');
@@ -61,27 +66,32 @@ final class SynapseReindexCommand extends Command
         $force = (bool) $input->getOption('force');
 
         $start = microtime(true);
+        // SynapseIndexer::indexAllTopics() returns
+        //   array{indexed: int, skipped: int, errors: int, failures: list<...>}
+        // — every scalar is a plain int, no null fallback needed. There is no
+        // total_topics key; derive it locally so the operator gets a quick
+        // "0 / 9 reindexed" sanity check.
         $result = $this->synapseIndexer->indexAllTopics($userId, $force);
         $ms = (int) ((microtime(true) - $start) * 1000);
 
+        $totalTopics = $result['indexed'] + $result['skipped'] + $result['errors'];
+
         $io->section('indexAllTopics result');
         $io->definitionList(
-            ['total_topics' => (string) ($result['total_topics'] ?? '?')],
-            ['indexed' => (string) ($result['indexed'] ?? '?')],
-            ['skipped' => (string) ($result['skipped'] ?? '?')],
-            ['errors' => (string) ($result['errors'] ?? '?')],
+            ['total_topics' => (string) $totalTopics],
+            ['indexed' => (string) $result['indexed']],
+            ['skipped' => (string) $result['skipped']],
+            ['errors' => (string) $result['errors']],
             ['total_ms' => (string) $ms],
         );
 
-        if (!empty($result['failures'])) {
+        if ([] !== $result['failures']) {
             $io->section('failures');
             foreach ($result['failures'] as $failure) {
                 $io->writeln('  - '.json_encode($failure, JSON_UNESCAPED_SLASHES));
             }
         }
 
-        $errors = (int) ($result['errors'] ?? 0);
-
-        return $errors > 0 ? Command::FAILURE : Command::SUCCESS;
+        return $result['errors'] > 0 ? Command::FAILURE : Command::SUCCESS;
     }
 }
