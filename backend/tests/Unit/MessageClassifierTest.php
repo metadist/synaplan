@@ -394,7 +394,7 @@ class MessageClassifierTest extends TestCase
     public function testFastPathYieldsToAiSorterOnMediaVerbs(): void
     {
         $configRepo = $this->createMock(ConfigRepository::class);
-        $configRepo->method('getValue')->willReturnCallback(static function (int $owner, string $group): ?string {
+        $configRepo->method('getValue')->willReturnCallback(static function (int $owner, string $group, string $setting): ?string {
             return 'QDRANT_SEARCH' === $group ? '0' : null;
         });
 

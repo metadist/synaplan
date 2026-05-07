@@ -642,6 +642,7 @@ const handleOpenFeedbackDialogEvent = (event: Event) => {
 
 // Cleanup: Stop streaming when component unmounts (user leaves chat)
 onBeforeUnmount(() => {
+  isViewUnmounted = true
   handleStopStreaming()
   if (currentAudioStreamer) {
     currentAudioStreamer.stop()
@@ -653,6 +654,7 @@ onBeforeUnmount(() => {
   window.removeEventListener('focus', prefetchSseToken)
   document.removeEventListener('visibilitychange', handleVisibilityChangeForToken)
   clearDeleteDialogTimer()
+  clearMemoryPollTimers()
 })
 
 // Watch for active chat changes and load messages
@@ -850,6 +852,25 @@ watch(
   }
 )
 
+// Phase 2c: timers tied to the backgrounded memory-extraction polling.
+// Tracked so onBeforeUnmount can cancel them — otherwise a slow Claude
+// Opus extraction (or a queue backlog) can keep polling for ~25 s after
+// the user navigates away and would update reactive state on an
+// unmounted component.
+const memoryPollTimers = new Set<ReturnType<typeof setTimeout>>()
+let isViewUnmounted = false
+
+function trackTimer(handle: ReturnType<typeof setTimeout>): void {
+  memoryPollTimers.add(handle)
+}
+
+function clearMemoryPollTimers(): void {
+  for (const handle of memoryPollTimers) {
+    clearTimeout(handle)
+  }
+  memoryPollTimers.clear()
+}
+
 /**
  * Phase 2c: poll the backgrounded memory extraction outcome a couple of
  * times after the SSE stream completes. The messenger worker takes 2-7 s
@@ -863,11 +884,11 @@ watch(
 async function pollExtractedMemoriesOnce(messageId: number): Promise<boolean> {
   try {
     const result = await chatApi.getExtractedMemories(messageId)
+    if (isViewUnmounted) return true
     if (result.status === 'pending') {
       return false
     }
 
-    // Push saved memories into the local store + show toast (legacy behaviour).
     for (const memoryData of result.saved) {
       if (!memoryData?.id) continue
 
@@ -906,9 +927,12 @@ async function pollExtractedMemoriesOnce(messageId: number): Promise<boolean> {
           ? t('processing.memoriesCompleteTitle')
           : t('processing.analyzingMemoriesTitle')
       memoryToastVisible.value = true
-      setTimeout(() => {
+      const hideHandle = setTimeout(() => {
+        memoryPollTimers.delete(hideHandle)
+        if (isViewUnmounted) return
         memoryToastVisible.value = false
       }, 3000)
+      trackTimer(hideHandle)
     }
 
     return true
@@ -929,16 +953,25 @@ function schedulePostStreamMemoryPoll(messageId: number): void {
   let attempt = 0
 
   const tick = async () => {
+    if (isViewUnmounted) return
     if (attempt >= delaysMs.length) return
     const done = await pollExtractedMemoriesOnce(messageId)
-    if (done) return
+    if (done || isViewUnmounted) return
     attempt += 1
     if (attempt < delaysMs.length) {
-      setTimeout(tick, delaysMs[attempt])
+      const nextHandle = setTimeout(() => {
+        memoryPollTimers.delete(nextHandle)
+        void tick()
+      }, delaysMs[attempt])
+      trackTimer(nextHandle)
     }
   }
 
-  setTimeout(tick, delaysMs[0])
+  const firstHandle = setTimeout(() => {
+    memoryPollTimers.delete(firstHandle)
+    void tick()
+  }, delaysMs[0])
+  trackTimer(firstHandle)
 }
 
 /**

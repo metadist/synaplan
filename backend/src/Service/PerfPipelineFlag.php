@@ -7,22 +7,22 @@ namespace App\Service;
 use App\Repository\ConfigRepository;
 
 /**
- * Phase 4 rollout switch for the performance overhaul (Phases 1-3).
+ * Phase 4 rollout switch for the **backgrounded memory extraction** half
+ * of the performance overhaul.
  *
- * The overhaul changes user-visible behaviour in a few non-trivial ways:
- *   - background memory extraction (Phase 2) instead of inline
- *   - classifier fast-path (Phase 1c) skipping the AI sorter
- *   - Gemini `thinkingConfig` (Phase 1e) reducing reasoning by default
+ * Currently consulted only by {@see Message\Handler\ChatHandler}
+ * to gate the dispatch of `ExtractMemoriesCommand` to the async worker.
+ * The other Phase 1 wins (classifier fast-path, Gemini `thinkingConfig`,
+ * shared embeddings, etc.) have their own dedicated BCONFIG keys or are
+ * always-on; they are **not** affected by this flag.
  *
- * This service exposes a single `isEnabled()` check so ops can disable the
- * whole bundle in one place if they spot a regression in production. Reads
- * BCONFIG group `PERF`, key `V2_PIPELINE_ENABLED`. Per-user overrides take
- * precedence over the global value; the default is **on** (the new code
- * path) because the old inline memory extraction was already removed —
- * disabling the flag now means "skip memory extraction entirely" rather
- * than "go back to inline".
+ * Reads BCONFIG group `PERF`, key `V2_PIPELINE_ENABLED`. Per-user
+ * overrides take precedence over the global value; the default is **on**.
+ * Because the old inline memory extraction code path was removed in
+ * Phase 2, disabling this flag now means "skip memory extraction
+ * entirely" rather than "go back to inline".
  *
- * To kill switch globally:
+ * To kill switch globally (skip background memory extraction for everyone):
  *   INSERT INTO BCONFIG (BOWNERID, BGROUP, BSETTING, BVALUE)
  *     VALUES (0, 'PERF', 'V2_PIPELINE_ENABLED', '0');
  *

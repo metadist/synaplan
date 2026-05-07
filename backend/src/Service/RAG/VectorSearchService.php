@@ -24,23 +24,19 @@ final readonly class VectorSearchService
     }
 
     /**
-     * Semantic search using vector embeddings.
-     *
-     * @param int         $userId   User ID for filtering
-     * @param string|null $groupKey Optional group filter
-     * @param int         $limit    Number of results (default: 10)
-     * @param float       $minScore Minimum similarity score (0-1, default: 0.3)
-     *
-     * @return array Top-K similar documents
-     */
-    /**
      * Semantic search using a precomputed vector.
      *
      * Phase 1a: ChatHandler computes one embedding for the user query and
      * fans it out across memories + RAG + feedback searches. Skipping the
      * embedding round-trip here is the dominant TTFT win.
      *
-     * @param array<int, float> $vector Already-embedded query vector
+     * @param int               $userId   User ID for filtering
+     * @param array<int, float> $vector   Already-embedded query vector
+     * @param string|null       $groupKey Optional group filter
+     * @param int               $limit    Number of results (default: 10)
+     * @param float             $minScore Minimum similarity score (0-1, default: 0.3)
+     *
+     * @return array Top-K similar documents
      */
     public function semanticSearchByVector(
         int $userId,
@@ -90,6 +86,22 @@ final readonly class VectorSearchService
         }
     }
 
+    /**
+     * Semantic search using vector embeddings.
+     *
+     * Embeds the query string via the user's configured embedding model
+     * and delegates to {@see semanticSearchByVector()}. Pair the latter
+     * with {@see UserMemoryService::embedUserQuery()} when fanning the
+     * same embedding out across multiple searches.
+     *
+     * @param string      $query    Search query (will be embedded)
+     * @param int         $userId   User ID for filtering
+     * @param string|null $groupKey Optional group filter
+     * @param int         $limit    Number of results (default: 10)
+     * @param float       $minScore Minimum similarity score (0-1, default: 0.3)
+     *
+     * @return array Top-K similar documents
+     */
     public function semanticSearch(
         string $query,
         int $userId,

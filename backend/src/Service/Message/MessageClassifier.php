@@ -78,7 +78,7 @@ final readonly class MessageClassifier
         // Falls through to the full sorter on any signal of ambiguity.
         if (null === $overrideModelId
             && !empty($text)
-            && $this->isClassifierFastPathEnabled()
+            && $this->isClassifierFastPathEnabled($userId)
             && $this->canFastPathClassify($message, $text)
         ) {
             $detectedLanguage = $this->detectLanguageHeuristic($text);
@@ -441,14 +441,23 @@ final readonly class MessageClassifier
     /**
      * Whether the Phase 1c fast-path is enabled (default: true).
      *
-     * Read from BCONFIG group `CLASSIFIER`, key `FAST_PATH_ENABLED`. Operators
-     * who notice mis-routing can disable globally; users who need richer
-     * classification (e.g. heavy media-generation traffic that shouldn't go
-     * through the chat handler) can opt out per-account by inserting their own
-     * BCONFIG row.
+     * Read from BCONFIG group `CLASSIFIER`, key `FAST_PATH_ENABLED`. A
+     * per-user row (BOWNERID = $userId) takes precedence over the global
+     * row (BOWNERID = 0). Operators who notice mis-routing can disable
+     * globally; users who need richer classification (e.g. heavy
+     * media-generation traffic that shouldn't go through the chat
+     * handler) can opt out per-account by inserting their own BCONFIG
+     * row.
      */
-    private function isClassifierFastPathEnabled(): bool
+    private function isClassifierFastPathEnabled(int $userId): bool
     {
+        if ($userId > 0) {
+            $perUser = $this->configRepository->getValue($userId, 'CLASSIFIER', 'FAST_PATH_ENABLED');
+            if (null !== $perUser) {
+                return filter_var($perUser, \FILTER_VALIDATE_BOOL, \FILTER_NULL_ON_FAILURE) ?? true;
+            }
+        }
+
         $value = $this->configRepository->getValue(0, 'CLASSIFIER', 'FAST_PATH_ENABLED');
 
         if (null === $value) {

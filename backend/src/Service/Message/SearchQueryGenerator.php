@@ -202,13 +202,16 @@ final readonly class SearchQueryGenerator
 
         // Pronouns / referential expressions that need conversation context.
         // The list is intentionally conservative — common words like "the"
-        // would over-trigger.
+        // and definite articles ("der/die/das" in DE, "le/la/les" in FR)
+        // would over-trigger and force the LLM rewrite on most short
+        // queries, defeating the heuristic. Match only genuinely
+        // referential pronouns/demonstratives.
         static $referentialPatterns = [
             '/\b(it|its|that|this|those|these|them|they|he|she|him|her|his|hers)\b/i',
-            '/\b(es|ihn|ihm|ihr|ihrer|der|die|das|jenes|jener)\b/iu', // German pronouns (kept loose)
-            '/\b(le|la|les|lui|leur|cela|celui|celle)\b/iu',           // French
-            '/\b(eso|esa|este|esta|aquel|aquella)\b/iu',                // Spanish
-            '/\b(quello|quella|questo|questa|esso|essa)\b/iu',          // Italian
+            '/\b(es|ihn|ihm|jene[rs]?|diese[rs]?|dasselbe|derselbe|dieselbe)\b/iu', // German pronouns
+            '/\b(lui|leur|cela|ceci|celui|celle|ceux|celles)\b/iu',                // French pronouns
+            '/\b(eso|esa|esto|aquel|aquella|aquello)\b/iu',                        // Spanish demonstratives
+            '/\b(quello|quella|questo|questa|esso|essa)\b/iu',                     // Italian
         ];
 
         foreach ($referentialPatterns as $pattern) {
