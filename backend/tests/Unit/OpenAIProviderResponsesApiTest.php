@@ -287,6 +287,103 @@ class OpenAIProviderResponsesApiTest extends TestCase
         $this->assertArrayNotHasKey('reasoning', $result);
     }
 
+    /**
+     * Phase 1e parallel for OpenAI: when the chat pipeline calls with
+     * `reasoning => false` (the user did NOT enable the Thinking UI toggle)
+     * we want gpt-5* to skip its server-default `medium` reasoning so the
+     * first token arrives in ~hundreds of ms instead of ~1-3 s.
+     */
+    public function testBuildResponsesRequestDefaultChatUsesMinimalEffortOnGpt5(): void
+    {
+        $provider = $this->createProvider();
+        $method = new \ReflectionMethod($provider, 'buildResponsesRequest');
+
+        $messages = [['role' => 'user', 'content' => 'Hi']];
+        $options = ['reasoning' => false];
+
+        $result = $method->invoke($provider, $messages, 'gpt-5.5', true, $options);
+
+        $this->assertArrayHasKey('reasoning', $result);
+        $this->assertSame('minimal', $result['reasoning']['effort']);
+        // Minimal effort = no chain-of-thought worth summarising.
+        $this->assertArrayNotHasKey('summary', $result['reasoning']);
+    }
+
+    /**
+     * o-series models reject `effort = 'minimal'`, so the auto-disable path
+     * has to fall back to `'low'` (their lowest available tier). Still
+     * faster than the server-side default of `medium`.
+     */
+    public function testBuildResponsesRequestDefaultChatFallsBackToLowOnOSeries(): void
+    {
+        $provider = $this->createProvider();
+        $method = new \ReflectionMethod($provider, 'buildResponsesRequest');
+
+        $messages = [['role' => 'user', 'content' => 'Hi']];
+        $options = ['reasoning' => false];
+
+        $result = $method->invoke($provider, $messages, 'o3-mini', true, $options);
+
+        $this->assertArrayHasKey('reasoning', $result);
+        $this->assertSame('low', $result['reasoning']['effort']);
+        $this->assertArrayNotHasKey('summary', $result['reasoning']);
+    }
+
+    /**
+     * When the caller passes neither `reasoning` nor `reasoning_effort`, we
+     * must NOT inject a reasoning block — preserve the prior behaviour so
+     * tests / advanced callers that opt out of the cross-provider semantics
+     * keep getting OpenAI's server-side default.
+     */
+    public function testBuildResponsesRequestNoReasoningSignalSendsNoBlock(): void
+    {
+        $provider = $this->createProvider();
+        $method = new \ReflectionMethod($provider, 'buildResponsesRequest');
+
+        $messages = [['role' => 'user', 'content' => 'Hi']];
+
+        $result = $method->invoke($provider, $messages, 'gpt-5.5', true, []);
+
+        $this->assertArrayNotHasKey('reasoning', $result);
+    }
+
+    /**
+     * Cross-provider `reasoning_effort` knob takes precedence over the
+     * legacy boolean flag. Verifies the explicit-tier path lines up with
+     * what GoogleProvider does for the same input.
+     */
+    public function testBuildResponsesRequestExplicitEffortHigh(): void
+    {
+        $provider = $this->createProvider();
+        $method = new \ReflectionMethod($provider, 'buildResponsesRequest');
+
+        $messages = [['role' => 'user', 'content' => 'Solve this carefully']];
+        $options = ['reasoning' => true, 'reasoning_effort' => 'high'];
+
+        $result = $method->invoke($provider, $messages, 'gpt-5.5', true, $options);
+
+        $this->assertSame('high', $result['reasoning']['effort']);
+        $this->assertSame('auto', $result['reasoning']['summary']);
+    }
+
+    /**
+     * Native passthrough path: when the caller already supplies a fully
+     * formed `reasoning` array, send it verbatim (advanced override).
+     */
+    public function testBuildResponsesRequestArrayReasoningIsPassedThroughVerbatim(): void
+    {
+        $provider = $this->createProvider();
+        $method = new \ReflectionMethod($provider, 'buildResponsesRequest');
+
+        $messages = [['role' => 'user', 'content' => 'Hi']];
+        $options = ['reasoning' => ['effort' => 'high', 'summary' => 'concise']];
+
+        $result = $method->invoke($provider, $messages, 'gpt-5.5', true, $options);
+
+        $this->assertSame('high', $result['reasoning']['effort']);
+        $this->assertSame('concise', $result['reasoning']['summary']);
+    }
+
     public function testReduceToLastUserMessageViaReflection(): void
     {
         $provider = $this->createProvider();
