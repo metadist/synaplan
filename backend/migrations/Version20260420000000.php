@@ -58,7 +58,7 @@ final class Version20260420000000 extends AbstractMigration
                 AND c1.BID      < c2.keep_bid
         SQL);
 
-        $this->addSql('DROP INDEX idx_config_lookup ON BCONFIG');
+        $this->addSql('DROP INDEX IF EXISTS idx_config_lookup ON BCONFIG');
         $this->addSql('CREATE UNIQUE INDEX uniq_config_owner_group_setting ON BCONFIG (BOWNERID, BGROUP, BSETTING)');
     }
 
