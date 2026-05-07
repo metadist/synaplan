@@ -400,7 +400,7 @@ class GoogleProvider implements ChatProviderInterface, ImageGenerationProviderIn
             // UNAVAILABLE) since that's the most common transient failure
             // and the user can act on it (switch model / retry).
             if (503 === $statusCode || (false !== stripos($body, 'UNAVAILABLE') && false !== stripos($body, 'high demand'))) {
-                throw new ProviderException(sprintf('Google AI model "%s" is currently overloaded. Please retry in a few seconds, or switch to another model.', $options['model'] ?? 'gemini'), 'google');
+                throw new ProviderException(sprintf('Google AI model "%s" is currently overloaded. Please retry in a few seconds, or switch to another model.', (string) $options['model']), 'google');
             }
 
             $detail = '' !== $body ? ' — '.mb_substr($body, 0, 500) : '';
