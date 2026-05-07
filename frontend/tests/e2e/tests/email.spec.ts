@@ -9,7 +9,15 @@ import { getApiUrl } from '../config/config'
 import { INTEGRATION } from '../config/integration-data'
 
 const WEBHOOK_PATH = '/api/v1/webhooks/email'
-const MAILHOG_POLL_TIMEOUT_MS = 3000
+// 10 s upper bound on the inbound-email round-trip to MailHog.
+//
+// Originally 3 s — that worked on a quiet CI but is brittle once the test
+// stack has any concurrent load (other E2E specs share the same backend +
+// in-memory messenger queue, and SMTP→MailHog isn't sub-second). Bumping
+// to 10 s is still well within the 60 s test timeout and removes the
+// flake without masking real regressions: a genuinely broken email path
+// won't deliver a reply at all.
+const MAILHOG_POLL_TIMEOUT_MS = 10_000
 const MAILHOG_POLL_INTERVAL_MS = 200
 
 const { TEST_FROM, TEST_TO } = INTEGRATION.EMAIL

@@ -504,6 +504,87 @@ class ModelCatalog
                 'meta' => ['context_window' => '131072', 'max_output' => '16384', 'license' => 'Apache-2.0', 'quantization' => 'TruePoint Numerics'],
             ],
         ],
+        // Phase 2d: dedicated MEM-tagged models for backgrounded memory
+        // extraction. The MEM tag keeps these out of the user-facing chat
+        // model picker so picking a heavy chat model (Gemini 3 Pro, Claude
+        // Opus, etc.) never cascades into post-stream extraction latency.
+        // MemoryExtractionService resolves via
+        // ModelConfigService::getDefaultModel('MEM', $userId), which reads
+        // BCONFIG.DEFAULTMODEL/MEM (seeded by DefaultModelConfigSeeder via
+        // findBidByKey lookup, so the mapping is BID-agnostic at the call
+        // site).
+        //
+        // Three options seeded by default — pick whichever the operator's
+        // setup makes cheapest/fastest:
+        //   - 220: Groq gpt-oss-120b      (~200 ms TTFT, $0.15/$0.75 per 1M tokens)
+        //   - 221: Local Ollama gpt-oss:120b (free, latency depends on the GPU box)
+        //   - 222: Anthropic Claude Opus 4.6 (highest quality, slowest)
+        [
+            'id' => 220,
+            'service' => 'Groq',
+            'name' => 'gpt-oss-120b',
+            'tag' => 'mem',
+            'selectable' => 0,
+            'active' => 1,
+            'providerId' => 'openai/gpt-oss-120b',
+            'priceIn' => 0.15,
+            'inUnit' => 'per1M',
+            'priceOut' => 0.75,
+            'outUnit' => 'per1M',
+            'quality' => 10,
+            'rating' => 4,
+            'json' => [
+                'description' => 'Groq-hosted gpt-oss-120b for memory extraction. Sub-200 ms TTFT — recommended default for the post-stream memory pipeline.',
+                'max_tokens' => 4096,
+                'is_system' => true,
+                'params' => ['model' => 'openai/gpt-oss-120b'],
+                'meta' => ['context_window' => '131072', 'max_output' => '16384', 'license' => 'Apache-2.0', 'quantization' => 'TruePoint Numerics'],
+            ],
+        ],
+        [
+            'id' => 221,
+            'service' => 'Ollama',
+            'name' => 'gpt-oss:120b',
+            'tag' => 'mem',
+            'selectable' => 0,
+            'active' => 1,
+            'providerId' => 'gpt-oss:120b',
+            'priceIn' => 0.05,
+            'inUnit' => 'per1M',
+            'priceOut' => 0.25,
+            'outUnit' => 'per1M',
+            'quality' => 9,
+            'rating' => 1,
+            'json' => [
+                'description' => 'Local Ollama gpt-oss:120b for memory extraction. Same weights as the Groq option; runs on the operator\'s GPU box (zero per-token cost, latency depends on hardware).',
+                'max_tokens' => 4096,
+                'is_system' => true,
+                'params' => ['model' => 'gpt-oss:120b'],
+                'meta' => ['context_window' => '128000', 'max_output' => '16384', 'license' => 'Apache-2.0', 'quantization' => 'MXFP4'],
+            ],
+        ],
+        [
+            'id' => 222,
+            'service' => 'Anthropic',
+            'name' => 'Claude Opus 4.6',
+            'tag' => 'mem',
+            'selectable' => 0,
+            'active' => 1,
+            'providerId' => 'claude-opus-4-6',
+            'priceIn' => 5,
+            'inUnit' => 'per1M',
+            'priceOut' => 25,
+            'outUnit' => 'per1M',
+            'quality' => 10,
+            'rating' => 1,
+            'json' => [
+                'description' => 'Anthropic Claude Opus 4.6 for memory extraction. Highest extraction quality; significantly more expensive than the Groq/Ollama gpt-oss options — pick this only when extraction accuracy matters more than latency.',
+                'max_tokens' => 4096,
+                'is_system' => true,
+                'params' => ['model' => 'claude-opus-4-6'],
+                'meta' => ['context_window' => '1000000', 'max_output' => '128000'],
+            ],
+        ],
         // ==================== OPENAI MODELS ====================
         [
             'id' => 29,

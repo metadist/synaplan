@@ -51,13 +51,21 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, watch } from 'vue'
 import { ensureHighlighter, highlightCode, escapeHtml } from '@/composables/useHighlight'
 
 interface Props {
   content: string
   language?: string
   filename?: string
+  /**
+   * Phase 3c: while the parent message is still streaming, skip the
+   * highlight.js call and just show escaped text. highlight.js parsing on
+   * a half-written code block costs 10-50 ms per chunk and produces
+   * visibly wrong colours that flip every time a new keyword/string token
+   * arrives. We re-run the highlighter exactly once when streaming ends.
+   */
+  isStreaming?: boolean
 }
 
 const props = defineProps<Props>()
@@ -65,18 +73,42 @@ const props = defineProps<Props>()
 const copied = ref(false)
 const hljsReady = ref(false)
 
-// Load highlight.js and trigger re-render when ready
-ensureHighlighter().then(() => {
-  hljsReady.value = true
-})
+// Load highlight.js and trigger re-render when ready (only when not streaming —
+// no point loading the lib at the start of a stream that's about to ignore it).
+if (!props.isStreaming) {
+  ensureHighlighter().then(() => {
+    hljsReady.value = true
+  })
+}
 
 const highlightedCode = computed(() => {
+  // While streaming, return escaped text with no syntax highlighting. This
+  // prevents the "rainbow flash" where partial code re-tokenises every time
+  // a new chunk arrives. The full highlight runs once when isStreaming flips
+  // false (the watch below loads the lib lazily at that point).
+  if (props.isStreaming) {
+    return escapeHtml(props.content)
+  }
   // Access hljsReady to re-compute when highlight.js finishes loading
   if (!hljsReady.value) {
     return escapeHtml(props.content)
   }
   return highlightCode(props.content, props.language || '')
 })
+
+// When streaming flips to false (or the part is mounted post-stream),
+// ensure the highlighter is loaded so the final render shows colours.
+watch(
+  () => props.isStreaming,
+  (streaming) => {
+    if (!streaming && !hljsReady.value) {
+      ensureHighlighter().then(() => {
+        hljsReady.value = true
+      })
+    }
+  },
+  { immediate: true }
+)
 
 const copyCode = async () => {
   try {

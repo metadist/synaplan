@@ -803,6 +803,8 @@
     "generatingFile": "Erstelle Datei...",
     "generatingFileTitle": "Datei wird generiert",
     "generatingFileDesc": "KI erstellt die angeforderte Datei",
+    "thinkingTitle": "Denkt nach…",
+    "thinkingDesc": "Das Modell überlegt vor der Antwort",
     "analyzingMemories": "Analysiere Erinnerungen...",
     "analyzingMemoriesTitle": "Erinnerungen werden analysiert",
     "analyzingMemoriesDesc": "KI prüft, was wichtig ist und gespeichert werden soll",
@@ -896,6 +898,7 @@
       "capabilities": {
         "sort": "Nachrichten-Sortierung",
         "chat": "Chat / Allgemeine KI",
+        "mem": "Memory-Extraktion",
         "vectorize": "Einbettung / Vektorisierung",
         "pic2text": "Bilderkennung (Bild → Text)",
         "text2pic": "Bildgenerierung (Text → Bild)",

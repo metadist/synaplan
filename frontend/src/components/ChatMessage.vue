@@ -24,7 +24,7 @@
       <template v-if="role === 'assistant'">
         <MessagePart
           v-for="(part, index) in thinkingParts"
-          :key="`thinking-${index}`"
+          :key="part.partId ?? `thinking-${index}`"
           :part="part"
         />
       </template>
@@ -44,11 +44,27 @@
           class="sr-only"
           aria-hidden="true"
         />
-        <!-- Copy button (assistant only, hidden during streaming) -->
+        <!--
+          Copy button (assistant only).
+          Phase 3f: pre-rendered with `opacity: 0` while streaming so the
+          flip from streaming → done is a CSS transition rather than a
+          mount/unmount. That removes the layout pop where the bubble
+          briefly shifts when the button materialises.
+          `pointer-events-none` while hidden keeps the streaming bubble
+          fully click-through-able.
+        -->
         <button
-          v-if="role === 'assistant' && !isStreaming"
+          v-if="role === 'assistant'"
           type="button"
-          class="absolute top-2 right-2 z-10 p-1.5 rounded-md txt-secondary transition-opacity duration-150 bg-black/5 dark:bg-white/10 hover:bg-black/10 dark:hover:bg-white/20 hover:txt-primary pointer-fine:opacity-0 pointer-fine:group-hover/bubble:opacity-100"
+          :class="[
+            'absolute top-2 right-2 z-10 p-1.5 rounded-md txt-secondary bg-black/5 dark:bg-white/10 hover:bg-black/10 dark:hover:bg-white/20 hover:txt-primary',
+            'transition-opacity duration-200',
+            isStreaming
+              ? 'opacity-0 pointer-events-none'
+              : 'pointer-fine:opacity-0 pointer-fine:group-hover/bubble:opacity-100',
+          ]"
+          :aria-hidden="isStreaming ? 'true' : undefined"
+          :tabindex="isStreaming ? -1 : 0"
           :aria-label="t('chatMessage.copy')"
           data-testid="btn-message-copy"
           @click="copyMessageText"
@@ -206,6 +222,14 @@
                   {{ processingMetadata?.customMessage || $t('processing.generatingFileDesc') }}
                 </div>
               </template>
+              <template v-else-if="processingStatus === 'thinking'">
+                <div class="font-medium animate-pulse">
+                  {{ $t('processing.thinkingTitle') }}
+                </div>
+                <div class="text-sm txt-tertiary mt-0.5">
+                  {{ processingMetadata?.customMessage || $t('processing.thinkingDesc') }}
+                </div>
+              </template>
               <template v-else-if="processingStatus === 'analyzing_memories'">
                 <div class="font-medium animate-pulse">
                   {{ $t('processing.analyzingMemoriesTitle') }}
@@ -325,9 +349,18 @@
           </div>
 
           <!-- Message Content -->
+          <!--
+            Phase 3a: prefer the stable `partId` (assigned by parseAIResponse
+            / renderStreamingContent the first time a part appears) over the
+            v-for index. Index-based keys flickered when parts split mid-
+            stream — e.g. a single text part becoming text+code reused the
+            wrong DOM nodes for one frame and showed code formatting briefly
+            on plain text. Falling back to `${type}-${index}` keeps backward
+            compatibility for parts without partId (legacy stored messages).
+          -->
           <MessagePart
             v-for="(part, index) in contentParts"
-            :key="index"
+            :key="part.partId ?? `${part.type}-${index}`"
             :part="part"
             :is-streaming="isStreaming"
             :memories="memories"

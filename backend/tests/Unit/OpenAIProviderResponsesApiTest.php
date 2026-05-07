@@ -287,6 +287,311 @@ class OpenAIProviderResponsesApiTest extends TestCase
         $this->assertArrayNotHasKey('reasoning', $result);
     }
 
+    /**
+     * Phase 1e parallel for OpenAI on gpt-5.5+: when the chat pipeline calls
+     * with `reasoning => false` (Thinking toggle off) the request must skip
+     * chain-of-thought entirely. gpt-5.5 renamed the original `'minimal'`
+     * tier to `'none'` and rejects `'minimal'` with HTTP 400, so the lowest
+     * tier on this family is `'none'`.
+     */
+    public function testBuildResponsesRequestDefaultChatUsesNoneEffortOnGpt55(): void
+    {
+        $provider = $this->createProvider();
+        $method = new \ReflectionMethod($provider, 'buildResponsesRequest');
+
+        $messages = [['role' => 'user', 'content' => 'Hi']];
+        $options = ['reasoning' => false];
+
+        $result = $method->invoke($provider, $messages, 'gpt-5.5', true, $options);
+
+        $this->assertArrayHasKey('reasoning', $result);
+        $this->assertSame('none', $result['reasoning']['effort']);
+        // No chain-of-thought = nothing to summarise.
+        $this->assertArrayNotHasKey('summary', $result['reasoning']);
+    }
+
+    /**
+     * The original gpt-5 family still uses the legacy `'minimal'` tier name
+     * (gpt-5.5 renamed it to `'none'`). Verify we pick the right one per
+     * model family.
+     */
+    public function testBuildResponsesRequestDefaultChatUsesMinimalEffortOnOriginalGpt5(): void
+    {
+        $provider = $this->createProvider();
+        $method = new \ReflectionMethod($provider, 'buildResponsesRequest');
+
+        $messages = [['role' => 'user', 'content' => 'Hi']];
+        $options = ['reasoning' => false];
+
+        $result = $method->invoke($provider, $messages, 'gpt-5', true, $options);
+
+        $this->assertArrayHasKey('reasoning', $result);
+        $this->assertSame('minimal', $result['reasoning']['effort']);
+        $this->assertArrayNotHasKey('summary', $result['reasoning']);
+    }
+
+    /**
+     * o-series models reject both `'minimal'` and `'none'`, so the auto-disable
+     * path has to fall back to `'low'` (their lowest available tier). Still
+     * faster than the server-side default of `medium`.
+     */
+    public function testBuildResponsesRequestDefaultChatFallsBackToLowOnOSeries(): void
+    {
+        $provider = $this->createProvider();
+        $method = new \ReflectionMethod($provider, 'buildResponsesRequest');
+
+        $messages = [['role' => 'user', 'content' => 'Hi']];
+        $options = ['reasoning' => false];
+
+        $result = $method->invoke($provider, $messages, 'o3-mini', true, $options);
+
+        $this->assertArrayHasKey('reasoning', $result);
+        $this->assertSame('low', $result['reasoning']['effort']);
+        $this->assertArrayNotHasKey('summary', $result['reasoning']);
+    }
+
+    /**
+     * gpt-5.5+ exposes an `'xhigh'` tier above `'high'`. Older families don't
+     * accept it — make sure we pass it through on gpt-5.5 and clamp to
+     * `'high'` everywhere else.
+     */
+    public function testBuildResponsesRequestXHighEffortPassesThroughOnGpt55(): void
+    {
+        $provider = $this->createProvider();
+        $method = new \ReflectionMethod($provider, 'buildResponsesRequest');
+
+        $messages = [['role' => 'user', 'content' => 'Solve this carefully']];
+        $options = ['reasoning_effort' => 'xhigh'];
+
+        $result = $method->invoke($provider, $messages, 'gpt-5.5', true, $options);
+
+        $this->assertSame('xhigh', $result['reasoning']['effort']);
+        $this->assertSame('auto', $result['reasoning']['summary']);
+    }
+
+    public function testBuildResponsesRequestXHighEffortClampsToHighOnGpt5(): void
+    {
+        $provider = $this->createProvider();
+        $method = new \ReflectionMethod($provider, 'buildResponsesRequest');
+
+        $messages = [['role' => 'user', 'content' => 'Solve this carefully']];
+        $options = ['reasoning_effort' => 'xhigh'];
+
+        $result = $method->invoke($provider, $messages, 'gpt-5', true, $options);
+
+        $this->assertSame('high', $result['reasoning']['effort']);
+        $this->assertSame('auto', $result['reasoning']['summary']);
+    }
+
+    /**
+     * Per-family lowest-tier mapping. The catalog ships `gpt-5.4` (BIDs 180,
+     * 181) and `gpt-5.5` / `gpt-5.5-pro` (BIDs 204-207); both must continue
+     * to work with default chat (Thinking toggle off). Lock the mapping
+     * down so a future refactor of `lowestEffortTier()` can't silently
+     * regress existing users.
+     *
+     * @param string $model expected lowest-tier output for this model
+     */
+    #[DataProvider('lowestEffortTierProvider')]
+    public function testLowestEffortTierPerModelFamily(string $model, string $expected): void
+    {
+        $provider = $this->createProvider();
+        $method = new \ReflectionMethod($provider, 'lowestEffortTier');
+
+        $this->assertSame($expected, $method->invoke($provider, $model));
+    }
+
+    /**
+     * @return array<string, array{0: string, 1: string}>
+     */
+    public static function lowestEffortTierProvider(): array
+    {
+        return [
+            // gpt-5.5+ family — accepts 'none', rejects 'minimal'
+            'gpt-5.5' => ['gpt-5.5',                  'none'],
+            'gpt-5.5-pro' => ['gpt-5.5-pro',              'none'],
+            'gpt-5.5 with date suffix' => ['gpt-5.5-2026-01-15',       'none'],
+            'gpt-5.5-pro with date' => ['gpt-5.5-pro-2026-01-15',   'none'],
+            // gpt-5.x where x < 5 — original 'minimal' tier
+            'gpt-5' => ['gpt-5',                    'minimal'],
+            'gpt-5.0' => ['gpt-5.0',                  'minimal'],
+            'gpt-5.1' => ['gpt-5.1',                  'minimal'],
+            'gpt-5.2' => ['gpt-5.2',                  'minimal'],
+            'gpt-5.3' => ['gpt-5.3',                  'minimal'],
+            'gpt-5.4 (in catalog)' => ['gpt-5.4',                  'minimal'],
+            'gpt-5 with date suffix' => ['gpt-5-2025-08-06',         'minimal'],
+            'gpt-5.4 with date' => ['gpt-5.4-2025-12-01',       'minimal'],
+            // o-series — rejects both 'minimal' and 'none'
+            'o1' => ['o1',                       'low'],
+            'o1-mini' => ['o1-mini',                  'low'],
+            'o3' => ['o3',                       'low'],
+            'o3-mini' => ['o3-mini',                  'low'],
+            'o4-mini' => ['o4-mini',                  'low'],
+        ];
+    }
+
+    /**
+     * Regression test for the 5.4-and-lower concern: a user whose default
+     * chat model is gpt-5.4 must keep getting a working request. The
+     * previous behaviour (no reasoning block, server default = `medium`)
+     * is upgraded to `effort='minimal'`, which the gpt-5.x line accepts —
+     * not `'none'`, which only gpt-5.5+ accepts.
+     */
+    public function testGpt54DefaultChatSendsMinimalNotNone(): void
+    {
+        $provider = $this->createProvider();
+        $method = new \ReflectionMethod($provider, 'buildResponsesRequest');
+
+        $messages = [['role' => 'user', 'content' => 'Hi']];
+        $options = ['reasoning' => false];
+
+        $result = $method->invoke($provider, $messages, 'gpt-5.4', true, $options);
+
+        $this->assertSame('minimal', $result['reasoning']['effort']);
+        $this->assertNotSame('none', $result['reasoning']['effort']);
+    }
+
+    /**
+     * @param string $errorMessage exception message to test against the matcher
+     */
+    #[DataProvider('reasoningRejectionErrorProvider')]
+    public function testReasoningEffortRejectedErrorDetector(string $errorMessage, bool $expected): void
+    {
+        $provider = $this->createProvider();
+        $method = new \ReflectionMethod($provider, 'isReasoningEffortRejectedError');
+
+        $this->assertSame($expected, $method->invoke($provider, new \Exception($errorMessage)));
+    }
+
+    /**
+     * @return array<string, array{0: string, 1: bool}>
+     */
+    public static function reasoningRejectionErrorProvider(): array
+    {
+        return [
+            // Real OpenAI 400 messages we want to recover from
+            'gpt-5.5 rejecting minimal' => [
+                "Unsupported value: 'minimal' is not supported with the 'gpt-5.5' model. Supported values are: 'none', 'low', 'medium', 'high', and 'xhigh'.",
+                true,
+            ],
+            'hypothetical future model rejecting none' => [
+                "Unsupported value: 'none' is not supported with the 'gpt-5.6' model. Supported values are: 'minimal', 'low', 'medium', 'high'.",
+                true,
+            ],
+            'o-series rejecting minimal' => [
+                "Unsupported value: 'minimal' is not supported with the 'o1' model. Supported values are: 'low', 'medium', 'high'.",
+                true,
+            ],
+            // Unrelated errors must NOT trigger the retry (otherwise we'd
+            // strip reasoning on every error, masking real bugs)
+            'rate limit' => [
+                'Rate limit reached for gpt-5.5 in organization org-abc on tokens per min',
+                false,
+            ],
+            'invalid api key' => [
+                'Incorrect API key provided',
+                false,
+            ],
+            'previous_response_id error' => [
+                "previous_response_id 'resp_abc' is invalid",
+                false,
+            ],
+        ];
+    }
+
+    /**
+     * Pre-flight cache: once a model has rejected our reasoning tier, the
+     * NEXT request for that model must skip the reasoning block before it
+     * even hits the wire. Otherwise we'd pay a 400 + retry round-trip on
+     * every subsequent message.
+     */
+    public function testApplyReasoningRejectionCacheStripsReasoningWhenModelKnownToReject(): void
+    {
+        $provider = $this->createProvider();
+
+        $cacheProperty = new \ReflectionProperty($provider, 'reasoningRejectionCache');
+        $cacheProperty->setValue($provider, ['gpt-future' => true]);
+
+        $method = new \ReflectionMethod($provider, 'applyReasoningRejectionCache');
+
+        $result = $method->invoke($provider, [
+            'model' => 'gpt-future',
+            'reasoning' => ['effort' => 'minimal'],
+            'input' => [],
+        ]);
+
+        $this->assertArrayNotHasKey('reasoning', $result);
+    }
+
+    public function testApplyReasoningRejectionCachePassesThroughForKnownGoodModel(): void
+    {
+        $provider = $this->createProvider();
+        $method = new \ReflectionMethod($provider, 'applyReasoningRejectionCache');
+
+        $result = $method->invoke($provider, [
+            'model' => 'gpt-5.5',
+            'reasoning' => ['effort' => 'none'],
+            'input' => [],
+        ]);
+
+        $this->assertSame(['effort' => 'none'], $result['reasoning']);
+    }
+
+    /**
+     * When the caller passes neither `reasoning` nor `reasoning_effort`, we
+     * must NOT inject a reasoning block — preserve the prior behaviour so
+     * tests / advanced callers that opt out of the cross-provider semantics
+     * keep getting OpenAI's server-side default.
+     */
+    public function testBuildResponsesRequestNoReasoningSignalSendsNoBlock(): void
+    {
+        $provider = $this->createProvider();
+        $method = new \ReflectionMethod($provider, 'buildResponsesRequest');
+
+        $messages = [['role' => 'user', 'content' => 'Hi']];
+
+        $result = $method->invoke($provider, $messages, 'gpt-5.5', true, []);
+
+        $this->assertArrayNotHasKey('reasoning', $result);
+    }
+
+    /**
+     * Cross-provider `reasoning_effort` knob takes precedence over the
+     * legacy boolean flag. Verifies the explicit-tier path lines up with
+     * what GoogleProvider does for the same input.
+     */
+    public function testBuildResponsesRequestExplicitEffortHigh(): void
+    {
+        $provider = $this->createProvider();
+        $method = new \ReflectionMethod($provider, 'buildResponsesRequest');
+
+        $messages = [['role' => 'user', 'content' => 'Solve this carefully']];
+        $options = ['reasoning' => true, 'reasoning_effort' => 'high'];
+
+        $result = $method->invoke($provider, $messages, 'gpt-5.5', true, $options);
+
+        $this->assertSame('high', $result['reasoning']['effort']);
+        $this->assertSame('auto', $result['reasoning']['summary']);
+    }
+
+    /**
+     * Native passthrough path: when the caller already supplies a fully
+     * formed `reasoning` array, send it verbatim (advanced override).
+     */
+    public function testBuildResponsesRequestArrayReasoningIsPassedThroughVerbatim(): void
+    {
+        $provider = $this->createProvider();
+        $method = new \ReflectionMethod($provider, 'buildResponsesRequest');
+
+        $messages = [['role' => 'user', 'content' => 'Hi']];
+        $options = ['reasoning' => ['effort' => 'high', 'summary' => 'concise']];
+
+        $result = $method->invoke($provider, $messages, 'gpt-5.5', true, $options);
+
+        $this->assertSame('high', $result['reasoning']['effort']);
+        $this->assertSame('concise', $result['reasoning']['summary']);
+    }
+
     public function testReduceToLastUserMessageViaReflection(): void
     {
         $provider = $this->createProvider();

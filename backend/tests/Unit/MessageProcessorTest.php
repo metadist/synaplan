@@ -261,7 +261,20 @@ class MessageProcessorTest extends TestCase
                 $this->anything(),
                 $this->anything(),
                 $this->anything(),
-                $options
+                // Phase 0 instrumentation injects `perf_timer` into options so
+                // ChatHandler can mark first-token latency. Verify the original
+                // caller-supplied options are preserved alongside it instead of
+                // pinning to an exact-match array (which would lock out future
+                // additive options like resolved_prompt_data).
+                $this->callback(static function (array $passedOptions) use ($options): bool {
+                    foreach ($options as $key => $value) {
+                        if (!array_key_exists($key, $passedOptions) || $passedOptions[$key] !== $value) {
+                            return false;
+                        }
+                    }
+
+                    return $passedOptions['perf_timer'] instanceof \App\Service\PerfTimer;
+                })
             )
             ->willReturn(['metadata' => ['provider' => 'test', 'model' => 'test']]);
 

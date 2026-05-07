@@ -658,4 +658,127 @@ class MessageController extends AbstractController
 
         return $this->json($status);
     }
+
+    /**
+     * Phase 2c: poll endpoint for backgrounded memory extraction results.
+     *
+     * After SSE `complete` fires, the frontend polls this endpoint a couple
+     * of times to pick up memories that the messenger worker extracted in
+     * the background. The worker writes outcomes to the message's
+     * `extracted_memories` BMESSAGEMETA row; this endpoint just decodes and
+     * returns it.
+     *
+     * Response shape mirrors the legacy SSE `memory_suggested` payload so
+     * the frontend can reuse the same store-update logic.
+     */
+    #[Route('/{messageId}/memories', name: 'extracted_memories', methods: ['GET'])]
+    #[OA\Get(
+        path: '/api/v1/messages/{messageId}/memories',
+        summary: 'Get backgrounded memory extraction results for a message',
+        description: 'Polled by the frontend after SSE `complete`. Returns `pending` until the worker has finished, then `complete`/`empty` with saved memories and delete suggestions.',
+        security: [['Bearer' => []]],
+        tags: ['Messages']
+    )]
+    #[OA\Parameter(
+        name: 'messageId',
+        in: 'path',
+        required: true,
+        schema: new OA\Schema(type: 'integer')
+    )]
+    #[OA\Response(
+        response: 200,
+        description: 'Extraction status payload',
+        content: new OA\JsonContent(
+            required: ['status', 'completed_at', 'saved', 'delete_suggestions'],
+            properties: [
+                new OA\Property(property: 'status', type: 'string', enum: ['pending', 'empty', 'complete']),
+                new OA\Property(property: 'completed_at', type: 'integer', nullable: true),
+                new OA\Property(
+                    property: 'saved',
+                    type: 'array',
+                    description: 'Memories created/updated by this extraction (UserMemoryDTO::toArray() shape).',
+                    items: new OA\Items(
+                        required: ['id', 'category', 'key', 'value', 'source', 'created', 'updated'],
+                        properties: [
+                            new OA\Property(property: 'id', type: 'integer'),
+                            new OA\Property(property: 'category', type: 'string'),
+                            new OA\Property(property: 'key', type: 'string'),
+                            new OA\Property(property: 'value', type: 'string'),
+                            new OA\Property(property: 'source', type: 'string', enum: ['auto_detected', 'user_created', 'user_edited', 'ai_edited']),
+                            new OA\Property(property: 'messageId', type: 'integer', nullable: true),
+                            new OA\Property(property: 'created', type: 'integer'),
+                            new OA\Property(property: 'updated', type: 'integer'),
+                        ],
+                        type: 'object'
+                    )
+                ),
+                new OA\Property(
+                    property: 'delete_suggestions',
+                    type: 'array',
+                    description: 'Memories the model suggests removing (same shape as `saved`).',
+                    items: new OA\Items(
+                        required: ['id', 'category', 'key', 'value', 'source', 'created', 'updated'],
+                        properties: [
+                            new OA\Property(property: 'id', type: 'integer'),
+                            new OA\Property(property: 'category', type: 'string'),
+                            new OA\Property(property: 'key', type: 'string'),
+                            new OA\Property(property: 'value', type: 'string'),
+                            new OA\Property(property: 'source', type: 'string', enum: ['auto_detected', 'user_created', 'user_edited', 'ai_edited']),
+                            new OA\Property(property: 'messageId', type: 'integer', nullable: true),
+                            new OA\Property(property: 'created', type: 'integer'),
+                            new OA\Property(property: 'updated', type: 'integer'),
+                        ],
+                        type: 'object'
+                    )
+                ),
+            ]
+        )
+    )]
+    public function getExtractedMemories(
+        int $messageId,
+        #[CurrentUser] ?User $user,
+    ): JsonResponse {
+        if (!$user) {
+            return $this->json(['error' => 'Not authenticated'], Response::HTTP_UNAUTHORIZED);
+        }
+
+        $message = $this->em->getRepository(Message::class)->find($messageId);
+        if (!$message || $message->getUserId() !== $user->getId()) {
+            return $this->json(['error' => 'Message not found'], Response::HTTP_NOT_FOUND);
+        }
+
+        $raw = $message->getMeta('extracted_memories');
+        if (null === $raw || '' === $raw) {
+            // Worker hasn't finished yet — frontend keeps polling.
+            return $this->json([
+                'status' => 'pending',
+                'completed_at' => null,
+                'saved' => [],
+                'delete_suggestions' => [],
+            ]);
+        }
+
+        try {
+            $decoded = json_decode((string) $raw, true, 512, JSON_THROW_ON_ERROR);
+        } catch (\JsonException $e) {
+            $this->logger->warning('getExtractedMemories: corrupt payload, treating as empty', [
+                'message_id' => $messageId,
+                'error' => $e->getMessage(),
+            ]);
+
+            return $this->json([
+                'status' => 'empty',
+                'completed_at' => null,
+                'saved' => [],
+                'delete_suggestions' => [],
+            ]);
+        }
+
+        return $this->json([
+            'status' => $decoded['status'] ?? 'empty',
+            'completed_at' => $decoded['completed_at'] ?? null,
+            'saved' => $decoded['saved'] ?? [],
+            'delete_suggestions' => $decoded['delete_suggestions'] ?? [],
+        ]);
+    }
 }

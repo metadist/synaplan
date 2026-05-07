@@ -70,6 +70,38 @@ final readonly class MessageClassifier
             'override_model_id' => $overrideModelId,
         ]);
 
+        // Phase 1c: fast-path. The full AI sorter call costs 200-800 ms TTFT
+        // and is unnecessary for plain chat messages. If the message looks
+        // unambiguously like a normal chat (short, no tool prefix, no
+        // attachment, no media-generation keywords), we classify locally
+        // with a regex/heuristic and skip the LLM entirely.
+        // Falls through to the full sorter on any signal of ambiguity.
+        if (null === $overrideModelId
+            && !empty($text)
+            && $this->isClassifierFastPathEnabled($userId)
+            && $this->canFastPathClassify($message, $text)
+        ) {
+            $detectedLanguage = $this->detectLanguageHeuristic($text);
+
+            $this->logger->info('MessageClassifier: Fast-path classification (skipped AI sorter)', [
+                'message_id' => $messageId,
+                'language' => $detectedLanguage,
+                'text_length' => strlen($text),
+            ]);
+
+            return [
+                'topic' => 'general',
+                'language' => $detectedLanguage,
+                'web_search' => false,
+                'source' => 'fast_path_heuristic',
+                'skip_sorting' => true,
+                'intent' => 'chat',
+                'model_id' => null,
+                'provider' => null,
+                'model_name' => null,
+            ];
+        }
+
         // 1. Check for "Again" function - user-selected AI/prompt
         $promptOverride = $this->checkPromptOverride($messageId);
         $modelOverride = $this->checkModelOverride($messageId);
@@ -404,6 +436,178 @@ final readonly class MessageClassifier
 
         return in_array($ext, MessagePreProcessor::DOCUMENT_EXTENSIONS, true)
             || in_array($ext, MessagePreProcessor::AUDIO_EXTENSIONS, true);
+    }
+
+    /**
+     * Whether the Phase 1c fast-path is enabled (default: true).
+     *
+     * Read from BCONFIG group `CLASSIFIER`, key `FAST_PATH_ENABLED`. A
+     * per-user row (BOWNERID = $userId) takes precedence over the global
+     * row (BOWNERID = 0). Operators who notice mis-routing can disable
+     * globally; users who need richer classification (e.g. heavy
+     * media-generation traffic that shouldn't go through the chat
+     * handler) can opt out per-account by inserting their own BCONFIG
+     * row.
+     */
+    private function isClassifierFastPathEnabled(int $userId): bool
+    {
+        if ($userId > 0) {
+            $perUser = $this->configRepository->getValue($userId, 'CLASSIFIER', 'FAST_PATH_ENABLED');
+            if (null !== $perUser) {
+                return filter_var($perUser, \FILTER_VALIDATE_BOOL, \FILTER_NULL_ON_FAILURE) ?? true;
+            }
+        }
+
+        $value = $this->configRepository->getValue(0, 'CLASSIFIER', 'FAST_PATH_ENABLED');
+
+        if (null === $value) {
+            return true; // default-on
+        }
+
+        return filter_var($value, \FILTER_VALIDATE_BOOL, \FILTER_NULL_ON_FAILURE) ?? true;
+    }
+
+    /**
+     * Decide whether a message can skip the AI sorter without risk of misroute.
+     *
+     * The conservative checks below mean only "obviously chat" messages take
+     * the fast path. Anything ambiguous — files, tool prefixes, media verbs,
+     * Synapse-enabled accounts — still gets the full classifier.
+     */
+    private function canFastPathClassify(Message $message, string $text): bool
+    {
+        // Synapse routing has its own embedding-based classifier and may surface
+        // intent we'd lose with the heuristic (e.g. 'mediamaker' for "draw a
+        // cat"). Defer to it when enabled.
+        if ($this->isSynapseEnabled()) {
+            return false;
+        }
+
+        // Files of any kind go through the full pipeline (vision/analyze/etc).
+        if ($message->getFile() > 0 || $message->getFiles()->count() > 0) {
+            return false;
+        }
+
+        $trimmed = trim($text);
+        if ('' === $trimmed) {
+            return false;
+        }
+
+        // Tool prefixes are already handled earlier in classify(); be defensive
+        // in case the order changes.
+        if (str_starts_with($trimmed, '/')) {
+            return false;
+        }
+
+        // Long messages can hide intent — keep the full sorter for anything
+        // over ~280 characters (Twitter limit feels right for a chat one-liner).
+        if (mb_strlen($trimmed) > 280) {
+            return false;
+        }
+
+        // Media / media-generation verbs in EN/DE/ES/FR. If any appear, the
+        // sorter may pick a topic other than `general`/`chat` (e.g.
+        // mediamaker → image_generation), so don't shortcut.
+        // The list is intentionally narrow to avoid false negatives in normal
+        // chat ("describe the picture I just saw" → fine to fast-path).
+        static $mediaTriggers = [
+            'generate ', 'create ', 'draw ', 'paint ', 'sketch ', 'render ',
+            'make a picture', 'make an image', 'make a video', 'make a song',
+            'image of', 'picture of', 'photo of', 'illustration of',
+            'erstelle', 'erzeuge', 'zeichne', 'male ', 'rendere',
+            'genera ', 'crea ', 'dibuja ',
+            'génère', 'crée', 'dessine',
+        ];
+        $lower = mb_strtolower($trimmed);
+        foreach ($mediaTriggers as $trigger) {
+            if (str_contains($lower, $trigger)) {
+                return false;
+            }
+        }
+
+        // Web-search hint phrases that the AI sorter would flip `web_search`
+        // for. Better to take the slow path so we surface results.
+        static $searchTriggers = [
+            'search the web', 'google ', 'latest news', 'current price',
+            'today\'s', "today's", 'right now', 'this week',
+            'aktuelle nachrichten', 'durchsuche das internet',
+            'busca en', 'recherche dans',
+        ];
+        foreach ($searchTriggers as $trigger) {
+            if (str_contains($lower, $trigger)) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    /**
+     * Cheap language heuristic for fast-path classification.
+     *
+     * The full AI sorter detects language too — we lose that signal when we
+     * skip it, so reproduce a "good enough" guess locally. Uses common
+     * stopwords as anchors, falls back to `'en'` when too ambiguous.
+     *
+     * IMPORTANT: returns a 2-character ISO code, NEVER `'auto'`. The
+     * `'auto'` sentinel is used elsewhere in the pipeline (fixed-prompt
+     * widget mode) for the system-prompt directive only and is NOT
+     * persistable to `BMESSAGES.BLANG` (varchar(2)). My fast-path
+     * classification result flows through paths that DO persist BLANG
+     * (e.g. WebhookController email reply), so leaking `'auto'` here
+     * triggers SQLSTATE[22001] "Data too long for column 'BLANG'" on the
+     * outgoing message insert. Stick to ISO codes.
+     */
+    private function detectLanguageHeuristic(string $text): string
+    {
+        $lower = ' '.mb_strtolower($text).' ';
+
+        // Order matters: check stopwords with low ambiguity first.
+        $hits = [
+            'de' => 0, 'en' => 0, 'fr' => 0, 'es' => 0, 'it' => 0,
+        ];
+
+        // German stopwords with diacritics or German-only forms.
+        foreach (['ich ', ' der ', ' die ', ' und ', ' nicht ', ' ist ', 'für ', 'können', 'möchte', 'über', 'wäre'] as $w) {
+            if (str_contains($lower, $w)) {
+                $hits['de'] += 2;
+            }
+        }
+        // English (commonest stopwords).
+        foreach ([' the ', ' and ', ' you ', ' please ', ' what ', ' write ', 'don\'t ', 'i\'m ', 'i\'ll '] as $w) {
+            if (str_contains($lower, $w)) {
+                $hits['en'] += 2;
+            }
+        }
+        // French.
+        foreach ([' le ', ' la ', ' les ', ' un ', ' une ', ' est ', ' pour ', ' avec ', 'écrire', 'merci'] as $w) {
+            if (str_contains($lower, $w)) {
+                $hits['fr'] += 2;
+            }
+        }
+        // Spanish.
+        foreach ([' el ', ' la ', ' los ', ' las ', ' por ', ' para ', 'escribir', 'gracias'] as $w) {
+            if (str_contains($lower, $w)) {
+                $hits['es'] += 2;
+            }
+        }
+        // Italian.
+        foreach ([' il ', ' lo ', ' la ', ' gli ', ' una ', ' per ', 'scrivere', 'grazie'] as $w) {
+            if (str_contains($lower, $w)) {
+                $hits['it'] += 2;
+            }
+        }
+
+        arsort($hits);
+        $best = array_key_first($hits);
+        $bestScore = $hits[$best];
+
+        // Below 4 hits we have no strong signal — fall back to 'en'. The 2-
+        // char constraint matters: BMESSAGES.BLANG is varchar(2), so even
+        // though the existing 'auto' sentinel works for in-memory routing,
+        // it'd break any downstream code that persists $classification['language']
+        // to BLANG (email webhook reply, queue-mode chat persistence, ...).
+        return $bestScore >= 4 ? $best : 'en';
     }
 
     /**

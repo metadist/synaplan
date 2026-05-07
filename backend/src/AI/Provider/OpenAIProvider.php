@@ -21,6 +21,18 @@ class OpenAIProvider implements ChatProviderInterface, EmbeddingProviderInterfac
     private $client;
     private array $modelCapabilities = [];
 
+    /**
+     * Per-model cache of "this model rejects the reasoning.effort tier we
+     * sent" outcomes. Populated by {@see self::executeResponsesCreate()} /
+     * {@see self::executeResponsesCreateStreamed()} on the first HTTP 400 of
+     * the form "Unsupported value: 'X' is not supported with the 'Y' model".
+     * Subsequent requests for the same model skip the reasoning block
+     * pre-emptively so we don't keep paying the round-trip-then-retry cost.
+     *
+     * @var array<string, true>
+     */
+    private array $reasoningRejectionCache = [];
+
     public function __construct(
         private LoggerInterface $logger,
         private HttpClientInterface $httpClient,
@@ -301,15 +313,9 @@ class OpenAIProvider implements ChatProviderInterface, EmbeddingProviderInterfac
         }
 
         if ($isReasoningModel) {
-            $reasoning = [];
-
-            if (!empty($options['reasoning'])) {
-                $reasoning['effort'] = $options['reasoning_effort'] ?? 'medium';
-                $reasoning['summary'] = 'auto';
-            }
-
-            if (!empty($reasoning)) {
-                $requestOptions['reasoning'] = $reasoning;
+            $reasoningConfig = $this->resolveReasoningConfig($model, $isReasoningModel, $options);
+            if (null !== $reasoningConfig) {
+                $requestOptions['reasoning'] = $reasoningConfig;
             }
         }
 
@@ -321,15 +327,150 @@ class OpenAIProvider implements ChatProviderInterface, EmbeddingProviderInterfac
     }
 
     /**
-     * Execute responses()->create() with fallback when previous_response_id is invalid.
+     * Translate the cross-provider `reasoning_effort` knob into OpenAI's
+     * Responses API `reasoning` config.
      *
-     * When previous_response_id is present, the input is reduced to just the last user
-     * message (the API already has prior context). On fallback the full input is restored.
+     * Mirrors the logic in {@see GoogleProvider::resolveThinkingConfig()} so the
+     * "default chat = no thinking, near-instant TTFT" behaviour is identical
+     * across providers. The headline Phase 1e win on Gemini Pro
+     * (`thinkingBudget=0` for default chat) translates to OpenAI as the
+     * model family's lowest reasoning tier — `'none'` on gpt-5.5+, `'minimal'`
+     * on the original gpt-5, `'low'` on the o-series. Without this, the model
+     * falls back to OpenAI's server-side default of `medium` and burns 1-3 s
+     * of chain-of-thought before emitting the first visible token, even on a
+     * "Hi, how are you?" style chat where the user did not enable the
+     * Thinking toggle.
+     *
+     * Resolution order:
+     *
+     * 1. Native passthrough — if `options['reasoning']` is already a fully
+     *    formed array, send it verbatim (advanced override path).
+     * 2. Cross-provider `options['reasoning_effort']` wins over the legacy
+     *    boolean flag.
+     * 3. Legacy `options['reasoning']` boolean (the user's "Thinking" UI
+     *    toggle) maps to:
+     *    - `true`  → `'medium'` (preserves prior behaviour)
+     *    - `false` → lowest available tier (NEW — the Phase 1e parallel)
+     * 4. No signal at all → return `null` so no reasoning block is sent and
+     *    the server applies its own default (preserves prior behaviour for
+     *    callers that pass empty options, e.g. unit tests).
+     *
+     * `summary => 'auto'` is included only when the resolved effort is
+     * `medium`, `high` or `xhigh` — that's where chain-of-thought is long
+     * enough for the SSE reasoning-summary stream to be useful.
+     *
+     * @param array<string, mixed> $options
+     *
+     * @return array<string, string>|null
+     */
+    private function resolveReasoningConfig(string $model, bool $isReasoningModel, array $options): ?array
+    {
+        if (!$isReasoningModel) {
+            return null;
+        }
+
+        if (isset($options['reasoning']) && is_array($options['reasoning'])) {
+            /** @var array<string, string> $explicit */
+            $explicit = $options['reasoning'];
+
+            return $explicit;
+        }
+
+        $effort = isset($options['reasoning_effort']) ? (string) $options['reasoning_effort'] : null;
+
+        if (null === $effort && array_key_exists('reasoning', $options)) {
+            $effort = ((bool) $options['reasoning']) ? 'medium' : 'lowest';
+        }
+
+        if (null === $effort) {
+            return null;
+        }
+
+        $lowestTier = $this->lowestEffortTier($model);
+        $supportsXHigh = $this->modelSupportsXHighEffort($model);
+
+        $resolvedEffort = match ($effort) {
+            // 'lowest' is our internal sentinel for "lowest tier this model
+            // accepts" (= the Phase 1e fast-default path). 'minimal' / 'none'
+            // / 'off' / 'disabled' all map to the same intent: skip reasoning.
+            'lowest', 'off', 'none', 'disabled', 'minimal' => $lowestTier,
+            'low' => 'low',
+            'medium' => 'medium',
+            'high' => 'high',
+            // gpt-5.5+ exposes an 'xhigh' tier above 'high'. On older models
+            // it isn't accepted — clamp down to 'high' to avoid an HTTP 400.
+            'xhigh', 'extra-high', 'extreme' => $supportsXHigh ? 'xhigh' : 'high',
+            default => null,
+        };
+
+        if (null === $resolvedEffort) {
+            return null;
+        }
+
+        $config = ['effort' => $resolvedEffort];
+
+        if (in_array($resolvedEffort, ['medium', 'high', 'xhigh'], true)) {
+            $config['summary'] = 'auto';
+        }
+
+        return $config;
+    }
+
+    /**
+     * Lowest `reasoning.effort` tier the given model accepts.
+     *
+     * The Responses-API vocabulary is per family:
+     *
+     * - `gpt-5.5*` (gpt-5.5, gpt-5.5-pro, …): `none`, `low`, `medium`, `high`,
+     *   `xhigh`. Skip-reasoning tier is `none`. (Sending `minimal` here
+     *   returns HTTP 400 with "Unsupported value: 'minimal' is not supported
+     *   with the 'gpt-5.5' model".)
+     * - `gpt-5` (original): `minimal`, `low`, `medium`, `high`. Skip tier is
+     *   `minimal`.
+     * - o-series (`o1`, `o3`, `o4`): `low`, `medium`, `high`. Skip tier is
+     *   `low` — these models don't accept `minimal`/`none`.
+     */
+    private function lowestEffortTier(string $model): string
+    {
+        if (str_starts_with($model, 'gpt-5.5')) {
+            return 'none';
+        }
+        if (str_starts_with($model, 'gpt-5')) {
+            return 'minimal';
+        }
+
+        return 'low';
+    }
+
+    /**
+     * Whether the model accepts `reasoning.effort = 'xhigh'`.
+     *
+     * Currently only the `gpt-5.5` family. Original gpt-5 + o-series cap at
+     * `'high'` and reject `xhigh` with HTTP 400.
+     */
+    private function modelSupportsXHighEffort(string $model): bool
+    {
+        return str_starts_with($model, 'gpt-5.5');
+    }
+
+    /**
+     * Execute responses()->create() with fallback when previous_response_id
+     * is invalid OR when the chosen reasoning.effort tier is rejected by the
+     * model (tier vocabulary differs across the gpt-5 family — see
+     * {@see self::lowestEffortTier()}).
+     *
+     * When previous_response_id is present, the input is reduced to just the
+     * last user message (the API already has prior context). On fallback the
+     * full input is restored.
      */
     private function executeResponsesCreate(array $requestOptions): mixed
     {
+        $requestOptions = $this->applyReasoningRejectionCache($requestOptions);
+
         $fullInput = $requestOptions['input'] ?? [];
         $hasPreviousResponse = isset($requestOptions['previous_response_id']);
+        $hasReasoning = isset($requestOptions['reasoning']);
+        $model = (string) ($requestOptions['model'] ?? '');
 
         if ($hasPreviousResponse) {
             $requestOptions['input'] = $this->reduceToLastUserMessage($fullInput);
@@ -338,6 +479,13 @@ class OpenAIProvider implements ChatProviderInterface, EmbeddingProviderInterfac
         try {
             return $this->client->responses()->create($requestOptions);
         } catch (\Exception $e) {
+            if ($hasReasoning && $this->isReasoningEffortRejectedError($e)) {
+                $this->rememberReasoningRejection($model, $requestOptions['reasoning'] ?? [], $e);
+                unset($requestOptions['reasoning']);
+
+                return $this->client->responses()->create($requestOptions);
+            }
+
             if ($hasPreviousResponse && $this->isPreviousResponseError($e)) {
                 $this->logger->warning('OpenAI: previous_response_id invalid, retrying with full context', [
                     'previous_response_id' => $requestOptions['previous_response_id'],
@@ -354,15 +502,18 @@ class OpenAIProvider implements ChatProviderInterface, EmbeddingProviderInterfac
     }
 
     /**
-     * Execute responses()->createStreamed() with fallback when previous_response_id is invalid.
-     *
-     * When previous_response_id is present, the input is reduced to just the last user
-     * message (the API already has prior context). On fallback the full input is restored.
+     * Execute responses()->createStreamed() with the same two fallbacks as
+     * {@see self::executeResponsesCreate()}: invalid `previous_response_id`,
+     * and an unsupported `reasoning.effort` value (per-model tier vocab).
      */
     private function executeResponsesCreateStreamed(array $requestOptions): mixed
     {
+        $requestOptions = $this->applyReasoningRejectionCache($requestOptions);
+
         $fullInput = $requestOptions['input'] ?? [];
         $hasPreviousResponse = isset($requestOptions['previous_response_id']);
+        $hasReasoning = isset($requestOptions['reasoning']);
+        $model = (string) ($requestOptions['model'] ?? '');
 
         if ($hasPreviousResponse) {
             $requestOptions['input'] = $this->reduceToLastUserMessage($fullInput);
@@ -371,6 +522,13 @@ class OpenAIProvider implements ChatProviderInterface, EmbeddingProviderInterfac
         try {
             return $this->client->responses()->createStreamed($requestOptions);
         } catch (\Exception $e) {
+            if ($hasReasoning && $this->isReasoningEffortRejectedError($e)) {
+                $this->rememberReasoningRejection($model, $requestOptions['reasoning'] ?? [], $e);
+                unset($requestOptions['reasoning']);
+
+                return $this->client->responses()->createStreamed($requestOptions);
+            }
+
             if ($hasPreviousResponse && $this->isPreviousResponseError($e)) {
                 $this->logger->warning('OpenAI: previous_response_id invalid for stream, retrying with full context', [
                     'previous_response_id' => $requestOptions['previous_response_id'],
@@ -384,6 +542,74 @@ class OpenAIProvider implements ChatProviderInterface, EmbeddingProviderInterfac
 
             throw $e;
         }
+    }
+
+    /**
+     * Strip `reasoning` from the request when this model has previously
+     * rejected our chosen tier. Cheap pre-flight check that avoids a
+     * round-trip + retry on every subsequent request after the first 400.
+     *
+     * @param array<string, mixed> $requestOptions
+     *
+     * @return array<string, mixed>
+     */
+    private function applyReasoningRejectionCache(array $requestOptions): array
+    {
+        $model = (string) ($requestOptions['model'] ?? '');
+        if ('' !== $model && isset($this->reasoningRejectionCache[$model], $requestOptions['reasoning'])) {
+            unset($requestOptions['reasoning']);
+        }
+
+        return $requestOptions;
+    }
+
+    /**
+     * Cache the fact that this model rejected our reasoning config + log it
+     * once so ops can spot model-vocab drift (e.g. a future gpt-5.6 with a
+     * tier name we don't know about).
+     *
+     * @param array<string, mixed> $reasoning
+     */
+    private function rememberReasoningRejection(string $model, array $reasoning, \Throwable $e): void
+    {
+        if ('' !== $model) {
+            $this->reasoningRejectionCache[$model] = true;
+        }
+
+        $this->logger->warning('OpenAI: reasoning.effort rejected by model, retrying without reasoning block', [
+            'model' => $model,
+            'rejected_effort' => $reasoning['effort'] ?? null,
+            'error' => $e->getMessage(),
+        ]);
+    }
+
+    /**
+     * Detect HTTP 400 errors caused by an `reasoning.effort` value the model
+     * doesn't accept.
+     *
+     * The user-visible OpenAI message is e.g.:
+     *   "Unsupported value: 'minimal' is not supported with the 'gpt-5.5'
+     *    model. Supported values are: 'none', 'low', 'medium', 'high', and
+     *    'xhigh'."
+     *
+     * The match is intentionally loose ("unsupported value" + at least one
+     * effort-tier word) so it survives small wording changes from OpenAI.
+     */
+    private function isReasoningEffortRejectedError(\Exception $e): bool
+    {
+        $message = strtolower($e->getMessage());
+
+        if (!str_contains($message, 'unsupported value')) {
+            return false;
+        }
+
+        foreach (['minimal', 'none', 'low', 'medium', 'high', 'xhigh'] as $tier) {
+            if (str_contains($message, "'".$tier."'")) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**

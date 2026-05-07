@@ -34,6 +34,11 @@ final readonly class DefaultModelConfigSeeder
         ['group' => 'DEFAULTMODEL', 'setting' => 'TOOLS',      'modelKey' => 'openai:gpt-5.4:chat'],
         ['group' => 'DEFAULTMODEL', 'setting' => 'SORT',       'modelKey' => 'groq:openai/gpt-oss-120b:chat'],
         ['group' => 'DEFAULTMODEL', 'setting' => 'SUMMARIZE',  'modelKey' => 'groq:openai/gpt-oss-120b:chat'],
+        // Phase 2d: dedicated MEM tag so memory extraction never inherits the
+        // user's heavy chat model (Gemini Pro etc.). Resolves to the new
+        // ModelCatalog row id 220 ("Memory extraction model") which is a
+        // system-only clone of Groq gpt-oss-120b — fast and cheap.
+        ['group' => 'DEFAULTMODEL', 'setting' => 'MEM',        'modelKey' => 'groq:openai/gpt-oss-120b:mem'],
         ['group' => 'DEFAULTMODEL', 'setting' => 'TEXT2PIC',   'modelKey' => 'google:gemini-3.1-flash-image-preview:text2pic'],
         ['group' => 'DEFAULTMODEL', 'setting' => 'PIC2PIC',    'modelKey' => 'google:gemini-3.1-flash-image-preview:text2pic'],
         ['group' => 'DEFAULTMODEL', 'setting' => 'TEXT2VID',   'modelKey' => 'google:veo-3.1-generate-preview:text2vid'],
@@ -72,6 +77,9 @@ final readonly class DefaultModelConfigSeeder
         ['ownerId' => 0, 'group' => 'DEFAULTMODEL', 'setting' => 'TOOLS',      'value' => '-1'],
         ['ownerId' => 0, 'group' => 'DEFAULTMODEL', 'setting' => 'SORT',       'value' => '-1'],
         ['ownerId' => 0, 'group' => 'DEFAULTMODEL', 'setting' => 'SUMMARIZE',  'value' => '-1'],
+        // Phase 2d: MEM tag in test routes through the test stub chat model
+        // so PHPUnit doesn't need real Groq access for memory extraction.
+        ['ownerId' => 0, 'group' => 'DEFAULTMODEL', 'setting' => 'MEM',        'value' => '-1'],
         ['ownerId' => 0, 'group' => 'DEFAULTMODEL', 'setting' => 'ANALYZE',    'value' => '-1'],
         ['ownerId' => 0, 'group' => 'DEFAULTMODEL', 'setting' => 'VECTORIZE',         'value' => '-2'],
         ['ownerId' => 0, 'group' => 'DEFAULTMODEL', 'setting' => 'SYNAPSE_VECTORIZE', 'value' => '-2'],

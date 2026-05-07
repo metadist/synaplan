@@ -15,9 +15,16 @@ export class ChatHelper {
     const newBubble = bubbles.nth(previousCount)
     const raceTimeout = longTimeout ? TIMEOUTS.EXTREME : TIMEOUTS.LONG
 
-    await newBubble.waitFor({ state: 'attached', timeout: TIMEOUTS.STANDARD })
-    await newBubble.scrollIntoViewIfNeeded()
-    await newBubble.waitFor({ state: 'visible', timeout: TIMEOUTS.SHORT })
+    // Wait directly for 'visible' (auto-retries on detach) instead of the racy
+    // attached → scrollIntoViewIfNeeded → visible sequence: after the perf push,
+    // historyStore.loadMessages() can replace messages.value while a freshly
+    // optimistic assistant bubble is mid-mount, briefly detaching the DOM node
+    // we just resolved. scrollIntoViewIfNeeded snapshots the handle and throws
+    // 'Element is not attached to the DOM' if the node is swapped mid-call;
+    // waitFor({ state: 'visible' }) re-resolves the locator and is stable.
+    // Subsequent inner-locator waits and Playwright's own auto-scroll handle
+    // any viewport positioning needed for downstream interactions.
+    await newBubble.waitFor({ state: 'visible', timeout: TIMEOUTS.STANDARD })
 
     const result = await Promise.race([
       newBubble
@@ -34,7 +41,43 @@ export class ChatHelper {
     }
 
     const answerBody = newBubble.locator(selectors.chat.assistantAnswerBody).last()
-    return (await answerBody.innerText()).trim().toLowerCase()
+
+    // Wait for the bubble's textContent to stabilise before reading it.
+    //
+    // After the perf overhaul the streaming text path renders cheaply (escape +
+    // <br>) for speed during the stream, then re-renders through the full
+    // marked + DOMPurify + highlight.js pipeline once `isStreaming` flips
+    // false. That second render is on a microtask boundary inside MessageText,
+    // so `data-testid="message-done"` can become visible a tick or two before
+    // the bubble's final HTML lands. Reading innerText immediately after the
+    // selector check would race that re-render and return a half-rendered
+    // snapshot (e.g. "ollama" instead of "ollama stub response").
+    //
+    // Polling for stability — text unchanged for STABILITY_WINDOW_MS — fixes
+    // it without coupling the test to internal render scheduling.
+    const STABILITY_WINDOW_MS = 200
+    const POLL_INTERVAL_MS = 50
+    const MAX_WAIT_MS = 5000
+    const start = Date.now()
+    let lastText = ''
+    let stableSince = 0
+
+    while (Date.now() - start < MAX_WAIT_MS) {
+      const current = (await answerBody.innerText()).trim()
+      if (current.length > 0 && current === lastText) {
+        if (stableSince === 0) {
+          stableSince = Date.now()
+        } else if (Date.now() - stableSince >= STABILITY_WINDOW_MS) {
+          return current.toLowerCase()
+        }
+      } else {
+        lastText = current
+        stableSince = 0
+      }
+      await new Promise((r) => setTimeout(r, POLL_INTERVAL_MS))
+    }
+
+    return lastText.toLowerCase()
   }
 
   /**
@@ -110,8 +153,9 @@ export class ChatHelper {
     optionCount: number
   }> {
     const latestBubble = this.conversationBubbles().last()
-    await latestBubble.waitFor({ state: 'attached', timeout: TIMEOUTS.STANDARD })
-    await latestBubble.scrollIntoViewIfNeeded()
+    // 'visible' instead of 'attached' + scrollIntoViewIfNeeded() avoids the
+    // detach-during-reconciliation race; Playwright auto-scrolls before clicks.
+    await latestBubble.waitFor({ state: 'visible', timeout: TIMEOUTS.STANDARD })
     const toggle = latestBubble.locator(selectors.chat.againDropdown)
     await expect(toggle).toBeVisible({ timeout: TIMEOUTS.STANDARD })
     await expect(toggle).toBeEnabled({ timeout: TIMEOUTS.STANDARD })

@@ -335,4 +335,99 @@ class MessageClassifierTest extends TestCase
         yield 'empty string' => ['', false];
         yield 'random string' => ['banana', false];
     }
+
+    /**
+     * Phase 1c: short, plain-chat messages should skip the AI sorter when the
+     * fast-path BCONFIG flag is enabled (default-on in production). Builds an
+     * isolated classifier (without the global "all configs return '0'" mock)
+     * so the default-on behaviour is exercised authentically.
+     */
+    public function testFastPathClassificationSkipsAiSorter(): void
+    {
+        $configRepo = $this->createMock(ConfigRepository::class);
+        // Synapse off, fast-path on (the default).
+        $configRepo->method('getValue')->willReturnCallback(static function (int $owner, string $group, string $setting): ?string {
+            if ('QDRANT_SEARCH' === $group) {
+                return '0';
+            }
+            if ('CLASSIFIER' === $group && 'FAST_PATH_ENABLED' === $setting) {
+                return null; // null → default-on
+            }
+
+            return null;
+        });
+
+        $sorter = $this->createMock(MessageSorter::class);
+        $sorter->expects($this->never())->method('classify');
+
+        $classifier = new MessageClassifier(
+            $sorter,
+            $this->createMock(SynapseRouter::class),
+            $this->createMock(MessageMetaRepository::class),
+            $this->createMock(ModelConfigService::class),
+            $configRepo,
+            $this->createMock(EntityManagerInterface::class),
+            $this->createMock(LoggerInterface::class),
+        );
+
+        $message = $this->createMock(Message::class);
+        $message->method('getId')->willReturn(101);
+        $message->method('getUserId')->willReturn(10);
+        $message->method('getText')->willReturn('Hello, how are you today?');
+        $message->method('getLanguage')->willReturn('en');
+        $message->method('getFile')->willReturn(0);
+        $message->method('getFiles')->willReturn(new \Doctrine\Common\Collections\ArrayCollection());
+
+        $result = $classifier->classify($message);
+
+        $this->assertSame('general', $result['topic']);
+        $this->assertSame('chat', $result['intent']);
+        $this->assertSame('fast_path_heuristic', $result['source']);
+        $this->assertTrue($result['skip_sorting']);
+    }
+
+    /**
+     * Phase 1c: media verbs ("draw", "create an image of") force the full
+     * sorter path so the request can be routed to the right handler instead
+     * of the chat handler.
+     */
+    public function testFastPathYieldsToAiSorterOnMediaVerbs(): void
+    {
+        $configRepo = $this->createMock(ConfigRepository::class);
+        $configRepo->method('getValue')->willReturnCallback(static function (int $owner, string $group, string $setting): ?string {
+            return 'QDRANT_SEARCH' === $group ? '0' : null;
+        });
+
+        $sorter = $this->createMock(MessageSorter::class);
+        $sorter->expects($this->once())
+            ->method('classify')
+            ->willReturn(['topic' => 'mediamaker', 'language' => 'en']);
+
+        $classifier = new MessageClassifier(
+            $sorter,
+            $this->createMock(SynapseRouter::class),
+            $this->createMock(MessageMetaRepository::class),
+            $this->createMock(ModelConfigService::class),
+            $configRepo,
+            $this->createMock(EntityManagerInterface::class),
+            $this->createMock(LoggerInterface::class),
+        );
+
+        $message = $this->createMock(Message::class);
+        $message->method('getId')->willReturn(102);
+        $message->method('getUserId')->willReturn(10);
+        $message->method('getText')->willReturn('Please draw a sunset over a mountain.');
+        $message->method('getLanguage')->willReturn('en');
+        $message->method('getFile')->willReturn(0);
+        $message->method('getFiles')->willReturn(new \Doctrine\Common\Collections\ArrayCollection());
+        $message->method('getDateTime')->willReturn('20250116120000');
+        $message->method('getFilePath')->willReturn('');
+        $message->method('getTopic')->willReturn('');
+        $message->method('getFileText')->willReturn('');
+
+        $result = $classifier->classify($message);
+
+        // Sorter ran → topic comes from the sorter, not the heuristic.
+        $this->assertSame('mediamaker', $result['topic']);
+    }
 }

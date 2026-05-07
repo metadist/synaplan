@@ -24,9 +24,77 @@ final readonly class VectorSearchService
     }
 
     /**
+     * Semantic search using a precomputed vector.
+     *
+     * Phase 1a: ChatHandler computes one embedding for the user query and
+     * fans it out across memories + RAG + feedback searches. Skipping the
+     * embedding round-trip here is the dominant TTFT win.
+     *
+     * @param int               $userId   User ID for filtering
+     * @param array<int, float> $vector   Already-embedded query vector
+     * @param string|null       $groupKey Optional group filter
+     * @param int               $limit    Number of results (default: 10)
+     * @param float             $minScore Minimum similarity score (0-1, default: 0.3)
+     *
+     * @return array Top-K similar documents
+     */
+    public function semanticSearchByVector(
+        int $userId,
+        array $vector,
+        ?string $groupKey = null,
+        int $limit = 10,
+        float $minScore = 0.3,
+    ): array {
+        if (empty($vector)) {
+            return [];
+        }
+
+        try {
+            $searchQuery = new SearchQuery(
+                userId: $userId,
+                vector: array_map('floatval', $vector),
+                groupKey: $groupKey,
+                limit: $limit,
+                minScore: $minScore,
+            );
+
+            $results = $this->vectorStorage->search($searchQuery);
+
+            return array_map(static function ($result): array {
+                return [
+                    'chunk_id' => $result->chunkId,
+                    'file_id' => $result->fileId,
+                    'message_id' => $result->fileId,
+                    'chunk_text' => $result->text,
+                    'start_line' => $result->startLine,
+                    'end_line' => $result->endLine,
+                    'group_key' => $result->groupKey,
+                    'distance' => $result->score,
+                    'score' => $result->score,
+                    'file_name' => $result->fileName,
+                    'mime_type' => $result->mimeType,
+                ];
+            }, $results);
+        } catch (\Throwable $e) {
+            $this->logger->warning('VectorSearchService::semanticSearchByVector failed', [
+                'user_id' => $userId,
+                'group_key' => $groupKey,
+                'error' => $e->getMessage(),
+            ]);
+
+            return [];
+        }
+    }
+
+    /**
      * Semantic search using vector embeddings.
      *
-     * @param string      $query    Search query
+     * Embeds the query string via the user's configured embedding model
+     * and delegates to {@see semanticSearchByVector()}. Pair the latter
+     * with {@see UserMemoryService::embedUserQuery()} when fanning the
+     * same embedding out across multiple searches.
+     *
+     * @param string      $query    Search query (will be embedded)
      * @param int         $userId   User ID for filtering
      * @param string|null $groupKey Optional group filter
      * @param int         $limit    Number of results (default: 10)

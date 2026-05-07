@@ -492,87 +492,217 @@ function normalizeInlineReferences(text: string): string {
     .replace(/(\[(?:Feedback|Memory)\s*:\s*[\w.-]+\])\n+/gi, '$1 ')
 }
 
-// Process content - sync for regular markdown, async for math formulas
-async function processContent(content: string, version: number): Promise<string | null> {
-  // Handle special file generation markers from backend with i18n
-  if (content.startsWith('__FILE_GENERATED__:')) {
-    const filename = content.replace('__FILE_GENERATED__:', '').trim()
-    content = t('message.fileGenerated', { filename })
-  } else if (content === '__FILE_GENERATION_FAILED__') {
-    content = t('message.fileGenerationFailed')
+// Normalize special file markers + reference markers + apply badge / table
+// post-processing. Shared between the sync and async render paths so the
+// post-render HTML shape is identical regardless of which path produced it.
+function normalizeContentForRender(input: string): string {
+  if (input.startsWith('__FILE_GENERATED__:')) {
+    const filename = input.replace('__FILE_GENERATED__:', '').trim()
+    return t('message.fileGenerated', { filename })
   }
-
-  // Keep reference markers inline to prevent markdown paragraph breaks
-  content = normalizeInlineReferences(content)
-
-  let html: string
-
-  // Use async rendering if content has math formulas, otherwise sync
-  if (hasMathFormulas(content)) {
-    html = await renderAsync(content, { processFileMarkers: false, katex: true })
-    // Check if this render is still current (prevents race conditions)
-    if (version !== renderVersion) return null
-  } else {
-    html = render(content, { processFileMarkers: false })
+  if (input === '__FILE_GENERATION_FAILED__') {
+    return t('message.fileGenerationFailed')
   }
+  return input
+}
 
-  // Process memory and feedback badges after markdown rendering
+function postProcessHtml(html: string): string {
   html = processFeedbackBadges(processMemoryBadges(html))
-
-  // Wrap bare <table> elements in a scrollable container for mobile
   html = html.replace(/<table(\s|>)/g, '<div class="table-scroll"><table$1')
   html = html.replace(/<\/table>/g, '</table></div>')
-
   return html
 }
 
-// Debounce timer for markdown rendering during streaming
-let renderDebounceTimer: ReturnType<typeof setTimeout> | null = null
-const RENDER_DEBOUNCE_MS = 80
+/**
+ * Synchronous full-pipeline render. Used for the post-stream final render of
+ * non-math content. Critical for E2E tests that read `innerText` immediately
+ * after `data-testid="message-done"` becomes visible — anything async here
+ * would push the final renderedContent update onto the next microtask, after
+ * Vue has already committed `message-done` to the DOM. Tests would then read
+ * a stale half-rendered bubble (only the cheap streaming HTML).
+ */
+function processContentSync(content: string): string {
+  const normalized = normalizeInlineReferences(normalizeContentForRender(content))
+  const html = render(normalized, { processFileMarkers: false })
+  return postProcessHtml(html)
+}
 
-// Update rendered content when props change (debounced during streaming)
+/**
+ * Async full-pipeline render. Only used when math formulas need the KaTeX
+ * pipeline (which is genuinely async). Returns null if a newer render
+ * superseded this one mid-flight.
+ */
+async function processContentAsync(content: string, version: number): Promise<string | null> {
+  const normalized = normalizeInlineReferences(normalizeContentForRender(content))
+  const html = await renderAsync(normalized, { processFileMarkers: false, katex: true })
+  if (version !== renderVersion) return null
+  return postProcessHtml(html)
+}
+
+/**
+ * Legacy entry point retained so any other caller still gets the right
+ * behaviour without a duplicated branch. Routes to sync for plain content,
+ * async for math.
+ */
+async function processContent(content: string, version: number): Promise<string | null> {
+  if (hasMathFormulas(content)) {
+    return processContentAsync(content, version)
+  }
+  return processContentSync(content)
+}
+
+// Phase 3c: during streaming, render the prose with a CHEAP path (HTML
+// escape + newline-to-<br>) and skip marked + DOMPurify + highlight.js
+// entirely. The full pipeline costs 5-30 ms per call which compounds
+// every 80 ms throughout the stream — we used to burn most of the
+// frontend CPU on a render that gets thrown away as soon as the next
+// chunk arrives. We run the full pipeline once when streaming ends.
+//
+// The streaming path still calls processContent indirectly via the
+// existing memory/feedback badge resolution paths, but only on a
+// 250 ms interval (vs 80 ms before) so reactive updates from the
+// memory store still resolve `[Memory:ID]` placeholders — just less
+// often during the hot streaming window.
+let renderDebounceTimer: ReturnType<typeof setTimeout> | null = null
+const RENDER_DEBOUNCE_STREAMING_MS = 250
+
+function escapeHtml(input: string): string {
+  return input
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;')
+}
+
+/**
+ * Cheap streaming-mode renderer. Preserves whitespace, inserts <br> for
+ * newlines, leaves a placeholder where an unclosed code fence would have
+ * been so long code blocks don't appear as one giant escaped wall of text.
+ * Memory/feedback badges still get resolved via `processFeedbackBadges` /
+ * `processMemoryBadges` so existing `[Memory:ID]` markers turn into pills
+ * in real time.
+ */
+function renderStreamingFast(content: string): string {
+  // Split on triple-backtick fences. Fenced regions are wrapped in <pre>
+  // (un-highlighted) so visually they look like a code block immediately,
+  // but skipping highlight.js avoids the ~10-50 ms hit per fence per tick.
+  const parts: Array<{ kind: 'prose' | 'code'; text: string; lang?: string }> = []
+  const fenceRe = /```([a-zA-Z0-9_+-]*)\n([\s\S]*?)(?:```|$)/g
+  let lastIdx = 0
+  let m: RegExpExecArray | null
+  while ((m = fenceRe.exec(content)) !== null) {
+    if (m.index > lastIdx) {
+      parts.push({ kind: 'prose', text: content.slice(lastIdx, m.index) })
+    }
+    parts.push({ kind: 'code', text: m[2] ?? '', lang: m[1] || 'text' })
+    lastIdx = fenceRe.lastIndex
+  }
+  if (lastIdx < content.length) {
+    parts.push({ kind: 'prose', text: content.slice(lastIdx) })
+  }
+
+  return parts
+    .map((p) => {
+      if (p.kind === 'code') {
+        return `<pre class="code-block streaming-code-block"><code class="hljs language-${escapeHtml(p.lang ?? 'text')}">${escapeHtml(p.text)}</code></pre>`
+      }
+      // For prose, escape HTML and convert newlines to <br>. Memory/feedback
+      // badges still flow through later regex replacement.
+      return escapeHtml(p.text).replace(/\n/g, '<br>')
+    })
+    .join('')
+}
+
+// Update rendered content when props change.
+//
+// IMPORTANT: this watcher MUST be synchronous when transitioning out of
+// streaming mode for plain (non-math) content. The post-stream final render
+// happens in the same Vue tick as the `isStreaming = false` flip that makes
+// `data-testid="message-done"` visible in the DOM. If we awaited even one
+// microtask here, Vue would commit `message-done` first and Playwright's
+// `waitForAnswer` would read the stale cheap-render HTML left behind from
+// the streaming phase. Math content still routes through the async path
+// (KaTeX is genuinely async); for that case the cheap render stays on
+// screen until the math render completes — better than blocking the paint.
 watch(
   () => props.content,
-  async (newContent) => {
+  (newContent) => {
     const currentVersion = ++renderVersion
 
-    // During streaming, debounce to avoid re-rendering full markdown on every chunk
     if (props.isStreaming) {
+      // Cheap streaming path — synchronous, no debounce delay.
+      let html = renderStreamingFast(newContent)
+      // Still resolve memory + feedback badges in real time.
+      html = processFeedbackBadges(processMemoryBadges(html))
+      renderedContent.value = html
+
+      // Schedule a low-frequency full re-render so memory store updates
+      // (badges arriving via the polled extraction endpoint, etc.) still
+      // surface during long streams. 250 ms is much cheaper than the
+      // previous 80 ms while still feeling responsive.
       if (renderDebounceTimer !== null) {
         clearTimeout(renderDebounceTimer)
       }
-      renderDebounceTimer = setTimeout(async () => {
+      renderDebounceTimer = setTimeout(() => {
         renderDebounceTimer = null
         if (currentVersion !== renderVersion) return
-        const result = await processContent(newContent, currentVersion)
-        if (result !== null) {
-          renderedContent.value = result
+        if (!props.isStreaming) return // streaming ended → final pass below handles it
+
+        if (hasMathFormulas(newContent)) {
+          void processContentAsync(newContent, currentVersion).then((result) => {
+            if (result !== null) {
+              renderedContent.value = result
+            }
+          })
+        } else {
+          renderedContent.value = processContentSync(newContent)
         }
-      }, RENDER_DEBOUNCE_MS)
+      }, RENDER_DEBOUNCE_STREAMING_MS)
       return
     }
 
-    // Not streaming — render immediately
-    const result = await processContent(newContent, currentVersion)
-    if (result !== null) {
-      renderedContent.value = result
+    // Not streaming — full markdown pipeline. Sync for non-math (the common
+    // case) so `message-done` and the final bubble HTML land in the same
+    // Vue render commit; async only when KaTeX needs it.
+    if (hasMathFormulas(newContent)) {
+      void processContentAsync(newContent, currentVersion).then((result) => {
+        if (result !== null) {
+          renderedContent.value = result
+        }
+      })
+    } else {
+      renderedContent.value = processContentSync(newContent)
     }
   },
   { immediate: true }
 )
 
-// When streaming ends, flush any pending debounced render so final content is visible
+// When streaming ends, run the full pipeline exactly once so the final
+// rendered HTML matches what stored messages look like (markdown, code
+// highlight, math, mermaid). For non-math content this MUST be synchronous
+// — see the matching note on the content watcher above. The two watchers
+// can both fire on the streaming → not-streaming transition (content tends
+// to change too); since `processContentSync` is idempotent and cheap, the
+// duplicate work is harmless and the synchronicity is what matters.
 watch(
   () => props.isStreaming,
-  async (streaming) => {
-    if (!streaming && renderDebounceTimer !== null) {
+  (streaming) => {
+    if (streaming) return
+    if (renderDebounceTimer !== null) {
       clearTimeout(renderDebounceTimer)
       renderDebounceTimer = null
-      const currentVersion = ++renderVersion
-      const result = await processContent(props.content, currentVersion)
-      if (result !== null) {
-        renderedContent.value = result
-      }
+    }
+
+    const currentVersion = ++renderVersion
+    if (hasMathFormulas(props.content)) {
+      void processContentAsync(props.content, currentVersion).then((result) => {
+        if (result !== null) {
+          renderedContent.value = result
+        }
+      })
+    } else {
+      renderedContent.value = processContentSync(props.content)
     }
   }
 )

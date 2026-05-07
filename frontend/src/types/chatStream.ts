@@ -69,6 +69,13 @@ export interface StreamEventMetadata {
   [key: string]: unknown
 }
 
+/** Per-request performance breakdown emitted by the backend just before `complete`. */
+export interface StreamPerfPayload {
+  phases?: Record<string, number>
+  marks?: Record<string, number>
+  total_ms?: number
+}
+
 /** Normalized chat stream event from /api/v1/messages/stream */
 export interface StreamUpdatePayload {
   status?: string
@@ -103,5 +110,9 @@ export interface StreamUpdatePayload {
   phone_verified?: boolean
   install_command?: string
   suggested_models?: StreamSuggestedModels
+  /** Phase 0 instrumentation payload (only present on `status === 'perf'`). */
+  phases?: Record<string, number>
+  marks?: Record<string, number>
+  total_ms?: number
   [key: string]: unknown
 }

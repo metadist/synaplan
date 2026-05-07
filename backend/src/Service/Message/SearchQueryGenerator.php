@@ -48,6 +48,24 @@ final readonly class SearchQueryGenerator
             'question_length' => strlen($userQuestion),
         ]);
 
+        // Phase 1c: skip the LLM round-trip when the user's message is already
+        // a perfectly good search query. Brave's BM25 doesn't benefit from a
+        // model-rewritten paraphrase for short, self-contained questions —
+        // and the AI call costs 200-1500 ms before we can even start the
+        // search. We only invoke the model when the message is long *and*
+        // contains pronouns / context references that need conversation
+        // resolution ("what about it", "explain that").
+        if (!$this->messageNeedsLlmRewrite($userQuestion)) {
+            $cleaned = $this->fallbackExtraction($userQuestion);
+
+            $this->logger->info('SearchQueryGenerator: Skipped LLM rewrite (heuristic short-circuit)', [
+                'original_length' => strlen($userQuestion),
+                'cleaned' => $cleaned,
+            ]);
+
+            return $cleaned;
+        }
+
         // Get search query prompt
         $searchPrompt = $this->promptRepository->findByTopic('tools:search', 0, 'en');
 
@@ -156,6 +174,53 @@ final readonly class SearchQueryGenerator
                 'user_id' => $userId,
             ]);
         }
+    }
+
+    /**
+     * Decide whether the message needs an LLM-driven rewrite to make a good
+     * Brave search query.
+     *
+     * Heuristic: the model is only worth the round-trip when the question is
+     * either very long (likely needs distillation) or contains conversation-
+     * relative pronouns that require context to disambiguate ("explain that",
+     * "what about it").
+     *
+     * Plain factual queries ("strait of hormuz history") work fine as-is.
+     */
+    private function messageNeedsLlmRewrite(string $userQuestion): bool
+    {
+        $trimmed = trim($userQuestion);
+        if ('' === $trimmed) {
+            return false;
+        }
+
+        // Long message → likely needs distillation.
+        $wordCount = preg_match_all('/\S+/u', $trimmed) ?: 0;
+        if ($wordCount > 25) {
+            return true;
+        }
+
+        // Pronouns / referential expressions that need conversation context.
+        // The list is intentionally conservative — common words like "the"
+        // and definite articles ("der/die/das" in DE, "le/la/les" in FR)
+        // would over-trigger and force the LLM rewrite on most short
+        // queries, defeating the heuristic. Match only genuinely
+        // referential pronouns/demonstratives.
+        static $referentialPatterns = [
+            '/\b(it|its|that|this|those|these|them|they|he|she|him|her|his|hers)\b/i',
+            '/\b(es|ihn|ihm|jene[rs]?|diese[rs]?|dasselbe|derselbe|dieselbe)\b/iu', // German pronouns
+            '/\b(lui|leur|cela|ceci|celui|celle|ceux|celles)\b/iu',                // French pronouns
+            '/\b(eso|esa|esto|aquel|aquella|aquello)\b/iu',                        // Spanish demonstratives
+            '/\b(quello|quella|questo|questa|esso|essa)\b/iu',                     // Italian
+        ];
+
+        foreach ($referentialPatterns as $pattern) {
+            if (preg_match($pattern, $trimmed)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**

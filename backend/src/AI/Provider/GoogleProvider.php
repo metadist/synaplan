@@ -10,6 +10,7 @@ use App\AI\Interface\VideoGenerationProviderInterface;
 use App\AI\Interface\VisionProviderInterface;
 use App\Service\File\FileHelper;
 use Psr\Log\LoggerInterface;
+use Symfony\Contracts\HttpClient\Exception\HttpExceptionInterface;
 use Symfony\Contracts\HttpClient\HttpClientInterface;
 
 /**
@@ -247,14 +248,33 @@ class GoogleProvider implements ChatProviderInterface, ImageGenerationProviderIn
 
             $url = self::API_BASE."/models/{$model}:streamGenerateContent?alt=sse";
 
+            $generationConfig = [
+                'temperature' => $options['temperature'] ?? 0.7,
+                'topP' => $options['top_p'] ?? 0.95,
+                'topK' => $options['top_k'] ?? 40,
+                'maxOutputTokens' => $options['max_tokens'] ?? ChatProviderInterface::DEFAULT_MAX_COMPLETION_TOKENS,
+            ];
+
+            // Phase 1e: Gemini 2.5+ Pro / 3.x "thinking" models otherwise
+            // burn 5-10s on internal reasoning before emitting the first
+            // visible token. Map an optional `reasoning_effort` knob onto
+            // Google's `thinkingConfig.thinkingBudget` so chat (default
+            // `low`) gets near-instant TTFT on FLASH models, while leaving
+            // Pro models (which mandate non-zero thinking) on Google's
+            // server-side default.
+            //
+            // Budget interpretation (per Google docs):
+            //   - 0      → thinking disabled (Flash only — Pro rejects this with HTTP 4xx)
+            //   - >0     → token budget reserved for hidden reasoning
+            //   - -1     → "dynamic" — model decides
+            $thinkingConfig = $this->resolveThinkingConfig($options, $model);
+            if (null !== $thinkingConfig) {
+                $generationConfig['thinkingConfig'] = $thinkingConfig;
+            }
+
             $payload = [
                 'contents' => $contents,
-                'generationConfig' => [
-                    'temperature' => $options['temperature'] ?? 0.7,
-                    'topP' => $options['top_p'] ?? 0.95,
-                    'topK' => $options['top_k'] ?? 40,
-                    'maxOutputTokens' => $options['max_tokens'] ?? ChatProviderInterface::DEFAULT_MAX_COMPLETION_TOKENS,
-                ],
+                'generationConfig' => $generationConfig,
             ];
 
             $this->logger->info('Google: Streaming chat completion', [
@@ -262,14 +282,26 @@ class GoogleProvider implements ChatProviderInterface, ImageGenerationProviderIn
                 'message_count' => count($messages),
             ]);
 
-            $response = $this->httpClient->request('POST', $url, [
-                'headers' => [
-                    'Content-Type' => 'application/json',
-                    'x-goog-api-key' => $this->apiKey,
+            // Single auto-retry for transient UNAVAILABLE / 503 — Gemini's
+            // edge sometimes blips even when capacity is healthy, and
+            // Pro-tier models in particular are prone to short overload
+            // windows. We do exactly ONE retry after 1s; further failures
+            // surface to the user so they can switch models or wait.
+            // Only the request/header phase is retried — once chunks start
+            // flowing, we never restart mid-stream.
+            $response = $this->requestWithSingleRetryOn503(
+                'POST',
+                $url,
+                [
+                    'headers' => [
+                        'Content-Type' => 'application/json',
+                        'x-goog-api-key' => $this->apiKey,
+                    ],
+                    'json' => $payload,
+                    'timeout' => 120,
                 ],
-                'json' => $payload,
-                'timeout' => 120,
-            ]);
+                $model,
+            );
 
             $usage = [
                 'prompt_tokens' => 0,
@@ -343,9 +375,168 @@ class GoogleProvider implements ChatProviderInterface, ImageGenerationProviderIn
             return ['usage' => $usage];
         } catch (ProviderException $e) {
             throw $e;
+        } catch (HttpExceptionInterface $e) {
+            // Surface the actual Google response body so the user sees the
+            // root cause ("API key invalid", "quota exhausted", "model
+            // overloaded", etc.) instead of a bare "HTTP/2 503 returned"
+            // message that wastes a debug round-trip.
+            $body = '';
+            $statusCode = 0;
+            try {
+                $statusCode = $e->getResponse()->getStatusCode();
+                $body = $e->getResponse()->getContent(false);
+            } catch (\Throwable) {
+                // ignore — fall through with empty body
+            }
+            $body = trim($body);
+
+            $this->logger->error('Google: streamGenerateContent failed', [
+                'error' => $e->getMessage(),
+                'status_code' => $statusCode,
+                'body' => $body,
+            ]);
+
+            // Friendlier user-facing message for model-overload (503 /
+            // UNAVAILABLE) since that's the most common transient failure
+            // and the user can act on it (switch model / retry).
+            if (503 === $statusCode || (false !== stripos($body, 'UNAVAILABLE') && false !== stripos($body, 'high demand'))) {
+                throw new ProviderException(sprintf('Google AI model "%s" is currently overloaded. Please retry in a few seconds, or switch to another model.', (string) $options['model']), 'google');
+            }
+
+            $detail = '' !== $body ? ' — '.mb_substr($body, 0, 500) : '';
+
+            throw new ProviderException('Google streaming error: '.$e->getMessage().$detail, 'google');
         } catch (\Exception $e) {
             throw new ProviderException('Google streaming error: '.$e->getMessage(), 'google');
         }
+    }
+
+    /**
+     * Issue a Google API request with one transparent retry on 503/UNAVAILABLE.
+     *
+     * The Symfony HttpClient response is lazy — we trigger the status check
+     * via `getStatusCode()` so we can detect the failure before any chunks
+     * are consumed. On 503 we wait 1 s then issue the request once more;
+     * any further failure (or any non-503 error) propagates so the
+     * higher-level catch can surface a friendly message.
+     *
+     * @param array<string, mixed> $options
+     */
+    private function requestWithSingleRetryOn503(string $method, string $url, array $options, string $model): \Symfony\Contracts\HttpClient\ResponseInterface
+    {
+        $maxAttempts = 2;
+        $attempt = 0;
+
+        while (true) {
+            ++$attempt;
+            $response = $this->httpClient->request($method, $url, $options);
+
+            try {
+                $status = $response->getStatusCode();
+            } catch (\Throwable $e) {
+                // Transport error before headers — return the response and
+                // let the streaming loop surface the underlying exception.
+                return $response;
+            }
+
+            if (503 !== $status || $attempt >= $maxAttempts) {
+                return $response;
+            }
+
+            $this->logger->warning('Google: 503 from streamGenerateContent — retrying once', [
+                'model' => $model,
+                'attempt' => $attempt,
+            ]);
+
+            // Free the connection before sleeping so the retry can reuse it.
+            try {
+                $response->cancel();
+            } catch (\Throwable) {
+                // ignore — best-effort cleanup
+            }
+
+            usleep(1_000_000); // 1 s backoff
+        }
+    }
+
+    /**
+     * Whether the given Gemini model is in the "Pro" tier.
+     *
+     * Pro models (gemini-2.5-pro, gemini-3.x-pro, …) mandate a non-zero
+     * thinking budget — sending `thinkingBudget: 0` returns HTTP 4xx (sometimes
+     * surfaced as 5xx by Google's edge). We use this to skip the disable path
+     * for Pro models entirely while keeping it for Flash where 0 is allowed.
+     *
+     * The heuristic matches `pro` only as a hyphen- or slash-delimited token
+     * (or at the start/end of the string), so unrelated names that happen to
+     * contain the substring (e.g. an internal alias with `prompt`/`promo`/
+     * `approve` in it) don't accidentally trip the Pro guard.
+     *
+     * Examples that match: `gemini-2.5-pro`, `gemini-pro`, `gemini-1.5-pro-002`,
+     * `models/gemini-3.0-pro-latest`.
+     * Examples that don't match: `gemini-flash-promo`, `gemini-prompt-tuner`.
+     */
+    private function isProGeminiModel(string $model): bool
+    {
+        $lower = strtolower($model);
+
+        return 1 === preg_match('/(?:^|[\/-])pro(?:[\/-]|$)/', $lower);
+    }
+
+    /**
+     * Translate the cross-provider `reasoning_effort` knob into Google's
+     * `generationConfig.thinkingConfig` payload.
+     *
+     * Returns null when no thinking config should be sent (Google falls back
+     * to its server-side default). Accepts either `reasoning_effort`
+     * (cross-provider) or the Google-native `thinking_budget` key.
+     *
+     * @param array<string, mixed> $options
+     *
+     * @return array<string, int|bool>|null
+     */
+    private function resolveThinkingConfig(array $options, string $model = ''): ?array
+    {
+        // Native passthrough — admin/per-prompt override wins over the
+        // generic effort knob (and bypasses the Pro-tier guard, since the
+        // caller is explicit about the budget).
+        if (array_key_exists('thinking_budget', $options)) {
+            $budget = (int) $options['thinking_budget'];
+
+            return ['thinkingBudget' => $budget];
+        }
+
+        // Cross-provider semantic levels. We default to 'low' for chat to
+        // make TTFT acceptable on Gemini 3.x Pro models. Callers that
+        // explicitly want deeper reasoning (e.g. an "extended thinking"
+        // toggle in the UI) can set 'high'.
+        $effort = $options['reasoning_effort'] ?? null;
+
+        // The legacy `reasoning => true/false` flag (already used by some
+        // providers) maps to 'high'/'low' here so we don't break callers
+        // that flip reasoning on without choosing a level.
+        if (null === $effort && array_key_exists('reasoning', $options)) {
+            $effort = ((bool) $options['reasoning']) ? 'high' : 'low';
+        }
+
+        if (null === $effort) {
+            return null;
+        }
+
+        // Pro guard: gemini-*-pro models reject `thinkingBudget: 0` with HTTP
+        // 4xx (Google sometimes maps this to an opaque 503). For Pro models
+        // we OMIT thinkingConfig on the disable path and let Google's
+        // server-side default apply — the user picked Pro, they expect
+        // reasoning. Flash models accept 0 for max-speed mode.
+        $isPro = '' !== $model && $this->isProGeminiModel($model);
+
+        return match ($effort) {
+            'off', 'none', 'disabled', 'low' => $isPro ? null : ['thinkingBudget' => 0],
+            'medium' => ['thinkingBudget' => 1024],
+            'high' => ['thinkingBudget' => 8192],
+            'dynamic' => ['thinkingBudget' => -1],
+            default => null,
+        };
     }
 
     // ==================== IMAGE GENERATION ====================
@@ -724,7 +915,7 @@ class GoogleProvider implements ChatProviderInterface, ImageGenerationProviderIn
             ]];
         } catch (ProviderException $e) {
             throw $e;
-        } catch (\Symfony\Contracts\HttpClient\Exception\HttpExceptionInterface $e) {
+        } catch (HttpExceptionInterface $e) {
             $this->logger->error('Google Veo: HTTP Error', [
                 'status_code' => $e->getResponse()->getStatusCode(),
                 'response_body' => $e->getResponse()->getContent(false),

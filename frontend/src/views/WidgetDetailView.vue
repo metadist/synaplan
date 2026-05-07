@@ -16,6 +16,7 @@
           </h1>
           <div class="flex gap-2">
             <button
+              v-if="widget"
               class="px-4 py-2.5 rounded-xl border border-light-border/30 dark:border-dark-border/20 txt-secondary text-sm hover:txt-primary transition-colors"
               data-testid="btn-widget-settings"
               @click="openAdvancedModal()"

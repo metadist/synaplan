@@ -420,6 +420,7 @@ class ConfigController extends AbstractController
         $grouped = [
             'SORT' => [],
             'CHAT' => [],
+            'MEM' => [],
             'VECTORIZE' => [],
             'PIC2TEXT' => [],
             'TEXT2PIC' => [],
@@ -439,6 +440,17 @@ class ConfigController extends AbstractController
                     $grouped['CHAT'][] = $model;
                     $grouped['SORT'][] = $model; // Chat models can also be used for sorting
                     $grouped['ANALYZE'][] = $model; // Chat models can analyze
+                    // NOTE: chat models are NOT bucketed into MEM — the
+                    // MEM dropdown is intentionally restricted to a small
+                    // curated set (BTAG=mem) to keep memory extraction
+                    // fast and predictable. Operators can clone any chat
+                    // model into BMODELS with BTAG=mem if they want a
+                    // custom option in the picker.
+                    break;
+                case 'MEM':
+                    // Phase 2d: dedicated memory-extraction tag. Show in the
+                    // MEM dropdown only — it's not a general chat model.
+                    $grouped['MEM'][] = $model;
                     break;
                 case 'VECTORIZE':
                 case 'EMBEDDING':
@@ -494,7 +506,7 @@ class ConfigController extends AbstractController
         }
 
         $userId = $user->getId();
-        $capabilities = ['SORT', 'CHAT', 'VECTORIZE', 'PIC2TEXT', 'TEXT2PIC', 'PIC2PIC', 'TEXT2VID', 'SOUND2TEXT', 'TEXT2SOUND', 'ANALYZE'];
+        $capabilities = ['SORT', 'CHAT', 'MEM', 'VECTORIZE', 'PIC2TEXT', 'TEXT2PIC', 'PIC2PIC', 'TEXT2VID', 'SOUND2TEXT', 'TEXT2SOUND', 'ANALYZE'];
 
         $defaults = [];
 
@@ -571,7 +583,7 @@ class ConfigController extends AbstractController
         }
 
         $ownerId = $global ? 0 : $user->getId();
-        $validCapabilities = ['SORT', 'CHAT', 'VECTORIZE', 'PIC2TEXT', 'TEXT2PIC', 'PIC2PIC', 'TEXT2VID', 'SOUND2TEXT', 'TEXT2SOUND', 'ANALYZE'];
+        $validCapabilities = ['SORT', 'CHAT', 'MEM', 'VECTORIZE', 'PIC2TEXT', 'TEXT2PIC', 'PIC2PIC', 'TEXT2VID', 'SOUND2TEXT', 'TEXT2SOUND', 'ANALYZE'];
 
         // Premium gate for VECTORIZE: switching the embedding model is
         // a paid feature even at the per-user scope, because every

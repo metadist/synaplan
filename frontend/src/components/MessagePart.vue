@@ -80,6 +80,7 @@ const componentProps = computed(() => {
         content: props.part.content || '',
         language: props.part.language,
         filename: props.part.filename,
+        isStreaming: props.isStreaming,
       }
     case 'links':
       return { items: props.part.items || [] }
