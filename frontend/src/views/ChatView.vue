@@ -1945,37 +1945,41 @@ const streamAIResponse = async (
               // localStorage can throw in private mode — don't let perf logging break the stream.
             }
           } else if (data.status === 'complete') {
-            // Phase 3f: sequence the complete-handling work inside a single
-            // requestAnimationFrame so the user perceives ONE smooth
-            // transition (streaming text → final markdown render → copy
-            // button fade-in) instead of three separate paints. The copy
-            // button is already pre-rendered with opacity 0 (see
-            // ChatMessage.vue) so this just flips reactive state — no
-            // mount/unmount jolt.
+            // Phase 3f (corrected): do the final render + state cleanup
+            // synchronously so they all land in the same Vue render tick.
+            //
+            // The earlier rAF-wrapped variant deferred renderStreamingContent
+            // by one frame, which let `historyStore.finishStreamingMessage`
+            // (further below) flip `isStreaming = false` first. The DOM
+            // commit triggered by that flip showed `data-testid="message-done"`
+            // BEFORE message.parts had been filled with the final accumulated
+            // text — Playwright's `waitForAnswer` then read a stale partial
+            // bubble (e.g. "ollama" instead of "ollama stub response").
+            //
+            // Sync ordering avoids the race entirely: Vue batches the sync
+            // mutations (parts updated, processingStatus cleared, isStreaming
+            // toggled) into one paint, preserving the smooth single-frame
+            // transition this phase was originally targeting.
             if (streamingRafId !== null) {
               cancelAnimationFrame(streamingRafId)
               streamingRafId = null
             }
             streamingDirty = false
 
-            requestAnimationFrame(() => {
-              if (fullContent) {
-                renderStreamingContent(fullContent, messageId)
-              }
+            if (fullContent) {
+              renderStreamingContent(fullContent, messageId)
+            }
 
-              if (currentAudioStreamer) {
-                const remaining = audioText.slice(spokenLength)
-                if (remaining.trim()) {
-                  currentAudioStreamer.streamText(remaining, undefined, detectedLanguage)
-                }
-                currentAudioStreamer.markComplete()
+            if (currentAudioStreamer) {
+              const remaining = audioText.slice(spokenLength)
+              if (remaining.trim()) {
+                currentAudioStreamer.streamText(remaining, undefined, detectedLanguage)
               }
+              currentAudioStreamer.markComplete()
+            }
 
-              // Clear processing status in the same frame as the final
-              // text render so the strip doesn't reappear for a tick.
-              processingStatus.value = ''
-              processingMetadata.value = {}
-            })
+            processingStatus.value = ''
+            processingMetadata.value = {}
 
             // Update message metadata
             const message = historyStore.messages.find((m) => m.id === messageId)
