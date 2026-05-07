@@ -898,6 +898,7 @@
       "capabilities": {
         "sort": "Nachrichten-Sortierung",
         "chat": "Chat / Allgemeine KI",
+        "mem": "Memory-Extraktion",
         "vectorize": "Einbettung / Vektorisierung",
         "pic2text": "Bilderkennung (Bild → Text)",
         "text2pic": "Bildgenerierung (Text → Bild)",

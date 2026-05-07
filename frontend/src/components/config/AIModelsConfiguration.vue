@@ -429,6 +429,10 @@ const { t } = useI18n()
 const purposeLabels = computed<Record<Capability, string>>(() => ({
   SORT: t('config.aiModels.capabilities.sort'),
   CHAT: t('config.aiModels.capabilities.chat'),
+  // Phase 2d: backgrounded memory extraction. Defaults to Groq gpt-oss-120b
+  // (BTAG=mem, system row id 220) so the heavy chat model picked above
+  // doesn't cascade into the post-stream extraction call.
+  MEM: t('config.aiModels.capabilities.mem'),
   ANALYZE: t('config.aiModels.capabilities.analyze'),
   VECTORIZE: t('config.aiModels.capabilities.vectorize'),
   PIC2TEXT: t('config.aiModels.capabilities.pic2text'),
@@ -445,6 +449,7 @@ const availableModels = ref<ModelsData>({})
 const defaultConfig = ref<Record<Capability, number | null>>({
   SORT: null,
   CHAT: null,
+  MEM: null,
   ANALYZE: null,
   VECTORIZE: null,
   PIC2TEXT: null,

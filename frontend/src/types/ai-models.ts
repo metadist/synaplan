@@ -5,6 +5,8 @@
 export type Capability =
   | 'SORT'
   | 'CHAT'
+  /** Phase 2d: dedicated memory-extraction model. Routes through Groq by default for low-latency post-stream processing. */
+  | 'MEM'
   | 'VECTORIZE'
   | 'PIC2TEXT'
   | 'TEXT2PIC'

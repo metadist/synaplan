@@ -166,9 +166,18 @@ final readonly class ExtractMemoriesCommandHandler
     }
 
     /**
-     * Write extraction outcome to the source message metadata so the
-     * frontend's poll endpoint (Phase 2c) can pick it up after SSE
-     * `complete` has already closed the stream.
+     * Write extraction outcome to BOTH the incoming user message AND the
+     * outgoing assistant message (when present), so the frontend's poll
+     * endpoint (Phase 2c) finds it whether it polls the user-side or
+     * assistant-side message ID.
+     *
+     * The frontend currently polls the assistant message ID it received in
+     * the SSE `complete` event (StreamController emits
+     * `outgoingMessage->getId()`), but the worker only sees the user-side
+     * incoming message that was queued. We pair them up via trackingId +
+     * userId + direction='OUT' so the meta lands where the poll will look
+     * for it. Writing to both is idempotent and protects against future
+     * frontend changes.
      *
      * Stores a single JSON-encoded BMESSAGEMETA row keyed by
      * `extracted_memories` — small, idempotent, no schema change.
@@ -198,7 +207,30 @@ final readonly class ExtractMemoriesCommandHandler
                 return;
             }
 
+            // Always write to the incoming user message (for completeness +
+            // future-proofing).
             $message->setMeta('extracted_memories', $payload);
+
+            // Find the paired outgoing assistant message (same tracking_id +
+            // user_id, direction = OUT) and write the same payload there
+            // too. The poll endpoint's frontend caller uses the assistant
+            // message ID it got from the SSE `complete` event, so without
+            // this the poll would always return `pending`.
+            $outgoing = $this->em->getRepository(Message::class)->findOneBy([
+                'userId' => $message->getUserId(),
+                'trackingId' => $message->getTrackingId(),
+                'direction' => 'OUT',
+            ]);
+
+            if ($outgoing) {
+                $outgoing->setMeta('extracted_memories', $payload);
+            } else {
+                $this->logger->debug('ExtractMemoriesCommand: no outgoing message found for tracking_id, wrote to incoming only', [
+                    'message_id' => $message->getId(),
+                    'tracking_id' => $message->getTrackingId(),
+                ]);
+            }
+
             $this->em->flush();
         } catch (\Throwable $e) {
             $this->logger->warning('ExtractMemoriesCommand: failed to persist outcome meta', [

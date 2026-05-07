@@ -919,15 +919,26 @@ async function pollExtractedMemoriesOnce(messageId: number): Promise<boolean> {
 }
 
 function schedulePostStreamMemoryPoll(messageId: number): void {
-  // 3 s + 8 s. Stop early if the first poll already returned a final state.
-  setTimeout(async () => {
+  // Phase 2c: poll the backgrounded extraction outcome.
+  //
+  // Schedule increases gradually (2s, 4s, 7s, 12s, 20s) so cheap
+  // extractions show toasts almost immediately while slow ones (Claude
+  // Opus, queue backlog) still get picked up. Stop on the first non-
+  // pending response or after the schedule is exhausted.
+  const delaysMs = [2000, 4000, 7000, 12000, 20000]
+  let attempt = 0
+
+  const tick = async () => {
+    if (attempt >= delaysMs.length) return
     const done = await pollExtractedMemoriesOnce(messageId)
-    if (!done) {
-      setTimeout(() => {
-        void pollExtractedMemoriesOnce(messageId)
-      }, 5000)
+    if (done) return
+    attempt += 1
+    if (attempt < delaysMs.length) {
+      setTimeout(tick, delaysMs[attempt])
     }
-  }, 3000)
+  }
+
+  setTimeout(tick, delaysMs[0])
 }
 
 /**

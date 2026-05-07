@@ -747,6 +747,7 @@
       "capabilities": {
         "sort": "Message Sorting",
         "chat": "Chat / General AI",
+        "mem": "Memory Extraction",
         "vectorize": "Embedding / Vectorization",
         "pic2text": "Vision (Image → Text)",
         "text2pic": "Image Generation (Text → Image)",
