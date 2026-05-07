@@ -3125,6 +3125,11 @@ function openNextDeleteDialogFromQueue() {
  * Phase 3e: backgrounded memory extraction status pill.
  * Fixed-position so it doesn't shift the chat layout. Sits just above the
  * chat input on desktop and stays out of the way on mobile.
+ *
+ * Uses the brand colour for the border + a brand-tinted background so the
+ * pill is unambiguously visible in both light and dark mode (the previous
+ * `--bg-elevated` + `--border-light` combo blended into the dark-mode
+ * chat background and looked washed-out).
  */
 .memory-toast-pill {
   position: absolute;
@@ -3136,9 +3141,15 @@ function openNextDeleteDialogFromQueue() {
   gap: 0.5rem;
   padding: 0.5rem 0.875rem;
   border-radius: 9999px;
-  background-color: var(--bg-elevated, var(--surface-card));
-  border: 1px solid var(--border-light);
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+  background-color: var(--bg-card);
+  /* 2px brand border so the pill reads even when sitting on a dark bubble. */
+  border: 2px solid var(--brand);
+  /* Larger drop shadow + brand-tinted glow so the pill lifts off the chat
+     surface in both themes. */
+  box-shadow:
+    0 6px 20px rgba(0, 0, 0, 0.18),
+    0 0 0 4px var(--brand-alpha-light);
+  color: var(--text-primary);
   pointer-events: none;
   white-space: nowrap;
   max-width: calc(100vw - 2rem);
