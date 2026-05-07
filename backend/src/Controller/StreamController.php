@@ -682,14 +682,21 @@ class StreamController extends AbstractController
                                     $reasoningBuffer = '<think>';
                                     $hasReasoningStarted = true;
 
-                                    // Phase 1e: surface a "Thinking…" status
-                                    // the moment the model starts reasoning, so
-                                    // the bubble doesn't sit empty for the
-                                    // whole reasoning window (Gemini 3.x Pro
-                                    // can spend 5-8 s here before emitting any
+                                    // Phase 1e: surface a "thinking" status the
+                                    // moment the model starts reasoning so the
+                                    // bubble doesn't sit empty for the whole
+                                    // reasoning window (Gemini 3.x Pro can
+                                    // spend 5-8 s here before emitting any
                                     // visible token).
+                                    //
+                                    // Intentionally no human-readable `message`
+                                    // text: the frontend localizes the label
+                                    // via `processing.thinkingTitle` /
+                                    // `processing.thinkingDesc` from the user's
+                                    // active vue-i18n locale. Sending an
+                                    // English string here would leak into the
+                                    // bubble description as `customMessage`.
                                     $this->sendSSE('thinking', [
-                                        'message' => 'Thinking…',
                                         'metadata' => [],
                                         'timestamp' => microtime(true),
                                     ]);

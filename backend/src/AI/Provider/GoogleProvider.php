@@ -466,12 +466,21 @@ class GoogleProvider implements ChatProviderInterface, ImageGenerationProviderIn
      * thinking budget — sending `thinkingBudget: 0` returns HTTP 4xx (sometimes
      * surfaced as 5xx by Google's edge). We use this to skip the disable path
      * for Pro models entirely while keeping it for Flash where 0 is allowed.
+     *
+     * The heuristic matches `pro` only as a hyphen- or slash-delimited token
+     * (or at the start/end of the string), so unrelated names that happen to
+     * contain the substring (e.g. an internal alias with `prompt`/`promo`/
+     * `approve` in it) don't accidentally trip the Pro guard.
+     *
+     * Examples that match: `gemini-2.5-pro`, `gemini-pro`, `gemini-1.5-pro-002`,
+     * `models/gemini-3.0-pro-latest`.
+     * Examples that don't match: `gemini-flash-promo`, `gemini-prompt-tuner`.
      */
     private function isProGeminiModel(string $model): bool
     {
         $lower = strtolower($model);
 
-        return str_contains($lower, 'pro');
+        return 1 === preg_match('/(?:^|[\/-])pro(?:[\/-]|$)/', $lower);
     }
 
     /**

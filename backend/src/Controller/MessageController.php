@@ -689,11 +689,48 @@ class MessageController extends AbstractController
         response: 200,
         description: 'Extraction status payload',
         content: new OA\JsonContent(
+            required: ['status', 'completed_at', 'saved', 'delete_suggestions'],
             properties: [
                 new OA\Property(property: 'status', type: 'string', enum: ['pending', 'empty', 'complete']),
                 new OA\Property(property: 'completed_at', type: 'integer', nullable: true),
-                new OA\Property(property: 'saved', type: 'array', items: new OA\Items(type: 'object')),
-                new OA\Property(property: 'delete_suggestions', type: 'array', items: new OA\Items(type: 'object')),
+                new OA\Property(
+                    property: 'saved',
+                    type: 'array',
+                    description: 'Memories created/updated by this extraction (UserMemoryDTO::toArray() shape).',
+                    items: new OA\Items(
+                        required: ['id', 'category', 'key', 'value', 'source', 'created', 'updated'],
+                        properties: [
+                            new OA\Property(property: 'id', type: 'integer'),
+                            new OA\Property(property: 'category', type: 'string'),
+                            new OA\Property(property: 'key', type: 'string'),
+                            new OA\Property(property: 'value', type: 'string'),
+                            new OA\Property(property: 'source', type: 'string', enum: ['auto_detected', 'user_created', 'user_edited', 'ai_edited']),
+                            new OA\Property(property: 'messageId', type: 'integer', nullable: true),
+                            new OA\Property(property: 'created', type: 'integer'),
+                            new OA\Property(property: 'updated', type: 'integer'),
+                        ],
+                        type: 'object'
+                    )
+                ),
+                new OA\Property(
+                    property: 'delete_suggestions',
+                    type: 'array',
+                    description: 'Memories the model suggests removing (same shape as `saved`).',
+                    items: new OA\Items(
+                        required: ['id', 'category', 'key', 'value', 'source', 'created', 'updated'],
+                        properties: [
+                            new OA\Property(property: 'id', type: 'integer'),
+                            new OA\Property(property: 'category', type: 'string'),
+                            new OA\Property(property: 'key', type: 'string'),
+                            new OA\Property(property: 'value', type: 'string'),
+                            new OA\Property(property: 'source', type: 'string', enum: ['auto_detected', 'user_created', 'user_edited', 'ai_edited']),
+                            new OA\Property(property: 'messageId', type: 'integer', nullable: true),
+                            new OA\Property(property: 'created', type: 'integer'),
+                            new OA\Property(property: 'updated', type: 'integer'),
+                        ],
+                        type: 'object'
+                    )
+                ),
             ]
         )
     )]

@@ -37,18 +37,21 @@ const collapsed = ref(false)
 
 const groupedModels = computed(() => {
   const groups: { label: string; models: AIModel[]; capability: Capability }[] = []
+  // All UI text goes through vue-i18n; reuse the canonical capability
+  // labels defined in `config.aiModels.capabilities.*` so we don't
+  // duplicate translations across components / languages.
   const capabilityLabels: Record<Capability, string> = {
-    CHAT: 'Chat & General AI',
-    SORT: 'Message Sorting',
-    MEM: 'Memory Extraction',
-    ANALYZE: 'Text Analytics',
-    TEXT2PIC: 'Image Generation',
-    PIC2PIC: 'Image Editing (Image → Image)',
-    TEXT2VID: 'Video Generation',
-    TEXT2SOUND: 'Text-to-Speech',
-    SOUND2TEXT: 'Speech-to-Text',
-    PIC2TEXT: 'Vision (Image Analysis)',
-    VECTORIZE: 'Embedding / RAG',
+    CHAT: t('config.aiModels.capabilities.chat'),
+    SORT: t('config.aiModels.capabilities.sort'),
+    MEM: t('config.aiModels.capabilities.mem'),
+    ANALYZE: t('config.aiModels.capabilities.analyze'),
+    TEXT2PIC: t('config.aiModels.capabilities.text2pic'),
+    PIC2PIC: t('config.aiModels.capabilities.pic2pic'),
+    TEXT2VID: t('config.aiModels.capabilities.text2vid'),
+    TEXT2SOUND: t('config.aiModels.capabilities.text2sound'),
+    SOUND2TEXT: t('config.aiModels.capabilities.sound2text'),
+    PIC2TEXT: t('config.aiModels.capabilities.pic2text'),
+    VECTORIZE: t('config.aiModels.capabilities.vectorize'),
   }
   const ordered: Capability[] = ['CHAT', 'PIC2TEXT']
   ordered.forEach((cap) => {

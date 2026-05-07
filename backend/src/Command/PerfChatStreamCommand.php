@@ -29,10 +29,20 @@ use Symfony\Component\Console\Style\SymfonyStyle;
  * Wire into CI as a soft gate: track the per-phase numbers across builds
  * and warn (don't fail) when any phase regresses by more than 50 %.
  *
+ * **DB side effects**: each iteration writes one inbound `Message` row
+ * (and the chat pipeline persists at least one outbound assistant row),
+ * all tagged with `BPROVIDX = 'PERF'`. By default the command deletes
+ * those rows after the benchmark finishes so it leaves the DB clean —
+ * use `--keep-data` if you want to inspect the intermediate state.
+ * Even with cleanup, **don't run this against a live production DB**:
+ * the inserts go through the regular pipeline, so embeddings and
+ * memory-extraction worker jobs can fire as a side effect.
+ *
  * Usage:
  *
  *     bin/console app:perf:chat-stream
  *     bin/console app:perf:chat-stream --user-id=1 --message="Tell me a story" --runs=5
+ *     bin/console app:perf:chat-stream --keep-data   # leave PERF rows in place
  */
 #[AsCommand(
     name: 'app:perf:chat-stream',
@@ -52,7 +62,8 @@ final class PerfChatStreamCommand extends Command
         $this
             ->addOption('user-id', null, InputOption::VALUE_REQUIRED, 'User ID to run the bench as', '1')
             ->addOption('message', null, InputOption::VALUE_REQUIRED, 'Prompt text', 'Hello from the perf benchmark — please reply briefly.')
-            ->addOption('runs', null, InputOption::VALUE_REQUIRED, 'Number of iterations to average', '3');
+            ->addOption('runs', null, InputOption::VALUE_REQUIRED, 'Number of iterations to average', '3')
+            ->addOption('keep-data', null, InputOption::VALUE_NONE, 'Keep the BPROVIDX=PERF rows after the run instead of cleaning them up');
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int
@@ -61,6 +72,7 @@ final class PerfChatStreamCommand extends Command
         $userId = (int) $input->getOption('user-id');
         $messageText = (string) $input->getOption('message');
         $runs = max(1, (int) $input->getOption('runs'));
+        $keepData = (bool) $input->getOption('keep-data');
 
         $user = $this->em->getRepository(User::class)->find($userId);
         if (!$user) {
@@ -71,6 +83,11 @@ final class PerfChatStreamCommand extends Command
 
         $io->title('Synaplan: chat-stream perf benchmark');
         $io->text(sprintf('User: #%d (%s) | runs: %d', $userId, $user->getMail(), $runs));
+        $io->note(
+            'This command writes real Message rows (BPROVIDX=PERF) through the '
+            .'production pipeline. Use against the test stack only; rows are '
+            .'cleaned up at the end unless --keep-data is passed.'
+        );
 
         // Aggregate phase totals across runs so we can print a mean.
         $aggregated = [];
@@ -167,6 +184,44 @@ final class PerfChatStreamCommand extends Command
             count($totals),
         ));
 
+        if ($keepData) {
+            $io->text('Skipping cleanup (--keep-data); BPROVIDX=PERF rows left in place.');
+
+            return Command::SUCCESS;
+        }
+
+        $this->cleanupPerfRows($userId, $io);
+
         return Command::SUCCESS;
+    }
+
+    /**
+     * Delete every Message row tagged `BPROVIDX = 'PERF'` for this user.
+     *
+     * Covers both the inbound rows we created in {@see self::execute()} and
+     * any outbound assistant rows the streaming pipeline persisted in
+     * response. We don't touch BMESSAGEMETA explicitly — Doctrine's cascade
+     * + the FK on `BMESSAGEMETA.BMESSAGEID` keep it in sync.
+     */
+    private function cleanupPerfRows(int $userId, SymfonyStyle $io): void
+    {
+        try {
+            $deleted = (int) $this->em->createQuery(
+                'DELETE FROM '.Message::class.' m '
+                .'WHERE m.userId = :uid AND m.providerIndex = :px'
+            )
+                ->setParameter('uid', $userId)
+                ->setParameter('px', 'PERF')
+                ->execute();
+
+            if ($deleted > 0) {
+                $io->text(sprintf('Cleaned up %d PERF Message row(s).', $deleted));
+            }
+        } catch (\Throwable $e) {
+            $io->warning(sprintf(
+                'Cleanup failed (%s) — re-run with --keep-data and remove rows manually.',
+                $e->getMessage(),
+            ));
+        }
     }
 }

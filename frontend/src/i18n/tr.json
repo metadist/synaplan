@@ -962,6 +962,8 @@
     "generatingFile": "Dosya oluşturuluyor...",
     "generatingFileTitle": "Dosya oluşturuluyor",
     "generatingFileDesc": "AI istenen dosyayı oluşturuyor",
+    "thinkingTitle": "Düşünüyor…",
+    "thinkingDesc": "Model, yanıt vermeden önce düşünüyor",
     "topic": "Konu",
     "language": "Dil",
     "modelId": "Model ID",
@@ -1292,6 +1294,7 @@
       "capabilities": {
         "sort": "Mesaj Sıralama",
         "chat": "Sohbet / Genel AI",
+        "mem": "Hafıza Çıkarımı",
         "vectorize": "Gömme / Vektörleştirme",
         "pic2text": "Görü (Görsel → Metin)",
         "text2pic": "Görsel Oluşturma (Metin → Görsel)",

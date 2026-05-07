@@ -2,8 +2,36 @@
  * Chat API - Message & Conversation Management
  */
 
+import { z } from 'zod'
 import { httpClient, getApiBaseUrl } from './httpClient'
+import { UserMemorySchema } from './userMemoriesApi'
 import type { StreamUpdatePayload } from '@/types/chatStream'
+
+/**
+ * Phase 2c: response shape of `GET /api/v1/messages/{id}/memories`.
+ *
+ * Hand-written Zod schema (matches the OpenAPI annotation on
+ * `MessageController::getExtractedMemories()` and the JSON written by
+ * `ExtractMemoriesCommandHandler::writeOutcomeMeta()`). Once
+ * `make -C frontend generate-schemas` learns to walk the new annotation
+ * we'll swap this for the generated `Get*MemoriesResponseSchema` alias —
+ * until then this matches the project's API convention of validating
+ * every JSON response with Zod via `httpClient({ schema })`.
+ *
+ * `saved` and `delete_suggestions` are arrays of `UserMemoryDTO::toArray()`
+ * payloads, which is exactly what `UserMemorySchema` (defined in
+ * `userMemoriesApi.ts`) describes. Extra DTO keys (`userId`, `active`)
+ * are stripped by Zod's default object semantics — fine, the chat UI
+ * doesn't read them.
+ */
+export const GetExtractedMemoriesResponseSchema = z.object({
+  status: z.enum(['pending', 'empty', 'complete']),
+  completed_at: z.number().nullable(),
+  saved: z.array(UserMemorySchema),
+  delete_suggestions: z.array(UserMemorySchema),
+})
+
+export type GetExtractedMemoriesResponse = z.infer<typeof GetExtractedMemoriesResponseSchema>
 
 // SSE token configuration
 // Note: SSE_TOKEN_EXPIRY_MS = 5 * 60 * 1000 (5 minutes, backend setting)
@@ -79,7 +107,9 @@ async function getSseToken(): Promise<string | null> {
 
       // Handle 401 - try to refresh access token first
       if (response.status === 401) {
-        console.log('🔄 SSE token fetch got 401 - attempting token refresh')
+        if (import.meta.env.DEV) {
+          console.debug('🔄 SSE token fetch got 401 - attempting token refresh')
+        }
         const refreshSuccess = await refreshAccessToken()
 
         if (refreshSuccess) {
@@ -92,7 +122,6 @@ async function getSseToken(): Promise<string | null> {
             const data = await retryResponse.json()
             cacheSseToken(data.token)
 
-            console.log('✅ SSE token refreshed successfully')
             return cachedSseToken
           }
 
@@ -406,27 +435,14 @@ export const chatApi = {
    * Returns `{ status: 'pending' | 'empty' | 'complete', saved, delete_suggestions }`.
    * The frontend calls this once or twice after SSE `complete` to pick up
    * memories the worker extracted asynchronously.
+   *
+   * Response is validated at runtime against
+   * {@link GetExtractedMemoriesResponseSchema}.
    */
-  async getExtractedMemories(messageId: number): Promise<{
-    status: 'pending' | 'empty' | 'complete'
-    completed_at: number | null
-    saved: Array<{
-      id: number
-      category?: string
-      key?: string
-      value?: string
-      [k: string]: unknown
-    }>
-    delete_suggestions: Array<{
-      id: number
-      category?: string
-      key?: string
-      value?: string
-      [k: string]: unknown
-    }>
-  }> {
+  async getExtractedMemories(messageId: number): Promise<GetExtractedMemoriesResponse> {
     return httpClient(`/api/v1/messages/${messageId}/memories`, {
       method: 'GET',
+      schema: GetExtractedMemoriesResponseSchema,
     })
   },
 
