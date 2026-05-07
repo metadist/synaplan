@@ -15,9 +15,16 @@ export class ChatHelper {
     const newBubble = bubbles.nth(previousCount)
     const raceTimeout = longTimeout ? TIMEOUTS.EXTREME : TIMEOUTS.LONG
 
-    await newBubble.waitFor({ state: 'attached', timeout: TIMEOUTS.STANDARD })
-    await newBubble.scrollIntoViewIfNeeded()
-    await newBubble.waitFor({ state: 'visible', timeout: TIMEOUTS.SHORT })
+    // Wait directly for 'visible' (auto-retries on detach) instead of the racy
+    // attached → scrollIntoViewIfNeeded → visible sequence: after the perf push,
+    // historyStore.loadMessages() can replace messages.value while a freshly
+    // optimistic assistant bubble is mid-mount, briefly detaching the DOM node
+    // we just resolved. scrollIntoViewIfNeeded snapshots the handle and throws
+    // 'Element is not attached to the DOM' if the node is swapped mid-call;
+    // waitFor({ state: 'visible' }) re-resolves the locator and is stable.
+    // Subsequent inner-locator waits and Playwright's own auto-scroll handle
+    // any viewport positioning needed for downstream interactions.
+    await newBubble.waitFor({ state: 'visible', timeout: TIMEOUTS.STANDARD })
 
     const result = await Promise.race([
       newBubble
@@ -146,8 +153,9 @@ export class ChatHelper {
     optionCount: number
   }> {
     const latestBubble = this.conversationBubbles().last()
-    await latestBubble.waitFor({ state: 'attached', timeout: TIMEOUTS.STANDARD })
-    await latestBubble.scrollIntoViewIfNeeded()
+    // 'visible' instead of 'attached' + scrollIntoViewIfNeeded() avoids the
+    // detach-during-reconciliation race; Playwright auto-scrolls before clicks.
+    await latestBubble.waitFor({ state: 'visible', timeout: TIMEOUTS.STANDARD })
     const toggle = latestBubble.locator(selectors.chat.againDropdown)
     await expect(toggle).toBeVisible({ timeout: TIMEOUTS.STANDARD })
     await expect(toggle).toBeEnabled({ timeout: TIMEOUTS.STANDARD })
