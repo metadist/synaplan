@@ -547,8 +547,16 @@ final readonly class MessageClassifier
      *
      * The full AI sorter detects language too — we lose that signal when we
      * skip it, so reproduce a "good enough" guess locally. Uses common
-     * stopwords as anchors, falls back to 'auto' (which the rest of the
-     * pipeline interprets as "answer in the language the user wrote in").
+     * stopwords as anchors, falls back to `'en'` when too ambiguous.
+     *
+     * IMPORTANT: returns a 2-character ISO code, NEVER `'auto'`. The
+     * `'auto'` sentinel is used elsewhere in the pipeline (fixed-prompt
+     * widget mode) for the system-prompt directive only and is NOT
+     * persistable to `BMESSAGES.BLANG` (varchar(2)). My fast-path
+     * classification result flows through paths that DO persist BLANG
+     * (e.g. WebhookController email reply), so leaking `'auto'` here
+     * triggers SQLSTATE[22001] "Data too long for column 'BLANG'" on the
+     * outgoing message insert. Stick to ISO codes.
      */
     private function detectLanguageHeuristic(string $text): string
     {
@@ -594,9 +602,12 @@ final readonly class MessageClassifier
         $best = array_key_first($hits);
         $bestScore = $hits[$best];
 
-        // Treat anything below 4 hits as "ambiguous" — let the answering model
-        // pick its own language (the directive builder handles `auto`).
-        return $bestScore >= 4 ? $best : 'auto';
+        // Below 4 hits we have no strong signal — fall back to 'en'. The 2-
+        // char constraint matters: BMESSAGES.BLANG is varchar(2), so even
+        // though the existing 'auto' sentinel works for in-memory routing,
+        // it'd break any downstream code that persists $classification['language']
+        // to BLANG (email webhook reply, queue-mode chat persistence, ...).
+        return $bestScore >= 4 ? $best : 'en';
     }
 
     /**

@@ -492,38 +492,63 @@ function normalizeInlineReferences(text: string): string {
     .replace(/(\[(?:Feedback|Memory)\s*:\s*[\w.-]+\])\n+/gi, '$1 ')
 }
 
-// Process content - sync for regular markdown, async for math formulas
-async function processContent(content: string, version: number): Promise<string | null> {
-  // Handle special file generation markers from backend with i18n
-  if (content.startsWith('__FILE_GENERATED__:')) {
-    const filename = content.replace('__FILE_GENERATED__:', '').trim()
-    content = t('message.fileGenerated', { filename })
-  } else if (content === '__FILE_GENERATION_FAILED__') {
-    content = t('message.fileGenerationFailed')
+// Normalize special file markers + reference markers + apply badge / table
+// post-processing. Shared between the sync and async render paths so the
+// post-render HTML shape is identical regardless of which path produced it.
+function normalizeContentForRender(input: string): string {
+  if (input.startsWith('__FILE_GENERATED__:')) {
+    const filename = input.replace('__FILE_GENERATED__:', '').trim()
+    return t('message.fileGenerated', { filename })
   }
-
-  // Keep reference markers inline to prevent markdown paragraph breaks
-  content = normalizeInlineReferences(content)
-
-  let html: string
-
-  // Use async rendering if content has math formulas, otherwise sync
-  if (hasMathFormulas(content)) {
-    html = await renderAsync(content, { processFileMarkers: false, katex: true })
-    // Check if this render is still current (prevents race conditions)
-    if (version !== renderVersion) return null
-  } else {
-    html = render(content, { processFileMarkers: false })
+  if (input === '__FILE_GENERATION_FAILED__') {
+    return t('message.fileGenerationFailed')
   }
+  return input
+}
 
-  // Process memory and feedback badges after markdown rendering
+function postProcessHtml(html: string): string {
   html = processFeedbackBadges(processMemoryBadges(html))
-
-  // Wrap bare <table> elements in a scrollable container for mobile
   html = html.replace(/<table(\s|>)/g, '<div class="table-scroll"><table$1')
   html = html.replace(/<\/table>/g, '</table></div>')
-
   return html
+}
+
+/**
+ * Synchronous full-pipeline render. Used for the post-stream final render of
+ * non-math content. Critical for E2E tests that read `innerText` immediately
+ * after `data-testid="message-done"` becomes visible — anything async here
+ * would push the final renderedContent update onto the next microtask, after
+ * Vue has already committed `message-done` to the DOM. Tests would then read
+ * a stale half-rendered bubble (only the cheap streaming HTML).
+ */
+function processContentSync(content: string): string {
+  const normalized = normalizeInlineReferences(normalizeContentForRender(content))
+  const html = render(normalized, { processFileMarkers: false })
+  return postProcessHtml(html)
+}
+
+/**
+ * Async full-pipeline render. Only used when math formulas need the KaTeX
+ * pipeline (which is genuinely async). Returns null if a newer render
+ * superseded this one mid-flight.
+ */
+async function processContentAsync(content: string, version: number): Promise<string | null> {
+  const normalized = normalizeInlineReferences(normalizeContentForRender(content))
+  const html = await renderAsync(normalized, { processFileMarkers: false, katex: true })
+  if (version !== renderVersion) return null
+  return postProcessHtml(html)
+}
+
+/**
+ * Legacy entry point retained so any other caller still gets the right
+ * behaviour without a duplicated branch. Routes to sync for plain content,
+ * async for math.
+ */
+async function processContent(content: string, version: number): Promise<string | null> {
+  if (hasMathFormulas(content)) {
+    return processContentAsync(content, version)
+  }
+  return processContentSync(content)
 }
 
 // Phase 3c: during streaming, render the prose with a CHEAP path (HTML
@@ -590,9 +615,19 @@ function renderStreamingFast(content: string): string {
 }
 
 // Update rendered content when props change.
+//
+// IMPORTANT: this watcher MUST be synchronous when transitioning out of
+// streaming mode for plain (non-math) content. The post-stream final render
+// happens in the same Vue tick as the `isStreaming = false` flip that makes
+// `data-testid="message-done"` visible in the DOM. If we awaited even one
+// microtask here, Vue would commit `message-done` first and Playwright's
+// `waitForAnswer` would read the stale cheap-render HTML left behind from
+// the streaming phase. Math content still routes through the async path
+// (KaTeX is genuinely async); for that case the cheap render stays on
+// screen until the math render completes — better than blocking the paint.
 watch(
   () => props.content,
-  async (newContent) => {
+  (newContent) => {
     const currentVersion = ++renderVersion
 
     if (props.isStreaming) {
@@ -609,22 +644,35 @@ watch(
       if (renderDebounceTimer !== null) {
         clearTimeout(renderDebounceTimer)
       }
-      renderDebounceTimer = setTimeout(async () => {
+      renderDebounceTimer = setTimeout(() => {
         renderDebounceTimer = null
         if (currentVersion !== renderVersion) return
         if (!props.isStreaming) return // streaming ended → final pass below handles it
-        const result = await processContent(newContent, currentVersion)
-        if (result !== null) {
-          renderedContent.value = result
+
+        if (hasMathFormulas(newContent)) {
+          void processContentAsync(newContent, currentVersion).then((result) => {
+            if (result !== null) {
+              renderedContent.value = result
+            }
+          })
+        } else {
+          renderedContent.value = processContentSync(newContent)
         }
       }, RENDER_DEBOUNCE_STREAMING_MS)
       return
     }
 
-    // Not streaming — full markdown pipeline immediately.
-    const result = await processContent(newContent, currentVersion)
-    if (result !== null) {
-      renderedContent.value = result
+    // Not streaming — full markdown pipeline. Sync for non-math (the common
+    // case) so `message-done` and the final bubble HTML land in the same
+    // Vue render commit; async only when KaTeX needs it.
+    if (hasMathFormulas(newContent)) {
+      void processContentAsync(newContent, currentVersion).then((result) => {
+        if (result !== null) {
+          renderedContent.value = result
+        }
+      })
+    } else {
+      renderedContent.value = processContentSync(newContent)
     }
   },
   { immediate: true }
@@ -632,21 +680,29 @@ watch(
 
 // When streaming ends, run the full pipeline exactly once so the final
 // rendered HTML matches what stored messages look like (markdown, code
-// highlight, math, mermaid). This is the single biggest visual transition
-// users see — Phase 3f sequences it inside a rAF.
+// highlight, math, mermaid). For non-math content this MUST be synchronous
+// — see the matching note on the content watcher above. The two watchers
+// can both fire on the streaming → not-streaming transition (content tends
+// to change too); since `processContentSync` is idempotent and cheap, the
+// duplicate work is harmless and the synchronicity is what matters.
 watch(
   () => props.isStreaming,
-  async (streaming) => {
-    if (!streaming) {
-      if (renderDebounceTimer !== null) {
-        clearTimeout(renderDebounceTimer)
-        renderDebounceTimer = null
-      }
-      const currentVersion = ++renderVersion
-      const result = await processContent(props.content, currentVersion)
-      if (result !== null) {
-        renderedContent.value = result
-      }
+  (streaming) => {
+    if (streaming) return
+    if (renderDebounceTimer !== null) {
+      clearTimeout(renderDebounceTimer)
+      renderDebounceTimer = null
+    }
+
+    const currentVersion = ++renderVersion
+    if (hasMathFormulas(props.content)) {
+      void processContentAsync(props.content, currentVersion).then((result) => {
+        if (result !== null) {
+          renderedContent.value = result
+        }
+      })
+    } else {
+      renderedContent.value = processContentSync(props.content)
     }
   }
 )
