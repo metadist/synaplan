@@ -470,6 +470,137 @@ final readonly class UserMemoryService
     }
 
     /**
+     * Embed a query string for the user's default VECTORIZE model.
+     *
+     * Phase 1a: callers that want to fan out multiple searches against the
+     * same user query (RAG + memories + 2x feedback in ChatHandler) can call
+     * this once and pass the resulting `embedding` array to
+     * {@see searchMemoriesByVector()} so the embedding HTTP round-trip is
+     * paid exactly once instead of N times.
+     *
+     * Returns null if no VECTORIZE model is configured or embedding fails —
+     * callers should fall back to skipping vector-based search rather than
+     * crashing the request.
+     *
+     * @return array{embedding: array<int, float>, model_id: ?int, model_name: ?string, provider: ?string}|null
+     */
+    public function embedUserQuery(int $userId, string $queryText): ?array
+    {
+        if ('' === trim($queryText)) {
+            return null;
+        }
+
+        $embeddingModelId = $this->modelConfigService->getDefaultModel('VECTORIZE', $userId);
+        $modelName = null;
+        $provider = null;
+
+        if ($embeddingModelId) {
+            $model = $this->em->getRepository('App\Entity\Model')->find($embeddingModelId);
+            if ($model) {
+                $modelName = $model->getProviderId();
+                $provider = strtolower($model->getService());
+            }
+        }
+
+        try {
+            $embedResult = $this->aiFacade->embed($queryText, $userId, array_filter([
+                'model' => $modelName,
+                'provider' => $provider,
+            ]));
+        } catch (\Throwable $e) {
+            $this->logger->warning('embedUserQuery failed, falling back to no embedding', [
+                'user_id' => $userId,
+                'error' => $e->getMessage(),
+            ]);
+
+            return null;
+        }
+
+        $embedding = $embedResult['embedding'];
+        if (empty($embedding)) {
+            return null;
+        }
+
+        // Record usage once for the shared embedding call.
+        $user = $this->em->getRepository(User::class)->find($userId);
+        if ($user) {
+            $this->rateLimitService->recordUsage($user, 'EMBEDDINGS', [
+                'usage' => $embedResult['usage'],
+                'provider' => $provider ?? 'unknown',
+                'model' => $modelName ?? 'unknown',
+                'model_id' => $embeddingModelId,
+                'input_text' => $queryText,
+                'source' => 'CHAT_PIPELINE_SHARED',
+            ]);
+        }
+
+        return [
+            'embedding' => array_map('floatval', $embedding),
+            'model_id' => $embeddingModelId,
+            'model_name' => $modelName,
+            'provider' => $provider,
+        ];
+    }
+
+    /**
+     * Search memories using a precomputed vector.
+     *
+     * Skips the embedding step — pair with {@see embedUserQuery()} to fan out
+     * multiple searches off a single embedding.
+     *
+     * @param array<int, float> $queryVector
+     */
+    public function searchMemoriesByVector(
+        int $userId,
+        array $queryVector,
+        ?string $category = null,
+        int $limit = 5,
+        float $minScore = 0.5,
+        ?string $namespace = null,
+        bool $includeHidden = false,
+    ): array {
+        if (empty($queryVector)) {
+            return [];
+        }
+
+        try {
+            $results = $this->qdrantClient->searchMemories(
+                $queryVector,
+                $userId,
+                $category,
+                $limit * 2,
+                $minScore,
+                $namespace
+            );
+
+            $filtered = $this->embeddingMetadata->filterStaleHits($results);
+            $results = array_slice($filtered['fresh'], 0, $limit);
+
+            $memories = [];
+            foreach ($results as $result) {
+                $payload = $result['payload'] ?? [];
+                $resultCategory = $payload['category'] ?? null;
+                if (!$includeHidden && $resultCategory && $this->isHiddenCategory($resultCategory)) {
+                    continue;
+                }
+
+                $memory = UserMemoryDTO::fromQdrantPayload($payload, $result['id'])->toArray();
+                $memory['score'] = (float) ($result['score'] ?? 0.0);
+                $memories[] = $memory;
+            }
+
+            return $memories;
+        } catch (\Throwable $e) {
+            $this->logger->error('searchMemoriesByVector failed', [
+                'user_id' => $userId,
+                'error' => $e->getMessage(),
+            ]);
+
+            return [];
+        }
+    }
+
+    /**
      * Search relevant memories by text similarity.
      *
      * @param string|null $namespace Optional namespace filter (e.g., 'feedback_false_positive', 'feedback_positive')

@@ -11,9 +11,9 @@ use App\Repository\ModelRepository;
 use App\Repository\PromptRepository;
 use App\Service\FeedbackConfigService;
 use App\Service\File\UserUploadPathBuilder;
-use App\Service\MemoryExtractionService;
 use App\Service\Message\Handler\ChatHandler;
 use App\Service\ModelConfigService;
+use App\Service\PerfPipelineFlag;
 use App\Service\PromptService;
 use App\Service\RAG\VectorSearchService;
 use App\Service\RateLimitService;
@@ -21,6 +21,7 @@ use App\Service\UserMemoryService;
 use Doctrine\ORM\EntityManagerInterface;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
+use Symfony\Component\Messenger\MessageBusInterface;
 
 class ChatHandlerTest extends TestCase
 {
@@ -34,9 +35,10 @@ class ChatHandlerTest extends TestCase
     private EntityManagerInterface $em;
     private UserUploadPathBuilder $userUploadPathBuilder;
     private UserMemoryService $userMemoryService;
-    private MemoryExtractionService $memoryExtractionService;
     private FeedbackConfigService $feedbackConfigService;
     private RateLimitService $rateLimitService;
+    private MessageBusInterface $messageBus;
+    private PerfPipelineFlag $perfPipelineFlag;
     private ChatHandler $handler;
 
     protected function setUp(): void
@@ -51,9 +53,10 @@ class ChatHandlerTest extends TestCase
         $this->em = $this->createMock(EntityManagerInterface::class);
         $this->userUploadPathBuilder = new UserUploadPathBuilder();
         $this->userMemoryService = $this->createMock(UserMemoryService::class);
-        $this->memoryExtractionService = $this->createMock(MemoryExtractionService::class);
         $this->feedbackConfigService = new FeedbackConfigService($this->createStub(ConfigRepository::class));
         $this->rateLimitService = $this->createMock(RateLimitService::class);
+        $this->messageBus = $this->createMock(MessageBusInterface::class);
+        $this->perfPipelineFlag = $this->createMock(PerfPipelineFlag::class);
 
         $this->handler = new ChatHandler(
             $this->aiFacade,
@@ -67,9 +70,10 @@ class ChatHandlerTest extends TestCase
             '/tmp/uploads',
             $this->userUploadPathBuilder,
             $this->userMemoryService,
-            $this->memoryExtractionService,
             $this->feedbackConfigService,
-            $this->rateLimitService
+            $this->rateLimitService,
+            $this->messageBus,
+            $this->perfPipelineFlag,
         );
     }
 

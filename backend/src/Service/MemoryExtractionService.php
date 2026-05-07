@@ -357,32 +357,46 @@ PROMPT;
     }
 
     /**
-     * Get model and provider for memory extraction.
+     * Resolve which model runs the memory-extraction LLM call.
      *
-     * Resolves both the model name AND the matching provider from the model ID
-     * to avoid provider/model mismatch (e.g., sending an OpenAI model to Groq).
+     * Phase 2d priority:
+     *   1. User-scoped DEFAULTMODEL.MEM   (per-user override, set via the admin UI)
+     *   2. Global DEFAULTMODEL.MEM        (the new "Memory extraction model"
+     *                                       BMODELS row, BTAG=mem, default
+     *                                       points at Groq gpt-oss-120b for
+     *                                       ~200 ms TTFT)
+     *   3. User-scoped DEFAULTMODEL.CHAT  (legacy fallback — preserved for
+     *                                       installations that haven't seeded
+     *                                       the MEM tag yet)
+     *   4. Global DEFAULTMODEL.CHAT       (last resort)
+     *
+     * The MEM tag exists so picking a slow/expensive chat model (e.g. Gemini
+     * 3.x Pro) for the user-facing answer no longer cascades into the
+     * background memory extraction.
      *
      * @return array{model: string|null, provider: string|null, model_id: int|null}
      */
     private function getExtractionModelConfig(int $userId): array
     {
-        // Try to get user's default chat model
-        $modelId = $this->modelConfigService->getDefaultModel('CHAT', $userId);
+        $modelId = $this->modelConfigService->getDefaultModel('MEM', $userId)
+            ?? $this->modelConfigService->getDefaultModel('MEM', 0)
+            ?? $this->modelConfigService->getDefaultModel('CHAT', $userId)
+            ?? $this->modelConfigService->getDefaultModel('CHAT', 0);
 
-        if ($modelId) {
-            $model = $this->modelConfigService->getModelName($modelId);
-            $provider = $this->modelConfigService->getProviderForModel($modelId);
-
-            $this->logger->debug('Memory extraction model resolved', [
-                'user_id' => $userId,
-                'model_id' => $modelId,
-                'model' => $model,
-                'provider' => $provider,
-            ]);
-
-            return ['model' => $model, 'provider' => $provider, 'model_id' => $modelId];
+        if (!$modelId) {
+            return ['model' => null, 'provider' => null, 'model_id' => null];
         }
 
-        return ['model' => null, 'provider' => null, 'model_id' => null];
+        $model = $this->modelConfigService->getModelName($modelId);
+        $provider = $this->modelConfigService->getProviderForModel($modelId);
+
+        $this->logger->debug('Memory extraction model resolved', [
+            'user_id' => $userId,
+            'model_id' => $modelId,
+            'model' => $model,
+            'provider' => $provider,
+        ]);
+
+        return ['model' => $model, 'provider' => $provider, 'model_id' => $modelId];
     }
 }

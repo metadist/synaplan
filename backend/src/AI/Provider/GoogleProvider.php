@@ -247,14 +247,32 @@ class GoogleProvider implements ChatProviderInterface, ImageGenerationProviderIn
 
             $url = self::API_BASE."/models/{$model}:streamGenerateContent?alt=sse";
 
+            $generationConfig = [
+                'temperature' => $options['temperature'] ?? 0.7,
+                'topP' => $options['top_p'] ?? 0.95,
+                'topK' => $options['top_k'] ?? 40,
+                'maxOutputTokens' => $options['max_tokens'] ?? ChatProviderInterface::DEFAULT_MAX_COMPLETION_TOKENS,
+            ];
+
+            // Phase 1e: Gemini 2.5+ Pro / 3.x "thinking" models otherwise
+            // burn 5-10s on internal reasoning before emitting the first
+            // visible token. Map an optional `reasoning_effort` knob onto
+            // Google's `thinkingConfig.thinkingBudget` so chat (default
+            // `low`) gets near-instant TTFT without losing reasoning when
+            // the user explicitly asks for "deep think".
+            //
+            // Budget interpretation (per Google docs):
+            //   - 0      → thinking disabled (fastest TTFT)
+            //   - >0     → token budget reserved for hidden reasoning
+            //   - -1     → "dynamic" — model decides
+            $thinkingConfig = $this->resolveThinkingConfig($options);
+            if (null !== $thinkingConfig) {
+                $generationConfig['thinkingConfig'] = $thinkingConfig;
+            }
+
             $payload = [
                 'contents' => $contents,
-                'generationConfig' => [
-                    'temperature' => $options['temperature'] ?? 0.7,
-                    'topP' => $options['top_p'] ?? 0.95,
-                    'topK' => $options['top_k'] ?? 40,
-                    'maxOutputTokens' => $options['max_tokens'] ?? ChatProviderInterface::DEFAULT_MAX_COMPLETION_TOKENS,
-                ],
+                'generationConfig' => $generationConfig,
             ];
 
             $this->logger->info('Google: Streaming chat completion', [
@@ -346,6 +364,55 @@ class GoogleProvider implements ChatProviderInterface, ImageGenerationProviderIn
         } catch (\Exception $e) {
             throw new ProviderException('Google streaming error: '.$e->getMessage(), 'google');
         }
+    }
+
+    /**
+     * Translate the cross-provider `reasoning_effort` knob into Google's
+     * `generationConfig.thinkingConfig` payload.
+     *
+     * Returns null when no thinking config should be sent (caller's existing
+     * behaviour). Accepts either `reasoning_effort` (cross-provider) or the
+     * Google-native `thinking_budget` key.
+     *
+     * @param array<string, mixed> $options
+     *
+     * @return array<string, int|bool>|null
+     */
+    private function resolveThinkingConfig(array $options): ?array
+    {
+        // Native passthrough — admin/per-prompt override wins over the
+        // generic effort knob.
+        if (array_key_exists('thinking_budget', $options)) {
+            $budget = (int) $options['thinking_budget'];
+
+            return ['thinkingBudget' => $budget];
+        }
+
+        // Cross-provider semantic levels. We default to 'low' for chat to
+        // make TTFT acceptable on Gemini 3.x Pro models. Callers that
+        // explicitly want deeper reasoning (e.g. an "extended thinking"
+        // toggle in the UI) can set 'high'.
+        $effort = $options['reasoning_effort'] ?? null;
+
+        // The legacy `reasoning => true/false` flag (already used by some
+        // providers) maps to 'high'/'low' here so we don't break callers
+        // that flip reasoning on without choosing a level.
+        if (null === $effort && array_key_exists('reasoning', $options)) {
+            $effort = ((bool) $options['reasoning']) ? 'high' : 'low';
+        }
+
+        if (null === $effort) {
+            return null;
+        }
+
+        return match ($effort) {
+            'off', 'none', 'disabled' => ['thinkingBudget' => 0],
+            'low' => ['thinkingBudget' => 0],
+            'medium' => ['thinkingBudget' => 1024],
+            'high' => ['thinkingBudget' => 8192],
+            'dynamic' => ['thinkingBudget' => -1],
+            default => null,
+        };
     }
 
     // ==================== IMAGE GENERATION ====================

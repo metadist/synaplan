@@ -14,6 +14,7 @@ use App\Service\GuestSessionService;
 use App\Service\Message\MessageForwardingService;
 use App\Service\Message\MessageProcessor;
 use App\Service\ModelConfigService;
+use App\Service\PerfTimer;
 use App\Service\PromptService;
 use App\Service\RateLimitService;
 use App\Service\TtsTextSanitizer;
@@ -361,6 +362,13 @@ class StreamController extends AbstractController
             // Stop execution when client disconnects
             ignore_user_abort(false);
 
+            // Phase 0: per-request performance timer.
+            // Lives only inside the callback so it doesn't measure connection
+            // setup time we have no control over. Forwarded to MessageProcessor
+            // via processing options and emitted as a `perf` SSE event before
+            // `complete`.
+            $perfTimer = new PerfTimer();
+
             // If rate limit was exceeded, send error as SSE event and return immediately
             // This prevents the user message from being saved when rate limited
             if ($rateLimitError) {
@@ -564,6 +572,7 @@ class StreamController extends AbstractController
                     'web_search' => $webSearch,
                     'voice_reply' => $voiceReply,
                     'is_continuation' => (bool) $continueMessageId,
+                    'perf_timer' => $perfTimer,
                 ];
 
                 if ($isWidgetMode || $isGuestMode || $disableMemories) {
@@ -672,6 +681,18 @@ class StreamController extends AbstractController
                                 if (!$hasReasoningStarted) {
                                     $reasoningBuffer = '<think>';
                                     $hasReasoningStarted = true;
+
+                                    // Phase 1e: surface a "Thinking…" status
+                                    // the moment the model starts reasoning, so
+                                    // the bubble doesn't sit empty for the
+                                    // whole reasoning window (Gemini 3.x Pro
+                                    // can spend 5-8 s here before emitting any
+                                    // visible token).
+                                    $this->sendSSE('thinking', [
+                                        'message' => 'Thinking…',
+                                        'metadata' => [],
+                                        'timestamp' => microtime(true),
+                                    ]);
                                 }
                                 $reasoningBuffer .= $content;
                             } else {
@@ -1369,6 +1390,13 @@ class StreamController extends AbstractController
                         'limitReached' => $guestSession->isLimitReached(),
                     ]);
                 }
+
+                // Phase 0: emit per-request performance breakdown so the
+                // frontend (gated by localStorage.synaplanDebug) and
+                // benchmarks can see where wall-clock time was spent.
+                // Sent before `complete` so the client picks it up while the
+                // EventSource is still open.
+                $this->sendSSE('perf', $perfTimer->toArray());
 
                 $this->sendSSE('complete', $completeData);
 

@@ -496,6 +496,36 @@ class ModelCatalog
                 'meta' => ['context_window' => '131072', 'max_output' => '16384', 'license' => 'Apache-2.0', 'quantization' => 'TruePoint Numerics'],
             ],
         ],
+        // Phase 2d: dedicated "Memory extraction model" — runs on the worker
+        // when ChatHandler dispatches ExtractMemoriesCommand. Tagged 'mem'
+        // (a new BTAG) so it never appears in the user-facing chat model
+        // picker and so MemoryExtractionService can resolve it via
+        // ModelConfigService::getDefaultModel('MEM', $userId) without
+        // cascading into whatever heavy chat model the user picked. Cloned
+        // from the Groq gpt-oss-120b row above because Groq's hardware gives
+        // ~200 ms TTFT on the small extraction prompt.
+        [
+            'id' => 220,
+            'service' => 'Groq',
+            'name' => 'Memory extraction model',
+            'tag' => 'mem',
+            'selectable' => 0,
+            'active' => 1,
+            'providerId' => 'openai/gpt-oss-120b',
+            'priceIn' => 0.15,
+            'inUnit' => 'per1M',
+            'priceOut' => 0.75,
+            'outUnit' => 'per1M',
+            'quality' => 10,
+            'rating' => 4,
+            'json' => [
+                'description' => 'Internal memory-extraction model. Cloned from Groq gpt-oss-120b for cheap, ~200 ms TTFT classification of which conversation facts to persist.',
+                'max_tokens' => 4096,
+                'is_system' => true,
+                'params' => ['model' => 'openai/gpt-oss-120b'],
+                'meta' => ['context_window' => '131072', 'max_output' => '16384', 'license' => 'Apache-2.0', 'quantization' => 'TruePoint Numerics'],
+            ],
+        ],
         // ==================== OPENAI MODELS ====================
         [
             'id' => 29,

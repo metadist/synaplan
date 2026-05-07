@@ -9,11 +9,18 @@ import type { StreamUpdatePayload } from '@/types/chatStream'
 // Note: SSE_TOKEN_EXPIRY_MS = 5 * 60 * 1000 (5 minutes, backend setting)
 const SSE_TOKEN_REFRESH_MS = 4 * 60 * 1000 // Refresh 1 minute before expiry
 
+// Phase 1d: how long before the cache expiry we proactively re-fetch the
+// token in the background. Picking 30s gives us a ~3.5 min "always-warm"
+// window so the user-visible streamMessage() never waits on a token
+// round-trip.
+const SSE_TOKEN_PROACTIVE_REFRESH_MS = SSE_TOKEN_REFRESH_MS - 30 * 1000
+
 // Cache SSE token (needed because EventSource can't send cookies)
 let cachedSseToken: string | null = null
 let tokenFetchPromise: Promise<string | null> | null = null
 let tokenRefreshPromise: Promise<boolean> | null = null
 let tokenExpiryTimer: ReturnType<typeof setTimeout> | null = null
+let tokenProactiveTimer: ReturnType<typeof setTimeout> | null = null
 
 /**
  * Centralized token refresh - prevents concurrent refresh requests (stampede)
@@ -83,16 +90,7 @@ async function getSseToken(): Promise<string | null> {
 
           if (retryResponse.ok) {
             const data = await retryResponse.json()
-            cachedSseToken = data.token
-
-            // Clear any existing timer first
-            if (tokenExpiryTimer) {
-              clearTimeout(tokenExpiryTimer)
-            }
-            tokenExpiryTimer = setTimeout(() => {
-              cachedSseToken = null
-              tokenExpiryTimer = null
-            }, SSE_TOKEN_REFRESH_MS)
+            cacheSseToken(data.token)
 
             console.log('✅ SSE token refreshed successfully')
             return cachedSseToken
@@ -116,16 +114,7 @@ async function getSseToken(): Promise<string | null> {
       }
 
       const data = await response.json()
-      cachedSseToken = data.token
-
-      // Clear any existing timer first
-      if (tokenExpiryTimer) {
-        clearTimeout(tokenExpiryTimer)
-      }
-      tokenExpiryTimer = setTimeout(() => {
-        cachedSseToken = null
-        tokenExpiryTimer = null
-      }, SSE_TOKEN_REFRESH_MS)
+      cacheSseToken(data.token)
 
       return cachedSseToken
     } catch (error) {
@@ -144,10 +133,78 @@ async function getSseToken(): Promise<string | null> {
 }
 
 /**
+ * Cache the SSE token and schedule both:
+ *   - hard expiry: drop from cache so the next call refetches
+ *   - proactive refresh: 30s before hard expiry, kick off a background
+ *     refetch so the cache is always warm for the user-visible
+ *     `streamMessage()` call. Phase 1d optimization — the previous code
+ *     waited until cache miss and made the user wait one extra HTTP RTT
+ *     per message after the 4-minute window expired.
+ */
+function cacheSseToken(token: string | null): void {
+  cachedSseToken = token
+
+  if (tokenExpiryTimer) {
+    clearTimeout(tokenExpiryTimer)
+    tokenExpiryTimer = null
+  }
+  if (tokenProactiveTimer) {
+    clearTimeout(tokenProactiveTimer)
+    tokenProactiveTimer = null
+  }
+
+  if (!token) {
+    return
+  }
+
+  tokenExpiryTimer = setTimeout(() => {
+    cachedSseToken = null
+    tokenExpiryTimer = null
+  }, SSE_TOKEN_REFRESH_MS)
+
+  // Schedule a proactive background refresh well before the hard expiry.
+  // Don't await — we want this to happen silently while the user keeps
+  // chatting. If the page is hidden, skip; we'll refresh on next visibility.
+  tokenProactiveTimer = setTimeout(() => {
+    tokenProactiveTimer = null
+    if (typeof document !== 'undefined' && document.visibilityState === 'hidden') {
+      return
+    }
+    cachedSseToken = null
+    void getSseToken().catch(() => {
+      // Network blip — next call will retry. Don't crash the page.
+    })
+  }, SSE_TOKEN_PROACTIVE_REFRESH_MS)
+}
+
+/**
+ * Prefetch the SSE token without waiting for the result.
+ *
+ * Call from app boot and on window focus to keep the cache warm so the
+ * user-visible `streamMessage()` call never spends a round-trip on auth.
+ */
+export function prefetchSseToken(): void {
+  if (cachedSseToken || tokenFetchPromise) {
+    return
+  }
+  void getSseToken().catch(() => {
+    // Silent — this is a best-effort warm-up.
+  })
+}
+
+/**
  * Clear cached SSE token (call on logout)
  */
 export function clearSseToken(): void {
   cachedSseToken = null
+  if (tokenExpiryTimer) {
+    clearTimeout(tokenExpiryTimer)
+    tokenExpiryTimer = null
+  }
+  if (tokenProactiveTimer) {
+    clearTimeout(tokenProactiveTimer)
+    tokenProactiveTimer = null
+  }
 }
 
 export type { StreamUpdatePayload }
@@ -339,6 +396,36 @@ export const chatApi = {
 
   async getChatMessages(chatId: number, offset = 0, limit = 50): Promise<unknown> {
     return httpClient(`/api/v1/chats/${chatId}/messages?offset=${offset}&limit=${limit}`, {
+      method: 'GET',
+    })
+  },
+
+  /**
+   * Phase 2c: poll the backgrounded memory extraction outcome for a message.
+   *
+   * Returns `{ status: 'pending' | 'empty' | 'complete', saved, delete_suggestions }`.
+   * The frontend calls this once or twice after SSE `complete` to pick up
+   * memories the worker extracted asynchronously.
+   */
+  async getExtractedMemories(messageId: number): Promise<{
+    status: 'pending' | 'empty' | 'complete'
+    completed_at: number | null
+    saved: Array<{
+      id: number
+      category?: string
+      key?: string
+      value?: string
+      [k: string]: unknown
+    }>
+    delete_suggestions: Array<{
+      id: number
+      category?: string
+      key?: string
+      value?: string
+      [k: string]: unknown
+    }>
+  }> {
+    return httpClient(`/api/v1/messages/${messageId}/memories`, {
       method: 'GET',
     })
   },

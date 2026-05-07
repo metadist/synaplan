@@ -526,33 +526,102 @@ async function processContent(content: string, version: number): Promise<string 
   return html
 }
 
-// Debounce timer for markdown rendering during streaming
+// Phase 3c: during streaming, render the prose with a CHEAP path (HTML
+// escape + newline-to-<br>) and skip marked + DOMPurify + highlight.js
+// entirely. The full pipeline costs 5-30 ms per call which compounds
+// every 80 ms throughout the stream — we used to burn most of the
+// frontend CPU on a render that gets thrown away as soon as the next
+// chunk arrives. We run the full pipeline once when streaming ends.
+//
+// The streaming path still calls processContent indirectly via the
+// existing memory/feedback badge resolution paths, but only on a
+// 250 ms interval (vs 80 ms before) so reactive updates from the
+// memory store still resolve `[Memory:ID]` placeholders — just less
+// often during the hot streaming window.
 let renderDebounceTimer: ReturnType<typeof setTimeout> | null = null
-const RENDER_DEBOUNCE_MS = 80
+const RENDER_DEBOUNCE_STREAMING_MS = 250
 
-// Update rendered content when props change (debounced during streaming)
+function escapeHtml(input: string): string {
+  return input
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;')
+}
+
+/**
+ * Cheap streaming-mode renderer. Preserves whitespace, inserts <br> for
+ * newlines, leaves a placeholder where an unclosed code fence would have
+ * been so long code blocks don't appear as one giant escaped wall of text.
+ * Memory/feedback badges still get resolved via `processFeedbackBadges` /
+ * `processMemoryBadges` so existing `[Memory:ID]` markers turn into pills
+ * in real time.
+ */
+function renderStreamingFast(content: string): string {
+  // Split on triple-backtick fences. Fenced regions are wrapped in <pre>
+  // (un-highlighted) so visually they look like a code block immediately,
+  // but skipping highlight.js avoids the ~10-50 ms hit per fence per tick.
+  const parts: Array<{ kind: 'prose' | 'code'; text: string; lang?: string }> = []
+  const fenceRe = /```([a-zA-Z0-9_+-]*)\n([\s\S]*?)(?:```|$)/g
+  let lastIdx = 0
+  let m: RegExpExecArray | null
+  while ((m = fenceRe.exec(content)) !== null) {
+    if (m.index > lastIdx) {
+      parts.push({ kind: 'prose', text: content.slice(lastIdx, m.index) })
+    }
+    parts.push({ kind: 'code', text: m[2] ?? '', lang: m[1] || 'text' })
+    lastIdx = fenceRe.lastIndex
+  }
+  if (lastIdx < content.length) {
+    parts.push({ kind: 'prose', text: content.slice(lastIdx) })
+  }
+
+  return parts
+    .map((p) => {
+      if (p.kind === 'code') {
+        return `<pre class="code-block streaming-code-block"><code class="hljs language-${escapeHtml(p.lang ?? 'text')}">${escapeHtml(p.text)}</code></pre>`
+      }
+      // For prose, escape HTML and convert newlines to <br>. Memory/feedback
+      // badges still flow through later regex replacement.
+      return escapeHtml(p.text).replace(/\n/g, '<br>')
+    })
+    .join('')
+}
+
+// Update rendered content when props change.
 watch(
   () => props.content,
   async (newContent) => {
     const currentVersion = ++renderVersion
 
-    // During streaming, debounce to avoid re-rendering full markdown on every chunk
     if (props.isStreaming) {
+      // Cheap streaming path — synchronous, no debounce delay.
+      let html = renderStreamingFast(newContent)
+      // Still resolve memory + feedback badges in real time.
+      html = processFeedbackBadges(processMemoryBadges(html))
+      renderedContent.value = html
+
+      // Schedule a low-frequency full re-render so memory store updates
+      // (badges arriving via the polled extraction endpoint, etc.) still
+      // surface during long streams. 250 ms is much cheaper than the
+      // previous 80 ms while still feeling responsive.
       if (renderDebounceTimer !== null) {
         clearTimeout(renderDebounceTimer)
       }
       renderDebounceTimer = setTimeout(async () => {
         renderDebounceTimer = null
         if (currentVersion !== renderVersion) return
+        if (!props.isStreaming) return // streaming ended → final pass below handles it
         const result = await processContent(newContent, currentVersion)
         if (result !== null) {
           renderedContent.value = result
         }
-      }, RENDER_DEBOUNCE_MS)
+      }, RENDER_DEBOUNCE_STREAMING_MS)
       return
     }
 
-    // Not streaming — render immediately
+    // Not streaming — full markdown pipeline immediately.
     const result = await processContent(newContent, currentVersion)
     if (result !== null) {
       renderedContent.value = result
@@ -561,13 +630,18 @@ watch(
   { immediate: true }
 )
 
-// When streaming ends, flush any pending debounced render so final content is visible
+// When streaming ends, run the full pipeline exactly once so the final
+// rendered HTML matches what stored messages look like (markdown, code
+// highlight, math, mermaid). This is the single biggest visual transition
+// users see — Phase 3f sequences it inside a rAF.
 watch(
   () => props.isStreaming,
   async (streaming) => {
-    if (!streaming && renderDebounceTimer !== null) {
-      clearTimeout(renderDebounceTimer)
-      renderDebounceTimer = null
+    if (!streaming) {
+      if (renderDebounceTimer !== null) {
+        clearTimeout(renderDebounceTimer)
+        renderDebounceTimer = null
+      }
       const currentVersion = ++renderVersion
       const result = await processContent(props.content, currentVersion)
       if (result !== null) {

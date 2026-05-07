@@ -33,6 +33,14 @@ export type PartType =
   | 'tts_loading'
 
 export interface Part {
+  /**
+   * Phase 3a: stable id assigned when the part is first created so the
+   * ChatMessage `<MessagePart v-for>` can use it as `:key` instead of the
+   * array index. With index-based keys, mid-stream parser splits (text →
+   * text+code) reused the wrong DOM nodes for ~1 frame, which read as a
+   * visible flash. partId stays attached to the part across re-parses.
+   */
+  partId?: string
   type: PartType
   content?: string
   url?: string

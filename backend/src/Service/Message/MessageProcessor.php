@@ -7,6 +7,7 @@ use App\Repository\MessageRepository;
 use App\Repository\SearchResultRepository;
 use App\Service\Exception\VisionModelRequiredException;
 use App\Service\ModelConfigService;
+use App\Service\PerfTimer;
 use App\Service\PromptService;
 use App\Service\Search\BraveSearchService;
 use App\Service\UrlContentService;
@@ -54,11 +55,19 @@ final readonly class MessageProcessor
     {
         $this->notify($statusCallback, 'started', 'Message processing started');
 
+        $perfTimer = $options['perf_timer'] ?? null;
+        if (!$perfTimer instanceof PerfTimer) {
+            $perfTimer = new PerfTimer();
+            $options['perf_timer'] = $perfTimer;
+        }
+
         try {
             // Step 1: Preprocessing (modifies Message entity in-place)
             $this->notify($statusCallback, 'preprocessing', 'Downloading and parsing files...');
 
+            $perfTimer->start('preprocess');
             $message = $this->preProcessor->process($message);
+            $perfTimer->stop('preprocess');
             $preprocessed = ['hasFiles' => $message->getFile() > 0];
 
             if ($message->getFile() > 0 && $message->getFileText()) {
@@ -132,7 +141,9 @@ final readonly class MessageProcessor
                 }
             } elseif (!empty($options['is_widget_mode'])) {
                 // Widget Mode without fixed prompt: still disable memories
+                $perfTimer->start('classify');
                 $classification = $this->classifier->classify($message, $conversationHistory);
+                $perfTimer->stop('classify');
                 $classification['is_widget_mode'] = true;
             } elseif ($isAgainRequest) {
                 // Skip sorting but preserve/override topic & language for routing
@@ -191,6 +202,7 @@ final readonly class MessageProcessor
 
             // Get conversation history for context - STREAMING VERSION
             // Priority: Use chatId if available (chat window context), otherwise fall back to trackingId
+            $perfTimer->start('history');
             if ($message->getChatId()) {
                 $conversationHistory = $this->messageRepository->findChatHistory(
                     $message->getUserId(),
@@ -214,6 +226,7 @@ final readonly class MessageProcessor
                     'history_count' => count($conversationHistory),
                 ]);
             }
+            $perfTimer->stop('history');
 
             if (!$isAgainRequest && !$hasFixedPrompt) {
                 if (!empty($options['force_image_description'])) {
@@ -228,7 +241,9 @@ final readonly class MessageProcessor
                 } else {
                     // Run classification (override_model_id is NOT passed to classifier;
                     // it's added to classification below so ChatHandler can use it)
+                    $perfTimer->start('classify');
                     $classification = $this->classifier->classify($message, $conversationHistory);
+                    $perfTimer->stop('classify');
                 }
 
                 // IMPORTANT: Save sorting model info separately (don't pass to ChatHandler!)
@@ -263,8 +278,16 @@ final readonly class MessageProcessor
 
             // Step 2.3: Load Prompt Metadata and apply tool restrictions
             $topic = $classification['topic'] ?? 'general';
+            $perfTimer->start('prompt');
             $promptData = $this->promptService->getPromptWithMetadata($topic, $message->getUserId(), $classification['language'] ?? 'en');
+            $perfTimer->stop('prompt');
             $promptMetadata = $promptData['metadata'] ?? [];
+
+            // Stash the resolved prompt bundle in options so ChatHandler can reuse it
+            // without redoing the DB lookup + deserialize. See Phase 1b in the plan.
+            if (null !== $promptData) {
+                $options['resolved_prompt_data'] = $promptData;
+            }
 
             // Apply tool restrictions from prompt metadata
             // If prompt explicitly DISABLES a tool, override frontend request
@@ -299,10 +322,12 @@ final readonly class MessageProcessor
 
                 try {
                     // Generate optimized search query using AI
+                    $perfTimer->start('search_query');
                     $searchQuery = $this->searchQueryGenerator->generate(
                         $message->getText(),
                         $message->getUserId()
                     );
+                    $perfTimer->stop('search_query');
 
                     // Get language from classification (e.g., "de", "en", "fr")
                     // Use it directly as both search_lang and country (ISO 639-1 codes)
@@ -321,10 +346,12 @@ final readonly class MessageProcessor
                     ]);
 
                     // Pass language and country to search service
+                    $perfTimer->start('search_brave');
                     $searchResults = $this->braveSearchService->search($searchQuery, [
                         'country' => $country,
                         'search_lang' => $language,
                     ]);
+                    $perfTimer->stop('search_brave');
 
                     // Save search results to database
                     if ($searchResults && !empty($searchResults['results']) && $this->searchResultRepository) {
@@ -392,7 +419,9 @@ final readonly class MessageProcessor
                 $options['search_results'] = $searchResults;
             }
 
+            $perfTimer->start('handler_total');
             $response = $this->router->routeStream($message, $conversationHistory, $classification, $streamCallback, $statusCallback, $options);
+            $perfTimer->stop('handler_total');
 
             // Re-add sorting model info to result (for StreamController to save)
             $classification['sorting_model_id'] = $sortingModelId;

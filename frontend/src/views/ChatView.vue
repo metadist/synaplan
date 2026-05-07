@@ -202,6 +202,39 @@
         @stop="handleStopStreaming"
         @guest-feature-gate="handleGuestFeatureGate"
       />
+
+      <!--
+        Phase 3e: backgrounded memory extraction status pill.
+        Lives outside the message bubble (fixed-position, bottom-right
+        of the chat area) so it can never push content around or cause
+        the assistant bubble to flicker. Driven by `memoryToastVisible`
+        from `pollExtractedMemoriesOnce()` after the SSE stream has
+        already closed.
+      -->
+      <Transition name="memory-toast">
+        <div
+          v-if="memoryToastVisible"
+          class="memory-toast-pill"
+          role="status"
+          aria-live="polite"
+          data-testid="memory-toast"
+        >
+          <svg
+            class="w-4 h-4 txt-brand flex-shrink-0"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+            stroke-width="2"
+          >
+            <path
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"
+            />
+          </svg>
+          <span class="text-sm font-medium">{{ memoryToastMessage }}</span>
+        </div>
+      </Transition>
     </div>
 
     <!-- Limit Reached Modal -->
@@ -316,6 +349,7 @@ import { useFeedbackStore } from '@/stores/userFeedback'
 import { useLimitCheck } from '@/composables/useLimitCheck'
 import { useNotification } from '@/composables/useNotification'
 import { chatApi } from '@/services/api'
+import { prefetchSseToken } from '@/services/api/chatApi'
 import type { ModelOption } from '@/composables/useModelSelection'
 import { parseAIResponse } from '@/utils/responseParser'
 import { normalizeMediaUrl } from '@/utils/urlHelper'
@@ -412,6 +446,12 @@ type StreamingProcessingMetadata = {
 }
 
 const processingMetadata = ref<StreamingProcessingMetadata>({})
+
+// Phase 3e: non-blocking pill that surfaces when backgrounded memory
+// extraction (Phase 2) completes after the assistant message has already
+// landed. Lives outside the bubble so it can never push content around.
+const memoryToastVisible = ref(false)
+const memoryToastMessage = ref('')
 
 // Memory suggestion toasts
 const activeMemoryToasts = ref<Array<UserMemory & { toastId: number }>>([])
@@ -563,7 +603,22 @@ onMounted(async () => {
   window.addEventListener('open-memory-dialog', handleOpenMemoryDialogEvent)
   // Setup window event listener for feedback dialog (used by MessageText.vue)
   window.addEventListener('open-feedback-dialog', handleOpenFeedbackDialogEvent)
+
+  // Phase 1d: keep the SSE token cache warm.
+  //   - Prefetch on mount so the first message of a session never waits.
+  //   - Re-prefetch when the tab regains focus (token may have expired in
+  //     the background; warming it now avoids a stale-cache hit on the
+  //     user's first interaction after switching back).
+  prefetchSseToken()
+  window.addEventListener('focus', prefetchSseToken)
+  document.addEventListener('visibilitychange', handleVisibilityChangeForToken)
 })
+
+const handleVisibilityChangeForToken = () => {
+  if (document.visibilityState === 'visible') {
+    prefetchSseToken()
+  }
+}
 
 // Window event handler for memory dialog (used by MessageText.vue)
 const handleOpenMemoryDialogEvent = (event: Event) => {
@@ -595,6 +650,8 @@ onBeforeUnmount(() => {
   isAudioStreaming.value = false
   window.removeEventListener('open-memory-dialog', handleOpenMemoryDialogEvent)
   window.removeEventListener('open-feedback-dialog', handleOpenFeedbackDialogEvent)
+  window.removeEventListener('focus', prefetchSseToken)
+  document.removeEventListener('visibilitychange', handleVisibilityChangeForToken)
   clearDeleteDialogTimer()
 })
 
@@ -755,18 +812,145 @@ const handleScroll = async () => {
   }
 }
 
+// Phase 3d: replace the deep watcher with two targeted ones.
+//
+//   1. Length of the messages array — fires when a brand new message
+//      lands (user input, assistant response added). One scroll, no
+//      per-chunk work.
+//   2. Total accumulated character count of the streaming assistant
+//      message's text parts — fires only while the active stream grows,
+//      and only once per rAF tick because `renderStreamingContent` is
+//      already throttled via requestAnimationFrame.
+//
+// The previous { deep: true } watcher fired on every nested mutation
+// (every streaming chunk, every memory store update, every part
+// content tweak) which forced multiple full layout passes per second
+// and made the chat container thrash.
 watch(
-  () => historyStore.messages,
+  () => historyStore.messages.length,
   () => {
     scrollToBottom()
-  },
-  { deep: true }
+  }
 )
+
+watch(
+  () => {
+    const streaming = historyStore.messages.find((m) => m.isStreaming)
+    if (!streaming) return 0
+    let total = 0
+    for (const p of streaming.parts) {
+      if ((p.type === 'text' || p.type === 'thinking') && p.content) {
+        total += p.content.length
+      }
+    }
+    return total
+  },
+  () => {
+    scrollToBottom()
+  }
+)
+
+/**
+ * Phase 2c: poll the backgrounded memory extraction outcome a couple of
+ * times after the SSE stream completes. The messenger worker takes 2-7 s
+ * to do the extraction LLM call + Qdrant writes; polling at 3 s and 8 s
+ * covers ~95% of cases without hammering the API.
+ *
+ * Pushes any saved memories into the local memories store so the
+ * `[Memory:ID]` badges in the assistant response resolve immediately. We
+ * also surface a non-blocking toast/strip indicator (handled in Phase 3e).
+ */
+async function pollExtractedMemoriesOnce(messageId: number): Promise<boolean> {
+  try {
+    const result = await chatApi.getExtractedMemories(messageId)
+    if (result.status === 'pending') {
+      return false
+    }
+
+    // Push saved memories into the local store + show toast (legacy behaviour).
+    for (const memoryData of result.saved) {
+      if (!memoryData?.id) continue
+
+      const existing = memoriesStore.memories.find((m) => m.id === memoryData.id)
+      if (!existing) {
+        const allowedSources = [
+          'auto_detected',
+          'user_created',
+          'user_edited',
+          'ai_edited',
+        ] as const
+        type MemorySource = (typeof allowedSources)[number]
+        const rawSource = String(memoryData.source ?? 'auto_detected')
+        const source: MemorySource = (allowedSources as readonly string[]).includes(rawSource)
+          ? (rawSource as MemorySource)
+          : 'auto_detected'
+
+        memoriesStore.memories.push({
+          id: memoryData.id,
+          category: String(memoryData.category ?? ''),
+          key: String(memoryData.key ?? ''),
+          value: String(memoryData.value ?? ''),
+          source,
+          messageId: (memoryData.messageId as number | null | undefined) ?? null,
+          created: Number(memoryData.created ?? Math.floor(Date.now() / 1000)),
+          updated: Number(memoryData.updated ?? Math.floor(Date.now() / 1000)),
+        })
+      }
+    }
+
+    // Mirror old `analyzing_memories → memories_complete` UI pulse, but
+    // outside the bubble (Phase 3e moves the indicator to a fixed pill).
+    if (result.saved.length > 0 || result.delete_suggestions.length > 0) {
+      memoryToastMessage.value =
+        result.saved.length > 0
+          ? t('processing.memoriesCompleteTitle')
+          : t('processing.analyzingMemoriesTitle')
+      memoryToastVisible.value = true
+      setTimeout(() => {
+        memoryToastVisible.value = false
+      }, 3000)
+    }
+
+    return true
+  } catch (e) {
+    console.warn('Memory extraction poll failed:', e)
+    return false
+  }
+}
+
+function schedulePostStreamMemoryPoll(messageId: number): void {
+  // 3 s + 8 s. Stop early if the first poll already returned a final state.
+  setTimeout(async () => {
+    const done = await pollExtractedMemoriesOnce(messageId)
+    if (!done) {
+      setTimeout(() => {
+        void pollExtractedMemoriesOnce(messageId)
+      }, 5000)
+    }
+  }, 3000)
+}
 
 /**
  * Parse accumulated streaming content and update message parts.
  * Extracted so it can be called from the rAF throttle and the flush on 'complete'.
+ *
+ * Phase 3a + 3b refactor:
+ *   - Each part gets a stable `partId` the first time it appears, so the
+ *     `<MessagePart>` v-for can use it as `:key` and Vue won't reuse the
+ *     wrong DOM nodes when parts split mid-stream.
+ *   - Reconcile structural parts in place. The last text part grows by
+ *     mutating `.content` (no new object reference), so child components
+ *     bound to that part don't unmount/remount on every animation frame.
+ *     Earlier parts (e.g. a finished code block followed by more streaming
+ *     prose) keep their identity instead of being re-created each tick.
  */
+function generatePartId(): string {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return crypto.randomUUID()
+  }
+  return `p_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 10)}`
+}
+
 function renderStreamingContent(content: string, msgId: string): void {
   const trimmedContent = content.trim()
 
@@ -791,13 +975,13 @@ function renderStreamingContent(content: string, msgId: string): void {
 
   // Extract thinking blocks
   const thinkingMatches = content.match(/<think>([\s\S]*?)(<\/think>|$)/g)
-  const thinkingParts: Part[] = []
+  const desiredThinking: Part[] = []
 
   if (thinkingMatches) {
     thinkingMatches.forEach((match) => {
       const inner = match.replace(/<think>|<\/think>/g, '').trim()
       if (inner) {
-        thinkingParts.push({ type: 'thinking', content: inner })
+        desiredThinking.push({ type: 'thinking', content: inner })
       }
     })
   }
@@ -806,53 +990,85 @@ function renderStreamingContent(content: string, msgId: string): void {
   const parsed = parseAIResponse(displayContent)
 
   const message = historyStore.messages.find((m) => m.id === msgId)
-  if (message) {
-    const newParts: Part[] = [...thinkingParts]
+  if (!message) return
 
-    parsed.parts.forEach((part) => {
-      if (part.type === 'text') {
-        newParts.push({ type: 'text', content: part.content })
-      } else if (part.type === 'code' || part.type === 'json') {
-        newParts.push({
-          type: 'code',
-          content: part.content,
-          language: part.language,
-        })
-      } else if (part.type === 'links' && part.links) {
-        newParts.push({
-          type: 'links',
-          items: part.links.map((l) => {
-            try {
-              return {
-                title: l.title,
-                url: l.url,
-                desc: l.description,
-                host: new URL(l.url).hostname,
-              }
-            } catch {
-              return {
-                title: l.title,
-                url: l.url,
-                desc: l.description,
-                host: l.url,
-              }
+  // Build the desired ordered list of structural parts.
+  const desired: Part[] = [...desiredThinking]
+  parsed.parts.forEach((part) => {
+    if (part.type === 'text') {
+      desired.push({ type: 'text', content: part.content })
+    } else if (part.type === 'code' || part.type === 'json') {
+      desired.push({ type: 'code', content: part.content, language: part.language })
+    } else if (part.type === 'links' && part.links) {
+      desired.push({
+        type: 'links',
+        items: part.links.map((l) => {
+          try {
+            return {
+              title: l.title,
+              url: l.url,
+              desc: l.description,
+              host: new URL(l.url).hostname,
             }
-          }),
-        })
-      }
-    })
+          } catch {
+            return { title: l.title, url: l.url, desc: l.description, host: l.url }
+          }
+        }),
+      })
+    }
+  })
 
-    const preservedMediaParts = message.parts.filter(
-      (p) =>
-        (p.type === 'image' || p.type === 'video' || p.type === 'audio') &&
-        !newParts.some(
-          (np) =>
-            np.type === p.type &&
-            ((np.url && np.url === p.url) || (np.imageUrl && np.imageUrl === p.imageUrl))
-        )
-    )
-    message.parts = [...newParts, ...preservedMediaParts]
+  // Split current parts into (structural, media). Media parts (image / video
+  // / audio) are pushed by separate SSE events and not part of `desired`;
+  // we keep them appended after the structural section.
+  const existingStructural = message.parts.filter(
+    (p) => p.type === 'thinking' || p.type === 'text' || p.type === 'code' || p.type === 'links'
+  )
+  const existingMedia = message.parts.filter(
+    (p) => p.type === 'image' || p.type === 'video' || p.type === 'audio'
+  )
+
+  // Reconcile in-place so existing partIds (and therefore Vue keys) stay
+  // stable. For each desired slot:
+  //   - if the existing slot has the same `type`, mutate its content fields
+  //     in-place (no new object — Vue's reactivity on the field still fires)
+  //   - otherwise, build a fresh part with a new partId
+  const reconciled: Part[] = []
+  for (let i = 0; i < desired.length; i++) {
+    const want = desired[i]
+    const have = existingStructural[i]
+
+    if (have && have.type === want.type) {
+      if (!have.partId) {
+        have.partId = generatePartId()
+      }
+      switch (want.type) {
+        case 'text':
+        case 'thinking':
+          if (have.content !== want.content) {
+            have.content = want.content
+          }
+          break
+        case 'code':
+          if (have.content !== want.content) have.content = want.content
+          if (have.language !== want.language) have.language = want.language
+          if (have.filename !== want.filename) have.filename = want.filename
+          break
+        case 'links':
+          // Replace items wholesale only when changed (cheap JSON compare).
+          if (JSON.stringify(have.items ?? []) !== JSON.stringify(want.items ?? [])) {
+            have.items = want.items
+          }
+          break
+      }
+      reconciled.push(have)
+    } else {
+      want.partId = generatePartId()
+      reconciled.push(want)
+    }
   }
+
+  message.parts = [...reconciled, ...existingMedia]
 }
 
 const handleContinueResponse = async (message: Message) => {
@@ -1435,6 +1651,11 @@ const streamAIResponse = async (
             }
           } else if (data.status === 'processing') {
             // Processing/routing messages - improved logging
+          } else if (data.status === 'thinking') {
+            // Phase 1e: surface model "thinking" reasoning so the bubble
+            // doesn't sit empty for 5-8 s on Gemini Pro.
+            processingStatus.value = 'thinking'
+            processingMetadata.value = { customMessage: data.message || undefined }
           } else if (data.status === 'analyzing_memories') {
             // 🎯 Memory analysis started
             processingStatus.value = 'analyzing_memories'
@@ -1694,30 +1915,56 @@ const streamAIResponse = async (
             if (memoryId) {
               memoriesStore.memories = memoriesStore.memories.filter((m) => m.id !== memoryId)
             }
+          } else if (data.status === 'perf') {
+            // Phase 0 instrumentation — only log when the user opts in via
+            // `localStorage.setItem('synaplanDebug', '1')`. Keeps prod consoles
+            // quiet but lets us inspect every phase in dev / on demand.
+            try {
+              if (typeof window !== 'undefined' && window.localStorage?.getItem('synaplanDebug')) {
+                console.groupCollapsed(
+                  `[synaplan perf] ${data.total_ms ?? '?'} ms total — message ${messageId}`
+                )
+                console.table(data.phases ?? {})
+                if (data.marks && Object.keys(data.marks).length > 0) {
+                  console.table(data.marks)
+                }
+                console.groupEnd()
+              }
+            } catch {
+              // localStorage can throw in private mode — don't let perf logging break the stream.
+            }
           } else if (data.status === 'complete') {
-            // Cancel any pending throttled render and always do a final
-            // synchronous render so no trailing content is lost.
+            // Phase 3f: sequence the complete-handling work inside a single
+            // requestAnimationFrame so the user perceives ONE smooth
+            // transition (streaming text → final markdown render → copy
+            // button fade-in) instead of three separate paints. The copy
+            // button is already pre-rendered with opacity 0 (see
+            // ChatMessage.vue) so this just flips reactive state — no
+            // mount/unmount jolt.
             if (streamingRafId !== null) {
               cancelAnimationFrame(streamingRafId)
               streamingRafId = null
             }
             streamingDirty = false
 
-            if (fullContent) {
-              renderStreamingContent(fullContent, messageId)
-            }
-
-            if (currentAudioStreamer) {
-              const remaining = audioText.slice(spokenLength)
-              if (remaining.trim()) {
-                currentAudioStreamer.streamText(remaining, undefined, detectedLanguage)
+            requestAnimationFrame(() => {
+              if (fullContent) {
+                renderStreamingContent(fullContent, messageId)
               }
-              currentAudioStreamer.markComplete()
-            }
 
-            // Clear processing status
-            processingStatus.value = ''
-            processingMetadata.value = {}
+              if (currentAudioStreamer) {
+                const remaining = audioText.slice(spokenLength)
+                if (remaining.trim()) {
+                  currentAudioStreamer.streamText(remaining, undefined, detectedLanguage)
+                }
+                currentAudioStreamer.markComplete()
+              }
+
+              // Clear processing status in the same frame as the final
+              // text render so the strip doesn't reappear for a tick.
+              processingStatus.value = ''
+              processingMetadata.value = {}
+            })
 
             // Update message metadata
             const message = historyStore.messages.find((m) => m.id === messageId)
@@ -1875,6 +2122,14 @@ const streamAIResponse = async (
             generateChatTitleFromFirstMessage(userMessage)
 
             historyStore.finishStreamingMessage(messageId)
+
+            // Phase 2c: schedule a couple of polls for backgrounded memory
+            // extraction results. The worker writes to the source message
+            // metadata; we pick it up here and surface via the same memory
+            // store dispatch the legacy SSE events used.
+            if (data.messageId) {
+              schedulePostStreamMemoryPoll(data.messageId)
+            }
 
             // Clean up streaming resources after successful completion
             streamingAbortController = null
@@ -2853,5 +3108,41 @@ function openNextDeleteDialogFromQueue() {
 .fade-enter-from,
 .fade-leave-to {
   opacity: 0;
+}
+
+/*
+ * Phase 3e: backgrounded memory extraction status pill.
+ * Fixed-position so it doesn't shift the chat layout. Sits just above the
+ * chat input on desktop and stays out of the way on mobile.
+ */
+.memory-toast-pill {
+  position: absolute;
+  bottom: 5.5rem;
+  right: 1rem;
+  z-index: 30;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 0.875rem;
+  border-radius: 9999px;
+  background-color: var(--bg-elevated, var(--surface-card));
+  border: 1px solid var(--border-light);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+  pointer-events: none;
+  white-space: nowrap;
+  max-width: calc(100vw - 2rem);
+}
+
+.memory-toast-enter-active,
+.memory-toast-leave-active {
+  transition:
+    opacity 200ms ease-out,
+    transform 200ms ease-out;
+}
+
+.memory-toast-enter-from,
+.memory-toast-leave-to {
+  opacity: 0;
+  transform: translateY(8px);
 }
 </style>
