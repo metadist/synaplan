@@ -15,7 +15,8 @@ use Symfony\Component\Console\Style\SymfonyStyle;
 
 #[AsCommand(
     name: 'synapse:index',
-    description: 'Index topic embeddings into Qdrant for Synapse Routing',
+    description: 'Index topic embeddings into Qdrant for Synapse Routing (full superset of POST /api/v1/admin/synapse/reindex)',
+    aliases: ['app:synapse:reindex']
 )]
 class SynapseIndexCommand extends Command
 {
@@ -29,7 +30,8 @@ class SynapseIndexCommand extends Command
     protected function configure(): void
     {
         $this
-            ->addOption('user', 'u', InputOption::VALUE_OPTIONAL, 'Index topics for a specific user ID (also re-indexes system topics)')
+            ->addOption('user', 'u', InputOption::VALUE_OPTIONAL, 'Index topics for a specific user ID (also re-indexes system topics; with --topic, treated as that topic\'s owner)')
+            ->addOption('topic', 't', InputOption::VALUE_OPTIONAL, 'Re-index a single topic (mirrors the admin endpoint\'s "topic" parameter). Owner defaults to 0 unless --user is given.')
             ->addOption('status', 's', InputOption::VALUE_NONE, 'Show indexing status without performing any indexing')
             ->addOption('force', 'f', InputOption::VALUE_NONE, 'Bypass the source-hash skip-when-unchanged optimisation')
             ->addOption('recreate', null, InputOption::VALUE_NONE, 'Drop and recreate the Qdrant collection (use when switching to a model with a different vector dim). Implies --force.')
@@ -38,12 +40,17 @@ class SynapseIndexCommand extends Command
                 "synapse_topics collection for fast embedding-based routing.\n\n".
                 "Run this once after deployment or whenever topics are changed\n".
                 "directly in the database (API changes auto-index).\n\n".
+                "This command is the CLI superset of POST /api/v1/admin/synapse/reindex —\n".
+                "operators can verify the SYNAPSE_VECTORIZE provider end-to-end without\n".
+                "booting the full SPA / admin auth stack.\n\n".
                 "Examples:\n".
-                "  synapse:index               Index all system topics (skip unchanged)\n".
-                "  synapse:index --force       Re-embed every topic, even unchanged\n".
-                "  synapse:index --recreate    Drop+recreate collection then full re-embed\n".
-                "  synapse:index --user=42     Index system + user 42's topics\n".
-                "  synapse:index --status      Show collection stats / per-model counts\n"
+                "  synapse:index                       Index system topics (skip unchanged)\n".
+                "  synapse:index --force               Re-embed every topic, even unchanged\n".
+                "  synapse:index --recreate            Drop+recreate collection then full re-embed\n".
+                "  synapse:index --user=42             Index system + user 42's topics\n".
+                "  synapse:index --topic=coding        Re-index only the 'coding' system topic\n".
+                "  synapse:index --topic=foo --user=42 Re-index user 42's 'foo' topic\n".
+                "  synapse:index --status              Show collection stats / per-model counts\n"
             );
     }
 
@@ -59,6 +66,8 @@ class SynapseIndexCommand extends Command
         $userId = null !== $userId ? (int) $userId : null;
         $force = (bool) $input->getOption('force');
         $recreate = (bool) $input->getOption('recreate');
+        $topicOpt = $input->getOption('topic');
+        $topic = (null !== $topicOpt && '' !== $topicOpt) ? (string) $topicOpt : null;
 
         $modelInfo = $this->indexer->getEmbeddingModelInfo();
         $io->section('Synapse Routing — Topic Indexer');
@@ -70,7 +79,10 @@ class SynapseIndexCommand extends Command
             $modelInfo['vector_dim'],
         ));
 
-        if (null !== $userId) {
+        if (null !== $topic) {
+            $topicOwner = $userId ?? 0;
+            $io->text(sprintf('Scope: single topic "%s" (owner=%d)', $topic, $topicOwner));
+        } elseif (null !== $userId) {
             $io->text(sprintf('Scope: system topics + user %d topics', $userId));
         } else {
             $io->text('Scope: system topics only');
@@ -94,8 +106,46 @@ class SynapseIndexCommand extends Command
 
         $io->newLine();
 
+        if (null !== $topic) {
+            return $this->runSingleTopic($io, $topic, $userId ?? 0, $force);
+        }
+
         try {
+            $start = microtime(true);
             $result = $this->indexer->indexAllTopics($userId, $force);
+            $ms = (int) ((microtime(true) - $start) * 1000);
+
+            $totalTopics = $result['indexed'] + $result['skipped'] + $result['errors'];
+
+            $io->definitionList(
+                ['total_topics' => (string) $totalTopics],
+                ['indexed' => (string) $result['indexed']],
+                ['skipped' => (string) $result['skipped']],
+                ['errors' => (string) $result['errors']],
+                ['total_ms' => (string) $ms],
+            );
+
+            // Operators running this from the CLI always want to see failure
+            // detail — there's no privacy boundary here like the admin HTTP
+            // endpoint has, and a silent error count is useless for diagnosis.
+            if (!empty($result['failures'])) {
+                $io->section('Failures');
+                foreach ($result['failures'] as $failure) {
+                    $io->writeln('  - '.json_encode($failure, JSON_UNESCAPED_SLASHES));
+                }
+            }
+
+            if ($result['errors'] > 0) {
+                $io->error(sprintf(
+                    'Indexed %d / Skipped %d / Errors %d.',
+                    $result['indexed'],
+                    $result['skipped'],
+                    $result['errors'],
+                ));
+
+                return Command::FAILURE;
+            }
+
             $io->success(sprintf(
                 'Indexed %d / Skipped %d / Errors %d.',
                 $result['indexed'],
@@ -103,12 +153,42 @@ class SynapseIndexCommand extends Command
                 $result['errors'],
             ));
 
-            return $result['errors'] > 0 ? Command::FAILURE : Command::SUCCESS;
+            return Command::SUCCESS;
         } catch (\Throwable $e) {
             $io->error(sprintf('Indexing failed: %s', $e->getMessage()));
 
             return Command::FAILURE;
         }
+    }
+
+    private function runSingleTopic(SymfonyStyle $io, string $topic, int $ownerId, bool $force): int
+    {
+        try {
+            $result = $this->indexer->indexTopic($topic, $ownerId, $force);
+        } catch (\Throwable $e) {
+            $io->error(sprintf('Failed to index topic "%s": %s', $topic, $e->getMessage()));
+
+            return Command::FAILURE;
+        }
+
+        $io->definitionList(
+            ['topic' => $topic],
+            ['ownerId' => (string) $ownerId],
+            ['result' => $result],
+        );
+
+        return match ($result) {
+            'indexed', 'skipped' => Command::SUCCESS,
+            'missing' => self::topicMissing($io, $topic, $ownerId),
+            default => Command::FAILURE,
+        };
+    }
+
+    private static function topicMissing(SymfonyStyle $io, string $topic, int $ownerId): int
+    {
+        $io->error(sprintf('Topic "%s" (owner=%d) does not exist in the database.', $topic, $ownerId));
+
+        return Command::FAILURE;
     }
 
     private function showStatus(SymfonyStyle $io): int
