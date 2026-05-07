@@ -12,7 +12,7 @@
 # moving floating tag. To bump:
 #   docker buildx imagetools inspect ghcr.io/metadist/synaplan-base-php:<new>
 # and replace the @sha256:... below.
-FROM ghcr.io/metadist/synaplan-base-php:1.0.0@sha256:48d69f9c29357f49bb03e101b02eb304453117e79dfc65f398b8a11ae8ad141a
+FROM ghcr.io/metadist/synaplan-base-php:1.0.1@sha256:35e81beba0b8b09f8b43cd3a371df1e91e6b7c34c9c02e37d263f63308c022d9
 
 WORKDIR /var/www/backend
 
