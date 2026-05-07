@@ -35,6 +35,9 @@ use Symfony\Component\HttpFoundation\Response;
  * Webhook signatures are computed locally with the test webhook secret
  * (`whsec_fakeWebhookSecretForTests`) so the controller's
  * \Stripe\Webhook::constructEvent() accepts our crafted payloads.
+ *
+ * Fails in dev when Docker exports a real STRIPE_WEBHOOK_SECRET (overrides
+ * .env.test). In CI no real Stripe vars exist, so these pass.
  */
 class StripeWebhookControllerTest extends WebTestCase
 {
