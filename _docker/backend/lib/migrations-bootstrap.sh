@@ -161,5 +161,16 @@ bootstrap_migrations_metadata() {
     if [ "${_has_baseline:-0}" -eq 0 ]; then
         echo "📌 [$_label] Baseline (${BASELINE_MIGRATION}) not registered but schema exists — marking as applied so its DDL is not replayed"
         _register_baseline_migration "$_env_flag"
+
+        # When the metadata table was just created (no prior migration history),
+        # the schema was set up via doctrine:schema:update --force (dev entrypoint)
+        # and already reflects the FINAL state — all incremental migrations are
+        # already applied at the DDL level. Mark every available migration as
+        # executed so doctrine:migrations:migrate doesn't replay them.
+        if [ "${_has_versions:-0}" -eq 0 ]; then
+            echo "📌 [$_label] Fresh schema detected — marking all migrations as applied"
+            php bin/console doctrine:migrations:version --add --all --no-interaction ${_env_flag} \
+                >/dev/null 2>&1 || true
+        fi
     fi
 }

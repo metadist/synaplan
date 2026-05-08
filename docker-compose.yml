@@ -82,6 +82,7 @@ services:
       - ./plugins:/plugins:ro
       - ./_docker/backend/Caddyfile:/etc/caddy/Caddyfile:ro
       - ./_docker/backend/docker-entrypoint.sh:/usr/local/bin/docker-entrypoint.sh:ro
+      - ./_docker/backend/lib:/usr/local/bin/lib:ro
       - whisper_models:/var/www/backend/var/whisper:ro
       - ./_devextras/backend/docker-entrypoint.d:/docker-entrypoint.d:ro
     environment:
