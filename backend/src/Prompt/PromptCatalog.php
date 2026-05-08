@@ -117,7 +117,14 @@ class PromptCatalog
                 // chat in here — that's why every keyword pair includes
                 // a creation verb.
                 'shortDescription' => 'User explicitly asks to CREATE, GENERATE, RENDER or EDIT an image, picture, illustration, drawing, painting, photo or photo-realistic render from a text prompt and/or reference images. Trigger only when the message contains an explicit creation verb directly addressed at an image (for example "create an image of …", "generate a picture of …", "draw me a …", "render a photo of …", "edit this image so that …", "replace the background with …", "merge these two images"). Do NOT trigger for casual conversation that merely mentions a picture, a photo, an illustration or a "Bild" without a clear creation/edit request, and do NOT trigger for vision/OCR questions about an attached image.',
-                'keywords' => 'create an image, create a picture, create a photo, create an illustration, generate an image, generate a picture, make a picture, make an image, draw me, paint a picture, render a photo, render an image, render a picture, retouch this image, edit this image, replace the background, combine these images, merge these images, image to image, illustrate, erstelle ein bild, erstelle ein foto, erstelle eine illustration, generiere ein bild, generiere ein foto, mache ein bild, male ein bild, male mir, zeichne ein bild, zeichne mir, render ein bild, bild von, foto von, illustration von, hintergrund ersetzen, bild bearbeiten, bilder kombinieren',
+                // Every entry below pairs a creation verb with a media
+                // noun (or is a self-contained edit verb). Bare noun
+                // phrases like "bild von" / "foto von" have been removed
+                // — they previously matched perfectly innocuous "ich
+                // habe ein bild von gestern" turns and would also fail
+                // the SynapseRouter media-intent guard anyway, so they
+                // were dead weight (caught by Copilot review on PR #884).
+                'keywords' => 'create an image, create a picture, create a photo, create an illustration, generate an image, generate a picture, make a picture, make an image, draw me, paint a picture, render a photo, render an image, render a picture, retouch this image, edit this image, replace the background, combine these images, merge these images, image to image, illustrate this, erstelle ein bild, erstelle ein foto, erstelle eine illustration, generiere ein bild, generiere ein foto, mache ein bild, male ein bild, male mir, zeichne ein bild, zeichne mir, render ein bild, hintergrund ersetzen, bild bearbeiten, bilder kombinieren',
                 'prompt' => self::mediaMakerPrompt(),
             ],
             [
@@ -129,7 +136,12 @@ class PromptCatalog
                 // version only matches messages that *imperatively*
                 // request a video to be produced.
                 'shortDescription' => 'User explicitly asks to GENERATE a video, film, clip, animation, motion graphic or moving image from a prompt. Trigger only when the message contains an explicit creation verb directly addressed at video output (for example "create a video of …", "generate a clip of …", "make a short film of …", "animate …", "render a video of …", "erstelle ein Video von …", "mach mir ein Video von …"). Do NOT trigger for general conversation that merely mentions video, film, clips, YouTube, TV, fitness, hobbies, business ideas or anything else that is not an unambiguous request to render a new video file. Duration and resolution may be specified inside the request.',
-                'keywords' => 'create a video, create a clip, create an animation, generate a video, generate a clip, make a video, make a clip, make an animation, render a video, render an animation, animate this, animate the, produce a video, short cinematic video of, erstelle ein video, erstelle einen clip, erstelle eine animation, generiere ein video, generiere einen clip, mache ein video, mach mir ein video, mache einen clip, animiere, animiere mir, render ein video, render einen clip, render mir ein video, kurzes video von, kurzer clip von',
+                // Verb+noun pairs only; bare phrases like "kurzes video
+                // von …" have been dropped because they ambiguously
+                // match non-creation turns ("ich habe ein kurzes Video
+                // von gestern") and would fail the media-intent guard
+                // anyway (caught by Copilot review on PR #884).
+                'keywords' => 'create a video, create a clip, create an animation, generate a video, generate a clip, make a video, make a clip, make an animation, render a video, render an animation, animate this, animate the, produce a video, shoot a short video, erstelle ein video, erstelle einen clip, erstelle eine animation, generiere ein video, generiere einen clip, mache ein video, mach mir ein video, mache einen clip, animiere, animiere mir, render ein video, render einen clip, render mir ein video',
                 'prompt' => self::mediaMakerPrompt(),
             ],
             [

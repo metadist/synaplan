@@ -409,10 +409,21 @@ final readonly class SynapseIndexer
      * disabled. Used by indexAllTopics() to keep the synapse_topics
      * collection in lockstep with BPROMPTS.BENABLED so retired topics
      * stop matching as soon as the seed runs (issue #878).
+     *
+     * Note: `findAllForUser()` defaults `excludeDisabled` to **true**, so
+     * the disabled rows we're trying to clean up would be filtered out
+     * at the SQL layer and the loop would silently see nothing. We pass
+     * `excludeDisabled: false` and re-filter for `enabled=false` here so
+     * this method actually does what its name says (caught by Copilot
+     * review on PR #884).
      */
     private function dropDisabledPromptVectors(?int $userId): void
     {
-        $prompts = $this->promptRepository->findAllForUser($userId ?? 0);
+        $prompts = $this->promptRepository->findAllForUser(
+            $userId ?? 0,
+            'en',
+            excludeDisabled: false,
+        );
 
         foreach ($prompts as $prompt) {
             if ($prompt->isEnabled()) {
