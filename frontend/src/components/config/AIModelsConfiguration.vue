@@ -532,12 +532,14 @@ const normalizeHighlight = (highlight: string): Capability | 'ALL' | null => {
   return aliasMap[highlight] || null
 }
 
-// VECTORIZE switching is gated server-side by ROLE_ADMIN
-// (AdminEmbeddingController#[IsGranted('ROLE_ADMIN')]). Non-admins must
-// still SEE the active embedding model — they need that context to
-// understand their RAG behaviour — but the dropdown is disabled and
-// shows an "Admin only" badge so they don't trip into a 403 + cryptic
-// "Failed to load cost estimate" toast on the cost-estimate pre-flight.
+// VECTORIZE switching is not exclusively gated server-side by ROLE_ADMIN:
+// the admin embedding endpoint is admin-only, but
+// ConfigController::saveDefaultModels also allows eligible non-admin paid
+// users to change it, subject to premium/cooldown guards. This flag is a
+// frontend UX restriction for non-admins: they must still SEE the active
+// embedding model — they need that context to understand their RAG
+// behaviour — but the dropdown is disabled and shows an "Admin only"
+// badge so they don't trip into a failed cost-estimate pre-flight.
 const isVectorizeAdminOnly = computed(() => !authStore.isAdmin)
 
 // Optimistic UI flag for the VECTORIZE Premium-Lock badge: free users
