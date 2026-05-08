@@ -24,18 +24,25 @@ class PromptCatalog
      * Topic taxonomy (Synapse Routing v2):
      *
      *  Granular routing topics (preferred for embedding-based Tier-1):
-     *    - general-chat        ← smalltalk, lifestyle, travel, health
-     *    - coding              ← programming languages, code review, debugging
+     *    - general-chat        ← smalltalk, lifestyle, coding, technical Q&A, everything that resolves to a chat answer
      *    - image-generation    ← create/edit images, photos, illustrations
      *    - video-generation    ← create video clips, animations
      *    - audio-generation    ← TTS, voice output, audio synthesis
      *    - docsummary          ← summarize a document or attached file text
      *    - officemaker         ← generate XLSX/DOCX/PPTX/CSV documents
      *
+     *  Note (#878): the previously dedicated `coding` topic was retired.
+     *  Programming questions overlapped too aggressively with everyday
+     *  chat in the embedding space (any "how do I…" sentence scored close
+     *  to it), pulling routine messages off `general-chat`. Coding now
+     *  rides on `general-chat` and the LLM picks the depth from context.
+     *  The legacy alias `coding` → `general` is retained in
+     *  TopicAliasResolver so older AI-fallback responses still resolve.
+     *
      *  Legacy canonical topics (still used by downstream handlers; the
      *  TopicAliasResolver maps the granular topics back to these for
      *  intent routing and groupKey backwards compatibility):
-     *    - general             ← canonical for general-chat + coding
+     *    - general             ← canonical for general-chat
      *    - mediamaker          ← canonical for *-generation
      *
      *  Internal helper prompts (excluded from the routing pool):
@@ -73,39 +80,66 @@ class PromptCatalog
             // ──────────────────────────────────────────────
             //  Granular routing topics (Synapse v2)
             // ──────────────────────────────────────────────
-            [
-                'topic' => 'general-chat',
-                'language' => 'en',
-                'shortDescription' => 'Casual conversation, smalltalk, opinions, lifestyle questions and everyday advice. Use this for chit-chat, greetings, travel and health tips, recipes, recommendations and similar non-technical requests.',
-                'keywords' => 'chat, smalltalk, hello, hi, hallo, talk, conversation, opinion, advice, tip, lifestyle, travel, reise, health, gesundheit, recipe, rezept, recommendation, empfehlung, frage, question',
-                'prompt' => self::generalPrompt(),
-            ],
+            // Retired (#878): the dedicated `coding` topic was retired
+            // because it overlapped too aggressively with everyday chat
+            // in the embedding space. Kept here as DISABLED so the seed
+            // run flips BENABLED=0 on existing installs and the indexer
+            // drops the orphan vector from Qdrant on its next pass.
+            // Removing the row from PromptCatalog entirely would NOT
+            // touch existing DBs.
             [
                 'topic' => 'coding',
                 'language' => 'en',
-                'shortDescription' => 'Programming, code review, debugging, refactoring, architecture and technical software questions. Use this whenever the user asks about source code, frameworks, libraries, errors, stack traces or wants help writing/explaining a snippet.',
-                'keywords' => 'code, programming, programmieren, php, python, javascript, typescript, java, kotlin, swift, go, rust, c++, c#, ruby, sql, query, html, css, vue, react, angular, svelte, node, nodejs, npm, composer, function, class, method, variable, error, fehler, exception, traceback, stack trace, bug, debug, refactor, refactoring, architecture, framework, library, api, rest, graphql, regex, algorithm, datastructure, leetcode, snippet, script, terminal, shell, bash, docker, kubernetes',
+                'shortDescription' => 'RETIRED. Coding/programming questions are answered by the general-chat topic.',
+                'keywords' => '',
+                'prompt' => self::generalPrompt(),
+                'enabled' => false,
+            ],
+            [
+                'topic' => 'general-chat',
+                'language' => 'en',
+                // Broadened on purpose (#878): everyday business ideas,
+                // hobbies, planning, smalltalk, programming questions and
+                // technical Q&A all fall here so they can't be sucked into
+                // the much narrower media-generation buckets by a stray
+                // embedding match. The dedicated `coding` topic was
+                // retired for the same reason.
+                'shortDescription' => 'Catch-all conversational topic. Use this for casual conversation, smalltalk, opinions, advice, lifestyle, travel, health, recipes, recommendations, business ideas, planning, hobbies, learning questions, programming and technical questions, debugging help, code review, software architecture, frameworks, libraries, errors and stack traces, and any other question that should be answered with a written reply.',
+                'keywords' => 'chat, smalltalk, hello, hi, hallo, talk, conversation, opinion, advice, tip, lifestyle, travel, reise, health, gesundheit, recipe, rezept, recommendation, empfehlung, frage, question, idea, idee, business, hobby, hobbies, plan, planning, planen, project, projekt, learning, lernen, study, school, university, student, code, coding, programming, programmieren, software, php, python, javascript, typescript, java, kotlin, swift, go, rust, ruby, sql, html, css, vue, react, angular, node, function, class, method, variable, error, fehler, exception, bug, debug, refactor, framework, library, api, rest, graphql, regex, algorithm, terminal, shell, bash, docker, kubernetes, fitness, gym, fitnessstudio, sport, food, essen, drink, getränk, shake, restaurant, shop, store, geschäft, idea for, möchte, will, want to',
                 'prompt' => self::generalPrompt(),
             ],
             [
                 'topic' => 'image-generation',
                 'language' => 'en',
-                'shortDescription' => 'User wants to CREATE or EDIT an image, picture, illustration, drawing or photo from a text description and/or reference images. Includes background replacement, style transfer, image composition, retouching and any other image-to-image transformation.',
-                'keywords' => 'image, picture, photo, foto, bild, illustration, draw, draw me, zeichne, malen, paint, design, render, generate image, generiere bild, create image, erstelle bild, make a picture, picture of, foto von, bild von, edit image, retouch, replace background, style transfer, composition, composite, combine images, merge images, hintergrund ersetzen, photorealistic, painting, sketch',
+                // Tightened (#878): only fire when the user *explicitly*
+                // asks for an image to be CREATED, RENDERED or EDITED.
+                // Bare nouns like "Foto" or "Bild" must not pull general
+                // chat in here — that's why every keyword pair includes
+                // a creation verb.
+                'shortDescription' => 'User explicitly asks to CREATE, GENERATE, RENDER or EDIT an image, picture, illustration, drawing, painting, photo or photo-realistic render from a text prompt and/or reference images. Trigger only when the message contains an explicit creation verb directly addressed at an image (for example "create an image of …", "generate a picture of …", "draw me a …", "render a photo of …", "edit this image so that …", "replace the background with …", "merge these two images"). Do NOT trigger for casual conversation that merely mentions a picture, a photo, an illustration or a "Bild" without a clear creation/edit request, and do NOT trigger for vision/OCR questions about an attached image.',
+                'keywords' => 'create an image, create a picture, create a photo, create an illustration, generate an image, generate a picture, make a picture, make an image, draw me, paint a picture, render a photo, render an image, render a picture, retouch this image, edit this image, replace the background, combine these images, merge these images, image to image, illustrate, erstelle ein bild, erstelle ein foto, erstelle eine illustration, generiere ein bild, generiere ein foto, mache ein bild, male ein bild, male mir, zeichne ein bild, zeichne mir, render ein bild, bild von, foto von, illustration von, hintergrund ersetzen, bild bearbeiten, bilder kombinieren',
                 'prompt' => self::mediaMakerPrompt(),
             ],
             [
                 'topic' => 'video-generation',
                 'language' => 'en',
-                'shortDescription' => 'User wants to CREATE a video, film, clip, animation or moving image. Examples: short cinematic clips, product videos, animated scenes. Duration and resolution may be specified.',
-                'keywords' => 'video, film, clip, animation, animate, motion, bewegt, moving image, generate video, create video, make a video, erstelle video, mache video, video von, kurzfilm, animation erstellen, cinemagraph, gif, motion picture, render video',
+                // Heavily tightened (#878). The previous entry pulled in
+                // anything mentioning "Kette", "shake", "Wagon" etc.
+                // because the description leaned on common nouns. This
+                // version only matches messages that *imperatively*
+                // request a video to be produced.
+                'shortDescription' => 'User explicitly asks to GENERATE a video, film, clip, animation, motion graphic or moving image from a prompt. Trigger only when the message contains an explicit creation verb directly addressed at video output (for example "create a video of …", "generate a clip of …", "make a short film of …", "animate …", "render a video of …", "erstelle ein Video von …", "mach mir ein Video von …"). Do NOT trigger for general conversation that merely mentions video, film, clips, YouTube, TV, fitness, hobbies, business ideas or anything else that is not an unambiguous request to render a new video file. Duration and resolution may be specified inside the request.',
+                'keywords' => 'create a video, create a clip, create an animation, generate a video, generate a clip, make a video, make a clip, make an animation, render a video, render an animation, animate this, animate the, produce a video, short cinematic video of, erstelle ein video, erstelle einen clip, erstelle eine animation, generiere ein video, generiere einen clip, mache ein video, mach mir ein video, mache einen clip, animiere, animiere mir, render ein video, render einen clip, render mir ein video, kurzes video von, kurzer clip von',
                 'prompt' => self::mediaMakerPrompt(),
             ],
             [
                 'topic' => 'audio-generation',
                 'language' => 'en',
-                'shortDescription' => 'User wants AUDIO output: text-to-speech, voice synthesis, narration or any spoken-audio rendering of text. Use this for "read this aloud", "convert to speech", "create an audio", "lies vor".',
-                'keywords' => 'audio, sound, voice, stimme, speech, sprache, tts, text to speech, text-to-speech, narration, narrate, read aloud, lies vor, vorlesen, sprich, speak, voiceover, voice-over, mp3, wav, podcast, audio version, vertonen, vertone, audio aus text, audio generieren',
+                // Tightened (#878): only fire on explicit speech-output
+                // requests. Bare nouns like "Stimme" or "Audio" must not
+                // be enough.
+                'shortDescription' => 'User explicitly asks for AUDIO output: text-to-speech, narration, voice synthesis, voiceover or any spoken-audio rendering of provided text. Trigger only when the message contains an explicit speech/audio creation verb (for example "read this aloud", "convert to speech", "create an audio of …", "generate a voiceover saying …", "narrate this text", "vertone …", "lies das vor", "sprich folgenden Text", "erstelle ein Audio mit …"). Do NOT trigger for general conversation that mentions audio, voice, sound, music or podcasts without an unambiguous TTS request.',
+                'keywords' => 'read aloud, read this aloud, read it aloud, convert to speech, text to speech, generate audio of, generate a voiceover, generate a narration, create an audio, create a voiceover, create a narration, narrate this, narrate the following, voiceover saying, voice over saying, speak this, say the following, lies vor, lies das vor, lies dies vor, sprich folgenden text, sprich folgendes, sprich diesen text, erstelle ein audio, erstelle eine vertonung, generiere ein audio, generiere eine vertonung, mache ein audio, vertone, vertone diesen text, vertone folgenden text, vertonen, audio generieren',
                 'prompt' => self::mediaMakerPrompt(),
             ],
 

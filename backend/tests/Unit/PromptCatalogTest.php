@@ -19,8 +19,12 @@ final class PromptCatalogTest extends TestCase
     {
         $topics = array_column(PromptCatalog::all(), 'topic');
 
+        // Note (#878): `coding` was retired as a routing target. The
+        // catalog still carries the row (so existing installs can flip
+        // BENABLED=0 on the next seed), but it no longer participates in
+        // Tier-1 recall.
         foreach (
-            ['general-chat', 'coding', 'image-generation', 'video-generation', 'audio-generation'] as $expected
+            ['general-chat', 'image-generation', 'video-generation', 'audio-generation'] as $expected
         ) {
             $this->assertContains(
                 $expected,
@@ -58,7 +62,7 @@ final class PromptCatalogTest extends TestCase
         }
 
         foreach (
-            ['general-chat', 'coding', 'image-generation', 'video-generation', 'audio-generation', 'docsummary', 'officemaker'] as $routable
+            ['general-chat', 'image-generation', 'video-generation', 'audio-generation', 'docsummary', 'officemaker'] as $routable
         ) {
             $this->assertArrayHasKey('keywords', $byTopic[$routable], sprintf(
                 'Routable topic "%s" must declare keywords for Synapse recall',
@@ -68,17 +72,36 @@ final class PromptCatalogTest extends TestCase
         }
     }
 
-    public function testCodingKeywordsContainProgrammingTerms(): void
+    public function testRetiredCodingTopicIsDisabled(): void
     {
+        // Issue #878: the coding topic was retired but stays in the
+        // catalog so existing installs flip BENABLED=0 on the next seed
+        // run. The keywords are intentionally blank; the row exists
+        // purely to drive the seed update.
         $byTopic = [];
         foreach (PromptCatalog::all() as $entry) {
             $byTopic[$entry['topic']] = $entry;
         }
 
-        $codingKeywords = strtolower((string) $byTopic['coding']['keywords']);
-        $this->assertStringContainsString('php', $codingKeywords);
-        $this->assertStringContainsString('python', $codingKeywords);
-        $this->assertStringContainsString('debug', $codingKeywords);
+        $this->assertArrayHasKey('coding', $byTopic);
+        $this->assertArrayHasKey('enabled', $byTopic['coding']);
+        $this->assertFalse($byTopic['coding']['enabled']);
+    }
+
+    public function testGeneralChatKeywordsCoverProgrammingTermsAfterCodingRetirement(): void
+    {
+        // Coding queries now ride on `general-chat` (#878). Make sure
+        // the general-chat keyword list pulled the relevant tokens over
+        // so embedding recall doesn't regress.
+        $byTopic = [];
+        foreach (PromptCatalog::all() as $entry) {
+            $byTopic[$entry['topic']] = $entry;
+        }
+
+        $keywords = strtolower((string) $byTopic['general-chat']['keywords']);
+        $this->assertStringContainsString('php', $keywords);
+        $this->assertStringContainsString('python', $keywords);
+        $this->assertStringContainsString('debug', $keywords);
     }
 
     public function testImageGenerationKeywordsContainBilingualTerms(): void

@@ -57,6 +57,91 @@ final readonly class SynapseRouter
     ];
 
     /**
+     * Generic creation verbs ("create", "erstelle", "render", …) that
+     * the media-intent guard pairs with a modality-specific noun.
+     *
+     * Kept narrow on purpose so messages with desire-only verbs ("ich
+     * möchte eine Kette gründen", "I want a small business") cannot pass.
+     * Anchored with `\b` at match time so "drawer" / "renderer" don't
+     * count as the verb. See {@see passesMediaIntentGuard()}.
+     */
+    private const MEDIA_INTENT_VERBS = [
+        // English
+        'create', 'creating', 'generate', 'generating', 'make', 'making',
+        'render', 'rendering', 'produce', 'producing',
+        'draw', 'drawing', 'paint', 'painting', 'sketch', 'sketching',
+        'illustrate', 'illustrating',
+        'animate', 'animating',
+        'edit', 'editing', 'retouch', 'retouching',
+        'compose', 'composing', 'composite', 'compositing',
+        'compile', 'compiling',
+        'narrate', 'narrating', 'speak', 'speaking', 'voiceover', 'voice-over',
+        'convert',
+        // German
+        'erstelle', 'erstell', 'erstellt', 'erstellen',
+        'generiere', 'generier', 'generiert', 'generieren',
+        'mache', 'mach', 'macht', 'machen',
+        'male', 'mal', 'malt', 'malen',
+        'zeichne', 'zeichn', 'zeichnet', 'zeichnen',
+        'animiere', 'animier', 'animiert', 'animieren',
+        'sprich', 'sprecht', 'sprechen',
+        'vertone', 'vertont', 'vertonen',
+    ];
+
+    /**
+     * Modality-specific media nouns. Paired with a creation verb (or a
+     * self-contained cue) the guard counts as passed. Singular tokens
+     * only — substring matching handles plurals/cases ("videos", "Bilder").
+     *
+     * @var array<string, list<string>>
+     */
+    private const MEDIA_INTENT_NOUNS = [
+        'image-generation' => [
+            'image', 'picture', 'photo', 'foto', 'bild', 'illustration', 'sketch',
+            'drawing', 'painting', 'render', 'logo', 'icon', 'wallpaper', 'avatar',
+            'thumbnail', 'cover', 'poster', 'artwork',
+        ],
+        'video-generation' => [
+            'video', 'clip', 'film', 'animation', 'animatic', 'cinemagraph',
+            'kurzfilm', 'reel',
+        ],
+        'audio-generation' => [
+            'audio', 'voice', 'voiceover', 'narration', 'speech',
+            'tts', 'mp3', 'wav', 'podcast', 'sprachausgabe', 'vertonung',
+        ],
+    ];
+
+    /**
+     * Self-contained cues that imply both verb AND noun on their own.
+     * Mostly TTS-style "read this aloud", "lies vor", "vorlesen" — these
+     * don't repeat the noun explicitly but unambiguously request audio
+     * output. Same for "text to speech" / "text-to-speech" wording.
+     *
+     * Matched with substring search after lowercasing.
+     *
+     * @var array<string, list<string>>
+     */
+    private const MEDIA_INTENT_SELF_CONTAINED = [
+        'image-generation' => [
+            'replace the background', 'hintergrund ersetzen', 'bild bearbeiten',
+            'edit this image', 'edit the image',
+        ],
+        'video-generation' => [
+            // Intentionally empty: video creation requests in the wild
+            // virtually always name "video"/"clip"/"film"/etc., so the
+            // verb+noun rule is sufficient.
+        ],
+        'audio-generation' => [
+            'read aloud', 'reading aloud', 'read it aloud', 'read this aloud',
+            'text to speech', 'text-to-speech', 'convert to speech',
+            'lies vor', 'lies mir vor', 'lies das vor', 'lies dies vor',
+            'vorlesen', 'vorzulesen',
+            'sprich folgenden text', 'sprich folgendes',
+            'vertone diesen text', 'vertone folgenden text', 'vertonen',
+        ],
+    ];
+
+    /**
      * Keywords that strongly indicate the user needs live/current data.
      *
      * Intentionally excludes deictic time markers like "jetzt" / "now" which
@@ -370,6 +455,26 @@ final readonly class SynapseRouter
                 );
             }
 
+            // Media-intent guard (#878): even at high confidence, do NOT
+            // route to the dedicated media-generation topics unless the
+            // user's text actually pairs a creation verb with a media
+            // noun. This is what stops messages like "ich beschäftige
+            // mich mit Protein Shakes…" from being interpreted as a
+            // video request just because the embedding model happens to
+            // place them near the video-generation centroid. Slash
+            // commands never reach this code path — MessageClassifier
+            // routes them directly.
+            if (!$this->passesMediaIntentGuard($topTopic, $messageText)) {
+                return $this->fallbackToAi(
+                    $messageData,
+                    $conversationHistory,
+                    $userId,
+                    'media_intent_guard',
+                    $topScore,
+                    $topTopic,
+                );
+            }
+
             // Resolve granular Synapse-v2 topic to canonical legacy topic
             // (e.g. coding -> general, image-generation -> mediamaker).
             // The granular topic stays in the synapse payload for analytics;
@@ -658,6 +763,65 @@ final readonly class SynapseRouter
         }
 
         return 'image';
+    }
+
+    /**
+     * Verify that a Tier-1 hit on a media-generation topic is justified
+     * by an explicit creation cue in the user's text (issue #878).
+     *
+     * Non-media topics are passed through unchanged. For media topics we
+     * accept the routing iff EITHER:
+     *   - the message contains a self-contained modality cue (e.g.
+     *     "lies vor" → audio is the only sensible interpretation), OR
+     *   - the message contains BOTH a generic creation verb AND a
+     *     media noun for the matching modality.
+     *
+     * Verb-and-noun do NOT have to be adjacent: "erstelle ein aktuelles
+     * Video von der Börse 2026" passes because "erstelle" + "video" are
+     * both present, even though they're separated by "ein aktuelles".
+     */
+    private function passesMediaIntentGuard(string $topic, string $messageText): bool
+    {
+        if (!isset(self::MEDIA_INTENT_NOUNS[$topic])) {
+            return true;
+        }
+
+        $lower = mb_strtolower($messageText);
+
+        foreach (self::MEDIA_INTENT_SELF_CONTAINED[$topic] as $cue) {
+            if (str_contains($lower, $cue)) {
+                return true;
+            }
+        }
+
+        if (!$this->containsCreationVerb($lower)) {
+            return false;
+        }
+
+        foreach (self::MEDIA_INTENT_NOUNS[$topic] as $noun) {
+            if (str_contains($lower, $noun)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * True when the lowercased message contains any of {@see MEDIA_INTENT_VERBS}
+     * as a whole-word match. The word-boundary check stops "drawer" /
+     * "rendering of opinions" / "machart" from leaking through.
+     */
+    private function containsCreationVerb(string $lowerText): bool
+    {
+        foreach (self::MEDIA_INTENT_VERBS as $verb) {
+            $pattern = '/\b'.preg_quote($verb, '/').'\b/u';
+            if (1 === preg_match($pattern, $lowerText)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**

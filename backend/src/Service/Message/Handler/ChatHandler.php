@@ -1035,6 +1035,13 @@ final readonly class ChatHandler implements MessageHandlerInterface
                     userId: $message->getUserId(),
                     aiResponse: $fullResponseText,
                     threadSnapshot: $threadSnapshot,
+                    // Forward the in-scope memories so the extractor can
+                    // emit `update` instead of duplicate `create` actions
+                    // (issue #879). The worker still merges this with the
+                    // user's full memory list, but the relevant subset
+                    // carries semantic-search signal we don't want to
+                    // throw away.
+                    relevantMemories: $loadedMemories,
                 ));
 
                 $this->logger->info('ChatHandler: Dispatched ExtractMemoriesCommand', [
