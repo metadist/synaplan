@@ -566,6 +566,11 @@ class SynapseRouterTest extends TestCase
     /**
      * `image-generation` ─► `mediamaker` with implied media=image. The router
      * must skip its own media-detection heuristics in this case.
+     *
+     * Updated for #878: the media-intent guard now requires the user's
+     * text to pair a creation verb with a media noun before Tier-1 can
+     * route to a granular media topic, so the message text below contains
+     * an unambiguous "create an image of …" cue.
      */
     public function testGranularImageGenerationTopicSetsMediaImage(): void
     {
@@ -589,11 +594,95 @@ class SynapseRouterTest extends TestCase
             'metadata' => [],
         ]);
 
-        $result = $this->router->route(['BTEXT' => 'Sing me a song'], [], 1);
+        $result = $this->router->route(['BTEXT' => 'Create an image of a small black cat'], [], 1);
 
         $this->assertSame('mediamaker', $result['topic']);
         $this->assertSame('image-generation', $result['granular_topic']);
         $this->assertSame('image', $result['media_type']);
+    }
+
+    /**
+     * Issue #878: a high-confidence Tier-1 hit on `video-generation` must
+     * be rejected when the user's text contains no explicit video-creation
+     * cue. The original bug report shows messages about hobbies/business
+     * ("ich beschäftige mich mit Protein shakes und möchte eine Kette
+     * öffnen…") being routed to Veo because the embedding model places
+     * them near the video-generation centroid.
+     */
+    public function testMediaIntentGuardRejectsVideoGenerationWithoutCreationCue(): void
+    {
+        $this->modelConfigService->method('getDefaultModel')->willReturn(null);
+        $this->promptRepository->method('findPromptsWithSelectionRules')->willReturn([]);
+
+        $this->aiFacade->method('embed')->willReturn([
+            'embedding' => array_fill(0, 1024, 0.1),
+            'usage' => ['prompt_tokens' => 10, 'total_tokens' => 10],
+        ]);
+
+        $this->qdrantClient->method('searchSynapseTopics')->willReturn([
+            [
+                'id' => 'synapse_0_video-generation',
+                'score' => 0.86, // well above the 0.78 threshold
+                'payload' => ['topic' => 'video-generation', 'owner_id' => 0],
+            ],
+        ]);
+
+        $this->messageSorter->expects($this->once())->method('classify')->willReturn([
+            'topic' => 'general-chat',
+            'language' => 'de',
+            'web_search' => false,
+        ]);
+
+        $result = $this->router->route(
+            ['BTEXT' => 'ich habe ein neues hobby. ich beschäftige mich mit Protein shakes und möchte eine kette öffnen'],
+            [],
+            1,
+        );
+
+        $this->assertSame('synapse_ai_fallback', $result['source']);
+        $this->assertSame('media_intent_guard', $result['synapse_fallback_reason']);
+        // The granular alias is still attached on the AI-fallback path so
+        // analytics keep parity with previous behaviour.
+        $this->assertSame('general', $result['topic']);
+    }
+
+    /**
+     * Counterpart to the guard test: a clear video-creation request must
+     * pass through to mediamaker even though the embedding score is the
+     * same as in the rejection case. Together they prove the guard
+     * doesn't break the legitimate happy path.
+     */
+    public function testMediaIntentGuardAcceptsExplicitVideoCreationRequest(): void
+    {
+        $this->modelConfigService->method('getDefaultModel')->willReturn(null);
+        $this->promptRepository->method('findPromptsWithSelectionRules')->willReturn([]);
+
+        $this->aiFacade->method('embed')->willReturn([
+            'embedding' => array_fill(0, 1024, 0.1),
+            'usage' => ['prompt_tokens' => 10, 'total_tokens' => 10],
+        ]);
+
+        $this->qdrantClient->method('searchSynapseTopics')->willReturn([
+            [
+                'id' => 'synapse_0_video-generation',
+                'score' => 0.86,
+                'payload' => ['topic' => 'video-generation', 'owner_id' => 0],
+            ],
+        ]);
+
+        $this->promptService->method('getPromptWithMetadata')->willReturn([
+            'metadata' => [],
+        ]);
+
+        $result = $this->router->route(
+            ['BTEXT' => 'erstelle ein video von einem golden retriever'],
+            [],
+            1,
+        );
+
+        $this->assertSame('mediamaker', $result['topic']);
+        $this->assertSame('video-generation', $result['granular_topic']);
+        $this->assertSame('video', $result['media_type']);
     }
 
     /**

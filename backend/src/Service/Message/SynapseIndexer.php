@@ -78,6 +78,12 @@ final readonly class SynapseIndexer
      */
     public function indexAllTopics(?int $userId = null, bool $force = false): array
     {
+        // Drop vectors for any prompt that has been disabled in the DB
+        // (e.g. the retired `coding` topic from #878). Without this step
+        // the orphan Qdrant point keeps participating in similarity
+        // search until the operator manually re-creates the collection.
+        $this->dropDisabledPromptVectors($userId);
+
         $prompts = $this->loadIndexablePrompts($userId);
 
         if (empty($prompts)) {
@@ -396,6 +402,49 @@ final readonly class SynapseIndexer
             $this->loadIndexablePrompts($userId),
             fn (Prompt $p) => $p->getOwnerId() === $userId,
         ));
+    }
+
+    /**
+     * Remove Qdrant vectors for any prompt that exists but is currently
+     * disabled. Used by indexAllTopics() to keep the synapse_topics
+     * collection in lockstep with BPROMPTS.BENABLED so retired topics
+     * stop matching as soon as the seed runs (issue #878).
+     *
+     * Note: `findAllForUser()` defaults `excludeDisabled` to **true**, so
+     * the disabled rows we're trying to clean up would be filtered out
+     * at the SQL layer and the loop would silently see nothing. We pass
+     * `excludeDisabled: false` and re-filter for `enabled=false` here so
+     * this method actually does what its name says (caught by Copilot
+     * review on PR #884).
+     */
+    private function dropDisabledPromptVectors(?int $userId): void
+    {
+        $prompts = $this->promptRepository->findAllForUser(
+            $userId ?? 0,
+            'en',
+            excludeDisabled: false,
+        );
+
+        foreach ($prompts as $prompt) {
+            if ($prompt->isEnabled()) {
+                continue;
+            }
+            if (str_starts_with($prompt->getTopic(), 'tools:')) {
+                continue;
+            }
+
+            try {
+                $this->removeTopic($prompt->getTopic(), $prompt->getOwnerId());
+            } catch (\Throwable $e) {
+                // Removal is best-effort — a stale vector is annoying
+                // but never fatal, so don't fail the whole index run.
+                $this->logger->warning('SynapseIndexer: Failed to drop disabled topic vector', [
+                    'topic' => $prompt->getTopic(),
+                    'owner_id' => $prompt->getOwnerId(),
+                    'error' => $e->getMessage(),
+                ]);
+            }
+        }
     }
 
     /**
