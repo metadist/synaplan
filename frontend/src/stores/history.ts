@@ -281,6 +281,12 @@ export const useHistoryStore = defineStore('history', () => {
   const hasMoreMessages = ref(false)
   const currentOffset = ref(0)
 
+  // Monotonic generation counter: incremented each time loadMessages is called
+  // for a fresh chat (offset === 0). Responses from older generations are
+  // discarded so a slow response for a previous chat never overwrites the
+  // messages of the current one.
+  let loadGeneration = 0
+
   const addMessage = (
     role: 'user' | 'assistant',
     parts: Part[],
@@ -402,6 +408,10 @@ export const useHistoryStore = defineStore('history', () => {
   const loadMessages = async (chatId: number, offset = 0, limit = 50) => {
     if (!checkAuthOrRedirect()) return
 
+    // Fresh load (offset 0) bumps the generation so any in-flight response
+    // for a *previous* chat is silently discarded when it lands.
+    const myGeneration = offset === 0 ? ++loadGeneration : loadGeneration
+
     isLoadingMessages.value = true
 
     // Reset pagination state when loading from start (prevents stale state on error)
@@ -417,6 +427,8 @@ export const useHistoryStore = defineStore('history', () => {
         messages?: ApiLoadedMessageRow[]
         pagination?: { hasMore?: boolean }
       }
+
+      if (myGeneration !== loadGeneration) return
 
       if (response.success && response.messages) {
         const loadedMessages: Message[] = response.messages.map((m) => {
@@ -498,10 +510,10 @@ export const useHistoryStore = defineStore('history', () => {
             originalMediaType: m.originalMediaType ?? m.original_media_type ?? null,
             backendMessageId: m.id,
             files: files.length > 0 ? files : undefined,
-            aiModels: m.aiModels || null, // Parse AI model metadata from backend
-            webSearch: m.webSearch || null, // Parse web search metadata from backend
-            searchResults: m.searchResults || null, // Parse actual search results from backend
-            tool: toolData, // Reconstruct tool metadata from topic
+            aiModels: m.aiModels || null,
+            webSearch: m.webSearch || null,
+            searchResults: m.searchResults || null,
+            tool: toolData,
           }
         })
 
@@ -516,9 +528,12 @@ export const useHistoryStore = defineStore('history', () => {
         hasMoreMessages.value = response.pagination?.hasMore || false
       }
     } catch (error) {
+      if (myGeneration !== loadGeneration) return
       console.error('Failed to load messages:', error)
     } finally {
-      isLoadingMessages.value = false
+      if (myGeneration === loadGeneration) {
+        isLoadingMessages.value = false
+      }
     }
   }
 
