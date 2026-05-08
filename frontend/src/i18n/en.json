@@ -295,6 +295,7 @@
     "web": "Web",
     "webSearch": "Search the web for up-to-date information",
     "enhance": "Enhance",
+    "enhanceRejected": "This text could not be improved. Try a clearer sentence or question.",
     "thinking": "Thinking",
     "reasoningNotSupported": "Your current chat model does not support reasoning. Please select a reasoning-capable model (GPT-5, o3, DeepSeek-R1) in AI Config → Models.",
     "voice": "Start voice",

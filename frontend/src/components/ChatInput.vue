@@ -72,7 +72,7 @@
 
         <!-- Scrollable container with padding for scrollbar alignment -->
         <div class="max-h-[40vh] overflow-y-auto chat-input-scroll">
-          <div class="pl-[60px] pr-[140px] py-2">
+          <div class="pl-[60px] py-2" :style="{ paddingRight: `${textareaPaddingRightPx}px` }">
             <!-- Textarea -->
             <Textarea
               ref="textareaRef"
@@ -130,6 +130,36 @@
           class="absolute bottom-2 right-3 md:right-4 flex items-center gap-2 pointer-events-none"
           data-testid="section-chat-primary-actions"
         >
+          <button
+            v-if="showEnhanceInInput"
+            type="button"
+            :class="[
+              'h-[44px] min-w-[44px] flex items-center justify-center rounded-xl pointer-events-auto relative',
+              isGuestMode && 'opacity-50',
+              !isGuestMode && enhanceEnabled && 'pill pill--active',
+              !isGuestMode && !enhanceEnabled && 'icon-ghost',
+              !isGuestMode && enhanceLoading && 'pill--loading',
+              isGuestMode && 'icon-ghost',
+            ]"
+            :disabled="!isGuestMode && enhanceLoading"
+            :aria-label="$t('chatInput.enhance')"
+            :title="$t('chatInput.enhance')"
+            data-testid="btn-chat-enhance"
+            @click="toggleEnhance"
+          >
+            <Icon
+              v-if="!isGuestMode && enhanceLoading"
+              icon="mdi:loading"
+              class="w-5 h-5 animate-spin"
+            />
+            <SparklesIcon v-else class="w-5 h-5" />
+            <Icon
+              v-if="isGuestMode"
+              icon="mdi:lock-outline"
+              class="w-2.5 h-2.5 absolute -top-0.5 -right-0.5 text-amber-500"
+            />
+          </button>
+
           <button
             v-if="showMicrophoneButton"
             type="button"
@@ -202,25 +232,6 @@
           @insert-command="handleInsertCommand"
         />
 
-        <button
-          type="button"
-          :class="[
-            'pill flex-shrink-0',
-            !isGuestMode && enhanceLoading && 'pill--loading',
-            !isGuestMode && enhanceEnabled && 'pill--active',
-            isGuestMode && 'opacity-50',
-          ]"
-          :disabled="!isGuestMode && enhanceLoading"
-          :aria-label="$t('chatInput.enhance')"
-          data-testid="btn-chat-enhance"
-          @click="toggleEnhance"
-        >
-          <SparklesIcon class="w-4 h-4 md:w-5 md:h-5" />
-          <span class="text-xs md:text-sm font-medium hidden sm:inline">{{
-            $t('chatInput.enhance')
-          }}</span>
-          <Icon v-if="isGuestMode" icon="mdi:lock-outline" class="w-3 h-3 text-amber-500" />
-        </button>
         <button
           type="button"
           :disabled="!isGuestMode && !supportsReasoning"
@@ -390,6 +401,17 @@ const showMicrophoneButton = computed(() => {
 
   // Show if either browser API or backend transcription is available
   return webSpeechSupported || speechToTextAvailable
+})
+
+/** Icon-only enhance control inside the input shell; visible when there is text to act on. */
+const showEnhanceInInput = computed(() => message.value.trim().length > 0)
+
+/** Reserve horizontal space so the textarea does not sit under the absolute action buttons. */
+const textareaPaddingRightPx = computed(() => {
+  if (showMicrophoneButton.value) {
+    return showEnhanceInInput.value ? 192 : 140
+  }
+  return showEnhanceInInput.value ? 120 : 80
 })
 
 /**
@@ -1159,9 +1181,12 @@ const toggleEnhance = async () => {
     message.value = result.enhanced
     enhanceEnabled.value = true
   } catch (err) {
-    // Show detailed error message if available
     const errorMsg = err instanceof Error ? err.message : 'Failed to enhance message'
-    showError(errorMsg)
+    if (errorMsg === 'enhance_rejected') {
+      showError(t('chatInput.enhanceRejected'))
+    } else {
+      showError(errorMsg)
+    }
     console.error('Enhancement error:', err)
   } finally {
     enhanceLoading.value = false

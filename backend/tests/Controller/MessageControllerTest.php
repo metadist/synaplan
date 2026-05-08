@@ -328,6 +328,7 @@ class MessageControllerTest extends WebTestCase
         $statusCode = $this->client->getResponse()->getStatusCode();
         $this->assertContains($statusCode, [
             Response::HTTP_OK,
+            Response::HTTP_UNPROCESSABLE_ENTITY,
             Response::HTTP_SERVICE_UNAVAILABLE,
             Response::HTTP_INTERNAL_SERVER_ERROR,
         ]);

@@ -142,12 +142,12 @@
           <div
             v-for="message in messages"
             :key="message.id"
-            class="flex gap-4"
+            class="flex gap-0 md:gap-4"
             :class="message.direction === 'IN' ? 'flex-row' : 'flex-row-reverse'"
             data-testid="item-message"
           >
-            <!-- Avatar -->
-            <div class="flex-shrink-0">
+            <!-- Avatar (tablet+) -->
+            <div class="hidden md:block flex-shrink-0">
               <div
                 class="w-10 h-10 rounded-full flex items-center justify-center"
                 :class="

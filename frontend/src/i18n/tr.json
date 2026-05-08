@@ -260,6 +260,7 @@
     "web": "Web",
     "webSearch": "Web'de güncel bilgi ara",
     "enhance": "Geliştir",
+    "enhanceRejected": "Bu metin geliştirilemedi. Daha net bir cümle veya soru deneyin.",
     "thinking": "Düşünme",
     "reasoningNotSupported": "Mevcut sohbet modeliniz akıl yürütmeyi desteklemiyor. Lütfen AI Yapılandırması → Modeller'den akıl yürütme özellikli bir model seçin (GPT-5, o3, DeepSeek-R1).",
     "voice": "Sesi başlat",
