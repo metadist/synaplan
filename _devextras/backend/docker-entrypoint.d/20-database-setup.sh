@@ -1,9 +1,21 @@
 #!/bin/bash
 set -euo pipefail
 
-echo "🔧 [dev] Checking database schema..."
+# Dev database setup — intentionally minimal.
+#
+# Schema creation, migrations, fixtures, and seeding are all handled by the
+# main docker-entrypoint.sh (in the correct order: migrations → fixtures →
+# app:seed). This script only verifies the database connection is reachable
+# early so the dev gets a clear error before the heavier startup steps run.
+#
+# IMPORTANT: Do NOT run doctrine:schema:update --force here. The schema must
+# be managed exclusively by Doctrine Migrations. Running schema:update before
+# migrations creates all tables in their final state, which then causes
+# incremental migrations to fail with duplicate index/table errors and puts
+# the backend into a crash loop. See PR #877.
 
-# Wait for database to be ready
+echo "🔧 [dev] Checking database connection..."
+
 max_attempts=30
 attempt=0
 while ! php bin/console dbal:run-sql "SELECT 1" > /dev/null 2>&1; do
@@ -17,23 +29,3 @@ while ! php bin/console dbal:run-sql "SELECT 1" > /dev/null 2>&1; do
 done
 
 echo "✅ [dev] Database connection established"
-
-# Check if schema needs to be created/updated
-if php bin/console doctrine:schema:update --dump-sql 2>&1 | grep -q "Nothing to update"; then
-    echo "✅ [dev] Database schema is up to date"
-else
-    echo "📦 [dev] Updating database schema..."
-    php bin/console doctrine:schema:update --force
-    echo "✅ [dev] Database schema updated"
-fi
-
-# Check if fixtures need to be loaded (check if users table is empty)
-user_count=$(php bin/console dbal:run-sql "SELECT COUNT(*) as count FROM BUSER" 2>/dev/null | grep -oE '[0-9]+' | tail -1 || echo "0")
-
-if [ "$user_count" = "0" ]; then
-    echo "📦 [dev] Loading database fixtures (test users, config, etc.)..."
-    php bin/console doctrine:fixtures:load --no-interaction
-    echo "✅ [dev] Database fixtures loaded"
-else
-    echo "✅ [dev] Database already contains data (${user_count} users)"
-fi
