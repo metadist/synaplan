@@ -39,7 +39,16 @@
             <CpuChipIcon class="w-4 h-4 text-[var(--brand)]" />
             <span class="flex-1 min-w-0">{{ purposeLabels[capability as Capability] }}</span>
             <span
-              v-if="capability === 'VECTORIZE' && !canSwitchEmbedding"
+              v-if="capability === 'VECTORIZE' && isVectorizeAdminOnly"
+              class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wide bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/30"
+              :title="$t('config.embeddingSwitch.adminOnly.lockTooltip')"
+              data-testid="badge-embedding-admin-only"
+            >
+              <LockClosedIcon class="w-3 h-3" />
+              {{ $t('config.embeddingSwitch.adminOnly.badge') }}
+            </span>
+            <span
+              v-else-if="capability === 'VECTORIZE' && !canSwitchEmbedding"
               class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wide bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/30"
               :title="$t('config.embeddingSwitch.premium.lockTooltip')"
               data-testid="badge-embedding-premium"
@@ -55,7 +64,16 @@
                 'w-full px-4 py-3 pl-10 pr-10 rounded-lg surface-card border txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)] transition-all text-left',
                 'border-light-border/30 dark:border-dark-border/20 hover:border-[var(--brand)]/50',
                 openDropdown === capability && 'ring-2 ring-[var(--brand)]',
+                capability === 'VECTORIZE' &&
+                  isVectorizeAdminOnly &&
+                  'opacity-60 cursor-not-allowed hover:border-light-border/30 dark:hover:border-dark-border/20',
               ]"
+              :disabled="capability === 'VECTORIZE' && isVectorizeAdminOnly"
+              :title="
+                capability === 'VECTORIZE' && isVectorizeAdminOnly
+                  ? $t('config.embeddingSwitch.adminOnly.lockTooltip')
+                  : undefined
+              "
               data-testid="btn-model-dropdown"
               @click="toggleDropdown(capability as Capability)"
             >
@@ -514,10 +532,20 @@ const normalizeHighlight = (highlight: string): Capability | 'ALL' | null => {
   return aliasMap[highlight] || null
 }
 
+// VECTORIZE switching is gated server-side by ROLE_ADMIN
+// (AdminEmbeddingController#[IsGranted('ROLE_ADMIN')]). Non-admins must
+// still SEE the active embedding model — they need that context to
+// understand their RAG behaviour — but the dropdown is disabled and
+// shows an "Admin only" badge so they don't trip into a 403 + cryptic
+// "Failed to load cost estimate" toast on the cost-estimate pre-flight.
+const isVectorizeAdminOnly = computed(() => !authStore.isAdmin)
+
 // Optimistic UI flag for the VECTORIZE Premium-Lock badge: free users
 // see the badge immediately, paid users only see it if the backend
 // guard explicitly says no (e.g. cooldown). The badge is purely
 // informational — the modal re-confirms the gate before any switch.
+// (Only consulted when the user IS an admin; non-admins get the
+// stricter Admin-only treatment above.)
 const canSwitchEmbedding = computed(() => {
   if (embeddingGuard.value) return embeddingGuard.value.canChange
   return authStore.isPro || authStore.isAdmin
@@ -674,12 +702,26 @@ const getSelectedModelObj = (purpose: Capability): AIModel | null => {
 }
 
 const toggleDropdown = (capability: Capability) => {
+  // Belt-and-braces: the button has `:disabled` for non-admin VECTORIZE,
+  // but a determined user could still toggle the v-if dropdown via the
+  // devtools or a stale ref. Bail here so the dropdown never opens.
+  if (capability === 'VECTORIZE' && isVectorizeAdminOnly.value) {
+    openDropdown.value = null
+    return
+  }
   openDropdown.value = openDropdown.value === capability ? null : capability
 }
 
 const selectModel = async (capability: Capability, modelId: number | null) => {
   openDropdown.value = null
   const previousModelId = defaultConfig.value[capability]
+
+  // Same defensive guard as toggleDropdown: the cost-estimate +
+  // /switch endpoints both require ROLE_ADMIN and would 403, surfacing
+  // as a cryptic "Failed to load cost estimate" toast.
+  if (capability === 'VECTORIZE' && isVectorizeAdminOnly.value) {
+    return
+  }
 
   // VECTORIZE swaps require pre-flight cost confirmation + paid plan,
   // so we route through the dedicated EmbeddingSwitchModal instead of
