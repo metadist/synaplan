@@ -99,6 +99,26 @@ export default defineConfig(({ mode }) => {
           target: backendUrl,
           changeOrigin: true,
         },
+        // Centrifugo realtime WebSocket gateway.
+        //
+        // In production Caddy serves the dashboard AND reverse-proxies
+        // `/connection/*` to Centrifugo on the same origin, so the operator
+        // browser opens `wss://app.example.com/connection/websocket` without
+        // any CORS or cross-origin gymnastics.
+        //
+        // In dev the dashboard is served by Vite on :5173 while Caddy +
+        // Centrifugo live behind :8000. Without this proxy the operator
+        // RealtimeClient resolves the WS URL from `window.location.host`,
+        // tries `ws://localhost:5173/connection/websocket`, fails, and the
+        // ConnectionStatusBadge flips to "Connection Error" — even though
+        // visitor widgets (which derive the URL from apiBaseUrl) keep
+        // working. `ws: true` is what unlocks the WS upgrade; without it
+        // Vite hijacks the request as plain HTTP and the upgrade 404s.
+        '/connection': {
+          target: backendUrl,
+          changeOrigin: true,
+          ws: true,
+        },
       },
     },
     test: {

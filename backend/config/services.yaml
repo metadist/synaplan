@@ -89,10 +89,14 @@ services:
         autowire: true
         autoconfigure: true
 
-    # Plugin Context Providers — plugins can inject context into chat system prompts
+    # Auto-tagging:
+    #   * Plugin context providers — inject context into chat system prompts.
+    #   * Realtime channel authorizers — collected by ChannelAuthorizerLocator.
     _instanceof:
         App\Service\Plugin\PluginContextProviderInterface:
             tags: ['app.plugin.context_provider']
+        App\Realtime\Authorizer\ChannelAuthorizerInterface:
+            tags: ['app.realtime.authorizer']
 
     App\:
         resource: '../src/'
@@ -210,6 +214,67 @@ services:
         arguments:
             $embeddingFallbackProvider: '%env(EMBEDDING_FALLBACK_PROVIDER)%'
 
+    # ----------------------------------------------------------------------
+    # Infrastructure / platform services
+    # ----------------------------------------------------------------------
+
+    # Redis platform wrapper. Symfony's cache/lock/rate-limiter components
+    # talk to Redis directly through their adapters; this service is for
+    # feature code (counters, idempotency, presence, ad-hoc pub/sub).
+    App\Service\Infrastructure\RedisService:
+        arguments:
+            $redisDsn: '%env(REDIS_DSN)%'
+            $environment: '%kernel.environment%'
+
+    # ----------------------------------------------------------------------
+    # Native PHP sessions backed by Redis (see framework.yaml session block).
+    # We use Predis (pure PHP) on purpose: the cache/lock/messenger trio
+    # already pulls in Predis, and sessions don't need the binary throughput
+    # that would justify pulling phpredis into every web request. The TTL
+    # mirrors framework.session.gc_maxlifetime so PHP's GC and Redis's own
+    # expiry don't fight each other.
+    # ----------------------------------------------------------------------
+    session.handler.redis_connection:
+        class: Predis\Client
+        arguments:
+            - '%env(REDIS_DSN)%'
+            - { parameters: { read_write_timeout: 2.5, timeout: 2.5 } }
+        lazy: true
+
+    Symfony\Component\HttpFoundation\Session\Storage\Handler\RedisSessionHandler:
+        autowire: false
+        autoconfigure: false
+        arguments:
+            - '@session.handler.redis_connection'
+            - { prefix: synaplan_sess_, ttl: 604800 }
+
+    # ----------------------------------------------------------------------
+    # Realtime framework (App\Realtime)
+    # ----------------------------------------------------------------------
+
+    # Channel authorizers are auto-tagged via the _instanceof block above and
+    # injected here as a tagged iterator.
+    App\Realtime\Authorizer\ChannelAuthorizerLocator:
+        arguments:
+            $authorizers: !tagged_iterator app.realtime.authorizer
+
+    # JWT minting service used by RealtimeTokenController.
+    App\Realtime\Token\RealtimeTokenService:
+        arguments:
+            $hmacSecret: '%env(REALTIME_TOKEN_SECRET)%'
+            $ttlSeconds: 60
+
+    # Default publisher: HTTP POST to Centrifugo. NullPublisher is bound in
+    # the test profile below so unit tests don't need a running gateway.
+    App\Realtime\Publisher\CentrifugoPublisher:
+        arguments:
+            $apiUrl: '%env(REALTIME_API_URL)%'
+            $apiKey: '%env(REALTIME_API_KEY)%'
+            $enabled: '%env(bool:REALTIME_ENABLED)%'
+
+    App\Realtime\Publisher\RealtimePublisherInterface:
+        alias: App\Realtime\Publisher\CentrifugoPublisher
+
     # Whisper Service for Audio Transcription
     App\Service\WhisperService:
         arguments:
@@ -294,8 +359,15 @@ services:
     App\Service\MediaGenerationServiceInterface:
         alias: App\Service\MediaGenerationService
 
-    # Model Configuration Service
-    App\Service\ModelConfigService: ~
+    # Model Configuration Service. Pinned to its own cache pool so the 5-min
+    # per-key TTL the service sets in code lives alongside the pool's own
+    # 1-hour upper bound (see config/packages/cache.yaml). Without an
+    # explicit binding this would resolve to `cache.app`, mixing model
+    # config keys with everything else and making targeted invalidation
+    # (`bin/console cache:pool:clear cache.model_config`) ineffective.
+    App\Service\ModelConfigService:
+        arguments:
+            $cache: '@cache.model_config'
 
     # Internal Email Service (system emails - uses SMTP from ENV)
     App\Service\InternalEmailService: ~
@@ -595,6 +667,11 @@ when@dev:
 
 when@test:
     services:
+        # Bind the no-op publisher so PHPUnit doesn't require a running
+        # Centrifugo instance.
+        App\Realtime\Publisher\RealtimePublisherInterface:
+            alias: App\Realtime\Publisher\NullPublisher
+
         App\AI\Provider\TestProvider:
             tags:
                 - { name: 'app.ai.chat' }

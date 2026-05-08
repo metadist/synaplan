@@ -3229,5 +3229,28 @@
     "rateLimitedDescription": "You've reached the session limit. Please try again later or create a free account.",
     "retry": "Try again",
     "createAccount": "Create account"
+  },
+  "realtime": {
+    "status": {
+      "connected": "Live",
+      "connecting": "Connecting…",
+      "reconnecting": "Reconnecting…",
+      "disconnected": "Offline",
+      "disabled": "Live updates off",
+      "error": "Connection error"
+    },
+    "tooltip": {
+      "connected": "Realtime connection is healthy",
+      "connecting": "Establishing realtime connection…",
+      "reconnecting": "Realtime connection lost — retrying automatically",
+      "disconnected": "Realtime connection is closed",
+      "disabled": "Live updates are turned off in this environment. Refresh to see the latest data.",
+      "error": "Realtime connection failed: {message}"
+    },
+    "notification": {
+      "reconnecting": "Connection lost — reconnecting…",
+      "reconnected": "You're back online.",
+      "error": "Live updates are temporarily unavailable. Refresh to see the latest activity."
+    }
   }
 }

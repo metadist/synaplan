@@ -20,6 +20,13 @@
 import type { App } from 'vue'
 import { detectApiUrl } from './widget-utils'
 
+interface WidgetRealtimeConfig {
+  /** Master kill-switch echoed by the backend. Defaults to true. */
+  enabled: boolean
+  /** Empty string ⇒ derive from `apiUrl` (recommended). */
+  wsUrl: string
+}
+
 interface WidgetConfig {
   widgetId: string
   position?: 'bottom-left' | 'bottom-right' | 'top-left' | 'top-right'
@@ -47,6 +54,8 @@ interface WidgetConfig {
   externalUserId?: string
   privacyPolicyUrl?: string
   sessionMode?: 'browser' | 'user'
+  /** Populated from /api/v1/widget/{id}/config — never sent in by callers. */
+  realtime?: WidgetRealtimeConfig
 }
 
 const DEFAULT_VUE_CDN = 'https://cdn.jsdelivr.net/npm/vue@3/dist/vue.global.prod.js'
@@ -169,6 +178,12 @@ class SynaplanWidget {
           ...this.config,
           ...data.config,
           widgetTitle: data.name || this.config.widgetTitle,
+          realtime: data.realtime
+            ? {
+                enabled: Boolean(data.realtime.enabled ?? true),
+                wsUrl: typeof data.realtime.wsUrl === 'string' ? data.realtime.wsUrl : '',
+              }
+            : { enabled: true, wsUrl: '' },
         }
         return true
       }
@@ -427,6 +442,7 @@ class SynaplanWidget {
         privacyPolicyUrl: this.config!.privacyPolicyUrl,
         sessionMode: this.config!.sessionMode,
         isPreview: false,
+        realtime: this.config!.realtime,
       })
 
       this.app.use(i18n)

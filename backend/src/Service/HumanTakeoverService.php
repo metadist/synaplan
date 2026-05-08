@@ -16,8 +16,9 @@ use Psr\Log\LoggerInterface;
 /**
  * Service for Human Takeover functionality in Chat Widgets.
  *
- * Allows widget owners to take over conversations from the AI
- * and communicate directly with visitors in real-time via SSE.
+ * Allows widget owners to take over conversations from the AI and chat
+ * with visitors in real time. Push delivery to both sides is fanned out
+ * via {@see WidgetRealtimeBroadcaster} (Centrifugo).
  */
 final readonly class HumanTakeoverService
 {
@@ -26,7 +27,7 @@ final readonly class HumanTakeoverService
         private WidgetSessionRepository $sessionRepository,
         private ChatRepository $chatRepository,
         private FileRepository $fileRepository,
-        private WidgetEventCacheService $eventCache,
+        private WidgetRealtimeBroadcaster $broadcaster,
         private LoggerInterface $logger,
     ) {
     }
@@ -263,24 +264,34 @@ final readonly class HumanTakeoverService
 
     /**
      * Notify widget owner about a new message in waiting session.
+     *
+     * Fan-out happens on the dedicated operator channel
+     * ({@see \App\Realtime\Channel\WidgetOperatorsChannel}) so every
+     * dashboard tab subscribed for this widget receives the notification
+     * in real time without polling.
      */
     public function notifyOperator(string $widgetId, int $operatorId, string $sessionId, string $messagePreview): void
     {
-        $this->eventCache->publishNotification($widgetId, [
+        $this->broadcaster->publishOperatorNotification($widgetId, [
             'sessionId' => $sessionId,
             'preview' => mb_substr($messagePreview, 0, 100),
             'timestamp' => time(),
+            'operatorId' => $operatorId,
         ]);
     }
 
     /**
-     * Publish event to a specific session via cache.
+     * Publish a session-scoped realtime event via {@see WidgetRealtimeBroadcaster}.
+     *
+     * Kept as a thin wrapper because every call site supplies the same
+     * (widgetId, sessionId) pair and we want one obvious place to enrich
+     * the payload (e.g. add audit metadata) in the future.
      *
      * @param array<string, mixed> $data
      */
     private function publishToSession(string $widgetId, string $sessionId, string $type, array $data): void
     {
-        $this->eventCache->publish($widgetId, $sessionId, $type, $data);
+        $this->broadcaster->publishSessionEvent($widgetId, $sessionId, $type, $data);
     }
 
     /**

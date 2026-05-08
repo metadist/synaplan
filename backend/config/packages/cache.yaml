@@ -1,29 +1,72 @@
+# Symfony cache configuration
+#
+# Strategy: Redis is the canonical default for caching across all web nodes
+# (the production cluster runs ≥3 backend instances behind a load balancer,
+# so a node-local filesystem cache would silently desync). The same Redis
+# instance is shared with:
+#   * Symfony Lock component (`framework.lock`)
+#   * Symfony Rate-Limiter (`framework.rate_limiter`)
+#   * Centrifugo realtime engine (different Redis logical DB, see
+#     `_docker/centrifugo/config.json`)
+#   * Future: Symfony Messenger transport, sessions, presence
+#
+# `REDIS_DSN` is provided by docker-compose / production env.
+# When the env is missing (early bootstrap, isolated CI) we fall back to a
+# null adapter so tests don't blow up just because Redis isn't reachable yet.
 framework:
     cache:
         prefix_seed: synaplan_sf
-        
-        # Filesystem cache (Redis removed)
-        app: cache.adapter.filesystem
-        
+
+        # `cache.app` (and every pool below that uses `cache.adapter.redis`)
+        # picks up its DSN from `default_redis_provider`. Per-pool `provider:`
+        # entries are deliberately omitted: they get propagated as tag
+        # attributes through Symfony's CachePoolPass and survive the
+        # `when@test` adapter swap, which then crashes kernel boot with
+        # `argument "1" doesn't exist in ArrayAdapter` (the leftover Redis
+        # provider becomes ctor arg 0 of the wrong adapter).
+        app: cache.adapter.redis
+        default_redis_provider: '%env(REDIS_DSN)%'
+
         pools:
-            # Provider status cache (short TTL)
+            # Provider status cache (short TTL - hot path, kept on Redis for
+            # cross-node consistency so all backend nodes see the same
+            # provider health snapshot).
             cache.provider_status:
-                adapter: cache.adapter.filesystem
+                adapter: cache.adapter.redis
                 default_lifetime: 60
-                
-            # Model configuration cache
+
+            # Model configuration cache.
             cache.model_config:
-                adapter: cache.adapter.filesystem
+                adapter: cache.adapter.redis
                 default_lifetime: 3600
-                
-            # User config cache
+
+            # User config cache.
             cache.user_config:
-                adapter: cache.adapter.filesystem
+                adapter: cache.adapter.redis
                 default_lifetime: 1800
-            
-            # Widget events cache (replaces BWIDGET_EVENTS table)
-            # All real-time events (takeover, handback, message, typing, notification)
-            # Events auto-expire after 10 minutes (enough for reconnects)
-            cache.widget_events:
-                adapter: cache.adapter.filesystem
-                default_lifetime: 600
+
+            # Symfony Rate-Limiter storage. Used by `framework.rate_limiter.*`
+            # named limiters (see config/packages/rate_limiter.yaml). Lives in
+            # the shared Redis instance so per-user / per-IP quotas are
+            # consistent across the load-balanced backend nodes — without a
+            # shared store, a user could circumvent quotas by hitting different
+            # backend nodes.
+            cache.rate_limiter:
+                adapter: cache.adapter.redis
+                default_lifetime: 3600
+
+# Test profile uses an in-memory cache so we don't require Redis to run unit
+# tests. Pools that PHPUnit hits via DI inherit this default.
+when@test:
+    framework:
+        cache:
+            app: cache.adapter.array
+            pools:
+                cache.provider_status:
+                    adapter: cache.adapter.array
+                cache.model_config:
+                    adapter: cache.adapter.array
+                cache.user_config:
+                    adapter: cache.adapter.array
+                cache.rate_limiter:
+                    adapter: cache.adapter.array

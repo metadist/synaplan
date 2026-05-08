@@ -21,6 +21,9 @@
             {{ widget?.name || $t('widgetSessions.title') }}
           </h1>
 
+          <!-- Realtime connection status (WS via Centrifugo) -->
+          <ConnectionStatusBadge class="hidden md:inline-flex flex-shrink-0" />
+
           <!-- Stats (inline on desktop) -->
           <div class="hidden md:flex items-center gap-3 text-xs txt-secondary flex-shrink-0">
             <span class="flex items-center gap-1.5 font-medium txt-primary">
@@ -968,7 +971,16 @@ import * as widgetsApi from '@/services/api/widgetsApi'
 import { useNotification } from '@/composables/useNotification'
 import { useDialog } from '@/composables/useDialog'
 import { getErrorMessage } from '@/utils/errorMessage'
-import { subscribeToSession, type EventSubscription, type WidgetEvent } from '@/services/sseClient'
+import {
+  subscribeToWidgetSessionAsOperator,
+  openOperatorTypingChannel,
+  type WidgetEvent,
+  type WidgetSubscription,
+} from '@/services/realtime/widgetOperatorRealtime'
+import type { WidgetTypingHandle } from '@/services/realtime/widgetTypingChannel'
+// Centrifugo connection-state badge — reads from the realtime Pinia store
+// that the operator helpers warm up on first subscribe.
+import ConnectionStatusBadge from '@/components/realtime/ConnectionStatusBadge.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -994,7 +1006,16 @@ const selectedSessionIdsArray = computed(() => Array.from(selectedSessionIds.val
 const deletingSessions = ref(false)
 const messageText = ref('')
 const sendingMessage = ref(false)
-const eventSubscription = ref<EventSubscription | null>(null)
+const eventSubscription = ref<WidgetSubscription | null>(null)
+// Dedicated typing channel — published from the browser via Centrifugo
+// (no per-keystroke HTTP round-trip). Lives next to eventSubscription so
+// both share the same teardown code path.
+let typingChannel: WidgetTypingHandle | null = null
+// Monotonic token bumped on every viewSession() call. The handler closure
+// captures the token at call-time and bails out if a newer call has
+// superseded it. This guards against the in-flight load racing with a
+// rapid second click.
+let viewSessionToken = 0
 const messagesContainer = ref<HTMLElement | null>(null)
 
 // File upload state
@@ -1287,10 +1308,21 @@ const deleteSelectedSessions = async () => {
 }
 
 const viewSession = async (session: widgetSessionsApi.WidgetSession) => {
-  // Unsubscribe from previous session's SSE
+  // Bump the token first so any in-flight viewSession() call can detect
+  // that it has been superseded before it tries to subscribe.
+  const myToken = ++viewSessionToken
+
+  // Drop the realtime subscription from the previously selected session
+  // so events for the old channel cannot leak into the new view.
   if (eventSubscription.value) {
     eventSubscription.value.unsubscribe()
     eventSubscription.value = null
+  }
+  // Close the typing channel as well — it is per-session, so reusing it
+  // across sessions would publish operator typing into the wrong chat.
+  if (typingChannel) {
+    typingChannel.close()
+    typingChannel = null
   }
 
   // Reset title editing state when switching sessions
@@ -1303,6 +1335,13 @@ const viewSession = async (session: widgetSessionsApi.WidgetSession) => {
 
   try {
     const response = await widgetSessionsApi.getWidgetSession(widgetId.value, session.sessionId)
+
+    // If the user clicked another session while the request was in flight,
+    // throw away the stale response — the newer viewSession() call already
+    // owns selectedSession + the subscription slot.
+    if (myToken !== viewSessionToken) {
+      return
+    }
 
     // Update selectedSession with fresh data from server (this is the key fix!)
     // This ensures the mode and other properties are accurate
@@ -1322,36 +1361,65 @@ const viewSession = async (session: widgetSessionsApi.WidgetSession) => {
       sessions.value[sessionIndex].lastMessagePreview = response.session.lastMessagePreview
     }
 
-    // Subscribe to SSE for this specific session (skip for internal mode --
-    // messages are added locally by sendInternalMessage, SSE would duplicate them)
+    // Internal mode = the widget owner chatting with their own widget from
+    // the dashboard. Messages are appended locally by sendInternalMessage,
+    // so subscribing here would just produce duplicates.
     if (response.session.mode === 'internal') {
       return
     }
 
-    // Use latestEventId to skip historical events and only receive new ones.
-    // This prevents replay of old takeover/handback events that would incorrectly
-    // change the session mode (e.g. 'waiting' → 'human' from a stale takeover event).
+    // Subscribe to the per-session realtime channel as an authenticated
+    // operator. Centrifugo handles missed-event replay via channel history
+    // (`force_recovery: true`), so we no longer need to thread a "latest
+    // event id" cursor through the API.
     const currentSessionId = response.session.sessionId
-    eventSubscription.value = subscribeToSession(
+    eventSubscription.value = subscribeToWidgetSessionAsOperator(
       widgetId.value,
       currentSessionId,
-      (event) => {
-        // Guard: Only process events for the currently selected session
+      (event: WidgetEvent) => {
+        // Defence-in-depth: even though the token guard above prevents the
+        // wrong subscription from being installed in the first place, the
+        // underlying centrifuge sub may still receive in-flight publications
+        // between unsubscribe() and full teardown — drop those silently.
         if (selectedSession.value?.sessionId !== currentSessionId) {
           return
         }
         handleSessionEvent(event)
       },
-      (err) => console.warn('[Admin SSE] Error:', err),
-      { initialLastEventId: response.latestEventId ?? 0 }
+      (err) => console.warn('[WidgetSessions] realtime error:', err)
+    )
+
+    // Open the dedicated typing channel for this session. Visitor typing
+    // frames arrive here directly from the browser via Centrifugo — no
+    // PHP round-trip per keystroke. The session-token race guard above
+    // also protects this handle (we close it on every viewSession() call).
+    typingChannel = openOperatorTypingChannel(
+      widgetId.value,
+      currentSessionId,
+      (frame) => {
+        if (selectedSession.value?.sessionId !== currentSessionId) return
+        if (frame.from !== 'visitor') return
+        if (frame.text) {
+          typingPreview.value = { text: frame.text, timestamp: Math.floor(frame.ts / 1000) }
+          nextTick(() => scrollToBottom())
+        } else {
+          typingPreview.value = null
+        }
+      },
+      (err) => console.debug('[WidgetSessions] typing channel error:', err)
     )
   } catch (err: unknown) {
+    if (myToken !== viewSessionToken) {
+      return
+    }
     error(getErrorMessage(err) || 'Failed to load session details')
   } finally {
-    loadingDetail.value = false
-    // Scroll after messages are rendered (after loadingDetail is false)
-    await nextTick()
-    scrollToBottom()
+    if (myToken === viewSessionToken) {
+      loadingDetail.value = false
+      // Scroll after messages are rendered (after loadingDetail is false)
+      await nextTick()
+      scrollToBottom()
+    }
   }
 }
 
@@ -1408,7 +1476,7 @@ const handleSessionEvent = (event: WidgetEvent) => {
         }
       }
 
-      // Operator replied via SSE (e.g. from another client) → set waiting back to human
+      // Operator replied from another tab → set waiting back to human.
       const isOperatorMessage = direction === 'OUT' && sender === 'human'
       if (isOperatorMessage && selectedSession.value.mode === 'waiting') {
         selectedSession.value.mode = 'human'
@@ -1503,25 +1571,21 @@ const handleSessionEvent = (event: WidgetEvent) => {
       })
       nextTick(() => scrollToBottom())
     }
-  } else if (event.type === 'typing') {
-    // Handle typing preview from widget user
-    const text = (event.text as string) ?? ''
-    const timestamp = (event.timestamp as number) ?? Math.floor(Date.now() / 1000)
-
-    if (text) {
-      typingPreview.value = { text, timestamp }
-      nextTick(() => scrollToBottom())
-    } else {
-      // Empty text means user cleared input or sent message
-      typingPreview.value = null
-    }
   }
+  // NOTE: visitor typing previews used to arrive on the session channel
+  // (`event.type === 'typing'`). They now stream over the dedicated
+  // `widgettyping:*` channel opened in viewSession(), so this handler
+  // intentionally no longer reacts to typing frames here.
 }
 
 const closeSessionDetail = () => {
   if (eventSubscription.value) {
     eventSubscription.value.unsubscribe()
     eventSubscription.value = null
+  }
+  if (typingChannel) {
+    typingChannel.close()
+    typingChannel = null
   }
   typingPreview.value = null
   selectedSession.value = null
@@ -1832,63 +1896,62 @@ const scrollToBottomOfMessages = () => {
   })
 }
 
-// Operator typing indicator - send to widget user
+// Operator typing indicator — published directly to the dedicated
+// `widgettyping:*` Centrifugo channel (no per-keystroke HTTP request).
+// We never send the operator's in-progress text — visitors only need a
+// "…" indicator, sending the text would leak the operator's draft to
+// whoever owns the visitor session.
 let typingStopTimer: ReturnType<typeof setTimeout> | null = null
 let isCurrentlyTyping = false
 let lastTypingEventTime = 0
-const TYPING_SEND_INTERVAL = 1500 // Send typing event at most every 1.5s
-const TYPING_STOP_DELAY = 2000 // Stop typing after 2s of no input
+const TYPING_SEND_INTERVAL = 1500 // Throttle: at most one publish every 1.5s
+const TYPING_STOP_DELAY = 2000 // Auto-clear typing 2s after the last keystroke
 
-async function sendOperatorTyping() {
+function publishOperatorTyping(text: string): void {
+  if (!typingChannel) return
   if (
     !selectedSession.value ||
     (selectedSession.value.mode !== 'human' && selectedSession.value.mode !== 'waiting')
-  )
+  ) {
     return
-
-  try {
-    await widgetSessionsApi.sendOperatorTyping(
-      widgetId.value,
-      selectedSession.value.sessionId,
-      true
-    )
-  } catch {
-    // Silently ignore typing errors - not critical
   }
+  typingChannel.publish(text)
 }
 
-// Watch messageText and send typing updates
+// Watch messageText and publish typing updates over the WS channel.
 watch(messageText, (newValue) => {
-  // Only send typing updates if session is in human or waiting mode
   if (
     !selectedSession.value ||
     (selectedSession.value.mode !== 'human' && selectedSession.value.mode !== 'waiting')
-  )
+  ) {
     return
+  }
 
-  // Clear stop timer on any input
   if (typingStopTimer) {
     clearTimeout(typingStopTimer)
     typingStopTimer = null
   }
 
   if (!newValue) {
-    // Text cleared (message sent or deleted) - stop typing indicator
+    if (isCurrentlyTyping) {
+      // Visitor sees "operator typing"; we explicitly clear it so the
+      // indicator doesn't linger after the operator wipes the input.
+      publishOperatorTyping('')
+    }
     isCurrentlyTyping = false
     return
   }
 
   const now = Date.now()
-
-  // Send immediately on first keystroke, then throttle
   if (!isCurrentlyTyping || now - lastTypingEventTime >= TYPING_SEND_INTERVAL) {
     isCurrentlyTyping = true
     lastTypingEventTime = now
-    sendOperatorTyping()
+    // Send a presence ping (non-empty marker, NOT the operator's draft).
+    publishOperatorTyping('typing')
   }
 
-  // Set timer to stop typing after 2 seconds of no input
   typingStopTimer = setTimeout(() => {
+    if (isCurrentlyTyping) publishOperatorTyping('')
     isCurrentlyTyping = false
   }, TYPING_STOP_DELAY)
 })
@@ -2117,11 +2180,16 @@ const getSenderLabel = (message: widgetSessionsApi.SessionMessage) => {
   return t('widgetSessions.assistant')
 }
 
-// Close SSE connection before page unload to prevent browser warning
+// Close the realtime subscription before page unload so the WS is torn
+// down cleanly (otherwise some browsers log a noisy warning).
 const handleBeforeUnload = () => {
   if (eventSubscription.value) {
     eventSubscription.value.unsubscribe()
     eventSubscription.value = null
+  }
+  if (typingChannel) {
+    typingChannel.close()
+    typingChannel = null
   }
 }
 
@@ -2139,6 +2207,10 @@ onUnmounted(() => {
   document.removeEventListener('mouseup', stopResize)
   if (eventSubscription.value) {
     eventSubscription.value.unsubscribe()
+  }
+  if (typingChannel) {
+    typingChannel.close()
+    typingChannel = null
   }
   if (cfSaveTimer) clearTimeout(cfSaveTimer)
 })

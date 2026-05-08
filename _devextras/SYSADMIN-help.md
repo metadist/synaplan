@@ -272,6 +272,109 @@ For high availability, Qdrant supports clustering. See [Qdrant documentation](ht
 
 ---
 
+# REDIS + REALTIME (CENTRIFUGO)
+
+The realtime stack (live chat takeover, operator notifications, future
+WebSocket features) runs on **Redis** as the shared state layer and
+**Centrifugo** as the WebSocket gateway. Both are sized to be
+"infrastructure" — many features depend on them, not just the chat widget.
+
+## Architecture
+
+```
+                Browser (visitor / operator)
+                           │  WSS /connection/websocket
+                           ▼
+                Cloudflare ──► Load Balancer
+                           │
+        ┌──────────────────┼──────────────────┐
+        ▼                  ▼                  ▼
+   Caddy (web1)       Caddy (web2)       Caddy (web3)
+        │                  │                  │
+        ├─► PHP/Symfony ──► HTTP publish ──► Centrifugo (web1)
+        │                  │                       │
+        │                  │                       ▼
+        │                  │                    Redis (shared)
+        │                  │                       ▲
+        └─► Centrifugo (local) ◄──── Redis pub/sub ┘
+```
+
+* **Redis** is shared across all web nodes. It backs Symfony cache, lock,
+  rate-limiter, sessions, and the Centrifugo engine (logical DB 3 by
+  default — see `_docker/centrifugo/config.json`).
+* **Centrifugo** runs locally on every web node. The load balancer can
+  send a WebSocket upgrade to any node — Centrifugo instances exchange
+  publishes via the shared Redis, so a publish on node A reaches a
+  subscriber on node B in <100ms. **No sticky sessions required.**
+* PHP publishes via Centrifugo's HTTP server API
+  (`REALTIME_API_URL=http://centrifugo:8000/api`), authenticated with
+  `REALTIME_API_KEY`.
+* Browsers obtain short-lived (60s) JWTs from
+  `/api/v1/realtime/token` (operators) or
+  `/api/v1/realtime/widget/{widgetId}/sessions/{sessionId}/token`
+  (visitors), signed with `REALTIME_TOKEN_SECRET`.
+
+## Cloudflare
+
+WebSockets work out of the box on every Cloudflare plan (WSS terminates
+identically to HTTPS). A few specifics worth knowing:
+
+* **Idle timeout is 100s.** Centrifugo sends pings every 25s by default,
+  so this never trips.
+* **Caching rules:** `/connection/*` should be set to "Bypass Cache" if
+  you have an aggressive cache policy. The default rules already exclude
+  WebSocket upgrade requests.
+* **No special config required for the WSS upgrade itself** — Cloudflare
+  automatically detects `Upgrade: websocket` and proxies it.
+
+## Load Balancer
+
+* Health check `/up` (PHP backend) is sufficient — the LB does not need
+  to know about Centrifugo specifically; the Caddy reverse-proxy maps
+  `/connection/*` to the local Centrifugo.
+* No sticky sessions / cookie affinity required (Redis fan-out handles
+  cross-node visibility).
+
+## Sizing & Failure Modes
+
+* If **Redis goes down**: cache misses degrade to "fresh fetch" everywhere,
+  rate-limit counters reset, locks throw, and Centrifugo loses cross-node
+  fan-out (subscribers on the same node still see local publishes).
+  Treat Redis as **mandatory infrastructure** — run it with HA / Sentinel.
+* If **Centrifugo goes down on one node**: the LB will route subsequent
+  WS upgrades to a healthy node automatically. Existing connections drop
+  and the browser auto-reconnects within seconds (Centrifuge JS handles
+  this).
+* If **the publish HTTP call fails**: the publisher logs a warning and
+  swallows — no chat reply is dropped because of realtime infra. The
+  message is persisted in MariaDB and the next refresh will show it.
+
+## Realtime kill switch
+
+Set `REALTIME_ENABLED=false` in the backend env to stop the frontend from
+opening WebSocket connections (the runtime config endpoint will report
+the flag). This is an **emergency switch** — there is no SSE fallback
+after the cleanup phase.
+
+## Quick health checks
+
+```bash
+# Redis (DSN-aware ping)
+docker compose exec backend php bin/console redis:health 2>/dev/null || \
+  docker compose exec redis redis-cli ping
+
+# Centrifugo
+curl -fsS http://localhost:8000/health
+
+# Backend → Centrifugo HTTP publish
+curl -fsS -X POST http://localhost:8000/centrifugo/api \
+  -H "X-API-Key: ${REALTIME_API_KEY}" \
+  -H "Content-Type: application/json" \
+  -d '{"method":"info"}'
+```
+
+---
+
 # ENVIRONMENT VARIABLES
 
 ## Required (backend/.env)

@@ -190,6 +190,25 @@ class ConfigController extends AbstractController
                     ]
                 ),
                 new OA\Property(
+                    property: 'realtime',
+                    type: 'object',
+                    description: 'Realtime / WebSocket gateway settings consumed by the frontend Centrifugo client. There is no transport fallback — when `enabled` is false the dashboard simply does not subscribe.',
+                    properties: [
+                        new OA\Property(
+                            property: 'enabled',
+                            type: 'boolean',
+                            example: true,
+                            description: 'Master kill-switch. When false, the dashboard skips every realtime subscription.'
+                        ),
+                        new OA\Property(
+                            property: 'wsUrl',
+                            type: 'string',
+                            example: 'wss://app.example.com/connection/websocket',
+                            description: 'Browser-facing WebSocket endpoint. Empty string means "use same-origin /connection/websocket" (Caddy reverse-proxies to centrifugo).'
+                        ),
+                    ]
+                ),
+                new OA\Property(
                     property: 'unavailableProviders',
                     type: 'array',
                     description: 'AI providers that are disabled due to missing API keys (only for authenticated users)',
@@ -289,6 +308,21 @@ class ConfigController extends AbstractController
             }
         }
 
+        // Realtime / WebSocket gateway settings.
+        // - enabled: master kill-switch so we can disable WS instantly without a deploy.
+        // - wsUrl:   empty string ⇒ frontend uses same-origin /connection/websocket
+        //            (Caddy reverse-proxies to centrifugo). Override only for setups
+        //            where Centrifugo lives on a separate hostname.
+        // There is no fallback transport: when realtime is disabled the dashboard
+        // simply skips its subscriptions (operators still see fresh data via the
+        // existing REST endpoints, just without push updates).
+        $realtimeEnabled = 'false' !== ($_ENV['REALTIME_ENABLED'] ?? 'true');
+        $realtimeWsUrl = (string) ($_ENV['REALTIME_PUBLIC_WS_URL'] ?? '');
+        $realtimeConfig = [
+            'enabled' => $realtimeEnabled,
+            'wsUrl' => $realtimeWsUrl,
+        ];
+
         $response = [
             'billing' => [
                 'enabled' => $this->billingService->isEnabled(),
@@ -299,6 +333,7 @@ class ConfigController extends AbstractController
             'plugins' => $plugins,
             'googleTag' => $googleTagConfig,
             'build' => $buildInfo,
+            'realtime' => $realtimeConfig,
         ];
 
         if ($user && !empty($unavailableProviders)) {

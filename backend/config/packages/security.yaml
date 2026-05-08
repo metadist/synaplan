@@ -105,9 +105,14 @@ security:
         - { path: ^/api/v1/messages/stream, roles: PUBLIC_ACCESS }
         - { path: ^/api, methods: [OPTIONS], roles: PUBLIC_ACCESS }
 
-        # Public widget session events (SSE and polling for real-time updates)
-        - { path: ^/api/v1/widgets/[^/]+/sessions/[^/]+/events, roles: PUBLIC_ACCESS }
-        - { path: ^/api/v1/widgets/[^/]+/sessions/[^/]+/poll, roles: PUBLIC_ACCESS }
+        # Realtime gateway (Centrifugo) — token endpoints.
+        # The widget visitor token endpoint is intentionally public and proves
+        # ownership via the (widgetId, sessionId) URL pair (the sessionId is a
+        # guess-resistant UUID minted server-side). The /subscribe endpoint
+        # accepts both anonymous visitors AND authenticated operators; the
+        # controller picks the right SubscriberContext based on the auth state.
+        - { path: ^/api/v1/realtime/widget/[^/]+/sessions/[^/]+/token, roles: PUBLIC_ACCESS }
+        - { path: ^/api/v1/realtime/subscribe, roles: PUBLIC_ACCESS }
 
         # Public marketeer published pages (anonymous slug URLs)
         - { path: ^/api/v1/marketeer/public/, methods: [GET, HEAD], roles: PUBLIC_ACCESS }

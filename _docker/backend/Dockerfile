@@ -16,6 +16,16 @@ FROM ghcr.io/metadist/synaplan-base-php:1.0.1@sha256:35e81beba0b8b09f8b43cd3a371
 
 WORKDIR /var/www/backend
 
+# phpredis (ext-redis) — required by Symfony Messenger's Redis Streams transport
+# (`symfony/redis-messenger`). Cache, Sessions, and the platform RedisService all
+# use Predis (pure PHP) and do NOT need this extension, but the messenger
+# CONSUMER must speak the binary protocol via phpredis.
+RUN apt-get update && apt-get install -y --no-install-recommends $PHPIZE_DEPS \
+    && pecl install redis \
+    && docker-php-ext-enable redis \
+    && apt-get purge -y --auto-remove -o APT::AutoRemove::RecommendsImportant=false $PHPIZE_DEPS \
+    && rm -rf /var/lib/apt/lists/*
+
 # Set default environment variables for paths and constants
 # These are baked into the image since they reference local filesystem paths
 ENV BRAVE_SEARCH_API_URL=https://api.search.brave.com/res/v1 \
@@ -57,7 +67,7 @@ COPY plugins/ /plugins/
 #   This is safe for Symfony apps where all classes are autoloaded via composer
 #   Provides significant performance improvement by eliminating file_exists() calls
 # Cache is cleared on container startup anyway via docker-entrypoint.sh
-RUN composer install --prefer-dist --no-interaction --no-dev --no-scripts --optimize-autoloader --classmap-authoritative --ignore-platform-req=ext-redis && \
+RUN composer install --prefer-dist --no-interaction --no-dev --no-scripts --optimize-autoloader --classmap-authoritative && \
     chown -R www-data:www-data /var/www/backend/vendor
 
 # Copy and setup entrypoint scripts (entrypoint + sourced migrations-bootstrap library)

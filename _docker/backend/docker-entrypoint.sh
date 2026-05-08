@@ -223,12 +223,37 @@ bootstrap_migrations_metadata "" "main"
 php bin/console doctrine:migrations:migrate --no-interaction --allow-no-migration
 echo "✅ Database migrations applied!"
 
-# Same flow for the test database (PHPUnit + DAMA transaction rollback)
+# Same flow for the test database (PHPUnit + DAMA transaction rollback).
+#
+# This is best-effort in dev: depending on which compose file is active, the
+# `db_test` host referenced in backend/.env.test may not exist (it ships with
+# docker-compose.test.yml's separate test-stack, not the default dev stack).
+# When it is missing, every `php bin/console … --env=test` call inside the
+# block fails to connect — and under `set -euo pipefail` a single failed
+# pipeline (e.g. `_count_sql` inside `bootstrap_migrations_metadata`) would
+# silently kill the entrypoint and put the container into a restart loop.
+#
+# The whole block therefore runs inside a subshell whose non-zero exit is
+# swallowed by `|| { … }`. Output is captured so a missing test DB doesn't
+# spam the dev log with confusing `Connection refused` traces; if you DO need
+# to debug the test bootstrap, run the same commands manually inside the
+# container.
 if [ "$APP_ENV" = "dev" ]; then
-    echo "🔄 Migrating test database..."
-    bootstrap_migrations_metadata "--env=test" "test"
-    php bin/console doctrine:migrations:migrate --no-interaction --allow-no-migration --env=test 2>/dev/null || true
-    echo "✅ Test database migrations applied!"
+    echo "🔄 Migrating test database (best-effort)..."
+    _test_bootstrap_failed=0
+    (
+        set -e
+        bootstrap_migrations_metadata "--env=test" "test"
+        php bin/console doctrine:migrations:migrate \
+            --no-interaction --allow-no-migration --env=test
+    ) >/dev/null 2>&1 || _test_bootstrap_failed=1
+
+    if [ "$_test_bootstrap_failed" -eq 0 ]; then
+        echo "✅ Test database migrations applied!"
+    else
+        echo "ℹ️  Test database unreachable — skipping (expected unless docker-compose.test.yml is active)."
+    fi
+    unset _test_bootstrap_failed
 fi
 
 # Load demo user fixtures FIRST (dev/test only, when DB is fresh).

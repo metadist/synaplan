@@ -24,7 +24,9 @@ jobs:
         uses: shivammathur/setup-php@accd6127cb78bee3e8082180cb391013d204ef9f # v2
         with:
           php-version: "8.4"
-          extensions: mbstring, xml, ctype, iconv, intl
+          # `redis` (phpredis) is in composer.json's require for `symfony/redis-messenger`,
+          # so installing without it would force `--ignore-platform-req=ext-redis` here too.
+          extensions: mbstring, xml, ctype, iconv, intl, redis
           coverage: none
 
       - name: Cache composer dependencies
@@ -74,7 +76,10 @@ jobs:
         uses: shivammathur/setup-php@accd6127cb78bee3e8082180cb391013d204ef9f # v2
         with:
           php-version: "8.4"
-          extensions: mbstring, xml, ctype, iconv, intl, pdo, pdo_mysql, zip, gd, curl, bcmath, exif, pcntl, opcache, readline, soap, sodium, ffi, imagick, grpc
+          # `redis` (phpredis) is required by `symfony/redis-messenger`. Sessions
+          # and cache.app use Predis (pure PHP) so they don't need it, but `composer
+          # install` would refuse to run without it on the platform-req check.
+          extensions: mbstring, xml, ctype, iconv, intl, pdo, pdo_mysql, zip, gd, curl, bcmath, exif, pcntl, opcache, readline, soap, sodium, ffi, imagick, grpc, redis
           coverage: none
 
       - name: Cache composer dependencies

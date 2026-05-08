@@ -10,7 +10,6 @@ use App\Repository\ChatRepository;
 use App\Repository\MessageRepository;
 use App\Repository\WidgetRepository;
 use App\Repository\WidgetSessionRepository;
-use App\Service\WidgetEventCacheService;
 use App\Service\WidgetService;
 use App\Service\WidgetSessionService;
 use Doctrine\ORM\EntityManagerInterface;
@@ -38,7 +37,6 @@ class WidgetSessionController extends AbstractController
         private ChatRepository $chatRepository,
         private MessageRepository $messageRepository,
         private LoggerInterface $logger,
-        private WidgetEventCacheService $eventCache,
         private EntityManagerInterface $em,
         private WidgetService $widgetService,
         private WidgetSessionService $sessionService,
@@ -337,9 +335,9 @@ class WidgetSessionController extends AbstractController
             }
         }
 
-        // Get the latest event ID so the frontend can subscribe to SSE
-        // starting from this point, avoiding replay of historical events
-        $latestEventId = $this->eventCache->getLatestEventId($widgetId, $session->getSessionId());
+        // Realtime delivery is handled by Centrifugo (channel history with
+        // `force_recovery` enabled). No event-id cursor is required from
+        // the REST detail endpoint.
 
         return $this->json([
             'success' => true,
@@ -364,7 +362,6 @@ class WidgetSessionController extends AbstractController
                 'customFieldValues' => $session->getCustomFieldValues(),
             ],
             'messages' => $messages,
-            'latestEventId' => $latestEventId,
         ]);
     }
 
@@ -527,89 +524,57 @@ class WidgetSessionController extends AbstractController
     }
 
     /**
-     * Send typing indicator from operator to widget user.
+     * @deprecated Operator typing indicators now stream over the
+     *             `widgettyping:*` Centrifugo channel via direct
+     *             client-publish. This endpoint is retained for ONE
+     *             release as a no-op so that browser-cached old dashboard
+     *             bundles do not start hitting 404s after the cutover.
+     *             Will be removed in the release that follows.
+     *
+     *             Why no-op (and not "still publish")? Keeping the legacy
+     *             publish path live alongside the new client-publish path
+     *             would deliver every operator typing event TWICE — once
+     *             over the legacy `widget:*` channel via this controller,
+     *             and once over the new `widgettyping:*` channel. The
+     *             receiver-side filters would have to special-case the
+     *             duplicate, which is the opposite of "boring code".
      */
     #[Route('/{sessionId}/typing', name: 'typing', methods: ['POST'])]
     #[OA\Post(
         path: '/api/v1/widgets/{widgetId}/sessions/{sessionId}/typing',
-        summary: 'Send typing indicator from operator to widget',
+        summary: '[DEPRECATED] Send typing indicator from operator to widget',
+        description: 'Deprecated — typing indicators now stream over the `widgettyping:*` Centrifugo channel via direct client-publish. Retained for one release as a no-op for backward compatibility with cached browser bundles.',
         security: [['Bearer' => []]],
+        deprecated: true,
         tags: ['Widget Sessions']
     )]
     #[OA\Parameter(name: 'widgetId', in: 'path', required: true, schema: new OA\Schema(type: 'string'))]
     #[OA\Parameter(name: 'sessionId', in: 'path', required: true, schema: new OA\Schema(type: 'string'))]
-    #[OA\RequestBody(
-        required: true,
-        content: new OA\JsonContent(
-            properties: [
-                new OA\Property(property: 'isTyping', type: 'boolean', description: 'Whether operator is typing'),
-            ]
-        )
-    )]
-    #[OA\Response(
-        response: 200,
-        description: 'Typing indicator sent',
-        content: new OA\JsonContent(
-            properties: [
-                new OA\Property(property: 'success', type: 'boolean'),
-            ]
-        )
-    )]
+    #[OA\Response(response: 200, description: 'Accepted (deprecated, no-op)')]
     public function typing(
         string $widgetId,
         string $sessionId,
-        Request $request,
         #[CurrentUser] ?User $user,
     ): JsonResponse {
         if (!$user) {
             return $this->json(['error' => 'Not authenticated'], Response::HTTP_UNAUTHORIZED);
         }
 
-        $widget = $this->widgetRepository->findByWidgetId($widgetId);
+        $this->logger->info('Deprecated operator typing endpoint hit (no-op)', [
+            'widget_id' => $widgetId,
+            'session_id' => $sessionId,
+            'user_id' => $user->getId(),
+        ]);
 
-        if (!$widget) {
-            return $this->json(['error' => 'Widget not found'], Response::HTTP_NOT_FOUND);
-        }
-
-        if ($widget->getOwnerId() !== $user->getId()) {
-            return $this->json(['error' => 'Access denied'], Response::HTTP_FORBIDDEN);
-        }
-
-        $session = $this->sessionRepository->findByWidgetAndSession($widgetId, $sessionId);
-
-        if (!$session) {
-            return $this->json(['error' => 'Session not found'], Response::HTTP_NOT_FOUND);
-        }
-
-        // Only send typing indicator if session is in human or waiting mode
-        if (!in_array($session->getMode(), ['human', 'waiting'], true)) {
-            return $this->json([
-                'error' => sprintf('Session must be in "human" or "waiting" mode, current mode: "%s"', (string) $session->getMode()),
-            ], Response::HTTP_BAD_REQUEST);
-        }
-
-        try {
-            $data = json_decode($request->getContent(), true);
-            $isTyping = $data['isTyping'] ?? true;
-
-            if ($isTyping) {
-                $this->eventCache->setTyping($widgetId, $sessionId, $user->getId());
-            } else {
-                $this->eventCache->clearTyping($widgetId, $sessionId);
-            }
-
-            return $this->json(['success' => true]);
-        } catch (\Exception $e) {
-            $this->logger->error('Failed to send typing indicator', [
-                'widget_id' => $widgetId,
-                'session_id' => $sessionId,
-                'error' => $e->getMessage(),
-            ]);
-
-            return $this->json([
-                'error' => 'Failed to send typing indicator',
-            ], Response::HTTP_INTERNAL_SERVER_ERROR);
-        }
+        // Authorisation is intentionally skipped — the endpoint never
+        // touches state. Returning 200 keeps stale dashboard bundles
+        // happy until they refresh and pick up the new client-publish
+        // code path.
+        return $this->json([
+            'success' => true,
+            'deprecated' => true,
+            'replacement' => 'widgettyping channel via direct client-publish',
+        ]);
     }
 
     /**

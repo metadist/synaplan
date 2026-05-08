@@ -18,7 +18,7 @@ use App\Service\Message\MessageProcessor;
 use App\Service\PromptService;
 use App\Service\RateLimitService;
 use App\Service\UrlContentService;
-use App\Service\WidgetEventCacheService;
+use App\Service\WidgetRealtimeBroadcaster;
 use App\Service\WidgetService;
 use App\Service\WidgetSessionService;
 use Doctrine\ORM\EntityManagerInterface;
@@ -54,7 +54,7 @@ class WidgetPublicController extends AbstractController
         private ChatRepository $chatRepository,
         private MessageRepository $messageRepository,
         private FileRepository $fileRepository,
-        private WidgetEventCacheService $eventCache,
+        private WidgetRealtimeBroadcaster $broadcaster,
         private EntityManagerInterface $em,
         private LoggerInterface $logger,
         private DiscordNotificationService $discord,
@@ -89,6 +89,25 @@ class WidgetPublicController extends AbstractController
                 new OA\Property(property: 'name', type: 'string'),
                 new OA\Property(property: 'config', type: 'object'),
                 new OA\Property(property: 'isActive', type: 'boolean'),
+                new OA\Property(
+                    property: 'realtime',
+                    type: 'object',
+                    description: 'Realtime / Centrifugo settings consumed by the embedded widget. The cross-origin widget cannot read /api/v1/config/runtime, so we surface the relevant subset here.',
+                    properties: [
+                        new OA\Property(
+                            property: 'enabled',
+                            type: 'boolean',
+                            example: true,
+                            description: 'Master kill-switch. When false, the widget makes no WebSocket connection.'
+                        ),
+                        new OA\Property(
+                            property: 'wsUrl',
+                            type: 'string',
+                            example: 'wss://app.example.com/connection/websocket',
+                            description: 'Browser-facing WebSocket endpoint. Empty string means "derive from apiUrl" (Caddy reverse-proxies /connection/websocket to Centrifugo).'
+                        ),
+                    ]
+                ),
             ]
         )
     )]
@@ -122,6 +141,15 @@ class WidgetPublicController extends AbstractController
             'name' => $widget->getName(),
             'config' => self::buildPublicConfig($config),
             'isActive' => true,
+            'realtime' => [
+                // REALTIME_ENABLED is the global kill-switch shared with the
+                // operator UI (see ConfigController::getRuntimeConfig). Empty
+                // wsUrl tells the widget to derive the endpoint from apiUrl,
+                // which is the right default for both same-origin and
+                // cross-origin embeds.
+                'enabled' => 'false' !== ($_ENV['REALTIME_ENABLED'] ?? 'true'),
+                'wsUrl' => (string) ($_ENV['REALTIME_PUBLIC_WS_URL'] ?? ''),
+            ],
         ]);
     }
 
@@ -352,8 +380,10 @@ class WidgetPublicController extends AbstractController
             $this->em->persist($incomingMessage);
             $this->em->flush();
 
-            // Publish event for user message (so admin panel receives it in real-time)
-            $this->eventCache->publish($widgetId, $session->getSessionId(), 'message', [
+            // Publish event for user message (so admin panel receives it in
+            // real-time). The broadcaster fans this out on the widget session
+            // channel via Centrifugo.
+            $this->broadcaster->publishSessionEvent($widgetId, $session->getSessionId(), 'message', [
                 'direction' => 'IN',
                 'text' => $data['text'],
                 'messageId' => $incomingMessage->getId(),
@@ -688,8 +718,9 @@ class WidgetPublicController extends AbstractController
                     $currentSession->setLastMessagePreview($responseText);
                     $this->em->flush();
 
-                    // Publish event for AI response (so admin panel receives it in real-time)
-                    $this->eventCache->publish($widgetId, $session->getSessionId(), 'message', [
+                    // Publish AI response on the session channel so the admin
+                    // dashboard receives it in real time via Centrifugo.
+                    $this->broadcaster->publishSessionEvent($widgetId, $session->getSessionId(), 'message', [
                         'direction' => 'OUT',
                         'text' => $responseText,
                         'messageId' => $outgoingMessage->getId(),
@@ -1556,61 +1587,37 @@ class WidgetPublicController extends AbstractController
     }
 
     /**
-     * Send typing indicator (live preview for admin dashboard).
-     *
-     * PUBLIC endpoint - no authentication required
+     * @deprecated Visitor typing previews now stream over the
+     *             `widgettyping:*` Centrifugo channel via direct
+     *             client-publish from the embedded widget. This endpoint
+     *             is retained for ONE release as a no-op so that
+     *             browser-cached old `widget.js` bundles do not start
+     *             hitting 404s after the cutover. Will be removed in the
+     *             release that follows.
      */
     #[Route('/{widgetId}/typing', name: 'typing', methods: ['POST'])]
     #[OA\Post(
         path: '/api/v1/widget/{widgetId}/typing',
-        summary: 'Send typing indicator (public)',
+        summary: '[DEPRECATED] Send typing indicator (public)',
+        description: 'Deprecated — visitor typing previews now stream over the `widgettyping:*` Centrifugo channel via direct client-publish. Retained for one release as a no-op for backward compatibility with cached widget bundles.',
+        deprecated: true,
         tags: ['Widget (Public)']
     )]
-    #[OA\RequestBody(
-        content: new OA\JsonContent(
-            required: ['sessionId'],
-            properties: [
-                new OA\Property(property: 'sessionId', type: 'string'),
-                new OA\Property(property: 'text', type: 'string', description: 'Current input text (empty to clear)'),
-            ]
-        )
-    )]
-    #[OA\Response(response: 200, description: 'Typing indicator sent')]
-    public function typing(string $widgetId, Request $request): JsonResponse
+    #[OA\Response(response: 200, description: 'Accepted (deprecated, no-op)')]
+    public function typing(string $widgetId): JsonResponse
     {
-        $widget = $this->widgetService->getWidgetById($widgetId);
-        if (!$widget) {
-            return $this->json(['error' => 'Widget not found'], Response::HTTP_NOT_FOUND);
-        }
-
-        if (!$this->widgetService->isWidgetActive($widget)) {
-            return $this->json(['error' => 'Widget is not active'], Response::HTTP_SERVICE_UNAVAILABLE);
-        }
-
-        $config = $widget->getConfig();
-        if ($domainError = $this->ensureDomainAllowed($config, $request, $widget->getOwnerId())) {
-            return $domainError;
-        }
-
-        $data = $request->toArray();
-        $sessionId = $data['sessionId'] ?? null;
-        $text = $data['text'] ?? '';
-
-        if (!$sessionId) {
-            return $this->json(['error' => 'Session ID required'], Response::HTTP_BAD_REQUEST);
-        }
-
-        // Get or create session
-        $session = $this->sessionService->getOrCreateSession($widgetId, $sessionId);
-
-        // Publish typing event via cache (ephemeral, auto-expires)
-        // Note: This is user typing (has 'text' field), different from operator typing (no text)
-        $this->eventCache->publish($widgetId, $sessionId, 'typing', [
-            'text' => mb_substr($text, 0, 500),
-            'timestamp' => time(),
+        $this->logger->info('Deprecated visitor typing endpoint hit (no-op)', [
+            'widget_id' => $widgetId,
         ]);
 
-        return $this->json(['success' => true]);
+        // Returning 200 lets stale widget bundles silently degrade until
+        // the customer reloads the page and picks up the new bundle that
+        // publishes typing frames directly to Centrifugo.
+        return $this->json([
+            'success' => true,
+            'deprecated' => true,
+            'replacement' => 'widgettyping channel via direct client-publish',
+        ]);
     }
 
     /**
