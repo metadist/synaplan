@@ -201,24 +201,30 @@ services:
     entrypoint: ["bash", "-c"]
     command:
       - |
-        # Wait for the backend container to finish migrations / cache warmup,
-        # otherwise the first consume cycle races against schema and crashes
-        # with "Table doctrine_migration_versions doesn't exist".
-        until php bin/console --env=prod dbal:run-sql 'SELECT 1' >/dev/null 2>&1; do
-          echo "[worker] waiting for db schema..."; sleep 3;
-        done
-
-        # Clear the prod cache on every restart. The cache lives under
-        # var/cache/prod/ on the bind-mounted backend volume, so it
-        # otherwise survives across container rebuilds and pins the
-        # compiled DI container to whatever code revision happened to
-        # boot it first. Symptom: ArgumentCountError /
-        # "Too few arguments to function ::__construct()" after any
-        # service constructor changes. Clearing on boot is a few
-        # seconds and matches what every Symfony deploy does anyway.
+        # Clear the prod cache BEFORE any console command runs. The cache lives
+        # under var/cache/prod/ on the bind-mounted backend volume, so it
+        # otherwise survives across container rebuilds and pins the compiled
+        # DI container to whatever code revision happened to boot it first.
+        #
+        # If we ran a console command first (e.g. dbal:run-sql), Symfony would
+        # try to load the stale compiled container and crash on any class that
+        # was removed in the new code — for example after the Doctrine DBAL
+        # upgrade the cached container references the removed
+        # `Doctrine\DBAL\Schema\LegacySchemaManagerFactory` and the worker
+        # deadlocks on its own DB readiness loop (issue #882). Same class of
+        # symptom as ArgumentCountError / "Too few arguments to function
+        # ::__construct()" after service constructor changes. Clearing on boot
+        # is a few seconds and matches what every Symfony deploy does anyway.
         echo "[worker] clearing prod cache..."
         rm -rf var/cache/prod
         php bin/console --env=prod cache:warmup
+
+        # Wait for the backend container to finish migrations, otherwise the
+        # first consume cycle races against schema and crashes with
+        # "Table doctrine_migration_versions doesn't exist".
+        until php bin/console --env=prod dbal:run-sql 'SELECT 1' >/dev/null 2>&1; do
+          echo "[worker] waiting for db schema..."; sleep 3;
+        done
 
         echo "[worker] db + cache ready, starting messenger:consume"
         exec php bin/console --env=prod messenger:consume \
