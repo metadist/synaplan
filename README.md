@@ -6,19 +6,27 @@ AI-powered knowledge management with RAG, chat widgets, and multi-channel integr
 
 > **Live instance**: [web.synaplan.com](https://web.synaplan.com/)
 
-![Synaplan Dashboard](docs/images/dashboard.png)
+![Synaplan Dashboard](docs/images/model-select.png)
 
 ---
+
+## Prerequisites
+
+- **Docker** + **Docker Compose v2** (Docker Desktop on macOS/Windows, or Docker Engine + the Compose plugin on Linux)
+- **Git**
+- **8 GB RAM** minimum (16 GB recommended for the local-AI standard install)
+- **~9 GB free disk** for the standard install (~5 GB for minimal)
+- Free TCP ports `5173`, `8000`, `8082`, `8025`, `3307`, `6333`, `11435`
 
 ## Quick Start
 
 ```bash
-git clone <repository-url>
+git clone https://github.com/metadist/synaplan.git
 cd synaplan
 docker compose up -d
 ```
 
-Open http://localhost:5173 — ready in ~2 minutes.
+Open http://localhost:5173 — the **UI is ready in ~2 minutes**. With the standard install, local Ollama models (`gpt-oss:20b`, `bge-m3`, ~14 GB total) continue downloading in the background — chat that uses local AI will start working once that download finishes (`docker compose logs -f backend` shows progress). For the fastest first experience, use the [Minimal](#install-options) install below.
 
 ---
 
@@ -29,7 +37,14 @@ Open http://localhost:5173 — ready in ~2 minutes.
 | **Standard** | `docker compose up -d` | ~9 GB | Full features, local AI |
 | **Minimal** | `docker compose -f docker-compose-minimal.yml up -d` | ~5 GB | Cloud AI only (Groq/OpenAI) |
 
-For minimal install, add your API key:
+For the minimal install, set your API key **before** starting the stack so the first boot already sees it (avoids a restart). Get a free key at [console.groq.com](https://console.groq.com):
+
+```bash
+echo "GROQ_API_KEY=your_key" >> backend/.env
+docker compose -f docker-compose-minimal.yml up -d
+```
+
+Already started without a key? Add it and restart the backend:
 ```bash
 echo "GROQ_API_KEY=your_key" >> backend/.env && docker compose restart backend
 ```
