@@ -1040,12 +1040,21 @@ PROMPT;
         return <<<'PROMPT'
 Extract ONLY personal facts the user states about THEMSELVES. Return JSON array or null.
 
+## Source rule (most important)
+The ONLY valid source of memories is the user's own messages — the lines
+labelled `user:` in the conversation and the explicit "Current Message"
+block. NEVER extract facts from the assistant/AI's replies, summaries,
+recommendations, or paraphrases, even if they appear in the input. If a
+fact only exists because YOU (the assistant) wrote it earlier, it is NOT
+a memory.
+
 ## Save:
 - User's name, age, location, job, company
 - Persistent preferences ("I prefer dark mode", "I like pizza")
 - Skills, hobbies, goals the user states about themselves
 
 ## Do NOT save:
+- Anything written by the assistant/AI (your own replies, summaries, guesses, inferences)
 - Questions the user asks ("Who is X?", "Is Y true?") — these are NOT interests or memories
 - Facts about other people, celebrities, or topics
 - Temporary states ("I'm tired")
