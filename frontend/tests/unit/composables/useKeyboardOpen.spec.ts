@@ -19,6 +19,7 @@ import { useKeyboardOpen } from '@/composables/useKeyboardOpen'
 
 type FakeViewport = {
   height: number
+  scale: number
   addEventListener: (event: string, handler: () => void) => void
   removeEventListener: (event: string, handler: () => void) => void
 }
@@ -27,10 +28,11 @@ let listeners: Map<string, Set<() => void>>
 let originalVisualViewport: VisualViewport | null | undefined
 let originalInnerHeight: number
 
-const installFakeViewport = (height: number): FakeViewport => {
+const installFakeViewport = (height: number, scale: number = 1): FakeViewport => {
   listeners = new Map()
   const fake: FakeViewport = {
     height,
+    scale,
     addEventListener: (event, handler) => {
       if (!listeners.has(event)) listeners.set(event, new Set())
       listeners.get(event)!.add(handler)
@@ -150,5 +152,53 @@ describe('useKeyboardOpen', () => {
 
     expect(listeners.get('resize')?.size).toBe(0)
     expect(listeners.get('scroll')?.size).toBe(0)
+  })
+
+  // Per Copilot review on PR #907: pinch-zoom shrinks
+  // `visualViewport.height` proportionally to `visualViewport.scale`, which
+  // pre-fix would falsely trigger keyboard-open and rip the safe-area inset
+  // out from under a user who's just zooming in to inspect a chart / table.
+  // Guard: only attribute the height delta to the keyboard when scale ≈ 1.
+  it('does NOT trigger keyboard-open during pinch-zoom (scale > 1)', async () => {
+    // Pinch to 2× zoom: visualViewport.height roughly halves while scale
+    // doubles. Without the scale guard, the delta would be ≥ 150 px and
+    // the composable would erroneously flip true.
+    const fake = installFakeViewport(400, 2)
+    const wrapper = mount(Probe)
+    expect(wrapper.text()).toBe('false')
+
+    // Even firing a resize while still zoomed must keep it false.
+    fake.height = 350
+    fireEvent('resize')
+    await nextTick()
+    expect(wrapper.text()).toBe('false')
+
+    // Once the user pinches back to scale = 1 *and* the keyboard happens
+    // to be up at that moment, the composable must flip true again.
+    fake.scale = 1
+    fake.height = 540
+    fireEvent('resize')
+    await nextTick()
+    expect(wrapper.text()).toBe('true')
+  })
+
+  it('tolerates near-1 scale values (subpixel rounding) without flipping false', async () => {
+    // Android Chrome occasionally reports scale = 1.001 / 0.999 during a
+    // resize burst that is otherwise a plain keyboard show. Stay within
+    // the documented ±0.05 tolerance so we don't regress the keyboard-up
+    // detection on those devices.
+    const fake = installFakeViewport(800, 1)
+    const wrapper = mount(Probe)
+
+    fake.scale = 1.02
+    fake.height = 500
+    fireEvent('resize')
+    await nextTick()
+    expect(wrapper.text()).toBe('true')
+
+    fake.scale = 0.98
+    fireEvent('resize')
+    await nextTick()
+    expect(wrapper.text()).toBe('true')
   })
 })

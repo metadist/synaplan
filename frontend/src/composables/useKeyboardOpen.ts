@@ -28,6 +28,14 @@ import { ref, onMounted, onBeforeUnmount, type Ref } from 'vue'
  *   on a viewport we don't trust.
  * - `resize` and `scroll` events both fire on iOS during keyboard show/hide;
  *   we listen to both to avoid lag.
+ * - **Pinch-zoom guard**: `visualViewport.height` also shrinks during a
+ *   pinch-zoom (the visible viewport gets smaller because each CSS pixel
+ *   covers a larger physical area). Without a guard we'd falsely report
+ *   "keyboard open" and rip the safe-area inset out from under a user
+ *   that's just zooming in to inspect a chart. Only treat the height
+ *   delta as a keyboard signal when `scale` is at-or-near 1 (we leave a
+ *   ±0.05 tolerance so subpixel rounding on Android Chrome doesn't
+ *   create a near-1.0 false negative for short bursts).
  */
 export function useKeyboardOpen(): Ref<boolean> {
   const isOpen = ref(false)
@@ -35,9 +43,22 @@ export function useKeyboardOpen(): Ref<boolean> {
   // Empirically: keyboards eat ≥ 150 px even on the smallest iPhones. URL bar
   // collapses are typically ≤ 100 px and must NOT trigger this.
   const MIN_DELTA_PX = 150
+  // Tolerance around scale = 1.0 below which a viewport-height delta is
+  // attributed to the keyboard, not pinch-zoom. Anything outside this band
+  // is almost certainly user zoom — the soft keyboard does not change the
+  // visual viewport's `scale`.
+  const SCALE_TOLERANCE = 0.05
 
   const update = (): void => {
     if (typeof window === 'undefined' || !window.visualViewport) {
+      return
+    }
+    // Pinch-zoom shrinks `visualViewport.height` by the same factor as
+    // `scale`. We must NOT treat that as keyboard-open or we'll yank the
+    // home-indicator inset away while the user is just zooming in.
+    if (Math.abs(window.visualViewport.scale - 1) > SCALE_TOLERANCE) {
+      isOpen.value = false
+
       return
     }
     const delta = window.innerHeight - window.visualViewport.height
