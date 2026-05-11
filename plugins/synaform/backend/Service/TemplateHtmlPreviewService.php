@@ -72,7 +72,26 @@ final class TemplateHtmlPreviewService
 
         $doc = new \DOMDocument();
         $doc->preserveWhiteSpace = true;
-        @$doc->loadXML($xml);
+
+        // Capture libxml errors instead of suppressing with `@` so genuine
+        // parse failures are observable in logs.
+        $prevUseInternal = libxml_use_internal_errors(true);
+        libxml_clear_errors();
+        $loaded = $doc->loadXML($xml);
+        $xmlErrors = libxml_get_errors();
+        libxml_clear_errors();
+        libxml_use_internal_errors($prevUseInternal);
+
+        if (!$loaded) {
+            foreach ($xmlErrors as $err) {
+                $this->logger->warning('TemplateHtmlPreviewService: XML parse error', [
+                    'path'    => $docxPath,
+                    'message' => trim($err->message),
+                    'line'    => $err->line,
+                ]);
+            }
+            return $this->emptyResult();
+        }
 
         $xpath = new \DOMXPath($doc);
         $xpath->registerNamespace('w', 'http://schemas.openxmlformats.org/wordprocessingml/2006/main');
@@ -199,21 +218,18 @@ final class TemplateHtmlPreviewService
     private function renderRuns(\DOMElement $p, \DOMXPath $xpath, array &$state): string
     {
         // 1. Collect runs: text + merged rPr-derived style.
+        //
+        // Use `.//w:r` (rather than `./w:r`) so runs that WordprocessingML
+        // wraps inside `<w:hyperlink>`, `<w:sdt>`, `<w:smartTag>`, `<w:ins>`,
+        // etc. are picked up. XPath returns matches in document order, so
+        // visual ordering is preserved.
         $runs = [];
-        foreach ($xpath->query('./w:r', $p) as $run) {
+        foreach ($xpath->query('.//w:r', $p) as $run) {
             if (!$run instanceof \DOMElement) {
                 continue;
             }
             $rStyle = $this->runStyle($run, $xpath);
-            $text = '';
-            foreach ($xpath->query('.//w:t', $run) as $tNode) {
-                $text .= $tNode->nodeValue ?? '';
-            }
-            // Line breaks inside a run
-            foreach ($xpath->query('.//w:br', $run) as $_) {
-                $text .= "\n";
-            }
-            $runs[] = ['text' => $text, 'style' => $rStyle];
+            $runs[] = ['text' => $this->extractRunText($run), 'style' => $rStyle];
         }
 
         if (empty($runs)) {
@@ -381,6 +397,40 @@ final class TemplateHtmlPreviewService
             $parts[] = 'text-decoration:underline';
         }
         return implode(';', $parts);
+    }
+
+    /**
+     * Walk a `<w:r>`'s child nodes in document order so text fragments,
+     * line breaks, and tabs land in the position they appear in the DOCX.
+     * Pre-existing behaviour concatenated all `<w:t>` first and then appended
+     * `\n` per `<w:br>`, which moved every break to the end of the run.
+     */
+    private function extractRunText(\DOMElement $run): string
+    {
+        $text = '';
+        foreach ($run->childNodes as $child) {
+            if (!$child instanceof \DOMElement) {
+                continue;
+            }
+            switch ($child->localName) {
+                case 't':
+                    $text .= $child->nodeValue ?? '';
+                    break;
+                case 'br':
+                    $text .= "\n";
+                    break;
+                case 'tab':
+                    $text .= "\t";
+                    break;
+                case 'noBreakHyphen':
+                    $text .= "\u{2011}";
+                    break;
+                case 'softHyphen':
+                    $text .= "\u{00AD}";
+                    break;
+            }
+        }
+        return $text;
     }
 
     private function runStyle(\DOMElement $run, \DOMXPath $xpath): array
