@@ -757,7 +757,10 @@ import type {
   SavedMailHandler,
 } from '@/services/api/inboundEmailHandlersApi'
 import { defaultMailConfig, protocolOptions, securityOptions } from '@/mocks/mail'
-import { inboundEmailHandlersApi, MASKED_MAIL_PASSWORD_PLACEHOLDER } from '@/services/api/inboundEmailHandlersApi'
+import {
+  inboundEmailHandlersApi,
+  MASKED_MAIL_PASSWORD_PLACEHOLDER,
+} from '@/services/api/inboundEmailHandlersApi'
 import { useAuthStore } from '@/stores/auth'
 import { useI18n } from 'vue-i18n'
 
@@ -953,8 +956,7 @@ const testConnection = async () => {
   }
 
   const pwd = config.value.password ?? ''
-  const needsMailboxPassword =
-    pwd === '' || pwd === MASKED_MAIL_PASSWORD_PLACEHOLDER
+  const needsMailboxPassword = pwd === '' || pwd === MASKED_MAIL_PASSWORD_PLACEHOLDER
   if (needsMailboxPassword && !props.handlerId) {
     testResult.value = {
       success: false,

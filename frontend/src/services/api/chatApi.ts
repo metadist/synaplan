@@ -5,6 +5,7 @@
 import { z } from 'zod'
 import { httpClient, getApiBaseUrl } from './httpClient'
 import { UserMemorySchema } from './userMemoriesApi'
+import { hasSessionHint, clearSessionHint } from '@/services/sessionHint'
 import type { StreamUpdatePayload } from '@/types/chatStream'
 
 /**
@@ -52,9 +53,17 @@ let tokenProactiveTimer: ReturnType<typeof setTimeout> | null = null
 
 /**
  * Centralized token refresh - prevents concurrent refresh requests (stampede)
+ *
+ * Short-circuits when no session hint is present (issue #204): without
+ * this guard a guest hitting any chat surface would unconditionally fire
+ * `POST /api/v1/auth/refresh`, log a misleading "session expired" error
+ * and force-redirect to `/login?reason=session_expired`.
  */
 async function refreshAccessToken(): Promise<boolean> {
-  // If already refreshing, wait for that promise
+  if (!hasSessionHint()) {
+    return false
+  }
+
   if (tokenRefreshPromise) {
     return tokenRefreshPromise
   }
@@ -72,6 +81,9 @@ async function refreshAccessToken(): Promise<boolean> {
         return true
       }
 
+      // Server rejected the refresh - the cookie is gone. Clear the hint
+      // so subsequent calls short-circuit instead of repeating the dance.
+      clearSessionHint()
       return false
     } catch {
       return false
@@ -87,11 +99,22 @@ async function refreshAccessToken(): Promise<boolean> {
  * Get access token for SSE (EventSource can't send cookies)
  * Handles 401 with automatic token refresh
  * Throws error if authentication fails (triggers redirect to login)
+ *
+ * Short-circuits cleanly when no session hint is present (issue #204):
+ * unauthenticated callers — guests, page warm-ups, anything pre-login —
+ * get `null` back without firing any network requests or console errors.
+ * The misleading "Token refresh failed - session expired" log only
+ * surfaces when there genuinely WAS a session that just expired.
  */
 async function getSseToken(): Promise<string | null> {
   // Return cached token if available
   if (cachedSseToken) {
     return cachedSseToken
+  }
+
+  // Issue #204: never bootstrap auth for callers that have no session.
+  if (!hasSessionHint()) {
+    return null
   }
 
   // Prevent multiple simultaneous fetches

@@ -1,5 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { inboundEmailHandlersApi, MASKED_MAIL_PASSWORD_PLACEHOLDER } from '@/services/api/inboundEmailHandlersApi'
+import {
+  inboundEmailHandlersApi,
+  MASKED_MAIL_PASSWORD_PLACEHOLDER,
+} from '@/services/api/inboundEmailHandlersApi'
 import { httpClient } from '@/services/api/httpClient'
 
 vi.mock('@/services/api/httpClient', () => ({
@@ -267,7 +270,9 @@ describe('inboundEmailHandlersApi', () => {
         handlerId: '7',
       })
 
-      const payload = JSON.parse((vi.mocked(httpClient).mock.calls[0]?.[1] as { body: string }).body)
+      const payload = JSON.parse(
+        (vi.mocked(httpClient).mock.calls[0]?.[1] as { body: string }).body
+      )
       expect(payload).toEqual({
         mailServer: 'imap.test.com',
         port: 993,

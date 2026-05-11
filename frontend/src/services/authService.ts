@@ -14,6 +14,7 @@
 import { ref, type Ref } from 'vue'
 import { clearSseToken } from '@/services/api/chatApi'
 import { getApiBaseUrl } from '@/services/api/httpClient'
+import { setSessionHint, clearSessionHint, hasSessionHint } from '@/services/sessionHint'
 
 const API_BASE_URL = getApiBaseUrl()
 
@@ -47,39 +48,6 @@ const impersonator = ref<ImpersonatorInfo | null>(null)
 const isRefreshing = ref(false)
 const isLoggingOut = ref(false) // Prevent auth checks during logout
 let refreshPromise: Promise<boolean> | null = null
-
-/**
- * Session hint key in localStorage.
- * NOT security-sensitive - purely an optimization flag to avoid unnecessary
- * 401 requests (GET /auth/me + POST /auth/refresh) for users who have
- * never logged in. Set on successful auth, cleared on logout.
- */
-const SESSION_HINT_KEY = 'sh'
-
-function setSessionHint(): void {
-  try {
-    localStorage.setItem(SESSION_HINT_KEY, '1')
-  } catch {
-    // localStorage unavailable - graceful degradation
-  }
-}
-
-function clearSessionHint(): void {
-  try {
-    localStorage.removeItem(SESSION_HINT_KEY)
-  } catch {
-    // localStorage unavailable - graceful degradation
-  }
-}
-
-function hasSessionHint(): boolean {
-  try {
-    return localStorage.getItem(SESSION_HINT_KEY) === '1'
-  } catch {
-    // localStorage unavailable - assume session might exist to avoid breaking auth
-    return true
-  }
-}
 
 export const authService = {
   /**

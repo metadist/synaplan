@@ -5,6 +5,7 @@
 
 import { z } from 'zod'
 import { GetApiConfigRuntimeConfigResponseSchema } from '@/generated/api-schemas'
+import { hasSessionHint, clearSessionHint } from '@/services/sessionHint'
 
 // API base URL - lazy initialized on first use
 // For admin UI: empty string (same-origin)
@@ -221,8 +222,19 @@ function recordAuthFailure(): void {
  * Refresh access token using refresh token cookie.
  * For OIDC users, this refreshes against Keycloak.
  * If Keycloak rejects the refresh (user logged out), returns oidcSessionExpired: true
+ *
+ * Short-circuits without a network call when no session hint is present
+ * (e.g. first visit, incognito, after clearing storage). This prevents the
+ * 401 cascade that issue #204 documented on a fresh visit, and makes the
+ * refresh path safe to invoke from any code path without leaking misleading
+ * "session expired" noise into the console for users who never had a
+ * session in the first place.
  */
 async function refreshAccessToken(): Promise<RefreshResult> {
+  if (!hasSessionHint()) {
+    return { success: false }
+  }
+
   if (isRefreshing && refreshPromise) {
     return refreshPromise as Promise<RefreshResult>
   }
@@ -240,6 +252,10 @@ async function refreshAccessToken(): Promise<RefreshResult> {
         authFailureCount = 0
         return { success: true }
       }
+
+      // Refresh definitively failed - the stored cookie is dead. Clear the
+      // hint so future visits don't keep retrying against a closed session.
+      clearSessionHint()
 
       // Check if this was an OIDC session expiry (user logged out from Keycloak)
       try {
