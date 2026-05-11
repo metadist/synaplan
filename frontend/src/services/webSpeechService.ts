@@ -68,6 +68,25 @@ interface SpeechRecognitionConstructor {
   new (): SpeechRecognitionInstance
 }
 
+/**
+ * Snapshot of the entire recognition session at a single point in time.
+ *
+ * `final` is the concatenation of every result whose `isFinal` flag is true,
+ * `interim` is the most recent in-progress phrase (or empty string).
+ *
+ * Consumers should treat this as "the whole truth right now" and **assign**
+ * (`message.value = ...`) rather than append (`message.value += ...`). This
+ * is what makes the consumer immune to Android Chrome's broken behaviour
+ * where the same final segment can be re-emitted across multiple events with
+ * `event.resultIndex === 0` (issue #898).
+ */
+export interface WebSpeechSnapshot {
+  /** All finalized text since `start()`, joined with single spaces. */
+  final: string
+  /** The current interim (in-progress) phrase. Empty when no interim is pending. */
+  interim: string
+}
+
 export interface WebSpeechOptions {
   /** Language for recognition (e.g., 'en-US', 'de-DE'). Defaults to browser language. */
   language?: string
@@ -75,8 +94,13 @@ export interface WebSpeechOptions {
   interimResults?: boolean
   /** Keep listening after user stops speaking */
   continuous?: boolean
-  /** Called with transcribed text (interim or final) */
-  onResult?: (text: string, isFinal: boolean) => void
+  /**
+   * Called whenever the recognition state changes, with a full snapshot of
+   * the session so far. Replaces the legacy per-result `(text, isFinal)`
+   * signature, which was unsafe on Android: see `onresult` handler below
+   * and the `WebSpeechSnapshot` JSDoc for the rationale.
+   */
+  onResult?: (snapshot: WebSpeechSnapshot) => void
   /** Called when recognition starts */
   onStart?: () => void
   /** Called when recognition ends */
@@ -114,10 +138,11 @@ function getSpeechRecognition(): SpeechRecognitionConstructor | null {
  * Usage:
  * ```typescript
  * const speech = new WebSpeechService({
- *   onResult: (text, isFinal) => {
- *     if (isFinal) {
- *       messageInput.value += text
- *     }
+ *   onResult: ({ final, interim }) => {
+ *     // ALWAYS assign the snapshot — never append. The service rebuilds
+ *     // the cumulative final string on every event, so appending would
+ *     // duplicate text on Android Chrome (issue #898).
+ *     messageInput.value = `${final}${final && interim ? ' ' : ''}${interim}`
  *   },
  *   onError: (error) => {
  *     showError(error.userMessage)
@@ -190,14 +215,37 @@ export class WebSpeechService {
     }
 
     this.recognition.onresult = (event: SpeechRecognitionEventType) => {
-      const resultIndex = event.resultIndex
-      const result = event.results[resultIndex]
-
-      if (result) {
+      // The W3C spec says `event.results` is the cumulative list of all
+      // recognition results since the recogniser started. Final results are
+      // stable once their `isFinal` flag is true; the *last* result may still
+      // be interim. `event.resultIndex` is the first changed entry — but
+      // Android Chrome (and a handful of other engines) emit multiple events
+      // with the same `resultIndex` value and a growing final transcript at
+      // that index, which produced the duplicated text in #898.
+      //
+      // Treat `event.results` as the source of truth: rebuild the full final
+      // string on every event and emit a single snapshot. The consumer is
+      // then expected to *assign* (not append) the snapshot into the textbox,
+      // which makes duplicate emissions a no-op.
+      const finals: string[] = []
+      let interim = ''
+      for (let i = 0; i < event.results.length; i++) {
+        const result = event.results[i]
+        if (!result || result.length === 0) continue
         const transcript = result[0].transcript
-        const isFinal = result.isFinal
-        this.options.onResult?.(transcript, isFinal)
+        if (result.isFinal) {
+          finals.push(transcript)
+        } else {
+          // Per spec only one trailing interim is meaningful at a time, but
+          // some engines briefly report multiple in-progress entries. Keep
+          // the latest one — concatenation would inflate the visible text.
+          interim = transcript
+        }
       }
+      this.options.onResult?.({
+        final: finals.join(' ').replace(/\s+/g, ' ').trim(),
+        interim: interim.replace(/\s+/g, ' ').trim(),
+      })
     }
 
     this.recognition.onerror = (event: SpeechRecognitionErrorEventType) => {
