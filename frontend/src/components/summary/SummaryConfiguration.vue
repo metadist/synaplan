@@ -393,7 +393,12 @@ import {
 import type { SummaryConfig, FocusArea } from '@/mocks/summaries'
 import { summaryTypes, summaryLengths, outputLanguages, focusAreaOptions } from '@/mocks/summaries'
 import { useNotification } from '@/composables/useNotification'
-import { uploadFiles, getFileContent, type FileItem } from '@/services/filesService'
+import {
+  uploadFiles,
+  getFileContent,
+  UploadBlockedError,
+  type FileItem,
+} from '@/services/filesService'
 import FileSelectionModal from '@/components/FileSelectionModal.vue'
 import { getErrorMessage } from '@/utils/errorMessage'
 
@@ -549,8 +554,12 @@ const handleFile = async (file: File) => {
       error('Failed to extract text from file. Please try again.')
     }
   } catch (err: unknown) {
-    console.error('File upload error:', err)
-    error(getErrorMessage(err) || 'Failed to upload file. Please try again.')
+    if (err instanceof UploadBlockedError) {
+      error(`${err.filename}: ${err.check.message ?? 'Upload not allowed'}`)
+    } else {
+      console.error('File upload error:', err)
+      error(getErrorMessage(err) || 'Failed to upload file. Please try again.')
+    }
   } finally {
     isUploadingFile.value = false
     // Reset file input

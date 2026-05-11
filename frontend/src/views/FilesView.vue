@@ -1245,7 +1245,11 @@ import {
   XMarkIcon,
   ExclamationTriangleIcon,
 } from '@heroicons/vue/24/outline'
-import filesService, { type FileItem, type UploadProgress } from '@/services/filesService'
+import filesService, {
+  type FileItem,
+  type UploadProgress,
+  UploadBlockedError,
+} from '@/services/filesService'
 import { useNotification } from '@/composables/useNotification'
 import { useFilePersistence } from '@/composables/useInputPersistence'
 
@@ -1639,8 +1643,13 @@ const onFolderDrop = async (event: DragEvent, folderName: string) => {
       result.errors.forEach((err) => showError(`${err.filename}: ${err.error}`))
     }
   } catch (err) {
-    console.error('Upload error:', err)
-    showError('Failed to upload files: ' + (err as Error).message)
+    if (err instanceof UploadBlockedError) {
+      showError(translateUploadBlocked(err))
+      if (storageWidget.value) await storageWidget.value.refresh()
+    } else {
+      console.error('Upload error:', err)
+      showError('Failed to upload files: ' + (err as Error).message)
+    }
   } finally {
     isUploading.value = false
     uploadProgress.value = null
@@ -1714,12 +1723,33 @@ const uploadFiles = async () => {
       })
     }
   } catch (error) {
-    console.error('Upload error:', error)
-    showError('Failed to upload files: ' + (error as Error).message)
+    if (error instanceof UploadBlockedError) {
+      showError(translateUploadBlocked(error))
+      if (storageWidget.value) await storageWidget.value.refresh()
+    } else {
+      console.error('Upload error:', error)
+      showError('Failed to upload files: ' + (error as Error).message)
+    }
   } finally {
     isUploading.value = false
     uploadProgress.value = null
   }
+}
+
+const translateUploadBlocked = (err: UploadBlockedError): string => {
+  const key = `files.uploadBlocked.${err.reason}`
+  // Fall back to a generic translated message if the reason key is missing
+  const translated = t(key, {
+    filename: err.filename,
+    message: err.check.message ?? '',
+  })
+  if (translated === key) {
+    return t('files.uploadBlocked.generic', {
+      filename: err.filename,
+      message: err.check.message ?? '',
+    })
+  }
+  return translated
 }
 
 const handleUpgrade = () => {

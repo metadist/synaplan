@@ -318,7 +318,7 @@ import { ref, computed, watch, onUnmounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { XMarkIcon, ArrowDownTrayIcon, TrashIcon } from '@heroicons/vue/24/outline'
 import { Icon } from '@iconify/vue'
-import filesService, { type FileItem } from '@/services/filesService'
+import filesService, { type FileItem, UploadBlockedError } from '@/services/filesService'
 import { getApiBaseUrl } from '@/services/api/httpClient'
 import { useNotification } from '@/composables/useNotification'
 import FileContentModal from './FileContentModal.vue'
@@ -586,6 +586,22 @@ const uploadFiles = async (filesToUpload: File[]) => {
         if (err instanceof DOMException && err.name === 'AbortError') {
           await notifyUploadInterrupted()
           break
+        }
+        if (err instanceof UploadBlockedError) {
+          const key = `files.uploadBlocked.${err.reason}`
+          const translated = t(key, {
+            filename: err.filename,
+            message: err.check.message ?? '',
+          })
+          showError(
+            translated === key
+              ? t('files.uploadBlocked.generic', {
+                  filename: err.filename,
+                  message: err.check.message ?? '',
+                })
+              : translated
+          )
+          continue
         }
         console.error('Upload failed:', file.name, err)
         const msg = err instanceof Error ? err.message : 'Unknown error'

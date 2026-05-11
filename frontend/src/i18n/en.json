@@ -671,7 +671,14 @@
     "reVectorizeFailed": "Reprocessing failed",
     "uploadSuccess": "{count} file(s) uploaded successfully",
     "uploadCancelled": "Upload cancelled",
-    "uploadInterrupted": "Transfer interrupted. The file list was refreshed — anything that had already reached the server may still appear."
+    "uploadInterrupted": "Transfer interrupted. The file list was refreshed — anything that had already reached the server may still appear.",
+    "uploadBlocked": {
+      "storage_exceeded": "{filename}: Not enough storage. {message}",
+      "file_too_large": "{filename}: File is too large. {message}",
+      "extension_not_allowed": "{filename}: File type is not supported. {message}",
+      "rate_limit_exceeded": "{filename}: Upload rate limit reached. {message}",
+      "generic": "{filename}: Upload is not allowed. {message}"
+    }
   },
   "fileMention": {
     "hint": "Type to search files — press Enter to attach",

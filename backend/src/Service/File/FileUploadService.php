@@ -80,6 +80,105 @@ final readonly class FileUploadService
     }
 
     /**
+     * Pre-flight upload check.
+     *
+     * Validates rate limit, per-file size, file extension, and storage quota
+     * BEFORE the client uploads the file body. Lets the UI show a deterministic
+     * error instead of waiting for a slow/timing-out upload near quota.
+     *
+     * @return array{
+     *   allowed: bool,
+     *   reason?: 'rate_limit_exceeded'|'file_too_large'|'extension_not_allowed'|'storage_exceeded',
+     *   message?: string,
+     *   max_file_size: int,
+     *   allowed_extensions: list<string>,
+     *   remaining: int,
+     *   used?: int,
+     *   limit?: int
+     * }
+     */
+    public function checkUpload(User $user, string $filename, int $fileSize): array
+    {
+        $maxFileSize = FileStorageService::getMaxFileSize();
+        $allowedExtensions = FileStorageService::getAllowedExtensions();
+        $remaining = $this->storageQuotaService->getRemainingStorage($user);
+
+        $base = [
+            'max_file_size' => $maxFileSize,
+            'allowed_extensions' => $allowedExtensions,
+            'remaining' => $remaining,
+        ];
+
+        $rateLimitCheck = $this->rateLimitService->checkLimit($user, 'FILE_ANALYSIS');
+        if (!$rateLimitCheck['allowed']) {
+            return array_merge($base, [
+                'allowed' => false,
+                'reason' => 'rate_limit_exceeded',
+                'message' => "Rate limit exceeded for FILE_ANALYSIS. Used: {$rateLimitCheck['used']}/{$rateLimitCheck['limit']}",
+                'used' => (int) $rateLimitCheck['used'],
+                'limit' => (int) $rateLimitCheck['limit'],
+            ]);
+        }
+
+        if ($fileSize <= 0) {
+            return array_merge($base, [
+                'allowed' => false,
+                'reason' => 'file_too_large',
+                'message' => 'File appears to be empty. If using Dropbox, iCloud, or OneDrive, please download the file locally first before uploading.',
+            ]);
+        }
+
+        if ($fileSize > $maxFileSize) {
+            return array_merge($base, [
+                'allowed' => false,
+                'reason' => 'file_too_large',
+                'message' => sprintf('File too large. Maximum size is %d MB.', (int) ($maxFileSize / 1024 / 1024)),
+            ]);
+        }
+
+        $extension = strtolower(pathinfo($filename, PATHINFO_EXTENSION));
+        if ('' === $extension || !in_array($extension, $allowedExtensions, true)) {
+            return array_merge($base, [
+                'allowed' => false,
+                'reason' => 'extension_not_allowed',
+                'message' => 'File type not allowed. Allowed: '.implode(', ', $allowedExtensions),
+            ]);
+        }
+
+        if ($fileSize > $remaining) {
+            return array_merge($base, [
+                'allowed' => false,
+                'reason' => 'storage_exceeded',
+                'message' => sprintf(
+                    'Storage limit exceeded. You have %s remaining, but the file is %s. Upgrade your plan for more storage.',
+                    $this->formatBytes($remaining),
+                    $this->formatBytes($fileSize)
+                ),
+            ]);
+        }
+
+        return array_merge($base, ['allowed' => true]);
+    }
+
+    /**
+     * Format bytes to human-readable text. Kept private and minimal.
+     */
+    private function formatBytes(int $bytes): string
+    {
+        if ($bytes < 1024) {
+            return $bytes.' B';
+        }
+        if ($bytes < 1024 * 1024) {
+            return round($bytes / 1024, 2).' KB';
+        }
+        if ($bytes < 1024 * 1024 * 1024) {
+            return round($bytes / (1024 * 1024), 2).' MB';
+        }
+
+        return round($bytes / (1024 * 1024 * 1024), 2).' GB';
+    }
+
+    /**
      * Process a single uploaded file: store, extract text, vectorize.
      *
      * @return array<string, mixed>

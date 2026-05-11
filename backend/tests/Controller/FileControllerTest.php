@@ -281,6 +281,88 @@ class FileControllerTest extends WebTestCase
         $this->assertEquals(404, $response->getStatusCode());
     }
 
+    public function testCheckUploadAllowsValidFile(): void
+    {
+        $this->client->request(
+            'POST',
+            '/api/v1/files/check-upload',
+            [],
+            [],
+            [
+                'HTTP_AUTHORIZATION' => 'Bearer '.$this->authToken,
+                'CONTENT_TYPE' => 'application/json',
+            ],
+            json_encode(['filename' => 'doc.pdf', 'size' => 1024])
+        );
+
+        $response = $this->client->getResponse();
+        $this->assertEquals(200, $response->getStatusCode());
+
+        $data = json_decode($response->getContent(), true);
+        $this->assertTrue($data['allowed']);
+        $this->assertArrayHasKey('max_file_size', $data);
+        $this->assertArrayHasKey('allowed_extensions', $data);
+        $this->assertArrayHasKey('remaining', $data);
+    }
+
+    public function testCheckUploadRejectsDisallowedExtension(): void
+    {
+        $this->client->request(
+            'POST',
+            '/api/v1/files/check-upload',
+            [],
+            [],
+            [
+                'HTTP_AUTHORIZATION' => 'Bearer '.$this->authToken,
+                'CONTENT_TYPE' => 'application/json',
+            ],
+            json_encode(['filename' => 'evil.exe', 'size' => 1024])
+        );
+
+        $response = $this->client->getResponse();
+        $this->assertEquals(200, $response->getStatusCode());
+
+        $data = json_decode($response->getContent(), true);
+        $this->assertFalse($data['allowed']);
+        $this->assertSame('extension_not_allowed', $data['reason']);
+    }
+
+    public function testCheckUploadRequiresFilename(): void
+    {
+        $this->client->request(
+            'POST',
+            '/api/v1/files/check-upload',
+            [],
+            [],
+            [
+                'HTTP_AUTHORIZATION' => 'Bearer '.$this->authToken,
+                'CONTENT_TYPE' => 'application/json',
+            ],
+            json_encode(['size' => 1024])
+        );
+
+        $response = $this->client->getResponse();
+        $this->assertEquals(400, $response->getStatusCode());
+    }
+
+    public function testCheckUploadRequiresAuthentication(): void
+    {
+        self::ensureKernelShutdown();
+        $client = static::createClient();
+
+        $client->request(
+            'POST',
+            '/api/v1/files/check-upload',
+            [],
+            [],
+            ['CONTENT_TYPE' => 'application/json'],
+            json_encode(['filename' => 'doc.pdf', 'size' => 1024])
+        );
+
+        $response = $client->getResponse();
+        $this->assertEquals(401, $response->getStatusCode());
+    }
+
     private function createTestFile(string $filename, string $content): string
     {
         $tempFile = tempnam(sys_get_temp_dir(), 'synaplan_test_');
