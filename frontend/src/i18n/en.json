@@ -893,6 +893,10 @@
         "badge": "Premium",
         "lockTooltip": "Embedding-model switching requires a paid plan."
       },
+      "adminOnly": {
+        "badge": "Admin only",
+        "lockTooltip": "Switching the embedding model is restricted to administrators. The currently active model is shown for reference."
+      },
       "cooldown": {
         "title": "Cooldown active",
         "body": "Another switch was started recently. The next switch is possible in approx. {minutes} minutes."

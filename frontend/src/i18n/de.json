@@ -1031,6 +1031,10 @@
         "badge": "Premium",
         "lockTooltip": "Embedding-Modell-Wechsel erfordert ein bezahltes Abo."
       },
+      "adminOnly": {
+        "badge": "Nur Admin",
+        "lockTooltip": "Das Wechseln des Embedding-Modells ist Administrator:innen vorbehalten. Das derzeit aktive Modell wird zur Referenz angezeigt."
+      },
       "cooldown": {
         "title": "Cooldown aktiv",
         "body": "Ein anderer Wechsel wurde kürzlich gestartet. Der nächste Wechsel ist in ca. {minutes} Minuten möglich."
