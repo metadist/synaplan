@@ -740,6 +740,7 @@
       "noModelsAvailable": "No models available for this purpose",
       "saveSuccess": "Model configuration saved",
       "saveError": "Failed to save model configuration",
+      "saveErrorPremiumRequired": "{reason} Please upgrade your plan, or pick a different model.",
       "tableName": "Name",
       "tableService": "Service",
       "tableRating": "Rating",

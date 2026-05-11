@@ -433,6 +433,7 @@ import {
   checkModelAvailability,
 } from '@/services/api/configApi'
 import { adminEmbeddingApi, type EmbeddingGuardStatus } from '@/services/api/adminEmbeddingApi'
+import { ApiError } from '@/services/api/httpClient'
 import { useAuthStore } from '@/stores/auth'
 import type { AIModel, Capability } from '@/types/ai-models'
 import { getProviderIcon } from '@/utils/providerIcons'
@@ -923,7 +924,23 @@ const saveConfiguration = async () => {
     }
   } catch (err: unknown) {
     console.error('Failed to save configuration:', err)
-    showError(t('config.aiModels.saveError'))
+    // Issue #883: surface the actual reason the backend gave us instead of
+    // a generic "Failed to save model configuration" toast. The premium
+    // gate on `ConfigController::saveDefaultModels` returns a structured
+    // 403 `{ error: 'requires_premium', message: 'Switching the embedding
+    // model requires an active paid subscription. Current level: NEW.', ... }`
+    // and `httpClient.ApiError` now exposes both the message and the code.
+    if (err instanceof ApiError && 403 === err.status) {
+      const reason =
+        'requires_premium' === err.code
+          ? t('config.aiModels.saveErrorPremiumRequired', { reason: err.message })
+          : err.message
+      showError(reason)
+    } else if (err instanceof Error && err.message) {
+      showError(err.message)
+    } else {
+      showError(t('config.aiModels.saveError'))
+    }
   } finally {
     saving.value = false
   }
