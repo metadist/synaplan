@@ -4,7 +4,7 @@ AI-powered knowledge management with RAG, chat widgets, and multi-channel integr
 
 [![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
 
-> **Live instance**: [web.synaplan.com](https://web.synaplan.com/)
+> **Live instance**: [web.synaplan.com](https://web.synaplan.com/) &nbsp;|&nbsp; **Docs**: [docs.synaplan.com](https://docs.synaplan.com/) &nbsp;|&nbsp; **API**: [Swagger UI](https://web.synaplan.com/api/doc)
 
 ![Synaplan Dashboard](docs/images/model-select.png)
 
@@ -75,13 +75,13 @@ echo "GROQ_API_KEY=your_key" >> backend/.env && docker compose restart backend
 
 - **AI Chat** — Ollama, OpenAI, Anthropic, Groq, Gemini
 - **RAG Search** — Semantic document search with MariaDB VECTOR or Qdrant
-- **Chat Widget** — Embed on any website
+- **Chat Widget** — Embed on any website ([widget guide](https://docs.synaplan.com/index.php/widget))
 - **WhatsApp** — Meta Business API integration
 - **Email** — AI-powered email responses
-- **Audio** — Whisper transcription
+- **Audio** — Whisper transcription (input) + optional [synaplan-tts](https://github.com/metadist/synaplan-tts) (output)
 - **Documents** — PDF, Word, Excel, images with OCR
 - **AI Memories** — User profiling with Qdrant vector search
-- **Feedback System** — False-positive detection and learning
+- **Plugins** — Non-invasive plugin system ([plugin guide](https://docs.synaplan.com/index.php/plugins))
 
 ---
 
@@ -126,6 +126,10 @@ make lint
 
 ## Documentation
 
+User-facing & API docs live at **[docs.synaplan.com](https://docs.synaplan.com/)**. Source: [`metadist/synaplan-docs`](https://github.com/metadist/synaplan-docs).
+
+In-repo guides (for developers working on this codebase):
+
 | Guide | Description |
 |-------|-------------|
 | [Installation](docs/INSTALLATION.md) | Detailed setup instructions |
@@ -135,6 +139,17 @@ make lint
 | [Chat Widget](docs/WIDGET.md) | Embed chat on websites |
 | [WhatsApp](docs/WHATSAPP.md) | Meta Business API setup |
 | [Email](docs/EMAIL.md) | Email channel integration |
+
+## Related Repositories
+
+| Repo | Purpose |
+|------|---------|
+| [synaplan](https://github.com/metadist/synaplan) | Main app (this repo) |
+| [synaplan-docs](https://github.com/metadist/synaplan-docs) | Public docs site (docs.synaplan.com) |
+| [synaplan-tts](https://github.com/metadist/synaplan-tts) | Optional Piper TTS service |
+| [synaplan-sortx](https://github.com/metadist/synaplan-sortx) | Document-sorting plugin + local tool |
+| [synaplan-charts](https://github.com/metadist/synaplan-charts) | Helm charts for Kubernetes |
+| [synaplan-platform](https://github.com/metadist/synaplan-platform) | Production deployment configs |
 
 ---
 
