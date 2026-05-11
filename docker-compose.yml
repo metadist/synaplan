@@ -82,6 +82,10 @@ services:
       - "8000:80"
     volumes:
       - ./backend:/var/www/backend
+      # Writable Symfony cache inside the container. Bind-mounted ./backend/var/cache often
+      # inherits host UID/GID (e.g. macOS), so www-data cannot write and PHPUnit fails with
+      # "Unable to write in the cache directory (/var/www/backend/var/cache/test)".
+      - /var/www/backend/var/cache
       - ./frontend/dist:/var/www/frontend:ro
       - ./frontend/dist-widget:/var/www/widgets
       - ./plugins:/plugins:ro
@@ -180,6 +184,7 @@ services:
         required: false
     volumes:
       - ./backend:/var/www/backend
+      - /var/www/backend/var/cache
       - ./plugins:/plugins:ro
       - whisper_models:/var/www/backend/var/whisper:ro
     environment:
