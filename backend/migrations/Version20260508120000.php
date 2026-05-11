@@ -14,8 +14,10 @@ use Doctrine\Migrations\AbstractMigration;
  * never deletes BMODELS rows. Historical BMESSAGES rows may still reference BID 92 via
  * FK, so we deactivate the row instead of deleting it.
  *
- * Operator DEFAULTMODEL overrides that still point at BID 92 are repointed to Claude
- * Haiku 4.5 chat (BID 162) when that successor row exists (guarded EXISTS subquery).
+ * Any {@see \App\Entity\Config} row with BGROUP = 'DEFAULTMODEL' and BVALUE = BID 92
+ * (global defaults and per-user overrides) is repointed to Claude Haiku 4.5 chat
+ * (BID 162) when that successor row exists (guarded EXISTS subquery), so nothing routes
+ * to a deactivated model.
  */
 final class Version20260508120000 extends AbstractMigration
 {
@@ -24,7 +26,7 @@ final class Version20260508120000 extends AbstractMigration
 
     public function getDescription(): string
     {
-        return 'Deactivate deprecated Claude 3 Haiku (BID 92) and repoint DEFAULTMODEL overrides to Claude Haiku 4.5 (BID 162).';
+        return 'Deactivate deprecated Claude 3 Haiku (BID 92) and repoint DEFAULTMODEL bindings (any owner) still on BID 92 to Claude Haiku 4.5 (BID 162).';
     }
 
     public function up(Schema $schema): void
@@ -54,6 +56,10 @@ final class Version20260508120000 extends AbstractMigration
 
     public function down(Schema $schema): void
     {
+        // Reactivate the deprecated row so it can reappear in the admin UI. We
+        // intentionally do NOT undo the BCONFIG repoint from `up()`: we cannot know
+        // which rows were auto-migrated vs intentionally set to BID 162 afterwards.
+        // Same contract as {@see Version20260429120000::down()}.
         $this->addSql(<<<'SQL'
             UPDATE BMODELS
                SET BACTIVE = 1,
