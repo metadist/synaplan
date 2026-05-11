@@ -29,22 +29,11 @@ The backend container exposes **two** aliases for the Docker host (via `extra_ho
 
 Both resolve to the host gateway (`host-gateway`). Use `docker-host` in `backend/.env` if you want the same value to work in both dev and prod; use `host.docker.internal` if you're copy-pasting from generic Docker docs.
 
-### Running the Qdrant vector database
+### Vector database (Qdrant)
 
-Qdrant can run in two ways depending on what you're testing:
-
-```bash
-# Option A (simplest): use the embedded qdrant service from the main compose.
-# Nothing to do — it starts with `docker compose up -d` and binds to :6333.
-
-# Option B (production-parity): use the synaplan-memories compose as the "canonical"
-# qdrant source-of-truth, the same way production does. First stop the embedded one
-# to free port 6333, then bring up memories:
-docker compose stop qdrant
-cd ../synaplan-memories && docker compose up -d
-```
-
-Either way the backend reaches it via `QDRANT_URL=http://docker-host:6333` (or `http://qdrant:6333` for the internal-network route when using Option A).
+Qdrant ships with the main compose file and starts automatically with `docker compose up -d`.
+The backend reaches it via `QDRANT_URL=http://qdrant:6333` (or `http://docker-host:6333` for production parity).
+No extra repo or external service needed.
 
 ---
 
