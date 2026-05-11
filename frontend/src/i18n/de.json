@@ -891,6 +891,7 @@
       "noModelsAvailable": "Keine Modelle für diesen Verwendungszweck verfügbar",
       "saveSuccess": "Modellkonfiguration gespeichert",
       "saveError": "Modellkonfiguration konnte nicht gespeichert werden",
+      "saveErrorPremiumRequired": "{reason} Bitte aktualisiere deinen Tarif oder wähle ein anderes Modell.",
       "tableName": "Name",
       "tableService": "Anbieter",
       "tableRating": "Bewertung",

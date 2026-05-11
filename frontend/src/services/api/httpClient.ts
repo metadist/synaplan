@@ -7,6 +7,32 @@ import { z } from 'zod'
 import { GetApiConfigRuntimeConfigResponseSchema } from '@/generated/api-schemas'
 import { hasSessionHint, clearSessionHint } from '@/services/sessionHint'
 
+/**
+ * Structured error thrown by httpClient on a non-OK response.
+ *
+ * Extends `Error` so every existing `catch (err) { if (err instanceof Error)
+ * ... }` consumer keeps working unchanged: `.message` is set to the
+ * human-readable text the backend chose (preferring `message`, falling back
+ * to the legacy `error` code, falling back to the bare HTTP status line).
+ *
+ * Consumers that want to differentiate between failure modes (e.g. show a
+ * specific upgrade CTA for `requires_premium` 403s — issue #883) can narrow
+ * with `instanceof ApiError` and inspect `.status`, `.code` and `.details`.
+ */
+export class ApiError extends Error {
+  public readonly name = 'ApiError'
+
+  public constructor(
+    public readonly status: number,
+    message: string,
+    public readonly code?: string,
+    public readonly details?: Record<string, unknown>,
+    public readonly debug?: string
+  ) {
+    super(message)
+  }
+}
+
 // API base URL - lazy initialized on first use
 // For admin UI: empty string (same-origin)
 // For cross-origin scenarios: full URL could be set
@@ -414,10 +440,24 @@ async function httpClient<T = unknown, S extends z.Schema | undefined = undefine
     }
 
     let errorMessage = `HTTP ${response.status}: ${response.statusText}`
+    let errorCode: string | undefined
+    let errorDetails: Record<string, unknown> | undefined
     let debugInfo: string | undefined
     try {
       const errorData = await response.json()
-      errorMessage = errorData.error || errorData.message || errorMessage
+      // Prefer the human-readable `message` field when the backend sends a
+      // structured `{ error: 'code', message: 'human text', ... }` shape (used
+      // by ConfigController premium gate, memory-service unavailable, etc.).
+      // Fall back to bare `error` so legacy single-field responses keep their
+      // current text. Issue #883: surface "Switching the embedding model
+      // requires an active paid subscription..." instead of "requires_premium".
+      errorMessage = errorData.message || errorData.error || errorMessage
+      if (typeof errorData.error === 'string') {
+        errorCode = errorData.error
+      }
+      if (errorData && typeof errorData === 'object') {
+        errorDetails = errorData as Record<string, unknown>
+      }
       // Capture debug info if present (only sent to admins by backend)
       debugInfo = errorData.debug
     } catch {
@@ -425,7 +465,7 @@ async function httpClient<T = unknown, S extends z.Schema | undefined = undefine
     }
     // Include debug info in error message if present
     const fullMessage = debugInfo ? `${errorMessage}\n[Debug] ${debugInfo}` : errorMessage
-    throw new Error(fullMessage)
+    throw new ApiError(response.status, fullMessage, errorCode, errorDetails, debugInfo)
   }
 
   // Parse response based on requested type

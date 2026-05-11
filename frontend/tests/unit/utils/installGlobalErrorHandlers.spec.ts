@@ -3,6 +3,7 @@ import { createApp } from 'vue'
 import { createPinia, setActivePinia } from 'pinia'
 import { installGlobalErrorHandlers } from '@/utils/installGlobalErrorHandlers'
 import { useGlobalErrorStore } from '@/stores/globalError'
+import { useNotification } from '@/composables/useNotification'
 
 describe('installGlobalErrorHandlers', () => {
   let app: ReturnType<typeof createApp>
@@ -11,6 +12,11 @@ describe('installGlobalErrorHandlers', () => {
     setActivePinia(createPinia())
     app = createApp({ template: '<div />' })
     vi.spyOn(console, 'error').mockImplementation(() => {})
+    vi.spyOn(console, 'warn').mockImplementation(() => {})
+    // Each test starts from a clean toast queue so the transient-path
+    // assertions don't bleed across cases.
+    const { notifications } = useNotification()
+    notifications.value.splice(0, notifications.value.length)
   })
 
   afterEach(() => {
@@ -109,6 +115,93 @@ describe('installGlobalErrorHandlers', () => {
     window.dispatchEvent(event)
 
     expect(store.hasError).toBe(false)
+  })
+
+  // -----------------------------------------------------------------------
+  // Issue #897 — transient (chunk-load / network) errors must NOT replace
+  // the entire UI with the full-screen ErrorView. They should fire a
+  // non-fatal toast warning instead so the user can simply retry their
+  // last action. See `TRANSIENT_PATTERNS` in installGlobalErrorHandlers.ts.
+  // -----------------------------------------------------------------------
+
+  const transientCases: Array<{ label: string; message: string }> = [
+    { label: 'Vite chunk-load failure', message: 'Loading chunk 42 failed.' },
+    {
+      label: 'dynamic-import failure after background-resume',
+      message:
+        'Failed to fetch dynamically imported module: https://example.test/assets/filesService-DEAD.js',
+    },
+    { label: 'ChunkLoadError shape', message: 'ChunkLoadError: Loading chunk 7 failed.' },
+    { label: 'generic Failed to fetch', message: 'Failed to fetch' },
+    { label: 'Safari Load failed', message: 'Load failed' },
+    { label: 'EventSource SSE error', message: 'EventSource connection to /api/v1/stream failed' },
+  ]
+
+  it.each(transientCases)(
+    'transient error ($label) does NOT raise the full-screen ErrorView',
+    ({ message }) => {
+      installGlobalErrorHandlers(app)
+      const store = useGlobalErrorStore()
+      const { notifications } = useNotification()
+
+      window.dispatchEvent(
+        new ErrorEvent('error', {
+          error: new Error(message),
+          message,
+        })
+      )
+
+      // Full-screen view is NOT triggered.
+      expect(store.hasError).toBe(false)
+      // A non-fatal toast IS shown to the user.
+      expect(notifications.value).toHaveLength(1)
+      expect(notifications.value[0]?.type).toBe('warning')
+      expect(notifications.value[0]?.message).toContain(message)
+    }
+  )
+
+  it('routes transient unhandledrejection into a warning toast (Scenario A: file upload + send)', () => {
+    installGlobalErrorHandlers(app)
+    const store = useGlobalErrorStore()
+    const { notifications } = useNotification()
+
+    // Simulates the issue's Scenario A: handleSendMessage's dynamic
+    // `import('@/services/filesService')` rejects on a flaky cellular
+    // connection. Pre-fix, this hit the global handler and replaced the
+    // chat with the full-screen "Etwas ist schiefgelaufen" view.
+    const reason = new Error(
+      'Failed to fetch dynamically imported module: https://example.test/assets/filesService-DEAD.js'
+    )
+    const event = new Event('unhandledrejection') as Event & {
+      reason: unknown
+      promise: Promise<unknown>
+    }
+    event.reason = reason
+    event.promise = Promise.reject(reason)
+    event.promise.catch(() => {})
+    window.dispatchEvent(event)
+
+    expect(store.hasError).toBe(false)
+    expect(notifications.value).toHaveLength(1)
+    expect(notifications.value[0]?.type).toBe('warning')
+  })
+
+  it('non-transient errors still raise the full-screen ErrorView', () => {
+    installGlobalErrorHandlers(app)
+    const store = useGlobalErrorStore()
+    const { notifications } = useNotification()
+
+    // A real, unexpected programming error must NOT be silently downgraded.
+    window.dispatchEvent(
+      new ErrorEvent('error', {
+        error: new TypeError("Cannot read properties of undefined (reading 'foo')"),
+        message: "TypeError: Cannot read properties of undefined (reading 'foo')",
+      })
+    )
+
+    expect(store.hasError).toBe(true)
+    expect(store.current?.message).toContain('Cannot read properties of undefined')
+    expect(notifications.value).toHaveLength(0)
   })
 
   it('is idempotent — re-installing replaces previous listeners cleanly', () => {

@@ -13,6 +13,25 @@ use Psr\Log\LoggerInterface;
 
 final readonly class VectorSearchService
 {
+    /**
+     * Target dimension for query vectors handed to {@see VectorStorageFacade::search()}.
+     *
+     * Mirrors `App\Service\File\VectorizationService::VECTOR_DIMENSION` and
+     * `App\Service\Embedding\EmbeddingReindexService::DOC_VECTOR_DIMENSION`.
+     * The documents collection is created with this fixed dimension at
+     * install time, so any provider whose native embedding width is wider
+     * (e.g. OpenAI `text-embedding-3-small` at 1536 dims, `-large` at 3072)
+     * or narrower must be coerced to this size on both ingest *and* query.
+     *
+     * Without this normalisation the query vector dimension does not match
+     * the stored vector dimension, which is exactly what produced the
+     * "RAG returns 0 results with OpenAI embeddings" symptom in #346 / #755:
+     * MariaDB `VEC_DISTANCE_COSINE` returns NULL for mismatched widths and
+     * Qdrant rejects the query outright. The previous query path was the
+     * only one in the codebase that did *not* normalise.
+     */
+    private const QUERY_VECTOR_DIMENSION = 1024;
+
     public function __construct(
         private EntityManagerInterface $em,
         private AiFacade $aiFacade,
@@ -52,7 +71,7 @@ final readonly class VectorSearchService
         try {
             $searchQuery = new SearchQuery(
                 userId: $userId,
-                vector: array_map('floatval', $vector),
+                vector: $this->normalizeQueryVector(array_map('floatval', $vector)),
                 groupKey: $groupKey,
                 limit: $limit,
                 minScore: $minScore,
@@ -166,7 +185,7 @@ final readonly class VectorSearchService
         // 3. Search via Facade
         $searchQuery = new SearchQuery(
             userId: $userId,
-            vector: array_map('floatval', $queryEmbedding),
+            vector: $this->normalizeQueryVector(array_map('floatval', $queryEmbedding)),
             groupKey: $groupKey,
             limit: $limit,
             minScore: $minScore,
@@ -272,5 +291,47 @@ final readonly class VectorSearchService
     public function getProviderName(): string
     {
         return $this->vectorStorage->getProviderName();
+    }
+
+    /**
+     * Coerce a query embedding to the documents collection's fixed width.
+     *
+     * Truncates wider vectors and zero-pads narrower ones, matching the same
+     * stop-gap normalisation that `VectorizationService::vectorizeAndStore()`
+     * applies on the ingest side. Both sides MUST agree on the width or the
+     * vector store returns no matches at all (issues #346 and #755).
+     *
+     * Logs at DEBUG so production operators can opt in to seeing the
+     * coercion (e.g. when investigating "why does my RAG suddenly retrieve
+     * less specific chunks?") without paying the per-query log volume that
+     * INFO would impose for OpenAI deployments — `text-embedding-3-small`
+     * (1536) and `-large` (3072) trigger this path on every chat / RAG
+     * request, including the hot `semanticSearchByVector()` fan-out from
+     * `ChatHandler`. The already-existing per-chunk WARN in
+     * `VectorizationService` still covers the ingest side at higher level.
+     *
+     * @param list<float> $vector
+     *
+     * @return list<float>
+     */
+    private function normalizeQueryVector(array $vector): array
+    {
+        $actual = count($vector);
+
+        if (self::QUERY_VECTOR_DIMENSION === $actual) {
+            return $vector;
+        }
+
+        $this->logger->debug('VectorSearchService: Coercing query embedding to collection dimension', [
+            'expected' => self::QUERY_VECTOR_DIMENSION,
+            'actual' => $actual,
+            'storage_provider' => $this->vectorStorage->getProviderName(),
+        ]);
+
+        if ($actual > self::QUERY_VECTOR_DIMENSION) {
+            return array_slice($vector, 0, self::QUERY_VECTOR_DIMENSION);
+        }
+
+        return array_pad($vector, self::QUERY_VECTOR_DIMENSION, 0.0);
     }
 }
