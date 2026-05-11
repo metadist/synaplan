@@ -301,11 +301,14 @@ final readonly class VectorSearchService
      * applies on the ingest side. Both sides MUST agree on the width or the
      * vector store returns no matches at all (issues #346 and #755).
      *
-     * Logs at INFO when a coercion happens so an operator can correlate any
-     * mild quality drop with the embedding model swap they just made; the
-     * already-existing per-chunk WARN in `VectorizationService` covers the
-     * ingest side, so this one stays at INFO to avoid log spam during
-     * regular RAG queries.
+     * Logs at DEBUG so production operators can opt in to seeing the
+     * coercion (e.g. when investigating "why does my RAG suddenly retrieve
+     * less specific chunks?") without paying the per-query log volume that
+     * INFO would impose for OpenAI deployments — `text-embedding-3-small`
+     * (1536) and `-large` (3072) trigger this path on every chat / RAG
+     * request, including the hot `semanticSearchByVector()` fan-out from
+     * `ChatHandler`. The already-existing per-chunk WARN in
+     * `VectorizationService` still covers the ingest side at higher level.
      *
      * @param list<float> $vector
      *
@@ -319,7 +322,7 @@ final readonly class VectorSearchService
             return $vector;
         }
 
-        $this->logger->info('VectorSearchService: Coercing query embedding to collection dimension', [
+        $this->logger->debug('VectorSearchService: Coercing query embedding to collection dimension', [
             'expected' => self::QUERY_VECTOR_DIMENSION,
             'actual' => $actual,
             'storage_provider' => $this->vectorStorage->getProviderName(),
