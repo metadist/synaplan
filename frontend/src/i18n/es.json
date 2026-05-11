@@ -260,6 +260,7 @@
     "web": "Web",
     "webSearch": "Buscar información actualizada en la web",
     "enhance": "Mejorar",
+    "enhanceRejected": "No se pudo mejorar este texto. Prueba con una frase o pregunta más clara.",
     "thinking": "Pensamiento",
     "reasoningNotSupported": "Tu modelo de chat actual no soporta razonamiento. Por favor selecciona un modelo con capacidad de razonamiento (GPT-5, o3, DeepSeek-R1) en Configuración de IA → Modelos.",
     "voice": "Iniciar voz",

@@ -1,7 +1,7 @@
 <template>
   <div
     :class="[
-      'flex gap-4 p-4 text-[16px] leading-6',
+      'flex gap-0 md:gap-4 p-3 md:p-4 text-[16px] leading-6',
       role === 'user' ? 'justify-end' : '',
       isSuperseded && 'opacity-50',
     ]"
@@ -12,14 +12,19 @@
     <!-- Avatar with provider logo for assistant -->
     <div
       v-if="role === 'assistant'"
-      class="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 surface-card"
+      class="hidden md:flex w-10 h-10 rounded-full items-center justify-center flex-shrink-0 surface-card"
     >
       <GroqIcon v-if="displayProvider.toLowerCase().includes('groq')" :size="24" class-name="" />
       <Icon v-else :icon="getProviderIcon(displayProvider)" class="w-6 h-6" />
     </div>
 
     <!-- Wrapper for thinking blocks + bubble -->
-    <div class="flex flex-col max-w-3xl min-w-0 gap-2">
+    <div
+      :class="[
+        'flex flex-col flex-1 min-w-0 md:flex-none md:max-w-3xl gap-2',
+        role === 'user' ? 'items-end' : '',
+      ]"
+    >
       <!-- Thinking blocks (ABOVE bubble, only for assistant) -->
       <template v-if="role === 'assistant'">
         <MessagePart
@@ -841,7 +846,7 @@
     <!-- Avatar on right for user -->
     <div
       v-if="role === 'user'"
-      class="w-10 h-10 rounded-full surface-chip flex items-center justify-center flex-shrink-0"
+      class="hidden md:flex w-10 h-10 rounded-full surface-chip items-center justify-center flex-shrink-0"
     >
       <UserIcon class="w-5 h-5 txt-secondary" />
     </div>

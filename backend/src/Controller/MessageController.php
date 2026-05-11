@@ -10,6 +10,7 @@ use App\Service\File\FileProcessor;
 use App\Service\File\FileStorageService;
 use App\Service\File\VectorizationService;
 use App\Service\Message\AgainHandler;
+use App\Service\Message\EnhanceOutputGuard;
 use App\Service\Message\MessagePreProcessor;
 use App\Service\MessageEnqueueService;
 use App\Service\ModelConfigService;
@@ -394,6 +395,18 @@ class MessageController extends AbstractController
             ]);
 
             $enhancedText = trim($response['content'] ?? $inputText);
+
+            if (EnhanceOutputGuard::isRefusalOrNonEnhancement($inputText, $enhancedText)) {
+                $this->logger->info('Enhancement output treated as refusal or explanation', [
+                    'user_id' => $user->getId(),
+                    'input_length' => strlen($inputText),
+                    'output_length' => strlen($enhancedText),
+                ]);
+
+                return $this->json([
+                    'error' => 'enhance_rejected',
+                ], Response::HTTP_UNPROCESSABLE_ENTITY);
+            }
 
             return $this->json([
                 'success' => true,

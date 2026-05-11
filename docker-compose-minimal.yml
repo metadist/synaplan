@@ -74,6 +74,7 @@ services:
       - "8000:80"
     volumes:
       - ./backend:/var/www/backend
+      - /var/www/backend/var/cache
       - ./frontend/dist:/var/www/frontend:ro
       - ./frontend/dist-widget:/var/www/widgets
       - ./plugins:/plugins:ro

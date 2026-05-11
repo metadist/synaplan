@@ -295,6 +295,7 @@
     "waitForStreaming": "Bitte warten Sie, bis die aktuelle Antwort abgeschlossen ist, bevor Sie eine weitere Nachricht senden.",
     "share": "Teilen",
     "enhance": "Verbessern",
+    "enhanceRejected": "Dieser Text konnte nicht verbessert werden. Bitte formuliere einen klareren Satz oder eine konkretere Frage.",
     "thinking": "Denken",
     "reasoningNotSupported": "Dein aktuelles Chat-Modell unterstützt kein Reasoning. Bitte wähle ein Reasoning-fähiges Modell (GPT-5, o3, DeepSeek-R1) in der KI-Konfiguration → Modelle.",
     "voice": "Spracheingabe starten",
