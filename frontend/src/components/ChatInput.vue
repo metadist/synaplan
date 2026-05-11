@@ -1000,7 +1000,7 @@ const startWebSpeechRecording = async () => {
         // makes the consumer immune to Android Chrome re-emitting the same
         // final segment across multiple events (issue #898).
         const base = speechBaseMessage.value
-        const separator = base ? ' ' : ''
+        const separator = base && (final || interim) ? ' ' : ''
 
         clearSilenceTimer()
 
