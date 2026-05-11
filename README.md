@@ -81,6 +81,7 @@ echo "GROQ_API_KEY=your_key" >> backend/.env && docker compose restart backend
 - **Audio** — Whisper transcription (input) + optional [synaplan-tts](https://github.com/metadist/synaplan-tts) (output)
 - **Documents** — PDF, Word, Excel, images with OCR
 - **AI Memories** — User profiling with Qdrant vector search
+- **Feedback System** — Feedback capture and analysis powered by Qdrant
 - **Plugins** — Non-invasive plugin system ([plugin guide](https://docs.synaplan.com/index.php/plugins))
 
 ---
