@@ -290,9 +290,10 @@
           <tbody>
             <tr
               v-for="model in paginatedModels"
-              :key="`${model.id}-${model.purpose}`"
+              :key="model.id"
               class="border-b border-light-border/10 dark:border-dark-border/10 hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
               data-testid="item-model"
+              :data-model-id="model.id"
             >
               <td class="py-3 px-2 sm:px-3">
                 <div class="flex items-center gap-2">
@@ -343,7 +344,32 @@
                 </div>
               </td>
               <td class="py-3 px-2 sm:px-3 hidden sm:table-cell">
-                <span class="pill pill--active text-xs">{{ model.purpose }}</span>
+                <div class="flex flex-wrap gap-1.5">
+                  <button
+                    v-for="purpose in model.purposes"
+                    :key="purpose"
+                    type="button"
+                    :class="[
+                      'inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium transition-colors border',
+                      isPurposeActiveForModel(model.id, purpose)
+                        ? 'bg-[var(--brand)] text-white border-[var(--brand)] hover:bg-[var(--brand)]/90'
+                        : 'border-light-border/40 dark:border-dark-border/30 txt-secondary hover:border-[var(--brand)] hover:text-[var(--brand)]',
+                      isPurposeDisabled(purpose) &&
+                        'opacity-50 cursor-not-allowed hover:border-light-border/40 hover:text-inherit',
+                      !isPurposeDisabled(purpose) &&
+                        !isPurposeActiveForModel(model.id, purpose) &&
+                        'cursor-pointer',
+                    ]"
+                    :disabled="isPurposeDisabled(purpose)"
+                    :title="getPurposeChipTitle(model, purpose)"
+                    :aria-pressed="isPurposeActiveForModel(model.id, purpose)"
+                    data-testid="btn-purpose-chip"
+                    :data-purpose="purpose"
+                    @click.stop="onPurposeChipClick(model, purpose)"
+                  >
+                    {{ purposeLabels[purpose] }}
+                  </button>
+                </div>
               </td>
               <td class="py-3 px-2 sm:px-3 txt-secondary text-sm hidden lg:table-cell">
                 {{ model.description }}
@@ -435,6 +461,7 @@ import {
 import { adminEmbeddingApi, type EmbeddingGuardStatus } from '@/services/api/adminEmbeddingApi'
 import { useAuthStore } from '@/stores/auth'
 import type { AIModel, Capability } from '@/types/ai-models'
+import { dedupeModelsByPurpose, type ModelWithPurposes } from '@/utils/aiModelDedupe'
 import { getProviderIcon } from '@/utils/providerIcons'
 import { useI18n } from 'vue-i18n'
 
@@ -809,6 +836,57 @@ const loadEmbeddingGuard = async () => {
   }
 }
 
+/**
+ * True when the given model is the current default for the given purpose.
+ * Drives the chip's active visual state in the dedup'd model table.
+ */
+const isPurposeActiveForModel = (modelId: number, purpose: Capability): boolean => {
+  return defaultConfig.value[purpose] === modelId
+}
+
+/**
+ * VECTORIZE is admin-only at the UI layer (see `isVectorizeAdminOnly` for
+ * the rationale). Disabled chips render greyed and ignore clicks so a
+ * non-admin can still see what their model supports without being teased
+ * with an action they cannot perform.
+ */
+const isPurposeDisabled = (purpose: Capability): boolean => {
+  return purpose === 'VECTORIZE' && isVectorizeAdminOnly.value
+}
+
+/**
+ * Tooltip text for the purpose chip. Active = "already the default",
+ * inactive = "click to set as default for X". Translated via i18n so the
+ * user gets the German/English copy that matches their UI locale.
+ */
+const getPurposeChipTitle = (model: AIModel, purpose: Capability): string => {
+  if (isPurposeDisabled(purpose)) {
+    return t('config.embeddingSwitch.adminOnly.lockTooltip')
+  }
+  const label = purposeLabels.value[purpose]
+  if (isPurposeActiveForModel(model.id, purpose)) {
+    return t('config.aiModels.purposeChip.activeTooltip', { purpose: label })
+  }
+  return t('config.aiModels.purposeChip.applyTooltip', {
+    purpose: label,
+    model: model.name,
+  })
+}
+
+/**
+ * Chip click handler: applies the model to the default config for the
+ * clicked purpose. We delegate to the existing `selectModel` flow so
+ * VECTORIZE keeps going through the embedding-switch modal and other
+ * purposes hit the same availability check + auto-save path as the
+ * dropdown. Clicking the already-active chip is a no-op — there is no
+ * value in re-saving the same configuration.
+ */
+const onPurposeChipClick = async (model: AIModel, purpose: Capability): Promise<void> => {
+  if (isPurposeDisabled(purpose)) return
+  if (isPurposeActiveForModel(model.id, purpose)) return
+  await selectModel(purpose, model.id)
+}
+
 const handleClickOutside = (event: MouseEvent) => {
   if (!openDropdown.value) return
   const target = event.target as HTMLElement
@@ -824,21 +902,28 @@ const handleKeydown = (event: KeyboardEvent) => {
   }
 }
 
-const allModels = computed(() => {
-  const all: Array<AIModel & { purpose: Capability }> = []
-  for (const [cap, models] of Object.entries(availableModels.value)) {
-    models.forEach((model) => {
-      all.push({ ...model, purpose: cap as Capability })
-    })
-  }
-  return all
-})
+/**
+ * Issue #261: dedupe the table so each model surfaces ONCE with all its
+ * purposes listed as selectable chips. The backend returns models indexed
+ * by purpose so the same model shows up in multiple buckets — e.g.
+ * Claude Haiku 4.5 appears under SORT, CHAT and ANALYZE. That made the
+ * list painful to scan: 11 purposes × N models meant hundreds of rows
+ * that all referred to the same handful of models.
+ *
+ * The dedup helper is extracted to `@/utils/aiModelDedupe` so the rule is
+ * unit-testable without mounting this whole component.
+ */
+const PURPOSE_ORDER = computed<Capability[]>(() => Object.keys(purposeLabels.value) as Capability[])
 
-const filteredModels = computed(() => {
+const allModels = computed<ModelWithPurposes[]>(() =>
+  dedupeModelsByPurpose(availableModels.value, PURPOSE_ORDER.value)
+)
+
+const filteredModels = computed<ModelWithPurposes[]>(() => {
   if (selectedPurpose.value === null) {
     return allModels.value
   }
-  return allModels.value.filter((model) => model.purpose === selectedPurpose.value)
+  return allModels.value.filter((model) => model.purposes.includes(selectedPurpose.value!))
 })
 
 /**
@@ -862,13 +947,25 @@ const getStarRating = (quality: number): number => {
   return Math.round(quality / 2)
 }
 
-type ModelWithPurpose = AIModel & { purpose: Capability }
-
-const sortedModels = computed(() => {
+const sortedModels = computed<ModelWithPurposes[]>(() => {
   const dir = sortDirection.value === 'asc' ? 1 : -1
   const col = sortBy.value
+  const order = PURPOSE_ORDER.value
 
-  const compareFn = (a: ModelWithPurpose, b: ModelWithPurpose): number => {
+  // Position of the model's "first" capability in the canonical order is
+  // the cleanest deterministic sort key for the dedup'd list: a generalist
+  // model with SORT+CHAT+ANALYZE sorts together with other SORT-capable
+  // models, while a TEXT2SOUND-only model lands near the bottom.
+  const primaryPurposeRank = (model: ModelWithPurposes): number => {
+    let min = Number.POSITIVE_INFINITY
+    for (const p of model.purposes) {
+      const idx = order.indexOf(p)
+      if (idx !== -1 && idx < min) min = idx
+    }
+    return Number.isFinite(min) ? min : order.length
+  }
+
+  const compareFn = (a: ModelWithPurposes, b: ModelWithPurposes): number => {
     let cmp = 0
     switch (col) {
       case 'alphabet':
@@ -882,7 +979,7 @@ const sortedModels = computed(() => {
         cmp = a.quality - b.quality
         break
       case 'purpose':
-        cmp = a.purpose.localeCompare(b.purpose)
+        cmp = primaryPurposeRank(a) - primaryPurposeRank(b)
         break
     }
     return cmp !== 0 ? dir * cmp : dir * a.name.localeCompare(b.name)

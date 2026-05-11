@@ -773,6 +773,10 @@
       "chatGeneration": "Response Generation",
       "messageClassification": "Message Classification",
       "clickToConfig": "Click to configure",
+      "purposeChip": {
+        "activeTooltip": "Already set as the default model for \"{purpose}\"",
+        "applyTooltip": "Set {model} as the default model for \"{purpose}\""
+      },
       "defaultConfig": "Default Model Configuration",
       "saveConfiguration": "Save Configuration",
       "resetForm": "Reset Form",

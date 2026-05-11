@@ -915,6 +915,10 @@
       "chatGeneration": "Antwort-Generierung",
       "messageClassification": "Nachrichten-Klassifizierung",
       "clickToConfig": "Klicken zum Konfigurieren",
+      "purposeChip": {
+        "activeTooltip": "Bereits als Standardmodell für „{purpose}\" gesetzt",
+        "applyTooltip": "{model} als Standardmodell für „{purpose}\" festlegen"
+      },
       "modelNotAvailable": "{model} ist nicht verfügbar. Bitte prüfe die Provider-Konfiguration.",
       "modelNotConfigured": "{model} ist nicht bereit: Setze {envVar} in der Umgebung (z. B. .env.local).",
       "admin": {
