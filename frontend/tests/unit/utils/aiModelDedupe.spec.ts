@@ -47,11 +47,14 @@ describe('dedupeModelsByPurpose (issue #261)', () => {
     )
 
     expect(dedupe).toHaveLength(1)
-    expect(dedupe[0].id).toBe(1)
-    expect(dedupe[0].purposes).toEqual(['SORT', 'CHAT', 'ANALYZE'])
+    expect(dedupe[0].purposes).toEqual([
+      { purpose: 'SORT', modelId: 1 },
+      { purpose: 'CHAT', modelId: 1 },
+      { purpose: 'ANALYZE', modelId: 1 },
+    ])
   })
 
-  it('keeps purposes in the canonical PURPOSE_ORDER, not API arrival order', () => {
+  it('keeps chips in the canonical PURPOSE_ORDER, not API arrival order', () => {
     const haiku = model(1, 'Claude Haiku 4.5')
 
     const dedupe = dedupeModelsByPurpose(
@@ -63,10 +66,10 @@ describe('dedupeModelsByPurpose (issue #261)', () => {
       PURPOSE_ORDER
     )
 
-    expect(dedupe[0].purposes).toEqual(['SORT', 'CHAT', 'ANALYZE'])
+    expect(dedupe[0].purposes.map((c) => c.purpose)).toEqual(['SORT', 'CHAT', 'ANALYZE'])
   })
 
-  it('returns one row per distinct model when multiple models share purposes', () => {
+  it('returns one row per distinct (service, name) when multiple models share purposes', () => {
     const haiku = model(1, 'Claude Haiku 4.5')
     const opus = model(2, 'Claude Opus 4.6')
     const sonnet = model(3, 'Claude Sonnet 4.6')
@@ -81,10 +84,63 @@ describe('dedupeModelsByPurpose (issue #261)', () => {
     )
 
     expect(dedupe).toHaveLength(3)
-    expect(dedupe.map((m) => m.id)).toEqual([1, 2, 3])
+    expect(dedupe.map((m) => m.name)).toEqual([
+      'Claude Haiku 4.5',
+      'Claude Opus 4.6',
+      'Claude Sonnet 4.6',
+    ])
     for (const row of dedupe) {
-      expect(row.purposes).toEqual(['SORT', 'CHAT', 'ANALYZE'])
+      expect(row.purposes.map((c) => c.purpose)).toEqual(['SORT', 'CHAT', 'ANALYZE'])
     }
+  })
+
+  it('merges (service, name) duplicates that have different backend ids, routing each chip to its own id', () => {
+    // Real-world scenario from the BMODELS catalogue: "Claude Opus 4.6"
+    // exists as two rows — one for general chat (BTAG=chat) and one
+    // dedicated to memory extraction (BTAG=mem). They share name +
+    // service but have distinct ids, and selecting CHAT vs MEM must
+    // persist the correct id.
+    const opusChat = model(160, 'Claude Opus 4.6')
+    const opusMem = model(222, 'Claude Opus 4.6')
+
+    const dedupe = dedupeModelsByPurpose(
+      {
+        SORT: [opusChat],
+        CHAT: [opusChat],
+        MEM: [opusMem],
+        ANALYZE: [opusChat],
+      },
+      PURPOSE_ORDER
+    )
+
+    expect(dedupe).toHaveLength(1)
+    expect(dedupe[0].purposes).toEqual([
+      { purpose: 'SORT', modelId: 160 },
+      { purpose: 'CHAT', modelId: 160 },
+      { purpose: 'MEM', modelId: 222 },
+      { purpose: 'ANALYZE', modelId: 160 },
+    ])
+  })
+
+  it('treats same name across different services as different models', () => {
+    // gpt-oss-120b is registered under both Groq and Ollama. Despite
+    // the identical model name, these are different runtimes and must
+    // not collapse into one row.
+    const groq = model(76, 'gpt-oss-120b', 'Groq')
+    const ollama = model(79, 'gpt-oss-120b', 'Ollama')
+
+    const dedupe = dedupeModelsByPurpose(
+      {
+        CHAT: [groq, ollama],
+      },
+      PURPOSE_ORDER
+    )
+
+    expect(dedupe).toHaveLength(2)
+    expect(dedupe.map((m) => `${m.service}/${m.name}`)).toEqual([
+      'Groq/gpt-oss-120b',
+      'Ollama/gpt-oss-120b',
+    ])
   })
 
   it('does not list the same purpose twice for one model', () => {
@@ -100,7 +156,7 @@ describe('dedupeModelsByPurpose (issue #261)', () => {
       PURPOSE_ORDER
     )
 
-    expect(dedupe[0].purposes).toEqual(['SORT'])
+    expect(dedupe[0].purposes).toEqual([{ purpose: 'SORT', modelId: 1 }])
   })
 
   it('preserves model metadata (name, service, quality) on the dedup row', () => {
@@ -111,12 +167,11 @@ describe('dedupeModelsByPurpose (issue #261)', () => {
     const dedupe = dedupeModelsByPurpose({ TEXT2PIC: [flux] }, PURPOSE_ORDER)
 
     expect(dedupe[0]).toMatchObject({
-      id: 99,
       name: 'Flux Schnell',
       service: 'TheHive',
       quality: 9.5,
       description: 'Fast image gen',
-      purposes: ['TEXT2PIC'],
+      purposes: [{ purpose: 'TEXT2PIC', modelId: 99 }],
     })
   })
 
@@ -138,7 +193,7 @@ describe('dedupeModelsByPurpose (issue #261)', () => {
     )
 
     expect(dedupe).toHaveLength(1)
-    expect(dedupe[0].purposes).toEqual(['SORT'])
+    expect(dedupe[0].purposes).toEqual([{ purpose: 'SORT', modelId: 1 }])
   })
 
   it('does not mutate the model objects from the input map', () => {
@@ -154,6 +209,6 @@ describe('dedupeModelsByPurpose (issue #261)', () => {
 
     // The shared input object must NOT have a `purposes` field grafted
     // on, otherwise re-rendering would compound the list across renders.
-    expect((haiku as AIModel & { purposes?: Capability[] }).purposes).toBeUndefined()
+    expect((haiku as AIModel & { purposes?: unknown }).purposes).toBeUndefined()
   })
 })

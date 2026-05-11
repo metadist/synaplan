@@ -290,10 +290,11 @@
           <tbody>
             <tr
               v-for="model in paginatedModels"
-              :key="model.id"
+              :key="`${model.service}-${model.name}`"
               class="border-b border-light-border/10 dark:border-dark-border/10 hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
               data-testid="item-model"
-              :data-model-id="model.id"
+              :data-model-service="model.service"
+              :data-model-name="model.name"
             >
               <td class="py-3 px-2 sm:px-3">
                 <div class="flex items-center gap-2">
@@ -346,28 +347,29 @@
               <td class="py-3 px-2 sm:px-3 hidden sm:table-cell">
                 <div class="flex flex-wrap gap-1.5">
                   <button
-                    v-for="purpose in model.purposes"
-                    :key="purpose"
+                    v-for="chip in model.purposes"
+                    :key="chip.purpose"
                     type="button"
                     :class="[
                       'inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium transition-colors border',
-                      isPurposeActiveForModel(model.id, purpose)
+                      isPurposeChipActive(chip)
                         ? 'bg-[var(--brand)] text-white border-[var(--brand)] hover:bg-[var(--brand)]/90'
                         : 'border-light-border/40 dark:border-dark-border/30 txt-secondary hover:border-[var(--brand)] hover:text-[var(--brand)]',
-                      isPurposeDisabled(purpose) &&
+                      isPurposeDisabled(chip.purpose) &&
                         'opacity-50 cursor-not-allowed hover:border-light-border/40 hover:text-inherit',
-                      !isPurposeDisabled(purpose) &&
-                        !isPurposeActiveForModel(model.id, purpose) &&
+                      !isPurposeDisabled(chip.purpose) &&
+                        !isPurposeChipActive(chip) &&
                         'cursor-pointer',
                     ]"
-                    :disabled="isPurposeDisabled(purpose)"
-                    :title="getPurposeChipTitle(model, purpose)"
-                    :aria-pressed="isPurposeActiveForModel(model.id, purpose)"
+                    :disabled="isPurposeDisabled(chip.purpose)"
+                    :title="getPurposeChipTitle(model, chip)"
+                    :aria-pressed="isPurposeChipActive(chip)"
                     data-testid="btn-purpose-chip"
-                    :data-purpose="purpose"
-                    @click.stop="onPurposeChipClick(model, purpose)"
+                    :data-purpose="chip.purpose"
+                    :data-model-id="chip.modelId"
+                    @click.stop="onPurposeChipClick(chip)"
                   >
-                    {{ purposeLabels[purpose] }}
+                    {{ purposeLabels[chip.purpose] }}
                   </button>
                 </div>
               </td>
@@ -461,7 +463,11 @@ import {
 import { adminEmbeddingApi, type EmbeddingGuardStatus } from '@/services/api/adminEmbeddingApi'
 import { useAuthStore } from '@/stores/auth'
 import type { AIModel, Capability } from '@/types/ai-models'
-import { dedupeModelsByPurpose, type ModelWithPurposes } from '@/utils/aiModelDedupe'
+import {
+  dedupeModelsByPurpose,
+  type ModelWithPurposes,
+  type PurposeChip,
+} from '@/utils/aiModelDedupe'
 import { getProviderIcon } from '@/utils/providerIcons'
 import { useI18n } from 'vue-i18n'
 
@@ -837,11 +843,14 @@ const loadEmbeddingGuard = async () => {
 }
 
 /**
- * True when the given model is the current default for the given purpose.
- * Drives the chip's active visual state in the dedup'd model table.
+ * True when this chip's underlying model id is the current default for
+ * its purpose. Each chip carries its own modelId because a dedup'd row
+ * can represent several BMODELS ids (e.g. "Claude Opus 4.6" — id 160
+ * for CHAT, id 222 for MEM); active state is therefore per-chip, not
+ * per-row.
  */
-const isPurposeActiveForModel = (modelId: number, purpose: Capability): boolean => {
-  return defaultConfig.value[purpose] === modelId
+const isPurposeChipActive = (chip: PurposeChip): boolean => {
+  return defaultConfig.value[chip.purpose] === chip.modelId
 }
 
 /**
@@ -859,12 +868,12 @@ const isPurposeDisabled = (purpose: Capability): boolean => {
  * inactive = "click to set as default for X". Translated via i18n so the
  * user gets the German/English copy that matches their UI locale.
  */
-const getPurposeChipTitle = (model: AIModel, purpose: Capability): string => {
-  if (isPurposeDisabled(purpose)) {
+const getPurposeChipTitle = (model: AIModel, chip: PurposeChip): string => {
+  if (isPurposeDisabled(chip.purpose)) {
     return t('config.embeddingSwitch.adminOnly.lockTooltip')
   }
-  const label = purposeLabels.value[purpose]
-  if (isPurposeActiveForModel(model.id, purpose)) {
+  const label = purposeLabels.value[chip.purpose]
+  if (isPurposeChipActive(chip)) {
     return t('config.aiModels.purposeChip.activeTooltip', { purpose: label })
   }
   return t('config.aiModels.purposeChip.applyTooltip', {
@@ -874,17 +883,17 @@ const getPurposeChipTitle = (model: AIModel, purpose: Capability): string => {
 }
 
 /**
- * Chip click handler: applies the model to the default config for the
- * clicked purpose. We delegate to the existing `selectModel` flow so
- * VECTORIZE keeps going through the embedding-switch modal and other
- * purposes hit the same availability check + auto-save path as the
- * dropdown. Clicking the already-active chip is a no-op — there is no
- * value in re-saving the same configuration.
+ * Chip click handler: applies this chip's specific model id to the
+ * default config for the chip's purpose. We delegate to the existing
+ * `selectModel` flow so VECTORIZE keeps going through the embedding-
+ * switch modal and other purposes hit the same availability check +
+ * auto-save path as the dropdown. Clicking the already-active chip is
+ * a no-op — there is no value in re-saving the same configuration.
  */
-const onPurposeChipClick = async (model: AIModel, purpose: Capability): Promise<void> => {
-  if (isPurposeDisabled(purpose)) return
-  if (isPurposeActiveForModel(model.id, purpose)) return
-  await selectModel(purpose, model.id)
+const onPurposeChipClick = async (chip: PurposeChip): Promise<void> => {
+  if (isPurposeDisabled(chip.purpose)) return
+  if (isPurposeChipActive(chip)) return
+  await selectModel(chip.purpose, chip.modelId)
 }
 
 const handleClickOutside = (event: MouseEvent) => {
@@ -923,7 +932,9 @@ const filteredModels = computed<ModelWithPurposes[]>(() => {
   if (selectedPurpose.value === null) {
     return allModels.value
   }
-  return allModels.value.filter((model) => model.purposes.includes(selectedPurpose.value!))
+  return allModels.value.filter((model) =>
+    model.purposes.some((chip) => chip.purpose === selectedPurpose.value)
+  )
 })
 
 /**
@@ -958,8 +969,8 @@ const sortedModels = computed<ModelWithPurposes[]>(() => {
   // models, while a TEXT2SOUND-only model lands near the bottom.
   const primaryPurposeRank = (model: ModelWithPurposes): number => {
     let min = Number.POSITIVE_INFINITY
-    for (const p of model.purposes) {
-      const idx = order.indexOf(p)
+    for (const chip of model.purposes) {
+      const idx = order.indexOf(chip.purpose)
       if (idx !== -1 && idx < min) min = idx
     }
     return Number.isFinite(min) ? min : order.length
