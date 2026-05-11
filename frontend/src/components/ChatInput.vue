@@ -1,10 +1,24 @@
 <template>
+  <!--
+    Sticky chat input bar — already follows the iOS soft keyboard via
+    `position: sticky; bottom: 0` against the visual viewport. The
+    `pb-[env(safe-area-inset-bottom)]` accounts for the iPhone home
+    indicator (~34px) when the keyboard is HIDDEN, but iOS Safari does not
+    zero that inset out when the keyboard is OPEN, leaving a permanent
+    ~50px gap below the textarea (inset + inner py-4). `useKeyboardOpen()`
+    flips off the home-indicator inset *only* while the keyboard is up,
+    and the inner wrapper drops to `py-2` on mobile. Net effect: ~40-50px
+    less dead space when typing on iPhone, no regression on desktop.
+  -->
   <div
-    class="sticky bottom-0 bg-chat-input-area pb-[env(safe-area-inset-bottom)]"
+    :class="[
+      'sticky bottom-0 bg-chat-input-area',
+      isKeyboardOpen ? 'pb-0' : 'pb-[env(safe-area-inset-bottom)]',
+    ]"
     data-testid="comp-chat-input"
     @paste="handlePaste"
   >
-    <div class="max-w-4xl mx-auto px-4 py-4">
+    <div class="max-w-4xl mx-auto px-4 py-2 md:py-4">
       <!-- Active Command and File Display (above input) -->
       <div v-if="activeCommand || uploadedFiles.length > 0" class="mb-3 flex flex-wrap gap-2">
         <!-- Uploaded Files -->
@@ -303,6 +317,7 @@ import { WebSpeechService, isWebSpeechSupported } from '@/services/webSpeechServ
 import { useConfigStore } from '@/stores/config'
 import { useI18n } from 'vue-i18n'
 import { useAutoPersist } from '@/composables/useInputPersistence'
+import { useKeyboardOpen } from '@/composables/useKeyboardOpen'
 import { useChatsStore } from '@/stores/chats'
 import { useAppModeStore } from '@/stores/appMode'
 
@@ -365,6 +380,7 @@ const configStore = useConfigStore()
 const appModeStore = useAppModeStore()
 const { warning, error: showError, success } = useNotification()
 const { t, locale } = useI18n()
+const isKeyboardOpen = useKeyboardOpen()
 
 /**
  * Get the speech recognition language code from the current UI locale.
