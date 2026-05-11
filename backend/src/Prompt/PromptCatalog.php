@@ -1178,15 +1178,21 @@ Respond ONLY with valid JSON in this exact format:
 {"contradictions":[{"id":123,"type":"memory","value":"old text","reason":"brief reason why it contradicts"}]}
 
 ## Understanding item types
-- "memory" items = stored facts the user considers TRUE
+- "memory" items = stored facts the user considers TRUE — always describe the USER themselves (their name, age, preferences, …)
 - "positive" items = statements the user CONFIRMED as CORRECT
 - "false_positive" items = statements the user marked as INCORRECT. The user believes the OPPOSITE is true.
   Example: false_positive "Putin is Orthodox" means the user previously said "Putin is Orthodox" is WRONG.
   So if a new statement says "Putin is Orthodox" is correct, that CONTRADICTS this false_positive.
 
+## Subject-match rule (apply BEFORE everything else)
+A new statement only contradicts an existing item when they are about the SAME SUBJECT.
+- "memory" items describe the user themselves. They can only contradict a new statement that is ALSO about the user (first-person: "you are X", "your name is X").
+- A new statement about an EXTERNAL subject (a person in an uploaded image, a public figure, a fictional character, a place, a topic — anything that is not the user) NEVER contradicts a personal user memory, even when the topic overlaps. The user being 32 years old has nothing to do with the age of a portrait subject.
+- When the subject of either side is unclear, do NOT flag a contradiction.
+
 ## Rules
-- Only include items that CLEARLY contradict the new statement:
-  - Same topic but opposite or conflicting information
+- Only include items that CLEARLY contradict the new statement AFTER passing the subject-match rule above:
+  - Same topic AND same subject but opposite or conflicting information
   - Same fact with different values
   - Implied contradictions via type inversion (a false_positive is the semantic opposite of what it says)
 - type must be exactly one of: memory, false_positive, positive

@@ -255,19 +255,30 @@ final readonly class FeedbackExampleService
             $memoryContext = $memoryData['text'];
             $memoryPart = <<<MEMORY
 
-STORED USER MEMORIES (these are actual facts currently saved for this user):
+STORED USER MEMORIES (these are actual facts currently saved for this user — they describe the USER, not anyone or anything else):
 {$memoryContext}
 
-IMPORTANT: If the incorrect AI response was based on one of these stored memories, the classification MUST be "memory". The AI did NOT hallucinate — it used stored data that the user now says is wrong. Correction options should reflect what the user actually wants (e.g., correct value, or leave empty if the memory should simply be deleted).
+IMPORTANT — use these memories ONLY when they actually match the subject of the false claim:
+- If the AI response is a claim ABOUT THE USER themselves (e.g. "you are 25", "your name is Tom") AND a related stored memory exists for that same user-attribute, classification MUST be "memory". Correction options should reflect the user's preferred value (or be empty if the memory should simply be deleted).
+- If the AI response is about an EXTERNAL subject (a person in an uploaded image, a public figure, a fictional character, a place, a topic — anyone or anything that is NOT the user themselves), the stored user memories are NOT the source and MUST NOT bleed into the correction. Classification MUST be "feedback". Never reuse the user's own age / name / location / etc. as a correction about a different subject.
+- When in doubt about the subject, default to "feedback" — do not invent a personal angle.
 MEMORY;
         }
 
         $systemPrompt = <<<'PROMPT'
 You analyze incorrect AI responses and generate feedback options. You must produce summary options (what was false), correction options (what is correct), AND a classification in a single JSON response.
 
-Classification rules:
-- "memory": The error is about PERSONAL USER FACTS (name, birthday, email, preferences, address, relationships, skills, etc.) OR the AI response was based on a stored user memory that is now incorrect. These should be stored/updated as user memories.
-- "feedback": The error is about GENERAL KNOWLEDGE or AI BEHAVIOR (wrong facts about the world, bad formatting, wrong tone, etc.) AND is NOT based on a stored memory. These should be stored as feedback examples.
+Step 1 — Identify the SUBJECT of the false claim:
+- "user": the claim is about the user themselves (first-person facts: their name, age, preferences, skills, location, …)
+- "external": the claim is about something or someone other than the user (a person in an uploaded image, a public figure, a fictional character, a place, a general topic, …)
+If unsure, treat the subject as "external".
+
+Step 2 — Classify:
+- "memory": ONLY when the subject is the user AND the error is about personal user facts (name, birthday, email, preferences, address, relationships, skills, …). Choose this when correcting the value should update the user's own memory.
+- "feedback": Everything else — general-knowledge errors, wrong facts about external subjects, bad formatting, wrong tone, etc. Use this whenever the subject is external, regardless of which memories the user happens to have stored.
+
+Subject-isolation rule (do not violate):
+- Personal user facts (e.g. the user's own age, name, location) MUST NEVER appear in correction options for claims about an external subject. The user's age has nothing to do with the age of a person in an uploaded image, even if both involve "age".
 
 Content rules:
 - Generate 2-4 options for EACH field, depending on complexity:
@@ -276,7 +287,7 @@ Content rules:
 - summaryOptions: Different phrasings of the false claim, ranked from most precise to most general
 - correctionOptions: Different phrasings of the correct information
   - If classification is "memory": Format corrections as clean memory values (e.g., "Python, JavaScript" not "The correct skills are Python and JavaScript"). Only provide corrections if there is a meaningful replacement value.
-  - If classification is "feedback": Format corrections as complete statements
+  - If classification is "feedback": Format corrections as complete statements about the SAME subject as the false claim (never substitute the user as subject).
 - Each option must be a single, clear sentence
 - ALWAYS respond in the SAME LANGUAGE as the input text
 - Output ONLY valid JSON: {"classification":"memory|feedback","summaryOptions":["..."],"correctionOptions":["..."]}
