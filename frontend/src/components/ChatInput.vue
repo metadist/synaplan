@@ -994,27 +994,23 @@ const startWebSpeechRecording = async () => {
           nextTick(() => sendMessage())
         }
       },
-      onResult: (text: string, isFinal: boolean) => {
+      onResult: ({ final, interim }) => {
+        // Snapshot semantics: the service hands us the *whole* recognition
+        // session so far. Assigning (never appending) the snapshot is what
+        // makes the consumer immune to Android Chrome re-emitting the same
+        // final segment across multiple events (issue #898).
         const base = speechBaseMessage.value
-        const separator = base ? ' ' : ''
+        const separator = base && (final || interim) ? ' ' : ''
 
         clearSilenceTimer()
 
-        if (isFinal) {
-          const finalSeparator = speechFinalTranscript.value ? ' ' : ''
-          speechFinalTranscript.value += finalSeparator + text
-          interimTranscript.value = ''
+        speechFinalTranscript.value = final
+        interimTranscript.value = interim
 
-          message.value = base + separator + speechFinalTranscript.value
-        } else {
-          interimTranscript.value = text
-          const finals = speechFinalTranscript.value
-          const interimSeparator = finals ? ' ' : ''
+        const finalInterimSeparator = final && interim ? ' ' : ''
+        message.value = base + separator + final + finalInterimSeparator + interim
 
-          message.value = base + separator + finals + interimSeparator + text
-        }
-
-        if (speechFinalTranscript.value.trim()) {
+        if (final.trim()) {
           silenceTimer.value = setTimeout(() => {
             if (speechFinalTranscript.value.trim()) {
               autoSendPending.value = true
