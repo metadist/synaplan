@@ -77,7 +77,8 @@ describe('WebSpeechService.onresult — snapshot semantics (issue #898)', () => 
 
   beforeEach(() => {
     recognition = new FakeRecognition()
-    originalWebkitSpeechRecognition = (window as unknown as { webkitSpeechRecognition: unknown }).webkitSpeechRecognition
+    originalWebkitSpeechRecognition = (window as unknown as { webkitSpeechRecognition: unknown })
+      .webkitSpeechRecognition
 
     // Install a constructor that returns our shared instance so we can drive it
     // from the test. The service only ever calls `new SpeechRecognitionClass()`
@@ -92,7 +93,8 @@ describe('WebSpeechService.onresult — snapshot semantics (issue #898)', () => 
     if (originalWebkitSpeechRecognition === undefined) {
       delete (window as Partial<{ webkitSpeechRecognition: unknown }>).webkitSpeechRecognition
     } else {
-      ;(window as unknown as { webkitSpeechRecognition: unknown }).webkitSpeechRecognition = originalWebkitSpeechRecognition
+      ;(window as unknown as { webkitSpeechRecognition: unknown }).webkitSpeechRecognition =
+        originalWebkitSpeechRecognition
     }
   })
 
