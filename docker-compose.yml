@@ -61,9 +61,14 @@ services:
   # Symfony PHP Backend
   # Serves both API and production frontend from frontend/dist
   backend:
+    # Docker's embedded resolver (127.0.0.11) MUST be listed first — otherwise
+    # only public DNS is used and service hostnames (db, ollama, …) never resolve,
+    # which puts the backend in a crash loop and prevents the frontend schema step
+    # from ever reaching a healthy API.
     dns:
-    - 8.8.8.8
-    - 8.8.4.4
+      - 127.0.0.11
+      - 8.8.8.8
+      - 8.8.4.4
     image: ghcr.io/metadist/synaplan:latest
     build:
       context: .

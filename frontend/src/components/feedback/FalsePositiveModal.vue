@@ -266,7 +266,7 @@ async function enhanceText(
     const result = await chatApi.enhanceMessage(textRef.value.trim())
     textRef.value = result.enhanced
     hintRef.value = false
-  } catch {
+  } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : ''
     showErrorToast(
       msg === 'enhance_rejected'
