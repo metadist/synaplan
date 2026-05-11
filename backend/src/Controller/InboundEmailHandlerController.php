@@ -186,6 +186,138 @@ class InboundEmailHandlerController extends AbstractController
     }
 
     /**
+     * Test mailbox (IMAP/POP3) connection with credentials from the request body.
+     * Does not persist changes or alter stored handler status (preview before save).
+     */
+    #[Route('/test-connection', name: 'test_connection_preview', methods: ['POST'], priority: 10)]
+    #[OA\Post(
+        path: '/api/v1/inbound-email-handlers/test-connection',
+        summary: 'Test mailbox connection without saving',
+        description: 'Tests IMAP/POP3 login using values from the form. When editing an existing handler, omit password or send the masked placeholder and pass handlerId to reuse the stored password while testing changed server settings.',
+        security: [['Bearer' => []]],
+        tags: ['Inbound Email Handlers']
+    )]
+    #[OA\RequestBody(
+        required: true,
+        content: new OA\JsonContent(
+            required: ['mailServer', 'port', 'protocol', 'security', 'username'],
+            properties: [
+                new OA\Property(property: 'mailServer', type: 'string', example: 'imap.example.com'),
+                new OA\Property(property: 'port', type: 'integer', example: 993),
+                new OA\Property(property: 'protocol', type: 'string', enum: ['IMAP', 'POP3']),
+                new OA\Property(property: 'security', type: 'string', enum: ['SSL/TLS', 'STARTTLS', 'None']),
+                new OA\Property(property: 'username', type: 'string', example: 'user@example.com'),
+                new OA\Property(property: 'password', type: 'string', nullable: true, description: 'Plain password; omit or mask when handlerId is set'),
+                new OA\Property(property: 'handlerId', type: 'integer', nullable: true, description: 'Existing handler ID to load stored password when password is omitted/masked'),
+            ]
+        )
+    )]
+    #[OA\Response(
+        response: 200,
+        description: 'Connection test result',
+        content: new OA\JsonContent(
+            properties: [
+                new OA\Property(property: 'success', type: 'boolean', example: true),
+                new OA\Property(property: 'message', type: 'string', example: 'Connection successful'),
+            ]
+        )
+    )]
+    #[OA\Response(response: 400, description: 'Invalid or incomplete parameters')]
+    #[OA\Response(response: 401, description: 'Not authenticated')]
+    #[OA\Response(response: 404, description: 'Handler not found')]
+    public function testConnectionPreview(Request $request, #[CurrentUser] ?User $user): JsonResponse
+    {
+        if (!$user) {
+            return $this->json(['error' => 'Not authenticated'], Response::HTTP_UNAUTHORIZED);
+        }
+
+        $data = json_decode($request->getContent(), true);
+        if (!is_array($data)) {
+            return $this->json([
+                'success' => false,
+                'message' => 'Invalid JSON body',
+            ], Response::HTTP_BAD_REQUEST);
+        }
+
+        $mailServer = isset($data['mailServer']) ? trim((string) $data['mailServer']) : '';
+        $username = isset($data['username']) ? trim((string) $data['username']) : '';
+        $port = isset($data['port']) ? (int) $data['port'] : 0;
+        $protocol = isset($data['protocol']) ? (string) $data['protocol'] : '';
+        $security = isset($data['security']) ? (string) $data['security'] : '';
+
+        if ('' === $mailServer || '' === $username || $port <= 0 || $port > 65535) {
+            return $this->json([
+                'success' => false,
+                'message' => 'mailServer, username, and a valid port (1–65535) are required',
+            ], Response::HTTP_BAD_REQUEST);
+        }
+
+        if (!in_array($protocol, ['IMAP', 'POP3'], true)) {
+            return $this->json([
+                'success' => false,
+                'message' => 'protocol must be IMAP or POP3',
+            ], Response::HTTP_BAD_REQUEST);
+        }
+
+        if (!in_array($security, ['SSL/TLS', 'STARTTLS', 'None'], true)) {
+            return $this->json([
+                'success' => false,
+                'message' => 'security must be SSL/TLS, STARTTLS, or None',
+            ], Response::HTTP_BAD_REQUEST);
+        }
+
+        $passwordInput = isset($data['password']) ? (string) $data['password'] : '';
+        $handlerId = isset($data['handlerId']) ? (int) $data['handlerId'] : 0;
+
+        $plainPassword = null;
+        if (!InboundEmailHandlerService::isMaskedPasswordPlaceholder($passwordInput)) {
+            $plainPassword = $passwordInput;
+        } elseif ($handlerId > 0) {
+            $stored = $this->handlerRepository->findByIdAndUser($handlerId, $user->getId());
+            if (!$stored) {
+                return $this->json([
+                    'success' => false,
+                    'error' => 'Handler not found',
+                ], Response::HTTP_NOT_FOUND);
+            }
+            $plainPassword = $stored->getDecryptedPassword($this->encryptionService);
+        }
+
+        if (null === $plainPassword || '' === $plainPassword) {
+            return $this->json([
+                'success' => false,
+                'message' => 'Password is required, or provide handlerId to reuse the saved password',
+            ], Response::HTTP_BAD_REQUEST);
+        }
+
+        try {
+            $result = $this->handlerService->testMailboxCredentials(
+                $mailServer,
+                $port,
+                $protocol,
+                $security,
+                $username,
+                $plainPassword
+            );
+
+            return $this->json([
+                'success' => $result['success'],
+                'message' => $result['message'],
+            ]);
+        } catch (\Exception $e) {
+            $this->logger->error('Preview mailbox connection test failed', [
+                'user_id' => $user->getId(),
+                'error' => $e->getMessage(),
+            ]);
+
+            return $this->json([
+                'success' => false,
+                'message' => 'Test connection failed: '.$e->getMessage(),
+            ], Response::HTTP_INTERNAL_SERVER_ERROR);
+        }
+    }
+
+    /**
      * Update handler.
      */
     #[Route('/{id}', name: 'update', methods: ['PUT'])]

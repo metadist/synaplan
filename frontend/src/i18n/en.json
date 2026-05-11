@@ -471,6 +471,8 @@
     "testing": "Testing Connection...",
     "testSuccess": "Connection Successful",
     "testFailed": "Connection Failed",
+    "testPickUpIncomplete": "Enter mail server, port, and username before testing.",
+    "testPickUpPasswordRequired": "Enter the mailbox password to test this configuration.",
     "savedHandlers": "Email Agents",
     "savedHandlersDesc": "Automate your inbox with AI-powered email agents that read, sort, and forward messages.",
     "createHandler": "New Email Agent",

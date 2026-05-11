@@ -5,6 +5,10 @@
  */
 
 import { httpClient } from './httpClient'
+import { PostApiInboundEmailHandlersTestConnectionPreviewResponseSchema } from '@/generated/api-schemas'
+
+/** Backend masked secret placeholder (must match ToolsView and API). */
+export const MASKED_MAIL_PASSWORD_PLACEHOLDER = '••••••••' as const
 
 // Backend Response Types
 export interface BackendMailHandler {
@@ -100,6 +104,18 @@ export interface CreateHandlerRequest {
   // Email filter settings
   emailFilterMode: 'new' | 'historical'
   emailFilterFromDate?: string | null
+}
+
+export interface TestMailboxConnectionBody {
+  mailServer: string
+  port: number
+  protocol: 'IMAP' | 'POP3'
+  security: 'SSL/TLS' | 'STARTTLS' | 'None'
+  username: string
+  /** Omit when reusing saved password via handlerId */
+  password?: string
+  /** When password is omitted/masked, load stored password for this handler */
+  handlerId?: string
 }
 
 export interface UpdateHandlerRequest {
@@ -246,6 +262,44 @@ export const inboundEmailHandlersApi = {
       `/api/v1/inbound-email-handlers/${id}`,
       { method: 'DELETE' }
     )
+  },
+
+  /**
+   * Test mailbox (IMAP/POP3) with unsaved form values (no handler ID required).
+   */
+  async testMailboxConnection(
+    body: TestMailboxConnectionBody
+  ): Promise<{ success: boolean; message: string }> {
+    const payload: Record<string, unknown> = {
+      mailServer: body.mailServer,
+      port: body.port,
+      protocol: body.protocol,
+      security: body.security,
+      username: body.username,
+    }
+
+    const pwd = body.password ?? ''
+    const useStoredPassword =
+      body.handlerId !== undefined &&
+      body.handlerId !== '' &&
+      (pwd === '' || pwd === MASKED_MAIL_PASSWORD_PLACEHOLDER)
+
+    if (useStoredPassword) {
+      payload.handlerId = Number(body.handlerId)
+    } else if (pwd !== '') {
+      payload.password = pwd
+    }
+
+    const data = await httpClient('/api/v1/inbound-email-handlers/test-connection', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+      schema: PostApiInboundEmailHandlersTestConnectionPreviewResponseSchema,
+    })
+
+    return {
+      success: data.success === true,
+      message: typeof data.message === 'string' ? data.message : '',
+    }
   },
 
   /**

@@ -757,8 +757,11 @@ import type {
   SavedMailHandler,
 } from '@/services/api/inboundEmailHandlersApi'
 import { defaultMailConfig, protocolOptions, securityOptions } from '@/mocks/mail'
-import { inboundEmailHandlersApi } from '@/services/api/inboundEmailHandlersApi'
+import { inboundEmailHandlersApi, MASKED_MAIL_PASSWORD_PLACEHOLDER } from '@/services/api/inboundEmailHandlersApi'
 import { useAuthStore } from '@/stores/auth'
+import { useI18n } from 'vue-i18n'
+
+const { t } = useI18n()
 
 const authStore = useAuthStore()
 
@@ -939,11 +942,23 @@ const resetToDefault = () => {
 }
 
 const testConnection = async () => {
-  // For new handlers, we need to save first before testing
-  if (!props.handlerId) {
+  const server = config.value.mailServer?.trim() ?? ''
+  const user = config.value.username?.trim() ?? ''
+  if (!server || !config.value.port || !user) {
     testResult.value = {
       success: false,
-      message: 'Please save the handler first before testing the connection.',
+      message: t('mail.testPickUpIncomplete'),
+    }
+    return
+  }
+
+  const pwd = config.value.password ?? ''
+  const needsMailboxPassword =
+    pwd === '' || pwd === MASKED_MAIL_PASSWORD_PLACEHOLDER
+  if (needsMailboxPassword && !props.handlerId) {
+    testResult.value = {
+      success: false,
+      message: t('mail.testPickUpPasswordRequired'),
     }
     return
   }
@@ -952,7 +967,15 @@ const testConnection = async () => {
   testResult.value = null
 
   try {
-    const result = await inboundEmailHandlersApi.testConnection(props.handlerId)
+    const result = await inboundEmailHandlersApi.testMailboxConnection({
+      mailServer: server,
+      port: config.value.port,
+      protocol: config.value.protocol,
+      security: config.value.security,
+      username: user,
+      password: needsMailboxPassword ? undefined : pwd,
+      handlerId: needsMailboxPassword ? props.handlerId : undefined,
+    })
     testResult.value = {
       success: result.success,
       message: result.message,
@@ -960,7 +983,7 @@ const testConnection = async () => {
   } catch (error: unknown) {
     testResult.value = {
       success: false,
-      message: getErrorMessage(error) || 'Failed to test connection',
+      message: getErrorMessage(error) || t('mail.connectionTestWarning'),
     }
   } finally {
     isTestingConnection.value = false

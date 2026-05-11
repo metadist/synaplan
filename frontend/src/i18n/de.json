@@ -1918,6 +1918,8 @@
     "bulkDeleteSuccess": "{count} Handler erfolgreich gelöscht",
     "bulkDeleteFailed": "Handler konnten nicht gelöscht werden",
     "connectionTestWarning": "Verbindungstest fehlgeschlagen",
+    "testPickUpIncomplete": "Bitte Mailserver, Port und Benutzername ausfüllen, bevor Sie testen.",
+    "testPickUpPasswordRequired": "Bitte geben Sie das Postfach-Passwort ein, um diese Konfiguration zu testen.",
     "handlerSavedTestFailed": "Handler gespeichert, aber Verbindungstest fehlgeschlagen",
     "handlerDeleted": "Mail-Handler erfolgreich gelöscht",
     "deleteFailed": "Fehler beim Löschen des Mail-Handlers",

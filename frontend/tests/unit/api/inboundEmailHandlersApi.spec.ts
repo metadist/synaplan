@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { inboundEmailHandlersApi } from '@/services/api/inboundEmailHandlersApi'
+import { inboundEmailHandlersApi, MASKED_MAIL_PASSWORD_PLACEHOLDER } from '@/services/api/inboundEmailHandlersApi'
 import { httpClient } from '@/services/api/httpClient'
 
 vi.mock('@/services/api/httpClient', () => ({
@@ -223,6 +223,60 @@ describe('inboundEmailHandlersApi', () => {
 
       expect(result.success).toBe(false)
       expect(result.message).toContain('Invalid credentials')
+    })
+  })
+
+  describe('testMailboxConnection', () => {
+    it('posts plain password for preview test', async () => {
+      vi.mocked(httpClient).mockResolvedValue({
+        success: true,
+        message: 'Connection successful',
+      })
+
+      await inboundEmailHandlersApi.testMailboxConnection({
+        mailServer: 'imap.test.com',
+        port: 993,
+        protocol: 'IMAP',
+        security: 'SSL/TLS',
+        username: 'user@test.com',
+        password: 'plain-secret',
+      })
+
+      expect(httpClient).toHaveBeenCalledWith(
+        '/api/v1/inbound-email-handlers/test-connection',
+        expect.objectContaining({
+          method: 'POST',
+          body: expect.stringContaining('"password":"plain-secret"'),
+        })
+      )
+    })
+
+    it('sends handlerId instead of password when password is masked', async () => {
+      vi.mocked(httpClient).mockResolvedValue({
+        success: true,
+        message: 'Connection successful',
+      })
+
+      await inboundEmailHandlersApi.testMailboxConnection({
+        mailServer: 'imap.test.com',
+        port: 993,
+        protocol: 'IMAP',
+        security: 'SSL/TLS',
+        username: 'user@test.com',
+        password: MASKED_MAIL_PASSWORD_PLACEHOLDER,
+        handlerId: '7',
+      })
+
+      const payload = JSON.parse((vi.mocked(httpClient).mock.calls[0]?.[1] as { body: string }).body)
+      expect(payload).toEqual({
+        mailServer: 'imap.test.com',
+        port: 993,
+        protocol: 'IMAP',
+        security: 'SSL/TLS',
+        username: 'user@test.com',
+        handlerId: 7,
+      })
+      expect(payload.password).toBeUndefined()
     })
   })
 })
