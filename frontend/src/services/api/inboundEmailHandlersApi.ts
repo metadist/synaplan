@@ -114,8 +114,13 @@ export interface TestMailboxConnectionBody {
   username: string
   /** Omit when reusing saved password via handlerId */
   password?: string
-  /** When password is omitted/masked, load stored password for this handler */
-  handlerId?: string
+  /**
+   * When password is omitted/masked, load the stored password for this
+   * handler. Accepts string (from form inputs) or number (from API
+   * responses); a non-finite or non-positive value is treated as "not
+   * provided" by `testMailboxConnection`.
+   */
+  handlerId?: string | number
 }
 
 export interface UpdateHandlerRequest {
@@ -279,13 +284,26 @@ export const inboundEmailHandlersApi = {
     }
 
     const pwd = body.password ?? ''
+    // Parse handlerId defensively: the caller may pass a string from a
+    // form, a number, or `undefined`. Number(undefined)/Number('') yield
+    // NaN, which JSON-serializes to `null` and the backend then casts to
+    // 0 — silently looking up handler #0 and 404-ing. Coerce only when
+    // we actually have a finite positive integer.
+    const parsedHandlerId =
+      body.handlerId === undefined || body.handlerId === ''
+        ? null
+        : (() => {
+            const n =
+              typeof body.handlerId === 'number'
+                ? body.handlerId
+                : parseInt(String(body.handlerId), 10)
+            return Number.isFinite(n) && n > 0 ? n : null
+          })()
     const useStoredPassword =
-      body.handlerId !== undefined &&
-      body.handlerId !== '' &&
-      (pwd === '' || pwd === MASKED_MAIL_PASSWORD_PLACEHOLDER)
+      parsedHandlerId !== null && (pwd === '' || pwd === MASKED_MAIL_PASSWORD_PLACEHOLDER)
 
     if (useStoredPassword) {
-      payload.handlerId = Number(body.handlerId)
+      payload.handlerId = parsedHandlerId
     } else if (pwd !== '') {
       payload.password = pwd
     }

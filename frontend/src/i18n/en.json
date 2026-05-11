@@ -675,6 +675,7 @@
     "uploadBlocked": {
       "storage_exceeded": "{filename}: Not enough storage. {message}",
       "file_too_large": "{filename}: File is too large. {message}",
+      "file_empty": "{filename}: File is empty. {message}",
       "extension_not_allowed": "{filename}: File type is not supported. {message}",
       "rate_limit_exceeded": "{filename}: Upload rate limit reached. {message}",
       "generic": "{filename}: Upload is not allowed. {message}"

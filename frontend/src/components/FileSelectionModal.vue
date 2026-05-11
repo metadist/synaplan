@@ -337,6 +337,25 @@ const emit = defineEmits<{
 
 const { success, error: showError, warning } = useNotification()
 
+// Localized message for a pre-flight upload rejection, with a hard
+// non-i18n fallback so the user never sees a raw dot-path key when a
+// translation is missing in the active locale.
+const translateUploadBlocked = (err: UploadBlockedError): string => {
+  const params = {
+    filename: err.filename,
+    message: err.check.message ?? '',
+  }
+  const reasonKey = `files.uploadBlocked.${err.reason}`
+  const reasonTranslated = t(reasonKey, params)
+  if (reasonTranslated !== reasonKey) return reasonTranslated
+
+  const genericKey = 'files.uploadBlocked.generic'
+  const genericTranslated = t(genericKey, params)
+  if (genericTranslated !== genericKey) return genericTranslated
+
+  return params.message ? `${params.filename}: ${params.message}` : params.filename
+}
+
 // State
 const isLoading = ref(false)
 const isUploading = ref(false)
@@ -588,19 +607,7 @@ const uploadFiles = async (filesToUpload: File[]) => {
           break
         }
         if (err instanceof UploadBlockedError) {
-          const key = `files.uploadBlocked.${err.reason}`
-          const translated = t(key, {
-            filename: err.filename,
-            message: err.check.message ?? '',
-          })
-          showError(
-            translated === key
-              ? t('files.uploadBlocked.generic', {
-                  filename: err.filename,
-                  message: err.check.message ?? '',
-                })
-              : translated
-          )
+          showError(translateUploadBlocked(err))
           continue
         }
         console.error('Upload failed:', file.name, err)

@@ -4,6 +4,7 @@ import { httpClient, getApiBaseUrl, refreshAccessToken } from './api/httpClient'
 export type UploadCheckReason =
   | 'rate_limit_exceeded'
   | 'file_too_large'
+  | 'file_empty'
   | 'extension_not_allowed'
   | 'storage_exceeded'
 
@@ -136,10 +137,17 @@ export interface FileListResponse {
  * @returns Upload response with file details
  */
 export const uploadFiles = async (options: UploadFileOptions): Promise<UploadResponse> => {
-  for (const file of options.files) {
-    const check = await checkUpload(file.name, file.size, file.type)
-    if (!check.allowed) {
-      throw new UploadBlockedError(file.name, check)
+  // Pre-flight all files concurrently — N small HEAD-style metadata
+  // requests in parallel beat N sequential round-trips when the user
+  // drops a folder of files. We throw on the FIRST rejection we
+  // encounter (in original file-order) so the user sees the same error
+  // regardless of network jitter.
+  const checks = await Promise.all(
+    options.files.map((file) => checkUpload(file.name, file.size, file.type))
+  )
+  for (let i = 0; i < options.files.length; i++) {
+    if (!checks[i].allowed) {
+      throw new UploadBlockedError(options.files[i].name, checks[i])
     }
   }
 

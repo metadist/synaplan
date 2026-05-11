@@ -290,7 +290,7 @@
           <tbody>
             <tr
               v-for="model in paginatedModels"
-              :key="`${model.service}-${model.name}`"
+              :key="`${model.service}\u0000${model.name}`"
               class="border-b border-light-border/10 dark:border-dark-border/10 hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
               data-testid="item-model"
               :data-model-service="model.service"

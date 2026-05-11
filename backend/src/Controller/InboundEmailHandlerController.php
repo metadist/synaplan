@@ -275,9 +275,12 @@ class InboundEmailHandlerController extends AbstractController
         } elseif ($handlerId > 0) {
             $stored = $this->handlerRepository->findByIdAndUser($handlerId, $user->getId());
             if (!$stored) {
+                // Use `message` (not `error`) to match the 200/400 responses on
+                // the same endpoint — keeps the generated Zod schema stable
+                // and lets clients render a single field regardless of status.
                 return $this->json([
                     'success' => false,
-                    'error' => 'Handler not found',
+                    'message' => 'Handler not found',
                 ], Response::HTTP_NOT_FOUND);
             }
             $plainPassword = $stored->getDecryptedPassword($this->encryptionService);
@@ -305,14 +308,18 @@ class InboundEmailHandlerController extends AbstractController
                 'message' => $result['message'],
             ]);
         } catch (\Exception $e) {
+            // Log the raw exception (with hostname, library detail, stack
+            // trace, …) but return a generic message to the caller — we
+            // never want IMAP/POP3 library internals leaking into a
+            // user-facing toast.
             $this->logger->error('Preview mailbox connection test failed', [
                 'user_id' => $user->getId(),
-                'error' => $e->getMessage(),
+                'exception' => $e,
             ]);
 
             return $this->json([
                 'success' => false,
-                'message' => 'Test connection failed: '.$e->getMessage(),
+                'message' => 'Test connection failed. Please check your settings and try again.',
             ], Response::HTTP_INTERNAL_SERVER_ERROR);
         }
     }

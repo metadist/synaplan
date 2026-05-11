@@ -128,15 +128,20 @@ class FileUploadServiceCheckUploadTest extends TestCase
         $this->assertSame(100, $result['limit']);
     }
 
-    public function testRejectsZeroByteFiles(): void
+    public function testRejectsZeroByteFilesWithDedicatedReason(): void
     {
+        // Zero-byte files used to surface as `file_too_large`, which
+        // the UI then translated to "File is too large" — directly
+        // contradicting the actual "file is empty" message. They get
+        // their own reason so the frontend can render matching copy.
         $this->expectRateLimitAllowed();
         $this->storageQuotaService->method('getRemainingStorage')->willReturn(10 * 1024 * 1024);
 
         $result = $this->service->checkUpload($this->createUser(), 'empty.pdf', 0);
 
         $this->assertFalse($result['allowed']);
-        $this->assertSame('file_too_large', $result['reason']);
+        $this->assertSame('file_empty', $result['reason']);
+        $this->assertStringContainsString('empty', $result['message']);
     }
 
     public function testIncludesQuotaMetadataInAllResponses(): void

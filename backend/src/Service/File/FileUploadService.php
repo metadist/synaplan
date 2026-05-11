@@ -88,7 +88,7 @@ final readonly class FileUploadService
      *
      * @return array{
      *   allowed: bool,
-     *   reason?: 'rate_limit_exceeded'|'file_too_large'|'extension_not_allowed'|'storage_exceeded',
+     *   reason?: 'rate_limit_exceeded'|'file_too_large'|'file_empty'|'extension_not_allowed'|'storage_exceeded',
      *   message?: string,
      *   max_file_size: int,
      *   allowed_extensions: list<string>,
@@ -121,9 +121,15 @@ final readonly class FileUploadService
         }
 
         if ($fileSize <= 0) {
+            // Distinct reason from `file_too_large` so the frontend can
+            // render an "empty file" copy that actually matches the
+            // situation. The shared message hint about
+            // Dropbox/iCloud/OneDrive lazy-loading covers the most
+            // common cause for a zero-byte upload (the user picked a
+            // cloud placeholder instead of the actual file).
             return array_merge($base, [
                 'allowed' => false,
-                'reason' => 'file_too_large',
+                'reason' => 'file_empty',
                 'message' => 'File appears to be empty. If using Dropbox, iCloud, or OneDrive, please download the file locally first before uploading.',
             ]);
         }

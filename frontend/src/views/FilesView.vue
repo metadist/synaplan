@@ -1737,19 +1737,24 @@ const uploadFiles = async () => {
 }
 
 const translateUploadBlocked = (err: UploadBlockedError): string => {
-  const key = `files.uploadBlocked.${err.reason}`
-  // Fall back to a generic translated message if the reason key is missing
-  const translated = t(key, {
+  const params = {
     filename: err.filename,
     message: err.check.message ?? '',
-  })
-  if (translated === key) {
-    return t('files.uploadBlocked.generic', {
-      filename: err.filename,
-      message: err.check.message ?? '',
-    })
   }
-  return translated
+  const reasonKey = `files.uploadBlocked.${err.reason}`
+  const reasonTranslated = t(reasonKey, params)
+  if (reasonTranslated !== reasonKey) return reasonTranslated
+
+  // Reason-specific copy missing in the active locale → try the generic
+  // localized template.
+  const genericKey = 'files.uploadBlocked.generic'
+  const genericTranslated = t(genericKey, params)
+  if (genericTranslated !== genericKey) return genericTranslated
+
+  // Both keys missing → never show the raw `files.uploadBlocked.x`
+  // dot-path to the user. Fall back to a non-i18n string that still
+  // carries the filename + backend message.
+  return params.message ? `${params.filename}: ${params.message}` : params.filename
 }
 
 const handleUpgrade = () => {

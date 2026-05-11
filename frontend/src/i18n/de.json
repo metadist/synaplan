@@ -917,8 +917,8 @@
       "messageClassification": "Nachrichten-Klassifizierung",
       "clickToConfig": "Klicken zum Konfigurieren",
       "purposeChip": {
-        "activeTooltip": "Bereits als Standardmodell für „{purpose}\" gesetzt",
-        "applyTooltip": "{model} als Standardmodell für „{purpose}\" festlegen"
+        "activeTooltip": "Bereits als Standardmodell für „{purpose}“ gesetzt",
+        "applyTooltip": "{model} als Standardmodell für „{purpose}“ festlegen"
       },
       "modelNotAvailable": "{model} ist nicht verfügbar. Bitte prüfe die Provider-Konfiguration.",
       "modelNotConfigured": "{model} ist nicht bereit: Setze {envVar} in der Umgebung (z. B. .env.local).",
@@ -1804,6 +1804,7 @@
     "uploadBlocked": {
       "storage_exceeded": "{filename}: Nicht genug Speicherplatz. {message}",
       "file_too_large": "{filename}: Datei ist zu groß. {message}",
+      "file_empty": "{filename}: Datei ist leer. {message}",
       "extension_not_allowed": "{filename}: Dateityp wird nicht unterstützt. {message}",
       "rate_limit_exceeded": "{filename}: Upload-Limit erreicht. {message}",
       "generic": "{filename}: Upload nicht erlaubt. {message}"

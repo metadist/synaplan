@@ -1312,8 +1312,8 @@
       "messageClassification": "Mesaj Sınıflandırma",
       "clickToConfig": "Yapılandırmak için tıklayın",
       "purposeChip": {
-        "activeTooltip": "Zaten „{purpose}\" için varsayılan model olarak ayarlandı",
-        "applyTooltip": "{model} modelini „{purpose}\" için varsayılan model olarak ayarla"
+        "activeTooltip": "Zaten \"{purpose}\" için varsayılan model olarak ayarlandı",
+        "applyTooltip": "{model} modelini \"{purpose}\" için varsayılan model olarak ayarla"
       },
       "defaultConfig": "Varsayılan Model Yapılandırması",
       "saveConfiguration": "Yapılandırmayı Kaydet",

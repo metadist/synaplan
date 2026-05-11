@@ -392,6 +392,7 @@ import {
 } from '@heroicons/vue/24/outline'
 import type { SummaryConfig, FocusArea } from '@/mocks/summaries'
 import { summaryTypes, summaryLengths, outputLanguages, focusAreaOptions } from '@/mocks/summaries'
+import { useI18n } from 'vue-i18n'
 import { useNotification } from '@/composables/useNotification'
 import {
   uploadFiles,
@@ -401,6 +402,8 @@ import {
 } from '@/services/filesService'
 import FileSelectionModal from '@/components/FileSelectionModal.vue'
 import { getErrorMessage } from '@/utils/errorMessage'
+
+const { t } = useI18n()
 
 interface Props {
   isGenerating?: boolean
@@ -441,6 +444,27 @@ const isUploadingFile = ref(false)
 const fileSelectionModalVisible = ref(false)
 
 const { warning, error, success } = useNotification()
+
+// Localized message for a pre-flight upload rejection, matching the
+// behavior used in FilesView and FileSelectionModal so the user sees
+// the same copy regardless of which upload entry point they hit.
+// Plain-string fallback prevents raw `files.uploadBlocked.x` dot-paths
+// from ever surfacing if a locale is missing the key.
+const translateUploadBlocked = (err: UploadBlockedError): string => {
+  const params = {
+    filename: err.filename,
+    message: err.check.message ?? '',
+  }
+  const reasonKey = `files.uploadBlocked.${err.reason}`
+  const reasonTranslated = t(reasonKey, params)
+  if (reasonTranslated !== reasonKey) return reasonTranslated
+
+  const genericKey = 'files.uploadBlocked.generic'
+  const genericTranslated = t(genericKey, params)
+  if (genericTranslated !== genericKey) return genericTranslated
+
+  return params.message ? `${params.filename}: ${params.message}` : params.filename
+}
 
 const characterCount = computed(() => documentText.value.length)
 const wordCount = computed(() => {
@@ -555,7 +579,7 @@ const handleFile = async (file: File) => {
     }
   } catch (err: unknown) {
     if (err instanceof UploadBlockedError) {
-      error(`${err.filename}: ${err.check.message ?? 'Upload not allowed'}`)
+      error(translateUploadBlocked(err))
     } else {
       console.error('File upload error:', err)
       error(getErrorMessage(err) || 'Failed to upload file. Please try again.')

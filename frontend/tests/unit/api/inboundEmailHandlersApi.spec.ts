@@ -283,5 +283,53 @@ describe('inboundEmailHandlersApi', () => {
       })
       expect(payload.password).toBeUndefined()
     })
+
+    it('omits handlerId when value is not a positive integer (NaN-safe)', async () => {
+      vi.mocked(httpClient).mockResolvedValue({
+        success: true,
+        message: 'Connection successful',
+      })
+
+      // Garbage handlerId + plain password → only the password ends up
+      // in the payload. We never want to send `handlerId: NaN` (which
+      // serializes to `null` and the backend would cast to 0).
+      await inboundEmailHandlersApi.testMailboxConnection({
+        mailServer: 'imap.test.com',
+        port: 993,
+        protocol: 'IMAP',
+        security: 'SSL/TLS',
+        username: 'user@test.com',
+        password: 'plain-secret',
+        handlerId: 'not-a-number',
+      })
+
+      const payload = JSON.parse(
+        (vi.mocked(httpClient).mock.calls[0]?.[1] as { body: string }).body
+      )
+      expect(payload.handlerId).toBeUndefined()
+      expect(payload.password).toBe('plain-secret')
+    })
+
+    it('omits handlerId when value is zero or negative', async () => {
+      vi.mocked(httpClient).mockResolvedValue({
+        success: true,
+        message: 'Connection successful',
+      })
+
+      await inboundEmailHandlersApi.testMailboxConnection({
+        mailServer: 'imap.test.com',
+        port: 993,
+        protocol: 'IMAP',
+        security: 'SSL/TLS',
+        username: 'user@test.com',
+        password: 'plain-secret',
+        handlerId: 0,
+      })
+
+      const payload = JSON.parse(
+        (vi.mocked(httpClient).mock.calls[0]?.[1] as { body: string }).body
+      )
+      expect(payload.handlerId).toBeUndefined()
+    })
   })
 })
