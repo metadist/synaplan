@@ -242,8 +242,18 @@ export class WebSpeechService {
           interim = transcript
         }
       }
+
+      // Android Chrome (some versions) reports cumulative finals: each
+      // results[i].transcript contains ALL text from results[0..i], not just
+      // the new segment. Joining them naively produces "hi hi wie hi wie wird".
+      // Detect this pattern and take only the last (most complete) final.
+      const finalText =
+        finals.length > 1 && this.areFinalsCumulative(finals)
+          ? finals[finals.length - 1]
+          : finals.join(' ')
+
       this.options.onResult?.({
-        final: finals.join(' ').replace(/\s+/g, ' ').trim(),
+        final: finalText.replace(/\s+/g, ' ').trim(),
         interim: interim.replace(/\s+/g, ' ').trim(),
       })
     }
@@ -314,6 +324,23 @@ export class WebSpeechService {
    */
   get listening(): boolean {
     return this.isListening
+  }
+
+  /**
+   * Detect Android Chrome's "cumulative finals" pattern where each
+   * results[i].transcript is a superset of results[i-1].transcript
+   * rather than an independent new segment.
+   *
+   * Requires a word boundary (space) after the prefix to avoid false
+   * positives like ["hi", "higher"] being detected as cumulative.
+   */
+  private areFinalsCumulative(finals: string[]): boolean {
+    for (let i = 1; i < finals.length; i++) {
+      const prev = finals[i - 1].trim()
+      const curr = finals[i].trim()
+      if (curr !== prev && !curr.startsWith(prev + ' ')) return false
+    }
+    return true
   }
 
   /**
