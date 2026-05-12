@@ -46,6 +46,32 @@ final class WhatsAppService
      */
     private const DUPLICATE_CACHE_TTL = 300;
 
+    /**
+     * Allow-list of WhatsApp webhook message types the AI pipeline knows
+     * how to handle. Anything outside this set is silently acknowledged
+     * to Meta (HTTP 200) without persisting a Message or invoking the
+     * AI — see {@see handleIncomingMessage()} and issue #633.
+     *
+     * Filtered-out types include `reaction`, `poll`, `poll_vote`,
+     * `ephemeral`, `request_welcome`, `system`, `unsupported`,
+     * `interactive`, `button` and `order`. These either carry no
+     * user-actionable text payload (reactions, polls) or require
+     * dedicated handlers the platform does not yet implement
+     * (interactive buttons, catalog orders). Acknowledging them
+     * silently keeps Meta from retrying the webhook and stops the
+     * "one poll → seven AI replies" cascade described in #633.
+     */
+    private const SUPPORTED_MESSAGE_TYPES = [
+        'text',
+        'image',
+        'sticker',
+        'audio',
+        'video',
+        'document',
+        'location',
+        'contacts',
+    ];
+
     private const DEFAULT_GRAPH_BASE = 'https://graph.facebook.com';
 
     private string $accessToken;
@@ -165,6 +191,55 @@ final class WhatsAppService
 
             return null;
         }
+    }
+
+    /**
+     * Drop non-actionable webhook message types before they enter the
+     * AI pipeline. Returns a webhook-success payload when the type is
+     * not in {@see SUPPORTED_MESSAGE_TYPES}, or `null` to continue
+     * normal processing.
+     *
+     * We also fire-and-forget a read receipt so the user's WhatsApp
+     * thread doesn't show an unread bubble for a poll/reaction the
+     * platform legitimately ignored — failures here are logged but
+     * never block the webhook acknowledgement (Meta would otherwise
+     * retry, compounding the original bug from issue #633).
+     */
+    private function handleUnsupportedTypeIfNeeded(IncomingMessageDto $dto): ?array
+    {
+        if (in_array($dto->type, self::SUPPORTED_MESSAGE_TYPES, true)) {
+            return null;
+        }
+
+        $this->logger->info('WhatsApp: Skipping unsupported message type', [
+            'message_id' => $dto->messageId,
+            'from' => $dto->from,
+            'type' => $dto->type,
+        ]);
+
+        if ($this->isAvailable() && '' !== $dto->phoneNumberId) {
+            try {
+                $this->markAsRead($dto->messageId, $dto->phoneNumberId);
+            } catch (\Throwable $e) {
+                // Read receipts are best-effort. A failure here must
+                // not bubble up: the webhook MUST still return 200
+                // so Meta doesn't retry and re-trigger the cascade.
+                $this->logger->warning('WhatsApp: Failed to mark unsupported message as read', [
+                    'message_id' => $dto->messageId,
+                    'type' => $dto->type,
+                    'error' => $e->getMessage(),
+                ]);
+            }
+        }
+
+        return [
+            'success' => true,
+            'message_id' => $dto->messageId,
+            'skipped' => true,
+            'reason' => 'unsupported_type',
+            'type' => $dto->type,
+            'response_sent' => false,
+        ];
     }
 
     /**
@@ -566,6 +641,17 @@ final class WhatsAppService
         $duplicateResult = $this->checkAndMarkAsDuplicate($dto);
         if (null !== $duplicateResult) {
             return $duplicateResult;
+        }
+
+        // Issue #633: silently acknowledge unsupported webhook types
+        // (poll, reaction, system, …) so the AI pipeline doesn't fire
+        // for non-user-actionable events. Duplicate detection cannot
+        // help here — each poll vote / reaction lands with a distinct
+        // wamid, so without this filter a single poll cascades into
+        // 7+ "[Unsupported message type: …]" messages and 7+ replies.
+        $unsupportedResult = $this->handleUnsupportedTypeIfNeeded($dto);
+        if (null !== $unsupportedResult) {
+            return $unsupportedResult;
         }
 
         $effectiveUserId = $isAnonymous ? $this->whatsappUserId : $user->getId();
@@ -1108,6 +1194,14 @@ final class WhatsAppService
      * Extract initial message text from the WhatsApp message.
      * For media messages, this returns captions or placeholders that will be
      * replaced with transcribed/extracted content during media processing.
+     *
+     * The `default` branch is defense-in-depth only: the outer
+     * {@see handleUnsupportedTypeIfNeeded()} filter (issue #633) already
+     * short-circuits any type that is not in {@see SUPPORTED_MESSAGE_TYPES},
+     * so this method should never see one in production. The fallback
+     * string stays around so direct callers (e.g. reflection-driven
+     * unit tests) still get a deterministic value instead of an
+     * UnhandledMatchError.
      */
     private function extractMessageText(IncomingMessageDto $dto): string
     {

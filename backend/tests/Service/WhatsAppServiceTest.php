@@ -17,6 +17,7 @@ use App\Service\RateLimitService;
 use App\Service\UserMemoryService;
 use App\Service\WhatsAppService;
 use Doctrine\ORM\EntityManagerInterface;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\Lock\LockFactory;
@@ -1471,5 +1472,178 @@ class WhatsAppServiceTest extends TestCase
         $this->assertTrue($result['success']);
         $this->assertTrue($result['duplicate']);
         $this->assertFalse($result['response_sent']);
+    }
+
+    // ============================================
+    // Tests for issue #633: unsupported webhook types
+    // ============================================
+
+    /**
+     * @return iterable<string, array{0: string, 1: array<string, mixed>}>
+     */
+    public static function unsupportedWebhookTypesProvider(): iterable
+    {
+        // Each row describes a real WhatsApp webhook payload that used
+        // to leak through the old `default` branch in extractMessageText()
+        // and end up as a `[Unsupported message type: …]` AI prompt.
+        yield 'reaction' => ['reaction', ['reaction' => ['message_id' => 'wamid.x', 'emoji' => '👍']]];
+        yield 'poll' => ['poll', ['poll' => ['name' => 'Lunch?', 'options' => ['Pizza', 'Sushi']]]];
+        yield 'poll_vote' => ['poll_vote', ['poll_vote' => ['option_id' => 1]]];
+        yield 'system' => ['system', ['system' => ['body' => 'User changed name']]];
+        yield 'unsupported' => ['unsupported', ['errors' => [['code' => 131051, 'title' => 'Unsupported']]]];
+        yield 'interactive' => ['interactive', ['interactive' => ['type' => 'button_reply']]];
+        yield 'button' => ['button', ['button' => ['payload' => 'YES', 'text' => 'Yes']]];
+        yield 'ephemeral' => ['ephemeral', ['ephemeral' => []]];
+        yield 'request_welcome' => ['request_welcome', []];
+        yield 'order' => ['order', ['order' => ['catalog_id' => 'cat_1']]];
+    }
+
+    /**
+     * Issue #633: a poll / reaction / system / interactive event must
+     * be acknowledged with HTTP 200 but never reach the AI. A single
+     * poll otherwise cascaded into 7+ "[Unsupported message type: …]"
+     * messages and 7+ AI replies.
+     *
+     * @param array<string, mixed> $extraFields
+     */
+    #[DataProvider('unsupportedWebhookTypesProvider')]
+    public function testUnsupportedWebhookTypeIsSilentlyAcknowledged(string $type, array $extraFields): void
+    {
+        $user = $this->createMock(User::class);
+        $user->method('getId')->willReturn(1);
+
+        $incomingMsg = array_merge(
+            [
+                'from' => '+1234567890',
+                'id' => 'wamid.'.$type.'.'.bin2hex(random_bytes(4)),
+                'timestamp' => (string) time(),
+                'type' => $type,
+            ],
+            $extraFields,
+        );
+
+        $value = [
+            'messaging_product' => 'whatsapp',
+            'metadata' => [
+                'phone_number_id' => $this->testPhoneNumberId,
+                'display_phone_number' => '+49123456789',
+            ],
+            'contacts' => [['profile' => ['name' => 'Test User'], 'wa_id' => '+1234567890']],
+            'messages' => [$incomingMsg],
+        ];
+
+        $dto = IncomingMessageDto::fromPayload($incomingMsg, $value);
+
+        // The AI pipeline must stay completely cold for unsupported
+        // webhook types — these are the two side effects that used to
+        // surface the bug in the platform UI (one DB row + one AI reply
+        // per poll vote / reaction event).
+        $this->messageProcessor->expects($this->never())->method('processStream');
+        $this->em->expects($this->never())->method('persist');
+
+        // Read receipt is best-effort — we only care that we DID NOT
+        // crash on it. Letting the underlying httpClient mock no-op is
+        // enough; failures would be swallowed by the helper anyway.
+
+        $result = $this->service->handleIncomingMessage($dto, $user, false);
+
+        $this->assertTrue($result['success']);
+        $this->assertTrue($result['skipped']);
+        $this->assertSame('unsupported_type', $result['reason']);
+        $this->assertSame($type, $result['type']);
+        $this->assertFalse($result['response_sent']);
+        $this->assertSame($incomingMsg['id'], $result['message_id']);
+    }
+
+    /**
+     * @return iterable<string, array{0: string}>
+     */
+    public static function supportedWebhookTypesProvider(): iterable
+    {
+        // Pins every type in WhatsAppService::SUPPORTED_MESSAGE_TYPES so
+        // a future refactor of the allowlist can't accidentally drop a
+        // core inbound channel (text / audio / image / …) into the
+        // unsupported branch and silently stop replying to users.
+        yield 'text' => ['text'];
+        yield 'image' => ['image'];
+        yield 'sticker' => ['sticker'];
+        yield 'audio' => ['audio'];
+        yield 'video' => ['video'];
+        yield 'document' => ['document'];
+        yield 'location' => ['location'];
+        yield 'contacts' => ['contacts'];
+    }
+
+    /**
+     * Issue #633 inverse coverage: every type in the allowlist must
+     * survive the early filter. Tested via the private
+     * {@see WhatsAppService::handleUnsupportedTypeIfNeeded()} so the
+     * downstream pipeline (entity manager, rate limit, AI router…)
+     * stays out of scope — we only care that the filter does not
+     * short-circuit.
+     */
+    #[DataProvider('supportedWebhookTypesProvider')]
+    public function testSupportedTypePassesFilter(string $type): void
+    {
+        $dto = IncomingMessageDto::fromPayload(
+            [
+                'from' => '+1234567890',
+                'id' => 'wamid.supported.'.$type,
+                'timestamp' => (string) time(),
+                'type' => $type,
+            ],
+            [
+                'metadata' => [
+                    'phone_number_id' => $this->testPhoneNumberId,
+                    'display_phone_number' => '+49123456789',
+                ],
+            ],
+        );
+
+        $method = (new \ReflectionClass($this->service))->getMethod('handleUnsupportedTypeIfNeeded');
+
+        // null => continue, array => early-return as unsupported
+        $this->assertNull(
+            $method->invoke($this->service, $dto),
+            "Supported type '{$type}' must not be dropped by the unsupported-type filter",
+        );
+    }
+
+    /**
+     * The filter must use a strict allowlist (issue #633 notes):
+     * "consider an allowlist approach instead of a denylist". An
+     * unknown type the platform has never seen before — say, a future
+     * `payment_authorization` — must be skipped, not forwarded.
+     */
+    public function testUnknownFutureTypeIsAlsoSkipped(): void
+    {
+        $user = $this->createMock(User::class);
+        $user->method('getId')->willReturn(1);
+
+        $incomingMsg = [
+            'from' => '+1234567890',
+            'id' => 'wamid.future.'.bin2hex(random_bytes(4)),
+            'timestamp' => (string) time(),
+            'type' => 'payment_authorization', // not in the allowlist
+        ];
+
+        $value = [
+            'messaging_product' => 'whatsapp',
+            'metadata' => [
+                'phone_number_id' => $this->testPhoneNumberId,
+                'display_phone_number' => '+49123456789',
+            ],
+            'contacts' => [['profile' => ['name' => 'Test User'], 'wa_id' => '+1234567890']],
+            'messages' => [$incomingMsg],
+        ];
+
+        $dto = IncomingMessageDto::fromPayload($incomingMsg, $value);
+
+        $this->messageProcessor->expects($this->never())->method('processStream');
+
+        $result = $this->service->handleIncomingMessage($dto, $user, false);
+
+        $this->assertTrue($result['skipped']);
+        $this->assertSame('payment_authorization', $result['type']);
     }
 }
