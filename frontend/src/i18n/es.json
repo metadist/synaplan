@@ -299,7 +299,8 @@
     "again": "Otra vez",
     "againWith": "Otra vez con",
     "regenerateWith": "Regenerar con",
-    "copy": "Copiar mensaje"
+    "copy": "Copiar mensaje",
+    "infoAudioModel": "Modelo de audio"
   },
   "commands": {
     "noResults": "No se encontraron comandos",

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Tests\Controller;
 
 use App\Entity\Chat;
+use App\Entity\Message;
 use App\Entity\User;
 use App\Service\TokenService;
 use App\Tests\Trait\AuthenticatedTestTrait;
@@ -427,5 +428,119 @@ class ChatControllerTest extends WebTestCase
         // Verify deletion in database
         $deletedChat = $this->em->getRepository(Chat::class)->find($chatId);
         $this->assertNull($deletedChat);
+    }
+
+    /**
+     * Regression for issue #583 — when a voice reply has been generated,
+     * the TTS provider/model must surface in the message history under
+     * a separate `aiModels.audio` block (not silently relabelled as
+     * `aiModels.chat`). Without this, the UI badge after a page reload
+     * showed the chat LLM (e.g. gpt-5.4) instead of the TTS engine
+     * (e.g. piper-multi).
+     */
+    public function testMessageHistoryExposesAudioModelSeparatelyFromChatModel(): void
+    {
+        $chat = new Chat();
+        $chat->setUserId($this->user->getId());
+        $chat->setTitle('Voice reply chat');
+        $chat->setCreatedAt(new \DateTime());
+        $chat->setUpdatedAt(new \DateTime());
+        $this->em->persist($chat);
+        $this->em->flush();
+
+        $assistantMessage = new Message();
+        $assistantMessage->setUserId($this->user->getId());
+        $assistantMessage->setChat($chat);
+        $assistantMessage->setTrackingId(time());
+        $assistantMessage->setUnixTimestamp(time());
+        $assistantMessage->setDateTime(date('YmdHis'));
+        $assistantMessage->setText('Hello, this is a spoken reply.');
+        $assistantMessage->setDirection('OUT');
+        $assistantMessage->setProviderIndex('WEB');
+        $this->em->persist($assistantMessage);
+        $this->em->flush();
+
+        $assistantMessage->setMeta('ai_chat_provider', 'openai');
+        $assistantMessage->setMeta('ai_chat_model', 'gpt-5.4');
+        $assistantMessage->setMeta('ai_chat_model_id', '42');
+        $assistantMessage->setMeta('ai_audio_provider', 'piper');
+        $assistantMessage->setMeta('ai_audio_model', 'piper-multi');
+        $assistantMessage->setMeta('ai_audio_model_id', '907');
+        $this->em->flush();
+
+        $this->client->request(
+            'GET',
+            '/api/v1/chats/'.$chat->getId().'/messages',
+            [],
+            [],
+            ['HTTP_AUTHORIZATION' => 'Bearer '.$this->token]
+        );
+
+        $this->assertResponseIsSuccessful();
+        $response = json_decode($this->client->getResponse()->getContent(), true);
+        $this->assertIsArray($response);
+        $this->assertArrayHasKey('messages', $response);
+        $this->assertNotEmpty($response['messages']);
+
+        $msg = $response['messages'][0];
+        $this->assertArrayHasKey('aiModels', $msg);
+        $this->assertIsArray($msg['aiModels']);
+
+        $this->assertArrayHasKey('chat', $msg['aiModels']);
+        $this->assertSame('openai', $msg['aiModels']['chat']['provider']);
+        $this->assertSame('gpt-5.4', $msg['aiModels']['chat']['model']);
+        $this->assertSame(42, $msg['aiModels']['chat']['model_id']);
+
+        $this->assertArrayHasKey('audio', $msg['aiModels'], 'aiModels.audio must be present for voice replies');
+        $this->assertSame('piper', $msg['aiModels']['audio']['provider']);
+        $this->assertSame('piper-multi', $msg['aiModels']['audio']['model']);
+        $this->assertSame(907, $msg['aiModels']['audio']['model_id']);
+    }
+
+    /**
+     * Negative case — when no TTS ran, the history response must not
+     * synthesise an `aiModels.audio` block. This guards against
+     * accidental mirror-of-chat regressions.
+     */
+    public function testMessageHistoryOmitsAudioModelWhenNoTtsRan(): void
+    {
+        $chat = new Chat();
+        $chat->setUserId($this->user->getId());
+        $chat->setTitle('Plain chat');
+        $chat->setCreatedAt(new \DateTime());
+        $chat->setUpdatedAt(new \DateTime());
+        $this->em->persist($chat);
+        $this->em->flush();
+
+        $assistantMessage = new Message();
+        $assistantMessage->setUserId($this->user->getId());
+        $assistantMessage->setChat($chat);
+        $assistantMessage->setTrackingId(time());
+        $assistantMessage->setUnixTimestamp(time());
+        $assistantMessage->setDateTime(date('YmdHis'));
+        $assistantMessage->setText('Plain text reply.');
+        $assistantMessage->setDirection('OUT');
+        $assistantMessage->setProviderIndex('WEB');
+        $this->em->persist($assistantMessage);
+        $this->em->flush();
+
+        $assistantMessage->setMeta('ai_chat_provider', 'openai');
+        $assistantMessage->setMeta('ai_chat_model', 'gpt-5.4');
+        $this->em->flush();
+
+        $this->client->request(
+            'GET',
+            '/api/v1/chats/'.$chat->getId().'/messages',
+            [],
+            [],
+            ['HTTP_AUTHORIZATION' => 'Bearer '.$this->token]
+        );
+
+        $this->assertResponseIsSuccessful();
+        $response = json_decode($this->client->getResponse()->getContent(), true);
+
+        $msg = $response['messages'][0];
+        $this->assertArrayHasKey('chat', $msg['aiModels']);
+        $this->assertArrayNotHasKey('audio', $msg['aiModels']);
     }
 }

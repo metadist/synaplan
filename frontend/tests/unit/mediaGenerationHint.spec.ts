@@ -19,6 +19,17 @@ describe('mediaHintFromClassificationTopic', () => {
     expect(mediaHintFromClassificationTopic('mediamaker', 'IMAGE')).toBe('image')
   })
 
+  // Issue #624: live SSE complete for MEDIAMAKER audio now ships
+  // `originalMediaType: 'audio'`. Combined with `chatBadgeLabel`
+  // (see chatModelBadge.spec.ts) this gives the chat row a stable
+  // 'Audio Model' label even before the audio part lands in
+  // `message.parts`, so the badge no longer flips from
+  // "Chat Model" live to "Audio Model" after a page reload.
+  it('maps mediamaker + originalMediaType=audio to audio (issue #624)', () => {
+    expect(mediaHintFromClassificationTopic('mediamaker', 'audio')).toBe('audio')
+    expect(mediaHintFromClassificationTopic('mediamaker', 'AUDIO')).toBe('audio')
+  })
+
   it('returns null when topic is unknown or mediamaker without media type', () => {
     expect(mediaHintFromClassificationTopic('general', null)).toBeNull()
     expect(mediaHintFromClassificationTopic('mediamaker', null)).toBeNull()

@@ -627,6 +627,30 @@
                       </button>
                     </div>
 
+                    <!-- Audio (TTS) Model -->
+                    <!-- Shown as a separate badge so the LLM that generated the
+                         text and the TTS engine that voiced it are visually
+                         distinguishable — see issue #583. -->
+                    <div
+                      v-if="aiModels?.audio"
+                      class="flex items-center justify-between gap-2"
+                      data-testid="info-audio-model"
+                    >
+                      <span class="text-xs txt-tertiary">{{
+                        $t('chatMessage.infoAudioModel')
+                      }}</span>
+                      <button
+                        type="button"
+                        class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-xs font-medium bg-sky-500/10 hover:bg-sky-500/20 text-sky-600 dark:text-sky-400 transition-colors cursor-pointer"
+                        @click="handleInfoModelClick('audio')"
+                      >
+                        <Icon icon="mdi:music" class="w-3.5 h-3.5" />
+                        <span class="font-semibold truncate max-w-[10rem]">{{
+                          shortenModel(aiModels.audio.model)
+                        }}</span>
+                      </button>
+                    </div>
+
                     <!-- Sorting Model -->
                     <div v-if="aiModels?.sorting" class="flex items-center justify-between gap-2">
                       <span class="text-xs txt-tertiary">{{ $t('config.aiModels.sorting') }}</span>
@@ -887,6 +911,7 @@ import { useDateFormat } from '@/composables/useDateFormat'
 import type { Part, MessageFile } from '@/stores/history'
 import type { AgainData } from '@/types/ai-models'
 import { mediaHintFromClassificationTopic } from '@/utils/mediaGenerationHint'
+import { chatBadgeIcon, chatBadgeLabel } from '@/utils/chatModelBadge'
 
 const { t } = useI18n()
 const { error: showError } = useNotification()
@@ -933,6 +958,14 @@ interface Props {
       model_id: number | null
     }
     sorting?: {
+      provider: string
+      model: string
+      model_id: number | null
+    }
+    // Audio (TTS) model used to synthesize the voice reply.
+    // Sent independently from `chat` because voice reply pipes the
+    // LLM's text through a separate TTS pipeline — see issue #583.
+    audio?: {
       provider: string
       model: string
       model_id: number | null
@@ -1161,39 +1194,15 @@ const mediaHint = computed(() => {
   return null
 })
 
-// Dynamic label for model badge based on content type
-const getModelTypeLabel = computed(() => {
-  if (isFileAnalysisResponse.value) return 'Analyze Model'
-  switch (mediaHint.value) {
-    case 'vision':
-      return 'Vision Model'
-    case 'image':
-      return 'Image Model'
-    case 'video':
-      return 'Video Model'
-    case 'audio':
-      return 'Audio Model'
-    default:
-      return 'Chat Model'
-  }
-})
-
-// Dynamic icon for model badge
-const getModelTypeIcon = computed(() => {
-  if (isFileAnalysisResponse.value) return 'mdi:file-search'
-  switch (mediaHint.value) {
-    case 'vision':
-      return 'mdi:eye'
-    case 'image':
-      return 'mdi:image'
-    case 'video':
-      return 'mdi:video'
-    case 'audio':
-      return 'mdi:music'
-    default:
-      return 'mdi:chat'
-  }
-})
+// Pure-function helpers live in chatModelBadge.ts so the voice-reply
+// label rule (#583) is unit-testable in isolation. The computed
+// wrappers below just bind them to reactive component state.
+const getModelTypeLabel = computed(() =>
+  chatBadgeLabel(mediaHint.value, !!props.aiModels?.audio, isFileAnalysisResponse.value)
+)
+const getModelTypeIcon = computed(() =>
+  chatBadgeIcon(mediaHint.value, !!props.aiModels?.audio, isFileAnalysisResponse.value)
+)
 
 const formattedTime = computed(() => formatTime(props.timestamp))
 
@@ -1254,7 +1263,7 @@ const infoPopoverOpen = ref(false)
 
 const hasMessageMetadata = computed(() => {
   if (props.topic) return true
-  if (props.aiModels?.chat || props.aiModels?.sorting) return true
+  if (props.aiModels?.chat || props.aiModels?.sorting || props.aiModels?.audio) return true
   if (props.modelLabel && props.provider) return true
   return false
 })
@@ -1263,7 +1272,7 @@ const closeInfoPopover = () => {
   infoPopoverOpen.value = false
 }
 
-const handleInfoModelClick = (modelType: 'chat' | 'sorting') => {
+const handleInfoModelClick = (modelType: 'chat' | 'sorting' | 'audio') => {
   showModelDetails(modelType)
   closeInfoPopover()
 }
@@ -1309,18 +1318,23 @@ const getModelForOption = (option: ModelOption): AIModel | undefined => {
 }
 
 // Navigate to AI models configuration with highlight
-const showModelDetails = (modelType?: 'chat' | 'sorting') => {
+const showModelDetails = (modelType?: 'chat' | 'sorting' | 'audio') => {
   if (modelType === 'chat') {
     const capabilityMap: Record<string, string> = {
       vision: 'PIC2TEXT',
       image: 'TEXT2PIC',
       video: 'TEXT2VID',
-      audio: 'TEXT2SOUND',
+      // Only point CHAT badge at TEXT2SOUND when the chat handler itself
+      // produced the audio (no separate `audio` row exists). For voice
+      // replies the chat row is the LLM — keep it pointing at CHAT.
+      audio: props.aiModels?.audio ? 'CHAT' : 'TEXT2SOUND',
     }
     const capability = capabilityMap[mediaHint.value ?? ''] ?? 'CHAT'
     router.push({ path: '/config/ai-models', query: { highlight: capability } })
   } else if (modelType === 'sorting') {
     router.push({ path: '/config/ai-models', query: { highlight: 'SORT' } })
+  } else if (modelType === 'audio') {
+    router.push({ path: '/config/ai-models', query: { highlight: 'TEXT2SOUND' } })
   } else {
     router.push('/config/ai-models')
   }

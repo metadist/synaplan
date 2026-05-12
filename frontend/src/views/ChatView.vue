@@ -353,6 +353,7 @@ import { prefetchSseToken } from '@/services/api/chatApi'
 import type { ModelOption } from '@/composables/useModelSelection'
 import { parseAIResponse } from '@/utils/responseParser'
 import { normalizeMediaUrl } from '@/utils/urlHelper'
+import { generatePartId, pushMediaPart, extractMediaParts } from '@/utils/mediaParts'
 import { AudioStreamer } from '@/utils/AudioStreamer'
 import { httpClient } from '@/services/api/httpClient'
 import { z } from 'zod'
@@ -988,13 +989,6 @@ function schedulePostStreamMemoryPoll(messageId: number): void {
  *     Earlier parts (e.g. a finished code block followed by more streaming
  *     prose) keep their identity instead of being re-created each tick.
  */
-function generatePartId(): string {
-  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
-    return crypto.randomUUID()
-  }
-  return `p_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 10)}`
-}
-
 function renderStreamingContent(content: string, msgId: string): void {
   const trimmedContent = content.trim()
 
@@ -1012,7 +1006,12 @@ function renderStreamingContent(content: string, msgId: string): void {
     }
     const message = historyStore.messages.find((m) => m.id === msgId)
     if (message) {
-      message.parts = []
+      // Issue #625: structural wipe must not drop in-flight media. The
+      // SSE `file` event for image / video / audio can land before
+      // this branch (e.g. a MEDIAMAKER turn whose JSON markup arrives
+      // after the media was already uploaded) — preserving them here
+      // keeps the audio player visible in the live bubble.
+      message.parts = extractMediaParts(message.parts)
     }
     return
   }
@@ -1068,9 +1067,7 @@ function renderStreamingContent(content: string, msgId: string): void {
   const existingStructural = message.parts.filter(
     (p) => p.type === 'thinking' || p.type === 'text' || p.type === 'code' || p.type === 'links'
   )
-  const existingMedia = message.parts.filter(
-    (p) => p.type === 'image' || p.type === 'video' || p.type === 'audio'
-  )
+  const existingMedia = extractMediaParts(message.parts)
 
   // Reconcile in-place so existing partIds (and therefore Vue keys) stay
   // stable. For each desired slot:
@@ -1333,6 +1330,10 @@ function applyAssistantChatModelFooter(
 
   const nestedChat = data.aiModels?.chat
   const nestedSorting = data.aiModels?.sorting
+  // Audio (TTS) model is independent of the chat model — pass it
+  // through whenever the backend ships it so the voice-reply badge
+  // appears live (no page reload required). See issue #583.
+  const nestedAudio = data.aiModels?.audio
 
   if (resolvedModel && resolvedProvider) {
     message.modelLabel = resolvedModel
@@ -1344,11 +1345,13 @@ function applyAssistantChatModelFooter(
         model_id: resolvedId,
       },
       ...(nestedSorting ? { sorting: nestedSorting } : {}),
+      ...(nestedAudio ? { audio: nestedAudio } : {}),
     }
-  } else if (nestedChat || nestedSorting) {
+  } else if (nestedChat || nestedSorting || nestedAudio) {
     message.aiModels = {
       ...(nestedChat ? { chat: nestedChat } : {}),
       ...(nestedSorting ? { sorting: nestedSorting } : {}),
+      ...(nestedAudio ? { audio: nestedAudio } : {}),
     }
   }
 }
@@ -1804,16 +1807,19 @@ const streamAIResponse = async (
             }
           } else if (data.status === 'file') {
             // Handle file attachments (images, videos, audio, etc.)
+            //
+            // Issue #625: the live MEDIAMAKER audio player used to go
+            // missing whenever this push raced the streaming text
+            // reconciler. {@link pushMediaPart} now assigns a stable
+            // `partId` and re-assigns `message.parts` so we always
+            // mutate the current reactive proxy (a stale closure
+            // reference from a sibling handler would otherwise
+            // silently drop the push).
             const message = historyStore.messages.find((m) => m.id === messageId)
-            if (message) {
-              // Add file part based on type - normalize URLs to absolute
+            if (message && data.url) {
               const absoluteUrl = normalizeMediaUrl(data.url)
-              if (data.type === 'image') {
-                message.parts.push({ type: 'image', url: absoluteUrl })
-              } else if (data.type === 'video') {
-                message.parts.push({ type: 'video', url: absoluteUrl })
-              } else if (data.type === 'audio') {
-                message.parts.push({ type: 'audio', url: absoluteUrl })
+              if (data.type === 'image' || data.type === 'video' || data.type === 'audio') {
+                pushMediaPart(message, data.type, absoluteUrl)
               }
             }
           } else if (data.status === 'tts_generating') {
@@ -1835,7 +1841,7 @@ const streamAIResponse = async (
               const absoluteUrl = normalizeMediaUrl(data.url)
               // If we are already streaming audio (currentAudioStreamer exists), don't autoplay the file
               const shouldAutoplay = isVoiceReply && !currentAudioStreamer
-              message.parts.push({ type: 'audio', url: absoluteUrl, autoplay: shouldAutoplay })
+              pushMediaPart(message, 'audio', absoluteUrl, { autoplay: shouldAutoplay })
             }
           } else if (data.status === 'links') {
             // Handle web search results
