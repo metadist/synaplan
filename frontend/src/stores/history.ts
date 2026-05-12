@@ -3,6 +3,7 @@ import { ref } from 'vue'
 import { normalizeMediaUrl } from '@/utils/urlHelper'
 import { extractBTextPayload } from '@/utils/jsonResponse'
 import { parseAIResponse } from '@/utils/responseParser'
+import { generatePartId } from '@/utils/mediaParts'
 import type { AgainData } from '@/types/ai-models'
 import { authService } from '@/services/authService'
 
@@ -444,22 +445,29 @@ export const useHistoryStore = defineStore('history', () => {
 
           const parts = parseContentWithThinking(m.text || '', role)
 
-          // Add generated file (image/video/audio) as part if present
+          // Add generated file (image/video/audio) as part if present.
+          // Issue #625: assign a stable `partId` on load so the `<audio>` /
+          // `<video>` element keeps its identity if the message later gets
+          // re-parsed (e.g. continuation appends text). Without this, the
+          // index-based fallback key would remount the media player.
           if (m.file && m.file.path) {
             const absoluteUrl = normalizeMediaUrl(m.file.path)
             if (m.file.type === 'image') {
               parts.push({
+                partId: generatePartId(),
                 type: 'image',
                 url: absoluteUrl,
                 alt: m.text || 'Generated image',
               })
             } else if (m.file.type === 'video') {
               parts.push({
+                partId: generatePartId(),
                 type: 'video',
                 url: absoluteUrl,
               })
             } else if (m.file.type === 'audio') {
               parts.push({
+                partId: generatePartId(),
                 type: 'audio',
                 url: absoluteUrl,
               })
