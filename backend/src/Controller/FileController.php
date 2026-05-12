@@ -93,6 +93,77 @@ class FileController extends AbstractController
         return $this->json($result, $result['success'] ? Response::HTTP_OK : Response::HTTP_PARTIAL_CONTENT);
     }
 
+    #[Route('/check-upload', name: 'check_upload', methods: ['POST'], priority: 10)]
+    #[OA\Post(
+        path: '/api/v1/files/check-upload',
+        summary: 'Pre-flight check for an upload (quota, size, extension, rate limit)',
+        description: 'Lightweight metadata-only check that lets the UI fail fast BEFORE streaming the file body. Prevents timeouts when an upload would be rejected for quota reasons.',
+        tags: ['Files'],
+        requestBody: new OA\RequestBody(
+            required: true,
+            content: new OA\JsonContent(
+                required: ['filename', 'size'],
+                properties: [
+                    new OA\Property(property: 'filename', type: 'string', example: 'document.pdf'),
+                    new OA\Property(property: 'size', type: 'integer', example: 1048576, description: 'File size in bytes'),
+                    new OA\Property(property: 'mime', type: 'string', example: 'application/pdf', nullable: true),
+                ]
+            )
+        ),
+        responses: [
+            new OA\Response(
+                response: 200,
+                description: 'Pre-flight result. allowed=false includes a reason and message; allowed=true means the upload may proceed.',
+                content: new OA\JsonContent(
+                    properties: [
+                        new OA\Property(property: 'allowed', type: 'boolean', example: false),
+                        new OA\Property(property: 'reason', type: 'string', enum: ['rate_limit_exceeded', 'file_too_large', 'extension_not_allowed', 'storage_exceeded'], nullable: true),
+                        new OA\Property(property: 'message', type: 'string', nullable: true),
+                        new OA\Property(property: 'max_file_size', type: 'integer', description: 'Per-file size limit in bytes'),
+                        new OA\Property(
+                            property: 'allowed_extensions',
+                            type: 'array',
+                            items: new OA\Items(type: 'string'),
+                        ),
+                        new OA\Property(property: 'remaining', type: 'integer', description: 'Remaining storage quota in bytes'),
+                        new OA\Property(property: 'used', type: 'integer', nullable: true),
+                        new OA\Property(property: 'limit', type: 'integer', nullable: true),
+                    ]
+                )
+            ),
+            new OA\Response(response: 400, description: 'Invalid input'),
+            new OA\Response(response: 401, description: 'Not authenticated'),
+        ]
+    )]
+    public function checkUpload(Request $request, #[CurrentUser] ?User $user): JsonResponse
+    {
+        if (!$user) {
+            return $this->json(['error' => 'Not authenticated'], Response::HTTP_UNAUTHORIZED);
+        }
+
+        $data = json_decode((string) $request->getContent(), true);
+        if (!is_array($data)) {
+            return $this->json(['error' => 'Invalid JSON body'], Response::HTTP_BAD_REQUEST);
+        }
+
+        $filename = isset($data['filename']) ? trim((string) $data['filename']) : '';
+        if ('' === $filename) {
+            return $this->json(['error' => 'filename is required'], Response::HTTP_BAD_REQUEST);
+        }
+
+        if (!isset($data['size']) || !is_numeric($data['size'])) {
+            return $this->json(['error' => 'size (integer, bytes) is required'], Response::HTTP_BAD_REQUEST);
+        }
+        $size = (int) $data['size'];
+        if ($size < 0) {
+            return $this->json(['error' => 'size must be a non-negative integer'], Response::HTTP_BAD_REQUEST);
+        }
+
+        $result = $this->uploadService->checkUpload($user, $filename, $size);
+
+        return $this->json($result);
+    }
+
     #[Route('/{id}/process', name: 'process', methods: ['POST'])]
     #[OA\Post(
         path: '/api/v1/files/{id}/process',

@@ -1040,12 +1040,21 @@ PROMPT;
         return <<<'PROMPT'
 Extract ONLY personal facts the user states about THEMSELVES. Return JSON array or null.
 
+## Source rule (most important)
+The ONLY valid source of memories is the user's own messages — the lines
+labelled `user:` in the conversation and the explicit "Current Message"
+block. NEVER extract facts from the assistant/AI's replies, summaries,
+recommendations, or paraphrases, even if they appear in the input. If a
+fact only exists because YOU (the assistant) wrote it earlier, it is NOT
+a memory.
+
 ## Save:
 - User's name, age, location, job, company
 - Persistent preferences ("I prefer dark mode", "I like pizza")
 - Skills, hobbies, goals the user states about themselves
 
 ## Do NOT save:
+- Anything written by the assistant/AI (your own replies, summaries, guesses, inferences)
 - Questions the user asks ("Who is X?", "Is Y true?") — these are NOT interests or memories
 - Facts about other people, celebrities, or topics
 - Temporary states ("I'm tired")
@@ -1169,15 +1178,21 @@ Respond ONLY with valid JSON in this exact format:
 {"contradictions":[{"id":123,"type":"memory","value":"old text","reason":"brief reason why it contradicts"}]}
 
 ## Understanding item types
-- "memory" items = stored facts the user considers TRUE
+- "memory" items = stored facts the user considers TRUE — always describe the USER themselves (their name, age, preferences, …)
 - "positive" items = statements the user CONFIRMED as CORRECT
 - "false_positive" items = statements the user marked as INCORRECT. The user believes the OPPOSITE is true.
   Example: false_positive "Putin is Orthodox" means the user previously said "Putin is Orthodox" is WRONG.
   So if a new statement says "Putin is Orthodox" is correct, that CONTRADICTS this false_positive.
 
+## Subject-match rule (apply BEFORE everything else)
+A new statement only contradicts an existing item when they are about the SAME SUBJECT.
+- "memory" items describe the user themselves. They can only contradict a new statement that is ALSO about the user (first-person: "you are X", "your name is X").
+- A new statement about an EXTERNAL subject (a person in an uploaded image, a public figure, a fictional character, a place, a topic — anything that is not the user) NEVER contradicts a personal user memory, even when the topic overlaps. The user being 32 years old has nothing to do with the age of a portrait subject.
+- When the subject of either side is unclear, do NOT flag a contradiction.
+
 ## Rules
-- Only include items that CLEARLY contradict the new statement:
-  - Same topic but opposite or conflicting information
+- Only include items that CLEARLY contradict the new statement AFTER passing the subject-match rule above:
+  - Same topic AND same subject but opposite or conflicting information
   - Same fact with different values
   - Implied contradictions via type inversion (a false_positive is the semantic opposite of what it says)
 - type must be exactly one of: memory, false_positive, positive

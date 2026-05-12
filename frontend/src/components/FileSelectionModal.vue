@@ -318,7 +318,7 @@ import { ref, computed, watch, onUnmounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { XMarkIcon, ArrowDownTrayIcon, TrashIcon } from '@heroicons/vue/24/outline'
 import { Icon } from '@iconify/vue'
-import filesService, { type FileItem } from '@/services/filesService'
+import filesService, { type FileItem, UploadBlockedError } from '@/services/filesService'
 import { getApiBaseUrl } from '@/services/api/httpClient'
 import { useNotification } from '@/composables/useNotification'
 import FileContentModal from './FileContentModal.vue'
@@ -336,6 +336,25 @@ const emit = defineEmits<{
 }>()
 
 const { success, error: showError, warning } = useNotification()
+
+// Localized message for a pre-flight upload rejection, with a hard
+// non-i18n fallback so the user never sees a raw dot-path key when a
+// translation is missing in the active locale.
+const translateUploadBlocked = (err: UploadBlockedError): string => {
+  const params = {
+    filename: err.filename,
+    message: err.check.message ?? '',
+  }
+  const reasonKey = `files.uploadBlocked.${err.reason}`
+  const reasonTranslated = t(reasonKey, params)
+  if (reasonTranslated !== reasonKey) return reasonTranslated
+
+  const genericKey = 'files.uploadBlocked.generic'
+  const genericTranslated = t(genericKey, params)
+  if (genericTranslated !== genericKey) return genericTranslated
+
+  return params.message ? `${params.filename}: ${params.message}` : params.filename
+}
 
 // State
 const isLoading = ref(false)
@@ -586,6 +605,10 @@ const uploadFiles = async (filesToUpload: File[]) => {
         if (err instanceof DOMException && err.name === 'AbortError') {
           await notifyUploadInterrupted()
           break
+        }
+        if (err instanceof UploadBlockedError) {
+          showError(translateUploadBlocked(err))
+          continue
         }
         console.error('Upload failed:', file.name, err)
         const msg = err instanceof Error ? err.message : 'Unknown error'

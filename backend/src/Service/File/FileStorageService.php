@@ -14,14 +14,32 @@ use Symfony\Component\HttpFoundation\File\UploadedFile;
  */
 final readonly class FileStorageService
 {
-    private const MAX_FILE_SIZE = 128 * 1024 * 1024; // 128 MB
-    private const ALLOWED_EXTENSIONS = [
+    public const MAX_FILE_SIZE = 128 * 1024 * 1024; // 128 MB
+    public const ALLOWED_EXTENSIONS = [
         'pdf', 'docx', 'doc', 'xlsx', 'xls', 'pptx', 'ppt', 'txt', 'md', 'csv',
         'odt', 'ods', 'odp', 'odg', 'odf',
         'jpg', 'jpeg', 'png', 'gif', 'webp',
         'mp3', 'mp4', 'wav', 'ogg', 'm4a', 'webm',
     ];
     private const VIDEO_EXTENSIONS = ['mp4', 'webm', 'mov', 'avi', 'mkv'];
+
+    /**
+     * Maximum file size for a single upload, in bytes.
+     */
+    public static function getMaxFileSize(): int
+    {
+        return self::MAX_FILE_SIZE;
+    }
+
+    /**
+     * Allowed file extensions for uploads (lowercase, no leading dot).
+     *
+     * @return list<string>
+     */
+    public static function getAllowedExtensions(): array
+    {
+        return self::ALLOWED_EXTENSIONS;
+    }
 
     public function __construct(
         private string $uploadDir,

@@ -471,6 +471,8 @@
     "testing": "Testing Connection...",
     "testSuccess": "Connection Successful",
     "testFailed": "Connection Failed",
+    "testPickUpIncomplete": "Enter mail server, port, and username before testing.",
+    "testPickUpPasswordRequired": "Enter the mailbox password to test this configuration.",
     "savedHandlers": "Email Agents",
     "savedHandlersDesc": "Automate your inbox with AI-powered email agents that read, sort, and forward messages.",
     "createHandler": "New Email Agent",
@@ -669,7 +671,15 @@
     "reVectorizeFailed": "Reprocessing failed",
     "uploadSuccess": "{count} file(s) uploaded successfully",
     "uploadCancelled": "Upload cancelled",
-    "uploadInterrupted": "Transfer interrupted. The file list was refreshed — anything that had already reached the server may still appear."
+    "uploadInterrupted": "Transfer interrupted. The file list was refreshed — anything that had already reached the server may still appear.",
+    "uploadBlocked": {
+      "storage_exceeded": "{filename}: Not enough storage. {message}",
+      "file_too_large": "{filename}: File is too large. {message}",
+      "file_empty": "{filename}: File is empty. {message}",
+      "extension_not_allowed": "{filename}: File type is not supported. {message}",
+      "rate_limit_exceeded": "{filename}: Upload rate limit reached. {message}",
+      "generic": "{filename}: Upload is not allowed. {message}"
+    }
   },
   "fileMention": {
     "hint": "Type to search files — press Enter to attach",
@@ -765,6 +775,10 @@
       "chatGeneration": "Response Generation",
       "messageClassification": "Message Classification",
       "clickToConfig": "Click to configure",
+      "purposeChip": {
+        "activeTooltip": "Already set as the default model for \"{purpose}\"",
+        "applyTooltip": "Set {model} as the default model for \"{purpose}\""
+      },
       "defaultConfig": "Default Model Configuration",
       "saveConfiguration": "Save Configuration",
       "resetForm": "Reset Form",
