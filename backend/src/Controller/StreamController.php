@@ -1348,14 +1348,44 @@ class StreamController extends AbstractController
                             $outgoingMessage->setFile(1);
                             $outgoingMessage->setFilePath($audioUrl);
                             $outgoingMessage->setFileType('audio');
+
+                            // Persist the TTS provider/model on the
+                            // outgoing message so the history endpoint
+                            // (and any later page reload) surfaces the
+                            // *audio* model — not the chat LLM — under
+                            // the "Audio Model" badge. Fixes #583 and
+                            // its post-refresh sibling reports.
+                            $ttsProvider = $ttsResult['provider'] ?? null;
+                            $ttsModelName = $ttsResult['model'] ?? null;
+                            $ttsModelId = $ttsResult['model_id'] ?? null;
+                            if (null !== $ttsProvider) {
+                                $outgoingMessage->setMeta('ai_audio_provider', (string) $ttsProvider);
+                            }
+                            if (null !== $ttsModelName) {
+                                $outgoingMessage->setMeta('ai_audio_model', (string) $ttsModelName);
+                            }
+                            if (null !== $ttsModelId && '' !== (string) $ttsModelId) {
+                                $outgoingMessage->setMeta('ai_audio_model_id', (string) $ttsModelId);
+                            }
                             $this->em->flush();
 
-                            $this->sendSSE('audio', ['url' => $audioUrl]);
+                            // Refresh the `aiModels` payload that was
+                            // pre-built before TTS ran, so the live SSE
+                            // `complete` event already carries the
+                            // audio badge — no page reload required.
+                            $completeData['aiModels'] = $this->buildAiModelsPayload($outgoingMessage);
+
+                            $this->sendSSE('audio', [
+                                'url' => $audioUrl,
+                                'provider' => $ttsProvider,
+                                'model' => $ttsModelName,
+                                'model_id' => $this->normalizeModelId($ttsModelId, 'sse_audio_event'),
+                            ]);
 
                             $this->rateLimitService->recordUsage($user, 'AUDIOS', [
-                                'provider' => $ttsResult['provider'] ?? 'unknown',
-                                'model' => $ttsResult['model'] ?? 'unknown',
-                                'model_id' => $ttsResult['model_id'] ?? null,
+                                'provider' => $ttsProvider ?? 'unknown',
+                                'model' => $ttsModelName ?? 'unknown',
+                                'model_id' => $ttsModelId,
                                 'media_usage' => [
                                     'characters' => $ttsResult['text_length'] ?? mb_strlen($ttsText),
                                 ],
@@ -1363,7 +1393,8 @@ class StreamController extends AbstractController
 
                             $this->logger->info('StreamController: Voice reply generated', [
                                 'url' => $audioUrl,
-                                'provider' => $ttsResult['provider'] ?? 'unknown',
+                                'provider' => $ttsProvider ?? 'unknown',
+                                'model' => $ttsModelName ?? 'unknown',
                             ]);
                         }
                     } catch (\Throwable $e) {
@@ -1893,6 +1924,7 @@ class StreamController extends AbstractController
      * @return array{
      *   chat?: array{provider: ?string, model: ?string, model_id: ?int},
      *   sorting?: array{provider: ?string, model: ?string, model_id: ?int},
+     *   audio?: array{provider: ?string, model: ?string, model_id: ?int},
      * }|null
      */
     private function buildAiModelsPayload(Message $message): ?array
@@ -1918,6 +1950,22 @@ class StreamController extends AbstractController
                 'provider' => $sortingProvider,
                 'model' => $sortingModel,
                 'model_id' => $this->normalizeModelId($sortingModelId, 'aiModels_sorting'),
+            ];
+        }
+
+        // Audio (TTS) model — separate from `chat` because voice-reply
+        // pipes the LLM's text through an independent TTS provider
+        // (e.g. Piper). Before #583 the chat model was relabelled as
+        // "Audio Model" in the UI, which surfaced the wrong identifier
+        // (gpt-5.4 instead of piper-multi).
+        $audioProvider = $message->getMeta('ai_audio_provider');
+        $audioModel = $message->getMeta('ai_audio_model');
+        $audioModelId = $message->getMeta('ai_audio_model_id');
+        if ($audioProvider || $audioModel) {
+            $aiModels['audio'] = [
+                'provider' => $audioProvider,
+                'model' => $audioModel,
+                'model_id' => $this->normalizeModelId($audioModelId, 'aiModels_audio'),
             ];
         }
 

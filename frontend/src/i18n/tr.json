@@ -299,7 +299,8 @@
     "again": "Tekrar",
     "againWith": "Şununla tekrar",
     "regenerateWith": "Şununla yeniden oluştur",
-    "copy": "Mesajı kopyala"
+    "copy": "Mesajı kopyala",
+    "infoAudioModel": "Ses Modeli"
   },
   "commands": {
     "noResults": "Komut bulunamadı",

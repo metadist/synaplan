@@ -118,6 +118,14 @@ export interface Message {
       model: string
       model_id: number | null
     }
+    // Audio (TTS) model used for voice replies. Sent independently
+    // from `chat` because the LLM authors the text and a separate TTS
+    // pipeline (e.g. Piper) synthesises it — see issue #583.
+    audio?: {
+      provider: string
+      model: string
+      model_id: number | null
+    }
   } | null // AI model metadata
   webSearch?: {
     enabled?: boolean

@@ -1333,6 +1333,10 @@ function applyAssistantChatModelFooter(
 
   const nestedChat = data.aiModels?.chat
   const nestedSorting = data.aiModels?.sorting
+  // Audio (TTS) model is independent of the chat model — pass it
+  // through whenever the backend ships it so the voice-reply badge
+  // appears live (no page reload required). See issue #583.
+  const nestedAudio = data.aiModels?.audio
 
   if (resolvedModel && resolvedProvider) {
     message.modelLabel = resolvedModel
@@ -1344,11 +1348,13 @@ function applyAssistantChatModelFooter(
         model_id: resolvedId,
       },
       ...(nestedSorting ? { sorting: nestedSorting } : {}),
+      ...(nestedAudio ? { audio: nestedAudio } : {}),
     }
-  } else if (nestedChat || nestedSorting) {
+  } else if (nestedChat || nestedSorting || nestedAudio) {
     message.aiModels = {
       ...(nestedChat ? { chat: nestedChat } : {}),
       ...(nestedSorting ? { sorting: nestedSorting } : {}),
+      ...(nestedAudio ? { audio: nestedAudio } : {}),
     }
   }
 }
