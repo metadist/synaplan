@@ -251,14 +251,26 @@ final readonly class ModelConfigService
      */
     public function getUserAiConfig(?int $userId): array
     {
+        // Vision is a special case: the settings UI writes the user's
+        // image-recognition pick to DEFAULTMODEL.PIC2TEXT (a model id),
+        // not DEFAULTMODEL.VISION (which doesn't exist in the schema).
+        // Surface the actual saved model + its provider here so callers
+        // (dashboards, debug tooling, AiFacade::analyzeImage, …) see the
+        // truth instead of the alphabetical fallback that
+        // getDefaultProvider('vision') would return.
+        $visionModelId = $this->getDefaultModel('PIC2TEXT', $userId);
+        $visionProvider = $visionModelId
+            ? $this->getProviderForModel((int) $visionModelId)
+            : $this->getDefaultProvider($userId, 'vision');
+
         return [
             'chat' => [
                 'provider' => $this->getDefaultProvider($userId, 'chat'),
                 'model' => $this->getDefaultModel('CHAT', $userId),
             ],
             'vision' => [
-                'provider' => $this->getDefaultProvider($userId, 'vision'),
-                'model' => $this->getDefaultModel('VISION', $userId),
+                'provider' => $visionProvider,
+                'model' => $visionModelId,
             ],
             'embedding' => [
                 'provider' => $this->getDefaultProvider($userId, 'embedding'),

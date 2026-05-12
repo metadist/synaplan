@@ -395,6 +395,29 @@ class AiFacade
     public function analyzeImage(string $imagePath, string $prompt, ?int $userId = null, array $options = []): array
     {
         $providerWasExplicit = array_key_exists('provider', $options);
+
+        // The settings UI persists the user's vision pick to
+        // BCONFIG.DEFAULTMODEL.PIC2TEXT (a model id). Honour that selection
+        // before falling through to the legacy default-vision-provider chain
+        // so callers don't have to know the BCONFIG layout. Both the
+        // provider and the concrete model name are derived from the row
+        // and injected into $options, so providers receive the right
+        // model id (instead of using their own internal default).
+        if (!$providerWasExplicit && null !== $userId) {
+            $picTextModelId = $this->modelConfig->getDefaultModel('PIC2TEXT', $userId);
+            if ($picTextModelId) {
+                $picTextProvider = $this->modelConfig->getProviderForModel((int) $picTextModelId);
+                $picTextModelName = $this->modelConfig->getModelName((int) $picTextModelId);
+                if (null !== $picTextProvider) {
+                    $options['provider'] = $picTextProvider;
+                    $providerWasExplicit = true;
+                    if (null !== $picTextModelName && !array_key_exists('model', $options)) {
+                        $options['model'] = $picTextModelName;
+                    }
+                }
+            }
+        }
+
         $requestedProvider = $options['provider'] ?? $this->modelConfig->getDefaultProvider($userId, 'vision');
         // Don't default to 'test' - let real providers be tried first via fallback logic
         $normalizedRequested = $requestedProvider ? strtolower($requestedProvider) : null;
