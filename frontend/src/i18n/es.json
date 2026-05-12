@@ -1311,6 +1311,10 @@
       "chatGeneration": "Generación de Respuestas",
       "messageClassification": "Clasificación de Mensajes",
       "clickToConfig": "Clic para configurar",
+      "purposeChip": {
+        "activeTooltip": "Ya establecido como modelo predeterminado para «{purpose}»",
+        "applyTooltip": "Establecer {model} como modelo predeterminado para «{purpose}»"
+      },
       "defaultConfig": "Configuración de Modelo Predeterminado",
       "saveConfiguration": "Guardar Configuración",
       "resetForm": "Restablecer Formulario",

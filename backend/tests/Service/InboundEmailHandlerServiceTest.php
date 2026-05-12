@@ -48,6 +48,13 @@ class InboundEmailHandlerServiceTest extends TestCase
         );
     }
 
+    public function testIsMaskedPasswordPlaceholder(): void
+    {
+        $this->assertTrue(InboundEmailHandlerService::isMaskedPasswordPlaceholder(''));
+        $this->assertTrue(InboundEmailHandlerService::isMaskedPasswordPlaceholder('••••••••'));
+        $this->assertFalse(InboundEmailHandlerService::isMaskedPasswordPlaceholder('secret'));
+    }
+
     public function testProcessAllHandlersWithNoHandlers(): void
     {
         $this->handlerRepository
@@ -91,51 +98,33 @@ class InboundEmailHandlerServiceTest extends TestCase
 
     public function testBuildServerStringWithIMAP(): void
     {
-        $handler = new InboundEmailHandler();
-        $handler->setMailServer('imap.example.com');
-        $handler->setPort(993);
-        $handler->setProtocol('IMAP');
-        $handler->setSecurity('SSL/TLS');
-
         $reflection = new \ReflectionClass($this->service);
-        $method = $reflection->getMethod('buildServerString');
+        $method = $reflection->getMethod('buildMailboxServerString');
         $method->setAccessible(true);
 
-        $serverString = $method->invoke($this->service, $handler);
+        $serverString = $method->invoke($this->service, 'imap.example.com', 993, 'IMAP', 'SSL/TLS');
 
         $this->assertEquals('{imap.example.com:993/imap/ssl}INBOX', $serverString);
     }
 
     public function testBuildServerStringWithPOP3(): void
     {
-        $handler = new InboundEmailHandler();
-        $handler->setMailServer('pop3.example.com');
-        $handler->setPort(995);
-        $handler->setProtocol('POP3');
-        $handler->setSecurity('SSL/TLS');
-
         $reflection = new \ReflectionClass($this->service);
-        $method = $reflection->getMethod('buildServerString');
+        $method = $reflection->getMethod('buildMailboxServerString');
         $method->setAccessible(true);
 
-        $serverString = $method->invoke($this->service, $handler);
+        $serverString = $method->invoke($this->service, 'pop3.example.com', 995, 'POP3', 'SSL/TLS');
 
         $this->assertEquals('{pop3.example.com:995/pop3/ssl}INBOX', $serverString);
     }
 
     public function testBuildServerStringWithSTARTTLS(): void
     {
-        $handler = new InboundEmailHandler();
-        $handler->setMailServer('imap.example.com');
-        $handler->setPort(143);
-        $handler->setProtocol('IMAP');
-        $handler->setSecurity('STARTTLS');
-
         $reflection = new \ReflectionClass($this->service);
-        $method = $reflection->getMethod('buildServerString');
+        $method = $reflection->getMethod('buildMailboxServerString');
         $method->setAccessible(true);
 
-        $serverString = $method->invoke($this->service, $handler);
+        $serverString = $method->invoke($this->service, 'imap.example.com', 143, 'IMAP', 'STARTTLS');
 
         $this->assertEquals('{imap.example.com:143/imap/tls}INBOX', $serverString);
     }

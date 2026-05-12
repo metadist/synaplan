@@ -917,6 +917,10 @@
       "chatGeneration": "Antwort-Generierung",
       "messageClassification": "Nachrichten-Klassifizierung",
       "clickToConfig": "Klicken zum Konfigurieren",
+      "purposeChip": {
+        "activeTooltip": "Bereits als Standardmodell für „{purpose}“ gesetzt",
+        "applyTooltip": "{model} als Standardmodell für „{purpose}“ festlegen"
+      },
       "modelNotAvailable": "{model} ist nicht verfügbar. Bitte prüfe die Provider-Konfiguration.",
       "modelNotConfigured": "{model} ist nicht bereit: Setze {envVar} in der Umgebung (z. B. .env.local).",
       "admin": {
@@ -1797,7 +1801,15 @@
     "reVectorizeFailed": "Neuverarbeitung fehlgeschlagen",
     "uploadSuccess": "{count} Datei(en) erfolgreich hochgeladen",
     "uploadCancelled": "Upload abgebrochen",
-    "uploadInterrupted": "Übertragung unterbrochen. Die Liste wurde aktualisiert — Dateien, die den Server schon erreicht hatten, können weiterhin erscheinen."
+    "uploadInterrupted": "Übertragung unterbrochen. Die Liste wurde aktualisiert — Dateien, die den Server schon erreicht hatten, können weiterhin erscheinen.",
+    "uploadBlocked": {
+      "storage_exceeded": "{filename}: Nicht genug Speicherplatz. {message}",
+      "file_too_large": "{filename}: Datei ist zu groß. {message}",
+      "file_empty": "{filename}: Datei ist leer. {message}",
+      "extension_not_allowed": "{filename}: Dateityp wird nicht unterstützt. {message}",
+      "rate_limit_exceeded": "{filename}: Upload-Limit erreicht. {message}",
+      "generic": "{filename}: Upload nicht erlaubt. {message}"
+    }
   },
   "fileMention": {
     "hint": "Tippen um Dateien zu suchen — Enter zum Anhängen",
@@ -1920,6 +1932,8 @@
     "bulkDeleteSuccess": "{count} Handler erfolgreich gelöscht",
     "bulkDeleteFailed": "Handler konnten nicht gelöscht werden",
     "connectionTestWarning": "Verbindungstest fehlgeschlagen",
+    "testPickUpIncomplete": "Bitte Mailserver, Port und Benutzername ausfüllen, bevor Sie testen.",
+    "testPickUpPasswordRequired": "Bitte geben Sie das Postfach-Passwort ein, um diese Konfiguration zu testen.",
     "handlerSavedTestFailed": "Handler gespeichert, aber Verbindungstest fehlgeschlagen",
     "handlerDeleted": "Mail-Handler erfolgreich gelöscht",
     "deleteFailed": "Fehler beim Löschen des Mail-Handlers",

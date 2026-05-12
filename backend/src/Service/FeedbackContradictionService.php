@@ -229,6 +229,8 @@ Analyze whether the new statement contradicts any of the existing items. A contr
 - Same topic but opposite or conflicting information (e.g., "Sydney is capital" vs "Canberra is capital")
 - Same fact with different values (e.g., "email is a@b.com" vs "email is c@d.com")
 
+SUBJECT-MATCH (apply first): a "memory" item is always about the USER themselves. It can only contradict a new statement that is ALSO about the user. A new statement about an external subject (a person in an uploaded image, a public figure, a fictional character, a place, …) NEVER contradicts a personal user memory, even when the topic overlaps. If the subjects don't match, do NOT include that item.
+
 CRITICAL: Understand item types:
 - "memory" and "positive" items = the user believes these are TRUE
 - "false_positive" items = the user believes these are FALSE (the OPPOSITE is what the user considers true)
@@ -278,6 +280,8 @@ EXISTING RELATED ITEMS:
 Analyze whether ANY of the new statements contradict any existing items. A contradiction means:
 - Same topic but opposite or conflicting information
 - Same fact with different values
+
+SUBJECT-MATCH (apply first): a "memory" item is always about the USER themselves. It can only contradict a new statement that is ALSO about the user (first-person facts). A new statement about an external subject — e.g. the age or identity of a person in an uploaded image, a public figure, a fictional character, a place — NEVER contradicts a personal user memory, even when the topic overlaps. If subjects don't match, do NOT include that item.
 
 CRITICAL: Understand item types:
 - "memory" and "positive" items = the user believes these are TRUE
@@ -446,6 +450,7 @@ Rules:
 - Only include items that CLEARLY contradict the new statement (same fact, different/opposite value).
 - type must be one of: memory, false_positive, positive
 - id and value must match the provided existing items
+- CRITICAL: "memory" items always describe the USER themselves. They only contradict statements that are ALSO about the user. A new statement about an external subject (a person in an uploaded image, a public figure, a character, etc.) NEVER contradicts a personal user memory, even when the topic overlaps.
 - CRITICAL: "false_positive" items were marked as INCORRECT by the user — the user believes the OPPOSITE.
   So false_positive "X is true" means the user thinks "X is NOT true".
   If a new statement agrees with "X is true", it contradicts this false_positive.

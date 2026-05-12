@@ -5,6 +5,10 @@
  */
 
 import { httpClient } from './httpClient'
+import { PostApiInboundEmailHandlersTestConnectionPreviewResponseSchema } from '@/generated/api-schemas'
+
+/** Backend masked secret placeholder (must match ToolsView and API). */
+export const MASKED_MAIL_PASSWORD_PLACEHOLDER = '••••••••' as const
 
 // Backend Response Types
 export interface BackendMailHandler {
@@ -100,6 +104,23 @@ export interface CreateHandlerRequest {
   // Email filter settings
   emailFilterMode: 'new' | 'historical'
   emailFilterFromDate?: string | null
+}
+
+export interface TestMailboxConnectionBody {
+  mailServer: string
+  port: number
+  protocol: 'IMAP' | 'POP3'
+  security: 'SSL/TLS' | 'STARTTLS' | 'None'
+  username: string
+  /** Omit when reusing saved password via handlerId */
+  password?: string
+  /**
+   * When password is omitted/masked, load the stored password for this
+   * handler. Accepts string (from form inputs) or number (from API
+   * responses); a non-finite or non-positive value is treated as "not
+   * provided" by `testMailboxConnection`.
+   */
+  handlerId?: string | number
 }
 
 export interface UpdateHandlerRequest {
@@ -246,6 +267,57 @@ export const inboundEmailHandlersApi = {
       `/api/v1/inbound-email-handlers/${id}`,
       { method: 'DELETE' }
     )
+  },
+
+  /**
+   * Test mailbox (IMAP/POP3) with unsaved form values (no handler ID required).
+   */
+  async testMailboxConnection(
+    body: TestMailboxConnectionBody
+  ): Promise<{ success: boolean; message: string }> {
+    const payload: Record<string, unknown> = {
+      mailServer: body.mailServer,
+      port: body.port,
+      protocol: body.protocol,
+      security: body.security,
+      username: body.username,
+    }
+
+    const pwd = body.password ?? ''
+    // Parse handlerId defensively: the caller may pass a string from a
+    // form, a number, or `undefined`. Number(undefined)/Number('') yield
+    // NaN, which JSON-serializes to `null` and the backend then casts to
+    // 0 — silently looking up handler #0 and 404-ing. Coerce only when
+    // we actually have a finite positive integer.
+    const parsedHandlerId =
+      body.handlerId === undefined || body.handlerId === ''
+        ? null
+        : (() => {
+            const n =
+              typeof body.handlerId === 'number'
+                ? body.handlerId
+                : parseInt(String(body.handlerId), 10)
+            return Number.isFinite(n) && n > 0 ? n : null
+          })()
+    const useStoredPassword =
+      parsedHandlerId !== null && (pwd === '' || pwd === MASKED_MAIL_PASSWORD_PLACEHOLDER)
+
+    if (useStoredPassword) {
+      payload.handlerId = parsedHandlerId
+    } else if (pwd !== '') {
+      payload.password = pwd
+    }
+
+    const data = await httpClient('/api/v1/inbound-email-handlers/test-connection', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+      schema: PostApiInboundEmailHandlersTestConnectionPreviewResponseSchema,
+    })
+
+    return {
+      success: data.success === true,
+      message: typeof data.message === 'string' ? data.message : '',
+    }
   },
 
   /**

@@ -1245,7 +1245,11 @@ import {
   XMarkIcon,
   ExclamationTriangleIcon,
 } from '@heroicons/vue/24/outline'
-import filesService, { type FileItem, type UploadProgress } from '@/services/filesService'
+import filesService, {
+  type FileItem,
+  type UploadProgress,
+  UploadBlockedError,
+} from '@/services/filesService'
 import { useNotification } from '@/composables/useNotification'
 import { useFilePersistence } from '@/composables/useInputPersistence'
 
@@ -1639,8 +1643,13 @@ const onFolderDrop = async (event: DragEvent, folderName: string) => {
       result.errors.forEach((err) => showError(`${err.filename}: ${err.error}`))
     }
   } catch (err) {
-    console.error('Upload error:', err)
-    showError('Failed to upload files: ' + (err as Error).message)
+    if (err instanceof UploadBlockedError) {
+      showError(translateUploadBlocked(err))
+      if (storageWidget.value) await storageWidget.value.refresh()
+    } else {
+      console.error('Upload error:', err)
+      showError('Failed to upload files: ' + (err as Error).message)
+    }
   } finally {
     isUploading.value = false
     uploadProgress.value = null
@@ -1714,12 +1723,38 @@ const uploadFiles = async () => {
       })
     }
   } catch (error) {
-    console.error('Upload error:', error)
-    showError('Failed to upload files: ' + (error as Error).message)
+    if (error instanceof UploadBlockedError) {
+      showError(translateUploadBlocked(error))
+      if (storageWidget.value) await storageWidget.value.refresh()
+    } else {
+      console.error('Upload error:', error)
+      showError('Failed to upload files: ' + (error as Error).message)
+    }
   } finally {
     isUploading.value = false
     uploadProgress.value = null
   }
+}
+
+const translateUploadBlocked = (err: UploadBlockedError): string => {
+  const params = {
+    filename: err.filename,
+    message: err.check.message ?? '',
+  }
+  const reasonKey = `files.uploadBlocked.${err.reason}`
+  const reasonTranslated = t(reasonKey, params)
+  if (reasonTranslated !== reasonKey) return reasonTranslated
+
+  // Reason-specific copy missing in the active locale → try the generic
+  // localized template.
+  const genericKey = 'files.uploadBlocked.generic'
+  const genericTranslated = t(genericKey, params)
+  if (genericTranslated !== genericKey) return genericTranslated
+
+  // Both keys missing → never show the raw `files.uploadBlocked.x`
+  // dot-path to the user. Fall back to a non-i18n string that still
+  // carries the filename + backend message.
+  return params.message ? `${params.filename}: ${params.message}` : params.filename
 }
 
 const handleUpgrade = () => {

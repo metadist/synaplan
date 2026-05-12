@@ -1,6 +1,59 @@
 import { api } from './apiService'
 import { httpClient, getApiBaseUrl, refreshAccessToken } from './api/httpClient'
 
+export type UploadCheckReason =
+  | 'rate_limit_exceeded'
+  | 'file_too_large'
+  | 'file_empty'
+  | 'extension_not_allowed'
+  | 'storage_exceeded'
+
+export interface UploadCheckResponse {
+  allowed: boolean
+  reason?: UploadCheckReason
+  message?: string
+  max_file_size: number
+  allowed_extensions: string[]
+  remaining: number
+  used?: number
+  limit?: number
+}
+
+/**
+ * UploadBlockedError — thrown when the server's pre-flight check rejects an upload.
+ * Catch this in the UI to show a clear, i18n-friendly message instead of waiting
+ * for the slow upload to time out.
+ */
+export class UploadBlockedError extends Error {
+  public readonly reason: UploadCheckReason
+  public readonly check: UploadCheckResponse
+  public readonly filename: string
+
+  constructor(filename: string, check: UploadCheckResponse) {
+    super(check.message ?? 'Upload not allowed')
+    this.name = 'UploadBlockedError'
+    this.filename = filename
+    this.reason = (check.reason ?? 'storage_exceeded') as UploadCheckReason
+    this.check = check
+  }
+}
+
+/**
+ * Pre-flight check before uploading a file body. Sends only metadata so the
+ * server can reject quota/size/extension/rate-limit violations in milliseconds.
+ */
+export async function checkUpload(
+  filename: string,
+  size: number,
+  mime?: string
+): Promise<UploadCheckResponse> {
+  return httpClient<UploadCheckResponse>('/api/v1/files/check-upload', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ filename, size, mime }),
+  })
+}
+
 export interface UploadFileOptions {
   files: File[]
   groupKey?: string
@@ -68,14 +121,36 @@ export interface FileListResponse {
 }
 
 /**
- * Upload files with processing and progress tracking
+ * Upload files with processing and progress tracking.
  *
- * Uses XMLHttpRequest to enable upload progress monitoring.
+ * Performs a metadata-only pre-flight check first (filename + size) so that
+ * uploads which would be rejected for quota, size, extension, or rate-limit
+ * reasons fail FAST and deterministically — preventing client/proxy timeouts
+ * when streaming a large body that is going to be rejected anyway.
+ *
+ * Throws {@link UploadBlockedError} when the pre-flight rejects a file. The UI
+ * should catch this and surface the localized message to the user.
+ *
+ * Uses XMLHttpRequest for the actual transfer to support upload progress.
  *
  * @param options Upload options with files, processing level, and optional progress callback
  * @returns Upload response with file details
  */
 export const uploadFiles = async (options: UploadFileOptions): Promise<UploadResponse> => {
+  // Pre-flight all files concurrently — N small HEAD-style metadata
+  // requests in parallel beat N sequential round-trips when the user
+  // drops a folder of files. We throw on the FIRST rejection we
+  // encounter (in original file-order) so the user sees the same error
+  // regardless of network jitter.
+  const checks = await Promise.all(
+    options.files.map((file) => checkUpload(file.name, file.size, file.type))
+  )
+  for (let i = 0; i < options.files.length; i++) {
+    if (!checks[i].allowed) {
+      throw new UploadBlockedError(options.files[i].name, checks[i])
+    }
+  }
+
   const buildFormData = (): FormData => {
     const fd = new FormData()
     options.files.forEach((file) => fd.append('files[]', file))
@@ -380,36 +455,29 @@ export const getShareInfo = async (
   return response.data
 }
 
+export interface StorageStats {
+  limit: number
+  usage: number
+  remaining: number
+  percentage: number
+  limit_formatted: string
+  usage_formatted: string
+  remaining_formatted: string
+  max_file_size: number
+  max_file_size_formatted: string
+}
+
+export interface StorageStatsResponse {
+  success: boolean
+  user_level: string
+  storage: StorageStats
+}
+
 /**
  * Get storage quota statistics
  */
-export async function getStorageStats(): Promise<{
-  success: boolean
-  user_level: string
-  storage: {
-    limit: number
-    usage: number
-    remaining: number
-    percentage: number
-    limit_formatted: string
-    usage_formatted: string
-    remaining_formatted: string
-  }
-}> {
-  const response = await httpClient<{
-    success: boolean
-    user_level: string
-    storage: {
-      limit: number
-      usage: number
-      remaining: number
-      percentage: number
-      limit_formatted: string
-      usage_formatted: string
-      remaining_formatted: string
-    }
-  }>('/api/v1/files/storage-stats')
-  return response
+export async function getStorageStats(): Promise<StorageStatsResponse> {
+  return httpClient<StorageStatsResponse>('/api/v1/files/storage-stats')
 }
 
 /**
@@ -519,6 +587,7 @@ export async function processFile(
 
 export default {
   uploadFiles,
+  checkUpload,
   listFiles,
   deleteFile,
   deleteMultipleFiles,
