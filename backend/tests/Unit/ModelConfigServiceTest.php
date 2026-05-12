@@ -375,6 +375,52 @@ class ModelConfigServiceTest extends TestCase
         $this->assertEquals('openai', $result['chat']['provider']);
     }
 
+    public function testGetUserAiConfigFallsBackWhenPic2TextModelRowIsMissing(): void
+    {
+        // Cache miss for the chat/embedding getDefaultProvider lookups.
+        $this->cacheItem->method('isHit')->willReturn(false);
+        $this->cache->method('getItem')->willReturn($this->cacheItem);
+
+        // DEFAULTMODEL.PIC2TEXT points at id 999 — but that row was deleted.
+        $picTextConfig = $this->createMock(Config::class);
+        $picTextConfig->method('getValue')->willReturn('999');
+
+        $this->configRepository
+            ->method('findOneBy')
+            ->willReturnCallback(function (array $criteria) use ($picTextConfig) {
+                if (($criteria['group'] ?? null) === 'DEFAULTMODEL'
+                    && ($criteria['setting'] ?? null) === 'PIC2TEXT') {
+                    return $picTextConfig;
+                }
+
+                return null;
+            });
+
+        // Stale: model row no longer exists → provider lookup returns null.
+        $this->modelRepository->method('find')->with(999)->willReturn(null);
+
+        // Vision falls through to the capability default chain. There's no
+        // BCONFIG row, so it walks through findFallbackProvider() and lands
+        // on the first available provider from the registry mock.
+        $this->configRepository
+            ->method('findByOwnerGroupAndSetting')
+            ->willReturn(null);
+
+        // First available provider from setUp() is 'openai'; ensure modelRepository->findByTag
+        // returns a model owned by openai so findFallbackProvider returns it.
+        $openAiModel = $this->createMock(Model::class);
+        $openAiModel->method('getService')->willReturn('openai');
+        $this->modelRepository->method('findByTag')->willReturn([$openAiModel]);
+
+        $result = $this->service->getUserAiConfig(1);
+
+        $this->assertSame('openai', $result['vision']['provider']);
+        $this->assertNull(
+            $result['vision']['model'],
+            'Stale PIC2TEXT model id must be nulled out when the referenced row is gone'
+        );
+    }
+
     public function testGetEffectiveUserIdForMessageWithWhatsAppUnverifiedUser(): void
     {
         $userId = 1;

@@ -395,9 +395,39 @@ class AiFacade
     public function analyzeImage(string $imagePath, string $prompt, ?int $userId = null, array $options = []): array
     {
         $providerWasExplicit = array_key_exists('provider', $options);
-        $requestedProvider = $options['provider'] ?? $this->modelConfig->getDefaultProvider($userId, 'vision');
+        $callerSuppliedModel = array_key_exists('model', $options);
+        $resolvedVisionProvider = null;
+
+        // The settings UI persists the user's vision pick to
+        // BCONFIG.DEFAULTMODEL.PIC2TEXT. Honour that configured row before
+        // falling through to the legacy default-vision-provider chain.
+        if (!$providerWasExplicit && null !== $userId) {
+            $visionDefault = $this->modelConfig->resolveVisionDefault($userId);
+            $resolvedVisionProvider = $visionDefault['provider'];
+
+            if (null !== $visionDefault['model_id']) {
+                $options['provider'] = $visionDefault['provider'];
+                $providerWasExplicit = true;
+                if (null !== $visionDefault['model'] && !$callerSuppliedModel) {
+                    $options['model'] = $visionDefault['model'];
+                }
+            }
+        }
+
+        $requestedProvider = $options['provider'] ?? $resolvedVisionProvider ?? $this->modelConfig->getDefaultProvider($userId, 'vision');
         // Don't default to 'test' - let real providers be tried first via fallback logic
         $normalizedRequested = $requestedProvider ? strtolower($requestedProvider) : null;
+
+        // The model id stashed in $options is the API identifier of whichever
+        // provider we just picked as primary. When we fall back to a *different*
+        // provider, that string is meaningless (and often actively harmful: e.g.
+        // OpenAI/Google read $options['model'] verbatim and will 400 on a Groq
+        // model name). Remember whose model this is so we can strip it for any
+        // non-matching candidate further down — mirrors the embedding fallback's
+        // `unset($fallbackOptions['model'])` safeguard.
+        $modelOwnerProvider = (isset($options['model']) && $normalizedRequested)
+            ? $normalizedRequested
+            : null;
 
         $candidates = [];
 
@@ -481,15 +511,26 @@ class AiFacade
                 continue;
             }
 
+            // Build per-candidate options: drop the provider-specific `model`
+            // override whenever the candidate isn't the provider that string
+            // belongs to, so each provider gets either its own model or nothing
+            // (in which case it falls back to its internal default).
+            $candidateOptions = $options;
+            $candidateOptions['provider'] = $candidateName;
+            if (null !== $modelOwnerProvider && $modelOwnerProvider !== $normalizedCandidate) {
+                unset($candidateOptions['model']);
+            }
+
             $this->logger->info('AI vision request via '.$provider->getName(), [
                 'provider' => $provider->getName(),
                 'user_id' => $userId,
                 'image' => basename($imagePath),
+                'model' => $candidateOptions['model'] ?? null,
             ]);
 
             try {
                 $response = $this->circuitBreaker->execute(
-                    callback: fn () => $provider->explainImage($imagePath, $prompt, $options),
+                    callback: fn () => $provider->explainImage($imagePath, $prompt, $candidateOptions),
                     serviceName: 'ai_provider_vision_'.$provider->getName(),
                     fallback: null // NO FALLBACK
                 );
@@ -497,7 +538,7 @@ class AiFacade
                 return [
                     'content' => $response,
                     'provider' => $provider->getName(),
-                    'model' => $options['model'] ?? 'unknown',
+                    'model' => $candidateOptions['model'] ?? 'unknown',
                 ];
             } catch (ProviderException $e) {
                 $this->logger->warning('AI vision provider failed: '.$provider->getName().' - '.$e->getMessage(), [

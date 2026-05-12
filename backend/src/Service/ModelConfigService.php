@@ -251,19 +251,56 @@ final readonly class ModelConfigService
      */
     public function getUserAiConfig(?int $userId): array
     {
+        $visionDefault = $this->resolveVisionDefault($userId);
+
         return [
             'chat' => [
                 'provider' => $this->getDefaultProvider($userId, 'chat'),
                 'model' => $this->getDefaultModel('CHAT', $userId),
             ],
             'vision' => [
-                'provider' => $this->getDefaultProvider($userId, 'vision'),
-                'model' => $this->getDefaultModel('VISION', $userId),
+                'provider' => $visionDefault['provider'],
+                'model' => $visionDefault['model_id'],
             ],
             'embedding' => [
                 'provider' => $this->getDefaultProvider($userId, 'embedding'),
                 'model' => $this->getDefaultModel('EMBEDDING', $userId),
             ],
+        ];
+    }
+
+    /**
+     * Resolve the user's configured Pic→Text default model and provider.
+     *
+     * The settings UI writes image-recognition defaults to DEFAULTMODEL.PIC2TEXT
+     * as a numeric BMODELS id. Return both the DB id for config/debug surfaces
+     * and the provider-facing model name for runtime calls.
+     *
+     * @return array{provider: string, model: ?string, model_id: ?int}
+     */
+    public function resolveVisionDefault(?int $userId): array
+    {
+        $visionModelId = $this->getDefaultModel('PIC2TEXT', $userId);
+        $visionModelName = null;
+        $visionProvider = null;
+
+        if ($visionModelId) {
+            $visionProvider = $this->getProviderForModel((int) $visionModelId);
+            if (null === $visionProvider) {
+                $visionModelId = null;
+            } else {
+                $visionModelName = $this->getModelName((int) $visionModelId);
+            }
+        }
+
+        if (null === $visionProvider) {
+            $visionProvider = $this->getDefaultProvider($userId, 'vision');
+        }
+
+        return [
+            'provider' => $visionProvider,
+            'model' => $visionModelName,
+            'model_id' => $visionModelId,
         ];
     }
 
