@@ -6,9 +6,12 @@ use App\AI\Service\AiFacade;
 use App\Entity\Message;
 use App\Entity\Model;
 use App\Entity\Prompt;
+use App\Entity\User;
+use App\Message\ExtractMemoriesCommand;
 use App\Repository\ConfigRepository;
 use App\Repository\ModelRepository;
 use App\Repository\PromptRepository;
+use App\Repository\UserRepository;
 use App\Service\FeedbackConfigService;
 use App\Service\File\UserUploadPathBuilder;
 use App\Service\Message\Handler\ChatHandler;
@@ -21,6 +24,7 @@ use App\Service\UserMemoryService;
 use Doctrine\ORM\EntityManagerInterface;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
+use Symfony\Component\Messenger\Envelope;
 use Symfony\Component\Messenger\MessageBusInterface;
 
 class ChatHandlerTest extends TestCase
@@ -355,6 +359,211 @@ class ChatHandlerTest extends TestCase
         );
 
         self::assertNotEmpty($chunks);
+    }
+
+    /**
+     * Issue #615: the non-streaming `handle()` path serves email
+     * (`smart+...@synaplan.net`) and the generic API webhook. Before the
+     * fix, neither loaded user memories nor extracted new ones. This
+     * test pins the regression: when Qdrant has relevant memories,
+     * `handle()` must inject them into the system prompt that ships
+     * with the AI request.
+     */
+    public function testHandleLoadsMemoriesIntoSystemPromptForEmailChannel(): void
+    {
+        $message = $this->createMock(Message::class);
+        $message->method('getUserId')->willReturn(7);
+        $message->method('getId')->willReturn(123);
+        $message->method('getText')->willReturn('Where do I live?');
+        $message->method('getUnixTimestamp')->willReturn(time());
+        $message->method('getDateTime')->willReturn('20260512100000');
+        $message->method('getFilePath')->willReturn('');
+        $message->method('getFileType')->willReturn('');
+        $message->method('getTopic')->willReturn('CHAT');
+        $message->method('getLanguage')->willReturn('en');
+        $message->method('getFileText')->willReturn('');
+        $message->method('getDirection')->willReturn('IN');
+
+        $user = $this->createMock(User::class);
+        $user->method('getId')->willReturn(7);
+        $user->method('isMemoriesEnabled')->willReturn(true);
+
+        $userRepository = $this->createMock(UserRepository::class);
+        $userRepository->method('find')->with(7)->willReturn($user);
+        $this->em->method('getRepository')->with(User::class)->willReturn($userRepository);
+
+        $this->userMemoryService->method('isAvailable')->willReturn(true);
+        $this->userMemoryService->method('embedUserQuery')->willReturn(['embedding' => [0.1, 0.2, 0.3]]);
+        $this->userMemoryService
+            ->method('searchMemoriesByVector')
+            ->willReturnCallback(function (int $userId, array $vec, ...$rest) {
+                $category = $rest[0] ?? null;
+                if (null === $category) {
+                    return [
+                        ['id' => 42, 'key' => 'city', 'value' => 'Hamburg', 'score' => 0.91],
+                    ];
+                }
+
+                return [];
+            });
+
+        $this->promptRepository->method('findOneBy')->willReturn(null);
+        $this->modelConfigService->method('getEffectiveUserIdForMessage')->willReturn(7);
+        $this->modelConfigService->method('getDefaultModel')->willReturn(10);
+        $this->modelConfigService->method('getProviderForModel')->willReturn('openai');
+        $this->modelConfigService->method('getModelName')->willReturn('gpt-4.1');
+
+        $capturedMessages = null;
+        $this->aiFacade
+            ->expects($this->once())
+            ->method('chat')
+            ->willReturnCallback(function (array $messages, int $userId, array $options) use (&$capturedMessages) {
+                $capturedMessages = $messages;
+
+                return [
+                    'content' => 'You live in Hamburg.',
+                    'provider' => 'openai',
+                    'model' => 'gpt-4.1',
+                ];
+            });
+
+        $this->perfPipelineFlag->method('isEnabled')->willReturn(true);
+        $this->messageBus
+            ->method('dispatch')
+            ->willReturnCallback(static fn (object $msg) => new Envelope($msg));
+
+        $result = $this->handler->handle($message, [], ['topic' => 'CHAT', 'language' => 'en']);
+
+        self::assertNotNull($capturedMessages, 'aiFacade->chat() should have been called');
+        $systemMessage = $capturedMessages[0]['content'] ?? '';
+        self::assertStringContainsString(
+            'User Memories',
+            $systemMessage,
+            'system prompt must include the memories section so email replies use stored memories'
+        );
+        self::assertStringContainsString(
+            'Hamburg',
+            $systemMessage,
+            'system prompt must contain the actual memory value'
+        );
+        self::assertSame([
+            ['id' => 42, 'key' => 'city', 'value' => 'Hamburg', 'score' => 0.91],
+        ], $result['metadata']['memories']);
+    }
+
+    /**
+     * Issue #615: after generating a reply, the non-streaming path must
+     * also dispatch `ExtractMemoriesCommand` so new facts (e.g. a user
+     * sharing their new address by email) end up in long-term storage.
+     */
+    public function testHandleDispatchesMemoryExtractionAfterResponse(): void
+    {
+        $message = $this->createMock(Message::class);
+        $message->method('getUserId')->willReturn(7);
+        $message->method('getId')->willReturn(456);
+        $message->method('getText')->willReturn('My new address is Bahnhofstrasse 1.');
+        $message->method('getUnixTimestamp')->willReturn(time());
+        $message->method('getDateTime')->willReturn('20260512100000');
+        $message->method('getFilePath')->willReturn('');
+        $message->method('getFileType')->willReturn('');
+        $message->method('getTopic')->willReturn('CHAT');
+        $message->method('getLanguage')->willReturn('en');
+        $message->method('getFileText')->willReturn('');
+
+        $user = $this->createMock(User::class);
+        $user->method('getId')->willReturn(7);
+        $user->method('isMemoriesEnabled')->willReturn(true);
+
+        $userRepository = $this->createMock(UserRepository::class);
+        $userRepository->method('find')->with(7)->willReturn($user);
+        $this->em->method('getRepository')->with(User::class)->willReturn($userRepository);
+
+        $this->userMemoryService->method('isAvailable')->willReturn(false);
+
+        $this->promptRepository->method('findOneBy')->willReturn(null);
+        $this->modelConfigService->method('getEffectiveUserIdForMessage')->willReturn(7);
+        $this->modelConfigService->method('getDefaultModel')->willReturn(10);
+        $this->modelConfigService->method('getProviderForModel')->willReturn('openai');
+        $this->modelConfigService->method('getModelName')->willReturn('gpt-4.1');
+
+        $this->aiFacade->method('chat')->willReturn([
+            'content' => 'Got it, I will remember your new address.',
+            'provider' => 'openai',
+            'model' => 'gpt-4.1',
+        ]);
+
+        $this->perfPipelineFlag->method('isEnabled')->with(7)->willReturn(true);
+
+        $dispatched = null;
+        $this->messageBus
+            ->expects($this->once())
+            ->method('dispatch')
+            ->willReturnCallback(function (object $msg) use (&$dispatched) {
+                $dispatched = $msg;
+
+                return new Envelope($msg);
+            });
+
+        $this->handler->handle($message, [], ['topic' => 'CHAT', 'language' => 'en']);
+
+        self::assertInstanceOf(ExtractMemoriesCommand::class, $dispatched);
+        self::assertSame(456, $dispatched->getMessageId());
+        self::assertSame(7, $dispatched->getUserId());
+        self::assertStringContainsString('remember your new address', $dispatched->getAiResponse());
+    }
+
+    /**
+     * Widget requests opt out of memory loading + extraction (privacy:
+     * widget visitors are anonymous embeds). Verifies the
+     * `disable_memories` flag short-circuits before we ever talk to
+     * Qdrant or the messenger bus.
+     */
+    public function testHandleSkipsMemoriesForWidgetSource(): void
+    {
+        $message = $this->createMock(Message::class);
+        $message->method('getUserId')->willReturn(7);
+        $message->method('getText')->willReturn('Hi widget');
+        $message->method('getUnixTimestamp')->willReturn(time());
+        $message->method('getDateTime')->willReturn('20260512100000');
+        $message->method('getFilePath')->willReturn('');
+        $message->method('getFileType')->willReturn('');
+        $message->method('getTopic')->willReturn('CHAT');
+        $message->method('getLanguage')->willReturn('en');
+        $message->method('getFileText')->willReturn('');
+
+        $user = $this->createMock(User::class);
+        $user->method('isMemoriesEnabled')->willReturn(true);
+        $userRepository = $this->createMock(UserRepository::class);
+        $userRepository->method('find')->willReturn($user);
+        $this->em->method('getRepository')->willReturn($userRepository);
+
+        // If the disable flag is honoured we never reach Qdrant; if a
+        // future regression bypasses it, the mock's strict expectation
+        // below will fail the test.
+        $this->userMemoryService->expects($this->never())->method('embedUserQuery');
+        $this->userMemoryService->expects($this->never())->method('searchMemoriesByVector');
+        $this->userMemoryService->expects($this->never())->method('searchRelevantMemories');
+
+        $this->promptRepository->method('findOneBy')->willReturn(null);
+        $this->modelConfigService->method('getEffectiveUserIdForMessage')->willReturn(7);
+        $this->modelConfigService->method('getDefaultModel')->willReturn(10);
+        $this->modelConfigService->method('getProviderForModel')->willReturn('openai');
+        $this->modelConfigService->method('getModelName')->willReturn('gpt-4.1');
+
+        $this->aiFacade->method('chat')->willReturn([
+            'content' => 'Hi there',
+            'provider' => 'openai',
+            'model' => 'gpt-4.1',
+        ]);
+
+        // No extraction either — widget visitors must not leave a memory trail.
+        $this->messageBus->expects($this->never())->method('dispatch');
+
+        $this->handler->handle(
+            $message,
+            [],
+            ['topic' => 'CHAT', 'language' => 'en', 'source' => 'widget'],
+        );
     }
 
     public function testHandleStreamLoadsPromptMetadataForTaskPrompt(): void
