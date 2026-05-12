@@ -15,7 +15,6 @@
     "jsx": "preserve",
 
     /* Path mapping */
-    "baseUrl": ".",
     "paths": {
       "@/*": ["./src/*"]
     },
