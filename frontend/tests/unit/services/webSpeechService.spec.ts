@@ -153,6 +153,63 @@ describe('WebSpeechService.onresult — snapshot semantics (issue #898)', () => 
     }
   })
 
+  it('does NOT duplicate when Android Chrome reports cumulative finals in multiple result entries', async () => {
+    // Some Android Chrome versions add a NEW result entry to the list for
+    // each progressive recognition, but each entry's transcript already
+    // contains ALL previously recognized text (cumulative). Joining them
+    // naively produces "hi hi wie hi wie wird..." — the service must detect
+    // this pattern and take only the last (most complete) final.
+    const calls: WebSpeechSnapshot[] = []
+    const service = new WebSpeechService({ onResult: (snap) => calls.push({ ...snap }) })
+    await service.start()
+
+    // Simulate: results array grows with cumulative transcripts
+    recognition.fireResults(0, [{ transcript: 'hi', isFinal: true }])
+    recognition.fireResults(0, [
+      { transcript: 'hi', isFinal: true },
+      { transcript: 'hi wie', isFinal: true },
+    ])
+    recognition.fireResults(0, [
+      { transcript: 'hi', isFinal: true },
+      { transcript: 'hi wie', isFinal: true },
+      { transcript: 'hi wie wird', isFinal: true },
+    ])
+    recognition.fireResults(0, [
+      { transcript: 'hi', isFinal: true },
+      { transcript: 'hi wie', isFinal: true },
+      { transcript: 'hi wie wird', isFinal: true },
+      { transcript: 'hi wie wird das Wetter heute in Münster', isFinal: true },
+    ])
+
+    // Every snapshot must be the clean cumulative text — no duplication.
+    expect(calls.map((c) => c.final)).toEqual([
+      'hi',
+      'hi wie',
+      'hi wie wird',
+      'hi wie wird das Wetter heute in Münster',
+    ])
+    for (const call of calls) {
+      expect(call.final).not.toMatch(/\b(\w+)\s+\1\b/)
+    }
+  })
+
+  it('still joins independent finals correctly (standard W3C desktop pattern)', async () => {
+    // On desktop Chrome, each result entry is an independent word/phrase.
+    // These must still be joined, NOT collapsed.
+    const calls: WebSpeechSnapshot[] = []
+    const service = new WebSpeechService({ onResult: (snap) => calls.push({ ...snap }) })
+    await service.start()
+
+    recognition.fireResults(1, [
+      { transcript: 'hello', isFinal: true },
+      { transcript: 'world', isFinal: true },
+    ])
+
+    // "world" does NOT start with "hello", so this is independent → join.
+    expect(calls.at(-1)).toEqual({ final: 'hello world', interim: '' })
+  })
+
+
   it('keeps the latest interim only when the engine briefly reports multiple', async () => {
     const calls: WebSpeechSnapshot[] = []
     const service = new WebSpeechService({ onResult: (snap) => calls.push({ ...snap }) })
