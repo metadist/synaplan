@@ -1139,6 +1139,12 @@ class StreamController extends AbstractController
                     $outgoingMessage->setMeta('media_type', $response['metadata']['media_type']);
                 }
 
+                $this->persistOriginalMediaMeta(
+                    $outgoingMessage,
+                    $classification,
+                    $response['metadata'] ?? []
+                );
+
                 // Store SORTING model information in MessageMeta (from classification)
                 if (!empty($classification['sorting_provider'])) {
                     $outgoingMessage->setMeta('ai_sorting_provider', $classification['sorting_provider']);
@@ -1250,6 +1256,16 @@ class StreamController extends AbstractController
                 $rawChatModelId = $response['metadata']['model_id'] ?? $modelId ?? null;
                 $completeChatModelId = $this->normalizeModelId($rawChatModelId, 'streaming_complete');
 
+                // `originalTopic` / `originalMediaType` mirror the same fields
+                // the error path already ships and the history endpoint reads
+                // (`ChatController::getMessages`). The frontend `complete`
+                // handler in ChatView assigns them onto `message.*` so
+                // `mediaHintFromClassificationTopic('mediamaker', 'audio')`
+                // returns `audio` live — fixing the badge-label flip
+                // documented in issue #624.
+                $originalTopic = $outgoingMessage->getMeta('original_topic');
+                $originalMediaType = $outgoingMessage->getMeta('original_media_type');
+
                 $completeData = [
                     'messageId' => $outgoingMessage->getId(),
                     'trackId' => $trackId,
@@ -1257,6 +1273,8 @@ class StreamController extends AbstractController
                     'model' => $response['metadata']['model'] ?? 'unknown',
                     'model_id' => $completeChatModelId,
                     'topic' => $classification['topic'],
+                    'originalTopic' => $originalTopic,
+                    'originalMediaType' => $originalMediaType,
                     'language' => $classification['language'],
                     'searchResults' => $searchResults,
                     'aiModels' => $this->buildAiModelsPayload($outgoingMessage),
@@ -1777,6 +1795,12 @@ class StreamController extends AbstractController
                 $outgoingMessage->setMeta('ai_sorting_model_id', (string) $classification['sorting_model_id']);
             }
 
+            // Mirror the streaming branch above: keep MEDIAMAKER meta
+            // consistent for non-streaming callers (email, generic webhook)
+            // so a later history fetch surfaces the right "Audio Model"
+            // badge and the right capability for the Again dropdown.
+            $this->persistOriginalMediaMeta($outgoingMessage, $classification, $metadata);
+
             if (!empty($options['web_search'])) {
                 $message->setMeta('web_search_enabled', 'true');
             }
@@ -1819,6 +1843,13 @@ class StreamController extends AbstractController
             // so the flat SSE field and the nested payload stay in sync.
             $nonStreamingModelId = $this->normalizeModelId($metadata['model_id'] ?? null, 'non_streaming_complete');
 
+            // Mirror the streaming branch so the non-streaming `complete`
+            // event also carries `originalTopic` / `originalMediaType` —
+            // keeps the badge label and Again model selection consistent
+            // for callers that share this SSE shape (see issue #624).
+            $nonStreamingOriginalTopic = $outgoingMessage->getMeta('original_topic');
+            $nonStreamingOriginalMediaType = $outgoingMessage->getMeta('original_media_type');
+
             $completeData = [
                 'messageId' => $outgoingMessage->getId(),
                 'provider' => $metadata['provider'] ?? 'unknown',
@@ -1826,6 +1857,8 @@ class StreamController extends AbstractController
                 'model_id' => $nonStreamingModelId,
                 'trackId' => $trackId,
                 'topic' => $classification['topic'] ?? null,
+                'originalTopic' => $nonStreamingOriginalTopic,
+                'originalMediaType' => $nonStreamingOriginalMediaType,
                 'language' => $classification['language'] ?? null,
                 'searchResults' => $this->formatSearchResultsForSse($result['search_results'] ?? null),
                 'aiModels' => $this->buildAiModelsPayload($outgoingMessage),
@@ -1909,6 +1942,45 @@ class StreamController extends AbstractController
         ]);
 
         return null;
+    }
+
+    /**
+     * Persist `original_topic` / `original_media_type` meta on a MEDIAMAKER
+     * outgoing message so the chat-message badge label (#583) and the
+     * "Again" model dropdown surface a stable media type both during live
+     * SSE streaming and after the page reloads history from the DB.
+     *
+     * Without this, MEDIAMAKER audio falls back to mediaHint=null live
+     * (no `audio` part is yet in `message.parts` — see issue #625) which
+     * surfaces "Chat Model" and a CHAT-capability prediction for the Again
+     * dropdown. After reload, the audio file lands in parts and the badge
+     * flips to "Audio Model" / TEXT2SOUND. This helper fixes the flip by
+     * pre-persisting the original media intent. See issue #624.
+     *
+     * No-op for non-mediamaker classifications so we don't leak this meta
+     * onto regular chat replies.
+     *
+     * @param array{topic?: ?string, media_type?: ?string}|array<string, mixed> $classification
+     * @param array{media_type?: ?string}|array<string, mixed>                  $metadata
+     */
+    private function persistOriginalMediaMeta(Message $message, array $classification, array $metadata = []): void
+    {
+        if ('mediamaker' !== ($classification['topic'] ?? null)) {
+            return;
+        }
+
+        $message->setMeta('original_topic', 'mediamaker');
+
+        // Handler-derived media_type wins because it reflects the actual
+        // pipeline that ran (synthesize/generateImage/generateVideo); the
+        // classifier value is only the predicted intent.
+        $mediaType = $metadata['media_type']
+            ?? $classification['media_type']
+            ?? null;
+
+        if (!empty($mediaType)) {
+            $message->setMeta('original_media_type', (string) $mediaType);
+        }
     }
 
     /**
