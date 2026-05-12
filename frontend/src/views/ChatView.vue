@@ -28,7 +28,7 @@
 
       <div
         ref="chatContainer"
-        class="flex-1 overflow-y-auto bg-chat"
+        class="flex-1 overflow-y-auto bg-chat overscroll-contain"
         data-testid="section-messages"
         @scroll="handleScroll"
       >
@@ -348,6 +348,7 @@ import { useMemoriesStore } from '@/stores/userMemories'
 import { useFeedbackStore } from '@/stores/userFeedback'
 import { useLimitCheck } from '@/composables/useLimitCheck'
 import { useNotification } from '@/composables/useNotification'
+import { useHeaderVisibility } from '@/composables/useHeaderVisibility'
 import { chatApi } from '@/services/api'
 import { prefetchSseToken } from '@/services/api/chatApi'
 import type { ModelOption } from '@/composables/useModelSelection'
@@ -649,6 +650,7 @@ onBeforeUnmount(() => {
     currentAudioStreamer = null
   }
   isAudioStreaming.value = false
+  showHeader()
   window.removeEventListener('open-memory-dialog', handleOpenMemoryDialogEvent)
   window.removeEventListener('open-feedback-dialog', handleOpenFeedbackDialogEvent)
   window.removeEventListener('focus', prefetchSseToken)
@@ -786,10 +788,14 @@ const handleDrop = async (event: DragEvent) => {
   }
 }
 
+const { onScroll: onHeaderScroll, show: showHeader } = useHeaderVisibility()
+
 const handleScroll = async () => {
   if (!chatContainer.value) return
 
   const { scrollTop, scrollHeight, clientHeight } = chatContainer.value
+
+  onHeaderScroll(scrollTop)
 
   // Check if at bottom for auto-scroll
   const isAtBottom = Math.abs(scrollHeight - clientHeight - scrollTop) < 50

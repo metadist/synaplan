@@ -1,6 +1,10 @@
 <template>
   <header
-    class="bg-header relative z-50 border-b border-black/[0.04] dark:border-white/[0.04] md:hidden"
+    :class="[
+      'fixed top-0 inset-x-0 z-50 bg-header border-b border-black/[0.04] dark:border-white/[0.04] md:hidden',
+      'transition-transform duration-200 ease-out',
+      hidden ? '-translate-y-full' : 'translate-y-0',
+    ]"
     data-testid="comp-app-header"
     :style="{ paddingTop: 'env(safe-area-inset-top)' }"
   >
@@ -21,6 +25,8 @@
 <script setup lang="ts">
 import { Bars3Icon } from '@heroicons/vue/24/outline'
 import { useSidebarStore } from '../stores/sidebar'
+import { useHeaderVisibility } from '../composables/useHeaderVisibility'
 
 const sidebarStore = useSidebarStore()
+const { hidden } = useHeaderVisibility()
 </script>
