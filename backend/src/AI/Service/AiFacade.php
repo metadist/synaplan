@@ -395,14 +395,17 @@ class AiFacade
     public function analyzeImage(string $imagePath, string $prompt, ?int $userId = null, array $options = []): array
     {
         $providerWasExplicit = array_key_exists('provider', $options);
+        $callerSuppliedModel = array_key_exists('model', $options);
 
         // The settings UI persists the user's vision pick to
-        // BCONFIG.DEFAULTMODEL.PIC2TEXT (a model id). Honour that selection
-        // before falling through to the legacy default-vision-provider chain
-        // so callers don't have to know the BCONFIG layout. Both the
-        // provider and the concrete model name are derived from the row
-        // and injected into $options, so providers receive the right
-        // model id (instead of using their own internal default).
+        // BCONFIG.DEFAULTMODEL.PIC2TEXT (a numeric DB row id). Honour that
+        // selection before falling through to the legacy default-vision-provider
+        // chain so callers don't have to know the BCONFIG layout. Both the
+        // provider (BMODELS.BSERVICE) and the provider's own model identifier
+        // (BMODELS.BPROVID, falling back to BMODELS.BNAME — i.e. the string the
+        // provider's API expects, NOT the numeric DB id) are derived from the
+        // row and injected into $options, so the chosen provider receives the
+        // user's actual selection instead of using its own internal default.
         if (!$providerWasExplicit && null !== $userId) {
             $picTextModelId = $this->modelConfig->getDefaultModel('PIC2TEXT', $userId);
             if ($picTextModelId) {
@@ -411,7 +414,7 @@ class AiFacade
                 if (null !== $picTextProvider) {
                     $options['provider'] = $picTextProvider;
                     $providerWasExplicit = true;
-                    if (null !== $picTextModelName && !array_key_exists('model', $options)) {
+                    if (null !== $picTextModelName && !$callerSuppliedModel) {
                         $options['model'] = $picTextModelName;
                     }
                 }
@@ -421,6 +424,17 @@ class AiFacade
         $requestedProvider = $options['provider'] ?? $this->modelConfig->getDefaultProvider($userId, 'vision');
         // Don't default to 'test' - let real providers be tried first via fallback logic
         $normalizedRequested = $requestedProvider ? strtolower($requestedProvider) : null;
+
+        // The model id stashed in $options is the API identifier of whichever
+        // provider we just picked as primary. When we fall back to a *different*
+        // provider, that string is meaningless (and often actively harmful: e.g.
+        // OpenAI/Google read $options['model'] verbatim and will 400 on a Groq
+        // model name). Remember whose model this is so we can strip it for any
+        // non-matching candidate further down — mirrors the embedding fallback's
+        // `unset($fallbackOptions['model'])` safeguard.
+        $modelOwnerProvider = (isset($options['model']) && $normalizedRequested)
+            ? $normalizedRequested
+            : null;
 
         $candidates = [];
 
@@ -504,15 +518,26 @@ class AiFacade
                 continue;
             }
 
+            // Build per-candidate options: drop the provider-specific `model`
+            // override whenever the candidate isn't the provider that string
+            // belongs to, so each provider gets either its own model or nothing
+            // (in which case it falls back to its internal default).
+            $candidateOptions = $options;
+            $candidateOptions['provider'] = $candidateName;
+            if (null !== $modelOwnerProvider && $modelOwnerProvider !== $normalizedCandidate) {
+                unset($candidateOptions['model']);
+            }
+
             $this->logger->info('AI vision request via '.$provider->getName(), [
                 'provider' => $provider->getName(),
                 'user_id' => $userId,
                 'image' => basename($imagePath),
+                'model' => $candidateOptions['model'] ?? null,
             ]);
 
             try {
                 $response = $this->circuitBreaker->execute(
-                    callback: fn () => $provider->explainImage($imagePath, $prompt, $options),
+                    callback: fn () => $provider->explainImage($imagePath, $prompt, $candidateOptions),
                     serviceName: 'ai_provider_vision_'.$provider->getName(),
                     fallback: null // NO FALLBACK
                 );
@@ -520,7 +545,7 @@ class AiFacade
                 return [
                     'content' => $response,
                     'provider' => $provider->getName(),
-                    'model' => $options['model'] ?? 'unknown',
+                    'model' => $candidateOptions['model'] ?? 'unknown',
                 ];
             } catch (ProviderException $e) {
                 $this->logger->warning('AI vision provider failed: '.$provider->getName().' - '.$e->getMessage(), [

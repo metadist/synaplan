@@ -825,7 +825,7 @@ parameters:
 		-
 			message: '#^Call to an undefined method App\\Repository\\ConfigRepository\:\:method\(\)\.$#'
 			identifier: method.notFound
-			count: 4
+			count: 6
 			path: tests/Unit/ModelConfigServiceTest.php
 
 		-
@@ -837,7 +837,7 @@ parameters:
 		-
 			message: '#^Call to an undefined method App\\Repository\\ModelRepository\:\:method\(\)\.$#'
 			identifier: method.notFound
-			count: 3
+			count: 5
 			path: tests/Unit/ModelConfigServiceTest.php
 
 		-
@@ -849,7 +849,7 @@ parameters:
 		-
 			message: '#^Call to an undefined method Psr\\Cache\\CacheItemInterface\:\:method\(\)\.$#'
 			identifier: method.notFound
-			count: 6
+			count: 7
 			path: tests/Unit/ModelConfigServiceTest.php
 
 		-
@@ -861,7 +861,7 @@ parameters:
 		-
 			message: '#^Call to an undefined method Psr\\Cache\\CacheItemPoolInterface\:\:method\(\)\.$#'
 			identifier: method.notFound
-			count: 5
+			count: 6
 			path: tests/Unit/ModelConfigServiceTest.php
 
 		-

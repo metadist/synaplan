@@ -259,9 +259,19 @@ final readonly class ModelConfigService
         // truth instead of the alphabetical fallback that
         // getDefaultProvider('vision') would return.
         $visionModelId = $this->getDefaultModel('PIC2TEXT', $userId);
-        $visionProvider = $visionModelId
-            ? $this->getProviderForModel((int) $visionModelId)
-            : $this->getDefaultProvider($userId, 'vision');
+        $visionProvider = null;
+        if ($visionModelId) {
+            $visionProvider = $this->getProviderForModel((int) $visionModelId);
+            // The configured model row was deleted/disabled: drop the stale
+            // id and fall back to the capability-level default so callers
+            // always get a usable provider string.
+            if (null === $visionProvider) {
+                $visionModelId = null;
+            }
+        }
+        if (null === $visionProvider) {
+            $visionProvider = $this->getDefaultProvider($userId, 'vision');
+        }
 
         return [
             'chat' => [
