@@ -59,15 +59,13 @@ class AiFacadeAnalyzeImageTest extends TestCase
 
     public function testAnalyzeImageHonoursPic2TextProviderAndModel(): void
     {
-        $this->modelConfig->method('getDefaultModel')
-            ->with('PIC2TEXT', 42)
-            ->willReturn(123);
-        $this->modelConfig->method('getProviderForModel')
-            ->with(123)
-            ->willReturn('groq');
-        $this->modelConfig->method('getModelName')
-            ->with(123)
-            ->willReturn('llama-4-scout-17b-16e-instruct');
+        $this->modelConfig->method('resolveVisionDefault')
+            ->with(42)
+            ->willReturn([
+                'provider' => 'groq',
+                'model' => 'llama-4-scout-17b-16e-instruct',
+                'model_id' => 123,
+            ]);
 
         $this->registry->method('getAvailableProviders')
             ->willReturn(['groq']);
@@ -98,15 +96,13 @@ class AiFacadeAnalyzeImageTest extends TestCase
 
     public function testAnalyzeImageDoesNotLeakPic2TextModelToFallbackProvider(): void
     {
-        $this->modelConfig->method('getDefaultModel')
-            ->with('PIC2TEXT', 42)
-            ->willReturn(123);
-        $this->modelConfig->method('getProviderForModel')
-            ->with(123)
-            ->willReturn('groq');
-        $this->modelConfig->method('getModelName')
-            ->with(123)
-            ->willReturn('llama-4-scout-17b-16e-instruct');
+        $this->modelConfig->method('resolveVisionDefault')
+            ->with(42)
+            ->willReturn([
+                'provider' => 'groq',
+                'model' => 'llama-4-scout-17b-16e-instruct',
+                'model_id' => 123,
+            ]);
 
         $this->registry->method('getAvailableProviders')
             ->willReturn(['openai']);
@@ -148,15 +144,13 @@ class AiFacadeAnalyzeImageTest extends TestCase
         // PIC2TEXT row exists but the referenced BMODELS row is gone (e.g. catalog
         // reshuffle): provider lookup returns null. We must NOT fail — we should
         // fall back to the capability-level default provider chain.
-        $this->modelConfig->method('getDefaultModel')
-            ->with('PIC2TEXT', 42)
-            ->willReturn(999);
-        $this->modelConfig->method('getProviderForModel')
-            ->with(999)
-            ->willReturn(null);
-        $this->modelConfig->method('getDefaultProvider')
-            ->with(42, 'vision')
-            ->willReturn('anthropic');
+        $this->modelConfig->method('resolveVisionDefault')
+            ->with(42)
+            ->willReturn([
+                'provider' => 'anthropic',
+                'model' => null,
+                'model_id' => null,
+            ]);
 
         $this->registry->method('getAvailableProviders')
             ->willReturn(['anthropic']);
@@ -188,10 +182,8 @@ class AiFacadeAnalyzeImageTest extends TestCase
     public function testAnalyzeImageRespectsExplicitProviderOverPic2Text(): void
     {
         // When the caller passes an explicit provider, PIC2TEXT must NOT override it.
-        // getDefaultModel is therefore never consulted.
-        $this->modelConfig->expects($this->never())->method('getDefaultModel');
-        $this->modelConfig->expects($this->never())->method('getProviderForModel');
-        $this->modelConfig->expects($this->never())->method('getModelName');
+        // resolveVisionDefault is therefore never consulted.
+        $this->modelConfig->expects($this->never())->method('resolveVisionDefault');
 
         $this->registry->method('getAvailableProviders')
             ->willReturn(['openai']);

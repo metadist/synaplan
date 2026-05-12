@@ -251,27 +251,7 @@ final readonly class ModelConfigService
      */
     public function getUserAiConfig(?int $userId): array
     {
-        // Vision is a special case: the settings UI writes the user's
-        // image-recognition pick to DEFAULTMODEL.PIC2TEXT (a model id),
-        // not DEFAULTMODEL.VISION (which doesn't exist in the schema).
-        // Surface the actual saved model + its provider here so callers
-        // (dashboards, debug tooling, AiFacade::analyzeImage, …) see the
-        // truth instead of the alphabetical fallback that
-        // getDefaultProvider('vision') would return.
-        $visionModelId = $this->getDefaultModel('PIC2TEXT', $userId);
-        $visionProvider = null;
-        if ($visionModelId) {
-            $visionProvider = $this->getProviderForModel((int) $visionModelId);
-            // The configured model row was deleted/disabled: drop the stale
-            // id and fall back to the capability-level default so callers
-            // always get a usable provider string.
-            if (null === $visionProvider) {
-                $visionModelId = null;
-            }
-        }
-        if (null === $visionProvider) {
-            $visionProvider = $this->getDefaultProvider($userId, 'vision');
-        }
+        $visionDefault = $this->resolveVisionDefault($userId);
 
         return [
             'chat' => [
@@ -279,13 +259,48 @@ final readonly class ModelConfigService
                 'model' => $this->getDefaultModel('CHAT', $userId),
             ],
             'vision' => [
-                'provider' => $visionProvider,
-                'model' => $visionModelId,
+                'provider' => $visionDefault['provider'],
+                'model' => $visionDefault['model_id'],
             ],
             'embedding' => [
                 'provider' => $this->getDefaultProvider($userId, 'embedding'),
                 'model' => $this->getDefaultModel('EMBEDDING', $userId),
             ],
+        ];
+    }
+
+    /**
+     * Resolve the user's configured Pic→Text default model and provider.
+     *
+     * The settings UI writes image-recognition defaults to DEFAULTMODEL.PIC2TEXT
+     * as a numeric BMODELS id. Return both the DB id for config/debug surfaces
+     * and the provider-facing model name for runtime calls.
+     *
+     * @return array{provider: string, model: ?string, model_id: ?int}
+     */
+    public function resolveVisionDefault(?int $userId): array
+    {
+        $visionModelId = $this->getDefaultModel('PIC2TEXT', $userId);
+        $visionModelName = null;
+        $visionProvider = null;
+
+        if ($visionModelId) {
+            $visionProvider = $this->getProviderForModel((int) $visionModelId);
+            if (null === $visionProvider) {
+                $visionModelId = null;
+            } else {
+                $visionModelName = $this->getModelName((int) $visionModelId);
+            }
+        }
+
+        if (null === $visionProvider) {
+            $visionProvider = $this->getDefaultProvider($userId, 'vision');
+        }
+
+        return [
+            'provider' => $visionProvider,
+            'model' => $visionModelName,
+            'model_id' => $visionModelId,
         ];
     }
 

@@ -396,32 +396,25 @@ class AiFacade
     {
         $providerWasExplicit = array_key_exists('provider', $options);
         $callerSuppliedModel = array_key_exists('model', $options);
+        $resolvedVisionProvider = null;
 
         // The settings UI persists the user's vision pick to
-        // BCONFIG.DEFAULTMODEL.PIC2TEXT (a numeric DB row id). Honour that
-        // selection before falling through to the legacy default-vision-provider
-        // chain so callers don't have to know the BCONFIG layout. Both the
-        // provider (BMODELS.BSERVICE) and the provider's own model identifier
-        // (BMODELS.BPROVID, falling back to BMODELS.BNAME — i.e. the string the
-        // provider's API expects, NOT the numeric DB id) are derived from the
-        // row and injected into $options, so the chosen provider receives the
-        // user's actual selection instead of using its own internal default.
+        // BCONFIG.DEFAULTMODEL.PIC2TEXT. Honour that configured row before
+        // falling through to the legacy default-vision-provider chain.
         if (!$providerWasExplicit && null !== $userId) {
-            $picTextModelId = $this->modelConfig->getDefaultModel('PIC2TEXT', $userId);
-            if ($picTextModelId) {
-                $picTextProvider = $this->modelConfig->getProviderForModel((int) $picTextModelId);
-                $picTextModelName = $this->modelConfig->getModelName((int) $picTextModelId);
-                if (null !== $picTextProvider) {
-                    $options['provider'] = $picTextProvider;
-                    $providerWasExplicit = true;
-                    if (null !== $picTextModelName && !$callerSuppliedModel) {
-                        $options['model'] = $picTextModelName;
-                    }
+            $visionDefault = $this->modelConfig->resolveVisionDefault($userId);
+            $resolvedVisionProvider = $visionDefault['provider'];
+
+            if (null !== $visionDefault['model_id']) {
+                $options['provider'] = $visionDefault['provider'];
+                $providerWasExplicit = true;
+                if (null !== $visionDefault['model'] && !$callerSuppliedModel) {
+                    $options['model'] = $visionDefault['model'];
                 }
             }
         }
 
-        $requestedProvider = $options['provider'] ?? $this->modelConfig->getDefaultProvider($userId, 'vision');
+        $requestedProvider = $options['provider'] ?? $resolvedVisionProvider ?? $this->modelConfig->getDefaultProvider($userId, 'vision');
         // Don't default to 'test' - let real providers be tried first via fallback logic
         $normalizedRequested = $requestedProvider ? strtolower($requestedProvider) : null;
 
