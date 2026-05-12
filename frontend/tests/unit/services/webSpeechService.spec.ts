@@ -134,18 +134,18 @@ describe('WebSpeechService.onresult — snapshot semantics (issue #898)', () => 
     await service.start()
 
     recognition.fireResults(0, [{ transcript: 'hi', isFinal: true }])
-    recognition.fireResults(0, [{ transcript: 'hi wie', isFinal: true }])
-    recognition.fireResults(0, [{ transcript: 'hi wie wird', isFinal: true }])
-    recognition.fireResults(0, [{ transcript: 'hi wie wird das Wetter', isFinal: true }])
+    recognition.fireResults(0, [{ transcript: 'hi how', isFinal: true }])
+    recognition.fireResults(0, [{ transcript: 'hi how is', isFinal: true }])
+    recognition.fireResults(0, [{ transcript: 'hi how is the weather', isFinal: true }])
     recognition.fireResults(0, [
-      { transcript: 'hi wie wird das Wetter heute in Münster', isFinal: true },
+      { transcript: 'hi how is the weather today in London', isFinal: true },
     ])
 
     // Each snapshot is the full final string at that point in time. None of
     // them ever contain a duplicated word. The last snapshot is the final
     // transcript the user expected to see.
     expect(calls.at(-1)).toEqual({
-      final: 'hi wie wird das Wetter heute in Münster',
+      final: 'hi how is the weather today in London',
       interim: '',
     })
     for (const call of calls) {
@@ -167,26 +167,26 @@ describe('WebSpeechService.onresult — snapshot semantics (issue #898)', () => 
     recognition.fireResults(0, [{ transcript: 'hi', isFinal: true }])
     recognition.fireResults(0, [
       { transcript: 'hi', isFinal: true },
-      { transcript: 'hi wie', isFinal: true },
+      { transcript: 'hi how', isFinal: true },
     ])
     recognition.fireResults(0, [
       { transcript: 'hi', isFinal: true },
-      { transcript: 'hi wie', isFinal: true },
-      { transcript: 'hi wie wird', isFinal: true },
+      { transcript: 'hi how', isFinal: true },
+      { transcript: 'hi how is', isFinal: true },
     ])
     recognition.fireResults(0, [
       { transcript: 'hi', isFinal: true },
-      { transcript: 'hi wie', isFinal: true },
-      { transcript: 'hi wie wird', isFinal: true },
-      { transcript: 'hi wie wird das Wetter heute in Münster', isFinal: true },
+      { transcript: 'hi how', isFinal: true },
+      { transcript: 'hi how is', isFinal: true },
+      { transcript: 'hi how is the weather today in London', isFinal: true },
     ])
 
     // Every snapshot must be the clean cumulative text — no duplication.
     expect(calls.map((c) => c.final)).toEqual([
       'hi',
-      'hi wie',
-      'hi wie wird',
-      'hi wie wird das Wetter heute in Münster',
+      'hi how',
+      'hi how is',
+      'hi how is the weather today in London',
     ])
     for (const call of calls) {
       expect(call.final).not.toMatch(/\b(\w+)\s+\1\b/)
@@ -209,7 +209,6 @@ describe('WebSpeechService.onresult — snapshot semantics (issue #898)', () => 
     expect(calls.at(-1)).toEqual({ final: 'hello world', interim: '' })
   })
 
-
   it('keeps the latest interim only when the engine briefly reports multiple', async () => {
     const calls: WebSpeechSnapshot[] = []
     const service = new WebSpeechService({ onResult: (snap) => calls.push({ ...snap }) })
@@ -218,11 +217,11 @@ describe('WebSpeechService.onresult — snapshot semantics (issue #898)', () => 
     // Some engines report multiple in-progress entries between finals; we
     // must not concatenate them into the visible interim.
     recognition.fireResults(0, [
-      { transcript: 'guten', isFinal: false },
-      { transcript: 'guten morgen', isFinal: false },
+      { transcript: 'good', isFinal: false },
+      { transcript: 'good morning', isFinal: false },
     ])
 
-    expect(calls).toEqual<WebSpeechSnapshot[]>([{ final: '', interim: 'guten morgen' }])
+    expect(calls).toEqual<WebSpeechSnapshot[]>([{ final: '', interim: 'good morning' }])
   })
 
   it('collapses repeated whitespace inside the joined final string', async () => {
