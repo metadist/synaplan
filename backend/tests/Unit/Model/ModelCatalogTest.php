@@ -253,38 +253,40 @@ class ModelCatalogTest extends TestCase
     }
 
     /**
-     * Regression test for issue #886b: every `text2sound` (TTS) model in
-     * the catalog MUST declare `pricing_mode: per_character` so that
-     * MediaGenerationHandler's `media_usage['characters']` flows through
-     * the media-cost path. Without it, TTS generation fell silently into
-     * the per-token path and recorded $0.000000 in BUSELOG.
+     * Regression test for issue #886b: TTS models that the upstream
+     * provider bills as a flat per-character fee MUST set
+     * `pricing_mode: per_character` so the media-cost path runs. Live
+     * prod BMODELS confirms exactly two such rows in the current catalog
+     * — OpenAI tts-1 (BID 41) and tts-1-hd (BID 83). Google Gemini 2.5
+     * Flash TTS bills as tokens (per_token default); Piper is operator-
+     * hosted with an effectively free price.
      *
-     * Free / self-hosted entries (Piper, priceIn = 0) still get the flag
-     * — they're free anyway, but the flag keeps the behaviour consistent
-     * and protects against a later commercial fork that gives the entry
-     * a non-zero price.
+     * Pinning the explicit allow-list here (rather than "every text2sound")
+     * stops a future contributor from blanket-flagging providers whose
+     * upstream billing is actually token-based — which would re-introduce
+     * the catastrophic-overbill class of bug Copilot flagged on PR #933.
      */
-    public function testEveryTtsModelHasPerCharacterPricingMode(): void
+    public function testOpenAiTtsModelsHavePerCharacterPricingMode(): void
     {
-        $ttsModels = array_filter(
-            ModelCatalog::all(),
-            static fn (array $m): bool => 'text2sound' === ($m['tag'] ?? null)
-        );
+        $expected = [
+            'tts-1' => 0.000015,
+            'tts-1-hd' => 0.00003,
+        ];
 
-        $this->assertNotEmpty($ttsModels, 'Catalog must contain at least one text2sound model.');
+        foreach ($expected as $providerId => $expectedPriceIn) {
+            $rows = array_values(array_filter(
+                ModelCatalog::all(),
+                static fn (array $m): bool => $providerId === ($m['providerId'] ?? null),
+            ));
 
-        foreach ($ttsModels as $model) {
-            $pricingMode = $model['json']['pricing_mode'] ?? null;
-            $this->assertSame(
-                'per_character',
-                $pricingMode,
-                sprintf(
-                    'Model "%s:%s" (id=%s) has tag=text2sound but pricing_mode=%s — issue #886b requires per_character so media_usage[characters] is honoured.',
-                    $model['service'] ?? '?',
-                    $model['providerId'] ?? '?',
-                    $model['id'] ?? '?',
-                    var_export($pricingMode, true),
-                )
+            $this->assertCount(1, $rows, sprintf('Catalog must contain exactly one %s entry.', $providerId));
+            $this->assertSame('per_character', $rows[0]['json']['pricing_mode'] ?? null);
+            $this->assertSame('perChar', $rows[0]['inUnit'] ?? null);
+            $this->assertEqualsWithDelta(
+                $expectedPriceIn,
+                (float) ($rows[0]['priceIn'] ?? 0.0),
+                1e-9,
+                sprintf('%s priceIn must be authored per-character (matches live BMODELS).', $providerId),
             );
         }
     }
