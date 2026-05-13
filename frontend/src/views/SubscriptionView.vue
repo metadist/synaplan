@@ -261,7 +261,7 @@ import { useConfigStore } from '@/stores/config'
 import { useDialog } from '@/composables/useDialog'
 import MainLayout from '@/components/MainLayout.vue'
 
-const { t } = useI18n()
+const { t, te } = useI18n()
 const { formatDateTime } = useDateFormat()
 const router = useRouter()
 const authStore = useAuthStore()
@@ -423,14 +423,21 @@ function getStatusBadgeClass(status: string): string {
  * and produced broken keys like `statusPast_due` for snake_case statuses
  * (issue #856). Splitting on `_` and PascalCasing the parts is enough —
  * Stripe's status enum has no other separator characters.
+ *
+ * Per Copilot review on PR #931, the previous `t(...) || status` fallback
+ * never fired because vue-i18n's `t()` returns the key path itself when
+ * a translation is missing (a truthy string), so we'd render
+ * `subscription.manage.statusFooBar` instead of falling through to the
+ * raw `foo_bar`. Use `te()` to check key existence before `t()`.
  */
 function getStatusText(status: string): string {
   const camelKey = status
     .split('_')
     .map((part, index) => (0 === index ? part : capitalize(part)))
     .join('')
+  const i18nKey = `subscription.manage.status${capitalize(camelKey)}`
 
-  return t(`subscription.manage.status${capitalize(camelKey)}`) || status
+  return te(i18nKey) ? t(i18nKey) : status
 }
 
 function capitalize(str: string): string {
