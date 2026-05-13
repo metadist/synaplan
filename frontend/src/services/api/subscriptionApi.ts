@@ -20,9 +20,27 @@ export interface SubscriptionStatus {
   hasSubscription: boolean
   plan: string
   status?: string
-  nextBilling?: string
-  cancelAt?: string
-  stripeSubscriptionId?: string
+  /**
+   * Unix timestamp (seconds since epoch) of the next billing date, or
+   * `null` when the subscription is not in a billable state.
+   *
+   * Per Copilot review on PR #931, this used to be typed as `string`
+   * which silently hid the actual `number | null` shape coming back
+   * from Stripe webhook payloads. `formatDate()` already accepts both
+   * shapes, but other callers branching on `typeof` would have been
+   * unsafe. Mirrors the OpenAPI annotation on
+   * `SubscriptionController::getSubscriptionStatus`.
+   */
+  nextBilling?: number | null
+  cancelAt?: number | null
+  stripeSubscriptionId?: string | null
+  /**
+   * Set by the backend when an `invoice.payment_failed` webhook fires.
+   * The user keeps access during Stripe's smart-retry window, but the
+   * SubscriptionView surfaces a dedicated warning so they can update
+   * their card before access is revoked (issue #856).
+   */
+  paymentFailed?: boolean
 }
 
 export interface PortalSession {
