@@ -602,7 +602,6 @@ class ModelCatalog
             'rating' => 1,
             'json' => [
                 'description' => 'OpenAI image generation model. Costs are 1:1 funneled.',
-                'pricing_mode' => 'per_image',
                 'params' => ['model' => 'gpt-image-1'],
             ],
         ],
@@ -898,7 +897,6 @@ class ModelCatalog
             'rating' => 1,
             'json' => [
                 'description' => 'OpenAI GPT Image 1.5 - state-of-the-art image generation and editing. Supports pic2pic via Responses API.',
-                'pricing_mode' => 'per_image',
                 'params' => ['model' => 'gpt-image-1.5'],
                 'features' => ['image', 'pic2pic'],
                 'meta' => ['api' => 'responses'],
@@ -1211,15 +1209,21 @@ class ModelCatalog
             'selectable' => 1,
             'active' => 1,
             'providerId' => 'imagen-4.0-generate-001',
-            'priceIn' => 0.1,
-            'inUnit' => 'per1M',
-            'priceOut' => 0.4,
-            'outUnit' => 'per1M',
+            // Imagen 4.0 is a flat per-image-fee model in production
+            // ($0.04/image standard quality). Mirrors live BMODELS BID 115:
+            // priceIn=0 (no input cost), priceOut=0.04 in `perImage` units.
+            'priceIn' => 0,
+            'inUnit' => 'perImage',
+            'priceOut' => 0.04,
+            'outUnit' => 'perImage',
             'quality' => 9,
             'rating' => 1,
             'json' => [
                 'description' => 'Google Imagen 4.0 image generation',
                 'pricing_mode' => 'per_image',
+                'mode_prices' => [
+                    'output_cost_per_image' => 0.04,
+                ],
                 'params' => ['model' => 'imagen-4.0-generate-001'],
                 'features' => ['image'],
             ],
@@ -1240,7 +1244,6 @@ class ModelCatalog
             'rating' => 1,
             'json' => [
                 'description' => 'Google Nano Banana gemini-2.5-flash-image',
-                'pricing_mode' => 'per_image',
                 'params' => ['model' => 'gemini-2.5-flash-image'],
                 'features' => ['image', 'pic2pic'],
             ],
@@ -1261,7 +1264,6 @@ class ModelCatalog
             'rating' => 1,
             'json' => [
                 'description' => 'Google Nano Banana 2 - advanced image generation and editing. Up to 4K, 14 reference images, Google Search grounding.',
-                'pricing_mode' => 'per_image',
                 'params' => ['model' => 'gemini-3.1-flash-image-preview'],
                 'features' => ['image', 'pic2pic'],
                 'meta' => ['max_reference_images' => 14],
@@ -1540,7 +1542,6 @@ class ModelCatalog
             'rating' => 1,
             'json' => [
                 'description' => 'TheHive Flux Schnell - Fast image generation for prototyping. Generates images quickly with good quality.',
-                'pricing_mode' => 'per_image',
                 'params' => ['model' => 'flux-schnell', 'width' => 1024, 'height' => 1024],
             ],
         ],
@@ -1560,7 +1561,6 @@ class ModelCatalog
             'rating' => 1,
             'json' => [
                 'description' => 'TheHive Flux Schnell Enhanced - Photorealistic image generation with enhanced quality.',
-                'pricing_mode' => 'per_image',
                 'params' => ['model' => 'flux-schnell-enhanced', 'width' => 1024, 'height' => 1024],
             ],
         ],
@@ -1580,7 +1580,6 @@ class ModelCatalog
             'rating' => 1,
             'json' => [
                 'description' => 'TheHive SDXL - Stable Diffusion XL for general purpose high-quality image generation.',
-                'pricing_mode' => 'per_image',
                 'params' => ['model' => 'sdxl', 'width' => 1024, 'height' => 1024],
             ],
         ],
@@ -1600,7 +1599,6 @@ class ModelCatalog
             'rating' => 1,
             'json' => [
                 'description' => 'TheHive SDXL Enhanced - Premium quality image generation with enhanced details and photorealism.',
-                'pricing_mode' => 'per_image',
                 'params' => ['model' => 'sdxl-enhanced', 'width' => 1024, 'height' => 1024],
             ],
         ],
@@ -1620,7 +1618,6 @@ class ModelCatalog
             'rating' => 1,
             'json' => [
                 'description' => 'TheHive Emoji Model - Generate custom emojis with transparent backgrounds.',
-                'pricing_mode' => 'per_image',
                 'params' => ['model' => 'emoji', 'width' => 512, 'height' => 512],
             ],
         ],

@@ -324,19 +324,39 @@ class CostCalculationServiceTest extends TestCase
     }
 
     /**
-     * Per Copilot review on PR #932: when an OpenAI / Google image entry
-     * is authored with `per1M` units (because the canonical catalog price
-     * is per-million-token-equivalent until LiteLLM overrides it), the
-     * calculator must still produce a sensible per-image bill. With the
-     * unit-aware normalisation in `calculateMediaCost`, `priceOut=40` on
-     * `outUnit=per1M` resolves to $0.00004 / image — under-billed but not
-     * catastrophic. Real installs override via `SyncModelPricesCommand`
-     * with the proper $0.04 / image; the catalog price stays authored in
-     * its native canonical unit.
+     * Imagen 4.0 production shape: priceIn=0, priceOut=0.04, units=perImage.
+     * 5 images × $0.04 = $0.20. The unit normaliser must NOT divide
+     * `perImage` by 1M — it is already dollars per single image.
      */
-    public function testCalculateMediaCostHonoursPer1MOutUnitForPerImageBilling(): void
+    public function testCalculateMediaCostHonoursPerImageOutUnit(): void
     {
-        // Mirrors the on-disk shape of OpenAI gpt-image-1 in ModelCatalog.
+        $model = $this->createModelMock('google', 0.0, 0.04, 'perImage', 'perImage', [
+            'pricing_mode' => 'per_image',
+        ]);
+
+        // @phpstan-ignore-next-line
+        $this->modelRepository->method('find')->willReturn($model);
+        // @phpstan-ignore-next-line
+        $this->priceHistoryRepository->method('findPriceAtTimestamp')->willReturn(null);
+
+        $result = $this->service->calculateMediaCost(1, 0, 5);
+
+        $this->assertSame('0.200000', $result->totalCost);
+        $this->assertSame('0.200000', $result->outputCost);
+        $this->assertSame('0.000000', $result->inputCost);
+    }
+
+    /**
+     * Defensive case for the unit normaliser: even if a future catalog
+     * entry mistakenly leaves `outUnit=per1M` while flipping the
+     * `pricing_mode` flag, the calculator must NOT bill $40/image. The
+     * normaliser interprets `per1M` as "$X per million units", so 1
+     * image × ($40 / 1_000_000) = $0.00004. Tiny, but not catastrophic
+     * (Copilot review on PR #932 flagged the original $40-per-image
+     * regression caused by the missing unit conversion).
+     */
+    public function testCalculateMediaCostNormalisesPer1MOutUnitForPerImage(): void
+    {
         $model = $this->createModelMock('openai', 5.0, 40.0, 'per1M', 'per1M', [
             'pricing_mode' => 'per_image',
         ]);
@@ -348,17 +368,14 @@ class CostCalculationServiceTest extends TestCase
 
         $result = $this->service->calculateMediaCost(1, 0, 1);
 
-        // 1 * (40 / 1_000_000) = $0.00004 — non-zero (i.e. the bug #886a
-        // describes is fixed) but tiny because the catalog carries the
-        // pre-LiteLLM token-equivalent price.
+        // 1 × (40 / 1_000_000) = $0.00004. Non-catastrophic.
         $this->assertSame('0.000040', $result->outputCost);
-        $this->assertNotSame('0.000000', $result->totalCost, 'Single-image generation must produce non-zero cost.');
     }
 
-    public function testCalculateMediaCostHonoursPerPicOutUnitForPerImageBilling(): void
+    public function testCalculateMediaCostHonoursPerPicOutUnit(): void
     {
-        // TheHive flux-schnell on-disk shape: `priceOut=0.01, outUnit=perpic`.
-        // The calculator must NOT divide by 1M here — the unit is already
+        // TheHive flux-schnell prod shape: priceOut=0.01, outUnit=perpic.
+        // The calculator must NOT divide by 1M — the unit is already
         // dollars per image.
         $model = $this->createModelMock('thehive', 0.0, 0.01, '-', 'perpic', [
             'pricing_mode' => 'per_image',
@@ -371,7 +388,7 @@ class CostCalculationServiceTest extends TestCase
 
         $result = $this->service->calculateMediaCost(1, 0, 5);
 
-        // 5 images * $0.01 = $0.05.
+        // 5 images × $0.01 = $0.05.
         $this->assertSame('0.050000', $result->totalCost);
     }
 
