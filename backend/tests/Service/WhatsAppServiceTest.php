@@ -1678,11 +1678,14 @@ class WhatsAppServiceTest extends TestCase
         $this->assertStringContainsString('*[3] DFDS Hirtshals → Bergen*', $result);
 
         // Answer body must precede the citation block — otherwise the user
-        // sees a wall of links before reading the AI's actual reply.
-        $this->assertLessThan(
-            strpos($result, '🔗 *Quellen:*'),
-            strpos($result, 'Camping in Bergen kostet ca. 15€/Nacht.'),
-        );
+        // sees a wall of links before reading the AI's actual reply. Phrased
+        // with assertGreaterThan + named variables so the intent is obvious
+        // at a glance instead of relying on assertLessThan argument order.
+        $answerPos = strpos($result, 'Camping in Bergen kostet ca. 15€/Nacht.');
+        $citationsPos = strpos($result, '🔗 *Quellen:*');
+        $this->assertNotFalse($answerPos, 'Answer body missing from rendered output');
+        $this->assertNotFalse($citationsPos, 'Citation block missing from rendered output');
+        $this->assertGreaterThan($answerPos, $citationsPos, 'Citations must appear after the answer');
     }
 
     public function testAppendWhatsAppSourcesIsNoOpForEmptySources(): void

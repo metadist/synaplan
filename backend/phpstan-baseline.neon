@@ -505,42 +505,6 @@ parameters:
 			path: tests/Unit/MessageEnqueueServiceTest.php
 
 		-
-			message: '#^Call to an undefined method App\\Repository\\MessageRepository\:\:expects\(\)\.$#'
-			identifier: method.notFound
-			count: 2
-			path: tests/Unit/MessagePreProcessorTest.php
-
-		-
-			message: '#^Call to an undefined method App\\Repository\\MessageRepository\:\:method\(\)\.$#'
-			identifier: method.notFound
-			count: 6
-			path: tests/Unit/MessagePreProcessorTest.php
-
-		-
-			message: '#^Call to an undefined method App\\Service\\File\\FileProcessor\:\:expects\(\)\.$#'
-			identifier: method.notFound
-			count: 2
-			path: tests/Unit/MessagePreProcessorTest.php
-
-		-
-			message: '#^Call to an undefined method App\\Service\\WhisperService\:\:expects\(\)\.$#'
-			identifier: method.notFound
-			count: 2
-			path: tests/Unit/MessagePreProcessorTest.php
-
-		-
-			message: '#^Call to an undefined method App\\Service\\WhisperService\:\:method\(\)\.$#'
-			identifier: method.notFound
-			count: 1
-			path: tests/Unit/MessagePreProcessorTest.php
-
-		-
-			message: '#^Call to an undefined method Psr\\Log\\LoggerInterface\:\:expects\(\)\.$#'
-			identifier: method.notFound
-			count: 1
-			path: tests/Unit/MessagePreProcessorTest.php
-
-		-
 			message: '#^Unreachable statement \- code above always terminates\.$#'
 			identifier: deadCode.unreachable
 			count: 2

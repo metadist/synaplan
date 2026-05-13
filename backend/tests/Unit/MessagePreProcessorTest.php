@@ -11,19 +11,20 @@ use App\Service\File\TikaClient;
 use App\Service\Message\MessagePreProcessor;
 use App\Service\RateLimitService;
 use App\Service\WhisperService;
+use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
 
 class MessagePreProcessorTest extends TestCase
 {
-    private MessageRepository $messageRepository;
-    private TikaClient $tikaClient;
-    private WhisperService $whisperService;
-    private AiFacade $aiFacade;
-    private LoggerInterface $logger;
-    private RateLimitService $rateLimitService;
-    private UserRepository $userRepository;
-    private FileProcessor $fileProcessor;
+    private MessageRepository&MockObject $messageRepository;
+    private TikaClient&MockObject $tikaClient;
+    private WhisperService&MockObject $whisperService;
+    private AiFacade&MockObject $aiFacade;
+    private LoggerInterface&MockObject $logger;
+    private RateLimitService&MockObject $rateLimitService;
+    private UserRepository&MockObject $userRepository;
+    private FileProcessor&MockObject $fileProcessor;
     private MessagePreProcessor $service;
 
     protected function setUp(): void
