@@ -696,6 +696,12 @@
                       </div>
                     </div>
                     <div class="flex items-center gap-0 shrink-0">
+                      <FolderMoveMenu
+                        :open="folderMenuOpen === file.id"
+                        :folders="displayedFolders"
+                        @toggle="toggleFolderMenu(file.id)"
+                        @move="moveFileToFolder(file.id, $event)"
+                      />
                       <button
                         class="p-1.5 rounded-lg hover:bg-black/5 dark:hover:bg-white/5 txt-secondary transition-colors"
                         :title="$t('common.view')"
@@ -991,6 +997,13 @@
                     }}</span>
                   </div>
                   <div class="flex items-center gap-0 shrink-0">
+                    <FolderMoveMenu
+                      :open="folderMenuOpen === file.id"
+                      :folders="displayedFolders"
+                      :current-folder="openFolder"
+                      @toggle="toggleFolderMenu(file.id)"
+                      @move="moveFileToFolder(file.id, $event)"
+                    />
                     <button
                       class="p-1.5 rounded-lg hover:bg-black/5 dark:hover:bg-white/5 txt-secondary transition-colors"
                       :title="$t('common.view')"
