@@ -2667,7 +2667,9 @@
     "topic": "Topic",
     "language": "Language",
     "modelId": "Model ID",
-    "longRunningHint": "This request is taking a bit longer than usual — please hang tight."
+    "longRunningHint": "This request is taking a bit longer than usual — please hang tight.",
+    "waitingDesc": "Just a moment…",
+    "waitingAria": "Preparing response"
   },
   "message": {
     "thinking": "Thinking process",

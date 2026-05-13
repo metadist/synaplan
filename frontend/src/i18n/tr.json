@@ -969,7 +969,9 @@
     "topic": "Konu",
     "language": "Dil",
     "modelId": "Model ID",
-    "longRunningHint": "Bu istek normalden biraz daha uzun sürüyor — lütfen biraz bekleyin."
+    "longRunningHint": "Bu istek normalden biraz daha uzun sürüyor — lütfen biraz bekleyin.",
+    "waitingDesc": "Bir saniye…",
+    "waitingAria": "Yanıt hazırlanıyor"
   },
   "message": {
     "thinking": "Düşünme süreci",

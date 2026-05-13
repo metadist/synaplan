@@ -116,6 +116,8 @@ export const selectors = {
     /** Present inside assistant bubble when streaming finished (prefer over loader hidden) */
     messageDone: '[data-testid="message-done"]',
     loadIndicator: '[data-testid="loading-typing-indicator"]',
+    /** Fallback typing-dots shown before the first SSE status event arrives (issue #902) */
+    loadIndicatorInitial: '[data-testid="loading-initial-indicator"]',
     /** Wrapper that contains only the generated answer body (no timestamp, no footer). Use this for asserting reply text. */
     assistantAnswerBody: '[data-testid="section-message-text"]',
     messageText: '[data-testid="message-text"]',
