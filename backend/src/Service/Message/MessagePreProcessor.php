@@ -6,7 +6,9 @@ use App\AI\Service\AiFacade;
 use App\Entity\File;
 use App\Entity\Message;
 use App\Repository\MessageRepository;
+use App\Repository\UserRepository;
 use App\Service\File\TikaClient;
+use App\Service\RateLimitService;
 use App\Service\WhisperService;
 use Psr\Log\LoggerInterface;
 
@@ -41,6 +43,8 @@ final readonly class MessagePreProcessor
         private AiFacade $aiFacade,
         private LoggerInterface $logger,
         private string $uploadsDir,
+        private RateLimitService $rateLimitService,
+        private UserRepository $userRepository,
     ) {
     }
 
@@ -128,6 +132,12 @@ final readonly class MessagePreProcessor
             ]);
             $messageFile->setStatus('processed');
 
+            // Issue #887: even when extraction was already done at upload
+            // time, the analysis-billing event fires HERE (the message is
+            // actually being sent / consumed). The dedup helper makes this
+            // safe across re-runs of the preprocessor.
+            $this->billFileAnalysis($messageFile, $message, 'reuse_extracted');
+
             return;
         }
 
@@ -148,6 +158,7 @@ final readonly class MessagePreProcessor
                 ]);
             }
             $messageFile->setStatus('processed');
+            $this->billFileAnalysis($messageFile, $message, 'document');
         }
 
         // Audio mit Whisper (or external STT if user configured one)
@@ -185,6 +196,8 @@ final readonly class MessagePreProcessor
                         'text_length' => strlen($transcribedText),
                         'language' => $result['language'],
                     ]);
+
+                    $this->billFileAnalysis($messageFile, $message, 'audio');
                 }
             } catch (\Exception $e) {
                 $this->logger->error('PreProcessor: Audio transcription failed', [
@@ -207,6 +220,8 @@ final readonly class MessagePreProcessor
                     'file_id' => $messageFile->getId(),
                     'text_length' => strlen($text ?? ''),
                 ]);
+
+                $this->billFileAnalysis($messageFile, $message, 'image');
             } catch (\Exception $e) {
                 $this->logger->error('PreProcessor: Vision AI failed', [
                     'file_id' => $messageFile->getId(),
@@ -214,6 +229,51 @@ final readonly class MessagePreProcessor
                 ]);
                 $messageFile->setStatus('error');
             }
+        }
+    }
+
+    /**
+     * Bill exactly one FILE_ANALYSIS event per file the user actually used.
+     *
+     * Issue #887: the chat upload no longer writes a BUSELOG row up front,
+     * so the moment of analysis (here, during the streamed message turn)
+     * is the correct billing event. RateLimitService::recordFileAnalysisOnce
+     * is idempotent on (user_id, file_id) — re-runs of the preprocessor
+     * (chunked stream retries, Vue HMR replays in dev, etc.) are no-ops.
+     *
+     * Failures here MUST NOT block the message from completing — usage
+     * recording is best-effort accounting, not a hard prerequisite. We log
+     * and swallow.
+     */
+    private function billFileAnalysis(File $messageFile, Message $message, string $stage): void
+    {
+        $fileId = $messageFile->getId();
+        if (null === $fileId) {
+            return;
+        }
+
+        $userId = $messageFile->getUserId() ?: $message->getUserId();
+        if ($userId <= 0) {
+            return;
+        }
+
+        $user = $this->userRepository->find($userId);
+        if (null === $user) {
+            return;
+        }
+
+        try {
+            $this->rateLimitService->recordFileAnalysisOnce($user, $fileId, [
+                'filename' => $messageFile->getFileName(),
+                'source' => 'WEB',
+                'stage' => $stage,
+            ]);
+        } catch (\Throwable $e) {
+            $this->logger->warning('PreProcessor: FILE_ANALYSIS recording failed (non-fatal)', [
+                'file_id' => $fileId,
+                'user_id' => $userId,
+                'error' => $e->getMessage(),
+            ]);
         }
     }
 

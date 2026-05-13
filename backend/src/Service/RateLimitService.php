@@ -118,6 +118,66 @@ final class RateLimitService
     }
 
     /**
+     * Record FILE_ANALYSIS usage exactly once per (user, file).
+     *
+     * The chat upload, the RAG `processSingleUpload` path and the async
+     * `processFile` retry path all converge on the same business event —
+     * "this user has had this file analysed" — so they must not produce
+     * more than one BUSELOG row between them. Issue #887: a vectorize
+     * retry after Qdrant came back online used to write a second row, and
+     * the chat-upload-without-send used to bill for an analysis that
+     * never actually happened.
+     *
+     * Idempotency key = (BUSERID, BACTION='FILE_ANALYSIS', BMETADATA->file_id).
+     * The lookup uses MariaDB's `JSON_EXTRACT`; `BMETADATA` is JSON-typed
+     * (declared in the migration that seeds BUSELOG) so the index-friendly
+     * path is preferred over a `LIKE %file_id":%` substring match.
+     *
+     * Returns true if a fresh row was inserted, false if a row for the
+     * same (user, file) already existed and the call was a no-op.
+     */
+    public function recordFileAnalysisOnce(User $user, int $fileId, array $metadata = []): bool
+    {
+        if ($fileId <= 0) {
+            // Defensive: callers that don't have a file id yet (e.g. a
+            // pre-upload billing check) must keep using the existing
+            // `recordUsage()` path. We refuse to dedup on a sentinel.
+            $this->recordUsage($user, 'FILE_ANALYSIS', $metadata);
+
+            return true;
+        }
+
+        $existing = (int) $this->em->getConnection()->fetchOne(
+            "SELECT 1 FROM BUSELOG
+              WHERE BUSERID = :user_id
+                AND BACTION = 'FILE_ANALYSIS'
+                AND JSON_EXTRACT(BMETADATA, '$.file_id') = :file_id
+              LIMIT 1",
+            [
+                'user_id' => $user->getId(),
+                'file_id' => $fileId,
+            ]
+        );
+
+        if (1 === $existing) {
+            $this->logger->debug('RateLimitService: FILE_ANALYSIS already recorded for file, skipping', [
+                'user_id' => $user->getId(),
+                'file_id' => $fileId,
+            ]);
+
+            return false;
+        }
+
+        // Always set file_id explicitly so the dedup query above works
+        // regardless of whether the caller remembered to include it.
+        $metadata['file_id'] = $fileId;
+
+        $this->recordUsage($user, 'FILE_ANALYSIS', $metadata);
+
+        return true;
+    }
+
+    /**
      * Record usage of an action.
      *
      * Accepts granular token data from provider usage arrays.

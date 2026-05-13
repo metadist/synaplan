@@ -575,12 +575,21 @@ class MessageController extends AbstractController
                 'status' => $messageFile->getStatus(),
             ]);
 
-            // Record FILE_ANALYSIS usage for statistics
-            $this->rateLimitService->recordUsage($user, 'FILE_ANALYSIS', [
-                'file_id' => $messageFile->getId(),
-                'filename' => $uploadedFile->getClientOriginalName(),
-                'source' => 'WEB',
-            ]);
+            // FILE_ANALYSIS recording is INTENTIONALLY deferred to
+            // MessagePreProcessor::processMessageFile() — a chat upload
+            // that the user never sends should not be billed (issue #887).
+            // The pre-upload `checkLimit('FILE_ANALYSIS')` above still
+            // rejects users who have already exhausted their quota, so the
+            // limit gate stays in place; we just no longer write a
+            // BUSELOG row at the point a file is staged.
+            //
+            // For audio files we extracted synchronously above, recording
+            // also happens via MessagePreProcessor: when the message is
+            // streamed (or when an audio-only upload triggers an immediate
+            // analysis through the standard pipeline), the file id is
+            // looked up by the preprocessor and routed through
+            // RateLimitService::recordFileAnalysisOnce(), which dedups so
+            // the same file never bills twice.
 
             $response = [
                 'success' => true,
