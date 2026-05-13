@@ -800,7 +800,6 @@ const handleDrop = async (event: DragEvent) => {
   }
 }
 
-
 const handleScroll = async () => {
   if (!chatContainer.value) return
 
