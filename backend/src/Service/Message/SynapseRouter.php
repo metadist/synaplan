@@ -330,6 +330,10 @@ final readonly class SynapseRouter
                     'latency_ms' => $this->elapsed($startTime),
                 ]);
 
+                // Use the canonical `sorting_*` keys so MessageClassifier
+                // can read them the same way it reads MessageSorter output.
+                // Rule-based routing matched without any AI/embedding call,
+                // so leave the model identifiers null — see issue #603.
                 return [
                     'topic' => $ruleBasedTopic,
                     'language' => $messageData['BLANG'] ?? 'en',
@@ -337,9 +341,9 @@ final readonly class SynapseRouter
                     'raw_response' => 'Synapse: Rule-based routing',
                     'prompt_metadata' => $promptMetadata,
                     'source' => 'synapse_rule',
-                    'model_id' => null,
-                    'provider' => null,
-                    'model_name' => null,
+                    'sorting_model_id' => null,
+                    'sorting_provider' => null,
+                    'sorting_model_name' => null,
                 ];
             }
         }
@@ -517,6 +521,13 @@ final readonly class SynapseRouter
                 'latency_ms' => $latencyMs,
             ]);
 
+            // The embedding model IS the model that produced the routing
+            // decision, so surface it under the `sorting_*` keys (drop-in
+            // compatible with MessageSorter::classify()). Without this, the
+            // outgoing message had no `ai_sorting_*` meta, so the Sorting
+            // Model badge only ever appeared after a page refresh once the
+            // backend was patched to also surface this from a different
+            // code path — see issue #603.
             return [
                 'topic' => $canonicalTopic,
                 'granular_topic' => $aliasSource,
@@ -528,9 +539,9 @@ final readonly class SynapseRouter
                 'source' => $lastTopic === $canonicalTopic ? 'synapse_sticky' : 'synapse_embedding',
                 'synapse_score' => $topScore,
                 'synapse_latency_ms' => $latencyMs,
-                'model_id' => null,
-                'provider' => null,
-                'model_name' => null,
+                'sorting_model_id' => $currentModelInfo['model_id'],
+                'sorting_provider' => $currentModelInfo['provider'],
+                'sorting_model_name' => $currentModelInfo['model'],
             ];
         } catch (\Throwable $e) {
             $this->logger->error('SynapseRouter: Embedding/search failed, falling back to AI', [

@@ -928,6 +928,22 @@ class StreamController extends AbstractController
                         $outgoingMessage->setMeta('original_media_type', $originalMediaType);
                     }
 
+                    // Persist the sorting/routing model when the classifier
+                    // ran before the handler exploded — without this, error
+                    // rows show only the chat badge live and the sorting
+                    // badge never appears, even after refresh (#603).
+                    if (is_array($classification)) {
+                        if (!empty($classification['sorting_provider'])) {
+                            $outgoingMessage->setMeta('ai_sorting_provider', (string) $classification['sorting_provider']);
+                        }
+                        if (!empty($classification['sorting_model_name'])) {
+                            $outgoingMessage->setMeta('ai_sorting_model', (string) $classification['sorting_model_name']);
+                        }
+                        if (!empty($classification['sorting_model_id'])) {
+                            $outgoingMessage->setMeta('ai_sorting_model_id', (string) $classification['sorting_model_id']);
+                        }
+                    }
+
                     // Update incoming message
                     $incomingMessage->setTopic('ERROR');
                     $incomingMessage->setStatus('error');
