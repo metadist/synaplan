@@ -24,6 +24,7 @@ use Doctrine\ORM\EntityManagerInterface;
 use OpenApi\Attributes as OA;
 use Psr\Log\LoggerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
+use Symfony\Component\DependencyInjection\Attribute\Autowire;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpFoundation\StreamedResponse;
@@ -48,6 +49,8 @@ class StreamController extends AbstractController
         private UserUploadPathBuilder $userUploadPathBuilder,
         private PromptService $promptService,
         private MessageForwardingService $messageForwardingService,
+        #[Autowire(env: 'default::bool:COST_BUDGET_GATE_ENABLED')]
+        private bool $costBudgetGateEnabled = false,
     ) {
     }
 
@@ -342,6 +345,21 @@ class StreamController extends AbstractController
                     // verification — not email verification (see #839).
                     'phone_verified' => $user->hasVerifiedPhone(),
                 ];
+            } elseif ($this->costBudgetGateEnabled) {
+                $budgetCheck = $this->rateLimitService->checkCostBudget($user);
+                if (!$budgetCheck['allowed']) {
+                    $rateLimitError = [
+                        'status' => 'error',
+                        'error' => 'Cost budget exceeded',
+                        'limit_type' => 'budget',
+                        'action_type' => 'COST',
+                        'limit' => $budgetCheck['budget'],
+                        'used' => $budgetCheck['used_cost'],
+                        'remaining' => $budgetCheck['remaining'],
+                        'user_level' => $user->getUserLevel(),
+                        'phone_verified' => $user->hasVerifiedPhone(),
+                    ];
+                }
             }
         }
 

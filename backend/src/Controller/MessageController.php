@@ -20,6 +20,7 @@ use Doctrine\ORM\EntityManagerInterface;
 use OpenApi\Attributes as OA;
 use Psr\Log\LoggerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
+use Symfony\Component\DependencyInjection\Attribute\Autowire;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -41,6 +42,8 @@ class MessageController extends AbstractController
         private FileProcessor $fileProcessor,
         private VectorizationService $vectorizationService,
         private LoggerInterface $logger,
+        #[Autowire(env: 'default::bool:COST_BUDGET_GATE_ENABLED')]
+        private bool $costBudgetGateEnabled = false,
     ) {
     }
 
@@ -110,6 +113,20 @@ class MessageController extends AbstractController
                 // verification — not email verification (see #839).
                 'phone_verified' => $user->hasVerifiedPhone(),
             ], Response::HTTP_TOO_MANY_REQUESTS);
+        } elseif ($this->costBudgetGateEnabled) {
+            $budgetCheck = $this->rateLimitService->checkCostBudget($user);
+            if (!$budgetCheck['allowed']) {
+                return $this->json([
+                    'error' => 'Cost budget exceeded',
+                    'limit_type' => 'budget',
+                    'action_type' => 'COST',
+                    'limit' => $budgetCheck['budget'],
+                    'used' => $budgetCheck['used_cost'],
+                    'remaining' => $budgetCheck['remaining'],
+                    'user_level' => $user->getUserLevel(),
+                    'phone_verified' => $user->hasVerifiedPhone(),
+                ], Response::HTTP_TOO_MANY_REQUESTS);
+            }
         }
 
         try {
@@ -144,9 +161,6 @@ class MessageController extends AbstractController
                 }
                 $this->em->flush();
             }
-
-            // Record usage
-            $this->rateLimitService->recordUsage($user, 'MESSAGES');
 
             // Prepare context with file contents
             $contextMessages = [];
@@ -230,6 +244,17 @@ class MessageController extends AbstractController
             if (!empty($aiResponse['usage'])) {
                 $outgoingMessage->setMeta('ai_chat_usage', json_encode($aiResponse['usage']));
             }
+
+            // Record usage with full metadata
+            $this->rateLimitService->recordUsage($user, 'MESSAGES', [
+                'provider' => $aiResponse['provider'] ?? 'unknown',
+                'model' => $aiResponse['model'] ?? 'unknown',
+                'model_id' => $aiResponse['model_id'] ?? null,
+                'usage' => $aiResponse['usage'] ?? [],
+                'input_text' => $messageText,
+                'response_text' => $responseText,
+                'source' => 'WEB',
+            ]);
 
             // NOTE: MessageController doesn't use MessageProcessor, so there's no sorting model info here
             // Only StreamController (which uses MessageProcessor) has sorting model metadata
