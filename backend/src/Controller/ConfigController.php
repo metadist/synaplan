@@ -499,6 +499,41 @@ class ConfigController extends AbstractController
      * Get current default model configuration for user.
      */
     #[Route('/models/defaults', name: 'models_defaults', methods: ['GET'])]
+    #[OA\Get(
+        path: '/api/v1/config/models/defaults',
+        summary: 'Get default model configuration',
+        description: 'Returns the currently configured default model IDs per capability for the authenticated user. Falls back to global defaults when no user-specific setting exists. VECTORIZE always returns the system-wide default.',
+        security: [['Bearer' => []]],
+        tags: ['Configuration']
+    )]
+    #[OA\Response(
+        response: 200,
+        description: 'Default model IDs per capability (null if not configured)',
+        content: new OA\JsonContent(
+            properties: [
+                new OA\Property(property: 'success', type: 'boolean', example: true),
+                new OA\Property(
+                    property: 'defaults',
+                    type: 'object',
+                    description: 'Map of capability name to model ID (null if no default is set)',
+                    properties: [
+                        new OA\Property(property: 'SORT', type: 'integer', nullable: true, example: 12),
+                        new OA\Property(property: 'CHAT', type: 'integer', nullable: true, example: 53),
+                        new OA\Property(property: 'MEM', type: 'integer', nullable: true, example: 7),
+                        new OA\Property(property: 'VECTORIZE', type: 'integer', nullable: true, example: 3),
+                        new OA\Property(property: 'PIC2TEXT', type: 'integer', nullable: true, example: null),
+                        new OA\Property(property: 'TEXT2PIC', type: 'integer', nullable: true, example: null),
+                        new OA\Property(property: 'PIC2PIC', type: 'integer', nullable: true, example: null),
+                        new OA\Property(property: 'TEXT2VID', type: 'integer', nullable: true, example: null),
+                        new OA\Property(property: 'SOUND2TEXT', type: 'integer', nullable: true, example: null),
+                        new OA\Property(property: 'TEXT2SOUND', type: 'integer', nullable: true, example: null),
+                        new OA\Property(property: 'ANALYZE', type: 'integer', nullable: true, example: 53),
+                    ]
+                ),
+            ]
+        )
+    )]
+    #[OA\Response(response: 401, description: 'Not authenticated')]
     public function getDefaultModels(#[CurrentUser] ?User $user): JsonResponse
     {
         if (!$user) {
@@ -563,6 +598,64 @@ class ConfigController extends AbstractController
      * With `global: true` (admin-only), saves system-wide defaults (ownerId = 0).
      */
     #[Route('/models/defaults', name: 'models_defaults_save', methods: ['POST'])]
+    #[OA\Post(
+        path: '/api/v1/config/models/defaults',
+        summary: 'Save default model configuration',
+        description: 'Saves per-capability default model IDs for the authenticated user. Admins may pass `global: true` to override system-wide defaults (ownerId=0), which act as the fallback for all users. VECTORIZE requires a premium subscription for non-admins.',
+        security: [['Bearer' => []]],
+        tags: ['Configuration'],
+        requestBody: new OA\RequestBody(
+            required: true,
+            content: new OA\JsonContent(
+                required: ['defaults'],
+                properties: [
+                    new OA\Property(
+                        property: 'defaults',
+                        type: 'object',
+                        description: 'Map of capability name to model ID',
+                        example: ['CHAT' => 53, 'SORT' => 12, 'ANALYZE' => 53]
+                    ),
+                    new OA\Property(
+                        property: 'global',
+                        type: 'boolean',
+                        description: 'Admin-only: when true, saves as system-wide defaults that apply to all users as fallback',
+                        example: false
+                    ),
+                ]
+            )
+        )
+    )]
+    #[OA\Response(
+        response: 200,
+        description: 'Defaults saved successfully',
+        content: new OA\JsonContent(
+            properties: [
+                new OA\Property(property: 'success', type: 'boolean', example: true),
+                new OA\Property(property: 'message', type: 'string', example: 'Default models saved successfully'),
+                new OA\Property(
+                    property: 'skipped',
+                    type: 'object',
+                    description: 'Capabilities whose model ID was rejected because the model no longer exists or is inactive',
+                    example: ['TEXT2PIC' => 99],
+                    nullable: true
+                ),
+            ]
+        )
+    )]
+    #[OA\Response(response: 400, description: 'Invalid request body')]
+    #[OA\Response(response: 401, description: 'Not authenticated')]
+    #[OA\Response(
+        response: 403,
+        description: 'Forbidden – either `global: true` without admin role, or VECTORIZE change requires premium subscription',
+        content: new OA\JsonContent(
+            properties: [
+                new OA\Property(property: 'error', type: 'string', example: 'requires_premium'),
+                new OA\Property(property: 'capability', type: 'string', example: 'VECTORIZE'),
+                new OA\Property(property: 'message', type: 'string', example: 'Switching the embedding model requires a premium subscription'),
+                new OA\Property(property: 'currentLevel', type: 'string', example: 'FREE'),
+            ]
+        )
+    )]
     public function saveDefaultModels(
         Request $request,
         #[CurrentUser] ?User $user,
@@ -677,6 +770,77 @@ class ConfigController extends AbstractController
      * @return JsonResponse {available: bool, provider_type: string, message?: string, install_command?: string}
      */
     #[Route('/models/{modelId}/check', name: 'models_check', methods: ['GET'])]
+    #[OA\Get(
+        path: '/api/v1/config/models/{modelId}/check',
+        summary: 'Check model availability',
+        description: 'Checks whether a specific model is ready to use. For local Ollama models it verifies the Ollama server is running. For external providers it validates that the required API keys or environment variables are configured.',
+        security: [['Bearer' => []]],
+        tags: ['Configuration']
+    )]
+    #[OA\Parameter(
+        name: 'modelId',
+        in: 'path',
+        required: true,
+        description: 'Model database ID',
+        schema: new OA\Schema(type: 'integer', example: 53)
+    )]
+    #[OA\Response(
+        response: 200,
+        description: 'Model availability status',
+        content: new OA\JsonContent(
+            properties: [
+                new OA\Property(property: 'available', type: 'boolean', example: true),
+                new OA\Property(
+                    property: 'provider_type',
+                    type: 'string',
+                    enum: ['local', 'external', 'unknown'],
+                    description: '`local` for Ollama, `external` for cloud API providers',
+                    example: 'external'
+                ),
+                new OA\Property(property: 'model_name', type: 'string', example: 'llama3.2:latest'),
+                new OA\Property(property: 'service', type: 'string', example: 'ollama'),
+                new OA\Property(
+                    property: 'message',
+                    type: 'string',
+                    nullable: true,
+                    description: 'Human-readable reason when `available` is false',
+                    example: 'Ollama server is not running'
+                ),
+                new OA\Property(
+                    property: 'install_command',
+                    type: 'string',
+                    nullable: true,
+                    description: 'Command to pull/install the model (Ollama only)',
+                    example: 'docker compose exec ollama ollama pull llama3.2:latest'
+                ),
+                new OA\Property(
+                    property: 'env_var',
+                    type: 'string',
+                    nullable: true,
+                    description: 'Environment variable that must be set for external providers',
+                    example: 'OPENAI_API_KEY'
+                ),
+                new OA\Property(
+                    property: 'setup_instructions',
+                    type: 'string',
+                    nullable: true,
+                    description: 'Short setup hint when `env_var` is present',
+                    example: 'Set OPENAI_API_KEY in your environment (e.g. .env.local)'
+                ),
+            ]
+        )
+    )]
+    #[OA\Response(response: 401, description: 'Not authenticated')]
+    #[OA\Response(
+        response: 404,
+        description: 'Model not found',
+        content: new OA\JsonContent(
+            properties: [
+                new OA\Property(property: 'available', type: 'boolean', example: false),
+                new OA\Property(property: 'error', type: 'string', example: 'Model not found'),
+            ]
+        )
+    )]
     public function checkModelAvailability(
         int $modelId,
         #[CurrentUser] ?User $user,
@@ -834,8 +998,56 @@ class ConfigController extends AbstractController
     /**
      * Get status of all features and services (Web Search, AI Providers, Processing Services, etc.)
      * Only available in development mode.
+     *
+     * Intentionally excluded from Swagger/OpenAPI documentation because:
+     *  - Only accessible in APP_ENV=dev (returns 403 in production)
+     *  - Returns dynamic runtime data that cannot be represented as a static schema
+     *  - Exposing this in public API docs would mislead production deployments
      */
     #[Route('/features', name: 'features_status', methods: ['GET'])]
+    #[OA\Get(
+        path: '/api/v1/config/features',
+        summary: 'Get feature and service status (dev only)',
+        description: 'Returns the live status of all configured features, AI providers, and infrastructure services. **Only available in `APP_ENV=dev`** – returns 403 Forbidden in production. Useful during local development to verify that all required services are reachable and correctly configured.',
+        security: [['Bearer' => []]],
+        tags: ['Configuration']
+    )]
+    #[OA\Response(
+        response: 200,
+        description: 'Feature status map with summary',
+        content: new OA\JsonContent(
+            properties: [
+                new OA\Property(
+                    property: 'features',
+                    type: 'object',
+                    description: 'Map of feature ID to status object',
+                    additionalProperties: new OA\AdditionalProperties(
+                        properties: [
+                            new OA\Property(property: 'id', type: 'string', example: 'web-search'),
+                            new OA\Property(property: 'category', type: 'string', example: 'AI Features'),
+                            new OA\Property(property: 'name', type: 'string', example: 'Web Search'),
+                            new OA\Property(property: 'enabled', type: 'boolean', example: true),
+                            new OA\Property(property: 'status', type: 'string', enum: ['active', 'healthy', 'unhealthy', 'disabled'], example: 'active'),
+                            new OA\Property(property: 'message', type: 'string', example: 'Web search is active and ready to use'),
+                            new OA\Property(property: 'setup_required', type: 'boolean', example: false),
+                        ]
+                    )
+                ),
+                new OA\Property(
+                    property: 'summary',
+                    type: 'object',
+                    properties: [
+                        new OA\Property(property: 'total', type: 'integer', example: 10),
+                        new OA\Property(property: 'healthy', type: 'integer', example: 8),
+                        new OA\Property(property: 'unhealthy', type: 'integer', example: 2),
+                        new OA\Property(property: 'all_ready', type: 'boolean', example: false),
+                    ]
+                ),
+            ]
+        )
+    )]
+    #[OA\Response(response: 401, description: 'Not authenticated')]
+    #[OA\Response(response: 403, description: 'Only available in development mode (APP_ENV=dev)')]
     public function getFeaturesStatus(#[CurrentUser] ?User $user): JsonResponse
     {
         if (!$user) {
