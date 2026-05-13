@@ -945,17 +945,10 @@ class StreamController extends AbstractController
                     // ran before the handler exploded — without this, error
                     // rows show only the chat badge live and the sorting
                     // badge never appears, even after refresh (#603).
-                    if (is_array($classification)) {
-                        if (!empty($classification['sorting_provider'])) {
-                            $outgoingMessage->setMeta('ai_sorting_provider', (string) $classification['sorting_provider']);
-                        }
-                        if (!empty($classification['sorting_model_name'])) {
-                            $outgoingMessage->setMeta('ai_sorting_model', (string) $classification['sorting_model_name']);
-                        }
-                        if (!empty($classification['sorting_model_id'])) {
-                            $outgoingMessage->setMeta('ai_sorting_model_id', (string) $classification['sorting_model_id']);
-                        }
-                    }
+                    $this->persistClassificationSortingMeta(
+                        $outgoingMessage,
+                        is_array($classification) ? $classification : null
+                    );
 
                     // Update incoming message
                     $incomingMessage->setTopic('ERROR');
@@ -1175,15 +1168,7 @@ class StreamController extends AbstractController
                 );
 
                 // Store SORTING model information in MessageMeta (from classification)
-                if (!empty($classification['sorting_provider'])) {
-                    $outgoingMessage->setMeta('ai_sorting_provider', $classification['sorting_provider']);
-                }
-                if (!empty($classification['sorting_model_name'])) {
-                    $outgoingMessage->setMeta('ai_sorting_model', $classification['sorting_model_name']);
-                }
-                if (!empty($classification['sorting_model_id'])) {
-                    $outgoingMessage->setMeta('ai_sorting_model_id', (string) $classification['sorting_model_id']);
-                }
+                $this->persistClassificationSortingMeta($outgoingMessage, $classification);
 
                 // Store Web Search metadata if web search was used
                 if ($webSearch) {
@@ -1721,6 +1706,12 @@ class StreamController extends AbstractController
                     $outgoingMessage->setMeta('original_media_type', $originalMediaType);
                 }
 
+                // Mirror the streaming error branch (see issue #603): if the
+                // classifier ran before the non-streaming handler failed, keep
+                // the sorting badge live and after refresh by persisting the
+                // routing model meta on the error row.
+                $this->persistClassificationSortingMeta($outgoingMessage, $failedClassification);
+
                 $message->setTopic('ERROR');
                 $message->setStatus('error');
                 $chat->updateTimestamp();
@@ -1821,15 +1812,7 @@ class StreamController extends AbstractController
                 $outgoingMessage->setMeta('openai_response_id', $metadata['response_id']);
             }
 
-            if (!empty($classification['sorting_provider'])) {
-                $outgoingMessage->setMeta('ai_sorting_provider', $classification['sorting_provider']);
-            }
-            if (!empty($classification['sorting_model_name'])) {
-                $outgoingMessage->setMeta('ai_sorting_model', $classification['sorting_model_name']);
-            }
-            if (!empty($classification['sorting_model_id'])) {
-                $outgoingMessage->setMeta('ai_sorting_model_id', (string) $classification['sorting_model_id']);
-            }
+            $this->persistClassificationSortingMeta($outgoingMessage, $classification);
 
             // Mirror the streaming branch above: keep MEDIAMAKER meta
             // consistent for non-streaming callers (email, generic webhook)
@@ -2028,6 +2011,39 @@ class StreamController extends AbstractController
         ]);
 
         return null;
+    }
+
+    /**
+     * Persist the routing/sorting model the classifier picked onto the
+     * outgoing message so the "Sorting Model" badge appears live in the
+     * SSE complete event and survives a page reload.
+     *
+     * Without this, error rows (e.g. ProviderException for an unpulled
+     * Ollama model, or a failed image generation) drop the sorting badge
+     * even though the classifier ran — the row shows only the chat badge
+     * live AND after refresh, since the meta was never persisted.
+     *
+     * Used from both the streaming `success: false` branch and the
+     * non-streaming error branch in `handleNonStreamingRequest()`. See
+     * issue #603.
+     *
+     * @param array<string, mixed>|null $classification
+     */
+    private function persistClassificationSortingMeta(Message $message, ?array $classification): void
+    {
+        if (!is_array($classification)) {
+            return;
+        }
+
+        if (!empty($classification['sorting_provider'])) {
+            $message->setMeta('ai_sorting_provider', (string) $classification['sorting_provider']);
+        }
+        if (!empty($classification['sorting_model_name'])) {
+            $message->setMeta('ai_sorting_model', (string) $classification['sorting_model_name']);
+        }
+        if (!empty($classification['sorting_model_id'])) {
+            $message->setMeta('ai_sorting_model_id', (string) $classification['sorting_model_id']);
+        }
     }
 
     /**

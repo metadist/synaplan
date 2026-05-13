@@ -126,6 +126,63 @@ class StreamControllerAiModelsPayloadTest extends TestCase
     }
 
     /**
+     * Pins the contract that `persistClassificationSortingMeta()` writes
+     * the three `ai_sorting_*` meta keys when the classifier handed us a
+     * sorting model. Both the streaming and the non-streaming error
+     * branches now go through this helper so the live `complete` event
+     * (and any later refresh) carries the Sorting Model badge — see
+     * issue #603 (refresh-only badges).
+     */
+    public function testPersistClassificationSortingMetaWritesSortingMetaWhenAvailable(): void
+    {
+        $message = $this->createPersistedMessage();
+
+        $this->invokePersistSorting($message, [
+            'sorting_provider' => 'google',
+            'sorting_model_name' => 'gemini-2.5-pro',
+            'sorting_model_id' => 99,
+            'topic' => 'mediamaker',
+        ]);
+
+        $this->assertSame('google', $message->getMeta('ai_sorting_provider'));
+        $this->assertSame('gemini-2.5-pro', $message->getMeta('ai_sorting_model'));
+        $this->assertSame('99', $message->getMeta('ai_sorting_model_id'));
+    }
+
+    public function testPersistClassificationSortingMetaIsNoOpForNullClassification(): void
+    {
+        $message = $this->createPersistedMessage();
+
+        $this->invokePersistSorting($message, null);
+
+        $this->assertNull($message->getMeta('ai_sorting_provider'));
+        $this->assertNull($message->getMeta('ai_sorting_model'));
+        $this->assertNull($message->getMeta('ai_sorting_model_id'));
+    }
+
+    /**
+     * Rule-based routing returns null sorting fields (no model produced
+     * the routing decision). The helper must not coerce empty values
+     * into "0" / "" meta — those would render as a phantom Sorting
+     * Model badge with an unknown identifier.
+     */
+    public function testPersistClassificationSortingMetaSkipsEmptySortingFields(): void
+    {
+        $message = $this->createPersistedMessage();
+
+        $this->invokePersistSorting($message, [
+            'sorting_provider' => null,
+            'sorting_model_name' => '',
+            'sorting_model_id' => 0,
+            'topic' => 'general',
+        ]);
+
+        $this->assertNull($message->getMeta('ai_sorting_provider'));
+        $this->assertNull($message->getMeta('ai_sorting_model'));
+        $this->assertNull($message->getMeta('ai_sorting_model_id'));
+    }
+
+    /**
      * Build a Message with a non-null id so {@see Message::setMeta()}
      * can back-fill {@see \App\Entity\MessageMeta::$messageId} (which
      * is a non-nullable int column on the join table).
@@ -144,5 +201,14 @@ class StreamControllerAiModelsPayloadTest extends TestCase
         $reflection = new \ReflectionMethod(StreamController::class, 'buildAiModelsPayload');
 
         return $reflection->invoke($this->controller, $message);
+    }
+
+    /**
+     * @param array<string, mixed>|null $classification
+     */
+    private function invokePersistSorting(Message $message, ?array $classification): void
+    {
+        $reflection = new \ReflectionMethod(StreamController::class, 'persistClassificationSortingMeta');
+        $reflection->invoke($this->controller, $message, $classification);
     }
 }
