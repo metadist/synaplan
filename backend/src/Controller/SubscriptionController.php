@@ -331,8 +331,14 @@ class SubscriptionController extends AbstractController
                 new OA\Property(property: 'hasSubscription', type: 'boolean'),
                 new OA\Property(property: 'plan', type: 'string'),
                 new OA\Property(property: 'status', type: 'string'),
-                new OA\Property(property: 'nextBilling', type: 'string'),
-                new OA\Property(property: 'cancelAt', type: 'string'),
+                new OA\Property(property: 'nextBilling', type: 'string', nullable: true),
+                new OA\Property(property: 'cancelAt', type: 'string', nullable: true),
+                new OA\Property(property: 'stripeSubscriptionId', type: 'string', nullable: true),
+                new OA\Property(
+                    property: 'paymentFailed',
+                    type: 'boolean',
+                    description: 'True when Stripe declined the last invoice. The user keeps access during Stripe\'s smart-retry window but the SubscriptionView surfaces a dedicated warning so they can update their card before access is revoked (issue #856).',
+                ),
             ]
         )
     )]

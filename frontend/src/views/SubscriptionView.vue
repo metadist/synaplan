@@ -21,6 +21,45 @@
             </p>
           </div>
 
+          <!--
+            Payment-failed warning (issue #856).
+            Shown above section-current-plan when Stripe declined the last
+            invoice. The user keeps access during Stripe's smart-retry
+            window (typically ~3 weeks) but needs to update their card.
+            CTA reuses the existing customer-portal flow.
+          -->
+          <div
+            v-if="hasActivePlan && showPaymentFailedWarning"
+            data-testid="section-payment-failed"
+            class="alert-warning max-w-2xl mx-auto mb-8"
+            role="alert"
+          >
+            <div class="flex items-start gap-3">
+              <Icon icon="mdi:alert-circle" class="w-6 h-6 flex-shrink-0" />
+              <div class="flex-1">
+                <p class="font-semibold alert-warning-text mb-1">
+                  {{ $t('subscription.manage.paymentFailedTitle') }}
+                </p>
+                <p class="alert-warning-text text-sm mb-3">
+                  {{ $t('subscription.manage.paymentFailedBody') }}
+                </p>
+                <button
+                  :disabled="isProcessing || !stripeConfigured"
+                  class="btn-primary px-4 py-2 rounded-lg text-sm font-medium"
+                  data-testid="btn-fix-payment"
+                  @click="openBillingPortal"
+                >
+                  <Icon
+                    v-if="isProcessing"
+                    icon="mdi:loading"
+                    class="w-4 h-4 animate-spin inline mr-2"
+                  />
+                  {{ $t('subscription.manage.paymentFailedCta') }}
+                </button>
+              </div>
+            </div>
+          </div>
+
           <!-- Current Subscription Info (if active) -->
           <div
             v-if="hasActivePlan"
@@ -58,7 +97,7 @@
                     {{ formatDate(subscriptionStatus.cancelAt) }}
                   </p>
                   <p
-                    v-else-if="subscriptionStatus?.nextBilling"
+                    v-else-if="subscriptionStatus?.nextBilling && !showPaymentFailedWarning"
                     data-testid="text-next-billing"
                     class="txt-secondary text-sm"
                   >
@@ -246,6 +285,21 @@ const isHighestPlan = computed(() => {
   return currentLevel.value === 'BUSINESS' || currentLevel.value === 'ADMIN'
 })
 
+/**
+ * Surface the dunning warning whenever the backend tells us either that
+ * the last invoice was declined (`paymentFailed === true`, set on
+ * `invoice.payment_failed`) OR that the subscription has already
+ * transitioned into Stripe's `past_due` window. Issue #856 asks for both
+ * — the flag persists across the smart-retry window and the status
+ * persists on Stripe's side, so reading both keeps the warning visible
+ * for the entire period the user might lose access.
+ */
+const showPaymentFailedWarning = computed(() => {
+  if (!subscriptionStatus.value) return false
+  if (subscriptionStatus.value.paymentFailed === true) return true
+  return subscriptionStatus.value.status === 'past_due'
+})
+
 function isCurrentPlan(planId: string): boolean {
   return currentLevel.value === planId
 }
@@ -360,8 +414,23 @@ function getStatusBadgeClass(status: string): string {
   return classes[status] || classes['active']
 }
 
+/**
+ * Map a Stripe subscription status (`active`, `past_due`,
+ * `incomplete_expired`, …) to the camelCase i18n key the locale files use
+ * (`statusActive`, `statusPastDue`, `statusIncompleteExpired`).
+ *
+ * Pre-fix this used `capitalize()` which only uppercases the first letter
+ * and produced broken keys like `statusPast_due` for snake_case statuses
+ * (issue #856). Splitting on `_` and PascalCasing the parts is enough —
+ * Stripe's status enum has no other separator characters.
+ */
 function getStatusText(status: string): string {
-  return t(`subscription.manage.status${capitalize(status)}`) || status
+  const camelKey = status
+    .split('_')
+    .map((part, index) => (0 === index ? part : capitalize(part)))
+    .join('')
+
+  return t(`subscription.manage.status${capitalize(camelKey)}`) || status
 }
 
 function capitalize(str: string): string {

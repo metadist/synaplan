@@ -23,6 +23,13 @@ export interface SubscriptionStatus {
   nextBilling?: string
   cancelAt?: string
   stripeSubscriptionId?: string
+  /**
+   * Set by the backend when an `invoice.payment_failed` webhook fires.
+   * The user keeps access during Stripe's smart-retry window, but the
+   * SubscriptionView surfaces a dedicated warning so they can update
+   * their card before access is revoked (issue #856).
+   */
+  paymentFailed?: boolean
 }
 
 export interface PortalSession {
