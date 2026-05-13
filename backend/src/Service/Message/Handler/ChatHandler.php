@@ -122,6 +122,7 @@ final readonly class ChatHandler implements MessageHandlerInterface
         $loadedMemories = $memoriesResult['memories'];
         $memoriesDisabledByRequest = $memoriesResult['disabledByRequest'];
         $memoriesDisabledByUser = $memoriesResult['disabledByUser'];
+        $memoriesRequestDisableContext = $memoriesResult['requestDisableContext'];
 
         $feedbackResult = $this->loadFeedbackContext(
             $message,
@@ -412,6 +413,7 @@ final readonly class ChatHandler implements MessageHandlerInterface
             $loadedMemories,
             $memoriesDisabledByRequest,
             $memoriesDisabledByUser,
+            $memoriesRequestDisableContext,
         );
 
         return [
@@ -608,6 +610,7 @@ final readonly class ChatHandler implements MessageHandlerInterface
         $loadedMemories = $memoriesResult['memories'];
         $memoriesDisabledByRequest = $memoriesResult['disabledByRequest'];
         $memoriesDisabledByUser = $memoriesResult['disabledByUser'];
+        $memoriesRequestDisableContext = $memoriesResult['requestDisableContext'];
 
         $feedbackResult = $this->loadFeedbackContext(
             $message,
@@ -913,6 +916,7 @@ final readonly class ChatHandler implements MessageHandlerInterface
             $loadedMemories,
             $memoriesDisabledByRequest,
             $memoriesDisabledByUser,
+            $memoriesRequestDisableContext,
         );
 
         return [
@@ -1882,13 +1886,21 @@ final readonly class ChatHandler implements MessageHandlerInterface
      *     context: string,
      *     memories: array<int, array<string, mixed>>,
      *     disabledByRequest: bool,
-     *     disabledByUser: bool
+     *     disabledByUser: bool,
+     *     requestDisableContext: array{
+     *         channel: string|null,
+     *         classification_source: string|null,
+     *         disable_memories_flag: bool
+     *     }
      * }
      *                                  `disabledByRequest` is true when the *caller* (widget channel /
      *                                  `disable_memories` option) opted out; `disabledByUser` is true when
      *                                  the user has disabled memories in their settings. They are returned
      *                                  separately so {@see dispatchMemoryExtractionAsync()} can log the
      *                                  specific reason (issue PR #925 Copilot review).
+     *                                  `requestDisableContext` carries which lever fired (widget channel,
+     *                                  classification source, or explicit `disable_memories` flag) so the
+     *                                  precise cause is visible in production logs.
      */
     private function loadMemoriesContext(
         Message $message,
@@ -1905,12 +1917,24 @@ final readonly class ChatHandler implements MessageHandlerInterface
 
         $disabledByUser = !($user?->isMemoriesEnabled() ?? true);
 
+        // Captures *why* this request opted out (widget channel vs explicit
+        // disable_memories flag vs widget classification source). Surfaced
+        // in both the memories-load and the dispatch log so operators can
+        // tell apart widget embeds from e.g. a guest-mode UI toggle that
+        // also sets `disable_memories` — both share the same code path but
+        // need different debugging.
+        $requestDisableContext = [
+            'channel' => $options['channel'] ?? null,
+            'classification_source' => $classification['source'] ?? null,
+            'disable_memories_flag' => !empty($options['disable_memories']),
+        ];
+
         $loadedMemories = [];
 
         if ($disabledByRequest) {
-            $this->logger->debug('ChatHandler: Memories disabled for widget request, skipping memories', [
+            $this->logger->debug('ChatHandler: Memories disabled by request, skipping memories', array_merge([
                 'user_id' => $message->getUserId(),
-            ]);
+            ], $requestDisableContext));
         } elseif ($disabledByUser) {
             $this->logger->debug('ChatHandler: Memories disabled by user setting, skipping memories', [
                 'user_id' => $message->getUserId(),
@@ -2005,6 +2029,7 @@ final readonly class ChatHandler implements MessageHandlerInterface
             'memories' => $loadedMemories,
             'disabledByRequest' => $disabledByRequest,
             'disabledByUser' => $disabledByUser,
+            'requestDisableContext' => $requestDisableContext,
         ];
     }
 
@@ -2135,10 +2160,13 @@ final readonly class ChatHandler implements MessageHandlerInterface
      * disable flags used during context loading, so widgets and
      * operator-disabled users never trigger an extraction run.
      *
-     * The reason for skipping is logged precisely — a widget request and a
-     * user with memories disabled in their settings produce different log
-     * messages so production operators can tell the cases apart without
-     * spelunking through user records.
+     * The reason for skipping is logged precisely. A request-level opt-out
+     * (widget embed, guest-mode UI toggle, explicit `disable_memories`)
+     * and a user disabling memories in their profile settings produce
+     * different log messages, and the request-level case also carries the
+     * specific lever (channel, classification source, flag value) in the
+     * log context — operators don't have to spelunk through user records
+     * to tell the cases apart.
      *
      * Never throws — a failed dispatch is logged at warning level and the
      * user's response continues. Worst case is that one message's memories
@@ -2146,8 +2174,9 @@ final readonly class ChatHandler implements MessageHandlerInterface
      *
      * @param array<int, array{role: string, content: string}|Message> $thread
      * @param array<int, array<string, mixed>>                         $loadedMemories
-     * @param bool                                                     $disabledByRequest true when the caller (widget channel / `disable_memories` option) opted out
-     * @param bool                                                     $disabledByUser    true when the user's profile setting has memories disabled
+     * @param bool                                                     $disabledByRequest     true when the caller (widget channel / `disable_memories` option) opted out
+     * @param bool                                                     $disabledByUser        true when the user's profile setting has memories disabled
+     * @param array<string, mixed>                                     $requestDisableContext optional log context describing which request-level lever fired (channel, classification source, disable_memories flag) — built by {@see loadMemoriesContext()}
      */
     private function dispatchMemoryExtractionAsync(
         Message $message,
@@ -2156,17 +2185,18 @@ final readonly class ChatHandler implements MessageHandlerInterface
         array $loadedMemories,
         bool $disabledByRequest,
         bool $disabledByUser,
+        array $requestDisableContext = [],
     ): void {
         if ($disabledByRequest) {
-            $this->logger->info('ChatHandler: Skipping memory extraction for widget request', [
+            $this->logger->info('ChatHandler: Memory extraction disabled by request, skipping', array_merge([
                 'user_id' => $message->getUserId(),
-            ]);
+            ], $requestDisableContext));
 
             return;
         }
 
         if ($disabledByUser) {
-            $this->logger->info('ChatHandler: Skipping memory extraction — disabled by user setting', [
+            $this->logger->info('ChatHandler: Memory extraction disabled by user setting, skipping', [
                 'user_id' => $message->getUserId(),
             ]);
 

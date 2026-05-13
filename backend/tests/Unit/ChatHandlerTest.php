@@ -22,6 +22,7 @@ use App\Service\RAG\VectorSearchService;
 use App\Service\RateLimitService;
 use App\Service\UserMemoryService;
 use Doctrine\ORM\EntityManagerInterface;
+use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\Messenger\Envelope;
@@ -29,20 +30,20 @@ use Symfony\Component\Messenger\MessageBusInterface;
 
 class ChatHandlerTest extends TestCase
 {
-    private AiFacade $aiFacade;
-    private PromptRepository $promptRepository;
-    private PromptService $promptService;
-    private ModelConfigService $modelConfigService;
-    private ModelRepository $modelRepository;
-    private LoggerInterface $logger;
-    private VectorSearchService $vectorSearchService;
-    private EntityManagerInterface $em;
+    private AiFacade&MockObject $aiFacade;
+    private PromptRepository&MockObject $promptRepository;
+    private PromptService&MockObject $promptService;
+    private ModelConfigService&MockObject $modelConfigService;
+    private ModelRepository&MockObject $modelRepository;
+    private LoggerInterface&MockObject $logger;
+    private VectorSearchService&MockObject $vectorSearchService;
+    private EntityManagerInterface&MockObject $em;
     private UserUploadPathBuilder $userUploadPathBuilder;
-    private UserMemoryService $userMemoryService;
+    private UserMemoryService&MockObject $userMemoryService;
     private FeedbackConfigService $feedbackConfigService;
-    private RateLimitService $rateLimitService;
-    private MessageBusInterface $messageBus;
-    private PerfPipelineFlag $perfPipelineFlag;
+    private RateLimitService&MockObject $rateLimitService;
+    private MessageBusInterface&MockObject $messageBus;
+    private PerfPipelineFlag&MockObject $perfPipelineFlag;
     private ChatHandler $handler;
 
     protected function setUp(): void
@@ -612,12 +613,15 @@ class ChatHandlerTest extends TestCase
         $this->messageBus->expects($this->never())->method('dispatch');
 
         // Capture every info-level log call and assert the exact reason
-        // string surfaces — the widget log is the regression we are
-        // explicitly NOT supposed to emit here.
+        // string surfaces — the request log is the regression we are
+        // explicitly NOT supposed to emit here. The callback declares the
+        // PSR-3 `(message, context)` signature so PHPUnit's pass-through
+        // never trips an ArgumentCountError when ChatHandler ships a
+        // context array alongside the message.
         $infoMessages = [];
         $this->logger
             ->method('info')
-            ->willReturnCallback(function (string $message) use (&$infoMessages): void {
+            ->willReturnCallback(function (string $message, array $context = []) use (&$infoMessages): void {
                 $infoMessages[] = $message;
             });
 
@@ -630,14 +634,14 @@ class ChatHandlerTest extends TestCase
         );
 
         self::assertContains(
-            'ChatHandler: Skipping memory extraction — disabled by user setting',
+            'ChatHandler: Memory extraction disabled by user setting, skipping',
             $infoMessages,
             'dispatchMemoryExtractionAsync() must log the user-setting reason when the user has memories disabled',
         );
         self::assertNotContains(
-            'ChatHandler: Skipping memory extraction for widget request',
+            'ChatHandler: Memory extraction disabled by request, skipping',
             $infoMessages,
-            'must not emit the widget log when the cause is the user setting',
+            'must not emit the request-level log when the cause is the user setting',
         );
     }
 
