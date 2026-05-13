@@ -532,12 +532,24 @@ class MessageController extends AbstractController
             $this->em->persist($messageFile);
             $this->em->flush();
 
-            // Extract text: audio files synchronously (user needs transcription in UI),
-            // other files deferred to MessagePreProcessor during stream to avoid timeouts
+            // Extract text synchronously for files the chat handler will analyze
+            // immediately (audio, documents). Image extraction is left to the
+            // vision-model pipeline, which reads the file directly at analyze
+            // time. Doing extraction here closes the race documented in
+            // issue #729: the stream used to run FileAnalysisHandler before
+            // the async/deferred extraction had populated BFILETEXT, yielding
+            // a false "Document text extraction failed" error on the user's
+            // first send. By the time uploadFileForChat returns, the file is
+            // either `extracted` (text available) or `error` (extraction
+            // failed) — never `uploaded` with empty text.
             $extractMeta = [];
             $isAudio = in_array($fileExtension, MessagePreProcessor::AUDIO_EXTENSIONS, true);
+            $isDocument = in_array($fileExtension, MessagePreProcessor::DOCUMENT_EXTENSIONS, true);
 
-            if ($isAudio) {
+            if ($isAudio || $isDocument) {
+                $messageFile->setStatus('extracting');
+                $this->em->flush();
+
                 try {
                     [$extractedText, $extractMeta] = $this->fileProcessor->extractText(
                         $relativePath,
@@ -549,9 +561,10 @@ class MessageController extends AbstractController
                     $messageFile->setStatus(empty(trim($extractedText)) ? 'error' : 'extracted');
                     $this->em->flush();
 
-                    $this->logger->info('Chat file extracted (audio)', [
+                    $this->logger->info('Chat file extracted', [
                         'user_id' => $user->getId(),
                         'file_id' => $messageFile->getId(),
+                        'kind' => $isAudio ? 'audio' : 'document',
                         'text_length' => strlen($extractedText),
                         'strategy' => $extractMeta['strategy'] ?? 'unknown',
                     ]);
@@ -559,6 +572,7 @@ class MessageController extends AbstractController
                     $this->logger->error('Chat file extraction failed', [
                         'user_id' => $user->getId(),
                         'file_id' => $messageFile->getId(),
+                        'kind' => $isAudio ? 'audio' : 'document',
                         'error' => $e->getMessage(),
                     ]);
 
@@ -601,6 +615,18 @@ class MessageController extends AbstractController
                 'extracted_text_length' => strlen($messageFile->getFileText()),
                 'status' => $messageFile->getStatus(),
             ];
+
+            // Surface a clean error code when synchronous extraction failed
+            // (issue #729). The frontend uses this to render a friendly
+            // notification and block sending the file until the user removes
+            // or replaces it, instead of getting the generic
+            // "Document text extraction failed" mid-stream.
+            if ('error' === $messageFile->getStatus() && ($isAudio || $isDocument)) {
+                $response['extraction_error'] = $isAudio
+                    ? 'audio_transcription_failed'
+                    : 'document_extraction_failed';
+                $response['extraction_strategy'] = $extractMeta['strategy'] ?? 'unknown';
+            }
 
             // Include transcribed text for audio files (for microphone input)
             if (!empty($messageFile->getFileText()) && in_array($fileExtension, ['ogg', 'mp3', 'wav', 'm4a', 'opus', 'flac', 'webm', 'aac', 'wma', 'mp4', 'avi', 'mov', 'mkv', 'mpeg', 'mpg'])) {

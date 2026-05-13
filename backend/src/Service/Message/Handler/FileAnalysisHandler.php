@@ -106,16 +106,32 @@ final readonly class FileAnalysisHandler implements MessageHandlerInterface
                 // Document with extracted text → Use Chat Model
                 return $this->handleWithChatModel($message, $fileInfo, $userPrompt, $classification, $progressCallback);
             }
-            // Document without extracted text → Error
+
+            // Document without extracted text → distinguish between
+            // "still extracting" (issue #729 race) and "extraction failed"
+            $isStillExtracting = in_array(
+                $fileInfo['status'] ?? '',
+                ['uploaded', 'extracting'],
+                true
+            );
             $this->logger->error('FileAnalysisHandler: Document without extracted text', [
                 'file_id' => $fileInfo['id'],
                 'file_name' => $fileInfo['name'],
                 'file_type' => $fileInfo['type'],
+                'file_status' => $fileInfo['status'] ?? null,
+                'still_extracting' => $isStillExtracting,
             ]);
 
             return [
-                'content' => 'Document text extraction failed. The document may be empty, corrupted, or in an unsupported format.',
-                'metadata' => ['error' => 'document_extraction_failed'],
+                'content' => $isStillExtracting
+                    ? 'The document is still being prepared. Please wait a moment and send your question again — extraction is usually fast, but very large documents can take a few extra seconds.'
+                    : "I couldn't read any text from this document. It may be empty, scanned without OCR, password-protected, or in an unsupported format. Try a different file or paste the text directly.",
+                'metadata' => [
+                    'error' => $isStillExtracting
+                        ? 'document_extraction_in_progress'
+                        : 'document_extraction_failed',
+                    'file_status' => $fileInfo['status'] ?? null,
+                ],
             ];
         }
 
@@ -203,17 +219,33 @@ final readonly class FileAnalysisHandler implements MessageHandlerInterface
                 // Document with extracted text → Use Chat Model with streaming
                 return $this->handleStreamWithChatModel($message, $fileInfo, $userPrompt, $classification, $streamCallback, $progressCallback, $options);
             }
-            // Document without extracted text → Error
+
+            // Document without extracted text → distinguish between
+            // "still extracting" (issue #729 race) and "extraction failed"
+            $isStillExtracting = in_array(
+                $fileInfo['status'] ?? '',
+                ['uploaded', 'extracting'],
+                true
+            );
             $this->logger->error('FileAnalysisHandler: Document without extracted text (streaming)', [
                 'file_id' => $fileInfo['id'],
                 'file_name' => $fileInfo['name'],
                 'file_type' => $fileInfo['type'],
+                'file_status' => $fileInfo['status'] ?? null,
+                'still_extracting' => $isStillExtracting,
             ]);
 
-            $streamCallback('Document text extraction failed. The document may be empty, corrupted, or in an unsupported format.');
+            $streamCallback($isStillExtracting
+                ? 'The document is still being prepared. Please wait a moment and send your question again — extraction is usually fast, but very large documents can take a few extra seconds.'
+                : "I couldn't read any text from this document. It may be empty, scanned without OCR, password-protected, or in an unsupported format. Try a different file or paste the text directly.");
 
             return [
-                'metadata' => ['error' => 'document_extraction_failed'],
+                'metadata' => [
+                    'error' => $isStillExtracting
+                        ? 'document_extraction_in_progress'
+                        : 'document_extraction_failed',
+                    'file_status' => $fileInfo['status'] ?? null,
+                ],
             ];
         }
 
@@ -560,6 +592,7 @@ final readonly class FileAnalysisHandler implements MessageHandlerInterface
                 'type' => $file->getFileType(),
                 'path' => $filePath,
                 'text' => $file->getFileText(), // Pre-extracted text!
+                'status' => $file->getStatus(),
                 'is_image' => $isImage,
                 'is_audio' => $isAudio,
                 'is_document' => $isDocument,
@@ -582,6 +615,7 @@ final readonly class FileAnalysisHandler implements MessageHandlerInterface
                 'type' => $extension,
                 'path' => $filePath,
                 'text' => $message->getFileText() ?: '', // Get text from message for legacy
+                'status' => null,
                 'is_image' => $isImage,
                 'is_audio' => $isAudio,
                 'is_document' => $isDocument,

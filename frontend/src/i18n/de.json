@@ -311,6 +311,9 @@
     "dropFiles": "Dateien hier ablegen",
     "dropFilesHint": "Bilder, Dokumente, Audiodateien...",
     "filesPasted": "{count} Datei eingefügt | {count} Dateien eingefügt",
+    "uploadError": "Datei-Upload fehlgeschlagen. Bitte erneut versuchen.",
+    "documentExtractionFailed": "Aus „{filename}\" konnte kein Text gelesen werden. Das Dokument ist möglicherweise leer, ein Scan ohne OCR, passwortgeschützt oder in einem nicht unterstützten Format.",
+    "audioTranscriptionFailed": "„{filename}\" konnte nicht transkribiert werden. Die Audiodatei ist möglicherweise leer, beschädigt oder in einem nicht unterstützten Format.",
     "tools": {
       "label": "Agents",
       "webSearch": "Web-Suche",
