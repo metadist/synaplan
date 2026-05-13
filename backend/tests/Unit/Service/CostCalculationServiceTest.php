@@ -292,6 +292,35 @@ class CostCalculationServiceTest extends TestCase
         $this->assertSame('0.000000', $result->totalCost);
     }
 
+    /**
+     * Regression test for issue #886b: TTS catalog entries had no
+     * `pricing_mode` set, so even though MediaGenerationHandler correctly
+     * passed `media_usage['characters']`, the cost path fell through to
+     * per-token and recorded $0.000000 in BUSELOG. With
+     * `pricing_mode: per_character` the inputQuantity (characters spoken)
+     * is billed at priceIn.
+     */
+    public function testCalculateMediaCostBillsPerCharacterWhenPricingModeIsPerCharacter(): void
+    {
+        // OpenAI tts-1 catalog price after unit normalisation: $0.000015 per character.
+        $model = $this->createModelMock('openai', 0.000015, 0.0, 'per1', '-', [
+            'pricing_mode' => 'per_character',
+        ]);
+
+        // @phpstan-ignore-next-line
+        $this->modelRepository->method('find')->willReturn($model);
+        // @phpstan-ignore-next-line
+        $this->priceHistoryRepository->method('findPriceAtTimestamp')->willReturn(null);
+
+        // 12 000 characters spoken.
+        $result = $this->service->calculateMediaCost(45, 12000.0, 0.0);
+
+        // 12 000 * 0.000015 = $0.18 — input billed, output ignored.
+        $this->assertSame('0.180000', $result->totalCost);
+        $this->assertSame('0.180000', $result->inputCost);
+        $this->assertSame('0.000000', $result->outputCost);
+    }
+
     public function testCostResultDtoStructure(): void
     {
         $result = new CostResult(

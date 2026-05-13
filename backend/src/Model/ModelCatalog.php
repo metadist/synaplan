@@ -621,6 +621,7 @@ class ModelCatalog
             'rating' => 1,
             'json' => [
                 'description' => 'OpenAI\'s text to speech, defaulting on voice NOVA.',
+                'pricing_mode' => 'per_character',
                 'params' => ['model' => 'tts-1', 'voice' => 'nova'],
             ],
         ],
@@ -681,6 +682,7 @@ class ModelCatalog
             'rating' => 1,
             'json' => [
                 'description' => 'OpenAI high-quality text-to-speech.',
+                'pricing_mode' => 'per_character',
                 'params' => ['model' => 'tts-1-hd'],
             ],
         ],
@@ -1071,6 +1073,7 @@ class ModelCatalog
             'rating' => 1,
             'json' => [
                 'description' => 'Google Gemini 2.5 Flash Preview TTS (native speech generation)',
+                'pricing_mode' => 'per_character',
                 'params' => ['model' => 'gemini-2.5-flash-preview-tts', 'voice' => 'Kore'],
                 'features' => ['tts', 'audio'],
             ],
@@ -1631,6 +1634,7 @@ class ModelCatalog
             'rating' => 0.8,
             'json' => [
                 'description' => 'Self-hosted Piper TTS via synaplan-tts. Multi-language (en, de, es, tr, ru, fa). Free, no API key required.',
+                'pricing_mode' => 'per_character',
                 'params' => [
                     'voices' => ['en_US-lessac-medium', 'de_DE-thorsten-medium', 'es_ES-davefx-medium', 'tr_TR-dfki-medium', 'ru_RU-irina-medium', 'fa_IR-reza_ibrahim-medium'],
                 ],

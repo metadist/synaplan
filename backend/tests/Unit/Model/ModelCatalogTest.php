@@ -252,6 +252,43 @@ class ModelCatalogTest extends TestCase
         $this->assertNotSame($original, ModelCatalog::fingerprint($model));
     }
 
+    /**
+     * Regression test for issue #886b: every `text2sound` (TTS) model in
+     * the catalog MUST declare `pricing_mode: per_character` so that
+     * MediaGenerationHandler's `media_usage['characters']` flows through
+     * the media-cost path. Without it, TTS generation fell silently into
+     * the per-token path and recorded $0.000000 in BUSELOG.
+     *
+     * Free / self-hosted entries (Piper, priceIn = 0) still get the flag
+     * — they're free anyway, but the flag keeps the behaviour consistent
+     * and protects against a later commercial fork that gives the entry
+     * a non-zero price.
+     */
+    public function testEveryTtsModelHasPerCharacterPricingMode(): void
+    {
+        $ttsModels = array_filter(
+            ModelCatalog::all(),
+            static fn (array $m): bool => 'text2sound' === ($m['tag'] ?? null)
+        );
+
+        $this->assertNotEmpty($ttsModels, 'Catalog must contain at least one text2sound model.');
+
+        foreach ($ttsModels as $model) {
+            $pricingMode = $model['json']['pricing_mode'] ?? null;
+            $this->assertSame(
+                'per_character',
+                $pricingMode,
+                sprintf(
+                    'Model "%s:%s" (id=%s) has tag=text2sound but pricing_mode=%s — issue #886b requires per_character so media_usage[characters] is honoured.',
+                    $model['service'] ?? '?',
+                    $model['providerId'] ?? '?',
+                    $model['id'] ?? '?',
+                    var_export($pricingMode, true),
+                )
+            );
+        }
+    }
+
     public function testFingerprintIsStableAcrossFloatRoundTrip(): void
     {
         // Doctrine DBAL hands floats back as native floats; the identity should
