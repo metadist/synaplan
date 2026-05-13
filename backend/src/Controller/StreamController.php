@@ -351,8 +351,8 @@ class StreamController extends AbstractController
                     $rateLimitError = [
                         'status' => 'error',
                         'error' => 'Cost budget exceeded',
-                        'limit_type' => 'budget',
-                        'action_type' => 'COST',
+                        'limit_type' => 'monthly',
+                        'action_type' => 'MESSAGES',
                         'limit' => $budgetCheck['budget'],
                         'used' => $budgetCheck['used_cost'],
                         'remaining' => $budgetCheck['remaining'],

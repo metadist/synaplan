@@ -519,13 +519,15 @@ final readonly class MediaGenerationHandler implements MessageHandlerInterface
             if ('image' === $mediaType) {
                 $mediaUsage['images'] = $result['image_count'] ?? 1;
             } elseif ('video' === $mediaType) {
+                $requestedDuration = $options['duration'] ?? $classification['duration'] ?? 8;
                 $duration = $result['duration_seconds'] ?? null;
                 if (null === $duration) {
-                    $this->logger->warning('MediaGenerationHandler: Provider omitted duration_seconds for video generation. Falling back to 5.0 seconds.', [
+                    $this->logger->warning('MediaGenerationHandler: Provider omitted duration_seconds for video generation. Falling back to requested duration.', [
                         'provider' => $provider,
                         'model' => $modelName,
+                        'requested_duration' => $requestedDuration,
                     ]);
-                    $duration = 5.0;
+                    $duration = (float) $requestedDuration;
                     $mediaUsage['duration_missing_fallback'] = true;
                 }
                 $mediaUsage['duration_seconds'] = $duration;

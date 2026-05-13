@@ -9,89 +9,25 @@ use Doctrine\DBAL\Connection;
 use PHPUnit\Framework\TestCase;
 
 /**
- * Tests for the BSUBSCRIPTIONS plan seeder (issue #886 sub-task g).
+ * Tests for the BSUBSCRIPTIONS budget seeder (issue #886 sub-task g).
  *
- * Locks down the operator-vs-catalog ownership contract: the seeder
- * inserts plans that don't exist, fills in zero-valued cost budgets on
- * legacy installs, and refuses to clobber an operator-customised price
- * or budget that has already been set above 0.
+ * The seeder's contract:
+ * - Never inserts new plan rows (operator owns plan creation and pricing).
+ * - Fills in zero-valued budget columns independently so an operator who
+ *   customised only one of the two budget columns keeps their override.
+ * - Skips plans that don't exist in the database.
  */
 final class SubscriptionPlanSeederTest extends TestCase
 {
-    public function testInsertsAllThreePlansOnFreshInstall(): void
+    public function testFillsZeroBudgetsOnLegacyRows(): void
     {
-        /** @var array<string, array{BID: int}> $existing */
-        $existing = [];
-        /** @var list<array<string, mixed>> $inserts */
-        $inserts = [];
-        /** @var list<array<string, mixed>> $updates */
-        $updates = [];
-
-        $connection = $this->createMock(Connection::class);
-        $connection->method('fetchAssociative')->willReturnCallback(
-            static function (string $sql, array $params = []) use (&$existing): false {
-                // No existing rows on a fresh install: every lookup returns false.
-                unset($params, $sql, $existing);
-
-                return false;
-            }
-        );
-        $connection->method('executeStatement')->willReturnCallback(
-            static function (string $sql, array $params = []) use (&$inserts, &$updates, &$existing): int {
-                if (str_contains($sql, 'INSERT INTO BSUBSCRIPTIONS')) {
-                    $inserts[] = $params;
-                    $existing[$params['level']] = ['BID' => count($inserts)];
-
-                    return 1;
-                }
-                if (str_contains($sql, 'UPDATE BSUBSCRIPTIONS')) {
-                    $updates[] = $params;
-
-                    return 1;
-                }
-
-                return 0;
-            }
-        );
-
-        $seeder = new SubscriptionPlanSeeder($connection);
-        $result = $seeder->seed();
-
-        self::assertSame(3, $result->inserted, 'PRO/TEAM/BUSINESS each get one row');
-        self::assertSame(0, $result->updated);
-        self::assertCount(3, $inserts);
-
-        $byLevel = [];
-        foreach ($inserts as $row) {
-            $byLevel[$row['level']] = $row;
-        }
-        self::assertSame('10.00', $byLevel['PRO']['budget_monthly']);
-        self::assertSame('30.00', $byLevel['TEAM']['budget_monthly']);
-        self::assertSame('60.00', $byLevel['BUSINESS']['budget_monthly']);
-    }
-
-    public function testFillsZeroBudgetsOnLegacyRowsAndPreservesOperatorEdits(): void
-    {
-        // Pretend the table already has all three rows. PRO has a zero
-        // budget (legacy default) and SHOULD be filled in. TEAM has been
-        // edited to 25.00 by the operator and MUST be left alone. BUSINESS
-        // was already at 60.00 from a previous seed run — also untouched.
-        /** @var array<string, array{BID: int}> $existing */
         $existing = [
-            'PRO' => ['BID' => 1],
-            'TEAM' => ['BID' => 2],
-            'BUSINESS' => ['BID' => 3],
+            'PRO' => ['BID' => 1, 'BCOST_BUDGET_MONTHLY' => '0.00', 'BCOST_BUDGET_YEARLY' => '0.00'],
+            'TEAM' => ['BID' => 2, 'BCOST_BUDGET_MONTHLY' => '0.00', 'BCOST_BUDGET_YEARLY' => '0.00'],
+            'BUSINESS' => ['BID' => 3, 'BCOST_BUDGET_MONTHLY' => '0.00', 'BCOST_BUDGET_YEARLY' => '0.00'],
         ];
-        /** @var list<array<string, mixed>> $updates */
+        /** @var list<array{sql: string, params: array<string, mixed>}> $updates */
         $updates = [];
-
-        // Track per-level current budget so the WHERE BCOST_BUDGET_MONTHLY <= 0
-        // affected-rows count is realistic.
-        $budgets = [
-            'PRO' => 0.0,
-            'TEAM' => 25.00,
-            'BUSINESS' => 60.00,
-        ];
 
         $connection = $this->createMock(Connection::class);
         $connection->method('fetchAssociative')->willReturnCallback(
@@ -100,19 +36,10 @@ final class SubscriptionPlanSeederTest extends TestCase
             }
         );
         $connection->method('executeStatement')->willReturnCallback(
-            static function (string $sql, array $params = []) use (&$updates, &$budgets): int {
-                if (str_contains($sql, 'UPDATE BSUBSCRIPTIONS')) {
-                    $level = $params['level'];
-                    if ($budgets[$level] > 0) {
-                        return 0; // WHERE clause does not match -> no rows
-                    }
-                    $budgets[$level] = (float) $params['budget_monthly'];
-                    $updates[] = $params;
+            static function (string $sql, array $params = []) use (&$updates): int {
+                $updates[] = ['sql' => $sql, 'params' => $params];
 
-                    return 1;
-                }
-
-                return 0;
+                return 1;
             }
         );
 
@@ -120,12 +47,62 @@ final class SubscriptionPlanSeederTest extends TestCase
         $result = $seeder->seed();
 
         self::assertSame(0, $result->inserted);
-        self::assertSame(1, $result->updated, 'Only the legacy zero-budget row gets updated');
-        self::assertCount(1, $updates);
-        self::assertSame('PRO', $updates[0]['level']);
-        self::assertSame('10.00', $updates[0]['budget_monthly']);
+        self::assertSame(3, $result->updated, 'All three legacy zero-budget plans get updated');
+        self::assertCount(3, $updates);
+    }
 
-        // Operator-modified TEAM budget is preserved.
-        self::assertSame(25.00, $budgets['TEAM']);
+    public function testPreservesOperatorCustomisedBudgetsIndependently(): void
+    {
+        // PRO: monthly zero, yearly customised → only monthly gets filled.
+        // TEAM: both customised → skipped entirely.
+        // BUSINESS: doesn't exist → skipped.
+        $existing = [
+            'PRO' => ['BID' => 1, 'BCOST_BUDGET_MONTHLY' => '0.00', 'BCOST_BUDGET_YEARLY' => '200.00'],
+            'TEAM' => ['BID' => 2, 'BCOST_BUDGET_MONTHLY' => '25.00', 'BCOST_BUDGET_YEARLY' => '300.00'],
+        ];
+        /** @var list<array{sql: string, params: array<string, mixed>}> $updates */
+        $updates = [];
+
+        $connection = $this->createMock(Connection::class);
+        $connection->method('fetchAssociative')->willReturnCallback(
+            static function (string $sql, array $params = []) use ($existing): array|false {
+                return $existing[$params['level']] ?? false;
+            }
+        );
+        $connection->method('executeStatement')->willReturnCallback(
+            static function (string $sql, array $params = []) use (&$updates): int {
+                $updates[] = ['sql' => $sql, 'params' => $params];
+
+                return 1;
+            }
+        );
+
+        $seeder = new SubscriptionPlanSeeder($connection);
+        $result = $seeder->seed();
+
+        self::assertSame(0, $result->inserted);
+        self::assertSame(1, $result->updated, 'Only PRO (with zero monthly) gets updated');
+        self::assertSame(2, $result->skipped, 'TEAM (both non-zero) and BUSINESS (missing) skipped');
+        self::assertCount(1, $updates);
+
+        // Only monthly budget is updated, yearly is preserved.
+        self::assertStringContainsString('BCOST_BUDGET_MONTHLY', $updates[0]['sql']);
+        self::assertStringNotContainsString('BCOST_BUDGET_YEARLY', $updates[0]['sql']);
+        self::assertSame('10.00', $updates[0]['params']['budget_monthly']);
+    }
+
+    public function testSkipsMissingPlans(): void
+    {
+        // Empty database — no plans exist.
+        $connection = $this->createMock(Connection::class);
+        $connection->method('fetchAssociative')->willReturn(false);
+        $connection->expects(self::never())->method('executeStatement');
+
+        $seeder = new SubscriptionPlanSeeder($connection);
+        $result = $seeder->seed();
+
+        self::assertSame(0, $result->inserted);
+        self::assertSame(0, $result->updated);
+        self::assertSame(3, $result->skipped);
     }
 }

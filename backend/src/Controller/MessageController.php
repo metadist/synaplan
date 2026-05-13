@@ -118,8 +118,8 @@ class MessageController extends AbstractController
             if (!$budgetCheck['allowed']) {
                 return $this->json([
                     'error' => 'Cost budget exceeded',
-                    'limit_type' => 'budget',
-                    'action_type' => 'COST',
+                    'limit_type' => 'monthly',
+                    'action_type' => 'MESSAGES',
                     'limit' => $budgetCheck['budget'],
                     'used' => $budgetCheck['used_cost'],
                     'remaining' => $budgetCheck['remaining'],
@@ -245,11 +245,16 @@ class MessageController extends AbstractController
                 $outgoingMessage->setMeta('ai_chat_usage', json_encode($aiResponse['usage']));
             }
 
-            // Record usage with full metadata
+            // Record usage with full metadata.
+            // AiFacade::chat() does not return model_id, so resolve it
+            // from the user's DEFAULTMODEL config (same logic the facade
+            // itself uses to select the provider/model).
+            $resolvedModelId = $this->modelConfigService->getDefaultModel('CHAT', $user->getId());
+
             $this->rateLimitService->recordUsage($user, 'MESSAGES', [
                 'provider' => $aiResponse['provider'] ?? 'unknown',
                 'model' => $aiResponse['model'] ?? 'unknown',
-                'model_id' => $aiResponse['model_id'] ?? null,
+                'model_id' => $resolvedModelId,
                 'usage' => $aiResponse['usage'] ?? [],
                 'input_text' => $messageText,
                 'response_text' => $responseText,
