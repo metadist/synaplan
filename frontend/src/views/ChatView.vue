@@ -28,7 +28,7 @@
 
       <div
         ref="chatContainer"
-        class="flex-1 overflow-y-auto bg-chat"
+        class="flex-1 overflow-y-auto bg-chat overscroll-contain"
         data-testid="section-messages"
         @scroll="handleScroll"
       >
@@ -348,6 +348,7 @@ import { useMemoriesStore } from '@/stores/userMemories'
 import { useFeedbackStore } from '@/stores/userFeedback'
 import { useLimitCheck } from '@/composables/useLimitCheck'
 import { useNotification } from '@/composables/useNotification'
+import { useHeaderVisibility } from '@/composables/useHeaderVisibility'
 import { chatApi } from '@/services/api'
 import { prefetchSseToken } from '@/services/api/chatApi'
 import type { ModelOption } from '@/composables/useModelSelection'
@@ -621,6 +622,16 @@ const handleVisibilityChangeForToken = () => {
   }
 }
 
+const handleViewportResize = () => {
+  if (autoScroll.value && chatContainer.value) {
+    chatContainer.value.scrollTop = chatContainer.value.scrollHeight
+  }
+}
+
+if (window.visualViewport) {
+  window.visualViewport.addEventListener('resize', handleViewportResize)
+}
+
 // Window event handler for memory dialog (used by MessageText.vue)
 const handleOpenMemoryDialogEvent = (event: Event) => {
   const customEvent = event as CustomEvent<{ memory: UserMemory }>
@@ -650,6 +661,10 @@ onBeforeUnmount(() => {
     currentAudioStreamer = null
   }
   isAudioStreaming.value = false
+  showHeader()
+  if (window.visualViewport) {
+    window.visualViewport.removeEventListener('resize', handleViewportResize)
+  }
   window.removeEventListener('open-memory-dialog', handleOpenMemoryDialogEvent)
   window.removeEventListener('open-feedback-dialog', handleOpenFeedbackDialogEvent)
   window.removeEventListener('focus', prefetchSseToken)
@@ -750,6 +765,7 @@ const scrollToBottom = (force = false) => {
       if (chatContainer.value) {
         chatContainer.value.scrollTop = chatContainer.value.scrollHeight
         autoScroll.value = true
+        syncHeader()
       }
     })
   }
@@ -787,10 +803,14 @@ const handleDrop = async (event: DragEvent) => {
   }
 }
 
+const { onScroll: onHeaderScroll, show: showHeader, sync: syncHeader } = useHeaderVisibility()
+
 const handleScroll = async () => {
   if (!chatContainer.value) return
 
   const { scrollTop, scrollHeight, clientHeight } = chatContainer.value
+
+  onHeaderScroll(scrollTop)
 
   // Check if at bottom for auto-scroll
   const isAtBottom = Math.abs(scrollHeight - clientHeight - scrollTop) < 50
