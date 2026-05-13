@@ -38,12 +38,19 @@ final readonly class FileAnalysisHandler implements MessageHandlerInterface
 
     /**
      * Non-streaming handle method.
+     *
+     * @param array<string, mixed> $classification
+     * @param array<string, mixed> $options        reserved for parity with the interface (file analysis
+     *                                             does not currently consume these flags but accepts
+     *                                             them so callers can use the same signature
+     *                                             across handlers)
      */
     public function handle(
         Message $message,
         array $thread,
         array $classification,
         ?callable $progressCallback = null,
+        array $options = [],
     ): array {
         $this->notify($progressCallback, 'analyzing', 'Analyzing file...');
 

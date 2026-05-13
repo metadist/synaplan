@@ -199,7 +199,7 @@ parameters:
 			path: src/Controller/LegacyApiController.php
 
 		-
-			message: '#^Method App\\Service\\Message\\InferenceRouter\:\:route\(\) invoked with 1 parameter, 3\-4 required\.$#'
+			message: '#^Method App\\Service\\Message\\InferenceRouter\:\:route\(\) invoked with 1 parameter, 3\-5 required\.$#'
 			identifier: arguments.count
 			count: 1
 			path: src/Controller/LegacyApiController.php
@@ -273,12 +273,6 @@ parameters:
 		-
 			message: '#^Method App\\Repository\\PromptRepository\:\:findByTopic\(\) invoked with 3 parameters, 1\-2 required\.$#'
 			identifier: arguments.count
-			count: 1
-			path: src/Service/InboundEmailHandlerService.php
-
-		-
-			message: '#^Method App\\Service\\InboundEmailHandlerService\:\:connectImap\(\) never returns null so it can be removed from the return type\.$#'
-			identifier: return.unusedType
 			count: 1
 			path: src/Service/InboundEmailHandlerService.php
 
@@ -461,78 +455,6 @@ parameters:
 			identifier: argument.type
 			count: 3
 			path: tests/Service/VectorSearchServiceTest.php
-
-		-
-			message: '#^Call to an undefined method App\\AI\\Service\\AiFacade\:\:expects\(\)\.$#'
-			identifier: method.notFound
-			count: 5
-			path: tests/Unit/ChatHandlerTest.php
-
-		-
-			message: '#^Call to an undefined method App\\AI\\Service\\AiFacade\:\:method\(\)\.$#'
-			identifier: method.notFound
-			count: 5
-			path: tests/Unit/ChatHandlerTest.php
-
-		-
-			message: '#^Call to an undefined method App\\Repository\\ModelRepository\:\:method\(\)\.$#'
-			identifier: method.notFound
-			count: 1
-			path: tests/Unit/ChatHandlerTest.php
-
-		-
-			message: '#^Call to an undefined method App\\Repository\\PromptRepository\:\:method\(\)\.$#'
-			identifier: method.notFound
-			count: 9
-			path: tests/Unit/ChatHandlerTest.php
-
-		-
-			message: '#^Call to an undefined method App\\Service\\ModelConfigService\:\:method\(\)\.$#'
-			identifier: method.notFound
-			count: 25
-			path: tests/Unit/ChatHandlerTest.php
-
-		-
-			message: '#^Call to an undefined method App\\Service\\PerfPipelineFlag\:\:method\(\)\.$#'
-			identifier: method.notFound
-			count: 2
-			path: tests/Unit/ChatHandlerTest.php
-
-		-
-			message: '#^Call to an undefined method App\\Service\\PromptService\:\:expects\(\)\.$#'
-			identifier: method.notFound
-			count: 1
-			path: tests/Unit/ChatHandlerTest.php
-
-		-
-			message: '#^Call to an undefined method App\\Service\\UserMemoryService\:\:expects\(\)\.$#'
-			identifier: method.notFound
-			count: 3
-			path: tests/Unit/ChatHandlerTest.php
-
-		-
-			message: '#^Call to an undefined method App\\Service\\UserMemoryService\:\:method\(\)\.$#'
-			identifier: method.notFound
-			count: 4
-			path: tests/Unit/ChatHandlerTest.php
-
-		-
-			message: '#^Call to an undefined method Doctrine\\ORM\\EntityManagerInterface\:\:method\(\)\.$#'
-			identifier: method.notFound
-			count: 3
-			path: tests/Unit/ChatHandlerTest.php
-
-		-
-			message: '#^Call to an undefined method Symfony\\Component\\Messenger\\MessageBusInterface\:\:expects\(\)\.$#'
-			identifier: method.notFound
-			count: 2
-			path: tests/Unit/ChatHandlerTest.php
-
-		-
-			message: '#^Call to an undefined method Symfony\\Component\\Messenger\\MessageBusInterface\:\:method\(\)\.$#'
-			identifier: method.notFound
-			count: 1
-			path: tests/Unit/ChatHandlerTest.php
 
 		-
 			message: '#^Unreachable statement \- code above always terminates\.$#'
