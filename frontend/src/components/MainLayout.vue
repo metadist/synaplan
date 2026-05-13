@@ -5,7 +5,7 @@
     <div class="flex-1 flex flex-col min-w-0" data-testid="section-main-shell">
       <Header />
       <main
-        class="flex-1 min-h-0 overflow-y-auto overscroll-contain"
+        class="flex-1 min-h-0 overflow-y-auto overscroll-contain pt-[60px] md:pt-0"
         data-testid="section-primary-content"
       >
         <slot />
