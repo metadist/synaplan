@@ -20,11 +20,14 @@ use Symfony\Contracts\Cache\CacheInterface;
 /**
  * Regression tests for AiFacade::transcribe() provider/model selection.
  *
- * Covers issue #696: prior to the fix the SOUND2TEXT default model row was
- * only consulted as a boolean ("use external STT yes/no"). The actual provider
- * was resolved from the legacy ai/default_speech_to_text_provider config which
- * the settings UI never writes — so users who picked "Groq / whisper-large-v3"
- * silently ended up on OpenAI / whisper-1.
+ * Covers issues #696 and #700: prior to the fix the SOUND2TEXT default model
+ * row was only consulted as a boolean ("use external STT yes/no"). The actual
+ * provider was resolved from the legacy ai/default_speech_to_text_provider
+ * config which the settings UI never writes — so users who picked
+ * "Groq / whisper-large-v3" silently ended up on OpenAI / whisper-1 (#696),
+ * and even when the right provider was reached, the specific model within a
+ * provider (e.g. whisper-large-v3 vs whisper-large-v3-turbo) was never
+ * forwarded, so the provider's hardcoded default was used regardless (#700).
  *
  * Mirrors AiFacadeAnalyzeImageTest, which guards the analogous PIC2TEXT fix.
  */
@@ -94,6 +97,52 @@ class AiFacadeTranscribeTest extends TestCase
         $result = $this->facade->transcribe('audio.mp3', 42);
 
         $this->assertSame('hello', $result['text']);
+        $this->assertSame('groq', $result['provider']);
+        $this->assertSame('whisper-large-v3', $result['model']);
+    }
+
+    public function testTranscribeForwardsNonTurboModelWhenSameProviderHasMultiple(): void
+    {
+        // Regression for issue #700: when a single provider exposes multiple
+        // STT models (e.g. Groq exposes both whisper-large-v3 and
+        // whisper-large-v3-turbo) the user's specific pick MUST reach the
+        // provider — not the provider's hardcoded default (turbo). Prior to
+        // the fix, GroqProvider's "$options['model'] ?? 'whisper-large-v3-turbo'"
+        // fallback masked the user's choice because the facade never set the
+        // model in $options.
+        $this->modelConfig->method('resolveSttDefault')
+            ->with(42)
+            ->willReturn([
+                'provider' => 'groq',
+                'model' => 'whisper-large-v3',
+                'model_id' => 21,
+            ]);
+
+        $groq = $this->mockSttProvider('groq');
+        $groq->expects($this->once())
+            ->method('transcribe')
+            ->with(
+                'audio.mp3',
+                $this->callback(static function (array $opts): bool {
+                    // The non-turbo model must be forwarded verbatim — never
+                    // collapsed to the provider's "-turbo" hardcoded default.
+                    return array_key_exists('model', $opts)
+                        && 'whisper-large-v3' === $opts['model'];
+                })
+            )
+            ->willReturn([
+                'text' => 'accurate transcription',
+                'language' => 'en',
+                'duration' => 2.5,
+                'segments' => [],
+            ]);
+
+        $this->registry->method('getSpeechToTextProvider')
+            ->with('groq')
+            ->willReturn($groq);
+
+        $result = $this->facade->transcribe('audio.mp3', 42);
+
         $this->assertSame('groq', $result['provider']);
         $this->assertSame('whisper-large-v3', $result['model']);
     }
