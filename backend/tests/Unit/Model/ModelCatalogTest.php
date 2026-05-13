@@ -252,6 +252,38 @@ class ModelCatalogTest extends TestCase
         $this->assertNotSame($original, ModelCatalog::fingerprint($model));
     }
 
+    /**
+     * Regression test for issue #886a: every `text2pic` model in the
+     * catalog MUST declare `pricing_mode: per_image` so that
+     * MediaGenerationHandler's `media_usage['images']` flows through the
+     * media-cost path. Without it, image generation fell silently into
+     * the per-token path and recorded $0.000000 in BUSELOG.
+     */
+    public function testEveryImageModelHasPerImagePricingMode(): void
+    {
+        $imageModels = array_filter(
+            ModelCatalog::all(),
+            static fn (array $m): bool => 'text2pic' === ($m['tag'] ?? null)
+        );
+
+        $this->assertNotEmpty($imageModels, 'Catalog must contain at least one text2pic model.');
+
+        foreach ($imageModels as $model) {
+            $pricingMode = $model['json']['pricing_mode'] ?? null;
+            $this->assertSame(
+                'per_image',
+                $pricingMode,
+                sprintf(
+                    'Model "%s:%s" (id=%s) has tag=text2pic but pricing_mode=%s — issue #886a requires per_image so media_usage[images] is honoured.',
+                    $model['service'] ?? '?',
+                    $model['providerId'] ?? '?',
+                    $model['id'] ?? '?',
+                    var_export($pricingMode, true),
+                )
+            );
+        }
+    }
+
     public function testFingerprintIsStableAcrossFloatRoundTrip(): void
     {
         // Doctrine DBAL hands floats back as native floats; the identity should
