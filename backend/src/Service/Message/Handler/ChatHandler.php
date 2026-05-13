@@ -14,6 +14,7 @@ use App\Service\FeedbackConfigService;
 use App\Service\FeedbackConstants;
 use App\Service\File\FileHelper;
 use App\Service\File\UserUploadPathBuilder;
+use App\Service\MemoryExtractionDispatcher;
 use App\Service\ModelConfigService;
 use App\Service\PerfPipelineFlag;
 use App\Service\PerfTimer;
@@ -26,7 +27,6 @@ use App\Service\UserMemoryService;
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\DependencyInjection\Attribute\AutoconfigureTag;
-use Symfony\Component\Messenger\MessageBusInterface;
 
 /**
  * Chat Handler - Normaler Konversations-Chat.
@@ -53,7 +53,7 @@ final readonly class ChatHandler implements MessageHandlerInterface
         private UserMemoryService $memoryService,
         private FeedbackConfigService $feedbackConfig,
         private RateLimitService $rateLimitService,
-        private MessageBusInterface $messageBus,
+        private MemoryExtractionDispatcher $memoryExtractionDispatcher,
         private PerfPipelineFlag $perfPipelineFlag,
         iterable $pluginContextProviders = [],
     ) {
@@ -2260,42 +2260,18 @@ final readonly class ChatHandler implements MessageHandlerInterface
     }
 
     /**
-     * Push a previously built extraction command onto the messenger bus.
+     * Forward a prepared extraction command to the messenger bus.
      *
-     * Idempotent + null-safe: passing `null` (the payload returned by
-     * {@see buildPendingMemoryExtraction()} when extraction is skipped)
-     * is a no-op. Dispatch failures are swallowed and logged at
-     * `warning` so they never block the user-facing response — worst
-     * case is one missed extraction.
-     *
-     * Public so {@see \App\Controller\StreamController} can call it
-     * AFTER the outgoing assistant message has been persisted +
-     * flushed, fixing the race described in issue #881.
+     * Thin proxy around {@see MemoryExtractionDispatcher::dispatch()} so
+     * the synchronous (non-deferred) handler paths inside this class can
+     * keep their existing call sites. The deferred SSE path lives in
+     * {@see \App\Controller\StreamController} and goes through the same
+     * dispatcher service directly to avoid duplicating the dispatch +
+     * log + swallow contract (Copilot review of PR #939).
      */
     public function dispatchPendingMemoryExtraction(?ExtractMemoriesCommand $command): void
     {
-        if (null === $command) {
-            return;
-        }
-
-        try {
-            $this->messageBus->dispatch($command);
-
-            $this->logger->info('ChatHandler: Dispatched ExtractMemoriesCommand', [
-                'message_id' => $command->getMessageId(),
-                'user_id' => $command->getUserId(),
-                'thread_length' => count($command->getThreadSnapshot()),
-            ]);
-        } catch (\Throwable $e) {
-            // Never block the user's response on the dispatch failing —
-            // worst case is that one message worth of memories never
-            // gets extracted; the next message's extraction will pick up
-            // from where it left off.
-            $this->logger->warning('ChatHandler: Failed to dispatch ExtractMemoriesCommand', [
-                'message_id' => $command->getMessageId(),
-                'error' => $e->getMessage(),
-            ]);
-        }
+        $this->memoryExtractionDispatcher->dispatch($command);
     }
 
     /**

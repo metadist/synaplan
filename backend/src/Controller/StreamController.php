@@ -12,6 +12,7 @@ use App\Message\ExtractMemoriesCommand;
 use App\Service\File\FileHelper;
 use App\Service\File\UserUploadPathBuilder;
 use App\Service\GuestSessionService;
+use App\Service\MemoryExtractionDispatcher;
 use App\Service\Message\MessageForwardingService;
 use App\Service\Message\MessageProcessor;
 use App\Service\ModelConfigService;
@@ -28,7 +29,6 @@ use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpFoundation\StreamedResponse;
-use Symfony\Component\Messenger\MessageBusInterface;
 use Symfony\Component\Routing\Attribute\Route;
 use Symfony\Component\Security\Http\Attribute\CurrentUser;
 
@@ -50,7 +50,7 @@ class StreamController extends AbstractController
         private UserUploadPathBuilder $userUploadPathBuilder,
         private PromptService $promptService,
         private MessageForwardingService $messageForwardingService,
-        private MessageBusInterface $messageBus,
+        private MemoryExtractionDispatcher $memoryExtractionDispatcher,
     ) {
     }
 
@@ -1925,10 +1925,13 @@ class StreamController extends AbstractController
      *
      * Now ChatHandler returns the prepared command in
      * `metadata.extraction_payload` and we fire it here, AFTER
-     * `$this->em->flush()` has made the OUT row visible. Failures are
-     * swallowed and logged at warning level — a missed extraction is
-     * recoverable on the next message; corrupting the user-visible
-     * stream is not.
+     * `$this->em->flush()` has made the OUT row visible. Dispatch +
+     * logging + swallow-on-failure all live in
+     * {@see MemoryExtractionDispatcher} so this method only translates
+     * the metadata-array contract into a typed command (Copilot review
+     * of PR #939: keep the dispatch policy in one service so this path
+     * and the synchronous ChatHandler fallback cannot drift on logging,
+     * retry semantics, or future middleware).
      *
      * @param array<string, mixed> $metadata The `metadata` block from the inference result
      */
@@ -1939,19 +1942,7 @@ class StreamController extends AbstractController
             return;
         }
 
-        try {
-            $this->messageBus->dispatch($payload);
-
-            $this->logger->info('StreamController: Dispatched deferred ExtractMemoriesCommand', [
-                'message_id' => $payload->getMessageId(),
-                'user_id' => $payload->getUserId(),
-            ]);
-        } catch (\Throwable $e) {
-            $this->logger->warning('StreamController: Failed to dispatch deferred ExtractMemoriesCommand', [
-                'message_id' => $payload->getMessageId(),
-                'error' => $e->getMessage(),
-            ]);
-        }
+        $this->memoryExtractionDispatcher->dispatch($payload);
     }
 
     /**

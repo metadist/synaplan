@@ -9,6 +9,7 @@ use App\Controller\StreamController;
 use App\Entity\Message;
 use App\Service\File\UserUploadPathBuilder;
 use App\Service\GuestSessionService;
+use App\Service\MemoryExtractionDispatcher;
 use App\Service\Message\MessageForwardingService;
 use App\Service\Message\MessageProcessor;
 use App\Service\ModelConfigService;
@@ -19,7 +20,6 @@ use App\Service\WidgetSessionService;
 use Doctrine\ORM\EntityManagerInterface;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
-use Symfony\Component\Messenger\MessageBusInterface;
 
 /**
  * Unit coverage for {@see StreamController::buildAiModelsPayload()}.
@@ -55,7 +55,7 @@ class StreamControllerAiModelsPayloadTest extends TestCase
             $this->createMock(UserUploadPathBuilder::class),
             $this->createMock(PromptService::class),
             $this->createMock(MessageForwardingService::class),
-            $this->createMock(MessageBusInterface::class),
+            $this->createMock(MemoryExtractionDispatcher::class),
         );
     }
 
