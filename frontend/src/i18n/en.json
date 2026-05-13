@@ -3187,8 +3187,8 @@
       "action": "View Plans"
     },
     "fileMention": {
-      "title": "Mention Files with @",
-      "description": "Type @ in the chat to quickly reference your uploaded files. The AI will read the file content and use it to answer your question.",
+      "title": "Mention Files with {'@'}",
+      "description": "Type {'@'} in the chat to quickly reference your uploaded files. The AI will read the file content and use it to answer your question.",
       "action": ""
     },
     "widgetPreview": {
