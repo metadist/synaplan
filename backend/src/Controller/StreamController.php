@@ -8,6 +8,7 @@ use App\Entity\File;
 use App\Entity\Message;
 use App\Entity\Prompt;
 use App\Entity\User;
+use App\Message\ExtractMemoriesCommand;
 use App\Service\File\FileHelper;
 use App\Service\File\UserUploadPathBuilder;
 use App\Service\GuestSessionService;
@@ -27,6 +28,7 @@ use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpFoundation\StreamedResponse;
+use Symfony\Component\Messenger\MessageBusInterface;
 use Symfony\Component\Routing\Attribute\Route;
 use Symfony\Component\Security\Http\Attribute\CurrentUser;
 
@@ -48,6 +50,7 @@ class StreamController extends AbstractController
         private UserUploadPathBuilder $userUploadPathBuilder,
         private PromptService $promptService,
         private MessageForwardingService $messageForwardingService,
+        private MessageBusInterface $messageBus,
     ) {
     }
 
@@ -573,6 +576,16 @@ class StreamController extends AbstractController
                     'voice_reply' => $voiceReply,
                     'is_continuation' => (bool) $continueMessageId,
                     'perf_timer' => $perfTimer,
+                    // Issue #881: defer the ExtractMemoriesCommand dispatch
+                    // until after the outgoing assistant message has been
+                    // persisted + flushed below. Otherwise the worker can
+                    // beat the OUT-row insert and write the memory meta to
+                    // the IN row only — the frontend polls the OUT id and
+                    // never sees `complete`, so no toast appears in
+                    // production. ChatHandler now returns the prepared
+                    // ExtractMemoriesCommand in `metadata.extraction_payload`
+                    // so we can fire it after the flush.
+                    'defer_memory_extraction' => true,
                 ];
 
                 if ($isWidgetMode || $isGuestMode || $disableMemories) {
@@ -1207,6 +1220,13 @@ class StreamController extends AbstractController
 
                 $this->em->flush();
 
+                // Issue #881: now that the outgoing assistant message is
+                // persisted (so its OUT row is visible to the worker),
+                // fire the deferred ExtractMemoriesCommand. ChatHandler
+                // built the payload but skipped the dispatch because we
+                // passed `defer_memory_extraction = true` above.
+                $this->dispatchDeferredMemoryExtraction($response['metadata'] ?? []);
+
                 if (!$isWidgetMode && !$isGuestMode) {
                     $this->messageForwardingService->forwardIfNeeded($chat, $finalText);
                 }
@@ -1838,6 +1858,12 @@ class StreamController extends AbstractController
             $chat->updateTimestamp();
             $this->em->flush();
 
+            // Issue #881: outgoing message is now persisted, so the
+            // worker can safely look it up via tracking_id when it
+            // writes the extracted_memories meta. Fire the deferred
+            // dispatch the same way the streaming branch does.
+            $this->dispatchDeferredMemoryExtraction($metadata);
+
             if ('WEB' === $source) {
                 $this->messageForwardingService->forwardIfNeeded($chat, $content);
             }
@@ -1898,6 +1924,50 @@ class StreamController extends AbstractController
                 'trace' => $e->getTraceAsString(),
             ]);
             $this->sendSSE('error', ['error' => 'Failed to process: '.$e->getMessage()]);
+        }
+    }
+
+    /**
+     * Push the deferred ExtractMemoriesCommand prepared by ChatHandler
+     * onto the messenger bus.
+     *
+     * Issue #881 race fix: ChatHandler used to dispatch the command
+     * itself at the end of `handleStream()` / `handle()`, which races
+     * the StreamController flush of the outgoing assistant message. On
+     * a fast worker (empty queue, low load) the worker would look up
+     * the OUT row by tracking_id, find nothing, and write the
+     * `extracted_memories` meta to the IN row only. The frontend polls
+     * the OUT message id from the SSE `complete` event, so the poll
+     * always returned `pending` and the memory toast never appeared.
+     *
+     * Now ChatHandler returns the prepared command in
+     * `metadata.extraction_payload` and we fire it here, AFTER
+     * `$this->em->flush()` has made the OUT row visible. Failures are
+     * swallowed and logged at warning level — a missed extraction is
+     * recoverable on the next message; corrupting the user-visible
+     * stream is not.
+     *
+     * @param array<string, mixed> $metadata The `metadata` block from the inference result
+     */
+    private function dispatchDeferredMemoryExtraction(array $metadata): void
+    {
+        $payload = $metadata['extraction_payload'] ?? null;
+        if (!$payload instanceof ExtractMemoriesCommand) {
+            return;
+        }
+
+        try {
+            $this->messageBus->dispatch($payload);
+
+            $this->logger->info('StreamController: Dispatched deferred ExtractMemoriesCommand', [
+                'message_id' => $payload->getMessageId(),
+                'user_id' => $payload->getUserId(),
+            ]);
+        } catch (\Throwable $e) {
+            $this->logger->warning('StreamController: Failed to dispatch deferred ExtractMemoriesCommand', [
+                'message_id' => $payload->getMessageId(),
+                'error' => $e->getMessage(),
+            ]);
         }
     }
 

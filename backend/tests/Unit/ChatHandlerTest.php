@@ -695,4 +695,168 @@ class ChatHandlerTest extends TestCase
             $streamCallback
         );
     }
+
+    /**
+     * Issue #881: when the caller passes `defer_memory_extraction = true`
+     * the ChatHandler must NOT dispatch the ExtractMemoriesCommand
+     * itself (would race the StreamController flush of the outgoing
+     * assistant message). Instead it returns the prepared command in
+     * `metadata.extraction_payload` so the caller can fire it after
+     * persisting the OUT row.
+     */
+    public function testHandleDefersMemoryExtractionWhenOptionIsSet(): void
+    {
+        $message = $this->createMock(Message::class);
+        $message->method('getUserId')->willReturn(7);
+        $message->method('getId')->willReturn(456);
+        $message->method('getText')->willReturn('My new address is Bahnhofstrasse 1.');
+        $message->method('getUnixTimestamp')->willReturn(time());
+        $message->method('getDateTime')->willReturn('20260512100000');
+        $message->method('getFilePath')->willReturn('');
+        $message->method('getFileType')->willReturn('');
+        $message->method('getTopic')->willReturn('CHAT');
+        $message->method('getLanguage')->willReturn('en');
+        $message->method('getFileText')->willReturn('');
+
+        $user = $this->createMock(User::class);
+        $user->method('getId')->willReturn(7);
+        $user->method('isMemoriesEnabled')->willReturn(true);
+
+        $userRepository = $this->createMock(UserRepository::class);
+        $userRepository->method('find')->with(7)->willReturn($user);
+        $this->em->method('getRepository')->with(User::class)->willReturn($userRepository);
+
+        $this->userMemoryService->method('isAvailable')->willReturn(false);
+
+        $this->promptRepository->method('findOneBy')->willReturn(null);
+        $this->modelConfigService->method('getEffectiveUserIdForMessage')->willReturn(7);
+        $this->modelConfigService->method('getDefaultModel')->willReturn(10);
+        $this->modelConfigService->method('getProviderForModel')->willReturn('openai');
+        $this->modelConfigService->method('getModelName')->willReturn('gpt-4.1');
+
+        $this->aiFacade->method('chat')->willReturn([
+            'content' => 'Got it.',
+            'provider' => 'openai',
+            'model' => 'gpt-4.1',
+        ]);
+
+        $this->perfPipelineFlag->method('isEnabled')->with(7)->willReturn(true);
+
+        // The crucial expectation: the handler must NOT touch the bus
+        // when the dispatch is deferred — that is the whole point of
+        // the option. The StreamController fires it later, after the
+        // outgoing message flush.
+        $this->messageBus->expects($this->never())->method('dispatch');
+
+        $result = $this->handler->handle(
+            $message,
+            [],
+            ['topic' => 'CHAT', 'language' => 'en'],
+            null,
+            ['defer_memory_extraction' => true],
+        );
+
+        self::assertArrayHasKey('extraction_payload', $result['metadata']);
+        $payload = $result['metadata']['extraction_payload'];
+        self::assertInstanceOf(ExtractMemoriesCommand::class, $payload);
+        self::assertSame(456, $payload->getMessageId());
+        self::assertSame(7, $payload->getUserId());
+        self::assertStringContainsString('Got it', $payload->getAiResponse());
+    }
+
+    /**
+     * Issue #881: even when extraction is deferred, the same
+     * skip-conditions (request opt-out, user setting opt-out,
+     * kill-switch) must short-circuit BEFORE building the payload.
+     * Returning a non-null payload for a widget visitor would leak the
+     * dispatch back into the request lifecycle and rebuild the privacy
+     * regression we already fixed in PR #925.
+     */
+    public function testHandleSkipsExtractionPayloadForWidgetEvenWhenDeferred(): void
+    {
+        $message = $this->createMock(Message::class);
+        $message->method('getUserId')->willReturn(7);
+        $message->method('getText')->willReturn('Hi widget');
+        $message->method('getUnixTimestamp')->willReturn(time());
+        $message->method('getDateTime')->willReturn('20260512100000');
+        $message->method('getFilePath')->willReturn('');
+        $message->method('getFileType')->willReturn('');
+        $message->method('getTopic')->willReturn('CHAT');
+        $message->method('getLanguage')->willReturn('en');
+        $message->method('getFileText')->willReturn('');
+
+        $user = $this->createMock(User::class);
+        $user->method('isMemoriesEnabled')->willReturn(true);
+        $userRepository = $this->createMock(UserRepository::class);
+        $userRepository->method('find')->willReturn($user);
+        $this->em->method('getRepository')->willReturn($userRepository);
+
+        $this->promptRepository->method('findOneBy')->willReturn(null);
+        $this->modelConfigService->method('getEffectiveUserIdForMessage')->willReturn(7);
+        $this->modelConfigService->method('getDefaultModel')->willReturn(10);
+        $this->modelConfigService->method('getProviderForModel')->willReturn('openai');
+        $this->modelConfigService->method('getModelName')->willReturn('gpt-4.1');
+
+        $this->aiFacade->method('chat')->willReturn([
+            'content' => 'Hi there',
+            'provider' => 'openai',
+            'model' => 'gpt-4.1',
+        ]);
+
+        $this->messageBus->expects($this->never())->method('dispatch');
+
+        $result = $this->handler->handle(
+            $message,
+            [],
+            ['topic' => 'CHAT', 'language' => 'en', 'source' => 'widget'],
+            null,
+            [
+                'defer_memory_extraction' => true,
+                // Mirrors what the StreamController/widget flow sets.
+            ],
+        );
+
+        self::assertNull(
+            $result['metadata']['extraction_payload'],
+            'widget requests must not produce an extraction payload, even with defer_memory_extraction set',
+        );
+    }
+
+    /**
+     * The new public {@see ChatHandler::dispatchPendingMemoryExtraction()}
+     * is the seam the StreamController uses to actually fire the
+     * command after persisting the OUT row. It must be a no-op when the
+     * payload is null (extraction skipped) so callers can blindly
+     * forward the metadata without conditionals.
+     */
+    public function testDispatchPendingMemoryExtractionIsNoopForNullPayload(): void
+    {
+        $this->messageBus->expects($this->never())->method('dispatch');
+
+        $this->handler->dispatchPendingMemoryExtraction(null);
+    }
+
+    /**
+     * The dispatch helper must forward the prepared command to the
+     * messenger bus exactly once — that is the whole reason for
+     * splitting build + dispatch (issue #881 race fix).
+     */
+    public function testDispatchPendingMemoryExtractionForwardsCommandToBus(): void
+    {
+        $command = new ExtractMemoriesCommand(
+            messageId: 123,
+            userId: 7,
+            aiResponse: 'hello',
+            threadSnapshot: [],
+            relevantMemories: [],
+        );
+
+        $this->messageBus
+            ->expects($this->once())
+            ->method('dispatch')
+            ->with($this->identicalTo($command))
+            ->willReturn(new Envelope($command));
+
+        $this->handler->dispatchPendingMemoryExtraction($command);
+    }
 }
