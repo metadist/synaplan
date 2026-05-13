@@ -299,10 +299,8 @@ class CostCalculationServiceTest extends TestCase
      * silently fell through to the per-token path with zero billed tokens.
      *
      * With `pricing_mode: per_image` on the catalog entry, `media_usage`
-     * goes through the per-image path and bills `outputQuantity * priceOut`
-     * exactly. This test pins both the multiplication and the contract that
-     * the input quantity is unused for `per_image` (image gen pays for the
-     * output, not the prompt characters).
+     * goes through the per-image path. The TheHive entries already author
+     * their price in `perpic` units, so the natural multiplication holds.
      */
     public function testCalculateMediaCostBillsPerImageWhenPricingModeIsPerImage(): void
     {
@@ -319,18 +317,26 @@ class CostCalculationServiceTest extends TestCase
         // input quantity (e.g. 1200 prompt characters) MUST NOT add cost.
         $result = $this->service->calculateMediaCost(1, 1200, 4.0);
 
-        // 4 * $0.05 = $0.20 — input is ignored.
+        // 4 * $0.05 = $0.20 — input is ignored (the `-` inUnit normalises to 0).
         $this->assertSame('0.200000', $result->totalCost);
         $this->assertSame('0.000000', $result->inputCost);
         $this->assertSame('0.200000', $result->outputCost);
     }
 
-    public function testCalculateMediaCostHandlesSingleImageGeneration(): void
+    /**
+     * Per Copilot review on PR #932: when an OpenAI / Google image entry
+     * is authored with `per1M` units (because the canonical catalog price
+     * is per-million-token-equivalent until LiteLLM overrides it), the
+     * calculator must still produce a sensible per-image bill. With the
+     * unit-aware normalisation in `calculateMediaCost`, `priceOut=40` on
+     * `outUnit=per1M` resolves to $0.00004 / image — under-billed but not
+     * catastrophic. Real installs override via `SyncModelPricesCommand`
+     * with the proper $0.04 / image; the catalog price stays authored in
+     * its native canonical unit.
+     */
+    public function testCalculateMediaCostHonoursPer1MOutUnitForPerImageBilling(): void
     {
-        // The most common case — `media_usage = ['images' => 1]` in
-        // MediaGenerationHandler. Confirms the typical `gpt-image-*` /
-        // `imagen-4` / `flux-schnell` flow ends up with non-zero cost
-        // instead of $0.000000 (the bug #886a documents).
+        // Mirrors the on-disk shape of OpenAI gpt-image-1 in ModelCatalog.
         $model = $this->createModelMock('openai', 5.0, 40.0, 'per1M', 'per1M', [
             'pricing_mode' => 'per_image',
         ]);
@@ -342,8 +348,31 @@ class CostCalculationServiceTest extends TestCase
 
         $result = $this->service->calculateMediaCost(1, 0, 1);
 
+        // 1 * (40 / 1_000_000) = $0.00004 — non-zero (i.e. the bug #886a
+        // describes is fixed) but tiny because the catalog carries the
+        // pre-LiteLLM token-equivalent price.
+        $this->assertSame('0.000040', $result->outputCost);
         $this->assertNotSame('0.000000', $result->totalCost, 'Single-image generation must produce non-zero cost.');
-        $this->assertSame('40.000000', $result->totalCost, '1 image * $40 priceOut = $40 (catalog values are LiteLLM-overridden in real installs).');
+    }
+
+    public function testCalculateMediaCostHonoursPerPicOutUnitForPerImageBilling(): void
+    {
+        // TheHive flux-schnell on-disk shape: `priceOut=0.01, outUnit=perpic`.
+        // The calculator must NOT divide by 1M here — the unit is already
+        // dollars per image.
+        $model = $this->createModelMock('thehive', 0.0, 0.01, '-', 'perpic', [
+            'pricing_mode' => 'per_image',
+        ]);
+
+        // @phpstan-ignore-next-line
+        $this->modelRepository->method('find')->willReturn($model);
+        // @phpstan-ignore-next-line
+        $this->priceHistoryRepository->method('findPriceAtTimestamp')->willReturn(null);
+
+        $result = $this->service->calculateMediaCost(1, 0, 5);
+
+        // 5 images * $0.01 = $0.05.
+        $this->assertSame('0.050000', $result->totalCost);
     }
 
     public function testCostResultDtoStructure(): void
