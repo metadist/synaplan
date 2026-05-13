@@ -839,7 +839,7 @@ class ChatHandlerTest extends TestCase
      * contract in one service so this path and the
      * StreamController-deferred path cannot drift). The null-safety
      * contract is therefore the dispatcher's job — exercised in
-     * {@see \App\Tests\Unit\Service\MemoryExtractionDispatcherTest} —
+     * {@see Service\MemoryExtractionDispatcherTest} —
      * and this test only pins that the wrapper forwards a null payload
      * unchanged so callers can blindly hand the result of
      * `buildPendingMemoryExtraction()` over without conditionals.
