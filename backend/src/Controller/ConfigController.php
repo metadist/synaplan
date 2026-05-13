@@ -646,13 +646,26 @@ class ConfigController extends AbstractController
     #[OA\Response(response: 401, description: 'Not authenticated')]
     #[OA\Response(
         response: 403,
-        description: 'Forbidden – either `global: true` without admin role, or VECTORIZE change requires premium subscription',
+        description: 'Forbidden. Two distinct cases: (1) `global: true` used without ROLE_ADMIN, (2) VECTORIZE change attempted without premium subscription.',
         content: new OA\JsonContent(
-            properties: [
-                new OA\Property(property: 'error', type: 'string', example: 'requires_premium'),
-                new OA\Property(property: 'capability', type: 'string', example: 'VECTORIZE'),
-                new OA\Property(property: 'message', type: 'string', example: 'Switching the embedding model requires a premium subscription'),
-                new OA\Property(property: 'currentLevel', type: 'string', example: 'FREE'),
+            oneOf: [
+                new OA\Schema(
+                    title: 'AdminRequired',
+                    description: 'Returned when `global: true` is passed without ROLE_ADMIN',
+                    properties: [
+                        new OA\Property(property: 'error', type: 'string', example: 'Admin access required for global defaults'),
+                    ]
+                ),
+                new OA\Schema(
+                    title: 'PremiumRequired',
+                    description: 'Returned when a non-admin user attempts to change the VECTORIZE model',
+                    properties: [
+                        new OA\Property(property: 'error', type: 'string', example: 'requires_premium'),
+                        new OA\Property(property: 'capability', type: 'string', example: 'VECTORIZE'),
+                        new OA\Property(property: 'message', type: 'string', example: 'Switching the embedding model requires a premium subscription'),
+                        new OA\Property(property: 'currentLevel', type: 'string', example: 'FREE'),
+                    ]
+                ),
             ]
         )
     )]
@@ -997,12 +1010,7 @@ class ConfigController extends AbstractController
 
     /**
      * Get status of all features and services (Web Search, AI Providers, Processing Services, etc.)
-     * Only available in development mode.
-     *
-     * Intentionally excluded from Swagger/OpenAPI documentation because:
-     *  - Only accessible in APP_ENV=dev (returns 403 in production)
-     *  - Returns dynamic runtime data that cannot be represented as a static schema
-     *  - Exposing this in public API docs would mislead production deployments
+     * Only available in development mode (APP_ENV=dev). Returns 403 Forbidden in production.
      */
     #[Route('/features', name: 'features_status', methods: ['GET'])]
     #[OA\Get(

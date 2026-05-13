@@ -267,6 +267,7 @@
                 v-if="selectedFiles.length > 0"
                 class="p-2 rounded-lg bg-red-500/10 text-red-500 hover:bg-red-500/20 transition-colors"
                 :title="$t('fileSelection.deleteSelected')"
+                :aria-label="$t('fileSelection.deleteSelected')"
                 data-testid="btn-file-selection-delete-selected"
                 @click="confirmDeleteSelected"
               >
