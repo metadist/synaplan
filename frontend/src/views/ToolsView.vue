@@ -1,7 +1,6 @@
 <template>
   <MainLayout>
     <div
-      ref="toolsContainer"
       class="flex flex-col h-full overflow-y-auto bg-chat scroll-thin overscroll-contain"
       data-testid="page-tools"
     >
@@ -229,7 +228,6 @@ const config = useConfigStore()
 const aiConfigStore = useAiConfigStore()
 const { success, error: showError, warning: showWarning } = useNotification()
 const dialog = useDialog()
-const toolsContainer = ref<HTMLElement | null>(null)
 
 const widgets = ref<Widget[]>(mockWidgets)
 const showWidgetEditor = ref(false)
