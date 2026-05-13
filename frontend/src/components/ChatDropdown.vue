@@ -278,23 +278,27 @@ const isChatEmpty = (chat: {
   return true
 }
 
-// Get all chats (excluding widget sessions and non-active empty chats)
+const chatActivityTimestamp = (chat: StoreChat): number => {
+  return Date.parse(chat.updatedAt ?? '') || Date.parse(chat.createdAt ?? '') || 0
+}
+
+// Get all chats (excluding widget sessions and non-active empty chats),
+// sorted so the most recently active chat is always on top.
 const allChats = computed(() => {
-  return chatsStore.chats.filter((c) => {
-    // Exclude widget sessions
-    if (c.widgetSession) return false
+  return chatsStore.chats
+    .filter((c) => {
+      if (c.widgetSession) return false
 
-    // Always show the active chat (even if empty, so user sees current context)
-    if (c.id === chatsStore.activeChatId) return true
+      if (c.id === chatsStore.activeChatId) return true
 
-    // Filter out truly empty chats (only active empty chat is shown above)
-    if (isChatEmpty(c)) return false
+      if (isChatEmpty(c)) return false
 
-    return true
-  })
+      return true
+    })
+    .slice()
+    .sort((a, b) => chatActivityTimestamp(b) - chatActivityTimestamp(a))
 })
 
-// Display chats based on showAll state
 const displayedChats = computed(() => {
   return allChats.value.slice(0, MAX_RECENT_CHATS)
 })

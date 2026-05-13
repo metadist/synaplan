@@ -989,20 +989,27 @@ const handleLogout = async () => {
   router.push('/login')
 }
 
-// Chat management
+const chatActivityTimestamp = (chat: StoreChat): number => {
+  const ts = Date.parse(chat.updatedAt ?? '') || Date.parse(chat.createdAt ?? '') || 0
+  return ts
+}
+
 const chatList = computed(() => {
-  return chatsStore.chats.filter((c) => {
-    if (c.widgetSession) return false
-    if (c.id === chatsStore.activeChatId) return true
-    const isEmpty =
-      (!c.messageCount || c.messageCount === 0) &&
-      !c.firstMessagePreview &&
-      (c.title === t('chat.newChat') ||
-        c.title === 'New Chat' ||
-        c.title === 'Neuer Chat' ||
-        c.title.startsWith('Chat '))
-    return !isEmpty
-  })
+  return chatsStore.chats
+    .filter((c) => {
+      if (c.widgetSession) return false
+      if (c.id === chatsStore.activeChatId) return true
+      const isEmpty =
+        (!c.messageCount || c.messageCount === 0) &&
+        !c.firstMessagePreview &&
+        (c.title === t('chat.newChat') ||
+          c.title === 'New Chat' ||
+          c.title === 'Neuer Chat' ||
+          c.title.startsWith('Chat '))
+      return !isEmpty
+    })
+    .slice()
+    .sort((a, b) => chatActivityTimestamp(b) - chatActivityTimestamp(a))
 })
 
 const filteredChatList = computed(() => {

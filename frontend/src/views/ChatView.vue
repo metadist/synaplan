@@ -1304,6 +1304,19 @@ const handleSendMessage = async (
     toolData // tool
   )
 
+  // Lift the active chat to the top of the sidebar lists right away so the
+  // conversation the user is interacting with is the most prominent one,
+  // matching the backend's `updatedAt DESC` order on the next reload.
+  // Mirrors the backend preview format (30 chars + ellipsis).
+  if (chatsStore.activeChatId) {
+    const previewSource = displayContent.trim()
+    const preview =
+      previewSource.length > 30 ? previewSource.slice(0, 30) + '…' : previewSource || undefined
+    chatsStore.bumpChatActivity(chatsStore.activeChatId, {
+      firstMessagePreview: preview,
+    })
+  }
+
   // Notify promo tip system
   promoTips.onMessageSent()
 
@@ -2204,6 +2217,10 @@ const streamAIResponse = async (
 
             // Generate chat title from first message
             generateChatTitleFromFirstMessage(userMessage)
+
+            // Bump chat activity so the sidebar reflects the assistant message
+            // landing without waiting for a full reload.
+            chatsStore.bumpChatActivity(chatId)
 
             historyStore.finishStreamingMessage(messageId)
 
