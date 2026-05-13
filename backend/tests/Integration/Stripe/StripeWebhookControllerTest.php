@@ -266,6 +266,101 @@ class StripeWebhookControllerTest extends WebTestCase
         $this->assertIsInt($sub['payment_failed_at']);
     }
 
+    public function testInvoicePaymentSucceededClearsPaymentFailedFlag(): void
+    {
+        // Issue #856 recovery criterion 1: when Stripe's dunning eventually
+        // recovers the card and fires invoice.payment_succeeded, the flag
+        // we set on payment_failed must clear so the SubscriptionView
+        // warning banner disappears on the next reload.
+        $subscriptionId = 'sub_payrecov_'.bin2hex(random_bytes(4));
+        $this->seedActiveSubscription($subscriptionId);
+
+        // Pre-state: simulate a previously-failed invoice.
+        $details = $this->user->getPaymentDetails();
+        $details['subscription']['payment_failed'] = true;
+        $details['subscription']['payment_failed_at'] = time() - 3600;
+        $this->user->setPaymentDetails($details);
+        $this->em->flush();
+
+        $payload = $this->buildEventPayload('invoice.payment_succeeded', [
+            'id' => 'in_'.bin2hex(random_bytes(4)),
+            'object' => 'invoice',
+            'customer' => $this->stripeCustomerId,
+            'subscription' => $subscriptionId,
+            'amount_paid' => 1995,
+        ]);
+        $this->postWebhook($payload, StripeSignatureHelper::header($payload, self::WEBHOOK_SECRET));
+        $this->assertResponseIsSuccessful();
+
+        $this->em->refresh($this->user);
+        $sub = $this->user->getPaymentDetails()['subscription'];
+        $this->assertArrayNotHasKey('payment_failed', $sub, 'payment_failed flag must be cleared');
+        $this->assertArrayNotHasKey('payment_failed_at', $sub, 'payment_failed_at timestamp must be cleared');
+    }
+
+    public function testSubscriptionUpdatedToActiveClearsPaymentFailedFlag(): void
+    {
+        // Issue #856 recovery criterion 2: Stripe's smart-retry can also
+        // resolve the past_due invoice via subscription.updated (status →
+        // active) without firing invoice.payment_succeeded. The flag must
+        // still clear so the warning banner disappears.
+        $subscriptionId = 'sub_resolved_'.bin2hex(random_bytes(4));
+        $this->seedActiveSubscription($subscriptionId);
+
+        $details = $this->user->getPaymentDetails();
+        $details['subscription']['payment_failed'] = true;
+        $details['subscription']['payment_failed_at'] = time() - 7200;
+        $this->user->setPaymentDetails($details);
+        $this->em->flush();
+
+        $payload = $this->buildEventPayload(
+            'customer.subscription.updated',
+            $this->subscriptionObject([
+                'id' => $subscriptionId,
+                'status' => 'active',
+            ]),
+        );
+        $this->postWebhook($payload, StripeSignatureHelper::header($payload, self::WEBHOOK_SECRET));
+        $this->assertResponseIsSuccessful();
+
+        $this->em->refresh($this->user);
+        $sub = $this->user->getPaymentDetails()['subscription'];
+        $this->assertSame('active', $sub['status']);
+        $this->assertArrayNotHasKey('payment_failed', $sub);
+        $this->assertArrayNotHasKey('payment_failed_at', $sub);
+    }
+
+    public function testSubscriptionUpdatedToPastDueDoesNotClearPaymentFailedFlag(): void
+    {
+        // Counter-test for #856: subscription.updated with status=past_due
+        // means the invoice is STILL not paid. The flag set by the earlier
+        // invoice.payment_failed must NOT be cleared here.
+        $subscriptionId = 'sub_stillpast_'.bin2hex(random_bytes(4));
+        $this->seedActiveSubscription($subscriptionId);
+
+        $details = $this->user->getPaymentDetails();
+        $details['subscription']['payment_failed'] = true;
+        $details['subscription']['payment_failed_at'] = time() - 3600;
+        $this->user->setPaymentDetails($details);
+        $this->em->flush();
+
+        $payload = $this->buildEventPayload(
+            'customer.subscription.updated',
+            $this->subscriptionObject([
+                'id' => $subscriptionId,
+                'status' => 'past_due',
+            ]),
+        );
+        $this->postWebhook($payload, StripeSignatureHelper::header($payload, self::WEBHOOK_SECRET));
+        $this->assertResponseIsSuccessful();
+
+        $this->em->refresh($this->user);
+        $sub = $this->user->getPaymentDetails()['subscription'];
+        $this->assertSame('past_due', $sub['status']);
+        $this->assertTrue($sub['payment_failed'], 'payment_failed flag must persist across past_due updates');
+        $this->assertIsInt($sub['payment_failed_at']);
+    }
+
     public function testCheckoutSessionCompletedPersistsCustomerAndSessionIds(): void
     {
         // checkout.session.completed runs before customer.subscription.created

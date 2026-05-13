@@ -331,8 +331,32 @@ class SubscriptionController extends AbstractController
                 new OA\Property(property: 'hasSubscription', type: 'boolean'),
                 new OA\Property(property: 'plan', type: 'string'),
                 new OA\Property(property: 'status', type: 'string'),
-                new OA\Property(property: 'nextBilling', type: 'string'),
-                new OA\Property(property: 'cancelAt', type: 'string'),
+                // `nextBilling` and `cancelAt` come from Stripe webhook
+                // payloads which carry Unix timestamps as integers (seconds
+                // since epoch). The previous OpenAPI annotation typed them
+                // as `string` and a regen of the frontend Zod schema would
+                // have generated a runtime parse mismatch — Copilot review
+                // on PR #931 caught the drift before it shipped.
+                new OA\Property(
+                    property: 'nextBilling',
+                    type: 'integer',
+                    format: 'int64',
+                    nullable: true,
+                    description: 'Unix timestamp (seconds since epoch) of the next billing date, or null if not applicable.',
+                ),
+                new OA\Property(
+                    property: 'cancelAt',
+                    type: 'integer',
+                    format: 'int64',
+                    nullable: true,
+                    description: 'Unix timestamp (seconds since epoch) when the cancellation takes effect, or null if not scheduled.',
+                ),
+                new OA\Property(property: 'stripeSubscriptionId', type: 'string', nullable: true),
+                new OA\Property(
+                    property: 'paymentFailed',
+                    type: 'boolean',
+                    description: 'True when Stripe declined the last invoice. The user keeps access during Stripe\'s smart-retry window but the SubscriptionView surfaces a dedicated warning so they can update their card before access is revoked (issue #856).',
+                ),
             ]
         )
     )]

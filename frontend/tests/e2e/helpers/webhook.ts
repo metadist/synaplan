@@ -206,15 +206,16 @@ export async function sendSubscriptionDeletedWebhook(
 }
 
 /**
- * Send invoice.payment_failed for a customer.
+ * Send invoice.payment_failed for a customer's specific subscription.
  *
- * Currently no E2E test consumes this — the user-facing paymentFailed UI is
- * tracked as a separate issue ("Subscription UI shows no warning when payment
- * fails"). Helper kept here so the future E2E test can use it directly.
+ * Consumed by the "negative path: payment failed" E2E test on the
+ * `subscription.spec.ts` flow (issue #856). Pass the same subscriptionId
+ * you used to activate PRO so the backend's
+ * `StripeWebhookController::handlePaymentFailed` can resolve the user.
  */
 export async function sendPaymentFailedWebhook(
   request: APIRequestContext,
-  opts: { customerId: string; eventId?: string }
+  opts: { customerId: string; subscriptionId?: string; eventId?: string }
 ): Promise<WebhookResult> {
   return sendStripeWebhook({
     request,
@@ -224,7 +225,7 @@ export async function sendPaymentFailedWebhook(
       id: `in_${randomUUID()}`,
       object: 'invoice',
       customer: opts.customerId,
-      subscription: `sub_${randomUUID()}`,
+      subscription: opts.subscriptionId ?? `sub_${randomUUID()}`,
       amount_due: 1999,
       amount_paid: 0,
       status: 'open',

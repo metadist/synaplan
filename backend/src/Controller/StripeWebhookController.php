@@ -361,6 +361,17 @@ class StripeWebhookController extends AbstractController
         $paymentDetails['subscription']['subscription_end'] = $firstItem?->current_period_end;
         $paymentDetails['subscription']['plan'] = $newLevel;
 
+        // Clear payment_failed when Stripe's smart-retry resolves the
+        // past_due invoice via subscription.updated rather than via the
+        // invoice.payment_succeeded path (issue #856 recovery criterion).
+        // Both `active` and `trialing` count as a healthy subscription.
+        if (in_array($subscription->status, ['active', 'trialing'], true)) {
+            unset(
+                $paymentDetails['subscription']['payment_failed'],
+                $paymentDetails['subscription']['payment_failed_at']
+            );
+        }
+
         // Track cancellation at period end (user canceled but still has access until period ends)
         $paymentDetails['subscription']['cancel_at_period_end'] = $subscription->cancel_at_period_end ?? false;
         if ($subscription->cancel_at_period_end) {
@@ -466,6 +477,33 @@ class StripeWebhookController extends AbstractController
             'amount' => $invoice->amount_paid,
             'customer' => $invoice->customer,
         ]);
+
+        // Clear the payment-failed flag so the SubscriptionView warning
+        // disappears on the next reload (issue #856 recovery criterion).
+        // We do this even when no flag was set — the unset() is a no-op
+        // in that case and keeps the code path simple.
+        $user = $this->getUserByStripeCustomer($invoice->customer);
+        if (!$user) {
+            return true;
+        }
+
+        $paymentDetails = $user->getPaymentDetails();
+        if (
+            isset($paymentDetails['subscription']['payment_failed'])
+            || isset($paymentDetails['subscription']['payment_failed_at'])
+        ) {
+            unset(
+                $paymentDetails['subscription']['payment_failed'],
+                $paymentDetails['subscription']['payment_failed_at']
+            );
+            $user->setPaymentDetails($paymentDetails);
+            $this->em->flush();
+
+            $this->logger->info('Cleared payment_failed flag after invoice.payment_succeeded', [
+                'user_id' => $user->getId(),
+                'invoice_id' => $invoice->id,
+            ]);
+        }
 
         return true;
     }
