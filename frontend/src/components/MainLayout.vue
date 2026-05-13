@@ -6,7 +6,7 @@
       <Header />
       <main
         ref="mainRef"
-        class="flex-1 min-h-0 overflow-y-auto overscroll-contain pt-[calc(36px+env(safe-area-inset-top))] md:pt-0"
+        class="flex-1 min-h-0 overflow-y-auto overscroll-contain"
         data-testid="section-primary-content"
         @scroll="handleMainScroll"
       >

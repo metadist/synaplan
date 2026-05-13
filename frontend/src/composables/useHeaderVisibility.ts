@@ -1,33 +1,42 @@
 import { ref } from 'vue'
 
-const hidden = ref(false)
-const SCROLL_THRESHOLD = 8
+const HEADER_HEIGHT = 36
 
 /**
  * Shared reactive state for the mobile header visibility.
- * Scroll-aware containers call `onScroll(scrollTop)` on every scroll
- * event; the composable tracks direction and toggles visibility.
- * Header.vue reads `hidden` to drive its CSS transform.
+ * Exposes a `progress` value (0–1) driven by scroll deltas:
+ *   0 = header bar fully visible, FAB invisible
+ *   1 = header bar hidden, FAB fully visible
  *
- * Module-level ref ensures all consumers share the same state without
- * a store or provide/inject ceremony.
+ * Delta-based: works regardless of absolute scrollTop, so views
+ * that start at the bottom (e.g. ChatView) behave correctly.
+ *
+ * Module-level ref ensures all consumers share the same state.
  */
+const progress = ref(0)
+
 export function useHeaderVisibility() {
-  let lastScrollTop = 0
+  const isVirtualKeyboardOpen = () => {
+    const tag = document.activeElement?.tagName
+    return (
+      tag === 'INPUT' ||
+      tag === 'TEXTAREA' ||
+      document.activeElement?.getAttribute('contenteditable') === 'true'
+    )
+  }
 
   const onScroll = (scrollTop: number) => {
-    const delta = scrollTop - lastScrollTop
-    if (delta > SCROLL_THRESHOLD) {
-      hidden.value = true
-    } else if (delta < -SCROLL_THRESHOLD) {
-      hidden.value = false
-    }
-    lastScrollTop = scrollTop
+    if (isVirtualKeyboardOpen()) return
+    progress.value = Math.min(1, Math.max(0, scrollTop / HEADER_HEIGHT))
   }
 
   const show = () => {
-    hidden.value = false
+    progress.value = 0
   }
 
-  return { hidden, onScroll, show }
+  const sync = () => {
+    progress.value = 1
+  }
+
+  return { progress, onScroll, show, sync }
 }
