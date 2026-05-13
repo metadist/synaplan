@@ -3,23 +3,23 @@
     <div
       class="relative w-full surface-card overflow-hidden rounded-lg border border-light-border/30 dark:border-dark-border/20 p-4"
     >
-      <div class="flex items-center gap-4">
+      <div class="flex items-center gap-2 sm:gap-4">
         <!-- Play/Pause Button -->
         <button
-          class="flex-shrink-0 w-12 h-12 rounded-full bg-[var(--brand)] text-white flex items-center justify-center hover:bg-[var(--brand)]/90 transition-all shadow-lg"
+          class="flex-shrink-0 w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-[var(--brand)] text-white flex items-center justify-center hover:bg-[var(--brand)]/90 transition-all shadow-lg"
           :aria-label="isPlaying ? 'Pause' : 'Play'"
           @click="togglePlay"
         >
-          <svg v-if="!isPlaying" class="w-6 h-6 ml-1" fill="currentColor" viewBox="0 0 24 24">
+          <svg v-if="!isPlaying" class="w-5 h-5 sm:w-6 sm:h-6 ml-0.5 sm:ml-1" fill="currentColor" viewBox="0 0 24 24">
             <path d="M8 5v14l11-7z" />
           </svg>
-          <svg v-else class="w-6 h-6" fill="currentColor" viewBox="0 0 24 24">
+          <svg v-else class="w-5 h-5 sm:w-6 sm:h-6" fill="currentColor" viewBox="0 0 24 24">
             <path d="M6 4h4v16H6V4zm8 0h4v16h-4V4z" />
           </svg>
         </button>
 
         <!-- Audio Controls -->
-        <div class="flex-1 space-y-2">
+        <div class="flex-1 min-w-0 space-y-1.5 sm:space-y-2">
           <!-- Progress Bar -->
           <div
             class="h-2 bg-black/10 dark:bg-white/10 rounded-full overflow-hidden cursor-pointer"
@@ -33,9 +33,9 @@
           </div>
 
           <!-- Time Display -->
-          <div class="flex items-center justify-between text-sm txt-secondary">
-            <span class="font-mono">{{ currentTime }}</span>
-            <span class="font-mono">{{ duration }}</span>
+          <div class="flex items-center justify-between text-xs sm:text-sm txt-secondary gap-2">
+            <span class="font-mono tabular-nums flex-shrink-0">{{ currentTime }}</span>
+            <span class="font-mono tabular-nums flex-shrink-0">{{ duration }}</span>
           </div>
         </div>
 
@@ -47,7 +47,7 @@
         >
           <svg
             v-if="!isMuted"
-            class="w-6 h-6"
+            class="w-5 h-5 sm:w-6 sm:h-6"
             fill="none"
             stroke="currentColor"
             viewBox="0 0 24 24"
@@ -59,7 +59,7 @@
               d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z"
             />
           </svg>
-          <svg v-else class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <svg v-else class="w-5 h-5 sm:w-6 sm:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path
               stroke-linecap="round"
               stroke-linejoin="round"
@@ -76,7 +76,7 @@
           class="flex-shrink-0 txt-primary hover:text-[var(--brand)] transition-colors"
           :aria-label="$t('commands.download')"
         >
-          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <svg class="w-5 h-5 sm:w-6 sm:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path
               stroke-linecap="round"
               stroke-linejoin="round"

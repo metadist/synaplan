@@ -664,7 +664,7 @@
                   <div
                     v-for="file in paginatedFiles"
                     :key="file.id"
-                    class="flex items-center gap-3 p-3 rounded-xl border border-light-border/15 dark:border-dark-border/5 hover:bg-black/[0.02] dark:hover:bg-white/[0.02] transition-colors"
+                    class="flex items-center gap-2 p-3 rounded-xl border border-light-border/15 dark:border-dark-border/5 hover:bg-black/[0.02] dark:hover:bg-white/[0.02] transition-colors"
                     data-testid="item-file"
                   >
                     <input
@@ -674,15 +674,15 @@
                       @change="toggleFileSelection(file.id)"
                     />
                     <div
-                      class="w-9 h-9 rounded-lg flex items-center justify-center shrink-0"
+                      class="w-8 h-8 rounded-lg flex items-center justify-center shrink-0"
                       :class="getFileColorClass(file.filename)"
                     >
-                      <Icon :icon="getFileIcon(file.filename)" class="w-4.5 h-4.5" />
+                      <Icon :icon="getFileIcon(file.filename)" class="w-4 h-4" />
                     </div>
                     <div class="flex-1 min-w-0">
-                      <p class="text-sm txt-primary truncate">{{ file.filename }}</p>
-                      <div class="flex items-center gap-2 mt-0.5 min-w-0">
-                        <span class="text-[11px] txt-secondary shrink-0">{{
+                      <p class="text-xs font-medium txt-primary truncate">{{ file.filename }}</p>
+                      <div class="flex items-center gap-1.5 mt-0.5 min-w-0">
+                        <span class="text-[10px] txt-secondary shrink-0">{{
                           formatFileSize(file.file_size)
                         }}</span>
                         <button
@@ -695,16 +695,23 @@
                         </button>
                       </div>
                     </div>
-                    <div class="flex items-center gap-0.5 shrink-0">
+                    <div class="flex items-center gap-0 shrink-0">
                       <button
-                        class="p-2 rounded-lg hover:bg-black/5 dark:hover:bg-white/5 txt-secondary transition-colors"
+                        class="p-1.5 rounded-lg hover:bg-black/5 dark:hover:bg-white/5 txt-secondary transition-colors"
+                        :title="$t('common.view')"
+                        @click="viewFileContent(file.id)"
+                      >
+                        <Icon icon="heroicons:eye" class="w-4 h-4" />
+                      </button>
+                      <button
+                        class="p-1.5 rounded-lg hover:bg-black/5 dark:hover:bg-white/5 txt-secondary transition-colors"
                         :title="$t('files.download')"
                         @click="downloadFile(file.id, file.filename)"
                       >
                         <ArrowDownTrayIcon class="w-4 h-4" />
                       </button>
                       <button
-                        class="p-2 rounded-lg hover:bg-red-500/10 text-red-400/70 hover:text-red-500 transition-colors"
+                        class="p-1.5 rounded-lg hover:bg-red-500/10 text-red-400/70 hover:text-red-500 transition-colors"
                         :title="$t('files.delete')"
                         @click="deleteFile(file.id)"
                       >
@@ -962,7 +969,7 @@
                 <div
                   v-for="file in paginatedFiles"
                   :key="file.id"
-                  class="flex items-center gap-3 p-3 rounded-xl border border-light-border/15 dark:border-dark-border/5 hover:bg-black/[0.02] dark:hover:bg-white/[0.02] transition-colors"
+                  class="flex items-center gap-2 p-3 rounded-xl border border-light-border/15 dark:border-dark-border/5 hover:bg-black/[0.02] dark:hover:bg-white/[0.02] transition-colors"
                   data-testid="item-file"
                 >
                   <input
@@ -972,20 +979,28 @@
                     @change="toggleFileSelection(file.id)"
                   />
                   <div
-                    class="w-9 h-9 rounded-lg flex items-center justify-center shrink-0"
+                    class="w-8 h-8 rounded-lg flex items-center justify-center shrink-0"
                     :class="getFileColorClass(file.filename)"
                   >
-                    <Icon :icon="getFileIcon(file.filename)" class="w-4.5 h-4.5" />
+                    <Icon :icon="getFileIcon(file.filename)" class="w-4 h-4" />
                   </div>
                   <div class="flex-1 min-w-0">
-                    <p class="text-sm txt-primary truncate">{{ file.filename }}</p>
-                    <span class="text-[11px] txt-secondary">{{
+                    <p class="text-xs font-medium txt-primary truncate">{{ file.filename }}</p>
+                    <span class="text-[10px] txt-secondary">{{
                       formatFileSize(file.file_size)
                     }}</span>
                   </div>
-                  <div class="flex items-center gap-0.5 shrink-0">
+                  <div class="flex items-center gap-0 shrink-0">
                     <button
-                      class="p-2 rounded-lg hover:bg-black/5 dark:hover:bg-white/5 txt-secondary transition-colors"
+                      class="p-1.5 rounded-lg hover:bg-black/5 dark:hover:bg-white/5 txt-secondary transition-colors"
+                      :title="$t('common.view')"
+                      data-testid="btn-view"
+                      @click="viewFileContent(file.id)"
+                    >
+                      <Icon icon="heroicons:eye" class="w-4 h-4" />
+                    </button>
+                    <button
+                      class="p-1.5 rounded-lg hover:bg-black/5 dark:hover:bg-white/5 txt-secondary transition-colors"
                       :title="$t('files.download')"
                       data-testid="btn-download"
                       @click="downloadFile(file.id, file.filename)"
@@ -993,7 +1008,7 @@
                       <ArrowDownTrayIcon class="w-4 h-4" />
                     </button>
                     <button
-                      class="p-2 rounded-lg hover:bg-red-500/10 text-red-400/70 hover:text-red-500 transition-colors"
+                      class="p-1.5 rounded-lg hover:bg-red-500/10 text-red-400/70 hover:text-red-500 transition-colors"
                       :title="$t('files.delete')"
                       data-testid="btn-delete"
                       @click="deleteFile(file.id)"
