@@ -196,7 +196,7 @@ final class RateLimitService
                 '', '', 0,
                 0, 0, 0, 0,
                 0, NULL, NULL,
-                0, 0, NULL, NULL, :metadata
+                0, 0, 'success', '', :metadata
             FROM DUAL
             WHERE NOT EXISTS (
                 SELECT 1 FROM BUSELOG
