@@ -664,7 +664,7 @@
                   <div
                     v-for="file in paginatedFiles"
                     :key="file.id"
-                    class="flex items-center gap-2 p-3 rounded-xl border border-light-border/15 dark:border-dark-border/5 hover:bg-black/[0.02] dark:hover:bg-white/[0.02] transition-colors"
+                    class="flex items-center gap-1.5 sm:gap-2 p-2.5 sm:p-3 rounded-xl border border-light-border/15 dark:border-dark-border/5 hover:bg-black/[0.02] dark:hover:bg-white/[0.02] transition-colors"
                     data-testid="item-file"
                   >
                     <input
@@ -674,7 +674,7 @@
                       @change="toggleFileSelection(file.id)"
                     />
                     <div
-                      class="w-8 h-8 rounded-lg flex items-center justify-center shrink-0"
+                      class="w-7 h-7 sm:w-8 sm:h-8 rounded-lg flex items-center justify-center shrink-0"
                       :class="getFileColorClass(file.filename)"
                     >
                       <Icon :icon="getFileIcon(file.filename)" class="w-4 h-4" />
@@ -797,7 +797,7 @@
                       </td>
                       <td class="py-2.5 px-3">
                         <div
-                          class="flex gap-0.5 justify-end opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity"
+                          class="flex gap-0.5 justify-end opacity-0 pointer-coarse:opacity-100 group-hover:opacity-100 focus-within:opacity-100 transition-opacity"
                         >
                           <FolderMoveMenu
                             :open="folderMenuOpen === file.id"
@@ -969,7 +969,7 @@
                 <div
                   v-for="file in paginatedFiles"
                   :key="file.id"
-                  class="flex items-center gap-2 p-3 rounded-xl border border-light-border/15 dark:border-dark-border/5 hover:bg-black/[0.02] dark:hover:bg-white/[0.02] transition-colors"
+                  class="flex items-center gap-1.5 sm:gap-2 p-2.5 sm:p-3 rounded-xl border border-light-border/15 dark:border-dark-border/5 hover:bg-black/[0.02] dark:hover:bg-white/[0.02] transition-colors"
                   data-testid="item-file"
                 >
                   <input
@@ -979,7 +979,7 @@
                     @change="toggleFileSelection(file.id)"
                   />
                   <div
-                    class="w-8 h-8 rounded-lg flex items-center justify-center shrink-0"
+                    class="w-7 h-7 sm:w-8 sm:h-8 rounded-lg flex items-center justify-center shrink-0"
                     :class="getFileColorClass(file.filename)"
                   >
                     <Icon :icon="getFileIcon(file.filename)" class="w-4 h-4" />
@@ -1085,7 +1085,7 @@
                     </td>
                     <td class="py-2.5 px-3">
                       <div
-                        class="flex gap-0.5 justify-end opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity"
+                        class="flex gap-0.5 justify-end opacity-0 pointer-coarse:opacity-100 group-hover:opacity-100 focus-within:opacity-100 transition-opacity"
                       >
                         <FolderMoveMenu
                           :open="folderMenuOpen === file.id"
