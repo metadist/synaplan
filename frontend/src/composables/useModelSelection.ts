@@ -154,15 +154,7 @@ export function useModelSelection(
     const tag = modelTag.value
     const models = aiConfigStore.models[tag] || []
 
-    console.log('🔍 useModelSelection:', {
-      mediaType: mediaType.value,
-      modelTag: tag,
-      filesCount: files?.value?.length || 0,
-      availableModelsForTag: models.length,
-    })
-
     if (models.length === 0) {
-      console.warn('⚠️ No models available for tag:', tag)
       return []
     }
 
@@ -228,13 +220,11 @@ export function useModelSelection(
     const currentIndex = currentModelIndex.value
     if (currentIndex !== -1) {
       const nextIndex = (currentIndex + 1) % options.length
-      console.log('🔄 Round-Robin: Current index', currentIndex, '→ Next index', nextIndex)
       return options[nextIndex]
     }
 
     // No match found for current model: fallback to second-best if available
     if (options.length > 1) {
-      console.log('⭐ Fallback: Using second-highest-rated model')
       return options[1]
     }
 

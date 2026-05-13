@@ -1313,10 +1313,15 @@ const shortenModel = (name: string): string => {
 }
 
 // Use model selection composable
+// Prefer the structured `aiModels.chat` metadata (current source of truth) and
+// fall back to the legacy flat `provider` / `modelLabel` props for older messages
+// that pre-date the structured metadata. Without this preference the round-robin
+// recommendation cannot identify the current model and always returns the
+// second-highest-rated model. See issue #922.
 const againDataComputed = computed(() => props.againData)
 const filesComputed = computed(() => props.files)
-const currentProviderComputed = computed(() => props.provider)
-const currentModelNameComputed = computed(() => props.modelLabel)
+const currentProviderComputed = computed(() => props.aiModels?.chat?.provider ?? props.provider)
+const currentModelNameComputed = computed(() => props.aiModels?.chat?.model ?? props.modelLabel)
 const { modelOptions, predictedModel, hasModels } = useModelSelection(
   againDataComputed,
   filesComputed,
