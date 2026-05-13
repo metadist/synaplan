@@ -5,8 +5,10 @@ namespace App\Tests\Unit;
 use App\AI\Service\AiFacade;
 use App\Entity\Message;
 use App\Repository\MessageRepository;
+use App\Repository\UserRepository;
 use App\Service\File\TikaClient;
 use App\Service\Message\MessagePreProcessor;
+use App\Service\RateLimitService;
 use App\Service\WhisperService;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
@@ -18,6 +20,8 @@ class MessagePreProcessorTest extends TestCase
     private WhisperService $whisperService;
     private AiFacade $aiFacade;
     private LoggerInterface $logger;
+    private RateLimitService $rateLimitService;
+    private UserRepository $userRepository;
     private MessagePreProcessor $service;
 
     protected function setUp(): void
@@ -27,6 +31,8 @@ class MessagePreProcessorTest extends TestCase
         $this->whisperService = $this->createMock(WhisperService::class);
         $this->aiFacade = $this->createMock(AiFacade::class);
         $this->logger = $this->createMock(LoggerInterface::class);
+        $this->rateLimitService = $this->createMock(RateLimitService::class);
+        $this->userRepository = $this->createMock(UserRepository::class);
 
         $this->service = new MessagePreProcessor(
             $this->messageRepository,
@@ -34,7 +40,9 @@ class MessagePreProcessorTest extends TestCase
             $this->whisperService,
             $this->aiFacade,
             $this->logger,
-            '/var/www/backend/uploads'
+            '/var/www/backend/uploads',
+            $this->rateLimitService,
+            $this->userRepository,
         );
     }
 
@@ -136,7 +144,9 @@ class MessagePreProcessorTest extends TestCase
                 $this->whisperService,
                 $this->aiFacade,
                 $this->logger,
-                $tempDir
+                $tempDir,
+                $this->rateLimitService,
+                $this->userRepository,
             );
 
             $message = $this->createMock(Message::class);
@@ -180,7 +190,9 @@ class MessagePreProcessorTest extends TestCase
                 $this->whisperService,
                 $this->aiFacade,
                 $this->logger,
-                $tempDir
+                $tempDir,
+                $this->rateLimitService,
+                $this->userRepository,
             );
 
             $message = $this->createMock(Message::class);
