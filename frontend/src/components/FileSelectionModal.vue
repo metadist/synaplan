@@ -114,12 +114,12 @@
                 v-model="searchQuery"
                 type="text"
                 :placeholder="$t('fileSelection.searchPlaceholder')"
-                class="flex-1 px-3 py-1.5 sm:px-4 sm:py-2 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
+                class="flex-1 min-w-0 px-3 py-1.5 sm:px-4 sm:py-2 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
                 data-testid="input-file-selection-search"
               />
               <select
                 v-model="filterStatus"
-                class="px-2 py-1.5 sm:px-4 sm:py-2 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
+                class="shrink-0 min-w-[7rem] px-2 py-1.5 sm:px-4 sm:py-2 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
                 data-testid="select-file-selection-status"
               >
                 <option value="all">{{ $t('fileSelection.allStatuses') }}</option>
@@ -255,25 +255,26 @@
             </div>
           </div>
 
-          <!-- Footer with actions — stacked on mobile -->
+          <!-- Footer with actions -->
           <div
-            class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between px-4 py-4 sm:p-6 border-t border-light-border/20 dark:border-dark-border/15"
+            class="flex items-center justify-between gap-3 px-3 py-3 sm:px-6 sm:py-4 border-t border-light-border/20 dark:border-dark-border/15"
           >
-            <span class="txt-secondary text-sm text-center sm:text-left">
+            <span class="txt-secondary text-xs sm:text-sm shrink-0">
               {{ $t('fileSelection.selectedCount', { count: selectedFiles.length }) }}
             </span>
-            <div class="flex flex-col sm:flex-row gap-2 sm:gap-3">
+            <div class="flex items-center gap-2 sm:gap-3">
               <button
                 v-if="selectedFiles.length > 0"
-                class="w-full sm:w-auto px-4 py-2.5 sm:py-1.5 rounded-lg bg-red-500/10 text-red-500 hover:bg-red-500/20 transition-colors text-sm flex items-center justify-center gap-2"
+                class="p-2 rounded-lg bg-red-500/10 text-red-500 hover:bg-red-500/20 transition-colors"
+                :title="$t('fileSelection.deleteSelected')"
+                :aria-label="$t('fileSelection.deleteSelected')"
                 data-testid="btn-file-selection-delete-selected"
                 @click="confirmDeleteSelected"
               >
                 <TrashIcon class="w-4 h-4" />
-                <span>{{ $t('fileSelection.deleteSelected') }}</span>
               </button>
               <button
-                class="w-full sm:w-auto btn-secondary px-4 py-2.5 sm:py-2 rounded-lg text-sm font-medium"
+                class="btn-secondary px-3 py-2 sm:px-4 rounded-lg text-sm font-medium"
                 data-testid="btn-file-selection-cancel"
                 @click="emit('close')"
               >
@@ -281,7 +282,7 @@
               </button>
               <button
                 :disabled="selectedFiles.length === 0"
-                class="w-full sm:w-auto btn-primary px-4 py-2.5 sm:py-2 rounded-lg text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                class="btn-primary px-3 py-2 sm:px-4 rounded-lg text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
                 data-testid="btn-file-selection-attach"
                 @click="attachFiles"
               >

@@ -3117,8 +3117,8 @@
       "action": "Pläne ansehen"
     },
     "fileMention": {
-      "title": "Dateien mit @ erwähnen",
-      "description": "Tippe @ im Chat, um schnell auf deine hochgeladenen Dateien zu verweisen. Die KI liest den Dateiinhalt und nutzt ihn zur Beantwortung deiner Frage.",
+      "title": "Dateien mit {'@'} erwähnen",
+      "description": "Tippe {'@'} im Chat, um schnell auf deine hochgeladenen Dateien zu verweisen. Die KI liest den Dateiinhalt und nutzt ihn zur Beantwortung deiner Frage.",
       "action": ""
     },
     "widgetPreview": {
