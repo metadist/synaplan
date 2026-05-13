@@ -566,6 +566,81 @@ class ChatHandlerTest extends TestCase
         );
     }
 
+    /**
+     * PR #925 Copilot follow-up: previously the dispatch helper received a
+     * single combined "disabled" boolean and always logged "Skipping
+     * memory extraction for widget request" — misleading when the actual
+     * reason was the user toggling memories off in their settings. The
+     * helper now takes two flags and logs the precise reason so
+     * production operators can tell the cases apart.
+     */
+    public function testHandleLogsUserSettingReasonWhenMemoriesDisabledByUser(): void
+    {
+        $message = $this->createMock(Message::class);
+        $message->method('getUserId')->willReturn(7);
+        $message->method('getId')->willReturn(789);
+        $message->method('getText')->willReturn('My new dog is called Bruno.');
+        $message->method('getUnixTimestamp')->willReturn(time());
+        $message->method('getDateTime')->willReturn('20260513120000');
+        $message->method('getFilePath')->willReturn('');
+        $message->method('getFileType')->willReturn('');
+        $message->method('getTopic')->willReturn('CHAT');
+        $message->method('getLanguage')->willReturn('en');
+        $message->method('getFileText')->willReturn('');
+
+        $user = $this->createMock(User::class);
+        $user->method('getId')->willReturn(7);
+        $user->method('isMemoriesEnabled')->willReturn(false); // ← user toggled memories off
+
+        $userRepository = $this->createMock(UserRepository::class);
+        $userRepository->method('find')->with(7)->willReturn($user);
+        $this->em->method('getRepository')->with(User::class)->willReturn($userRepository);
+
+        $this->promptRepository->method('findOneBy')->willReturn(null);
+        $this->modelConfigService->method('getEffectiveUserIdForMessage')->willReturn(7);
+        $this->modelConfigService->method('getDefaultModel')->willReturn(10);
+        $this->modelConfigService->method('getProviderForModel')->willReturn('openai');
+        $this->modelConfigService->method('getModelName')->willReturn('gpt-4.1');
+
+        $this->aiFacade->method('chat')->willReturn([
+            'content' => 'Got it.',
+            'provider' => 'openai',
+            'model' => 'gpt-4.1',
+        ]);
+
+        // No queue dispatch because extraction is skipped.
+        $this->messageBus->expects($this->never())->method('dispatch');
+
+        // Capture every info-level log call and assert the exact reason
+        // string surfaces — the widget log is the regression we are
+        // explicitly NOT supposed to emit here.
+        $infoMessages = [];
+        $this->logger
+            ->method('info')
+            ->willReturnCallback(function (string $message) use (&$infoMessages): void {
+                $infoMessages[] = $message;
+            });
+
+        $this->handler->handle(
+            $message,
+            [],
+            ['topic' => 'CHAT', 'language' => 'en'],
+            null,
+            ['channel' => 'email'], // non-widget channel
+        );
+
+        self::assertContains(
+            'ChatHandler: Skipping memory extraction — disabled by user setting',
+            $infoMessages,
+            'dispatchMemoryExtractionAsync() must log the user-setting reason when the user has memories disabled',
+        );
+        self::assertNotContains(
+            'ChatHandler: Skipping memory extraction for widget request',
+            $infoMessages,
+            'must not emit the widget log when the cause is the user setting',
+        );
+    }
+
     public function testHandleStreamLoadsPromptMetadataForTaskPrompt(): void
     {
         $message = $this->createMock(Message::class);

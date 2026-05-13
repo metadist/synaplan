@@ -120,7 +120,8 @@ final readonly class ChatHandler implements MessageHandlerInterface
         );
         $memoriesContext = $memoriesResult['context'];
         $loadedMemories = $memoriesResult['memories'];
-        $memoriesDisabledByRequest = $memoriesResult['disabled'];
+        $memoriesDisabledByRequest = $memoriesResult['disabledByRequest'];
+        $memoriesDisabledByUser = $memoriesResult['disabledByUser'];
 
         $feedbackResult = $this->loadFeedbackContext(
             $message,
@@ -410,6 +411,7 @@ final readonly class ChatHandler implements MessageHandlerInterface
             $thread,
             $loadedMemories,
             $memoriesDisabledByRequest,
+            $memoriesDisabledByUser,
         );
 
         return [
@@ -604,7 +606,8 @@ final readonly class ChatHandler implements MessageHandlerInterface
         );
         $memoriesContext = $memoriesResult['context'];
         $loadedMemories = $memoriesResult['memories'];
-        $memoriesDisabledByRequest = $memoriesResult['disabled'];
+        $memoriesDisabledByRequest = $memoriesResult['disabledByRequest'];
+        $memoriesDisabledByUser = $memoriesResult['disabledByUser'];
 
         $feedbackResult = $this->loadFeedbackContext(
             $message,
@@ -909,6 +912,7 @@ final readonly class ChatHandler implements MessageHandlerInterface
             $thread,
             $loadedMemories,
             $memoriesDisabledByRequest,
+            $memoriesDisabledByUser,
         );
 
         return [
@@ -1874,8 +1878,17 @@ final readonly class ChatHandler implements MessageHandlerInterface
      * @param array<string, mixed> $options
      * @param array<string, mixed> $classification
      *
-     * @return array{context: string, memories: array<int, array<string, mixed>>, disabled: bool}
-     *                                                                                            `disabled` mirrors the streaming-only `$memoriesDisabledByRequest` flag — feedback loading also needs it
+     * @return array{
+     *     context: string,
+     *     memories: array<int, array<string, mixed>>,
+     *     disabledByRequest: bool,
+     *     disabledByUser: bool
+     * }
+     *                                  `disabledByRequest` is true when the *caller* (widget channel /
+     *                                  `disable_memories` option) opted out; `disabledByUser` is true when
+     *                                  the user has disabled memories in their settings. They are returned
+     *                                  separately so {@see dispatchMemoryExtractionAsync()} can log the
+     *                                  specific reason (issue PR #925 Copilot review).
      */
     private function loadMemoriesContext(
         Message $message,
@@ -1886,19 +1899,19 @@ final readonly class ChatHandler implements MessageHandlerInterface
         \Closure $resolveSharedVector,
         PerfTimer $perfTimer,
     ): array {
-        $memoriesDisabledByRequest = !empty($options['disable_memories'])
+        $disabledByRequest = !empty($options['disable_memories'])
             || ('WIDGET' === ($options['channel'] ?? null))
             || ('widget' === ($classification['source'] ?? null));
 
-        $memoriesEnabledForUser = $user?->isMemoriesEnabled() ?? true;
+        $disabledByUser = !($user?->isMemoriesEnabled() ?? true);
 
         $loadedMemories = [];
 
-        if ($memoriesDisabledByRequest) {
+        if ($disabledByRequest) {
             $this->logger->debug('ChatHandler: Memories disabled for widget request, skipping memories', [
                 'user_id' => $message->getUserId(),
             ]);
-        } elseif (!$memoriesEnabledForUser) {
+        } elseif ($disabledByUser) {
             $this->logger->debug('ChatHandler: Memories disabled by user setting, skipping memories', [
                 'user_id' => $message->getUserId(),
             ]);
@@ -1990,7 +2003,8 @@ final readonly class ChatHandler implements MessageHandlerInterface
         return [
             'context' => $memoriesContext,
             'memories' => $loadedMemories,
-            'disabled' => $memoriesDisabledByRequest || !$memoriesEnabledForUser,
+            'disabledByRequest' => $disabledByRequest,
+            'disabledByUser' => $disabledByUser,
         ];
     }
 
@@ -2016,16 +2030,16 @@ final readonly class ChatHandler implements MessageHandlerInterface
         \Closure $resolveSharedVector,
         PerfTimer $perfTimer,
     ): array {
-        $memoriesDisabledByRequest = !empty($options['disable_memories'])
+        $disabledByRequest = !empty($options['disable_memories'])
             || ('WIDGET' === ($options['channel'] ?? null))
             || ('widget' === ($classification['source'] ?? null));
 
-        $memoriesEnabledForUser = $user?->isMemoriesEnabled() ?? true;
+        $disabledByUser = !($user?->isMemoriesEnabled() ?? true);
 
         $feedbackContext = '';
         $loadedFeedbacks = [];
 
-        if ($memoriesDisabledByRequest || !$memoriesEnabledForUser || !$this->memoryService->isAvailable()) {
+        if ($disabledByRequest || $disabledByUser || !$this->memoryService->isAvailable()) {
             return [
                 'context' => $feedbackContext,
                 'feedbacks' => $loadedFeedbacks,
@@ -2118,8 +2132,13 @@ final readonly class ChatHandler implements MessageHandlerInterface
      * Hand the post-response memory extraction off to the messenger worker.
      *
      * Honours the `PERF.V2_PIPELINE_ENABLED` kill switch and the same
-     * `disable_memories` flag used during context loading, so widgets and
+     * disable flags used during context loading, so widgets and
      * operator-disabled users never trigger an extraction run.
+     *
+     * The reason for skipping is logged precisely — a widget request and a
+     * user with memories disabled in their settings produce different log
+     * messages so production operators can tell the cases apart without
+     * spelunking through user records.
      *
      * Never throws — a failed dispatch is logged at warning level and the
      * user's response continues. Worst case is that one message's memories
@@ -2127,16 +2146,27 @@ final readonly class ChatHandler implements MessageHandlerInterface
      *
      * @param array<int, array{role: string, content: string}|Message> $thread
      * @param array<int, array<string, mixed>>                         $loadedMemories
+     * @param bool                                                     $disabledByRequest true when the caller (widget channel / `disable_memories` option) opted out
+     * @param bool                                                     $disabledByUser    true when the user's profile setting has memories disabled
      */
     private function dispatchMemoryExtractionAsync(
         Message $message,
         string $aiResponse,
         array $thread,
         array $loadedMemories,
-        bool $memoriesDisabledByRequest,
+        bool $disabledByRequest,
+        bool $disabledByUser,
     ): void {
-        if ($memoriesDisabledByRequest) {
+        if ($disabledByRequest) {
             $this->logger->info('ChatHandler: Skipping memory extraction for widget request', [
+                'user_id' => $message->getUserId(),
+            ]);
+
+            return;
+        }
+
+        if ($disabledByUser) {
+            $this->logger->info('ChatHandler: Skipping memory extraction — disabled by user setting', [
                 'user_id' => $message->getUserId(),
             ]);
 

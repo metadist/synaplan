@@ -199,7 +199,7 @@ parameters:
 			path: src/Controller/LegacyApiController.php
 
 		-
-			message: '#^Method App\\Service\\Message\\InferenceRouter\:\:route\(\) invoked with 1 parameter, 3\-4 required\.$#'
+			message: '#^Method App\\Service\\Message\\InferenceRouter\:\:route\(\) invoked with 1 parameter, 3\-5 required\.$#'
 			identifier: arguments.count
 			count: 1
 			path: src/Controller/LegacyApiController.php
@@ -273,12 +273,6 @@ parameters:
 		-
 			message: '#^Method App\\Repository\\PromptRepository\:\:findByTopic\(\) invoked with 3 parameters, 1\-2 required\.$#'
 			identifier: arguments.count
-			count: 1
-			path: src/Service/InboundEmailHandlerService.php
-
-		-
-			message: '#^Method App\\Service\\InboundEmailHandlerService\:\:connectImap\(\) never returns null so it can be removed from the return type\.$#'
-			identifier: return.unusedType
 			count: 1
 			path: src/Service/InboundEmailHandlerService.php
 
@@ -471,7 +465,7 @@ parameters:
 		-
 			message: '#^Call to an undefined method App\\AI\\Service\\AiFacade\:\:method\(\)\.$#'
 			identifier: method.notFound
-			count: 5
+			count: 6
 			path: tests/Unit/ChatHandlerTest.php
 
 		-
@@ -483,13 +477,13 @@ parameters:
 		-
 			message: '#^Call to an undefined method App\\Repository\\PromptRepository\:\:method\(\)\.$#'
 			identifier: method.notFound
-			count: 9
+			count: 10
 			path: tests/Unit/ChatHandlerTest.php
 
 		-
 			message: '#^Call to an undefined method App\\Service\\ModelConfigService\:\:method\(\)\.$#'
 			identifier: method.notFound
-			count: 25
+			count: 29
 			path: tests/Unit/ChatHandlerTest.php
 
 		-
@@ -519,13 +513,19 @@ parameters:
 		-
 			message: '#^Call to an undefined method Doctrine\\ORM\\EntityManagerInterface\:\:method\(\)\.$#'
 			identifier: method.notFound
-			count: 3
+			count: 4
+			path: tests/Unit/ChatHandlerTest.php
+
+		-
+			message: '#^Call to an undefined method Psr\\Log\\LoggerInterface\:\:method\(\)\.$#'
+			identifier: method.notFound
+			count: 1
 			path: tests/Unit/ChatHandlerTest.php
 
 		-
 			message: '#^Call to an undefined method Symfony\\Component\\Messenger\\MessageBusInterface\:\:expects\(\)\.$#'
 			identifier: method.notFound
-			count: 2
+			count: 3
 			path: tests/Unit/ChatHandlerTest.php
 
 		-
