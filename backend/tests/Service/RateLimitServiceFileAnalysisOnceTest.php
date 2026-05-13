@@ -61,28 +61,42 @@ class RateLimitServiceFileAnalysisOnceTest extends TestCase
         $this->existingFileIds = [];
         $this->insertCount = 0;
 
-        // The dedup query SELECTs by file_id; subsequent INSERT records a
-        // new row. Route both through a single callback that maintains an
-        // in-memory set of "rows that exist".
-        $this->connection->method('fetchOne')->willReturnCallback(
-            function (string $sql, array $params = []): int {
-                if (str_contains($sql, "BACTION = 'FILE_ANALYSIS'") && str_contains($sql, 'JSON_EXTRACT')) {
-                    $fileId = (int) ($params['file_id'] ?? 0);
-
-                    return isset($this->existingFileIds[$fileId]) ? 1 : 0;
-                }
-
-                return 0;
-            }
-        );
+        // The happy path is now a single statement:
+        //   INSERT INTO BUSELOG (...) SELECT ... WHERE NOT EXISTS (...)
+        // Mirror that contract with a fake DBAL connection that returns
+        // 1 affected row when the (user, file) pair is novel and 0 when
+        // it has already been seen — exactly what MariaDB does for the
+        // real INSERT...SELECT...WHERE NOT EXISTS pattern.
+        //
+        // The fileId <= 0 fallback still goes through the legacy
+        // `recordUsage()` INSERT (no WHERE NOT EXISTS clause). We count
+        // those too, since the test contract ("a row was written") cares
+        // about insert events, not the SQL shape.
         $this->connection->method('executeStatement')->willReturnCallback(
             function (string $sql, array $params = []): int {
-                if (str_contains($sql, 'INSERT INTO BUSELOG')) {
-                    ++$this->insertCount;
-                    $metadata = json_decode((string) ($params['metadata'] ?? '{}'), true);
-                    if (is_array($metadata) && isset($metadata['file_id'])) {
-                        $this->existingFileIds[(int) $metadata['file_id']] = true;
+                if (!str_contains($sql, 'INSERT INTO BUSELOG')) {
+                    return 1;
+                }
+
+                if (str_contains($sql, 'WHERE NOT EXISTS')) {
+                    $fileId = (int) ($params['file_id'] ?? 0);
+                    if (isset($this->existingFileIds[$fileId])) {
+                        // Row exists — INSERT...SELECT...WHERE NOT EXISTS
+                        // yields zero affected rows on MariaDB, signalling
+                        // the dedup.
+                        return 0;
                     }
+                    ++$this->insertCount;
+                    $this->existingFileIds[$fileId] = true;
+
+                    return 1;
+                }
+
+                // Legacy `recordUsage()` INSERT (fileId <= 0 fallback).
+                ++$this->insertCount;
+                $metadata = json_decode((string) ($params['metadata'] ?? '{}'), true);
+                if (is_array($metadata) && isset($metadata['file_id'])) {
+                    $this->existingFileIds[(int) $metadata['file_id']] = true;
                 }
 
                 return 1;
@@ -170,11 +184,16 @@ class RateLimitServiceFileAnalysisOnceTest extends TestCase
         $this->em = $this->createMock(EntityManagerInterface::class);
         $this->em->method('getConnection')->willReturn($this->connection);
 
-        $this->connection->method('fetchOne')->willReturn(0);
         $this->connection->method('executeStatement')->willReturnCallback(
             function (string $sql, array $params = []) use (&$captured): int {
-                if (str_contains($sql, 'INSERT INTO BUSELOG')) {
-                    $captured[] = json_decode((string) ($params['metadata'] ?? '{}'), true);
+                if (
+                    str_contains($sql, 'INSERT INTO BUSELOG')
+                    && str_contains($sql, 'WHERE NOT EXISTS')
+                ) {
+                    $captured[] = [
+                        'metadata' => json_decode((string) ($params['metadata'] ?? '{}'), true),
+                        'file_id_param' => $params['file_id'] ?? null,
+                    ];
                 }
 
                 return 1;
@@ -204,11 +223,13 @@ class RateLimitServiceFileAnalysisOnceTest extends TestCase
         );
 
         // Caller passes metadata WITHOUT file_id — the helper must inject it
-        // so the next dedup query can find this row.
+        // both into the BMETADATA JSON we INSERT and the WHERE NOT EXISTS
+        // file_id parameter, so the dedup contract holds end-to-end.
         $service->recordFileAnalysisOnce($this->user(7), 99, ['source' => 'WEB']);
 
         $this->assertCount(1, $captured);
-        $this->assertSame(99, $captured[0]['file_id'] ?? null);
-        $this->assertSame('WEB', $captured[0]['source'] ?? null);
+        $this->assertSame(99, $captured[0]['metadata']['file_id'] ?? null);
+        $this->assertSame('WEB', $captured[0]['metadata']['source'] ?? null);
+        $this->assertSame(99, $captured[0]['file_id_param']);
     }
 }

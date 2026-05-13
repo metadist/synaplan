@@ -129,37 +129,91 @@ final class RateLimitService
      * never actually happened.
      *
      * Idempotency key = (BUSERID, BACTION='FILE_ANALYSIS', BMETADATA->file_id).
-     * The lookup uses MariaDB's `JSON_EXTRACT`; `BMETADATA` is JSON-typed
-     * (declared in the migration that seeds BUSELOG) so the index-friendly
-     * path is preferred over a `LIKE %file_id":%` substring match.
+     * The check + insert run as a single SQL statement
+     * (`INSERT ... SELECT ... WHERE NOT EXISTS`) so two concurrent workers
+     * hitting the same file id can never both observe "no row" and both
+     * insert — Copilot review on PR #930 flagged the prior
+     * SELECT-then-INSERT pattern as race-prone, this closes that window
+     * without requiring a schema change.
      *
-     * Returns true if a fresh row was inserted, false if a row for the
-     * same (user, file) already existed and the call was a no-op.
+     * FILE_ANALYSIS rows carry no provider / model / token / cost data
+     * (the analysis is a billable *event*, not a billable AI call), so
+     * the inlined INSERT below intentionally hard-codes those columns to
+     * zero / empty rather than going through `recordUsage()` which would
+     * spend a price-snapshot lookup on values that are guaranteed zero.
+     *
+     * Return semantics:
+     *   - `true`  → a row was written for this call.
+     *   - `false` → a row for the same (user, file) already existed and
+     *               the call was a no-op (deduplicated).
+     *
+     * Callers that pass `fileId <= 0` get the legacy non-deduped
+     * `recordUsage()` path and always receive `true` — see the comment
+     * inside the early return below for the rationale.
      */
     public function recordFileAnalysisOnce(User $user, int $fileId, array $metadata = []): bool
     {
         if ($fileId <= 0) {
             // Defensive: callers that don't have a file id yet (e.g. a
-            // pre-upload billing check) must keep using the existing
-            // `recordUsage()` path. We refuse to dedup on a sentinel.
+            // pre-upload billing check or an error path before the File
+            // entity is persisted) must keep getting their row. There is
+            // no idempotency key, so we cannot dedup; we always write
+            // and always return `true`.
             $this->recordUsage($user, 'FILE_ANALYSIS', $metadata);
 
             return true;
         }
 
-        $existing = (int) $this->em->getConnection()->fetchOne(
-            "SELECT 1 FROM BUSELOG
-              WHERE BUSERID = :user_id
-                AND BACTION = 'FILE_ANALYSIS'
-                AND JSON_EXTRACT(BMETADATA, '$.file_id') = :file_id
-              LIMIT 1",
+        // Always set file_id explicitly so the WHERE NOT EXISTS clause
+        // and the BMETADATA we INSERT line up regardless of whether the
+        // caller remembered to include it in `$metadata`.
+        $metadata['file_id'] = $fileId;
+
+        // Trim transient fields the same way `recordUsage()` does so
+        // BMETADATA stays small and consistent across both code paths.
+        $storedMetadata = $metadata;
+        unset(
+            $storedMetadata['response_text'],
+            $storedMetadata['input_text'],
+            $storedMetadata['input_bytes'],
+            $storedMetadata['response_bytes'],
+            $storedMetadata['usage'],
+            $storedMetadata['model_id'],
+            $storedMetadata['media_usage'],
+        );
+
+        $affectedRows = $this->em->getConnection()->executeStatement(
+            <<<'SQL'
+            INSERT INTO BUSELOG (
+                BUSERID, BUNIXTIMES, BACTION,
+                BPROVIDER, BMODEL, BTOKENS,
+                BPROMPT_TOKENS, BCOMPLETION_TOKENS, BCACHED_TOKENS, BCACHE_CREATION_TOKENS,
+                BESTIMATED, BMODEL_ID, BPRICE_SNAPSHOT,
+                BCOST, BLATENCY, BSTATUS, BERROR, BMETADATA
+            )
+            SELECT
+                :user_id, :timestamp, 'FILE_ANALYSIS',
+                '', '', 0,
+                0, 0, 0, 0,
+                0, NULL, NULL,
+                0, 0, NULL, NULL, :metadata
+            FROM DUAL
+            WHERE NOT EXISTS (
+                SELECT 1 FROM BUSELOG
+                 WHERE BUSERID = :user_id
+                   AND BACTION = 'FILE_ANALYSIS'
+                   AND JSON_EXTRACT(BMETADATA, '$.file_id') = :file_id
+            )
+            SQL,
             [
                 'user_id' => $user->getId(),
+                'timestamp' => time(),
+                'metadata' => json_encode($storedMetadata, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
                 'file_id' => $fileId,
             ]
         );
 
-        if (1 === $existing) {
+        if ($affectedRows < 1) {
             $this->logger->debug('RateLimitService: FILE_ANALYSIS already recorded for file, skipping', [
                 'user_id' => $user->getId(),
                 'file_id' => $fileId,
@@ -167,12 +221,6 @@ final class RateLimitService
 
             return false;
         }
-
-        // Always set file_id explicitly so the dedup query above works
-        // regardless of whether the caller remembered to include it.
-        $metadata['file_id'] = $fileId;
-
-        $this->recordUsage($user, 'FILE_ANALYSIS', $metadata);
 
         return true;
     }
