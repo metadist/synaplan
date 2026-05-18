@@ -24,6 +24,24 @@ use Symfony\Component\Security\Http\Attribute\CurrentUser;
 #[OA\Tag(name: 'User Memories')]
 class UserMemoryController extends AbstractController
 {
+    /**
+     * Stable machine-readable error codes for the memory parse endpoint.
+     *
+     * The frontend's MemoryFormDialog inspects these codes (via ApiError.details.code)
+     * to decide whether a graceful fallback is possible:
+     *  - AI_PARSER_UNAVAILABLE / AI_NO_CHAT_MODEL: storage works, so we can still save
+     *    the input as a plain note (create) or fall back to manual edit (update).
+     *  - MEMORY_STORAGE_UNAVAILABLE: nothing can be persisted, show a hard error.
+     *
+     * Keep these constants in sync with the codes consumed in
+     * frontend/src/components/MemoryFormDialog.vue (see handleEasySubmit).
+     */
+    public const ERROR_CODE_MEMORY_STORAGE_UNAVAILABLE = 'memory_storage_unavailable';
+    public const ERROR_CODE_AI_PARSER_UNAVAILABLE = 'ai_parser_unavailable';
+    public const ERROR_CODE_AI_NO_CHAT_MODEL = 'ai_no_chat_model';
+    public const ERROR_CODE_AI_PARSE_FAILED = 'ai_parse_failed';
+    public const ERROR_CODE_INPUT_REQUIRED = 'input_required';
+
     public function __construct(
         private readonly UserMemoryService $memoryService,
         private readonly AiFacade $aiFacade,
@@ -576,7 +594,26 @@ class UserMemoryController extends AbstractController
         if (empty(trim($input))) {
             return $this->json([
                 'error' => 'Input is required',
+                'code' => self::ERROR_CODE_INPUT_REQUIRED,
             ], Response::HTTP_BAD_REQUEST);
+        }
+
+        // Resolve chat model up front so we can fail fast with a clear, actionable
+        // error code when no model is configured. Without this pre-check the request
+        // would either reach the provider with an empty model (provider-dependent
+        // behaviour) or fail later inside the AI stack with a confusing message.
+        $chatModelConfig = $this->getUserChatModelConfig($user->getId());
+
+        if (null === $chatModelConfig['model'] || null === $chatModelConfig['provider']) {
+            $response = [
+                'error' => 'No chat model configured for AI structuring',
+                'code' => self::ERROR_CODE_AI_NO_CHAT_MODEL,
+            ];
+            if ($user->isAdmin()) {
+                $response['debug'] = 'No default CHAT model configured for this user. Set one under Profile → AI Models, or as global default.';
+            }
+
+            return $this->json($response, Response::HTTP_SERVICE_UNAVAILABLE);
         }
 
         // Search for similar memories using Qdrant
@@ -621,10 +658,6 @@ class UserMemoryController extends AbstractController
             $userMessage .= "\n\nNo existing memories found.";
         }
 
-        // Get user's default chat model AND provider (both must come from the same model ID
-        // to avoid mismatch, e.g., sending an OpenAI model name to the Ollama provider)
-        $chatModelConfig = $this->getUserChatModelConfig($user->getId());
-
         try {
             $response = $this->aiFacade->chat(
                 messages: [
@@ -660,7 +693,10 @@ class UserMemoryController extends AbstractController
             $actions = $this->parseAiResponse($content, $input, $validMemoryIds);
 
             if (empty($actions)) {
-                $response = ['error' => 'AI could not parse the input'];
+                $response = [
+                    'error' => 'AI could not parse the input',
+                    'code' => self::ERROR_CODE_AI_PARSE_FAILED,
+                ];
                 if ($user->isAdmin()) {
                     $response['debug'] = 'AI response missing valid actions: '.$content;
                 }
@@ -684,8 +720,14 @@ class UserMemoryController extends AbstractController
 
             return $this->json($result);
         } catch (ProviderException $e) {
-            // AI unavailable - return error, no fallback
-            $response = ['error' => 'AI service unavailable'];
+            // AI provider unreachable / model not loaded / network failure.
+            // The frontend uses the `code` field to offer a graceful fallback
+            // (save as plain note for create, switch to manual edit for update)
+            // since Qdrant is still reachable at this point.
+            $response = [
+                'error' => 'AI service unavailable',
+                'code' => self::ERROR_CODE_AI_PARSER_UNAVAILABLE,
+            ];
             if ($user->isAdmin()) {
                 $response['debug'] = $e->getMessage();
             }
@@ -949,7 +991,10 @@ class UserMemoryController extends AbstractController
      */
     private function memoryServiceUnavailableResponse(User $user, ?\Throwable $e = null): JsonResponse
     {
-        $payload = ['error' => 'Memory service temporarily unavailable'];
+        $payload = [
+            'error' => 'Memory service temporarily unavailable',
+            'code' => self::ERROR_CODE_MEMORY_STORAGE_UNAVAILABLE,
+        ];
 
         if ($user->isAdmin()) {
             $payload['debug'] = null !== $e
