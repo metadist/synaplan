@@ -453,6 +453,12 @@ class WebhookController extends AbstractController
             $message->setLanguage($classification['language'] ?? 'en');
             $message->setStatus('complete');
 
+            // Persist generated media (image/video/audio) onto the outgoing message
+            // so the web chat surfaces the embedded player when the user later opens
+            // the same conversation in the UI (issue #626). The handler returns the
+            // serve URL + type in `metadata.file`; mirror the StreamController shape.
+            $generatedFile = $this->normalizeGeneratedFileMetadata($metadata['file'] ?? null);
+
             $outgoingMessage = new Message();
             $outgoingMessage->setUserId($user->getId());
             $outgoingMessage->setChat($chat);
@@ -461,7 +467,9 @@ class WebhookController extends AbstractController
             $outgoingMessage->setUnixTimestamp(time());
             $outgoingMessage->setDateTime(date('YmdHis'));
             $outgoingMessage->setMessageType('MAIL');
-            $outgoingMessage->setFile(0);
+            $outgoingMessage->setFile(null !== $generatedFile ? 1 : 0);
+            $outgoingMessage->setFilePath($generatedFile['path'] ?? '');
+            $outgoingMessage->setFileType($generatedFile['type'] ?? '');
             $outgoingMessage->setTopic($classification['topic'] ?? 'CHAT');
             $outgoingMessage->setLanguage($classification['language'] ?? 'en');
             $outgoingMessage->setText($responseText);
@@ -839,6 +847,34 @@ class WebhookController extends AbstractController
                 'error' => 'Internal error',
             ], Response::HTTP_INTERNAL_SERVER_ERROR);
         }
+    }
+
+    /**
+     * Normalize the `metadata.file` block returned by the media generation
+     * handler into the `{path, type}` shape we persist on a Message row.
+     *
+     * Returns null when the metadata does not describe a usable serve URL —
+     * keeps callers from writing empty file paths that would later short-circuit
+     * `ChatController::getChatMessages()` and confuse the frontend.
+     *
+     * @param mixed $fileMeta Expected shape: ['path' => string, 'type' => string]
+     *
+     * @return array{path: string, type: string}|null
+     */
+    private function normalizeGeneratedFileMetadata(mixed $fileMeta): ?array
+    {
+        if (!is_array($fileMeta)) {
+            return null;
+        }
+
+        $path = isset($fileMeta['path']) && is_string($fileMeta['path']) ? trim($fileMeta['path']) : '';
+        $type = isset($fileMeta['type']) && is_string($fileMeta['type']) ? trim($fileMeta['type']) : '';
+
+        if ('' === $path) {
+            return null;
+        }
+
+        return ['path' => $path, 'type' => $type];
     }
 
     private function resolveAttachmentPathFromAiMetadata(array $metadata): ?string

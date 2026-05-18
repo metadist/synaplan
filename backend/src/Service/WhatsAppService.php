@@ -878,7 +878,18 @@ final class WhatsAppService
                         'video' => '[Video response]',
                         default => '[Audio response]', // audio is the remaining case
                     };
-                    $this->storeOutgoingMessage($user, $dto, $responseText ?: $placeholderText, $sendResult['message_id'], $chat);
+                    // Persist the generated media path so the web chat
+                    // history surfaces the player (issue #626). WhatsApp
+                    // itself already received the asset via sendMedia(),
+                    // but the cross-channel mirror lives in the DB row.
+                    $this->storeOutgoingMessage(
+                        $user,
+                        $dto,
+                        $responseText ?: $placeholderText,
+                        $sendResult['message_id'],
+                        $chat,
+                        ['path' => $mediaPath, 'type' => $generatedMediaType],
+                    );
                     $responseSent = true;
 
                     // Discord notification: AI media generated and sent
@@ -929,7 +940,17 @@ final class WhatsAppService
 
                 $sendResult = $this->sendMedia($dto->from, 'audio', $audioUrl, $dto->phoneNumberId);
                 if ($sendResult['success']) {
-                    $this->storeOutgoingMessage($user, $dto, $responseText, $sendResult['message_id'], $chat);
+                    // Persist TTS audio on the DB row so the web chat history
+                    // surfaces the audio player (issue #626).
+                    $ttsServePath = '/api/v1/files/uploads/'.$ttsResult['relativePath'];
+                    $this->storeOutgoingMessage(
+                        $user,
+                        $dto,
+                        $responseText,
+                        $sendResult['message_id'],
+                        $chat,
+                        ['path' => $ttsServePath, 'type' => 'audio'],
+                    );
                     $responseSent = true;
 
                     // Discord notification: TTS response sent
@@ -1486,8 +1507,23 @@ final class WhatsAppService
         }
     }
 
-    private function storeOutgoingMessage(User $user, IncomingMessageDto $dto, string $text, string $externalId, ?Chat $chat = null): void
-    {
+    /**
+     * Persist an outgoing WhatsApp message and, when the response carried
+     * AI-generated media, record the serve URL + type on the row so the
+     * web chat history can replay the image/video/audio player (issue #626).
+     *
+     * @param array{path: string, type: string}|null $generatedFile optional file metadata
+     *                                                              produced by MediaGenerationHandler
+     *                                                              (already normalized to a serve URL)
+     */
+    private function storeOutgoingMessage(
+        User $user,
+        IncomingMessageDto $dto,
+        string $text,
+        string $externalId,
+        ?Chat $chat = null,
+        ?array $generatedFile = null,
+    ): void {
         $outgoingMessage = new Message();
         $outgoingMessage->setUserId($user->getId());
         if ($chat) {
@@ -1498,7 +1534,9 @@ final class WhatsAppService
         $outgoingMessage->setUnixTimestamp(time());
         $outgoingMessage->setDateTime(date('YmdHis'));
         $outgoingMessage->setMessageType('WTSP');
-        $outgoingMessage->setFile(0);
+        $outgoingMessage->setFile(null !== $generatedFile ? 1 : 0);
+        $outgoingMessage->setFilePath($generatedFile['path'] ?? '');
+        $outgoingMessage->setFileType($generatedFile['type'] ?? '');
         $outgoingMessage->setTopic('CHAT');
         $outgoingMessage->setLanguage('en');
         $outgoingMessage->setText($text);

@@ -661,6 +661,12 @@ class WidgetPublicController extends AbstractController
                     $incomingMessage->setLanguage($language);
                     $incomingMessage->setStatus('complete');
 
+                    // Persist generated media (image/video/audio) so widget admins and
+                    // the embedded chat history both render the player on reload
+                    // (issue #626 — mirrors the StreamController behaviour for the
+                    // authenticated web channel).
+                    $generatedFile = $this->normalizeGeneratedFileMetadata($responseMetadata['file'] ?? null);
+
                     $outgoingMessage = new Message();
                     $outgoingMessage->setUserId($owner->getId());
                     $outgoingMessage->setChat($chat);
@@ -669,9 +675,9 @@ class WidgetPublicController extends AbstractController
                     $outgoingMessage->setUnixTimestamp(time());
                     $outgoingMessage->setDateTime(date('YmdHis'));
                     $outgoingMessage->setMessageType('WDGT');
-                    $outgoingMessage->setFile(0);
-                    $outgoingMessage->setFilePath('');
-                    $outgoingMessage->setFileType('');
+                    $outgoingMessage->setFile(null !== $generatedFile ? 1 : 0);
+                    $outgoingMessage->setFilePath($generatedFile['path'] ?? '');
+                    $outgoingMessage->setFileType($generatedFile['type'] ?? '');
                     $outgoingMessage->setTopic($topic);
                     $outgoingMessage->setLanguage($language);
                     $outgoingMessage->setText($responseText);
@@ -1053,6 +1059,34 @@ class WidgetPublicController extends AbstractController
         }
 
         return $result;
+    }
+
+    /**
+     * Normalize the `metadata.file` block returned by the media generation
+     * handler into the `{path, type}` shape we persist on a Message row.
+     *
+     * Returns null when the metadata does not describe a usable serve URL —
+     * keeps callers from writing empty file paths that would later short-circuit
+     * the chat history endpoint and confuse the embedded widget UI.
+     *
+     * @param mixed $fileMeta Expected shape: ['path' => string, 'type' => string]
+     *
+     * @return array{path: string, type: string}|null
+     */
+    private function normalizeGeneratedFileMetadata(mixed $fileMeta): ?array
+    {
+        if (!is_array($fileMeta)) {
+            return null;
+        }
+
+        $path = isset($fileMeta['path']) && is_string($fileMeta['path']) ? trim($fileMeta['path']) : '';
+        $type = isset($fileMeta['type']) && is_string($fileMeta['type']) ? trim($fileMeta['type']) : '';
+
+        if ('' === $path) {
+            return null;
+        }
+
+        return ['path' => $path, 'type' => $type];
     }
 
     /**
