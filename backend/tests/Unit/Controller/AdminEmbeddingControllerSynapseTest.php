@@ -4,20 +4,21 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Controller;
 
+use App\AI\Interface\EmbeddingProviderInterface;
+use App\AI\Service\ProviderRegistry;
 use App\Controller\AdminEmbeddingController;
-use App\Entity\Config;
 use App\Entity\Model;
 use App\Entity\RevectorizeRun;
 use App\Entity\User;
 use App\Message\ReVectorizeMessage;
-use App\Repository\ConfigRepository;
 use App\Repository\ModelRepository;
 use App\Repository\RevectorizeRunRepository;
 use App\Service\Embedding\EmbeddingCostEstimator;
 use App\Service\Embedding\EmbeddingMetadataService;
 use App\Service\Embedding\EmbeddingModelChangeGuard;
+use App\Service\Embedding\VectorizeBindingService;
 use App\Service\Message\SynapseIndexer;
-use Doctrine\ORM\EntityManagerInterface;
+use App\Service\ModelConfigService;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
@@ -47,9 +48,10 @@ final class AdminEmbeddingControllerSynapseTest extends TestCase
     private EmbeddingModelChangeGuard&MockObject $changeGuard;
     private RevectorizeRunRepository&MockObject $runRepository;
     private ModelRepository&MockObject $modelRepository;
-    private ConfigRepository&MockObject $configRepository;
+    private ModelConfigService&MockObject $modelConfigService;
+    private ProviderRegistry&MockObject $providerRegistry;
+    private VectorizeBindingService&MockObject $bindingService;
     private SynapseIndexer&MockObject $synapseIndexer;
-    private EntityManagerInterface&MockObject $em;
     private MessageBusInterface&MockObject $messageBus;
     private AdminEmbeddingController $controller;
 
@@ -60,10 +62,17 @@ final class AdminEmbeddingControllerSynapseTest extends TestCase
         $this->changeGuard = $this->createMock(EmbeddingModelChangeGuard::class);
         $this->runRepository = $this->createMock(RevectorizeRunRepository::class);
         $this->modelRepository = $this->createMock(ModelRepository::class);
-        $this->configRepository = $this->createMock(ConfigRepository::class);
+        $this->modelConfigService = $this->createMock(ModelConfigService::class);
+        $this->providerRegistry = $this->createMock(ProviderRegistry::class);
+        $this->bindingService = $this->createMock(VectorizeBindingService::class);
         $this->synapseIndexer = $this->createMock(SynapseIndexer::class);
-        $this->em = $this->createMock(EntityManagerInterface::class);
         $this->messageBus = $this->createMock(MessageBusInterface::class);
+
+        // Default: provider is configured (has API key). Individual tests
+        // override this to exercise the provider-availability gate (#948).
+        $this->providerRegistry
+            ->method('getEmbeddingProvider')
+            ->willReturn($this->makeEmbeddingProvider(true));
 
         $this->controller = new AdminEmbeddingController(
             $this->embeddingMetadata,
@@ -71,9 +80,10 @@ final class AdminEmbeddingControllerSynapseTest extends TestCase
             $this->changeGuard,
             $this->runRepository,
             $this->modelRepository,
-            $this->configRepository,
+            $this->modelConfigService,
+            $this->providerRegistry,
+            $this->bindingService,
             $this->synapseIndexer,
-            $this->em,
             $this->messageBus,
             new NullLogger(),
         );
@@ -82,6 +92,14 @@ final class AdminEmbeddingControllerSynapseTest extends TestCase
         // looks up the serializer service if present, otherwise falls
         // back to plain json_encode — both paths are fine for tests).
         $this->controller->setContainer(new Container());
+    }
+
+    private function makeEmbeddingProvider(bool $available): EmbeddingProviderInterface
+    {
+        $provider = $this->createMock(EmbeddingProviderInterface::class);
+        $provider->method('isAvailable')->willReturn($available);
+
+        return $provider;
     }
 
     public function testSynapseStatusReturnsCurrentModelAndCatalog(): void
@@ -183,25 +201,24 @@ final class AdminEmbeddingControllerSynapseTest extends TestCase
 
     public function testSwitchPersistsBindingBeforeDispatchingJob(): void
     {
-        // The order matters: setSynapseDefault() MUST run before
+        // The order matters: setSynapseVectorizeModel() MUST run before
         // dispatch() so the worker resolves the new model id; we
-        // assert this by recording call order.
+        // assert this by recording call order on the binding service.
         $callOrder = [];
         $this->modelRepository->method('find')->willReturn($this->makeModel(188, 'Qwen3', 'cloudflare', '@cf/qwen/qwen3'));
+        $this->modelConfigService->method('getProviderForModel')->willReturn('cloudflare');
         $this->synapseIndexer->method('getEmbeddingModelInfo')->willReturn([
             'model_id' => 187, 'provider' => 'cloudflare', 'model' => 'bge-m3', 'vector_dim' => 1024,
         ]);
+        $this->runRepository->method('findActive')->willReturn(null);
 
-        $this->configRepository->method('findOneBy')->willReturn(null);
-        $this->em
+        $this->bindingService
             ->expects($this->once())
-            ->method('persist')
-            ->willReturnCallback(function (Config $config) use (&$callOrder) {
-                $callOrder[] = 'persist:'.$config->getSetting().'='.$config->getValue();
+            ->method('setSynapseVectorizeModel')
+            ->with(188)
+            ->willReturnCallback(function () use (&$callOrder): void {
+                $callOrder[] = 'bind:188';
             });
-        $this->em->expects($this->once())->method('flush')->willReturnCallback(function () use (&$callOrder) {
-            $callOrder[] = 'flush';
-        });
 
         $this->runRepository
             ->expects($this->once())
@@ -235,13 +252,82 @@ final class AdminEmbeddingControllerSynapseTest extends TestCase
         $this->assertSame(187, $payload['fromModelId']);
         $this->assertSame(188, $payload['toModelId']);
 
-        // persist+flush MUST come before save:run + dispatch, otherwise
-        // a freshly-spawned worker would still read the old binding.
-        $persistIndex = array_search('persist:SYNAPSE_VECTORIZE=188', $callOrder, true);
+        // bind MUST come before save:run + dispatch, otherwise a
+        // freshly-spawned worker would still read the old binding.
+        $bindIndex = array_search('bind:188', $callOrder, true);
         $dispatchIndex = array_search('dispatch:7', $callOrder, true);
-        $this->assertNotFalse($persistIndex);
+        $this->assertNotFalse($bindIndex);
         $this->assertNotFalse($dispatchIndex);
-        $this->assertLessThan($dispatchIndex, $persistIndex, 'Binding must be persisted before the re-vectorize job is dispatched.');
+        $this->assertLessThan($dispatchIndex, $bindIndex, 'Binding must be persisted before the re-vectorize job is dispatched.');
+    }
+
+    public function testSwitchRefusesProviderWithoutApiKey(): void
+    {
+        // Override the default "provider available" mock for this test.
+        $unavailableRegistry = $this->createMock(ProviderRegistry::class);
+        $unavailableRegistry->method('getEmbeddingProvider')
+            ->willReturn($this->makeEmbeddingProvider(false));
+
+        $controller = new AdminEmbeddingController(
+            $this->embeddingMetadata,
+            $this->costEstimator,
+            $this->changeGuard,
+            $this->runRepository,
+            $this->modelRepository,
+            $this->modelConfigService,
+            $unavailableRegistry,
+            $this->bindingService,
+            $this->synapseIndexer,
+            $this->messageBus,
+            new NullLogger(),
+        );
+        $controller->setContainer(new Container());
+
+        $this->modelRepository->method('find')->willReturn(
+            $this->makeModel(188, 'Qwen3', 'cloudflare', '@cf/qwen/qwen3')
+        );
+        $this->modelConfigService->method('getProviderForModel')->willReturn('cloudflare');
+
+        // The switch MUST short-circuit before touching BCONFIG / dispatching.
+        $this->bindingService->expects($this->never())->method('setSynapseVectorizeModel');
+        $this->messageBus->expects($this->never())->method('dispatch');
+
+        $request = Request::create('/api/v1/admin/embedding/synapse/switch', 'POST', content: json_encode(['toModelId' => 188]));
+        $response = $controller->synapseSwitch($request, $this->makeUser(1));
+        $payload = $this->decode($response);
+
+        $this->assertSame(Response::HTTP_BAD_REQUEST, $response->getStatusCode());
+        $this->assertSame('provider_not_configured', $payload['error']);
+        $this->assertSame('cloudflare', $payload['provider']);
+    }
+
+    public function testSwitchRefusesWhenAnotherRunIsActive(): void
+    {
+        $this->modelRepository->method('find')->willReturn(
+            $this->makeModel(188, 'Qwen3', 'cloudflare', '@cf/qwen/qwen3')
+        );
+        $this->modelConfigService->method('getProviderForModel')->willReturn('cloudflare');
+        $this->synapseIndexer->method('getEmbeddingModelInfo')->willReturn([
+            'model_id' => 187, 'provider' => 'cloudflare', 'model' => 'bge-m3', 'vector_dim' => 1024,
+        ]);
+
+        // A previous switch is still being processed.
+        $this->runRepository
+            ->method('findActive')
+            ->willReturn($this->makeRun(99, RevectorizeRun::SCOPE_SYNAPSE, RevectorizeRun::STATUS_RUNNING));
+
+        // Must NOT swap BCONFIG or dispatch — that's the rapid-click bug
+        // from the issue (admin bypasses cooldown → overlapping runs).
+        $this->bindingService->expects($this->never())->method('setSynapseVectorizeModel');
+        $this->messageBus->expects($this->never())->method('dispatch');
+
+        $request = Request::create('/api/v1/admin/embedding/synapse/switch', 'POST', content: json_encode(['toModelId' => 188]));
+        $response = $this->controller->synapseSwitch($request, $this->makeUser(1));
+        $payload = $this->decode($response);
+
+        $this->assertSame(Response::HTTP_CONFLICT, $response->getStatusCode());
+        $this->assertSame('run_in_progress', $payload['error']);
+        $this->assertSame(99, $payload['activeRun']['id']);
     }
 
     /**

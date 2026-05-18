@@ -22,14 +22,13 @@ use Psr\Log\LoggerInterface;
  */
 final class UserMemoryServiceTest extends TestCase
 {
-    private EntityManagerInterface $em;
-    /** @var QdrantClientInterface&MockObject */
-    private QdrantClientInterface $qdrantClient;
-    private AiFacade $aiFacade;
-    private ModelConfigService $modelConfigService;
-    private RateLimitService $rateLimitService;
-    private EmbeddingMetadataService $embeddingMetadata;
-    private LoggerInterface $logger;
+    private EntityManagerInterface&MockObject $em;
+    private QdrantClientInterface&MockObject $qdrantClient;
+    private AiFacade&MockObject $aiFacade;
+    private ModelConfigService&MockObject $modelConfigService;
+    private RateLimitService&MockObject $rateLimitService;
+    private EmbeddingMetadataService&MockObject $embeddingMetadata;
+    private LoggerInterface&MockObject $logger;
     private UserMemoryService $service;
 
     protected function setUp(): void
@@ -325,5 +324,47 @@ final class UserMemoryServiceTest extends TestCase
         $result = $this->service->resolveMemoryTags('Hallo [Memory:12345...]', $user);
 
         $this->assertSame('Hallo Cristian', $result);
+    }
+
+    /**
+     * Regression for #948.
+     *
+     * After an embedding-model swap to a wider model (1024 → 1536) the
+     * live path used to call `upsertMemory()` with a 1536-dim vector
+     * against a 1024-dim collection. Qdrant returned HTTP 400 and the
+     * memory was silently lost — the controller saw a "success" because
+     * the upsert exception was swallowed by the worker. The dim safety
+     * net MUST short-circuit BEFORE the upsert call so the failure
+     * surfaces as a clean RuntimeException (mapped to 503 / 5xx by the
+     * outer layers).
+     */
+    public function testCreateMemoryRejectsDimensionMismatchBeforeQdrantUpsert(): void
+    {
+        $user = $this->createMock(User::class);
+        $user->method('getId')->willReturn(123);
+
+        $this->qdrantClient->method('isAvailable')->willReturn(true);
+        $this->qdrantClient->method('scrollMemories')->willReturn([]);
+
+        $this->modelConfigService->method('getDefaultModel')->willReturn(42);
+        $this->em->method('getRepository')->willReturn($this->createMock(\Doctrine\ORM\EntityRepository::class));
+
+        // Active collection dim is 1024 but the new model produces 1536-dim vectors.
+        $this->embeddingMetadata->method('getCurrentVectorDim')->willReturn(1024);
+
+        $this->aiFacade
+            ->method('embed')
+            ->willReturn([
+                'embedding' => array_fill(0, 1536, 0.1),
+                'usage' => ['total_tokens' => 4],
+            ]);
+
+        // The upsert MUST NOT be reached — that's the silent-data-loss path.
+        $this->qdrantClient->expects($this->never())->method('upsertMemory');
+
+        $this->expectException(MemoryServiceUnavailableException::class);
+        $this->expectExceptionMessageMatches('/dimension mismatch/i');
+
+        $this->service->createMemory($user, 'personal', 'city', 'Berlin');
     }
 }
