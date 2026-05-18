@@ -20,6 +20,7 @@ use Doctrine\ORM\EntityManagerInterface;
 use OpenApi\Attributes as OA;
 use Psr\Log\LoggerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
+use Symfony\Component\DependencyInjection\Attribute\Autowire;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -41,6 +42,8 @@ class MessageController extends AbstractController
         private FileProcessor $fileProcessor,
         private VectorizationService $vectorizationService,
         private LoggerInterface $logger,
+        #[Autowire(env: 'default::bool:COST_BUDGET_GATE_ENABLED')]
+        private bool $costBudgetGateEnabled = false,
     ) {
     }
 
@@ -110,6 +113,20 @@ class MessageController extends AbstractController
                 // verification — not email verification (see #839).
                 'phone_verified' => $user->hasVerifiedPhone(),
             ], Response::HTTP_TOO_MANY_REQUESTS);
+        } elseif ($this->costBudgetGateEnabled) {
+            $budgetCheck = $this->rateLimitService->checkCostBudget($user);
+            if (!$budgetCheck['allowed']) {
+                return $this->json([
+                    'error' => 'Cost budget exceeded',
+                    'limit_type' => 'monthly',
+                    'action_type' => 'MESSAGES',
+                    'limit' => $budgetCheck['budget'],
+                    'used' => $budgetCheck['used_cost'],
+                    'remaining' => $budgetCheck['remaining'],
+                    'user_level' => $user->getUserLevel(),
+                    'phone_verified' => $user->hasVerifiedPhone(),
+                ], Response::HTTP_TOO_MANY_REQUESTS);
+            }
         }
 
         try {
@@ -144,9 +161,6 @@ class MessageController extends AbstractController
                 }
                 $this->em->flush();
             }
-
-            // Record usage
-            $this->rateLimitService->recordUsage($user, 'MESSAGES');
 
             // Prepare context with file contents
             $contextMessages = [];
@@ -230,6 +244,22 @@ class MessageController extends AbstractController
             if (!empty($aiResponse['usage'])) {
                 $outgoingMessage->setMeta('ai_chat_usage', json_encode($aiResponse['usage']));
             }
+
+            // Record usage with full metadata.
+            // AiFacade::chat() does not return model_id, so resolve it
+            // from the user's DEFAULTMODEL config (same logic the facade
+            // itself uses to select the provider/model).
+            $resolvedModelId = $this->modelConfigService->getDefaultModel('CHAT', $user->getId());
+
+            $this->rateLimitService->recordUsage($user, 'MESSAGES', [
+                'provider' => $aiResponse['provider'] ?? 'unknown',
+                'model' => $aiResponse['model'] ?? 'unknown',
+                'model_id' => $resolvedModelId,
+                'usage' => $aiResponse['usage'] ?? [],
+                'input_text' => $messageText,
+                'response_text' => $responseText,
+                'source' => 'WEB',
+            ]);
 
             // NOTE: MessageController doesn't use MessageProcessor, so there's no sorting model info here
             // Only StreamController (which uses MessageProcessor) has sorting model metadata
@@ -575,12 +605,21 @@ class MessageController extends AbstractController
                 'status' => $messageFile->getStatus(),
             ]);
 
-            // Record FILE_ANALYSIS usage for statistics
-            $this->rateLimitService->recordUsage($user, 'FILE_ANALYSIS', [
-                'file_id' => $messageFile->getId(),
-                'filename' => $uploadedFile->getClientOriginalName(),
-                'source' => 'WEB',
-            ]);
+            // FILE_ANALYSIS recording is INTENTIONALLY deferred to
+            // MessagePreProcessor::processMessageFile() — a chat upload
+            // that the user never sends should not be billed (issue #887).
+            // The pre-upload `checkLimit('FILE_ANALYSIS')` above still
+            // rejects users who have already exhausted their quota, so the
+            // limit gate stays in place; we just no longer write a
+            // BUSELOG row at the point a file is staged.
+            //
+            // For audio files we extracted synchronously above, recording
+            // also happens via MessagePreProcessor: when the message is
+            // streamed (or when an audio-only upload triggers an immediate
+            // analysis through the standard pipeline), the file id is
+            // looked up by the preprocessor and routed through
+            // RateLimitService::recordFileAnalysisOnce(), which dedups so
+            // the same file never bills twice.
 
             $response = [
                 'success' => true,

@@ -22,6 +22,7 @@ use App\Service\RAG\VectorSearchService;
 use App\Service\RateLimitService;
 use App\Service\UserMemoryService;
 use Doctrine\ORM\EntityManagerInterface;
+use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\Messenger\Envelope;
@@ -29,20 +30,20 @@ use Symfony\Component\Messenger\MessageBusInterface;
 
 class ChatHandlerTest extends TestCase
 {
-    private AiFacade $aiFacade;
-    private PromptRepository $promptRepository;
-    private PromptService $promptService;
-    private ModelConfigService $modelConfigService;
-    private ModelRepository $modelRepository;
-    private LoggerInterface $logger;
-    private VectorSearchService $vectorSearchService;
-    private EntityManagerInterface $em;
+    private AiFacade&MockObject $aiFacade;
+    private PromptRepository&MockObject $promptRepository;
+    private PromptService&MockObject $promptService;
+    private ModelConfigService&MockObject $modelConfigService;
+    private ModelRepository&MockObject $modelRepository;
+    private LoggerInterface&MockObject $logger;
+    private VectorSearchService&MockObject $vectorSearchService;
+    private EntityManagerInterface&MockObject $em;
     private UserUploadPathBuilder $userUploadPathBuilder;
-    private UserMemoryService $userMemoryService;
+    private UserMemoryService&MockObject $userMemoryService;
     private FeedbackConfigService $feedbackConfigService;
-    private RateLimitService $rateLimitService;
-    private MessageBusInterface $messageBus;
-    private PerfPipelineFlag $perfPipelineFlag;
+    private RateLimitService&MockObject $rateLimitService;
+    private MessageBusInterface&MockObject $messageBus;
+    private PerfPipelineFlag&MockObject $perfPipelineFlag;
     private ChatHandler $handler;
 
     protected function setUp(): void
@@ -563,6 +564,84 @@ class ChatHandlerTest extends TestCase
             $message,
             [],
             ['topic' => 'CHAT', 'language' => 'en', 'source' => 'widget'],
+        );
+    }
+
+    /**
+     * PR #925 Copilot follow-up: previously the dispatch helper received a
+     * single combined "disabled" boolean and always logged "Skipping
+     * memory extraction for widget request" — misleading when the actual
+     * reason was the user toggling memories off in their settings. The
+     * helper now takes two flags and logs the precise reason so
+     * production operators can tell the cases apart.
+     */
+    public function testHandleLogsUserSettingReasonWhenMemoriesDisabledByUser(): void
+    {
+        $message = $this->createMock(Message::class);
+        $message->method('getUserId')->willReturn(7);
+        $message->method('getId')->willReturn(789);
+        $message->method('getText')->willReturn('My new dog is called Bruno.');
+        $message->method('getUnixTimestamp')->willReturn(time());
+        $message->method('getDateTime')->willReturn('20260513120000');
+        $message->method('getFilePath')->willReturn('');
+        $message->method('getFileType')->willReturn('');
+        $message->method('getTopic')->willReturn('CHAT');
+        $message->method('getLanguage')->willReturn('en');
+        $message->method('getFileText')->willReturn('');
+
+        $user = $this->createMock(User::class);
+        $user->method('getId')->willReturn(7);
+        $user->method('isMemoriesEnabled')->willReturn(false); // ← user toggled memories off
+
+        $userRepository = $this->createMock(UserRepository::class);
+        $userRepository->method('find')->with(7)->willReturn($user);
+        $this->em->method('getRepository')->with(User::class)->willReturn($userRepository);
+
+        $this->promptRepository->method('findOneBy')->willReturn(null);
+        $this->modelConfigService->method('getEffectiveUserIdForMessage')->willReturn(7);
+        $this->modelConfigService->method('getDefaultModel')->willReturn(10);
+        $this->modelConfigService->method('getProviderForModel')->willReturn('openai');
+        $this->modelConfigService->method('getModelName')->willReturn('gpt-4.1');
+
+        $this->aiFacade->method('chat')->willReturn([
+            'content' => 'Got it.',
+            'provider' => 'openai',
+            'model' => 'gpt-4.1',
+        ]);
+
+        // No queue dispatch because extraction is skipped.
+        $this->messageBus->expects($this->never())->method('dispatch');
+
+        // Capture every info-level log call and assert the exact reason
+        // string surfaces — the request log is the regression we are
+        // explicitly NOT supposed to emit here. The callback declares the
+        // PSR-3 `(message, context)` signature so PHPUnit's pass-through
+        // never trips an ArgumentCountError when ChatHandler ships a
+        // context array alongside the message.
+        $infoMessages = [];
+        $this->logger
+            ->method('info')
+            ->willReturnCallback(function (string $message, array $context = []) use (&$infoMessages): void {
+                $infoMessages[] = $message;
+            });
+
+        $this->handler->handle(
+            $message,
+            [],
+            ['topic' => 'CHAT', 'language' => 'en'],
+            null,
+            ['channel' => 'email'], // non-widget channel
+        );
+
+        self::assertContains(
+            'ChatHandler: Memory extraction disabled by user setting, skipping',
+            $infoMessages,
+            'dispatchMemoryExtractionAsync() must log the user-setting reason when the user has memories disabled',
+        );
+        self::assertNotContains(
+            'ChatHandler: Memory extraction disabled by request, skipping',
+            $infoMessages,
+            'must not emit the request-level log when the cause is the user setting',
         );
     }
 

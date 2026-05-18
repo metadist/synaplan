@@ -293,6 +293,60 @@ class CostCalculationServiceTest extends TestCase
     }
 
     /**
+     * Regression test for issue #886a: image generation models had no
+     * `pricing_mode` set in the catalog, so MediaGenerationHandler's
+     * `media_usage['images']` was ignored by `recordUsage()` and cost
+     * silently fell through to the per-token path with zero billed tokens.
+     *
+     * With `pricing_mode: per_image` on the catalog entry, `media_usage`
+     * goes through the per-image path. The TheHive entries already author
+     * their price in `perpic` units, so the natural multiplication holds.
+     */
+    public function testCalculateMediaCostBillsPerImageWhenPricingModeIsPerImage(): void
+    {
+        $model = $this->createModelMock('thehive', 0.0, 0.05, '-', 'perpic', [
+            'pricing_mode' => 'per_image',
+        ]);
+
+        // @phpstan-ignore-next-line
+        $this->modelRepository->method('find')->willReturn($model);
+        // @phpstan-ignore-next-line
+        $this->priceHistoryRepository->method('findPriceAtTimestamp')->willReturn(null);
+
+        // Caller signals "we generated 4 images" via outputQuantity. The
+        // input quantity (e.g. 1200 prompt characters) MUST NOT add cost.
+        $result = $this->service->calculateMediaCost(1, 1200, 4.0);
+
+        // 4 * $0.05 = $0.20 — input is ignored (the `-` inUnit normalises to 0).
+        $this->assertSame('0.200000', $result->totalCost);
+        $this->assertSame('0.000000', $result->inputCost);
+        $this->assertSame('0.200000', $result->outputCost);
+    }
+
+    /**
+     * Imagen 4.0 production shape: priceIn=0, priceOut=0.04, units=perImage.
+     * 5 images × $0.04 = $0.20. The unit normaliser must NOT divide
+     * `perImage` by 1M — it is already dollars per single image.
+     */
+    public function testCalculateMediaCostHonoursPerImageOutUnit(): void
+    {
+        $model = $this->createModelMock('google', 0.0, 0.04, 'perImage', 'perImage', [
+            'pricing_mode' => 'per_image',
+        ]);
+
+        // @phpstan-ignore-next-line
+        $this->modelRepository->method('find')->willReturn($model);
+        // @phpstan-ignore-next-line
+        $this->priceHistoryRepository->method('findPriceAtTimestamp')->willReturn(null);
+
+        $result = $this->service->calculateMediaCost(1, 0, 5);
+
+        $this->assertSame('0.200000', $result->totalCost);
+        $this->assertSame('0.200000', $result->outputCost);
+        $this->assertSame('0.000000', $result->inputCost);
+    }
+
+    /**
      * Regression test for issue #886b: TTS catalog entries had no
      * `pricing_mode` set, so even though MediaGenerationHandler correctly
      * passed `media_usage['characters']`, the cost path fell through to
@@ -320,6 +374,52 @@ class CostCalculationServiceTest extends TestCase
         $this->assertSame('0.180000', $result->totalCost);
         $this->assertSame('0.180000', $result->inputCost);
         $this->assertSame('0.000000', $result->outputCost);
+    }
+
+    /**
+     * Defensive case for the unit normaliser: even if a future catalog
+     * entry mistakenly leaves `outUnit=per1M` while flipping the
+     * `pricing_mode` flag, the calculator must NOT bill $40/image. The
+     * normaliser interprets `per1M` as "$X per million units", so 1
+     * image × ($40 / 1_000_000) = $0.00004. Tiny, but not catastrophic
+     * (Copilot review on PR #932 flagged the original $40-per-image
+     * regression caused by the missing unit conversion).
+     */
+    public function testCalculateMediaCostNormalisesPer1MOutUnitForPerImage(): void
+    {
+        $model = $this->createModelMock('openai', 5.0, 40.0, 'per1M', 'per1M', [
+            'pricing_mode' => 'per_image',
+        ]);
+
+        // @phpstan-ignore-next-line
+        $this->modelRepository->method('find')->willReturn($model);
+        // @phpstan-ignore-next-line
+        $this->priceHistoryRepository->method('findPriceAtTimestamp')->willReturn(null);
+
+        $result = $this->service->calculateMediaCost(1, 0, 1);
+
+        // 1 × (40 / 1_000_000) = $0.00004. Non-catastrophic.
+        $this->assertSame('0.000040', $result->outputCost);
+    }
+
+    public function testCalculateMediaCostHonoursPerPicOutUnit(): void
+    {
+        // TheHive flux-schnell prod shape: priceOut=0.01, outUnit=perpic.
+        // The calculator must NOT divide by 1M — the unit is already
+        // dollars per image.
+        $model = $this->createModelMock('thehive', 0.0, 0.01, '-', 'perpic', [
+            'pricing_mode' => 'per_image',
+        ]);
+
+        // @phpstan-ignore-next-line
+        $this->modelRepository->method('find')->willReturn($model);
+        // @phpstan-ignore-next-line
+        $this->priceHistoryRepository->method('findPriceAtTimestamp')->willReturn(null);
+
+        $result = $this->service->calculateMediaCost(1, 0, 5);
+
+        // 5 images × $0.01 = $0.05.
+        $this->assertSame('0.050000', $result->totalCost);
     }
 
     /**

@@ -1221,14 +1221,21 @@ class ModelCatalog
             'selectable' => 1,
             'active' => 1,
             'providerId' => 'imagen-4.0-generate-001',
-            'priceIn' => 0.1,
-            'inUnit' => 'per1M',
-            'priceOut' => 0.4,
-            'outUnit' => 'per1M',
+            // Imagen 4.0 is a flat per-image-fee model in production
+            // ($0.04/image standard quality). Mirrors live BMODELS BID 115:
+            // priceIn=0 (no input cost), priceOut=0.04 in `perImage` units.
+            'priceIn' => 0,
+            'inUnit' => 'perImage',
+            'priceOut' => 0.04,
+            'outUnit' => 'perImage',
             'quality' => 9,
             'rating' => 1,
             'json' => [
                 'description' => 'Google Imagen 4.0 image generation',
+                'pricing_mode' => 'per_image',
+                'mode_prices' => [
+                    'output_cost_per_image' => 0.04,
+                ],
                 'params' => ['model' => 'imagen-4.0-generate-001'],
                 'features' => ['image'],
             ],

@@ -28,7 +28,7 @@
 
       <div
         ref="chatContainer"
-        class="flex-1 overflow-y-auto bg-chat"
+        class="flex-1 overflow-y-auto bg-chat overscroll-contain"
         data-testid="section-messages"
         @scroll="handleScroll"
       >
@@ -621,6 +621,16 @@ const handleVisibilityChangeForToken = () => {
   }
 }
 
+const handleViewportResize = () => {
+  if (autoScroll.value && chatContainer.value) {
+    chatContainer.value.scrollTop = chatContainer.value.scrollHeight
+  }
+}
+
+if (window.visualViewport) {
+  window.visualViewport.addEventListener('resize', handleViewportResize)
+}
+
 // Window event handler for memory dialog (used by MessageText.vue)
 const handleOpenMemoryDialogEvent = (event: Event) => {
   const customEvent = event as CustomEvent<{ memory: UserMemory }>
@@ -650,6 +660,9 @@ onBeforeUnmount(() => {
     currentAudioStreamer = null
   }
   isAudioStreaming.value = false
+  if (window.visualViewport) {
+    window.visualViewport.removeEventListener('resize', handleViewportResize)
+  }
   window.removeEventListener('open-memory-dialog', handleOpenMemoryDialogEvent)
   window.removeEventListener('open-feedback-dialog', handleOpenFeedbackDialogEvent)
   window.removeEventListener('focus', prefetchSseToken)

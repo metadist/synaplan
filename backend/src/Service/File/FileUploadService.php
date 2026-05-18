@@ -254,8 +254,10 @@ final readonly class FileUploadService
             $result['ai_processing_note'] = 'AI processing not yet implemented';
         }
 
-        $this->rateLimitService->recordUsage($user, 'FILE_ANALYSIS', [
-            'file_id' => $file->getId(),
+        // recordFileAnalysisOnce dedups on (user_id, file_id) so a later
+        // `processFile()` retry against the same File entity cannot create
+        // a second BUSELOG row (issue #887: RAG double-count on retry).
+        $this->rateLimitService->recordFileAnalysisOnce($user, (int) $file->getId(), [
             'filename' => $uploadedFile->getClientOriginalName(),
             'source' => 'WEB',
         ]);
@@ -427,8 +429,10 @@ final readonly class FileUploadService
             $file->setStatus('vectorized');
             $this->em->flush();
 
-            $this->rateLimitService->recordUsage($user, 'FILE_ANALYSIS', [
-                'file_id' => $file->getId(),
+            // Dedup on (user_id, file_id) — see issue #887. If the
+            // earlier processSingleUpload() (or a previous /process retry)
+            // already wrote a BUSELOG row for this file, this is a no-op.
+            $this->rateLimitService->recordFileAnalysisOnce($user, (int) $file->getId(), [
                 'filename' => $file->getFileName(),
                 'source' => 'WEB_ASYNC',
             ]);
@@ -454,8 +458,8 @@ final readonly class FileUploadService
                 $file->setStatus('vectorized');
                 $this->em->flush();
 
-                $this->rateLimitService->recordUsage($user, 'FILE_ANALYSIS', [
-                    'file_id' => $file->getId(),
+                // Dedup on (user_id, file_id) — issue #887 RAG double-count.
+                $this->rateLimitService->recordFileAnalysisOnce($user, (int) $file->getId(), [
                     'filename' => $file->getFileName(),
                     'source' => 'WEB_ASYNC',
                 ]);

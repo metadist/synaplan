@@ -425,7 +425,11 @@ async function httpClient<T = unknown, S extends z.Schema | undefined = undefine
       }
 
       if (refreshResult.success) {
-        // Retry the original request
+        // Brief delay to allow the refreshed cookie to propagate before retrying.
+        // Without this, a rapid retry can reach the server before the new access-token
+        // cookie is visible, causing an immediate second 401 that wrongly triggers
+        // the auth-failure loop detector (issue #635).
+        await new Promise((resolve) => setTimeout(resolve, 100))
         // @ts-expect-error - Recursive call with same types
         return httpClient(endpoint, { ...options, _isRetry: true })
       }

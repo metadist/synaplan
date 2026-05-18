@@ -728,7 +728,7 @@ class OpenAIProvider implements ChatProviderInterface, EmbeddingProviderInterfac
             'completion_tokens' => $usage['output_tokens'] ?? 0,
             'total_tokens' => $usage['total_tokens'] ?? 0,
             'cached_tokens' => $usage['input_tokens_details']['cached_tokens'] ?? 0,
-            'cache_creation_tokens' => 0,
+            'cache_creation_tokens' => $usage['input_tokens_details']['cache_creation_tokens'] ?? 0,
         ];
     }
 

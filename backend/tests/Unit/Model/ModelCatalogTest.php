@@ -253,6 +253,34 @@ class ModelCatalogTest extends TestCase
     }
 
     /**
+     * Regression test for issue #886a: image models that the upstream
+     * provider bills as a flat per-image fee MUST set
+     * `pricing_mode: per_image` so the media-cost path runs. Live prod
+     * BMODELS confirms exactly one such row in the current catalog —
+     * Google Imagen 4.0 (BID 115). OpenAI gpt-image-* and Google Nano
+     * Banana stay on the implicit per-token default because the provider
+     * bills them as tokens; TheHive entries stay on the implicit default
+     * because they're routed through a flat-rate operator agreement.
+     *
+     * Pinning the explicit allow-list here (rather than "every text2pic")
+     * stops a future contributor from blanket-flagging providers whose
+     * upstream billing is actually token-based — which would re-introduce
+     * the catastrophic-overbill class of bug Copilot flagged on PR #932.
+     */
+    public function testImagenFourHasPerImagePricingMode(): void
+    {
+        $imagen = array_values(array_filter(
+            ModelCatalog::all(),
+            static fn (array $m): bool => 'imagen-4.0-generate-001' === ($m['providerId'] ?? null),
+        ));
+
+        $this->assertCount(1, $imagen, 'Catalog must contain exactly one Imagen 4.0 entry.');
+        $this->assertSame('per_image', $imagen[0]['json']['pricing_mode'] ?? null);
+        $this->assertSame('perImage', $imagen[0]['outUnit'] ?? null);
+        $this->assertEqualsWithDelta(0.04, (float) ($imagen[0]['priceOut'] ?? 0.0), 1e-9);
+    }
+
+    /**
      * Regression test for issue #886b: TTS models that the upstream
      * provider bills as a flat per-character fee MUST set
      * `pricing_mode: per_character` so the media-cost path runs. Live

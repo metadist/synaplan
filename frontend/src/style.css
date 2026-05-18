@@ -5,8 +5,23 @@
   --color-dark-border: rgb(255 255 255);
 }
 
+/* Mobile floating header button clearance — pushes titles below the button.
+   Excluded: ChatView (page-chat) where messages scroll behind the button. */
+@media (max-width: 767px) {
+  [data-testid='section-primary-content'] > :first-child:not([data-testid='page-chat']) {
+    padding-top: calc(env(safe-area-inset-top, 0px) + 62px);
+  }
+}
+
 /* Base */
 @layer base {
+  html,
+  body {
+    overflow: hidden;
+    height: 100%;
+    overscroll-behavior: none;
+  }
+
   body {
     @apply m-0 text-base leading-relaxed antialiased;
     font-family:

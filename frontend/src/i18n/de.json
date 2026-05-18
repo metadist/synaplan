@@ -1532,9 +1532,13 @@
       "statusCanceled": "Gekündigt",
       "statusPastDue": "Zahlung überfällig",
       "statusIncomplete": "Unvollständig",
+      "statusIncompleteExpired": "Unvollständig (abgelaufen)",
       "statusTrialing": "Testphase",
       "statusUnpaid": "Unbezahlt",
       "statusPaused": "Pausiert",
+      "paymentFailedTitle": "Zahlung fehlgeschlagen — bitte Karte aktualisieren",
+      "paymentFailedBody": "Wir konnten deine letzte Zahlung nicht verarbeiten. Stripe versucht es in den nächsten Wochen automatisch erneut, aber dein Abo wird pausiert, falls die Karte nicht aktualisiert wird. Öffne das Zahlungsportal, um das zu beheben.",
+      "paymentFailedCta": "Zahlungsmethode aktualisieren",
       "nextBilling": "Nächstes Abrechnungsdatum",
       "cancelDate": "Kündigung zum",
       "billingPortal": "Rechnungsportal",
@@ -3113,8 +3117,8 @@
       "action": "Pläne ansehen"
     },
     "fileMention": {
-      "title": "Dateien mit @ erwähnen",
-      "description": "Tippe @ im Chat, um schnell auf deine hochgeladenen Dateien zu verweisen. Die KI liest den Dateiinhalt und nutzt ihn zur Beantwortung deiner Frage.",
+      "title": "Dateien mit {'@'} erwähnen",
+      "description": "Tippe {'@'} im Chat, um schnell auf deine hochgeladenen Dateien zu verweisen. Die KI liest den Dateiinhalt und nutzt ihn zur Beantwortung deiner Frage.",
       "action": ""
     },
     "widgetPreview": {

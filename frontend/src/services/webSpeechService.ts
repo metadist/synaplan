@@ -245,12 +245,13 @@ export class WebSpeechService {
 
       // Android Chrome (some versions) reports cumulative finals: each
       // results[i].transcript contains ALL text from results[0..i], not just
-      // the new segment. Joining them naively produces "hi hi wie hi wie wird".
-      // Detect this pattern and take only the last (most complete) final.
-      const finalText =
-        finals.length > 1 && this.areFinalsCumulative(finals)
-          ? finals[finals.length - 1]
-          : finals.join(' ')
+      // the new segment. Real Android sessions also mix patterns within a
+      // single recognition (e.g. ["hi", "hi wie wird", "neue session"]) where
+      // an all-or-nothing detection still leaks duplicates. Walk the list
+      // once and only keep the *new tail* whenever a final is a strict
+      // prefix-extension of the previous one — this collapses cumulative
+      // bursts while preserving genuinely independent segments.
+      const finalText = this.dedupeProgressiveFinals(finals)
 
       this.options.onResult?.({
         final: finalText.replace(/\s+/g, ' ').trim(),
@@ -327,20 +328,49 @@ export class WebSpeechService {
   }
 
   /**
-   * Detect Android Chrome's "cumulative finals" pattern where each
-   * results[i].transcript is a superset of results[i-1].transcript
-   * rather than an independent new segment.
+   * Walk the list of final transcripts and emit a deduplicated, joined
+   * string that handles three intermixed patterns Android Chrome has been
+   * observed to produce in a single recognition session:
    *
-   * Requires a word boundary (space) after the prefix to avoid false
-   * positives like ["hi", "higher"] being detected as cumulative.
+   *  1. **Identical re-emit:** the same final shows up multiple times in a
+   *     row (`["hi wie", "hi wie"]`). Skip the duplicate.
+   *  2. **Cumulative growth:** `finals[i]` extends `finals[i-1]` with a
+   *     space-separated tail (`["hi", "hi wie", "hi wie wird"]`). Append
+   *     only the new tail.
+   *  3. **Independent segment:** `finals[i]` is unrelated to the previous
+   *     one (`["hello", "world"]`, the standard W3C desktop pattern, or
+   *     a fresh phrase after silence). Append it whole.
+   *
+   * The previous all-or-nothing detection collapsed everything to the last
+   * final whenever the list was strictly cumulative, but leaked duplicates
+   * the moment a single independent segment slipped in (issue #898 follow-up
+   * reported by Furkan on PR #935).
+   *
+   * The cumulative check requires an actual space (` `) between prev and
+   * the rest to avoid false positives like ["hi", "higher"].
    */
-  private areFinalsCumulative(finals: string[]): boolean {
-    for (let i = 1; i < finals.length; i++) {
-      const prev = finals[i - 1].trim()
-      const curr = finals[i].trim()
-      if (curr !== prev && !curr.startsWith(prev + ' ')) return false
+  private dedupeProgressiveFinals(finals: string[]): string {
+    const parts: string[] = []
+    let previousCumulative = ''
+
+    for (const raw of finals) {
+      const curr = raw.trim()
+      if ('' === curr) continue
+
+      if (curr === previousCumulative) continue
+
+      if ('' !== previousCumulative && curr.startsWith(previousCumulative + ' ')) {
+        const tail = curr.slice(previousCumulative.length + 1).trim()
+        if ('' !== tail) parts.push(tail)
+        previousCumulative = curr
+        continue
+      }
+
+      parts.push(curr)
+      previousCumulative = curr
     }
-    return true
+
+    return parts.join(' ')
   }
 
   /**

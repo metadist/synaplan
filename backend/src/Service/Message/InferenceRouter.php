@@ -35,9 +35,22 @@ final class InferenceRouter
 
     /**
      * Routed Message zu richtigem Handler.
+     *
+     * Mirrors {@see routeStream()}'s `$options` parameter so the non-streaming
+     * email/generic-webhook path can forward channel / disable-memories /
+     * reasoning flags down to the handler. Existing callers that pass four
+     * args keep working unchanged because `$options` defaults to `[]`.
+     *
+     * @param array<string, mixed> $classification
+     * @param array<string, mixed> $options
      */
-    public function route(Message $message, array $thread, array $classification, ?callable $progressCallback = null): array
-    {
+    public function route(
+        Message $message,
+        array $thread,
+        array $classification,
+        ?callable $progressCallback = null,
+        array $options = [],
+    ): array {
         $intent = $classification['intent'] ?? 'chat';
 
         $this->notify($progressCallback, 'processing', "Routing to handler: {$intent}");
@@ -46,7 +59,7 @@ final class InferenceRouter
         $handler = $this->getHandler($intent);
 
         try {
-            $result = $handler->handle($message, $thread, $classification, $progressCallback);
+            $result = $handler->handle($message, $thread, $classification, $progressCallback, $options);
 
             $this->notify($progressCallback, 'processing', "Handler complete: {$intent}");
 
@@ -58,7 +71,7 @@ final class InferenceRouter
             if ('chat' !== $intent) {
                 $this->notify($progressCallback, 'processing', 'Falling back to chat handler');
 
-                return $this->handlers['chat']->handle($message, $thread, $classification, $progressCallback);
+                return $this->handlers['chat']->handle($message, $thread, $classification, $progressCallback, $options);
             }
 
             throw $e;

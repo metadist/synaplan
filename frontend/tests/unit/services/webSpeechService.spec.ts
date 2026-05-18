@@ -193,6 +193,63 @@ describe('WebSpeechService.onresult — snapshot semantics (issue #898)', () => 
     }
   })
 
+  it('does NOT duplicate when Android mixes cumulative and independent finals in one session', async () => {
+    // Real Android sessions reported on PR #935 mix patterns: a burst of
+    // cumulative finals is followed by a fresh independent segment after a
+    // pause. The previous all-or-nothing detection bailed to plain join()
+    // the moment any independent final showed up, leaking every cumulative
+    // duplicate ahead of it. The dedupe must collapse the cumulative burst
+    // AND still append the independent tail exactly once.
+    const calls: WebSpeechSnapshot[] = []
+    const service = new WebSpeechService({ onResult: (snap) => calls.push({ ...snap }) })
+    await service.start()
+
+    recognition.fireResults(0, [
+      { transcript: 'hi', isFinal: true },
+      { transcript: 'hi how are you', isFinal: true },
+      { transcript: 'today the weather is nice', isFinal: true },
+    ])
+
+    expect(calls.at(-1)).toEqual({
+      final: 'hi how are you today the weather is nice',
+      interim: '',
+    })
+    for (const call of calls) {
+      expect(call.final).not.toMatch(/\b(\w+)\s+\1\b/)
+    }
+  })
+
+  it('drops identical re-emitted finals without duplicating them', async () => {
+    // Some Android engines re-emit the exact same final transcript across
+    // consecutive events. Without dedupe these would join into "hi wie hi wie".
+    const calls: WebSpeechSnapshot[] = []
+    const service = new WebSpeechService({ onResult: (snap) => calls.push({ ...snap }) })
+    await service.start()
+
+    recognition.fireResults(0, [
+      { transcript: 'hi wie', isFinal: true },
+      { transcript: 'hi wie', isFinal: true },
+      { transcript: 'hi wie', isFinal: true },
+    ])
+
+    expect(calls.at(-1)).toEqual({ final: 'hi wie', interim: '' })
+  })
+
+  it('treats prefix matches without a word boundary as independent (no false positives)', async () => {
+    // ["hi", "higher"] is NOT cumulative — "higher" is a different word.
+    // The service must keep both and join them rather than collapsing.
+    const calls: WebSpeechSnapshot[] = []
+    const service = new WebSpeechService({ onResult: (snap) => calls.push({ ...snap }) })
+    await service.start()
+
+    recognition.fireResults(0, [
+      { transcript: 'hi', isFinal: true },
+      { transcript: 'higher', isFinal: true },
+    ])
+
+    expect(calls.at(-1)).toEqual({ final: 'hi higher', interim: '' })
+  })
+
   it('still joins independent finals correctly (standard W3C desktop pattern)', async () => {
     // On desktop Chrome, each result entry is an independent word/phrase.
     // These must still be joined, NOT collapsed.
