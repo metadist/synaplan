@@ -14,6 +14,7 @@ use App\Service\DiscordNotificationService;
 use App\Service\File\FileProcessor;
 use App\Service\File\FileStorageService;
 use App\Service\File\VectorizationService;
+use App\Service\Media\GeneratedFileMetadataNormalizer;
 use App\Service\Message\MessageProcessor;
 use App\Service\PromptService;
 use App\Service\RateLimitService;
@@ -58,6 +59,7 @@ class WidgetPublicController extends AbstractController
         private EntityManagerInterface $em,
         private LoggerInterface $logger,
         private DiscordNotificationService $discord,
+        private GeneratedFileMetadataNormalizer $generatedFileMetadataNormalizer,
         private string $uploadDir,
     ) {
     }
@@ -665,7 +667,7 @@ class WidgetPublicController extends AbstractController
                     // the embedded chat history both render the player on reload
                     // (issue #626 — mirrors the StreamController behaviour for the
                     // authenticated web channel).
-                    $generatedFile = $this->normalizeGeneratedFileMetadata($responseMetadata['file'] ?? null);
+                    $generatedFile = $this->generatedFileMetadataNormalizer->normalize($responseMetadata['file'] ?? null);
 
                     $outgoingMessage = new Message();
                     $outgoingMessage->setUserId($owner->getId());
@@ -1059,34 +1061,6 @@ class WidgetPublicController extends AbstractController
         }
 
         return $result;
-    }
-
-    /**
-     * Normalize the `metadata.file` block returned by the media generation
-     * handler into the `{path, type}` shape we persist on a Message row.
-     *
-     * Returns null when the metadata does not describe a usable serve URL —
-     * keeps callers from writing empty file paths that would later short-circuit
-     * the chat history endpoint and confuse the embedded widget UI.
-     *
-     * @param mixed $fileMeta Expected shape: ['path' => string, 'type' => string]
-     *
-     * @return array{path: string, type: string}|null
-     */
-    private function normalizeGeneratedFileMetadata(mixed $fileMeta): ?array
-    {
-        if (!is_array($fileMeta)) {
-            return null;
-        }
-
-        $path = isset($fileMeta['path']) && is_string($fileMeta['path']) ? trim($fileMeta['path']) : '';
-        $type = isset($fileMeta['type']) && is_string($fileMeta['type']) ? trim($fileMeta['type']) : '';
-
-        if ('' === $path) {
-            return null;
-        }
-
-        return ['path' => $path, 'type' => $type];
     }
 
     /**

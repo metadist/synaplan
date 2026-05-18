@@ -10,6 +10,7 @@ use App\Service\DiscordNotificationService;
 use App\Service\EmailChatService;
 use App\Service\EmailWebhookIdempotencyService;
 use App\Service\InternalEmailService;
+use App\Service\Media\GeneratedFileMetadataNormalizer;
 use App\Service\Message\MessageProcessor;
 use App\Service\ModelConfigService;
 use App\Service\RateLimitService;
@@ -42,6 +43,7 @@ class WebhookController extends AbstractController
         private string $whatsappWebhookVerifyToken,
         private AiFacade $aiFacade,
         private ModelConfigService $modelConfigService,
+        private GeneratedFileMetadataNormalizer $generatedFileMetadataNormalizer,
     ) {
     }
 
@@ -457,7 +459,7 @@ class WebhookController extends AbstractController
             // so the web chat surfaces the embedded player when the user later opens
             // the same conversation in the UI (issue #626). The handler returns the
             // serve URL + type in `metadata.file`; mirror the StreamController shape.
-            $generatedFile = $this->normalizeGeneratedFileMetadata($metadata['file'] ?? null);
+            $generatedFile = $this->generatedFileMetadataNormalizer->normalize($metadata['file'] ?? null);
 
             $outgoingMessage = new Message();
             $outgoingMessage->setUserId($user->getId());
@@ -847,34 +849,6 @@ class WebhookController extends AbstractController
                 'error' => 'Internal error',
             ], Response::HTTP_INTERNAL_SERVER_ERROR);
         }
-    }
-
-    /**
-     * Normalize the `metadata.file` block returned by the media generation
-     * handler into the `{path, type}` shape we persist on a Message row.
-     *
-     * Returns null when the metadata does not describe a usable serve URL —
-     * keeps callers from writing empty file paths that would later short-circuit
-     * `ChatController::getChatMessages()` and confuse the frontend.
-     *
-     * @param mixed $fileMeta Expected shape: ['path' => string, 'type' => string]
-     *
-     * @return array{path: string, type: string}|null
-     */
-    private function normalizeGeneratedFileMetadata(mixed $fileMeta): ?array
-    {
-        if (!is_array($fileMeta)) {
-            return null;
-        }
-
-        $path = isset($fileMeta['path']) && is_string($fileMeta['path']) ? trim($fileMeta['path']) : '';
-        $type = isset($fileMeta['type']) && is_string($fileMeta['type']) ? trim($fileMeta['type']) : '';
-
-        if ('' === $path) {
-            return null;
-        }
-
-        return ['path' => $path, 'type' => $type];
     }
 
     private function resolveAttachmentPathFromAiMetadata(array $metadata): ?string
