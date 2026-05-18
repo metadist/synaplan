@@ -1199,6 +1199,7 @@
       "errorTopicExists": "Ein Prompt mit diesem Topic existiert bereits. Bitte wählen Sie ein anderes Topic.",
       "errorToolsPrefix": "Prompts mit \"tools:\"-Präfix können nicht erstellt werden — reserviert fürs System.",
       "errorMissingFields": "Bitte füllen Sie alle Pflichtfelder aus: Topic, Name und Prompt-Inhalt.",
+      "saveErrorPremiumRequired": "{reason} Bitte aktualisieren Sie Ihren Tarif oder wählen Sie ein anderes AI-Modell für diesen Prompt.",
       "copy": "Kopieren",
       "copyToClipboard": "In Zwischenablage kopieren",
       "copySuccess": "In Zwischenablage kopiert.",
