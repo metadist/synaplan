@@ -613,14 +613,20 @@ class ModelCatalog
             'selectable' => 1,
             'active' => 1,
             'providerId' => 'tts-1',
-            'priceIn' => 0.015,
-            'inUnit' => 'per1000chars',
+            // OpenAI tts-1 is flat $0.015 per 1000 characters → $0.000015
+            // per character. Mirrors live BMODELS BID 41.
+            'priceIn' => 0.000015,
+            'inUnit' => 'perChar',
             'priceOut' => 0,
-            'outUnit' => '-',
+            'outUnit' => 'perChar',
             'quality' => 8,
             'rating' => 1,
             'json' => [
                 'description' => 'OpenAI\'s text to speech, defaulting on voice NOVA.',
+                'pricing_mode' => 'per_character',
+                'mode_prices' => [
+                    'input_cost_per_character' => 0.000015,
+                ],
                 'params' => ['model' => 'tts-1', 'voice' => 'nova'],
             ],
         ],
@@ -673,14 +679,20 @@ class ModelCatalog
             'selectable' => 1,
             'active' => 1,
             'providerId' => 'tts-1-hd',
-            'priceIn' => 0.03,
-            'inUnit' => 'per1000chars',
+            // OpenAI tts-1-hd is flat $0.03 per 1000 characters → $0.00003
+            // per character. Mirrors live BMODELS BID 83.
+            'priceIn' => 0.00003,
+            'inUnit' => 'perChar',
             'priceOut' => 0,
-            'outUnit' => '-',
+            'outUnit' => 'perChar',
             'quality' => 9,
             'rating' => 1,
             'json' => [
                 'description' => 'OpenAI high-quality text-to-speech.',
+                'pricing_mode' => 'per_character',
+                'mode_prices' => [
+                    'input_cost_per_character' => 0.00003,
+                ],
                 'params' => ['model' => 'tts-1-hd'],
             ],
         ],

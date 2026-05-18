@@ -280,6 +280,45 @@ class ModelCatalogTest extends TestCase
         $this->assertEqualsWithDelta(0.04, (float) ($imagen[0]['priceOut'] ?? 0.0), 1e-9);
     }
 
+    /**
+     * Regression test for issue #886b: TTS models that the upstream
+     * provider bills as a flat per-character fee MUST set
+     * `pricing_mode: per_character` so the media-cost path runs. Live
+     * prod BMODELS confirms exactly two such rows in the current catalog
+     * — OpenAI tts-1 (BID 41) and tts-1-hd (BID 83). Google Gemini 2.5
+     * Flash TTS bills as tokens (per_token default); Piper is operator-
+     * hosted with an effectively free price.
+     *
+     * Pinning the explicit allow-list here (rather than "every text2sound")
+     * stops a future contributor from blanket-flagging providers whose
+     * upstream billing is actually token-based — which would re-introduce
+     * the catastrophic-overbill class of bug Copilot flagged on PR #933.
+     */
+    public function testOpenAiTtsModelsHavePerCharacterPricingMode(): void
+    {
+        $expected = [
+            'tts-1' => 0.000015,
+            'tts-1-hd' => 0.00003,
+        ];
+
+        foreach ($expected as $providerId => $expectedPriceIn) {
+            $rows = array_values(array_filter(
+                ModelCatalog::all(),
+                static fn (array $m): bool => $providerId === ($m['providerId'] ?? null),
+            ));
+
+            $this->assertCount(1, $rows, sprintf('Catalog must contain exactly one %s entry.', $providerId));
+            $this->assertSame('per_character', $rows[0]['json']['pricing_mode'] ?? null);
+            $this->assertSame('perChar', $rows[0]['inUnit'] ?? null);
+            $this->assertEqualsWithDelta(
+                $expectedPriceIn,
+                (float) ($rows[0]['priceIn'] ?? 0.0),
+                1e-9,
+                sprintf('%s priceIn must be authored per-character (matches live BMODELS).', $providerId),
+            );
+        }
+    }
+
     public function testFingerprintIsStableAcrossFloatRoundTrip(): void
     {
         // Doctrine DBAL hands floats back as native floats; the identity should

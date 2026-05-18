@@ -347,6 +347,36 @@ class CostCalculationServiceTest extends TestCase
     }
 
     /**
+     * Regression test for issue #886b: TTS catalog entries had no
+     * `pricing_mode` set, so even though MediaGenerationHandler correctly
+     * passed `media_usage['characters']`, the cost path fell through to
+     * per-token and recorded $0.000000 in BUSELOG. With
+     * `pricing_mode: per_character` the inputQuantity (characters spoken)
+     * is billed at priceIn.
+     */
+    public function testCalculateMediaCostBillsPerCharacterWhenPricingModeIsPerCharacter(): void
+    {
+        // Mirrors the live BMODELS BID 41 (OpenAI tts-1) shape:
+        // priceIn=0.000015 with inUnit=perChar — already per-single-char.
+        $model = $this->createModelMock('openai', 0.000015, 0.0, 'perChar', 'perChar', [
+            'pricing_mode' => 'per_character',
+        ]);
+
+        // @phpstan-ignore-next-line
+        $this->modelRepository->method('find')->willReturn($model);
+        // @phpstan-ignore-next-line
+        $this->priceHistoryRepository->method('findPriceAtTimestamp')->willReturn(null);
+
+        // 12 000 characters spoken.
+        $result = $this->service->calculateMediaCost(45, 12000.0, 0.0);
+
+        // 12 000 * 0.000015 = $0.18 — input billed, output ignored.
+        $this->assertSame('0.180000', $result->totalCost);
+        $this->assertSame('0.180000', $result->inputCost);
+        $this->assertSame('0.000000', $result->outputCost);
+    }
+
+    /**
      * Defensive case for the unit normaliser: even if a future catalog
      * entry mistakenly leaves `outUnit=per1M` while flipping the
      * `pricing_mode` flag, the calculator must NOT bill $40/image. The
@@ -390,6 +420,33 @@ class CostCalculationServiceTest extends TestCase
 
         // 5 images × $0.01 = $0.05.
         $this->assertSame('0.050000', $result->totalCost);
+    }
+
+    /**
+     * Defensive case for the unit normaliser: even if a future catalog
+     * entry mistakenly leaves `inUnit=per1000chars` while flipping the
+     * `pricing_mode` flag to per_character, the calculator must convert
+     * to the per-single-char unit before multiplying. Without
+     * normalisation 12 000 chars at $0.015/per1000chars would bill $180
+     * (1000× too high — Copilot review on PR #933 flagged this).
+     */
+    public function testCalculateMediaCostNormalisesPer1000charsForPerCharacterBilling(): void
+    {
+        $model = $this->createModelMock('openai', 0.015, 0.0, 'per1000chars', '-', [
+            'pricing_mode' => 'per_character',
+        ]);
+
+        // @phpstan-ignore-next-line
+        $this->modelRepository->method('find')->willReturn($model);
+        // @phpstan-ignore-next-line
+        $this->priceHistoryRepository->method('findPriceAtTimestamp')->willReturn(null);
+
+        $result = $this->service->calculateMediaCost(45, 12000.0, 0.0);
+
+        // 12 000 * (0.015 / 1000) = $0.18 — same outcome as the canonical
+        // perChar shape above, despite the catalog being authored in
+        // per-1000-char units.
+        $this->assertSame('0.180000', $result->totalCost);
     }
 
     public function testCostResultDtoStructure(): void
