@@ -41,6 +41,7 @@ final readonly class MessageClassifier
     public function __construct(
         private MessageSorter $messageSorter,
         private SynapseRouter $synapseRouter,
+        private TopicAliasResolver $topicAliasResolver,
         private MessageMetaRepository $messageMetaRepository,
         private ModelConfigService $modelConfigService,
         private ConfigRepository $configRepository,
@@ -196,12 +197,38 @@ final readonly class MessageClassifier
 
         $source = $result['source'] ?? 'ai_sorting';
 
+        // Resolve granular Synapse-v2 topics (image-generation, video-generation,
+        // audio-generation, coding, general-chat) to their canonical legacy topics
+        // BEFORE mapping to intent. The AI sorter (used when Synapse Routing is
+        // OFF — the default) returns the granular topic from PromptCatalog, but
+        // downstream code (mapTopicToIntent, handler resolution, BFILEPATH keys)
+        // only understands canonical topics. Without this resolution all media-
+        // generation requests fall back to `chat`/ChatHandler (#952).
+        //
+        // SynapseRouter already runs this resolver internally, so calling it
+        // again here is idempotent for already-canonical topics — but it
+        // guarantees the contract for the AI-sorter path too.
+        $rawTopic = (string) ($result['topic'] ?? 'general');
+        $alias = $this->topicAliasResolver->resolve($rawTopic);
+        $canonicalTopic = $alias['topic'];
+        $impliedMedia = $alias['media'];
+
+        if (null !== $alias['alias_source']) {
+            $this->logger->info('MessageClassifier: Resolved granular topic to canonical', [
+                'message_id' => $messageId,
+                'granular_topic' => $alias['alias_source'],
+                'canonical_topic' => $canonicalTopic,
+                'implied_media' => $impliedMedia,
+            ]);
+        }
+
         $this->logger->info('MessageClassifier: Classification complete', [
             'message_id' => $messageId,
-            'topic' => $result['topic'],
+            'topic' => $canonicalTopic,
+            'granular_topic' => $alias['alias_source'],
             'language' => $result['language'],
             'web_search' => $result['web_search'] ?? false,
-            'media_type' => $result['media_type'] ?? null,
+            'media_type' => $result['media_type'] ?? $impliedMedia,
             'duration' => $result['duration'] ?? null,
             'resolution' => $result['resolution'] ?? null,
             'source' => $source,
@@ -210,23 +237,30 @@ final readonly class MessageClassifier
         ]);
 
         $classification = [
-            'topic' => $result['topic'],
+            'topic' => $canonicalTopic,
             'language' => $result['language'],
             'web_search' => $result['web_search'] ?? false,
             'source' => $source,
             'skip_sorting' => false,
-            'intent' => $this->mapTopicToIntent($result['topic']),
+            'intent' => $this->mapTopicToIntent($canonicalTopic),
             'model_id' => $result['sorting_model_id'] ?? null,
             'provider' => $result['sorting_provider'] ?? null,
             'model_name' => $result['sorting_model_name'] ?? null,
         ];
 
+        if (null !== $alias['alias_source']) {
+            $classification['granular_topic'] = $alias['alias_source'];
+        }
+
         if ($overrideModelId) {
             $classification['override_model_id'] = $overrideModelId;
         }
 
-        // Pass through media_type if detected (for mediamaker topic)
-        $mediaType = $result['media_type'] ?? null;
+        // Pass through media_type if detected (for mediamaker topic). Prefer
+        // the sorter's explicit BMEDIA value, fall back to the implied media
+        // from the granular topic alias (image-generation → 'image', etc.) so
+        // MediaGenerationHandler always knows which provider to invoke.
+        $mediaType = $result['media_type'] ?? $impliedMedia;
         if (null !== $mediaType) {
             $classification['media_type'] = $mediaType;
         }
@@ -514,7 +548,12 @@ final readonly class MessageClassifier
             'generate ', 'create ', 'draw ', 'paint ', 'sketch ', 'render ',
             'make a picture', 'make an image', 'make a video', 'make a song',
             'image of', 'picture of', 'photo of', 'illustration of',
+            // German imperatives. `generiere`/`generier` cover "generiere
+            // ein bild...", "generier mir...", "generiert eine grafik..."
+            // which would otherwise slip past the fast-path and get
+            // misclassified as `general`/chat (#952).
             'erstelle', 'erzeuge', 'zeichne', 'male ', 'rendere',
+            'generiere', 'generier ', 'generiert ',
             'genera ', 'crea ', 'dibuja ',
             'génère', 'crée', 'dessine',
         ];
