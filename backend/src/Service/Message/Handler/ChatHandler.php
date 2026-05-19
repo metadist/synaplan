@@ -14,6 +14,7 @@ use App\Service\FeedbackConfigService;
 use App\Service\FeedbackConstants;
 use App\Service\File\FileHelper;
 use App\Service\File\UserUploadPathBuilder;
+use App\Service\MemoryExtractionDispatcher;
 use App\Service\ModelConfigService;
 use App\Service\PerfPipelineFlag;
 use App\Service\PerfTimer;
@@ -26,7 +27,6 @@ use App\Service\UserMemoryService;
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\DependencyInjection\Attribute\AutoconfigureTag;
-use Symfony\Component\Messenger\MessageBusInterface;
 
 /**
  * Chat Handler - Normaler Konversations-Chat.
@@ -53,7 +53,7 @@ final readonly class ChatHandler implements MessageHandlerInterface
         private UserMemoryService $memoryService,
         private FeedbackConfigService $feedbackConfig,
         private RateLimitService $rateLimitService,
-        private MessageBusInterface $messageBus,
+        private MemoryExtractionDispatcher $memoryExtractionDispatcher,
         private PerfPipelineFlag $perfPipelineFlag,
         iterable $pluginContextProviders = [],
     ) {
@@ -405,8 +405,17 @@ final readonly class ChatHandler implements MessageHandlerInterface
         // exchange just like the streaming path does. We pass the final
         // assistant text (post JSON unwrap, post file-generation marker)
         // so the worker reasons about what the user actually saw.
+        //
+        // Issue #881: callers that persist a separate outgoing assistant
+        // message AFTER `handle()` returns (e.g. StreamController) MUST
+        // pass `defer_memory_extraction = true` so the dispatch happens
+        // after the outgoing flush. Otherwise the worker can run before
+        // the OUT row exists and `writeOutcomeMeta()` writes the meta to
+        // the IN row only — the frontend then polls the OUT id forever
+        // and the memory toast never appears.
         $extractionResponseText = is_string($content) ? $content : '';
-        $this->dispatchMemoryExtractionAsync(
+        $deferExtraction = !empty($options['defer_memory_extraction']);
+        $extractionPayload = $this->buildPendingMemoryExtraction(
             $message,
             $extractionResponseText,
             $thread,
@@ -416,12 +425,17 @@ final readonly class ChatHandler implements MessageHandlerInterface
             $memoriesRequestDisableContext,
         );
 
+        if (!$deferExtraction) {
+            $this->dispatchPendingMemoryExtraction($extractionPayload);
+        }
+
         return [
             'content' => $content,
             'metadata' => array_merge($metadata, [
                 'model_id' => $modelId, // Include resolved model_id for storage
                 'memories' => $loadedMemories,
                 'feedbacks' => $loadedFeedbacks,
+                'extraction_payload' => $deferExtraction ? $extractionPayload : null,
             ]),
         ];
     }
@@ -909,7 +923,17 @@ final readonly class ChatHandler implements MessageHandlerInterface
         // the post-stream extraction LLM call + Qdrant writes. Same
         // helper is now shared with `handle()` so the email/webhook
         // channel also benefits (issue #615).
-        $this->dispatchMemoryExtractionAsync(
+        //
+        // Issue #881: when invoked from StreamController the dispatch is
+        // deferred (`defer_memory_extraction` option) until after the
+        // outgoing assistant message has been persisted and flushed.
+        // Otherwise the worker can race the StreamController flush and
+        // write the extracted-memories meta to the IN row only — the
+        // frontend polls the OUT id and never sees `complete`, so no
+        // toast appears. The dispatch payload is returned in `metadata`
+        // so the StreamController can fire it after the flush.
+        $deferExtraction = !empty($options['defer_memory_extraction']);
+        $extractionPayload = $this->buildPendingMemoryExtraction(
             $message,
             $fullResponseText,
             $thread,
@@ -918,6 +942,10 @@ final readonly class ChatHandler implements MessageHandlerInterface
             $memoriesDisabledByUser,
             $memoriesRequestDisableContext,
         );
+
+        if (!$deferExtraction) {
+            $this->dispatchPendingMemoryExtraction($extractionPayload);
+        }
 
         return [
             'metadata' => [
@@ -928,6 +956,7 @@ final readonly class ChatHandler implements MessageHandlerInterface
                 'response_id' => $metadata['response_id'] ?? null,
                 'memories' => $loadedMemories,
                 'feedbacks' => $loadedFeedbacks,
+                'extraction_payload' => $deferExtraction ? $extractionPayload : null,
             ],
         ];
     }
@@ -1896,7 +1925,7 @@ final readonly class ChatHandler implements MessageHandlerInterface
      *                                  `disabledByRequest` is true when the *caller* (widget channel /
      *                                  `disable_memories` option) opted out; `disabledByUser` is true when
      *                                  the user has disabled memories in their settings. They are returned
-     *                                  separately so {@see dispatchMemoryExtractionAsync()} can log the
+     *                                  separately so {@see buildPendingMemoryExtraction()} can log the
      *                                  specific reason (issue PR #925 Copilot review).
      *                                  `requestDisableContext` carries which lever fired (widget channel,
      *                                  classification source, or explicit `disable_memories` flag) so the
@@ -2154,7 +2183,7 @@ final readonly class ChatHandler implements MessageHandlerInterface
     }
 
     /**
-     * Hand the post-response memory extraction off to the messenger worker.
+     * Build the (skip-aware) extraction payload without touching the bus.
      *
      * Honours the `PERF.V2_PIPELINE_ENABLED` kill switch and the same
      * disable flags used during context loading, so widgets and
@@ -2168,9 +2197,12 @@ final readonly class ChatHandler implements MessageHandlerInterface
      * log context — operators don't have to spelunk through user records
      * to tell the cases apart.
      *
-     * Never throws — a failed dispatch is logged at warning level and the
-     * user's response continues. Worst case is that one message's memories
-     * miss extraction; the next message picks them up.
+     * Returns either a ready-to-dispatch `ExtractMemoriesCommand` or
+     * `null` when extraction must be skipped. Pair with
+     * {@see dispatchPendingMemoryExtraction()} to actually fire it. The
+     * split exists so the StreamController can defer the dispatch until
+     * after the outgoing assistant message is persisted (issue #881
+     * race fix).
      *
      * @param array<int, array{role: string, content: string}|Message> $thread
      * @param array<int, array<string, mixed>>                         $loadedMemories
@@ -2178,7 +2210,7 @@ final readonly class ChatHandler implements MessageHandlerInterface
      * @param bool                                                     $disabledByUser        true when the user's profile setting has memories disabled
      * @param array<string, mixed>                                     $requestDisableContext optional log context describing which request-level lever fired (channel, classification source, disable_memories flag) — built by {@see loadMemoriesContext()}
      */
-    private function dispatchMemoryExtractionAsync(
+    private function buildPendingMemoryExtraction(
         Message $message,
         string $aiResponse,
         array $thread,
@@ -2186,13 +2218,13 @@ final readonly class ChatHandler implements MessageHandlerInterface
         bool $disabledByRequest,
         bool $disabledByUser,
         array $requestDisableContext = [],
-    ): void {
+    ): ?ExtractMemoriesCommand {
         if ($disabledByRequest) {
             $this->logger->info('ChatHandler: Memory extraction disabled by request, skipping', array_merge([
                 'user_id' => $message->getUserId(),
             ], $requestDisableContext));
 
-            return;
+            return null;
         }
 
         if ($disabledByUser) {
@@ -2200,7 +2232,7 @@ final readonly class ChatHandler implements MessageHandlerInterface
                 'user_id' => $message->getUserId(),
             ]);
 
-            return;
+            return null;
         }
 
         if (!$this->perfPipelineFlag->isEnabled($message->getUserId())) {
@@ -2213,35 +2245,33 @@ final readonly class ChatHandler implements MessageHandlerInterface
                 'user_id' => $message->getUserId(),
             ]);
 
-            return;
+            return null;
         }
 
-        try {
-            $threadSnapshot = $this->normalizeThreadForQueue($thread);
+        $threadSnapshot = $this->normalizeThreadForQueue($thread);
 
-            $this->messageBus->dispatch(new ExtractMemoriesCommand(
-                messageId: $message->getId(),
-                userId: $message->getUserId(),
-                aiResponse: $aiResponse,
-                threadSnapshot: $threadSnapshot,
-                relevantMemories: $loadedMemories,
-            ));
+        return new ExtractMemoriesCommand(
+            messageId: $message->getId(),
+            userId: $message->getUserId(),
+            aiResponse: $aiResponse,
+            threadSnapshot: $threadSnapshot,
+            relevantMemories: $loadedMemories,
+        );
+    }
 
-            $this->logger->info('ChatHandler: Dispatched ExtractMemoriesCommand', [
-                'message_id' => $message->getId(),
-                'user_id' => $message->getUserId(),
-                'thread_length' => count($threadSnapshot),
-            ]);
-        } catch (\Throwable $e) {
-            // Never block the user's response on the dispatch failing —
-            // worst case is that one message worth of memories never
-            // gets extracted; the next message's extraction will pick up
-            // from where it left off.
-            $this->logger->warning('ChatHandler: Failed to dispatch ExtractMemoriesCommand', [
-                'message_id' => $message->getId(),
-                'error' => $e->getMessage(),
-            ]);
-        }
+    /**
+     * Forward a prepared extraction command to the messenger bus.
+     *
+     * Thin proxy around {@see MemoryExtractionDispatcher::dispatch()} so
+     * the synchronous (non-deferred) handler paths inside this class can
+     * keep their existing call sites. The deferred SSE path lives in
+     * {@see \App\Controller\StreamController} and goes through the same
+     * dispatcher service directly to avoid duplicating the dispatch +
+     * log + swallow contract (Copilot review of PR #939).
+     */
+    public function dispatchPendingMemoryExtraction(?ExtractMemoriesCommand $command): void
+    {
+        $this->memoryExtractionDispatcher->dispatch($command);
     }
 
     /**

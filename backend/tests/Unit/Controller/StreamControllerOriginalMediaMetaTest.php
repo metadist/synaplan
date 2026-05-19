@@ -9,6 +9,7 @@ use App\Controller\StreamController;
 use App\Entity\Message;
 use App\Service\File\UserUploadPathBuilder;
 use App\Service\GuestSessionService;
+use App\Service\MemoryExtractionDispatcher;
 use App\Service\Message\MessageForwardingService;
 use App\Service\Message\MessageProcessor;
 use App\Service\ModelConfigService;
@@ -50,6 +51,7 @@ class StreamControllerOriginalMediaMetaTest extends TestCase
             $this->createMock(UserUploadPathBuilder::class),
             $this->createMock(PromptService::class),
             $this->createMock(MessageForwardingService::class),
+            $this->createMock(MemoryExtractionDispatcher::class),
         );
     }
 

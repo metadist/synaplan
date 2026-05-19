@@ -8,9 +8,11 @@ use App\Entity\File;
 use App\Entity\Message;
 use App\Entity\Prompt;
 use App\Entity\User;
+use App\Message\ExtractMemoriesCommand;
 use App\Service\File\FileHelper;
 use App\Service\File\UserUploadPathBuilder;
 use App\Service\GuestSessionService;
+use App\Service\MemoryExtractionDispatcher;
 use App\Service\Message\MessageForwardingService;
 use App\Service\Message\MessageProcessor;
 use App\Service\ModelConfigService;
@@ -49,6 +51,7 @@ class StreamController extends AbstractController
         private UserUploadPathBuilder $userUploadPathBuilder,
         private PromptService $promptService,
         private MessageForwardingService $messageForwardingService,
+        private MemoryExtractionDispatcher $memoryExtractionDispatcher,
         #[Autowire(env: 'default::bool:COST_BUDGET_GATE_ENABLED')]
         private bool $costBudgetGateEnabled = false,
     ) {
@@ -591,6 +594,16 @@ class StreamController extends AbstractController
                     'voice_reply' => $voiceReply,
                     'is_continuation' => (bool) $continueMessageId,
                     'perf_timer' => $perfTimer,
+                    // Issue #881: defer the ExtractMemoriesCommand dispatch
+                    // until after the outgoing assistant message has been
+                    // persisted + flushed below. Otherwise the worker can
+                    // beat the OUT-row insert and write the memory meta to
+                    // the IN row only — the frontend polls the OUT id and
+                    // never sees `complete`, so no toast appears in
+                    // production. ChatHandler now returns the prepared
+                    // ExtractMemoriesCommand in `metadata.extraction_payload`
+                    // so we can fire it after the flush.
+                    'defer_memory_extraction' => true,
                 ];
 
                 if ($isWidgetMode || $isGuestMode || $disableMemories) {
@@ -946,6 +959,15 @@ class StreamController extends AbstractController
                         $outgoingMessage->setMeta('original_media_type', $originalMediaType);
                     }
 
+                    // Persist the sorting/routing model when the classifier
+                    // ran before the handler exploded — without this, error
+                    // rows show only the chat badge live and the sorting
+                    // badge never appears, even after refresh (#603).
+                    $this->persistClassificationSortingMeta(
+                        $outgoingMessage,
+                        is_array($classification) ? $classification : null
+                    );
+
                     // Update incoming message
                     $incomingMessage->setTopic('ERROR');
                     $incomingMessage->setStatus('error');
@@ -1164,15 +1186,7 @@ class StreamController extends AbstractController
                 );
 
                 // Store SORTING model information in MessageMeta (from classification)
-                if (!empty($classification['sorting_provider'])) {
-                    $outgoingMessage->setMeta('ai_sorting_provider', $classification['sorting_provider']);
-                }
-                if (!empty($classification['sorting_model_name'])) {
-                    $outgoingMessage->setMeta('ai_sorting_model', $classification['sorting_model_name']);
-                }
-                if (!empty($classification['sorting_model_id'])) {
-                    $outgoingMessage->setMeta('ai_sorting_model_id', (string) $classification['sorting_model_id']);
-                }
+                $this->persistClassificationSortingMeta($outgoingMessage, $classification);
 
                 // Store Web Search metadata if web search was used
                 if ($webSearch) {
@@ -1208,6 +1222,13 @@ class StreamController extends AbstractController
                 $chat->updateTimestamp();
 
                 $this->em->flush();
+
+                // Issue #881: now that the outgoing assistant message is
+                // persisted (so its OUT row is visible to the worker),
+                // fire the deferred ExtractMemoriesCommand. ChatHandler
+                // built the payload but skipped the dispatch because we
+                // passed `defer_memory_extraction = true` above.
+                $this->dispatchDeferredMemoryExtraction($response['metadata'] ?? []);
 
                 if (!$isWidgetMode && !$isGuestMode) {
                     $this->messageForwardingService->forwardIfNeeded($chat, $finalText);
@@ -1703,6 +1724,12 @@ class StreamController extends AbstractController
                     $outgoingMessage->setMeta('original_media_type', $originalMediaType);
                 }
 
+                // Mirror the streaming error branch (see issue #603): if the
+                // classifier ran before the non-streaming handler failed, keep
+                // the sorting badge live and after refresh by persisting the
+                // routing model meta on the error row.
+                $this->persistClassificationSortingMeta($outgoingMessage, $failedClassification);
+
                 $message->setTopic('ERROR');
                 $message->setStatus('error');
                 $chat->updateTimestamp();
@@ -1803,15 +1830,7 @@ class StreamController extends AbstractController
                 $outgoingMessage->setMeta('openai_response_id', $metadata['response_id']);
             }
 
-            if (!empty($classification['sorting_provider'])) {
-                $outgoingMessage->setMeta('ai_sorting_provider', $classification['sorting_provider']);
-            }
-            if (!empty($classification['sorting_model_name'])) {
-                $outgoingMessage->setMeta('ai_sorting_model', $classification['sorting_model_name']);
-            }
-            if (!empty($classification['sorting_model_id'])) {
-                $outgoingMessage->setMeta('ai_sorting_model_id', (string) $classification['sorting_model_id']);
-            }
+            $this->persistClassificationSortingMeta($outgoingMessage, $classification);
 
             // Mirror the streaming branch above: keep MEDIAMAKER meta
             // consistent for non-streaming callers (email, generic webhook)
@@ -1839,6 +1858,12 @@ class StreamController extends AbstractController
             $message->setStatus('complete');
             $chat->updateTimestamp();
             $this->em->flush();
+
+            // Issue #881: outgoing message is now persisted, so the
+            // worker can safely look it up via tracking_id when it
+            // writes the extracted_memories meta. Fire the deferred
+            // dispatch the same way the streaming branch does.
+            $this->dispatchDeferredMemoryExtraction($metadata);
 
             if ('WEB' === $source) {
                 $this->messageForwardingService->forwardIfNeeded($chat, $content);
@@ -1904,6 +1929,41 @@ class StreamController extends AbstractController
     }
 
     /**
+     * Push the deferred ExtractMemoriesCommand prepared by ChatHandler
+     * onto the messenger bus.
+     *
+     * Issue #881 race fix: ChatHandler used to dispatch the command
+     * itself at the end of `handleStream()` / `handle()`, which races
+     * the StreamController flush of the outgoing assistant message. On
+     * a fast worker (empty queue, low load) the worker would look up
+     * the OUT row by tracking_id, find nothing, and write the
+     * `extracted_memories` meta to the IN row only. The frontend polls
+     * the OUT message id from the SSE `complete` event, so the poll
+     * always returned `pending` and the memory toast never appeared.
+     *
+     * Now ChatHandler returns the prepared command in
+     * `metadata.extraction_payload` and we fire it here, AFTER
+     * `$this->em->flush()` has made the OUT row visible. Dispatch +
+     * logging + swallow-on-failure all live in
+     * {@see MemoryExtractionDispatcher} so this method only translates
+     * the metadata-array contract into a typed command (Copilot review
+     * of PR #939: keep the dispatch policy in one service so this path
+     * and the synchronous ChatHandler fallback cannot drift on logging,
+     * retry semantics, or future middleware).
+     *
+     * @param array<string, mixed> $metadata The `metadata` block from the inference result
+     */
+    private function dispatchDeferredMemoryExtraction(array $metadata): void
+    {
+        $payload = $metadata['extraction_payload'] ?? null;
+        if (!$payload instanceof ExtractMemoriesCommand) {
+            return;
+        }
+
+        $this->memoryExtractionDispatcher->dispatch($payload);
+    }
+
+    /**
      * @param array<string, mixed>|null $rawSearchResults
      *
      * @return array<int, array<string, mixed>>|null
@@ -1960,6 +2020,39 @@ class StreamController extends AbstractController
         ]);
 
         return null;
+    }
+
+    /**
+     * Persist the routing/sorting model the classifier picked onto the
+     * outgoing message so the "Sorting Model" badge appears live in the
+     * SSE complete event and survives a page reload.
+     *
+     * Without this, error rows (e.g. ProviderException for an unpulled
+     * Ollama model, or a failed image generation) drop the sorting badge
+     * even though the classifier ran — the row shows only the chat badge
+     * live AND after refresh, since the meta was never persisted.
+     *
+     * Used from both the streaming `success: false` branch and the
+     * non-streaming error branch in `handleNonStreamingRequest()`. See
+     * issue #603.
+     *
+     * @param array<string, mixed>|null $classification
+     */
+    private function persistClassificationSortingMeta(Message $message, ?array $classification): void
+    {
+        if (!is_array($classification)) {
+            return;
+        }
+
+        if (!empty($classification['sorting_provider'])) {
+            $message->setMeta('ai_sorting_provider', (string) $classification['sorting_provider']);
+        }
+        if (!empty($classification['sorting_model_name'])) {
+            $message->setMeta('ai_sorting_model', (string) $classification['sorting_model_name']);
+        }
+        if (!empty($classification['sorting_model_id'])) {
+            $message->setMeta('ai_sorting_model_id', (string) $classification['sorting_model_id']);
+        }
     }
 
     /**

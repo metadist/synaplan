@@ -78,6 +78,35 @@
           <ClipboardDocumentIcon v-else class="w-4 h-4" />
         </button>
 
+        <!--
+          Fallback loading indicator (issue #902).
+          Shown while the assistant bubble is on screen but the backend has
+          not yet emitted any processing status event and no content has
+          streamed in. Without this fallback the bubble is visually empty
+          (just copy button, timestamp, provider avatar) for the seconds
+          (or minutes, with slow vision models) it takes the server to send
+          the first SSE status event, leaving the user with no indication
+          that anything is happening.
+        -->
+        <div
+          v-if="
+            isStreaming && !processingStatus && role === 'assistant' && contentParts.length === 0
+          "
+          class="px-4 pt-3 pb-3 processing-enter"
+          data-testid="loading-initial-indicator"
+          role="status"
+          :aria-label="t('processing.waitingAria')"
+        >
+          <div class="flex items-center gap-3">
+            <div class="typing-dots flex items-center gap-1.5" aria-hidden="true">
+              <span class="typing-dot"></span>
+              <span class="typing-dot"></span>
+              <span class="typing-dot"></span>
+            </div>
+            <div class="text-sm txt-tertiary">{{ t('processing.waitingDesc') }}</div>
+          </div>
+        </div>
+
         <!-- Processing Status (inside bubble, before content) -->
         <div
           v-if="isStreaming && processingStatus && role === 'assistant'"
@@ -1284,10 +1313,15 @@ const shortenModel = (name: string): string => {
 }
 
 // Use model selection composable
+// Prefer the structured `aiModels.chat` metadata (current source of truth) and
+// fall back to the legacy flat `provider` / `modelLabel` props for older messages
+// that pre-date the structured metadata. Without this preference the round-robin
+// recommendation cannot identify the current model and always returns the
+// second-highest-rated model. See issue #922.
 const againDataComputed = computed(() => props.againData)
 const filesComputed = computed(() => props.files)
-const currentProviderComputed = computed(() => props.provider)
-const currentModelNameComputed = computed(() => props.modelLabel)
+const currentProviderComputed = computed(() => props.aiModels?.chat?.provider ?? props.provider)
+const currentModelNameComputed = computed(() => props.aiModels?.chat?.model ?? props.modelLabel)
 const { modelOptions, predictedModel, hasModels } = useModelSelection(
   againDataComputed,
   filesComputed,
@@ -1536,5 +1570,48 @@ onUnmounted(() => {
 .long-running-enter-from {
   opacity: 0;
   transform: translateY(-4px);
+}
+
+/*
+ * Typing dots used by the initial loading indicator (issue #902).
+ * Three brand-coloured dots with staggered bounce animation — the
+ * universal "AI is typing" cue. Falls back to a static, slightly faded
+ * appearance when the user prefers reduced motion.
+ */
+.typing-dot {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: 9999px;
+  background-color: var(--brand);
+  animation: typing-bounce 1.2s infinite ease-in-out both;
+}
+
+.typing-dot:nth-child(1) {
+  animation-delay: -0.32s;
+}
+
+.typing-dot:nth-child(2) {
+  animation-delay: -0.16s;
+}
+
+@keyframes typing-bounce {
+  0%,
+  80%,
+  100% {
+    transform: scale(0.6);
+    opacity: 0.4;
+  }
+  40% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .typing-dot {
+    animation: none;
+    opacity: 0.75;
+  }
 }
 </style>

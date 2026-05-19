@@ -819,7 +819,9 @@
     "topic": "Thema",
     "language": "Sprache",
     "modelId": "Model ID",
-    "longRunningHint": "Diese Anfrage dauert etwas länger als üblich — bitte habe einen Moment Geduld."
+    "longRunningHint": "Diese Anfrage dauert etwas länger als üblich — bitte habe einen Moment Geduld.",
+    "waitingDesc": "Einen Moment…",
+    "waitingAria": "Antwort wird vorbereitet"
   },
   "message": {
     "thinking": "Denkprozess",

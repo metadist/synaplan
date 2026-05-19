@@ -14,6 +14,7 @@ use App\Repository\PromptRepository;
 use App\Repository\UserRepository;
 use App\Service\FeedbackConfigService;
 use App\Service\File\UserUploadPathBuilder;
+use App\Service\MemoryExtractionDispatcher;
 use App\Service\Message\Handler\ChatHandler;
 use App\Service\ModelConfigService;
 use App\Service\PerfPipelineFlag;
@@ -25,8 +26,6 @@ use Doctrine\ORM\EntityManagerInterface;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
-use Symfony\Component\Messenger\Envelope;
-use Symfony\Component\Messenger\MessageBusInterface;
 
 class ChatHandlerTest extends TestCase
 {
@@ -42,7 +41,7 @@ class ChatHandlerTest extends TestCase
     private UserMemoryService&MockObject $userMemoryService;
     private FeedbackConfigService $feedbackConfigService;
     private RateLimitService&MockObject $rateLimitService;
-    private MessageBusInterface&MockObject $messageBus;
+    private MemoryExtractionDispatcher&MockObject $memoryExtractionDispatcher;
     private PerfPipelineFlag&MockObject $perfPipelineFlag;
     private ChatHandler $handler;
 
@@ -60,7 +59,7 @@ class ChatHandlerTest extends TestCase
         $this->userMemoryService = $this->createMock(UserMemoryService::class);
         $this->feedbackConfigService = new FeedbackConfigService($this->createStub(ConfigRepository::class));
         $this->rateLimitService = $this->createMock(RateLimitService::class);
-        $this->messageBus = $this->createMock(MessageBusInterface::class);
+        $this->memoryExtractionDispatcher = $this->createMock(MemoryExtractionDispatcher::class);
         $this->perfPipelineFlag = $this->createMock(PerfPipelineFlag::class);
 
         $this->handler = new ChatHandler(
@@ -77,7 +76,7 @@ class ChatHandlerTest extends TestCase
             $this->userMemoryService,
             $this->feedbackConfigService,
             $this->rateLimitService,
-            $this->messageBus,
+            $this->memoryExtractionDispatcher,
             $this->perfPipelineFlag,
         );
     }
@@ -429,9 +428,9 @@ class ChatHandlerTest extends TestCase
             });
 
         $this->perfPipelineFlag->method('isEnabled')->willReturn(true);
-        $this->messageBus
-            ->method('dispatch')
-            ->willReturnCallback(static fn (object $msg) => new Envelope($msg));
+        // No dispatcher expectation here — this test only checks that the
+        // memory loader injected the matched memories into the system
+        // prompt; the dispatch is covered by other tests.
 
         $result = $this->handler->handle($message, [], ['topic' => 'CHAT', 'language' => 'en']);
 
@@ -496,13 +495,11 @@ class ChatHandlerTest extends TestCase
         $this->perfPipelineFlag->method('isEnabled')->with(7)->willReturn(true);
 
         $dispatched = null;
-        $this->messageBus
+        $this->memoryExtractionDispatcher
             ->expects($this->once())
             ->method('dispatch')
-            ->willReturnCallback(function (object $msg) use (&$dispatched) {
-                $dispatched = $msg;
-
-                return new Envelope($msg);
+            ->willReturnCallback(function (?ExtractMemoriesCommand $cmd) use (&$dispatched): void {
+                $dispatched = $cmd;
             });
 
         $this->handler->handle($message, [], ['topic' => 'CHAT', 'language' => 'en']);
@@ -558,7 +555,13 @@ class ChatHandlerTest extends TestCase
         ]);
 
         // No extraction either — widget visitors must not leave a memory trail.
-        $this->messageBus->expects($this->never())->method('dispatch');
+        // The proxy in ChatHandler still forwards to the dispatcher, but the
+        // payload must be null so the dispatcher (whose contract is exercised
+        // separately in MemoryExtractionDispatcherTest) short-circuits.
+        $this->memoryExtractionDispatcher
+            ->expects($this->any())
+            ->method('dispatch')
+            ->with($this->isNull());
 
         $this->handler->handle(
             $message,
@@ -609,8 +612,15 @@ class ChatHandlerTest extends TestCase
             'model' => 'gpt-4.1',
         ]);
 
-        // No queue dispatch because extraction is skipped.
-        $this->messageBus->expects($this->never())->method('dispatch');
+        // No real extraction because the user disabled memories — the
+        // proxy in ChatHandler still forwards to the dispatcher, but the
+        // payload must be null so the dispatcher (tested separately in
+        // MemoryExtractionDispatcherTest) short-circuits before touching
+        // the messenger bus.
+        $this->memoryExtractionDispatcher
+            ->expects($this->any())
+            ->method('dispatch')
+            ->with($this->isNull());
 
         // Capture every info-level log call and assert the exact reason
         // string surfaces — the request log is the regression we are
@@ -694,5 +704,176 @@ class ChatHandlerTest extends TestCase
             ['topic' => 'cristian', 'language' => 'en'],
             $streamCallback
         );
+    }
+
+    /**
+     * Issue #881: when the caller passes `defer_memory_extraction = true`
+     * the ChatHandler must NOT dispatch the ExtractMemoriesCommand
+     * itself (would race the StreamController flush of the outgoing
+     * assistant message). Instead it returns the prepared command in
+     * `metadata.extraction_payload` so the caller can fire it after
+     * persisting the OUT row.
+     */
+    public function testHandleDefersMemoryExtractionWhenOptionIsSet(): void
+    {
+        $message = $this->createMock(Message::class);
+        $message->method('getUserId')->willReturn(7);
+        $message->method('getId')->willReturn(456);
+        $message->method('getText')->willReturn('My new address is Bahnhofstrasse 1.');
+        $message->method('getUnixTimestamp')->willReturn(time());
+        $message->method('getDateTime')->willReturn('20260512100000');
+        $message->method('getFilePath')->willReturn('');
+        $message->method('getFileType')->willReturn('');
+        $message->method('getTopic')->willReturn('CHAT');
+        $message->method('getLanguage')->willReturn('en');
+        $message->method('getFileText')->willReturn('');
+
+        $user = $this->createMock(User::class);
+        $user->method('getId')->willReturn(7);
+        $user->method('isMemoriesEnabled')->willReturn(true);
+
+        $userRepository = $this->createMock(UserRepository::class);
+        $userRepository->method('find')->with(7)->willReturn($user);
+        $this->em->method('getRepository')->with(User::class)->willReturn($userRepository);
+
+        $this->userMemoryService->method('isAvailable')->willReturn(false);
+
+        $this->promptRepository->method('findOneBy')->willReturn(null);
+        $this->modelConfigService->method('getEffectiveUserIdForMessage')->willReturn(7);
+        $this->modelConfigService->method('getDefaultModel')->willReturn(10);
+        $this->modelConfigService->method('getProviderForModel')->willReturn('openai');
+        $this->modelConfigService->method('getModelName')->willReturn('gpt-4.1');
+
+        $this->aiFacade->method('chat')->willReturn([
+            'content' => 'Got it.',
+            'provider' => 'openai',
+            'model' => 'gpt-4.1',
+        ]);
+
+        $this->perfPipelineFlag->method('isEnabled')->with(7)->willReturn(true);
+
+        // The crucial expectation: the handler must NOT touch the bus
+        // when the dispatch is deferred — that is the whole point of
+        // the option. The StreamController fires it later, after the
+        // outgoing message flush.
+        $this->memoryExtractionDispatcher->expects($this->never())->method('dispatch');
+
+        $result = $this->handler->handle(
+            $message,
+            [],
+            ['topic' => 'CHAT', 'language' => 'en'],
+            null,
+            ['defer_memory_extraction' => true],
+        );
+
+        self::assertArrayHasKey('extraction_payload', $result['metadata']);
+        $payload = $result['metadata']['extraction_payload'];
+        self::assertInstanceOf(ExtractMemoriesCommand::class, $payload);
+        self::assertSame(456, $payload->getMessageId());
+        self::assertSame(7, $payload->getUserId());
+        self::assertStringContainsString('Got it', $payload->getAiResponse());
+    }
+
+    /**
+     * Issue #881: even when extraction is deferred, the same
+     * skip-conditions (request opt-out, user setting opt-out,
+     * kill-switch) must short-circuit BEFORE building the payload.
+     * Returning a non-null payload for a widget visitor would leak the
+     * dispatch back into the request lifecycle and rebuild the privacy
+     * regression we already fixed in PR #925.
+     */
+    public function testHandleSkipsExtractionPayloadForWidgetEvenWhenDeferred(): void
+    {
+        $message = $this->createMock(Message::class);
+        $message->method('getUserId')->willReturn(7);
+        $message->method('getText')->willReturn('Hi widget');
+        $message->method('getUnixTimestamp')->willReturn(time());
+        $message->method('getDateTime')->willReturn('20260512100000');
+        $message->method('getFilePath')->willReturn('');
+        $message->method('getFileType')->willReturn('');
+        $message->method('getTopic')->willReturn('CHAT');
+        $message->method('getLanguage')->willReturn('en');
+        $message->method('getFileText')->willReturn('');
+
+        $user = $this->createMock(User::class);
+        $user->method('isMemoriesEnabled')->willReturn(true);
+        $userRepository = $this->createMock(UserRepository::class);
+        $userRepository->method('find')->willReturn($user);
+        $this->em->method('getRepository')->willReturn($userRepository);
+
+        $this->promptRepository->method('findOneBy')->willReturn(null);
+        $this->modelConfigService->method('getEffectiveUserIdForMessage')->willReturn(7);
+        $this->modelConfigService->method('getDefaultModel')->willReturn(10);
+        $this->modelConfigService->method('getProviderForModel')->willReturn('openai');
+        $this->modelConfigService->method('getModelName')->willReturn('gpt-4.1');
+
+        $this->aiFacade->method('chat')->willReturn([
+            'content' => 'Hi there',
+            'provider' => 'openai',
+            'model' => 'gpt-4.1',
+        ]);
+
+        $this->memoryExtractionDispatcher->expects($this->never())->method('dispatch');
+
+        $result = $this->handler->handle(
+            $message,
+            [],
+            ['topic' => 'CHAT', 'language' => 'en', 'source' => 'widget'],
+            null,
+            [
+                'defer_memory_extraction' => true,
+                // Mirrors what the StreamController/widget flow sets.
+            ],
+        );
+
+        self::assertNull(
+            $result['metadata']['extraction_payload'],
+            'widget requests must not produce an extraction payload, even with defer_memory_extraction set',
+        );
+    }
+
+    /**
+     * The public {@see ChatHandler::dispatchPendingMemoryExtraction()} is
+     * now a thin proxy onto {@see MemoryExtractionDispatcher::dispatch()}
+     * (Copilot review of PR #939: keep the dispatch + log + swallow
+     * contract in one service so this path and the
+     * StreamController-deferred path cannot drift). The null-safety
+     * contract is therefore the dispatcher's job — exercised in
+     * {@see Service\MemoryExtractionDispatcherTest} —
+     * and this test only pins that the wrapper forwards a null payload
+     * unchanged so callers can blindly hand the result of
+     * `buildPendingMemoryExtraction()` over without conditionals.
+     */
+    public function testDispatchPendingMemoryExtractionForwardsNullToDispatcher(): void
+    {
+        $this->memoryExtractionDispatcher
+            ->expects($this->once())
+            ->method('dispatch')
+            ->with($this->isNull());
+
+        $this->handler->dispatchPendingMemoryExtraction(null);
+    }
+
+    /**
+     * The dispatch helper must forward the prepared command to the
+     * messenger bus exactly once — that is the whole reason for
+     * splitting build + dispatch (issue #881 race fix).
+     */
+    public function testDispatchPendingMemoryExtractionForwardsCommandToBus(): void
+    {
+        $command = new ExtractMemoriesCommand(
+            messageId: 123,
+            userId: 7,
+            aiResponse: 'hello',
+            threadSnapshot: [],
+            relevantMemories: [],
+        );
+
+        $this->memoryExtractionDispatcher
+            ->expects($this->once())
+            ->method('dispatch')
+            ->with($this->identicalTo($command));
+
+        $this->handler->dispatchPendingMemoryExtraction($command);
     }
 }
