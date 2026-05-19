@@ -94,6 +94,17 @@ const router = createRouter({
       meta: { requiresAuth: false, public: true, titleKey: 'pageTitles.login' },
     },
     {
+      // Bridge page loaded inside an Office.context.ui.displayDialogAsync
+      // popup from the Synamail Outlook add-in. Issues a scoped API key
+      // and posts it back to the parent taskpane via messageParent.
+      // See AddinConnectView.vue for the protocol details, and
+      // Synamail/docs/SYNAPLAN_INTEGRATION.md for the cross-repo plan.
+      path: '/addin/connect',
+      name: 'addin-connect',
+      component: () => import('@/views/AddinConnectView.vue'),
+      meta: { requiresAuth: false, public: true, titleKey: 'pageTitles.addinConnect' },
+    },
+    {
       path: '/logged-out',
       name: 'logged-out',
       component: () => import('@/views/LoggedOutView.vue'),
