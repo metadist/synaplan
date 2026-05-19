@@ -23,8 +23,16 @@ use Psr\Log\LoggerInterface;
  */
 final readonly class MessagePreProcessor
 {
-    // Supported file types for preprocessing
-    public const DOCUMENT_EXTENSIONS = ['pdf', 'docx', 'doc', 'xlsx', 'xls', 'pptx', 'txt'];
+    // Supported file types for preprocessing.
+    //
+    // Issue #954: 'md', 'csv', and 'ppt' were missing here even though they
+    // are accepted uploads (FileStorageService::ALLOWED_EXTENSIONS) and are
+    // fully handled by FileProcessor::extractText() — 'md'/'csv' as native
+    // plain text and 'ppt' via Tika using OFFICE_EXT_TO_MIME. Without these
+    // entries the chat preprocessor silently skipped the file, leaving
+    // BFILETEXT empty and FileAnalysisHandler reporting "unsupported file
+    // type" for legitimately uploaded documents.
+    public const DOCUMENT_EXTENSIONS = ['pdf', 'docx', 'doc', 'xlsx', 'xls', 'pptx', 'ppt', 'txt', 'md', 'csv'];
     public const AUDIO_EXTENSIONS = ['ogg', 'mp3', 'wav', 'm4a', 'opus', 'flac', 'webm', 'amr'];
     public const IMAGE_EXTENSIONS = ['jpg', 'jpeg', 'png', 'webp', 'gif'];
 
