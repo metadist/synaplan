@@ -100,7 +100,7 @@ services:
 
   # Ollama Test (Optional - Integration Profile)
   ollama_test:
-    image: ollama/ollama:latest@sha256:d00473cb58f0082c07cd6ed0d326a8a86f443ab69c51f8fc2b1a41687d45c661
+    image: ollama/ollama:latest@sha256:a6149234667efc71d37766d61c1a16f24c33e4cd7a0bf4125c44a7e47e2419c4
     container_name: synaplan-ollama-test
     ports:
       - "11436:11434"
@@ -130,7 +130,7 @@ services:
   # Ollama API stub (deterministic responses for OllamaProvider integration tests).
   # Same pattern as whatsapp-stub: pinned node:22-alpine + bind mount so CI `docker compose pull` retries cover it.
   ollama-stub:
-    image: node:22-alpine@sha256:8ea2348b068a9544dae7317b4f3aafcdc032df1647bb7d768a05a5cad1a7683f
+    image: node:22-alpine@sha256:968df39aedcea65eeb078fb336ed7191baf48f972b4479711397108be0966920
     container_name: synaplan-ollama-stub
     user: node
     working_dir: /app
@@ -150,7 +150,7 @@ services:
   # Uses node:22-alpine directly instead of a Dockerfile build so that
   # `docker compose pull` (with retry) covers this image too.
   whatsapp-stub:
-    image: node:22-alpine@sha256:8ea2348b068a9544dae7317b4f3aafcdc032df1647bb7d768a05a5cad1a7683f
+    image: node:22-alpine@sha256:968df39aedcea65eeb078fb336ed7191baf48f972b4479711397108be0966920
     container_name: synaplan-whatsapp-stub
     user: node
     working_dir: /app

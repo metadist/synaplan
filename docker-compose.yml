@@ -16,7 +16,7 @@
 services:
   # Vue.js Frontend
   frontend:
-    image: node:22@sha256:62e4daa6819762bbd3072af77cc282ab72c631c4aed30dd7980192babaf385b3
+    image: node:22@sha256:e3ca095133ba41a0a73b009f19e4253f1a878e70bb9499f6a9d21b19d082bd91
     container_name: synaplan-frontend
     working_dir: /app
     entrypoint: ["/usr/local/bin/docker-entrypoint.sh"]
@@ -41,7 +41,7 @@ services:
   # Memory-limited to prevent unbounded growth from Chokidar polling (#515).
   # Container auto-restarts on OOM thanks to restart policy.
   frontend-widgets:
-    image: node:22@sha256:62e4daa6819762bbd3072af77cc282ab72c631c4aed30dd7980192babaf385b3
+    image: node:22@sha256:e3ca095133ba41a0a73b009f19e4253f1a878e70bb9499f6a9d21b19d082bd91
     container_name: synaplan-frontend-widgets
     working_dir: /app
     command: sh -c "npm ci && npm run build:widget -- --watch"
@@ -286,7 +286,7 @@ services:
 
   # Ollama - Local AI Models (GPU-accelerated if NVIDIA available)
   ollama:
-    image: ollama/ollama:latest@sha256:d00473cb58f0082c07cd6ed0d326a8a86f443ab69c51f8fc2b1a41687d45c661
+    image: ollama/ollama:latest@sha256:a6149234667efc71d37766d61c1a16f24c33e4cd7a0bf4125c44a7e47e2419c4
     container_name: synaplan-ollama
     ports:
       - "11435:11434"
