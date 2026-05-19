@@ -483,6 +483,10 @@ export const chatApi = {
     size: number
     mime: string
     file_type: string
+    status: string
+    extracted_text_length: number
+    extraction_error?: 'audio_transcription_failed' | 'document_extraction_failed'
+    extraction_strategy?: string
     text?: string
     language?: string
     duration?: number

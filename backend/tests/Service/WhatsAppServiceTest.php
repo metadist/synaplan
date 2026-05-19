@@ -1646,4 +1646,134 @@ class WhatsAppServiceTest extends TestCase
         $this->assertTrue($result['skipped']);
         $this->assertSame('payment_authorization', $result['type']);
     }
+
+    // ============================================
+    // Tests for issue #652: WhatsApp must surface sources alongside the
+    // initial answer instead of only after "wo sind die quellen?".
+    // ============================================
+
+    /**
+     * The citation block must be appended exactly once, in a stable shape,
+     * and limited to the top {@see WhatsAppService::MAX_WHATSAPP_SOURCES}
+     * hits so we don't push the actual answer out of the first WhatsApp
+     * chunk (4096-char message cap).
+     */
+    public function testAppendWhatsAppSourcesRendersCompactCitationBlock(): void
+    {
+        $method = (new \ReflectionClass($this->service))->getMethod('appendWhatsAppSources');
+
+        $sources = [
+            ['title' => 'Skyscanner – Bergen', 'url' => 'https://skyscanner.de/bergen'],
+            ['title' => 'FlixBus Norwegen', 'url' => 'https://flixbus.de/norwegen'],
+            ['title' => 'DFDS Hirtshals → Bergen', 'url' => 'https://dfds.com/bergen'],
+        ];
+
+        $result = $method->invoke($this->service, 'Camping in Bergen kostet ca. 15€/Nacht.', $sources);
+
+        $this->assertStringContainsString('Camping in Bergen kostet ca. 15€/Nacht.', $result);
+        $this->assertStringContainsString('🔗 *Quellen:*', $result);
+        $this->assertStringContainsString('*[1] Skyscanner – Bergen*', $result);
+        $this->assertStringContainsString('https://skyscanner.de/bergen', $result);
+        $this->assertStringContainsString('*[2] FlixBus Norwegen*', $result);
+        $this->assertStringContainsString('*[3] DFDS Hirtshals → Bergen*', $result);
+
+        // Answer body must precede the citation block — otherwise the user
+        // sees a wall of links before reading the AI's actual reply. Phrased
+        // with assertGreaterThan + named variables so the intent is obvious
+        // at a glance instead of relying on assertLessThan argument order.
+        $answerPos = strpos($result, 'Camping in Bergen kostet ca. 15€/Nacht.');
+        $citationsPos = strpos($result, '🔗 *Quellen:*');
+        $this->assertNotFalse($answerPos, 'Answer body missing from rendered output');
+        $this->assertNotFalse($citationsPos, 'Citation block missing from rendered output');
+        $this->assertGreaterThan($answerPos, $citationsPos, 'Citations must appear after the answer');
+    }
+
+    public function testAppendWhatsAppSourcesIsNoOpForEmptySources(): void
+    {
+        $method = (new \ReflectionClass($this->service))->getMethod('appendWhatsAppSources');
+
+        $original = 'Eine Antwort ohne Recherche.';
+        $this->assertSame($original, $method->invoke($this->service, $original, []));
+    }
+
+    public function testAppendWhatsAppSourcesSkipsEntriesWithoutUrl(): void
+    {
+        $method = (new \ReflectionClass($this->service))->getMethod('appendWhatsAppSources');
+
+        $sources = [
+            ['title' => 'Has URL', 'url' => 'https://example.com/1'],
+            ['title' => 'Missing URL'], // must be dropped — naked number would look broken
+            ['title' => 'Empty URL', 'url' => '   '],
+            ['title' => 'Second valid', 'url' => 'https://example.com/2'],
+        ];
+
+        $result = $method->invoke($this->service, 'Answer.', $sources);
+
+        $this->assertStringContainsString('*[1] Has URL*', $result);
+        $this->assertStringContainsString('*[2] Second valid*', $result);
+        $this->assertStringNotContainsString('Missing URL', $result);
+        $this->assertStringNotContainsString('*[3]', $result);
+    }
+
+    public function testAppendWhatsAppSourcesFallsBackToUrlWhenTitleMissing(): void
+    {
+        $method = (new \ReflectionClass($this->service))->getMethod('appendWhatsAppSources');
+
+        $sources = [
+            ['url' => 'https://example.com/no-title'],
+        ];
+
+        $result = $method->invoke($this->service, 'Answer.', $sources);
+
+        $this->assertStringContainsString('*[1] https://example.com/no-title*', $result);
+        $this->assertStringContainsString("\nhttps://example.com/no-title", $result);
+    }
+
+    public function testAppendWhatsAppSourcesCapsAtMaxLimit(): void
+    {
+        $method = (new \ReflectionClass($this->service))->getMethod('appendWhatsAppSources');
+
+        // Build twice the cap to prove we truncate, not crash.
+        $sources = [];
+        for ($i = 1; $i <= 12; ++$i) {
+            $sources[] = ['title' => 'Source '.$i, 'url' => 'https://example.com/'.$i];
+        }
+
+        $result = $method->invoke($this->service, 'Answer.', $sources);
+
+        $this->assertStringContainsString('*[1] Source 1*', $result);
+        $this->assertStringContainsString('*[5] Source 5*', $result);
+        $this->assertStringNotContainsString('*[6] Source 6*', $result);
+        $this->assertStringNotContainsString('*[12]', $result);
+    }
+
+    public function testAppendWhatsAppSourcesCollapsesWhitespaceInTitle(): void
+    {
+        $method = (new \ReflectionClass($this->service))->getMethod('appendWhatsAppSources');
+
+        $sources = [
+            ['title' => "Multi\nline\ttitle", 'url' => 'https://example.com'],
+        ];
+
+        $result = $method->invoke($this->service, 'Answer.', $sources);
+
+        // Newlines/tabs inside *…* would either break bold rendering or
+        // split the title across the URL — both confuse WhatsApp's
+        // markdown parser. The helper normalises them to spaces.
+        $this->assertStringContainsString('*[1] Multi line title*', $result);
+    }
+
+    public function testAppendWhatsAppSourcesOmitsLeadingSeparatorWhenAnswerIsBlank(): void
+    {
+        $method = (new \ReflectionClass($this->service))->getMethod('appendWhatsAppSources');
+
+        $sources = [
+            ['title' => 'Source', 'url' => 'https://example.com'],
+        ];
+
+        $result = $method->invoke($this->service, '', $sources);
+
+        // No empty preamble — the citation block should be the entire reply.
+        $this->assertStringStartsWith('🔗 *Quellen:*', $result);
+    }
 }

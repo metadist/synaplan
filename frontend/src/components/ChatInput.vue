@@ -879,6 +879,25 @@ const uploadFiles = async (files: File[]) => {
     try {
       const result = await chatApi.uploadChatFile(file, controller.signal)
 
+      // Issue #729: when the synchronous extraction at upload time fails
+      // (corrupted DOCX, password-protected PDF, etc.), surface a clear
+      // error and drop the file instead of letting the user send a
+      // message that we already know will hit "extraction failed" in the
+      // stream.
+      if (result.extraction_error) {
+        const index = uploadedFiles.value.findIndex((f) => f.name === file.name && f.processing)
+        if (index !== -1) {
+          uploadedFiles.value.splice(index, 1)
+        }
+
+        const errorKey =
+          result.extraction_error === 'audio_transcription_failed'
+            ? 'chatInput.audioTranscriptionFailed'
+            : 'chatInput.documentExtractionFailed'
+        showError(t(errorKey, { filename: result.filename }))
+        continue
+      }
+
       const index = uploadedFiles.value.findIndex((f) => f.name === file.name && f.processing)
       if (index !== -1) {
         uploadedFiles.value[index] = {

@@ -695,17 +695,20 @@
                       </button>
                     </div>
 
-                    <!-- Legacy model/provider (when aiModels not available) -->
-                    <template v-if="!aiModels && modelLabel && provider">
+                    <!-- Legacy model/provider (when aiModels not available).
+                         Filters out channel-source tokens (WHATSAPP, EMAIL, …)
+                         so the metadata bar is consistent across channels
+                         instead of showing redundant labels — see #653. -->
+                    <template v-if="!aiModels && legacyModelLabel && legacyProviderLabel">
                       <div class="flex items-center justify-between gap-2">
                         <span class="text-xs txt-tertiary">{{ t('chatMessage.infoModel') }}</span>
-                        <span class="text-xs font-medium txt-primary">{{ modelLabel }}</span>
+                        <span class="text-xs font-medium txt-primary">{{ legacyModelLabel }}</span>
                       </div>
                       <div class="flex items-center justify-between gap-2">
                         <span class="text-xs txt-tertiary">{{
                           t('chatMessage.infoProvider')
                         }}</span>
-                        <span class="text-xs txt-secondary">{{ provider }}</span>
+                        <span class="text-xs txt-secondary">{{ legacyProviderLabel }}</span>
                       </div>
                     </template>
                   </div>
@@ -926,6 +929,7 @@ import { useAiConfigStore } from '@/stores/aiConfig'
 import type { AIModel } from '@/types/ai-models'
 import { useNotification } from '@/composables/useNotification'
 import { getProviderIcon } from '@/utils/providerIcons'
+import { isChannelSource } from '@/utils/channelSource'
 import { useMemoriesStore } from '@/stores/userMemories'
 import { useFeedbackStore } from '@/stores/userFeedback'
 import { useConfigStore } from '@/stores/config'
@@ -1174,13 +1178,31 @@ const contentParts = computed(() => {
   })
 })
 
-// Get provider for avatar icon (prefer aiModels.chat, fallback to legacy provider prop)
+// Get provider for avatar icon (prefer aiModels.chat, fallback to legacy provider prop).
+// Channel-source tokens like `WHATSAPP` / `EMAIL` / `widget` must never reach
+// `getProviderIcon` — they would silently fall through to the default robot
+// icon AND surface the channel name in the metadata bar (issue #653).
 const displayProvider = computed(() => {
-  if (props.aiModels?.chat?.provider) {
-    return props.aiModels.chat.provider
+  const nested = props.aiModels?.chat?.provider
+  if (nested && !isChannelSource(nested)) {
+    return nested
   }
-  return props.provider || 'OpenAI'
+  const legacy = props.provider
+  if (legacy && !isChannelSource(legacy)) {
+    return legacy
+  }
+  return 'OpenAI'
 })
+
+// Real AI provider/model values for the legacy popover row. Hides
+// channel-source tokens entirely instead of showing redundant labels
+// like `Model: WHATSAPP · Provider: WHATSAPP` (issue #653).
+const legacyProviderLabel = computed(() =>
+  props.provider && !isChannelSource(props.provider) ? props.provider : null
+)
+const legacyModelLabel = computed(() =>
+  props.modelLabel && !isChannelSource(props.modelLabel) ? props.modelLabel : null
+)
 
 // Determine model type based on message topic and content
 const hasImageContent = computed(() => props.parts.some((p) => p.type === 'image'))
@@ -1293,7 +1315,10 @@ const infoPopoverOpen = ref(false)
 const hasMessageMetadata = computed(() => {
   if (props.topic) return true
   if (props.aiModels?.chat || props.aiModels?.sorting || props.aiModels?.audio) return true
-  if (props.modelLabel && props.provider) return true
+  // Only count legacy model/provider as metadata when neither is a
+  // channel-source token, otherwise we'd light up the info popover
+  // with nothing meaningful to show (issue #653).
+  if (legacyModelLabel.value && legacyProviderLabel.value) return true
   return false
 })
 

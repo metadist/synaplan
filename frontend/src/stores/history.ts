@@ -4,6 +4,7 @@ import { normalizeMediaUrl } from '@/utils/urlHelper'
 import { extractBTextPayload } from '@/utils/jsonResponse'
 import { parseAIResponse } from '@/utils/responseParser'
 import { generatePartId } from '@/utils/mediaParts'
+import { isChannelSource } from '@/utils/channelSource'
 import type { AgainData } from '@/types/ai-models'
 import { authService } from '@/services/authService'
 
@@ -514,13 +515,28 @@ export const useHistoryStore = defineStore('history', () => {
             }
           }
 
+          // The backend reuses the `provider` column to also store the
+          // channel/source for inbound messages (`WHATSAPP`, `EMAIL`,
+          // `WEB`, `widget`, …). When that token leaks into the chat
+          // footer the user sees confusing labels like
+          // `Model: WHATSAPP · Provider: WHATSAPP`. Strip it here so
+          // only real AI provider names ever reach the UI — see #653.
+          const rawProvider = m.aiModels?.chat?.provider ?? m.provider
+          const cleanProvider = isChannelSource(rawProvider) ? undefined : rawProvider
+          const rawModelLabel = m.aiModels?.chat?.model ?? m.provider
+          const cleanModelLabel = isChannelSource(rawModelLabel)
+            ? role === 'assistant'
+              ? 'AI'
+              : undefined
+            : (rawModelLabel ?? (role === 'assistant' ? 'AI' : undefined))
+
           return {
             id: `backend-${m.id}`,
             role,
             parts,
             timestamp: new Date(m.timestamp * 1000),
-            provider: m.aiModels?.chat?.provider ?? m.provider,
-            modelLabel: m.aiModels?.chat?.model ?? m.provider ?? 'AI',
+            provider: cleanProvider,
+            modelLabel: cleanModelLabel,
             topic: m.topic,
             originalTopic: m.originalTopic || null,
             originalMediaType: m.originalMediaType ?? m.original_media_type ?? null,

@@ -769,10 +769,28 @@ class AiFacade
     public function transcribe(string $audioPath, ?int $userId = null, array $options = []): array
     {
         $providerName = $options['provider'] ?? null;
+        $callerSuppliedModel = array_key_exists('model', $options);
+        $sttModelId = null;
 
-        // Fall back to user configuration when no provider is explicitly given
-        if (!$providerName && $userId > 0) {
-            $providerName = $this->modelConfig->getDefaultProvider($userId, 'speech_to_text');
+        // The settings UI persists the user's transcription pick to
+        // BCONFIG.DEFAULTMODEL.SOUND2TEXT. Honour that configured row before
+        // falling through to the legacy ai/default_speech_to_text_provider
+        // chain — that legacy key is never written by the UI, so prior to this
+        // we silently picked whichever provider the smart fallback returned
+        // (often OpenAI/whisper-1 instead of the user's Groq/whisper-large-v3).
+        // See issue #696.
+        if (!$providerName && null !== $userId && $userId > 0) {
+            $sttDefault = $this->modelConfig->resolveSttDefault($userId);
+            $providerName = $sttDefault['provider'];
+            $sttModelId = $sttDefault['model_id'];
+
+            // Only forward the SOUND2TEXT model name when it actually resolved
+            // to a BMODELS row — otherwise the provider would receive a stale
+            // string from a different provider's catalog and 400 (mirrors the
+            // PIC2TEXT safeguard in analyzeImage()).
+            if (null !== $sttDefault['model'] && !$callerSuppliedModel) {
+                $options['model'] = $sttDefault['model'];
+            }
         }
 
         $provider = $this->registry->getSpeechToTextProvider($providerName);
@@ -781,6 +799,8 @@ class AiFacade
             'provider' => $provider->getName(),
             'user_id' => $userId,
             'audio' => basename($audioPath),
+            'model' => $options['model'] ?? null,
+            'model_id' => $sttModelId,
         ]);
 
         try {

@@ -354,6 +354,7 @@ import type { ModelOption } from '@/composables/useModelSelection'
 import { parseAIResponse } from '@/utils/responseParser'
 import { normalizeMediaUrl } from '@/utils/urlHelper'
 import { generatePartId, pushMediaPart, extractMediaParts } from '@/utils/mediaParts'
+import { isChannelSource } from '@/utils/channelSource'
 import { AudioStreamer } from '@/utils/AudioStreamer'
 import { httpClient } from '@/services/api/httpClient'
 import { z } from 'zod'
@@ -1296,6 +1297,19 @@ const handleSendMessage = async (
     toolData // tool
   )
 
+  // Lift the active chat to the top of the sidebar lists right away so the
+  // conversation the user is interacting with is the most prominent one,
+  // matching the backend's `updatedAt DESC` order on the next reload.
+  // Mirrors the backend preview format (30 chars + ellipsis).
+  if (chatsStore.activeChatId) {
+    const previewSource = displayContent.trim()
+    const preview =
+      previewSource.length > 30 ? previewSource.slice(0, 30) + '…' : previewSource || undefined
+    chatsStore.bumpChatActivity(chatsStore.activeChatId, {
+      firstMessagePreview: preview,
+    })
+  }
+
   // Notify promo tip system
   promoTips.onMessageSent()
 
@@ -1325,9 +1339,18 @@ function applyAssistantChatModelFooter(
   streamFallback: { provider?: string; model?: string; model_id?: number | null }
 ) {
   const isBadModelToken = (m: unknown) =>
-    m === undefined || m === null || String(m).toLowerCase() === 'error'
+    m === undefined ||
+    m === null ||
+    String(m).toLowerCase() === 'error' ||
+    // Reject channel/source tokens (`WHATSAPP`, `EMAIL`, …) — they
+    // leak in from inbound-message `provider_index` and would otherwise
+    // surface as the AI model label in the chat footer (issue #653).
+    isChannelSource(typeof m === 'string' ? m : null)
   const isBadProviderToken = (p: unknown) =>
-    p === undefined || p === null || String(p).toLowerCase() === 'system'
+    p === undefined ||
+    p === null ||
+    String(p).toLowerCase() === 'system' ||
+    isChannelSource(typeof p === 'string' ? p : null)
 
   const resolvedModel = !isBadModelToken(data.model)
     ? String(data.model)
@@ -2187,6 +2210,10 @@ const streamAIResponse = async (
 
             // Generate chat title from first message
             generateChatTitleFromFirstMessage(userMessage)
+
+            // Bump chat activity so the sidebar reflects the assistant message
+            // landing without waiting for a full reload.
+            chatsStore.bumpChatActivity(chatId)
 
             historyStore.finishStreamingMessage(messageId)
 

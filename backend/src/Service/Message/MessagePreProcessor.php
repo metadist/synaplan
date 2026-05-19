@@ -7,6 +7,7 @@ use App\Entity\File;
 use App\Entity\Message;
 use App\Repository\MessageRepository;
 use App\Repository\UserRepository;
+use App\Service\File\FileProcessor;
 use App\Service\File\TikaClient;
 use App\Service\RateLimitService;
 use App\Service\WhisperService;
@@ -45,6 +46,7 @@ final readonly class MessagePreProcessor
         private string $uploadsDir,
         private RateLimitService $rateLimitService,
         private UserRepository $userRepository,
+        private FileProcessor $fileProcessor,
     ) {
     }
 
@@ -147,17 +149,50 @@ final readonly class MessagePreProcessor
             'size' => $messageFile->getFileSize(),
         ]);
 
-        // Parse File mit Tika (für PDFs, DOCX, etc.)
+        // Parse File mit FileProcessor (Tika + Vision-Fallback für PDFs).
+        //
+        // Issue #729: this used to call parseWithTika() directly, which has no
+        // vision fallback and no MIME normalisation. When Tika reported the
+        // DOCX as application/zip or returned an empty body, the file was
+        // marked `processed` with empty BFILETEXT and the chat surfaced a
+        // generic "Document text extraction failed" error. The shared
+        // FileProcessor::extractText() pipeline (Tika -> PDF rasterise +
+        // Vision AI fallback for low-quality output) is the same strategy
+        // the /api/v1/files upload path already uses, so we get one
+        // consistent extraction behaviour across upload entry points.
         if (in_array($fileType, self::DOCUMENT_EXTENSIONS)) {
-            $text = $this->parseWithTika($fullPath);
-            if ($text) {
-                $messageFile->setFileText($text);
-                $this->logger->info('PreProcessor: Document parsed', [
+            $messageFile->setStatus('extracting');
+
+            try {
+                [$text, $extractMeta] = $this->fileProcessor->extractText(
+                    $filePath,
+                    $fileType,
+                    $messageFile->getUserId(),
+                );
+
+                if ('' !== trim((string) $text)) {
+                    $messageFile->setFileText($text);
+                    $messageFile->setStatus('processed');
+                    $this->logger->info('PreProcessor: Document parsed', [
+                        'file_id' => $messageFile->getId(),
+                        'text_length' => strlen($text),
+                        'strategy' => $extractMeta['strategy'] ?? 'unknown',
+                    ]);
+                } else {
+                    $messageFile->setStatus('error');
+                    $this->logger->warning('PreProcessor: Document extraction produced empty text', [
+                        'file_id' => $messageFile->getId(),
+                        'strategy' => $extractMeta['strategy'] ?? 'unknown',
+                    ]);
+                }
+            } catch (\Throwable $e) {
+                $messageFile->setStatus('error');
+                $this->logger->error('PreProcessor: Document extraction failed', [
                     'file_id' => $messageFile->getId(),
-                    'text_length' => strlen($text),
+                    'error' => $e->getMessage(),
                 ]);
             }
-            $messageFile->setStatus('processed');
+
             $this->billFileAnalysis($messageFile, $message, 'document');
         }
 

@@ -6,22 +6,25 @@ use App\AI\Service\AiFacade;
 use App\Entity\Message;
 use App\Repository\MessageRepository;
 use App\Repository\UserRepository;
+use App\Service\File\FileProcessor;
 use App\Service\File\TikaClient;
 use App\Service\Message\MessagePreProcessor;
 use App\Service\RateLimitService;
 use App\Service\WhisperService;
+use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
 
 class MessagePreProcessorTest extends TestCase
 {
-    private MessageRepository $messageRepository;
-    private TikaClient $tikaClient;
-    private WhisperService $whisperService;
-    private AiFacade $aiFacade;
-    private LoggerInterface $logger;
-    private RateLimitService $rateLimitService;
-    private UserRepository $userRepository;
+    private MessageRepository&MockObject $messageRepository;
+    private TikaClient&MockObject $tikaClient;
+    private WhisperService&MockObject $whisperService;
+    private AiFacade&MockObject $aiFacade;
+    private LoggerInterface&MockObject $logger;
+    private RateLimitService&MockObject $rateLimitService;
+    private UserRepository&MockObject $userRepository;
+    private FileProcessor&MockObject $fileProcessor;
     private MessagePreProcessor $service;
 
     protected function setUp(): void
@@ -33,6 +36,7 @@ class MessagePreProcessorTest extends TestCase
         $this->logger = $this->createMock(LoggerInterface::class);
         $this->rateLimitService = $this->createMock(RateLimitService::class);
         $this->userRepository = $this->createMock(UserRepository::class);
+        $this->fileProcessor = $this->createMock(FileProcessor::class);
 
         $this->service = new MessagePreProcessor(
             $this->messageRepository,
@@ -43,6 +47,7 @@ class MessagePreProcessorTest extends TestCase
             '/var/www/backend/uploads',
             $this->rateLimitService,
             $this->userRepository,
+            $this->fileProcessor,
         );
     }
 
@@ -147,6 +152,7 @@ class MessagePreProcessorTest extends TestCase
                 $tempDir,
                 $this->rateLimitService,
                 $this->userRepository,
+                $this->fileProcessor,
             );
 
             $message = $this->createMock(Message::class);
@@ -193,6 +199,7 @@ class MessagePreProcessorTest extends TestCase
                 $tempDir,
                 $this->rateLimitService,
                 $this->userRepository,
+                $this->fileProcessor,
             );
 
             $message = $this->createMock(Message::class);
@@ -237,5 +244,129 @@ class MessagePreProcessorTest extends TestCase
         $this->messageRepository->method('save');
 
         $this->service->process($message);
+    }
+
+    /**
+     * Issue #729 — guards the regression that surfaced as
+     * "Document text extraction failed" on the first message after a chat
+     * upload. When BFILETEXT is already populated (synchronous extraction
+     * at upload time), the preprocessor must reuse it without invoking the
+     * fileProcessor again and must mark the file as `processed`.
+     */
+    public function testProcessFileEntityWithExtractedTextSkipsReExtraction(): void
+    {
+        $tempDir = sys_get_temp_dir();
+        $tempFile = $tempDir.'/test_doc_'.uniqid().'.docx';
+        touch($tempFile);
+
+        try {
+            $file = $this->createMock(\App\Entity\File::class);
+            $file->method('getId')->willReturn(42);
+            $file->method('getFilePath')->willReturn(basename($tempFile));
+            $file->method('getFileType')->willReturn('docx');
+            $file->method('getFileName')->willReturn('report.docx');
+            $file->method('getFileSize')->willReturn(1234);
+            $file->method('getFileText')->willReturn('Already extracted contents');
+            $file->method('getUserId')->willReturn(7);
+            $file
+                ->expects($this->atLeastOnce())
+                ->method('setStatus')
+                ->with('processed');
+
+            $files = new \Doctrine\Common\Collections\ArrayCollection([$file]);
+            $message = $this->createMock(Message::class);
+            $message->method('getFile')->willReturn(0);
+            $message->method('getFilePath')->willReturn('');
+            $message->method('getFiles')->willReturn($files);
+            $message->method('getUserId')->willReturn(7);
+
+            // fileProcessor must NOT run when text is already there
+            $this->fileProcessor
+                ->expects($this->never())
+                ->method('extractText');
+
+            $service = new MessagePreProcessor(
+                $this->messageRepository,
+                $this->tikaClient,
+                $this->whisperService,
+                $this->aiFacade,
+                $this->logger,
+                $tempDir,
+                $this->rateLimitService,
+                $this->userRepository,
+                $this->fileProcessor,
+            );
+
+            $this->messageRepository->method('save');
+
+            $service->process($message);
+        } finally {
+            if (file_exists($tempFile)) {
+                unlink($tempFile);
+            }
+        }
+    }
+
+    /**
+     * Issue #729 — when BFILETEXT is empty (e.g. the chat upload path
+     * couldn't extract synchronously for some reason), the preprocessor
+     * must delegate to the shared FileProcessor (Tika + Vision fallback)
+     * rather than calling Tika directly. This is what closes the race
+     * for legitimate fallback paths.
+     */
+    public function testProcessFileEntityWithoutExtractedTextUsesFileProcessor(): void
+    {
+        $tempDir = sys_get_temp_dir();
+        $tempFile = $tempDir.'/test_doc_'.uniqid().'.docx';
+        touch($tempFile);
+
+        try {
+            $file = $this->createMock(\App\Entity\File::class);
+            $file->method('getId')->willReturn(43);
+            $file->method('getFilePath')->willReturn(basename($tempFile));
+            $file->method('getFileType')->willReturn('docx');
+            $file->method('getFileName')->willReturn('doc.docx');
+            $file->method('getFileSize')->willReturn(2048);
+            $file->method('getFileText')->willReturn('');
+            $file->method('getUserId')->willReturn(11);
+
+            $file
+                ->expects($this->atLeastOnce())
+                ->method('setFileText')
+                ->with('extracted body');
+
+            $files = new \Doctrine\Common\Collections\ArrayCollection([$file]);
+            $message = $this->createMock(Message::class);
+            $message->method('getFile')->willReturn(0);
+            $message->method('getFilePath')->willReturn('');
+            $message->method('getFiles')->willReturn($files);
+            $message->method('getUserId')->willReturn(11);
+
+            $this->fileProcessor
+                ->expects($this->once())
+                ->method('extractText')
+                ->with(basename($tempFile), 'docx', 11)
+                ->willReturn(['extracted body', ['strategy' => 'tika']]);
+
+            $service = new MessagePreProcessor(
+                $this->messageRepository,
+                $this->tikaClient,
+                $this->whisperService,
+                $this->aiFacade,
+                $this->logger,
+                $tempDir,
+                $this->rateLimitService,
+                $this->userRepository,
+                $this->fileProcessor,
+            );
+
+            $this->messageRepository->method('save');
+
+            $service->process($message);
+        } finally {
+            if (file_exists($tempFile)) {
+                unlink($tempFile);
+            }
+        }
     }
 }

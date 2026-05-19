@@ -305,6 +305,48 @@ final readonly class ModelConfigService
     }
 
     /**
+     * Resolve the user's configured Sound→Text default model and provider.
+     *
+     * The settings UI writes transcription defaults to DEFAULTMODEL.SOUND2TEXT
+     * as a numeric BMODELS id. Return both the DB id for config/debug surfaces
+     * and the provider-facing model name for runtime calls.
+     *
+     * Mirrors resolveVisionDefault() so AiFacade::transcribe() can honour the
+     * configured row instead of falling through to the legacy
+     * ai/default_speech_to_text_provider chain (which the settings UI never
+     * writes — see issue #696).
+     *
+     * @return array{provider: string, model: ?string, model_id: ?int}
+     */
+    public function resolveSttDefault(?int $userId): array
+    {
+        $sttModelId = $this->getDefaultModel('SOUND2TEXT', $userId);
+        $sttModelName = null;
+        $sttProvider = null;
+
+        if ($sttModelId) {
+            $sttProvider = $this->getProviderForModel((int) $sttModelId);
+            if (null === $sttProvider) {
+                // BMODELS row is gone (e.g. catalog reshuffle): drop the stale
+                // id so callers fall back to the capability-level provider chain.
+                $sttModelId = null;
+            } else {
+                $sttModelName = $this->getModelName((int) $sttModelId);
+            }
+        }
+
+        if (null === $sttProvider) {
+            $sttProvider = $this->getDefaultProvider($userId, 'speech_to_text');
+        }
+
+        return [
+            'provider' => $sttProvider,
+            'model' => $sttModelName,
+            'model_id' => $sttModelId,
+        ];
+    }
+
+    /**
      * Get default model ID for a specific capability.
      *
      * Priority: User Config > Global Config > null.
