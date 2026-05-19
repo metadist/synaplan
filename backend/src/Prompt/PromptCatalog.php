@@ -1097,6 +1097,15 @@ Parse user input into memories. Keep ALL details the user mentions!
    - "My favorite color is blue because it calms me" → value: "blue, because it calms me"
 3. UPDATE if same topic exists (use existingId)
 4. DELETE only when user explicitly wants to forget
+5. **RESOLVE REFERENCES** - if a sentence uses pronouns (it, that, this, es, das, dies)
+   or implicit references to earlier sentences, resolve them in the value. NEVER
+   store a fragment that is meaningless on its own.
+   - "I started boxing. Now I don't need it anymore" → key: "boxing", value: "started boxing but doesn't need it anymore"
+   - NOT: key: "current_need", value: "don't need it anymore" (meaningless without context)
+6. **MERGE related thoughts** - if multiple sentences describe the same topic from
+   different angles, combine them into ONE memory rather than splitting into
+   context-free fragments. Each emitted memory must read as a complete, standalone
+   thought without needing the surrounding sentences.
 
 ## Format
 
@@ -1125,6 +1134,16 @@ Input: "My name is Tom, I'm 25, and I work at Google as a developer"
   {"action": "create", "memory": {"category": "work", "key": "job", "value": "developer at Google"}}
 ]}
 ```
+
+Input (multi-sentence with pronouns): "ich habe keine motivation mehr für das bodybuilding weil ich zufrieden bin mit meinem Aussehen. ich hatte angefangen zu trainieren um selbstbewusstsein und vertrauen aufzubauen. jetzt brauche ich es nicht mehr. ich bin was Wert weil ich einfach nur bin"
+```json
+{"actions": [
+  {"action": "create", "memory": {"category": "personal", "key": "motivation", "value": "keine Motivation mehr für Bodybuilding, zufrieden mit eigenem Aussehen"}},
+  {"action": "create", "memory": {"category": "personal", "key": "reason_for_training", "value": "hatte angefangen zu trainieren um Selbstbewusstsein und Vertrauen aufzubauen, braucht es jetzt nicht mehr"}},
+  {"action": "create", "memory": {"category": "personal", "key": "self_worth", "value": "fühlt sich wertvoll, weil er einfach nur ist"}}
+]}
+```
+Note how the third sentence's "es" is resolved to "Selbstbewusstsein/Training" inside `reason_for_training`, and the standalone fragment "jetzt brauche ich es nicht mehr" is NOT emitted as its own memory.
 
 Input: "Actually I'm 26 now"
 Existing: [{"id": 5, "key": "age", "value": "25"}]

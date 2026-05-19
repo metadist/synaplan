@@ -125,4 +125,33 @@ final class PromptCatalogTest extends TestCase
             $seen[$key] = true;
         }
     }
+
+    /**
+     * Issue #950: the memory_parse prompt used to extract context-free
+     * fragments from multi-sentence input — pronouns like "es"/"it"
+     * referencing earlier sentences ended up as standalone memories.
+     * The prompt must now explicitly require co-reference resolution and
+     * encourage merging related thoughts, plus include a multi-sentence
+     * example that demonstrates the behaviour.
+     */
+    public function testMemoryParsePromptResolvesReferencesAndMergesThoughts(): void
+    {
+        $byTopic = [];
+        foreach (PromptCatalog::all() as $entry) {
+            $byTopic[$entry['topic']] = $entry;
+        }
+
+        $this->assertArrayHasKey('tools:memory_parse', $byTopic);
+        $prompt = $byTopic['tools:memory_parse']['prompt'];
+
+        $this->assertStringContainsString('RESOLVE REFERENCES', $prompt);
+        $this->assertStringContainsString('MERGE related thoughts', $prompt);
+        $this->assertStringContainsString('context-free fragments', $prompt);
+
+        // The multi-sentence example from the issue must be present so the
+        // model has a concrete demonstration of co-reference resolution.
+        $this->assertStringContainsString('bodybuilding', $prompt);
+        $this->assertStringContainsString('reason_for_training', $prompt);
+        $this->assertStringContainsString('self_worth', $prompt);
+    }
 }
