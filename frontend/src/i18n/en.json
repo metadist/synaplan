@@ -106,7 +106,8 @@
       "share": "Share chat",
       "public": "Public"
     },
-    "fileOnlyDefaultMessage": "Please review the attached file."
+    "fileOnlyDefaultMessage": "Please review the attached file.",
+    "voiceMessageDefaultMessage": "Please respond to my voice message."
   },
   "admin": {
     "title": "Admin Panel",

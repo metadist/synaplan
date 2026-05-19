@@ -99,7 +99,8 @@
       "share": "Compartir chat",
       "public": "Público"
     },
-    "fileOnlyDefaultMessage": "Por favor, revisa el archivo adjunto."
+    "fileOnlyDefaultMessage": "Por favor, revisa el archivo adjunto.",
+    "voiceMessageDefaultMessage": "Por favor, responde a mi mensaje de voz."
   },
   "admin": {
     "title": "Panel de Administración",

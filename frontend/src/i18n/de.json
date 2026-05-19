@@ -101,7 +101,8 @@
       "share": "Chat teilen",
       "public": "Öffentlich"
     },
-    "fileOnlyDefaultMessage": "Bitte prüfe die angehängte Datei."
+    "fileOnlyDefaultMessage": "Bitte prüfe die angehängte Datei.",
+    "voiceMessageDefaultMessage": "Bitte antworte auf meine Sprachnachricht."
   },
   "admin": {
     "title": "Admin-Panel",

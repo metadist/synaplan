@@ -354,6 +354,7 @@ import type { ModelOption } from '@/composables/useModelSelection'
 import { parseAIResponse } from '@/utils/responseParser'
 import { normalizeMediaUrl } from '@/utils/urlHelper'
 import { generatePartId, pushMediaPart, extractMediaParts } from '@/utils/mediaParts'
+import { buildUploadUrl, isAudioFileType } from '@/utils/mediaTypes'
 import { isChannelSource } from '@/utils/channelSource'
 import { AudioStreamer } from '@/utils/AudioStreamer'
 import { httpClient } from '@/services/api/httpClient'
@@ -1243,9 +1244,21 @@ const handleSendMessage = async (
     }
   }
 
-  // File-only submission: provide a default message when no text but files are attached
+  // File-only submission: provide a default message when no text but files are attached.
+  // Issue #955: an audio-only submission (e.g. voice note from mobile, drag & drop of an
+  // .ogg/.mp3) used to inherit the generic "Please review the attached file." default,
+  // which made the LLM treat the recording as a document to summarise and produced
+  // meta-commentary like "The OGG audio file contains…". Use a voice-specific default
+  // so the FileAnalysisHandler picks the conversational audio path instead.
   const hasFiles = options?.fileIds && options.fileIds.length > 0
-  const messageToSend = !content.trim() && hasFiles ? t('chat.fileOnlyDefaultMessage') : content
+  const hasOnlyAudioFiles =
+    hasFiles && (files?.length ?? 0) > 0 && files!.every((f) => isAudioFileType(f.fileType))
+  const messageToSend =
+    !content.trim() && hasFiles
+      ? hasOnlyAudioFiles
+        ? t('chat.voiceMessageDefaultMessage')
+        : t('chat.fileOnlyDefaultMessage')
+      : content
 
   // Prepare webSearch metadata for user message
   const webSearchData = options?.webSearch ? { enabled: true } : null
@@ -1283,10 +1296,32 @@ const handleSendMessage = async (
   }
 
   // Add user message with files, webSearch, and tool info
-  // Use displayContent (without command) for the message text shown in UI
+  // Use displayContent (without command) for the message text shown in UI.
+  //
+  // Issue #955: when the upload contains audio files, surface them as an
+  // <audio> player on the user bubble immediately (in addition to the file
+  // badge). Without this the only visible artifact of a voice upload was
+  // the transcribed text — there was no way to replay the original
+  // recording from the web chat.
+  const optimisticParts: import('@/stores/history').Part[] = [
+    { type: 'text', content: displayContent },
+  ]
+  if (files && files.length > 0) {
+    for (const file of files) {
+      if (!isAudioFileType(file.fileType)) continue
+      const audioUrl = buildUploadUrl(file.filePath)
+      if (!audioUrl) continue
+      optimisticParts.push({
+        partId: generatePartId(),
+        type: 'audio',
+        url: normalizeMediaUrl(audioUrl),
+      })
+    }
+  }
+
   historyStore.addMessage(
     'user',
-    [{ type: 'text', content: displayContent }],
+    optimisticParts,
     files,
     undefined, // provider
     undefined, // modelLabel

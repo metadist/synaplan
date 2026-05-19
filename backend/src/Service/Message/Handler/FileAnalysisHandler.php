@@ -85,8 +85,10 @@ final readonly class FileAnalysisHandler implements MessageHandlerInterface
         // 1. Audio files: Must have transcribed text from PreProcessor
         if ($fileInfo['is_audio']) {
             if (!empty($fileInfo['text'])) {
-                // Audio with transcription → Use Chat Model
-                return $this->handleWithChatModel($message, $fileInfo, $userPrompt, $classification, $progressCallback);
+                // Issue #955: respond conversationally to the voice
+                // message instead of treating the audio file as a
+                // document to summarise.
+                return $this->handleAudioWithChatModel($message, $fileInfo, $userPrompt, $classification, $progressCallback);
             }
             // Audio without transcription → Error
             $this->logger->error('FileAnalysisHandler: Audio file without transcription', [
@@ -197,8 +199,10 @@ final readonly class FileAnalysisHandler implements MessageHandlerInterface
         // 1. Audio files: Must have transcribed text from PreProcessor
         if ($fileInfo['is_audio']) {
             if (!empty($fileInfo['text'])) {
-                // Audio with transcription → Use Chat Model
-                return $this->handleStreamWithChatModel($message, $fileInfo, $userPrompt, $classification, $streamCallback, $progressCallback, $options);
+                // Issue #955: respond conversationally to the voice
+                // message instead of treating the audio file as a
+                // document to summarise.
+                return $this->handleStreamAudioWithChatModel($message, $fileInfo, $userPrompt, $classification, $streamCallback, $progressCallback, $options);
             }
             // Audio without transcription → Error
             $this->logger->error('FileAnalysisHandler: Audio file without transcription (streaming)', [
@@ -265,6 +269,234 @@ final readonly class FileAnalysisHandler implements MessageHandlerInterface
         return [
             'metadata' => ['error' => 'unsupported_file_type'],
         ];
+    }
+
+    /**
+     * Issue #955: prompts that lead the LLM to treat a transcribed
+     * voice message as a normal chat turn, never as a file to describe.
+     *
+     * The user expects the assistant to *answer* the spoken message
+     * the same way it would answer typed text — not to produce
+     * meta-commentary like
+     * "The OGG audio file contains a very short recording that says…".
+     *
+     * @return array{system: string, prompt: string}
+     */
+    private function buildAudioConversationalPrompt(array $fileInfo, string $userPrompt): array
+    {
+        $transcript = trim((string) ($fileInfo['text'] ?? ''));
+        $cleanedUserPrompt = trim($userPrompt);
+
+        // Treat generic placeholder prompts (file-only uploads, the
+        // i18n defaults from ChatView.vue, mobile "[Audio message]"
+        // markers, or a verbatim copy of the transcript) as "no extra
+        // instruction" so the assistant answers the transcript itself
+        // instead of describing it.
+        $genericPrompts = [
+            '',
+            'please review the attached file.',
+            'please respond to my voice message.',
+            'bitte prüfe die angehängte datei.',
+            'bitte antworte auf meine sprachnachricht.',
+            'por favor, revisa el archivo adjunto.',
+            'por favor, responde a mi mensaje de voz.',
+            'lütfen ekteki dosyayı inceleyin.',
+            'lütfen sesli mesajıma yanıt verin.',
+            '[audio message]',
+            '[audio]',
+        ];
+        $isGeneric = in_array(mb_strtolower($cleanedUserPrompt), $genericPrompts, true)
+            || mb_strtolower($cleanedUserPrompt) === mb_strtolower($transcript);
+
+        $systemPrompt =
+            "The user sent you a voice message. The transcript of what they actually said is provided below.\n\n"
+            ."Respond directly and conversationally to the transcript, exactly as you would to a normal text chat message.\n\n"
+            ."IMPORTANT — do NOT:\n"
+            ."- describe, summarize, or analyze the audio file itself\n"
+            ."- mention the file format (OGG, MP3, WAV, etc.) or that it is a recording\n"
+            ."- say things like \"the audio file contains\", \"the recording says\", \"the user said in the audio\"\n"
+            ."- quote the transcript back at the user unless they explicitly asked you to\n\n"
+            ."Treat the transcript as if the user had typed it.\n\n"
+            ."=== VOICE MESSAGE TRANSCRIPT ===\n"
+            .$transcript."\n"
+            .'=== END TRANSCRIPT ===';
+
+        // When the user only attached audio (no extra text), feed the
+        // transcript itself as the user turn so the LLM has something
+        // concrete to reply to. When the user also typed something
+        // alongside the recording (e.g. "translate this"), preserve
+        // their instruction verbatim — the system prompt already gives
+        // the model the transcript as context.
+        $finalPrompt = $isGeneric ? $transcript : $cleanedUserPrompt;
+
+        return [
+            'system' => $systemPrompt,
+            'prompt' => '' !== $finalPrompt ? $finalPrompt : $transcript,
+        ];
+    }
+
+    /**
+     * Handle voice message (audio with transcript) using Chat Model —
+     * conversational reply path (issue #955).
+     */
+    private function handleAudioWithChatModel(
+        Message $message,
+        array $fileInfo,
+        string $userPrompt,
+        array $classification,
+        ?callable $progressCallback,
+    ): array {
+        $this->notify($progressCallback, 'generating', 'Replying to voice message...');
+
+        $prompts = $this->buildAudioConversationalPrompt($fileInfo, $userPrompt);
+
+        $effectiveUserId = $this->modelConfigService->getEffectiveUserIdForMessage($message);
+        $modelId = $classification['model_id']
+            ?? $this->resolvePromptAiModel($classification)
+            ?? $this->modelConfigService->getDefaultModel('CHAT', $effectiveUserId);
+        $provider = null;
+        $modelName = null;
+
+        if ($modelId) {
+            $provider = $this->modelConfigService->getProviderForModel($modelId);
+            $modelName = $this->modelConfigService->getModelName($modelId);
+        }
+
+        $this->logger->info('FileAnalysisHandler: Replying to voice message', [
+            'model_id' => $modelId,
+            'provider' => $provider,
+            'model' => $modelName,
+            'user_id' => $message->getUserId(),
+            'effective_user_id' => $effectiveUserId,
+            'transcript_length' => strlen($fileInfo['text'] ?? ''),
+        ]);
+
+        try {
+            $messages = [
+                ['role' => 'system', 'content' => $prompts['system']],
+                ['role' => 'user', 'content' => $prompts['prompt']],
+            ];
+
+            $result = $this->aiFacade->chat(
+                $messages,
+                $message->getUserId(),
+                [
+                    'provider' => $provider,
+                    'model' => $modelName,
+                    'max_tokens' => 4000,
+                ]
+            );
+
+            $this->notify($progressCallback, 'complete', 'Reply complete.');
+
+            return [
+                'content' => $result['content'],
+                'metadata' => [
+                    'provider' => $result['provider'] ?? $provider ?? 'unknown',
+                    'model' => $result['model'] ?? $modelName ?? 'unknown',
+                    'model_id' => $modelId,
+                    'analyzed_file' => $fileInfo['name'],
+                    'analysis_type' => 'voice_message_reply',
+                ],
+            ];
+        } catch (\Exception $e) {
+            $this->logger->error('FileAnalysisHandler: Voice message reply failed', [
+                'error' => $e->getMessage(),
+                'file' => $fileInfo['name'],
+            ]);
+
+            return [
+                'content' => 'Voice message reply failed: '.$e->getMessage(),
+                'metadata' => [
+                    'error' => $e->getMessage(),
+                    'provider' => $provider,
+                    'model' => $modelName,
+                ],
+            ];
+        }
+    }
+
+    /**
+     * Handle voice message with streaming Chat Model (issue #955).
+     */
+    private function handleStreamAudioWithChatModel(
+        Message $message,
+        array $fileInfo,
+        string $userPrompt,
+        array $classification,
+        callable $streamCallback,
+        ?callable $progressCallback,
+        array $options,
+    ): array {
+        $this->notify($progressCallback, 'generating', 'Replying to voice message...');
+
+        $prompts = $this->buildAudioConversationalPrompt($fileInfo, $userPrompt);
+
+        $effectiveUserId = $this->modelConfigService->getEffectiveUserIdForMessage($message);
+        $modelId = $classification['model_id']
+            ?? $this->resolvePromptAiModel($classification)
+            ?? $this->modelConfigService->getDefaultModel('CHAT', $effectiveUserId);
+        $provider = null;
+        $modelName = null;
+
+        if ($modelId) {
+            $provider = $this->modelConfigService->getProviderForModel($modelId);
+            $modelName = $this->modelConfigService->getModelName($modelId);
+        }
+
+        $this->logger->info('FileAnalysisHandler: Replying to voice message (streaming)', [
+            'model_id' => $modelId,
+            'provider' => $provider,
+            'model' => $modelName,
+            'user_id' => $message->getUserId(),
+            'effective_user_id' => $effectiveUserId,
+            'transcript_length' => strlen($fileInfo['text'] ?? ''),
+        ]);
+
+        try {
+            $messages = [
+                ['role' => 'system', 'content' => $prompts['system']],
+                ['role' => 'user', 'content' => $prompts['prompt']],
+            ];
+
+            $result = $this->aiFacade->chatStream(
+                $messages,
+                $streamCallback,
+                $message->getUserId(),
+                [
+                    'provider' => $provider,
+                    'model' => $modelName,
+                    'max_tokens' => 4000,
+                ]
+            );
+
+            $this->notify($progressCallback, 'complete', 'Reply complete.');
+
+            return [
+                'metadata' => [
+                    'provider' => $result['provider'] ?? $provider ?? 'unknown',
+                    'model' => $result['model'] ?? $modelName ?? 'unknown',
+                    'model_id' => $modelId,
+                    'analyzed_file' => $fileInfo['name'],
+                    'analysis_type' => 'voice_message_reply',
+                ],
+            ];
+        } catch (\Exception $e) {
+            $this->logger->error('FileAnalysisHandler: Streaming voice message reply failed', [
+                'error' => $e->getMessage(),
+                'file' => $fileInfo['name'],
+            ]);
+
+            $streamCallback('Voice message reply failed: '.$e->getMessage());
+
+            return [
+                'metadata' => [
+                    'error' => $e->getMessage(),
+                    'provider' => $provider,
+                    'model' => $modelName,
+                ],
+            ];
+        }
     }
 
     /**
