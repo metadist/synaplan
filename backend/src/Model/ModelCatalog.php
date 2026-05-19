@@ -613,14 +613,20 @@ class ModelCatalog
             'selectable' => 1,
             'active' => 1,
             'providerId' => 'tts-1',
-            'priceIn' => 0.015,
-            'inUnit' => 'per1000chars',
+            // OpenAI tts-1 is flat $0.015 per 1000 characters → $0.000015
+            // per character. Mirrors live BMODELS BID 41.
+            'priceIn' => 0.000015,
+            'inUnit' => 'perChar',
             'priceOut' => 0,
-            'outUnit' => '-',
+            'outUnit' => 'perChar',
             'quality' => 8,
             'rating' => 1,
             'json' => [
                 'description' => 'OpenAI\'s text to speech, defaulting on voice NOVA.',
+                'pricing_mode' => 'per_character',
+                'mode_prices' => [
+                    'input_cost_per_character' => 0.000015,
+                ],
                 'params' => ['model' => 'tts-1', 'voice' => 'nova'],
             ],
         ],
@@ -673,14 +679,20 @@ class ModelCatalog
             'selectable' => 1,
             'active' => 1,
             'providerId' => 'tts-1-hd',
-            'priceIn' => 0.03,
-            'inUnit' => 'per1000chars',
+            // OpenAI tts-1-hd is flat $0.03 per 1000 characters → $0.00003
+            // per character. Mirrors live BMODELS BID 83.
+            'priceIn' => 0.00003,
+            'inUnit' => 'perChar',
             'priceOut' => 0,
-            'outUnit' => '-',
+            'outUnit' => 'perChar',
             'quality' => 9,
             'rating' => 1,
             'json' => [
                 'description' => 'OpenAI high-quality text-to-speech.',
+                'pricing_mode' => 'per_character',
+                'mode_prices' => [
+                    'input_cost_per_character' => 0.00003,
+                ],
                 'params' => ['model' => 'tts-1-hd'],
             ],
         ],
@@ -1209,14 +1221,21 @@ class ModelCatalog
             'selectable' => 1,
             'active' => 1,
             'providerId' => 'imagen-4.0-generate-001',
-            'priceIn' => 0.1,
-            'inUnit' => 'per1M',
-            'priceOut' => 0.4,
-            'outUnit' => 'per1M',
+            // Imagen 4.0 is a flat per-image-fee model in production
+            // ($0.04/image standard quality). Mirrors live BMODELS BID 115:
+            // priceIn=0 (no input cost), priceOut=0.04 in `perImage` units.
+            'priceIn' => 0,
+            'inUnit' => 'perImage',
+            'priceOut' => 0.04,
+            'outUnit' => 'perImage',
             'quality' => 9,
             'rating' => 1,
             'json' => [
                 'description' => 'Google Imagen 4.0 image generation',
+                'pricing_mode' => 'per_image',
+                'mode_prices' => [
+                    'output_cost_per_image' => 0.04,
+                ],
                 'params' => ['model' => 'imagen-4.0-generate-001'],
                 'features' => ['image'],
             ],

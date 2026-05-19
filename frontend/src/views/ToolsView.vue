@@ -1,10 +1,8 @@
 <template>
   <MainLayout>
     <div
-      ref="toolsContainer"
       class="flex flex-col h-full overflow-y-auto bg-chat scroll-thin overscroll-contain"
       data-testid="page-tools"
-      @scroll="handleScroll"
     >
       <div class="max-w-[1400px] mx-auto w-full px-6 py-8">
         <div
@@ -192,11 +190,10 @@
 
 <script setup lang="ts">
 import { getErrorMessage } from '@/utils/errorMessage'
-import { ref, computed, watch, onBeforeUnmount } from 'vue'
+import { ref, computed, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { useConfigStore } from '@/stores/config'
-import { useHeaderVisibility } from '@/composables/useHeaderVisibility'
 import MainLayout from '@/components/MainLayout.vue'
 import WidgetList from '@/components/widgets/WidgetList.vue'
 import WidgetEditor from '@/components/widgets/WidgetEditor.vue'
@@ -231,17 +228,6 @@ const config = useConfigStore()
 const aiConfigStore = useAiConfigStore()
 const { success, error: showError, warning: showWarning } = useNotification()
 const dialog = useDialog()
-const { onScroll: onHeaderScroll, show: showHeader } = useHeaderVisibility()
-const toolsContainer = ref<HTMLElement | null>(null)
-
-const handleScroll = () => {
-  if (!toolsContainer.value) return
-  onHeaderScroll(toolsContainer.value.scrollTop)
-}
-
-onBeforeUnmount(() => {
-  showHeader()
-})
 
 const widgets = ref<Widget[]>(mockWidgets)
 const showWidgetEditor = ref(false)
