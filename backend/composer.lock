@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "ffb41e0f90c80248b4ce4789ce8b9982",
+    "content-hash": "c67cd805cb9e9f04f3138b80439061c9",
     "packages": [
         {
             "name": "api-platform/doctrine-common",
@@ -13952,16 +13952,16 @@
         },
         {
             "name": "friendsofphp/php-cs-fixer",
-            "version": "v3.95.1",
+            "version": "v3.95.2",
             "source": {
                 "type": "git",
                 "url": "https://github.com/PHP-CS-Fixer/PHP-CS-Fixer.git",
-                "reference": "a9727678fbd12997f1d9de8f4a37824ed9df1065"
+                "reference": "a28d88a5e172b27e78d0816992b15a9df3da20f1"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/PHP-CS-Fixer/PHP-CS-Fixer/zipball/a9727678fbd12997f1d9de8f4a37824ed9df1065",
-                "reference": "a9727678fbd12997f1d9de8f4a37824ed9df1065",
+                "url": "https://api.github.com/repos/PHP-CS-Fixer/PHP-CS-Fixer/zipball/a28d88a5e172b27e78d0816992b15a9df3da20f1",
+                "reference": "a28d88a5e172b27e78d0816992b15a9df3da20f1",
                 "shasum": ""
             },
             "require": {
@@ -13993,8 +13993,8 @@
                 "symfony/stopwatch": "^5.4.45 || ^6.4.24 || ^7.0 || ^8.0"
             },
             "require-dev": {
-                "facile-it/paraunit": "^1.3.1 || ^2.8.0",
-                "infection/infection": "^0.32.6",
+                "facile-it/paraunit": "^1.3.1 || ^2.11.0",
+                "infection/infection": "^0.32.7",
                 "justinrainbow/json-schema": "^6.8.0",
                 "keradus/cli-executor": "^2.3",
                 "mikey179/vfsstream": "^1.6.12",
@@ -14045,7 +14045,7 @@
             ],
             "support": {
                 "issues": "https://github.com/PHP-CS-Fixer/PHP-CS-Fixer/issues",
-                "source": "https://github.com/PHP-CS-Fixer/PHP-CS-Fixer/tree/v3.95.1"
+                "source": "https://github.com/PHP-CS-Fixer/PHP-CS-Fixer/tree/v3.95.2"
             },
             "funding": [
                 {
@@ -14053,7 +14053,7 @@
                     "type": "github"
                 }
             ],
-            "time": "2026-04-12T17:00:09+00:00"
+            "time": "2026-05-15T09:20:44+00:00"
         },
         {
             "name": "myclabs/deep-copy",
@@ -14235,11 +14235,11 @@
         },
         {
             "name": "phpstan/phpstan",
-            "version": "2.1.54",
+            "version": "2.1.55",
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/phpstan/phpstan/zipball/8be50c3992107dc837b17da4d140fbbdf9a5c5bd",
-                "reference": "8be50c3992107dc837b17da4d140fbbdf9a5c5bd",
+                "url": "https://api.github.com/repos/phpstan/phpstan/zipball/9eaac3826ed5e9b8427350a43cac825eeca3f566",
+                "reference": "9eaac3826ed5e9b8427350a43cac825eeca3f566",
                 "shasum": ""
             },
             "require": {
@@ -14284,20 +14284,20 @@
                     "type": "github"
                 }
             ],
-            "time": "2026-04-29T13:31:09+00:00"
+            "time": "2026-05-18T11:57:34+00:00"
         },
         {
             "name": "phpstan/phpstan-doctrine",
-            "version": "2.0.21",
+            "version": "2.0.22",
             "source": {
                 "type": "git",
                 "url": "https://github.com/phpstan/phpstan-doctrine.git",
-                "reference": "81dac0ee4363c2359128aec844df31efb215dddc"
+                "reference": "e87516b034749432d51653c0147e053e476e8c53"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/phpstan/phpstan-doctrine/zipball/81dac0ee4363c2359128aec844df31efb215dddc",
-                "reference": "81dac0ee4363c2359128aec844df31efb215dddc",
+                "url": "https://api.github.com/repos/phpstan/phpstan-doctrine/zipball/e87516b034749432d51653c0147e053e476e8c53",
+                "reference": "e87516b034749432d51653c0147e053e476e8c53",
                 "shasum": ""
             },
             "require": {
@@ -14331,6 +14331,7 @@
                 "phpstan/phpstan-strict-rules": "^2.0",
                 "phpunit/phpunit": "^9.6.20",
                 "ramsey/uuid": "^4.2",
+                "shipmonk/name-collision-detector": "^2.1",
                 "symfony/cache": "^5.4",
                 "symfony/uid": "^5.4 || ^6.4 || ^7.3"
             },
@@ -14358,9 +14359,9 @@
             ],
             "support": {
                 "issues": "https://github.com/phpstan/phpstan-doctrine/issues",
-                "source": "https://github.com/phpstan/phpstan-doctrine/tree/2.0.21"
+                "source": "https://github.com/phpstan/phpstan-doctrine/tree/2.0.22"
             },
-            "time": "2026-04-17T13:00:39+00:00"
+            "time": "2026-05-09T08:10:48+00:00"
         },
         {
             "name": "phpunit/php-code-coverage",
@@ -14709,16 +14710,16 @@
         },
         {
             "name": "phpunit/phpunit",
-            "version": "12.5.24",
+            "version": "12.5.25",
             "source": {
                 "type": "git",
                 "url": "https://github.com/sebastianbergmann/phpunit.git",
-                "reference": "d75dd30597caa80e72fad2ef7904601a30ef1046"
+                "reference": "792c2980442dfce319226b88fa845b8b6de3b333"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/sebastianbergmann/phpunit/zipball/d75dd30597caa80e72fad2ef7904601a30ef1046",
-                "reference": "d75dd30597caa80e72fad2ef7904601a30ef1046",
+                "url": "https://api.github.com/repos/sebastianbergmann/phpunit/zipball/792c2980442dfce319226b88fa845b8b6de3b333",
+                "reference": "792c2980442dfce319226b88fa845b8b6de3b333",
                 "shasum": ""
             },
             "require": {
@@ -14787,7 +14788,7 @@
             "support": {
                 "issues": "https://github.com/sebastianbergmann/phpunit/issues",
                 "security": "https://github.com/sebastianbergmann/phpunit/security/policy",
-                "source": "https://github.com/sebastianbergmann/phpunit/tree/12.5.24"
+                "source": "https://github.com/sebastianbergmann/phpunit/tree/12.5.25"
             },
             "funding": [
                 {
@@ -14795,7 +14796,7 @@
                     "type": "other"
                 }
             ],
-            "time": "2026-05-01T04:21:04+00:00"
+            "time": "2026-05-13T03:56:57+00:00"
         },
         {
             "name": "react/cache",
