@@ -768,15 +768,45 @@ const selectModel = async (capability: Capability, modelId: number | null) => {
   // model (no-op) or the "(none)" option.
   if (capability === 'VECTORIZE' && modelId !== null && modelId !== previousModelId) {
     const target = getModelsByPurpose(capability).find((m) => m.id === modelId)
-    if (target) {
-      switchModalTargetId.value = modelId
-      switchModalTargetName.value = target.name
-      switchModalTargetProvider.value = target.service
-      switchModalGuardReason.value = embeddingGuard.value?.canChange
-        ? null
-        : (embeddingGuard.value?.reason ?? null)
-      switchModalOpen.value = true
+    if (!target) return
+
+    // #949: Pre-flight provider key check BEFORE opening the modal.
+    // Without this guard, an admin can open the switch flow for a
+    // model whose API key is missing — the /switch endpoint would
+    // then 400 with "provider_unavailable", surfacing as a generic
+    // "Switch failed" toast deep in the modal. Catch it here so the
+    // user gets the same actionable "model not configured" warning
+    // they get for every other capability.
+    try {
+      const check = await checkModelAvailability(modelId)
+      if (!check.available) {
+        const modelName = target.name
+        if (check.env_var) {
+          warning(
+            t('config.aiModels.modelNotConfigured', {
+              model: modelName,
+              envVar: check.env_var,
+            })
+          )
+        } else {
+          showError(t('config.aiModels.modelNotAvailable', { model: modelName }))
+        }
+        return
+      }
+    } catch (err) {
+      console.error('Failed to check VECTORIZE model availability:', err)
+      // Network/server error: fall through and let the modal handle
+      // the failure with its full cost-estimate error UI rather than
+      // silently swallowing the click.
     }
+
+    switchModalTargetId.value = modelId
+    switchModalTargetName.value = target.name
+    switchModalTargetProvider.value = target.service
+    switchModalGuardReason.value = embeddingGuard.value?.canChange
+      ? null
+      : (embeddingGuard.value?.reason ?? null)
+    switchModalOpen.value = true
     return
   }
 

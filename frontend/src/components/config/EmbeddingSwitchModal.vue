@@ -108,6 +108,14 @@
                   {{ estimate?.fromModel.model || $t('config.embeddingSwitch.unknown') }}
                 </p>
                 <p class="text-xs txt-secondary">{{ estimate?.fromModel.provider || '—' }}</p>
+                <p
+                  v-if="estimate?.fromModel"
+                  class="text-xs txt-secondary mt-1 font-mono"
+                  data-testid="dim-from"
+                >
+                  {{ $t('config.embeddingSwitch.dimensions') }}:
+                  <span class="txt-primary">{{ estimate.fromModel.vectorDim }}</span>
+                </p>
               </div>
               <div class="surface-card p-3 ring-2 ring-[var(--brand)]/40">
                 <p class="text-xs uppercase tracking-wide txt-secondary mb-1">
@@ -117,7 +125,35 @@
                   {{ targetModelName }}
                 </p>
                 <p class="text-xs txt-secondary">{{ targetModelProvider }}</p>
+                <p
+                  v-if="estimate?.toModel"
+                  class="text-xs txt-secondary mt-1 font-mono"
+                  data-testid="dim-to"
+                >
+                  {{ $t('config.embeddingSwitch.dimensions') }}:
+                  <span class="txt-primary">{{ estimate.toModel.vectorDim }}</span>
+                </p>
               </div>
+            </div>
+
+            <!-- Dimension-mismatch banner: the storage layer reindexes
+                 with the new dim, but the admin should know that every
+                 vector physically changes shape — old/new cosine scores
+                 are not comparable until reindex finishes. -->
+            <div
+              v-if="dimensionMismatch"
+              class="rounded-lg border border-amber-500/40 bg-amber-500/10 p-3 mb-4 flex items-start gap-2"
+              data-testid="banner-dim-mismatch"
+            >
+              <ExclamationTriangleIcon class="w-5 h-5 text-amber-500 flex-shrink-0 mt-0.5" />
+              <p class="text-sm txt-primary">
+                {{
+                  $t('config.embeddingSwitch.dimMismatch', {
+                    from: estimate?.fromModel.vectorDim,
+                    to: estimate?.toModel.vectorDim,
+                  })
+                }}
+              </p>
             </div>
 
             <!-- Loading state -->
@@ -380,6 +416,18 @@ const canSubmit = computed(() => {
   if (!estimate.value) return false
   if (estimate.value.severity === 'critical' && !confirmCritical.value) return false
   return true
+})
+
+// #949: surface the dim change so the admin understands what the
+// switch physically does to the vector space. Both dims fall back to
+// EmbeddingMetadataService::DEFAULT_VECTOR_DIM (1024) on the backend
+// when the catalog row has no `meta.dimensions`, in which case there
+// is nothing to warn about.
+const dimensionMismatch = computed(() => {
+  const from = estimate.value?.fromModel.vectorDim
+  const to = estimate.value?.toModel.vectorDim
+  if (typeof from !== 'number' || typeof to !== 'number') return false
+  return from !== to
 })
 
 const formatTokens = (tokens: number): string => {

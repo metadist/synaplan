@@ -61,6 +61,13 @@ final class EmbeddingCostEstimatorTest extends TestCase
         $this->embeddingMetadata->method('getCurrentModelId')->willReturn(7);
         $this->modelConfigService->method('getProviderForModel')->willReturn('openai');
         $this->modelConfigService->method('getModelName')->willReturn('text-embedding-3-small');
+        // Real per-model dimensions from the catalog (#949): the previous
+        // hardcoded 1024 made the UI lie about target-model dims.
+        $this->modelConfigService->method('getVectorDimForModel')
+            ->willReturnMap([
+                [7, 768],     // current "from" model
+                [99, 1536],   // target "to" model
+            ]);
 
         // 100 BRAG rows × 200 chars each → ~5000 tokens for documents
         $this->connection->method('fetchOne')
@@ -87,6 +94,8 @@ final class EmbeddingCostEstimatorTest extends TestCase
 
         self::assertSame(99, $estimate['toModelId']);
         self::assertSame(7, $estimate['fromModelId']);
+        self::assertSame(768, $estimate['fromModel']['vectorDim']);
+        self::assertSame(1536, $estimate['toModel']['vectorDim']);
 
         // 100 documents
         self::assertSame(100, $estimate['scopes']['documents']['chunks']);
@@ -106,11 +115,37 @@ final class EmbeddingCostEstimatorTest extends TestCase
         self::assertSame('info', $estimate['severity']);
     }
 
+    public function testFallsBackToDefaultVectorDimWhenModelMetaMissing(): void
+    {
+        $this->embeddingMetadata->method('getCurrentModelId')->willReturn(null);
+        $this->modelConfigService->method('getProviderForModel')->willReturn('ollama');
+        $this->modelConfigService->method('getModelName')->willReturn('nomic-embed-text');
+        // Legacy/local model row missing BJSON.meta.dimensions → null. The
+        // estimator must fall back to DEFAULT_VECTOR_DIM (#949) so the UI
+        // still renders a number for the dim comparison.
+        $this->modelConfigService->method('getVectorDimForModel')->willReturn(null);
+
+        $this->connection->method('fetchOne')->willReturn(0);
+        $this->qdrantClient->method('scrollMemories')->willReturn([]);
+        $this->qdrantClient->method('getSynapseCollectionInfo')->willReturn([
+            'exists' => false,
+            'points_count' => 0,
+            'vector_dim' => 1024,
+            'distance' => 'Cosine',
+        ]);
+
+        $estimate = $this->estimator->estimateChange(42);
+
+        self::assertSame(EmbeddingMetadataService::DEFAULT_VECTOR_DIM, $estimate['toModel']['vectorDim']);
+        self::assertSame(EmbeddingMetadataService::DEFAULT_VECTOR_DIM, $estimate['fromModel']['vectorDim']);
+    }
+
     public function testCriticalSeverityForLargeRun(): void
     {
         $this->embeddingMetadata->method('getCurrentModelId')->willReturn(7);
         $this->modelConfigService->method('getProviderForModel')->willReturn('openai');
         $this->modelConfigService->method('getModelName')->willReturn('text-embedding-3-large');
+        $this->modelConfigService->method('getVectorDimForModel')->willReturn(3072);
 
         $this->connection->method('fetchOne')
             ->willReturnCallback(static function (string $sql) {
