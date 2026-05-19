@@ -464,8 +464,13 @@ export const useHistoryStore = defineStore('history', () => {
           // stores for inbound WhatsApp voice notes and direct uploads.
           // Without the extension-aware check, a WhatsApp voice reply was
           // surfaced as a plain text bubble with no player.
+          //
+          // Relative `m.file.path` values (e.g. WhatsApp's `13/.../voice.ogg`)
+          // are first prefixed with the static-serve endpoint so the player
+          // can fetch them; absolute URLs and already-prefixed paths pass
+          // through `buildUploadUrl` unchanged before final normalization.
           if (m.file && m.file.path) {
-            const absoluteUrl = normalizeMediaUrl(m.file.path)
+            const absoluteUrl = normalizeMediaUrl(buildUploadUrl(m.file.path))
             if (isImageFileType(m.file.type)) {
               parts.push({
                 partId: generatePartId(),
@@ -509,8 +514,13 @@ export const useHistoryStore = defineStore('history', () => {
           // filename / size and download the original recording. Inbound
           // WhatsApp voice messages travel through this same `files`
           // pipeline once they're persisted as a `File` entity.
+          //
+          // The MIME type is forwarded so that ambiguous containers like
+          // `.webm` get classified by the actual upload mime (`audio/webm`
+          // for voice notes, `video/webm` for screen recordings) instead
+          // of falling into the audio default purely by extension.
           for (const file of files) {
-            if (!isAudioFileType(file.fileType)) continue
+            if (!isAudioFileType(file.fileType, file.fileMime)) continue
             const audioUrl = buildUploadUrl(file.filePath)
             if (!audioUrl) continue
             parts.push({

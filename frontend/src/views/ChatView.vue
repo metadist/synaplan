@@ -1248,17 +1248,28 @@ const handleSendMessage = async (
   // Issue #955: an audio-only submission (e.g. voice note from mobile, drag & drop of an
   // .ogg/.mp3) used to inherit the generic "Please review the attached file." default,
   // which made the LLM treat the recording as a document to summarise and produced
-  // meta-commentary like "The OGG audio file contains…". Use a voice-specific default
-  // so the FileAnalysisHandler picks the conversational audio path instead.
+  // meta-commentary like "The OGG audio file contains…".
+  //
+  // For audio-only uploads we keep the localized voice placeholder for the
+  // optimistic user bubble (so the chat doesn't show an empty row while the
+  // transcription/streaming is in flight), but the value sent to the backend
+  // is an empty string. `FileAnalysisHandler::isGenericAudioPlaceholder()`
+  // matches the empty prompt structurally and routes the request through
+  // the conversational voice path — no language-specific magic strings on
+  // either side.
   const hasFiles = options?.fileIds && options.fileIds.length > 0
   const hasOnlyAudioFiles =
-    hasFiles && (files?.length ?? 0) > 0 && files!.every((f) => isAudioFileType(f.fileType))
-  const messageToSend =
+    hasFiles &&
+    (files?.length ?? 0) > 0 &&
+    files!.every((f) => isAudioFileType(f.fileType, f.fileMime))
+  const displayMessage =
     !content.trim() && hasFiles
       ? hasOnlyAudioFiles
         ? t('chat.voiceMessageDefaultMessage')
         : t('chat.fileOnlyDefaultMessage')
       : content
+  const backendMessage = !content.trim() && hasOnlyAudioFiles ? '' : displayMessage
+  const messageToSend = displayMessage
 
   // Prepare webSearch metadata for user message
   const webSearchData = options?.webSearch ? { enabled: true } : null
@@ -1267,7 +1278,7 @@ const handleSendMessage = async (
   // Also extract the clean content without command prefix for display
   let toolData: { command: string; label: string; icon: string } | null = null
   let displayContent = messageToSend
-  let backendContent = messageToSend
+  let backendContent = backendMessage
 
   if (messageToSend.startsWith('/')) {
     const commandMatch = messageToSend.match(/^\/(\w+)\s+(.*)$/)
@@ -1308,7 +1319,7 @@ const handleSendMessage = async (
   ]
   if (files && files.length > 0) {
     for (const file of files) {
-      if (!isAudioFileType(file.fileType)) continue
+      if (!isAudioFileType(file.fileType, file.fileMime)) continue
       const audioUrl = buildUploadUrl(file.filePath)
       if (!audioUrl) continue
       optimisticParts.push({

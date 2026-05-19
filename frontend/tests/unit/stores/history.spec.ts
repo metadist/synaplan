@@ -117,6 +117,10 @@ describe('History Store', () => {
             direction: 'IN',
             text: 'Hei, test.',
             timestamp: 1700000000,
+            // Inbound WhatsApp voice notes carry a relative upload path
+            // (the same shape the backend exposes via files[].file_path).
+            // The store must prefix it with the static-serve endpoint so
+            // the <audio> element can fetch the recording.
             file: { path: '13/000/voice.ogg', type: 'ogg' },
           },
         ])
@@ -131,6 +135,7 @@ describe('History Store', () => {
       const audioParts = store.messages[0].parts.filter((p) => p.type === 'audio')
       expect(audioParts).toHaveLength(1)
       expect(audioParts[0].url).toContain('voice.ogg')
+      expect(audioParts[0].url).toContain('/api/v1/files/uploads/')
     })
 
     it('renders an audio player for a generic file.type === "audio" message', async () => {

@@ -287,26 +287,7 @@ final readonly class FileAnalysisHandler implements MessageHandlerInterface
         $transcript = trim((string) ($fileInfo['text'] ?? ''));
         $cleanedUserPrompt = trim($userPrompt);
 
-        // Treat generic placeholder prompts (file-only uploads, the
-        // i18n defaults from ChatView.vue, mobile "[Audio message]"
-        // markers, or a verbatim copy of the transcript) as "no extra
-        // instruction" so the assistant answers the transcript itself
-        // instead of describing it.
-        $genericPrompts = [
-            '',
-            'please review the attached file.',
-            'please respond to my voice message.',
-            'bitte prüfe die angehängte datei.',
-            'bitte antworte auf meine sprachnachricht.',
-            'por favor, revisa el archivo adjunto.',
-            'por favor, responde a mi mensaje de voz.',
-            'lütfen ekteki dosyayı inceleyin.',
-            'lütfen sesli mesajıma yanıt verin.',
-            '[audio message]',
-            '[audio]',
-        ];
-        $isGeneric = in_array(mb_strtolower($cleanedUserPrompt), $genericPrompts, true)
-            || mb_strtolower($cleanedUserPrompt) === mb_strtolower($transcript);
+        $isGeneric = $this->isGenericAudioPlaceholder($cleanedUserPrompt, $transcript);
 
         $systemPrompt =
             "The user sent you a voice message. The transcript of what they actually said is provided below.\n\n"
@@ -333,6 +314,49 @@ final readonly class FileAnalysisHandler implements MessageHandlerInterface
             'system' => $systemPrompt,
             'prompt' => '' !== $finalPrompt ? $finalPrompt : $transcript,
         ];
+    }
+
+    /**
+     * Decide whether the user prompt is just a placeholder produced by
+     * an "audio-only" upload, as opposed to a real instruction the user
+     * typed alongside the voice note.
+     *
+     * The original implementation enumerated localized placeholders
+     * from the Vue i18n bundle ("Please review the attached file.",
+     * "Bitte prüfe die angehängte Datei.", …). That coupled the backend
+     * to translation strings — a single typo or new locale silently
+     * regressed the heuristic. Instead we rely on three locale-agnostic
+     * signals:
+     *
+     *  1. Empty / whitespace-only prompt — the web frontend submits this
+     *     when the user attached audio with no text, and `MessagePreProcessor`
+     *     also normalizes the WhatsApp `[Audio message]` placeholder to
+     *     the transcript before this handler runs.
+     *  2. Prompt is identical to the transcript (case-insensitive) — the
+     *     mobile app pre-fills the message text with the STT result and
+     *     `MessagePreProcessor` does the same for `[Audio]` markers.
+     *  3. Prompt is a single bracketed marker like `[audio]`, `[audio
+     *     message]`, `[voice]`, `[voice note]` — the convention every
+     *     mobile platform uses to signal "this row has no real text".
+     *
+     * Anything else is treated as a real instruction so the user's
+     * verbatim wording (e.g. "translate this", "summarise this in two
+     * lines") is preserved.
+     */
+    private function isGenericAudioPlaceholder(string $cleanedUserPrompt, string $transcript): bool
+    {
+        if ('' === $cleanedUserPrompt) {
+            return true;
+        }
+
+        if (mb_strtolower($cleanedUserPrompt) === mb_strtolower($transcript)) {
+            return true;
+        }
+
+        // Bracketed-marker rows used by mobile platforms when the body is
+        // pure media. The regex matches a single `[…]` token (no nested
+        // brackets) optionally surrounded by whitespace.
+        return 1 === preg_match('/^\s*\[[^\[\]]+\]\s*$/u', $cleanedUserPrompt);
     }
 
     /**

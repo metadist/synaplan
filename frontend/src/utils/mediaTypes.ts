@@ -20,45 +20,87 @@
  * in isolation and reused safely from anywhere in the chat UI.
  */
 
+// `webm` lives in BOTH the audio and video sets because the container
+// format is genuinely ambiguous (audio/webm voice notes vs. video/webm
+// recordings). Callers are expected to pass the MIME type alongside the
+// extension whenever they have it; the extension-only fallback resolves
+// `.webm` to audio because voice notes are by far the dominant chat
+// payload in this app, and `MessageAudio` plays them correctly via the
+// `<audio>` element.
 const AUDIO_EXTENSIONS = new Set(['ogg', 'mp3', 'wav', 'm4a', 'opus', 'flac', 'webm', 'amr', 'aac'])
 
 const IMAGE_EXTENSIONS = new Set(['jpg', 'jpeg', 'png', 'webp', 'gif', 'bmp', 'svg'])
 
-const VIDEO_EXTENSIONS = new Set(['mp4', 'mov', 'avi', 'mkv'])
+const VIDEO_EXTENSIONS = new Set(['mp4', 'mov', 'avi', 'mkv', 'webm'])
 
 function normalize(type: string | null | undefined): string {
   return (type ?? '').trim().toLowerCase()
 }
 
 /**
+ * Returns the major part of a MIME type (e.g. `audio/webm` → `audio`)
+ * or an empty string when the input is missing or malformed. Trimmed
+ * and lowercased to match the rest of this module.
+ */
+function mimeMajor(mime: string | null | undefined): string {
+  const normalized = (mime ?? '').trim().toLowerCase()
+  if (!normalized) return ''
+  const slash = normalized.indexOf('/')
+  return slash > 0 ? normalized.slice(0, slash) : normalized
+}
+
+/**
  * True for both the generic `audio` media kind and any concrete audio
  * file extension the backend may have stored (`ogg`, `mp3`, …).
  *
- * `webm` is intentionally in the audio set because WhatsApp/MediaRecorder
- * uploads use it for voice notes. `MessageAudio` plays it correctly via
- * `<audio>` — the duplicate entry in `VIDEO_EXTENSIONS` would only matter
- * if we tried to auto-classify a `.webm` *without* any other hint, which
- * the chat history path never does (it always has an explicit media kind
- * available too).
+ * Pass the `mime` argument whenever the attachment carries a MIME type
+ * (it does on `MessageFile.fileMime`). The MIME type is authoritative
+ * and disambiguates `webm` between audio (voice notes) and video.
  */
-export function isAudioFileType(type: string | null | undefined): boolean {
+export function isAudioFileType(
+  type: string | null | undefined,
+  mime?: string | null | undefined
+): boolean {
+  const major = mimeMajor(mime)
+  if ('audio' === major) return true
+  if ('video' === major || 'image' === major) return false
+
   const normalized = normalize(type)
   if (!normalized) return false
-  if (normalized === 'audio') return true
+  if ('audio' === normalized) return true
   return AUDIO_EXTENSIONS.has(normalized)
 }
 
-export function isImageFileType(type: string | null | undefined): boolean {
+export function isImageFileType(
+  type: string | null | undefined,
+  mime?: string | null | undefined
+): boolean {
+  const major = mimeMajor(mime)
+  if ('image' === major) return true
+  if ('audio' === major || 'video' === major) return false
+
   const normalized = normalize(type)
   if (!normalized) return false
-  if (normalized === 'image') return true
+  if ('image' === normalized) return true
   return IMAGE_EXTENSIONS.has(normalized)
 }
 
-export function isVideoFileType(type: string | null | undefined): boolean {
+export function isVideoFileType(
+  type: string | null | undefined,
+  mime?: string | null | undefined
+): boolean {
+  const major = mimeMajor(mime)
+  if ('video' === major) return true
+  if ('audio' === major || 'image' === major) return false
+
   const normalized = normalize(type)
   if (!normalized) return false
-  if (normalized === 'video') return true
+  if ('video' === normalized) return true
+  // Ambiguous extensions (webm) default to audio — see VIDEO_EXTENSIONS
+  // comment above. Without a MIME hint we cannot tell the formats apart,
+  // so the explicit `video` generic kind or a non-webm extension is
+  // required to classify as video here.
+  if ('webm' === normalized) return false
   return VIDEO_EXTENSIONS.has(normalized)
 }
 

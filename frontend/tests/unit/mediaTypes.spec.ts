@@ -78,6 +78,45 @@ describe('isVideoFileType', () => {
       expect(isVideoFileType(type)).toBe(false)
     }
   )
+
+  it('returns false for the ambiguous "webm" extension without a MIME hint (audio is the default)', () => {
+    expect(isVideoFileType('webm')).toBe(false)
+  })
+})
+
+/**
+ * Issue #955 follow-up — Copilot review caught that `webm` lives in
+ * both audio and video containers. The MIME type is the only reliable
+ * tiebreaker, and `MessageFile.fileMime` already carries it on uploads.
+ */
+describe('webm disambiguation via MIME', () => {
+  it('classifies audio/webm voice notes as audio when MIME is provided', () => {
+    expect(isAudioFileType('webm', 'audio/webm')).toBe(true)
+    expect(isVideoFileType('webm', 'audio/webm')).toBe(false)
+  })
+
+  it('classifies video/webm screen recordings as video when MIME is provided', () => {
+    expect(isVideoFileType('webm', 'video/webm')).toBe(true)
+    expect(isAudioFileType('webm', 'video/webm')).toBe(false)
+  })
+
+  it('falls back to the audio default when only the extension is known', () => {
+    expect(isAudioFileType('webm')).toBe(true)
+    expect(isVideoFileType('webm')).toBe(false)
+  })
+
+  it('lets MIME override the extension across all detectors', () => {
+    expect(isImageFileType('mp3', 'image/png')).toBe(true)
+    expect(isAudioFileType('mp3', 'image/png')).toBe(false)
+    expect(isVideoFileType('mp3', 'video/mp4')).toBe(true)
+  })
+
+  it('ignores empty / malformed MIME strings and falls back to the extension', () => {
+    expect(isAudioFileType('mp3', '')).toBe(true)
+    expect(isAudioFileType('mp3', null)).toBe(true)
+    expect(isAudioFileType('mp3', '   ')).toBe(true)
+    expect(isAudioFileType('mp3', 'application/octet-stream')).toBe(true)
+  })
 })
 
 describe('buildUploadUrl', () => {

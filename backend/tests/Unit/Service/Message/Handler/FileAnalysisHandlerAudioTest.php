@@ -48,8 +48,13 @@ class FileAnalysisHandlerAudioTest extends TestCase
 
     public function testAudioMessageUsesConversationalPromptInsteadOfDocumentAnalysis(): void
     {
+        // An audio-only upload from the web app reaches the handler with
+        // an empty `BTEXT` (the i18n placeholder shown in the user bubble
+        // is not forwarded as message content) — so the structural empty
+        // check inside `isGenericAudioPlaceholder` is what triggers the
+        // conversational path here.
         $message = $this->buildAudioMessage(
-            text: 'Bitte prüfe die angehängte Datei.',
+            text: '',
             transcript: 'Hei, test.',
         );
 
@@ -87,6 +92,50 @@ class FileAnalysisHandlerAudioTest extends TestCase
 
         $this->assertSame('Hi! What would you like to test?', $result['content']);
         $this->assertSame('voice_message_reply', $result['metadata']['analysis_type']);
+    }
+
+    /**
+     * Mobile platforms (WhatsApp, iOS, Android) send a bracketed marker
+     * like `[Audio message]` or `[voice]` when the row has no real text.
+     * `MessagePreProcessor` already swaps `[Audio message]` for the
+     * transcript on the WhatsApp path, but the handler must still treat
+     * any bracketed-only placeholder as generic on its own — that
+     * double-defense is what removed the brittle i18n string list.
+     *
+     * @return iterable<string, array{0: string}>
+     */
+    public static function provideBracketedAudioPlaceholders(): iterable
+    {
+        yield '[audio message] (lowercase)' => ['[audio message]'];
+        yield '[Audio] (titlecase)' => ['[Audio]'];
+        yield '[Voice note] (titlecase, two words)' => ['[Voice note]'];
+        yield 'whitespace-padded' => ['   [voice]   '];
+    }
+
+    #[\PHPUnit\Framework\Attributes\DataProvider('provideBracketedAudioPlaceholders')]
+    public function testBracketedMarkerIsTreatedAsGenericPlaceholder(string $marker): void
+    {
+        $message = $this->buildAudioMessage(
+            text: $marker,
+            transcript: 'Hei, test.',
+        );
+
+        $this->stubModelConfig();
+
+        $capturedMessages = null;
+        $this->aiFacade
+            ->expects($this->once())
+            ->method('chat')
+            ->willReturnCallback(function (array $messages) use (&$capturedMessages) {
+                $capturedMessages = $messages;
+
+                return ['content' => 'Hi!', 'provider' => 'openai', 'model' => 'gpt-4'];
+            });
+
+        $this->handler->handle($message, [], []);
+
+        $this->assertNotNull($capturedMessages);
+        $this->assertSame('Hei, test.', $capturedMessages[1]['content']);
     }
 
     public function testAudioMessagePreservesUserPromptWhenNotGeneric(): void
