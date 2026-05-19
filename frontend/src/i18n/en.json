@@ -1074,6 +1074,7 @@
       "errorTopicExists": "A prompt with this topic already exists. Please choose a different topic.",
       "errorToolsPrefix": "Cannot create prompts with \"tools:\" prefix — reserved for system.",
       "errorMissingFields": "Please fill in all required fields: Topic, Name and Prompt Content.",
+      "saveErrorPremiumRequired": "{reason} Please upgrade your plan, or pick a different AI model for this prompt.",
       "copy": "Copy",
       "copyToClipboard": "Copy to clipboard",
       "copySuccess": "Copied to clipboard.",
@@ -2670,7 +2671,9 @@
     "topic": "Topic",
     "language": "Language",
     "modelId": "Model ID",
-    "longRunningHint": "This request is taking a bit longer than usual — please hang tight."
+    "longRunningHint": "This request is taking a bit longer than usual — please hang tight.",
+    "waitingDesc": "Just a moment…",
+    "waitingAria": "Preparing response"
   },
   "message": {
     "thinking": "Thinking process",
@@ -2923,6 +2926,11 @@
       "customCategoryPlaceholder": "Enter custom category...",
       "createWithAI": "Create with AI",
       "aiUnavailable": "AI structuring unavailable, saving as note",
+      "aiUnavailableCreateFallback": "AI unavailable – your text has been prepared as a plain note. Confirm to save or adjust the category/key first.",
+      "aiUnavailableCreateReason": "Saved as a plain note because AI structuring was unavailable.",
+      "aiUnavailableEditFallback": "AI unavailable – please edit the memory directly in manual mode.",
+      "storageUnavailable": "Memory storage is currently unreachable. Please try again later.",
+      "parseFailed": "We couldn't process that. Please try again later or save manually.",
       "previewTitle": "Preview",
       "previewDescription": "Check if this looks correct before saving.",
       "actionCreate": "New Memory",

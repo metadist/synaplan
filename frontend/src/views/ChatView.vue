@@ -348,7 +348,6 @@ import { useMemoriesStore } from '@/stores/userMemories'
 import { useFeedbackStore } from '@/stores/userFeedback'
 import { useLimitCheck } from '@/composables/useLimitCheck'
 import { useNotification } from '@/composables/useNotification'
-import { useHeaderVisibility } from '@/composables/useHeaderVisibility'
 import { chatApi } from '@/services/api'
 import { prefetchSseToken } from '@/services/api/chatApi'
 import type { ModelOption } from '@/composables/useModelSelection'
@@ -662,7 +661,6 @@ onBeforeUnmount(() => {
     currentAudioStreamer = null
   }
   isAudioStreaming.value = false
-  showHeader()
   if (window.visualViewport) {
     window.visualViewport.removeEventListener('resize', handleViewportResize)
   }
@@ -766,7 +764,6 @@ const scrollToBottom = (force = false) => {
       if (chatContainer.value) {
         chatContainer.value.scrollTop = chatContainer.value.scrollHeight
         autoScroll.value = true
-        syncHeader()
       }
     })
   }
@@ -804,14 +801,10 @@ const handleDrop = async (event: DragEvent) => {
   }
 }
 
-const { onScroll: onHeaderScroll, show: showHeader, sync: syncHeader } = useHeaderVisibility()
-
 const handleScroll = async () => {
   if (!chatContainer.value) return
 
   const { scrollTop, scrollHeight, clientHeight } = chatContainer.value
-
-  onHeaderScroll(scrollTop)
 
   // Check if at bottom for auto-scroll
   const isAtBottom = Math.abs(scrollHeight - clientHeight - scrollTop) < 50

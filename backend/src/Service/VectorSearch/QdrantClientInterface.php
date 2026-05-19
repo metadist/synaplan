@@ -64,6 +64,22 @@ interface QdrantClientInterface
     ): array;
 
     /**
+     * Scroll ALL active memories across ALL users without vector search.
+     *
+     * Used exclusively by the SafeModelChange re-vectorize pipeline so a
+     * VECTORIZE model switch actually re-embeds the entire memories
+     * collection (the per-user `scrollMemories(int $userId)` filters by
+     * `user_id` and is therefore unusable for system-wide reindex).
+     *
+     * Deliberately exposed as a separate method (not `scrollMemories(?int)`)
+     * so the privacy-relevant "across all users" mode cannot be triggered
+     * accidentally by callers that forget to pass a user id.
+     *
+     * @return array Array of memories: [['id' => string, 'payload' => array], ...]
+     */
+    public function scrollAllMemoriesForReindex(int $limit = 5000): array;
+
+    /**
      * Delete a memory point from Qdrant collection.
      */
     public function deleteMemory(string $pointId, ?string $namespace = null): void;

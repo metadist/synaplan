@@ -14,6 +14,7 @@ use App\Service\DiscordNotificationService;
 use App\Service\File\FileProcessor;
 use App\Service\File\FileStorageService;
 use App\Service\File\VectorizationService;
+use App\Service\Media\GeneratedFileMetadataNormalizer;
 use App\Service\Message\MessageProcessor;
 use App\Service\PromptService;
 use App\Service\RateLimitService;
@@ -58,6 +59,7 @@ class WidgetPublicController extends AbstractController
         private EntityManagerInterface $em,
         private LoggerInterface $logger,
         private DiscordNotificationService $discord,
+        private GeneratedFileMetadataNormalizer $generatedFileMetadataNormalizer,
         private string $uploadDir,
     ) {
     }
@@ -661,6 +663,12 @@ class WidgetPublicController extends AbstractController
                     $incomingMessage->setLanguage($language);
                     $incomingMessage->setStatus('complete');
 
+                    // Persist generated media (image/video/audio) so widget admins and
+                    // the embedded chat history both render the player on reload
+                    // (issue #626 — mirrors the StreamController behaviour for the
+                    // authenticated web channel).
+                    $generatedFile = $this->generatedFileMetadataNormalizer->normalize($responseMetadata['file'] ?? null);
+
                     $outgoingMessage = new Message();
                     $outgoingMessage->setUserId($owner->getId());
                     $outgoingMessage->setChat($chat);
@@ -669,9 +677,9 @@ class WidgetPublicController extends AbstractController
                     $outgoingMessage->setUnixTimestamp(time());
                     $outgoingMessage->setDateTime(date('YmdHis'));
                     $outgoingMessage->setMessageType('WDGT');
-                    $outgoingMessage->setFile(0);
-                    $outgoingMessage->setFilePath('');
-                    $outgoingMessage->setFileType('');
+                    $outgoingMessage->setFile(null !== $generatedFile ? 1 : 0);
+                    $outgoingMessage->setFilePath($generatedFile['path'] ?? '');
+                    $outgoingMessage->setFileType($generatedFile['type'] ?? '');
                     $outgoingMessage->setTopic($topic);
                     $outgoingMessage->setLanguage($language);
                     $outgoingMessage->setText($responseText);

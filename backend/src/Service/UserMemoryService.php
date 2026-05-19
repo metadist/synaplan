@@ -777,6 +777,31 @@ final readonly class UserMemoryService
                 throw new \RuntimeException('Failed to create embedding');
             }
 
+            // Dimension safety net (#948).
+            //
+            // Qdrant collections are created with a FIXED dimension at install
+            // time. If the admin switches VECTORIZE to a model with a different
+            // native output dimension (e.g. 1024 → 1536), Qdrant rejects every
+            // upsert with HTTP 400 and the memory is silently lost. The user
+            // gets a friendly "memory saved" UI confirmation but nothing
+            // actually stored. Fail loud HERE so the worker logs surface the
+            // real cause and HTTP callers see a 503 instead of phantom-success.
+            $expectedDim = $this->embeddingMetadata->getCurrentVectorDim();
+            $actualDim = count($embedding);
+            if ($actualDim !== $expectedDim) {
+                $this->logger->error('Memory storage rejected — embedding dimension mismatches collection', [
+                    'user_id' => $user->getId(),
+                    'memory_id' => $memoryId,
+                    'expected_dim' => $expectedDim,
+                    'actual_dim' => $actualDim,
+                    'model_id' => $embeddingModelId,
+                    'provider' => $provider,
+                    'model' => $modelName,
+                ]);
+
+                throw new \RuntimeException(sprintf('Embedding dimension mismatch: model produced %d-dim vectors but the collection expects %d. The administrator must re-run the vector re-index for the active model.', $actualDim, $expectedDim));
+            }
+
             $this->rateLimitService->recordUsage($user, 'EMBEDDINGS', [
                 'usage' => $embedResult['usage'],
                 'provider' => $provider ?? 'unknown',

@@ -797,4 +797,100 @@ class SynapseRouterTest extends TestCase
 
         $this->assertSame('empty_embedding', $result['error']);
     }
+
+    /**
+     * Issue #603: When Synapse embedding routing wins, the router used to
+     * return `model_id`/`provider`/`model_name` while MessageClassifier and
+     * the rest of the pipeline read `sorting_model_id`/`sorting_provider`/
+     * `sorting_model_name` (the keys MessageSorter emits). That mismatch
+     * dropped the sorting model on the floor, so no `ai_sorting_*` meta
+     * was persisted on the outgoing message — the Sorting Model badge
+     * stayed missing in the live SSE view AND after refresh.
+     *
+     * The fix: surface the embedding model under the canonical sorting_*
+     * keys, since the embedding model IS what produced the routing
+     * decision.
+     */
+    public function testEmbeddingRoutingSurfacesEmbeddingModelUnderSortingKeys(): void
+    {
+        // Bind a non-null embedding model so `getCurrentModelInfo()`
+        // resolves to a real id/provider/name instead of the null
+        // fallback used by most other tests.
+        $this->modelConfigService->method('getDefaultModel')->willReturn(42);
+        $this->modelConfigService->method('getProviderForModel')->willReturn('cloudflare');
+        $this->modelConfigService->method('getModelName')->willReturn('bge-m3');
+        $this->modelConfigService->method('getVectorDimForModel')->willReturn(1024);
+
+        $this->promptRepository->method('findPromptsWithSelectionRules')->willReturn([]);
+        $this->promptService->method('getPromptWithMetadata')->willReturn([
+            'metadata' => ['tool_internet' => false],
+        ]);
+
+        $this->aiFacade->method('embed')->willReturn([
+            'embedding' => array_fill(0, 1024, 0.1),
+            'usage' => ['prompt_tokens' => 10, 'total_tokens' => 10],
+        ]);
+
+        $this->qdrantClient->method('searchSynapseTopics')->willReturn([
+            [
+                'id' => 'synapse_0_general',
+                'score' => 0.92,
+                'payload' => [
+                    'topic' => 'general',
+                    'owner_id' => 0,
+                    'embedding_model_id' => 42,
+                ],
+            ],
+        ]);
+
+        $this->messageSorter->expects($this->never())->method('classify');
+
+        $result = $this->router->route(['BTEXT' => 'Hello, how are you?'], [], 1);
+
+        $this->assertSame(42, $result['sorting_model_id']);
+        $this->assertSame('cloudflare', $result['sorting_provider']);
+        $this->assertSame('bge-m3', $result['sorting_model_name']);
+
+        // Sanity check: the legacy keys (`model_id`, `provider`,
+        // `model_name`) must NOT be present — they were the source of
+        // the bug and downstream consumers should fail loudly rather
+        // than silently fall back to null again.
+        $this->assertArrayNotHasKey('model_id', $result);
+        $this->assertArrayNotHasKey('provider', $result);
+        $this->assertArrayNotHasKey('model_name', $result);
+    }
+
+    /**
+     * Issue #603: rule-based routing short-circuits before any embedding
+     * or AI call, so there is no concrete sorting model to surface. Keep
+     * the keys present (so MessageClassifier sees them consistently with
+     * the embedding/fallback paths) but null.
+     */
+    public function testRuleBasedRoutingReturnsNullSortingKeys(): void
+    {
+        $rulePrompt = $this->createMock(\App\Entity\Prompt::class);
+        $rulePrompt->method('getTopic')->willReturn('support');
+        $rulePrompt->method('getSelectionRules')->willReturn('keyword:support');
+
+        $this->promptRepository->method('findPromptsWithSelectionRules')->willReturn([$rulePrompt]);
+        $this->promptService
+            ->method('matchesSelectionRules')
+            ->willReturn(true);
+        $this->promptService->method('getPromptWithMetadata')->willReturn([
+            'metadata' => ['tool_internet' => false],
+        ]);
+
+        // Embedding must not be called for a rule-based match.
+        $this->aiFacade->expects($this->never())->method('embed');
+
+        $result = $this->router->route(['BTEXT' => 'I need support please'], [], 1);
+
+        $this->assertSame('synapse_rule', $result['source']);
+        $this->assertArrayHasKey('sorting_model_id', $result);
+        $this->assertArrayHasKey('sorting_provider', $result);
+        $this->assertArrayHasKey('sorting_model_name', $result);
+        $this->assertNull($result['sorting_model_id']);
+        $this->assertNull($result['sorting_provider']);
+        $this->assertNull($result['sorting_model_name']);
+    }
 }

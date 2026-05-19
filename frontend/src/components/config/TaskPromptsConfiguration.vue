@@ -1335,6 +1335,7 @@ import { useDialog } from '@/composables/useDialog'
 import ModelSelectDropdown from '@/components/ModelSelectDropdown.vue'
 import { useAuthStore } from '@/stores/auth'
 import UnsavedChangesBar from '@/components/UnsavedChangesBar.vue'
+import { ApiError } from '@/services/api/httpClient'
 
 const SELECTION_RULES_TEMPLATE =
   'When the user mentions [TOPIC_NAME] or asks about [SPECIFIC_KEYWORDS], route to this prompt.'
@@ -2074,6 +2075,16 @@ const handleSave = saveChanges(async () => {
       }
     }
   } catch (err: unknown) {
+    // Issue #891: the prompt save now mirrors ConfigController's premium
+    // gate. When the backend rejects the chosen aiModel for the current
+    // subscription tier, surface the structured reason instead of a
+    // generic "Failed to save" toast — same pattern as
+    // AIModelsConfiguration.vue (issue #883).
+    if (err instanceof ApiError && err.status === 403 && err.code === 'requires_premium') {
+      showError(t('config.taskPrompts.saveErrorPremiumRequired', { reason: err.message }))
+      throw err
+    }
+
     let errorMessage = err instanceof Error ? err.message : 'Failed to save prompt'
 
     if (errorMessage.includes('Validation failed')) {
@@ -2236,6 +2247,13 @@ const handleCreateNew = async () => {
 
     await loadPromptFiles()
   } catch (err: unknown) {
+    // Issue #891: prompt create also gates the aiModel through the
+    // premium guard. Show the structured reason from the backend.
+    if (err instanceof ApiError && err.status === 403 && err.code === 'requires_premium') {
+      showError(t('config.taskPrompts.saveErrorPremiumRequired', { reason: err.message }))
+      return
+    }
+
     let errorMessage = err instanceof Error ? err.message : 'Failed to create prompt'
 
     if (errorMessage.includes('already have a prompt with this topic')) {

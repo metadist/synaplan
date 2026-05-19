@@ -905,7 +905,22 @@ final class WhatsAppService
                         'video' => '[Video response]',
                         default => '[Audio response]', // audio is the remaining case
                     };
-                    $this->storeOutgoingMessage($user, $dto, $responseText ?: $placeholderText, $sendResult['message_id'], $chat, $searchResults);
+                    // Persist the generated media path so the web chat
+                    // history surfaces the player (issue #626) and mirror
+                    // the web-search citations onto the outgoing row so the
+                    // platform chat view exposes them too (issue #652).
+                    // WhatsApp itself already received the asset via
+                    // sendMedia(), but the cross-channel mirror lives in the
+                    // DB row.
+                    $this->storeOutgoingMessage(
+                        $user,
+                        $dto,
+                        $responseText ?: $placeholderText,
+                        $sendResult['message_id'],
+                        $chat,
+                        $searchResults,
+                        ['path' => $mediaPath, 'type' => $generatedMediaType],
+                    );
                     $responseSent = true;
 
                     // Discord notification: AI media generated and sent
@@ -956,7 +971,21 @@ final class WhatsAppService
 
                 $sendResult = $this->sendMedia($dto->from, 'audio', $audioUrl, $dto->phoneNumberId);
                 if ($sendResult['success']) {
-                    $this->storeOutgoingMessage($user, $dto, $responseText, $sendResult['message_id'], $chat, $searchResults);
+                    // Persist TTS audio on the DB row so the web chat
+                    // history surfaces the audio player (issue #626) and
+                    // mirror the web-search citations onto the outgoing row
+                    // so the platform chat view exposes them too
+                    // (issue #652).
+                    $ttsServePath = '/api/v1/files/uploads/'.$ttsResult['relativePath'];
+                    $this->storeOutgoingMessage(
+                        $user,
+                        $dto,
+                        $responseText,
+                        $sendResult['message_id'],
+                        $chat,
+                        $searchResults,
+                        ['path' => $ttsServePath, 'type' => 'audio'],
+                    );
                     $responseSent = true;
 
                     // Discord notification: TTS response sent
@@ -1517,8 +1546,10 @@ final class WhatsAppService
     }
 
     /**
-     * Persist the outgoing WhatsApp message and mirror the web-search metadata
-     * stored on the incoming message. The chat history endpoint
+     * Persist an outgoing WhatsApp message.
+     *
+     * Mirrors the web-search metadata stored on the incoming message
+     * (issue #652). The chat history endpoint
      * ({@see \App\Controller\ChatController::getMessages()}) renders the
      * "Quellen" panel based on `web_search_query` + `web_search_results_count`
      * on the OUTGOING message, then resolves the actual citations from the
@@ -1526,7 +1557,20 @@ final class WhatsAppService
      * this mirror was the root cause of issue #652 — the platform view simply
      * didn't know that the WhatsApp answer was backed by citations.
      *
-     * @param array{query?: string, results?: array}|null $searchResults
+     * Also records the serve URL + type when the response carried
+     * AI-generated media so the web chat history can replay the
+     * image/video/audio player (issue #626). WhatsApp itself already received
+     * the asset via sendMedia(), but the cross-channel mirror lives in the DB
+     * row.
+     *
+     * @param array{query?: string, results?: array}|null $searchResults web-search payload
+     *                                                                   carried alongside the
+     *                                                                   AI response
+     * @param array{path: string, type: string}|null      $generatedFile optional file metadata
+     *                                                                   produced by
+     *                                                                   MediaGenerationHandler
+     *                                                                   (already normalized to a
+     *                                                                   serve URL)
      */
     private function storeOutgoingMessage(
         User $user,
@@ -1535,6 +1579,7 @@ final class WhatsAppService
         string $externalId,
         ?Chat $chat = null,
         ?array $searchResults = null,
+        ?array $generatedFile = null,
     ): void {
         $outgoingMessage = new Message();
         $outgoingMessage->setUserId($user->getId());
@@ -1546,7 +1591,9 @@ final class WhatsAppService
         $outgoingMessage->setUnixTimestamp(time());
         $outgoingMessage->setDateTime(date('YmdHis'));
         $outgoingMessage->setMessageType('WTSP');
-        $outgoingMessage->setFile(0);
+        $outgoingMessage->setFile(null !== $generatedFile ? 1 : 0);
+        $outgoingMessage->setFilePath($generatedFile['path'] ?? '');
+        $outgoingMessage->setFileType($generatedFile['type'] ?? '');
         $outgoingMessage->setTopic('CHAT');
         $outgoingMessage->setLanguage('en');
         $outgoingMessage->setText($text);

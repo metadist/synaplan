@@ -20,6 +20,7 @@ use Doctrine\ORM\EntityManagerInterface;
 use OpenApi\Attributes as OA;
 use Psr\Log\LoggerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
+use Symfony\Component\DependencyInjection\Attribute\Autowire;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -41,6 +42,8 @@ class MessageController extends AbstractController
         private FileProcessor $fileProcessor,
         private VectorizationService $vectorizationService,
         private LoggerInterface $logger,
+        #[Autowire(env: 'default::bool:COST_BUDGET_GATE_ENABLED')]
+        private bool $costBudgetGateEnabled = false,
     ) {
     }
 
@@ -110,6 +113,20 @@ class MessageController extends AbstractController
                 // verification — not email verification (see #839).
                 'phone_verified' => $user->hasVerifiedPhone(),
             ], Response::HTTP_TOO_MANY_REQUESTS);
+        } elseif ($this->costBudgetGateEnabled) {
+            $budgetCheck = $this->rateLimitService->checkCostBudget($user);
+            if (!$budgetCheck['allowed']) {
+                return $this->json([
+                    'error' => 'Cost budget exceeded',
+                    'limit_type' => 'monthly',
+                    'action_type' => 'MESSAGES',
+                    'limit' => $budgetCheck['budget'],
+                    'used' => $budgetCheck['used_cost'],
+                    'remaining' => $budgetCheck['remaining'],
+                    'user_level' => $user->getUserLevel(),
+                    'phone_verified' => $user->hasVerifiedPhone(),
+                ], Response::HTTP_TOO_MANY_REQUESTS);
+            }
         }
 
         try {
@@ -144,9 +161,6 @@ class MessageController extends AbstractController
                 }
                 $this->em->flush();
             }
-
-            // Record usage
-            $this->rateLimitService->recordUsage($user, 'MESSAGES');
 
             // Prepare context with file contents
             $contextMessages = [];
@@ -230,6 +244,22 @@ class MessageController extends AbstractController
             if (!empty($aiResponse['usage'])) {
                 $outgoingMessage->setMeta('ai_chat_usage', json_encode($aiResponse['usage']));
             }
+
+            // Record usage with full metadata.
+            // AiFacade::chat() does not return model_id, so resolve it
+            // from the user's DEFAULTMODEL config (same logic the facade
+            // itself uses to select the provider/model).
+            $resolvedModelId = $this->modelConfigService->getDefaultModel('CHAT', $user->getId());
+
+            $this->rateLimitService->recordUsage($user, 'MESSAGES', [
+                'provider' => $aiResponse['provider'] ?? 'unknown',
+                'model' => $aiResponse['model'] ?? 'unknown',
+                'model_id' => $resolvedModelId,
+                'usage' => $aiResponse['usage'] ?? [],
+                'input_text' => $messageText,
+                'response_text' => $responseText,
+                'source' => 'WEB',
+            ]);
 
             // NOTE: MessageController doesn't use MessageProcessor, so there's no sorting model info here
             // Only StreamController (which uses MessageProcessor) has sorting model metadata
@@ -787,18 +817,42 @@ class MessageController extends AbstractController
         #[CurrentUser] ?User $user,
     ): JsonResponse {
         if (!$user) {
-            return $this->json(['error' => 'Not authenticated'], Response::HTTP_UNAUTHORIZED);
+            return $this->noStoreJson(['error' => 'Not authenticated'], Response::HTTP_UNAUTHORIZED);
         }
 
         $message = $this->em->getRepository(Message::class)->find($messageId);
         if (!$message || $message->getUserId() !== $user->getId()) {
-            return $this->json(['error' => 'Message not found'], Response::HTTP_NOT_FOUND);
+            return $this->noStoreJson(['error' => 'Message not found'], Response::HTTP_NOT_FOUND);
+        }
+
+        // Issue #881: invalidate any stale in-memory state before reading
+        // the meta. Under FrankenPHP/worker mode the EntityManager's
+        // identity map persists across the SSE-stream + poll requests
+        // served by the same PHP process, so a Message + its
+        // BMESSAGEMETA collection initialised during the SSE stream can
+        // remain in memory without ever seeing the row that the
+        // messenger worker just inserted. `refresh()` drops the cached
+        // entity (and its collection) and reloads from the DB so each
+        // poll observes the current persisted state. The repeated
+        // `find()` above is still useful: it scopes the user-ownership
+        // check before we touch the DB again.
+        try {
+            $this->em->refresh($message);
+        } catch (\Throwable $e) {
+            // Most refresh failures here are benign (entity removed
+            // mid-poll, transient DB hiccup). Log + continue with the
+            // already-loaded state — at worst the user sees one extra
+            // `pending` poll and the next attempt picks up the meta.
+            $this->logger->warning('getExtractedMemories: failed to refresh message entity, falling back to cached state', [
+                'message_id' => $messageId,
+                'error' => $e->getMessage(),
+            ]);
         }
 
         $raw = $message->getMeta('extracted_memories');
         if (null === $raw || '' === $raw) {
             // Worker hasn't finished yet — frontend keeps polling.
-            return $this->json([
+            return $this->noStoreJson([
                 'status' => 'pending',
                 'completed_at' => null,
                 'saved' => [],
@@ -814,7 +868,7 @@ class MessageController extends AbstractController
                 'error' => $e->getMessage(),
             ]);
 
-            return $this->json([
+            return $this->noStoreJson([
                 'status' => 'empty',
                 'completed_at' => null,
                 'saved' => [],
@@ -822,11 +876,36 @@ class MessageController extends AbstractController
             ]);
         }
 
-        return $this->json([
+        return $this->noStoreJson([
             'status' => $decoded['status'] ?? 'empty',
             'completed_at' => $decoded['completed_at'] ?? null,
             'saved' => $decoded['saved'] ?? [],
             'delete_suggestions' => $decoded['delete_suggestions'] ?? [],
         ]);
+    }
+
+    /**
+     * Build a JsonResponse with explicit no-cache headers.
+     *
+     * Issue #881: the memory-poll endpoint defaults to
+     * `Cache-Control: private, must-revalidate` in production, which is
+     * usually fine, but Cloudflare (or any HTTP intermediary that
+     * speculatively caches GETs by URL) plus a misbehaving keep-alive
+     * stack has been observed serving the very first `pending` body for
+     * every subsequent poll on the same `messageId`. The frontend then
+     * never sees `complete` and the memory toast never appears. We
+     * explicitly opt out of every layer of caching here so each poll
+     * goes back to PHP and observes the worker's progress.
+     *
+     * @param array<string, mixed> $payload
+     */
+    private function noStoreJson(array $payload, int $status = Response::HTTP_OK): JsonResponse
+    {
+        $response = $this->json($payload, $status);
+        $response->headers->set('Cache-Control', 'no-cache, no-store, must-revalidate, max-age=0');
+        $response->headers->set('Pragma', 'no-cache');
+        $response->headers->set('Expires', '0');
+
+        return $response;
     }
 }

@@ -972,7 +972,9 @@
     "topic": "Konu",
     "language": "Dil",
     "modelId": "Model ID",
-    "longRunningHint": "Bu istek normalden biraz daha uzun sürüyor — lütfen biraz bekleyin."
+    "longRunningHint": "Bu istek normalden biraz daha uzun sürüyor — lütfen biraz bekleyin.",
+    "waitingDesc": "Bir saniye…",
+    "waitingAria": "Yanıt hazırlanıyor"
   },
   "message": {
     "thinking": "Düşünme süreci",
@@ -1827,6 +1829,11 @@
       "customCategoryPlaceholder": "Özel kategori girin...",
       "createWithAI": "AI ile Oluştur",
       "aiUnavailable": "AI yapılandırma kullanılamıyor, not olarak kaydediliyor",
+      "aiUnavailableCreateFallback": "AI kullanılamıyor – metniniz düz bir not olarak hazırlandı. Kaydetmek için onaylayın veya önce kategori/anahtarı düzenleyin.",
+      "aiUnavailableCreateReason": "AI yapılandırması kullanılamadığı için düz not olarak kaydedildi.",
+      "aiUnavailableEditFallback": "AI kullanılamıyor – lütfen anıyı manuel modda doğrudan düzenleyin.",
+      "storageUnavailable": "Anı deposuna şu anda ulaşılamıyor. Lütfen daha sonra tekrar deneyin.",
+      "parseFailed": "İşlenemedi. Lütfen daha sonra tekrar deneyin veya manuel olarak kaydedin.",
       "previewTitle": "Önizleme",
       "previewDescription": "Kaydetmeden önce bunun doğru olup olmadığını kontrol edin.",
       "actionCreate": "Yeni Anı",
