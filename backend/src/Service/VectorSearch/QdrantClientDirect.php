@@ -279,6 +279,45 @@ final class QdrantClientDirect implements QdrantClientInterface
         }
     }
 
+    public function scrollAllMemoriesForReindex(int $limit = 5000): array
+    {
+        $collection = $this->memoriesCollection;
+
+        try {
+            $response = $this->qdrantRequest('POST', "/collections/{$collection}/points/scroll", [
+                // Only filter on `active`; the re-index runs once per
+                // VECTORIZE switch and must walk every user's memories.
+                'filter' => [
+                    'must' => [
+                        ['key' => 'active', 'match' => ['value' => true]],
+                    ],
+                ],
+                'limit' => $limit,
+                'with_payload' => true,
+                'with_vector' => false,
+            ]);
+
+            $memoriesByLogical = [];
+            foreach ($response['result']['points'] ?? [] as $point) {
+                $logical = $point['payload']['_point_id'] ?? (string) $point['id'];
+                if (!isset($memoriesByLogical[$logical])) {
+                    $memoriesByLogical[$logical] = [
+                        'id' => $logical,
+                        'payload' => $point['payload'] ?? [],
+                    ];
+                }
+            }
+
+            return array_values($memoriesByLogical);
+        } catch (\Throwable $e) {
+            $this->logger->error('Failed to scroll all memories for reindex', [
+                'error' => $e->getMessage(),
+            ]);
+
+            return [];
+        }
+    }
+
     public function deleteMemory(string $pointId, ?string $namespace = null): void
     {
         $collection = $this->resolveMemoriesCollection($namespace);

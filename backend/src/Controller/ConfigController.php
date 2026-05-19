@@ -697,7 +697,22 @@ class ConfigController extends AbstractController
         // the new model, AND because we want to keep this consistent
         // with the global path (AdminEmbeddingController::switch).
         // Admins always pass the guard.
-        if (isset($data['defaults']['VECTORIZE'])) {
+        //
+        // CRITICAL (#891): only fire the gate when the user is ACTUALLY
+        // changing VECTORIZE. The frontend's `saveConfiguration()` echoes
+        // EVERY non-null capability on every save — including the
+        // unchanged VECTORIZE seeded from `getDefaultModels()` — so a
+        // NEW user who only wants to change their CHAT model would
+        // otherwise get a 403 here and watch the entire save silently
+        // fail (CHAT/TEXT2PIC/etc all blocked as collateral damage).
+        // The VECTORIZE read side resolves through ownerId=0 (see
+        // `getDefaultModels()` above for the matching rationale), so an
+        // unchanged echo is byte-equal to the global row.
+        $currentVectorizeId = $this->resolveCurrentVectorizeModelId();
+        $vectorizeChanged = isset($data['defaults']['VECTORIZE'])
+            && (int) $data['defaults']['VECTORIZE'] !== $currentVectorizeId;
+
+        if ($vectorizeChanged) {
             try {
                 $this->embeddingChangeGuard->assertCanChange($user);
             } catch (PremiumRequiredException $e) {
@@ -714,6 +729,16 @@ class ConfigController extends AbstractController
 
         foreach ($data['defaults'] as $capability => $modelId) {
             if (!in_array($capability, $validCapabilities)) {
+                continue;
+            }
+
+            // Same rationale as the premium gate above: don't write an
+            // unchanged VECTORIZE to a per-user row that is never read
+            // by anyone (VECTORIZE always resolves through ownerId=0)
+            // AND don't invalidate the embedding-metadata cache for a
+            // value that didn't actually change. Belt-and-braces with
+            // the gate skip so the no-op save stays a true no-op.
+            if ('VECTORIZE' === $capability && !$vectorizeChanged) {
                 continue;
             }
 
@@ -757,8 +782,11 @@ class ConfigController extends AbstractController
 
         // Drop cached active-model snapshot so the very next read
         // (Synapse status, RAG search, /admin/embedding/status) sees
-        // the new VECTORIZE model immediately.
-        if (array_key_exists('VECTORIZE', $data['defaults'])) {
+        // the new VECTORIZE model immediately. Skip the invalidation
+        // when VECTORIZE didn't actually change — the cache already
+        // holds the correct value and there's no point thrashing it
+        // on every CHAT-only save (#891).
+        if ($vectorizeChanged) {
             $this->embeddingMetadata->invalidate();
         }
 
@@ -947,6 +975,27 @@ class ConfigController extends AbstractController
         }
 
         return null;
+    }
+
+    /**
+     * Resolve the currently-bound VECTORIZE model id from the global
+     * config row (`ownerId=0`), which is what `getDefaultModels()` exposes
+     * to the frontend dropdown and what every embedding read site uses
+     * as the canonical answer.
+     *
+     * Returns 0 when no row is configured yet (treat as "no current
+     * binding"), so any incoming non-zero VECTORIZE id is correctly
+     * classified as a change.
+     */
+    private function resolveCurrentVectorizeModelId(): int
+    {
+        $config = $this->configRepository->findOneBy([
+            'ownerId' => 0,
+            'group' => 'DEFAULTMODEL',
+            'setting' => 'VECTORIZE',
+        ]);
+
+        return $config ? (int) $config->getValue() : 0;
     }
 
     /**

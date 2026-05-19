@@ -54,6 +54,13 @@ final class QdrantClientMock implements QdrantClientInterface
         return [];
     }
 
+    public function scrollAllMemoriesForReindex(int $limit = 5000): array
+    {
+        $this->logger->info('QdrantClientMock: scrollAllMemoriesForReindex', ['limit' => $limit]);
+
+        return [];
+    }
+
     public function deleteMemory(string $pointId, ?string $namespace = null): void
     {
         $this->logger->info('QdrantClientMock: deleteMemory', ['point_id' => $pointId]);

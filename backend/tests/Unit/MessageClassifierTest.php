@@ -9,6 +9,7 @@ use App\Repository\MessageMetaRepository;
 use App\Service\Message\MessageClassifier;
 use App\Service\Message\MessageSorter;
 use App\Service\Message\SynapseRouter;
+use App\Service\Message\TopicAliasResolver;
 use App\Service\ModelConfigService;
 use Doctrine\ORM\EntityManagerInterface;
 use PHPUnit\Framework\MockObject\MockObject;
@@ -23,6 +24,7 @@ class MessageClassifierTest extends TestCase
     // / `->expects()` call, forcing baseline bumps on every new test case.
     private MessageSorter&MockObject $messageSorter;
     private SynapseRouter&MockObject $synapseRouter;
+    private TopicAliasResolver $topicAliasResolver;
     private MessageMetaRepository&MockObject $messageMetaRepository;
     private ModelConfigService&MockObject $modelConfigService;
     private ConfigRepository&MockObject $configRepository;
@@ -34,6 +36,9 @@ class MessageClassifierTest extends TestCase
     {
         $this->messageSorter = $this->createMock(MessageSorter::class);
         $this->synapseRouter = $this->createMock(SynapseRouter::class);
+        // Real resolver — it's pure logic with no collaborators, so a stub
+        // would add noise without protecting any boundary.
+        $this->topicAliasResolver = new TopicAliasResolver();
         $this->messageMetaRepository = $this->createMock(MessageMetaRepository::class);
         $this->modelConfigService = $this->createMock(ModelConfigService::class);
         $this->configRepository = $this->createMock(ConfigRepository::class);
@@ -46,6 +51,7 @@ class MessageClassifierTest extends TestCase
         $this->service = new MessageClassifier(
             $this->messageSorter,
             $this->synapseRouter,
+            $this->topicAliasResolver,
             $this->messageMetaRepository,
             $this->modelConfigService,
             $this->configRepository,
@@ -306,6 +312,7 @@ class MessageClassifierTest extends TestCase
         $classifier = new MessageClassifier(
             $this->createMock(MessageSorter::class),
             $this->createMock(SynapseRouter::class),
+            new TopicAliasResolver(),
             $this->createMock(MessageMetaRepository::class),
             $this->createMock(ModelConfigService::class),
             $configRepo,
@@ -363,6 +370,7 @@ class MessageClassifierTest extends TestCase
         $classifier = new MessageClassifier(
             $sorter,
             $this->createMock(SynapseRouter::class),
+            new TopicAliasResolver(),
             $this->createMock(MessageMetaRepository::class),
             $this->createMock(ModelConfigService::class),
             $configRepo,
@@ -406,6 +414,7 @@ class MessageClassifierTest extends TestCase
         $classifier = new MessageClassifier(
             $sorter,
             $this->createMock(SynapseRouter::class),
+            new TopicAliasResolver(),
             $this->createMock(MessageMetaRepository::class),
             $this->createMock(ModelConfigService::class),
             $configRepo,
@@ -429,5 +438,192 @@ class MessageClassifierTest extends TestCase
 
         // Sorter ran → topic comes from the sorter, not the heuristic.
         $this->assertSame('mediamaker', $result['topic']);
+    }
+
+    /**
+     * Regression for #952.
+     *
+     * When Synapse Routing is OFF (default), the AI sorter directly emits the
+     * granular Synapse-v2 topics from PromptCatalog (`image-generation`,
+     * `video-generation`, `audio-generation`). The classifier MUST resolve
+     * them to the canonical `mediamaker` topic so `mapTopicToIntent()` can
+     * return `image_generation` and the request reaches MediaGenerationHandler
+     * instead of falling back to ChatHandler.
+     *
+     * @return iterable<string, array{0: string, 1: string}>
+     */
+    public static function granularMediaTopicProvider(): iterable
+    {
+        yield 'image-generation → image' => ['image-generation', 'image'];
+        yield 'video-generation → video' => ['video-generation', 'video'];
+        yield 'audio-generation → audio' => ['audio-generation', 'audio'];
+    }
+
+    #[\PHPUnit\Framework\Attributes\DataProvider('granularMediaTopicProvider')]
+    public function testGranularMediaTopicResolvesToMediamakerIntent(string $granularTopic, string $expectedMedia): void
+    {
+        $message = $this->createMock(Message::class);
+        $message->method('getId')->willReturn(200);
+        $message->method('getUserId')->willReturn(10);
+        $message->method('getText')->willReturn('erstelle ein bild einer katze');
+        $message->method('getLanguage')->willReturn('de');
+        $message->method('getDateTime')->willReturn('20260518120000');
+        $message->method('getFilePath')->willReturn('');
+        $message->method('getTopic')->willReturn('');
+        $message->method('getFileText')->willReturn('');
+        $message->method('getFile')->willReturn(0);
+        $message->method('getFiles')->willReturn(new \Doctrine\Common\Collections\ArrayCollection());
+
+        $this->messageMetaRepository->method('findOneBy')->willReturn(null);
+
+        // AI sorter returns the granular topic without an explicit BMEDIA —
+        // exactly the production trace from issue #952.
+        $this->messageSorter
+            ->expects($this->once())
+            ->method('classify')
+            ->willReturn([
+                'topic' => $granularTopic,
+                'language' => 'de',
+            ]);
+
+        $result = $this->service->classify($message);
+
+        $this->assertSame('mediamaker', $result['topic'], 'granular topic must be canonicalised before intent mapping');
+        $this->assertSame('image_generation', $result['intent'], 'mediamaker → image_generation routes to MediaGenerationHandler');
+        $this->assertSame($expectedMedia, $result['media_type'], 'BMEDIA must be inferred from the granular topic when sorter omits it');
+        $this->assertSame($granularTopic, $result['granular_topic'], 'granular topic preserved for diagnostics');
+    }
+
+    /**
+     * The sorter sometimes returns the granular topic AND an explicit BMEDIA
+     * (e.g. for richer Synapse-v2 prompts). When both are present, the
+     * sorter's BMEDIA wins so the resolver never overwrites a more specific
+     * upstream signal.
+     */
+    public function testGranularTopicDoesNotOverrideExplicitMediaType(): void
+    {
+        $message = $this->createMock(Message::class);
+        $message->method('getId')->willReturn(201);
+        $message->method('getUserId')->willReturn(10);
+        $message->method('getText')->willReturn('mach mir einen song');
+        $message->method('getLanguage')->willReturn('de');
+        $message->method('getDateTime')->willReturn('20260518120000');
+        $message->method('getFilePath')->willReturn('');
+        $message->method('getTopic')->willReturn('');
+        $message->method('getFileText')->willReturn('');
+        $message->method('getFile')->willReturn(0);
+        $message->method('getFiles')->willReturn(new \Doctrine\Common\Collections\ArrayCollection());
+
+        $this->messageMetaRepository->method('findOneBy')->willReturn(null);
+
+        $this->messageSorter->method('classify')->willReturn([
+            'topic' => 'audio-generation',
+            'language' => 'de',
+            'media_type' => 'audio',
+        ]);
+
+        $result = $this->service->classify($message);
+
+        $this->assertSame('mediamaker', $result['topic']);
+        $this->assertSame('audio', $result['media_type']);
+    }
+
+    /**
+     * Canonical topics passed through by the sorter (`mediamaker`, `general`,
+     * `analyzefile`, ...) must keep working — the resolver is idempotent for
+     * non-aliased topics.
+     */
+    public function testCanonicalTopicPassesThroughResolverUnchanged(): void
+    {
+        $message = $this->createMock(Message::class);
+        $message->method('getId')->willReturn(202);
+        $message->method('getUserId')->willReturn(10);
+        $message->method('getText')->willReturn('zeichne mir eine landschaft');
+        $message->method('getLanguage')->willReturn('de');
+        $message->method('getDateTime')->willReturn('20260518120000');
+        $message->method('getFilePath')->willReturn('');
+        $message->method('getTopic')->willReturn('');
+        $message->method('getFileText')->willReturn('');
+        $message->method('getFile')->willReturn(0);
+        $message->method('getFiles')->willReturn(new \Doctrine\Common\Collections\ArrayCollection());
+
+        $this->messageMetaRepository->method('findOneBy')->willReturn(null);
+
+        $this->messageSorter->method('classify')->willReturn([
+            'topic' => 'mediamaker',
+            'language' => 'de',
+            'media_type' => 'image',
+        ]);
+
+        $result = $this->service->classify($message);
+
+        $this->assertSame('mediamaker', $result['topic']);
+        $this->assertSame('image_generation', $result['intent']);
+        $this->assertSame('image', $result['media_type']);
+        $this->assertArrayNotHasKey('granular_topic', $result, 'canonical topics never emit a granular_topic field');
+    }
+
+    /**
+     * Secondary bug from #952: the German imperative "generiere" was missing
+     * from the fast-path media-trigger list. With the fast-path enabled
+     * (default-on), "generiere ein bild einer katze" would skip the AI
+     * sorter entirely and be classified as `general`/chat. Verify the
+     * trigger now defers to the full sorter.
+     *
+     * @return iterable<string, array{0: string}>
+     */
+    public static function germanMediaImperativeProvider(): iterable
+    {
+        yield 'generiere (imperative)' => ['generiere ein bild einer katze'];
+        yield 'generiert (plural imperative)' => ['generiert eine grafik'];
+        yield 'generier (colloquial imperative)' => ['generier mir bitte ein logo'];
+    }
+
+    #[\PHPUnit\Framework\Attributes\DataProvider('germanMediaImperativeProvider')]
+    public function testFastPathYieldsToAiSorterOnGermanGenerateImperatives(string $text): void
+    {
+        $configRepo = $this->createMock(ConfigRepository::class);
+        // Synapse off, fast-path on (default).
+        $configRepo->method('getValue')->willReturnCallback(static function (int $owner, string $group, string $setting): ?string {
+            return 'QDRANT_SEARCH' === $group ? '0' : null;
+        });
+
+        $sorter = $this->createMock(MessageSorter::class);
+        $sorter->expects($this->once())
+            ->method('classify')
+            ->willReturn(['topic' => 'image-generation', 'language' => 'de']);
+
+        $classifier = new MessageClassifier(
+            $sorter,
+            $this->createMock(SynapseRouter::class),
+            new TopicAliasResolver(),
+            $this->createMock(MessageMetaRepository::class),
+            $this->createMock(ModelConfigService::class),
+            $configRepo,
+            $this->createMock(EntityManagerInterface::class),
+            $this->createMock(LoggerInterface::class),
+        );
+
+        $message = $this->createMock(Message::class);
+        $message->method('getId')->willReturn(203);
+        $message->method('getUserId')->willReturn(10);
+        $message->method('getText')->willReturn($text);
+        $message->method('getLanguage')->willReturn('de');
+        $message->method('getFile')->willReturn(0);
+        $message->method('getFiles')->willReturn(new \Doctrine\Common\Collections\ArrayCollection());
+        $message->method('getDateTime')->willReturn('20260518120000');
+        $message->method('getFilePath')->willReturn('');
+        $message->method('getTopic')->willReturn('');
+        $message->method('getFileText')->willReturn('');
+
+        $result = $classifier->classify($message);
+
+        // End-to-end: granular topic from the sorter is canonicalised and
+        // mapped to the media-generation intent.
+        $this->assertSame('mediamaker', $result['topic']);
+        $this->assertSame('image_generation', $result['intent']);
+        $this->assertSame('image', $result['media_type']);
+        $this->assertSame('ai_sorting', $result['source']);
+        $this->assertFalse($result['skip_sorting']);
     }
 }

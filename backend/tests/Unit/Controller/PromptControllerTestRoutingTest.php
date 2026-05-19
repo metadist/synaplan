@@ -13,6 +13,7 @@ use App\Repository\PromptMetaRepository;
 use App\Repository\PromptRepository;
 use App\Service\Message\SynapseIndexer;
 use App\Service\Message\SynapseRouter;
+use App\Service\Model\PromptModelEligibilityValidator;
 use App\Service\ModelConfigService;
 use App\Service\PromptService;
 use App\Service\RAG\VectorStorage\VectorStorageFacade;
@@ -52,6 +53,7 @@ final class PromptControllerTestRoutingTest extends TestCase
             $this->createMock(VectorStorageFacade::class),
             $this->createMock(SynapseIndexer::class),
             $this->router,
+            $this->createMock(PromptModelEligibilityValidator::class),
         );
 
         $container = new Container();

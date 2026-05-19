@@ -5,10 +5,13 @@ namespace App\Controller;
 use App\Entity\Message;
 use App\Repository\MessageRepository;
 use App\Repository\UserRepository;
+use App\Service\Embedding\Exception\PremiumRequiredException;
 use App\Service\InternalEmailService;
 use App\Service\Message\InferenceRouter;
 use App\Service\Message\MessageClassifier;
 use App\Service\Message\MessagePreProcessor;
+use App\Service\Model\Exception\InvalidPromptModelException;
+use App\Service\Model\PromptModelEligibilityValidator;
 use App\Service\PromptService;
 use App\Service\WidgetService;
 use App\Service\WordPressIntegrationService;
@@ -39,6 +42,7 @@ class LegacyApiController extends AbstractController
         private PromptService $promptService,
         private InternalEmailService $emailService,
         private LoggerInterface $logger,
+        private PromptModelEligibilityValidator $modelEligibilityValidator,
     ) {
     }
 
@@ -413,6 +417,26 @@ class LegacyApiController extends AbstractController
             }
 
             if (!empty($metadata)) {
+                // Mirror the eligibility gate from PromptController so
+                // the legacy widget API cannot be used to assign a
+                // premium-only model behind the new check (issue #891).
+                $user = $this->userRepository->find($userId);
+                if ($user) {
+                    try {
+                        $this->modelEligibilityValidator->assertMetadataAllowed($user, $metadata);
+                    } catch (InvalidPromptModelException $e) {
+                        return $this->error($e->getMessage(), 400);
+                    } catch (PremiumRequiredException $e) {
+                        return new JsonResponse([
+                            'success' => false,
+                            'error' => 'requires_premium',
+                            'capability' => 'VECTORIZE',
+                            'message' => $e->getMessage(),
+                            'currentLevel' => $e->currentLevel,
+                        ], Response::HTTP_FORBIDDEN);
+                    }
+                }
+
                 $this->promptService->saveMetadataForPrompt($prompt, array_merge($promptData['metadata'], $metadata));
             }
 

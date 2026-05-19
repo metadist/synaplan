@@ -118,6 +118,11 @@ final readonly class EmbeddingReindexService
 
         if (null === $modelId || null === $modelName || null === $provider) {
             $this->logger->warning('EmbeddingReindex: documents skipped — no model configured');
+            // Mark as a failure so the handler can surface a clear error
+            // and roll back BCONFIG instead of returning "completed" with
+            // 0/0 (#948).
+            $run->incrementChunksFailed();
+            $this->runRepository->save($run);
 
             return;
         }
@@ -257,14 +262,27 @@ final readonly class EmbeddingReindexService
 
         if (null === $modelId || null === $modelName || null === $provider) {
             $this->logger->warning('EmbeddingReindex: memories skipped — no model configured');
+            // See reindexDocuments() — same rationale (#948).
+            $run->incrementChunksFailed();
+            $this->runRepository->save($run);
 
             return;
         }
 
         try {
-            $points = $this->qdrantClient->scrollMemories(0, null, 50000);
+            // Walk EVERY user's memories (#948). The previous
+            // `scrollMemories(0, ...)` call filtered on `user_id === 0`
+            // and therefore never returned a single real memory — the
+            // reindex was a silent no-op even when the UI reported
+            // "completed".
+            $points = $this->qdrantClient->scrollAllMemoriesForReindex(50000);
         } catch (\Throwable $e) {
             $this->logger->error('EmbeddingReindex: memories scroll failed', ['error' => $e->getMessage()]);
+            // Failure to even *discover* the memory points must be
+            // surfaced as a run-level failure — otherwise the run shows
+            // 0/0 and looks like "nothing to do" instead of "broken".
+            $run->incrementChunksFailed();
+            $this->runRepository->save($run);
 
             return;
         }
