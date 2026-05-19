@@ -36,7 +36,26 @@
     "feedback": "Comentarios",
     "widgetSessions": "Sesiones de Widget",
     "widgetChats": "Chats de Widget",
-    "liveSupport": "Soporte en vivo"
+    "liveSupport": "Soporte en vivo",
+    "addinConnect": "Conectar complemento de Outlook"
+  },
+  "addinConnect": {
+    "title": "Conectar a Synaplan",
+    "subtitle": "Autoriza al complemento Synamail de Outlook a usar esta cuenta de Synaplan.",
+    "loading": "Comprobando tu sesión…",
+    "confirmPrompt": "Conectar este Outlook a:",
+    "connectButton": "Conectar Outlook",
+    "scopesNote": "Concede acceso a mensajes, chats, archivos y búsqueda RAG.",
+    "connecting": "Emitiendo una clave de API segura…",
+    "successTitle": "Conectado.",
+    "successSubtitle": "Puedes cerrar esta ventana si no se cierra por sí sola.",
+    "errorTitle": "No se pudo conectar",
+    "retry": "Reintentar",
+    "helpLine": "Esta ventana se abre desde el complemento Synamail. Es seguro cerrarla.",
+    "errorMissingState": "Falta el parámetro state. Vuelve a abrir el complemento e inténtalo de nuevo.",
+    "errorOfficeNotReady": "Office.js no está disponible. Esta página debe abrirse desde Outlook.",
+    "errorNotSignedIn": "No has iniciado sesión. Actualiza la ventana y vuelve a iniciar sesión.",
+    "errorIssuanceFailed": "Synaplan no pudo emitir una clave de API para esta cuenta."
   },
   "welcome": "Bienvenido",
   "chat": {
