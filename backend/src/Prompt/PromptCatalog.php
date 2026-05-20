@@ -1084,6 +1084,16 @@ PROMPT;
 
     private static function memoryParsePrompt(): string
     {
+        // Notes on the rule shape (issue #950, follow-up from FExB17 on PR #956):
+        //   - Rule 5 ("RESOLVE PRONOUNS") is the minimal fix for #950: when the
+        //     user chains sentences and the second one carries a pronoun, the
+        //     extracted value must include the referent. One short bilingual
+        //     example is enough — anything longer made smaller production
+        //     models (gpt-oss-120b on Groq) overcorrect.
+        //   - We deliberately do NOT add a "merge related thoughts" rule. The
+        //     prompt already preserves splitting via the existing few-shots,
+        //     and a merge directive caused the same smaller models to dump the
+        //     entire input into a single memory. Splitting was never the bug.
         return <<<'PROMPT'
 # Memory Parse Assistant
 
@@ -1097,15 +1107,10 @@ Parse user input into memories. Keep ALL details the user mentions!
    - "My favorite color is blue because it calms me" → value: "blue, because it calms me"
 3. UPDATE if same topic exists (use existingId)
 4. DELETE only when user explicitly wants to forget
-5. **RESOLVE REFERENCES** - if a sentence uses pronouns (it, that, this, es, das, dies)
-   or implicit references to earlier sentences, resolve them in the value. NEVER
-   store a fragment that is meaningless on its own.
+5. **RESOLVE PRONOUNS** - when a sentence refers back to an earlier topic with a
+   pronoun, write the referent into the value so the memory makes sense alone.
    - "I started boxing. Now I don't need it anymore" → key: "boxing", value: "started boxing but doesn't need it anymore"
-   - NOT: key: "current_need", value: "don't need it anymore" (meaningless without context)
-6. **MERGE related thoughts** - if multiple sentences describe the same topic from
-   different angles, combine them into ONE memory rather than splitting into
-   context-free fragments. Each emitted memory must read as a complete, standalone
-   thought without needing the surrounding sentences.
+   - NOT: key: "current_need", value: "don't need it anymore"
 
 ## Format
 
@@ -1134,16 +1139,6 @@ Input: "My name is Tom, I'm 25, and I work at Google as a developer"
   {"action": "create", "memory": {"category": "work", "key": "job", "value": "developer at Google"}}
 ]}
 ```
-
-Input (multi-sentence with pronouns): "ich habe keine motivation mehr für das bodybuilding weil ich zufrieden bin mit meinem Aussehen. ich hatte angefangen zu trainieren um selbstbewusstsein und vertrauen aufzubauen. jetzt brauche ich es nicht mehr. ich bin was Wert weil ich einfach nur bin"
-```json
-{"actions": [
-  {"action": "create", "memory": {"category": "personal", "key": "motivation", "value": "keine Motivation mehr für Bodybuilding, zufrieden mit eigenem Aussehen"}},
-  {"action": "create", "memory": {"category": "personal", "key": "reason_for_training", "value": "hatte angefangen zu trainieren um Selbstbewusstsein und Vertrauen aufzubauen, braucht es jetzt nicht mehr"}},
-  {"action": "create", "memory": {"category": "personal", "key": "self_worth", "value": "fühlt sich wertvoll, weil er einfach nur ist"}}
-]}
-```
-Note how the third sentence's "es" is resolved to "Selbstbewusstsein/Training" inside `reason_for_training`, and the standalone fragment "jetzt brauche ich es nicht mehr" is NOT emitted as its own memory.
 
 Input: "Actually I'm 26 now"
 Existing: [{"id": 5, "key": "age", "value": "25"}]

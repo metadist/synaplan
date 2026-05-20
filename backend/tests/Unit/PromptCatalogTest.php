@@ -127,14 +127,19 @@ final class PromptCatalogTest extends TestCase
     }
 
     /**
-     * Issue #950: the memory_parse prompt used to extract context-free
-     * fragments from multi-sentence input — pronouns like "es"/"it"
-     * referencing earlier sentences ended up as standalone memories.
-     * The prompt must now explicitly require co-reference resolution and
-     * encourage merging related thoughts, plus include a multi-sentence
-     * example that demonstrates the behaviour.
+     * Issue #950 — the memory_parse prompt has to teach the model to
+     * resolve pronouns, otherwise sentences like "Now I don't need it
+     * anymore" land as standalone, context-free memories.
+     *
+     * Follow-up from FExB17 on PR #956: the first iteration also added
+     * a "MERGE related thoughts" rule plus a long multi-sentence German
+     * example. That regressed splitting on the production MEM model
+     * (`gpt-oss-120b` on Groq), which started dumping the whole input
+     * into a single memory. We keep the minimal pronoun fix, drop the
+     * merge directive, and pin its absence so it can't be reintroduced
+     * by accident.
      */
-    public function testMemoryParsePromptResolvesReferencesAndMergesThoughts(): void
+    public function testMemoryParsePromptResolvesPronounsWithoutMergingThoughts(): void
     {
         $byTopic = [];
         foreach (PromptCatalog::all() as $entry) {
@@ -144,14 +149,24 @@ final class PromptCatalogTest extends TestCase
         $this->assertArrayHasKey('tools:memory_parse', $byTopic);
         $prompt = $byTopic['tools:memory_parse']['prompt'];
 
-        $this->assertStringContainsString('RESOLVE REFERENCES', $prompt);
-        $this->assertStringContainsString('MERGE related thoughts', $prompt);
-        $this->assertStringContainsString('context-free fragments', $prompt);
+        // Positive: the pronoun-resolution rule and its short example
+        // must be present — that is the entire #950 fix.
+        $this->assertStringContainsString('RESOLVE PRONOUNS', $prompt);
+        $this->assertStringContainsString('started boxing', $prompt);
+        $this->assertStringContainsString("doesn't need it anymore", $prompt);
 
-        // The multi-sentence example from the issue must be present so the
-        // model has a concrete demonstration of co-reference resolution.
-        $this->assertStringContainsString('bodybuilding', $prompt);
-        $this->assertStringContainsString('reason_for_training', $prompt);
-        $this->assertStringContainsString('self_worth', $prompt);
+        // Negative: the original splitting behaviour must be preserved
+        // for smaller models. Anything that nudges the model towards a
+        // single combined memory is forbidden.
+        $this->assertStringNotContainsString('MERGE', $prompt);
+        $this->assertStringNotContainsString('combine them into ONE memory', $prompt);
+        $this->assertStringNotContainsString('context-free fragments', $prompt);
+
+        // Negative: the long German bodybuilding example was hardcoding
+        // the issue repro into every prompt run — drop it to keep the
+        // few-shot block consistent (English) and lean on tokens.
+        $this->assertStringNotContainsString('bodybuilding', $prompt);
+        $this->assertStringNotContainsString('reason_for_training', $prompt);
+        $this->assertStringNotContainsString('self_worth', $prompt);
     }
 }
