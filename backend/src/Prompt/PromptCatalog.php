@@ -1084,6 +1084,24 @@ PROMPT;
 
     private static function memoryParsePrompt(): string
     {
+        // Notes on the rule shape (issue #950, follow-up from FExB17 on PR #956):
+        //   - Rule 5 ("RESOLVE PRONOUNS") is the minimal fix for #950: when the
+        //     user chains sentences and the second one carries a pronoun, the
+        //     extracted value must include the referent. One short bilingual
+        //     example is enough — anything longer made smaller production
+        //     models (gpt-oss-120b on Groq) overcorrect.
+        //   - Rule 6 ("MATCH USER LANGUAGE") plugs a gap relative to the
+        //     extraction prompt: parse-mode used to silently translate German
+        //     input to English values, which then read foreign on later recall
+        //     in a German chat context. The rule is one line on purpose; the
+        //     existing English few-shots are not removed because (a) the model
+        //     generalizes "match the input language" without per-locale
+        //     examples, and (b) bigger DE/ES/TR examples were exactly what
+        //     regressed splitting on gpt-oss-120b in the previous iteration.
+        //   - We deliberately do NOT add a "merge related thoughts" rule. The
+        //     prompt already preserves splitting via the existing few-shots,
+        //     and a merge directive caused the same smaller models to dump the
+        //     entire input into a single memory. Splitting was never the bug.
         return <<<'PROMPT'
 # Memory Parse Assistant
 
@@ -1097,6 +1115,12 @@ Parse user input into memories. Keep ALL details the user mentions!
    - "My favorite color is blue because it calms me" → value: "blue, because it calms me"
 3. UPDATE if same topic exists (use existingId)
 4. DELETE only when user explicitly wants to forget
+5. **RESOLVE PRONOUNS** - when a sentence refers back to an earlier topic with a
+   pronoun, write the referent into the value so the memory makes sense alone.
+   - "I started boxing. Now I don't need it anymore" → key: "boxing", value: "started boxing but doesn't need it anymore"
+   - NOT: key: "current_need", value: "don't need it anymore"
+6. **MATCH USER LANGUAGE** - write `value` in the same language the user used in
+   the input. Never translate. Keys stay in English (snake_case).
 
 ## Format
 

@@ -281,6 +281,13 @@ final class EmbeddingCostEstimator
     }
 
     /**
+     * Build the {provider, model, modelId, vectorDim} info tuple for a
+     * cost-estimate response. The vector dimension is resolved from the
+     * BMODELS catalog (`BJSON.meta.dimensions`) so the UI can compare
+     * source vs target dims and warn on mismatches (#949). Falls back
+     * to the historical 1024 only when the model row has no metadata,
+     * which keeps legacy/local Ollama deployments working unchanged.
+     *
      * @return array{provider: ?string, model: ?string, modelId: ?int, vectorDim: int}
      */
     private function buildModelInfo(?int $modelId): array
@@ -298,7 +305,8 @@ final class EmbeddingCostEstimator
             'provider' => $this->modelConfigService->getProviderForModel($modelId),
             'model' => $this->modelConfigService->getModelName($modelId),
             'modelId' => $modelId,
-            'vectorDim' => EmbeddingMetadataService::DEFAULT_VECTOR_DIM,
+            'vectorDim' => $this->modelConfigService->getVectorDimForModel($modelId)
+                ?? EmbeddingMetadataService::DEFAULT_VECTOR_DIM,
         ];
     }
 }

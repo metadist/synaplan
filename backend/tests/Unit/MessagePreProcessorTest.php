@@ -11,6 +11,7 @@ use App\Service\File\TikaClient;
 use App\Service\Message\MessagePreProcessor;
 use App\Service\RateLimitService;
 use App\Service\WhisperService;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
@@ -284,6 +285,79 @@ class MessagePreProcessorTest extends TestCase
             $this->fileProcessor
                 ->expects($this->never())
                 ->method('extractText');
+
+            $service = new MessagePreProcessor(
+                $this->messageRepository,
+                $this->tikaClient,
+                $this->whisperService,
+                $this->aiFacade,
+                $this->logger,
+                $tempDir,
+                $this->rateLimitService,
+                $this->userRepository,
+                $this->fileProcessor,
+            );
+
+            $this->messageRepository->method('save');
+
+            $service->process($message);
+        } finally {
+            if (file_exists($tempFile)) {
+                unlink($tempFile);
+            }
+        }
+    }
+
+    /**
+     * Issue #954 — '.md', '.csv', and '.ppt' uploads must be routed through
+     * FileProcessor like every other document type. Before the fix they were
+     * missing from DOCUMENT_EXTENSIONS, so the preprocessor silently skipped
+     * them and FileAnalysisHandler reported "unsupported file type" for
+     * legitimately uploaded files.
+     *
+     * @return iterable<string, array{string}>
+     */
+    public static function supportedDocumentExtensionsProvider(): iterable
+    {
+        yield 'markdown' => ['md'];
+        yield 'csv' => ['csv'];
+        yield 'powerpoint legacy' => ['ppt'];
+    }
+
+    #[DataProvider('supportedDocumentExtensionsProvider')]
+    public function testProcessFileEntityExtractsTextForSupportedDocumentExtension(string $extension): void
+    {
+        $tempDir = sys_get_temp_dir();
+        $tempFile = $tempDir.'/test_doc_'.uniqid().'.'.$extension;
+        touch($tempFile);
+
+        try {
+            $file = $this->createMock(\App\Entity\File::class);
+            $file->method('getId')->willReturn(99);
+            $file->method('getFilePath')->willReturn(basename($tempFile));
+            $file->method('getFileType')->willReturn($extension);
+            $file->method('getFileName')->willReturn('notes.'.$extension);
+            $file->method('getFileSize')->willReturn(512);
+            $file->method('getFileText')->willReturn('');
+            $file->method('getUserId')->willReturn(5);
+
+            $file
+                ->expects($this->atLeastOnce())
+                ->method('setFileText')
+                ->with('extracted body');
+
+            $files = new \Doctrine\Common\Collections\ArrayCollection([$file]);
+            $message = $this->createMock(Message::class);
+            $message->method('getFile')->willReturn(0);
+            $message->method('getFilePath')->willReturn('');
+            $message->method('getFiles')->willReturn($files);
+            $message->method('getUserId')->willReturn(5);
+
+            $this->fileProcessor
+                ->expects($this->once())
+                ->method('extractText')
+                ->with(basename($tempFile), $extension, 5)
+                ->willReturn(['extracted body', ['strategy' => 'native_text']]);
 
             $service = new MessagePreProcessor(
                 $this->messageRepository,

@@ -120,7 +120,8 @@
       "share": "Chat teilen",
       "public": "Öffentlich"
     },
-    "fileOnlyDefaultMessage": "Bitte prüfe die angehängte Datei."
+    "fileOnlyDefaultMessage": "Bitte prüfe die angehängte Datei.",
+    "voiceMessageDefaultMessage": "Bitte antworte auf meine Sprachnachricht."
   },
   "admin": {
     "title": "Admin-Panel",
@@ -1031,6 +1032,8 @@
       "total": "Gesamt",
       "chunks": "Chunks",
       "tokens": "Tokens",
+      "dimensions": "Vektor-Dim",
+      "dimMismatch": "Die Vektor-Dimensionen ändern sich von {from} auf {to}. Alle bestehenden Vektoren werden neu erzeugt; alte Such-Scores sind erst nach Abschluss der Re-Vektorisierung wieder vergleichbar.",
       "scopes": {
         "documents": "Dokumente (RAG)",
         "memories": "Nutzer-Erinnerungen",
@@ -1078,6 +1081,10 @@
       "runningHint": "Aktualisiert sich automatisch alle paar Sekunden.",
       "chunks": "Chunks",
       "tokens": "Tokens",
+      "errorLabel": "Fehler",
+      "statusPartialBadge": "Teilweise",
+      "statusPartial": "Abgeschlossen mit Fehlern — {processed} verarbeitet, {failed} fehlgeschlagen.",
+      "partialDetail": "Dieser Lauf wurde beendet, aber {failed} der Chunks konnten nicht embeddet werden ({processed} erfolgreich). Die betroffenen Einträge behalten ihre vorherigen Vektoren und werden beim nächsten Wechsel erneut versucht.",
       "col": {
         "when": "Wann",
         "scope": "Bereich",

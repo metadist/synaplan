@@ -118,7 +118,8 @@
       "share": "Sohbeti paylaş",
       "public": "Herkese Açık"
     },
-    "fileOnlyDefaultMessage": "Lütfen ekteki dosyayı inceleyin."
+    "fileOnlyDefaultMessage": "Lütfen ekteki dosyayı inceleyin.",
+    "voiceMessageDefaultMessage": "Lütfen sesli mesajıma yanıt verin."
   },
   "admin": {
     "title": "Yönetici Paneli",

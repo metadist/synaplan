@@ -123,41 +123,109 @@
           </tr>
         </thead>
         <tbody>
-          <tr
-            v-for="run in runs"
-            :key="run.id"
-            class="border-b border-light-border/20 dark:border-dark-border/10 hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
-            data-testid="row-run"
-          >
-            <td class="py-2.5 px-2 txt-primary">
-              <div class="flex flex-col">
-                <span class="text-sm">{{ formatDate(run.created) }}</span>
-                <span class="text-xs txt-secondary font-mono">#{{ run.id }}</span>
-              </div>
-            </td>
-            <td class="py-2.5 px-2 txt-secondary capitalize">
-              {{ $t(`config.embeddingSwitch.scopes.${run.scope}`) }}
-            </td>
-            <td class="py-2.5 px-2">
-              <span
-                class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-xs font-semibold"
-                :class="statusBadgeClass(run.status)"
-              >
-                <span class="w-1.5 h-1.5 rounded-full" :class="statusDotColor(run.status)"></span>
-                {{ $t(`config.embeddingRuns.status.${run.status}`) }}
-              </span>
-            </td>
-            <td class="py-2.5 px-2 text-right txt-primary font-mono text-xs">
-              {{ formatNumber(run.chunksProcessed) }}
-              <span v-if="run.chunksFailed > 0" class="text-red-500">/-{{ run.chunksFailed }}</span>
-            </td>
-            <td class="py-2.5 px-2 text-right txt-primary font-mono text-xs">
-              ~{{ formatTokens(run.tokensProcessed) }}
-            </td>
-            <td class="py-2.5 px-2 text-right txt-brand font-mono text-xs font-semibold">
-              ${{ Number(run.costEstimatedUsd ?? 0).toFixed(4) }}
-            </td>
-          </tr>
+          <template v-for="run in runs" :key="run.id">
+            <tr
+              class="border-b border-light-border/20 dark:border-dark-border/10 hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
+              :class="isRunExpandable(run) && 'cursor-pointer'"
+              data-testid="row-run"
+              @click="isRunExpandable(run) && toggleRunDetail(run.id)"
+            >
+              <td class="py-2.5 px-2 txt-primary">
+                <div class="flex items-center gap-2">
+                  <ChevronRightIcon
+                    v-if="isRunExpandable(run)"
+                    class="w-3.5 h-3.5 txt-secondary transition-transform"
+                    :class="expandedRunId === run.id && 'rotate-90'"
+                  />
+                  <span v-else class="inline-block w-3.5"></span>
+                  <div class="flex flex-col">
+                    <span class="text-sm">{{ formatDate(run.created) }}</span>
+                    <span class="text-xs txt-secondary font-mono">#{{ run.id }}</span>
+                  </div>
+                </div>
+              </td>
+              <td class="py-2.5 px-2 txt-secondary capitalize">
+                {{ $t(`config.embeddingSwitch.scopes.${run.scope}`) }}
+              </td>
+              <td class="py-2.5 px-2">
+                <span
+                  class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-xs font-semibold"
+                  :class="statusBadgeClass(run)"
+                  :title="
+                    runHasFailures(run)
+                      ? $t('config.embeddingRuns.statusPartial', {
+                          processed: formatNumber(run.chunksProcessed),
+                          failed: formatNumber(run.chunksFailed),
+                        })
+                      : $t(`config.embeddingRuns.status.${run.status}`)
+                  "
+                  data-testid="badge-run-status"
+                >
+                  <span class="w-1.5 h-1.5 rounded-full" :class="statusDotColor(run.status)"></span>
+                  {{
+                    runHasFailures(run) && run.status === 'completed'
+                      ? $t('config.embeddingRuns.statusPartialBadge')
+                      : $t(`config.embeddingRuns.status.${run.status}`)
+                  }}
+                </span>
+              </td>
+              <td class="py-2.5 px-2 text-right txt-primary font-mono text-xs">
+                {{ formatNumber(run.chunksProcessed) }}
+                <span v-if="run.chunksFailed > 0" class="text-red-500"
+                  >/-{{ run.chunksFailed }}</span
+                >
+              </td>
+              <td class="py-2.5 px-2 text-right txt-primary font-mono text-xs">
+                ~{{ formatTokens(run.tokensProcessed) }}
+              </td>
+              <td class="py-2.5 px-2 text-right txt-brand font-mono text-xs font-semibold">
+                ${{ Number(run.costEstimatedUsd ?? 0).toFixed(4) }}
+              </td>
+            </tr>
+            <tr
+              v-if="expandedRunId === run.id && isRunExpandable(run)"
+              :key="`${run.id}-detail`"
+              class="border-b border-light-border/20 dark:border-dark-border/10 bg-black/5 dark:bg-white/5"
+              data-testid="row-run-detail"
+            >
+              <td colspan="6" class="py-3 px-4">
+                <div
+                  v-if="run.error"
+                  class="rounded-lg border border-red-500/30 bg-red-500/5 p-3"
+                  data-testid="detail-run-error"
+                >
+                  <div class="flex items-start gap-2">
+                    <ExclamationCircleIcon class="w-4 h-4 text-red-500 flex-shrink-0 mt-0.5" />
+                    <div class="flex-1 min-w-0">
+                      <p class="text-xs font-semibold text-red-600 dark:text-red-400 mb-1">
+                        {{ $t('config.embeddingRuns.errorLabel') }}
+                      </p>
+                      <pre class="text-xs txt-primary whitespace-pre-wrap break-words font-mono">{{
+                        run.error
+                      }}</pre>
+                    </div>
+                  </div>
+                </div>
+                <div
+                  v-else-if="runHasFailures(run)"
+                  class="rounded-lg border border-amber-500/30 bg-amber-500/5 p-3"
+                  data-testid="detail-run-partial"
+                >
+                  <div class="flex items-start gap-2">
+                    <ExclamationTriangleIcon class="w-4 h-4 text-amber-500 flex-shrink-0 mt-0.5" />
+                    <p class="text-xs txt-primary">
+                      {{
+                        $t('config.embeddingRuns.partialDetail', {
+                          processed: formatNumber(run.chunksProcessed),
+                          failed: formatNumber(run.chunksFailed),
+                        })
+                      }}
+                    </p>
+                  </div>
+                </div>
+              </td>
+            </tr>
+          </template>
         </tbody>
       </table>
     </div>
@@ -166,7 +234,13 @@
 
 <script setup lang="ts">
 import { onMounted, onBeforeUnmount, ref, computed } from 'vue'
-import { ArrowPathIcon, CheckCircleIcon } from '@heroicons/vue/24/outline'
+import {
+  ArrowPathIcon,
+  CheckCircleIcon,
+  ChevronRightIcon,
+  ExclamationCircleIcon,
+  ExclamationTriangleIcon,
+} from '@heroicons/vue/24/outline'
 import {
   adminEmbeddingApi,
   type EmbeddingRun,
@@ -176,10 +250,30 @@ import {
 const runs = ref<EmbeddingRun[]>([])
 const loading = ref(false)
 const pollHandle = ref<number | null>(null)
+const expandedRunId = ref<number | null>(null)
 
 const activeRun = computed<EmbeddingRun | null>(() => {
   return runs.value.find((r) => r.status === 'queued' || r.status === 'running') ?? null
 })
+
+// #949: a "completed" run with zero processed or any failures is not
+// really a success — the badge / detail row use this to switch to an
+// amber/red treatment and let the user expand the row to see why.
+const runHasFailures = (run: EmbeddingRun): boolean => {
+  if (run.status === 'failed') return true
+  if (run.status === 'completed' && run.chunksFailed > 0) return true
+  if (run.status === 'completed' && (run.chunksTotal ?? 0) > 0 && run.chunksProcessed === 0)
+    return true
+  return false
+}
+
+const isRunExpandable = (run: EmbeddingRun): boolean => {
+  return Boolean(run.error) || runHasFailures(run)
+}
+
+const toggleRunDetail = (id: number) => {
+  expandedRunId.value = expandedRunId.value === id ? null : id
+}
 
 const formatDate = (unixSeconds: number): string => {
   const d = new Date(unixSeconds * 1000)
@@ -222,15 +316,23 @@ const statusDotColor = (status: string): string => {
   }
 }
 
-const statusBadgeClass = (status: string): string => {
-  switch (status) {
+// #949: badge colour now reflects the *effective* outcome, not just
+// the status string. A "completed" run with N failures is no longer
+// indistinguishable from a clean run — it gets the amber treatment
+// and a "Partial" label, while a fully-failed run goes red.
+const statusBadgeClass = (run: EmbeddingRun): string => {
+  if (run.status === 'failed') {
+    return 'bg-red-500/10 text-red-600 dark:text-red-400'
+  }
+  if (run.status === 'completed' && runHasFailures(run)) {
+    return 'bg-amber-500/10 text-amber-600 dark:text-amber-400'
+  }
+  switch (run.status) {
     case 'running':
     case 'completed':
       return 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400'
     case 'queued':
       return 'bg-amber-500/10 text-amber-600 dark:text-amber-400'
-    case 'failed':
-      return 'bg-red-500/10 text-red-600 dark:text-red-400'
     default:
       return 'bg-gray-500/10 text-gray-600 dark:text-gray-400'
   }
@@ -298,7 +400,18 @@ onMounted(async () => {
 
 onBeforeUnmount(stopPolling)
 
-defineExpose({ refresh: loadRuns })
+// #949: previously `refresh()` only ran `loadRuns()` once, so after
+// the parent dispatched a switch the table never auto-updated until
+// a manual page reload. Re-fetch AND boot the polling loop here so
+// the freshly queued run transitions Queued → Running → Completed
+// in the live-progress card without user intervention. Idempotent:
+// startPolling() bails if a timer is already armed.
+const refresh = async () => {
+  await loadRuns()
+  if (activeRun.value !== null) startPolling()
+}
+
+defineExpose({ refresh })
 </script>
 
 <style scoped>

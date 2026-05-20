@@ -5,6 +5,12 @@ import { extractBTextPayload } from '@/utils/jsonResponse'
 import { parseAIResponse } from '@/utils/responseParser'
 import { generatePartId } from '@/utils/mediaParts'
 import { isChannelSource } from '@/utils/channelSource'
+import {
+  buildUploadUrl,
+  isAudioFileType,
+  isImageFileType,
+  isVideoFileType,
+} from '@/utils/mediaTypes'
 import type { AgainData } from '@/types/ai-models'
 import { authService } from '@/services/authService'
 
@@ -451,22 +457,34 @@ export const useHistoryStore = defineStore('history', () => {
           // `<video>` element keeps its identity if the message later gets
           // re-parsed (e.g. continuation appends text). Without this, the
           // index-based fallback key would remount the media player.
+          //
+          // Issue #955: detect audio/image/video by both the generic media
+          // kind (`audio`, `image`, `video` — used by TTS / MEDIAMAKER) and
+          // by the raw file extension (`ogg`, `mp3`, `png`, …) the backend
+          // stores for inbound WhatsApp voice notes and direct uploads.
+          // Without the extension-aware check, a WhatsApp voice reply was
+          // surfaced as a plain text bubble with no player.
+          //
+          // Relative `m.file.path` values (e.g. WhatsApp's `13/.../voice.ogg`)
+          // are first prefixed with the static-serve endpoint so the player
+          // can fetch them; absolute URLs and already-prefixed paths pass
+          // through `buildUploadUrl` unchanged before final normalization.
           if (m.file && m.file.path) {
-            const absoluteUrl = normalizeMediaUrl(m.file.path)
-            if (m.file.type === 'image') {
+            const absoluteUrl = normalizeMediaUrl(buildUploadUrl(m.file.path))
+            if (isImageFileType(m.file.type)) {
               parts.push({
                 partId: generatePartId(),
                 type: 'image',
                 url: absoluteUrl,
                 alt: m.text || 'Generated image',
               })
-            } else if (m.file.type === 'video') {
+            } else if (isVideoFileType(m.file.type)) {
               parts.push({
                 partId: generatePartId(),
                 type: 'video',
                 url: absoluteUrl,
               })
-            } else if (m.file.type === 'audio') {
+            } else if (isAudioFileType(m.file.type)) {
               parts.push({
                 partId: generatePartId(),
                 type: 'audio',
@@ -475,7 +493,7 @@ export const useHistoryStore = defineStore('history', () => {
             }
           }
 
-          // Parse files from backend response (user uploads)
+          // Parse files from backend response (user uploads).
           const files: MessageFile[] = []
           if (m.files && Array.isArray(m.files)) {
             files.push(
@@ -488,6 +506,28 @@ export const useHistoryStore = defineStore('history', () => {
                 fileMime: f.fileMime ?? f.file_mime,
               }))
             )
+          }
+
+          // Issue #955: render uploaded audio attachments with the
+          // `MessageAudio` player instead of only as a download badge.
+          // The badge stays via `files[]` so the user can still see the
+          // filename / size and download the original recording. Inbound
+          // WhatsApp voice messages travel through this same `files`
+          // pipeline once they're persisted as a `File` entity.
+          //
+          // The MIME type is forwarded so that ambiguous containers like
+          // `.webm` get classified by the actual upload mime (`audio/webm`
+          // for voice notes, `video/webm` for screen recordings) instead
+          // of falling into the audio default purely by extension.
+          for (const file of files) {
+            if (!isAudioFileType(file.fileType, file.fileMime)) continue
+            const audioUrl = buildUploadUrl(file.filePath)
+            if (!audioUrl) continue
+            parts.push({
+              partId: generatePartId(),
+              type: 'audio',
+              url: normalizeMediaUrl(audioUrl),
+            })
           }
 
           // Reconstruct tool metadata from topic field for user messages

@@ -125,7 +125,8 @@
       "share": "Share chat",
       "public": "Public"
     },
-    "fileOnlyDefaultMessage": "Please review the attached file."
+    "fileOnlyDefaultMessage": "Please review the attached file.",
+    "voiceMessageDefaultMessage": "Please respond to my voice message."
   },
   "admin": {
     "title": "Admin Panel",
@@ -901,6 +902,8 @@
       "total": "Total",
       "chunks": "chunks",
       "tokens": "tokens",
+      "dimensions": "Vector dim",
+      "dimMismatch": "Vector dimensions change from {from} to {to}. All existing vectors will be regenerated and old search scores are not comparable until the re-vectorize finishes.",
       "scopes": {
         "documents": "Documents (RAG)",
         "memories": "User Memories",
@@ -948,6 +951,10 @@
       "runningHint": "Updates automatically every few seconds.",
       "chunks": "chunks",
       "tokens": "tokens",
+      "errorLabel": "Error",
+      "statusPartialBadge": "Partial",
+      "statusPartial": "Completed with failures — {processed} processed, {failed} failed.",
+      "partialDetail": "This run finished but {failed} of the chunks could not be embedded ({processed} succeeded). The affected items keep their previous vectors and will be retried on the next switch.",
       "col": {
         "when": "When",
         "scope": "Scope",
