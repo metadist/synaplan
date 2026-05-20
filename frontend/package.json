@@ -74,7 +74,7 @@
     "tailwindcss": "4.3.0",
     "terser": "5.47.1",
     "typescript": "6.0.3",
-    "vite": "8.0.11",
+    "vite": "8.0.13",
     "vitest": "4.1.6",
     "vue-tsc": "3.2.8"
   }

@@ -97,12 +97,37 @@ export async function login(page: Page, credentials?: { user: string; pass: stri
 
   await page.fill(selectors.login.email, creds.user)
   await page.fill(selectors.login.password, creds.pass)
-  await page.click(selectors.login.submit)
+
+  const [response] = await Promise.all([
+    page.waitForResponse(
+      (r) => r.url().includes('/api/v1/auth/login') && r.request().method() === 'POST'
+    ),
+    page.click(selectors.login.submit),
+  ])
+
+  if (!response.ok()) {
+    const body = await response.text().catch(() => '(no body)')
+    throw new Error(`Login API returned ${response.status()}: ${body}`)
+  }
+
+  try {
+    await page.waitForURL((url) => !url.toString().includes('/login'), {
+      timeout: TIMEOUTS.STANDARD,
+    })
+  } catch {
+    const consoleErrors = await page.evaluate(() =>
+      (window as unknown as { __e2eErrors?: string[] }).__e2eErrors?.join('; ')
+    )
+    throw new Error(
+      `Login API succeeded (${response.status()}) but still on ${page.url()}.` +
+        (consoleErrors ? ` Console errors: ${consoleErrors}` : '')
+    )
+  }
 
   try {
     await page.waitForSelector(selectors.chat.textInput, { timeout: TIMEOUTS.STANDARD })
   } catch {
-    throw new Error(`Login failed: current URL is ${page.url()}`)
+    throw new Error(`Navigated to ${page.url()} but chat input never appeared`)
   }
 }
 
