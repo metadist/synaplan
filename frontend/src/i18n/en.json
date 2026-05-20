@@ -2964,6 +2964,7 @@
       "actionDelete": "Delete Memory",
       "similarFound": "Similar memories found - consider updating instead:",
       "confirm": "Confirm & Save",
+      "confirmSaving": "Saving…",
       "oneChange": "change",
       "multipleChanges": "changes"
     },

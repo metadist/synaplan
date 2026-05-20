@@ -2897,6 +2897,7 @@
       "actionDelete": "Erinnerung löschen",
       "similarFound": "Ähnliche Erinnerungen gefunden - vielleicht lieber aktualisieren:",
       "confirm": "Bestätigen & Speichern",
+      "confirmSaving": "Speichere…",
       "oneChange": "Änderung",
       "multipleChanges": "Änderungen"
     },

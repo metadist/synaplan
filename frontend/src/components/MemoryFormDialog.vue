@@ -297,7 +297,8 @@
             <div class="flex items-center gap-3">
               <button
                 type="button"
-                class="flex-1 btn-secondary px-4 py-2.5 rounded-xl font-medium transition-all"
+                class="flex-1 btn-secondary px-4 py-2.5 rounded-xl font-medium transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                :disabled="isSaving"
                 @click="step = 'input'"
               >
                 <Icon icon="mdi:arrow-left" class="w-4 h-4 inline mr-1" />
@@ -305,11 +306,17 @@
               </button>
               <button
                 type="button"
-                class="flex-1 btn-primary px-4 py-2.5 rounded-xl font-medium flex items-center justify-center gap-2"
+                class="flex-1 btn-primary px-4 py-2.5 rounded-xl font-medium flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                :disabled="isSaving"
+                :aria-busy="isSaving"
                 @click="confirmAndSave"
               >
-                <Icon icon="mdi:check" class="w-4 h-4" />
-                {{ $t('memories.form.confirm') }}
+                <Icon
+                  :icon="isSaving ? 'mdi:loading' : 'mdi:check'"
+                  class="w-4 h-4"
+                  :class="{ 'animate-spin': isSaving }"
+                />
+                {{ isSaving ? $t('memories.form.confirmSaving') : $t('memories.form.confirm') }}
               </button>
             </div>
           </div>
@@ -479,6 +486,7 @@ const { error, warning } = useNotification()
 const mode = ref<'easy' | 'advanced'>('easy')
 const step = ref<'input' | 'preview'>('input')
 const isProcessing = ref(false)
+const isSaving = ref(false)
 const easyInput = ref('')
 const easyCategory = ref('')
 const showCustomCategory = ref(false)
@@ -543,6 +551,7 @@ watch(
   (isOpen) => {
     if (!isOpen) {
       isProcessing.value = false
+      isSaving.value = false
       step.value = 'input'
     }
   }
@@ -676,8 +685,12 @@ function handleParseFailure(err: unknown): void {
 
 function confirmAndSave() {
   if (parsedActions.value.length === 0) return
+  // Guard against double-submits: parent's persistence loop is async (one
+  // request per action) and the dialog only closes after it finishes, so
+  // without this every extra click would create a full duplicate batch.
+  if (isSaving.value) return
+  isSaving.value = true
 
-  // Emit all actions for the parent to process
   emit('saveMultiple', parsedActions.value)
 }
 
