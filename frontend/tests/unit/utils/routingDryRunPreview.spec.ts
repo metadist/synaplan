@@ -23,6 +23,24 @@ describe('routingDryRunPreview', () => {
     expect(preview.steps[1].capability).toBe('TEXT2SOUND')
   })
 
+  it('detects answer + generate image from sorter classification', () => {
+    const preview = buildDryRunPreview(
+      'hey beantworte mir die frage: was kostet ein döner in deutschland und generiere ein bild von einem döner',
+      'image-generation',
+      'mediamaker',
+      {
+        webSearch: true,
+        mediaType: 'image',
+        intent: 'image_generation',
+      }
+    )
+    expect(preview.isCompound).toBe(true)
+    expect(preview.useCaseId).toBe('text_chat')
+    expect(preview.steps).toHaveLength(2)
+    expect(preview.steps[0].capability).toBe('CHAT')
+    expect(preview.steps[1].capability).toBe('TEXT2PIC')
+  })
+
   it('uses video capability for video generation topic', () => {
     const preview = buildDryRunPreview(
       'Create a short video clip',

@@ -50,15 +50,61 @@ final readonly class RuleBasedStepPlanner
         $granular = isset($classification['granular_topic']) ? (string) $classification['granular_topic'] : null;
         $useCaseId = (string) ($classification['primary_use_case_id'] ?? $this->useCaseMapper->topicToUseCaseId($topic, $granular));
 
+        $classificationPlan = $this->planFromClassification($classification, $useCaseId);
+        if (null !== $classificationPlan) {
+            return $classificationPlan;
+        }
+
         foreach (self::compoundPatterns() as $pattern) {
             if (1 === preg_match($pattern['test'], $messageText)) {
-                return new StepPlan($useCaseId, $pattern['steps'], true);
+                $primaryUseCaseId = $pattern['primary_use_case_id'] ?? $useCaseId;
+
+                return new StepPlan($primaryUseCaseId, $pattern['steps'], true);
             }
         }
 
         $steps = $this->defaultStepsForUseCase($useCaseId, $messageText);
 
         return new StepPlan($useCaseId, $steps, false);
+    }
+
+    /**
+     * Language-agnostic compound detection from sorter output (preferred over regex).
+     *
+     * @param array<string, mixed> $classification
+     */
+    private function planFromClassification(array $classification, string $useCaseId): ?StepPlan
+    {
+        if (!filter_var($classification['web_search'] ?? false, FILTER_VALIDATE_BOOLEAN)) {
+            return null;
+        }
+
+        $intent = (string) ($classification['intent'] ?? 'chat');
+        $mediaType = isset($classification['media_type']) ? (string) $classification['media_type'] : null;
+
+        if ('image_generation' !== $intent && 'media_generation' !== $useCaseId) {
+            return null;
+        }
+
+        if (null === $mediaType || '' === $mediaType) {
+            return null;
+        }
+
+        return $this->chatThenMediaPlan($mediaType);
+    }
+
+    private function chatThenMediaPlan(string $mediaType): StepPlan
+    {
+        [$labelKey, $capability] = match ($mediaType) {
+            'video' => ['config.routing.steps.videoGenerate', 'TEXT2VID'],
+            'audio' => ['config.routing.steps.readAloud', 'TEXT2SOUND'],
+            default => ['config.routing.steps.mediaGenerate', 'TEXT2PIC'],
+        };
+
+        return new StepPlan('text_chat', [
+            new PlannedStep('answer', 'config.routing.steps.chat', 'CHAT'),
+            new PlannedStep('generate', $labelKey, $capability),
+        ], true);
     }
 
     /**
@@ -86,7 +132,7 @@ final readonly class RuleBasedStepPlanner
     }
 
     /**
-     * @return list<array{test: non-empty-string, steps: list<PlannedStep>}>
+     * @return list<array{test: non-empty-string, steps: list<PlannedStep>, primary_use_case_id?: string}>
      */
     private static function compoundPatterns(): array
     {

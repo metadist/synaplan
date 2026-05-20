@@ -1085,7 +1085,11 @@ const dryRunPreview = computed(() => {
       })),
     }
   }
-  const preview = buildDryRunPreview(testResult.value.query, top.topic, top.alias_target ?? null)
+  const preview = buildDryRunPreview(testResult.value.query, top.topic, top.alias_target ?? null, {
+    webSearch: testResult.value.web_search,
+    mediaType: testResult.value.media_type ?? null,
+    intent: testResult.value.intent,
+  })
   const apiUseCaseId = testResult.value.primary_use_case_id
   if (apiUseCaseId) {
     return { ...preview, useCaseId: apiUseCaseId as UseCaseId }

@@ -64,6 +64,10 @@ final readonly class StepOrchestrator
         foreach ($plan->steps as $index => $step) {
             $stepNumber = $index + 1;
 
+            if ($index > 0 && $this->isMediaCapability($step->capability)) {
+                $this->streamCompoundMediaTransition($streamCallback, $classification, $step->capability);
+            }
+
             $this->notify($statusCallback, 'step_started', 'Step started', [
                 'step_id' => $step->id,
                 'step_index' => $index,
@@ -191,6 +195,9 @@ final readonly class StepOrchestrator
             $stepClassification['topic'] = 'mediamaker';
         } elseif ('file_analysis' === $intent) {
             $stepClassification['topic'] = 'analyzefile';
+        } elseif ('chat' === $intent) {
+            $stepClassification['topic'] = 'general-chat';
+            unset($stepClassification['media_type']);
         } else {
             $stepClassification['topic'] = $classification['topic'] ?? 'general';
         }
@@ -241,7 +248,36 @@ final readonly class StepOrchestrator
             }
         }
 
+        if ('generate' === $step->id && $this->isMediaCapability($step->capability)) {
+            unset($stepOptions['search_results']);
+        }
+
         return $stepOptions;
+    }
+
+    private function isMediaCapability(string $capability): bool
+    {
+        return in_array($capability, ['TEXT2PIC', 'TEXT2VID', 'TEXT2SOUND'], true);
+    }
+
+    private function streamCompoundMediaTransition(callable $streamCallback, array $classification, string $capability): void
+    {
+        $lang = (string) ($classification['language'] ?? 'en');
+        $isGerman = str_starts_with(strtolower($lang), 'de');
+
+        $message = match ($capability) {
+            'TEXT2VID' => $isGerman
+                ? "\n\nEinen Moment, ich generiere das Video …\n\n"
+                : "\n\nOne moment, generating the video …\n\n",
+            'TEXT2SOUND' => $isGerman
+                ? "\n\nEinen Moment, ich erstelle die Audioausgabe …\n\n"
+                : "\n\nOne moment, generating the audio …\n\n",
+            default => $isGerman
+                ? "\n\nEinen Moment, ich generiere das Bild …\n\n"
+                : "\n\nOne moment, generating the image …\n\n",
+        };
+
+        $streamCallback($message);
     }
 
     /**

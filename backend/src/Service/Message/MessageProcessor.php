@@ -418,28 +418,31 @@ final readonly class MessageProcessor
             }
 
             $response = null;
-            if ($this->stepOrchestrator->isEnabled()) {
-                $plan = $this->stepPlanner->plan($message->getText(), $classification);
-                $classification['step_plan'] = $plan->toArray();
+            $plan = $this->stepPlanner->plan($message->getText(), $classification);
+            $classification['step_plan'] = $plan->toArray();
 
-                if ($plan->isMultiStep()) {
-                    $this->logger->info('MessageProcessor: Executing multi-step plan', [
-                        'primary_use_case_id' => $plan->primaryUseCaseId,
-                        'step_count' => count($plan->steps),
-                    ]);
+            $shouldRunMultiStep = $plan->isMultiStep()
+                && ($this->stepOrchestrator->isEnabled() || $plan->isCompound);
 
-                    $perfTimer->start('handler_total');
-                    $response = $this->stepOrchestrator->executeStream(
-                        $message,
-                        $conversationHistory,
-                        $classification,
-                        $plan,
-                        $streamCallback,
-                        $statusCallback,
-                        $options,
-                    );
-                    $perfTimer->stop('handler_total');
-                }
+            if ($shouldRunMultiStep) {
+                $this->logger->info('MessageProcessor: Executing multi-step plan', [
+                    'primary_use_case_id' => $plan->primaryUseCaseId,
+                    'step_count' => count($plan->steps),
+                    'is_compound' => $plan->isCompound,
+                    'step_planner_enabled' => $this->stepOrchestrator->isEnabled(),
+                ]);
+
+                $perfTimer->start('handler_total');
+                $response = $this->stepOrchestrator->executeStream(
+                    $message,
+                    $conversationHistory,
+                    $classification,
+                    $plan,
+                    $streamCallback,
+                    $statusCallback,
+                    $options,
+                );
+                $perfTimer->stop('handler_total');
             }
 
             if (null === $response) {

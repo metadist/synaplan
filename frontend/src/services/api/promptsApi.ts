@@ -73,6 +73,9 @@ export interface RoutingTestResult {
   }>
   use_case_routing_enabled?: boolean
   primary_use_case_id?: string | null
+  web_search?: boolean
+  media_type?: string | null
+  intent?: string
   step_plan?: {
     primary_use_case_id: string
     is_compound: boolean

@@ -100,6 +100,7 @@ const USE_CASE_DEFAULT_STEPS: Record<UseCaseId, DryRunStepPreview[]> = {
 const COMPOUND_PATTERNS: Array<{
   test: RegExp
   steps: DryRunStepPreview[]
+  primaryUseCaseId?: UseCaseId
 }> = [
   {
     test: /\b(und|and|dann|then)\b.*\b(vorlesen|lies(?:\s+\w+){0,2}\s+vor|read(?:\s+\w+){0,2}\s+aloud|tts|text.?to.?speech|sprachausgabe)\b/i,
@@ -140,13 +141,27 @@ export function useCaseLabelKey(useCaseId: UseCaseId): string {
 export function buildDryRunPreview(
   query: string,
   primaryTopic: string,
-  aliasTarget?: string | null
+  aliasTarget?: string | null,
+  classification?: {
+    webSearch?: boolean
+    mediaType?: 'image' | 'video' | 'audio' | string | null
+    intent?: string
+  }
 ): { useCaseId: UseCaseId; steps: DryRunStepPreview[]; isCompound: boolean } {
   const useCaseId = topicToUseCaseId(primaryTopic, aliasTarget)
 
+  const classificationPlan = buildClassificationCompoundPreview(useCaseId, classification)
+  if (classificationPlan) {
+    return classificationPlan
+  }
+
   for (const pattern of COMPOUND_PATTERNS) {
     if (pattern.test.test(query)) {
-      return { useCaseId, steps: pattern.steps, isCompound: true }
+      return {
+        useCaseId: pattern.primaryUseCaseId ?? useCaseId,
+        steps: pattern.steps,
+        isCompound: true,
+      }
     }
   }
 
@@ -168,6 +183,57 @@ export function buildDryRunPreview(
   }
 
   return { useCaseId, steps, isCompound: false }
+}
+
+function buildClassificationCompoundPreview(
+  useCaseId: UseCaseId,
+  classification?: {
+    webSearch?: boolean
+    mediaType?: 'image' | 'video' | 'audio' | string | null
+    intent?: string
+  }
+): { useCaseId: UseCaseId; steps: DryRunStepPreview[]; isCompound: boolean } | null {
+  if (!classification?.webSearch) {
+    return null
+  }
+
+  const intent = classification.intent ?? 'chat'
+  const mediaType = classification.mediaType ?? null
+  if (!mediaType) {
+    return null
+  }
+
+  if (intent !== 'image_generation' && useCaseId !== 'media_generation') {
+    return null
+  }
+
+  const mediaStep =
+    mediaType === 'video'
+      ? {
+          stepKey: 'generate',
+          labelKey: 'config.routing.steps.videoGenerate',
+          capability: 'TEXT2VID' as Capability,
+        }
+      : mediaType === 'audio'
+        ? {
+            stepKey: 'generate',
+            labelKey: 'config.routing.steps.readAloud',
+            capability: 'TEXT2SOUND' as Capability,
+          }
+        : {
+            stepKey: 'generate',
+            labelKey: 'config.routing.steps.mediaGenerate',
+            capability: 'TEXT2PIC' as Capability,
+          }
+
+  return {
+    useCaseId: 'text_chat',
+    isCompound: true,
+    steps: [
+      { stepKey: 'answer', labelKey: 'config.routing.steps.chat', capability: 'CHAT' },
+      mediaStep,
+    ],
+  }
 }
 
 export function resolveModelLabelForCapability(
