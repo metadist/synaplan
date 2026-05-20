@@ -644,12 +644,10 @@ class StreamController extends AbstractController
                 }
 
                 // Resolve the chat model that ChatHandler will eventually pick. We mirror its
-                // priority order (Again → override → fixed-prompt metadata → DB default) so the
-                // streaming/non-streaming routing decision matches the model that actually runs.
+                // priority order (Again → override → DB default) so the streaming/non-streaming
+                // routing decision matches the model that actually runs.
                 $streamModelId = $this->resolveEffectiveChatModelId(
                     $modelId ? (int) $modelId : null,
-                    $processingOptions['fixed_task_prompt'] ?? null,
-                    (int) $user->getId(),
                     $intendedChat['id'] ?? null
                 );
                 $supportsStreaming = true;
@@ -1596,36 +1594,17 @@ class StreamController extends AbstractController
      *
      * Priority mirrors {@see ChatHandler::handle()} / {@see ChatHandler::handleStream()}:
      *   1. Explicit query-param model (`Again` or override).
-     *   2. `aiModel` metadata of a fixed task prompt (widget / API `promptTopic`).
-     *   3. The user's DB default chat model.
+     *   2. The user's DB default chat model.
      *
      * Used to decide before classification whether the streaming or the
      * non-streaming SSE path should run.
      */
     private function resolveEffectiveChatModelId(
         ?int $explicitModelId,
-        ?string $fixedTaskPromptTopic,
-        int $userId,
         mixed $defaultChatModelId,
     ): ?int {
         if (null !== $explicitModelId && $explicitModelId > 0) {
             return $explicitModelId;
-        }
-
-        if (null !== $fixedTaskPromptTopic && '' !== $fixedTaskPromptTopic) {
-            try {
-                $promptData = $this->promptService->getPromptWithMetadata($fixedTaskPromptTopic, $userId);
-                $promptModelId = (int) ($promptData['metadata']['aiModel'] ?? 0);
-                if ($promptModelId > 0) {
-                    return $promptModelId;
-                }
-            } catch (\Throwable $e) {
-                // Prompt resolution is best-effort here; fall through to the default.
-                $this->logger->debug('StreamController: Could not pre-resolve prompt model for streaming routing', [
-                    'topic' => $fixedTaskPromptTopic,
-                    'error' => $e->getMessage(),
-                ]);
-            }
         }
 
         if (is_int($defaultChatModelId) && $defaultChatModelId > 0) {

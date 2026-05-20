@@ -17,7 +17,7 @@ If a topic defines explicit `BSELECTION_RULES` (hard if/then matchers), those wi
 1. The user's message is converted to an embedding vector (active VECTORIZE model).
 2. The vector is compared against pre-indexed topic embeddings in Qdrant.
 3. Each indexed point carries the `embedding_model_id` it was produced with — hits from a different model than the active one are filtered as **stale** before scoring.
-4. If the top fresh match has a confidence score ≥ `SYNAPSE_CONFIDENCE_THRESHOLD` (default `0.38`), the message is routed directly.
+4. If the top fresh match has a confidence score ≥ `SYNAPSE_CONFIDENCE_THRESHOLD` (default `0.62`), the message is routed directly.
 5. **Conversation-Sticky**: if the previously routed topic is still among the candidates with score ≥ `0.32`, it is preferred to avoid topic-thrashing mid-conversation.
 
 ### Tier 2: AI Fallback
@@ -176,7 +176,7 @@ Synapse Routing is a **beta feature and is OFF by default** — every install sh
 | Setting                       | Default | Description |
 | ----------------------------- | ------- | ----------- |
 | `SYNAPSE_ROUTING_ENABLED`     | `false` | Enable/disable Synapse Routing entirely. While off, every message goes through `MessageSorter` (AI sort). |
-| `SYNAPSE_CONFIDENCE_THRESHOLD`| `0.78`  | Minimum cosine similarity for Tier-1 to win over the AI fallback. Kept conservative on purpose so beta installs only short-circuit on high-confidence hits; lower carefully if you want more Tier-1 wins at the cost of accuracy. |
+| `SYNAPSE_CONFIDENCE_THRESHOLD`| `0.62`  | Minimum cosine similarity for Tier-1 to win over the AI fallback. Clear chat/media intents typically score ~0.63–0.85; ambiguous cases still fall back to the AI sorter. |
 
 Changes take effect immediately — no restart required.
 

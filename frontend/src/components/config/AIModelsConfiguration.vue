@@ -17,142 +17,178 @@
         <p class="mt-2 txt-secondary">{{ $t('config.aiModels.loadingModels') }}</p>
       </div>
 
-      <div v-else class="grid grid-cols-1 md:grid-cols-2 gap-5" data-testid="section-capabilities">
-        <div
-          v-for="capability in Object.keys(purposeLabels)"
-          :key="capability"
-          :ref="
-            (el: any) => {
-              if (el) capabilityRefs[capability as Capability] = el as HTMLElement
-            }
-          "
-          class="space-y-2 transition-all duration-300 relative"
-          :class="[
-            highlightedCapability === capability || highlightedCapability === 'ALL'
-              ? 'ring-4 ring-[var(--brand)] ring-offset-4 rounded-xl p-3 bg-[var(--brand)]/5'
-              : '',
-            openDropdown === capability ? 'z-10' : 'z-0',
-          ]"
-          data-testid="item-capability"
+      <div v-else class="space-y-8" data-testid="section-capabilities">
+        <section
+          v-for="group in CAPABILITY_GROUPS"
+          :key="group.id"
+          class="space-y-4"
+          :data-testid="`section-capability-group-${group.id}`"
         >
-          <label class="flex flex-wrap items-center gap-2 text-sm font-semibold txt-primary">
-            <CpuChipIcon class="w-4 h-4 text-[var(--brand)]" />
-            <span class="flex-1 min-w-0">{{ purposeLabels[capability as Capability] }}</span>
-            <span
-              v-if="capability === 'VECTORIZE' && isVectorizeAdminOnly"
-              class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wide bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/30"
-              :title="$t('config.embeddingSwitch.adminOnly.lockTooltip')"
-              data-testid="badge-embedding-admin-only"
-            >
-              <LockClosedIcon class="w-3 h-3" />
-              {{ $t('config.embeddingSwitch.adminOnly.badge') }}
-            </span>
-            <span
-              v-else-if="capability === 'VECTORIZE' && !canSwitchEmbedding"
-              class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wide bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/30"
-              :title="$t('config.embeddingSwitch.premium.lockTooltip')"
-              data-testid="badge-embedding-premium"
-            >
-              <LockClosedIcon class="w-3 h-3" />
-              {{ $t('config.embeddingSwitch.premium.badge') }}
-            </span>
-          </label>
-          <div class="relative">
-            <button
-              type="button"
-              :class="[
-                'w-full px-4 py-3 pl-10 pr-10 rounded-lg surface-card border txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)] transition-all text-left',
-                'border-light-border/30 dark:border-dark-border/20 hover:border-[var(--brand)]/50',
-                openDropdown === capability && 'ring-2 ring-[var(--brand)]',
-                capability === 'VECTORIZE' &&
-                  isVectorizeAdminOnly &&
-                  'opacity-60 cursor-not-allowed hover:border-light-border/30 dark:hover:border-dark-border/20',
-              ]"
-              :disabled="capability === 'VECTORIZE' && isVectorizeAdminOnly"
-              :title="
-                capability === 'VECTORIZE' && isVectorizeAdminOnly
-                  ? $t('config.embeddingSwitch.adminOnly.lockTooltip')
-                  : undefined
-              "
-              data-testid="btn-model-dropdown"
-              @click="toggleDropdown(capability as Capability)"
-            >
-              <span class="flex items-center gap-2 truncate">
-                <span class="truncate">{{ getSelectedModelLabel(capability as Capability) }}</span>
-                <ModelCostBadge
-                  v-if="getSelectedModelObj(capability as Capability)"
-                  :model="getSelectedModelObj(capability as Capability)!"
-                  :peers="getModelsByPurpose(capability as Capability)"
-                />
-              </span>
-            </button>
-            <div class="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none">
-              <GroqIcon
-                v-if="
-                  getSelectedModelService(capability as Capability)
-                    .toLowerCase()
-                    .includes('groq')
-                "
-                :size="16"
-                class-name="txt-primary"
-              />
-              <Icon
-                v-else
-                :icon="getProviderIcon(getSelectedModelService(capability as Capability))"
-                class="w-4 h-4"
-              />
-            </div>
-            <ChevronDownIcon
-              :class="[
-                'absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 txt-secondary pointer-events-none transition-transform',
-                openDropdown === capability && 'rotate-180',
-              ]"
-            />
-
-            <!-- Custom Dropdown -->
+          <h3 class="text-sm font-semibold uppercase tracking-wide txt-secondary">
+            {{ $t(group.labelKey) }}
+          </h3>
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
             <div
-              v-if="openDropdown === capability"
-              class="absolute z-50 mt-2 w-full max-h-[60vh] overflow-y-auto dropdown-panel"
+              v-for="capability in group.capabilities"
+              :key="capability"
+              :ref="
+                (el: any) => {
+                  if (el) capabilityRefs[capability as Capability] = el as HTMLElement
+                }
+              "
+              class="space-y-2 transition-all duration-300 relative"
+              :class="[
+                highlightedCapability === capability || highlightedCapability === 'ALL'
+                  ? 'ring-4 ring-[var(--brand)] ring-offset-4 rounded-xl p-3 bg-[var(--brand)]/5'
+                  : '',
+                openDropdown === capability ? 'z-10' : 'z-0',
+              ]"
+              data-testid="item-capability"
             >
-              <button
-                type="button"
-                class="dropdown-item w-full"
-                data-testid="btn-model-option"
-                @click="selectModel(capability as Capability, null)"
-              >
-                <span class="txt-secondary italic">{{ $t('config.aiModels.selectModel') }}</span>
-              </button>
-              <button
-                v-for="model in getModelsByPurpose(capability as Capability)"
-                :key="model.id"
-                type="button"
-                :class="[
-                  'dropdown-item w-full',
-                  defaultConfig[capability as Capability] === model.id && 'dropdown-item--active',
-                ]"
-                data-testid="btn-model-option"
-                @click="selectModel(capability as Capability, model.id)"
-              >
-                <GroqIcon
-                  v-if="model.service.toLowerCase().includes('groq')"
-                  :size="20"
-                  class-name="flex-shrink-0"
-                />
-                <Icon v-else :icon="getProviderIcon(model.service)" class="w-5 h-5 flex-shrink-0" />
-                <div class="flex-1 min-w-0 text-left">
-                  <div class="flex items-center gap-2">
-                    <span class="font-medium truncate">{{ model.name }}</span>
+              <label class="flex flex-wrap items-center gap-2 text-sm font-semibold txt-primary">
+                <CpuChipIcon class="w-4 h-4 text-[var(--brand)]" />
+                <span class="flex-1 min-w-0">{{ purposeLabels[capability as Capability] }}</span>
+                <span
+                  v-if="capability === 'VECTORIZE' && isVectorizeAdminOnly"
+                  class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wide bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/30"
+                  :title="$t('config.embeddingSwitch.adminOnly.lockTooltip')"
+                  data-testid="badge-embedding-admin-only"
+                >
+                  <LockClosedIcon class="w-3 h-3" />
+                  {{ $t('config.embeddingSwitch.adminOnly.badge') }}
+                </span>
+                <span
+                  v-else-if="capability === 'VECTORIZE' && !canSwitchEmbedding"
+                  class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wide bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/30"
+                  :title="$t('config.embeddingSwitch.premium.lockTooltip')"
+                  data-testid="badge-embedding-premium"
+                >
+                  <LockClosedIcon class="w-3 h-3" />
+                  {{ $t('config.embeddingSwitch.premium.badge') }}
+                </span>
+              </label>
+              <div class="relative">
+                <button
+                  type="button"
+                  :class="[
+                    'w-full px-4 py-3 pl-10 pr-10 rounded-lg surface-card border txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)] transition-all text-left',
+                    'border-light-border/30 dark:border-dark-border/20 hover:border-[var(--brand)]/50',
+                    openDropdown === capability && 'ring-2 ring-[var(--brand)]',
+                    capability === 'VECTORIZE' &&
+                      isVectorizeAdminOnly &&
+                      'opacity-60 cursor-not-allowed hover:border-light-border/30 dark:hover:border-dark-border/20',
+                  ]"
+                  :disabled="capability === 'VECTORIZE' && isVectorizeAdminOnly"
+                  :title="
+                    capability === 'VECTORIZE' && isVectorizeAdminOnly
+                      ? $t('config.embeddingSwitch.adminOnly.lockTooltip')
+                      : undefined
+                  "
+                  data-testid="btn-model-dropdown"
+                  @click="toggleDropdown(capability as Capability)"
+                >
+                  <span class="flex items-center gap-2 truncate">
+                    <span class="truncate">{{
+                      getSelectedModelLabel(capability as Capability)
+                    }}</span>
                     <ModelCostBadge
-                      :model="model"
+                      v-if="getSelectedModelObj(capability as Capability)"
+                      :model="getSelectedModelObj(capability as Capability)!"
                       :peers="getModelsByPurpose(capability as Capability)"
                     />
-                  </div>
-                  <div class="text-xs txt-secondary truncate">{{ model.service }}</div>
+                  </span>
+                </button>
+                <div class="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none">
+                  <GroqIcon
+                    v-if="
+                      getSelectedModelService(capability as Capability)
+                        .toLowerCase()
+                        .includes('groq')
+                    "
+                    :size="16"
+                    class-name="txt-primary"
+                  />
+                  <Icon
+                    v-else
+                    :icon="getProviderIcon(getSelectedModelService(capability as Capability))"
+                    class="w-4 h-4"
+                  />
                 </div>
-              </button>
+                <ChevronDownIcon
+                  :class="[
+                    'absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 txt-secondary pointer-events-none transition-transform',
+                    openDropdown === capability && 'rotate-180',
+                  ]"
+                />
+
+                <!-- Custom Dropdown -->
+                <div
+                  v-if="openDropdown === capability"
+                  class="absolute z-50 mt-2 w-full max-h-[60vh] overflow-y-auto dropdown-panel"
+                >
+                  <button
+                    type="button"
+                    class="dropdown-item w-full"
+                    data-testid="btn-model-option"
+                    @click="selectModel(capability as Capability, null)"
+                  >
+                    <span class="txt-secondary italic">{{
+                      $t('config.aiModels.selectModel')
+                    }}</span>
+                  </button>
+                  <button
+                    v-for="model in getModelsByPurpose(capability as Capability)"
+                    :key="model.id"
+                    type="button"
+                    :class="[
+                      'dropdown-item w-full',
+                      defaultConfig[capability as Capability] === model.id &&
+                        'dropdown-item--active',
+                    ]"
+                    data-testid="btn-model-option"
+                    @click="selectModel(capability as Capability, model.id)"
+                  >
+                    <GroqIcon
+                      v-if="model.service.toLowerCase().includes('groq')"
+                      :size="20"
+                      class-name="flex-shrink-0"
+                    />
+                    <Icon
+                      v-else
+                      :icon="getProviderIcon(model.service)"
+                      class="w-5 h-5 flex-shrink-0"
+                    />
+                    <div class="flex-1 min-w-0 text-left">
+                      <div class="flex items-center gap-2">
+                        <span class="font-medium truncate">{{ model.name }}</span>
+                        <ModelCostBadge
+                          :model="model"
+                          :peers="getModelsByPurpose(capability as Capability)"
+                        />
+                      </div>
+                      <div class="text-xs txt-secondary truncate">{{ model.service }}</div>
+                    </div>
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
-        </div>
+          <p
+            v-if="group.id === 'routing'"
+            class="text-xs txt-secondary flex flex-wrap items-center gap-1"
+            data-testid="text-synapse-embedding-hint"
+          >
+            {{ $t('config.aiModels.synapseEmbeddingHint') }}
+            <RouterLink
+              to="/config/routing?section=embedding"
+              class="text-[var(--brand)] hover:underline inline-flex items-center gap-0.5"
+              data-testid="link-synapse-embedding-settings"
+            >
+              {{ $t('config.aiModels.synapseEmbeddingLink') }}
+              <Icon icon="heroicons:arrow-top-right-on-square" class="w-3.5 h-3.5" />
+            </RouterLink>
+          </p>
+        </section>
       </div>
     </div>
 
@@ -437,7 +473,7 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { ChevronLeftIcon, ChevronRightIcon } from '@heroicons/vue/20/solid'
-import { useRoute } from 'vue-router'
+import { useRoute, RouterLink } from 'vue-router'
 import {
   ChevronDownIcon,
   CpuChipIcon,
@@ -470,6 +506,7 @@ import {
   type PurposeChip,
 } from '@/utils/aiModelDedupe'
 import { getProviderIcon } from '@/utils/providerIcons'
+import { CAPABILITY_GROUPS } from '@/utils/capabilityGroups'
 import { useI18n } from 'vue-i18n'
 
 type ModelsData = Partial<Record<Capability, AIModel[]>>

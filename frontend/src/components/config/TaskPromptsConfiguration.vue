@@ -1,15 +1,22 @@
 <template>
   <div class="space-y-6" data-testid="page-config-task-prompts">
     <!-- Header / overview card -->
-    <div class="surface-card p-6" data-testid="section-task-prompts-overview">
-      <div class="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4">
+    <div
+      class="surface-card p-6 ring-1 ring-[var(--brand)]/15 border-l-4 border-l-[var(--brand)]/60"
+      data-testid="section-task-prompts-overview"
+    >
+      <div class="flex flex-col xl:flex-row xl:items-start xl:justify-between gap-5">
         <div class="flex items-start gap-3 flex-1 min-w-0">
-          <div class="p-2 rounded-lg bg-[var(--brand)]/10 flex-shrink-0">
-            <Icon icon="heroicons:document-text" class="w-6 h-6 text-[var(--brand)]" />
+          <div
+            class="p-2.5 rounded-xl bg-gradient-to-br from-[var(--brand)]/20 to-[var(--brand)]/5 flex-shrink-0"
+          >
+            <Icon icon="heroicons:squares-2x2" class="w-6 h-6 text-[var(--brand)]" />
           </div>
           <div class="flex-1 min-w-0">
             <h2 class="text-2xl font-semibold txt-primary">{{ $t('config.taskPrompts.title') }}</h2>
-            <p class="txt-secondary text-sm mt-1">{{ $t('config.taskPrompts.subtitle') }}</p>
+            <p class="txt-secondary text-sm mt-1 leading-relaxed max-w-2xl">
+              {{ $t('config.taskPrompts.subtitle') }}
+            </p>
             <div class="flex items-center gap-2 mt-3 text-xs flex-wrap">
               <span
                 class="px-2 py-1 rounded-full bg-[var(--brand)]/10 text-[var(--brand)] flex items-center gap-1.5"
@@ -20,10 +27,31 @@
               </span>
               <span class="txt-secondary">{{ $t('config.taskPrompts.workingLanguageHint') }}</span>
             </div>
+            <div
+              class="flex flex-wrap items-center gap-2 mt-4"
+              data-testid="section-use-case-quick-links"
+            >
+              <RouterLink
+                to="/config/routing?section=test"
+                class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-[var(--brand)]/10 text-[var(--brand)] hover:bg-[var(--brand)]/20 transition-colors"
+                data-testid="link-routing-test"
+              >
+                <Icon icon="heroicons:beaker" class="w-3.5 h-3.5" />
+                {{ $t('config.taskPrompts.quickLinkRoutingTest') }}
+              </RouterLink>
+              <RouterLink
+                to="/config/ai-models"
+                class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium surface-chip txt-secondary hover:txt-primary transition-colors"
+                data-testid="link-quick-ai-models"
+              >
+                <Icon icon="heroicons:cpu-chip" class="w-3.5 h-3.5" />
+                {{ $t('config.taskPrompts.quickLinkAiModels') }}
+              </RouterLink>
+            </div>
           </div>
         </div>
 
-        <div class="flex flex-col sm:flex-row sm:items-center gap-3 lg:flex-shrink-0">
+        <div class="flex flex-col sm:flex-row sm:items-center gap-3 xl:flex-shrink-0">
           <!-- Stat pills -->
           <div class="flex flex-wrap items-center gap-2" data-testid="section-task-prompts-stats">
             <div
@@ -220,7 +248,7 @@
                       prompt.enabled === false && 'opacity-60',
                     ]"
                     :data-testid="`card-prompt-${prompt.topic}`"
-                    :title="prompt.shortDescription || prompt.topic"
+                    :title="displayPromptTitle(prompt.name)"
                     @click="onCardSelect(prompt.id)"
                   >
                     <!-- Active indicator stripe -->
@@ -242,8 +270,18 @@
                     />
 
                     <div class="flex-1 min-w-0">
-                      <div class="flex items-center gap-1.5">
-                        <span class="text-sm font-medium truncate">{{ prompt.name }}</span>
+                      <div class="flex items-center gap-1.5 flex-wrap">
+                        <span class="text-sm font-medium truncate">{{
+                          displayPromptTitle(prompt.name)
+                        }}</span>
+
+                        <span
+                          class="px-1.5 py-0.5 rounded-full text-[9px] font-medium bg-[var(--brand)]/10 text-[var(--brand)] leading-none flex-shrink-0 max-w-[8rem] truncate"
+                          :title="useCaseLabelForTopic(prompt.topic)"
+                          :data-testid="`badge-use-case-${prompt.topic}`"
+                        >
+                          {{ useCaseLabelForTopic(prompt.topic) }}
+                        </span>
 
                         <!-- Inline mini-badges (always visible) -->
                         <span
@@ -255,17 +293,14 @@
                           {{ $t('config.taskPrompts.badgeOverride') }}
                         </span>
                       </div>
-                      <p
-                        v-if="viewDensity === 'detailed' && prompt.shortDescription"
-                        class="text-[11px] txt-secondary line-clamp-1 mt-0.5"
-                      >
-                        {{ prompt.shortDescription }}
+                      <p class="text-[10px] txt-secondary font-mono truncate mt-0.5">
+                        {{ prompt.topic }}
                       </p>
                       <p
-                        v-else-if="viewDensity === 'detailed'"
-                        class="text-[10px] txt-secondary font-mono truncate mt-0.5"
+                        v-if="viewDensity === 'detailed' && prompt.shortDescription"
+                        class="text-[11px] txt-secondary line-clamp-2 mt-0.5"
                       >
-                        {{ prompt.topic }}
+                        {{ prompt.shortDescription }}
                       </p>
                     </div>
 
@@ -384,7 +419,7 @@
             <div class="flex-1 min-w-0">
               <div class="flex items-center gap-2 flex-wrap">
                 <h3 class="text-lg font-semibold txt-primary truncate">
-                  {{ currentPrompt.name }}
+                  {{ displayPromptTitle(currentPrompt.name) }}
                 </h3>
                 <span
                   v-if="currentPrompt.isDefault && !currentPrompt.isUserOverride"
@@ -397,6 +432,12 @@
                   class="px-1.5 py-0.5 rounded text-[10px] font-medium uppercase bg-purple-500/10 text-purple-600 dark:text-purple-400 leading-none"
                 >
                   {{ $t('config.taskPrompts.badgeCustom') }}
+                </span>
+                <span
+                  class="px-2 py-0.5 rounded-full text-[10px] font-medium bg-[var(--brand)]/10 text-[var(--brand)] leading-none"
+                  :data-testid="`badge-use-case-header-${currentPrompt.topic}`"
+                >
+                  {{ useCaseLabelForTopic(currentPrompt.topic) }}
                 </span>
                 <span
                   v-if="formData.enabled === false"
@@ -486,6 +527,23 @@
             role="tabpanel"
             aria-labelledby="tab-routing"
           >
+            <div
+              class="p-4 rounded-xl bg-[var(--brand)]/5 border border-[var(--brand)]/20 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3"
+              data-testid="section-routing-hint"
+            >
+              <p class="text-sm txt-secondary leading-relaxed">
+                {{ $t('config.taskPrompts.routingHint') }}
+              </p>
+              <RouterLink
+                to="/config/routing?section=test"
+                class="inline-flex items-center gap-1.5 text-sm font-medium text-[var(--brand)] hover:underline whitespace-nowrap shrink-0"
+                data-testid="link-routing-test-editor"
+              >
+                {{ $t('config.taskPrompts.routingTestLink') }}
+                <Icon icon="heroicons:arrow-right" class="w-4 h-4" />
+              </RouterLink>
+            </div>
+
             <!-- Description -->
             <div>
               <label class="block text-sm font-semibold txt-primary mb-2 flex items-center gap-2">
@@ -645,27 +703,34 @@
             role="tabpanel"
             aria-labelledby="tab-prompt"
           >
-            <!-- Model + tools -->
+            <!-- Capability defaults (managed on AI Models page) -->
             <div class="surface-card p-6 space-y-5" data-testid="section-prompt-config">
-              <div>
-                <label class="block text-sm font-semibold txt-primary mb-2 flex items-center gap-2">
-                  <Icon icon="heroicons:cpu-chip" class="w-4 h-4" />
-                  {{ $t('config.taskPrompts.aiModel') }}
-                </label>
-                <ModelSelectDropdown
-                  :model-value="formData.aiModel ?? 'default'"
-                  :groups="groupedModels"
-                  :loading="loadingModels"
-                  default-option="Default Model (Auto-selected based on capability)"
-                  data-testid="input-ai-model"
-                  @update:model-value="
-                    (v: string | number | null) => (formData.aiModel = String(v ?? 'default'))
-                  "
-                />
-                <p class="text-xs txt-secondary mt-1.5 flex items-center gap-1">
-                  <Icon icon="heroicons:information-circle" class="w-3.5 h-3.5" />
-                  {{ $t('config.taskPrompts.aiModelHelp') }}
-                </p>
+              <div
+                class="rounded-lg border border-light-border/30 dark:border-dark-border/20 p-4 bg-[var(--brand)]/5"
+                data-testid="section-capability-models"
+              >
+                <div class="flex items-start gap-3">
+                  <Icon
+                    icon="heroicons:cpu-chip"
+                    class="w-5 h-5 text-[var(--brand)] mt-0.5 shrink-0"
+                  />
+                  <div class="space-y-2">
+                    <p class="text-sm font-semibold txt-primary">
+                      {{ $t('config.taskPrompts.modelsManagedSeparately') }}
+                    </p>
+                    <p class="text-xs txt-secondary">
+                      {{ $t('config.taskPrompts.modelsManagedSeparatelyHelp') }}
+                    </p>
+                    <RouterLink
+                      to="/config/ai-models"
+                      class="inline-flex items-center gap-1.5 text-sm text-[var(--brand)] hover:underline"
+                      data-testid="link-ai-models"
+                    >
+                      {{ $t('config.taskPrompts.modelsManagedSeparatelyLink') }}
+                      <Icon icon="heroicons:arrow-top-right-on-square" class="w-4 h-4" />
+                    </RouterLink>
+                  </div>
+                </div>
               </div>
 
               <div>
@@ -1309,6 +1374,7 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
+import { RouterLink, useRoute } from 'vue-router'
 import { useEscapeKey } from '@/composables/useEscapeKey'
 import { useI18n } from 'vue-i18n'
 import { useDateFormat } from '@/composables/useDateFormat'
@@ -1321,21 +1387,22 @@ import {
   type PromptMetadata,
   type UpdatePromptRequest,
 } from '@/services/api/promptsApi'
-import { configApi } from '@/services/api/configApi'
 import {
   adminSynapseApi,
   type SynapseStatusResponse,
   type SynapseTopicEntry,
 } from '@/services/api/adminSynapseApi'
-import type { AIModel, Capability } from '@/types/ai-models'
-import { findModelIdByString } from '@/utils/aiModelDefaults'
 import { useNotification } from '@/composables/useNotification'
 import { useUnsavedChanges } from '@/composables/useUnsavedChanges'
 import { useDialog } from '@/composables/useDialog'
-import ModelSelectDropdown from '@/components/ModelSelectDropdown.vue'
 import { useAuthStore } from '@/stores/auth'
 import UnsavedChangesBar from '@/components/UnsavedChangesBar.vue'
-import { ApiError } from '@/services/api/httpClient'
+import {
+  topicToUseCaseId,
+  useCaseLabelKey,
+  isRoutingExcludedCanonicalTopic,
+  canonicalToEditableRoutingTopic,
+} from '@/utils/routingDryRunPreview'
 
 const SELECTION_RULES_TEMPLATE =
   'When the user mentions [TOPIC_NAME] or asks about [SPECIFIC_KEYWORDS], route to this prompt.'
@@ -1357,7 +1424,6 @@ Remember to always [IMPORTANT_REMINDER].`
 
 interface TaskPrompt extends ApiTaskPrompt {
   rules?: string
-  aiModel?: string
   availableTools?: string[]
   content: string
 }
@@ -1373,6 +1439,25 @@ type EditorTabId = 'routing' | 'prompt' | 'knowledge' | 'danger'
 const { success, error: showError } = useNotification()
 const dialog = useDialog()
 const { t, locale } = useI18n()
+const route = useRoute()
+
+function useCaseLabelForTopic(topic: string): string {
+  return t(useCaseLabelKey(topicToUseCaseId(topic)))
+}
+
+/** Strip legacy "(default) topic - Long English description…" down to a short list title. */
+function displayPromptTitle(name: string): string {
+  const stripped = name.replace(/^\(default\)\s*/i, '').trim()
+  const dashIdx = stripped.indexOf(' - ')
+  if (dashIdx > 0) {
+    const before = stripped.slice(0, dashIdx).trim()
+    const after = stripped.slice(dashIdx + 3).trim()
+    if (after.length > 35 || /^(the user|der nutzer|user asks)/i.test(after)) {
+      return before
+    }
+  }
+  return stripped
+}
 const { formatRelativeTime } = useDateFormat()
 const authStore = useAuthStore()
 const isAdmin = computed(() => authStore.isAdmin)
@@ -1478,6 +1563,9 @@ const contentWordCount = computed(() => {
 const filteredPrompts = computed(() => {
   const search = promptListSearch.value.trim().toLowerCase()
   return prompts.value.filter((p) => {
+    if (isRoutingExcludedCanonicalTopic(p.topic)) {
+      return false
+    }
     if (promptListFilter.value === 'system' && !(p.isDefault && !p.isUserOverride)) {
       return false
     }
@@ -1499,11 +1587,12 @@ const filteredPrompts = computed(() => {
  * specifically wants to see them.
  */
 type CategoryId =
-  | 'conversation'
-  | 'code'
-  | 'generation'
-  | 'productivity'
-  | 'other-system'
+  | 'text_chat'
+  | 'media_generation'
+  | 'file_analytics'
+  | 'file_generation'
+  | 'communication'
+  | 'internal'
   | 'custom'
   | 'disabled'
 
@@ -1516,62 +1605,53 @@ interface CategoryDef {
 function topicCategory(prompt: TaskPrompt): CategoryId {
   if (prompt.enabled === false) return 'disabled'
   if (!prompt.isDefault) return 'custom'
-  const t = prompt.topic.toLowerCase()
-  if (
-    t.includes('image') ||
-    t.includes('video') ||
-    t.includes('audio') ||
-    t.includes('media') ||
-    t.includes('voice') ||
-    t.includes('sound')
-  ) {
-    return 'generation'
-  }
-  if (t.includes('code') || t.includes('coding') || t.includes('dev')) {
-    return 'code'
+  const topic = prompt.topic.toLowerCase()
+  if (topic.startsWith('tools:')) return 'internal'
+  const useCaseId = topicToUseCaseId(prompt.topic)
+  if (useCaseId === 'comm_send_email' || useCaseId === 'comm_receive_email') {
+    return 'communication'
   }
   if (
-    t.includes('office') ||
-    t.includes('summary') ||
-    t.includes('translate') ||
-    t.includes('mail') ||
-    t.includes('email') ||
-    t.includes('docs')
+    useCaseId === 'media_generation' ||
+    useCaseId === 'file_analytics' ||
+    useCaseId === 'file_generation'
   ) {
-    return 'productivity'
+    return useCaseId
   }
-  if (t.includes('chat') || t === 'general' || t === 'general-chat' || t.includes('smalltalk')) {
-    return 'conversation'
-  }
-  return 'other-system'
+  return 'text_chat'
 }
 
 const categorizedPrompts = computed(() => {
   const order: CategoryDef[] = [
     {
-      id: 'conversation',
-      label: t('config.taskPrompts.categoryConversation'),
+      id: 'text_chat',
+      label: t('config.taskPrompts.categoryTextChat'),
       icon: 'heroicons:chat-bubble-left-right',
     },
     {
-      id: 'code',
-      label: t('config.taskPrompts.categoryCode'),
-      icon: 'heroicons:code-bracket-square',
-    },
-    {
-      id: 'generation',
-      label: t('config.taskPrompts.categoryGeneration'),
+      id: 'media_generation',
+      label: t('config.taskPrompts.categoryMedia'),
       icon: 'heroicons:sparkles',
     },
     {
-      id: 'productivity',
-      label: t('config.taskPrompts.categoryProductivity'),
-      icon: 'heroicons:briefcase',
+      id: 'file_analytics',
+      label: t('config.taskPrompts.categoryFileAnalytics'),
+      icon: 'heroicons:document-magnifying-glass',
     },
     {
-      id: 'other-system',
-      label: t('config.taskPrompts.categoryOther'),
-      icon: 'heroicons:rectangle-stack',
+      id: 'file_generation',
+      label: t('config.taskPrompts.categoryFileGeneration'),
+      icon: 'heroicons:document-plus',
+    },
+    {
+      id: 'communication',
+      label: t('config.taskPrompts.categoryCommunication'),
+      icon: 'heroicons:envelope',
+    },
+    {
+      id: 'internal',
+      label: t('config.taskPrompts.categoryInternal'),
+      icon: 'heroicons:cog-6-tooth',
     },
     {
       id: 'custom',
@@ -1586,11 +1666,12 @@ const categorizedPrompts = computed(() => {
   ]
 
   const buckets: Record<CategoryId, TaskPrompt[]> = {
-    conversation: [],
-    code: [],
-    generation: [],
-    productivity: [],
-    'other-system': [],
+    text_chat: [],
+    media_generation: [],
+    file_analytics: [],
+    file_generation: [],
+    communication: [],
+    internal: [],
     custom: [],
     disabled: [],
   }
@@ -1682,58 +1763,11 @@ const availableFiles = ref<AvailableFile[]>([])
 const availableFilesSearch = ref('')
 const loadingAvailableFiles = ref(false)
 
-const allModels = ref<Partial<Record<Capability, AIModel[]>>>({})
-const loadingModels = ref(false)
-
 const availableTools: ToolOption[] = [
   { value: 'internet-search', label: 'Internet Search', icon: 'heroicons:magnifying-glass' },
   { value: 'files-search', label: 'Files Search', icon: 'heroicons:document-magnifying-glass' },
   { value: 'url-screenshot', label: 'URL Content', icon: 'heroicons:globe-alt' },
 ]
-
-const groupedModels = computed(() => {
-  const groups: { label: string; models: AIModel[]; capability: Capability }[] = []
-
-  // All UI text goes through vue-i18n; reuse the canonical capability
-  // labels defined in `config.aiModels.capabilities.*` so we don't
-  // duplicate translations across components / languages.
-  const capabilityLabels: Record<Capability, string> = {
-    CHAT: t('config.aiModels.capabilities.chat'),
-    SORT: t('config.aiModels.capabilities.sort'),
-    MEM: t('config.aiModels.capabilities.mem'),
-    ANALYZE: t('config.aiModels.capabilities.analyze'),
-    TEXT2PIC: t('config.aiModels.capabilities.text2pic'),
-    PIC2PIC: t('config.aiModels.capabilities.pic2pic'),
-    TEXT2VID: t('config.aiModels.capabilities.text2vid'),
-    TEXT2SOUND: t('config.aiModels.capabilities.text2sound'),
-    SOUND2TEXT: t('config.aiModels.capabilities.sound2text'),
-    PIC2TEXT: t('config.aiModels.capabilities.pic2text'),
-    VECTORIZE: t('config.aiModels.capabilities.vectorize'),
-  }
-
-  const orderedCapabilities: Capability[] = [
-    'CHAT',
-    'TEXT2PIC',
-    'TEXT2VID',
-    'TEXT2SOUND',
-    'SOUND2TEXT',
-    'PIC2TEXT',
-    'VECTORIZE',
-    'SORT',
-  ]
-
-  orderedCapabilities.forEach((capability) => {
-    if (allModels.value[capability] && allModels.value[capability].length > 0) {
-      groups.push({
-        label: capabilityLabels[capability] || capability,
-        models: allModels.value[capability],
-        capability,
-      })
-    }
-  })
-
-  return groups
-})
 
 const hasTemplateText = computed(() => {
   const rulesHasTemplate =
@@ -1824,20 +1858,6 @@ const { hasUnsavedChanges, saveChanges, discardChanges, setupNavigationGuard } =
 
 let cleanupGuard: (() => void) | undefined
 
-const loadAIModels = async () => {
-  loadingModels.value = true
-  try {
-    const response = await configApi.getModels()
-    if (response.success) {
-      allModels.value = response.models
-    }
-  } catch (err: unknown) {
-    console.error('Failed to load AI models:', err)
-  } finally {
-    loadingModels.value = false
-  }
-}
-
 const loadSynapseStatus = async () => {
   if (!isAdmin.value) return
   try {
@@ -1858,20 +1878,6 @@ const loadPrompts = async () => {
     prompts.value = nonWidgetPrompts.map((p) => {
       const metadata = p.metadata || {}
 
-      let aiModelString = 'default'
-      if (metadata.aiModel && metadata.aiModel > 0) {
-        let foundModel = null
-        for (const models of Object.values(allModels.value)) {
-          if (models) {
-            foundModel = models.find((m: AIModel) => m.id === metadata.aiModel)
-            if (foundModel) break
-          }
-        }
-        if (foundModel) {
-          aiModelString = `${foundModel.name} (${foundModel.service})`
-        }
-      }
-
       const tools: string[] = []
       if (metadata.tool_internet_search) tools.push('internet-search')
       if (metadata.tool_files_search) tools.push('files-search')
@@ -1881,7 +1887,6 @@ const loadPrompts = async () => {
         ...p,
         content: p.prompt,
         rules: p.selectionRules || '',
-        aiModel: aiModelString,
         availableTools: tools,
       }
     })
@@ -1903,7 +1908,6 @@ const loadPrompt = () => {
       selectionRules: prompt.selectionRules || '',
       keywords: prompt.keywords || '',
       enabled: prompt.enabled !== false,
-      aiModel: prompt.aiModel,
       availableTools: prompt.availableTools,
       content: prompt.content,
       language: prompt.language || 'en',
@@ -2008,12 +2012,6 @@ const handleSave = saveChanges(async () => {
   try {
     const metadata: PromptMetadata = {}
 
-    if (formData.value.aiModel === 'default' || !formData.value.aiModel) {
-      metadata.aiModel = 0
-    } else {
-      metadata.aiModel = findModelIdByString(allModels.value, formData.value.aiModel)
-    }
-
     metadata.tool_internet_search = (formData.value.availableTools || []).includes(
       'internet-search'
     )
@@ -2038,7 +2036,6 @@ const handleSave = saveChanges(async () => {
           ...newPrompt,
           content: newPrompt.prompt,
           rules: newPrompt.selectionRules || '',
-          aiModel: formData.value.aiModel,
           availableTools: formData.value.availableTools,
           isUserOverride: true,
         }
@@ -2067,7 +2064,6 @@ const handleSave = saveChanges(async () => {
           ...updated,
           content: updated.prompt,
           rules: updated.selectionRules || '',
-          aiModel: formData.value.aiModel,
           availableTools: formData.value.availableTools,
         }
         currentPrompt.value = { ...prompts.value[index] }
@@ -2075,16 +2071,6 @@ const handleSave = saveChanges(async () => {
       }
     }
   } catch (err: unknown) {
-    // Issue #891: the prompt save now mirrors ConfigController's premium
-    // gate. When the backend rejects the chosen aiModel for the current
-    // subscription tier, surface the structured reason instead of a
-    // generic "Failed to save" toast — same pattern as
-    // AIModelsConfiguration.vue (issue #883).
-    if (err instanceof ApiError && err.status === 403 && err.code === 'requires_premium') {
-      showError(t('config.taskPrompts.saveErrorPremiumRequired', { reason: err.message }))
-      throw err
-    }
-
     let errorMessage = err instanceof Error ? err.message : 'Failed to save prompt'
 
     if (errorMessage.includes('Validation failed')) {
@@ -2158,7 +2144,6 @@ const handleCreateNew = async () => {
   try {
     const metadata: PromptMetadata = {}
 
-    metadata.aiModel = 0
     metadata.tool_internet_search = true
     metadata.tool_files_search = true
     metadata.tool_url_screenshot = false
@@ -2180,7 +2165,6 @@ const handleCreateNew = async () => {
       ...newPrompt,
       content: newPrompt.prompt,
       rules: newPrompt.selectionRules || '',
-      aiModel: 'default',
       availableTools: formData.value.availableTools || [],
     }
 
@@ -2192,7 +2176,6 @@ const handleCreateNew = async () => {
       selectionRules: mappedPrompt.selectionRules || '',
       keywords: mappedPrompt.keywords || '',
       enabled: mappedPrompt.enabled !== false,
-      aiModel: mappedPrompt.aiModel,
       availableTools: mappedPrompt.availableTools,
       content: mappedPrompt.content,
       language: mappedPrompt.language || 'en',
@@ -2247,13 +2230,6 @@ const handleCreateNew = async () => {
 
     await loadPromptFiles()
   } catch (err: unknown) {
-    // Issue #891: prompt create also gates the aiModel through the
-    // premium guard. Show the structured reason from the backend.
-    if (err instanceof ApiError && err.status === 403 && err.code === 'requires_premium') {
-      showError(t('config.taskPrompts.saveErrorPremiumRequired', { reason: err.message }))
-      return
-    }
-
     let errorMessage = err instanceof Error ? err.message : 'Failed to create prompt'
 
     if (errorMessage.includes('already have a prompt with this topic')) {
@@ -2390,26 +2366,34 @@ watch(locale, () => {
   loadPrompts()
 })
 
+function selectPromptFromTopicParam(topicParam: string | null | undefined) {
+  if (!topicParam) return
+  const resolvedTopic = canonicalToEditableRoutingTopic(topicParam)
+  const prompt = prompts.value.find((p) => p.topic === resolvedTopic)
+  if (!prompt) return
+  selectedPromptId.value = prompt.id
+  loadPrompt()
+  listVisibleMobile.value = false
+}
+
+watch(
+  () => route.query.topic,
+  (topicParam) => {
+    if (typeof topicParam === 'string') {
+      selectPromptFromTopicParam(topicParam)
+    }
+  }
+)
+
 onMounted(() => {
   cleanupGuard = setupNavigationGuard()
   // Disabled topics are demoted to a separate group that is collapsed by default
   // — they only matter when actively triaging the routing pool.
   collapsedGroups.value = new Set(['disabled'])
-  Promise.all([loadAIModels(), loadPrompts(), loadAvailableFiles(), loadSynapseStatus()]).then(
-    () => {
-      const urlParams = new URLSearchParams(window.location.search)
-      const topicParam = urlParams.get('topic')
-      if (topicParam) {
-        const prompt = prompts.value.find((p) => p.topic === topicParam)
-        if (prompt) {
-          selectedPromptId.value = prompt.id
-          loadPrompt()
-          // Deep link from another page: open the editor and stash the list (mobile)
-          listVisibleMobile.value = false
-        }
-      }
-    }
-  )
+  Promise.all([loadPrompts(), loadAvailableFiles(), loadSynapseStatus()]).then(() => {
+    const topicParam = typeof route.query.topic === 'string' ? route.query.topic : null
+    selectPromptFromTopicParam(topicParam)
+  })
 })
 
 onUnmounted(() => {

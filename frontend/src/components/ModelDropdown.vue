@@ -3,7 +3,8 @@
     <button
       type="button"
       :class="['pill', isOpen && 'pill--active']"
-      :aria-label="$t('chatInput.model')"
+      :aria-label="$t('chatInput.modelOverrideTooltip')"
+      :title="$t('chatInput.modelOverrideTooltip')"
       data-testid="btn-model-toggle"
       @click="toggleOpen"
       @keydown.escape="closeDropdown"
@@ -21,6 +22,12 @@
       data-testid="dropdown-model-panel"
       @keydown.escape="closeDropdown"
     >
+      <p
+        class="px-3 py-2 text-xs txt-secondary border-b border-light-border/20 dark:border-dark-border/20"
+        data-testid="text-model-override-hint"
+      >
+        {{ $t('chatInput.modelOverrideHint') }}
+      </p>
       <!-- Default Option -->
       <button
         ref="itemRefs"

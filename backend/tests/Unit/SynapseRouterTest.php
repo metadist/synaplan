@@ -13,6 +13,7 @@ use App\Service\Message\TopicAliasResolver;
 use App\Service\ModelConfigService;
 use App\Service\PromptService;
 use App\Service\VectorSearch\QdrantClientInterface;
+use App\UseCase\UseCaseMapper;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
@@ -46,6 +47,7 @@ class SynapseRouterTest extends TestCase
             $this->modelConfigService,
             $configRepository,
             new TopicAliasResolver(),
+            new UseCaseMapper(),
             $this->createMock(LoggerInterface::class),
         );
     }
@@ -79,7 +81,7 @@ class SynapseRouterTest extends TestCase
         $this->assertEquals('general', $result['topic']);
         $this->assertStringStartsWith('synapse_', $result['source']);
         $this->assertArrayHasKey('synapse_score', $result);
-        $this->assertGreaterThanOrEqual(0.78, $result['synapse_score']);
+        $this->assertGreaterThanOrEqual(0.62, $result['synapse_score']);
     }
 
     public function testLowConfidenceFallsBackToAi(): void
@@ -622,7 +624,7 @@ class SynapseRouterTest extends TestCase
         $this->qdrantClient->method('searchSynapseTopics')->willReturn([
             [
                 'id' => 'synapse_0_video-generation',
-                'score' => 0.86, // well above the 0.78 threshold
+                'score' => 0.86, // well above the 0.62 threshold
                 'payload' => ['topic' => 'video-generation', 'owner_id' => 0],
             ],
         ]);

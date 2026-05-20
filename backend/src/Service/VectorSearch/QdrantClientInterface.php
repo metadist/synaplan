@@ -292,6 +292,31 @@ interface QdrantClientInterface
      */
     public function getSynapseCollection(): string;
 
+    // --- Synapse Use Case Catalogue (Release C) ---
+
+    public function upsertUseCase(string $pointId, array $vector, array $payload): void;
+
+    /**
+     * @return array<int, array{id: string, score: float, payload: array}>
+     */
+    public function searchUseCases(array $queryVector, int $limit = 5, float $minScore = 0.3): array;
+
+    public function getUseCase(string $pointId): ?array;
+
+    /**
+     * @return list<array{id: string, payload: array}>
+     */
+    public function scrollUseCases(int $limit = 1000): array;
+
+    /**
+     * @return array{exists: bool, vector_dim: ?int, points_count: ?int, distance: ?string}
+     */
+    public function getUseCasesCollectionInfo(): array;
+
+    public function recreateUseCasesCollection(int $vectorDimension): void;
+
+    public function getUseCasesCollection(): string;
+
     // --- Health & Info ---
 
     /**

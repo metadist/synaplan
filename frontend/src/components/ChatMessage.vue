@@ -201,6 +201,50 @@
                   </span>
                 </div>
               </template>
+              <template v-else-if="processingStatus === 'step_started'">
+                <div class="font-medium animate-pulse">
+                  {{
+                    $t('processing.stepStartedTitle', {
+                      current: processingMetadata?.step_number ?? 1,
+                      total: processingMetadata?.step_total ?? 1,
+                    })
+                  }}
+                </div>
+                <div class="text-sm txt-tertiary mt-0.5">
+                  {{
+                    processingMetadata?.label_key
+                      ? $t(String(processingMetadata.label_key))
+                      : $t('processing.stepStartedDesc')
+                  }}
+                </div>
+              </template>
+              <template v-else-if="processingStatus === 'step_completed'">
+                <div class="font-medium">
+                  {{
+                    $t('processing.stepCompletedTitle', {
+                      current: processingMetadata?.step_number ?? 1,
+                      total: processingMetadata?.step_total ?? 1,
+                    })
+                  }}
+                </div>
+              </template>
+              <template v-else-if="processingStatus === 'step_failed'">
+                <div class="font-medium text-amber-600 dark:text-amber-400">
+                  {{
+                    $t('processing.stepFailedTitle', {
+                      current: processingMetadata?.step_number ?? 1,
+                      total: processingMetadata?.step_total ?? 1,
+                    })
+                  }}
+                </div>
+                <div class="text-sm txt-tertiary mt-0.5">
+                  {{
+                    processingMetadata?.partial_success
+                      ? $t('processing.stepPartialSuccessDesc')
+                      : $t('processing.stepFailedDesc')
+                  }}
+                </div>
+              </template>
               <template v-else-if="processingStatus === 'searching'">
                 <div class="font-medium animate-pulse">{{ $t('processing.searchingTitle') }}</div>
                 <div class="text-sm txt-tertiary mt-0.5">
@@ -974,6 +1018,11 @@ interface Props {
     customMessage?: string
     results_count?: number
     handler?: string
+    step_number?: number
+    step_total?: number
+    label_key?: string
+    step_id?: string
+    partial_success?: boolean
   } | null
   files?: MessageFile[] // Attached files
   searchResults?: Array<{

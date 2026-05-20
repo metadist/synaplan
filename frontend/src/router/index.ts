@@ -263,9 +263,14 @@ const router = createRouter({
     },
     {
       path: '/config/sorting-prompt',
-      name: 'config-sorting-prompt',
+      redirect: '/config/routing',
+      meta: { requiresAuth: true },
+    },
+    {
+      path: '/config/routing',
+      name: 'config-routing',
       component: () => import('@/views/ConfigView.vue'),
-      meta: { requiresAuth: true, titleKey: 'pageTitles.configSortingPrompt' },
+      meta: { requiresAuth: true, titleKey: 'pageTitles.configRouting' },
     },
     {
       path: '/config/api-keys',

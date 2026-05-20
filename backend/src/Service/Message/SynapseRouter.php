@@ -10,6 +10,7 @@ use App\Repository\PromptRepository;
 use App\Service\ModelConfigService;
 use App\Service\PromptService;
 use App\Service\VectorSearch\QdrantClientInterface;
+use App\UseCase\UseCaseMapper;
 use Psr\Log\LoggerInterface;
 
 /**
@@ -28,11 +29,12 @@ final readonly class SynapseRouter
      * Code-side fallback for the Tier-1 confidence threshold, used only
      * when no `QDRANT_SEARCH.SYNAPSE_CONFIDENCE_THRESHOLD` row is present
      * in BCONFIG. Kept in lockstep with `SystemConfigService`'s UI default
-     * (`0.78`) so the runtime behaviour does not change depending on
+     * (`0.62`) so the runtime behaviour does not change depending on
      * whether an admin has touched the setting (raised by Copilot review
-     * on PR #853).
+     * on PR #853). Tuned so clear chat/media intents (~0.63+) route via
+     * Tier-1 while ambiguous matches still fall back to the AI sorter.
      */
-    private const DEFAULT_CONFIDENCE_THRESHOLD = 0.78;
+    private const DEFAULT_CONFIDENCE_THRESHOLD = 0.62;
     private const STICKY_THRESHOLD = 0.32;
     /**
      * Fallback target dimension used only when the bound SYNAPSE_VECTORIZE
@@ -209,6 +211,7 @@ final readonly class SynapseRouter
         private ModelConfigService $modelConfigService,
         private ConfigRepository $configRepository,
         private TopicAliasResolver $topicAliasResolver,
+        private UseCaseMapper $useCaseMapper,
         private LoggerInterface $logger,
     ) {
     }
@@ -224,6 +227,9 @@ final readonly class SynapseRouter
      *     query: string,
      *     model: array{provider: ?string, model: ?string, model_id: ?int},
      *     candidates: list<array{topic: string, score: float, payload: array, stale: bool, alias_target: ?string}>,
+     *     use_case_candidates?: list<array{use_case_id: string, score: float, payload: array, stale: bool}>,
+     *     use_case_routing_enabled?: bool,
+     *     primary_use_case_id: ?string,
      *     latency_ms: float,
      *     error: ?string,
      * }
@@ -237,6 +243,9 @@ final readonly class SynapseRouter
             'query' => $messageText,
             'model' => $modelInfo,
             'candidates' => [],
+            'use_case_candidates' => [],
+            'use_case_routing_enabled' => $this->isUseCaseRoutingEnabled(),
+            'primary_use_case_id' => null,
             'latency_ms' => 0.0,
             'error' => null,
         ];
@@ -256,6 +265,29 @@ final readonly class SynapseRouter
             }
 
             $vector = $this->normalizeVector($vector, $modelInfo['vector_dim']);
+
+            if ($this->isUseCaseRoutingEnabled()) {
+                $useCaseHits = $this->qdrantClient->searchUseCases(
+                    $vector,
+                    $limit,
+                    self::MIN_SCORE,
+                );
+                $currentModelId = $modelInfo['model_id'];
+                foreach ($useCaseHits as $hit) {
+                    if ($this->isStaleEntry($hit['payload'], $currentModelId)) {
+                        continue;
+                    }
+                    $base['use_case_candidates'][] = [
+                        'use_case_id' => (string) ($hit['payload']['use_case_id'] ?? ''),
+                        'score' => (float) $hit['score'],
+                        'payload' => $hit['payload'],
+                        'stale' => false,
+                    ];
+                }
+                if ([] !== $base['use_case_candidates']) {
+                    $base['primary_use_case_id'] = $base['use_case_candidates'][0]['use_case_id'];
+                }
+            }
 
             $hits = $this->qdrantClient->searchSynapseTopics(
                 $vector,
@@ -280,10 +312,21 @@ final readonly class SynapseRouter
                 ];
             }
 
+            if (null === $base['primary_use_case_id'] && [] !== $candidates) {
+                $top = $candidates[0];
+                $base['primary_use_case_id'] = $this->useCaseMapper->topicToUseCaseId(
+                    $top['topic'],
+                    $top['alias_target'],
+                );
+            }
+
             return [
                 'query' => $messageText,
                 'model' => $modelInfo,
                 'candidates' => $candidates,
+                'use_case_candidates' => $base['use_case_candidates'],
+                'use_case_routing_enabled' => $base['use_case_routing_enabled'],
+                'primary_use_case_id' => $base['primary_use_case_id'],
                 'latency_ms' => $this->elapsed($startTime),
                 'error' => null,
             ];
@@ -334,7 +377,7 @@ final readonly class SynapseRouter
                 // can read them the same way it reads MessageSorter output.
                 // Rule-based routing matched without any AI/embedding call,
                 // so leave the model identifiers null — see issue #603.
-                return [
+                return $this->useCaseMapper->attachPrimaryUseCaseId([
                     'topic' => $ruleBasedTopic,
                     'language' => $messageData['BLANG'] ?? 'en',
                     'web_search' => $promptMetadata['tool_internet'] ?? false,
@@ -344,7 +387,7 @@ final readonly class SynapseRouter
                     'sorting_model_id' => null,
                     'sorting_provider' => null,
                     'sorting_model_name' => null,
-                ];
+                ]);
             }
         }
 
@@ -372,6 +415,18 @@ final readonly class SynapseRouter
                     'first_5' => array_slice($queryVector, 0, 5),
                     'text_length' => strlen($messageText),
                 ]);
+            }
+
+            $useCaseRoute = $this->tryRouteViaUseCases(
+                $queryVector,
+                $messageText,
+                $messageData,
+                $userId,
+                $currentModelInfo,
+                $startTime,
+            );
+            if (null !== $useCaseRoute) {
+                return $useCaseRoute;
             }
 
             $searchResults = $this->qdrantClient->searchSynapseTopics(
@@ -528,7 +583,7 @@ final readonly class SynapseRouter
             // Model badge only ever appeared after a page refresh once the
             // backend was patched to also surface this from a different
             // code path — see issue #603.
-            return [
+            return $this->useCaseMapper->attachPrimaryUseCaseId([
                 'topic' => $canonicalTopic,
                 'granular_topic' => $aliasSource,
                 'language' => $language,
@@ -542,7 +597,7 @@ final readonly class SynapseRouter
                 'sorting_model_id' => $currentModelInfo['model_id'],
                 'sorting_provider' => $currentModelInfo['provider'],
                 'sorting_model_name' => $currentModelInfo['model'],
-            ];
+            ]);
         } catch (\Throwable $e) {
             $this->logger->error('SynapseRouter: Embedding/search failed, falling back to AI', [
                 'error' => $e->getMessage(),
@@ -592,7 +647,96 @@ final readonly class SynapseRouter
             }
         }
 
-        return $result;
+        return $this->useCaseMapper->attachPrimaryUseCaseId($result);
+    }
+
+    private function isUseCaseRoutingEnabled(): bool
+    {
+        $value = $this->configRepository->getValue(0, 'QDRANT_SEARCH', 'USE_CASE_ROUTING_ENABLED');
+
+        return filter_var($value ?? 'false', FILTER_VALIDATE_BOOLEAN);
+    }
+
+    /**
+     * Tier-1 use case search (Release C). Returns null to fall through to legacy topic search.
+     *
+     * @param float[]                                                                   $queryVector
+     * @param array{provider: ?string, model: ?string, model_id: ?int, vector_dim: int} $currentModelInfo
+     *
+     * @return array<string, mixed>|null
+     */
+    private function tryRouteViaUseCases(
+        array $queryVector,
+        string $messageText,
+        array $messageData,
+        ?int $userId,
+        array $currentModelInfo,
+        float $startTime,
+    ): ?array {
+        if (!$this->isUseCaseRoutingEnabled()) {
+            return null;
+        }
+
+        $hits = $this->qdrantClient->searchUseCases(
+            $queryVector,
+            self::SEARCH_LIMIT,
+            self::MIN_SCORE,
+        );
+        if ([] === $hits) {
+            return null;
+        }
+
+        $currentModelId = $currentModelInfo['model_id'];
+        $freshHits = array_values(array_filter(
+            $hits,
+            fn (array $hit): bool => !$this->isStaleEntry($hit['payload'], $currentModelId),
+        ));
+        if ([] === $freshHits) {
+            return null;
+        }
+
+        $topHit = $freshHits[0];
+        $topScore = (float) $topHit['score'];
+        $useCaseId = (string) ($topHit['payload']['use_case_id'] ?? '');
+        if ('' === $useCaseId || $topScore < $this->getConfidenceThreshold()) {
+            return null;
+        }
+
+        $mediaType = 'media_generation' === $useCaseId ? $this->detectMediaType($messageText) : null;
+        $legacyTopic = $this->useCaseMapper->useCaseToLegacyTopic($useCaseId, $mediaType);
+
+        $language = $this->detectLanguage($messageText, $messageData['BLANG'] ?? null);
+        $promptMetadata = $this->loadPromptMetadata($legacyTopic, $userId ?? 0);
+        $skipHeuristic = $this->isNonWebSearchTopic($legacyTopic);
+        $webSearch = $skipHeuristic ? false : $this->detectWebSearchIntent($messageText);
+        if (!$webSearch && ($promptMetadata['tool_internet'] ?? false)) {
+            $webSearch = true;
+        }
+
+        $latencyMs = $this->elapsed($startTime);
+
+        $this->logger->info('SynapseRouter: Use case Tier 1 classification', [
+            'primary_use_case_id' => $useCaseId,
+            'legacy_topic' => $legacyTopic,
+            'score' => round($topScore, 4),
+            'latency_ms' => $latencyMs,
+        ]);
+
+        return [
+            'primary_use_case_id' => $useCaseId,
+            'topic' => $legacyTopic,
+            'language' => $language,
+            'web_search' => $webSearch,
+            'media_type' => $mediaType,
+            'raw_response' => sprintf('Synapse use case: %.4f confidence', $topScore),
+            'prompt_metadata' => $promptMetadata,
+            'source' => 'synapse_use_case',
+            'synapse_score' => $topScore,
+            'synapse_latency_ms' => $latencyMs,
+            'sorting_model_id' => $currentModelInfo['model_id'],
+            'sorting_provider' => $currentModelInfo['provider'],
+            'sorting_model_name' => $currentModelInfo['model'],
+        ];
     }
 
     /**

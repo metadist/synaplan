@@ -27,7 +27,12 @@
     </div>
 
     <!-- Beta toggle (admin only) -->
-    <div v-if="isAdmin" class="surface-card overflow-hidden" data-testid="section-routing-beta">
+    <div
+      v-if="isAdmin"
+      class="surface-card overflow-hidden"
+      id="routing-section-synapse"
+      data-testid="section-routing-beta"
+    >
       <div class="p-6 border-b border-light-border/30 dark:border-dark-border/20">
         <div class="flex items-start gap-4 flex-wrap">
           <div
@@ -120,6 +125,125 @@
           {{ $t('config.routing.aiDefaultBody') }}
         </p>
       </div>
+
+      <!-- Use-case catalogue routing (Release C) -->
+      <div
+        v-if="synapseEnabled"
+        class="p-5 border-t border-light-border/30 dark:border-dark-border/20"
+        data-testid="section-use-case-routing"
+      >
+        <div class="flex items-start gap-4 flex-wrap">
+          <div class="flex-1 min-w-0">
+            <h4 class="text-sm font-semibold txt-primary mb-1 flex items-center gap-2 flex-wrap">
+              {{ $t('config.routing.useCaseRoutingTitle') }}
+              <span
+                v-if="isDev"
+                class="px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider bg-gray-500/15 txt-secondary"
+                data-testid="badge-release-c"
+              >
+                {{ $t('config.routing.devReleaseBadge', { release: 'C' }) }}
+              </span>
+            </h4>
+            <p class="text-sm txt-secondary">
+              {{ $t('config.routing.useCaseRoutingSubtitle') }}
+            </p>
+          </div>
+          <label
+            class="inline-flex items-center gap-3 cursor-pointer flex-shrink-0"
+            data-testid="toggle-use-case-routing"
+          >
+            <span class="text-sm font-medium txt-primary">
+              {{
+                useCaseRoutingEnabled
+                  ? $t('config.routing.useCaseRoutingOn')
+                  : $t('config.routing.useCaseRoutingOff')
+              }}
+            </span>
+            <span class="relative inline-flex">
+              <input
+                type="checkbox"
+                class="sr-only peer"
+                :checked="useCaseRoutingEnabled"
+                :disabled="togglingUseCaseRouting"
+                data-testid="toggle-use-case-routing-input"
+                @change="onToggleUseCaseRouting(($event.target as HTMLInputElement).checked)"
+              />
+              <span
+                class="w-11 h-6 bg-gray-300 dark:bg-gray-700 rounded-full peer-checked:bg-[var(--brand)] peer-disabled:opacity-50 transition-colors"
+              ></span>
+              <span
+                class="absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform peer-checked:translate-x-5"
+              ></span>
+            </span>
+          </label>
+        </div>
+        <div
+          v-if="useCaseRoutingEnabled && status?.useCasesIndexed === 0"
+          class="mt-3 p-3 rounded-lg bg-amber-500/10 border border-amber-500/20 flex flex-col sm:flex-row sm:items-center gap-3"
+          data-testid="banner-use-case-reindex"
+        >
+          <p class="text-sm text-amber-800 dark:text-amber-200 flex-1">
+            {{ $t('config.routing.useCaseRoutingReindexBanner') }}
+          </p>
+          <button
+            type="button"
+            class="px-3 py-1.5 rounded-lg text-sm font-medium bg-amber-600 text-white hover:bg-amber-700 disabled:opacity-50 whitespace-nowrap"
+            data-testid="btn-use-case-reindex"
+            :disabled="reindexing"
+            @click="reindex({ force: true })"
+          >
+            {{ $t('config.routing.useCaseRoutingReindexAction') }}
+          </button>
+        </div>
+
+        <div class="mt-5 pt-5 border-t border-light-border/20 dark:border-dark-border/10">
+          <div class="flex items-start gap-4 flex-wrap">
+            <div class="flex-1 min-w-0">
+              <h4 class="text-sm font-semibold txt-primary mb-1 flex items-center gap-2 flex-wrap">
+                {{ $t('config.routing.stepPlannerTitle') }}
+                <span
+                  v-if="isDev"
+                  class="px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider bg-gray-500/15 txt-secondary"
+                  data-testid="badge-release-d"
+                >
+                  {{ $t('config.routing.devReleaseBadge', { release: 'D' }) }}
+                </span>
+              </h4>
+              <p class="text-sm txt-secondary">
+                {{ $t('config.routing.stepPlannerSubtitle') }}
+              </p>
+            </div>
+            <label
+              class="inline-flex items-center gap-3 cursor-pointer flex-shrink-0"
+              data-testid="toggle-step-planner"
+            >
+              <span class="text-sm font-medium txt-primary">
+                {{
+                  stepPlannerEnabled
+                    ? $t('config.routing.stepPlannerOn')
+                    : $t('config.routing.stepPlannerOff')
+                }}
+              </span>
+              <span class="relative inline-flex">
+                <input
+                  type="checkbox"
+                  class="sr-only peer"
+                  :checked="stepPlannerEnabled"
+                  :disabled="togglingStepPlanner"
+                  data-testid="toggle-step-planner-input"
+                  @change="onToggleStepPlanner(($event.target as HTMLInputElement).checked)"
+                />
+                <span
+                  class="w-11 h-6 bg-gray-300 dark:bg-gray-700 rounded-full peer-checked:bg-[var(--brand)] peer-disabled:opacity-50 transition-colors"
+                ></span>
+                <span
+                  class="absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform peer-checked:translate-x-5"
+                ></span>
+              </span>
+            </label>
+          </div>
+        </div>
+      </div>
     </div>
 
     <!--
@@ -131,6 +255,7 @@
     <div
       v-if="isAdmin"
       class="surface-card p-6 ring-1 ring-amber-500/20 border-l-4 border-l-amber-500/70"
+      id="routing-section-embedding"
       data-testid="section-routing-embedding-model"
     >
       <div class="flex items-start gap-3 mb-5">
@@ -244,7 +369,12 @@
     </div>
 
     <!-- Live status (admin) -->
-    <div v-if="isAdmin" class="surface-card p-6" data-testid="section-routing-status">
+    <div
+      v-if="isAdmin"
+      class="surface-card p-6"
+      id="routing-section-status"
+      data-testid="section-routing-status"
+    >
       <div class="flex items-center justify-between mb-4 flex-wrap gap-3">
         <h3 class="text-lg font-semibold txt-primary flex items-center gap-2">
           <Icon icon="heroicons:signal" class="w-5 h-5 text-[var(--brand)]" />
@@ -310,7 +440,7 @@
       </div>
 
       <!-- Stat cards -->
-      <div v-if="status" class="grid grid-cols-2 md:grid-cols-4 gap-3">
+      <div v-if="status" class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
         <div class="surface-chip rounded-lg p-3" data-testid="stat-active-model">
           <p class="text-xs txt-secondary uppercase tracking-wide mb-1">
             {{ $t('config.routing.activeModel') }}
@@ -357,6 +487,20 @@
           <p class="text-2xl font-semibold txt-primary">{{ disabledTopicsCount }}</p>
           <p class="text-xs txt-secondary">
             {{ $t('config.routing.disabledHint') }}
+          </p>
+        </div>
+
+        <div
+          v-if="status.useCasesCollection"
+          class="surface-chip rounded-lg p-3"
+          data-testid="stat-use-cases-indexed"
+        >
+          <p class="text-xs txt-secondary uppercase tracking-wide mb-1">
+            {{ $t('config.routing.useCasesIndexed') }}
+          </p>
+          <p class="text-2xl font-semibold txt-primary">{{ status.useCasesIndexed ?? 0 }}</p>
+          <p class="text-xs txt-secondary truncate">
+            {{ $t('config.routing.collection', { name: status.useCasesCollection.name }) }}
           </p>
         </div>
       </div>
@@ -406,6 +550,7 @@
     <div
       v-if="isAdmin && status && status.topics.length > 0"
       class="surface-card p-6"
+      id="routing-section-topics"
       data-testid="section-routing-topics"
     >
       <div class="flex items-center justify-between mb-4 flex-wrap gap-2">
@@ -497,7 +642,7 @@
     </div>
 
     <!-- Test box -->
-    <div class="surface-card p-6" data-testid="section-routing-test">
+    <div class="surface-card p-6" id="routing-section-test" data-testid="section-routing-test">
       <h3 class="text-lg font-semibold txt-primary mb-2 flex items-center gap-2">
         <Icon icon="heroicons:beaker" class="w-5 h-5 text-[var(--brand)]" />
         {{ $t('config.routing.testTitle') }}
@@ -606,11 +751,57 @@
             </div>
           </li>
         </ul>
+
+        <!-- User-friendly routing preview (Release A) -->
+        <div
+          v-if="dryRunPreview && !testResult.error && testResult.candidates.length > 0"
+          class="border-t border-light-border/30 dark:border-dark-border/20 bg-[var(--brand)]/5 p-4 space-y-3"
+          data-testid="section-dry-run-preview"
+        >
+          <p v-if="dryRunPreview.isCompound" class="text-xs txt-secondary">
+            {{ $t('config.routing.dryRunCompoundHint') }}
+          </p>
+          <div>
+            <p class="text-[10px] uppercase tracking-wide txt-secondary mb-1">
+              {{ $t('config.routing.dryRunPrimary') }}
+            </p>
+            <p class="text-sm font-semibold txt-primary">
+              {{ $t(useCaseLabelKey(dryRunPreview.useCaseId)) }}
+              <span class="font-normal txt-secondary text-xs ml-2">
+                ({{ testResult.candidates[0].topic }})
+              </span>
+            </p>
+          </div>
+          <div>
+            <p class="text-[10px] uppercase tracking-wide txt-secondary mb-2">
+              {{ $t('config.routing.dryRunSteps') }}
+            </p>
+            <ol class="space-y-2">
+              <li
+                v-for="(step, idx) in dryRunStepsWithModels"
+                :key="step.stepKey"
+                class="flex flex-wrap items-baseline gap-x-2 gap-y-1 text-sm"
+                data-testid="item-dry-run-step"
+              >
+                <span class="txt-secondary">{{ idx + 1 }}.</span>
+                <span class="font-medium txt-primary">{{ step.stepLabel }}</span>
+                <span class="text-xs txt-secondary">→ {{ step.modelLabel }}</span>
+              </li>
+            </ol>
+            <p class="text-[10px] txt-secondary mt-2">
+              {{ $t('config.routing.dryRunModelsHint') }}
+            </p>
+          </div>
+        </div>
       </div>
     </div>
 
     <!-- AI Fallback Prompt (collapsed accordion) -->
-    <div class="surface-card overflow-hidden" data-testid="section-routing-fallback">
+    <div
+      class="surface-card overflow-hidden"
+      id="routing-section-ai-sort"
+      data-testid="section-routing-fallback"
+    >
       <button
         type="button"
         class="w-full px-6 py-4 flex items-center justify-between hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
@@ -810,6 +1001,7 @@
 
 <script setup lang="ts">
 import { ref, onMounted, onBeforeUnmount, computed, watch } from 'vue'
+import { useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { Icon } from '@iconify/vue'
 import { PencilIcon, EyeIcon, CheckIcon, InformationCircleIcon } from '@heroicons/vue/24/outline'
@@ -832,8 +1024,17 @@ import { useAuthStore } from '@/stores/auth'
 import { getMarkdownRenderer } from '@/composables/useMarkdown'
 import { useDateFormat } from '@/composables/useDateFormat'
 import { useTheme } from '@/composables/useTheme'
+import { getModels, getDefaultModels } from '@/services/api/configApi'
+import type { AIModel, Capability } from '@/types/ai-models'
+import {
+  buildDryRunPreview,
+  useCaseLabelKey,
+  resolveModelLabelForCapability,
+  isRoutingExcludedCanonicalTopic,
+  type UseCaseId,
+} from '@/utils/routingDryRunPreview'
 
-// --- Routing-status state ---------------------------------------------------
+const route = useRoute()
 const status = ref<SynapseStatusResponse | null>(null)
 const loadingStatus = ref(false)
 const reindexing = ref(false)
@@ -842,6 +1043,10 @@ const topicSearch = ref('')
 // --- Beta toggle state ------------------------------------------------------
 const synapseEnabled = ref(false)
 const togglingSynapse = ref(false)
+const useCaseRoutingEnabled = ref(false)
+const togglingUseCaseRouting = ref(false)
+const stepPlannerEnabled = ref(false)
+const togglingStepPlanner = ref(false)
 
 // --- Synapse embedding-model state -----------------------------------------
 const synapseEmbeddingStatus = ref<SynapseEmbeddingStatusResponse | null>(null)
@@ -860,6 +1065,62 @@ const synapseActiveRun = computed<EmbeddingRun | null>(() => {
 const testInput = ref('')
 const testRunning = ref(false)
 const testResult = ref<RoutingTestResult | null>(null)
+const modelDefaults = ref<Partial<Record<Capability, number | null>>>({})
+const modelsByCapability = ref<Partial<Record<Capability, AIModel[]>>>({})
+
+const dryRunPreview = computed(() => {
+  if (!testResult.value?.candidates.length || testResult.value.error) return null
+  const top = testResult.value.candidates[0]
+  const apiPlan = testResult.value.step_plan
+  if (apiPlan?.steps?.length) {
+    return {
+      useCaseId: (apiPlan.primary_use_case_id ??
+        testResult.value.primary_use_case_id ??
+        'text_chat') as UseCaseId,
+      isCompound: apiPlan.is_compound,
+      steps: apiPlan.steps.map((step) => ({
+        stepKey: step.id,
+        labelKey: step.label_key,
+        capability: step.capability as Capability,
+      })),
+    }
+  }
+  const preview = buildDryRunPreview(testResult.value.query, top.topic, top.alias_target ?? null)
+  const apiUseCaseId = testResult.value.primary_use_case_id
+  if (apiUseCaseId) {
+    return { ...preview, useCaseId: apiUseCaseId as UseCaseId }
+  }
+  return preview
+})
+
+const ROUTING_SECTION_IDS: Record<string, string> = {
+  synapse: 'routing-section-synapse',
+  embedding: 'routing-section-embedding',
+  status: 'routing-section-status',
+  topics: 'routing-section-topics',
+  'use-cases': 'routing-section-topics',
+  test: 'routing-section-test',
+  'ai-sort': 'routing-section-ai-sort',
+}
+
+async function loadModelDefaultsForDryRun() {
+  try {
+    const [modelsRes, defaultsRes] = await Promise.all([getModels(), getDefaultModels()])
+    modelsByCapability.value = modelsRes.models ?? {}
+    modelDefaults.value = defaultsRes.defaults ?? {}
+  } catch {
+    // Preview works without model names
+  }
+}
+
+function scrollToRoutingSection(section: string | undefined) {
+  if (!section) return
+  const elementId = ROUTING_SECTION_IDS[section]
+  if (!elementId) return
+  requestAnimationFrame(() => {
+    document.getElementById(elementId)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  })
+}
 
 // --- AI-fallback prompt state (legacy) -------------------------------------
 const fallbackOpen = ref(false)
@@ -872,10 +1133,26 @@ const saving = ref(false)
 
 const authStore = useAuthStore()
 const isAdmin = computed(() => authStore.isAdmin)
+const isDev = import.meta.env.DEV
 const canEdit = computed(() => authStore.isAdmin)
 const { success, error: showError, warning } = useNotification()
 const dialog = useDialog()
 const { t, locale } = useI18n()
+
+const dryRunStepsWithModels = computed(() => {
+  if (!dryRunPreview.value) return []
+  return dryRunPreview.value.steps.map((step) => ({
+    ...step,
+    stepLabel: t(step.labelKey),
+    modelLabel:
+      resolveModelLabelForCapability(
+        step.capability,
+        modelDefaults.value,
+        modelsByCapability.value
+      ) ?? t('config.routing.dryRunNoModel'),
+  }))
+})
+
 const { formatRelativeTime } = useDateFormat()
 const markdownRenderer = getMarkdownRenderer()
 const { theme } = useTheme()
@@ -910,8 +1187,11 @@ const disabledTopicsCount = computed(() => {
 const filteredTopics = computed(() => {
   if (!status.value) return []
   const search = topicSearch.value.trim().toLowerCase()
-  if (!search) return status.value.topics
-  return status.value.topics.filter((topic) =>
+  const routable = status.value.topics.filter(
+    (topic) => !isRoutingExcludedCanonicalTopic(topic.topic)
+  )
+  if (!search) return routable
+  return routable.filter((topic) =>
     [topic.topic, topic.embeddingModel ?? '', topic.embeddingProvider ?? '']
       .join(' ')
       .toLowerCase()
@@ -1122,8 +1402,11 @@ const loadSynapseEnabled = async () => {
   if (!isAdmin.value) return
   try {
     const values = await getConfigValues()
-    const raw = values['SYNAPSE_ROUTING_ENABLED']?.value ?? 'false'
-    synapseEnabled.value = ['true', '1', 'yes', 'on'].includes(raw.toLowerCase())
+    const parseFlag = (raw: string | undefined): boolean =>
+      ['true', '1', 'yes', 'on'].includes((raw ?? 'false').toLowerCase())
+    synapseEnabled.value = parseFlag(values['SYNAPSE_ROUTING_ENABLED']?.value)
+    useCaseRoutingEnabled.value = parseFlag(values['USE_CASE_ROUTING_ENABLED']?.value)
+    stepPlannerEnabled.value = parseFlag(values['STEP_PLANNER_ENABLED']?.value)
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Failed to load Synapse routing state'
     showError(message)
@@ -1168,6 +1451,79 @@ const onToggleSynapse = async (next: boolean) => {
   }
 }
 
+const onToggleUseCaseRouting = async (next: boolean) => {
+  if (!isAdmin.value || !synapseEnabled.value) return
+
+  if (next) {
+    const confirmed = await dialog.confirm({
+      title: t('config.routing.useCaseRoutingConfirmTitle'),
+      message: t('config.routing.useCaseRoutingConfirmBody'),
+      confirmText: t('config.routing.useCaseRoutingConfirmAction'),
+      cancelText: t('config.routing.useCaseRoutingConfirmCancel'),
+    })
+    if (!confirmed) return
+  }
+
+  togglingUseCaseRouting.value = true
+  const previous = useCaseRoutingEnabled.value
+  useCaseRoutingEnabled.value = next
+  try {
+    const result = await updateConfigValue('USE_CASE_ROUTING_ENABLED', next ? 'true' : 'false')
+    if (!result.success) {
+      throw new Error(result.error || 'Failed to update use case routing state')
+    }
+    success(
+      next
+        ? t('config.routing.useCaseRoutingEnabledNotice')
+        : t('config.routing.useCaseRoutingDisabledNotice')
+    )
+    if (next) {
+      await loadStatus()
+    }
+  } catch (err) {
+    useCaseRoutingEnabled.value = previous
+    const message = err instanceof Error ? err.message : 'Failed to update use case routing state'
+    showError(message)
+  } finally {
+    togglingUseCaseRouting.value = false
+  }
+}
+
+const onToggleStepPlanner = async (next: boolean) => {
+  if (!isAdmin.value || !synapseEnabled.value) return
+
+  if (next) {
+    const confirmed = await dialog.confirm({
+      title: t('config.routing.stepPlannerConfirmTitle'),
+      message: t('config.routing.stepPlannerConfirmBody'),
+      confirmText: t('config.routing.stepPlannerConfirmAction'),
+      cancelText: t('config.routing.stepPlannerConfirmCancel'),
+    })
+    if (!confirmed) return
+  }
+
+  togglingStepPlanner.value = true
+  const previous = stepPlannerEnabled.value
+  stepPlannerEnabled.value = next
+  try {
+    const result = await updateConfigValue('STEP_PLANNER_ENABLED', next ? 'true' : 'false')
+    if (!result.success) {
+      throw new Error(result.error || 'Failed to update step planner state')
+    }
+    success(
+      next
+        ? t('config.routing.stepPlannerEnabledNotice')
+        : t('config.routing.stepPlannerDisabledNotice')
+    )
+  } catch (err) {
+    stepPlannerEnabled.value = previous
+    const message = err instanceof Error ? err.message : 'Failed to update step planner state'
+    showError(message)
+  } finally {
+    togglingStepPlanner.value = false
+  }
+}
+
 const reindex = async (opts: { force?: boolean; recreate?: boolean }) => {
   if (!isAdmin.value) {
     warning('Admin access required.')
@@ -1204,7 +1560,19 @@ const reindex = async (opts: { force?: boolean; recreate?: boolean }) => {
       // a description / keywords. Not a success in any meaningful sense.
       warning(t('config.routing.reindexResultEmpty'))
     } else {
-      success(t('config.routing.reindexResult', counts))
+      const useCases = result.useCases
+      if (useCases && (useCases.indexed > 0 || useCases.errors > 0)) {
+        success(
+          t('config.routing.reindexResultWithUseCases', {
+            ...counts,
+            useCasesIndexed: useCases.indexed,
+            useCasesSkipped: useCases.skipped,
+            useCasesErrors: useCases.errors,
+          })
+        )
+      } else {
+        success(t('config.routing.reindexResult', counts))
+      }
     }
 
     await loadStatus()
@@ -1396,6 +1764,8 @@ const stopSynapseEmbeddingPolling = () => {
 
 onMounted(async () => {
   loadSortingPrompt()
+  loadModelDefaultsForDryRun()
+  scrollToRoutingSection(typeof route.query.section === 'string' ? route.query.section : undefined)
   if (isAdmin.value) {
     loadSynapseEnabled()
     loadStatus()
@@ -1405,6 +1775,13 @@ onMounted(async () => {
     }
   }
 })
+
+watch(
+  () => route.query.section,
+  (section) => {
+    scrollToRoutingSection(typeof section === 'string' ? section : undefined)
+  }
+)
 
 onBeforeUnmount(() => {
   stopSynapseEmbeddingPolling()

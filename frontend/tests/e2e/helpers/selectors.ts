@@ -340,6 +340,7 @@ export const selectors = {
     promptConfig: '[data-testid="section-prompt-config"]',
     embeddingPreview: '[data-testid="text-embedding-preview"]',
     aiModel: '[data-testid="input-ai-model"]',
+    capabilityModelsLink: '[data-testid="link-ai-models"]',
     rules: '[data-testid="input-rules"]',
     keywords: '[data-testid="input-keywords"]',
     description: '[data-testid="input-description"]',

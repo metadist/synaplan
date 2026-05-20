@@ -1498,6 +1498,15 @@ const streamAIResponse = async (
             const meta = data.metadata || {}
             processingMetadata.value = meta
             processingStatus.value = 'classified'
+          } else if (data.status === 'step_started') {
+            processingStatus.value = 'step_started'
+            processingMetadata.value = data.metadata || {}
+          } else if (data.status === 'step_completed') {
+            processingStatus.value = 'step_completed'
+            processingMetadata.value = data.metadata || {}
+          } else if (data.status === 'step_failed') {
+            processingStatus.value = 'step_failed'
+            processingMetadata.value = data.metadata || {}
           } else if (data.status === 'searching') {
             processingStatus.value = 'searching'
             processingMetadata.value = { customMessage: data.message }
@@ -1701,6 +1710,15 @@ const streamAIResponse = async (
             if (typeof meta.language === 'string') {
               detectedLanguage = meta.language
             }
+          } else if (data.status === 'step_started') {
+            processingStatus.value = 'step_started'
+            processingMetadata.value = data.metadata || {}
+          } else if (data.status === 'step_completed') {
+            processingStatus.value = 'step_completed'
+            processingMetadata.value = data.metadata || {}
+          } else if (data.status === 'step_failed') {
+            processingStatus.value = 'step_failed'
+            processingMetadata.value = data.metadata || {}
           } else if (data.status === 'searching') {
             processingStatus.value = 'searching'
             processingMetadata.value = { customMessage: data.message }

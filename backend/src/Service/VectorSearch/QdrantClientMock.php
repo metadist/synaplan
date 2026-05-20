@@ -262,6 +262,65 @@ final class QdrantClientMock implements QdrantClientInterface
         return 'synapse_topics';
     }
 
+    /** @var array<string, array{vector: array<int, float>, payload: array}> */
+    private array $useCasePoints = [];
+
+    public function upsertUseCase(string $pointId, array $vector, array $payload): void
+    {
+        $payload['_point_id'] = $pointId;
+        $this->useCasePoints[$pointId] = ['vector' => $vector, 'payload' => $payload];
+    }
+
+    public function searchUseCases(array $queryVector, int $limit = 5, float $minScore = 0.3): array
+    {
+        return [];
+    }
+
+    public function getUseCase(string $pointId): ?array
+    {
+        if (!isset($this->useCasePoints[$pointId])) {
+            return null;
+        }
+
+        return [
+            'id' => $pointId,
+            'payload' => $this->useCasePoints[$pointId]['payload'],
+        ];
+    }
+
+    public function scrollUseCases(int $limit = 1000): array
+    {
+        $points = [];
+        foreach ($this->useCasePoints as $id => $point) {
+            $points[] = ['id' => $id, 'payload' => $point['payload']];
+            if (count($points) >= $limit) {
+                break;
+            }
+        }
+
+        return $points;
+    }
+
+    public function getUseCasesCollectionInfo(): array
+    {
+        return [
+            'exists' => !empty($this->useCasePoints),
+            'vector_dim' => 1024,
+            'points_count' => count($this->useCasePoints),
+            'distance' => 'Cosine',
+        ];
+    }
+
+    public function recreateUseCasesCollection(int $vectorDimension): void
+    {
+        $this->useCasePoints = [];
+    }
+
+    public function getUseCasesCollection(): string
+    {
+        return 'synapse_use_cases';
+    }
+
     // --- Health & Info ---
 
     public function healthCheck(): bool

@@ -806,8 +806,8 @@ const navItems = computed<NavItem[]>(() => {
         group: t('nav.settingsAiTools'),
       },
       {
-        path: '/config/sorting-prompt',
-        label: t('nav.configSortingPrompt'),
+        path: '/config/routing',
+        label: t('nav.configRouting'),
         group: t('nav.settingsAiTools'),
       },
       {

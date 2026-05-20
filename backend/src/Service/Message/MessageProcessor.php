@@ -11,6 +11,7 @@ use App\Service\PerfTimer;
 use App\Service\PromptService;
 use App\Service\Search\BraveSearchService;
 use App\Service\UrlContentService;
+use App\UseCase\RuleBasedStepPlanner;
 use Psr\Log\LoggerInterface;
 
 /**
@@ -32,6 +33,8 @@ final readonly class MessageProcessor
         private MessagePreProcessor $preProcessor,
         private MessageClassifier $classifier,
         private InferenceRouter $router,
+        private RuleBasedStepPlanner $stepPlanner,
+        private StepOrchestrator $stepOrchestrator,
         private ModelConfigService $modelConfigService,
         private PromptService $promptService,
         private BraveSearchService $braveSearchService,
@@ -85,6 +88,7 @@ final readonly class MessageProcessor
             $sortingProvider = null;
             $sortingModelName = null;
             $conversationHistory = [];
+            $classification = [];
 
             $promptMetadata = [];
 
@@ -279,7 +283,7 @@ final readonly class MessageProcessor
             // Step 2.3: Load Prompt Metadata and apply tool restrictions
             $topic = $classification['topic'] ?? 'general';
             $perfTimer->start('prompt');
-            $promptData = $this->promptService->getPromptWithMetadata($topic, $message->getUserId(), $classification['language'] ?? 'en');
+            $promptData = $this->promptService->getPromptForClassification($classification, $message->getUserId());
             $perfTimer->stop('prompt');
             $promptMetadata = $promptData['metadata'] ?? [];
 
@@ -398,19 +402,13 @@ final readonly class MessageProcessor
             }
 
             // Step 3: Inference (AI Response) mit STREAMING
-            // Get chat model info to display during generation
-            $chatModelId = $this->modelConfigService->getDefaultModel('CHAT', $message->getUserId());
-            $chatProvider = null;
-            $chatModelName = null;
-            if ($chatModelId) {
-                $chatProvider = $this->modelConfigService->getProviderForModel($chatModelId);
-                $chatModelName = $this->modelConfigService->getModelName($chatModelId);
-            }
+            $generatingModel = $this->resolveGeneratingStatusModel($message, $classification);
 
             $this->notify($statusCallback, 'generating', 'Generating response...', [
-                'model_id' => $chatModelId,
-                'provider' => $chatProvider,
-                'model_name' => $chatModelName,
+                'model_id' => $generatingModel['model_id'],
+                'provider' => $generatingModel['provider'],
+                'model_name' => $generatingModel['model_name'],
+                'capability' => $generatingModel['capability'],
             ]);
 
             // Use routeStream instead of route, pass options through
@@ -419,9 +417,36 @@ final readonly class MessageProcessor
                 $options['search_results'] = $searchResults;
             }
 
-            $perfTimer->start('handler_total');
-            $response = $this->router->routeStream($message, $conversationHistory, $classification, $streamCallback, $statusCallback, $options);
-            $perfTimer->stop('handler_total');
+            $response = null;
+            if ($this->stepOrchestrator->isEnabled()) {
+                $plan = $this->stepPlanner->plan($message->getText(), $classification);
+                $classification['step_plan'] = $plan->toArray();
+
+                if ($plan->isMultiStep()) {
+                    $this->logger->info('MessageProcessor: Executing multi-step plan', [
+                        'primary_use_case_id' => $plan->primaryUseCaseId,
+                        'step_count' => count($plan->steps),
+                    ]);
+
+                    $perfTimer->start('handler_total');
+                    $response = $this->stepOrchestrator->executeStream(
+                        $message,
+                        $conversationHistory,
+                        $classification,
+                        $plan,
+                        $streamCallback,
+                        $statusCallback,
+                        $options,
+                    );
+                    $perfTimer->stop('handler_total');
+                }
+            }
+
+            if (null === $response) {
+                $perfTimer->start('handler_total');
+                $response = $this->router->routeStream($message, $conversationHistory, $classification, $streamCallback, $statusCallback, $options);
+                $perfTimer->stop('handler_total');
+            }
 
             // Re-add sorting model info to result (for StreamController to save)
             $classification['sorting_model_id'] = $sortingModelId;
@@ -689,7 +714,7 @@ final readonly class MessageProcessor
             }
 
             if (empty($promptMetadata) && !empty($classification['topic'])) {
-                $promptData = $this->promptService->getPromptWithMetadata($classification['topic'], $message->getUserId());
+                $promptData = $this->promptService->getPromptForClassification($classification, $message->getUserId());
                 if ($promptData) {
                     $promptMetadata = $promptData['metadata'] ?? [];
                     $classification['prompt_metadata'] = $promptMetadata;
@@ -798,19 +823,13 @@ final readonly class MessageProcessor
             }
 
             // Step 3: Inference (AI Response)
-            // Get chat model info to display during generation
-            $chatModelId = $this->modelConfigService->getDefaultModel('CHAT', $message->getUserId());
-            $chatProvider = null;
-            $chatModelName = null;
-            if ($chatModelId) {
-                $chatProvider = $this->modelConfigService->getProviderForModel($chatModelId);
-                $chatModelName = $this->modelConfigService->getModelName($chatModelId);
-            }
+            $generatingModel = $this->resolveGeneratingStatusModel($message, $classification);
 
             $this->notify($statusCallback, 'generating', 'Generating response...', [
-                'model_id' => $chatModelId,
-                'provider' => $chatProvider,
-                'model_name' => $chatModelName,
+                'model_id' => $generatingModel['model_id'],
+                'provider' => $generatingModel['provider'],
+                'model_name' => $generatingModel['model_name'],
+                'capability' => $generatingModel['capability'],
             ]);
 
             $response = $this->router->route($message, $conversationHistory, $classification, $statusCallback);
@@ -934,5 +953,52 @@ final readonly class MessageProcessor
             'document', 'officemaker', 'text2doc' => 'officemaker',
             default => $fallback ?: 'chat',
         };
+    }
+
+    /**
+     * Best-effort model metadata for SSE "generating" status — aligned with handler capability, not always CHAT.
+     *
+     * @param array<string, mixed> $classification
+     *
+     * @return array{model_id: ?int, provider: ?string, model_name: ?string, capability: string}
+     */
+    private function resolveGeneratingStatusModel(Message $message, array $classification): array
+    {
+        $intent = $classification['intent'] ?? 'chat';
+        $mediaType = $classification['media_type'] ?? null;
+
+        $capability = match ($intent) {
+            'image_generation' => match ($mediaType) {
+                'video' => 'TEXT2VID',
+                'audio' => 'TEXT2SOUND',
+                default => 'TEXT2PIC',
+            },
+            'file_analysis' => 'ANALYZE',
+            default => 'CHAT',
+        };
+
+        $effectiveUserId = $this->modelConfigService->getEffectiveUserIdForMessage($message);
+        $modelId = $this->modelConfigService->getDefaultModel($capability, $effectiveUserId);
+
+        if (!$modelId && 'ANALYZE' === $capability) {
+            $modelId = $this->modelConfigService->getDefaultModel('CHAT', $effectiveUserId);
+            $capability = 'CHAT';
+        }
+
+        if (!$modelId) {
+            return [
+                'model_id' => null,
+                'provider' => null,
+                'model_name' => null,
+                'capability' => $capability,
+            ];
+        }
+
+        return [
+            'model_id' => $modelId,
+            'provider' => $this->modelConfigService->getProviderForModel($modelId),
+            'model_name' => $this->modelConfigService->getModelName($modelId),
+            'capability' => $capability,
+        ];
     }
 }

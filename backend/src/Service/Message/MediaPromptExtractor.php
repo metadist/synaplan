@@ -3,6 +3,7 @@
 namespace App\Service\Message;
 
 use App\Entity\Message;
+use App\Prompt\RoutingTopicPolicy;
 use App\Service\Message\Handler\ChatHandler;
 use Psr\Log\LoggerInterface;
 
@@ -53,7 +54,13 @@ final readonly class MediaPromptExtractor
         $rawContent = '';
 
         try {
-            $rawContent = $this->runPrompt($message, $thread, $classification, 'mediamaker');
+            $lookupTopics = RoutingTopicPolicy::promptLookupTopics(
+                (string) ($classification['topic'] ?? 'mediamaker'),
+                isset($classification['granular_topic']) ? (string) $classification['granular_topic'] : null,
+                isset($classification['media_type']) ? (string) $classification['media_type'] : null,
+            );
+            $promptTopic = $lookupTopics[0] ?? 'image-generation';
+            $rawContent = $this->runPrompt($message, $thread, $classification, $promptTopic);
         } catch (\Throwable $e) {
             $this->logger->warning('MediaPromptExtractor: ChatHandler extraction failed, using fallback', [
                 'error' => $e->getMessage(),

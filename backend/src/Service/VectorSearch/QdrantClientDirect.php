@@ -24,6 +24,7 @@ final class QdrantClientDirect implements QdrantClientInterface
     private const DEFAULT_MEMORIES_COLLECTION = 'user_memories';
     private const DEFAULT_DOCUMENTS_COLLECTION = 'user_documents';
     private const DEFAULT_SYNAPSE_COLLECTION = 'synapse_topics';
+    private const DEFAULT_USE_CASES_COLLECTION = 'synapse_use_cases';
     private const BATCH_LIMIT = 100;
 
     /** @var array<string, bool> tracks which collections have been verified/created */
@@ -32,6 +33,7 @@ final class QdrantClientDirect implements QdrantClientInterface
     private readonly string $memoriesCollection;
     private readonly string $documentsCollection;
     private readonly string $synapseCollection;
+    private readonly string $useCasesCollection;
 
     public function __construct(
         private readonly HttpClientInterface $httpClient,
@@ -43,6 +45,7 @@ final class QdrantClientDirect implements QdrantClientInterface
         ?string $documentsCollection = null,
         private readonly int $vectorDimension = self::DEFAULT_VECTOR_DIM,
         ?string $synapseCollection = null,
+        ?string $useCasesCollection = null,
     ) {
         $this->memoriesCollection = (null !== $memoriesCollection && '' !== $memoriesCollection)
             ? $memoriesCollection
@@ -53,6 +56,9 @@ final class QdrantClientDirect implements QdrantClientInterface
         $this->synapseCollection = (null !== $synapseCollection && '' !== $synapseCollection)
             ? $synapseCollection
             : self::DEFAULT_SYNAPSE_COLLECTION;
+        $this->useCasesCollection = (null !== $useCasesCollection && '' !== $useCasesCollection)
+            ? $useCasesCollection
+            : self::DEFAULT_USE_CASES_COLLECTION;
     }
 
     public function getMemoriesCollection(): string
@@ -1155,6 +1161,241 @@ final class QdrantClientDirect implements QdrantClientInterface
                 'error' => $e->getMessage(),
             ]);
 
+            throw $e;
+        }
+    }
+
+    public function getUseCasesCollection(): string
+    {
+        return $this->useCasesCollection;
+    }
+
+    public function upsertUseCase(string $pointId, array $vector, array $payload): void
+    {
+        $this->ensureUseCasesCollection();
+        $payload['_point_id'] = $pointId;
+
+        try {
+            $this->pointsBatch($this->useCasesCollection, [
+                ['delete' => ['filter' => QdrantPointId::payloadFilterFor($pointId)]],
+                ['upsert' => ['points' => [
+                    [
+                        'id' => QdrantPointId::uuidFor($pointId),
+                        'vector' => $vector,
+                        'payload' => $payload,
+                    ],
+                ]]],
+            ]);
+        } catch (\Throwable $e) {
+            $this->logger->error('Failed to upsert use case', [
+                'point_id' => $pointId,
+                'error' => $e->getMessage(),
+            ]);
+
+            throw new \RuntimeException('Failed to upsert use case: '.$e->getMessage(), 0, $e);
+        }
+    }
+
+    public function searchUseCases(array $queryVector, int $limit = 5, float $minScore = 0.3): array
+    {
+        try {
+            $response = $this->qdrantRequest('POST', "/collections/{$this->useCasesCollection}/points/search", [
+                'vector' => $queryVector,
+                'limit' => $limit,
+                'score_threshold' => $minScore,
+                'with_payload' => true,
+            ]);
+
+            $results = [];
+            foreach ($response['result'] ?? [] as $hit) {
+                $results[] = [
+                    'id' => $hit['payload']['_point_id'] ?? (string) $hit['id'],
+                    'score' => $hit['score'],
+                    'payload' => $hit['payload'] ?? [],
+                ];
+            }
+
+            return $results;
+        } catch (\Throwable $e) {
+            $this->logger->error('Failed to search use cases', [
+                'error' => $e->getMessage(),
+            ]);
+
+            return [];
+        }
+    }
+
+    public function getUseCase(string $pointId): ?array
+    {
+        try {
+            $response = $this->qdrantRequest('POST', "/collections/{$this->useCasesCollection}/points/scroll", [
+                'filter' => QdrantPointId::payloadFilterFor($pointId),
+                'limit' => 1,
+                'with_payload' => true,
+                'with_vector' => false,
+            ]);
+
+            $points = $response['result']['points'] ?? [];
+            if ([] === $points) {
+                return null;
+            }
+
+            $point = $points[0];
+
+            return [
+                'id' => $point['payload']['_point_id'] ?? (string) $point['id'],
+                'payload' => $point['payload'] ?? [],
+            ];
+        } catch (\Throwable $e) {
+            $this->logger->debug('getUseCase: lookup failed', [
+                'point_id' => $pointId,
+                'error' => $e->getMessage(),
+            ]);
+
+            return null;
+        }
+    }
+
+    public function scrollUseCases(int $limit = 1000): array
+    {
+        try {
+            $response = $this->qdrantRequest('POST', "/collections/{$this->useCasesCollection}/points/scroll", [
+                'limit' => $limit,
+                'with_payload' => true,
+                'with_vector' => false,
+            ]);
+
+            $points = [];
+            foreach ($response['result']['points'] ?? [] as $point) {
+                $points[] = [
+                    'id' => $point['payload']['_point_id'] ?? (string) $point['id'],
+                    'payload' => $point['payload'] ?? [],
+                ];
+            }
+
+            return $points;
+        } catch (\Throwable $e) {
+            $this->logger->debug('scrollUseCases: scroll failed', [
+                'error' => $e->getMessage(),
+            ]);
+
+            return [];
+        }
+    }
+
+    public function getUseCasesCollectionInfo(): array
+    {
+        $defaults = [
+            'exists' => false,
+            'vector_dim' => null,
+            'points_count' => null,
+            'distance' => null,
+        ];
+
+        try {
+            $response = $this->qdrantRequest('GET', "/collections/{$this->useCasesCollection}");
+            $result = $response['result'] ?? [];
+            $vectorsConfig = $result['config']['params']['vectors'] ?? [];
+
+            return [
+                'exists' => true,
+                'vector_dim' => isset($vectorsConfig['size']) ? (int) $vectorsConfig['size'] : null,
+                'points_count' => isset($result['points_count']) ? (int) $result['points_count'] : null,
+                'distance' => $vectorsConfig['distance'] ?? null,
+            ];
+        } catch (\Throwable $e) {
+            $this->logger->debug('getUseCasesCollectionInfo: collection missing or unreachable', [
+                'error' => $e->getMessage(),
+            ]);
+
+            return $defaults;
+        }
+    }
+
+    public function recreateUseCasesCollection(int $vectorDimension): void
+    {
+        $collection = $this->useCasesCollection;
+
+        try {
+            $this->qdrantRequest('DELETE', "/collections/{$collection}");
+            unset($this->ensuredCollections[$collection]);
+        } catch (\Throwable $e) {
+            $this->logger->debug('recreateUseCasesCollection: drop skipped', [
+                'collection' => $collection,
+                'error' => $e->getMessage(),
+            ]);
+        }
+
+        try {
+            $this->qdrantRequest('PUT', "/collections/{$collection}", [
+                'vectors' => [
+                    'size' => $vectorDimension,
+                    'distance' => 'Cosine',
+                ],
+            ]);
+
+            $this->createPayloadIndex($collection, 'use_case_id', 'keyword');
+            $this->createPayloadIndex($collection, '_point_id', 'keyword');
+            $this->createPayloadIndex($collection, 'embedding_model_id', 'integer');
+
+            $this->ensuredCollections[$collection] = true;
+
+            $this->logger->info('Recreated Qdrant use cases collection', [
+                'collection' => $collection,
+                'vector_dim' => $vectorDimension,
+            ]);
+        } catch (\Throwable $e) {
+            $this->logger->error('Failed to recreate use cases collection', [
+                'collection' => $collection,
+                'error' => $e->getMessage(),
+            ]);
+
+            throw $e;
+        }
+    }
+
+    private function ensureUseCasesCollection(): void
+    {
+        $collection = $this->useCasesCollection;
+
+        if (isset($this->ensuredCollections[$collection])) {
+            return;
+        }
+
+        try {
+            $this->qdrantRequest('GET', "/collections/{$collection}");
+            $this->ensurePayloadIndexes($collection, [
+                'use_case_id' => 'keyword',
+                '_point_id' => 'keyword',
+                'embedding_model_id' => 'integer',
+            ]);
+            $this->ensuredCollections[$collection] = true;
+
+            return;
+        } catch (\Throwable) {
+            // Collection doesn't exist, create it
+        }
+
+        try {
+            $this->qdrantRequest('PUT', "/collections/{$collection}", [
+                'vectors' => [
+                    'size' => $this->vectorDimension,
+                    'distance' => 'Cosine',
+                ],
+            ]);
+
+            $this->createPayloadIndex($collection, 'use_case_id', 'keyword');
+            $this->createPayloadIndex($collection, '_point_id', 'keyword');
+            $this->createPayloadIndex($collection, 'embedding_model_id', 'integer');
+
+            $this->ensuredCollections[$collection] = true;
+
+            $this->logger->info('Created Qdrant use cases collection', ['collection' => $collection]);
+        } catch (\Throwable $e) {
+            $this->logger->error('Failed to create use cases collection', [
+                'collection' => $collection,
+                'error' => $e->getMessage(),
+            ]);
             throw $e;
         }
     }

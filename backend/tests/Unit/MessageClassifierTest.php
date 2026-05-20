@@ -11,6 +11,7 @@ use App\Service\Message\MessageSorter;
 use App\Service\Message\SynapseRouter;
 use App\Service\Message\TopicAliasResolver;
 use App\Service\ModelConfigService;
+use App\UseCase\UseCaseMapper;
 use Doctrine\ORM\EntityManagerInterface;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
@@ -52,6 +53,7 @@ class MessageClassifierTest extends TestCase
             $this->messageSorter,
             $this->synapseRouter,
             $this->topicAliasResolver,
+            new UseCaseMapper(),
             $this->messageMetaRepository,
             $this->modelConfigService,
             $this->configRepository,
@@ -313,6 +315,7 @@ class MessageClassifierTest extends TestCase
             $this->createMock(MessageSorter::class),
             $this->createMock(SynapseRouter::class),
             new TopicAliasResolver(),
+            new UseCaseMapper(),
             $this->createMock(MessageMetaRepository::class),
             $this->createMock(ModelConfigService::class),
             $configRepo,
@@ -371,6 +374,7 @@ class MessageClassifierTest extends TestCase
             $sorter,
             $this->createMock(SynapseRouter::class),
             new TopicAliasResolver(),
+            new UseCaseMapper(),
             $this->createMock(MessageMetaRepository::class),
             $this->createMock(ModelConfigService::class),
             $configRepo,
@@ -415,6 +419,7 @@ class MessageClassifierTest extends TestCase
             $sorter,
             $this->createMock(SynapseRouter::class),
             new TopicAliasResolver(),
+            new UseCaseMapper(),
             $this->createMock(MessageMetaRepository::class),
             $this->createMock(ModelConfigService::class),
             $configRepo,
@@ -597,6 +602,7 @@ class MessageClassifierTest extends TestCase
             $sorter,
             $this->createMock(SynapseRouter::class),
             new TopicAliasResolver(),
+            new UseCaseMapper(),
             $this->createMock(MessageMetaRepository::class),
             $this->createMock(ModelConfigService::class),
             $configRepo,

@@ -17,7 +17,7 @@
           <TaskPromptsConfiguration />
         </div>
 
-        <div v-else-if="currentPage === 'sorting-prompt'" data-testid="section-sorting-prompt">
+        <div v-else-if="currentPage === 'routing'" data-testid="section-routing">
           <SortingPromptConfiguration />
         </div>
 
@@ -54,7 +54,7 @@ const currentPage = computed(() => {
   if (path.includes('/config/inbound')) return 'inbound'
   if (path.includes('/config/ai-models')) return 'ai-models'
   if (path.includes('/config/task-prompts')) return 'task-prompts'
-  if (path.includes('/config/sorting-prompt')) return 'sorting-prompt'
+  if (path.includes('/config/routing') || path.includes('/config/sorting-prompt')) return 'routing'
   if (path.includes('/config/api-keys')) return 'api-keys'
   if (path.includes('/config/api-documentation')) return 'api-documentation'
   return 'inbound'

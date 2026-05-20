@@ -122,10 +122,22 @@ final readonly class MediaGenerationHandler implements MessageHandlerInterface
         // dispatch is cheap (a few ms) so the user doesn't notice.
         $this->maybeDispatchMemoryExtraction($message, $thread, $classification, $options);
 
-        // Extract media prompt via AI (mediamaker prompt)
-        $promptData = $this->promptExtractor->extract($message, $thread, $classification);
-        $prompt = trim($promptData['prompt'] ?? '');
-        $promptMediaType = $promptData['media_type'] ?? null;
+        $prompt = '';
+        $promptMediaType = null;
+
+        if (!empty($options['step_prompt_text']) && is_string($options['step_prompt_text'])) {
+            $prompt = trim($options['step_prompt_text']);
+            $promptMediaType = match ($classification['media_type'] ?? null) {
+                'video' => 'video',
+                'audio' => 'audio',
+                default => 'image',
+            };
+        } else {
+            // Extract media prompt via AI (mediamaker prompt)
+            $promptData = $this->promptExtractor->extract($message, $thread, $classification);
+            $prompt = trim($promptData['prompt'] ?? '');
+            $promptMediaType = $promptData['media_type'] ?? null;
+        }
 
         if ('' === $prompt) {
             $prompt = $message->getText();
@@ -170,21 +182,10 @@ final readonly class MediaGenerationHandler implements MessageHandlerInterface
             $this->logger->info('MediaGenerationHandler: Detected /tts command, forcing audio generation');
         }
 
-        // Priority: Again model_id > Task-prompt aiModel > DB default
-        $promptMetadata = $classification['prompt_metadata'] ?? [];
-        $promptAiModel = (isset($promptMetadata['aiModel']) && (int) $promptMetadata['aiModel'] > 0)
-            ? (int) $promptMetadata['aiModel']
-            : null;
-
+        // Priority: Again model_id > capability default
         if (isset($classification['model_id']) && $classification['model_id']) {
             $modelId = $classification['model_id'];
             $this->logger->info('MediaGenerationHandler: Using classification override model', [
-                'model_id' => $modelId,
-            ]);
-            [$mediaType, $provider, $modelName] = $this->resolveMediaTypeFromModelId($modelId, $isSlashCommand, $mediaType, $provider, $modelName);
-        } elseif ($promptAiModel) {
-            $modelId = $promptAiModel;
-            $this->logger->info('MediaGenerationHandler: Using task-prompt aiModel override', [
                 'model_id' => $modelId,
             ]);
             [$mediaType, $provider, $modelName] = $this->resolveMediaTypeFromModelId($modelId, $isSlashCommand, $mediaType, $provider, $modelName);

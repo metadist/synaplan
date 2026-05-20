@@ -47,6 +47,8 @@ export interface SynapseStatusResponse {
   perModel: SynapsePerModelEntry[]
   topics: SynapseTopicEntry[]
   aliases: Record<string, string>
+  useCasesCollection?: SynapseCollectionInfo
+  useCasesIndexed?: number
 }
 
 export interface SynapseReindexRequest {
@@ -90,6 +92,11 @@ export interface SynapseReindexResponse {
   failures?: SynapseReindexFailure[]
   topic?: string
   topicResult?: string
+  useCases?: {
+    indexed: number
+    skipped: number
+    errors: number
+  }
 }
 
 class AdminSynapseApi {

@@ -3,6 +3,7 @@
 namespace App\Service;
 
 use App\Entity\Prompt;
+use App\Prompt\RoutingTopicPolicy;
 use App\Repository\PromptMetaRepository;
 use App\Repository\PromptRepository;
 use Doctrine\ORM\EntityManagerInterface;
@@ -22,33 +23,70 @@ final readonly class PromptService
     }
 
     /**
-     * Get prompt with metadata by topic and user
-     * Returns prompt with metadata loaded as array
-     * Note: $lang parameter is kept for backward compatibility but NOT used for filtering.
+     * Get prompt with metadata by topic and user.
      *
-     * @param string $topic  Topic identifier
-     * @param int    $userId User ID (0 = only system prompts)
-     * @param string $lang   Language code (not used for filtering, just for logging)
+     * When $topic is a canonical handler key (`general`, `mediamaker`), the
+     * matching granular routing row is preferred for editable content.
+     *
+     * @param string      $topic         Topic identifier (usually canonical handler key)
+     * @param int         $userId        User ID (0 = only system prompts)
+     * @param string      $lang          Language code (not used for filtering, just for logging)
+     * @param string|null $granularTopic Granular routing topic from classification, if any
+     * @param string|null $mediaType     Media subtype hint for mediamaker handler lookups
      *
      * @return array|null ['prompt' => Prompt, 'metadata' => array] or null
      */
-    public function getPromptWithMetadata(string $topic, int $userId = 0, string $lang = 'en'): ?array
-    {
-        // Get prompt (with user override support)
-        // Language is NOT used as filter - it's just metadata
-        $prompt = $this->promptRepository->findByTopicAndUser($topic, $userId);
+    public function getPromptWithMetadata(
+        string $topic,
+        int $userId = 0,
+        string $lang = 'en',
+        ?string $granularTopic = null,
+        ?string $mediaType = null,
+    ): ?array {
+        foreach (RoutingTopicPolicy::promptLookupTopics($topic, $granularTopic, $mediaType) as $lookupTopic) {
+            $prompt = $this->promptRepository->findByTopicAndUser($lookupTopic, $userId);
 
-        if (!$prompt) {
-            return null;
+            if (!$prompt) {
+                continue;
+            }
+
+            $metadata = $this->loadMetadataForPrompt($prompt->getId());
+
+            if ($lookupTopic !== strtolower(trim($topic))) {
+                $this->logger->debug('PromptService: Loaded prompt via routing topic alias', [
+                    'requested_topic' => $topic,
+                    'lookup_topic' => $lookupTopic,
+                    'granular_topic' => $granularTopic,
+                    'user_id' => $userId,
+                ]);
+            }
+
+            return [
+                'prompt' => $prompt,
+                'metadata' => $metadata,
+            ];
         }
 
-        // Load metadata
-        $metadata = $this->loadMetadataForPrompt($prompt->getId());
+        return null;
+    }
 
-        return [
-            'prompt' => $prompt,
-            'metadata' => $metadata,
-        ];
+    /**
+     * @param array<string, mixed> $classification
+     *
+     * @return array|null ['prompt' => Prompt, 'metadata' => array] or null
+     */
+    public function getPromptForClassification(array $classification, int $userId): ?array
+    {
+        $granularTopic = isset($classification['granular_topic']) ? (string) $classification['granular_topic'] : null;
+        $mediaType = isset($classification['media_type']) ? (string) $classification['media_type'] : null;
+
+        return $this->getPromptWithMetadata(
+            (string) ($classification['topic'] ?? 'general'),
+            $userId,
+            (string) ($classification['language'] ?? 'en'),
+            $granularTopic,
+            $mediaType,
+        );
     }
 
     /**

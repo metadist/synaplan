@@ -7,6 +7,7 @@ use App\Entity\Message;
 use App\Repository\ConfigRepository;
 use App\Repository\MessageMetaRepository;
 use App\Service\ModelConfigService;
+use App\UseCase\UseCaseMapper;
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;
 
@@ -42,6 +43,7 @@ final readonly class MessageClassifier
         private MessageSorter $messageSorter,
         private SynapseRouter $synapseRouter,
         private TopicAliasResolver $topicAliasResolver,
+        private UseCaseMapper $useCaseMapper,
         private MessageMetaRepository $messageMetaRepository,
         private ModelConfigService $modelConfigService,
         private ConfigRepository $configRepository,
@@ -246,6 +248,8 @@ final readonly class MessageClassifier
             'model_id' => $result['sorting_model_id'] ?? null,
             'provider' => $result['sorting_provider'] ?? null,
             'model_name' => $result['sorting_model_name'] ?? null,
+            'primary_use_case_id' => $result['primary_use_case_id']
+                ?? $this->useCaseMapper->topicToUseCaseId($canonicalTopic, $alias['alias_source']),
         ];
 
         if (null !== $alias['alias_source']) {

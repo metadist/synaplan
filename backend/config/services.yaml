@@ -53,6 +53,7 @@ parameters:
     env(QDRANT_MEMORIES_COLLECTION): ''
     env(QDRANT_DOCUMENTS_COLLECTION): ''
     env(QDRANT_SYNAPSE_COLLECTION): ''
+    env(QDRANT_USE_CASES_COLLECTION): ''
     env(TRITON_SERVER_URL): ''
     env(GOOGLE_CLIENT_ID): ''
     env(GITHUB_CLIENT_ID): ''
@@ -521,6 +522,7 @@ services:
             $memoriesCollection: '%env(default::QDRANT_MEMORIES_COLLECTION)%'
             $documentsCollection: '%env(default::QDRANT_DOCUMENTS_COLLECTION)%'
             $synapseCollection: '%env(default::QDRANT_SYNAPSE_COLLECTION)%'
+            $useCasesCollection: '%env(default::QDRANT_USE_CASES_COLLECTION)%'
 
     App\Service\VectorSearch\QdrantClientInterface:
         alias: App\Service\VectorSearch\QdrantClientDirect

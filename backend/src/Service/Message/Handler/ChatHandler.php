@@ -86,8 +86,9 @@ final readonly class ChatHandler implements MessageHandlerInterface
 
         $topic = $classification['topic'] ?? 'general';
         $language = $classification['language'] ?? 'en';
+        $granularTopic = isset($classification['granular_topic']) ? (string) $classification['granular_topic'] : null;
 
-        $promptData = $this->promptService->getPromptWithMetadata($topic, $message->getUserId(), $language);
+        $promptData = $this->promptService->getPromptWithMetadata($topic, $message->getUserId(), $language, $granularTopic);
         $promptMetadata = $promptData['metadata'] ?? [];
 
         $searchResults = $classification['search_results'] ?? null;
@@ -136,7 +137,7 @@ final readonly class ChatHandler implements MessageHandlerInterface
         $feedbackContext = $feedbackResult['context'];
         $loadedFeedbacks = $feedbackResult['feedbacks'];
 
-        // Determine model: Again > Widget config override > Prompt Metadata > DB default
+        // Determine model: Again > Widget config override > capability default
         $modelId = null;
         $provider = null;
         $modelName = null;
@@ -151,13 +152,6 @@ final readonly class ChatHandler implements MessageHandlerInterface
             $modelId = (int) $classification['override_model_id'];
             $this->logger->info('ChatHandler: Using widget config model override', [
                 'model_id' => $modelId,
-                'user_id' => $message->getUserId(),
-            ]);
-        } elseif (isset($promptMetadata['aiModel']) && (int) $promptMetadata['aiModel'] > 0) {
-            $modelId = (int) $promptMetadata['aiModel'];
-            $this->logger->info('ChatHandler: Using prompt metadata model', [
-                'model_id' => $modelId,
-                'topic' => $topic,
                 'user_id' => $message->getUserId(),
             ]);
         } else {
@@ -465,7 +459,15 @@ final readonly class ChatHandler implements MessageHandlerInterface
             $promptData = $options['resolved_prompt_data'];
         } else {
             $perfTimer->start('prompt_chathandler');
-            $promptData = $this->promptService->getPromptWithMetadata($topic, $message->getUserId(), $classification['language'] ?? 'en');
+            $granularTopic = isset($classification['granular_topic']) ? (string) $classification['granular_topic'] : null;
+            $mediaType = isset($classification['media_type']) ? (string) $classification['media_type'] : null;
+            $promptData = $this->promptService->getPromptWithMetadata(
+                $topic,
+                $message->getUserId(),
+                $classification['language'] ?? 'en',
+                $granularTopic,
+                $mediaType,
+            );
             $perfTimer->stop('prompt_chathandler');
         }
 
@@ -638,7 +640,7 @@ final readonly class ChatHandler implements MessageHandlerInterface
         $feedbackContext = $feedbackResult['context'];
         $loadedFeedbacks = $feedbackResult['feedbacks'];
 
-        // Get model - Priority: Again > Widget config override > Prompt Metadata > DB default
+        // Get model - Priority: Again > Widget config override > capability default
         $modelId = null;
         $provider = null;
         $modelName = null;
@@ -659,16 +661,7 @@ final readonly class ChatHandler implements MessageHandlerInterface
                 'user_id' => $message->getUserId(),
             ]);
         }
-        // 3. Check if prompt metadata defines a model (and it's not AUTOMATED = -1)
-        elseif (isset($promptMetadata['aiModel']) && $promptMetadata['aiModel'] > 0) {
-            $modelId = $promptMetadata['aiModel'];
-            $this->logger->info('ChatHandler: Using prompt metadata model', [
-                'model_id' => $modelId,
-                'topic' => $topic,
-                'user_id' => $message->getUserId(),
-            ]);
-        }
-        // 4. Fall back to user's default model from DB
+        // 3. Fall back to user's default model from DB
         else {
             $effectiveUserId = $this->modelConfigService->getEffectiveUserIdForMessage($message);
             $modelId = $this->modelConfigService->getDefaultModel('CHAT', $effectiveUserId);
@@ -780,6 +773,14 @@ final readonly class ChatHandler implements MessageHandlerInterface
         // Voice reply mode: enforce concise answers for TTS (spoken responses should be brief)
         if (!empty($options['voice_reply'])) {
             $systemPrompt .= "\n\n**VOICE MODE: Your response will be spoken aloud as audio. Keep your answer concise and conversational — maximum 4-5 sentences. Avoid markdown formatting, code blocks, bullet lists, and tables. Write in natural, flowing prose suitable for speech.**";
+        }
+
+        if (!empty($options['orchestrator_deferred_action']) && is_string($options['orchestrator_deferred_action'])) {
+            $systemPrompt .= match ($options['orchestrator_deferred_action']) {
+                'comm_send_email' => "\n\n**ORCHESTRATOR: Draft the email body only. Outbound mail delivery is not wired yet — do not claim the message was sent.**",
+                'comm_receive_email' => "\n\n**ORCHESTRATOR: Inbox fetch is not wired yet. Explain what you would analyze if the mail were available, based on the user request.**",
+                default => '',
+            };
         }
 
         // Check if model supports system messages (o1 models don't)
@@ -1109,6 +1110,10 @@ final readonly class ChatHandler implements MessageHandlerInterface
      */
     private function buildCurrentMessageContent(Message $currentMessage, bool $includeImages, array $options = []): string|array
     {
+        if (!empty($options['step_prompt_text']) && is_string($options['step_prompt_text'])) {
+            return $options['step_prompt_text'];
+        }
+
         $content = $currentMessage->getText();
         $allFilesText = $currentMessage->getAllFilesText();
 

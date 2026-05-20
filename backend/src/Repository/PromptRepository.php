@@ -3,6 +3,7 @@
 namespace App\Repository;
 
 use App\Entity\Prompt;
+use App\Prompt\RoutingTopicPolicy;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
 use Doctrine\Persistence\ManagerRegistry;
 
@@ -39,15 +40,21 @@ class PromptRepository extends ServiceEntityRepository
      * Get all available topics for sorting
      * Includes both system (ownerId=0) AND user-specific prompts.
      *
-     * @param int      $ownerId         Owner ID (0 for system only)
-     * @param int|null $userId          User ID for including user-specific prompts
-     * @param bool     $excludeTools    Exclude tool topics (tools:*) from result
-     * @param bool     $excludeDisabled Exclude soft-disabled topics (BENABLED=0); default true
+     * @param int      $ownerId                 Owner ID (0 for system only)
+     * @param int|null $userId                  User ID for including user-specific prompts
+     * @param bool     $excludeTools            Exclude tool topics (tools:*) from result
+     * @param bool     $excludeDisabled         Exclude soft-disabled topics (BENABLED=0); default true
+     * @param bool     $excludeRoutingCanonical Exclude handler-only keys (`general`, `mediamaker`)
      *
      * @return array Array of topic strings
      */
-    public function getAllTopics(int $ownerId = 0, ?int $userId = null, bool $excludeTools = true, bool $excludeDisabled = true): array
-    {
+    public function getAllTopics(
+        int $ownerId = 0,
+        ?int $userId = null,
+        bool $excludeTools = true,
+        bool $excludeDisabled = true,
+        bool $excludeRoutingCanonical = false,
+    ): array {
         $qb = $this->createQueryBuilder('p')
             ->select('DISTINCT p.topic');
 
@@ -73,7 +80,9 @@ class PromptRepository extends ServiceEntityRepository
 
         $results = $qb->getQuery()->getScalarResult();
 
-        return array_map(fn ($r) => $r['topic'], $results);
+        $topics = array_map(fn ($r) => $r['topic'], $results);
+
+        return $excludeRoutingCanonical ? $this->filterRoutingExcludedTopics($topics) : $topics;
     }
 
     /**
@@ -81,16 +90,23 @@ class PromptRepository extends ServiceEntityRepository
      * Neither system nor user prompts are filtered by language.
      * The $lang parameter is kept for backward compatibility but ignored.
      *
-     * @param int      $ownerId         Owner ID (0 for system)
-     * @param string   $lang            Language code (kept for API compat, not used)
-     * @param int|null $userId          User ID for including user-specific prompts
-     * @param bool     $excludeTools    Exclude tool topics (tools:*) from result
-     * @param bool     $excludeDisabled Exclude soft-disabled topics (BENABLED=0); default true
+     * @param int      $ownerId                 Owner ID (0 for system)
+     * @param string   $lang                    Language code (kept for API compat, not used)
+     * @param int|null $userId                  User ID for including user-specific prompts
+     * @param bool     $excludeTools            Exclude tool topics (tools:*) from result
+     * @param bool     $excludeDisabled         Exclude soft-disabled topics (BENABLED=0); default true
+     * @param bool     $excludeRoutingCanonical Exclude handler-only keys (`general`, `mediamaker`)
      *
      * @return array Array of ['topic' => string, 'description' => string, 'ownerId' => int]
      */
-    public function getTopicsWithDescriptions(int $ownerId = 0, string $lang = 'en', ?int $userId = null, bool $excludeTools = true, bool $excludeDisabled = true): array
-    {
+    public function getTopicsWithDescriptions(
+        int $ownerId = 0,
+        string $lang = 'en',
+        ?int $userId = null,
+        bool $excludeTools = true,
+        bool $excludeDisabled = true,
+        bool $excludeRoutingCanonical = false,
+    ): array {
         $sysQb = $this->createQueryBuilder('p')
             ->select('p.topic', 'p.shortDescription', 'p.ownerId')
             ->where('p.ownerId = :ownerId')
@@ -152,7 +168,7 @@ class PromptRepository extends ServiceEntityRepository
             }
         }
 
-        return $result;
+        return $excludeRoutingCanonical ? $this->filterRoutingExcludedTopicRows($result) : $result;
     }
 
     /**
@@ -277,5 +293,31 @@ class PromptRepository extends ServiceEntityRepository
         }
 
         return array_values($map);
+    }
+
+    /**
+     * @param list<string> $topics
+     *
+     * @return list<string>
+     */
+    private function filterRoutingExcludedTopics(array $topics): array
+    {
+        return array_values(array_filter(
+            $topics,
+            static fn (string $topic): bool => !RoutingTopicPolicy::isRoutingExcluded($topic),
+        ));
+    }
+
+    /**
+     * @param list<array{topic: string, description: string, ownerId: int}> $rows
+     *
+     * @return list<array{topic: string, description: string, ownerId: int}>
+     */
+    private function filterRoutingExcludedTopicRows(array $rows): array
+    {
+        return array_values(array_filter(
+            $rows,
+            static fn (array $row): bool => !RoutingTopicPolicy::isRoutingExcluded($row['topic']),
+        ));
     }
 }

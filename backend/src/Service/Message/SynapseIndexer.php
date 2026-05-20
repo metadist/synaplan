@@ -7,6 +7,7 @@ namespace App\Service\Message;
 use App\AI\Exception\ProviderException;
 use App\AI\Service\AiFacade;
 use App\Entity\Prompt;
+use App\Prompt\RoutingTopicPolicy;
 use App\Repository\PromptRepository;
 use App\Service\ModelConfigService;
 use App\Service\VectorSearch\QdrantClientInterface;
@@ -83,6 +84,7 @@ final readonly class SynapseIndexer
         // the orphan Qdrant point keeps participating in similarity
         // search until the operator manually re-creates the collection.
         $this->dropDisabledPromptVectors($userId);
+        $this->dropRoutingExcludedCanonicalVectors($userId);
 
         $prompts = $this->loadIndexablePrompts($userId);
 
@@ -167,6 +169,16 @@ final readonly class SynapseIndexer
 
         if (!$prompt->isEnabled()) {
             $this->logger->debug('SynapseIndexer: Topic is disabled, removing from index', [
+                'topic' => $topic,
+                'owner_id' => $ownerId,
+            ]);
+            $this->removeTopic($topic, $ownerId);
+
+            return 'skipped';
+        }
+
+        if (RoutingTopicPolicy::isRoutingExcluded($topic)) {
+            $this->logger->debug('SynapseIndexer: Canonical handler topic excluded from routing pool', [
                 'topic' => $topic,
                 'owner_id' => $ownerId,
             ]);
@@ -448,6 +460,32 @@ final readonly class SynapseIndexer
     }
 
     /**
+     * Remove Qdrant vectors for canonical handler keys (`general`, `mediamaker`)
+     * that must not participate in Synapse similarity search.
+     */
+    private function dropRoutingExcludedCanonicalVectors(?int $userId): void
+    {
+        $ownerIds = [0];
+        if (null !== $userId && $userId > 0) {
+            $ownerIds[] = $userId;
+        }
+
+        foreach ($ownerIds as $ownerId) {
+            foreach (RoutingTopicPolicy::ROUTING_EXCLUDED_CANONICAL as $topic) {
+                try {
+                    $this->removeTopic($topic, $ownerId);
+                } catch (\Throwable $e) {
+                    $this->logger->warning('SynapseIndexer: Failed to drop routing-excluded topic vector', [
+                        'topic' => $topic,
+                        'owner_id' => $ownerId,
+                        'error' => $e->getMessage(),
+                    ]);
+                }
+            }
+        }
+    }
+
+    /**
      * @return list<Prompt>
      */
     private function loadIndexablePrompts(?int $userId): array
@@ -460,6 +498,9 @@ final readonly class SynapseIndexer
                 continue;
             }
             if (str_starts_with($prompt->getTopic(), 'tools:')) {
+                continue;
+            }
+            if (RoutingTopicPolicy::isRoutingExcluded($prompt->getTopic())) {
                 continue;
             }
             if ('' === trim($prompt->getShortDescription()) && '' === trim((string) $prompt->getKeywords())) {

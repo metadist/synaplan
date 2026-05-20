@@ -65,14 +65,14 @@ class PromptCatalog
             [
                 'topic' => 'general',
                 'language' => 'en',
-                'shortDescription' => 'Catch-all topic for everyday questions, smalltalk, advice, opinions and any request that does not fit a more specific topic. Used as a routing fallback when no granular topic matches.',
+                'shortDescription' => 'Internal handler key for chat, widgets and legacy message history. Edit routing and AI instructions under the general-chat use case instead.',
                 'keywords' => 'fallback, default, catch-all, allgemein, frage, question',
                 'prompt' => self::generalPrompt(),
             ],
             [
                 'topic' => 'mediamaker',
                 'language' => 'en',
-                'shortDescription' => 'Canonical media-generation topic that handles all create/edit requests for images, videos and audio. Prefer the more specific image-generation, video-generation or audio-generation topics for routing; this entry stays as a catch-all and downstream handler key.',
+                'shortDescription' => 'Internal handler key for media generation. Edit routing and AI instructions under image-generation, video-generation or audio-generation instead.',
                 'keywords' => 'media generation, mediengenerierung, bild, video, audio, image, picture, photo, sound, voice',
                 'prompt' => self::mediaMakerPrompt(),
             ],

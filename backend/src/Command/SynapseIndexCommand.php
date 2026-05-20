@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Command;
 
 use App\Service\Message\SynapseIndexer;
+use App\Service\Message\UseCaseIndexer;
 use App\Service\VectorSearch\QdrantClientInterface;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;
@@ -22,6 +23,7 @@ class SynapseIndexCommand extends Command
 {
     public function __construct(
         private readonly SynapseIndexer $indexer,
+        private readonly UseCaseIndexer $useCaseIndexer,
         private readonly QdrantClientInterface $qdrantClient,
     ) {
         parent::__construct();
@@ -92,6 +94,7 @@ class SynapseIndexCommand extends Command
             $io->warning('Recreate flag set — dropping and recreating the collection');
             try {
                 $this->qdrantClient->recreateSynapseCollection($modelInfo['vector_dim']);
+                $this->qdrantClient->recreateUseCasesCollection($modelInfo['vector_dim']);
             } catch (\Throwable $e) {
                 $io->error(sprintf('Failed to recreate collection: %s', $e->getMessage()));
 
@@ -113,6 +116,7 @@ class SynapseIndexCommand extends Command
         try {
             $start = microtime(true);
             $result = $this->indexer->indexAllTopics($userId, $force);
+            $useCaseResult = $this->useCaseIndexer->indexAllUseCases($force);
             $ms = (int) ((microtime(true) - $start) * 1000);
 
             $totalTopics = $result['indexed'] + $result['skipped'] + $result['errors'];
@@ -122,6 +126,9 @@ class SynapseIndexCommand extends Command
                 ['indexed' => (string) $result['indexed']],
                 ['skipped' => (string) $result['skipped']],
                 ['errors' => (string) $result['errors']],
+                ['use_cases_indexed' => (string) $useCaseResult['indexed']],
+                ['use_cases_skipped' => (string) $useCaseResult['skipped']],
+                ['use_cases_errors' => (string) $useCaseResult['errors']],
                 ['total_ms' => (string) $ms],
             );
 
@@ -135,7 +142,7 @@ class SynapseIndexCommand extends Command
                 }
             }
 
-            if ($result['errors'] > 0) {
+            if ($result['errors'] > 0 || $useCaseResult['errors'] > 0) {
                 $io->error(sprintf(
                     'Indexed %d / Skipped %d / Errors %d.',
                     $result['indexed'],

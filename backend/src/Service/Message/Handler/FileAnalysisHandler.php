@@ -291,10 +291,9 @@ final readonly class FileAnalysisHandler implements MessageHandlerInterface
 
         $finalPrompt = !empty($userPrompt) ? $userPrompt : 'What is in this document? Please summarize the content.';
 
-        // Model priority: Again model_id > Task-prompt aiModel > DB default (ANALYZE → CHAT)
+        // Model priority: Again model_id > capability default (ANALYZE → CHAT)
         $effectiveUserId = $this->modelConfigService->getEffectiveUserIdForMessage($message);
         $modelId = $classification['model_id']
-            ?? $this->resolvePromptAiModel($classification)
             ?? $this->modelConfigService->getDefaultModel('ANALYZE', $effectiveUserId)
             ?? $this->modelConfigService->getDefaultModel('CHAT', $effectiveUserId);
         $provider = null;
@@ -384,10 +383,9 @@ final readonly class FileAnalysisHandler implements MessageHandlerInterface
 
         $finalPrompt = !empty($userPrompt) ? $userPrompt : 'What is in this document? Please summarize the content.';
 
-        // Model priority: Again model_id > Task-prompt aiModel > DB default (ANALYZE → CHAT)
+        // Model priority: Again model_id > capability default (ANALYZE → CHAT)
         $effectiveUserId = $this->modelConfigService->getEffectiveUserIdForMessage($message);
         $modelId = $classification['model_id']
-            ?? $this->resolvePromptAiModel($classification)
             ?? $this->modelConfigService->getDefaultModel('ANALYZE', $effectiveUserId)
             ?? $this->modelConfigService->getDefaultModel('CHAT', $effectiveUserId);
         $provider = null;
@@ -481,10 +479,9 @@ final readonly class FileAnalysisHandler implements MessageHandlerInterface
             ];
         }
 
-        // Model priority: Again model_id > Task-prompt aiModel > DB default (PIC2TEXT)
+        // Model priority: Again model_id > capability default (PIC2TEXT)
         $effectiveUserId = $this->modelConfigService->getEffectiveUserIdForMessage($message);
         $modelId = $classification['model_id']
-            ?? $this->resolvePromptAiModel($classification)
             ?? $this->modelConfigService->getDefaultModel('PIC2TEXT', $effectiveUserId);
         $provider = null;
         $modelName = null;
@@ -660,17 +657,6 @@ final readonly class FileAnalysisHandler implements MessageHandlerInterface
         }
 
         return ltrim($path, '/');
-    }
-
-    /**
-     * Extract the task-prompt aiModel override from classification metadata.
-     */
-    private function resolvePromptAiModel(array $classification): ?int
-    {
-        $promptMetadata = $classification['prompt_metadata'] ?? [];
-        $aiModel = $promptMetadata['aiModel'] ?? null;
-
-        return (null !== $aiModel && (int) $aiModel > 0) ? (int) $aiModel : null;
     }
 
     /**

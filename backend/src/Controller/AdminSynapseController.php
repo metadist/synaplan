@@ -8,7 +8,9 @@ use App\Repository\PromptRepository;
 use App\Service\Message\SynapseIndexer;
 use App\Service\Message\SynapseRouter;
 use App\Service\Message\TopicAliasResolver;
+use App\Service\Message\UseCaseIndexer;
 use App\Service\VectorSearch\QdrantClientInterface;
+use App\UseCase\RuleBasedStepPlanner;
 use OpenApi\Attributes as OA;
 use Psr\Log\LoggerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -35,10 +37,12 @@ final class AdminSynapseController extends AbstractController
 {
     public function __construct(
         private readonly SynapseIndexer $synapseIndexer,
+        private readonly UseCaseIndexer $useCaseIndexer,
         private readonly SynapseRouter $synapseRouter,
         private readonly QdrantClientInterface $qdrantClient,
         private readonly PromptRepository $promptRepository,
         private readonly TopicAliasResolver $topicAliasResolver,
+        private readonly RuleBasedStepPlanner $stepPlanner,
         private readonly LoggerInterface $logger,
     ) {
     }
@@ -125,7 +129,9 @@ final class AdminSynapseController extends AbstractController
     {
         $modelInfo = $this->synapseIndexer->getEmbeddingModelInfo();
         $collectionInfo = $this->qdrantClient->getSynapseCollectionInfo();
+        $useCasesCollectionInfo = $this->qdrantClient->getUseCasesCollectionInfo();
         $points = $this->qdrantClient->scrollSynapseTopics(null, 5000);
+        $useCasePoints = $this->qdrantClient->scrollUseCases(100);
 
         $perModel = [];
         $staleCount = 0;
@@ -206,6 +212,14 @@ final class AdminSynapseController extends AbstractController
             'perModel' => array_values($perModel),
             'topics' => $topics,
             'aliases' => $this->topicAliasResolver->getAliasMap(),
+            'useCasesCollection' => [
+                'name' => $this->qdrantClient->getUseCasesCollection(),
+                'exists' => $useCasesCollectionInfo['exists'],
+                'vectorDim' => $useCasesCollectionInfo['vector_dim'],
+                'pointsCount' => $useCasesCollectionInfo['points_count'],
+                'distance' => $useCasesCollectionInfo['distance'],
+            ],
+            'useCasesIndexed' => count($useCasePoints),
         ]);
     }
 
@@ -284,6 +298,7 @@ final class AdminSynapseController extends AbstractController
         if ($recreate) {
             $modelInfo = $this->synapseIndexer->getEmbeddingModelInfo();
             $this->qdrantClient->recreateSynapseCollection($modelInfo['vector_dim']);
+            $this->qdrantClient->recreateUseCasesCollection($modelInfo['vector_dim']);
             // recreate implies force: every point must be re-uploaded
             $force = true;
         }
@@ -311,6 +326,7 @@ final class AdminSynapseController extends AbstractController
         }
 
         $result = $this->synapseIndexer->indexAllTopics(null, $force);
+        $useCaseResult = $this->useCaseIndexer->indexAllUseCases($force);
 
         // Rename the indexer's snake_case `owner_id` to camelCase `ownerId`
         // for the public API contract (the rest of /admin/synapse/* uses
@@ -333,6 +349,11 @@ final class AdminSynapseController extends AbstractController
             'skipped' => $result['skipped'],
             'errors' => $result['errors'],
             'failures' => $failures,
+            'useCases' => [
+                'indexed' => $useCaseResult['indexed'],
+                'skipped' => $useCaseResult['skipped'],
+                'errors' => $useCaseResult['errors'],
+            ],
         ]);
     }
 
@@ -375,6 +396,24 @@ final class AdminSynapseController extends AbstractController
         $userId = method_exists($user, 'getId') ? $user->getId() : null;
 
         $result = $this->synapseRouter->dryRun($text, $userId, $limit);
+
+        $topTopic = 'general';
+        $aliasTarget = null;
+        if ([] !== $result['candidates']) {
+            $top = $result['candidates'][0];
+            $topTopic = $top['topic'];
+            $aliasTarget = $top['alias_target'];
+        }
+
+        $classification = ['topic' => $topTopic];
+        if (null !== $aliasTarget && $aliasTarget !== $topTopic) {
+            $classification['granular_topic'] = $aliasTarget;
+        }
+        if (null !== $result['primary_use_case_id']) {
+            $classification['primary_use_case_id'] = $result['primary_use_case_id'];
+        }
+
+        $result['step_plan'] = $this->stepPlanner->plan($text, $classification)->toArray();
 
         return $this->json(['success' => null === $result['error']] + $result);
     }

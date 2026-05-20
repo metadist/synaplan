@@ -141,11 +141,11 @@ final readonly class MessageSorter
         // Get all available topics (exclude tools:* internal topics)
         // Include user-specific prompts if userId is provided
         // Load prompts for ALL supported languages to ensure user prompts are included
-        $topics = $this->promptRepository->getAllTopics(0, $userId, excludeTools: true);
+        $topics = $this->promptRepository->getAllTopics(0, $userId, excludeTools: true, excludeRoutingCanonical: true);
 
         // Get topics with descriptions - all prompts included regardless of language
         // so the sorter knows every available routing target
-        $topicsWithDesc = $this->promptRepository->getTopicsWithDescriptions(0, '', $userId, excludeTools: true);
+        $topicsWithDesc = $this->promptRepository->getTopicsWithDescriptions(0, '', $userId, excludeTools: true, excludeRoutingCanonical: true);
 
         // Build dynamic list and key list for prompt
         $dynamicList = $this->buildDynamicList($topicsWithDesc);

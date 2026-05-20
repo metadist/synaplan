@@ -67,7 +67,7 @@ class SynapseIndexerTest extends TestCase
         $this->modelConfigService->method('getDefaultModel')->willReturn(null);
 
         $this->promptRepository->method('findAllForUser')->willReturn([
-            $this->makePrompt('general', 'General conversation'),
+            $this->makePrompt('general-chat', 'General conversation'),
             $this->makePrompt('coding', 'Programming help'),
         ]);
 
@@ -77,6 +77,8 @@ class SynapseIndexerTest extends TestCase
         ]);
 
         $this->qdrantClient->method('getSynapseTopic')->willReturn(null);
+        $this->qdrantClient->expects($this->exactly(2))
+            ->method('deleteSynapseTopic');
         $this->qdrantClient->expects($this->exactly(2))
             ->method('upsertSynapseTopic');
 
@@ -92,7 +94,7 @@ class SynapseIndexerTest extends TestCase
         $this->modelConfigService->method('getDefaultModel')->willReturn(null);
 
         $this->promptRepository->method('findAllForUser')->willReturn([
-            $this->makePrompt('general', 'General'),
+            $this->makePrompt('general-chat', 'General'),
             $this->makePrompt('disabled-topic', 'Disabled', enabled: false),
         ]);
 
@@ -115,7 +117,7 @@ class SynapseIndexerTest extends TestCase
 
         $this->promptRepository->method('findAllForUser')->willReturn([
             $this->makePrompt('tools:sort', 'Sort prompt'),
-            $this->makePrompt('general', 'General'),
+            $this->makePrompt('general-chat', 'General'),
         ]);
 
         $this->aiFacade->method('embed')->willReturn([
@@ -136,7 +138,7 @@ class SynapseIndexerTest extends TestCase
         $this->modelConfigService->method('getDefaultModel')->willReturn(null);
 
         $this->promptRepository->method('findAllForUser')->willReturn([
-            $this->makePrompt('general', 'General'),
+            $this->makePrompt('general-chat', 'General'),
             $this->makePrompt('empty', '', null),
         ]);
 
@@ -242,7 +244,7 @@ class SynapseIndexerTest extends TestCase
     {
         $this->modelConfigService->method('getDefaultModel')->willReturn(null);
 
-        $prompt = $this->makePrompt('general', 'Hello world');
+        $prompt = $this->makePrompt('general-chat', 'Hello world');
         $this->promptRepository->method('findAllForUser')->willReturn([$prompt]);
 
         $embeddingText = $this->indexer->buildEmbeddingText($prompt);
@@ -250,7 +252,7 @@ class SynapseIndexerTest extends TestCase
 
         // Existing point already carries the matching hash → skip
         $this->qdrantClient->method('getSynapseTopic')->willReturn([
-            'id' => 'synapse_0_general',
+            'id' => 'synapse_0_general-chat',
             'payload' => ['source_hash' => $sourceHash],
         ]);
 
@@ -267,14 +269,14 @@ class SynapseIndexerTest extends TestCase
     {
         $this->modelConfigService->method('getDefaultModel')->willReturn(null);
 
-        $prompt = $this->makePrompt('general', 'Hello world');
+        $prompt = $this->makePrompt('general-chat', 'Hello world');
         $this->promptRepository->method('findAllForUser')->willReturn([$prompt]);
 
         $embeddingText = $this->indexer->buildEmbeddingText($prompt);
         $sourceHash = $this->indexer->computeSourceHash($embeddingText, null, 1024);
 
         $this->qdrantClient->method('getSynapseTopic')->willReturn([
-            'id' => 'synapse_0_general',
+            'id' => 'synapse_0_general-chat',
             'payload' => ['source_hash' => $sourceHash],
         ]);
 
@@ -316,6 +318,21 @@ class SynapseIndexerTest extends TestCase
         $result = $this->indexer->indexTopic('coding', 0);
 
         $this->assertSame('indexed', $result);
+    }
+
+    public function testIndexTopicSkipsRoutingExcludedCanonical(): void
+    {
+        $prompt = $this->makePrompt('general', 'Legacy handler key');
+        $this->promptRepository->method('findByTopic')->willReturn($prompt);
+
+        $this->qdrantClient->expects($this->once())
+            ->method('deleteSynapseTopic')
+            ->with('synapse_0_general');
+        $this->qdrantClient->expects($this->never())->method('upsertSynapseTopic');
+
+        $result = $this->indexer->indexTopic('general', 0);
+
+        $this->assertSame('skipped', $result);
     }
 
     public function testIndexTopicReturnsMissingWhenPromptNotFound(): void

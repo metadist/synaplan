@@ -87,6 +87,7 @@ final readonly class SystemConfigService
                     'qdrant' => ['label' => 'Qdrant', 'fields' => ['QDRANT_URL']],
                     'synapse' => ['label' => 'Synapse Routing', 'fields' => [
                         'SYNAPSE_ROUTING_ENABLED', 'SYNAPSE_CONFIDENCE_THRESHOLD',
+                        'USE_CASE_ROUTING_ENABLED', 'STEP_PLANNER_ENABLED',
                     ]],
                     'qdrant_search' => ['label' => 'Search Thresholds', 'fields' => [
                         'MIN_CHAT_FEEDBACK_SCORE', 'MIN_CHAT_MEMORY_SCORE', 'MIN_CONTRADICTION_SCORE',
@@ -818,8 +819,20 @@ final readonly class SystemConfigService
             ],
             'SYNAPSE_CONFIDENCE_THRESHOLD' => [
                 'tab' => 'vectordb', 'section' => 'synapse', 'type' => 'number',
-                'sensitive' => false, 'description' => 'Min cosine similarity score for Synapse to route directly (0.0–1.0). Below this threshold, the system falls back to AI-based sorting. Default: 0.78',
-                'default' => '0.78',
+                'sensitive' => false, 'description' => 'Min cosine similarity score for Synapse to route directly (0.0–1.0). Below this threshold, the system falls back to AI-based sorting. Default: 0.62 (clear intents; ambiguous cases still use AI fallback).',
+                'default' => '0.62',
+                'source' => 'database',
+            ],
+            'USE_CASE_ROUTING_ENABLED' => [
+                'tab' => 'vectordb', 'section' => 'synapse', 'type' => 'boolean',
+                'sensitive' => false, 'description' => '[Release C — disabled by default] Search the use case catalogue (`synapse_use_cases`) before legacy topic vectors. Emits `primary_use_case_id` while keeping legacy handler topics. Requires use case re-index after enabling.',
+                'default' => 'false',
+                'source' => 'database',
+            ],
+            'STEP_PLANNER_ENABLED' => [
+                'tab' => 'vectordb', 'section' => 'synapse', 'type' => 'boolean',
+                'sensitive' => false, 'description' => '[Release D — disabled by default] Expand compound utterances into multi-step plans (e.g. chat → TTS). Emits SSE step_* events. Single-step messages keep the legacy one-hop path.',
+                'default' => 'false',
                 'source' => 'database',
             ],
             // === Search Thresholds (database-backed, no restart required) ===

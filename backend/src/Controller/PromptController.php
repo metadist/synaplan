@@ -274,8 +274,8 @@ class PromptController extends AbstractController
         }
 
         $userId = $user->getId();
-        $topics = $this->promptRepository->getAllTopics(0, $userId, excludeTools: true);
-        $topicsWithDesc = $this->promptRepository->getTopicsWithDescriptions(0, $language, $userId, excludeTools: true);
+        $topics = $this->promptRepository->getAllTopics(0, $userId, excludeTools: true, excludeRoutingCanonical: true);
+        $topicsWithDesc = $this->promptRepository->getTopicsWithDescriptions(0, $language, $userId, excludeTools: true, excludeRoutingCanonical: true);
 
         $dynamicList = $this->buildDynamicList($topicsWithDesc);
         $keyList = implode(' | ', array_map(fn ($topic) => '"'.$topic.'"', $topics));

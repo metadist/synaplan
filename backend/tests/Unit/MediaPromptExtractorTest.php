@@ -54,7 +54,7 @@ class MediaPromptExtractorTest extends TestCase
                 $this->identicalTo($this->message),
                 $this->equalTo([]),
                 $this->callback(function (array $classification): bool {
-                    $this->assertSame('mediamaker', $classification['topic']);
+                    $this->assertSame('image-generation', $classification['topic']);
                     $this->assertSame('image_generation', $classification['intent']);
                     $this->assertSame('de', $classification['language']);
                     $this->assertArrayNotHasKey('model_id', $classification);
@@ -67,7 +67,7 @@ class MediaPromptExtractorTest extends TestCase
             ->willReturn(['content' => '{"BMEDIA":"audio","BTEXT":"Hallo"}']);
 
         $classification = [
-            'topic' => 'general',
+            'topic' => 'mediamaker',
             'language' => 'de',
             'model_id' => 123,
             'override_model_id' => 999,
@@ -213,7 +213,7 @@ class MediaPromptExtractorTest extends TestCase
             ->method('handle')
             ->willReturnCallback(function ($message, $thread, $classification, $progress) use (&$call) {
                 if (0 === $call) {
-                    $this->assertSame('mediamaker', $classification['topic']);
+                    $this->assertSame('image-generation', $classification['topic']);
                     ++$call;
 
                     return ['content' => 'Audio Prompt: Erstelle eine Audiodatei, in der ich sage: "Hallo, was geht?"'];
@@ -241,7 +241,7 @@ class MediaPromptExtractorTest extends TestCase
         $chatHandler->expects($this->exactly(2))
             ->method('handle')
             ->willReturnCallback(function ($message, $thread, $classification, $progress) {
-                if ('mediamaker' === $classification['topic']) {
+                if ('image-generation' === $classification['topic']) {
                     // JSON without BMEDIA should trigger inference + audio fallback extraction
                     return ['content' => '{"BTEXT":"some generic media prompt"}'];
                 }

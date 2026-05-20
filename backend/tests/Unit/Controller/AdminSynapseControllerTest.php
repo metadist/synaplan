@@ -11,7 +11,10 @@ use App\Repository\PromptRepository;
 use App\Service\Message\SynapseIndexer;
 use App\Service\Message\SynapseRouter;
 use App\Service\Message\TopicAliasResolver;
+use App\Service\Message\UseCaseIndexer;
 use App\Service\VectorSearch\QdrantClientInterface;
+use App\UseCase\RuleBasedStepPlanner;
+use App\UseCase\UseCaseMapper;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
@@ -21,6 +24,7 @@ use Symfony\Component\HttpFoundation\Request;
 final class AdminSynapseControllerTest extends TestCase
 {
     private SynapseIndexer&MockObject $indexer;
+    private UseCaseIndexer&MockObject $useCaseIndexer;
     private SynapseRouter&MockObject $router;
     private QdrantClientInterface&MockObject $qdrant;
     private PromptRepository&MockObject $promptRepository;
@@ -29,16 +33,19 @@ final class AdminSynapseControllerTest extends TestCase
     protected function setUp(): void
     {
         $this->indexer = $this->createMock(SynapseIndexer::class);
+        $this->useCaseIndexer = $this->createMock(UseCaseIndexer::class);
         $this->router = $this->createMock(SynapseRouter::class);
         $this->qdrant = $this->createMock(QdrantClientInterface::class);
         $this->promptRepository = $this->createMock(PromptRepository::class);
 
         $this->controller = new AdminSynapseController(
             $this->indexer,
+            $this->useCaseIndexer,
             $this->router,
             $this->qdrant,
             $this->promptRepository,
             new TopicAliasResolver(),
+            new RuleBasedStepPlanner(new UseCaseMapper()),
             new NullLogger(),
         );
 
@@ -78,6 +85,14 @@ final class AdminSynapseControllerTest extends TestCase
             'distance' => 'Cosine',
         ]);
         $this->qdrant->method('getSynapseCollection')->willReturn('synapse_topics');
+        $this->qdrant->method('getUseCasesCollectionInfo')->willReturn([
+            'exists' => true,
+            'vector_dim' => 1024,
+            'points_count' => 6,
+            'distance' => 'Cosine',
+        ]);
+        $this->qdrant->method('getUseCasesCollection')->willReturn('synapse_use_cases');
+        $this->qdrant->method('scrollUseCases')->willReturn([]);
 
         // Two indexed points: one fresh (model 42), one stale (model 7)
         $this->qdrant->method('scrollSynapseTopics')->willReturn([
@@ -139,6 +154,14 @@ final class AdminSynapseControllerTest extends TestCase
             'distance' => 'Cosine',
         ]);
         $this->qdrant->method('getSynapseCollection')->willReturn('synapse_topics');
+        $this->qdrant->method('getUseCasesCollectionInfo')->willReturn([
+            'exists' => true,
+            'vector_dim' => 1024,
+            'points_count' => 6,
+            'distance' => 'Cosine',
+        ]);
+        $this->qdrant->method('getUseCasesCollection')->willReturn('synapse_use_cases');
+        $this->qdrant->method('scrollUseCases')->willReturn([]);
         $this->qdrant->method('scrollSynapseTopics')->willReturn([]);
         $this->promptRepository->method('findAllForUser')->willReturn([]);
 
@@ -161,6 +184,11 @@ final class AdminSynapseControllerTest extends TestCase
                     ['topic' => 'coding', 'owner_id' => 0, 'code' => 'model_not_available', 'hint' => "Model 'foo' is not available on provider 'cloudflare'."],
                 ],
             ]);
+
+        $this->useCaseIndexer->expects($this->once())
+            ->method('indexAllUseCases')
+            ->with(false)
+            ->willReturn(['indexed' => 6, 'skipped' => 0, 'errors' => 0]);
 
         $request = Request::create('/api/v1/admin/synapse/reindex', 'POST', content: json_encode([]));
         $response = $this->controller->reindex($request);
@@ -191,11 +219,19 @@ final class AdminSynapseControllerTest extends TestCase
         $this->qdrant->expects($this->once())
             ->method('recreateSynapseCollection')
             ->with(3072);
+        $this->qdrant->expects($this->once())
+            ->method('recreateUseCasesCollection')
+            ->with(3072);
 
         $this->indexer->expects($this->once())
             ->method('indexAllTopics')
             ->with(null, true) // recreate implies force
             ->willReturn(['indexed' => 7, 'skipped' => 0, 'errors' => 0, 'failures' => []]);
+
+        $this->useCaseIndexer->expects($this->once())
+            ->method('indexAllUseCases')
+            ->with(true)
+            ->willReturn(['indexed' => 6, 'skipped' => 0, 'errors' => 0]);
 
         $request = Request::create(
             '/api/v1/admin/synapse/reindex',

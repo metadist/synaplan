@@ -8,10 +8,7 @@ const PAGE = '/config/task-prompts'
 const SEL = selectors.taskPrompts
 
 test.describe('@ci Task Prompts', () => {
-  test('admin can edit AI model, rules and content on system prompt', async ({
-    page,
-    credentials,
-  }) => {
+  test('admin can edit rules and content on system prompt', async ({ page, credentials }) => {
     void credentials
 
     await test.step('Arrange: login as admin and pick the first card', async () => {
@@ -23,25 +20,23 @@ test.describe('@ci Task Prompts', () => {
       await expect(firstCard).toBeVisible({ timeout: TIMEOUTS.STANDARD })
       await firstCard.click()
 
-      // Editor opens on the Routing tab — switch to Prompt to reach AI/content
+      // Editor opens on the Routing tab — switch to Prompt to reach content
       await expect(page.locator(SEL.promptDetails)).toBeVisible({ timeout: TIMEOUTS.STANDARD })
       await page.locator(SEL.tabPrompt).click()
-      await expect(page.locator(SEL.aiModel)).toBeVisible({ timeout: TIMEOUTS.STANDARD })
+      await expect(page.locator(SEL.capabilityModelsLink)).toBeVisible({
+        timeout: TIMEOUTS.STANDARD,
+      })
     })
 
-    await test.step('Assert: AI model, rules and content are enabled', async () => {
-      // Rules live on the Routing tab, AI model and content on the Prompt tab.
-      await expect(page.locator(SEL.aiModel)).toBeEnabled({ timeout: TIMEOUTS.SHORT })
+    await test.step('Assert: capability models link, rules and content are enabled', async () => {
+      await expect(page.locator(SEL.capabilityModelsLink)).toBeVisible({ timeout: TIMEOUTS.SHORT })
       await expect(page.locator(SEL.content)).toBeEnabled({ timeout: TIMEOUTS.SHORT })
       await page.locator(SEL.tabRouting).click()
       await expect(page.locator(SEL.rules)).toBeEnabled({ timeout: TIMEOUTS.SHORT })
     })
   })
 
-  test('non-admin can edit AI model, rules and content on system prompt', async ({
-    page,
-    credentials,
-  }) => {
+  test('non-admin can edit rules and content on system prompt', async ({ page, credentials }) => {
     await test.step('Arrange: login and pick the first card', async () => {
       await login(page, credentials)
       await page.goto(PAGE)
@@ -52,11 +47,13 @@ test.describe('@ci Task Prompts', () => {
 
       await expect(page.locator(SEL.promptDetails)).toBeVisible({ timeout: TIMEOUTS.STANDARD })
       await page.locator(SEL.tabPrompt).click()
-      await expect(page.locator(SEL.aiModel)).toBeVisible({ timeout: TIMEOUTS.STANDARD })
+      await expect(page.locator(SEL.capabilityModelsLink)).toBeVisible({
+        timeout: TIMEOUTS.STANDARD,
+      })
     })
 
-    await test.step('Assert: AI model, rules and content are enabled', async () => {
-      await expect(page.locator(SEL.aiModel)).toBeEnabled({ timeout: TIMEOUTS.SHORT })
+    await test.step('Assert: capability models link, rules and content are enabled', async () => {
+      await expect(page.locator(SEL.capabilityModelsLink)).toBeVisible({ timeout: TIMEOUTS.SHORT })
       await expect(page.locator(SEL.content)).toBeEnabled({ timeout: TIMEOUTS.SHORT })
       await page.locator(SEL.tabRouting).click()
       await expect(page.locator(SEL.rules)).toBeEnabled({ timeout: TIMEOUTS.SHORT })

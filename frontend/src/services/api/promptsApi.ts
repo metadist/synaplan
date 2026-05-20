@@ -66,6 +66,23 @@ export interface RoutingTestResult {
   query: string
   model: { provider: string | null; model: string | null; model_id: number | null }
   candidates: RoutingTestCandidate[]
+  use_case_candidates?: Array<{
+    use_case_id: string
+    score: number
+    stale: boolean
+  }>
+  use_case_routing_enabled?: boolean
+  primary_use_case_id?: string | null
+  step_plan?: {
+    primary_use_case_id: string
+    is_compound: boolean
+    steps: Array<{
+      id: string
+      label_key: string
+      capability: string
+      input_from?: string
+    }>
+  } | null
   latency_ms: number
   error: string | null
 }

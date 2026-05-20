@@ -10,10 +10,12 @@ use App\Service\Message\MessageClassifier;
 use App\Service\Message\MessagePreProcessor;
 use App\Service\Message\MessageProcessor;
 use App\Service\Message\SearchQueryGenerator;
+use App\Service\Message\StepOrchestrator;
 use App\Service\ModelConfigService;
 use App\Service\PromptService;
 use App\Service\Search\BraveSearchService;
 use App\Service\UrlContentService;
+use App\UseCase\RuleBasedStepPlanner;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
 
@@ -50,6 +52,8 @@ class MessageProcessorTest extends TestCase
             $this->preProcessor,
             $this->classifier,
             $this->router,
+            new RuleBasedStepPlanner(new \App\UseCase\UseCaseMapper()),
+            new StepOrchestrator($this->router, $this->createMock(\App\Repository\ConfigRepository::class), $this->logger),
             $this->modelConfigService,
             $this->promptService,
             $this->braveSearchService,

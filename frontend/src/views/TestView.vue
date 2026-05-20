@@ -93,9 +93,9 @@
             >
             <router-link
               data-testid="link-route"
-              to="/config/sorting-prompt"
+              to="/config/routing"
               class="px-4 py-2 rounded surface-chip hover-surface txt-primary text-sm"
-              >/config/sorting-prompt</router-link
+              >/config/routing</router-link
             >
             <router-link
               data-testid="link-route"
