@@ -155,6 +155,13 @@ final class PromptCatalogTest extends TestCase
         $this->assertStringContainsString('started boxing', $prompt);
         $this->assertStringContainsString("doesn't need it anymore", $prompt);
 
+        // Positive: the language-preservation rule plugs the parse-mode
+        // gap where German input silently became an English memory value.
+        // The directive must explicitly forbid translation while keeping
+        // keys in English (snake_case stays the storage convention).
+        $this->assertStringContainsString('MATCH USER LANGUAGE', $prompt);
+        $this->assertStringContainsString('Never translate', $prompt);
+
         // Negative: the original splitting behaviour must be preserved
         // for smaller models. Anything that nudges the model towards a
         // single combined memory is forbidden.

@@ -1090,6 +1090,14 @@ PROMPT;
         //     extracted value must include the referent. One short bilingual
         //     example is enough — anything longer made smaller production
         //     models (gpt-oss-120b on Groq) overcorrect.
+        //   - Rule 6 ("MATCH USER LANGUAGE") plugs a gap relative to the
+        //     extraction prompt: parse-mode used to silently translate German
+        //     input to English values, which then read foreign on later recall
+        //     in a German chat context. The rule is one line on purpose; the
+        //     existing English few-shots are not removed because (a) the model
+        //     generalizes "match the input language" without per-locale
+        //     examples, and (b) bigger DE/ES/TR examples were exactly what
+        //     regressed splitting on gpt-oss-120b in the previous iteration.
         //   - We deliberately do NOT add a "merge related thoughts" rule. The
         //     prompt already preserves splitting via the existing few-shots,
         //     and a merge directive caused the same smaller models to dump the
@@ -1111,6 +1119,8 @@ Parse user input into memories. Keep ALL details the user mentions!
    pronoun, write the referent into the value so the memory makes sense alone.
    - "I started boxing. Now I don't need it anymore" → key: "boxing", value: "started boxing but doesn't need it anymore"
    - NOT: key: "current_need", value: "don't need it anymore"
+6. **MATCH USER LANGUAGE** - write `value` in the same language the user used in
+   the input. Never translate. Keys stay in English (snake_case).
 
 ## Format
 
