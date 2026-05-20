@@ -37,7 +37,26 @@
     "widgetSessions": "Widget-Sitzungen",
     "widgetChats": "Widget-Chats",
     "widgetDetail": "Widget-Detail",
-    "liveSupport": "Live-Support"
+    "liveSupport": "Live-Support",
+    "addinConnect": "Outlook-Add-in verbinden"
+  },
+  "addinConnect": {
+    "title": "Mit Synaplan verbinden",
+    "subtitle": "Erlaube dem Synamail Outlook-Add-in, dieses Synaplan-Konto zu verwenden.",
+    "loading": "Sitzung wird geprüft…",
+    "confirmPrompt": "Dieses Outlook verbinden mit:",
+    "connectButton": "Outlook verbinden",
+    "scopesNote": "Gewährt Zugriff auf Nachrichten, Chats, Dateien und RAG-Suche.",
+    "connecting": "API-Schlüssel wird ausgestellt…",
+    "successTitle": "Verbunden.",
+    "successSubtitle": "Du kannst dieses Fenster schließen, falls es sich nicht selbst schließt.",
+    "errorTitle": "Verbindung fehlgeschlagen",
+    "retry": "Erneut versuchen",
+    "helpLine": "Dieses Fenster wird vom Synamail-Add-in geöffnet. Es kann gefahrlos geschlossen werden.",
+    "errorMissingState": "Fehlender state-Parameter. Add-in erneut öffnen und nochmal versuchen.",
+    "errorOfficeNotReady": "Office.js ist nicht verfügbar. Diese Seite muss aus Outlook heraus geöffnet werden.",
+    "errorNotSignedIn": "Du bist nicht angemeldet. Bitte das Fenster aktualisieren und erneut anmelden.",
+    "errorIssuanceFailed": "Synaplan konnte für dieses Konto keinen API-Schlüssel ausstellen."
   },
   "welcome": "Willkommen bei Synaplan",
   "chat": {

@@ -36,7 +36,26 @@
     "feedback": "Geri Bildirim",
     "widgetSessions": "Widget Oturumları",
     "widgetChats": "Widget Sohbetleri",
-    "liveSupport": "Canlı Destek"
+    "liveSupport": "Canlı Destek",
+    "addinConnect": "Outlook eklentisini bağla"
+  },
+  "addinConnect": {
+    "title": "Synaplan'a bağlan",
+    "subtitle": "Synamail Outlook eklentisinin bu Synaplan hesabını kullanmasına izin ver.",
+    "loading": "Oturumun denetleniyor…",
+    "confirmPrompt": "Bu Outlook'u şuna bağla:",
+    "connectButton": "Outlook'u bağla",
+    "scopesNote": "Mesajlara, sohbetlere, dosyalara ve RAG aramaya erişim sağlar.",
+    "connecting": "Güvenli bir API anahtarı oluşturuluyor…",
+    "successTitle": "Bağlandı.",
+    "successSubtitle": "Bu pencere kendiliğinden kapanmazsa kapatabilirsin.",
+    "errorTitle": "Bağlanılamadı",
+    "retry": "Tekrar dene",
+    "helpLine": "Bu pencere Synamail eklentisi tarafından açıldı. Kapatması güvenlidir.",
+    "errorMissingState": "state parametresi eksik. Eklentiyi yeniden açıp tekrar dene.",
+    "errorOfficeNotReady": "Office.js kullanılabilir değil. Bu sayfa Outlook içinden açılmalıdır.",
+    "errorNotSignedIn": "Oturum açmadın. Pencereyi yenileyip tekrar oturum aç.",
+    "errorIssuanceFailed": "Synaplan bu hesap için bir API anahtarı veremedi."
   },
   "welcome": "Hoş Geldiniz",
   "chat": {
