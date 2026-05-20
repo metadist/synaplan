@@ -79,7 +79,8 @@ export const useAuthStore = defineStore('auth', () => {
         error.value = result.error || 'Login failed'
         return false
       }
-    } catch {
+    } catch (err) {
+      console.error('Login post-auth error:', err)
       error.value = 'Network error'
       return false
     } finally {

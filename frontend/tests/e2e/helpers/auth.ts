@@ -93,34 +93,27 @@ export async function login(page: Page, credentials?: { user: string; pass: stri
 
   const creds = CREDENTIALS.getCredentials(credentials)
 
+  const consoleErrors: string[] = []
+  page.on('console', (msg) => {
+    if (msg.type() === 'error') consoleErrors.push(msg.text())
+  })
+
   await page.goto('/login')
 
   await page.fill(selectors.login.email, creds.user)
   await page.fill(selectors.login.password, creds.pass)
-
-  const [response] = await Promise.all([
-    page.waitForResponse(
-      (r) => r.url().includes('/api/v1/auth/login') && r.request().method() === 'POST'
-    ),
-    page.click(selectors.login.submit),
-  ])
-
-  if (!response.ok()) {
-    const body = await response.text().catch(() => '(no body)')
-    throw new Error(`Login API returned ${response.status()}: ${body}`)
-  }
+  await page.click(selectors.login.submit)
 
   try {
     await page.waitForURL((url) => !url.toString().includes('/login'), {
       timeout: TIMEOUTS.STANDARD,
     })
   } catch {
-    const consoleErrors = await page.evaluate(() =>
-      (window as unknown as { __e2eErrors?: string[] }).__e2eErrors?.join('; ')
-    )
+    const errorAlert = await page.textContent(selectors.login.errorAlert).catch(() => null)
     throw new Error(
-      `Login API succeeded (${response.status()}) but still on ${page.url()}.` +
-        (consoleErrors ? ` Console errors: ${consoleErrors}` : '')
+      `Login stuck on ${page.url()}.` +
+        (errorAlert ? ` UI error: "${errorAlert}"` : '') +
+        (consoleErrors.length ? ` Console errors: ${consoleErrors.join(' | ')}` : '')
     )
   }
 
