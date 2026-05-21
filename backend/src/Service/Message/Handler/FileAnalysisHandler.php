@@ -18,6 +18,13 @@ use Symfony\Component\DependencyInjection\Attribute\AutoconfigureTag;
  * - For images without extracted text: Uses Vision AI
  * - For audio files: Requires pre-transcribed text from PreProcessor
  *
+ * Issue #978: when the user attaches multiple files to a single message,
+ * combine the extracted text of ALL document/audio attachments into one
+ * chat-model prompt instead of silently dropping every file after the
+ * first. Images are still analysed one-at-a-time because the provider
+ * Vision APIs accept a single image per call, but their results are
+ * aggregated into a single response when multiple images are uploaded.
+ *
  * Note: File type extensions are defined in MessagePreProcessor to avoid duplication.
  */
 #[AutoconfigureTag('app.message.handler')]
@@ -56,10 +63,9 @@ final readonly class FileAnalysisHandler implements MessageHandlerInterface
 
         $userPrompt = $message->getText();
 
-        // Get file info
-        $fileInfo = $this->getFileInfo($message);
+        $filesInfo = $this->getFilesInfo($message);
 
-        if (!$fileInfo) {
+        if ([] === $filesInfo) {
             $this->logger->error('FileAnalysisHandler: No file found', [
                 'message_id' => $message->getId(),
             ]);
@@ -70,88 +76,62 @@ final readonly class FileAnalysisHandler implements MessageHandlerInterface
             ];
         }
 
-        $this->logger->info('FileAnalysisHandler: Processing file', [
-            'file_id' => $fileInfo['id'],
-            'file_name' => $fileInfo['name'],
-            'file_type' => $fileInfo['type'],
-            'has_extracted_text' => !empty($fileInfo['text']),
-            'extracted_text_length' => strlen($fileInfo['text'] ?? ''),
-            'is_image' => $fileInfo['is_image'],
-            'is_audio' => $fileInfo['is_audio'],
-            'is_document' => $fileInfo['is_document'],
-        ]);
+        $this->logFilesInfo($message, $filesInfo, streaming: false);
 
-        // Decision logic (explicit and ordered by priority):
-        // 1. Audio files: Must have transcribed text from PreProcessor
-        if ($fileInfo['is_audio']) {
-            if (!empty($fileInfo['text'])) {
-                // Issue #955: respond conversationally to the voice
-                // message instead of treating the audio file as a
-                // document to summarise.
-                return $this->handleAudioWithChatModel($message, $fileInfo, $userPrompt, $classification, $progressCallback);
-            }
-            // Audio without transcription → Error
-            $this->logger->error('FileAnalysisHandler: Audio file without transcription', [
-                'file_id' => $fileInfo['id'],
-                'file_name' => $fileInfo['name'],
-            ]);
+        $route = $this->routeFiles($filesInfo);
 
-            return [
-                'content' => 'Audio transcription failed or is not yet available. Please try again in a moment.',
-                'metadata' => ['error' => 'audio_not_transcribed'],
-            ];
+        switch ($route['kind']) {
+            case 'documents':
+                // Documents (optionally bundled with transcribed audio as extra
+                // context) — analyse all of them in a single chat-model call.
+                return $this->handleDocumentsWithChatModel(
+                    $message,
+                    $route['documents'],
+                    $userPrompt,
+                    $classification,
+                    $progressCallback,
+                );
+
+            case 'audio':
+                // Issue #955: respond conversationally to voice messages.
+                // Multiple recordings get their transcripts joined so the LLM
+                // sees the full spoken content (#978).
+                return $this->handleAudioWithChatModel(
+                    $message,
+                    $route['audio'],
+                    $userPrompt,
+                    $classification,
+                    $progressCallback,
+                );
+
+            case 'images':
+                return $this->handleImagesWithVisionModel(
+                    $message,
+                    $route['images'],
+                    $userPrompt,
+                    $classification,
+                    $progressCallback,
+                );
+
+            case 'document_extraction_pending':
+            case 'document_extraction_failed':
+                return $this->buildDocumentExtractionError($route);
+
+            case 'audio_not_transcribed':
+                return $this->buildAudioNotTranscribedError($route['audio_files']);
+
+            case 'unsupported':
+            default:
+                $this->logger->warning('FileAnalysisHandler: Unsupported file types only', [
+                    'message_id' => $message->getId(),
+                    'file_types' => array_map(static fn (array $f): ?string => $f['type'], $filesInfo),
+                ]);
+
+                return [
+                    'content' => 'This file type cannot be analyzed. Supported types include documents (such as PDF, Word, Excel), images (such as JPG, PNG, GIF), and audio files (such as MP3, OGG, WAV).',
+                    'metadata' => ['error' => 'unsupported_file_type'],
+                ];
         }
-
-        // 2. Documents (PDF, DOCX, etc.): Must have extracted text from PreProcessor
-        if ($fileInfo['is_document']) {
-            if (!empty($fileInfo['text'])) {
-                // Document with extracted text → Use Chat Model
-                return $this->handleWithChatModel($message, $fileInfo, $userPrompt, $classification, $progressCallback);
-            }
-
-            // Document without extracted text → distinguish between
-            // "still extracting" (issue #729 race) and "extraction failed"
-            $isStillExtracting = in_array(
-                $fileInfo['status'] ?? '',
-                ['uploaded', 'extracting'],
-                true
-            );
-            $this->logger->error('FileAnalysisHandler: Document without extracted text', [
-                'file_id' => $fileInfo['id'],
-                'file_name' => $fileInfo['name'],
-                'file_type' => $fileInfo['type'],
-                'file_status' => $fileInfo['status'] ?? null,
-                'still_extracting' => $isStillExtracting,
-            ]);
-
-            return [
-                'content' => $isStillExtracting
-                    ? 'The document is still being prepared. Please wait a moment and send your question again — extraction is usually fast, but very large documents can take a few extra seconds.'
-                    : "I couldn't read any text from this document. It may be empty, scanned without OCR, password-protected, or in an unsupported format. Try a different file or paste the text directly.",
-                'metadata' => [
-                    'error' => $isStillExtracting
-                        ? 'document_extraction_in_progress'
-                        : 'document_extraction_failed',
-                    'file_status' => $fileInfo['status'] ?? null,
-                ],
-            ];
-        }
-
-        // 3. Images → Use Vision Model
-        if ($fileInfo['is_image']) {
-            return $this->handleWithVisionModel($message, $fileInfo, $userPrompt, $classification, $progressCallback);
-        }
-
-        // 4. Other files → Error
-        $this->logger->warning('FileAnalysisHandler: Unsupported file type', [
-            'file_type' => $fileInfo['type'],
-            'file_name' => $fileInfo['name'],
-        ]);
-
-        return [
-            'content' => 'This file type cannot be analyzed. Supported types include documents (such as PDF, Word, Excel), images (such as JPG, PNG, GIF), and audio files (such as MP3, OGG, WAV).',
-            'metadata' => ['error' => 'unsupported_file_type'],
-        ];
     }
 
     /**
@@ -169,10 +149,9 @@ final readonly class FileAnalysisHandler implements MessageHandlerInterface
 
         $userPrompt = $message->getText();
 
-        // Get file info
-        $fileInfo = $this->getFileInfo($message);
+        $filesInfo = $this->getFilesInfo($message);
 
-        if (!$fileInfo) {
+        if ([] === $filesInfo) {
             $this->logger->error('FileAnalysisHandler: No file found (streaming)', [
                 'message_id' => $message->getId(),
             ]);
@@ -184,91 +163,69 @@ final readonly class FileAnalysisHandler implements MessageHandlerInterface
             ];
         }
 
-        $this->logger->info('FileAnalysisHandler: Processing file (streaming)', [
-            'file_id' => $fileInfo['id'],
-            'file_name' => $fileInfo['name'],
-            'file_type' => $fileInfo['type'],
-            'has_extracted_text' => !empty($fileInfo['text']),
-            'extracted_text_length' => strlen($fileInfo['text'] ?? ''),
-            'is_image' => $fileInfo['is_image'],
-            'is_audio' => $fileInfo['is_audio'],
-            'is_document' => $fileInfo['is_document'],
-        ]);
+        $this->logFilesInfo($message, $filesInfo, streaming: true);
 
-        // Decision logic (explicit and ordered by priority):
-        // 1. Audio files: Must have transcribed text from PreProcessor
-        if ($fileInfo['is_audio']) {
-            if (!empty($fileInfo['text'])) {
-                // Issue #955: respond conversationally to the voice
-                // message instead of treating the audio file as a
-                // document to summarise.
-                return $this->handleStreamAudioWithChatModel($message, $fileInfo, $userPrompt, $classification, $streamCallback, $progressCallback, $options);
-            }
-            // Audio without transcription → Error
-            $this->logger->error('FileAnalysisHandler: Audio file without transcription (streaming)', [
-                'file_id' => $fileInfo['id'],
-                'file_name' => $fileInfo['name'],
-            ]);
+        $route = $this->routeFiles($filesInfo);
 
-            $streamCallback('Audio transcription failed or is not yet available. Please try again in a moment.');
+        switch ($route['kind']) {
+            case 'documents':
+                return $this->handleStreamDocumentsWithChatModel(
+                    $message,
+                    $route['documents'],
+                    $userPrompt,
+                    $classification,
+                    $streamCallback,
+                    $progressCallback,
+                    $options,
+                );
 
-            return [
-                'metadata' => ['error' => 'audio_not_transcribed'],
-            ];
+            case 'audio':
+                return $this->handleStreamAudioWithChatModel(
+                    $message,
+                    $route['audio'],
+                    $userPrompt,
+                    $classification,
+                    $streamCallback,
+                    $progressCallback,
+                    $options,
+                );
+
+            case 'images':
+                return $this->handleStreamImagesWithVisionModel(
+                    $message,
+                    $route['images'],
+                    $userPrompt,
+                    $classification,
+                    $streamCallback,
+                    $progressCallback,
+                );
+
+            case 'document_extraction_pending':
+            case 'document_extraction_failed':
+                $error = $this->buildDocumentExtractionError($route);
+                $streamCallback($error['content']);
+
+                return ['metadata' => $error['metadata']];
+
+            case 'audio_not_transcribed':
+                $error = $this->buildAudioNotTranscribedError($route['audio_files']);
+                $streamCallback($error['content']);
+
+                return ['metadata' => $error['metadata']];
+
+            case 'unsupported':
+            default:
+                $this->logger->warning('FileAnalysisHandler: Unsupported file types only (streaming)', [
+                    'message_id' => $message->getId(),
+                    'file_types' => array_map(static fn (array $f): ?string => $f['type'], $filesInfo),
+                ]);
+
+                $streamCallback('This file type cannot be analyzed. Supported types include documents (such as PDF, Word, Excel), images (such as JPG, PNG, GIF), and audio files (such as MP3, OGG, WAV).');
+
+                return [
+                    'metadata' => ['error' => 'unsupported_file_type'],
+                ];
         }
-
-        // 2. Documents (PDF, DOCX, etc.): Must have extracted text from PreProcessor
-        if ($fileInfo['is_document']) {
-            if (!empty($fileInfo['text'])) {
-                // Document with extracted text → Use Chat Model with streaming
-                return $this->handleStreamWithChatModel($message, $fileInfo, $userPrompt, $classification, $streamCallback, $progressCallback, $options);
-            }
-
-            // Document without extracted text → distinguish between
-            // "still extracting" (issue #729 race) and "extraction failed"
-            $isStillExtracting = in_array(
-                $fileInfo['status'] ?? '',
-                ['uploaded', 'extracting'],
-                true
-            );
-            $this->logger->error('FileAnalysisHandler: Document without extracted text (streaming)', [
-                'file_id' => $fileInfo['id'],
-                'file_name' => $fileInfo['name'],
-                'file_type' => $fileInfo['type'],
-                'file_status' => $fileInfo['status'] ?? null,
-                'still_extracting' => $isStillExtracting,
-            ]);
-
-            $streamCallback($isStillExtracting
-                ? 'The document is still being prepared. Please wait a moment and send your question again — extraction is usually fast, but very large documents can take a few extra seconds.'
-                : "I couldn't read any text from this document. It may be empty, scanned without OCR, password-protected, or in an unsupported format. Try a different file or paste the text directly.");
-
-            return [
-                'metadata' => [
-                    'error' => $isStillExtracting
-                        ? 'document_extraction_in_progress'
-                        : 'document_extraction_failed',
-                    'file_status' => $fileInfo['status'] ?? null,
-                ],
-            ];
-        }
-
-        // 3. Images → Use Vision Model (non-streaming, then output)
-        if ($fileInfo['is_image']) {
-            return $this->handleStreamWithVisionModel($message, $fileInfo, $userPrompt, $classification, $streamCallback, $progressCallback);
-        }
-
-        // 4. Other files → Error
-        $this->logger->warning('FileAnalysisHandler: Unsupported file type (streaming)', [
-            'file_type' => $fileInfo['type'],
-            'file_name' => $fileInfo['name'],
-        ]);
-
-        $streamCallback('This file type cannot be analyzed. Supported types include documents (such as PDF, Word, Excel), images (such as JPG, PNG, GIF), and audio files (such as MP3, OGG, WAV).');
-
-        return [
-            'metadata' => ['error' => 'unsupported_file_type'],
-        ];
     }
 
     /**
@@ -280,17 +237,27 @@ final readonly class FileAnalysisHandler implements MessageHandlerInterface
      * meta-commentary like
      * "The OGG audio file contains a very short recording that says…".
      *
+     * Issue #978: when several voice notes are attached to the same
+     * message, every transcript is included so the LLM can reply to
+     * the full spoken content instead of just the first recording.
+     *
+     * @param list<array<string, mixed>> $audioFiles
+     *
      * @return array{system: string, prompt: string}
      */
-    private function buildAudioConversationalPrompt(array $fileInfo, string $userPrompt): array
+    private function buildAudioConversationalPrompt(array $audioFiles, string $userPrompt): array
     {
-        $transcript = trim((string) ($fileInfo['text'] ?? ''));
+        $transcript = $this->joinAudioTranscripts($audioFiles);
         $cleanedUserPrompt = trim($userPrompt);
 
         $isGeneric = $this->isGenericAudioPlaceholder($cleanedUserPrompt, $transcript);
 
+        $intro = count($audioFiles) > 1
+            ? 'The user sent you '.count($audioFiles).' voice messages. The transcripts of what they actually said are provided below in order.'
+            : 'The user sent you a voice message. The transcript of what they actually said is provided below.';
+
         $systemPrompt =
-            "The user sent you a voice message. The transcript of what they actually said is provided below.\n\n"
+            $intro."\n\n"
             ."Respond directly and conversationally to the transcript, exactly as you would to a normal text chat message.\n\n"
             ."IMPORTANT — do NOT:\n"
             ."- describe, summarize, or analyze the audio file itself\n"
@@ -314,6 +281,37 @@ final readonly class FileAnalysisHandler implements MessageHandlerInterface
             'system' => $systemPrompt,
             'prompt' => '' !== $finalPrompt ? $finalPrompt : $transcript,
         ];
+    }
+
+    /**
+     * Concatenate the transcripts of every uploaded voice note. When
+     * more than one recording is attached we label them so the LLM can
+     * tell them apart; for the single-file case we preserve the old
+     * (label-free) shape so existing tests/prompt expectations don't
+     * regress.
+     *
+     * @param list<array<string, mixed>> $audioFiles
+     */
+    private function joinAudioTranscripts(array $audioFiles): string
+    {
+        if (1 === count($audioFiles)) {
+            return trim((string) ($audioFiles[0]['text'] ?? ''));
+        }
+
+        $parts = [];
+        foreach ($audioFiles as $index => $audio) {
+            $transcript = trim((string) ($audio['text'] ?? ''));
+            if ('' === $transcript) {
+                continue;
+            }
+            $label = 'Voice message '.($index + 1);
+            if (!empty($audio['name'])) {
+                $label .= ' ('.$audio['name'].')';
+            }
+            $parts[] = "--- {$label} ---\n".$transcript;
+        }
+
+        return implode("\n\n", $parts);
     }
 
     /**
@@ -360,19 +358,23 @@ final readonly class FileAnalysisHandler implements MessageHandlerInterface
     }
 
     /**
-     * Handle voice message (audio with transcript) using Chat Model —
-     * conversational reply path (issue #955).
+     * Handle voice message(s) (audio with transcript) using Chat Model —
+     * conversational reply path (issue #955). Multiple voice notes
+     * attached to the same message are merged so every transcript
+     * reaches the LLM (issue #978).
+     *
+     * @param list<array<string, mixed>> $audioFiles
      */
     private function handleAudioWithChatModel(
         Message $message,
-        array $fileInfo,
+        array $audioFiles,
         string $userPrompt,
         array $classification,
         ?callable $progressCallback,
     ): array {
         $this->notify($progressCallback, 'generating', 'Replying to voice message...');
 
-        $prompts = $this->buildAudioConversationalPrompt($fileInfo, $userPrompt);
+        $prompts = $this->buildAudioConversationalPrompt($audioFiles, $userPrompt);
 
         $effectiveUserId = $this->modelConfigService->getEffectiveUserIdForMessage($message);
         $modelId = $classification['model_id']
@@ -392,7 +394,8 @@ final readonly class FileAnalysisHandler implements MessageHandlerInterface
             'model' => $modelName,
             'user_id' => $message->getUserId(),
             'effective_user_id' => $effectiveUserId,
-            'transcript_length' => strlen($fileInfo['text'] ?? ''),
+            'transcript_length' => strlen($prompts['system']),
+            'voice_message_count' => count($audioFiles),
         ]);
 
         try {
@@ -419,14 +422,15 @@ final readonly class FileAnalysisHandler implements MessageHandlerInterface
                     'provider' => $result['provider'] ?? $provider ?? 'unknown',
                     'model' => $result['model'] ?? $modelName ?? 'unknown',
                     'model_id' => $modelId,
-                    'analyzed_file' => $fileInfo['name'],
+                    'analyzed_file' => $this->describeFileList($audioFiles),
+                    'analyzed_file_count' => count($audioFiles),
                     'analysis_type' => 'voice_message_reply',
                 ],
             ];
         } catch (\Exception $e) {
             $this->logger->error('FileAnalysisHandler: Voice message reply failed', [
                 'error' => $e->getMessage(),
-                'file' => $fileInfo['name'],
+                'files' => $this->describeFileList($audioFiles),
             ]);
 
             return [
@@ -441,11 +445,13 @@ final readonly class FileAnalysisHandler implements MessageHandlerInterface
     }
 
     /**
-     * Handle voice message with streaming Chat Model (issue #955).
+     * Handle voice message(s) with streaming Chat Model (issues #955, #978).
+     *
+     * @param list<array<string, mixed>> $audioFiles
      */
     private function handleStreamAudioWithChatModel(
         Message $message,
-        array $fileInfo,
+        array $audioFiles,
         string $userPrompt,
         array $classification,
         callable $streamCallback,
@@ -454,7 +460,7 @@ final readonly class FileAnalysisHandler implements MessageHandlerInterface
     ): array {
         $this->notify($progressCallback, 'generating', 'Replying to voice message...');
 
-        $prompts = $this->buildAudioConversationalPrompt($fileInfo, $userPrompt);
+        $prompts = $this->buildAudioConversationalPrompt($audioFiles, $userPrompt);
 
         $effectiveUserId = $this->modelConfigService->getEffectiveUserIdForMessage($message);
         $modelId = $classification['model_id']
@@ -474,7 +480,8 @@ final readonly class FileAnalysisHandler implements MessageHandlerInterface
             'model' => $modelName,
             'user_id' => $message->getUserId(),
             'effective_user_id' => $effectiveUserId,
-            'transcript_length' => strlen($fileInfo['text'] ?? ''),
+            'transcript_length' => strlen($prompts['system']),
+            'voice_message_count' => count($audioFiles),
         ]);
 
         try {
@@ -501,14 +508,15 @@ final readonly class FileAnalysisHandler implements MessageHandlerInterface
                     'provider' => $result['provider'] ?? $provider ?? 'unknown',
                     'model' => $result['model'] ?? $modelName ?? 'unknown',
                     'model_id' => $modelId,
-                    'analyzed_file' => $fileInfo['name'],
+                    'analyzed_file' => $this->describeFileList($audioFiles),
+                    'analyzed_file_count' => count($audioFiles),
                     'analysis_type' => 'voice_message_reply',
                 ],
             ];
         } catch (\Exception $e) {
             $this->logger->error('FileAnalysisHandler: Streaming voice message reply failed', [
                 'error' => $e->getMessage(),
-                'file' => $fileInfo['name'],
+                'files' => $this->describeFileList($audioFiles),
             ]);
 
             $streamCallback('Voice message reply failed: '.$e->getMessage());
@@ -524,28 +532,28 @@ final readonly class FileAnalysisHandler implements MessageHandlerInterface
     }
 
     /**
-     * Handle document with pre-extracted text using Chat Model.
+     * Handle one-or-more documents with pre-extracted text using the
+     * Chat Model. Issue #978: every attached document's content is
+     * concatenated into the system prompt so the LLM can reason about
+     * all uploaded files, not just the first one.
+     *
+     * @param list<array<string, mixed>> $documents
      */
-    private function handleWithChatModel(
+    private function handleDocumentsWithChatModel(
         Message $message,
-        array $fileInfo,
+        array $documents,
         string $userPrompt,
         array $classification,
         ?callable $progressCallback,
     ): array {
-        $this->notify($progressCallback, 'generating', 'Analyzing document content...');
+        $this->notify(
+            $progressCallback,
+            'generating',
+            count($documents) > 1 ? 'Analyzing document contents...' : 'Analyzing document content...',
+        );
 
-        // Build context with extracted file content
-        $systemPrompt = "You are analyzing a document. The user has uploaded a file and wants to know about its contents.\n\n";
-        $systemPrompt .= "=== FILE INFORMATION ===\n";
-        $systemPrompt .= "Filename: {$fileInfo['name']}\n";
-        $systemPrompt .= "Type: {$fileInfo['type']}\n\n";
-        $systemPrompt .= "=== EXTRACTED CONTENT ===\n";
-        $systemPrompt .= $fileInfo['text']."\n";
-        $systemPrompt .= "=== END OF CONTENT ===\n\n";
-        $systemPrompt .= 'Answer the user\'s question about this document. If they ask what\'s in the file, summarize the key points.';
-
-        $finalPrompt = !empty($userPrompt) ? $userPrompt : 'What is in this document? Please summarize the content.';
+        $systemPrompt = $this->buildDocumentsSystemPrompt($documents);
+        $finalPrompt = $this->buildDocumentsUserPrompt($userPrompt, $documents);
 
         // Model priority: Again model_id > Task-prompt aiModel > DB default (ANALYZE → CHAT)
         $effectiveUserId = $this->modelConfigService->getEffectiveUserIdForMessage($message);
@@ -567,6 +575,7 @@ final readonly class FileAnalysisHandler implements MessageHandlerInterface
             'model' => $modelName,
             'user_id' => $message->getUserId(),
             'effective_user_id' => $effectiveUserId,
+            'document_count' => count($documents),
         ]);
 
         try {
@@ -593,14 +602,15 @@ final readonly class FileAnalysisHandler implements MessageHandlerInterface
                     'provider' => $result['provider'] ?? $provider ?? 'unknown',
                     'model' => $result['model'] ?? $modelName ?? 'unknown',
                     'model_id' => $modelId,
-                    'analyzed_file' => $fileInfo['name'],
+                    'analyzed_file' => $this->describeFileList($documents),
+                    'analyzed_file_count' => count($documents),
                     'analysis_type' => 'chat_with_extracted_text',
                 ],
             ];
         } catch (\Exception $e) {
             $this->logger->error('FileAnalysisHandler: Chat analysis failed', [
                 'error' => $e->getMessage(),
-                'file' => $fileInfo['name'],
+                'files' => $this->describeFileList($documents),
             ]);
 
             return [
@@ -615,30 +625,27 @@ final readonly class FileAnalysisHandler implements MessageHandlerInterface
     }
 
     /**
-     * Handle document with streaming using Chat Model.
+     * Streaming variant of {@see handleDocumentsWithChatModel}.
+     *
+     * @param list<array<string, mixed>> $documents
      */
-    private function handleStreamWithChatModel(
+    private function handleStreamDocumentsWithChatModel(
         Message $message,
-        array $fileInfo,
+        array $documents,
         string $userPrompt,
         array $classification,
         callable $streamCallback,
         ?callable $progressCallback,
         array $options,
     ): array {
-        $this->notify($progressCallback, 'generating', 'Analyzing document content...');
+        $this->notify(
+            $progressCallback,
+            'generating',
+            count($documents) > 1 ? 'Analyzing document contents...' : 'Analyzing document content...',
+        );
 
-        // Build context with extracted file content
-        $systemPrompt = "You are analyzing a document. The user has uploaded a file and wants to know about its contents.\n\n";
-        $systemPrompt .= "=== FILE INFORMATION ===\n";
-        $systemPrompt .= "Filename: {$fileInfo['name']}\n";
-        $systemPrompt .= "Type: {$fileInfo['type']}\n\n";
-        $systemPrompt .= "=== EXTRACTED CONTENT ===\n";
-        $systemPrompt .= $fileInfo['text']."\n";
-        $systemPrompt .= "=== END OF CONTENT ===\n\n";
-        $systemPrompt .= 'Answer the user\'s question about this document. If they ask what\'s in the file, summarize the key points.';
-
-        $finalPrompt = !empty($userPrompt) ? $userPrompt : 'What is in this document? Please summarize the content.';
+        $systemPrompt = $this->buildDocumentsSystemPrompt($documents);
+        $finalPrompt = $this->buildDocumentsUserPrompt($userPrompt, $documents);
 
         // Model priority: Again model_id > Task-prompt aiModel > DB default (ANALYZE → CHAT)
         $effectiveUserId = $this->modelConfigService->getEffectiveUserIdForMessage($message);
@@ -660,6 +667,7 @@ final readonly class FileAnalysisHandler implements MessageHandlerInterface
             'model' => $modelName,
             'user_id' => $message->getUserId(),
             'effective_user_id' => $effectiveUserId,
+            'document_count' => count($documents),
         ]);
 
         try {
@@ -668,7 +676,6 @@ final readonly class FileAnalysisHandler implements MessageHandlerInterface
                 ['role' => 'user', 'content' => $finalPrompt],
             ];
 
-            // Use streaming chat
             $result = $this->aiFacade->chatStream(
                 $messages,
                 $streamCallback,
@@ -687,14 +694,15 @@ final readonly class FileAnalysisHandler implements MessageHandlerInterface
                     'provider' => $result['provider'] ?? $provider ?? 'unknown',
                     'model' => $result['model'] ?? $modelName ?? 'unknown',
                     'model_id' => $modelId,
-                    'analyzed_file' => $fileInfo['name'],
+                    'analyzed_file' => $this->describeFileList($documents),
+                    'analyzed_file_count' => count($documents),
                     'analysis_type' => 'chat_with_extracted_text',
                 ],
             ];
         } catch (\Exception $e) {
             $this->logger->error('FileAnalysisHandler: Chat streaming analysis failed', [
                 'error' => $e->getMessage(),
-                'file' => $fileInfo['name'],
+                'files' => $this->describeFileList($documents),
             ]);
 
             $streamCallback('Document analysis failed: '.$e->getMessage());
@@ -710,34 +718,80 @@ final readonly class FileAnalysisHandler implements MessageHandlerInterface
     }
 
     /**
-     * Handle image using Vision Model.
+     * Build the system prompt that bundles the extracted text of every
+     * uploaded document. Single-file uploads keep the original layout
+     * so the prompt the LLM sees is unchanged for the common case.
+     *
+     * @param list<array<string, mixed>> $documents
      */
-    private function handleWithVisionModel(
+    private function buildDocumentsSystemPrompt(array $documents): string
+    {
+        if (1 === count($documents)) {
+            $doc = $documents[0];
+            $prompt = "You are analyzing a document. The user has uploaded a file and wants to know about its contents.\n\n";
+            $prompt .= "=== FILE INFORMATION ===\n";
+            $prompt .= "Filename: {$doc['name']}\n";
+            $prompt .= "Type: {$doc['type']}\n\n";
+            $prompt .= "=== EXTRACTED CONTENT ===\n";
+            $prompt .= $doc['text']."\n";
+            $prompt .= "=== END OF CONTENT ===\n\n";
+            $prompt .= 'Answer the user\'s question about this document. If they ask what\'s in the file, summarize the key points.';
+
+            return $prompt;
+        }
+
+        $count = count($documents);
+        $prompt = "You are analyzing {$count} documents. The user has uploaded multiple files and wants to know about their contents. Treat the documents as a related set — cross-reference them when the user's question spans more than one file, and clearly attribute any quotes or facts to the originating filename.\n\n";
+
+        foreach ($documents as $index => $doc) {
+            $position = $index + 1;
+            $prompt .= "=== FILE {$position} OF {$count} INFORMATION ===\n";
+            $prompt .= "Filename: {$doc['name']}\n";
+            $prompt .= "Type: {$doc['type']}\n\n";
+            $prompt .= "=== FILE {$position} EXTRACTED CONTENT ===\n";
+            $prompt .= $doc['text']."\n";
+            $prompt .= "=== END OF FILE {$position} CONTENT ===\n\n";
+        }
+
+        $prompt .= 'Answer the user\'s question using information from any of the files above. When summarizing, list the key points per file so the user can tell which document each statement came from.';
+
+        return $prompt;
+    }
+
+    /**
+     * Pick a sensible default user prompt when the user did not type
+     * anything alongside their uploads.
+     *
+     * @param list<array<string, mixed>> $documents
+     */
+    private function buildDocumentsUserPrompt(string $userPrompt, array $documents): string
+    {
+        $userPrompt = trim($userPrompt);
+        if ('' !== $userPrompt) {
+            return $userPrompt;
+        }
+
+        return count($documents) > 1
+            ? 'What is in these documents? Please summarize the content of each file.'
+            : 'What is in this document? Please summarize the content.';
+    }
+
+    /**
+     * Handle one-or-more images using the Vision Model. Issue #978:
+     * vision providers only accept a single image per request, so
+     * multi-image uploads are dispatched one-at-a-time and the
+     * per-image descriptions are aggregated into a single reply that
+     * the rest of the system handles like a normal handler result.
+     *
+     * @param list<array<string, mixed>> $images
+     */
+    private function handleImagesWithVisionModel(
         Message $message,
-        array $fileInfo,
+        array $images,
         string $userPrompt,
         array $classification,
         ?callable $progressCallback,
     ): array {
-        $this->notify($progressCallback, 'analyzing', 'Analyzing image...');
-
-        $analysisPrompt = !empty($userPrompt) ? $userPrompt : 'Please describe this image in detail.';
-
-        // Check if file exists
-        $fullPath = $this->uploadDir.'/'.$fileInfo['path'];
-        if (!file_exists($fullPath)) {
-            $this->logger->error('FileAnalysisHandler: File not found on disk', [
-                'path' => $fileInfo['path'],
-                'full_path' => $fullPath,
-            ]);
-
-            return [
-                'content' => "File not found: {$fileInfo['name']}",
-                'metadata' => ['error' => 'file_not_found'],
-            ];
-        }
-
-        // Model priority: Again model_id > Task-prompt aiModel > DB default (PIC2TEXT)
         $effectiveUserId = $this->modelConfigService->getEffectiveUserIdForMessage($message);
         $modelId = $classification['model_id']
             ?? $this->resolvePromptAiModel($classification)
@@ -750,68 +804,63 @@ final readonly class FileAnalysisHandler implements MessageHandlerInterface
             $modelName = $this->modelConfigService->getModelName($modelId);
         }
 
-        $this->logger->info('FileAnalysisHandler: Using Vision model for image', [
+        $this->logger->info('FileAnalysisHandler: Using Vision model for image(s)', [
             'model_id' => $modelId,
             'provider' => $provider,
             'model' => $modelName,
             'user_id' => $message->getUserId(),
             'effective_user_id' => $effectiveUserId,
+            'image_count' => count($images),
         ]);
 
-        try {
-            $result = $this->aiFacade->analyzeImage(
-                $fileInfo['path'],
-                $analysisPrompt,
-                $message->getUserId(),
-                [
-                    'provider' => $provider,
-                    'model' => $modelName,
-                    'max_tokens' => 4000,
-                ]
-            );
+        $perImage = $this->analyzeImageBatch($message, $images, $userPrompt, $provider, $modelName, $progressCallback);
+        $content = $this->combineImageAnalyses($perImage, $images);
 
-            $this->notify($progressCallback, 'complete', 'Analysis complete.');
+        $this->notify($progressCallback, 'complete', 'Analysis complete.');
 
-            return [
-                'content' => $result['content'],
-                'metadata' => [
-                    'provider' => $result['provider'] ?? 'unknown',
-                    'model' => $result['model'] ?? 'unknown',
-                    'model_id' => $modelId,
-                    'analyzed_file' => $fileInfo['name'],
-                    'analysis_type' => 'vision',
-                ],
-            ];
-        } catch (\Exception $e) {
-            $this->logger->error('FileAnalysisHandler: Vision analysis failed', [
-                'error' => $e->getMessage(),
-                'file' => $fileInfo['name'],
-            ]);
-
-            return [
-                'content' => 'Image analysis failed: '.$e->getMessage(),
-                'metadata' => [
-                    'error' => $e->getMessage(),
-                    'provider' => $provider,
-                    'model' => $modelName,
-                ],
-            ];
+        $firstSuccess = null;
+        foreach ($perImage as $entry) {
+            if (isset($entry['content'])) {
+                $firstSuccess = $entry;
+                break;
+            }
         }
+
+        return [
+            'content' => $content,
+            'metadata' => [
+                'provider' => $firstSuccess['provider'] ?? $provider ?? 'unknown',
+                'model' => $firstSuccess['model'] ?? $modelName ?? 'unknown',
+                'model_id' => $modelId,
+                'analyzed_file' => $this->describeFileList($images),
+                'analyzed_file_count' => count($images),
+                'analysis_type' => 'vision',
+            ],
+        ];
     }
 
     /**
-     * Handle image with streaming using Vision Model.
+     * Streaming variant — vision providers do not stream, so the
+     * aggregated result is emitted in one chunk after every image has
+     * been analyzed.
+     *
+     * @param list<array<string, mixed>> $images
      */
-    private function handleStreamWithVisionModel(
+    private function handleStreamImagesWithVisionModel(
         Message $message,
-        array $fileInfo,
+        array $images,
         string $userPrompt,
         array $classification,
         callable $streamCallback,
         ?callable $progressCallback,
     ): array {
-        // Vision AI doesn't support streaming, so get full result and output it
-        $result = $this->handleWithVisionModel($message, $fileInfo, $userPrompt, $classification, $progressCallback);
+        $result = $this->handleImagesWithVisionModel(
+            $message,
+            $images,
+            $userPrompt,
+            $classification,
+            $progressCallback,
+        );
 
         if (isset($result['content'])) {
             $streamCallback($result['content']);
@@ -823,62 +872,459 @@ final readonly class FileAnalysisHandler implements MessageHandlerInterface
     }
 
     /**
-     * Get file information from message.
+     * Dispatch one vision call per image and capture either a
+     * `content` field on success or an `error` field on failure so the
+     * aggregator can render a partial response without throwing.
+     *
+     * @param list<array<string, mixed>> $images
+     *
+     * @return list<array<string, mixed>>
      */
-    private function getFileInfo(Message $message): ?array
-    {
-        // Check for files in the MessageFiles relation
-        $files = $message->getFiles();
-        if ($files->count() > 0) {
-            /** @var File $file */
-            $file = $files->first();
+    private function analyzeImageBatch(
+        Message $message,
+        array $images,
+        string $userPrompt,
+        ?string $provider,
+        ?string $modelName,
+        ?callable $progressCallback,
+    ): array {
+        $perImagePrompt = !empty($userPrompt)
+            ? $userPrompt
+            : (count($images) > 1
+                ? 'Please describe this image in detail. The user uploaded several images in the same message — describe each one independently.'
+                : 'Please describe this image in detail.');
 
-            $fileType = strtolower($file->getFileType());
-            $isImage = in_array($fileType, MessagePreProcessor::IMAGE_EXTENSIONS, true);
-            $isAudio = in_array($fileType, MessagePreProcessor::AUDIO_EXTENSIONS, true);
-            $isDocument = in_array($fileType, MessagePreProcessor::DOCUMENT_EXTENSIONS, true);
+        $results = [];
 
-            // Normalize path to be relative to the upload directory (var/uploads).
-            // DB values should be stored relative; older/legacy values may contain "/uploads/" or full URLs.
-            $filePath = $this->normalizeRelativeUploadPath($file->getFilePath());
+        foreach ($images as $index => $image) {
+            $progressMessage = count($images) > 1
+                ? sprintf('Analyzing image %d of %d...', $index + 1, count($images))
+                : 'Analyzing image...';
+            $this->notify($progressCallback, 'analyzing', $progressMessage);
 
-            return [
-                'id' => $file->getId(),
-                'name' => $file->getFileName(),
-                'type' => $file->getFileType(),
-                'path' => $filePath,
-                'text' => $file->getFileText(), // Pre-extracted text!
-                'status' => $file->getStatus(),
-                'is_image' => $isImage,
-                'is_audio' => $isAudio,
-                'is_document' => $isDocument,
-            ];
+            $fullPath = $this->uploadDir.'/'.$image['path'];
+            if (!file_exists($fullPath)) {
+                $this->logger->error('FileAnalysisHandler: File not found on disk', [
+                    'path' => $image['path'],
+                    'full_path' => $fullPath,
+                    'image_index' => $index,
+                ]);
+                $results[] = [
+                    'name' => $image['name'],
+                    'error' => 'file_not_found',
+                    'message' => "File not found: {$image['name']}",
+                ];
+
+                continue;
+            }
+
+            try {
+                $analysis = $this->aiFacade->analyzeImage(
+                    $image['path'],
+                    $perImagePrompt,
+                    $message->getUserId(),
+                    [
+                        'provider' => $provider,
+                        'model' => $modelName,
+                        'max_tokens' => 4000,
+                    ]
+                );
+
+                $results[] = [
+                    'name' => $image['name'],
+                    'content' => $analysis['content'] ?? '',
+                    'provider' => $analysis['provider'] ?? null,
+                    'model' => $analysis['model'] ?? null,
+                ];
+            } catch (\Exception $e) {
+                $this->logger->error('FileAnalysisHandler: Vision analysis failed', [
+                    'error' => $e->getMessage(),
+                    'file' => $image['name'],
+                    'image_index' => $index,
+                ]);
+
+                $results[] = [
+                    'name' => $image['name'],
+                    'error' => 'analysis_failed',
+                    'message' => 'Image analysis failed: '.$e->getMessage(),
+                ];
+            }
         }
 
-        // Legacy: Check for file path in message
+        return $results;
+    }
+
+    /**
+     * Merge per-image vision results into a single reply string. Keeps
+     * the single-image output identical to the legacy format so that
+     * existing UX (and any test snapshots) are not affected.
+     *
+     * @param list<array<string, mixed>> $results
+     * @param list<array<string, mixed>> $images
+     */
+    private function combineImageAnalyses(array $results, array $images): string
+    {
+        if (1 === count($results)) {
+            $only = $results[0];
+
+            return $only['content'] ?? $only['message'] ?? 'Image analysis failed.';
+        }
+
+        $parts = [];
+        foreach ($results as $index => $entry) {
+            $position = $index + 1;
+            $name = $entry['name'] ?? ($images[$index]['name'] ?? 'image '.$position);
+            $body = $entry['content'] ?? $entry['message'] ?? 'Image analysis failed.';
+            $parts[] = "### Image {$position}: {$name}\n\n{$body}";
+        }
+
+        return implode("\n\n---\n\n", $parts);
+    }
+
+    /**
+     * Get file information for every attachment on the message. Issue
+     * #978: returning the full collection (instead of only the first
+     * row) is the foundation for the multi-document routing in
+     * {@see routeFiles()}.
+     *
+     * @return list<array<string, mixed>>
+     */
+    private function getFilesInfo(Message $message): array
+    {
+        $infos = [];
+
+        $files = $message->getFiles();
+        if ($files->count() > 0) {
+            foreach ($files as $file) {
+                /* @var File $file */
+                $infos[] = $this->buildFileInfoFromEntity($file);
+            }
+
+            return $infos;
+        }
+
+        // Legacy single-file fallback (BMESSAGES.BFILEPATH / BFILETEXT).
         $filePath = $message->getFilePath();
         if ($filePath) {
             $extension = strtolower(pathinfo($filePath, PATHINFO_EXTENSION));
-            $isImage = in_array($extension, MessagePreProcessor::IMAGE_EXTENSIONS, true);
-            $isAudio = in_array($extension, MessagePreProcessor::AUDIO_EXTENSIONS, true);
-            $isDocument = in_array($extension, MessagePreProcessor::DOCUMENT_EXTENSIONS, true);
+            $infos[] = $this->buildFileInfo(
+                id: null,
+                name: basename($filePath),
+                type: $extension,
+                rawPath: $filePath,
+                text: $message->getFileText() ?: '',
+                status: null,
+            );
+        }
 
-            $filePath = $this->normalizeRelativeUploadPath($filePath);
+        return $infos;
+    }
 
+    /**
+     * @return array<string, mixed>
+     */
+    private function buildFileInfoFromEntity(File $file): array
+    {
+        return $this->buildFileInfo(
+            id: $file->getId(),
+            name: $file->getFileName(),
+            type: $file->getFileType(),
+            rawPath: $file->getFilePath(),
+            text: $file->getFileText(),
+            status: $file->getStatus(),
+        );
+    }
+
+    /**
+     * Build a normalized file-info row from raw values. Keeping a
+     * single factory keeps the legacy single-file path and the modern
+     * `File` entity path in sync, so the routing layer never has to
+     * special-case where a row originated.
+     *
+     * @return array<string, mixed>
+     */
+    private function buildFileInfo(
+        ?int $id,
+        ?string $name,
+        ?string $type,
+        ?string $rawPath,
+        ?string $text,
+        ?string $status,
+    ): array {
+        $normalizedType = strtolower((string) $type);
+        $isImage = in_array($normalizedType, MessagePreProcessor::IMAGE_EXTENSIONS, true);
+        $isAudio = in_array($normalizedType, MessagePreProcessor::AUDIO_EXTENSIONS, true);
+        $isDocument = in_array($normalizedType, MessagePreProcessor::DOCUMENT_EXTENSIONS, true);
+
+        // Normalize path to be relative to the upload directory (var/uploads).
+        // DB values should be stored relative; older/legacy values may contain "/uploads/" or full URLs.
+        $path = $this->normalizeRelativeUploadPath((string) $rawPath);
+
+        return [
+            'id' => $id,
+            'name' => (string) ($name ?? basename($path)),
+            'type' => (string) $type,
+            'path' => $path,
+            'text' => (string) ($text ?? ''),
+            'status' => $status,
+            'is_image' => $isImage,
+            'is_audio' => $isAudio,
+            'is_document' => $isDocument,
+        ];
+    }
+
+    /**
+     * Decide which handler path the uploaded files should travel down.
+     * Returns a `kind` discriminator plus the buckets that path
+     * consumes so the caller can switch on it without re-doing the
+     * categorization.
+     *
+     * Priority rules:
+     *  1. Documents with extracted text → chat-model "document" path.
+     *     Any transcribed audio is appended as virtual "transcript"
+     *     documents so its content reaches the model too.
+     *  2. Otherwise audio-only (one or many) with transcripts → the
+     *     conversational voice-reply path.
+     *  3. Otherwise images → the vision path.
+     *  4. Otherwise we surface the first applicable error
+     *     (missing transcript / document still extracting / unsupported).
+     *
+     * @param list<array<string, mixed>> $filesInfo
+     *
+     * @return array{
+     *     kind: string,
+     *     documents?: list<array<string, mixed>>,
+     *     audio?: list<array<string, mixed>>,
+     *     images?: list<array<string, mixed>>,
+     *     audio_files?: list<array<string, mixed>>,
+     *     pending_documents?: list<array<string, mixed>>,
+     *     failed_documents?: list<array<string, mixed>>
+     * }
+     */
+    private function routeFiles(array $filesInfo): array
+    {
+        $documentsWithText = [];
+        $documentsPending = [];
+        $documentsFailed = [];
+        $audioWithText = [];
+        $audioMissingText = [];
+        $images = [];
+
+        foreach ($filesInfo as $info) {
+            if ($info['is_audio']) {
+                if ('' !== trim((string) ($info['text'] ?? ''))) {
+                    $audioWithText[] = $info;
+                } else {
+                    $audioMissingText[] = $info;
+                }
+                continue;
+            }
+
+            if ($info['is_document']) {
+                if ('' !== trim((string) ($info['text'] ?? ''))) {
+                    $documentsWithText[] = $info;
+                } else {
+                    $isStillExtracting = in_array(
+                        (string) ($info['status'] ?? ''),
+                        ['uploaded', 'extracting'],
+                        true
+                    );
+                    if ($isStillExtracting) {
+                        $documentsPending[] = $info;
+                    } else {
+                        $documentsFailed[] = $info;
+                    }
+                }
+                continue;
+            }
+
+            if ($info['is_image']) {
+                $images[] = $info;
+            }
+        }
+
+        // 1. Documents (with text) take priority. Merge any transcribed
+        //    audio into the document set as a virtual transcript file so
+        //    the chat model still sees the spoken content alongside the
+        //    PDFs/MDs the user attached.
+        if ([] !== $documentsWithText) {
+            $documents = $documentsWithText;
+            foreach ($audioWithText as $audio) {
+                $documents[] = $this->wrapAudioAsTranscriptDocument($audio);
+            }
+
+            return ['kind' => 'documents', 'documents' => $documents];
+        }
+
+        // 2. Audio-only message(s) with usable transcripts → reply
+        //    conversationally to the spoken content.
+        if ([] !== $audioWithText && [] === $images) {
+            return ['kind' => 'audio', 'audio' => $audioWithText];
+        }
+
+        // 3. Images only → vision path. We tolerate transcribed audio
+        //    being present alongside images by passing the spoken
+        //    content as the per-image prompt below isn't ideal, so we
+        //    fall through to vision and rely on its prompt for now.
+        if ([] !== $images && [] === $audioWithText) {
+            return ['kind' => 'images', 'images' => $images];
+        }
+
+        // 3b. Mixed images + audio (no documents): describe the images
+        //     and still attempt to route audio sensibly. The simplest
+        //     pragmatic behaviour is to favour images so the user sees
+        //     something useful; audio without a document is rare in
+        //     this combination.
+        if ([] !== $images) {
+            return ['kind' => 'images', 'images' => $images];
+        }
+
+        // 4. No usable documents / audio / images — surface the most
+        //    specific error that explains why.
+        if ([] !== $audioMissingText) {
             return [
-                'id' => null,
-                'name' => basename($filePath),
-                'type' => $extension,
-                'path' => $filePath,
-                'text' => $message->getFileText() ?: '', // Get text from message for legacy
-                'status' => null,
-                'is_image' => $isImage,
-                'is_audio' => $isAudio,
-                'is_document' => $isDocument,
+                'kind' => 'audio_not_transcribed',
+                'audio_files' => $audioMissingText,
             ];
         }
 
-        return null;
+        if ([] !== $documentsPending) {
+            return [
+                'kind' => 'document_extraction_pending',
+                'pending_documents' => $documentsPending,
+                'failed_documents' => $documentsFailed,
+            ];
+        }
+
+        if ([] !== $documentsFailed) {
+            return [
+                'kind' => 'document_extraction_failed',
+                'pending_documents' => $documentsPending,
+                'failed_documents' => $documentsFailed,
+            ];
+        }
+
+        return ['kind' => 'unsupported'];
+    }
+
+    /**
+     * Treat a transcribed audio attachment as a virtual "transcript"
+     * document so the multi-document prompt builder can include its
+     * spoken content alongside real PDFs/MDs without growing a special
+     * branch.
+     *
+     * @param array<string, mixed> $audio
+     *
+     * @return array<string, mixed>
+     */
+    private function wrapAudioAsTranscriptDocument(array $audio): array
+    {
+        $name = (string) ($audio['name'] ?? 'voice-message');
+        $type = (string) ($audio['type'] ?? 'audio');
+
+        return [
+            'id' => $audio['id'] ?? null,
+            'name' => $name.' (voice transcript)',
+            'type' => $type.' transcript',
+            'path' => $audio['path'] ?? '',
+            'text' => "Voice message transcript:\n".trim((string) ($audio['text'] ?? '')),
+            'status' => $audio['status'] ?? null,
+            'is_image' => false,
+            'is_audio' => false,
+            'is_document' => true,
+        ];
+    }
+
+    /**
+     * @param array{
+     *     kind: string,
+     *     pending_documents?: list<array<string, mixed>>,
+     *     failed_documents?: list<array<string, mixed>>
+     * } $route
+     *
+     * @return array{content: string, metadata: array<string, mixed>}
+     */
+    private function buildDocumentExtractionError(array $route): array
+    {
+        $pending = $route['pending_documents'] ?? [];
+        $failed = $route['failed_documents'] ?? [];
+        $isStillExtracting = 'document_extraction_pending' === $route['kind'];
+
+        $this->logger->error('FileAnalysisHandler: Document(s) without extracted text', [
+            'pending_files' => $this->describeFileList($pending),
+            'failed_files' => $this->describeFileList($failed),
+            'still_extracting' => $isStillExtracting,
+        ]);
+
+        $firstStatus = ($pending[0]['status'] ?? $failed[0]['status'] ?? null);
+
+        return [
+            'content' => $isStillExtracting
+                ? 'The document is still being prepared. Please wait a moment and send your question again — extraction is usually fast, but very large documents can take a few extra seconds.'
+                : "I couldn't read any text from this document. It may be empty, scanned without OCR, password-protected, or in an unsupported format. Try a different file or paste the text directly.",
+            'metadata' => [
+                'error' => $isStillExtracting
+                    ? 'document_extraction_in_progress'
+                    : 'document_extraction_failed',
+                'file_status' => $firstStatus,
+            ],
+        ];
+    }
+
+    /**
+     * @param list<array<string, mixed>> $audioFiles
+     *
+     * @return array{content: string, metadata: array<string, mixed>}
+     */
+    private function buildAudioNotTranscribedError(array $audioFiles): array
+    {
+        $this->logger->error('FileAnalysisHandler: Audio file(s) without transcription', [
+            'files' => $this->describeFileList($audioFiles),
+        ]);
+
+        return [
+            'content' => 'Audio transcription failed or is not yet available. Please try again in a moment.',
+            'metadata' => ['error' => 'audio_not_transcribed'],
+        ];
+    }
+
+    /**
+     * Log a compact summary that covers every attached file. The old
+     * single-file logging missed everything past the first row, which
+     * made it hard to spot multi-file dropping in production logs.
+     *
+     * @param list<array<string, mixed>> $filesInfo
+     */
+    private function logFilesInfo(Message $message, array $filesInfo, bool $streaming): void
+    {
+        $suffix = $streaming ? ' (streaming)' : '';
+        $this->logger->info('FileAnalysisHandler: Processing file(s)'.$suffix, [
+            'message_id' => $message->getId(),
+            'file_count' => count($filesInfo),
+            'files' => array_map(static fn (array $info): array => [
+                'id' => $info['id'] ?? null,
+                'name' => $info['name'] ?? null,
+                'type' => $info['type'] ?? null,
+                'is_image' => $info['is_image'] ?? false,
+                'is_audio' => $info['is_audio'] ?? false,
+                'is_document' => $info['is_document'] ?? false,
+                'has_extracted_text' => '' !== trim((string) ($info['text'] ?? '')),
+                'extracted_text_length' => strlen((string) ($info['text'] ?? '')),
+                'status' => $info['status'] ?? null,
+            ], $filesInfo),
+        ]);
+    }
+
+    /**
+     * Short, log/metadata-friendly summary of a file collection.
+     *
+     * @param list<array<string, mixed>> $files
+     */
+    private function describeFileList(array $files): string
+    {
+        $names = array_map(static fn (array $f): string => (string) ($f['name'] ?? 'unnamed'), $files);
+
+        return implode(', ', $names);
     }
 
     /**
