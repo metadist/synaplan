@@ -143,6 +143,7 @@ import { useAuthStore } from '@/stores/auth'
 import { authReady } from '@/stores/auth'
 import { useTheme } from '@/composables/useTheme'
 import { createApiKey } from '@/services/api/apiKeysApi'
+import { setPendingRedirect } from '@/utils/pendingAuthRedirect'
 
 /**
  * /addin/connect — Synamail Outlook add-in bridge page.
@@ -333,10 +334,16 @@ async function bootstrap(): Promise<void> {
 
     if (!authStore.isAuthenticated) {
       // Round-trip through /login so the user authenticates, then comes
-      // back here with the same state nonce intact.
+      // back here with the same state nonce intact. Belt-and-suspenders:
+      // we put the destination on the URL (the SPA-native channel) AND in
+      // sessionStorage (the OAuth-survives-roundtrip channel), so the
+      // bridge can resume the connect flow whether the user picked the
+      // email-password form or a social provider that bounces through a
+      // third-party origin. See utils/pendingAuthRedirect.ts.
       const redirect =
         `/addin/connect?state=${encodeURIComponent(stateNonce.value)}` +
         `&baseUrl=${encodeURIComponent(targetBaseUrl.value)}`
+      setPendingRedirect(redirect)
       void router.push({ path: '/login', query: { redirect } })
       return
     }

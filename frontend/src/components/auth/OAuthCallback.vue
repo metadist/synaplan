@@ -79,6 +79,7 @@ import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { useI18n } from 'vue-i18n'
+import { consumePendingRedirect } from '@/utils/pendingAuthRedirect'
 import Button from '../Button.vue'
 
 const router = useRouter()
@@ -131,13 +132,16 @@ onMounted(async () => {
         const result = await authStore.handleOAuthCallback()
 
         if (result) {
-          console.log('✅ Session verified, redirecting to home')
+          // Resume any pending deep-link that started this round-trip
+          // (e.g. the Outlook add-in `/addin/connect` bridge). Falls back
+          // to home if nothing was persisted. See `pendingAuthRedirect.ts`.
+          const target = consumePendingRedirect() ?? '/'
+          console.log('✅ Session verified, redirecting to', target)
           // Clear URL params for clean history
           window.history.replaceState({}, document.title, '/auth/callback')
 
-          // Redirect to home
           setTimeout(() => {
-            router.push('/')
+            router.push(target)
           }, 500)
         } else {
           console.error('❌ Session verification failed')

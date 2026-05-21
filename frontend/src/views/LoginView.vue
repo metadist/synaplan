@@ -367,6 +367,11 @@ import { useAuth } from '../composables/useAuth'
 import { useRecaptcha } from '../composables/useRecaptcha'
 import { validateEmail } from '../composables/usePasswordValidation'
 import { useConfigStore } from '@/stores/config'
+import {
+  consumePendingRedirect,
+  isSafeRedirectPath,
+  setPendingRedirect,
+} from '@/utils/pendingAuthRedirect'
 
 const router = useRouter()
 const route = useRoute()
@@ -446,7 +451,17 @@ onMounted(async () => {
   const reason = route.query.reason as string
   if (reason === 'session_expired') sessionExpired.value = true
   if (route.query.registered === 'true') justRegistered.value = true
-  if (reason || route.query.registered) router.replace({ query: {} })
+  if (reason || route.query.registered) {
+    // Strip the inbound `reason` / `registered` query keys, but preserve any
+    // other query params (notably `redirect`, which deep-links such as the
+    // Outlook add-in `/addin/connect` bridge depend on). Previously this
+    // line did `router.replace({ query: {} })`, which clobbered `redirect`
+    // and left users on `/` after login instead of back at the deep-link.
+    const cleaned = { ...route.query }
+    delete cleaned.reason
+    delete cleaned.registered
+    router.replace({ query: cleaned })
+  }
 
   await loadSocialProviders()
 
@@ -471,12 +486,25 @@ const handleLogin = async () => {
   if (success) {
     loginSuccess.value = true
     setTimeout(() => {
-      router.push((router.currentRoute.value.query.redirect as string) || '/')
+      // Prefer the query param (the primary, SPA-native channel), but fall
+      // back to sessionStorage so a deep-link survives a bounce that wiped
+      // the URL (e.g. an OAuth provider round-trip or a router replace).
+      const fromQuery = router.currentRoute.value.query.redirect as string | undefined
+      const queryPath = isSafeRedirectPath(fromQuery) ? fromQuery : null
+      const target = queryPath ?? consumePendingRedirect() ?? '/'
+      router.push(target)
     }, 400)
   }
 }
 
 const handleSocialLogin = (provider: string) => {
+  // OAuth providers redirect through their own origin, which destroys the
+  // SPA's URL state (including `?redirect=…`). Persist the intent to
+  // sessionStorage so OAuthCallback can resume it after the round-trip.
+  const fromQuery = route.query.redirect as string | undefined
+  if (isSafeRedirectPath(fromQuery)) {
+    setPendingRedirect(fromQuery)
+  }
   window.location.href = `${config.appBaseUrl}/api/v1/auth/${provider}/login`
 }
 </script>
