@@ -225,30 +225,51 @@ function cycleLanguage(): void {
   localStorage.setItem('language', languages[nextIndex])
 }
 
-function loadOfficeJs(): Promise<OfficeApi> {
-  return new Promise((resolve, reject) => {
+/**
+ * Try to bring Office.js up. Resolves with the Office global if it's
+ * usable, with `null` if we're clearly not inside an Office host (so the
+ * page can still proceed via the window.opener postMessage fallback).
+ *
+ * Office.js's onReady is supposed to fire even outside an Office host,
+ * but we've seen it hang silently in some browsers / dev tools. A 4 s
+ * timeout caps the wait so the bridge never sits in "loading" forever.
+ */
+function loadOfficeJs(): Promise<OfficeApi | null> {
+  return new Promise((resolve) => {
     const w = window as unknown as { Office?: OfficeApi }
-    if (w.Office?.onReady) {
-      w.Office.onReady(() => resolve(w.Office as OfficeApi))
-      return
+    let settled = false
+    const settle = (v: OfficeApi | null): void => {
+      if (settled) return
+      settled = true
+      resolve(v)
     }
-    const existing = document.querySelector<HTMLScriptElement>('script[data-office-js="1"]')
-    const tag = existing ?? document.createElement('script')
-    tag.src = 'https://appsforoffice.microsoft.com/lib/1/hosted/office.js'
-    tag.async = true
-    tag.dataset.officeJs = '1'
-    tag.addEventListener('load', () => {
-      const office = (window as unknown as { Office?: OfficeApi }).Office
-      if (!office) {
-        reject(new Error('Office.js loaded but did not expose the Office global'))
-        return
-      }
-      office.onReady(() => resolve(office))
-    })
-    tag.addEventListener('error', () => {
-      reject(new Error('Failed to load Office.js — are you opening this page inside Outlook?'))
-    })
-    if (!existing) document.head.appendChild(tag)
+
+    if (w.Office?.onReady) {
+      w.Office.onReady(() => settle(w.Office ?? null))
+    } else {
+      const existing = document.querySelector<HTMLScriptElement>('script[data-office-js="1"]')
+      const tag = existing ?? document.createElement('script')
+      tag.src = 'https://appsforoffice.microsoft.com/lib/1/hosted/office.js'
+      tag.async = true
+      tag.dataset.officeJs = '1'
+      tag.addEventListener('load', () => {
+        const office = (window as unknown as { Office?: OfficeApi }).Office
+        if (!office?.onReady) {
+          settle(null)
+          return
+        }
+        office.onReady(() => settle(office))
+      })
+      tag.addEventListener('error', () => settle(null))
+      if (!existing) document.head.appendChild(tag)
+    }
+
+    // Hard cap: if onReady never fires (or Office.js fails to load at all),
+    // resolve with null so the user can still complete the handshake via
+    // window.opener.postMessage. This is what makes the bridge testable
+    // outside Outlook AND avoids a perpetual loading state in production
+    // when Office.js's dialog channel is misbehaving.
+    setTimeout(() => settle(null), 4000)
   })
 }
 
@@ -263,23 +284,40 @@ function buildKeyName(): string {
 
 async function postPayloadToParent(payload: SignInPayload): Promise<void> {
   const serialized = JSON.stringify(payload)
-  const office = (window as unknown as { Office?: OfficeApi }).Office
-  if (!office?.context?.ui?.messageParent) {
-    throw new Error('Office.context.ui.messageParent is not available')
-  }
-  office.context.ui.messageParent(serialized)
-  // Fallback channel: Office's cross-domain messageParent is unreliable in
-  // Outlook on the Web when the taskpane and bridge live on different
-  // origins (taskpane on the add-in host, bridge on Synaplan). A direct
-  // window.opener.postMessage to the taskpane works whenever the popup's
-  // opener relationship survived. The Synamail taskpane listens for both
-  // channels and accepts whichever delivers first.
+  let sent = false
+
+  // Channel 1: window.opener.postMessage. Works in any popup whose opener
+  // relationship survived (which is the common OWA case and also any plain
+  // browser popup — making this bridge testable outside Outlook). The
+  // Synamail taskpane listens for `message` events with an origin check.
   try {
     if (window.opener && !window.opener.closed) {
       window.opener.postMessage(serialized, '*')
+      sent = true
     }
   } catch {
-    // Best-effort fallback — never block the primary success path on it.
+    // ignore — channel 2 may still succeed
+  }
+
+  // Channel 2: Office.context.ui.messageParent — the proper Office channel.
+  // Works in Outlook desktop, new Outlook for Windows, Mac, and OWA when
+  // Office's dialog channel is healthy (it isn't always, cross-domain in
+  // OWA — hence channel 1 above). Best-effort: don't throw if missing.
+  try {
+    const office = (window as unknown as { Office?: OfficeApi }).Office
+    if (office?.context?.ui?.messageParent) {
+      office.context.ui.messageParent(serialized)
+      sent = true
+    }
+  } catch {
+    // ignore — channel 1 may have succeeded
+  }
+
+  if (!sent) {
+    throw new Error(
+      'No channel available to deliver the sign-in payload to the parent — ' +
+        'window.opener is missing and Office.js is not present.'
+    )
   }
 }
 
@@ -363,9 +401,9 @@ async function bootstrap(): Promise<void> {
       return
     }
 
-    // Load Office.js. If we're not in an Office dialog this rejects;
-    // we surface that as an error rather than silently sitting on the
-    // loading state.
+    // Best-effort Office.js bring-up. Resolves with null if we're not in
+    // an Office host or if onReady never fires (4 s cap). Either way we
+    // proceed — postPayloadToParent will pick whichever channel is alive.
     await loadOfficeJs()
     officeReady.value = true
     viewState.value = 'ready'
