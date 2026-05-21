@@ -28,21 +28,41 @@ interface PendingRedirect {
   expiresAt: number
 }
 
+function safeRemove(key: string): void {
+  try {
+    sessionStorage.removeItem(key)
+  } catch {
+    // ignore — sessionStorage may be unavailable (private mode, SSR).
+  }
+}
+
 function safeGet(key: string): PendingRedirect | null {
   try {
     const raw = sessionStorage.getItem(key)
     if (!raw) return null
     const parsed = JSON.parse(raw) as Partial<PendingRedirect>
     if (typeof parsed.path !== 'string' || typeof parsed.expiresAt !== 'number') {
-      sessionStorage.removeItem(key)
+      // Wrong shape — drop it so we don't keep re-parsing the same garbage.
+      safeRemove(key)
       return null
     }
     if (parsed.expiresAt < Date.now()) {
-      sessionStorage.removeItem(key)
+      safeRemove(key)
+      return null
+    }
+    // Defence in depth: re-validate the path on read. A tampered or stale
+    // entry with the right shape but an unsafe path (protocol-relative,
+    // schemed, oversized, etc.) must not be returned to callers, who use
+    // the result for `router.push` without further checks.
+    if (!isSafeRedirectPath(parsed.path)) {
+      safeRemove(key)
       return null
     }
     return { path: parsed.path, expiresAt: parsed.expiresAt }
   } catch {
+    // Malformed JSON or sessionStorage throwing on read — self-heal by
+    // dropping the entry so subsequent calls don't keep failing.
+    safeRemove(key)
     return null
   }
 }
@@ -52,14 +72,6 @@ function safeSet(key: string, value: PendingRedirect): void {
     sessionStorage.setItem(key, JSON.stringify(value))
   } catch {
     // sessionStorage may be unavailable (private mode, SSR, quota).
-  }
-}
-
-function safeRemove(key: string): void {
-  try {
-    sessionStorage.removeItem(key)
-  } catch {
-    // ignore
   }
 }
 

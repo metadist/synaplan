@@ -132,15 +132,39 @@ describe('clearPendingRedirect', () => {
 })
 
 describe('robustness against corrupted storage', () => {
-  it('ignores and clears entries with malformed JSON', () => {
+  it('self-heals entries with malformed JSON', () => {
     sessionStorage.setItem(KEY, '{not json')
     expect(peekPendingRedirect()).toBeNull()
-    expect(consumePendingRedirect()).toBeNull()
+    // The malformed entry must be removed so subsequent reads don't keep
+    // re-parsing the same garbage.
+    expect(sessionStorage.getItem(KEY)).toBeNull()
   })
 
-  it('ignores and clears entries with the wrong shape', () => {
+  it('self-heals entries with the wrong shape', () => {
     sessionStorage.setItem(KEY, JSON.stringify({ path: 123, expiresAt: 'soon' }))
     expect(peekPendingRedirect()).toBeNull()
+    expect(sessionStorage.getItem(KEY)).toBeNull()
+  })
+
+  it('self-heals entries whose stored path fails re-validation on read', () => {
+    // Mimic a tampered or stale entry: correct JSON shape and future
+    // expiry, but the path itself is unsafe (protocol-relative). Even
+    // though setPendingRedirect would have rejected this at write time,
+    // the helper must defend against the value already being present.
+    sessionStorage.setItem(
+      KEY,
+      JSON.stringify({ path: '//evil.example/path', expiresAt: Date.now() + 60_000 })
+    )
+    expect(peekPendingRedirect()).toBeNull()
+    expect(sessionStorage.getItem(KEY)).toBeNull()
+  })
+
+  it('also self-heals entries with a schemed path', () => {
+    sessionStorage.setItem(
+      KEY,
+      JSON.stringify({ path: 'javascript:alert(1)', expiresAt: Date.now() + 60_000 })
+    )
+    expect(consumePendingRedirect()).toBeNull()
     expect(sessionStorage.getItem(KEY)).toBeNull()
   })
 
