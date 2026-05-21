@@ -257,6 +257,21 @@ final class QdrantClientMock implements QdrantClientInterface
         $this->synapsePoints = [];
     }
 
+    public function getMemoriesCollectionInfo(): array
+    {
+        return [
+            'exists' => true,
+            'vector_dim' => 1024,
+            'points_count' => 0,
+            'distance' => 'Cosine',
+        ];
+    }
+
+    public function recreateMemoriesCollection(int $vectorDimension): void
+    {
+        $this->logger->info('QdrantClientMock: recreateMemoriesCollection', ['vector_dim' => $vectorDimension]);
+    }
+
     public function getSynapseCollection(): string
     {
         return 'synapse_topics';

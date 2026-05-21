@@ -259,10 +259,10 @@ final readonly class EmbeddingReindexService
         $modelId = $modelInfo['model_id'];
         $modelName = $modelInfo['model'];
         $provider = $modelInfo['provider'];
+        $vectorDim = $modelInfo['vector_dim'];
 
         if (null === $modelId || null === $modelName || null === $provider) {
             $this->logger->warning('EmbeddingReindex: memories skipped — no model configured');
-            // See reindexDocuments() — same rationale (#948).
             $run->incrementChunksFailed();
             $this->runRepository->save($run);
 
@@ -270,22 +270,16 @@ final readonly class EmbeddingReindexService
         }
 
         try {
-            // Walk EVERY user's memories (#948). The previous
-            // `scrollMemories(0, ...)` call filtered on `user_id === 0`
-            // and therefore never returned a single real memory — the
-            // reindex was a silent no-op even when the UI reported
-            // "completed".
             $points = $this->qdrantClient->scrollAllMemoriesForReindex(50000);
         } catch (\Throwable $e) {
             $this->logger->error('EmbeddingReindex: memories scroll failed', ['error' => $e->getMessage()]);
-            // Failure to even *discover* the memory points must be
-            // surfaced as a run-level failure — otherwise the run shows
-            // 0/0 and looks like "nothing to do" instead of "broken".
             $run->incrementChunksFailed();
             $this->runRepository->save($run);
 
             return;
         }
+
+        $this->qdrantClient->recreateMemoriesCollection($vectorDim);
 
         foreach (array_chunk($points, self::MEMORIES_BATCH) as $batchPoints) {
             $texts = [];
@@ -331,12 +325,7 @@ final readonly class EmbeddingReindexService
                     continue;
                 }
 
-                // Same dimension-coercion as the documents path —
-                // synapse_memories also has a fixed collection dim.
-                $vector = $this->normalizeVectorDimension(
-                    array_map('floatval', $vector),
-                    self::DOC_VECTOR_DIMENSION,
-                );
+                $vector = array_map('floatval', $vector);
 
                 $pointId = (string) ($payload['_id'] ?? '');
                 if ('' === $pointId) {
@@ -349,7 +338,7 @@ final readonly class EmbeddingReindexService
                 $payload['embedding_model_id'] = $modelId;
                 $payload['embedding_provider'] = $provider;
                 $payload['embedding_model'] = $modelName;
-                $payload['vector_dim'] = self::DOC_VECTOR_DIMENSION;
+                $payload['vector_dim'] = $vectorDim;
                 $payload['indexed_at'] = date(\DATE_ATOM);
 
                 $this->qdrantClient->upsertMemory($pointId, $vector, $payload);
