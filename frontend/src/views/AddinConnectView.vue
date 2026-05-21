@@ -262,11 +262,25 @@ function buildKeyName(): string {
 }
 
 async function postPayloadToParent(payload: SignInPayload): Promise<void> {
+  const serialized = JSON.stringify(payload)
   const office = (window as unknown as { Office?: OfficeApi }).Office
   if (!office?.context?.ui?.messageParent) {
     throw new Error('Office.context.ui.messageParent is not available')
   }
-  office.context.ui.messageParent(JSON.stringify(payload))
+  office.context.ui.messageParent(serialized)
+  // Fallback channel: Office's cross-domain messageParent is unreliable in
+  // Outlook on the Web when the taskpane and bridge live on different
+  // origins (taskpane on the add-in host, bridge on Synaplan). A direct
+  // window.opener.postMessage to the taskpane works whenever the popup's
+  // opener relationship survived. The Synamail taskpane listens for both
+  // channels and accepts whichever delivers first.
+  try {
+    if (window.opener && !window.opener.closed) {
+      window.opener.postMessage(serialized, '*')
+    }
+  } catch {
+    // Best-effort fallback — never block the primary success path on it.
+  }
 }
 
 async function handleConnect(): Promise<void> {
