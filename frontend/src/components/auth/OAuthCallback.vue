@@ -79,7 +79,7 @@ import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { useI18n } from 'vue-i18n'
-import { consumePendingRedirect } from '@/utils/pendingAuthRedirect'
+import { clearPendingRedirect, consumePendingRedirect } from '@/utils/pendingAuthRedirect'
 import Button from '../Button.vue'
 
 const router = useRouter()
@@ -118,6 +118,9 @@ onMounted(async () => {
 
     // Check for error in URL params
     if (errorParam) {
+      // Cancelled / failed OAuth must not leave a pending deep-link in
+      // sessionStorage, or the next plain login could be hijacked.
+      clearPendingRedirect()
       error.value = decodeURIComponent(errorParam)
       return
     }
@@ -132,32 +135,34 @@ onMounted(async () => {
         const result = await authStore.handleOAuthCallback()
 
         if (result) {
-          // Resume any pending deep-link that started this round-trip
-          // (e.g. the Outlook add-in `/addin/connect` bridge). Falls back
-          // to home if nothing was persisted. See `pendingAuthRedirect.ts`.
           const target = consumePendingRedirect() ?? '/'
-          console.log('✅ Session verified, redirecting to', target)
           // Clear URL params for clean history
           window.history.replaceState({}, document.title, '/auth/callback')
 
+          // Short delay so the success spinner is perceivable before
+          // the route change unmounts this view.
           setTimeout(() => {
             router.push(target)
           }, 500)
         } else {
           console.error('❌ Session verification failed')
+          clearPendingRedirect()
           error.value = t('auth.socialLoginError')
         }
       } catch (e: unknown) {
         console.error('❌ Failed to verify session after OAuth:', e)
+        clearPendingRedirect()
         error.value = t('auth.socialLoginError')
       }
     } else {
       // No success param and no error - something went wrong
       console.error('❌ OAuth callback without success or error')
+      clearPendingRedirect()
       error.value = t('auth.socialLoginError')
     }
   } catch (e: unknown) {
     console.error('❌ OAuth callback error:', e)
+    clearPendingRedirect()
     error.value = getErrorMessage(e) || t('auth.socialLoginError')
   }
 })

@@ -452,11 +452,7 @@ onMounted(async () => {
   if (reason === 'session_expired') sessionExpired.value = true
   if (route.query.registered === 'true') justRegistered.value = true
   if (reason || route.query.registered) {
-    // Strip the inbound `reason` / `registered` query keys, but preserve any
-    // other query params (notably `redirect`, which deep-links such as the
-    // Outlook add-in `/addin/connect` bridge depend on). Previously this
-    // line did `router.replace({ query: {} })`, which clobbered `redirect`
-    // and left users on `/` after login instead of back at the deep-link.
+    // Strip only `reason`/`registered`; keep `redirect` so deep-links survive.
     const cleaned = { ...route.query }
     delete cleaned.reason
     delete cleaned.registered
@@ -485,10 +481,8 @@ const handleLogin = async () => {
   const success = await login(email.value, password.value, recaptchaToken)
   if (success) {
     loginSuccess.value = true
+    // Short delay so the success checkmark animation can play before nav.
     setTimeout(() => {
-      // Prefer the query param (the primary, SPA-native channel), but fall
-      // back to sessionStorage so a deep-link survives a bounce that wiped
-      // the URL (e.g. an OAuth provider round-trip or a router replace).
       const fromQuery = router.currentRoute.value.query.redirect as string | undefined
       const queryPath = isSafeRedirectPath(fromQuery) ? fromQuery : null
       const target = queryPath ?? consumePendingRedirect() ?? '/'
@@ -498,13 +492,10 @@ const handleLogin = async () => {
 }
 
 const handleSocialLogin = (provider: string) => {
-  // OAuth providers redirect through their own origin, which destroys the
-  // SPA's URL state (including `?redirect=…`). Persist the intent to
-  // sessionStorage so OAuthCallback can resume it after the round-trip.
-  const fromQuery = route.query.redirect as string | undefined
-  if (isSafeRedirectPath(fromQuery)) {
-    setPendingRedirect(fromQuery)
-  }
+  // OAuth round-trip strips the SPA's URL state, so stash the intent
+  // for OAuthCallback to pick up. setPendingRedirect validates internally.
+  const redirect = route.query.redirect as string | undefined
+  if (redirect) setPendingRedirect(redirect)
   window.location.href = `${config.appBaseUrl}/api/v1/auth/${provider}/login`
 }
 </script>

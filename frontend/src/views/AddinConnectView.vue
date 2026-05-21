@@ -333,13 +333,8 @@ async function bootstrap(): Promise<void> {
     await authReady
 
     if (!authStore.isAuthenticated) {
-      // Round-trip through /login so the user authenticates, then comes
-      // back here with the same state nonce intact. Belt-and-suspenders:
-      // we put the destination on the URL (the SPA-native channel) AND in
-      // sessionStorage (the OAuth-survives-roundtrip channel), so the
-      // bridge can resume the connect flow whether the user picked the
-      // email-password form or a social provider that bounces through a
-      // third-party origin. See utils/pendingAuthRedirect.ts.
+      // Stash in sessionStorage too: a social-provider OAuth round-trip
+      // would otherwise drop the `redirect` query and strand the user.
       const redirect =
         `/addin/connect?state=${encodeURIComponent(stateNonce.value)}` +
         `&baseUrl=${encodeURIComponent(targetBaseUrl.value)}`

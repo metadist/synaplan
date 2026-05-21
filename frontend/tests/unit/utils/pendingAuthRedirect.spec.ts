@@ -45,6 +45,12 @@ describe('isSafeRedirectPath', () => {
     expect(isSafeRedirectPath('data:text/html,<script>')).toBe(false)
   })
 
+  it('rejects paths containing a backslash (browsers may normalise to /)', () => {
+    expect(isSafeRedirectPath('/\\evil.example/path')).toBe(false)
+    expect(isSafeRedirectPath('/path\\with\\backslash')).toBe(false)
+    expect(isSafeRedirectPath('/path/\\\\evil.example')).toBe(false)
+  })
+
   it('rejects paths that do not start with /', () => {
     expect(isSafeRedirectPath('addin/connect')).toBe(false)
     expect(isSafeRedirectPath('?state=abc')).toBe(false)

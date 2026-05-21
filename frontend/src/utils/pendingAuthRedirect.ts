@@ -81,6 +81,8 @@ function safeSet(key: string, value: PendingRedirect): void {
  *   - empty / non-string inputs
  *   - protocol-relative URLs (`//evil.example`)
  *   - schemed URLs (`https://…`, `javascript:…`, `data:…`)
+ *   - paths containing a backslash (some browsers normalise `\` → `/`,
+ *     which can be used to smuggle a host through path-only validation)
  *   - over-long payloads
  */
 export function isSafeRedirectPath(path: unknown): path is string {
@@ -88,6 +90,7 @@ export function isSafeRedirectPath(path: unknown): path is string {
   if (path.length === 0 || path.length > MAX_PATH_LENGTH) return false
   if (!path.startsWith('/')) return false
   if (path.startsWith('//')) return false
+  if (path.includes('\\')) return false
   return true
 }
 
