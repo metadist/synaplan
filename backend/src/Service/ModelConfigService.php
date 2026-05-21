@@ -408,6 +408,47 @@ final readonly class ModelConfigService
     }
 
     /**
+     * Resolve the model that should run memory-related AI calls (auto-extraction
+     * from chat messages AND the "New Memory" parse endpoint in the UI).
+     *
+     * Priority:
+     *   1. User-scoped DEFAULTMODEL.MEM   (per-user override, set via the admin UI)
+     *   2. Global DEFAULTMODEL.MEM        (the dedicated "Memory extraction model"
+     *                                       BMODELS row, BTAG=mem, default points at
+     *                                       Groq gpt-oss-120b for ~200 ms TTFT)
+     *   3. User-scoped DEFAULTMODEL.CHAT  (legacy fallback — preserved for
+     *                                       installations that haven't seeded
+     *                                       the MEM tag yet)
+     *   4. Global DEFAULTMODEL.CHAT       (last resort)
+     *
+     * The MEM tag exists so picking a slow/expensive chat model (e.g. Claude
+     * Opus 4) for the user-facing answer no longer cascades into the cheaper
+     * memory extraction path. Centralising the resolution here keeps the
+     * background MemoryExtractionService and the synchronous UserMemoryController
+     * parse endpoint in lockstep — see issue #973.
+     *
+     * @return array{model: ?string, provider: ?string, model_id: ?int}
+     */
+    public function getMemoryModelConfig(?int $userId = null): array
+    {
+        // getDefaultModel() already walks user-scope → global, so we only need
+        // two outer calls (MEM then CHAT) — not four. Hitting MEM/0 explicitly
+        // after MEM/$userId would just repeat the same global lookup.
+        $modelId = $this->getDefaultModel('MEM', $userId)
+            ?? $this->getDefaultModel('CHAT', $userId);
+
+        if (!$modelId) {
+            return ['model' => null, 'provider' => null, 'model_id' => null];
+        }
+
+        return [
+            'model' => $this->getModelName($modelId),
+            'provider' => $this->getProviderForModel($modelId),
+            'model_id' => $modelId,
+        ];
+    }
+
+    /**
      * Get provider name for a specific model ID
      * Returns provider name from BMODELS.BSERVICE (e.g., 'Ollama', 'OpenAI').
      */
