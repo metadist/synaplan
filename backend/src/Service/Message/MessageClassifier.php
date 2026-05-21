@@ -566,11 +566,19 @@ final readonly class MessageClassifier
 
         // Web-search hint phrases that the AI sorter would flip `web_search`
         // for. Better to take the slow path so we surface results.
+        //
+        // German cost/price queries (#974): the bare infinitive `kosten` is
+        // far less common than the conjugated `kostet`, so we use the stem
+        // `kost` which catches `kostet`/`kosten`/`gekostet` while only
+        // accidentally matching rare false-positives like `kostüm`/`kostbar`
+        // — both of which still benefit from the slow path more than they
+        // suffer from it.
         static $searchTriggers = [
             'search the web', 'google ', 'latest news', 'current price',
             'today\'s', "today's", 'right now', 'this week',
             'aktuelle nachrichten', 'durchsuche das internet',
             'busca en', 'recherche dans',
+            'kost', 'preis', 'wie teuer', 'flug nach', 'flüge',
         ];
         foreach ($searchTriggers as $trigger) {
             if (str_contains($lower, $trigger)) {
