@@ -143,6 +143,7 @@ import { useAuthStore } from '@/stores/auth'
 import { authReady } from '@/stores/auth'
 import { useTheme } from '@/composables/useTheme'
 import { createApiKey } from '@/services/api/apiKeysApi'
+import { setPendingRedirect } from '@/utils/pendingAuthRedirect'
 
 /**
  * /addin/connect — Synamail Outlook add-in bridge page.
@@ -332,11 +333,12 @@ async function bootstrap(): Promise<void> {
     await authReady
 
     if (!authStore.isAuthenticated) {
-      // Round-trip through /login so the user authenticates, then comes
-      // back here with the same state nonce intact.
+      // Stash in sessionStorage too: a social-provider OAuth round-trip
+      // would otherwise drop the `redirect` query and strand the user.
       const redirect =
         `/addin/connect?state=${encodeURIComponent(stateNonce.value)}` +
         `&baseUrl=${encodeURIComponent(targetBaseUrl.value)}`
+      setPendingRedirect(redirect)
       void router.push({ path: '/login', query: { redirect } })
       return
     }
