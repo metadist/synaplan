@@ -60,8 +60,7 @@ const statusToColor = (status: MailHandlerLogStatus) => {
   return 'text-green-500 dark:text-green-400 bg-green-500/10'
 }
 
-const eventLabel = (event: MailHandlerLogEvent): string =>
-  t(`mail.activity.events.${event}`, event)
+const eventLabel = (event: MailHandlerLogEvent): string => t(`mail.activity.events.${event}`, event)
 
 const sortedDetails = (details: Record<string, unknown>): Array<{ key: string; value: string }> => {
   // Show known fields in a stable, useful order; pass through any extras after.
@@ -227,11 +226,7 @@ const hasLogs = computed(() => logs.value.length > 0)
             </div>
 
             <!-- Empty state -->
-            <div
-              v-else-if="!hasLogs"
-              class="py-12 text-center"
-              data-testid="mail-activity-empty"
-            >
+            <div v-else-if="!hasLogs" class="py-12 text-center" data-testid="mail-activity-empty">
               <ClockIcon class="w-10 h-10 txt-secondary/40 mx-auto mb-3" />
               <p class="text-sm font-medium txt-primary">{{ t('mail.activity.empty') }}</p>
               <p class="text-xs txt-secondary mt-1">{{ t('mail.activity.emptyDescription') }}</p>
@@ -248,7 +243,10 @@ const hasLogs = computed(() => logs.value.length > 0)
                   class="w-9 h-9 rounded-lg flex items-center justify-center shrink-0"
                   :class="statusToColor(entry.status)"
                 >
-                  <component :is="eventToIcon[entry.event] ?? InformationCircleIcon" class="w-4 h-4" />
+                  <component
+                    :is="eventToIcon[entry.event] ?? InformationCircleIcon"
+                    class="w-4 h-4"
+                  />
                 </div>
                 <div class="flex-1 min-w-0">
                   <div class="flex items-center justify-between gap-2 flex-wrap">
