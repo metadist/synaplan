@@ -187,74 +187,215 @@ final readonly class InboundEmailHandlerService
 
     /**
      * Extract clean email body from IMAP message.
-     * Handles multipart MIME messages and extracts text/plain or text/html.
+     * Recursively walks multipart MIME tree to extract the first text/plain
+     * (or text/html as fallback) body, ignoring attachments.
      */
-    private function extractEmailBody($connection, int $msgNumber): string
+    private function extractEmailBody(\IMAP\Connection $connection, int $msgNumber): string
     {
         $structure = imap_fetchstructure($connection, $msgNumber);
 
-        // Single part message (not multipart)
-        if (!isset($structure->parts)) {
+        if (!is_object($structure)) {
+            return '';
+        }
+
+        // Single-part message (not multipart): the whole body is the part.
+        if (empty($structure->parts)) {
             $body = imap_body($connection, $msgNumber);
 
-            // Decode based on encoding
-            return $this->decodeEmailBody($body, $structure->encoding ?? 0);
+            return $this->decodeEmailBody(
+                $body,
+                $structure->encoding ?? 0,
+                $this->getCharset($structure)
+            );
         }
 
-        // Multipart message - extract text/plain or text/html
-        $textPlain = '';
-        $textHtml = '';
+        $textParts = $this->collectTextParts($connection, $msgNumber, $structure->parts, '');
 
-        foreach ($structure->parts as $partNumber => $part) {
-            $partBody = imap_fetchbody($connection, $msgNumber, (string) ($partNumber + 1));
-
-            // Check MIME type
-            $mimeType = $this->getMimeType($part);
-
-            if ('text/plain' === $mimeType) {
-                $textPlain = $this->decodeEmailBody($partBody, $part->encoding ?? 0);
-            } elseif ('text/html' === $mimeType) {
-                $textHtml = $this->decodeEmailBody($partBody, $part->encoding ?? 0);
-            }
+        if ('' !== $textParts['plain']) {
+            return $textParts['plain'];
         }
 
-        // Prefer plain text, fallback to HTML (stripped)
-        if (!empty($textPlain)) {
-            return $textPlain;
+        if ('' !== $textParts['html']) {
+            return trim(strip_tags($textParts['html']));
         }
 
-        if (!empty($textHtml)) {
-            return strip_tags($textHtml);
-        }
-
-        // Fallback: return raw body
+        // Last resort: return the raw body so a downstream LLM at least
+        // has something to look at, even if it's MIME boundaries.
         return imap_body($connection, $msgNumber);
     }
 
     /**
-     * Get MIME type from IMAP body part.
+     * Recursively walk an IMAP body-structure tree and collect the first
+     * text/plain and text/html body parts, ignoring explicit attachments.
+     *
+     * Section numbers follow IMAP's dotted addressing (RFC 3501 §6.4.5):
+     * top-level parts are "1", "2", ...; nested parts are "1.1", "1.2", ...
+     *
+     * @param array<int, object> $parts
+     *
+     * @return array{plain: string, html: string}
+     */
+    private function collectTextParts(
+        \IMAP\Connection $connection,
+        int $msgNumber,
+        array $parts,
+        string $sectionPrefix,
+    ): array {
+        $textPlain = '';
+        $textHtml = '';
+
+        foreach ($parts as $partNumber => $part) {
+            $section = '' === $sectionPrefix
+                ? (string) ($partNumber + 1)
+                : $sectionPrefix.'.'.($partNumber + 1);
+
+            if ($this->isAttachment($part)) {
+                continue;
+            }
+
+            $mimeType = $this->getMimeType($part);
+            $isMultipart = !empty($part->parts);
+
+            if ('' === $textPlain && 'text/plain' === $mimeType && !$isMultipart) {
+                $body = imap_fetchbody($connection, $msgNumber, $section);
+                $textPlain = $this->decodeEmailBody(
+                    $body,
+                    $part->encoding ?? 0,
+                    $this->getCharset($part)
+                );
+            } elseif ('' === $textHtml && 'text/html' === $mimeType && !$isMultipart) {
+                $body = imap_fetchbody($connection, $msgNumber, $section);
+                $textHtml = $this->decodeEmailBody(
+                    $body,
+                    $part->encoding ?? 0,
+                    $this->getCharset($part)
+                );
+            } elseif ($isMultipart) {
+                $nested = $this->collectTextParts($connection, $msgNumber, $part->parts, $section);
+                if ('' === $textPlain) {
+                    $textPlain = $nested['plain'];
+                }
+                if ('' === $textHtml) {
+                    $textHtml = $nested['html'];
+                }
+            }
+
+            if ('' !== $textPlain && '' !== $textHtml) {
+                break;
+            }
+        }
+
+        return ['plain' => $textPlain, 'html' => $textHtml];
+    }
+
+    /**
+     * Get MIME type from IMAP body part (e.g. "text/plain", "multipart/alternative").
      */
     private function getMimeType(object $part): string
     {
         $primaryType = ['text', 'multipart', 'message', 'application', 'audio', 'image', 'video', 'other'];
-        $type = $primaryType[$part->type] ?? 'text';
+        $type = $primaryType[$part->type ?? 0] ?? 'text';
         $subtype = strtolower($part->subtype ?? 'plain');
 
         return $type.'/'.$subtype;
     }
 
     /**
-     * Decode email body based on encoding.
+     * Detect whether an IMAP body part is an explicit attachment so we
+     * don't accidentally treat an attached .txt or .html file as the body.
      */
-    private function decodeEmailBody(string $body, int $encoding): string
+    private function isAttachment(object $part): bool
     {
-        return match ($encoding) {
-            1 => imap_8bit($body),           // 8BIT
-            2 => imap_binary($body),         // BINARY
-            3 => base64_decode($body),       // BASE64
-            4 => quoted_printable_decode($body), // QUOTED-PRINTABLE
-            default => $body,                // 7BIT or OTHER
+        if (empty($part->ifdisposition)) {
+            return false;
+        }
+
+        return 'attachment' === strtolower($part->disposition ?? '');
+    }
+
+    /**
+     * Read the charset parameter from a part's Content-Type, if any.
+     */
+    private function getCharset(object $part): ?string
+    {
+        if (empty($part->ifparameters) || empty($part->parameters)) {
+            return null;
+        }
+
+        foreach ($part->parameters as $param) {
+            $attr = isset($param->attribute) ? strtolower($param->attribute) : '';
+            if ('charset' === $attr) {
+                $value = $param->value ?? null;
+
+                return ('' === $value || null === $value) ? null : (string) $value;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Decode an email body part according to its Content-Transfer-Encoding
+     * and convert to UTF-8 if a non-UTF-8 charset was declared.
+     *
+     * NOTE: Encodings 7BIT (0), 8BIT (1), BINARY (2) and "OTHER" all carry the
+     * payload as-is — the imap_8bit() / imap_binary() helpers *encode* (not
+     * decode) and would corrupt the body, so they are deliberately not used.
+     */
+    private function decodeEmailBody(string $body, int $encoding, ?string $charset = null): string
+    {
+        $decoded = match ($encoding) {
+            3 => base64_decode($body, false),
+            4 => quoted_printable_decode($body),
+            default => $body,
         };
+
+        if ('' === $decoded) {
+            return $decoded;
+        }
+
+        if (null !== $charset) {
+            $normalized = strtoupper($charset);
+            if ('UTF-8' !== $normalized && 'US-ASCII' !== $normalized && '' !== $normalized) {
+                $converted = @mb_convert_encoding($decoded, 'UTF-8', $normalized);
+                if (is_string($converted)) {
+                    $decoded = $converted;
+                }
+            }
+        }
+
+        return $decoded;
+    }
+
+    /**
+     * Decode RFC 2047 encoded-word headers (e.g. =?UTF-8?B?...?=) to a plain UTF-8 string.
+     */
+    private function decodeMimeHeader(string $header): string
+    {
+        if ('' === $header) {
+            return $header;
+        }
+
+        $elements = imap_mime_header_decode($header);
+        if (false === $elements || [] === $elements) {
+            return $header;
+        }
+
+        $decoded = '';
+        foreach ($elements as $element) {
+            $charset = isset($element->charset) ? strtolower((string) $element->charset) : 'default';
+            $text = (string) ($element->text ?? '');
+
+            if ('default' === $charset || '' === $charset || 'utf-8' === $charset || 'us-ascii' === $charset) {
+                $decoded .= $text;
+                continue;
+            }
+
+            $converted = @mb_convert_encoding($text, 'UTF-8', strtoupper($charset));
+            $decoded .= is_string($converted) ? $converted : $text;
+        }
+
+        return $decoded;
     }
 
     /**
@@ -495,6 +636,7 @@ final readonly class InboundEmailHandlerService
     {
         $processed = 0;
         $errors = [];
+        $connection = null;
 
         try {
             $connection = $this->connectImap($handler);
@@ -504,7 +646,6 @@ final readonly class InboundEmailHandlerService
             $messages = imap_search($connection, $searchCriteria);
 
             if (!$messages) {
-                imap_close($connection);
                 $handler->setLastChecked(date('YmdHis'));
                 $handler->setStatus('active');
 
@@ -520,7 +661,8 @@ final readonly class InboundEmailHandlerService
                     $header = imap_headerinfo($connection, $msgNumber);
                     $body = $this->extractEmailBody($connection, $msgNumber);
 
-                    $subject = $header->subject ?? '(no subject)';
+                    $rawSubject = (string) ($header->subject ?? '');
+                    $subject = '' === $rawSubject ? '(no subject)' : $this->decodeMimeHeader($rawSubject);
                     $from = $header->from[0]->mailbox.'@'.$header->from[0]->host;
 
                     // Route email to department
@@ -566,8 +708,6 @@ final readonly class InboundEmailHandlerService
                 imap_expunge($connection);
             }
 
-            imap_close($connection);
-
             $handler->setLastChecked(date('YmdHis'));
             $handler->setStatus('active');
 
@@ -588,6 +728,10 @@ final readonly class InboundEmailHandlerService
                 'processed' => $processed,
                 'errors' => [$e->getMessage()],
             ];
+        } finally {
+            if (null !== $connection) {
+                @imap_close($connection);
+            }
         }
     }
 
