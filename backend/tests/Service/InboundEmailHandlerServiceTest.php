@@ -11,6 +11,7 @@ use App\Repository\PromptRepository;
 use App\Repository\UserRepository;
 use App\Service\EncryptionService;
 use App\Service\InboundEmailHandlerService;
+use App\Service\MailHandlerLogService;
 use App\Service\ModelConfigService;
 use App\Service\RateLimitService;
 use PHPUnit\Framework\MockObject\MockObject;
@@ -44,6 +45,7 @@ class InboundEmailHandlerServiceTest extends TestCase
             $this->modelConfigService,
             $this->createMock(RateLimitService::class),
             $this->encryptionService,
+            $this->createMock(MailHandlerLogService::class),
             $this->logger
         );
     }

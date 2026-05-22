@@ -123,6 +123,37 @@ export interface TestMailboxConnectionBody {
   handlerId?: string | number
 }
 
+/**
+ * Possible activity log events emitted by the mail handler runner.
+ * Mirrors `MailHandlerLogService::EVENT_*` constants on the backend.
+ */
+export type MailHandlerLogEvent =
+  | 'check'
+  | 'connect_failed'
+  | 'forwarded'
+  | 'discarded'
+  | 'no_route'
+  | 'no_smtp'
+  | 'forward_failed'
+  | 'process_error'
+
+export type MailHandlerLogStatus = 'success' | 'warning' | 'error'
+
+export interface MailHandlerLogEntry {
+  id: number
+  /** Unix epoch seconds when the event was recorded. */
+  timestamp: number
+  event: MailHandlerLogEvent
+  status: MailHandlerLogStatus
+  /** Free-text error / explanation. Empty for success entries. */
+  error: string
+  /**
+   * Free-form metadata captured for this event (subject, from, routed_to,
+   * matched, criteria, message_number, ...). Shape depends on `event`.
+   */
+  details: Record<string, unknown>
+}
+
 export interface UpdateHandlerRequest {
   name?: string
   mailServer?: string
@@ -357,5 +388,18 @@ export const inboundEmailHandlersApi = {
         body: JSON.stringify({ handlerIds }),
       }
     )
+  },
+
+  /**
+   * Recent activity log for a handler (newest first, capped at 10 entries
+   * by the backend). Useful for diagnosing "marked seen but never forwarded"
+   * cases — see `MailHandlerLogService` on the backend.
+   */
+  async getLogs(id: string): Promise<MailHandlerLogEntry[]> {
+    const data = await httpClient<{ success: boolean; logs: MailHandlerLogEntry[] }>(
+      `/api/v1/inbound-email-handlers/${id}/logs`,
+      { method: 'GET' }
+    )
+    return Array.isArray(data.logs) ? data.logs : []
   },
 }

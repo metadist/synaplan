@@ -170,6 +170,17 @@
           </div>
         </div>
 
+        <!-- Activity log button (visible on hover) -->
+        <button
+          class="absolute top-3 right-[4.25rem] icon-ghost opacity-0 group-hover:opacity-100 transition-all z-20"
+          :aria-label="$t('mail.activity.openButton')"
+          :title="$t('mail.activity.openButton')"
+          data-testid="btn-activity"
+          @click.stop="openActivity(handler)"
+        >
+          <ClockIcon class="w-4 h-4" />
+        </button>
+
         <!-- Delete button (separate from header to avoid overlap) -->
         <button
           class="absolute top-3 right-10 icon-ghost icon-ghost--danger opacity-0 group-hover:opacity-100 transition-all z-20"
@@ -229,11 +240,18 @@
         </div>
       </div>
     </div>
+
+    <MailHandlerActivityLogModal
+      :is-open="activityModal.open"
+      :handler-id="activityModal.handlerId"
+      :handler-name="activityModal.handlerName"
+      @close="closeActivity"
+    />
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
+import { reactive, ref } from 'vue'
 import {
   EnvelopeIcon,
   PlusIcon,
@@ -248,6 +266,7 @@ import {
 } from '@heroicons/vue/24/outline'
 import type { SavedMailHandler } from '@/services/api/inboundEmailHandlersApi'
 import { useDateFormat } from '@/composables/useDateFormat'
+import MailHandlerActivityLogModal from './MailHandlerActivityLogModal.vue'
 
 interface Props {
   handlers: SavedMailHandler[]
@@ -297,5 +316,25 @@ const deleteSelected = () => {
 
 const formatDate = (date: Date) => {
   return formatRelativeTime(date)
+}
+
+const activityModal = reactive<{
+  open: boolean
+  handlerId: string | null
+  handlerName: string
+}>({
+  open: false,
+  handlerId: null,
+  handlerName: '',
+})
+
+const openActivity = (handler: SavedMailHandler) => {
+  activityModal.handlerId = handler.id
+  activityModal.handlerName = handler.name
+  activityModal.open = true
+}
+
+const closeActivity = () => {
+  activityModal.open = false
 }
 </script>

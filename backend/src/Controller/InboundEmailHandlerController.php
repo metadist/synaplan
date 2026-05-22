@@ -7,6 +7,7 @@ use App\Entity\User;
 use App\Repository\InboundEmailHandlerRepository;
 use App\Service\EncryptionService;
 use App\Service\InboundEmailHandlerService;
+use App\Service\MailHandlerLogService;
 use Doctrine\ORM\EntityManagerInterface;
 use OpenApi\Attributes as OA;
 use Psr\Log\LoggerInterface;
@@ -31,6 +32,7 @@ class InboundEmailHandlerController extends AbstractController
         private InboundEmailHandlerRepository $handlerRepository,
         private InboundEmailHandlerService $handlerService,
         private EncryptionService $encryptionService,
+        private MailHandlerLogService $activityLog,
         private EntityManagerInterface $em,
         private LoggerInterface $logger,
     ) {
@@ -471,6 +473,7 @@ class InboundEmailHandlerController extends AbstractController
             ], Response::HTTP_NOT_FOUND);
         }
 
+        $this->activityLog->deleteAll($user->getId(), $id);
         $this->em->remove($handler);
         $this->em->flush();
 
@@ -734,6 +737,7 @@ class InboundEmailHandlerController extends AbstractController
         foreach ($handlerIds as $handlerId) {
             $handler = $this->handlerRepository->findOneBy(['id' => $handlerId, 'userId' => $user->getId()]);
             if ($handler) {
+                $this->activityLog->deleteAll($user->getId(), (int) $handlerId);
                 $this->em->remove($handler);
                 ++$deleted;
             }
@@ -742,5 +746,75 @@ class InboundEmailHandlerController extends AbstractController
         $this->em->flush();
 
         return $this->json(['success' => true, 'deleted' => $deleted]);
+    }
+
+    /**
+     * Recent activity log entries for a handler (newest first, capped at 10).
+     */
+    #[Route('/{id}/logs', name: 'logs', methods: ['GET'], requirements: ['id' => '\d+'])]
+    #[OA\Get(
+        path: '/api/v1/inbound-email-handlers/{id}/logs',
+        summary: 'Recent activity log for an email handler',
+        description: 'Returns the last 10 activity entries (connection checks, routing decisions, forward results) for the handler. Useful for diagnosing "marked seen but never forwarded" cases.',
+        security: [['Bearer' => []]],
+        tags: ['Inbound Email Handlers']
+    )]
+    #[OA\Parameter(
+        name: 'id',
+        in: 'path',
+        description: 'Handler ID',
+        required: true,
+        schema: new OA\Schema(type: 'integer')
+    )]
+    #[OA\Response(
+        response: 200,
+        description: 'Recent activity entries (newest first)',
+        content: new OA\JsonContent(
+            properties: [
+                new OA\Property(property: 'success', type: 'boolean', example: true),
+                new OA\Property(
+                    property: 'logs',
+                    type: 'array',
+                    items: new OA\Items(
+                        properties: [
+                            new OA\Property(property: 'id', type: 'integer'),
+                            new OA\Property(property: 'timestamp', type: 'integer', description: 'Unix epoch seconds'),
+                            new OA\Property(property: 'event', type: 'string', enum: ['check', 'connect_failed', 'forwarded', 'discarded', 'no_route', 'no_smtp', 'forward_failed', 'process_error']),
+                            new OA\Property(property: 'status', type: 'string', enum: ['success', 'warning', 'error']),
+                            new OA\Property(property: 'error', type: 'string'),
+                            new OA\Property(property: 'details', type: 'object', additionalProperties: true),
+                        ]
+                    )
+                ),
+            ]
+        )
+    )]
+    #[OA\Response(response: 401, description: 'Not authenticated')]
+    #[OA\Response(response: 404, description: 'Handler not found')]
+    public function logs(int $id, #[CurrentUser] ?User $user): JsonResponse
+    {
+        if (!$user) {
+            return $this->json(['error' => 'Not authenticated'], Response::HTTP_UNAUTHORIZED);
+        }
+
+        $handler = $this->handlerRepository->findByIdAndUser($id, $user->getId());
+
+        if (!$handler) {
+            return $this->json([
+                'success' => false,
+                'error' => 'Handler not found',
+            ], Response::HTTP_NOT_FOUND);
+        }
+
+        $logs = $this->activityLog->findRecent(
+            $user->getId(),
+            $id,
+            MailHandlerLogService::DEFAULT_KEEP
+        );
+
+        return $this->json([
+            'success' => true,
+            'logs' => $logs,
+        ]);
     }
 }

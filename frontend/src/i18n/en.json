@@ -557,7 +557,35 @@
     "filterFromDateHelp": "Emails from this date onwards will be processed (including future emails)",
     "filterToDate": "To Date",
     "recommended": "Recommended",
-    "proOnly": "PRO+"
+    "proOnly": "PRO+",
+    "activity": {
+      "title": "Recent activity",
+      "description": "The last 10 things this email agent did. Use it to debug \"the message was marked seen but never forwarded\" cases.",
+      "openButton": "View activity log",
+      "refresh": "Reload activity",
+      "loadFailed": "Could not load activity log",
+      "empty": "No activity yet",
+      "emptyDescription": "Once this agent processes incoming mail, the most recent steps will appear here.",
+      "retentionNote": "Only the last 10 entries are kept; older entries are pruned automatically.",
+      "events": {
+        "check": "Mailbox checked",
+        "connect_failed": "Connection failed",
+        "forwarded": "Email forwarded",
+        "discarded": "Email discarded by AI",
+        "no_route": "No matching department",
+        "no_smtp": "Routed but not sent (no SMTP configured)",
+        "forward_failed": "Forward failed",
+        "process_error": "Could not process message"
+      },
+      "fields": {
+        "from": "From",
+        "subject": "Subject",
+        "routedTo": "Routed to",
+        "matched": "Matched",
+        "criteria": "IMAP criteria",
+        "messageNumber": "Message #"
+      }
+    }
   },
   "files": {
     "searchPlaceholder": "Search files...",

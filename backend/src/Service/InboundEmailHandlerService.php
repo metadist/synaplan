@@ -30,6 +30,7 @@ final readonly class InboundEmailHandlerService
         private ModelConfigService $modelConfigService,
         private RateLimitService $rateLimitService,
         private EncryptionService $encryptionService,
+        private MailHandlerLogService $activityLog,
         private LoggerInterface $logger,
     ) {
     }
@@ -637,6 +638,8 @@ final readonly class InboundEmailHandlerService
         $processed = 0;
         $errors = [];
         $connection = null;
+        $userId = $handler->getUserId();
+        $handlerId = (int) ($handler->getId() ?? 0);
 
         try {
             $connection = $this->connectImap($handler);
@@ -648,6 +651,15 @@ final readonly class InboundEmailHandlerService
             if (!$messages) {
                 $handler->setLastChecked(date('YmdHis'));
                 $handler->setStatus('active');
+                $this->activityLog->log(
+                    $userId,
+                    $handlerId,
+                    MailHandlerLogService::EVENT_CHECK,
+                    MailHandlerLogService::STATUS_SUCCESS,
+                    null,
+                    ['matched' => 0, 'criteria' => $searchCriteria],
+                );
+                $this->activityLog->prune($userId, $handlerId);
 
                 return [
                     'success' => true,
@@ -655,6 +667,16 @@ final readonly class InboundEmailHandlerService
                     'errors' => [],
                 ];
             }
+
+            $matched = count($messages);
+            $this->activityLog->log(
+                $userId,
+                $handlerId,
+                MailHandlerLogService::EVENT_CHECK,
+                MailHandlerLogService::STATUS_SUCCESS,
+                null,
+                ['matched' => $matched, 'criteria' => $searchCriteria],
+            );
 
             foreach ($messages as $msgNumber) {
                 try {
@@ -668,22 +690,48 @@ final readonly class InboundEmailHandlerService
                     // Route email to department
                     $routedEmail = $this->routeEmailToDepartment($handler, $subject, $body);
 
-                    if ($routedEmail) {
-                        // Forward email to routed department using SMTP
-                        $this->forwardEmail($handler, $from, $routedEmail, $subject, $body);
-
-                        $this->logger->info('Email processed and forwarded', [
-                            'handler_id' => $handler->getId(),
-                            'from' => $from,
-                            'subject' => $subject,
-                            'routed_to' => $routedEmail,
-                        ]);
-                    } else {
+                    if (null === $routedEmail) {
                         $this->logger->info('Email not forwarded (discarded as irrelevant)', [
-                            'handler_id' => $handler->getId(),
+                            'handler_id' => $handlerId,
                             'from' => $from,
                             'subject' => $subject,
                         ]);
+                        $this->activityLog->log(
+                            $userId,
+                            $handlerId,
+                            MailHandlerLogService::EVENT_DISCARDED,
+                            MailHandlerLogService::STATUS_SUCCESS,
+                            null,
+                            ['from' => $from, 'subject' => $subject],
+                        );
+                    } else {
+                        $forwardResult = $this->forwardEmail($handler, $from, $routedEmail, $subject, $body);
+
+                        if ('forwarded' === $forwardResult) {
+                            $this->logger->info('Email processed and forwarded', [
+                                'handler_id' => $handlerId,
+                                'from' => $from,
+                                'subject' => $subject,
+                                'routed_to' => $routedEmail,
+                            ]);
+                            $this->activityLog->log(
+                                $userId,
+                                $handlerId,
+                                MailHandlerLogService::EVENT_FORWARDED,
+                                MailHandlerLogService::STATUS_SUCCESS,
+                                null,
+                                ['from' => $from, 'subject' => $subject, 'routed_to' => $routedEmail],
+                            );
+                        } else {
+                            $this->activityLog->log(
+                                $userId,
+                                $handlerId,
+                                MailHandlerLogService::EVENT_NO_SMTP,
+                                MailHandlerLogService::STATUS_ERROR,
+                                'SMTP credentials are not configured for this handler — the routing decision was made but the email could not be forwarded.',
+                                ['from' => $from, 'subject' => $subject, 'routed_to' => $routedEmail],
+                            );
+                        }
                     }
 
                     // Mark as read (or delete if configured)
@@ -697,10 +745,18 @@ final readonly class InboundEmailHandlerService
                 } catch (\Exception $e) {
                     $errors[] = "Message {$msgNumber}: ".$e->getMessage();
                     $this->logger->error('Failed to process email', [
-                        'handler_id' => $handler->getId(),
+                        'handler_id' => $handlerId,
                         'message_number' => $msgNumber,
                         'error' => $e->getMessage(),
                     ]);
+                    $this->activityLog->log(
+                        $userId,
+                        $handlerId,
+                        MailHandlerLogService::EVENT_PROCESS_ERROR,
+                        MailHandlerLogService::STATUS_ERROR,
+                        $e->getMessage(),
+                        ['message_number' => $msgNumber],
+                    );
                 }
             }
 
@@ -711,6 +767,8 @@ final readonly class InboundEmailHandlerService
             $handler->setLastChecked(date('YmdHis'));
             $handler->setStatus('active');
 
+            $this->activityLog->prune($userId, $handlerId);
+
             return [
                 'success' => true,
                 'processed' => $processed,
@@ -719,9 +777,19 @@ final readonly class InboundEmailHandlerService
         } catch (\Exception $e) {
             $handler->setStatus('error');
             $this->logger->error('Handler processing failed', [
-                'handler_id' => $handler->getId(),
+                'handler_id' => $handlerId,
                 'error' => $e->getMessage(),
             ]);
+            if ($handlerId > 0) {
+                $this->activityLog->log(
+                    $userId,
+                    $handlerId,
+                    MailHandlerLogService::EVENT_CONNECT_FAILED,
+                    MailHandlerLogService::STATUS_ERROR,
+                    $e->getMessage(),
+                );
+                $this->activityLog->prune($userId, $handlerId);
+            }
 
             return [
                 'success' => false,
@@ -737,6 +805,15 @@ final readonly class InboundEmailHandlerService
 
     /**
      * Forward email to department using handler's SMTP credentials.
+     *
+     * Returns:
+     *   - "forwarded" when the SMTP send completed.
+     *   - "no_smtp"   when no SMTP credentials are configured (caller decides
+     *                 whether to mark the message seen anyway — keeping the
+     *                 historical "best-effort" behaviour).
+     *
+     * Throws on any other SMTP failure so the caller can log
+     * `forward_failed` and avoid marking the source message seen.
      */
     private function forwardEmail(
         InboundEmailHandler $handler,
@@ -744,7 +821,7 @@ final readonly class InboundEmailHandlerService
         string $toEmail,
         string $subject,
         string $body,
-    ): void {
+    ): string {
         // Get SMTP credentials (decrypted)
         $smtpConfig = $handler->getSmtpCredentials($this->encryptionService);
 
@@ -753,7 +830,7 @@ final readonly class InboundEmailHandlerService
                 'handler_id' => $handler->getId(),
             ]);
 
-            return;
+            return 'no_smtp';
         }
 
         try {
@@ -781,12 +858,25 @@ final readonly class InboundEmailHandlerService
                 'to' => $toEmail,
                 'subject' => $subject,
             ]);
+
+            return 'forwarded';
         } catch (\Exception $e) {
             $this->logger->error('Failed to forward email', [
                 'handler_id' => $handler->getId(),
                 'error' => $e->getMessage(),
                 'to' => $toEmail,
             ]);
+            $handlerId = (int) ($handler->getId() ?? 0);
+            if ($handlerId > 0) {
+                $this->activityLog->log(
+                    $handler->getUserId(),
+                    $handlerId,
+                    MailHandlerLogService::EVENT_FORWARD_FAILED,
+                    MailHandlerLogService::STATUS_ERROR,
+                    $e->getMessage(),
+                    ['from' => $fromEmail, 'subject' => $subject, 'routed_to' => $toEmail],
+                );
+            }
             throw $e;
         }
     }
