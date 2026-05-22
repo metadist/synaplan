@@ -346,11 +346,16 @@ final class UserMemoryServiceTest extends TestCase
         $this->qdrantClient->method('isAvailable')->willReturn(true);
         $this->qdrantClient->method('scrollMemories')->willReturn([]);
 
+        // Collection was created with 1024-dim but the new model produces 1536-dim vectors.
+        $this->qdrantClient->method('getMemoriesCollectionInfo')->willReturn([
+            'exists' => true,
+            'vector_dim' => 1024,
+            'points_count' => 15,
+            'distance' => 'Cosine',
+        ]);
+
         $this->modelConfigService->method('getDefaultModel')->willReturn(42);
         $this->em->method('getRepository')->willReturn($this->createMock(\Doctrine\ORM\EntityRepository::class));
-
-        // Active collection dim is 1024 but the new model produces 1536-dim vectors.
-        $this->embeddingMetadata->method('getCurrentVectorDim')->willReturn(1024);
 
         $this->aiFacade
             ->method('embed')

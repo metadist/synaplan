@@ -598,19 +598,24 @@ class UserMemoryController extends AbstractController
             ], Response::HTTP_BAD_REQUEST);
         }
 
-        // Resolve chat model up front so we can fail fast with a clear, actionable
+        // Resolve memory model up front so we can fail fast with a clear, actionable
         // error code when no model is configured. Without this pre-check the request
         // would either reach the provider with an empty model (provider-dependent
         // behaviour) or fail later inside the AI stack with a confusing message.
-        $chatModelConfig = $this->getUserChatModelConfig($user->getId());
+        //
+        // IMPORTANT: this MUST use the same MEM → CHAT fallback chain as the async
+        // MemoryExtractionService — otherwise the "New Memory" UI silently runs on
+        // the expensive CHAT model (e.g. Claude Opus) instead of the dedicated MEM
+        // model (e.g. Groq gpt-oss-120b). See issue #973.
+        $memoryModelConfig = $this->modelConfigService->getMemoryModelConfig($user->getId());
 
-        if (null === $chatModelConfig['model'] || null === $chatModelConfig['provider']) {
+        if (null === $memoryModelConfig['model'] || null === $memoryModelConfig['provider']) {
             $response = [
-                'error' => 'No chat model configured for AI structuring',
+                'error' => 'No memory model configured for AI structuring',
                 'code' => self::ERROR_CODE_AI_NO_CHAT_MODEL,
             ];
             if ($user->isAdmin()) {
-                $response['debug'] = 'No default CHAT model configured for this user. Set one under Profile → AI Models, or as global default.';
+                $response['debug'] = 'No default MEM or CHAT model configured for this user. Set one under Profile → AI Models, or as global default.';
             }
 
             return $this->json($response, Response::HTTP_SERVICE_UNAVAILABLE);
@@ -667,8 +672,8 @@ class UserMemoryController extends AbstractController
                 userId: $user->getId(),
                 options: array_filter([
                     'json_mode' => true,
-                    'model' => $chatModelConfig['model'],
-                    'provider' => $chatModelConfig['provider'],
+                    'model' => $memoryModelConfig['model'],
+                    'provider' => $memoryModelConfig['provider'],
                     'temperature' => 0.3, // Low temperature for consistent JSON output
                 ])
             );
@@ -678,7 +683,7 @@ class UserMemoryController extends AbstractController
             $this->rateLimitService->recordUsage($user, 'MEMORY_PARSE', [
                 'provider' => $response['provider'] ?? 'unknown',
                 'model' => $response['model'] ?? 'unknown',
-                'model_id' => $chatModelConfig['model_id'] ?? null,
+                'model_id' => $memoryModelConfig['model_id'] ?? null,
                 'usage' => $response['usage'] ?? [],
                 'response_text' => $content,
                 'input_text' => $userMessage,
@@ -1003,28 +1008,5 @@ class UserMemoryController extends AbstractController
         }
 
         return $this->json($payload, Response::HTTP_SERVICE_UNAVAILABLE);
-    }
-
-    /**
-     * Get both model name AND provider for the user's default chat model.
-     *
-     * Resolves both from the same model ID to prevent provider/model mismatch
-     * (e.g., sending an OpenAI model name to Groq provider).
-     *
-     * @return array{model: string|null, provider: string|null, model_id: int|null}
-     */
-    private function getUserChatModelConfig(int $userId): array
-    {
-        $modelId = $this->modelConfigService->getDefaultModel('CHAT', $userId);
-
-        if ($modelId) {
-            return [
-                'model' => $this->modelConfigService->getModelName($modelId),
-                'provider' => $this->modelConfigService->getProviderForModel($modelId),
-                'model_id' => $modelId,
-            ];
-        }
-
-        return ['model' => null, 'provider' => null, 'model_id' => null];
     }
 }

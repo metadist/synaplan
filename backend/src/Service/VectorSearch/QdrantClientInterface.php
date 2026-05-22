@@ -287,6 +287,24 @@ interface QdrantClientInterface
      */
     public function recreateSynapseCollection(int $vectorDimension): void;
 
+    // --- Memory Collection Management ---
+
+    /**
+     * Get information about the memories collection (vector size, point count, status).
+     *
+     * @return array{exists: bool, vector_dim: ?int, points_count: ?int, distance: ?string}
+     */
+    public function getMemoriesCollectionInfo(): array;
+
+    /**
+     * Drop the memories collection (if present) and recreate it with the given
+     * vector dimension. Used when the embedding model is swapped to one with
+     * a different output dimension (e.g. 1024 ─► 1536).
+     *
+     * Idempotent — safe to call when the collection does not yet exist.
+     */
+    public function recreateMemoriesCollection(int $vectorDimension): void;
+
     /**
      * Get the synapse collection name.
      */

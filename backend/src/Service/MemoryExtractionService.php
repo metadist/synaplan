@@ -397,44 +397,23 @@ PROMPT;
     /**
      * Resolve which model runs the memory-extraction LLM call.
      *
-     * Phase 2d priority:
-     *   1. User-scoped DEFAULTMODEL.MEM   (per-user override, set via the admin UI)
-     *   2. Global DEFAULTMODEL.MEM        (the new "Memory extraction model"
-     *                                       BMODELS row, BTAG=mem, default
-     *                                       points at Groq gpt-oss-120b for
-     *                                       ~200 ms TTFT)
-     *   3. User-scoped DEFAULTMODEL.CHAT  (legacy fallback — preserved for
-     *                                       installations that haven't seeded
-     *                                       the MEM tag yet)
-     *   4. Global DEFAULTMODEL.CHAT       (last resort)
-     *
-     * The MEM tag exists so picking a slow/expensive chat model (e.g. Gemini
-     * 3.x Pro) for the user-facing answer no longer cascades into the
-     * background memory extraction.
+     * Delegates to {@see ModelConfigService::getMemoryModelConfig()} so the
+     * same MEM → CHAT fallback chain is shared with the synchronous
+     * "New Memory" UI endpoint (UserMemoryController::parseMemory). See #973.
      *
      * @return array{model: string|null, provider: string|null, model_id: int|null}
      */
     private function getExtractionModelConfig(int $userId): array
     {
-        $modelId = $this->modelConfigService->getDefaultModel('MEM', $userId)
-            ?? $this->modelConfigService->getDefaultModel('MEM', 0)
-            ?? $this->modelConfigService->getDefaultModel('CHAT', $userId)
-            ?? $this->modelConfigService->getDefaultModel('CHAT', 0);
-
-        if (!$modelId) {
-            return ['model' => null, 'provider' => null, 'model_id' => null];
-        }
-
-        $model = $this->modelConfigService->getModelName($modelId);
-        $provider = $this->modelConfigService->getProviderForModel($modelId);
+        $config = $this->modelConfigService->getMemoryModelConfig($userId);
 
         $this->logger->debug('Memory extraction model resolved', [
             'user_id' => $userId,
-            'model_id' => $modelId,
-            'model' => $model,
-            'provider' => $provider,
+            'model_id' => $config['model_id'],
+            'model' => $config['model'],
+            'provider' => $config['provider'],
         ]);
 
-        return ['model' => $model, 'provider' => $provider, 'model_id' => $modelId];
+        return $config;
     }
 }
