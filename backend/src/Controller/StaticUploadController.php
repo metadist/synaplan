@@ -2,7 +2,9 @@
 
 namespace App\Controller;
 
+use App\Entity\Message;
 use App\Entity\User;
+use App\Repository\FileRepository;
 use App\Repository\MessageRepository;
 use App\Service\File\FileHelper;
 use Psr\Log\LoggerInterface;
@@ -24,6 +26,7 @@ class StaticUploadController extends AbstractController
 {
     public function __construct(
         private MessageRepository $messageRepository,
+        private FileRepository $fileRepository,
         private string $uploadDir,
         private LoggerInterface $logger,
     ) {
@@ -98,41 +101,44 @@ class StaticUploadController extends AbstractController
             return $this->serveFile($path, $request);
         }
 
-        // 1. For regular files: Find message by filePath (format: "/api/v1/files/uploads/{path}")
-        $filePath = "/api/v1/files/uploads/{$path}";
-
-        $message = $this->messageRepository->createQueryBuilder('m')
-            ->leftJoin('m.chat', 'c')
-            ->addSelect('c')
-            ->where('m.filePath = :path')
-            ->setParameter('path', $filePath)
-            ->getQuery()
-            ->getOneOrNullResult();
-
-        if (!$message) {
-            $this->logger->warning('StaticUploadController: Message not found for file', [
+        // 1. Resolve the asset to either a Message (legacy + AI-generated)
+        //    or a File entity (user uploads, WhatsApp media — issue #976).
+        //    The Message lookup tolerates both the prefixed
+        //    `/api/v1/files/uploads/...` form (AI-generated content,
+        //    `MediaGenerationHandler`) AND the raw relative path that
+        //    older WhatsApp messages persisted before File entities were
+        //    introduced. The File entity fallback covers regular web
+        //    uploads (issue #955) and new WhatsApp media stored via
+        //    `WhatsAppService::handleMediaDownload`.
+        $context = $this->resolveFileContext($path);
+        if (!$context) {
+            $this->logger->warning('StaticUploadController: File not found in database', [
                 'path' => $path,
-                'file_path' => $filePath,
             ]);
             throw $this->createNotFoundException('File not found in database');
         }
 
+        $message = $context['message'];
+        $ownerUserId = $context['owner_user_id'];
+
         // 2. Check if file is public (chat is shared) AND not expired
-        $chat = $message->getChat();
+        $chat = $message?->getChat();
         $isPublicCheck = $chat ? $chat->isPublic() : false;
-        $isExpiredCheck = $message->isShareExpired();
+        $isExpiredCheck = $message ? $message->isShareExpired() : false;
         $isPublicAndValid = $isPublicCheck && !$isExpiredCheck;
 
         $this->logger->info('StaticUploadController: Access check', [
             'path' => $path,
-            'message_id' => $message->getId(),
+            'source' => $context['source'],
+            'message_id' => $message?->getId(),
+            'file_id' => $context['file_id'],
             'chat_id' => $chat ? $chat->getId() : null,
             'is_public' => $isPublicCheck,
             'is_expired' => $isExpiredCheck,
             'is_public_and_valid' => $isPublicAndValid,
             'has_user' => null !== $user,
             'user_id' => $user?->getId(),
-            'owner_id' => $message->getUserId(),
+            'owner_id' => $ownerUserId,
         ]);
 
         // 3. Permission check: Public files OR authenticated owner
@@ -141,7 +147,7 @@ class StaticUploadController extends AbstractController
             if (!$user) {
                 $this->logger->warning('StaticUploadController: Unauthorized access attempt', [
                     'path' => $path,
-                    'is_chat_public' => $chat ? $chat->isPublic() : false,
+                    'is_chat_public' => $isPublicCheck,
                     'ip' => $_SERVER['REMOTE_ADDR'] ?? 'unknown',
                 ]);
 
@@ -151,12 +157,12 @@ class StaticUploadController extends AbstractController
             }
 
             // Check ownership (only owner can access private files)
-            if ($message->getUserId() !== $user->getId()) {
+            if ($ownerUserId !== $user->getId()) {
                 $this->logger->warning('StaticUploadController: Forbidden access attempt', [
                     'path' => $path,
                     'user_id' => $user->getId(),
-                    'owner_id' => $message->getUserId(),
-                    'is_chat_public' => $chat ? $chat->isPublic() : false,
+                    'owner_id' => $ownerUserId,
+                    'is_chat_public' => $isPublicCheck,
                 ]);
 
                 return $this->json([
@@ -165,7 +171,11 @@ class StaticUploadController extends AbstractController
             }
         }
 
-        // 4. Additional check for expired public shares
+        // 4. Additional check for expired public shares.
+        // `$chat` is only non-null when `$message` is set (we resolved
+        // `$chat = $message?->getChat()` above), so the existing chat
+        // checks already imply a non-null message — no extra null guard
+        // needed.
         if ($chat && $chat->isPublic() && $message->isShareExpired()) {
             $this->logger->info('StaticUploadController: Expired share link accessed', [
                 'path' => $path,
@@ -178,6 +188,80 @@ class StaticUploadController extends AbstractController
 
         // 5. Serve the file
         return $this->serveFile($path, $request);
+    }
+
+    /**
+     * Resolve a relative upload path to its owning Message (preferred) or
+     * orphan File entity, returning the metadata needed for the access
+     * check.
+     *
+     * Priority:
+     *  1. `Message::filePath` matching either the prefixed serve URL or
+     *     the raw relative path. This covers AI-generated media (which
+     *     stores the prefixed form) and legacy inbound WhatsApp messages
+     *     (which persisted the raw relative path before issue #976).
+     *  2. `File::filePath` matching the raw relative path. This covers
+     *     regular web uploads (issue #955 surfaced inline `<audio>`
+     *     playback for them) and new WhatsApp media that travels through
+     *     the same `File` pipeline.
+     *
+     * @return array{message: ?Message, owner_user_id: int, source: string, file_id: ?int}|null
+     */
+    private function resolveFileContext(string $path): ?array
+    {
+        $apiPath = '/api/v1/files/uploads/'.$path;
+
+        $message = $this->messageRepository->createQueryBuilder('m')
+            ->leftJoin('m.chat', 'c')
+            ->addSelect('c')
+            ->where('m.filePath = :apiPath OR m.filePath = :rawPath')
+            ->setParameter('apiPath', $apiPath)
+            ->setParameter('rawPath', $path)
+            ->setMaxResults(1)
+            ->getQuery()
+            ->getOneOrNullResult();
+
+        if ($message instanceof Message) {
+            return [
+                'message' => $message,
+                'owner_user_id' => $message->getUserId(),
+                'source' => 'message_filepath',
+                'file_id' => null,
+            ];
+        }
+
+        $file = $this->fileRepository->findOneBy(['filePath' => $path]);
+        if (null === $file) {
+            return null;
+        }
+
+        $linkedMessage = $this->messageRepository->createQueryBuilder('m')
+            ->leftJoin('m.chat', 'c')
+            ->addSelect('c')
+            ->innerJoin('m.files', 'f')
+            ->where('f.id = :fileId')
+            ->setParameter('fileId', $file->getId())
+            ->setMaxResults(1)
+            ->getQuery()
+            ->getOneOrNullResult();
+
+        // Prefer the owning Message's user_id when an attachment exists.
+        // The legacy `Message::filePath` branch above derives ownership
+        // from the Message; mirroring that here keeps access decisions
+        // consistent if the File row and its owning Message ever drift
+        // (e.g. impersonation paths or future schema migrations) — we
+        // never want a File-fallback to grant access the Message branch
+        // would have refused.
+        $ownerUserId = $linkedMessage instanceof Message
+            ? $linkedMessage->getUserId()
+            : $file->getUserId();
+
+        return [
+            'message' => $linkedMessage instanceof Message ? $linkedMessage : null,
+            'owner_user_id' => $ownerUserId,
+            'source' => $linkedMessage ? 'file_attached_to_message' : 'file_orphan',
+            'file_id' => $file->getId(),
+        ];
     }
 
     /**

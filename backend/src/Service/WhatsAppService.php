@@ -5,6 +5,7 @@ namespace App\Service;
 use App\AI\Service\AiFacade;
 use App\DTO\WhatsApp\IncomingMessageDto;
 use App\Entity\Chat;
+use App\Entity\File;
 use App\Entity\Message;
 use App\Entity\User;
 use App\Service\File\FileProcessor;
@@ -1419,14 +1420,41 @@ final class WhatsAppService
                 return 'Failed to download media file';
             }
 
+            // Issue #976: persist the downloaded asset as a `File` entity
+            // attached to the message, mirroring how regular web uploads
+            // travel through `MessageController::uploadFileForChat` and
+            // `StreamController`. Without this, WhatsApp media bypassed the
+            // standard storage pipeline: `Message::filePath` carried a raw
+            // relative path while the static-serve controller only matched
+            // the `/api/v1/files/uploads/...` prefix, so the audio 404'd in
+            // the web chat. Storing it as a File entity also lets the
+            // recording show up in the user's Files page and travel through
+            // the same access-control path as any other upload.
+            $relativePath = $downloadResult['file_path'];
+            $file = new File();
+            $file->setUserId($effectiveUserId);
+            $file->setFilePath($relativePath);
+            $file->setFileType($downloadResult['file_type'] ?? 'unknown');
+            $file->setFileName(basename($relativePath));
+            $file->setFileSize((int) ($downloadResult['size'] ?? 0));
+            $file->setFileMime((string) ($downloadResult['mime_type'] ?? 'application/octet-stream'));
+            $file->setStatus('uploaded');
+
+            // Persist + attach without an inner flush — `handleIncomingMessage`
+            // performs a single flush right after we return, which now
+            // covers BOTH the File row AND the Message↔File association
+            // in one transaction. An earlier version flushed twice and
+            // wrote the M2M row in a separate INSERT, which was wasteful
+            // and could leave a half-attached File if the second flush
+            // failed.
+            $this->em->persist($file);
+            $message->addFile($file);
             $message->setFile(1);
-            $message->setFilePath($downloadResult['file_path']);
-            $message->setFileType($downloadResult['file_type'] ?? 'unknown');
 
             $this->logger->info('WhatsApp: Media downloaded successfully', [
                 'media_id' => $mediaId,
                 'type' => $dto->type,
-                'file_path' => $downloadResult['file_path'],
+                'file_path' => $relativePath,
                 'file_type' => $downloadResult['file_type'],
                 'size' => $downloadResult['size'] ?? 0,
             ]);
@@ -1444,13 +1472,14 @@ final class WhatsAppService
                     ]);
 
                     [$extractedText, $extractionDetails] = $this->fileProcessor->extractText(
-                        $downloadResult['file_path'],
+                        $relativePath,
                         $downloadResult['file_type'],
                         $effectiveUserId
                     );
 
                     if (!empty($extractedText)) {
-                        $message->setFileText($extractedText);
+                        $file->setFileText($extractedText);
+                        $file->setStatus('extracted');
 
                         // CRITICAL: For audio/video messages, replace placeholder text with transcription
                         // This ensures the AI receives the actual spoken content
@@ -1467,6 +1496,7 @@ final class WhatsAppService
                         }
                     } else {
                         // Extraction failed - return error to user instead of proceeding with placeholder
+                        $file->setStatus('error');
                         $this->logger->warning('WhatsApp: No text extracted from audio/video', [
                             'type' => $dto->type,
                             'details' => $extractionDetails ?? [],
@@ -1490,7 +1520,7 @@ final class WhatsAppService
                         $this->logger->info('WhatsApp: Image/sticker with caption, delegating to ChatHandler vision', [
                             'type' => $dto->type,
                             'caption' => $caption,
-                            'file_path' => $downloadResult['file_path'],
+                            'file_path' => $relativePath,
                         ]);
                     } else {
                         // No caption: ask for a description
@@ -1500,25 +1530,29 @@ final class WhatsAppService
                         $message->setText($prompt);
                         $this->logger->info('WhatsApp: Image/sticker without caption, requesting description', [
                             'type' => $dto->type,
-                            'file_path' => $downloadResult['file_path'],
+                            'file_path' => $relativePath,
                         ]);
                     }
-                // Note: fileText is intentionally NOT set - ChatHandler will include
-                // the image directly in the Vision API request for proper analysis
+                // Note: fileText is intentionally NOT set on the File entity
+                // here — ChatHandler reads the image straight off disk for
+                // the Vision API request, and storing a placeholder text
+                // would only confuse downstream classifiers.
                 } else {
                     // For documents and other types, use standard extraction
                     [$extractedText] = $this->fileProcessor->extractText(
-                        $downloadResult['file_path'],
+                        $relativePath,
                         $downloadResult['file_type'],
                         $effectiveUserId
                     );
 
                     if (!empty($extractedText)) {
-                        $message->setFileText($extractedText);
+                        $file->setFileText($extractedText);
+                        $file->setStatus('extracted');
                     }
                 }
             } catch (\Throwable $e) {
                 $extractionError = $e->getMessage();
+                $file->setStatus('error');
                 $this->logger->error('WhatsApp: Text extraction failed', [
                     'type' => $dto->type,
                     'file_type' => $downloadResult['file_type'],
