@@ -388,13 +388,18 @@ final readonly class FileAnalysisHandler implements MessageHandlerInterface
             $modelName = $this->modelConfigService->getModelName($modelId);
         }
 
+        // Log the transcript length only — the system prompt also contains
+        // the "do NOT describe the recording" boilerplate and the
+        // === MARKERS ===, so logging strlen($prompts['system']) would
+        // overstate how much actual user content we sent to the model.
         $this->logger->info('FileAnalysisHandler: Replying to voice message', [
             'model_id' => $modelId,
             'provider' => $provider,
             'model' => $modelName,
             'user_id' => $message->getUserId(),
             'effective_user_id' => $effectiveUserId,
-            'transcript_length' => strlen($prompts['system']),
+            'transcript_length' => strlen($this->joinAudioTranscripts($audioFiles)),
+            'system_prompt_length' => strlen($prompts['system']),
             'voice_message_count' => count($audioFiles),
         ]);
 
@@ -1220,19 +1225,20 @@ final readonly class FileAnalysisHandler implements MessageHandlerInterface
             return ['kind' => 'audio', 'audio' => $audioWithText];
         }
 
-        // 3. Images only → vision path. We tolerate transcribed audio
-        //    being present alongside images by passing the spoken
-        //    content as the per-image prompt below isn't ideal, so we
-        //    fall through to vision and rely on its prompt for now.
+        // 3. Images only → vision path. Pure image upload, no audio
+        //    transcripts mixed in (the next branch handles that case).
         if ([] !== $images && [] === $audioWithText) {
             return ['kind' => 'images', 'images' => $images];
         }
 
-        // 3b. Mixed images + audio (no documents): describe the images
-        //     and still attempt to route audio sensibly. The simplest
-        //     pragmatic behaviour is to favour images so the user sees
-        //     something useful; audio without a document is rare in
-        //     this combination.
+        // 3b. Mixed images + audio (no documents): we currently favour
+        //     the images and route to the vision path. The audio
+        //     transcript is dropped here because `analyzeImageBatch()`
+        //     only feeds the user prompt — not arbitrary side text — to
+        //     the model. Mixing the two combinations is rare; the
+        //     pragmatic choice is to give the user a useful image
+        //     description and accept that the spoken content is not
+        //     surfaced in this corner case.
         if ([] !== $images) {
             return ['kind' => 'images', 'images' => $images];
         }
