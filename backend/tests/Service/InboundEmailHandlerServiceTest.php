@@ -364,6 +364,169 @@ class InboundEmailHandlerServiceTest extends TestCase
         $this->assertNull($method->invoke($this->service, $partWithoutCharset));
     }
 
+    /**
+     * Regression for issue #985: emails with attachments wrap the body inside
+     * a nested `multipart/alternative` under `multipart/mixed`, so the
+     * pre-fix top-level-only walker missed text/plain entirely. Pinning the
+     * recursive walker against the exact MIME shape from the bug report.
+     */
+    public function testCollectTextPartsWalksNestedMultipartFromBugReport(): void
+    {
+        $textPlain = (object) [
+            'type' => 0, 'subtype' => 'PLAIN',
+            'encoding' => 0,
+            'ifdisposition' => 0,
+            'ifparameters' => 1,
+            'parameters' => [(object) ['attribute' => 'charset', 'value' => 'UTF-8']],
+        ];
+        $textHtml = (object) [
+            'type' => 0, 'subtype' => 'HTML',
+            'encoding' => 4, // QUOTED-PRINTABLE
+            'ifdisposition' => 0,
+            'ifparameters' => 1,
+            'parameters' => [(object) ['attribute' => 'charset', 'value' => 'UTF-8']],
+        ];
+        $alternative = (object) [
+            'type' => 1, 'subtype' => 'alternative',
+            'ifdisposition' => 0,
+            'ifparameters' => 0, 'parameters' => [],
+            'parts' => [$textPlain, $textHtml],
+        ];
+        $pdfAttachment = (object) [
+            'type' => 3, 'subtype' => 'pdf',
+            'encoding' => 3,
+            'ifdisposition' => 1, 'disposition' => 'attachment',
+            'ifparameters' => 0, 'parameters' => [],
+        ];
+
+        // Sections we expect to be requested. PDF (top-level "2") must NOT
+        // be fetched because it is an explicit attachment.
+        $bodies = [
+            '1.1' => 'Hello from the plain body',
+            '1.2' => 'Hello=20from=20the=20HTML=20body',
+        ];
+        $requested = [];
+        $fetchBody = function (string $section) use (&$bodies, &$requested): string {
+            $requested[] = $section;
+
+            return $bodies[$section] ?? '';
+        };
+
+        $result = $this->invokeCollectTextParts([$alternative, $pdfAttachment], '', $fetchBody);
+
+        $this->assertSame('Hello from the plain body', $result['plain']);
+        $this->assertSame('Hello from the HTML body', $result['html']);
+        $this->assertNotContains('2', $requested, 'PDF attachment must not be fetched');
+    }
+
+    /**
+     * Walks plain `multipart/alternative` (no enclosing mixed wrapper) and
+     * still returns plain + html for the AI prompt fallback.
+     */
+    public function testCollectTextPartsHandlesTopLevelAlternative(): void
+    {
+        $plain = (object) [
+            'type' => 0, 'subtype' => 'plain',
+            'encoding' => 0,
+            'ifdisposition' => 0,
+            'ifparameters' => 0, 'parameters' => [],
+        ];
+        $html = (object) [
+            'type' => 0, 'subtype' => 'html',
+            'encoding' => 0,
+            'ifdisposition' => 0,
+            'ifparameters' => 0, 'parameters' => [],
+        ];
+
+        $fetchBody = fn (string $section): string => match ($section) {
+            '1' => 'plain body',
+            '2' => '<p>html body</p>',
+            default => '',
+        };
+
+        $result = $this->invokeCollectTextParts([$plain, $html], '', $fetchBody);
+
+        $this->assertSame('plain body', $result['plain']);
+        $this->assertSame('<p>html body</p>', $result['html']);
+    }
+
+    /**
+     * `Content-Disposition: attachment; text/plain` (an attached `.txt`
+     * file) must NOT be picked up as the body — the actual body text/plain
+     * sibling wins.
+     */
+    public function testCollectTextPartsSkipsAttachedTextPartsInFavourOfBody(): void
+    {
+        $bodyPlain = (object) [
+            'type' => 0, 'subtype' => 'plain',
+            'encoding' => 0,
+            'ifdisposition' => 0,
+            'ifparameters' => 0, 'parameters' => [],
+        ];
+        $attachedTxt = (object) [
+            'type' => 0, 'subtype' => 'plain',
+            'encoding' => 0,
+            'ifdisposition' => 1, 'disposition' => 'attachment',
+            'ifparameters' => 0, 'parameters' => [],
+        ];
+
+        $fetchBody = fn (string $section): string => '1' === $section
+            ? 'real body content'
+            : 'CONTENTS OF ATTACHMENT.TXT';
+
+        $result = $this->invokeCollectTextParts([$bodyPlain, $attachedTxt], '', $fetchBody);
+
+        $this->assertSame('real body content', $result['plain']);
+    }
+
+    /**
+     * Latin-1-declared parts inside a nested tree must be decoded to UTF-8
+     * during the walk so the routing prompt sees readable umlauts.
+     */
+    public function testCollectTextPartsConvertsCharsetForNestedParts(): void
+    {
+        $latin1Body = mb_convert_encoding('Bestellung über 12€', 'ISO-8859-15', 'UTF-8');
+        $this->assertIsString($latin1Body);
+
+        $textPlain = (object) [
+            'type' => 0, 'subtype' => 'PLAIN',
+            'encoding' => 0,
+            'ifdisposition' => 0,
+            'ifparameters' => 1,
+            'parameters' => [(object) ['attribute' => 'charset', 'value' => 'iso-8859-15']],
+        ];
+        $alternative = (object) [
+            'type' => 1, 'subtype' => 'alternative',
+            'ifdisposition' => 0,
+            'ifparameters' => 0, 'parameters' => [],
+            'parts' => [$textPlain],
+        ];
+
+        $fetchBody = fn (string $section): string => '1.1' === $section ? $latin1Body : '';
+
+        $result = $this->invokeCollectTextParts([$alternative], '', $fetchBody);
+
+        $this->assertSame('Bestellung über 12€', $result['plain']);
+    }
+
+    /**
+     * @param array<int, object>       $parts
+     * @param callable(string): string $fetchBody
+     *
+     * @return array{plain: string, html: string}
+     */
+    private function invokeCollectTextParts(array $parts, string $sectionPrefix, callable $fetchBody): array
+    {
+        $reflection = new \ReflectionClass($this->service);
+        $method = $reflection->getMethod('collectTextParts');
+        $method->setAccessible(true);
+
+        /** @var array{plain: string, html: string} $result */
+        $result = $method->invoke($this->service, $parts, $sectionPrefix, $fetchBody);
+
+        return $result;
+    }
+
     private function getDecodeEmailBodyMethod(): \ReflectionMethod
     {
         $reflection = new \ReflectionClass($this->service);

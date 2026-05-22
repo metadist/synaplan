@@ -196,7 +196,17 @@ final readonly class InboundEmailHandlerService
         $structure = imap_fetchstructure($connection, $msgNumber);
 
         if (!is_object($structure)) {
-            return '';
+            // imap_fetchstructure() returns false on protocol-level errors.
+            // Returning '' here would silently feed the AI router an empty
+            // body — fall back to the raw imap_body() (same "last resort"
+            // shape the deep-multipart path uses) and log the failure so
+            // the activity log can surface it.
+            $this->logger->warning('imap_fetchstructure failed; falling back to raw imap_body', [
+                'message_number' => $msgNumber,
+                'imap_errors' => imap_errors() ?: [],
+            ]);
+
+            return imap_body($connection, $msgNumber);
         }
 
         // Single-part message (not multipart): the whole body is the part.
@@ -210,7 +220,8 @@ final readonly class InboundEmailHandlerService
             );
         }
 
-        $textParts = $this->collectTextParts($connection, $msgNumber, $structure->parts, '');
+        $fetchBody = static fn (string $section): string => imap_fetchbody($connection, $msgNumber, $section);
+        $textParts = $this->collectTextParts($structure->parts, '', $fetchBody);
 
         if ('' !== $textParts['plain']) {
             return $textParts['plain'];
@@ -232,15 +243,22 @@ final readonly class InboundEmailHandlerService
      * Section numbers follow IMAP's dotted addressing (RFC 3501 §6.4.5):
      * top-level parts are "1", "2", ...; nested parts are "1.1", "1.2", ...
      *
-     * @param array<int, object> $parts
+     * The walker takes a `$fetchBody` closure rather than calling
+     * `imap_fetchbody()` directly so it can be unit-tested against
+     * synthetic body-structure trees without a real IMAP connection.
+     *
+     * @param array<int, object>       $parts
+     * @param callable(string): string $fetchBody receives a dotted section
+     *                                            number and returns the
+     *                                            (still-encoded) body for
+     *                                            that section
      *
      * @return array{plain: string, html: string}
      */
     private function collectTextParts(
-        \IMAP\Connection $connection,
-        int $msgNumber,
         array $parts,
         string $sectionPrefix,
+        callable $fetchBody,
     ): array {
         $textPlain = '';
         $textHtml = '';
@@ -258,21 +276,19 @@ final readonly class InboundEmailHandlerService
             $isMultipart = !empty($part->parts);
 
             if ('' === $textPlain && 'text/plain' === $mimeType && !$isMultipart) {
-                $body = imap_fetchbody($connection, $msgNumber, $section);
                 $textPlain = $this->decodeEmailBody(
-                    $body,
+                    $fetchBody($section),
                     $part->encoding ?? 0,
                     $this->getCharset($part)
                 );
             } elseif ('' === $textHtml && 'text/html' === $mimeType && !$isMultipart) {
-                $body = imap_fetchbody($connection, $msgNumber, $section);
                 $textHtml = $this->decodeEmailBody(
-                    $body,
+                    $fetchBody($section),
                     $part->encoding ?? 0,
                     $this->getCharset($part)
                 );
             } elseif ($isMultipart) {
-                $nested = $this->collectTextParts($connection, $msgNumber, $part->parts, $section);
+                $nested = $this->collectTextParts($part->parts, $section, $fetchBody);
                 if ('' === $textPlain) {
                     $textPlain = $nested['plain'];
                 }
