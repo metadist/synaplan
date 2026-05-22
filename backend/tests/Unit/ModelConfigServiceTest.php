@@ -9,19 +9,24 @@ use App\Repository\ConfigRepository;
 use App\Repository\ModelRepository;
 use App\Repository\UserRepository;
 use App\Service\ModelConfigService;
+use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use Psr\Cache\CacheItemInterface;
 use Psr\Cache\CacheItemPoolInterface;
 
 class ModelConfigServiceTest extends TestCase
 {
-    private ConfigRepository $configRepository;
-    private ModelRepository $modelRepository;
-    private UserRepository $userRepository;
-    private CacheItemPoolInterface $cache;
-    private ProviderRegistry $providerRegistry;
+    // Intersection types so PHPStan understands that the mocks expose
+    // PHPUnit's `expects()`/`method()`. The previous concrete-only typing
+    // forced phpstan-baseline.neon to swallow ~50 "undefined method"
+    // entries for this file (Copilot review on PR #986).
+    private ConfigRepository&MockObject $configRepository;
+    private ModelRepository&MockObject $modelRepository;
+    private UserRepository&MockObject $userRepository;
+    private CacheItemPoolInterface&MockObject $cache;
+    private ProviderRegistry&MockObject $providerRegistry;
     private ModelConfigService $service;
-    private CacheItemInterface $cacheItem;
+    private CacheItemInterface&MockObject $cacheItem;
 
     protected function setUp(): void
     {

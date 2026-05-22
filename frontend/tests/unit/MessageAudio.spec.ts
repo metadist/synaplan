@@ -9,9 +9,26 @@ import MessageAudio from '@/components/MessageAudio.vue'
  * element in tests needs `load()`, `play()`, and `pause()` to exist as
  * spy-friendly functions so we can drive the load/error/playback lifecycle
  * by hand without needing a real audio decoder.
+ *
+ * The original prototype descriptors are captured once and restored in
+ * `afterEach` so the stubs don't leak into other test files (Copilot
+ * review on PR #986). `vi.restoreAllMocks()` alone doesn't undo
+ * `Object.defineProperty` on a shared prototype, so order-dependent
+ * runs would otherwise pick up our spies and behave unpredictably.
  */
+const STUBBED_AUDIO_PROPS = ['play', 'pause', 'load'] as const
+type StubbableAudioProp = (typeof STUBBED_AUDIO_PROPS)[number]
+const originalAudioDescriptors: Partial<
+  Record<StubbableAudioProp, PropertyDescriptor | undefined>
+> = {}
+
 function stubAudioElement(overrides: Partial<HTMLAudioElement> = {}) {
   const proto = HTMLMediaElement.prototype
+  for (const prop of STUBBED_AUDIO_PROPS) {
+    if (!(prop in originalAudioDescriptors)) {
+      originalAudioDescriptors[prop] = Object.getOwnPropertyDescriptor(proto, prop)
+    }
+  }
   Object.defineProperty(proto, 'play', {
     configurable: true,
     writable: true,
@@ -29,6 +46,20 @@ function stubAudioElement(overrides: Partial<HTMLAudioElement> = {}) {
   })
 }
 
+function restoreAudioElement(): void {
+  const proto = HTMLMediaElement.prototype
+  for (const prop of STUBBED_AUDIO_PROPS) {
+    const original = originalAudioDescriptors[prop]
+    if (original) {
+      Object.defineProperty(proto, prop, original)
+    } else {
+      // JSDOM didn't define this prop natively — remove the stub
+      // so the next test starts from a clean slate.
+      delete (proto as unknown as Record<string, unknown>)[prop]
+    }
+  }
+}
+
 describe('MessageAudio', () => {
   beforeEach(() => {
     setActivePinia(createPinia())
@@ -39,6 +70,7 @@ describe('MessageAudio', () => {
   afterEach(() => {
     vi.useRealTimers()
     vi.restoreAllMocks()
+    restoreAudioElement()
   })
 
   it('renders the audio element with the provided URL', () => {
@@ -109,17 +141,23 @@ describe('MessageAudio', () => {
     const unhandledHandler = vi.fn()
     window.addEventListener('unhandledrejection', unhandledHandler)
 
-    const wrapper = mount(MessageAudio, {
-      props: {
-        url: '/api/v1/files/uploads/13/voice.ogg',
-      },
-    })
+    try {
+      const wrapper = mount(MessageAudio, {
+        props: {
+          url: '/api/v1/files/uploads/13/voice.ogg',
+        },
+      })
 
-    await wrapper.find('[data-testid="btn-audio-play"]').trigger('click')
-    await flushPromises()
+      await wrapper.find('[data-testid="btn-audio-play"]').trigger('click')
+      await flushPromises()
 
-    expect(unhandledHandler).not.toHaveBeenCalled()
-    window.removeEventListener('unhandledrejection', unhandledHandler)
+      expect(unhandledHandler).not.toHaveBeenCalled()
+    } finally {
+      // Guarantee removal even if an assertion above throws — otherwise
+      // the global listener would leak into later tests and turn an
+      // unrelated promise rejection into a failure (Copilot review #986).
+      window.removeEventListener('unhandledrejection', unhandledHandler)
+    }
   })
 
   it('escalates a play() NotSupportedError to the load-error retry flow', async () => {

@@ -331,6 +331,37 @@ final class AdminEmbeddingControllerSynapseTest extends TestCase
     }
 
     /**
+     * Regression for #985 — re-vectorising the user memories
+     * collection is temporarily refused because dropping it before
+     * confirming the new model emits the right dimension destroys
+     * every stored memory. The controller must short-circuit BEFORE
+     * touching BCONFIG so an admin can't fall into the data-loss
+     * path even by calling the API directly.
+     */
+    public function testSwitchRejectsMemoriesScopeWhileDataLossGateIsActive(): void
+    {
+        $this->modelRepository->method('find')->willReturn(
+            $this->makeModel(188, 'Qwen3', 'cloudflare', '@cf/qwen/qwen3')
+        );
+        $this->modelConfigService->method('getProviderForModel')->willReturn('cloudflare');
+
+        $this->bindingService->expects($this->never())->method('setVectorizeModel');
+        $this->messageBus->expects($this->never())->method('dispatch');
+        $this->runRepository->expects($this->never())->method('save');
+
+        $request = Request::create(
+            '/api/v1/admin/embedding/switch',
+            'POST',
+            content: json_encode(['toModelId' => 188, 'scope' => 'memories']),
+        );
+        $response = $this->controller->switch($request, $this->makeUser(1));
+        $payload = $this->decode($response);
+
+        $this->assertSame(Response::HTTP_FORBIDDEN, $response->getStatusCode());
+        $this->assertSame('memories_switch_disabled', $payload['error']);
+    }
+
+    /**
      * @return array<string, mixed>
      */
     private function decode(Response $response): array

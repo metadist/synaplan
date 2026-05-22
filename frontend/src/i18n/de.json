@@ -1036,6 +1036,7 @@
       "tokens": "Tokens",
       "dimensions": "Vektor-Dim",
       "dimMismatch": "Die Vektor-Dimensionen ändern sich von {from} auf {to}. Alle bestehenden Vektoren werden neu erzeugt; alte Such-Scores sind erst nach Abschluss der Re-Vektorisierung wieder vergleichbar.",
+      "memoriesFrozen": "Nutzer-Erinnerungen werden bei diesem Wechsel NICHT migriert. Sie bleiben in der bisherigen Embedding-Dimension; neue Erinnerungen werden weiter mit dem aktiven Modell gespeichert. (Vorübergehend deaktiviert wegen #985.)",
       "scopes": {
         "documents": "Dokumente (RAG)",
         "memories": "Nutzer-Erinnerungen",

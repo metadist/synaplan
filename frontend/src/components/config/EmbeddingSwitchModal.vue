@@ -156,6 +156,20 @@
               </p>
             </div>
 
+            <!-- #985: user memories are intentionally NOT part of this
+                 switch flow. Surfacing this prominently so the admin
+                 doesn't expect their stored memories to follow the
+                 new embedding model. -->
+            <div
+              class="rounded-lg border border-blue-500/40 bg-blue-500/10 p-3 mb-4 flex items-start gap-2"
+              data-testid="banner-memories-frozen"
+            >
+              <InformationCircleIcon class="w-5 h-5 text-blue-500 flex-shrink-0 mt-0.5" />
+              <p class="text-sm txt-primary">
+                {{ $t('config.embeddingSwitch.memoriesFrozen') }}
+              </p>
+            </div>
+
             <!-- Loading state -->
             <div v-if="loading" class="text-center py-8" data-testid="section-loading">
               <div
@@ -461,9 +475,16 @@ const onConfirm = async () => {
 
   submitting.value = true
   try {
+    // Issue #985 — explicitly migrate only the documents scope. The
+    // memories collection is left untouched on purpose: switching its
+    // embedding model atomically used to wipe every stored memory
+    // before the probe + rollback safety net landed, and the team
+    // agreed to keep that scope disabled in the UI until a per-user
+    // memory collection design replaces the global one. Synapse
+    // Routing has its own dedicated admin panel and is unaffected.
     const response = await adminEmbeddingApi.switch({
       toModelId: props.toModelId,
-      scope: 'all',
+      scope: 'documents',
       confirmCritical: estimate.value.severity === 'critical' ? true : undefined,
     })
     emit('switched', response.runId)

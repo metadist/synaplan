@@ -1080,14 +1080,24 @@ final readonly class FileAnalysisHandler implements MessageHandlerInterface
      * categorization.
      *
      * Priority rules:
-     *  1. Documents with extracted text → chat-model "document" path.
+     *  1. Any audio attachment is missing its transcript → surface
+     *     `audio_not_transcribed` immediately. Audio is the slowest
+     *     attachment to prepare in a multi-file bubble; processing
+     *     only the subset that's ready silently drops the rest
+     *     (Copilot review on PR #986). The user needs to wait/retry.
+     *  2. Any document is still being extracted → surface
+     *     `document_extraction_pending`. Same reasoning: don't run
+     *     the chat model on half a bundle.
+     *  3. Any document finished extraction with no usable text →
+     *     surface `document_extraction_failed` so the user knows
+     *     the file is unusable.
+     *  4. Documents with extracted text → chat-model "document" path.
      *     Any transcribed audio is appended as virtual "transcript"
      *     documents so its content reaches the model too.
-     *  2. Otherwise audio-only (one or many) with transcripts → the
+     *  5. Otherwise audio-only (one or many) with transcripts → the
      *     conversational voice-reply path.
-     *  3. Otherwise images → the vision path.
-     *  4. Otherwise we surface the first applicable error
-     *     (missing transcript / document still extracting / unsupported).
+     *  6. Otherwise images → the vision path.
+     *  7. Otherwise → `unsupported`.
      *
      * @param list<array<string, mixed>> $filesInfo
      *
@@ -1143,6 +1153,53 @@ final readonly class FileAnalysisHandler implements MessageHandlerInterface
             }
         }
 
+        // Surface "files-still-processing" errors BEFORE happily
+        // proceeding with a partial set. Copilot review on PR #986
+        // flagged that the previous routing happily fell through to
+        // the documents/audio branches as soon as ONE file had
+        // extracted text, silently dropping every other attachment.
+        // For multi-file bubbles that's the exact data-loss bug we
+        // were fixing for #978: "evaluate based on both" answers
+        // turning into "evaluated against whichever file was ready
+        // first" without the user being told.
+        //
+        // Resolution priorities, in order:
+        //   1. Any audio attachment missing a transcript → tell the
+        //      user audio is still being prepared, regardless of how
+        //      many documents are ready. Audio transcription is
+        //      usually the slowest path in a multi-file bubble.
+        //   2. Any document still being extracted → tell the user
+        //      to wait. Acting on only the ready subset has caused
+        //      "where's the rest of my plan?" support escalations.
+        //   3. Any document that finished extraction with no text →
+        //      surface the extraction-failed message so the user
+        //      knows that file is unusable, even if other docs
+        //      succeeded.
+        // Only once every attached doc/audio is ready do we hand
+        // the bundle off to the documents/audio chat pipelines.
+        if ([] !== $audioMissingText) {
+            return [
+                'kind' => 'audio_not_transcribed',
+                'audio_files' => $audioMissingText,
+            ];
+        }
+
+        if ([] !== $documentsPending) {
+            return [
+                'kind' => 'document_extraction_pending',
+                'pending_documents' => $documentsPending,
+                'failed_documents' => $documentsFailed,
+            ];
+        }
+
+        if ([] !== $documentsFailed) {
+            return [
+                'kind' => 'document_extraction_failed',
+                'pending_documents' => $documentsPending,
+                'failed_documents' => $documentsFailed,
+            ];
+        }
+
         // 1. Documents (with text) take priority. Merge any transcribed
         //    audio into the document set as a virtual transcript file so
         //    the chat model still sees the spoken content alongside the
@@ -1177,31 +1234,6 @@ final readonly class FileAnalysisHandler implements MessageHandlerInterface
         //     this combination.
         if ([] !== $images) {
             return ['kind' => 'images', 'images' => $images];
-        }
-
-        // 4. No usable documents / audio / images — surface the most
-        //    specific error that explains why.
-        if ([] !== $audioMissingText) {
-            return [
-                'kind' => 'audio_not_transcribed',
-                'audio_files' => $audioMissingText,
-            ];
-        }
-
-        if ([] !== $documentsPending) {
-            return [
-                'kind' => 'document_extraction_pending',
-                'pending_documents' => $documentsPending,
-                'failed_documents' => $documentsFailed,
-            ];
-        }
-
-        if ([] !== $documentsFailed) {
-            return [
-                'kind' => 'document_extraction_failed',
-                'pending_documents' => $documentsPending,
-                'failed_documents' => $documentsFailed,
-            ];
         }
 
         return ['kind' => 'unsupported'];
