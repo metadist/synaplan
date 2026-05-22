@@ -1200,6 +1200,7 @@ final readonly class FileAnalysisHandler implements MessageHandlerInterface
             ];
         }
 
+        // Happy paths only run after every attached doc/audio is ready.
         // 1. Documents (with text) take priority. Merge any transcribed
         //    audio into the document set as a virtual transcript file so
         //    the chat model still sees the spoken content alongside the
