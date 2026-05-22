@@ -132,7 +132,6 @@ export type MailHandlerLogEvent =
   | 'connect_failed'
   | 'forwarded'
   | 'discarded'
-  | 'no_route'
   | 'no_smtp'
   | 'forward_failed'
   | 'process_error'
@@ -149,7 +148,7 @@ export interface MailHandlerLogEntry {
   error: string
   /**
    * Free-form metadata captured for this event (subject, from, routed_to,
-   * matched, criteria, message_number, ...). Shape depends on `event`.
+   * matched, criteria, ...). Shape depends on `event`.
    */
   details: Record<string, unknown>
 }

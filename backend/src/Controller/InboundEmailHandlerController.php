@@ -551,15 +551,17 @@ class InboundEmailHandlerController extends AbstractController
                 'message' => $result['message'],
             ]);
         } catch (\Exception $e) {
+            // Match `testConnectionPreview`: log the full exception (host,
+            // library details, stack trace) server-side, but never leak
+            // IMAP/POP3 library internals into a user-facing toast.
             $this->logger->error('Test connection failed', [
                 'handler_id' => $id,
-                'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString(),
+                'exception' => $e,
             ]);
 
             return $this->json([
                 'success' => false,
-                'message' => 'Test connection failed: '.$e->getMessage(),
+                'message' => 'Test connection failed. Please check your settings and try again.',
             ], Response::HTTP_INTERNAL_SERVER_ERROR);
         }
     }
@@ -779,7 +781,7 @@ class InboundEmailHandlerController extends AbstractController
                         properties: [
                             new OA\Property(property: 'id', type: 'integer'),
                             new OA\Property(property: 'timestamp', type: 'integer', description: 'Unix epoch seconds'),
-                            new OA\Property(property: 'event', type: 'string', enum: ['check', 'connect_failed', 'forwarded', 'discarded', 'no_route', 'no_smtp', 'forward_failed', 'process_error']),
+                            new OA\Property(property: 'event', type: 'string', enum: ['check', 'connect_failed', 'forwarded', 'discarded', 'no_smtp', 'forward_failed', 'process_error']),
                             new OA\Property(property: 'status', type: 'string', enum: ['success', 'warning', 'error']),
                             new OA\Property(property: 'error', type: 'string'),
                             new OA\Property(property: 'details', type: 'object', additionalProperties: true),

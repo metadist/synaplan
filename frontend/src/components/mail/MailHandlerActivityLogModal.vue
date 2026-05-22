@@ -48,7 +48,6 @@ const eventToIcon: Record<MailHandlerLogEvent, typeof CheckCircleIcon> = {
   connect_failed: NoSymbolIcon,
   forwarded: PaperAirplaneIcon,
   discarded: TrashIcon,
-  no_route: InformationCircleIcon,
   no_smtp: EnvelopeIcon,
   forward_failed: XCircleIcon,
   process_error: ExclamationTriangleIcon,
@@ -62,13 +61,22 @@ const statusToColor = (status: MailHandlerLogStatus) => {
 
 const eventLabel = (event: MailHandlerLogEvent): string => t(`mail.activity.events.${event}`, event)
 
+/** Fields the activity modal renders, in display order. */
+const DETAIL_ORDER = ['from', 'subject', 'routed_to', 'matched', 'criteria'] as const
+
+/**
+ * Internal-only detail keys we never want to surface in the user-facing
+ * UI (e.g. raw IMAP sequence numbers). These keys stay in the API
+ * payload — kept for support copy-paste — but are filtered out before
+ * the modal renders them.
+ */
+const INTERNAL_DETAIL_KEYS = new Set<string>(['message_number'])
+
 const sortedDetails = (details: Record<string, unknown>): Array<{ key: string; value: string }> => {
-  // Show known fields in a stable, useful order; pass through any extras after.
-  const order = ['from', 'subject', 'routed_to', 'matched', 'criteria', 'message_number']
   const seen = new Set<string>()
   const rendered: Array<{ key: string; value: string }> = []
 
-  for (const key of order) {
+  for (const key of DETAIL_ORDER) {
     if (key in details) {
       const value = formatValue(details[key])
       if (value !== '') {
@@ -79,7 +87,7 @@ const sortedDetails = (details: Record<string, unknown>): Array<{ key: string; v
   }
 
   for (const [key, value] of Object.entries(details)) {
-    if (seen.has(key)) continue
+    if (seen.has(key) || INTERNAL_DETAIL_KEYS.has(key)) continue
     const formatted = formatValue(value)
     if (formatted !== '') {
       rendered.push({ key, value: formatted })
@@ -101,14 +109,12 @@ const formatValue = (value: unknown): string => {
 }
 
 const detailsLabel = (key: string): string => {
-  // Map technical keys to human i18n labels but fall back gracefully.
   const map: Record<string, string> = {
     from: t('mail.activity.fields.from'),
     subject: t('mail.activity.fields.subject'),
     routed_to: t('mail.activity.fields.routedTo'),
     matched: t('mail.activity.fields.matched'),
     criteria: t('mail.activity.fields.criteria'),
-    message_number: t('mail.activity.fields.messageNumber'),
   }
   return map[key] ?? key
 }
@@ -144,6 +150,22 @@ watch(
 )
 
 const hasLogs = computed(() => logs.value.length > 0)
+
+/**
+ * Pre-compute the rendered details list for every visible entry once per
+ * `logs` change. The template previously called `sortedDetails()` twice
+ * per row (once for `v-if=".length > 0"`, once as the `v-for` source) on
+ * every render — which is O(n) work per call and ran for each of Vue's
+ * reactivity passes. Caching keyed by entry.id keeps the modal stable
+ * even when other reactive deps trigger re-renders.
+ */
+const detailsByEntryId = computed<Record<number, Array<{ key: string; value: string }>>>(() => {
+  const out: Record<number, Array<{ key: string; value: string }>> = {}
+  for (const entry of logs.value) {
+    out[entry.id] = sortedDetails(entry.details)
+  }
+  return out
+})
 </script>
 
 <template>
@@ -269,10 +291,10 @@ const hasLogs = computed(() => logs.value.length > 0)
                   </p>
 
                   <dl
-                    v-if="sortedDetails(entry.details).length > 0"
+                    v-if="detailsByEntryId[entry.id]?.length"
                     class="mt-2 grid grid-cols-1 sm:grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-xs"
                   >
-                    <template v-for="item in sortedDetails(entry.details)" :key="item.key">
+                    <template v-for="item in detailsByEntryId[entry.id]" :key="item.key">
                       <dt class="txt-secondary">{{ detailsLabel(item.key) }}</dt>
                       <dd class="txt-primary break-words">{{ item.value }}</dd>
                     </template>

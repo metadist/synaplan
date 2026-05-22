@@ -1638,7 +1638,6 @@
         "connect_failed": "Error de conexión",
         "forwarded": "Correo reenviado",
         "discarded": "Correo descartado por la IA",
-        "no_route": "Ningún departamento coincide",
         "no_smtp": "Enrutado pero no enviado (SMTP no configurado)",
         "forward_failed": "Error al reenviar",
         "process_error": "No se pudo procesar el mensaje"
@@ -1648,8 +1647,7 @@
         "subject": "Asunto",
         "routedTo": "Enrutado a",
         "matched": "Coincidencias",
-        "criteria": "Criterios IMAP",
-        "messageNumber": "Mensaje N.º"
+        "criteria": "Criterios IMAP"
       }
     }
   },

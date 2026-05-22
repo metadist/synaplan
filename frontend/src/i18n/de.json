@@ -1961,7 +1961,6 @@
         "connect_failed": "Verbindung fehlgeschlagen",
         "forwarded": "E-Mail weitergeleitet",
         "discarded": "E-Mail von KI verworfen",
-        "no_route": "Keine passende Abteilung",
         "no_smtp": "Geroutet, aber nicht versendet (kein SMTP konfiguriert)",
         "forward_failed": "Weiterleitung fehlgeschlagen",
         "process_error": "Nachricht konnte nicht verarbeitet werden"
@@ -1971,8 +1970,7 @@
         "subject": "Betreff",
         "routedTo": "Weitergeleitet an",
         "matched": "Treffer",
-        "criteria": "IMAP-Kriterien",
-        "messageNumber": "Nachricht Nr."
+        "criteria": "IMAP-Kriterien"
       }
     },
     "savedHandlers": "E-Mail-Agents",

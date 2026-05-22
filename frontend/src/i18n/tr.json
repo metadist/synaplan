@@ -1639,7 +1639,6 @@
         "connect_failed": "Bağlantı başarısız",
         "forwarded": "E-posta iletildi",
         "discarded": "E-posta yapay zekâ tarafından atıldı",
-        "no_route": "Eşleşen departman yok",
         "no_smtp": "Yönlendirildi ancak gönderilmedi (SMTP yapılandırılmamış)",
         "forward_failed": "İletim başarısız",
         "process_error": "Mesaj işlenemedi"
@@ -1649,8 +1648,7 @@
         "subject": "Konu",
         "routedTo": "Yönlendirildiği yer",
         "matched": "Eşleşmeler",
-        "criteria": "IMAP ölçütleri",
-        "messageNumber": "Mesaj No."
+        "criteria": "IMAP ölçütleri"
       }
     }
   },

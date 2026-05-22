@@ -4,11 +4,10 @@ declare(strict_types=1);
 
 namespace App\Tests\Service;
 
+use App\Entity\UseLog;
+use App\Repository\MailHandlerLogRepository;
 use App\Service\MailHandlerLogService;
-use Doctrine\DBAL\Connection;
 use Doctrine\DBAL\Exception\InvalidArgumentException as DbalInvalidArgumentException;
-use Doctrine\DBAL\ParameterType;
-use Doctrine\ORM\EntityManagerInterface;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
@@ -16,33 +15,29 @@ use Psr\Log\LoggerInterface;
 class MailHandlerLogServiceTest extends TestCase
 {
     private MailHandlerLogService $service;
-    private Connection&MockObject $connection;
-    private EntityManagerInterface&MockObject $em;
+    private MailHandlerLogRepository&MockObject $repository;
     private LoggerInterface&MockObject $logger;
 
     protected function setUp(): void
     {
-        $this->connection = $this->createMock(Connection::class);
-        $this->em = $this->createMock(EntityManagerInterface::class);
-        $this->em->method('getConnection')->willReturn($this->connection);
+        $this->repository = $this->createMock(MailHandlerLogRepository::class);
         $this->logger = $this->createMock(LoggerInterface::class);
 
-        $this->service = new MailHandlerLogService($this->em, $this->logger);
+        $this->service = new MailHandlerLogService($this->repository, $this->logger);
     }
 
-    public function testLogPersistsRowWithCanonicalShape(): void
+    public function testLogPersistsEntryViaRepositoryWithCanonicalShape(): void
     {
         $captured = null;
 
-        $this->connection
+        $this->repository
             ->expects($this->once())
-            ->method('insert')
-            ->willReturnCallback(function (string $table, array $payload) use (&$captured): int {
-                $this->assertSame('BUSELOG', $table);
-                $captured = $payload;
-
-                return 1;
-            });
+            ->method('save')
+            ->willReturnCallback(
+                function (int $userId, int $handlerId, UseLog $entry) use (&$captured): void {
+                    $captured = ['user' => $userId, 'handler' => $handlerId, 'entry' => $entry];
+                }
+            );
 
         $this->service->log(
             42,
@@ -54,32 +49,36 @@ class MailHandlerLogServiceTest extends TestCase
         );
 
         $this->assertNotNull($captured);
-        $this->assertSame(42, $captured['BUSERID']);
-        $this->assertSame(MailHandlerLogService::ACTION, $captured['BACTION']);
-        $this->assertSame(MailHandlerLogService::STATUS_SUCCESS, $captured['BSTATUS']);
-        $this->assertSame('', $captured['BERROR']);
-        $this->assertIsString($captured['BMETADATA']);
+        $this->assertSame(42, $captured['user']);
+        $this->assertSame(7, $captured['handler']);
 
-        $metadata = json_decode($captured['BMETADATA'], true);
-        $this->assertIsArray($metadata);
-        $this->assertSame(7, $metadata['handler_id']);
+        /** @var UseLog $entry */
+        $entry = $captured['entry'];
+        $this->assertSame(42, $entry->getUserId());
+        $this->assertSame(MailHandlerLogService::STATUS_SUCCESS, $entry->getStatus());
+        $this->assertSame('', $entry->getError());
+
+        $metadata = $entry->getMetadata();
         $this->assertSame(MailHandlerLogService::EVENT_FORWARDED, $metadata['event']);
         $this->assertSame('alice@example.com', $metadata['from']);
         $this->assertSame('sales@acme.io', $metadata['routed_to']);
+        // handler_id lives in BPROVIDER (set by the repository) — it must
+        // NOT be duplicated into BMETADATA where it would be unindexable.
+        $this->assertArrayNotHasKey('handler_id', $metadata);
     }
 
     public function testLogStoresErrorAndCoercesUnknownStatus(): void
     {
         $captured = null;
 
-        $this->connection
+        $this->repository
             ->expects($this->once())
-            ->method('insert')
-            ->willReturnCallback(function (string $table, array $payload) use (&$captured): int {
-                $captured = $payload;
-
-                return 1;
-            });
+            ->method('save')
+            ->willReturnCallback(
+                function (int $userId, int $handlerId, UseLog $entry) use (&$captured): void {
+                    $captured = $entry;
+                }
+            );
 
         $this->service->log(
             42,
@@ -91,22 +90,47 @@ class MailHandlerLogServiceTest extends TestCase
         );
 
         $this->assertNotNull($captured);
-        $this->assertSame(MailHandlerLogService::STATUS_SUCCESS, $captured['BSTATUS']);
-        $this->assertSame('SMTP server refused the connection', $captured['BERROR']);
+        $this->assertSame(MailHandlerLogService::STATUS_SUCCESS, $captured->getStatus());
+        $this->assertSame('SMTP server refused the connection', $captured->getError());
+    }
+
+    public function testLogAcceptsWarningStatusVerbatim(): void
+    {
+        $captured = null;
+
+        $this->repository
+            ->expects($this->once())
+            ->method('save')
+            ->willReturnCallback(
+                function (int $userId, int $handlerId, UseLog $entry) use (&$captured): void {
+                    $captured = $entry;
+                }
+            );
+
+        $this->service->log(
+            42,
+            7,
+            MailHandlerLogService::EVENT_NO_SMTP,
+            MailHandlerLogService::STATUS_WARNING,
+            'SMTP not configured',
+        );
+
+        $this->assertNotNull($captured);
+        $this->assertSame(MailHandlerLogService::STATUS_WARNING, $captured->getStatus());
     }
 
     public function testLogTruncatesLongFreeTextFields(): void
     {
         $captured = null;
 
-        $this->connection
+        $this->repository
             ->expects($this->once())
-            ->method('insert')
-            ->willReturnCallback(function (string $table, array $payload) use (&$captured): int {
-                $captured = $payload;
-
-                return 1;
-            });
+            ->method('save')
+            ->willReturnCallback(
+                function (int $userId, int $handlerId, UseLog $entry) use (&$captured): void {
+                    $captured = $entry;
+                }
+            );
 
         $longSubject = str_repeat('A', 1000);
         $longError = str_repeat('B', 1000);
@@ -121,19 +145,52 @@ class MailHandlerLogServiceTest extends TestCase
         );
 
         $this->assertNotNull($captured);
-        $this->assertLessThanOrEqual(256, mb_strlen($captured['BERROR']));
+        $this->assertLessThanOrEqual(256, mb_strlen($captured->getError()));
 
-        $metadata = json_decode($captured['BMETADATA'], true);
-        $this->assertIsArray($metadata);
+        $metadata = $captured->getMetadata();
+        $this->assertIsString($metadata['subject']);
         $this->assertLessThanOrEqual(256, mb_strlen($metadata['subject']));
         $this->assertStringEndsWith('…', $metadata['subject']);
     }
 
-    public function testLogSwallowsDbalExceptions(): void
+    public function testLogStripsReservedDetailKeys(): void
     {
-        $this->connection
+        $captured = null;
+
+        $this->repository
             ->expects($this->once())
-            ->method('insert')
+            ->method('save')
+            ->willReturnCallback(
+                function (int $userId, int $handlerId, UseLog $entry) use (&$captured): void {
+                    $captured = $entry;
+                }
+            );
+
+        // Even if callers accidentally pass `handler_id` / `event`
+        // through details, the service must not double-store them in
+        // metadata — they come exclusively from the explicit parameters
+        // (and `handler_id` is stored in BPROVIDER by the repository).
+        $this->service->log(
+            42,
+            7,
+            MailHandlerLogService::EVENT_FORWARDED,
+            MailHandlerLogService::STATUS_SUCCESS,
+            null,
+            ['handler_id' => 999, 'event' => 'fake', 'from' => 'alice@example.com'],
+        );
+
+        $this->assertNotNull($captured);
+        $metadata = $captured->getMetadata();
+        $this->assertArrayNotHasKey('handler_id', $metadata);
+        $this->assertSame(MailHandlerLogService::EVENT_FORWARDED, $metadata['event']);
+        $this->assertSame('alice@example.com', $metadata['from']);
+    }
+
+    public function testLogSwallowsRepositoryExceptions(): void
+    {
+        $this->repository
+            ->expects($this->once())
+            ->method('save')
             ->willThrowException(new DbalInvalidArgumentException('connection lost'));
 
         $this->logger
@@ -148,31 +205,19 @@ class MailHandlerLogServiceTest extends TestCase
         $this->service->log(42, 7, MailHandlerLogService::EVENT_CHECK);
     }
 
-    public function testFindRecentDecodesMetadataAndOrdering(): void
+    public function testFindRecentDecodesMetadataAndStripsReservedKeys(): void
     {
-        $this->connection
+        $this->repository
             ->expects($this->once())
-            ->method('fetchAllAssociative')
-            ->with(
-                $this->stringContains('FROM BUSELOG'),
-                $this->callback(function (array $params): bool {
-                    return 11 === $params['user_id']
-                        && MailHandlerLogService::ACTION === $params['action']
-                        && 5 === $params['handler_id']
-                        && 10 === $params['limit'];
-                }),
-                $this->callback(function (array $types): bool {
-                    return ParameterType::INTEGER === $types['limit'];
-                })
-            )
+            ->method('findRecent')
+            ->with(11, 5, 10)
             ->willReturn([
                 [
-                    'id' => '101',
-                    'unix_time' => '1747900000',
+                    'id' => 101,
+                    'unix_time' => 1747900000,
                     'status' => 'success',
                     'error' => '',
                     'metadata' => json_encode([
-                        'handler_id' => 5,
                         'event' => MailHandlerLogService::EVENT_FORWARDED,
                         'from' => 'alice@example.com',
                         'subject' => 'Hi',
@@ -180,12 +225,11 @@ class MailHandlerLogServiceTest extends TestCase
                     ]),
                 ],
                 [
-                    'id' => '99',
-                    'unix_time' => '1747890000',
-                    'status' => 'error',
+                    'id' => 99,
+                    'unix_time' => 1747890000,
+                    'status' => 'warning',
                     'error' => 'No SMTP creds',
                     'metadata' => json_encode([
-                        'handler_id' => 5,
                         'event' => MailHandlerLogService::EVENT_NO_SMTP,
                     ]),
                 ],
@@ -199,38 +243,31 @@ class MailHandlerLogServiceTest extends TestCase
         $this->assertSame(MailHandlerLogService::EVENT_FORWARDED, $rows[0]['event']);
         $this->assertSame('success', $rows[0]['status']);
         $this->assertSame('alice@example.com', $rows[0]['details']['from']);
-        $this->assertArrayNotHasKey('handler_id', $rows[0]['details']);
         $this->assertArrayNotHasKey('event', $rows[0]['details']);
 
         $this->assertSame(99, $rows[1]['id']);
         $this->assertSame(MailHandlerLogService::EVENT_NO_SMTP, $rows[1]['event']);
+        $this->assertSame('warning', $rows[1]['status']);
         $this->assertSame('No SMTP creds', $rows[1]['error']);
     }
 
     public function testFindRecentClampsLimitToSafeRange(): void
     {
-        $captured = null;
-
-        $this->connection
+        $this->repository
             ->expects($this->once())
-            ->method('fetchAllAssociative')
-            ->willReturnCallback(function (string $sql, array $params) use (&$captured): array {
-                $captured = $params;
-
-                return [];
-            });
+            ->method('findRecent')
+            ->with(11, 5, 100)
+            ->willReturn([]);
 
         // Caller asks for 5_000 — must be clamped to 100.
         $this->service->findRecent(11, 5, 5_000);
-
-        $this->assertSame(100, $captured['limit']);
     }
 
-    public function testFindRecentReturnsEmptyOnDbalException(): void
+    public function testFindRecentReturnsEmptyOnRepositoryException(): void
     {
-        $this->connection
+        $this->repository
             ->expects($this->once())
-            ->method('fetchAllAssociative')
+            ->method('findRecent')
             ->willThrowException(new DbalInvalidArgumentException('boom'));
 
         $this->logger
@@ -240,23 +277,12 @@ class MailHandlerLogServiceTest extends TestCase
         $this->assertSame([], $this->service->findRecent(11, 5));
     }
 
-    public function testPruneIssuesDeleteWithKeepLimit(): void
+    public function testPruneForwardsKeepLimit(): void
     {
-        $this->connection
+        $this->repository
             ->expects($this->once())
-            ->method('executeStatement')
-            ->with(
-                $this->stringContains('DELETE FROM BUSELOG'),
-                $this->callback(function (array $params): bool {
-                    return 11 === $params['user_id']
-                        && MailHandlerLogService::ACTION === $params['action']
-                        && 5 === $params['handler_id']
-                        && 10 === $params['keep'];
-                }),
-                $this->callback(function (array $types): bool {
-                    return ParameterType::INTEGER === $types['keep'];
-                })
-            )
+            ->method('prune')
+            ->with(11, 5, 10)
             ->willReturn(3);
 
         $this->assertSame(3, $this->service->prune(11, 5));
@@ -264,40 +290,51 @@ class MailHandlerLogServiceTest extends TestCase
 
     public function testPruneCoercesNonPositiveKeepToOne(): void
     {
-        $captured = null;
-
-        $this->connection
+        $this->repository
             ->expects($this->once())
-            ->method('executeStatement')
-            ->willReturnCallback(function (string $sql, array $params) use (&$captured): int {
-                $captured = $params;
-
-                return 0;
-            });
+            ->method('prune')
+            ->with(11, 5, 1)
+            ->willReturn(0);
 
         $this->service->prune(11, 5, 0);
-
-        $this->assertSame(1, $captured['keep']);
     }
 
-    public function testDeleteAllIssuesUnboundedDelete(): void
+    public function testPruneSwallowsRepositoryExceptionsAndReturnsZero(): void
     {
-        $this->connection
+        $this->repository
             ->expects($this->once())
-            ->method('executeStatement')
-            ->with(
-                $this->logicalAnd(
-                    $this->stringContains('DELETE FROM BUSELOG'),
-                    $this->logicalNot($this->stringContains('LIMIT'))
-                ),
-                $this->callback(function (array $params): bool {
-                    return 11 === $params['user_id']
-                        && MailHandlerLogService::ACTION === $params['action']
-                        && 5 === $params['handler_id'];
-                })
-            )
+            ->method('prune')
+            ->willThrowException(new DbalInvalidArgumentException('boom'));
+
+        $this->logger
+            ->expects($this->once())
+            ->method('warning');
+
+        $this->assertSame(0, $this->service->prune(11, 5));
+    }
+
+    public function testDeleteAllForwardsToRepository(): void
+    {
+        $this->repository
+            ->expects($this->once())
+            ->method('deleteAll')
+            ->with(11, 5)
             ->willReturn(7);
 
         $this->assertSame(7, $this->service->deleteAll(11, 5));
+    }
+
+    public function testDeleteAllSwallowsRepositoryExceptionsAndReturnsZero(): void
+    {
+        $this->repository
+            ->expects($this->once())
+            ->method('deleteAll')
+            ->willThrowException(new DbalInvalidArgumentException('boom'));
+
+        $this->logger
+            ->expects($this->once())
+            ->method('warning');
+
+        $this->assertSame(0, $this->service->deleteAll(11, 5));
     }
 }

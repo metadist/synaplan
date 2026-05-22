@@ -739,11 +739,15 @@ final readonly class InboundEmailHandlerService
                                 ['from' => $from, 'subject' => $subject, 'routed_to' => $routedEmail],
                             );
                         } else {
+                            // "No SMTP configured" is a configuration gap, not a
+                            // runtime failure — surface it as a WARNING (yellow)
+                            // in the activity modal so users distinguish it from
+                            // genuine forward errors.
                             $this->activityLog->log(
                                 $userId,
                                 $handlerId,
                                 MailHandlerLogService::EVENT_NO_SMTP,
-                                MailHandlerLogService::STATUS_ERROR,
+                                MailHandlerLogService::STATUS_WARNING,
                                 'SMTP credentials are not configured for this handler — the routing decision was made but the email could not be forwarded.',
                                 ['from' => $from, 'subject' => $subject, 'routed_to' => $routedEmail],
                             );
@@ -760,6 +764,10 @@ final readonly class InboundEmailHandlerService
                     ++$processed;
                 } catch (\Exception $e) {
                     $errors[] = "Message {$msgNumber}: ".$e->getMessage();
+                    // IMAP sequence numbers (`$msgNumber`) are useful in the
+                    // framework logger for matching against a server-side
+                    // trace, but they're meaningless to end users — keep
+                    // them out of the activity modal details.
                     $this->logger->error('Failed to process email', [
                         'handler_id' => $handlerId,
                         'message_number' => $msgNumber,
@@ -771,7 +779,6 @@ final readonly class InboundEmailHandlerService
                         MailHandlerLogService::EVENT_PROCESS_ERROR,
                         MailHandlerLogService::STATUS_ERROR,
                         $e->getMessage(),
-                        ['message_number' => $msgNumber],
                     );
                 }
             }
@@ -814,7 +821,25 @@ final readonly class InboundEmailHandlerService
             ];
         } finally {
             if (null !== $connection) {
-                @imap_close($connection);
+                // Surface any IMAP-level failure on close (expired sessions,
+                // EXPUNGE conflicts, …) into the logger so it isn't lost.
+                // Errors here must never bubble out of `finally` — we have
+                // already returned/thrown the meaningful outcome above.
+                try {
+                    imap_close($connection);
+                } catch (\Throwable $e) {
+                    $this->logger->warning('imap_close failed', [
+                        'handler_id' => $handlerId,
+                        'error' => $e->getMessage(),
+                    ]);
+                }
+                $imapErrors = imap_errors();
+                if (false !== $imapErrors && [] !== $imapErrors) {
+                    $this->logger->warning('IMAP errors on close', [
+                        'handler_id' => $handlerId,
+                        'errors' => $imapErrors,
+                    ]);
+                }
             }
         }
     }

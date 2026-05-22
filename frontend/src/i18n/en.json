@@ -574,7 +574,6 @@
         "connect_failed": "Connection failed",
         "forwarded": "Email forwarded",
         "discarded": "Email discarded by AI",
-        "no_route": "No matching department",
         "no_smtp": "Routed but not sent (no SMTP configured)",
         "forward_failed": "Forward failed",
         "process_error": "Could not process message"
@@ -584,8 +583,7 @@
         "subject": "Subject",
         "routedTo": "Routed to",
         "matched": "Matched",
-        "criteria": "IMAP criteria",
-        "messageNumber": "Message #"
+        "criteria": "IMAP criteria"
       }
     }
   },

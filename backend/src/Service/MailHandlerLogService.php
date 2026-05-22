@@ -1,10 +1,11 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Service;
 
-use Doctrine\DBAL\Exception as DbalException;
-use Doctrine\DBAL\ParameterType;
-use Doctrine\ORM\EntityManagerInterface;
+use App\Entity\UseLog;
+use App\Repository\MailHandlerLogRepository;
 use Psr\Log\LoggerInterface;
 
 /**
@@ -15,17 +16,22 @@ use Psr\Log\LoggerInterface;
  * diagnose "the email was marked seen but not forwarded" cases from
  * the mail-handler UI.
  *
- * - Tagged with BACTION = self::ACTION so usage-aggregations and rate
- *   limits (which key off other action names like MESSAGES, IMAGES,
- *   EMAIL_ROUTING, …) are not affected.
- * - Bound to (BUSERID, handler_id-in-metadata). Old rows beyond the
- *   most recent {@see self::DEFAULT_KEEP} per (user, handler) are
- *   pruned at the end of every handler run, so the table cannot grow
- *   unbounded for long-lived handlers.
+ * - Tagged with `BACTION = MailHandlerLogRepository::ACTION` so
+ *   usage-aggregations and rate limits (which key off other action
+ *   names like MESSAGES, IMAGES, EMAIL_ROUTING, …) are not affected.
+ * - `handler_id` is stored in the indexed `BPROVIDER` column (which is
+ *   otherwise unused for these rows), keeping `findRecent` / `prune` /
+ *   `deleteAll` index-friendly without adding a new column or a
+ *   functional index on a JSON expression.
+ * - Bound to (BUSERID, BPROVIDER). Old rows beyond the most recent
+ *   {@see self::DEFAULT_KEEP} per (user, handler) are pruned at the end
+ *   of every handler run, so the table cannot grow unbounded for
+ *   long-lived handlers.
  */
 final readonly class MailHandlerLogService
 {
-    public const ACTION = 'MAIL_HANDLER_LOG';
+    /** Public alias so callers don't have to know about the repository. */
+    public const ACTION = MailHandlerLogRepository::ACTION;
 
     public const DEFAULT_KEEP = 10;
 
@@ -37,20 +43,20 @@ final readonly class MailHandlerLogService
     public const EVENT_CONNECT_FAILED = 'connect_failed';
     public const EVENT_FORWARDED = 'forwarded';
     public const EVENT_DISCARDED = 'discarded';
-    public const EVENT_NO_ROUTE = 'no_route';
     public const EVENT_NO_SMTP = 'no_smtp';
     public const EVENT_FORWARD_FAILED = 'forward_failed';
     public const EVENT_PROCESS_ERROR = 'process_error';
 
     /**
-     * Maximum length of free-text fields stored in BMETADATA. Keeps the JSON
-     * column compact so 10 entries per handler stay well under typical row
-     * size limits even for very long subjects or AI replies.
+     * Maximum length of free-text fields stored in BMETADATA / BERROR.
+     * Keeps the JSON column compact so 10 entries per handler stay well
+     * under typical row size limits even for very long subjects or AI
+     * replies.
      */
     private const FIELD_TRUNCATE = 256;
 
     public function __construct(
-        private EntityManagerInterface $em,
+        private MailHandlerLogRepository $repository,
         private LoggerInterface $logger,
     ) {
     }
@@ -63,8 +69,9 @@ final readonly class MailHandlerLogService
      * cascade into a broken mail-handler run.
      *
      * @param array<string, mixed> $details Free-form metadata; large strings are
-     *                                      truncated. `handler_id` is always set
-     *                                      from the $handlerId parameter.
+     *                                      truncated. `handler_id` and `event`
+     *                                      reserved keys are stripped and re-added
+     *                                      from the explicit parameters.
      */
     public function log(
         int $userId,
@@ -74,28 +81,19 @@ final readonly class MailHandlerLogService
         ?string $error = null,
         array $details = [],
     ): void {
-        $payload = $this->buildMetadata($handlerId, $event, $details);
+        $entry = new UseLog();
+        $entry->setUserId($userId);
+        $entry->setUnixTimestamp(time());
+        $entry->setStatus($this->normalizeStatus($status));
+        $entry->setError(null !== $error ? $this->truncate($error) : '');
+        $entry->setMetadata($this->buildMetadata($event, $details));
 
         try {
-            $this->em->getConnection()->insert('BUSELOG', [
-                'BUSERID' => $userId,
-                'BUNIXTIMES' => time(),
-                'BACTION' => self::ACTION,
-                'BPROVIDER' => '',
-                'BMODEL' => '',
-                'BTOKENS' => 0,
-                'BPROMPT_TOKENS' => 0,
-                'BCOMPLETION_TOKENS' => 0,
-                'BCACHED_TOKENS' => 0,
-                'BCACHE_CREATION_TOKENS' => 0,
-                'BESTIMATED' => 0,
-                'BCOST' => '0.000000',
-                'BLATENCY' => 0,
-                'BSTATUS' => $this->normalizeStatus($status),
-                'BERROR' => null !== $error ? $this->truncate($error) : '',
-                'BMETADATA' => $payload,
-            ]);
-        } catch (DbalException $e) {
+            $this->repository->save($userId, $handlerId, $entry);
+        } catch (\Throwable $e) {
+            // Any failure (DBAL, ORM, mapping, …) must be swallowed —
+            // a broken activity log must never cascade into a broken
+            // mail-handler run.
             $this->logger->warning('MailHandlerLogService: failed to persist activity entry', [
                 'user_id' => $userId,
                 'handler_id' => $handlerId,
@@ -122,34 +120,8 @@ final readonly class MailHandlerLogService
         $limit = max(1, min($limit, 100));
 
         try {
-            $rows = $this->em->getConnection()->fetchAllAssociative(
-                <<<'SQL'
-                SELECT
-                    BID         AS id,
-                    BUNIXTIMES  AS unix_time,
-                    BSTATUS     AS status,
-                    BERROR      AS error,
-                    BMETADATA   AS metadata
-                FROM BUSELOG
-                WHERE BUSERID = :user_id
-                  AND BACTION = :action
-                  AND JSON_EXTRACT(BMETADATA, '$.handler_id') = :handler_id
-                ORDER BY BUNIXTIMES DESC, BID DESC
-                LIMIT :limit
-                SQL,
-                [
-                    'user_id' => $userId,
-                    'action' => self::ACTION,
-                    'handler_id' => $handlerId,
-                    'limit' => $limit,
-                ],
-                [
-                    // Bind LIMIT as integer or DBAL emits it as a quoted string
-                    // and MariaDB raises a syntax error.
-                    'limit' => ParameterType::INTEGER,
-                ]
-            );
-        } catch (DbalException $e) {
+            $rows = $this->repository->findRecent($userId, $handlerId, $limit);
+        } catch (\Throwable $e) {
             $this->logger->warning('MailHandlerLogService: failed to read activity entries', [
                 'user_id' => $userId,
                 'handler_id' => $handlerId,
@@ -161,16 +133,16 @@ final readonly class MailHandlerLogService
 
         $result = [];
         foreach ($rows as $row) {
-            $metadata = $this->decodeMetadata($row['metadata'] ?? null);
+            $metadata = $this->decodeMetadata($row['metadata']);
             $event = isset($metadata['event']) && is_string($metadata['event']) ? $metadata['event'] : 'unknown';
-            unset($metadata['event'], $metadata['handler_id']);
+            unset($metadata['event']);
 
             $result[] = [
-                'id' => (int) $row['id'],
-                'timestamp' => (int) $row['unix_time'],
+                'id' => $row['id'],
+                'timestamp' => $row['unix_time'],
                 'event' => $event,
-                'status' => is_string($row['status']) ? $row['status'] : self::STATUS_SUCCESS,
-                'error' => is_string($row['error']) ? $row['error'] : '',
+                'status' => '' !== $row['status'] ? $row['status'] : self::STATUS_SUCCESS,
+                'error' => $row['error'],
                 'details' => $metadata,
             ];
         }
@@ -188,38 +160,8 @@ final readonly class MailHandlerLogService
         $keep = max(1, $keep);
 
         try {
-            // MariaDB does not allow referencing the same table directly inside
-            // a NOT IN subquery without an intermediate derived table — wrap
-            // the keep-set in a sub-SELECT so the DELETE is portable.
-            return (int) $this->em->getConnection()->executeStatement(
-                <<<'SQL'
-                DELETE FROM BUSELOG
-                 WHERE BUSERID = :user_id
-                   AND BACTION = :action
-                   AND JSON_EXTRACT(BMETADATA, '$.handler_id') = :handler_id
-                   AND BID NOT IN (
-                       SELECT keep_id FROM (
-                           SELECT BID AS keep_id
-                             FROM BUSELOG
-                            WHERE BUSERID = :user_id
-                              AND BACTION = :action
-                              AND JSON_EXTRACT(BMETADATA, '$.handler_id') = :handler_id
-                            ORDER BY BUNIXTIMES DESC, BID DESC
-                            LIMIT :keep
-                       ) AS keep_set
-                   )
-                SQL,
-                [
-                    'user_id' => $userId,
-                    'action' => self::ACTION,
-                    'handler_id' => $handlerId,
-                    'keep' => $keep,
-                ],
-                [
-                    'keep' => ParameterType::INTEGER,
-                ]
-            );
-        } catch (DbalException $e) {
+            return $this->repository->prune($userId, $handlerId, $keep);
+        } catch (\Throwable $e) {
             $this->logger->warning('MailHandlerLogService: failed to prune activity entries', [
                 'user_id' => $userId,
                 'handler_id' => $handlerId,
@@ -237,20 +179,8 @@ final readonly class MailHandlerLogService
     public function deleteAll(int $userId, int $handlerId): int
     {
         try {
-            return (int) $this->em->getConnection()->executeStatement(
-                <<<'SQL'
-                DELETE FROM BUSELOG
-                 WHERE BUSERID = :user_id
-                   AND BACTION = :action
-                   AND JSON_EXTRACT(BMETADATA, '$.handler_id') = :handler_id
-                SQL,
-                [
-                    'user_id' => $userId,
-                    'action' => self::ACTION,
-                    'handler_id' => $handlerId,
-                ]
-            );
-        } catch (DbalException $e) {
+            return $this->repository->deleteAll($userId, $handlerId);
+        } catch (\Throwable $e) {
             $this->logger->warning('MailHandlerLogService: failed to delete activity entries', [
                 'user_id' => $userId,
                 'handler_id' => $handlerId,
@@ -262,17 +192,21 @@ final readonly class MailHandlerLogService
     }
 
     /**
+     * Build the metadata payload stored in `BMETADATA`. Reserved keys
+     * `handler_id` and `event` from caller-supplied details are dropped:
+     * `handler_id` already lives in the indexed `BPROVIDER` column, and
+     * `event` comes from the explicit method parameter.
+     *
      * @param array<string, mixed> $details
+     *
+     * @return array<string, mixed>
      */
-    private function buildMetadata(int $handlerId, string $event, array $details): string
+    private function buildMetadata(string $event, array $details): array
     {
-        $payload = [
-            'handler_id' => $handlerId,
-            'event' => $event,
-        ];
+        $payload = ['event' => $event];
 
         foreach ($details as $key => $value) {
-            if ('handler_id' === $key || 'event' === $key) {
+            if ('event' === $key || 'handler_id' === $key) {
                 continue;
             }
             if (is_string($value)) {
@@ -284,12 +218,15 @@ final readonly class MailHandlerLogService
             }
         }
 
-        return json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?: '{}';
+        return $payload;
     }
 
-    private function decodeMetadata(mixed $raw): array
+    /**
+     * @return array<string, mixed>
+     */
+    private function decodeMetadata(string $raw): array
     {
-        if (!is_string($raw) || '' === $raw) {
+        if ('' === $raw) {
             return [];
         }
 

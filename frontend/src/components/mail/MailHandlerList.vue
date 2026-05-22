@@ -242,16 +242,16 @@
     </div>
 
     <MailHandlerActivityLogModal
-      :is-open="activityModal.open"
-      :handler-id="activityModal.handlerId"
-      :handler-name="activityModal.handlerName"
+      :is-open="activityModalOpen"
+      :handler-id="activityModalHandlerId"
+      :handler-name="activityModalHandlerName"
       @close="closeActivity"
     />
   </div>
 </template>
 
 <script setup lang="ts">
-import { reactive, ref } from 'vue'
+import { ref } from 'vue'
 import {
   EnvelopeIcon,
   PlusIcon,
@@ -318,23 +318,20 @@ const formatDate = (date: Date) => {
   return formatRelativeTime(date)
 }
 
-const activityModal = reactive<{
-  open: boolean
-  handlerId: string | null
-  handlerName: string
-}>({
-  open: false,
-  handlerId: null,
-  handlerName: '',
-})
+// Project rule (docs/FRONTEND_CONVENTIONS.md): prefer `ref()` over
+// `reactive()` for modal state — keeps reactivity boundaries explicit
+// and matches how the rest of the codebase wires up dialogs.
+const activityModalOpen = ref(false)
+const activityModalHandlerId = ref<string | null>(null)
+const activityModalHandlerName = ref('')
 
 const openActivity = (handler: SavedMailHandler) => {
-  activityModal.handlerId = handler.id
-  activityModal.handlerName = handler.name
-  activityModal.open = true
+  activityModalHandlerId.value = handler.id
+  activityModalHandlerName.value = handler.name
+  activityModalOpen.value = true
 }
 
 const closeActivity = () => {
-  activityModal.open = false
+  activityModalOpen.value = false
 }
 </script>
