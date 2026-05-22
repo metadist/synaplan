@@ -1621,7 +1621,35 @@
     "deleteHandler": "Eliminar Gestor",
     "handlerName": "Nombre del Gestor",
     "handlerNamePlaceholder": "ej. Bandeja de Soporte, Correo de Ventas",
-    "handlerNameHelp": "Dale un nombre descriptivo a este gestor de correo"
+    "handlerNameHelp": "Dale un nombre descriptivo a este gestor de correo",
+    "activity": {
+      "title": "Actividad reciente",
+      "description": "Las últimas 10 acciones de este agente de correo. Útil para investigar casos de «marcado como leído pero nunca reenviado».",
+      "openButton": "Ver registro de actividad",
+      "refresh": "Recargar actividad",
+      "loadFailed": "No se pudo cargar el registro de actividad",
+      "empty": "Aún no hay actividad",
+      "emptyDescription": "Cuando este agente procese correos entrantes, los pasos más recientes aparecerán aquí.",
+      "retentionNote": "Solo se conservan las últimas 10 entradas; las más antiguas se eliminan automáticamente.",
+      "events": {
+        "check": "Buzón comprobado",
+        "connect_failed": "Error de conexión",
+        "forwarded": "Correo reenviado",
+        "discarded": "Correo descartado por la IA",
+        "no_route": "Ningún departamento coincide",
+        "no_smtp": "Enrutado pero no enviado (SMTP no configurado)",
+        "forward_failed": "Error al reenviar",
+        "process_error": "No se pudo procesar el mensaje"
+      },
+      "fields": {
+        "from": "De",
+        "subject": "Asunto",
+        "routedTo": "Enrutado a",
+        "matched": "Coincidencias",
+        "criteria": "Criterios IMAP",
+        "messageNumber": "Mensaje N.º"
+      }
+    }
   },
   "shared": {
     "title": "Chat Compartido",
