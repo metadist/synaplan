@@ -367,6 +367,11 @@ import { useAuth } from '../composables/useAuth'
 import { useRecaptcha } from '../composables/useRecaptcha'
 import { validateEmail } from '../composables/usePasswordValidation'
 import { useConfigStore } from '@/stores/config'
+import {
+  consumePendingRedirect,
+  isSafeRedirectPath,
+  setPendingRedirect,
+} from '@/utils/pendingAuthRedirect'
 
 const router = useRouter()
 const route = useRoute()
@@ -446,7 +451,13 @@ onMounted(async () => {
   const reason = route.query.reason as string
   if (reason === 'session_expired') sessionExpired.value = true
   if (route.query.registered === 'true') justRegistered.value = true
-  if (reason || route.query.registered) router.replace({ query: {} })
+  if (reason || route.query.registered) {
+    // Strip only `reason`/`registered`; keep `redirect` so deep-links survive.
+    const cleaned = { ...route.query }
+    delete cleaned.reason
+    delete cleaned.registered
+    router.replace({ query: cleaned })
+  }
 
   await loadSocialProviders()
 
@@ -470,13 +481,21 @@ const handleLogin = async () => {
   const success = await login(email.value, password.value, recaptchaToken)
   if (success) {
     loginSuccess.value = true
+    // Short delay so the success checkmark animation can play before nav.
     setTimeout(() => {
-      router.push((router.currentRoute.value.query.redirect as string) || '/')
+      const fromQuery = router.currentRoute.value.query.redirect as string | undefined
+      const queryPath = isSafeRedirectPath(fromQuery) ? fromQuery : null
+      const target = queryPath ?? consumePendingRedirect() ?? '/'
+      router.push(target)
     }, 400)
   }
 }
 
 const handleSocialLogin = (provider: string) => {
+  // OAuth round-trip strips the SPA's URL state, so stash the intent
+  // for OAuthCallback to pick up. setPendingRedirect validates internally.
+  const redirect = route.query.redirect as string | undefined
+  if (redirect) setPendingRedirect(redirect)
   window.location.href = `${config.appBaseUrl}/api/v1/auth/${provider}/login`
 }
 </script>

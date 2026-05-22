@@ -4,6 +4,7 @@ import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { authService, type AuthUser, type ImpersonatorInfo } from '@/services/authService'
 import { useConfigStore } from '@/stores/config'
+import { clearPendingRedirect } from '@/utils/pendingAuthRedirect'
 
 export type User = AuthUser
 export type { ImpersonatorInfo } from '@/services/authService'
@@ -118,6 +119,9 @@ export const useAuthStore = defineStore('auth', () => {
     user.value = null
     impersonator.value = null
     loading.value = true
+    // Drop any in-flight deep-link intent so the next login isn't hijacked
+    // by a stale entry from this session.
+    clearPendingRedirect()
 
     try {
       await authService.logout()
