@@ -26,6 +26,7 @@ class FileAnalysisHandlerMultiFileTest extends TestCase
     private ModelConfigService&MockObject $modelConfigService;
     private LoggerInterface&MockObject $logger;
     private FileAnalysisHandler $handler;
+    private string $uploadDir;
 
     protected function setUp(): void
     {
@@ -33,17 +34,31 @@ class FileAnalysisHandlerMultiFileTest extends TestCase
         $this->modelConfigService = $this->createMock(ModelConfigService::class);
         $this->logger = $this->createMock(LoggerInterface::class);
 
+        // Use a hermetic per-test upload directory so the vision-path
+        // tests work in any environment (Docker container, GitHub
+        // Actions runner, dev laptop) without depending on a hardcoded
+        // `/var/www/backend/var/uploads` location.
+        $this->uploadDir = sys_get_temp_dir().'/synaplan-file-analysis-'.bin2hex(random_bytes(8));
+        mkdir($this->uploadDir, 0o775, true);
+
         $this->handler = new FileAnalysisHandler(
             $this->aiFacade,
             $this->modelConfigService,
             $this->logger,
-            '/var/www/backend/var/uploads',
+            $this->uploadDir,
         );
 
         $this->modelConfigService->method('getEffectiveUserIdForMessage')->willReturn(7);
         $this->modelConfigService->method('getDefaultModel')->willReturn(123);
         $this->modelConfigService->method('getProviderForModel')->willReturn('openai');
         $this->modelConfigService->method('getModelName')->willReturn('gpt-4');
+    }
+
+    protected function tearDown(): void
+    {
+        if (is_dir($this->uploadDir)) {
+            $this->removeDirectoryRecursive($this->uploadDir);
+        }
     }
 
     /**
@@ -364,13 +379,33 @@ class FileAnalysisHandlerMultiFileTest extends TestCase
     private function stubImagePathsExist(array $relativePaths): void
     {
         foreach ($relativePaths as $relative) {
-            $full = '/var/www/backend/var/uploads/'.$relative;
-            if (!is_dir(dirname($full))) {
-                @mkdir(dirname($full), 0o775, true);
+            $full = $this->uploadDir.'/'.$relative;
+            $dir = dirname($full);
+            if (!is_dir($dir) && !mkdir($dir, 0o775, true) && !is_dir($dir)) {
+                throw new \RuntimeException(sprintf('Failed to create test upload directory "%s"', $dir));
             }
-            if (!file_exists($full)) {
-                file_put_contents($full, 'fake-image-bytes');
+            if (false === file_put_contents($full, 'fake-image-bytes')) {
+                throw new \RuntimeException(sprintf('Failed to write test upload file "%s"', $full));
             }
         }
+    }
+
+    private function removeDirectoryRecursive(string $path): void
+    {
+        $iterator = new \RecursiveIteratorIterator(
+            new \RecursiveDirectoryIterator($path, \FilesystemIterator::SKIP_DOTS),
+            \RecursiveIteratorIterator::CHILD_FIRST,
+        );
+
+        foreach ($iterator as $item) {
+            /** @var \SplFileInfo $item */
+            if ($item->isDir()) {
+                rmdir($item->getPathname());
+            } else {
+                unlink($item->getPathname());
+            }
+        }
+
+        rmdir($path);
     }
 }
