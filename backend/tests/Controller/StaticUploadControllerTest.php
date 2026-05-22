@@ -7,6 +7,7 @@ namespace App\Tests\Controller;
 use App\Entity\File;
 use App\Entity\Message;
 use App\Entity\User;
+use App\Service\File\UserUploadPathBuilder;
 use App\Tests\Trait\AuthenticatedTestTrait;
 use Symfony\Bundle\FrameworkBundle\KernelBrowser;
 use Symfony\Bundle\FrameworkBundle\Test\WebTestCase;
@@ -199,15 +200,13 @@ class StaticUploadControllerTest extends WebTestCase
             $this->fail('app.upload_dir must be a string.');
         }
 
-        // Mirror the user-scoped folder layout used by both regular
-        // uploads and the WhatsApp pipeline so realpath() inside the
-        // controller still keeps us under $uploadDir.
-        $userBase = sprintf(
-            '%02d/%03d/%05d',
-            $this->user->getId() % 100,
-            ($this->user->getId() / 100) % 1000,
-            $this->user->getId(),
-        );
+        // Use the production sharding helper instead of duplicating its
+        // modulo math — drift between the test fixture and the real
+        // pipeline would silently make the regression test miss real
+        // bugs (e.g. if the layout ever changes for large user IDs).
+        $pathBuilder = $this->client->getContainer()->get(UserUploadPathBuilder::class);
+        $userBase = $pathBuilder->buildUserBaseRelativePath($this->user->getId());
+
         $relativePath = $userBase.'/'.date('Y').'/'.date('m').'/'.$filename;
         $absolute = $uploadDir.'/'.$relativePath;
 
@@ -222,12 +221,20 @@ class StaticUploadControllerTest extends WebTestCase
 
     private function persistFile(string $relativePath, string $type, string $mime): File
     {
+        // Read the actual byte size from disk so the persisted File row
+        // matches what real uploads look like — using strlen($relativePath)
+        // would store the path length in BFILESIZE and trip up any UI or
+        // logic that reads it as the body size.
+        $uploadDir = $this->client->getContainer()->getParameter('app.upload_dir');
+        $absolute = $uploadDir.'/'.$relativePath;
+        $bytes = is_file($absolute) ? (int) filesize($absolute) : 0;
+
         $file = new File();
         $file->setUserId($this->user->getId());
         $file->setFilePath($relativePath);
         $file->setFileType($type);
         $file->setFileName(basename($relativePath));
-        $file->setFileSize(strlen($relativePath));
+        $file->setFileSize($bytes);
         $file->setFileMime($mime);
         $file->setStatus('uploaded');
         $this->em->persist($file);

@@ -1440,9 +1440,14 @@ final class WhatsAppService
             $file->setFileMime((string) ($downloadResult['mime_type'] ?? 'application/octet-stream'));
             $file->setStatus('uploaded');
 
+            // Persist + attach without an inner flush — `handleIncomingMessage`
+            // performs a single flush right after we return, which now
+            // covers BOTH the File row AND the Message↔File association
+            // in one transaction. An earlier version flushed twice and
+            // wrote the M2M row in a separate INSERT, which was wasteful
+            // and could leave a half-attached File if the second flush
+            // failed.
             $this->em->persist($file);
-            $this->em->flush();
-
             $message->addFile($file);
             $message->setFile(1);
 
@@ -1451,7 +1456,6 @@ final class WhatsAppService
                 'type' => $dto->type,
                 'file_path' => $relativePath,
                 'file_type' => $downloadResult['file_type'],
-                'file_id' => $file->getId(),
                 'size' => $downloadResult['size'] ?? 0,
             ]);
 

@@ -245,9 +245,20 @@ class StaticUploadController extends AbstractController
             ->getQuery()
             ->getOneOrNullResult();
 
+        // Prefer the owning Message's user_id when an attachment exists.
+        // The legacy `Message::filePath` branch above derives ownership
+        // from the Message; mirroring that here keeps access decisions
+        // consistent if the File row and its owning Message ever drift
+        // (e.g. impersonation paths or future schema migrations) — we
+        // never want a File-fallback to grant access the Message branch
+        // would have refused.
+        $ownerUserId = $linkedMessage instanceof Message
+            ? $linkedMessage->getUserId()
+            : $file->getUserId();
+
         return [
             'message' => $linkedMessage instanceof Message ? $linkedMessage : null,
-            'owner_user_id' => $file->getUserId(),
+            'owner_user_id' => $ownerUserId,
             'source' => $linkedMessage ? 'file_attached_to_message' : 'file_orphan',
             'file_id' => $file->getId(),
         ];
