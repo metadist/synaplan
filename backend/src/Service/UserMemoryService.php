@@ -777,29 +777,27 @@ final readonly class UserMemoryService
                 throw new \RuntimeException('Failed to create embedding');
             }
 
-            // Dimension safety net (#948).
+            // Dimension safety net (#948, #959).
             //
-            // Qdrant collections are created with a FIXED dimension at install
-            // time. If the admin switches VECTORIZE to a model with a different
-            // native output dimension (e.g. 1024 → 1536), Qdrant rejects every
-            // upsert with HTTP 400 and the memory is silently lost. The user
-            // gets a friendly "memory saved" UI confirmation but nothing
-            // actually stored. Fail loud HERE so the worker logs surface the
-            // real cause and HTTP callers see a 503 instead of phantom-success.
-            $expectedDim = $this->embeddingMetadata->getCurrentVectorDim();
+            // Compare the embedding's actual dimension against the Qdrant
+            // collection's configured vector size — NOT the model's
+            // self-reported dim, which always matches its own output and
+            // therefore never detects the real mismatch (model vs collection).
+            $collectionInfo = $this->qdrantClient->getMemoriesCollectionInfo();
+            $collectionDim = $collectionInfo['vector_dim'];
             $actualDim = count($embedding);
-            if ($actualDim !== $expectedDim) {
+            if (null !== $collectionDim && $actualDim !== $collectionDim) {
                 $this->logger->error('Memory storage rejected — embedding dimension mismatches collection', [
                     'user_id' => $user->getId(),
                     'memory_id' => $memoryId,
-                    'expected_dim' => $expectedDim,
+                    'collection_dim' => $collectionDim,
                     'actual_dim' => $actualDim,
                     'model_id' => $embeddingModelId,
                     'provider' => $provider,
                     'model' => $modelName,
                 ]);
 
-                throw new \RuntimeException(sprintf('Embedding dimension mismatch: model produced %d-dim vectors but the collection expects %d. The administrator must re-run the vector re-index for the active model.', $actualDim, $expectedDim));
+                throw new \RuntimeException(sprintf('Embedding dimension mismatch: model produced %d-dim vectors but the collection expects %d. The administrator must re-run the vector re-index for the active model.', $actualDim, $collectionDim));
             }
 
             $this->rateLimitService->recordUsage($user, 'EMBEDDINGS', [

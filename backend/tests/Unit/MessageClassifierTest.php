@@ -579,6 +579,74 @@ class MessageClassifierTest extends TestCase
         yield 'generier (colloquial imperative)' => ['generier mir bitte ein logo'];
     }
 
+    /**
+     * Regression for #974.
+     *
+     * German cost/price queries like "Was kostet ein Flug nach Bergen?" used
+     * to slip through the fast-path because the trigger list only had a few
+     * English phrases plus the very specific `aktuelle nachrichten`. With
+     * the fast-path enabled (default-on) the AI sorter was never reached,
+     * `web_search` stayed `false`, and the model hallucinated "Ich starte
+     * eine Suche" without ever actually triggering Brave Search. Verify
+     * these messages now defer to the full sorter where web_search can be
+     * activated.
+     *
+     * @return iterable<string, array{0: string}>
+     */
+    public static function germanCostQueryFastPathProvider(): iterable
+    {
+        yield 'kostet + travel' => ['Was kostet ein Flug nach Bergen?'];
+        yield 'kostet + restaurant' => ['Was kostet ein Kebap-Gericht in Münster?'];
+        yield 'wie teuer' => ['Wie teuer ist ein iPhone 17?'];
+        yield 'preis (noun)' => ['Was ist der Preis für ein Bitcoin?'];
+        yield 'flüge (plural)' => ['Gibt es günstige Flüge im Dezember?'];
+    }
+
+    #[\PHPUnit\Framework\Attributes\DataProvider('germanCostQueryFastPathProvider')]
+    public function testFastPathYieldsToAiSorterOnGermanCostQueries(string $text): void
+    {
+        $configRepo = $this->createMock(ConfigRepository::class);
+        // Synapse off, fast-path on (default).
+        $configRepo->method('getValue')->willReturnCallback(static function (int $owner, string $group, string $setting): ?string {
+            return 'QDRANT_SEARCH' === $group ? '0' : null;
+        });
+
+        $sorter = $this->createMock(MessageSorter::class);
+        // The AI sorter MUST be reached — that's the entire point: without
+        // it, web_search never flips to true for these queries.
+        $sorter->expects($this->once())
+            ->method('classify')
+            ->willReturn(['topic' => 'general', 'language' => 'de', 'web_search' => true]);
+
+        $classifier = new MessageClassifier(
+            $sorter,
+            $this->createMock(SynapseRouter::class),
+            new TopicAliasResolver(),
+            $this->createMock(MessageMetaRepository::class),
+            $this->createMock(ModelConfigService::class),
+            $configRepo,
+            $this->createMock(EntityManagerInterface::class),
+            $this->createMock(LoggerInterface::class),
+        );
+
+        $message = $this->createMock(Message::class);
+        $message->method('getId')->willReturn(974);
+        $message->method('getUserId')->willReturn(10);
+        $message->method('getText')->willReturn($text);
+        $message->method('getLanguage')->willReturn('de');
+        $message->method('getFile')->willReturn(0);
+        $message->method('getFiles')->willReturn(new \Doctrine\Common\Collections\ArrayCollection());
+        $message->method('getDateTime')->willReturn('20260518120000');
+        $message->method('getFilePath')->willReturn('');
+        $message->method('getTopic')->willReturn('');
+        $message->method('getFileText')->willReturn('');
+
+        $result = $classifier->classify($message);
+
+        $this->assertSame('ai_sorting', $result['source'], sprintf('Fast-path must yield to the AI sorter for "%s" (#974)', $text));
+        $this->assertFalse($result['skip_sorting']);
+    }
+
     #[\PHPUnit\Framework\Attributes\DataProvider('germanMediaImperativeProvider')]
     public function testFastPathYieldsToAiSorterOnGermanGenerateImperatives(string $text): void
     {

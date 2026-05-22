@@ -147,10 +147,16 @@ final readonly class SynapseRouter
      * Intentionally excludes deictic time markers like "jetzt" / "now" which
      * are extremely common in follow-up requests ("jetzt das in blau", "jetzt
      * ein video davon", "now make it 4K") and almost never imply a web search.
+     *
+     * The German cost stem is `kost` (not `kosten`): the bare infinitive
+     * `kosten` does not appear in the most common phrasing "Was kostet …?"
+     * and `str_contains('kostet', 'kosten') === false`. The shorter stem
+     * also catches `kostet`/`gekostet`/`kostete` while leaving compounds
+     * like `unkosten` matched too. See issue #974.
      */
     private const WEB_SEARCH_KEYWORDS = [
         'aktuell', 'current', 'heute', 'today', 'news', 'nachrichten',
-        'wetter', 'weather', 'preis', 'price', 'kosten', 'cost',
+        'wetter', 'weather', 'preis', 'price', 'kost', 'cost', 'wie teuer',
         'neueste', 'latest', 'kürzlich', 'recently',
         'live', 'echtzeit', 'realtime', 'real-time',
         'öffnungszeiten', 'opening hours', 'restaurant', 'geschäft', 'store',

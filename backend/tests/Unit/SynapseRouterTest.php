@@ -204,6 +204,56 @@ class SynapseRouterTest extends TestCase
         $this->assertTrue($result['web_search']);
     }
 
+    /**
+     * Regression test for issue #974.
+     *
+     * The most common German phrasing for asking about prices is "Was kostet
+     * X?" — conjugated, not the bare infinitive. The previous keyword list
+     * used the literal `kosten`, but `str_contains('kostet', 'kosten')` is
+     * `false`, so neither WhatsApp nor the web chat ever triggered the Brave
+     * Search pipeline for these queries. Use the shorter stem `kost` instead.
+     *
+     * @return iterable<string, array{0: string}>
+     */
+    public static function germanCostQueryProvider(): iterable
+    {
+        yield 'kostet (singular)' => ['Was kostet ein Flug nach Bergen?'];
+        yield 'kostet + restaurant' => ['Was kostet ein Kebap-Gericht in Münster?'];
+        yield 'wie teuer' => ['Wie teuer ist ein iPhone 17?'];
+        yield 'gekostet (past)' => ['Was hat das Konzert gestern gekostet?'];
+    }
+
+    #[\PHPUnit\Framework\Attributes\DataProvider('germanCostQueryProvider')]
+    public function testGermanCostQueriesTriggerWebSearch(string $text): void
+    {
+        $this->modelConfigService->method('getDefaultModel')->willReturn(null);
+        $this->promptRepository->method('findPromptsWithSelectionRules')->willReturn([]);
+
+        $this->aiFacade->method('embed')->willReturn([
+            'embedding' => array_fill(0, 1024, 0.1),
+            'usage' => ['prompt_tokens' => 10, 'total_tokens' => 10],
+        ]);
+
+        $this->qdrantClient->method('searchSynapseTopics')->willReturn([
+            [
+                'id' => 'synapse_0_general',
+                'score' => 0.90,
+                'payload' => ['topic' => 'general', 'owner_id' => 0],
+            ],
+        ]);
+
+        $this->promptService->method('getPromptWithMetadata')->willReturn([
+            'metadata' => ['tool_internet' => false],
+        ]);
+
+        $result = $this->router->route(['BTEXT' => $text], [], 1);
+
+        $this->assertTrue(
+            $result['web_search'],
+            sprintf('German cost/price query "%s" must trigger web search (#974)', $text),
+        );
+    }
+
     public function testDetectsYearPatternAsWebSearch(): void
     {
         $this->modelConfigService->method('getDefaultModel')->willReturn(null);
