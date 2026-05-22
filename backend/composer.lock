@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "353df27b395b5348d7a626dfb44bb260",
+    "content-hash": "1bb824557c27b57d85d126698aa32dde",
     "packages": [
         {
             "name": "api-platform/doctrine-common",
@@ -3578,16 +3578,16 @@
         },
         {
             "name": "google/protobuf",
-            "version": "v5.34.1",
+            "version": "v5.35.0",
             "source": {
                 "type": "git",
                 "url": "https://github.com/protocolbuffers/protobuf-php.git",
-                "reference": "da52fbc6bb574bfa6693ee2c86f9096f7b7f003b"
+                "reference": "d96ed77c7edaff3cd576a74173aa0b0655c87b1a"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/protocolbuffers/protobuf-php/zipball/da52fbc6bb574bfa6693ee2c86f9096f7b7f003b",
-                "reference": "da52fbc6bb574bfa6693ee2c86f9096f7b7f003b",
+                "url": "https://api.github.com/repos/protocolbuffers/protobuf-php/zipball/d96ed77c7edaff3cd576a74173aa0b0655c87b1a",
+                "reference": "d96ed77c7edaff3cd576a74173aa0b0655c87b1a",
                 "shasum": ""
             },
             "require": {
@@ -3616,9 +3616,9 @@
                 "proto"
             ],
             "support": {
-                "source": "https://github.com/protocolbuffers/protobuf-php/tree/v5.34.1"
+                "source": "https://github.com/protocolbuffers/protobuf-php/tree/v5.35.0"
             },
-            "time": "2026-03-19T20:51:56+00:00"
+            "time": "2026-05-19T22:13:40+00:00"
         },
         {
             "name": "google/recaptcha",
