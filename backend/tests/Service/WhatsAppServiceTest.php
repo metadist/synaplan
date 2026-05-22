@@ -6,6 +6,7 @@ namespace App\Tests\Service;
 
 use App\AI\Service\AiFacade;
 use App\DTO\WhatsApp\IncomingMessageDto;
+use App\Entity\File;
 use App\Entity\Message;
 use App\Entity\User;
 use App\Service\DiscordNotificationService;
