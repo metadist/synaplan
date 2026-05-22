@@ -108,6 +108,7 @@ final readonly class ChatHandler implements MessageHandlerInterface
         // memories + feedback corrections.
         $user = $this->em->getRepository(User::class)->find($message->getUserId());
         $resolveSharedVector = $this->createSharedVectorResolver($message, $perfTimer);
+        $resolveMemoryVector = $this->createMemoryVectorResolver($message, $resolveSharedVector, $perfTimer);
 
         $memoriesResult = $this->loadMemoriesContext(
             $message,
@@ -115,7 +116,7 @@ final readonly class ChatHandler implements MessageHandlerInterface
             $options,
             $classification,
             $progressCallback,
-            $resolveSharedVector,
+            $resolveMemoryVector,
             $perfTimer,
         );
         $memoriesContext = $memoriesResult['context'];
@@ -130,7 +131,7 @@ final readonly class ChatHandler implements MessageHandlerInterface
             $options,
             $classification,
             $progressCallback,
-            $resolveSharedVector,
+            $resolveMemoryVector,
             $perfTimer,
         );
         $feedbackContext = $feedbackResult['context'];
@@ -610,6 +611,7 @@ final readonly class ChatHandler implements MessageHandlerInterface
         // prompts (issue #615). User entity load is needed up-front for
         // both helpers and for the rate-limit clamp further down.
         $user = $this->em->getRepository(User::class)->find($message->getUserId());
+        $resolveMemoryVector = $this->createMemoryVectorResolver($message, $resolveSharedVector, $perfTimer);
 
         $memoriesResult = $this->loadMemoriesContext(
             $message,
@@ -617,7 +619,7 @@ final readonly class ChatHandler implements MessageHandlerInterface
             $options,
             $classification,
             $progressCallback,
-            $resolveSharedVector,
+            $resolveMemoryVector,
             $perfTimer,
         );
         $memoriesContext = $memoriesResult['context'];
@@ -632,7 +634,7 @@ final readonly class ChatHandler implements MessageHandlerInterface
             $options,
             $classification,
             $progressCallback,
-            $resolveSharedVector,
+            $resolveMemoryVector,
             $perfTimer,
         );
         $feedbackContext = $feedbackResult['context'];
@@ -1896,6 +1898,84 @@ final readonly class ChatHandler implements MessageHandlerInterface
     }
 
     /**
+     * Lazily produce the embedding used for Qdrant *memory* searches.
+     *
+     * The memories collection is pinned to its own embedding model
+     * (see {@see UserMemoryService::getMemoryEmbeddingModelId()}) which
+     * may diverge from the active VECTORIZE default — that's the
+     * whole point of PR #985 (no data loss on switch). Memory and
+     * feedback searches therefore need a separate vector cache: using
+     * the shared VECTORIZE vector would be rejected by Qdrant (wrong
+     * dimension) or returned as zero hits (stale-filter mismatch).
+     *
+     * Optimisation: when the memory-pinned model happens to equal the
+     * active VECTORIZE model (the typical case for fresh installs and
+     * for ops who haven't switched yet), this resolver reuses the
+     * already-computed shared vector instead of paying for a second
+     * embed call.
+     *
+     * @return \Closure(): ?array<int, float>
+     */
+    private function createMemoryVectorResolver(
+        Message $message,
+        \Closure $resolveSharedVector,
+        PerfTimer $perfTimer,
+    ): \Closure {
+        $memoryQueryVector = null;
+        $memoryVectorComputed = false;
+
+        return function () use (
+            $message,
+            $resolveSharedVector,
+            $perfTimer,
+            &$memoryQueryVector,
+            &$memoryVectorComputed,
+        ): ?array {
+            if ($memoryVectorComputed) {
+                return $memoryQueryVector;
+            }
+            $memoryVectorComputed = true;
+
+            $text = $message->getText();
+            if ('' === trim($text) || !$this->memoryService->isAvailable()) {
+                return null;
+            }
+
+            // Reuse the VECTORIZE-embedded vector when the memory model
+            // matches VECTORIZE. Keeps the existing 1-embed-per-message
+            // performance for the 99% of installations that never swap.
+            $stickyMemoryModelId = $this->memoryService->getMemoryEmbeddingModelId();
+            $vectorizeModelId = $this->modelConfigService->getDefaultModel('VECTORIZE', $message->getUserId());
+            if (null !== $stickyMemoryModelId && $stickyMemoryModelId === $vectorizeModelId) {
+                $shared = $resolveSharedVector();
+                if (null !== $shared) {
+                    return $memoryQueryVector = $shared;
+                }
+            }
+
+            // Memory model diverges from VECTORIZE (or shared vector
+            // is unavailable) — embed the query against the memory
+            // model directly so reads land in the right vector space.
+            $perfTimer->start('memory_embedding');
+            try {
+                $embed = $this->memoryService->embedQueryForMemorySearch($message->getUserId(), $text);
+            } catch (\Throwable $e) {
+                $this->logger->warning('ChatHandler: memory embed failed, falling back to per-call embeds', [
+                    'error' => $e->getMessage(),
+                ]);
+                $embed = null;
+            }
+            $perfTimer->stop('memory_embedding');
+
+            if (null !== $embed && !empty($embed['embedding'])) {
+                $memoryQueryVector = $embed['embedding'];
+            }
+
+            return $memoryQueryVector;
+        };
+    }
+
+    /**
      * Load relevant user memories from Qdrant and build the system-prompt
      * fragment that injects them into the AI context.
      *
@@ -1937,7 +2017,7 @@ final readonly class ChatHandler implements MessageHandlerInterface
         array $options,
         array $classification,
         ?callable $progressCallback,
-        \Closure $resolveSharedVector,
+        \Closure $resolveMemoryVector,
         PerfTimer $perfTimer,
     ): array {
         $disabledByRequest = !empty($options['disable_memories'])
@@ -1976,11 +2056,11 @@ final readonly class ChatHandler implements MessageHandlerInterface
                 ]);
 
                 $perfTimer->start('memories_search');
-                $sharedVector = $resolveSharedVector();
-                if (null !== $sharedVector) {
+                $memoryVector = $resolveMemoryVector();
+                if (null !== $memoryVector) {
                     $rawMemories = $this->memoryService->searchMemoriesByVector(
                         $message->getUserId(),
-                        $sharedVector,
+                        $memoryVector,
                         limit: $this->feedbackConfig->getMaxChatMemories(),
                         minScore: $this->feedbackConfig->getMinChatMemoryScore()
                     );
@@ -2081,7 +2161,7 @@ final readonly class ChatHandler implements MessageHandlerInterface
         array $options,
         array $classification,
         ?callable $progressCallback,
-        \Closure $resolveSharedVector,
+        \Closure $resolveMemoryVector,
         PerfTimer $perfTimer,
     ): array {
         $disabledByRequest = !empty($options['disable_memories'])
@@ -2102,13 +2182,13 @@ final readonly class ChatHandler implements MessageHandlerInterface
 
         try {
             $perfTimer->start('feedback');
-            $sharedVector = $resolveSharedVector();
+            $memoryVector = $resolveMemoryVector();
             $falsePositives = $this->searchFeedback(
                 $message->getUserId(),
                 $message->getText(),
                 'feedback_negative',
                 FeedbackConstants::NAMESPACE_FALSE_POSITIVE,
-                $sharedVector
+                $memoryVector
             );
 
             $positiveExamples = $this->searchFeedback(
@@ -2116,7 +2196,7 @@ final readonly class ChatHandler implements MessageHandlerInterface
                 $message->getText(),
                 'feedback_positive',
                 FeedbackConstants::NAMESPACE_POSITIVE,
-                $sharedVector
+                $memoryVector
             );
             $perfTimer->stop('feedback');
 

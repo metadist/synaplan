@@ -9,6 +9,7 @@ use App\DTO\UserMemoryDTO;
 use App\Entity\User;
 use App\Service\Embedding\EmbeddingMetadataService;
 use App\Service\Exception\MemoryServiceUnavailableException;
+use App\Service\Memory\MemoryEmbeddingModelResolver;
 use App\Service\VectorSearch\QdrantClientInterface;
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;
@@ -37,8 +38,40 @@ final readonly class UserMemoryService
         private ModelConfigService $modelConfigService,
         private RateLimitService $rateLimitService,
         private EmbeddingMetadataService $embeddingMetadata,
+        private MemoryEmbeddingModelResolver $memoryEmbeddingResolver,
         private LoggerInterface $logger,
     ) {
+    }
+
+    /**
+     * Resolve the embedding model that owns the user-memories collection.
+     *
+     * Memories are intentionally pinned to their own embedding model,
+     * independent of the active VECTORIZE default. Why: a VECTORIZE
+     * switch with different dimensions does NOT migrate the memories
+     * collection (PR #985 — preventing accidental data loss), so write
+     * and read paths must keep using the model that created the
+     * collection, otherwise:
+     *   - storeInQdrant would emit a dimension mismatch and reject
+     *     every new memory ("can't save anything after a switch")
+     *   - searchMemories would query Qdrant with the wrong dim and
+     *     either error or return zero hits ("memories lookup broken")
+     *
+     * The resolver caches lazily and self-heals if the operator
+     * manually drops/recreates the collection.
+     *
+     * @return array{model_id: ?int, model_name: ?string, provider: ?string, vector_dim: ?int}
+     */
+    private function getMemoryEmbeddingConfig(): array
+    {
+        $info = $this->memoryEmbeddingResolver->resolve();
+
+        return [
+            'model_id' => $info['model_id'],
+            'model_name' => $info['model'],
+            'provider' => $info['provider'],
+            'vector_dim' => $info['vector_dim'],
+        ];
     }
 
     /**
@@ -486,11 +519,64 @@ final readonly class UserMemoryService
      */
     public function embedUserQuery(int $userId, string $queryText): ?array
     {
+        return $this->embedQueryInternal(
+            $userId,
+            $queryText,
+            $this->modelConfigService->getDefaultModel('VECTORIZE', $userId),
+            'CHAT_PIPELINE_SHARED',
+        );
+    }
+
+    /**
+     * Embed `$queryText` against the *memory-pinned* embedding model
+     * (sticky pointer, see {@see MemoryEmbeddingModelResolver}). Use
+     * this — NOT {@see embedUserQuery()} — whenever the resulting
+     * vector will be sent to Qdrant's memories collection: that
+     * collection's dimension is decoupled from VECTORIZE so an active-
+     * model query embedding would either be rejected or filtered out
+     * by the stale-hit guard.
+     *
+     * Returns null on the same conditions as `embedUserQuery()`
+     * (empty text, missing model, embed failure). Callers fall back to
+     * skipping the vector search rather than crashing.
+     *
+     * @return array{embedding: array<int, float>, model_id: ?int, model_name: ?string, provider: ?string}|null
+     */
+    public function embedQueryForMemorySearch(int $userId, string $queryText): ?array
+    {
+        return $this->embedQueryInternal(
+            $userId,
+            $queryText,
+            $this->memoryEmbeddingResolver->getModelId(),
+            'CHAT_PIPELINE_MEMORY',
+        );
+    }
+
+    /**
+     * Returns the model id currently pinned to the user-memories
+     * collection. Exposed publicly so callers in the request pipeline
+     * (ChatHandler) can decide whether they may reuse an existing
+     * VECTORIZE-embedded vector for memory search instead of paying
+     * for a second embed call.
+     */
+    public function getMemoryEmbeddingModelId(): ?int
+    {
+        return $this->memoryEmbeddingResolver->getModelId();
+    }
+
+    /**
+     * @return array{embedding: array<int, float>, model_id: ?int, model_name: ?string, provider: ?string}|null
+     */
+    private function embedQueryInternal(
+        int $userId,
+        string $queryText,
+        ?int $embeddingModelId,
+        string $usageSource,
+    ): ?array {
         if ('' === trim($queryText)) {
             return null;
         }
 
-        $embeddingModelId = $this->modelConfigService->getDefaultModel('VECTORIZE', $userId);
         $modelName = null;
         $provider = null;
 
@@ -508,8 +594,9 @@ final readonly class UserMemoryService
                 'provider' => $provider,
             ]));
         } catch (\Throwable $e) {
-            $this->logger->warning('embedUserQuery failed, falling back to no embedding', [
+            $this->logger->warning('embedQueryInternal failed, falling back to no embedding', [
                 'user_id' => $userId,
+                'source' => $usageSource,
                 'error' => $e->getMessage(),
             ]);
 
@@ -521,7 +608,6 @@ final readonly class UserMemoryService
             return null;
         }
 
-        // Record usage once for the shared embedding call.
         $user = $this->em->getRepository(User::class)->find($userId);
         if ($user) {
             $this->rateLimitService->recordUsage($user, 'EMBEDDINGS', [
@@ -530,7 +616,7 @@ final readonly class UserMemoryService
                 'model' => $modelName ?? 'unknown',
                 'model_id' => $embeddingModelId,
                 'input_text' => $queryText,
-                'source' => 'CHAT_PIPELINE_SHARED',
+                'source' => $usageSource,
             ]);
         }
 
@@ -573,7 +659,13 @@ final readonly class UserMemoryService
                 $namespace
             );
 
-            $filtered = $this->embeddingMetadata->filterStaleHits($results);
+            // Compare against the memory-pinned model id, not VECTORIZE.
+            // See `searchRelevantMemories()` for the full rationale.
+            $filtered = $this->embeddingMetadata->filterStaleHits(
+                $results,
+                'payload',
+                $this->memoryEmbeddingResolver->getModelId()
+            );
             $results = array_slice($filtered['fresh'], 0, $limit);
 
             $memories = [];
@@ -633,18 +725,13 @@ final readonly class UserMemoryService
                 'minScore' => $minScore,
             ]);
 
-            // Get embedding model (SAME as when storing!)
-            $embeddingModelId = $this->modelConfigService->getDefaultModel('VECTORIZE', $userId);
-            $modelName = null;
-            $provider = null;
-
-            if ($embeddingModelId) {
-                $model = $this->em->getRepository('App\Entity\Model')->find($embeddingModelId);
-                if ($model) {
-                    $modelName = $model->getProviderId();
-                    $provider = strtolower($model->getService());
-                }
-            }
+            // Resolve the memory-pinned embedding model (SAME as when
+            // storing — must match the dimension of the memories
+            // collection, not the active VECTORIZE default).
+            $memoryConfig = $this->getMemoryEmbeddingConfig();
+            $embeddingModelId = $memoryConfig['model_id'];
+            $modelName = $memoryConfig['model_name'];
+            $provider = $memoryConfig['provider'];
 
             $this->logger->info('🎯 Using embedding model for search', [
                 'userId' => $userId,
@@ -653,7 +740,6 @@ final readonly class UserMemoryService
                 'provider' => $provider,
             ]);
 
-            // Create embedding for query (with EXPLICIT model!)
             $embedResult = $this->aiFacade->embed($queryText, $userId, array_filter([
                 'model' => $modelName,
                 'provider' => $provider,
@@ -700,17 +786,26 @@ final readonly class UserMemoryService
             );
 
             // Filter out hits embedded with a different model than the
-            // currently active one. Cross-model cosine scores are
+            // memory-pinned one. Cross-model cosine scores are
             // physically meaningless — including them would silently
-            // corrupt the assistant's answers right after a model swap,
-            // until the user re-vectorizes their memories.
-            $filtered = $this->embeddingMetadata->filterStaleHits($results);
+            // corrupt the assistant's answers right after a model swap.
+            //
+            // Important: we compare against the *memory-pinned* model
+            // (sticky pointer), NOT VECTORIZE. After a VECTORIZE swap
+            // that left memories untouched, every memory still looks
+            // "fresh" relative to its own collection — using VECTORIZE
+            // here would mark them all stale and return zero hits.
+            $filtered = $this->embeddingMetadata->filterStaleHits(
+                $results,
+                'payload',
+                $embeddingModelId
+            );
             if ($filtered['stale_count'] > 0) {
                 $this->logger->info('🧪 Filtered stale memory hits', [
                     'userId' => $userId,
                     'stale_count' => $filtered['stale_count'],
                     'fresh_count' => count($filtered['fresh']),
-                    'current_model_id' => $this->embeddingMetadata->getCurrentModelId(),
+                    'memory_model_id' => $embeddingModelId,
                 ]);
             }
             $results = array_slice($filtered['fresh'], 0, $limit);
@@ -753,20 +848,21 @@ final readonly class UserMemoryService
         try {
             $textToEmbed = "{$dto->key}: {$dto->value}";
 
-            // Get embedding model
-            $embeddingModelId = $this->modelConfigService->getDefaultModel('VECTORIZE', $user->getId());
-            $modelName = null;
-            $provider = null;
+            // Resolve the *memory-pinned* embedding model — NOT the
+            // active VECTORIZE default. Why this distinction matters:
+            // PR #985 froze the memories collection across VECTORIZE
+            // switches to avoid data loss, so if we embedded with
+            // VECTORIZE here the resulting vector would have the wrong
+            // dimension and the safety net below would reject every
+            // new memory. The resolver returns the model that owns
+            // the current memories collection (sticky pointer in
+            // BCONFIG, payload inference, or VECTORIZE fallback for
+            // a brand-new install).
+            $memoryConfig = $this->getMemoryEmbeddingConfig();
+            $embeddingModelId = $memoryConfig['model_id'];
+            $modelName = $memoryConfig['model_name'];
+            $provider = $memoryConfig['provider'];
 
-            if ($embeddingModelId) {
-                $model = $this->em->getRepository('App\Entity\Model')->find($embeddingModelId);
-                if ($model) {
-                    $modelName = $model->getProviderId();
-                    $provider = strtolower($model->getService());
-                }
-            }
-
-            // Create embedding
             $embedResult = $this->aiFacade->embed($textToEmbed, $user->getId(), array_filter([
                 'model' => $modelName,
                 'provider' => $provider,

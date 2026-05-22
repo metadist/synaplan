@@ -7,6 +7,7 @@ namespace App\Service\Embedding;
 use App\AI\Service\AiFacade;
 use App\Entity\RevectorizeRun;
 use App\Repository\RevectorizeRunRepository;
+use App\Service\Memory\MemoryEmbeddingModelResolver;
 use App\Service\Message\SynapseIndexer;
 use App\Service\VectorSearch\QdrantClientInterface;
 use Doctrine\DBAL\Connection;
@@ -51,6 +52,7 @@ final readonly class EmbeddingReindexService
         private AiFacade $aiFacade,
         private SynapseIndexer $synapseIndexer,
         private EmbeddingMetadataService $embeddingMetadata,
+        private MemoryEmbeddingModelResolver $memoryEmbeddingResolver,
         private RevectorizeRunRepository $runRepository,
         private Connection $connection,
         private LoggerInterface $logger,
@@ -398,5 +400,15 @@ final readonly class EmbeddingReindexService
 
             $this->runRepository->save($run);
         }
+
+        // Migration complete — every memory point now lives in a
+        // collection sized for `$modelId`. Move the sticky pointer
+        // forward so subsequent writes (UserMemoryService::storeInQdrant)
+        // and reads (UserMemoryService::searchRelevantMemories) embed
+        // against the new model instead of the old one. Doing this
+        // ONLY here (and not on the VECTORIZE switch) is what keeps
+        // memories independently re-indexable without a destructive
+        // collection drop on every model swap.
+        $this->memoryEmbeddingResolver->rememberModel($modelId);
     }
 }
