@@ -1624,7 +1624,33 @@
     "deleteHandler": "İşleyiciyi Sil",
     "handlerName": "İşleyici Adı",
     "handlerNamePlaceholder": "ör. Destek Gelen Kutusu, Satış E-postası",
-    "handlerNameHelp": "Bu e-posta işleyicisine açıklayıcı bir ad verin"
+    "handlerNameHelp": "Bu e-posta işleyicisine açıklayıcı bir ad verin",
+    "activity": {
+      "title": "Son etkinlikler",
+      "description": "Bu e-posta ajanının son 10 işlemi. \"Okundu olarak işaretlendi ama hiç iletilmedi\" durumlarını araştırmak için kullanışlıdır.",
+      "openButton": "Etkinlik günlüğünü görüntüle",
+      "refresh": "Etkinlikleri yeniden yükle",
+      "loadFailed": "Etkinlik günlüğü yüklenemedi",
+      "empty": "Henüz etkinlik yok",
+      "emptyDescription": "Bu ajan gelen e-postaları işlediğinde, en son adımlar burada görünecektir.",
+      "retentionNote": "Yalnızca son 10 kayıt saklanır; daha eski olanlar otomatik olarak silinir.",
+      "events": {
+        "check": "Posta kutusu kontrol edildi",
+        "connect_failed": "Bağlantı başarısız",
+        "forwarded": "E-posta iletildi",
+        "discarded": "E-posta yapay zekâ tarafından atıldı",
+        "no_smtp": "Yönlendirildi ancak gönderilmedi (SMTP yapılandırılmamış)",
+        "forward_failed": "İletim başarısız",
+        "process_error": "Mesaj işlenemedi"
+      },
+      "fields": {
+        "from": "Gönderen",
+        "subject": "Konu",
+        "routedTo": "Yönlendirildiği yer",
+        "matched": "Eşleşmeler",
+        "criteria": "IMAP ölçütleri"
+      }
+    }
   },
   "shared": {
     "title": "Paylaşılan Sohbet",

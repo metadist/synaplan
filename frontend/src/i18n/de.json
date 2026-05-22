@@ -1947,6 +1947,32 @@
     "filterToDate": "Bis Datum",
     "recommended": "Empfohlen",
     "proOnly": "PRO+",
+    "activity": {
+      "title": "Letzte Aktivitäten",
+      "description": "Die letzten 10 Aktionen dieses E-Mail-Agents. Hilft dabei, „als gelesen markiert, aber nicht weitergeleitet\"-Fälle zu untersuchen.",
+      "openButton": "Aktivitätsprotokoll anzeigen",
+      "refresh": "Aktivitäten neu laden",
+      "loadFailed": "Aktivitätsprotokoll konnte nicht geladen werden",
+      "empty": "Noch keine Aktivität",
+      "emptyDescription": "Sobald dieser Agent eingehende E-Mails verarbeitet, erscheinen die letzten Schritte hier.",
+      "retentionNote": "Es werden nur die letzten 10 Einträge gespeichert; ältere werden automatisch entfernt.",
+      "events": {
+        "check": "Postfach geprüft",
+        "connect_failed": "Verbindung fehlgeschlagen",
+        "forwarded": "E-Mail weitergeleitet",
+        "discarded": "E-Mail von KI verworfen",
+        "no_smtp": "Geroutet, aber nicht versendet (kein SMTP konfiguriert)",
+        "forward_failed": "Weiterleitung fehlgeschlagen",
+        "process_error": "Nachricht konnte nicht verarbeitet werden"
+      },
+      "fields": {
+        "from": "Von",
+        "subject": "Betreff",
+        "routedTo": "Weitergeleitet an",
+        "matched": "Treffer",
+        "criteria": "IMAP-Kriterien"
+      }
+    },
     "savedHandlers": "E-Mail-Agents",
     "savedHandlersDesc": "Automatisiere deinen Posteingang mit KI-gestützten E-Mail-Agents, die Nachrichten lesen, sortieren und weiterleiten.",
     "createHandler": "Neuer E-Mail-Agent",
