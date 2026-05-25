@@ -202,13 +202,27 @@ final readonly class SynapseRouter
         'partei', 'koalition', 'parlament', 'parliament', 'gesetz',
         'sanktion', 'sanctions', 'eu-', 'nato',
 
-        // Sports / scores / leagues
+        // Sports / scores / leagues.
+        //
+        // No bare `wm `/`em ` here: as 2-letter substring matches they would
+        // fire on extremely common English/German words ending in `em` or
+        // `wm` followed by a space — `system `, `problem `, `theorem `,
+        // `them `, `poem `. Use the unambiguous full stems `europameister`
+        // (also matches `europameisterschaft`) and `weltmeister` (also
+        // matches `weltmeisterschaft`) for the tournament context.
         'spielstand', 'ergebnis', 'tabelle', 'liga', 'bundesliga', 'champions league',
-        'wm ', 'em ', 'olympia', 'olympic',
+        'europameister', 'weltmeister', 'turnier', 'olympia', 'olympic',
         'transfer', 'kader',
 
-        // Conflict / crisis / safety
-        'krieg', 'war ', 'konflikt', 'conflict', 'krise', 'crisis',
+        // Conflict / crisis / safety.
+        //
+        // No bare `war ` here: it would substring-match the extremely
+        // common German past-tense form of `sein` (e.g. `Wer war Einstein?`,
+        // `Was war das?`, `Das war nett.`). `krieg` covers the German
+        // domain and `conflict`/`crisis` cover the English side; English
+        // war-news queries almost always pair with `today`/`current`/year
+        // patterns which already trigger.
+        'krieg', 'konflikt', 'conflict', 'krise', 'crisis',
         'pandemie', 'pandemic', 'unfall', 'accident', 'katastrophe',
 
         // Local / locations / places-of-business
@@ -216,9 +230,16 @@ final readonly class SynapseRouter
         'adresse', 'telefonnummer', 'kontakt ', 'route nach', 'route to',
         'in der nähe', 'nearby', 'in meiner nähe',
 
-        // Reviews / comparisons / recommendations
+        // Reviews / comparisons / recommendations.
+        //
+        // No bare `best `/`beste ` here: they collide with the very common
+        // English sign-off `best regards`/`best wishes`, the German polite
+        // form `beste Grüße`, and casual comparatives like `die beste
+        // Lösung`. `top 10` covers explicit listicle queries; recommendation
+        // questions about live products usually also trigger via `vergleich`,
+        // a domain keyword, or the year pattern.
         'bewertung', 'review', 'vergleich', 'comparison', 'test ', 'testbericht',
-        'empfehlung', 'recommendation', 'beste ', 'best ', 'top 10',
+        'empfehlung', 'recommendation', 'top 10',
 
         // Technology releases / availability
         'release', 'released', 'erscheint', 'erscheinungsdatum',

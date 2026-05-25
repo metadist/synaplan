@@ -284,6 +284,12 @@ class SynapseRouterTest extends TestCase
         // Sports.
         yield 'sports_bundesliga' => ['Wer führt die Bundesliga an?'];
         yield 'sports_champions_league' => ['Was waren die Ergebnisse der Champions League?'];
+        // Replacements for the dropped `wm `/`em ` stems — these full
+        // words cover both the tournament and its participants, and
+        // also catch the `-schaft` suffix via prefix-only substring match.
+        yield 'sports_europameister' => ['Wer wird Europameister im Fußball?'];
+        yield 'sports_weltmeisterschaft' => ['Wann ist die nächste Fußball-Weltmeisterschaft?'];
+        yield 'sports_turnier' => ['Welche Mannschaften spielen im Turnier?'];
 
         // Finance.
         yield 'finance_bitcoin' => ['Wie ist der Bitcoin Kurs gerade?'];
@@ -353,6 +359,26 @@ class SynapseRouterTest extends TestCase
         yield 'greeting' => ['Hallo, wie geht es dir?'];
         yield 'small_talk' => ['Schön dich kennenzulernen!'];
         yield 'creative_writing' => ['Schreibe ein kurzes Gedicht über den Wald'];
+
+        // Regression cases for Copilot review on PR #1003: short
+        // 2-letter stems / very common verb forms must NOT be in
+        // WEB_SEARCH_KEYWORDS, otherwise these casual queries would
+        // burn Brave Search quota for no benefit.
+        //
+        // Old `wm `/`em ` substring would have fired on these:
+        yield 'em_collision_system' => ['What is your system used for?'];
+        yield 'em_collision_problem' => ['Was ist das Problem hier?'];
+        yield 'em_collision_theorem' => ['Explain the theorem of Pythagoras'];
+
+        // Old `war ` substring would have fired on these:
+        yield 'war_collision_einstein' => ['Wer war Einstein?'];
+        yield 'war_collision_kurz' => ['Das war nett.'];
+        yield 'war_collision_was_war' => ['Was war das?'];
+
+        // Old `best `/`beste ` substring would have fired on these:
+        yield 'best_collision_signoff_en' => ['Thanks for the help, best regards.'];
+        yield 'best_collision_signoff_de' => ['Danke für die Hilfe, beste Grüße!'];
+        yield 'best_collision_practice' => ['Was sind die best practices für PSR-12?'];
     }
 
     #[\PHPUnit\Framework\Attributes\DataProvider('nonSearchWorthyQueryProvider')]
