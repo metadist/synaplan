@@ -14,21 +14,22 @@ use App\Service\ModelConfigService;
 use App\Service\PromptService;
 use App\Service\Search\BraveSearchService;
 use App\Service\UrlContentService;
+use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
 
 class MessageProcessorTest extends TestCase
 {
-    private MessageRepository $messageRepository;
-    private SearchResultRepository $searchResultRepository;
-    private MessagePreProcessor $preProcessor;
-    private MessageClassifier $classifier;
-    private InferenceRouter $router;
-    private ModelConfigService $modelConfigService;
-    private PromptService $promptService;
-    private BraveSearchService $braveSearchService;
-    private SearchQueryGenerator $searchQueryGenerator;
-    private LoggerInterface $logger;
+    private MessageRepository&MockObject $messageRepository;
+    private SearchResultRepository&MockObject $searchResultRepository;
+    private MessagePreProcessor&MockObject $preProcessor;
+    private MessageClassifier&MockObject $classifier;
+    private InferenceRouter&MockObject $router;
+    private ModelConfigService&MockObject $modelConfigService;
+    private PromptService&MockObject $promptService;
+    private BraveSearchService&MockObject $braveSearchService;
+    private SearchQueryGenerator&MockObject $searchQueryGenerator;
+    private LoggerInterface&MockObject $logger;
     private MessageProcessor $processor;
 
     protected function setUp(): void
@@ -279,6 +280,124 @@ class MessageProcessorTest extends TestCase
             ->willReturn(['metadata' => ['provider' => 'test', 'model' => 'test']]);
 
         $this->processor->processStream($message, function () {}, null, $options);
+    }
+
+    /**
+     * Regression test for the silent "Internet Search" toggle bug.
+     *
+     * Setup: a German message that would otherwise NOT trigger the
+     * classifier's web_search hint (no keyword from WEB_SEARCH_KEYWORDS).
+     * The task prompt has `tool_internet=true` set in the user's UI.
+     *
+     * Before the fix `processStream()` had no positive trigger for the
+     * prompt flag — only a negative gate that read the wrong key
+     * (`tool_internet_search`). The user toggle was therefore ignored.
+     *
+     * After the fix the streaming pipeline must mirror the non-streaming
+     * `process()` path and call `BraveSearchService::search()` exactly
+     * once when the prompt opts in via `tool_internet`.
+     */
+    public function testProcessStreamTriggersWebSearchFromPromptToolInternetFlag(): void
+    {
+        $message = $this->createMock(Message::class);
+        $message->method('getUserId')->willReturn(1);
+        $message->method('getTrackingId')->willReturn(123);
+        $message->method('getFile')->willReturn(0);
+        $message->method('getId')->willReturn(99);
+        $message->method('getText')->willReturn('Erzähl mir etwas über Eigentumswohnungen in München');
+
+        $this->preProcessor->method('process')->willReturn($message);
+        $this->messageRepository->method('findConversationHistory')->willReturn([]);
+        $this->modelConfigService->method('getDefaultModel')->willReturn(null);
+
+        // Classifier picks a non-search-worthy topic and does NOT set
+        // web_search — so the only way search can fire is the prompt flag.
+        $this->classifier->method('classify')->willReturn([
+            'topic' => 'company',
+            'language' => 'de',
+            'source' => 'ai_sorting',
+            'web_search' => false,
+        ]);
+
+        // Prompt metadata has internet search opted-in by the user's UI.
+        $this->promptService
+            ->method('getPromptWithMetadata')
+            ->willReturn([
+                'metadata' => ['tool_internet' => true],
+            ]);
+
+        $this->braveSearchService->method('isEnabled')->willReturn(true);
+        $this->searchQueryGenerator->method('generate')->willReturn('Eigentumswohnungen München Preise');
+
+        $braveSearchCalled = false;
+        $this->braveSearchService
+            ->expects($this->once())
+            ->method('search')
+            ->willReturnCallback(function (string $query) use (&$braveSearchCalled): array {
+                $braveSearchCalled = true;
+
+                return ['results' => [], 'query' => $query];
+            });
+
+        $this->router
+            ->method('routeStream')
+            ->willReturn(['metadata' => ['provider' => 'test', 'model' => 'test']]);
+
+        $this->processor->processStream($message, function (): void {});
+
+        $this->assertTrue(
+            $braveSearchCalled,
+            'BraveSearchService::search() must be called when the resolved task prompt has tool_internet=true',
+        );
+    }
+
+    /**
+     * Negative gate: when the prompt explicitly disables internet search
+     * the streaming pipeline must NOT call BraveSearchService — even if
+     * the frontend passed `web_search=true`.
+     */
+    public function testProcessStreamRespectsPromptToolInternetFalseAsHardDisable(): void
+    {
+        $message = $this->createMock(Message::class);
+        $message->method('getUserId')->willReturn(1);
+        $message->method('getTrackingId')->willReturn(123);
+        $message->method('getFile')->willReturn(0);
+        $message->method('getId')->willReturn(100);
+        $message->method('getText')->willReturn('Was kostet ein iPhone heute?');
+
+        $this->preProcessor->method('process')->willReturn($message);
+        $this->messageRepository->method('findConversationHistory')->willReturn([]);
+        $this->modelConfigService->method('getDefaultModel')->willReturn(null);
+
+        $this->classifier->method('classify')->willReturn([
+            'topic' => 'translate',
+            'language' => 'de',
+            'source' => 'ai_sorting',
+            'web_search' => true,
+        ]);
+
+        $this->promptService
+            ->method('getPromptWithMetadata')
+            ->willReturn([
+                'metadata' => ['tool_internet' => false],
+            ]);
+
+        $this->braveSearchService->method('isEnabled')->willReturn(true);
+
+        $this->braveSearchService
+            ->expects($this->never())
+            ->method('search');
+
+        $this->router
+            ->method('routeStream')
+            ->willReturn(['metadata' => ['provider' => 'test', 'model' => 'test']]);
+
+        $this->processor->processStream(
+            $message,
+            function (): void {},
+            null,
+            ['web_search' => true],
+        );
     }
 
     public function testProcessLoadsConversationHistory(): void

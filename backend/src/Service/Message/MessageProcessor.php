@@ -289,21 +289,44 @@ final readonly class MessageProcessor
                 $options['resolved_prompt_data'] = $promptData;
             }
 
-            // Apply tool restrictions from prompt metadata
-            // If prompt explicitly DISABLES a tool, override frontend request
-            if (isset($promptMetadata['tool_internet_search']) && !$promptMetadata['tool_internet_search']) {
-                $options['web_search'] = false;
-            }
+            // PromptService normalises legacy `tool_internet_search` rows onto
+            // the canonical `tool_internet` key; we only read the canonical name.
+            $promptToolInternet = $promptMetadata['tool_internet'] ?? null;
 
             // Step 2.5: Web Search (if requested or AI-classified)
+            // Decision order (any positive trigger wins, "rather search than not"):
+            //   1. Frontend explicitly requested it (manual /search command).
+            //   2. Task prompt has `tool_internet=true` (user-facing toggle).
+            //   3. AI classifier voted yes (Synapse heuristic or BWEBSEARCH).
+            //   4. Legacy `tools:search` / `tools:web` source for classifier
+            //      back-compat.
+            //
+            // A prompt with `tool_internet=false` acts as a HARD kill switch
+            // applied AFTER all positive triggers — when a user disables
+            // internet search on a topic they mean no search, regardless of
+            // what the classifier thinks.
             $searchResults = null;
             $shouldSearch = $options['web_search'] ?? false;
+            $triggerReason = $shouldSearch ? 'frontend_flag' : null;
+
+            // Positive trigger: per-prompt opt-in from the user's settings page.
+            // Mirrors the non-streaming process() path so the streaming web chat
+            // honours the same per-topic toggle (issue: Internet Search toggle ignored).
+            if (!$shouldSearch && true === $promptToolInternet) {
+                $shouldSearch = true;
+                $triggerReason = 'prompt_tool_internet';
+                $this->logger->info('MessageProcessor: Prompt metadata requests internet search', [
+                    'topic' => $classification['topic'] ?? 'unknown',
+                    'message_id' => $message->getId(),
+                ]);
+            }
 
             // Check if AI classifier detected search intent automatically
             if (!$shouldSearch && isset($classification['web_search'])) {
                 $shouldSearch = (bool) $classification['web_search'];
 
                 if ($shouldSearch) {
+                    $triggerReason = 'ai_classifier';
                     $this->logger->info('🤖 AI Classifier activated web search automatically', [
                         'message_id' => $message->getId(),
                         'classification' => $classification,
@@ -315,9 +338,43 @@ final readonly class MessageProcessor
             if (!$shouldSearch && isset($classification['source'])) {
                 $source = $classification['source'];
                 $shouldSearch = in_array($source, ['tools:search', 'tools:web'], true);
+                if ($shouldSearch) {
+                    $triggerReason = 'legacy_topic_source';
+                }
             }
 
-            if ($shouldSearch && $this->braveSearchService->isEnabled()) {
+            // Hard kill switch: explicit `tool_internet=false` on the prompt
+            // beats every positive trigger. Run last so any earlier vote
+            // that flipped the flag still gets recorded as the disable cause.
+            if ($shouldSearch && false === $promptToolInternet) {
+                $shouldSearch = false;
+                $triggerReason = 'disabled_by_prompt_tool_internet';
+                $options['web_search'] = false;
+            }
+
+            // Consolidated decision log: lets us diagnose "search didn't trigger"
+            // reports without correlating multiple log lines from different services.
+            $braveEnabled = $this->braveSearchService->isEnabled();
+            $this->logger->info('MessageProcessor: Web search decision', [
+                'message_id' => $message->getId(),
+                'should_search' => $shouldSearch,
+                'trigger_reason' => $triggerReason,
+                'frontend_flag' => (bool) ($options['web_search'] ?? false),
+                'prompt_tool_internet' => $promptToolInternet,
+                'classifier_web_search' => $classification['web_search'] ?? null,
+                'classification_source' => $classification['source'] ?? null,
+                'classification_topic' => $classification['topic'] ?? null,
+                'brave_enabled' => $braveEnabled,
+            ]);
+
+            if ($shouldSearch && !$braveEnabled) {
+                $this->logger->warning('MessageProcessor: Web search requested but Brave Search is disabled', [
+                    'message_id' => $message->getId(),
+                    'trigger_reason' => $triggerReason,
+                ]);
+            }
+
+            if ($shouldSearch && $braveEnabled) {
                 $this->notify($statusCallback, 'searching', 'Searching the web...');
 
                 try {
@@ -702,18 +759,22 @@ final readonly class MessageProcessor
 
             $searchResults = null;
             $shouldSearch = isset($options['force_web_search']) ? (bool) $options['force_web_search'] : false;
+            $triggerReason = $shouldSearch ? 'force_web_search' : null;
 
-            if (!$shouldSearch && ($promptMetadata['tool_internet'] ?? false)) {
+            $promptToolInternet = $promptMetadata['tool_internet'] ?? null;
+            if (!$shouldSearch && true === $promptToolInternet) {
+                $shouldSearch = true;
+                $triggerReason = 'prompt_tool_internet';
                 $this->logger->info('MessageProcessor: Prompt metadata requests internet search', [
                     'topic' => $classification['topic'] ?? 'unknown',
                 ]);
-                $shouldSearch = true;
             }
 
             if (!$shouldSearch && isset($classification['web_search'])) {
                 $shouldSearch = (bool) $classification['web_search'];
 
                 if ($shouldSearch) {
+                    $triggerReason = 'ai_classifier';
                     $this->logger->info('🤖 AI Classifier activated web search automatically', [
                         'message_id' => $message->getId(),
                         'classification' => $classification,
@@ -724,9 +785,42 @@ final readonly class MessageProcessor
             if (!$shouldSearch && isset($classification['source'])) {
                 $source = $classification['source'];
                 $shouldSearch = in_array($source, ['tools:search', 'tools:web'], true);
+                if ($shouldSearch) {
+                    $triggerReason = 'legacy_topic_source';
+                }
             }
 
-            if ($shouldSearch && $this->braveSearchService->isEnabled()) {
+            // Hard kill switch (matches processStream()): explicit
+            // `tool_internet=false` beats every positive trigger so the
+            // per-topic opt-out is honoured consistently across pipelines.
+            if ($shouldSearch && false === $promptToolInternet) {
+                $shouldSearch = false;
+                $triggerReason = 'disabled_by_prompt_tool_internet';
+            }
+
+            $braveEnabled = $this->braveSearchService->isEnabled();
+            $this->logger->info('MessageProcessor: Web search decision', [
+                'message_id' => $message->getId(),
+                'should_search' => $shouldSearch,
+                'trigger_reason' => $triggerReason,
+                'force_web_search' => (bool) ($options['force_web_search'] ?? false),
+                'prompt_tool_internet' => $promptToolInternet,
+                'classifier_web_search' => $classification['web_search'] ?? null,
+                'classification_source' => $classification['source'] ?? null,
+                'classification_topic' => $classification['topic'] ?? null,
+                'brave_enabled' => $braveEnabled,
+                'pipeline' => 'process',
+            ]);
+
+            if ($shouldSearch && !$braveEnabled) {
+                $this->logger->warning('MessageProcessor: Web search requested but Brave Search is disabled', [
+                    'message_id' => $message->getId(),
+                    'trigger_reason' => $triggerReason,
+                    'pipeline' => 'process',
+                ]);
+            }
+
+            if ($shouldSearch && $braveEnabled) {
                 $this->notify($statusCallback, 'searching', 'Searching the web...');
 
                 try {

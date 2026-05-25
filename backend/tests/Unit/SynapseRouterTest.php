@@ -254,6 +254,138 @@ class SynapseRouterTest extends TestCase
         );
     }
 
+    /**
+     * Coverage for the expanded WEB_SEARCH_KEYWORDS list — the keyword
+     * heuristic should fire on time-sensitive / factual / locational
+     * queries spanning real estate, travel, finance, politics, sports,
+     * news, weather, reviews and technology releases. Philosophy is
+     * "rather search than not" for anything that benefits from current
+     * data.
+     *
+     * @return iterable<string, array{0: string}>
+     */
+    public static function expandedWebSearchTriggerProvider(): iterable
+    {
+        // Real estate — original failing prompt from the bug report.
+        yield 'real_estate_eigentumswohnung' => ['Erzähl mir etwas über Eigentumswohnungen in München'];
+        yield 'real_estate_apartment_for' => ['What is a small apartment for sale in Berlin?'];
+        yield 'real_estate_mietspiegel' => ['Wie ist der Mietspiegel in Hamburg?'];
+
+        // Travel.
+        yield 'travel_flug' => ['Wann geht der nächste Flug nach Rom?'];
+        yield 'travel_hotel' => ['Welche Hotels gibt es in Lissabon?'];
+        yield 'travel_einreise' => ['Brauche ich ein Visa für die Einreise nach Japan?'];
+
+        // Politics / current affairs.
+        yield 'politics_kanzler' => ['Wer ist der aktuelle Bundeskanzler von Deutschland?'];
+        yield 'politics_wahl' => ['Wann ist die nächste Wahl in Bayern?'];
+        yield 'politics_sanctions' => ['Welche EU-Sanktionen gibt es gerade?'];
+
+        // Sports.
+        yield 'sports_bundesliga' => ['Wer führt die Bundesliga an?'];
+        yield 'sports_champions_league' => ['Was waren die Ergebnisse der Champions League?'];
+
+        // Finance.
+        yield 'finance_bitcoin' => ['Wie ist der Bitcoin Kurs gerade?'];
+        yield 'finance_zins' => ['Wie hoch ist der EZB Zins?'];
+
+        // News / crisis.
+        yield 'news_breaking' => ['Was sind die heutigen Schlagzeilen aus Berlin?'];
+        yield 'news_war' => ['Was passiert gerade im Krieg in Osteuropa?'];
+
+        // Local / location.
+        yield 'local_oeffnungszeiten' => ['Wie sind die Öffnungszeiten vom Apple Store München?'];
+        yield 'local_nearby' => ['Gibt es ein gutes Restaurant in meiner Nähe?'];
+
+        // Reviews / comparisons.
+        yield 'review_vergleich' => ['Bitte einen Vergleich der besten Laptops 2026.'];
+        yield 'review_test' => ['Hast du einen Testbericht zum neuen iPhone?'];
+
+        // Technology releases.
+        yield 'tech_release' => ['Wann wird die neue PlayStation released?'];
+    }
+
+    #[\PHPUnit\Framework\Attributes\DataProvider('expandedWebSearchTriggerProvider')]
+    public function testExpandedKeywordHeuristicTriggersWebSearch(string $text): void
+    {
+        $this->modelConfigService->method('getDefaultModel')->willReturn(null);
+        $this->promptRepository->method('findPromptsWithSelectionRules')->willReturn([]);
+
+        $this->aiFacade->method('embed')->willReturn([
+            'embedding' => array_fill(0, 1024, 0.1),
+            'usage' => ['prompt_tokens' => 10, 'total_tokens' => 10],
+        ]);
+
+        $this->qdrantClient->method('searchSynapseTopics')->willReturn([
+            [
+                'id' => 'synapse_0_general',
+                'score' => 0.90,
+                'payload' => ['topic' => 'general', 'owner_id' => 0],
+            ],
+        ]);
+
+        $this->promptService->method('getPromptWithMetadata')->willReturn([
+            'metadata' => ['tool_internet' => false],
+        ]);
+
+        $result = $this->router->route(['BTEXT' => $text], [], 1);
+
+        $this->assertTrue(
+            $result['web_search'],
+            sprintf('Search-worthy query "%s" must trigger web search via keyword heuristic', $text),
+        );
+    }
+
+    /**
+     * Counterpart to the expanded-trigger test: timeless conceptual or
+     * generic-chat queries must NOT trigger the heuristic, otherwise we
+     * spend Brave Search quota on every casual message.
+     *
+     * @return iterable<string, array{0: string}>
+     */
+    public static function nonSearchWorthyQueryProvider(): iterable
+    {
+        // Conceptual/educational questions phrased without any
+        // WEB_SEARCH_KEYWORDS — these should answer from the model's
+        // existing knowledge, not burn Brave Search quota.
+        yield 'concept_explanation_de' => ['Erkläre mir bitte das Konzept der Vererbung in OOP'];
+        yield 'concept_explanation_en' => ['Explain how recursion works in programming'];
+        yield 'greeting' => ['Hallo, wie geht es dir?'];
+        yield 'small_talk' => ['Schön dich kennenzulernen!'];
+        yield 'creative_writing' => ['Schreibe ein kurzes Gedicht über den Wald'];
+    }
+
+    #[\PHPUnit\Framework\Attributes\DataProvider('nonSearchWorthyQueryProvider')]
+    public function testNonSearchWorthyQueriesDoNotTriggerWebSearch(string $text): void
+    {
+        $this->modelConfigService->method('getDefaultModel')->willReturn(null);
+        $this->promptRepository->method('findPromptsWithSelectionRules')->willReturn([]);
+
+        $this->aiFacade->method('embed')->willReturn([
+            'embedding' => array_fill(0, 1024, 0.1),
+            'usage' => ['prompt_tokens' => 10, 'total_tokens' => 10],
+        ]);
+
+        $this->qdrantClient->method('searchSynapseTopics')->willReturn([
+            [
+                'id' => 'synapse_0_general',
+                'score' => 0.90,
+                'payload' => ['topic' => 'general', 'owner_id' => 0],
+            ],
+        ]);
+
+        $this->promptService->method('getPromptWithMetadata')->willReturn([
+            'metadata' => ['tool_internet' => false],
+        ]);
+
+        $result = $this->router->route(['BTEXT' => $text], [], 1);
+
+        $this->assertFalse(
+            $result['web_search'],
+            sprintf('Timeless/casual query "%s" must NOT trigger web search', $text),
+        );
+    }
+
     public function testDetectsYearPatternAsWebSearch(): void
     {
         $this->modelConfigService->method('getDefaultModel')->willReturn(null);

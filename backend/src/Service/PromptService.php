@@ -10,9 +10,36 @@ use Psr\Log\LoggerInterface;
 
 /**
  * Service for loading prompts with their metadata (AI model, tools, etc.).
+ *
+ * ## Metadata key naming
+ *
+ * The backend's canonical tool-flag keys are `tool_internet` and
+ * `tool_files`. Historic frontend builds wrote `tool_internet_search` /
+ * `tool_files_search` instead; both aliases are accepted on read AND on
+ * write and folded onto the canonical names by {@see self::METADATA_KEY_ALIASES}.
+ * This keeps existing `BPROMPTMETA` rows readable while new writes always
+ * land on the canonical key — and prevents the router from silently
+ * ignoring the user-facing "Internet Search" toggle.
  */
 final readonly class PromptService
 {
+    /**
+     * Legacy → canonical metadata key aliases.
+     *
+     * Historically the Vue config wrote `tool_internet_search` /
+     * `tool_files_search` while the routing layer read `tool_internet` /
+     * `tool_files`, so the per-prompt "Internet Search" toggle never
+     * actually enabled web search in `MessageProcessor`. Both names are
+     * now folded onto the backend-canonical short form here, in one
+     * place, on both the read and write paths.
+     *
+     * Keep additions sorted alphabetically.
+     */
+    private const METADATA_KEY_ALIASES = [
+        'tool_files_search' => 'tool_files',
+        'tool_internet_search' => 'tool_internet',
+    ];
+
     public function __construct(
         private PromptRepository $promptRepository,
         private PromptMetaRepository $promptMetaRepository,
@@ -71,8 +98,9 @@ final readonly class PromptService
         ];
 
         foreach ($metaEntries as $meta) {
-            $key = $meta->getMetaKey();
+            $rawKey = $meta->getMetaKey();
             $value = $meta->getMetaValue();
+            $key = self::canonicalizeMetadataKey($rawKey);
 
             // Convert boolean strings to actual booleans
             if (str_starts_with($key, 'tool_')) {
@@ -85,6 +113,16 @@ final readonly class PromptService
         }
 
         return $metadata;
+    }
+
+    /**
+     * Normalise a metadata key to its canonical backend name.
+     *
+     * Returns the input unchanged if it is not a known legacy alias.
+     */
+    public static function canonicalizeMetadataKey(string $key): string
+    {
+        return self::METADATA_KEY_ALIASES[$key] ?? $key;
     }
 
     /**
@@ -111,8 +149,14 @@ final readonly class PromptService
             $this->em->flush();
         }
 
+        // Canonicalise the payload before persisting so a frontend that still
+        // sends the legacy aliases (e.g. `tool_internet_search`) lands on the
+        // backend-canonical key (`tool_internet`). If both the alias and the
+        // canonical key are present, the canonical value wins.
+        $normalised = $this->normaliseMetadataKeys($metadata);
+
         // Save new metadata
-        foreach ($metadata as $key => $value) {
+        foreach ($normalised as $key => $value) {
             $meta = new \App\Entity\PromptMeta();
             $meta->setPrompt($prompt);  // ✅ Use setPrompt() instead of setPromptId()
             $meta->setMetaKey($key);
@@ -128,9 +172,33 @@ final readonly class PromptService
         }
 
         // Flush all new metadata at once
-        if (!empty($metadata)) {
+        if (!empty($normalised)) {
             $this->em->flush();
         }
+    }
+
+    /**
+     * Fold legacy aliases onto canonical keys. If both are present the
+     * canonical value wins, so an explicit `tool_internet` payload from the
+     * frontend can never be silently overridden by a stale alias.
+     *
+     * @param array<string, mixed> $metadata
+     *
+     * @return array<string, mixed>
+     */
+    private function normaliseMetadataKeys(array $metadata): array
+    {
+        $result = [];
+        foreach ($metadata as $key => $value) {
+            $canonical = self::canonicalizeMetadataKey((string) $key);
+            // Canonical entry written explicitly takes precedence over an alias.
+            if ($canonical !== $key && array_key_exists($canonical, $metadata)) {
+                continue;
+            }
+            $result[$canonical] = $value;
+        }
+
+        return $result;
     }
 
     /**

@@ -675,8 +675,8 @@ class ChatHandlerTest extends TestCase
                 'prompt' => $promptMock,
                 'metadata' => [
                     'aiModel' => -1,
-                    'tool_internet_search' => true,
-                    'tool_files_search' => true,
+                    'tool_internet' => true,
+                    'tool_files' => true,
                     'tool_url_screenshot' => false,
                 ],
             ]);

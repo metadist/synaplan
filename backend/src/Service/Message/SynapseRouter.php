@@ -144,6 +144,12 @@ final readonly class SynapseRouter
     /**
      * Keywords that strongly indicate the user needs live/current data.
      *
+     * Philosophy: "rather search than not". For timeless explanations the
+     * keyword list misses on purpose; for anything time-sensitive, factual,
+     * locational or news-/event-driven we want to opt in. Keep stems short
+     * (e.g. `kost`, `wahl`, `flug`) so they catch German conjugations and
+     * compounds without listing every form.
+     *
      * Intentionally excludes deictic time markers like "jetzt" / "now" which
      * are extremely common in follow-up requests ("jetzt das in blau", "jetzt
      * ein video davon", "now make it 4K") and almost never imply a web search.
@@ -155,12 +161,68 @@ final readonly class SynapseRouter
      * like `unkosten` matched too. See issue #974.
      */
     private const WEB_SEARCH_KEYWORDS = [
-        'aktuell', 'current', 'heute', 'today', 'news', 'nachrichten',
-        'wetter', 'weather', 'preis', 'price', 'kost', 'cost', 'wie teuer',
-        'neueste', 'latest', 'kürzlich', 'recently',
+        // Time / recency
+        'aktuell', 'current', 'heute', 'today', 'gestern', 'yesterday',
+        'morgen früh', 'tomorrow', 'diese woche', 'this week', 'dieser monat', 'this month',
+        'kürzlich', 'recently', 'neueste', 'latest', 'neuesten', 'newest',
         'live', 'echtzeit', 'realtime', 'real-time',
+
+        // News / current affairs
+        'news', 'nachrichten', 'schlagzeile', 'headline', 'meldung',
+        'breaking', 'eilmeldung',
+
+        // Weather / climate
+        'wetter', 'weather', 'temperatur', 'temperature', 'regen ', 'rainfall',
+        'sturm', 'storm', 'klima',
+
+        // Prices / costs / shopping (kost stem catches kostet/gekostet/kostete)
+        'preis', 'price', 'kost', 'cost', 'wie teuer', 'how much', 'how expensive',
+        'angebot', 'rabatt', 'discount', 'sale',
+
+        // Real estate / housing (the original failing-prompt domain)
+        'eigentumswohnung', 'wohnung kauf', 'wohnung mieten', 'wohnung in ',
+        'immobilie', 'immobilien', 'haus kauf', 'haus mieten',
+        'mietpreis', 'kaufpreis', 'mietspiegel', 'quadratmeterpreis',
+        'apartment for ', 'property in ', 'real estate',
+
+        // Travel / transit
+        'flug', 'flüge', 'flight ', 'hotel', 'reise', 'urlaub',
+        'visa ', 'einreise', 'fähre', 'bahn ', 'zug nach', 'train to',
+        'ticket', 'preisvergleich',
+
+        // Finance / markets / crypto
+        'aktie', 'aktien', 'aktienk', 'stock price', 'börse', 'exchange',
+        'kurs ', 'wechselkurs', 'exchange rate',
+        'zins', 'inflation', 'rendite', 'dividende',
+        'bitcoin', 'ethereum', 'krypto', 'crypto',
+
+        // Politics / government / elections
+        'politik', 'politics', 'wahl', 'election', 'bundeskanzler', 'kanzler',
+        'präsident', 'president', 'regierung', 'government', 'minister',
+        'partei', 'koalition', 'parlament', 'parliament', 'gesetz',
+        'sanktion', 'sanctions', 'eu-', 'nato',
+
+        // Sports / scores / leagues
+        'spielstand', 'ergebnis', 'tabelle', 'liga', 'bundesliga', 'champions league',
+        'wm ', 'em ', 'olympia', 'olympic',
+        'transfer', 'kader',
+
+        // Conflict / crisis / safety
+        'krieg', 'war ', 'konflikt', 'conflict', 'krise', 'crisis',
+        'pandemie', 'pandemic', 'unfall', 'accident', 'katastrophe',
+
+        // Local / locations / places-of-business
         'öffnungszeiten', 'opening hours', 'restaurant', 'geschäft', 'store',
-        'aktienk', 'stock price', 'börse', 'exchange',
+        'adresse', 'telefonnummer', 'kontakt ', 'route nach', 'route to',
+        'in der nähe', 'nearby', 'in meiner nähe',
+
+        // Reviews / comparisons / recommendations
+        'bewertung', 'review', 'vergleich', 'comparison', 'test ', 'testbericht',
+        'empfehlung', 'recommendation', 'beste ', 'best ', 'top 10',
+
+        // Technology releases / availability
+        'release', 'released', 'erscheint', 'erscheinungsdatum',
+        'verfügbar in', 'available in',
     ];
 
     /** Year patterns that indicate need for current information */

@@ -1873,8 +1873,8 @@ const loadPrompts = async () => {
       }
 
       const tools: string[] = []
-      if (metadata.tool_internet_search) tools.push('internet-search')
-      if (metadata.tool_files_search) tools.push('files-search')
+      if (metadata.tool_internet ?? metadata.tool_internet_search) tools.push('internet-search')
+      if (metadata.tool_files ?? metadata.tool_files_search) tools.push('files-search')
       if (metadata.tool_url_screenshot) tools.push('url-screenshot')
 
       return {
@@ -2014,10 +2014,8 @@ const handleSave = saveChanges(async () => {
       metadata.aiModel = findModelIdByString(allModels.value, formData.value.aiModel)
     }
 
-    metadata.tool_internet_search = (formData.value.availableTools || []).includes(
-      'internet-search'
-    )
-    metadata.tool_files_search = (formData.value.availableTools || []).includes('files-search')
+    metadata.tool_internet = (formData.value.availableTools || []).includes('internet-search')
+    metadata.tool_files = (formData.value.availableTools || []).includes('files-search')
     metadata.tool_url_screenshot = (formData.value.availableTools || []).includes('url-screenshot')
 
     if (currentPrompt.value.isDefault && !currentPrompt.value.isUserOverride && !isAdmin.value) {
@@ -2159,8 +2157,8 @@ const handleCreateNew = async () => {
     const metadata: PromptMetadata = {}
 
     metadata.aiModel = 0
-    metadata.tool_internet_search = true
-    metadata.tool_files_search = true
+    metadata.tool_internet = true
+    metadata.tool_files = true
     metadata.tool_url_screenshot = false
 
     const requestPayload = {
