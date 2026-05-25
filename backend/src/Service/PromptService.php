@@ -89,12 +89,20 @@ final readonly class PromptService
     {
         $metaEntries = $this->promptMetaRepository->findBy(['promptId' => $promptId]);
 
+        // IMPORTANT: do NOT pre-populate `tool_*` keys with a default
+        // boolean. Downstream routing (`WebSearchTopicPolicy::shouldSearch`)
+        // discriminates between three states:
+        //
+        //   - true  → user explicitly opted in   → search
+        //   - false → user explicitly opted out  → never search
+        //   - null  (key absent) → no preference → search (project default)
+        //
+        // A pre-populated `tool_internet => false` would collapse the
+        // "no preference" case onto "explicit opt-out" and silently
+        // disable web search for every prompt that has never been
+        // customised through the UI.
         $metadata = [
             'aiModel' => -1, // -1 = no specific model set, frontend defaults to gpt-oss-120b
-            'tool_internet' => false,
-            'tool_files' => false,
-            'tool_url_screenshot' => false,
-            'tool_transfer' => false,
         ];
 
         foreach ($metaEntries as $meta) {

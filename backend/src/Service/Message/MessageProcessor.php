@@ -289,68 +289,24 @@ final readonly class MessageProcessor
                 $options['resolved_prompt_data'] = $promptData;
             }
 
-            // PromptService normalises legacy `tool_internet_search` rows onto
-            // the canonical `tool_internet` key; we only read the canonical name.
-            $promptToolInternet = $promptMetadata['tool_internet'] ?? null;
-
-            // Step 2.5: Web Search (if requested or AI-classified)
-            // Decision order (any positive trigger wins, "rather search than not"):
-            //   1. Frontend explicitly requested it (manual /search command).
-            //   2. Task prompt has `tool_internet=true` (user-facing toggle).
-            //   3. AI classifier voted yes (Synapse heuristic or BWEBSEARCH).
-            //   4. Legacy `tools:search` / `tools:web` source for classifier
-            //      back-compat.
+            // Step 2.5: Web Search
             //
-            // A prompt with `tool_internet=false` acts as a HARD kill switch
-            // applied AFTER all positive triggers — when a user disables
-            // internet search on a topic they mean no search, regardless of
-            // what the classifier thinks.
+            // Project-wide policy: search is the DEFAULT for every chat.
+            // The only ways to suppress it are:
+            //   (a) Topic is a pure asset/document generation topic where
+            //       the handler does not consume web context.
+            //   (b) The user has explicitly opted out by setting
+            //       `tool_internet=false` on the task prompt.
+            //
+            // All other signals (classifier `web_search` vote, AI BWEBSEARCH,
+            // legacy `tools:search` source) are now advisory only — they are
+            // recorded in the decision log for diagnostics, but no longer
+            // gate the decision.
             $searchResults = null;
-            $shouldSearch = $options['web_search'] ?? false;
-            $triggerReason = $shouldSearch ? 'frontend_flag' : null;
-
-            // Positive trigger: per-prompt opt-in from the user's settings page.
-            // Mirrors the non-streaming process() path so the streaming web chat
-            // honours the same per-topic toggle (issue: Internet Search toggle ignored).
-            if (!$shouldSearch && true === $promptToolInternet) {
-                $shouldSearch = true;
-                $triggerReason = 'prompt_tool_internet';
-                $this->logger->info('MessageProcessor: Prompt metadata requests internet search', [
-                    'topic' => $classification['topic'] ?? 'unknown',
-                    'message_id' => $message->getId(),
-                ]);
-            }
-
-            // Check if AI classifier detected search intent automatically
-            if (!$shouldSearch && isset($classification['web_search'])) {
-                $shouldSearch = (bool) $classification['web_search'];
-
-                if ($shouldSearch) {
-                    $triggerReason = 'ai_classifier';
-                    $this->logger->info('🤖 AI Classifier activated web search automatically', [
-                        'message_id' => $message->getId(),
-                        'classification' => $classification,
-                    ]);
-                }
-            }
-
-            // Also check if classifier set a search-related topic (legacy fallback)
-            if (!$shouldSearch && isset($classification['source'])) {
-                $source = $classification['source'];
-                $shouldSearch = in_array($source, ['tools:search', 'tools:web'], true);
-                if ($shouldSearch) {
-                    $triggerReason = 'legacy_topic_source';
-                }
-            }
-
-            // Hard kill switch: explicit `tool_internet=false` on the prompt
-            // beats every positive trigger. Run last so any earlier vote
-            // that flipped the flag still gets recorded as the disable cause.
-            if ($shouldSearch && false === $promptToolInternet) {
-                $shouldSearch = false;
-                $triggerReason = 'disabled_by_prompt_tool_internet';
-                $options['web_search'] = false;
-            }
+            $topic = $classification['topic'] ?? 'general';
+            $promptToolInternet = $promptMetadata['tool_internet'] ?? null;
+            $shouldSearch = WebSearchTopicPolicy::shouldSearch($topic, $promptToolInternet);
+            $triggerReason = $this->triggerReasonFor($topic, $promptToolInternet, $shouldSearch);
 
             // Consolidated decision log: lets us diagnose "search didn't trigger"
             // reports without correlating multiple log lines from different services.
@@ -361,9 +317,9 @@ final readonly class MessageProcessor
                 'trigger_reason' => $triggerReason,
                 'frontend_flag' => (bool) ($options['web_search'] ?? false),
                 'prompt_tool_internet' => $promptToolInternet,
-                'classifier_web_search' => $classification['web_search'] ?? null,
+                'classifier_web_search_hint' => $classification['web_search'] ?? null,
                 'classification_source' => $classification['source'] ?? null,
-                'classification_topic' => $classification['topic'] ?? null,
+                'classification_topic' => $topic,
                 'brave_enabled' => $braveEnabled,
             ]);
 
@@ -758,45 +714,10 @@ final readonly class MessageProcessor
             }
 
             $searchResults = null;
-            $shouldSearch = isset($options['force_web_search']) ? (bool) $options['force_web_search'] : false;
-            $triggerReason = $shouldSearch ? 'force_web_search' : null;
-
+            $topic = $classification['topic'] ?? 'general';
             $promptToolInternet = $promptMetadata['tool_internet'] ?? null;
-            if (!$shouldSearch && true === $promptToolInternet) {
-                $shouldSearch = true;
-                $triggerReason = 'prompt_tool_internet';
-                $this->logger->info('MessageProcessor: Prompt metadata requests internet search', [
-                    'topic' => $classification['topic'] ?? 'unknown',
-                ]);
-            }
-
-            if (!$shouldSearch && isset($classification['web_search'])) {
-                $shouldSearch = (bool) $classification['web_search'];
-
-                if ($shouldSearch) {
-                    $triggerReason = 'ai_classifier';
-                    $this->logger->info('🤖 AI Classifier activated web search automatically', [
-                        'message_id' => $message->getId(),
-                        'classification' => $classification,
-                    ]);
-                }
-            }
-
-            if (!$shouldSearch && isset($classification['source'])) {
-                $source = $classification['source'];
-                $shouldSearch = in_array($source, ['tools:search', 'tools:web'], true);
-                if ($shouldSearch) {
-                    $triggerReason = 'legacy_topic_source';
-                }
-            }
-
-            // Hard kill switch (matches processStream()): explicit
-            // `tool_internet=false` beats every positive trigger so the
-            // per-topic opt-out is honoured consistently across pipelines.
-            if ($shouldSearch && false === $promptToolInternet) {
-                $shouldSearch = false;
-                $triggerReason = 'disabled_by_prompt_tool_internet';
-            }
+            $shouldSearch = WebSearchTopicPolicy::shouldSearch($topic, $promptToolInternet);
+            $triggerReason = $this->triggerReasonFor($topic, $promptToolInternet, $shouldSearch);
 
             $braveEnabled = $this->braveSearchService->isEnabled();
             $this->logger->info('MessageProcessor: Web search decision', [
@@ -805,9 +726,9 @@ final readonly class MessageProcessor
                 'trigger_reason' => $triggerReason,
                 'force_web_search' => (bool) ($options['force_web_search'] ?? false),
                 'prompt_tool_internet' => $promptToolInternet,
-                'classifier_web_search' => $classification['web_search'] ?? null,
+                'classifier_web_search_hint' => $classification['web_search'] ?? null,
                 'classification_source' => $classification['source'] ?? null,
-                'classification_topic' => $classification['topic'] ?? null,
+                'classification_topic' => $topic,
                 'brave_enabled' => $braveEnabled,
                 'pipeline' => 'process',
             ]);
@@ -992,6 +913,30 @@ final readonly class MessageProcessor
     /**
      * Send status notification to callback.
      */
+    /**
+     * Human-readable reason for the consolidated web-search decision log.
+     *
+     * Mirrors the precedence in {@see WebSearchTopicPolicy::shouldSearch()}
+     * so the log line directly explains the decision without a reader
+     * having to consult two services.
+     */
+    private function triggerReasonFor(?string $topic, ?bool $promptToolInternet, bool $shouldSearch): string
+    {
+        if (!$shouldSearch) {
+            if (WebSearchTopicPolicy::isNonWebSearchTopic($topic)) {
+                return 'non_web_search_topic';
+            }
+
+            return 'disabled_by_prompt_tool_internet';
+        }
+
+        if (true === $promptToolInternet) {
+            return 'prompt_tool_internet_opt_in';
+        }
+
+        return 'project_default';
+    }
+
     private function notify(?callable $callback, string $status, string $message, array $metadata = []): void
     {
         if ($callback) {

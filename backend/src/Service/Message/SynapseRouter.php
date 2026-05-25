@@ -142,135 +142,6 @@ final readonly class SynapseRouter
     ];
 
     /**
-     * Keywords that strongly indicate the user needs live/current data.
-     *
-     * Philosophy: "rather search than not". For timeless explanations the
-     * keyword list misses on purpose; for anything time-sensitive, factual,
-     * locational or news-/event-driven we want to opt in. Keep stems short
-     * (e.g. `kost`, `wahl`, `flug`) so they catch German conjugations and
-     * compounds without listing every form.
-     *
-     * Intentionally excludes deictic time markers like "jetzt" / "now" which
-     * are extremely common in follow-up requests ("jetzt das in blau", "jetzt
-     * ein video davon", "now make it 4K") and almost never imply a web search.
-     *
-     * The German cost stem is `kost` (not `kosten`): the bare infinitive
-     * `kosten` does not appear in the most common phrasing "Was kostet …?"
-     * and `str_contains('kostet', 'kosten') === false`. The shorter stem
-     * also catches `kostet`/`gekostet`/`kostete` while leaving compounds
-     * like `unkosten` matched too. See issue #974.
-     */
-    private const WEB_SEARCH_KEYWORDS = [
-        // Time / recency
-        'aktuell', 'current', 'heute', 'today', 'gestern', 'yesterday',
-        'morgen früh', 'tomorrow', 'diese woche', 'this week', 'dieser monat', 'this month',
-        'kürzlich', 'recently', 'neueste', 'latest', 'neuesten', 'newest',
-        'live', 'echtzeit', 'realtime', 'real-time',
-
-        // News / current affairs
-        'news', 'nachrichten', 'schlagzeile', 'headline', 'meldung',
-        'breaking', 'eilmeldung',
-
-        // Weather / climate
-        'wetter', 'weather', 'temperatur', 'temperature', 'regen ', 'rainfall',
-        'sturm', 'storm', 'klima',
-
-        // Prices / costs / shopping (kost stem catches kostet/gekostet/kostete)
-        'preis', 'price', 'kost', 'cost', 'wie teuer', 'how much', 'how expensive',
-        'angebot', 'rabatt', 'discount', 'sale',
-
-        // Real estate / housing (the original failing-prompt domain)
-        'eigentumswohnung', 'wohnung kauf', 'wohnung mieten', 'wohnung in ',
-        'immobilie', 'immobilien', 'haus kauf', 'haus mieten',
-        'mietpreis', 'kaufpreis', 'mietspiegel', 'quadratmeterpreis',
-        'apartment for ', 'property in ', 'real estate',
-
-        // Travel / transit
-        'flug', 'flüge', 'flight ', 'hotel', 'reise', 'urlaub',
-        'visa ', 'einreise', 'fähre', 'bahn ', 'zug nach', 'train to',
-        'ticket', 'preisvergleich',
-
-        // Finance / markets / crypto
-        'aktie', 'aktien', 'aktienk', 'stock price', 'börse', 'exchange',
-        'kurs ', 'wechselkurs', 'exchange rate',
-        'zins', 'inflation', 'rendite', 'dividende',
-        'bitcoin', 'ethereum', 'krypto', 'crypto',
-
-        // Politics / government / elections
-        'politik', 'politics', 'wahl', 'election', 'bundeskanzler', 'kanzler',
-        'präsident', 'president', 'regierung', 'government', 'minister',
-        'partei', 'koalition', 'parlament', 'parliament', 'gesetz',
-        'sanktion', 'sanctions', 'eu-', 'nato',
-
-        // Sports / scores / leagues.
-        //
-        // No bare `wm `/`em ` here: as 2-letter substring matches they would
-        // fire on extremely common English/German words ending in `em` or
-        // `wm` followed by a space — `system `, `problem `, `theorem `,
-        // `them `, `poem `. Use the unambiguous full stems `europameister`
-        // (also matches `europameisterschaft`) and `weltmeister` (also
-        // matches `weltmeisterschaft`) for the tournament context.
-        'spielstand', 'ergebnis', 'tabelle', 'liga', 'bundesliga', 'champions league',
-        'europameister', 'weltmeister', 'turnier', 'olympia', 'olympic',
-        'transfer', 'kader',
-
-        // Conflict / crisis / safety.
-        //
-        // No bare `war ` here: it would substring-match the extremely
-        // common German past-tense form of `sein` (e.g. `Wer war Einstein?`,
-        // `Was war das?`, `Das war nett.`). `krieg` covers the German
-        // domain and `conflict`/`crisis` cover the English side; English
-        // war-news queries almost always pair with `today`/`current`/year
-        // patterns which already trigger.
-        'krieg', 'konflikt', 'conflict', 'krise', 'crisis',
-        'pandemie', 'pandemic', 'unfall', 'accident', 'katastrophe',
-
-        // Local / locations / places-of-business
-        'öffnungszeiten', 'opening hours', 'restaurant', 'geschäft', 'store',
-        'adresse', 'telefonnummer', 'kontakt ', 'route nach', 'route to',
-        'in der nähe', 'nearby', 'in meiner nähe',
-
-        // Reviews / comparisons / recommendations.
-        //
-        // No bare `best `/`beste ` here: they collide with the very common
-        // English sign-off `best regards`/`best wishes`, the German polite
-        // form `beste Grüße`, and casual comparatives like `die beste
-        // Lösung`. `top 10` covers explicit listicle queries; recommendation
-        // questions about live products usually also trigger via `vergleich`,
-        // a domain keyword, or the year pattern.
-        'bewertung', 'review', 'vergleich', 'comparison', 'test ', 'testbericht',
-        'empfehlung', 'recommendation', 'top 10',
-
-        // Technology releases / availability
-        'release', 'released', 'erscheint', 'erscheinungsdatum',
-        'verfügbar in', 'available in',
-    ];
-
-    /** Year patterns that indicate need for current information */
-    private const YEAR_PATTERN = '/\b(202[4-9]|203\d)\b/';
-
-    /**
-     * Topics where automatic web-search heuristics are nonsensical because
-     * the handler purely generates assets (image/video/audio/document) and
-     * does not consume web context. Web search for these topics is only
-     * activated when a prompt explicitly opts in via `tool_internet`.
-     *
-     * Includes both canonical legacy topics and the granular Synapse-v2
-     * topics, so this stays correct even if `TopicAliasResolver` is bypassed.
-     */
-    private const NON_WEB_SEARCH_TOPICS = [
-        'mediamaker',
-        'image-generation',
-        'video-generation',
-        'audio-generation',
-        'text2pic',
-        'text2vid',
-        'text2sound',
-        'officemaker',
-        'text2doc',
-    ];
-
-    /**
      * Common language-specific words for n-gram-free detection.
      * Ordered by frequency of occurrence in typical messages.
      *
@@ -426,7 +297,10 @@ final readonly class SynapseRouter
                 return [
                     'topic' => $ruleBasedTopic,
                     'language' => $messageData['BLANG'] ?? 'en',
-                    'web_search' => $promptMetadata['tool_internet'] ?? false,
+                    'web_search' => WebSearchTopicPolicy::shouldSearch(
+                        $ruleBasedTopic,
+                        $promptMetadata['tool_internet'] ?? null,
+                    ),
                     'raw_response' => 'Synapse: Rule-based routing',
                     'prompt_metadata' => $promptMetadata,
                     'source' => 'synapse_rule',
@@ -583,18 +457,15 @@ final readonly class SynapseRouter
 
             $promptMetadata = $this->loadPromptMetadata($canonicalTopic, $userId ?? 0);
 
-            // Web-search activation:
-            //   - For pure asset/document generation topics, the heuristic is
-            //     meaningless (the handler does not consume web context). We
-            //     only honor the explicit `tool_internet` opt-in there.
-            //   - For all other topics we run the keyword/year heuristic and
-            //     additionally honor the prompt's `tool_internet` flag.
-            $skipHeuristic = $this->isNonWebSearchTopic($canonicalTopic) || $this->isNonWebSearchTopic($aliasSource ?? '');
-            $webSearch = $skipHeuristic ? false : $this->detectWebSearchIntent($messageText);
-
-            if (!$webSearch && ($promptMetadata['tool_internet'] ?? false)) {
-                $webSearch = true;
-            }
+            // Web-search activation: delegate to the shared policy so the
+            // streaming chat, non-streaming pipeline and embedding router
+            // all share one rule. Defaults to "search unless explicitly
+            // opted out or a non-web-search topic". The granular topic
+            // (`aliasSource`) is also fed through in case it sits on the
+            // NON_WEB_SEARCH list while the canonical topic does not.
+            $promptToolInternet = $promptMetadata['tool_internet'] ?? null;
+            $webSearch = WebSearchTopicPolicy::shouldSearch($canonicalTopic, $promptToolInternet)
+                && !WebSearchTopicPolicy::isNonWebSearchTopic($aliasSource);
 
             $latencyMs = $this->elapsed($startTime);
 
@@ -604,7 +475,7 @@ final readonly class SynapseRouter
                 'score' => round($topScore, 4),
                 'language' => $language,
                 'web_search' => $webSearch,
-                'web_search_heuristic_skipped' => $skipHeuristic,
+                'prompt_tool_internet' => $promptToolInternet,
                 'media_type' => $mediaType,
                 'source' => 'synapse_embedding',
                 'latency_ms' => $latencyMs,
@@ -825,29 +696,6 @@ final readonly class SynapseRouter
         }
 
         return $bestCount >= 2 ? $bestLang : 'en';
-    }
-
-    private function detectWebSearchIntent(string $text): bool
-    {
-        $lower = mb_strtolower($text);
-
-        foreach (self::WEB_SEARCH_KEYWORDS as $keyword) {
-            if (str_contains($lower, $keyword)) {
-                return true;
-            }
-        }
-
-        return 1 === preg_match(self::YEAR_PATTERN, $text);
-    }
-
-    /**
-     * True when the topic is a pure asset/document generation topic where
-     * the web-search heuristic must not run automatically (only explicit
-     * `tool_internet` opt-in is honored).
-     */
-    private function isNonWebSearchTopic(string $topic): bool
-    {
-        return '' !== $topic && in_array($topic, self::NON_WEB_SEARCH_TOPICS, true);
     }
 
     private function detectMediaType(string $text): string

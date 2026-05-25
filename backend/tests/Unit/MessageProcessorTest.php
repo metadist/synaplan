@@ -283,6 +283,93 @@ class MessageProcessorTest extends TestCase
     }
 
     /**
+     * Locks down the project-wide "rather search than not" policy:
+     * a chat-friendly topic with NO explicit `tool_internet` opinion
+     * must trigger search. This is the new default after Variante B —
+     * the user no longer has to enable a toggle to get search.
+     */
+    public function testProcessStreamSearchesByDefaultForChatTopic(): void
+    {
+        $message = $this->createMock(Message::class);
+        $message->method('getUserId')->willReturn(1);
+        $message->method('getTrackingId')->willReturn(123);
+        $message->method('getFile')->willReturn(0);
+        $message->method('getId')->willReturn(98);
+        $message->method('getText')->willReturn('Hallo, was sind die aktuellen News?');
+
+        $this->preProcessor->method('process')->willReturn($message);
+        $this->messageRepository->method('findConversationHistory')->willReturn([]);
+        $this->modelConfigService->method('getDefaultModel')->willReturn(null);
+
+        $this->classifier->method('classify')->willReturn([
+            'topic' => 'general',
+            'language' => 'de',
+            'source' => 'fast_path_heuristic',
+        ]);
+
+        // No tool_internet opinion → project default kicks in (search).
+        $this->promptService
+            ->method('getPromptWithMetadata')
+            ->willReturn(['metadata' => []]);
+
+        $this->braveSearchService->method('isEnabled')->willReturn(true);
+        $this->searchQueryGenerator->method('generate')->willReturn('aktuelle News');
+
+        $this->braveSearchService
+            ->expects($this->once())
+            ->method('search')
+            ->willReturn(['results' => []]);
+
+        $this->router
+            ->method('routeStream')
+            ->willReturn(['metadata' => ['provider' => 'test', 'model' => 'test']]);
+
+        $this->processor->processStream($message, function (): void {});
+    }
+
+    /**
+     * Locks down the NON_WEB_SEARCH-topic exclusion: a media-generation
+     * topic without an explicit opt-in must NOT trigger search, because
+     * the handler does not consume web context.
+     */
+    public function testProcessStreamSkipsSearchForMediaGenerationTopic(): void
+    {
+        $message = $this->createMock(Message::class);
+        $message->method('getUserId')->willReturn(1);
+        $message->method('getTrackingId')->willReturn(123);
+        $message->method('getFile')->willReturn(0);
+        $message->method('getId')->willReturn(97);
+        $message->method('getText')->willReturn('Erstelle ein Bild von einem schwarzen Kater');
+
+        $this->preProcessor->method('process')->willReturn($message);
+        $this->messageRepository->method('findConversationHistory')->willReturn([]);
+        $this->modelConfigService->method('getDefaultModel')->willReturn(null);
+
+        $this->classifier->method('classify')->willReturn([
+            'topic' => 'mediamaker',
+            'language' => 'de',
+            'source' => 'ai_sorting',
+        ]);
+
+        // No opt-in → NON_WEB_SEARCH gate suppresses search.
+        $this->promptService
+            ->method('getPromptWithMetadata')
+            ->willReturn(['metadata' => []]);
+
+        $this->braveSearchService->method('isEnabled')->willReturn(true);
+
+        $this->braveSearchService
+            ->expects($this->never())
+            ->method('search');
+
+        $this->router
+            ->method('routeStream')
+            ->willReturn(['metadata' => ['provider' => 'test', 'model' => 'test']]);
+
+        $this->processor->processStream($message, function (): void {});
+    }
+
+    /**
      * Regression test for the silent "Internet Search" toggle bug.
      *
      * Setup: a German message that would otherwise NOT trigger the

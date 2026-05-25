@@ -580,16 +580,27 @@ class MessageClassifierTest extends TestCase
     }
 
     /**
-     * Regression for #974.
+     * Regression coverage for #974 and #1000, rewritten for the
+     * Variante B routing policy.
      *
-     * German cost/price queries like "Was kostet ein Flug nach Bergen?" used
-     * to slip through the fast-path because the trigger list only had a few
-     * English phrases plus the very specific `aktuelle nachrichten`. With
-     * the fast-path enabled (default-on) the AI sorter was never reached,
-     * `web_search` stayed `false`, and the model hallucinated "Ich starte
-     * eine Suche" without ever actually triggering Brave Search. Verify
-     * these messages now defer to the full sorter where web_search can be
-     * activated.
+     * BEFORE: the fast-path returned `web_search => false` and tried to
+     * compensate by deferring to the AI sorter on a hard-coded
+     * `$searchTriggers` blocklist (`kost`, `preis`, `wie teuer`, …).
+     * The blocklist was incomplete — any query that didn't happen to
+     * match (`günstigsten tankstellen in 10km umgebung von 48161`)
+     * silently stayed on the fast-path with `web_search=false`.
+     *
+     * AFTER: the fast-path no longer decides web_search at all (returns
+     * `null`). The actual decision is made downstream by
+     * `WebSearchTopicPolicy::shouldSearch()`, which defaults to "search"
+     * for any non-media topic without an explicit `tool_internet=false`
+     * opt-out. So:
+     *
+     *   - Fast-path STAYS on the fast-path for these short queries (no
+     *     hand-rolled blocklist to maintain).
+     *   - `web_search` is `null` in the classification — the policy
+     *     fills it in at `MessageProcessor` time using the resolved
+     *     prompt's `tool_internet` flag.
      *
      * @return iterable<string, array{0: string}>
      */
@@ -600,10 +611,12 @@ class MessageClassifierTest extends TestCase
         yield 'wie teuer' => ['Wie teuer ist ein iPhone 17?'];
         yield 'preis (noun)' => ['Was ist der Preis für ein Bitcoin?'];
         yield 'flüge (plural)' => ['Gibt es günstige Flüge im Dezember?'];
+        // #1000 case: query that didn't match any of the old triggers.
+        yield 'tankstellen (no old trigger)' => ['günstigsten tankstellen in 10km umgebung von 48161'];
     }
 
     #[\PHPUnit\Framework\Attributes\DataProvider('germanCostQueryFastPathProvider')]
-    public function testFastPathYieldsToAiSorterOnGermanCostQueries(string $text): void
+    public function testFastPathReturnsNullWebSearchHintForGermanCostQueries(string $text): void
     {
         $configRepo = $this->createMock(ConfigRepository::class);
         // Synapse off, fast-path on (default).
@@ -612,11 +625,10 @@ class MessageClassifierTest extends TestCase
         });
 
         $sorter = $this->createMock(MessageSorter::class);
-        // The AI sorter MUST be reached — that's the entire point: without
-        // it, web_search never flips to true for these queries.
-        $sorter->expects($this->once())
-            ->method('classify')
-            ->willReturn(['topic' => 'general', 'language' => 'de', 'web_search' => true]);
+        // The AI sorter must NOT be reached — the fast-path now handles
+        // these short queries itself and lets MessageProcessor decide
+        // web_search via the project-wide policy.
+        $sorter->expects($this->never())->method('classify');
 
         $classifier = new MessageClassifier(
             $sorter,
@@ -643,8 +655,9 @@ class MessageClassifierTest extends TestCase
 
         $result = $classifier->classify($message);
 
-        $this->assertSame('ai_sorting', $result['source'], sprintf('Fast-path must yield to the AI sorter for "%s" (#974)', $text));
-        $this->assertFalse($result['skip_sorting']);
+        self::assertSame('fast_path_heuristic', $result['source'], sprintf('Fast-path must take "%s" (no blocklist deferral)', $text));
+        self::assertTrue($result['skip_sorting']);
+        self::assertNull($result['web_search'], 'Fast-path must NOT pre-empt the WebSearchTopicPolicy decision');
     }
 
     #[\PHPUnit\Framework\Attributes\DataProvider('germanMediaImperativeProvider')]
