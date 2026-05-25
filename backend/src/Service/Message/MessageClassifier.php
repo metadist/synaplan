@@ -90,10 +90,17 @@ final readonly class MessageClassifier
                 'text_length' => strlen($text),
             ]);
 
+            // `web_search` is intentionally null on the fast-path: under
+            // the project-wide policy the actual decision is made later
+            // in `MessageProcessor::processStream()` via
+            // `WebSearchTopicPolicy::shouldSearch()`, which combines the
+            // resolved prompt's `tool_internet` flag with the topic
+            // exclusion list. The fast-path has no access to prompt
+            // metadata and must not pre-empt that decision (see #1000).
             return [
                 'topic' => 'general',
                 'language' => $detectedLanguage,
-                'web_search' => false,
+                'web_search' => null,
                 'source' => 'fast_path_heuristic',
                 'skip_sorting' => true,
                 'intent' => 'chat',
@@ -564,28 +571,13 @@ final readonly class MessageClassifier
             }
         }
 
-        // Web-search hint phrases that the AI sorter would flip `web_search`
-        // for. Better to take the slow path so we surface results.
-        //
-        // German cost/price queries (#974): the bare infinitive `kosten` is
-        // far less common than the conjugated `kostet`, so we use the stem
-        // `kost` which catches `kostet`/`kosten`/`gekostet` while only
-        // accidentally matching rare false-positives like `kostüm`/`kostbar`
-        // — both of which still benefit from the slow path more than they
-        // suffer from it.
-        static $searchTriggers = [
-            'search the web', 'google ', 'latest news', 'current price',
-            'today\'s', "today's", 'right now', 'this week',
-            'aktuelle nachrichten', 'durchsuche das internet',
-            'busca en', 'recherche dans',
-            'kost', 'preis', 'wie teuer', 'flug nach', 'flüge',
-        ];
-        foreach ($searchTriggers as $trigger) {
-            if (str_contains($lower, $trigger)) {
-                return false;
-            }
-        }
-
+        // Note: there is no longer a `$searchTriggers` blocklist here.
+        // It was a workaround for the fast-path's inability to decide
+        // `web_search` on its own — under the project-wide policy
+        // "search unless explicitly opted out", the fast-path no longer
+        // needs to defer to the slow AI sorter just to surface results
+        // (see issue #1000). The actual search decision is owned by
+        // `WebSearchTopicPolicy` and applied in `MessageProcessor`.
         return true;
     }
 

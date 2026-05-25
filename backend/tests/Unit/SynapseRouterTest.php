@@ -177,7 +177,84 @@ class SynapseRouterTest extends TestCase
         $this->assertEquals('no_search_results', $result['synapse_fallback_reason']);
     }
 
-    public function testDetectsWebSearchKeywords(): void
+    /**
+     * Under the project-wide WebSearchTopicPolicy, the default for any
+     * chat-style topic without an explicit `tool_internet=false` opt-out
+     * is to enable web search — regardless of the query text. This is
+     * the "rather search than not" mandate.
+     *
+     * The data provider covers a wide spectrum of phrasings that used
+     * to depend on the keyword heuristic but now succeed by default.
+     *
+     * @return iterable<string, array{0: string}>
+     */
+    public static function defaultRouteSearchQueryProvider(): iterable
+    {
+        // Time-sensitive / news-like (used to depend on `aktuell`, `wetter`, year)
+        yield 'weather' => ['Was ist das aktuelle Wetter in Berlin?'];
+        yield 'year_pattern' => ['Bundeskanzler 2026'];
+
+        // Cost queries — original #974 regression cases. Still pass under
+        // the simpler policy: default is search, period.
+        yield 'cost_kostet' => ['Was kostet ein Flug nach Bergen?'];
+        yield 'cost_wie_teuer' => ['Wie teuer ist ein iPhone 17?'];
+        yield 'cost_gekostet' => ['Was hat das Konzert gestern gekostet?'];
+
+        // Real-estate — original failing prompt that motivated this PR.
+        yield 'real_estate_eigentumswohnung' => ['Erzähl mir etwas über Eigentumswohnungen in München'];
+
+        // Travel / politics / finance / sports — sample one per domain.
+        yield 'travel_flug' => ['Wann geht der nächste Flug nach Rom?'];
+        yield 'politics_kanzler' => ['Wer ist der aktuelle Bundeskanzler von Deutschland?'];
+        yield 'finance_bitcoin' => ['Wie ist der Bitcoin Kurs gerade?'];
+        yield 'sports_bundesliga' => ['Wer führt die Bundesliga an?'];
+
+        // Casual / conceptual queries — under Variante B these ALSO
+        // trigger search by default. The model is trusted to ignore
+        // irrelevant Brave results when answering from training data.
+        yield 'concept_explanation' => ['Erkläre mir das Konzept der Vererbung in OOP'];
+        yield 'greeting' => ['Hallo, wie geht es dir?'];
+    }
+
+    #[\PHPUnit\Framework\Attributes\DataProvider('defaultRouteSearchQueryProvider')]
+    public function testDefaultRouteEnablesWebSearch(string $text): void
+    {
+        $this->modelConfigService->method('getDefaultModel')->willReturn(null);
+        $this->promptRepository->method('findPromptsWithSelectionRules')->willReturn([]);
+
+        $this->aiFacade->method('embed')->willReturn([
+            'embedding' => array_fill(0, 1024, 0.1),
+            'usage' => ['prompt_tokens' => 10, 'total_tokens' => 10],
+        ]);
+
+        $this->qdrantClient->method('searchSynapseTopics')->willReturn([
+            [
+                'id' => 'synapse_0_general',
+                'score' => 0.90,
+                'payload' => ['topic' => 'general', 'owner_id' => 0],
+            ],
+        ]);
+
+        // No `tool_internet` opinion on the prompt → falls through to
+        // the project default, which is "search".
+        $this->promptService->method('getPromptWithMetadata')->willReturn([
+            'metadata' => [],
+        ]);
+
+        $result = $this->router->route(['BTEXT' => $text], [], 1);
+
+        $this->assertTrue(
+            $result['web_search'],
+            sprintf('Default policy must enable web search for "%s"', $text),
+        );
+    }
+
+    /**
+     * Explicit opt-out at the prompt level (`tool_internet=false`) is the
+     * one and only way to suppress search on a regular (non-media) topic
+     * under Variante B.
+     */
+    public function testExplicitToolInternetFalseSuppressesSearch(): void
     {
         $this->modelConfigService->method('getDefaultModel')->willReturn(null);
         $this->promptRepository->method('findPromptsWithSelectionRules')->willReturn([]);
@@ -201,121 +278,10 @@ class SynapseRouterTest extends TestCase
 
         $result = $this->router->route(['BTEXT' => 'Was ist das aktuelle Wetter in Berlin?'], [], 1);
 
-        $this->assertTrue($result['web_search']);
-    }
-
-    /**
-     * Regression test for issue #974.
-     *
-     * The most common German phrasing for asking about prices is "Was kostet
-     * X?" — conjugated, not the bare infinitive. The previous keyword list
-     * used the literal `kosten`, but `str_contains('kostet', 'kosten')` is
-     * `false`, so neither WhatsApp nor the web chat ever triggered the Brave
-     * Search pipeline for these queries. Use the shorter stem `kost` instead.
-     *
-     * @return iterable<string, array{0: string}>
-     */
-    public static function germanCostQueryProvider(): iterable
-    {
-        yield 'kostet (singular)' => ['Was kostet ein Flug nach Bergen?'];
-        yield 'kostet + restaurant' => ['Was kostet ein Kebap-Gericht in Münster?'];
-        yield 'wie teuer' => ['Wie teuer ist ein iPhone 17?'];
-        yield 'gekostet (past)' => ['Was hat das Konzert gestern gekostet?'];
-    }
-
-    #[\PHPUnit\Framework\Attributes\DataProvider('germanCostQueryProvider')]
-    public function testGermanCostQueriesTriggerWebSearch(string $text): void
-    {
-        $this->modelConfigService->method('getDefaultModel')->willReturn(null);
-        $this->promptRepository->method('findPromptsWithSelectionRules')->willReturn([]);
-
-        $this->aiFacade->method('embed')->willReturn([
-            'embedding' => array_fill(0, 1024, 0.1),
-            'usage' => ['prompt_tokens' => 10, 'total_tokens' => 10],
-        ]);
-
-        $this->qdrantClient->method('searchSynapseTopics')->willReturn([
-            [
-                'id' => 'synapse_0_general',
-                'score' => 0.90,
-                'payload' => ['topic' => 'general', 'owner_id' => 0],
-            ],
-        ]);
-
-        $this->promptService->method('getPromptWithMetadata')->willReturn([
-            'metadata' => ['tool_internet' => false],
-        ]);
-
-        $result = $this->router->route(['BTEXT' => $text], [], 1);
-
-        $this->assertTrue(
+        $this->assertFalse(
             $result['web_search'],
-            sprintf('German cost/price query "%s" must trigger web search (#974)', $text),
+            'Explicit tool_internet=false must suppress search even on a chat-friendly query',
         );
-    }
-
-    public function testDetectsYearPatternAsWebSearch(): void
-    {
-        $this->modelConfigService->method('getDefaultModel')->willReturn(null);
-        $this->promptRepository->method('findPromptsWithSelectionRules')->willReturn([]);
-
-        $this->aiFacade->method('embed')->willReturn([
-            'embedding' => array_fill(0, 1024, 0.1),
-            'usage' => ['prompt_tokens' => 10, 'total_tokens' => 10],
-        ]);
-
-        $this->qdrantClient->method('searchSynapseTopics')->willReturn([
-            [
-                'id' => 'synapse_0_general',
-                'score' => 0.90,
-                'payload' => ['topic' => 'general', 'owner_id' => 0],
-            ],
-        ]);
-
-        $this->promptService->method('getPromptWithMetadata')->willReturn([
-            'metadata' => ['tool_internet' => false],
-        ]);
-
-        $result = $this->router->route(['BTEXT' => 'Bundeskanzler 2026'], [], 1);
-
-        $this->assertTrue($result['web_search']);
-    }
-
-    /**
-     * Regression test: deictic time markers like "jetzt" (German) and "now"
-     * (English) are extremely common in follow-up messages such as
-     *   - "jetzt ein video davon"
-     *   - "now make it 4K"
-     *   - "jetzt das Gleiche in blau"
-     * and must not trigger a web search.
-     */
-    public function testFollowUpJetztDoesNotTriggerWebSearch(): void
-    {
-        $this->modelConfigService->method('getDefaultModel')->willReturn(null);
-        $this->promptRepository->method('findPromptsWithSelectionRules')->willReturn([]);
-
-        $this->aiFacade->method('embed')->willReturn([
-            'embedding' => array_fill(0, 1024, 0.1),
-            'usage' => ['prompt_tokens' => 10, 'total_tokens' => 10],
-        ]);
-
-        $this->qdrantClient->method('searchSynapseTopics')->willReturn([
-            [
-                'id' => 'synapse_0_general',
-                'score' => 0.90,
-                'payload' => ['topic' => 'general', 'owner_id' => 0],
-            ],
-        ]);
-
-        $this->promptService->method('getPromptWithMetadata')->willReturn([
-            'metadata' => ['tool_internet' => false],
-        ]);
-
-        $resultDe = $this->router->route(['BTEXT' => 'jetzt das gleiche in blau'], [], 1);
-        $this->assertFalse($resultDe['web_search'], '"jetzt" alone must not trigger web search');
-
-        $resultEn = $this->router->route(['BTEXT' => 'now make it 4K'], [], 1);
-        $this->assertFalse($resultEn['web_search'], '"now" alone must not trigger web search');
     }
 
     /**

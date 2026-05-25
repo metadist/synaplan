@@ -142,52 +142,6 @@ final readonly class SynapseRouter
     ];
 
     /**
-     * Keywords that strongly indicate the user needs live/current data.
-     *
-     * Intentionally excludes deictic time markers like "jetzt" / "now" which
-     * are extremely common in follow-up requests ("jetzt das in blau", "jetzt
-     * ein video davon", "now make it 4K") and almost never imply a web search.
-     *
-     * The German cost stem is `kost` (not `kosten`): the bare infinitive
-     * `kosten` does not appear in the most common phrasing "Was kostet …?"
-     * and `str_contains('kostet', 'kosten') === false`. The shorter stem
-     * also catches `kostet`/`gekostet`/`kostete` while leaving compounds
-     * like `unkosten` matched too. See issue #974.
-     */
-    private const WEB_SEARCH_KEYWORDS = [
-        'aktuell', 'current', 'heute', 'today', 'news', 'nachrichten',
-        'wetter', 'weather', 'preis', 'price', 'kost', 'cost', 'wie teuer',
-        'neueste', 'latest', 'kürzlich', 'recently',
-        'live', 'echtzeit', 'realtime', 'real-time',
-        'öffnungszeiten', 'opening hours', 'restaurant', 'geschäft', 'store',
-        'aktienk', 'stock price', 'börse', 'exchange',
-    ];
-
-    /** Year patterns that indicate need for current information */
-    private const YEAR_PATTERN = '/\b(202[4-9]|203\d)\b/';
-
-    /**
-     * Topics where automatic web-search heuristics are nonsensical because
-     * the handler purely generates assets (image/video/audio/document) and
-     * does not consume web context. Web search for these topics is only
-     * activated when a prompt explicitly opts in via `tool_internet`.
-     *
-     * Includes both canonical legacy topics and the granular Synapse-v2
-     * topics, so this stays correct even if `TopicAliasResolver` is bypassed.
-     */
-    private const NON_WEB_SEARCH_TOPICS = [
-        'mediamaker',
-        'image-generation',
-        'video-generation',
-        'audio-generation',
-        'text2pic',
-        'text2vid',
-        'text2sound',
-        'officemaker',
-        'text2doc',
-    ];
-
-    /**
      * Common language-specific words for n-gram-free detection.
      * Ordered by frequency of occurrence in typical messages.
      *
@@ -343,7 +297,10 @@ final readonly class SynapseRouter
                 return [
                     'topic' => $ruleBasedTopic,
                     'language' => $messageData['BLANG'] ?? 'en',
-                    'web_search' => $promptMetadata['tool_internet'] ?? false,
+                    'web_search' => WebSearchTopicPolicy::shouldSearch(
+                        $ruleBasedTopic,
+                        $promptMetadata['tool_internet'] ?? null,
+                    ),
                     'raw_response' => 'Synapse: Rule-based routing',
                     'prompt_metadata' => $promptMetadata,
                     'source' => 'synapse_rule',
@@ -500,18 +457,15 @@ final readonly class SynapseRouter
 
             $promptMetadata = $this->loadPromptMetadata($canonicalTopic, $userId ?? 0);
 
-            // Web-search activation:
-            //   - For pure asset/document generation topics, the heuristic is
-            //     meaningless (the handler does not consume web context). We
-            //     only honor the explicit `tool_internet` opt-in there.
-            //   - For all other topics we run the keyword/year heuristic and
-            //     additionally honor the prompt's `tool_internet` flag.
-            $skipHeuristic = $this->isNonWebSearchTopic($canonicalTopic) || $this->isNonWebSearchTopic($aliasSource ?? '');
-            $webSearch = $skipHeuristic ? false : $this->detectWebSearchIntent($messageText);
-
-            if (!$webSearch && ($promptMetadata['tool_internet'] ?? false)) {
-                $webSearch = true;
-            }
+            // Web-search activation: delegate to the shared policy so the
+            // streaming chat, non-streaming pipeline and embedding router
+            // all share one rule. Defaults to "search unless explicitly
+            // opted out or a non-web-search topic". The granular topic
+            // (`aliasSource`) is also fed through in case it sits on the
+            // NON_WEB_SEARCH list while the canonical topic does not.
+            $promptToolInternet = $promptMetadata['tool_internet'] ?? null;
+            $webSearch = WebSearchTopicPolicy::shouldSearch($canonicalTopic, $promptToolInternet)
+                && !WebSearchTopicPolicy::isNonWebSearchTopic($aliasSource);
 
             $latencyMs = $this->elapsed($startTime);
 
@@ -521,7 +475,7 @@ final readonly class SynapseRouter
                 'score' => round($topScore, 4),
                 'language' => $language,
                 'web_search' => $webSearch,
-                'web_search_heuristic_skipped' => $skipHeuristic,
+                'prompt_tool_internet' => $promptToolInternet,
                 'media_type' => $mediaType,
                 'source' => 'synapse_embedding',
                 'latency_ms' => $latencyMs,
@@ -742,29 +696,6 @@ final readonly class SynapseRouter
         }
 
         return $bestCount >= 2 ? $bestLang : 'en';
-    }
-
-    private function detectWebSearchIntent(string $text): bool
-    {
-        $lower = mb_strtolower($text);
-
-        foreach (self::WEB_SEARCH_KEYWORDS as $keyword) {
-            if (str_contains($lower, $keyword)) {
-                return true;
-            }
-        }
-
-        return 1 === preg_match(self::YEAR_PATTERN, $text);
-    }
-
-    /**
-     * True when the topic is a pure asset/document generation topic where
-     * the web-search heuristic must not run automatically (only explicit
-     * `tool_internet` opt-in is honored).
-     */
-    private function isNonWebSearchTopic(string $topic): bool
-    {
-        return '' !== $topic && in_array($topic, self::NON_WEB_SEARCH_TOPICS, true);
     }
 
     private function detectMediaType(string $text): string
