@@ -441,6 +441,7 @@
             :key="part.partId ?? `${part.type}-${index}`"
             :part="part"
             :is-streaming="isStreaming"
+            :stream-render-generation="streamRenderGeneration"
             :memories="memories"
           />
 
@@ -1001,6 +1002,7 @@ interface Props {
   timestamp: Date
   isSuperseded?: boolean
   isStreaming?: boolean
+  streamRenderGeneration?: number
   provider?: string
   modelLabel?: string
   topic?: string // Topic from message classification

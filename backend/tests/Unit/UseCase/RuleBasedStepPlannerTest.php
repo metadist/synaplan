@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\UseCase;
 
+use App\UseCase\ClassificationStepPlanner;
 use App\UseCase\RuleBasedStepPlanner;
 use App\UseCase\UseCaseMapper;
 use PHPUnit\Framework\TestCase;
@@ -14,7 +15,7 @@ final class RuleBasedStepPlannerTest extends TestCase
 
     protected function setUp(): void
     {
-        $this->planner = new RuleBasedStepPlanner(new UseCaseMapper());
+        $this->planner = new RuleBasedStepPlanner(new ClassificationStepPlanner(new UseCaseMapper()));
     }
 
     public function testDetectsPoemAndReadAloudCompoundPlan(): void

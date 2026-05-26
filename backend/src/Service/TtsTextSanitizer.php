@@ -44,14 +44,17 @@ final readonly class TtsTextSanitizer
         // 8. Remove HTML tags
         $text = strip_tags($text);
 
-        // 9. Remove bullet points and list markers
+        // 9. Remove soft hyphens and zero-width spaces (break TTS engines)
+        $text = str_replace(["\u{00AD}", "\u{200B}", "\u{FEFF}"], '', $text);
+
+        // 10. Remove bullet points and list markers
         $text = preg_replace('/^[\s]*[-*•]\s+/m', '', $text);
         $text = preg_replace('/^[\s]*\d+\.\s+/m', '', $text);
 
-        // 10. Remove horizontal rules
+        // 11. Remove horizontal rules
         $text = preg_replace('/^[-*_]{3,}$/m', '', $text);
 
-        // 11. Collapse whitespace
+        // 12. Collapse whitespace
         $text = preg_replace('/\n{3,}/', "\n\n", $text);
         $text = trim($text);
 

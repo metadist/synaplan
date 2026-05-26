@@ -6,6 +6,7 @@ namespace App\Service\Message;
 
 use App\AI\Service\AiFacade;
 use App\Service\VectorSearch\QdrantClientInterface;
+use App\UseCase\CompoundRoutingCatalog;
 use App\UseCase\UseCaseCatalog;
 use Psr\Log\LoggerInterface;
 
@@ -32,7 +33,7 @@ final readonly class UseCaseIndexer
         $errors = 0;
         $modelInfo = $this->synapseIndexer->getEmbeddingModelInfo();
 
-        foreach (UseCaseCatalog::all() as $entry) {
+        foreach ([...UseCaseCatalog::all(), ...CompoundRoutingCatalog::all()] as $entry) {
             try {
                 $result = $this->indexUseCaseEntry($entry, $force, $modelInfo);
                 if ('indexed' === $result) {
@@ -54,8 +55,9 @@ final readonly class UseCaseIndexer
 
     public function buildEmbeddingText(array $entry): string
     {
+        $isCompound = str_starts_with($entry['id'], 'compound_');
         $parts = [
-            sprintf('Use case: %s', $entry['id']),
+            sprintf('%s: %s', $isCompound ? 'Compound multi-step workflow' : 'Use case', $entry['id']),
             sprintf('Description: %s', $entry['shortDescription']),
         ];
 
@@ -63,11 +65,22 @@ final readonly class UseCaseIndexer
             $parts[] = sprintf('Keywords: %s', $entry['keywords']);
         }
 
+        if (isset($entry['example_queries']) && '' !== trim((string) $entry['example_queries'])) {
+            $parts[] = sprintf("Example user requests:\n%s", $entry['example_queries']);
+        }
+
         return implode("\n", $parts);
     }
 
     /**
-     * @param array{id: string, shortDescription: string, keywords: string}             $entry
+     * @param array{
+     *     id: string,
+     *     shortDescription: string,
+     *     keywords: string,
+     *     primary_use_case_id?: string,
+     *     example_queries?: string,
+     *     routing_steps?: list<array<string, mixed>>,
+     * } $entry
      * @param array{provider: ?string, model: ?string, model_id: ?int, vector_dim: int} $modelInfo
      */
     private function indexUseCaseEntry(array $entry, bool $force, array $modelInfo): string
@@ -100,7 +113,7 @@ final readonly class UseCaseIndexer
                 : array_pad($vector, $vectorDim, 0.0);
         }
 
-        $this->qdrantClient->upsertUseCase($pointId, $vector, [
+        $payload = [
             'use_case_id' => $entry['id'],
             'short_description' => $entry['shortDescription'],
             'keywords' => $entry['keywords'],
@@ -110,7 +123,16 @@ final readonly class UseCaseIndexer
             'vector_dim' => $vectorDim,
             'source_hash' => $sourceHash,
             'indexed_at' => date(\DATE_ATOM),
-        ]);
+        ];
+
+        $routingSteps = $entry['routing_steps'] ?? [];
+        if ([] !== $routingSteps) {
+            $payload['routing_steps'] = $routingSteps;
+            $payload['is_compound'] = true;
+            $payload['primary_use_case_id'] = $entry['primary_use_case_id'] ?? $entry['id'];
+        }
+
+        $this->qdrantClient->upsertUseCase($pointId, $vector, $payload);
 
         return 'indexed';
     }

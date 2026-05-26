@@ -11,6 +11,7 @@ use App\Seed\PromptSeeder;
 use App\Seed\RateLimitConfigSeeder;
 use App\Seed\SeedResult;
 use App\Seed\SubscriptionPlanSeeder;
+use App\Seed\SynapseRoutingConfigSeeder;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputInterface;
@@ -43,6 +44,7 @@ final class SeedAllCommand extends Command
         private readonly RateLimitConfigSeeder $rateLimitConfigSeeder,
         private readonly DemoWidgetConfigSeeder $demoWidgetConfigSeeder,
         private readonly SubscriptionPlanSeeder $subscriptionPlanSeeder,
+        private readonly SynapseRoutingConfigSeeder $synapseRoutingConfigSeeder,
     ) {
         parent::__construct();
     }
@@ -70,6 +72,7 @@ final class SeedAllCommand extends Command
             ['prompts',     fn (): SeedResult => $this->promptSeeder->seed()],
             ['defaults',    fn (): SeedResult => $this->defaultModelConfigSeeder->seed()],
             ['rate-limits', fn (): SeedResult => $this->rateLimitConfigSeeder->seed()],
+            ['synapse-routing', fn (): SeedResult => $this->synapseRoutingConfigSeeder->seed()],
             ['subscriptions', fn (): SeedResult => $this->subscriptionPlanSeeder->seed()],
             ['demo-widget', fn (): SeedResult => $this->demoWidgetConfigSeeder->seed()],
         ];

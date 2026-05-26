@@ -24,6 +24,11 @@ class MediaErrorMessageBuilder
                     $lang,
                 );
             }
+
+            $providerHint = $this->buildProviderFailureHint($e, $mediaType, $lang);
+            if (null !== $providerHint) {
+                return $providerHint;
+            }
         }
 
         return $this->getGenericMediaError($mediaType, $lang);
@@ -108,6 +113,30 @@ class MediaErrorMessageBuilder
             'OTHER' => 'The request was blocked for an unknown reason. '
                 .'Tip: Rephrase your request or try a different model.',
         ];
+    }
+
+    private function buildProviderFailureHint(ProviderException $e, string $mediaType, string $lang): ?string
+    {
+        if ('audio' !== $mediaType) {
+            return null;
+        }
+
+        $message = strtolower($e->getMessage());
+        $provider = strtolower($e->getProviderName());
+
+        if ('piper' !== $provider && !str_contains($message, 'piper')) {
+            return null;
+        }
+
+        if ('de' === $lang) {
+            return 'Der TTS-Dienst (Piper) ist nicht erreichbar. '
+                .'Starte synaplan-tts auf Port 10200 '
+                .'oder wähle unter Einstellungen → Modelle ein anderes Sprachmodell (z. B. OpenAI/Google).';
+        }
+
+        return 'The TTS service (Piper) is unreachable. '
+            .'Start synaplan-tts on port 10200 '
+            .'or pick another speech model under Settings → Models (e.g. OpenAI/Google).';
     }
 
     private function getGenericMediaError(string $mediaType, string $lang): string

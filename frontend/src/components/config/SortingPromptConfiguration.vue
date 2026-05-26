@@ -1089,6 +1089,11 @@ const dryRunPreview = computed(() => {
     webSearch: testResult.value.web_search,
     mediaType: testResult.value.media_type ?? null,
     intent: testResult.value.intent,
+    steps: testResult.value.steps?.map((step) => ({
+      id: step.id,
+      capability: step.capability as Capability,
+      label_key: step.label_key,
+    })),
   })
   const apiUseCaseId = testResult.value.primary_use_case_id
   if (apiUseCaseId) {

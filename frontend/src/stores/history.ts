@@ -78,6 +78,7 @@ export interface Message {
   timestamp: Date
   isSuperseded?: boolean
   isStreaming?: boolean
+  streamRenderGeneration?: number
   truncated?: boolean
   provider?: string
   modelLabel?: string

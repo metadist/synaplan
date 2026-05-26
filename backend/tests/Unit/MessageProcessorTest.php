@@ -52,7 +52,7 @@ class MessageProcessorTest extends TestCase
             $this->preProcessor,
             $this->classifier,
             $this->router,
-            new RuleBasedStepPlanner(new \App\UseCase\UseCaseMapper()),
+            new RuleBasedStepPlanner(new \App\UseCase\ClassificationStepPlanner(new \App\UseCase\UseCaseMapper())),
             new StepOrchestrator($this->router, $this->createMock(\App\Repository\ConfigRepository::class), $this->logger),
             $this->modelConfigService,
             $this->promptService,

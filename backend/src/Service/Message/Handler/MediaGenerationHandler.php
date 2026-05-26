@@ -13,6 +13,7 @@ use App\Service\Message\MediaPromptExtractor;
 use App\Service\ModelConfigService;
 use App\Service\PerfPipelineFlag;
 use App\Service\RateLimitService;
+use App\Service\TtsTextSanitizer;
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\DependencyInjection\Attribute\AutoconfigureTag;
@@ -140,6 +141,9 @@ final readonly class MediaGenerationHandler implements MessageHandlerInterface
         }
 
         if ('' === $prompt) {
+            if (!empty($options['orchestrator_media_step'])) {
+                throw new \RuntimeException('Orchestrated media step has no text input from prior step');
+            }
             $prompt = $message->getText();
         }
 
@@ -262,8 +266,11 @@ final readonly class MediaGenerationHandler implements MessageHandlerInterface
             ]);
         }
 
-        // Fallback to OpenAI DALL-E if no model configured
+        // Fallback to OpenAI DALL-E if no image model configured (never for TTS)
         if (!$provider) {
+            if ('audio' === $mediaType) {
+                throw new \RuntimeException('No TEXT2SOUND model configured');
+            }
             $provider = 'openai';
             $modelName = 'dall-e-3';
             $this->logger->warning('MediaGenerationHandler: No model configured, using DALL-E fallback');
@@ -357,15 +364,21 @@ final readonly class MediaGenerationHandler implements MessageHandlerInterface
 
                 $media = $result['videos'] ?? [];
             } elseif ('audio' === $mediaType) {
+                $ttsPrompt = TtsTextSanitizer::sanitize($prompt);
+                if ('' === trim($ttsPrompt)) {
+                    throw new \RuntimeException('No speakable text available for TTS');
+                }
+
                 // Generate audio using TTS
                 $this->logger->info('MediaGenerationHandler: Starting TTS generation', [
                     'provider' => $provider,
                     'model' => $modelName,
-                    'text_length' => strlen($prompt),
+                    'text_length' => strlen($ttsPrompt),
+                    'orchestrator_step' => !empty($options['orchestrator_media_step']),
                 ]);
 
                 $result = $this->aiFacade->synthesize(
-                    $prompt,
+                    $ttsPrompt,
                     $message->getUserId(),
                     [
                         'provider' => $provider,
@@ -387,9 +400,14 @@ final readonly class MediaGenerationHandler implements MessageHandlerInterface
                 // Build display URL for StaticUploadController
                 $displayUrl = '/api/v1/files/uploads/'.$relativePath;
 
-                // Stream response
-                $responseText = "Generated audio: {$prompt}";
-                $streamCallback($responseText);
+                // Stream response (skip caption text in orchestrated multi-step — file SSE is enough)
+                $isOrchestratorMediaStep = !empty($options['orchestrator_media_step'])
+                    || !empty($classification['orchestrator_step_id']);
+
+                if (!$isOrchestratorMediaStep) {
+                    $responseText = "Generated audio: {$prompt}";
+                    $streamCallback($responseText);
+                }
 
                 $this->notify($progressCallback, 'generating', 'Audio generated successfully.');
 
@@ -399,10 +417,10 @@ final readonly class MediaGenerationHandler implements MessageHandlerInterface
                         'model' => $result['model'] ?? $modelName,
                         'model_id' => $modelId,
                         'local_path' => $relativePath,
-                        'media_prompt' => $prompt,
+                        'media_prompt' => $ttsPrompt,
                         'media_type' => $mediaType,
                         'media_usage' => [
-                            'characters' => $result['text_length'] ?? mb_strlen($prompt),
+                            'characters' => $result['text_length'] ?? mb_strlen($ttsPrompt),
                         ],
                         'file' => [
                             'path' => $displayUrl,
@@ -507,12 +525,15 @@ final readonly class MediaGenerationHandler implements MessageHandlerInterface
                 }
             }
 
-            // Stream response with revised prompt
+            // Stream response with revised prompt (skip caption text in orchestrated multi-step — file SSE is enough)
             $revisedPrompt = $media[0]['revised_prompt'] ?? $prompt;
-            $responseText = "Generated {$mediaType}: {$revisedPrompt}";
+            $isOrchestratorMediaStep = !empty($options['orchestrator_media_step'])
+                || !empty($classification['orchestrator_step_id']);
 
-            // Stream the response
-            $streamCallback($responseText);
+            if (!$isOrchestratorMediaStep) {
+                $responseText = "Generated {$mediaType}: {$revisedPrompt}";
+                $streamCallback($responseText);
+            }
 
             $this->notify($progressCallback, 'generating', ucfirst($mediaType).' generated successfully.');
 

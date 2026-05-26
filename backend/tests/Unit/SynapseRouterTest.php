@@ -895,4 +895,66 @@ class SynapseRouterTest extends TestCase
         $this->assertNull($result['sorting_provider']);
         $this->assertNull($result['sorting_model_name']);
     }
+
+    public function testCompoundUseCaseRouteAttachesStepsWithoutSingleUseCaseToggle(): void
+    {
+        $configRepository = $this->createMock(ConfigRepository::class);
+        $configRepository->method('getValue')->willReturnCallback(
+            static fn (int $ownerId, string $group, string $setting): ?string => 'USE_CASE_ROUTING_ENABLED' === $setting ? 'false' : null,
+        );
+
+        $router = new SynapseRouter(
+            $this->qdrantClient,
+            $this->aiFacade,
+            $this->messageSorter,
+            $this->promptService,
+            $this->promptRepository,
+            $this->modelConfigService,
+            $configRepository,
+            new TopicAliasResolver(),
+            new UseCaseMapper(),
+            $this->createMock(LoggerInterface::class),
+        );
+
+        $this->modelConfigService->method('getDefaultModel')->willReturn(null);
+        $this->promptRepository->method('findPromptsWithSelectionRules')->willReturn([]);
+        $this->promptService->method('getPromptWithMetadata')->willReturn([
+            'metadata' => ['tool_internet' => false],
+        ]);
+
+        $this->aiFacade->method('embed')->willReturn([
+            'embedding' => array_fill(0, 1024, 0.1),
+            'usage' => ['prompt_tokens' => 10, 'total_tokens' => 10],
+        ]);
+
+        $this->qdrantClient->method('searchUseCases')->willReturn([
+            [
+                'score' => 0.58,
+                'payload' => [
+                    'use_case_id' => 'compound_write_read_aloud',
+                    'is_compound' => true,
+                    'primary_use_case_id' => 'text_chat',
+                    'routing_steps' => [
+                        ['id' => 'write', 'capability' => 'CHAT', 'label_key' => 'config.routing.steps.chat'],
+                        [
+                            'id' => 'speak',
+                            'capability' => 'TEXT2SOUND',
+                            'label_key' => 'config.routing.steps.readAloud',
+                            'input_from' => 'steps.write.output.text',
+                        ],
+                    ],
+                ],
+            ],
+        ]);
+
+        $this->qdrantClient->expects($this->never())->method('searchSynapseTopics');
+        $this->messageSorter->expects($this->never())->method('classify');
+
+        $result = $router->route(['BTEXT' => 'Write a poem and read it aloud'], [], 1);
+
+        $this->assertSame('synapse_use_case_compound', $result['source']);
+        $this->assertSame('text_chat', $result['primary_use_case_id']);
+        $this->assertCount(2, $result['steps']);
+        $this->assertSame('TEXT2SOUND', $result['steps'][1]['capability']);
+    }
 }

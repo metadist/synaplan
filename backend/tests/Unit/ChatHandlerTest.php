@@ -876,4 +876,34 @@ class ChatHandlerTest extends TestCase
 
         $this->handler->dispatchPendingMemoryExtraction($command);
     }
+
+    public function testStepPromptTextStillIncludesWebSearchResults(): void
+    {
+        $message = (new Message())
+            ->setUserId(1)
+            ->setTrackingId(42)
+            ->setText('Preis und Bild');
+
+        $method = new \ReflectionMethod(ChatHandler::class, 'buildCurrentMessageContent');
+        $method->setAccessible(true);
+
+        $content = $method->invoke($this->handler, $message, false, [
+            'step_prompt_text' => 'Nur die Recherche beantworten.',
+            'search_results' => [
+                'query' => 'Pferdefleisch Preis Deutschland',
+                'results' => [
+                    [
+                        'title' => 'Pferdefleisch Shop',
+                        'url' => 'https://example.com/pferd',
+                        'description' => '6,29 EUR pro kg',
+                    ],
+                ],
+            ],
+        ]);
+
+        $this->assertIsString($content);
+        $this->assertStringContainsString('Nur die Recherche beantworten.', $content);
+        $this->assertStringContainsString('Web Search Results', $content);
+        $this->assertStringContainsString('Pferdefleisch Shop', $content);
+    }
 }

@@ -64,10 +64,6 @@ final readonly class StepOrchestrator
         foreach ($plan->steps as $index => $step) {
             $stepNumber = $index + 1;
 
-            if ($index > 0 && $this->isMediaCapability($step->capability)) {
-                $this->streamCompoundMediaTransition($streamCallback, $classification, $step->capability);
-            }
-
             $this->notify($statusCallback, 'step_started', 'Step started', [
                 'step_id' => $step->id,
                 'step_index' => $index,
@@ -79,7 +75,7 @@ final readonly class StepOrchestrator
 
             try {
                 $stepClassification = $this->buildStepClassification($message, $classification, $step);
-                $stepOptions = $this->buildStepOptions($options, $step, $stepOutputs, $message);
+                $stepOptions = $this->buildStepOptions($options, $step, $stepOutputs, $message, $plan, $index, $classification);
 
                 $accumulatedText = '';
                 $wrappedStream = function ($chunk) use ($streamCallback, &$accumulatedText): void {
@@ -109,8 +105,13 @@ final readonly class StepOrchestrator
                     $stepOptions,
                 );
 
+                $stepText = trim($accumulatedText);
+                if ('' === $stepText) {
+                    $stepText = trim((string) ($lastResult['metadata']['response_text'] ?? ''));
+                }
+
                 $stepOutputs[$step->id] = [
-                    'text' => trim($accumulatedText),
+                    'text' => $stepText,
                     'metadata' => $lastResult['metadata'] ?? [],
                 ];
 
@@ -122,6 +123,7 @@ final readonly class StepOrchestrator
                     'step_number' => $stepNumber,
                     'step_total' => $totalSteps,
                     'label_key' => $step->labelKey,
+                    'capability' => $step->capability,
                 ]);
             } catch (\Throwable $e) {
                 $this->logger->error('StepOrchestrator: Step failed', [
@@ -193,10 +195,12 @@ final readonly class StepOrchestrator
         if (null !== $mediaType) {
             $stepClassification['media_type'] = $mediaType;
             $stepClassification['topic'] = 'mediamaker';
+            unset($stepClassification['model_id'], $stepClassification['override_model_id']);
         } elseif ('file_analysis' === $intent) {
             $stepClassification['topic'] = 'analyzefile';
         } elseif ('chat' === $intent) {
-            $stepClassification['topic'] = 'general-chat';
+            $stepClassification['topic'] = 'general';
+            $stepClassification['granular_topic'] = 'general-chat';
             unset($stepClassification['media_type']);
         } else {
             $stepClassification['topic'] = $classification['topic'] ?? 'general';
@@ -219,9 +223,14 @@ final readonly class StepOrchestrator
         PlannedStep $step,
         array $stepOutputs,
         Message $message,
+        StepPlan $plan,
+        int $stepIndex,
+        array $classification,
     ): array {
         $stepOptions = $options;
-        unset($stepOptions['resolved_prompt_data']);
+        if ('CHAT' !== $step->capability) {
+            unset($stepOptions['resolved_prompt_data']);
+        }
 
         if (null !== $step->inputFrom && '' !== $step->inputFrom) {
             $resolved = $this->resolveStepInput($step->inputFrom, $stepOutputs);
@@ -248,7 +257,25 @@ final readonly class StepOrchestrator
             }
         }
 
-        if ('generate' === $step->id && $this->isMediaCapability($step->capability)) {
+        $nextStep = $plan->steps[$stepIndex + 1] ?? null;
+        if ('CHAT' === $step->capability && null !== $nextStep && $this->isVisualMediaCapability($nextStep->capability)) {
+            $stepOptions['orchestrator_pending_media'] = true;
+        }
+
+        if ('TEXT2SOUND' === $step->capability && null !== $step->inputFrom && empty($stepOptions['step_prompt_text'])) {
+            $this->logger->warning('StepOrchestrator: TTS step missing text from prior step', [
+                'step_id' => $step->id,
+                'input_from' => $step->inputFrom,
+            ]);
+        }
+
+        $stepNeedsSearch = $step->webSearch
+            || ('CHAT' === $step->capability && filter_var($classification['web_search'] ?? false, FILTER_VALIDATE_BOOLEAN));
+
+        if ($this->isMediaCapability($step->capability)) {
+            unset($stepOptions['search_results']);
+            $stepOptions['orchestrator_media_step'] = true;
+        } elseif ('CHAT' === $step->capability && !$stepNeedsSearch) {
             unset($stepOptions['search_results']);
         }
 
@@ -260,24 +287,9 @@ final readonly class StepOrchestrator
         return in_array($capability, ['TEXT2PIC', 'TEXT2VID', 'TEXT2SOUND'], true);
     }
 
-    private function streamCompoundMediaTransition(callable $streamCallback, array $classification, string $capability): void
+    private function isVisualMediaCapability(string $capability): bool
     {
-        $lang = (string) ($classification['language'] ?? 'en');
-        $isGerman = str_starts_with(strtolower($lang), 'de');
-
-        $message = match ($capability) {
-            'TEXT2VID' => $isGerman
-                ? "\n\nEinen Moment, ich generiere das Video …\n\n"
-                : "\n\nOne moment, generating the video …\n\n",
-            'TEXT2SOUND' => $isGerman
-                ? "\n\nEinen Moment, ich erstelle die Audioausgabe …\n\n"
-                : "\n\nOne moment, generating the audio …\n\n",
-            default => $isGerman
-                ? "\n\nEinen Moment, ich generiere das Bild …\n\n"
-                : "\n\nOne moment, generating the image …\n\n",
-        };
-
-        $streamCallback($message);
+        return in_array($capability, ['TEXT2PIC', 'TEXT2VID'], true);
     }
 
     /**

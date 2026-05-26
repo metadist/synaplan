@@ -15,12 +15,28 @@ describe('routingDryRunPreview', () => {
     expect(canonicalToEditableRoutingTopic('mediamaker')).toBe('image-generation')
   })
 
-  it('detects poem + read aloud as compound steps', () => {
-    const preview = buildDryRunPreview('Write a poem and read it aloud', 'general-chat', 'general')
+  it('detects poem + read aloud from sorter steps', () => {
+    const preview = buildDryRunPreview('Write a poem and read it aloud', 'general-chat', 'general', {
+      steps: [
+        { id: 'write', capability: 'CHAT' },
+        { id: 'speak', capability: 'TEXT2SOUND' },
+      ],
+    })
     expect(preview.isCompound).toBe(true)
     expect(preview.steps).toHaveLength(2)
     expect(preview.steps[0].capability).toBe('CHAT')
     expect(preview.steps[1].capability).toBe('TEXT2SOUND')
+  })
+
+  it('builds preview from sorter BSTEPS array', () => {
+    const preview = buildDryRunPreview('any query', 'general-chat', null, {
+      steps: [
+        { id: 'answer', capability: 'CHAT' },
+        { id: 'generate', capability: 'TEXT2PIC' },
+      ],
+    })
+    expect(preview.isCompound).toBe(true)
+    expect(preview.steps).toHaveLength(2)
   })
 
   it('detects answer + generate image from sorter classification', () => {
@@ -41,11 +57,12 @@ describe('routingDryRunPreview', () => {
     expect(preview.steps[1].capability).toBe('TEXT2PIC')
   })
 
-  it('uses video capability for video generation topic', () => {
+  it('uses video capability when classification media type is video', () => {
     const preview = buildDryRunPreview(
       'Create a short video clip',
       'video-generation',
-      'mediamaker'
+      'mediamaker',
+      { mediaType: 'video' }
     )
     expect(preview.useCaseId).toBe('media_generation')
     expect(preview.steps[0].capability).toBe('TEXT2VID')

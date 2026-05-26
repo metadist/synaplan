@@ -25,7 +25,21 @@ final readonly class StepPlan
     }
 
     /**
-     * @return array{primary_use_case_id: string, is_compound: bool, steps: list<array<string, string>>}
+     * Compound plan whose first step is CHAT with live web data (research + media, etc.).
+     */
+    public function compoundStartsWithWebSearch(): bool
+    {
+        if (!$this->isCompound || [] === $this->steps) {
+            return false;
+        }
+
+        $first = $this->steps[0];
+
+        return 'CHAT' === $first->capability && $first->webSearch;
+    }
+
+    /**
+     * @return array{primary_use_case_id: string, is_compound: bool, steps: list<array{id: string, label_key: string, capability: string, input_from?: string, web_search?: bool}>}
      */
     public function toArray(): array
     {

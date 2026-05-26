@@ -783,6 +783,10 @@ final readonly class ChatHandler implements MessageHandlerInterface
             };
         }
 
+        if (!empty($options['orchestrator_pending_media'])) {
+            $systemPrompt .= "\n\n**MULTI-STEP — TEXT ONLY (step 1 of 2):** Answer only the factual or research question; ignore any image/video/audio request in the user message (a separate step handles media). Web search results are appended below — use them directly; do NOT say you will search. Do NOT mention or preview images. When using markdown tables, put a blank line before the table. A separate system step generates media after your reply.";
+        }
+
         // Check if model supports system messages (o1 models don't)
         if ($modelId) {
             $model = $this->modelRepository->find($modelId);
@@ -955,6 +959,7 @@ final readonly class ChatHandler implements MessageHandlerInterface
                 'model_id' => $modelId,
                 'usage' => $metadata['usage'] ?? [],
                 'response_id' => $metadata['response_id'] ?? null,
+                'response_text' => $fullResponseText,
                 'memories' => $loadedMemories,
                 'feedbacks' => $loadedFeedbacks,
                 'extraction_payload' => $deferExtraction ? $extractionPayload : null,
@@ -1111,31 +1116,31 @@ final readonly class ChatHandler implements MessageHandlerInterface
     private function buildCurrentMessageContent(Message $currentMessage, bool $includeImages, array $options = []): string|array
     {
         if (!empty($options['step_prompt_text']) && is_string($options['step_prompt_text'])) {
-            return $options['step_prompt_text'];
-        }
+            $content = $options['step_prompt_text'];
+        } else {
+            $content = $currentMessage->getText();
+            $allFilesText = $currentMessage->getAllFilesText();
 
-        $content = $currentMessage->getText();
-        $allFilesText = $currentMessage->getAllFilesText();
+            $this->logger->debug('ChatHandler: File text debug', [
+                'message_id' => $currentMessage->getId(),
+                'has_legacy_file' => $currentMessage->getFile() > 0,
+                'legacy_file_text_length' => strlen($currentMessage->getFileText() ?? ''),
+                'files_collection_count' => $currentMessage->getFiles()->count(),
+                'all_files_text_length' => strlen($allFilesText),
+            ]);
 
-        $this->logger->debug('ChatHandler: File text debug', [
-            'message_id' => $currentMessage->getId(),
-            'has_legacy_file' => $currentMessage->getFile() > 0,
-            'legacy_file_text_length' => strlen($currentMessage->getFileText() ?? ''),
-            'files_collection_count' => $currentMessage->getFiles()->count(),
-            'all_files_text_length' => strlen($allFilesText),
-        ]);
+            if (!empty($allFilesText)) {
+                $fileInfo = '';
+                if ($currentMessage->getFiles()->count() > 0) {
+                    $fileInfo = $currentMessage->getFiles()->count().' file(s)';
+                } elseif ($currentMessage->getFileType()) {
+                    $fileInfo = $currentMessage->getFileType().' file';
+                }
 
-        if (!empty($allFilesText)) {
-            $fileInfo = '';
-            if ($currentMessage->getFiles()->count() > 0) {
-                $fileInfo = $currentMessage->getFiles()->count().' file(s)';
-            } elseif ($currentMessage->getFileType()) {
-                $fileInfo = $currentMessage->getFileType().' file';
+                $content .= "\n\n\n---\n\n\nUser provided $fileInfo:\n\n".
+                           substr($allFilesText, 0, 10000).
+                           "\n\n";
             }
-
-            $content .= "\n\n\n---\n\n\nUser provided $fileInfo:\n\n".
-                       substr($allFilesText, 0, 10000).
-                       "\n\n";
         }
 
         if (isset($options['search_results']) && !empty($options['search_results']['results'])) {

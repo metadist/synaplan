@@ -80,6 +80,11 @@ export function pushMediaPart(
   url: string,
   options: PushMediaPartOptions = {}
 ): Part {
+  const existing = message.parts.find((p) => p.type === type && p.url === url)
+  if (existing) {
+    return existing
+  }
+
   const part: Part = {
     partId: options.partId ?? generatePartId(),
     type,

@@ -283,6 +283,11 @@ final readonly class MessageClassifier
             $classification['resolution'] = $resolution;
         }
 
+        $steps = $result['steps'] ?? null;
+        if (is_array($steps) && [] !== $steps) {
+            $classification['steps'] = $steps;
+        }
+
         return $classification;
     }
 

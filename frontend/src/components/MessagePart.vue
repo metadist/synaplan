@@ -23,6 +23,7 @@ import MessageTtsLoading from './MessageTtsLoading.vue'
 interface Props {
   part: Part
   isStreaming?: boolean
+  streamRenderGeneration?: number
   memories?: UserMemory[] | null // Full memory objects (resolved from IDs)
 }
 
@@ -67,6 +68,7 @@ const componentProps = computed(() => {
       return {
         content: props.part.content || '',
         isStreaming: props.isStreaming,
+        streamRenderGeneration: props.streamRenderGeneration,
         memories: props.memories,
       }
     case 'image':

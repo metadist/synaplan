@@ -287,6 +287,22 @@ final readonly class MessageProcessor
             $perfTimer->stop('prompt');
             $promptMetadata = $promptData['metadata'] ?? [];
 
+            // Build step plan early so compound flows can use a chat-focused prompt
+            // and a research-only search query before web search runs.
+            $stepPlan = $this->stepPlanner->plan($message->getText(), $classification);
+            $classification['step_plan'] = $stepPlan->toArray();
+
+            if ($stepPlan->isCompound) {
+                $chatPromptData = $this->promptService->getPromptForClassification(
+                    $this->chatClassificationForCompound($classification),
+                    $message->getUserId(),
+                );
+                if (null !== $chatPromptData) {
+                    $promptData = $chatPromptData;
+                    $promptMetadata = $chatPromptData['metadata'] ?? [];
+                }
+            }
+
             // Stash the resolved prompt bundle in options so ChatHandler can reuse it
             // without redoing the DB lookup + deserialize. See Phase 1b in the plan.
             if (null !== $promptData) {
@@ -327,10 +343,15 @@ final readonly class MessageProcessor
                 try {
                     // Generate optimized search query using AI
                     $perfTimer->start('search_query');
-                    $searchQuery = $this->searchQueryGenerator->generate(
-                        $message->getText(),
-                        $message->getUserId()
-                    );
+                    $searchQuery = $stepPlan->compoundStartsWithWebSearch()
+                        ? $this->searchQueryGenerator->generateResearchOnly(
+                            $message->getText(),
+                            $message->getUserId(),
+                        )
+                        : $this->searchQueryGenerator->generate(
+                            $message->getText(),
+                            $message->getUserId(),
+                        );
                     $perfTimer->stop('search_query');
 
                     // Get language from classification (e.g., "de", "en", "fr")
@@ -418,8 +439,7 @@ final readonly class MessageProcessor
             }
 
             $response = null;
-            $plan = $this->stepPlanner->plan($message->getText(), $classification);
-            $classification['step_plan'] = $plan->toArray();
+            $plan = $stepPlan;
 
             $shouldRunMultiStep = $plan->isMultiStep()
                 && ($this->stepOrchestrator->isEnabled() || $plan->isCompound);
@@ -936,6 +956,25 @@ final readonly class MessageProcessor
             'message' => $message,
             'metadata' => $metadata,
         ]);
+    }
+
+    /**
+     * Classification shape for loading the chat prompt in compound plans
+     * (research answer first, media generation in a later step).
+     *
+     * @param array<string, mixed> $classification
+     *
+     * @return array<string, mixed>
+     */
+    private function chatClassificationForCompound(array $classification): array
+    {
+        $chatClassification = $classification;
+        $chatClassification['topic'] = 'general';
+        $chatClassification['granular_topic'] = 'general-chat';
+        $chatClassification['intent'] = 'chat';
+        unset($chatClassification['media_type']);
+
+        return $chatClassification;
     }
 
     private function mapTopicToIntentForAgain(string $topic): string

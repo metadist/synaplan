@@ -10,6 +10,7 @@ use App\Repository\PromptRepository;
 use App\Service\ModelConfigService;
 use App\Service\PromptService;
 use App\Service\VectorSearch\QdrantClientInterface;
+use App\UseCase\CompoundRoutingCatalog;
 use App\UseCase\UseCaseMapper;
 use Psr\Log\LoggerInterface;
 
@@ -35,6 +36,8 @@ final readonly class SynapseRouter
      * Tier-1 while ambiguous matches still fall back to the AI sorter.
      */
     private const DEFAULT_CONFIDENCE_THRESHOLD = 0.62;
+    /** Lower bar for indexed compound scenarios — phrasing varies more than single intents. */
+    private const DEFAULT_COMPOUND_CONFIDENCE_THRESHOLD = 0.55;
     private const STICKY_THRESHOLD = 0.32;
     /**
      * Fallback target dimension used only when the bound SYNAPSE_VECTORIZE
@@ -227,9 +230,17 @@ final readonly class SynapseRouter
      *     query: string,
      *     model: array{provider: ?string, model: ?string, model_id: ?int},
      *     candidates: list<array{topic: string, score: float, payload: array, stale: bool, alias_target: ?string}>,
-     *     use_case_candidates?: list<array{use_case_id: string, score: float, payload: array, stale: bool}>,
+     *     use_case_candidates?: list<array{
+     *         use_case_id: string,
+     *         score: float,
+     *         payload: array,
+     *         stale: bool,
+     *         is_compound?: bool,
+     *         routing_steps?: list<array<string, mixed>>,
+     *     }>,
      *     use_case_routing_enabled?: bool,
      *     primary_use_case_id: ?string,
+     *     plan_classification?: array<string, mixed>,
      *     latency_ms: float,
      *     error: ?string,
      * }
@@ -266,27 +277,27 @@ final readonly class SynapseRouter
 
             $vector = $this->normalizeVector($vector, $modelInfo['vector_dim']);
 
-            if ($this->isUseCaseRoutingEnabled()) {
-                $useCaseHits = $this->qdrantClient->searchUseCases(
-                    $vector,
-                    $limit,
-                    self::MIN_SCORE,
-                );
-                $currentModelId = $modelInfo['model_id'];
-                foreach ($useCaseHits as $hit) {
-                    if ($this->isStaleEntry($hit['payload'], $currentModelId)) {
-                        continue;
-                    }
-                    $base['use_case_candidates'][] = [
-                        'use_case_id' => (string) ($hit['payload']['use_case_id'] ?? ''),
-                        'score' => (float) $hit['score'],
-                        'payload' => $hit['payload'],
-                        'stale' => false,
-                    ];
+            $useCaseHits = $this->qdrantClient->searchUseCases(
+                $vector,
+                $limit,
+                self::MIN_SCORE,
+            );
+            $currentModelId = $modelInfo['model_id'];
+            foreach ($useCaseHits as $hit) {
+                if ($this->isStaleEntry($hit['payload'], $currentModelId)) {
+                    continue;
                 }
-                if ([] !== $base['use_case_candidates']) {
-                    $base['primary_use_case_id'] = $base['use_case_candidates'][0]['use_case_id'];
-                }
+                $base['use_case_candidates'][] = [
+                    'use_case_id' => (string) ($hit['payload']['use_case_id'] ?? ''),
+                    'score' => (float) $hit['score'],
+                    'payload' => $hit['payload'],
+                    'stale' => false,
+                    'is_compound' => $this->isCompoundUseCasePayload($hit['payload']),
+                    'routing_steps' => $this->parseRoutingSteps($hit['payload']),
+                ];
+            }
+            if ([] !== $base['use_case_candidates']) {
+                $base['primary_use_case_id'] = $base['use_case_candidates'][0]['use_case_id'];
             }
 
             $hits = $this->qdrantClient->searchSynapseTopics(
@@ -319,6 +330,13 @@ final readonly class SynapseRouter
                     $top['alias_target'],
                 );
             }
+
+            $base['plan_classification'] = $this->buildDryRunPlanClassification(
+                $messageText,
+                $base['use_case_candidates'],
+                $candidates,
+                $userId,
+            );
 
             return [
                 'query' => $messageText,
@@ -583,7 +601,7 @@ final readonly class SynapseRouter
             // Model badge only ever appeared after a page refresh once the
             // backend was patched to also surface this from a different
             // code path — see issue #603.
-            return $this->useCaseMapper->attachPrimaryUseCaseId([
+            return $this->enrichWithCompoundSteps($this->useCaseMapper->attachPrimaryUseCaseId([
                 'topic' => $canonicalTopic,
                 'granular_topic' => $aliasSource,
                 'language' => $language,
@@ -597,7 +615,7 @@ final readonly class SynapseRouter
                 'sorting_model_id' => $currentModelInfo['model_id'],
                 'sorting_provider' => $currentModelInfo['provider'],
                 'sorting_model_name' => $currentModelInfo['model'],
-            ]);
+            ]), $messageText);
         } catch (\Throwable $e) {
             $this->logger->error('SynapseRouter: Embedding/search failed, falling back to AI', [
                 'error' => $e->getMessage(),
@@ -673,10 +691,6 @@ final readonly class SynapseRouter
         array $currentModelInfo,
         float $startTime,
     ): ?array {
-        if (!$this->isUseCaseRoutingEnabled()) {
-            return null;
-        }
-
         $hits = $this->qdrantClient->searchUseCases(
             $queryVector,
             self::SEARCH_LIMIT,
@@ -695,15 +709,173 @@ final readonly class SynapseRouter
             return null;
         }
 
-        $topHit = $freshHits[0];
-        $topScore = (float) $topHit['score'];
-        $useCaseId = (string) ($topHit['payload']['use_case_id'] ?? '');
+        $compoundHit = $this->pickBestCompoundHit($freshHits);
+        if (null !== $compoundHit) {
+            $compoundScore = (float) $compoundHit['score'];
+            if ($compoundScore >= $this->getCompoundConfidenceThreshold()) {
+                return $this->buildClassificationFromUseCaseHit(
+                    $compoundHit,
+                    $messageText,
+                    $messageData,
+                    $userId,
+                    $currentModelInfo,
+                    $startTime,
+                    'synapse_use_case_compound',
+                );
+            }
+        }
+
+        if (!$this->isUseCaseRoutingEnabled()) {
+            return null;
+        }
+
+        $singleHit = $this->pickBestSingleUseCaseHit($freshHits);
+        if (null === $singleHit) {
+            return null;
+        }
+
+        $topScore = (float) $singleHit['score'];
+        $useCaseId = (string) ($singleHit['payload']['use_case_id'] ?? '');
         if ('' === $useCaseId || $topScore < $this->getConfidenceThreshold()) {
             return null;
         }
 
-        $mediaType = 'media_generation' === $useCaseId ? $this->detectMediaType($messageText) : null;
-        $legacyTopic = $this->useCaseMapper->useCaseToLegacyTopic($useCaseId, $mediaType);
+        return $this->buildClassificationFromUseCaseHit(
+            $singleHit,
+            $messageText,
+            $messageData,
+            $userId,
+            $currentModelInfo,
+            $startTime,
+            'synapse_use_case',
+        );
+    }
+
+    /**
+     * @param array<string, mixed> $payload
+     */
+    private function isCompoundUseCasePayload(array $payload): bool
+    {
+        if (filter_var($payload['is_compound'] ?? false, FILTER_VALIDATE_BOOLEAN)) {
+            return true;
+        }
+
+        $useCaseId = (string) ($payload['use_case_id'] ?? '');
+
+        return str_starts_with($useCaseId, 'compound_') || [] !== $this->parseRoutingSteps($payload);
+    }
+
+    /**
+     * @param array<string, mixed> $payload
+     *
+     * @return list<array<string, mixed>>
+     */
+    private function parseRoutingSteps(array $payload): array
+    {
+        $raw = $payload['routing_steps'] ?? null;
+        if (!is_array($raw) || [] === $raw) {
+            $useCaseId = (string) ($payload['use_case_id'] ?? '');
+            if ('' !== $useCaseId) {
+                return CompoundRoutingCatalog::routingStepsFor($useCaseId);
+            }
+
+            return [];
+        }
+
+        $steps = [];
+        foreach ($raw as $step) {
+            if (!is_array($step)) {
+                continue;
+            }
+            $id = isset($step['id']) ? (string) $step['id'] : '';
+            $capability = isset($step['capability']) ? strtoupper((string) $step['capability']) : '';
+            if ('' === $id || '' === $capability) {
+                continue;
+            }
+            $normalized = [
+                'id' => $id,
+                'capability' => $capability,
+            ];
+            if (isset($step['label_key']) && is_string($step['label_key'])) {
+                $normalized['label_key'] = $step['label_key'];
+            }
+            if (filter_var($step['web_search'] ?? false, FILTER_VALIDATE_BOOLEAN)) {
+                $normalized['web_search'] = true;
+            }
+            if (isset($step['input_from']) && is_string($step['input_from'])) {
+                $normalized['input_from'] = $step['input_from'];
+            }
+            $steps[] = $normalized;
+        }
+
+        return $steps;
+    }
+
+    /**
+     * @param list<array{score: float, payload: array<string, mixed>}> $hits
+     *
+     * @return array{score: float, payload: array<string, mixed>}|null
+     */
+    private function pickBestCompoundHit(array $hits): ?array
+    {
+        $best = null;
+        foreach ($hits as $hit) {
+            if (!$this->isCompoundUseCasePayload($hit['payload'])) {
+                continue;
+            }
+            if (null === $best || $hit['score'] > $best['score']) {
+                $best = $hit;
+            }
+        }
+
+        return $best;
+    }
+
+    /**
+     * @param list<array{score: float, payload: array<string, mixed>}> $hits
+     *
+     * @return array{score: float, payload: array<string, mixed>}|null
+     */
+    private function pickBestSingleUseCaseHit(array $hits): ?array
+    {
+        $best = null;
+        foreach ($hits as $hit) {
+            if ($this->isCompoundUseCasePayload($hit['payload'])) {
+                continue;
+            }
+            if (null === $best || $hit['score'] > $best['score']) {
+                $best = $hit;
+            }
+        }
+
+        return $best;
+    }
+
+    /**
+     * @param array{score: float, payload: array<string, mixed>} $hit
+     *
+     * @return array<string, mixed>
+     */
+    private function buildClassificationFromUseCaseHit(
+        array $hit,
+        string $messageText,
+        array $messageData,
+        ?int $userId,
+        array $currentModelInfo,
+        float $startTime,
+        string $source,
+    ): array {
+        $topScore = (float) $hit['score'];
+        $payload = $hit['payload'];
+        $useCaseId = (string) ($payload['use_case_id'] ?? '');
+        $routingSteps = $this->parseRoutingSteps($payload);
+        $primaryUseCaseId = (string) ($payload['primary_use_case_id'] ?? $useCaseId);
+        if ('' === $primaryUseCaseId) {
+            $primaryUseCaseId = 'text_chat';
+        }
+
+        $mediaType = $this->inferMediaTypeFromRoutingSteps($routingSteps, $messageText, $useCaseId);
+        $legacyTopic = $this->useCaseMapper->useCaseToLegacyTopic($primaryUseCaseId, $mediaType);
 
         $language = $this->detectLanguage($messageText, $messageData['BLANG'] ?? null);
         $promptMetadata = $this->loadPromptMetadata($legacyTopic, $userId ?? 0);
@@ -712,31 +884,243 @@ final readonly class SynapseRouter
         if (!$webSearch && ($promptMetadata['tool_internet'] ?? false)) {
             $webSearch = true;
         }
+        if ([] !== $routingSteps) {
+            foreach ($routingSteps as $step) {
+                if (filter_var($step['web_search'] ?? false, FILTER_VALIDATE_BOOLEAN)) {
+                    $webSearch = true;
+                    break;
+                }
+            }
+        }
 
         $latencyMs = $this->elapsed($startTime);
 
         $this->logger->info('SynapseRouter: Use case Tier 1 classification', [
-            'primary_use_case_id' => $useCaseId,
+            'primary_use_case_id' => $primaryUseCaseId,
+            'use_case_id' => $useCaseId,
             'legacy_topic' => $legacyTopic,
             'score' => round($topScore, 4),
+            'compound' => [] !== $routingSteps,
+            'step_count' => count($routingSteps),
+            'source' => $source,
             'latency_ms' => $latencyMs,
         ]);
 
-        return [
-            'primary_use_case_id' => $useCaseId,
+        $classification = [
+            'primary_use_case_id' => $primaryUseCaseId,
             'topic' => $legacyTopic,
             'language' => $language,
             'web_search' => $webSearch,
             'media_type' => $mediaType,
             'raw_response' => sprintf('Synapse use case: %.4f confidence', $topScore),
             'prompt_metadata' => $promptMetadata,
-            'source' => 'synapse_use_case',
+            'source' => $source,
             'synapse_score' => $topScore,
             'synapse_latency_ms' => $latencyMs,
             'sorting_model_id' => $currentModelInfo['model_id'],
             'sorting_provider' => $currentModelInfo['provider'],
             'sorting_model_name' => $currentModelInfo['model'],
         ];
+
+        if ([] !== $routingSteps) {
+            $classification['steps'] = $routingSteps;
+        }
+
+        return $this->enrichWithCompoundSteps(
+            $this->useCaseMapper->attachPrimaryUseCaseId($classification),
+            $messageText,
+        );
+    }
+
+    /**
+     * @param list<array<string, mixed>> $routingSteps
+     */
+    private function inferMediaTypeFromRoutingSteps(array $routingSteps, string $messageText, string $useCaseId): ?string
+    {
+        foreach ($routingSteps as $step) {
+            $capability = strtoupper((string) ($step['capability'] ?? ''));
+            $mediaType = match ($capability) {
+                'TEXT2VID' => 'video',
+                'TEXT2SOUND' => 'audio',
+                'TEXT2PIC' => 'image',
+                default => null,
+            };
+            if (null !== $mediaType) {
+                return $mediaType;
+            }
+        }
+
+        return 'media_generation' === $useCaseId ? $this->detectMediaType($messageText) : null;
+    }
+
+    /**
+     * Attach multi-step plans from classification signals when Qdrant did not return steps.
+     *
+     * @param array<string, mixed> $classification
+     *
+     * @return array<string, mixed>
+     */
+    private function enrichWithCompoundSteps(array $classification, string $messageText): array
+    {
+        if (isset($classification['steps']) && is_array($classification['steps']) && [] !== $classification['steps']) {
+            return $classification;
+        }
+
+        $webSearch = filter_var($classification['web_search'] ?? false, FILTER_VALIDATE_BOOLEAN);
+        $mediaType = isset($classification['media_type']) ? (string) $classification['media_type'] : '';
+
+        if ($webSearch && '' !== $mediaType) {
+            $scenarioId = 'video' === $mediaType ? 'compound_research_video' : 'compound_research_image';
+            $steps = CompoundRoutingCatalog::routingStepsFor($scenarioId);
+            if ([] !== $steps) {
+                $classification['steps'] = $steps;
+                $classification['primary_use_case_id'] = 'text_chat';
+            }
+
+            return $classification;
+        }
+
+        if ($this->detectWriteThenReadAloudIntent($messageText)) {
+            $steps = CompoundRoutingCatalog::routingStepsFor('compound_write_read_aloud');
+            if ([] !== $steps) {
+                $classification['steps'] = $steps;
+                $classification['primary_use_case_id'] = 'text_chat';
+                $classification['media_type'] = 'audio';
+            }
+        }
+
+        return $classification;
+    }
+
+    private function detectWriteThenReadAloudIntent(string $text): bool
+    {
+        $lower = mb_strtolower($text);
+
+        $readCues = [
+            'vorlesen', 'lies vor', 'lese vor', 'read aloud', 'tts', 'sprachausgabe',
+            'text to speech', 'text-to-speech', 'voice output', 'als audio',
+        ];
+        $hasReadCue = str_contains($lower, 'lese') && str_contains($lower, ' vor');
+        foreach ($readCues as $cue) {
+            if (str_contains($lower, $cue)) {
+                $hasReadCue = true;
+                break;
+            }
+        }
+        if (!$hasReadCue) {
+            return false;
+        }
+
+        $writeCues = [
+            'schreib', 'write', 'gedicht', 'poem', 'story', 'brief', 'letter', 'compose', 'text',
+        ];
+        foreach ($writeCues as $cue) {
+            if (str_contains($lower, $cue)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * @param list<array{
+     *     use_case_id: string,
+     *     score: float,
+     *     payload?: array<string, mixed>,
+     *     routing_steps?: list<array<string, mixed>>,
+     *     is_compound?: bool,
+     * }> $useCaseCandidates
+     * @param list<array{topic: string, score: float, alias_target: ?string}>                                                            $topicCandidates
+     *
+     * @return array<string, mixed>
+     */
+    private function buildDryRunPlanClassification(
+        string $messageText,
+        array $useCaseCandidates,
+        array $topicCandidates,
+        ?int $userId,
+    ): array {
+        $bestCompound = null;
+        foreach ($useCaseCandidates as $candidate) {
+            if (!($candidate['is_compound'] ?? false)) {
+                continue;
+            }
+            if ((float) $candidate['score'] < $this->getCompoundConfidenceThreshold()) {
+                continue;
+            }
+            $steps = $candidate['routing_steps'] ?? $this->parseRoutingSteps($candidate['payload'] ?? []);
+            if ([] === $steps) {
+                continue;
+            }
+            if (null === $bestCompound || (float) $candidate['score'] > (float) $bestCompound['score']) {
+                $bestCompound = $candidate;
+            }
+        }
+
+        if (null !== $bestCompound) {
+            $steps = $bestCompound['routing_steps'] ?? $this->parseRoutingSteps($bestCompound['payload'] ?? []);
+            $useCaseId = (string) $bestCompound['use_case_id'];
+            $entry = CompoundRoutingCatalog::find($useCaseId);
+            $primaryUseCaseId = is_array($entry)
+                ? (string) ($entry['primary_use_case_id'] ?? 'text_chat')
+                : 'text_chat';
+
+            return [
+                'topic' => $this->useCaseMapper->useCaseToLegacyTopic(
+                    $primaryUseCaseId,
+                    $this->inferMediaTypeFromRoutingSteps($steps, $messageText, $useCaseId),
+                ),
+                'primary_use_case_id' => $primaryUseCaseId,
+                'steps' => $steps,
+                'web_search' => $this->stepPlanRequiresWebSearch($steps),
+                'media_type' => $this->inferMediaTypeFromRoutingSteps($steps, $messageText, $useCaseId),
+            ];
+        }
+
+        $classification = ['topic' => 'general'];
+        if ([] !== $topicCandidates) {
+            $top = $topicCandidates[0];
+            $alias = $this->topicAliasResolver->resolve($top['topic']);
+            $canonicalTopic = $alias['topic'];
+            $classification = [
+                'topic' => $canonicalTopic,
+                'granular_topic' => $alias['alias_source'],
+                'media_type' => $alias['media'] ?? ('mediamaker' === $canonicalTopic ? $this->detectMediaType($messageText) : null),
+            ];
+            $skipHeuristic = $this->isNonWebSearchTopic($canonicalTopic);
+            $classification['web_search'] = $skipHeuristic ? false : $this->detectWebSearchIntent($messageText);
+        }
+
+        return $this->enrichWithCompoundSteps(
+            $this->useCaseMapper->attachPrimaryUseCaseId($classification),
+            $messageText,
+        );
+    }
+
+    /**
+     * @param list<array<string, mixed>> $steps
+     */
+    private function stepPlanRequiresWebSearch(array $steps): bool
+    {
+        foreach ($steps as $step) {
+            if (filter_var($step['web_search'] ?? false, FILTER_VALIDATE_BOOLEAN)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private function getCompoundConfidenceThreshold(): float
+    {
+        $value = $this->configRepository->getValue(0, 'QDRANT_SEARCH', 'SYNAPSE_COMPOUND_CONFIDENCE_THRESHOLD');
+
+        if (null !== $value && is_numeric($value)) {
+            return (float) $value;
+        }
+
+        return self::DEFAULT_COMPOUND_CONFIDENCE_THRESHOLD;
     }
 
     /**

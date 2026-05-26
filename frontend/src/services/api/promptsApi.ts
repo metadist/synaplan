@@ -76,6 +76,12 @@ export interface RoutingTestResult {
   web_search?: boolean
   media_type?: string | null
   intent?: string
+  steps?: Array<{
+    id: string
+    capability: string
+    label_key?: string
+    web_search?: boolean
+  }>
   step_plan?: {
     primary_use_case_id: string
     is_compound: boolean

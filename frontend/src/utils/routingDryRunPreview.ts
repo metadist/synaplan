@@ -97,37 +97,6 @@ const USE_CASE_DEFAULT_STEPS: Record<UseCaseId, DryRunStepPreview[]> = {
   ],
 }
 
-const COMPOUND_PATTERNS: Array<{
-  test: RegExp
-  steps: DryRunStepPreview[]
-  primaryUseCaseId?: UseCaseId
-}> = [
-  {
-    test: /\b(und|and|dann|then)\b.*\b(vorlesen|lies(?:\s+\w+){0,2}\s+vor|read(?:\s+\w+){0,2}\s+aloud|tts|text.?to.?speech|sprachausgabe)\b/i,
-    steps: [
-      { stepKey: 'write', labelKey: 'config.routing.steps.chat', capability: 'CHAT' },
-      { stepKey: 'speak', labelKey: 'config.routing.steps.readAloud', capability: 'TEXT2SOUND' },
-    ],
-  },
-  {
-    test: /\b(und|and|dann|then)\b.*\b(mail|email|e-mail|schick|send)\b/i,
-    steps: [
-      {
-        stepKey: 'generate',
-        labelKey: 'config.routing.steps.mediaGenerate',
-        capability: 'TEXT2PIC',
-      },
-      { stepKey: 'send', labelKey: 'config.routing.steps.sendEmail', capability: 'CHAT' },
-    ],
-  },
-  {
-    test: /\b(mail|email|e-mail|gemailt|mailed)\b.*\b(gestern|yesterday|hol|fetch|get)\b/i,
-    steps: [
-      { stepKey: 'fetch', labelKey: 'config.routing.steps.fetchEmail', capability: 'CHAT' },
-      { stepKey: 'analyse', labelKey: 'config.routing.steps.fileExtract', capability: 'ANALYZE' },
-    ],
-  },
-]
 
 export function topicToUseCaseId(topic: string, aliasTarget?: string | null): UseCaseId {
   const canonical = aliasTarget && aliasTarget !== topic ? aliasTarget : topic
@@ -146,34 +115,31 @@ export function buildDryRunPreview(
     webSearch?: boolean
     mediaType?: 'image' | 'video' | 'audio' | string | null
     intent?: string
+    steps?: Array<{ id: string; capability: Capability; label_key?: string }>
   }
 ): { useCaseId: UseCaseId; steps: DryRunStepPreview[]; isCompound: boolean } {
   const useCaseId = topicToUseCaseId(primaryTopic, aliasTarget)
+
+  const sorterStepsPlan = buildSorterStepsPreview(classification?.steps)
+  if (sorterStepsPlan) {
+    return sorterStepsPlan
+  }
 
   const classificationPlan = buildClassificationCompoundPreview(useCaseId, classification)
   if (classificationPlan) {
     return classificationPlan
   }
 
-  for (const pattern of COMPOUND_PATTERNS) {
-    if (pattern.test.test(query)) {
-      return {
-        useCaseId: pattern.primaryUseCaseId ?? useCaseId,
-        steps: pattern.steps,
-        isCompound: true,
-      }
-    }
-  }
-
   const steps = USE_CASE_DEFAULT_STEPS[useCaseId].map((s) => ({ ...s }))
   if (useCaseId === 'media_generation') {
-    if (/\b(video|vid|film|clip|animation)\b/i.test(query)) {
+    const mediaType = classification?.mediaType?.toLowerCase() ?? ''
+    if (mediaType === 'video') {
       steps[0] = {
         ...steps[0],
         capability: 'TEXT2VID',
         labelKey: 'config.routing.steps.videoGenerate',
       }
-    } else if (/\b(audio|tts|vorlesen|read aloud|speech|sound|sprachausgabe|mp3)\b/i.test(query)) {
+    } else if (mediaType === 'audio') {
       steps[0] = {
         ...steps[0],
         capability: 'TEXT2SOUND',
@@ -183,6 +149,33 @@ export function buildDryRunPreview(
   }
 
   return { useCaseId, steps, isCompound: false }
+}
+
+function buildSorterStepsPreview(
+  steps?: Array<{ id: string; capability: Capability; label_key?: string }>
+): { useCaseId: UseCaseId; steps: DryRunStepPreview[]; isCompound: boolean } | null {
+  if (!steps?.length) {
+    return null
+  }
+
+  const mapped = steps.map((step) => ({
+    stepKey: step.id,
+    labelKey: step.label_key ?? defaultLabelKeyForCapability(step.capability),
+    capability: step.capability,
+  }))
+
+  return {
+    useCaseId: mapped.length > 1 ? 'text_chat' : topicToUseCaseId('general-chat'),
+    steps: mapped,
+    isCompound: mapped.length > 1,
+  }
+}
+
+function defaultLabelKeyForCapability(capability: Capability): string {
+  const match = Object.values(USE_CASE_DEFAULT_STEPS)
+    .flat()
+    .find((step) => step.capability === capability)
+  return match?.labelKey ?? 'config.routing.steps.chat'
 }
 
 function buildClassificationCompoundPreview(

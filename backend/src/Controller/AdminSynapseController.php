@@ -397,21 +397,7 @@ final class AdminSynapseController extends AbstractController
 
         $result = $this->synapseRouter->dryRun($text, $userId, $limit);
 
-        $topTopic = 'general';
-        $aliasTarget = null;
-        if ([] !== $result['candidates']) {
-            $top = $result['candidates'][0];
-            $topTopic = $top['topic'];
-            $aliasTarget = $top['alias_target'];
-        }
-
-        $classification = ['topic' => $topTopic];
-        if (null !== $aliasTarget && $aliasTarget !== $topTopic) {
-            $classification['granular_topic'] = $aliasTarget;
-        }
-        if (null !== $result['primary_use_case_id']) {
-            $classification['primary_use_case_id'] = $result['primary_use_case_id'];
-        }
+        $classification = $result['plan_classification'] ?? ['topic' => 'general'];
 
         $result['step_plan'] = $this->stepPlanner->plan($text, $classification)->toArray();
 

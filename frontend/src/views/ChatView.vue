@@ -144,6 +144,7 @@
               :timestamp="message.timestamp"
               :is-superseded="message.isSuperseded"
               :is-streaming="message.isStreaming"
+              :stream-render-generation="message.streamRenderGeneration"
               :provider="message.provider"
               :model-label="message.modelLabel"
               :topic="message.topic"
@@ -1126,6 +1127,31 @@ function renderStreamingContent(content: string, msgId: string): void {
   message.parts = [...reconciled, ...existingMedia]
 }
 
+/**
+ * Compound orchestrator: after a CHAT step finishes, force a full markdown
+ * parse of accumulated text before the media step continues streaming.
+ * Uses the existing MessageText `processContentSync` path (issue #903).
+ */
+function finalizeCompoundChatStepMarkdown(
+  msgId: string,
+  content: string,
+  metadata: Record<string, unknown> | undefined
+): void {
+  const stepTotal = Number(metadata?.step_total ?? 1)
+  const stepNumber = Number(metadata?.step_number ?? 1)
+  const capability = typeof metadata?.capability === 'string' ? metadata.capability : ''
+
+  if (stepTotal <= 1 || stepNumber >= stepTotal || capability !== 'CHAT' || !content) {
+    return
+  }
+
+  const message = historyStore.messages.find((m) => m.id === msgId)
+  if (!message) return
+
+  message.streamRenderGeneration = (message.streamRenderGeneration ?? 0) + 1
+  renderStreamingContent(content, msgId)
+}
+
 const handleContinueResponse = async (message: Message) => {
   if (!message.backendMessageId) return
 
@@ -1504,6 +1530,7 @@ const streamAIResponse = async (
           } else if (data.status === 'step_completed') {
             processingStatus.value = 'step_completed'
             processingMetadata.value = data.metadata || {}
+            finalizeCompoundChatStepMarkdown(messageId, fullContent, data.metadata || {})
           } else if (data.status === 'step_failed') {
             processingStatus.value = 'step_failed'
             processingMetadata.value = data.metadata || {}
@@ -1716,6 +1743,7 @@ const streamAIResponse = async (
           } else if (data.status === 'step_completed') {
             processingStatus.value = 'step_completed'
             processingMetadata.value = data.metadata || {}
+            finalizeCompoundChatStepMarkdown(messageId, fullContent, data.metadata || {})
           } else if (data.status === 'step_failed') {
             processingStatus.value = 'step_failed'
             processingMetadata.value = data.metadata || {}

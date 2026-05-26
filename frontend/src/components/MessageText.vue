@@ -26,6 +26,8 @@ import type { UserMemory } from '@/services/api/userMemoriesApi'
 interface Props {
   content: string
   isStreaming?: boolean
+  /** Bumped between compound orchestrator steps to force a full markdown re-render. */
+  streamRenderGeneration?: number
   memories?: UserMemory[] | null | undefined
   /** When true, disables memory fetching (for shared/anonymous views) */
   readonly?: boolean
@@ -668,6 +670,16 @@ function renderStreamingFast(content: string): string {
 // keeps the stable prefix (everything up to the last `\n\n` outside a code
 // fence) byte-identical between chunks — no flicker (issue #903). Only the
 // trailing in-progress paragraph is re-rendered with each chunk.
+watch(
+  () => props.streamRenderGeneration,
+  () => {
+    if (!props.isStreaming || !props.content) return
+    invalidateStreamingCache()
+    if (hasMathFormulas(props.content)) return
+    renderedContent.value = processContentSync(props.content)
+  }
+)
+
 watch(
   () => props.content,
   (newContent) => {

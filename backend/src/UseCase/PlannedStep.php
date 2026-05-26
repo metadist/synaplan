@@ -16,11 +16,12 @@ final readonly class PlannedStep
         public string $labelKey,
         public string $capability,
         public ?string $inputFrom = null,
+        public bool $webSearch = false,
     ) {
     }
 
     /**
-     * @return array{id: string, label_key: string, capability: string, input_from?: string}
+     * @return array{id: string, label_key: string, capability: string, input_from?: string, web_search?: bool}
      */
     public function toArray(): array
     {
@@ -32,6 +33,10 @@ final readonly class PlannedStep
 
         if (null !== $this->inputFrom && '' !== $this->inputFrom) {
             $data['input_from'] = $this->inputFrom;
+        }
+
+        if ($this->webSearch) {
+            $data['web_search'] = true;
         }
 
         return $data;

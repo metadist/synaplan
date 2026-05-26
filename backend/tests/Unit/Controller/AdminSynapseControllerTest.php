@@ -13,6 +13,7 @@ use App\Service\Message\SynapseRouter;
 use App\Service\Message\TopicAliasResolver;
 use App\Service\Message\UseCaseIndexer;
 use App\Service\VectorSearch\QdrantClientInterface;
+use App\UseCase\ClassificationStepPlanner;
 use App\UseCase\RuleBasedStepPlanner;
 use App\UseCase\UseCaseMapper;
 use PHPUnit\Framework\MockObject\MockObject;
@@ -45,7 +46,7 @@ final class AdminSynapseControllerTest extends TestCase
             $this->qdrant,
             $this->promptRepository,
             new TopicAliasResolver(),
-            new RuleBasedStepPlanner(new UseCaseMapper()),
+            new RuleBasedStepPlanner(new ClassificationStepPlanner(new UseCaseMapper())),
             new NullLogger(),
         );
 

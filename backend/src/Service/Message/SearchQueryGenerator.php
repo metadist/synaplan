@@ -66,6 +66,27 @@ final readonly class SearchQueryGenerator
             return $cleaned;
         }
 
+        return $this->generateWithLlm($userQuestion, $userId, false);
+    }
+
+    /**
+     * Extract only the factual/web-research portion from a compound message
+     * (e.g. price question + image request). Always uses the LLM — compound
+     * messages are short enough to hit the heuristic short-circuit otherwise,
+     * which would send the full text (including media clauses) to Brave.
+     */
+    public function generateResearchOnly(string $userQuestion, ?int $userId = null): string
+    {
+        $this->logger->info('SearchQueryGenerator: Starting research-only query extraction', [
+            'user_id' => $userId,
+            'question_length' => strlen($userQuestion),
+        ]);
+
+        return $this->generateWithLlm($userQuestion, $userId, true);
+    }
+
+    private function generateWithLlm(string $userQuestion, ?int $userId, bool $researchOnly): string
+    {
         // Get search query prompt
         $searchPrompt = $this->promptRepository->findByTopic('tools:search', 0, 'en');
 
@@ -93,9 +114,14 @@ final readonly class SearchQueryGenerator
             return $this->fallbackExtraction($userQuestion);
         }
 
+        $systemPrompt = $searchPrompt->getPrompt();
+        if ($researchOnly) {
+            $systemPrompt .= "\n\nIMPORTANT: The user message may combine a web-research question with a separate media request (image, video, or audio generation). Extract ONLY the factual question that needs live web data. Omit image/video/audio generation entirely. Reply with the search query only — no explanation.";
+        }
+
         // Build messages array for AI
         $messages = [
-            ['role' => 'system', 'content' => $searchPrompt->getPrompt()],
+            ['role' => 'system', 'content' => $systemPrompt],
             ['role' => 'user', 'content' => $userQuestion],
         ];
 
