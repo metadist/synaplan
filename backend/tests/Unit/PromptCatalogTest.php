@@ -88,6 +88,66 @@ final class PromptCatalogTest extends TestCase
         $this->assertFalse($byTopic['coding']['enabled']);
     }
 
+    /**
+     * Granular routing aliases ship DISABLED by default — they are aliases
+     * of canonical topics (TopicAliasResolver) that confuse the legacy AI
+     * sorter when active alongside the canonical row. Admins flip them all
+     * back on via the `QDRANT_SEARCH.GRANULAR_TOPICS_ENABLED` toggle when
+     * Synapse Routing v2 is in use.
+     *
+     * Keeping them in the catalog (rather than removing) lets the seed
+     * idempotently flip BENABLED=0 on existing installs and drives the
+     * SynapseIndexer to drop orphan vectors from Qdrant.
+     */
+    public function testGranularRoutingAliasesShipDisabledByDefault(): void
+    {
+        $byTopic = [];
+        foreach (PromptCatalog::all() as $entry) {
+            $byTopic[$entry['topic']] = $entry;
+        }
+
+        foreach (
+            ['coding', 'general-chat', 'image-generation', 'video-generation', 'audio-generation'] as $alias
+        ) {
+            $this->assertArrayHasKey($alias, $byTopic, sprintf(
+                'Expected granular alias "%s" to remain in the catalog so the seed flips BENABLED.',
+                $alias
+            ));
+            $this->assertArrayHasKey('enabled', $byTopic[$alias], sprintf(
+                'Granular alias "%s" must declare an explicit `enabled` flag so the seed write is deterministic.',
+                $alias
+            ));
+            $this->assertFalse(
+                $byTopic[$alias]['enabled'],
+                sprintf(
+                    'Granular alias "%s" must ship DISABLED — admins re-enable via the GRANULAR_TOPICS_ENABLED toggle.',
+                    $alias
+                )
+            );
+        }
+    }
+
+    /**
+     * The canonical `general` row carries the chat/coding/lifestyle keyword
+     * list because the granular `general-chat` topic ships disabled by
+     * default. Synapse Routing v2 embedding recall therefore relies on the
+     * canonical row's keywords, which must include the programming terms
+     * that previously lived under `general-chat`.
+     */
+    public function testCanonicalGeneralKeywordsCoverProgrammingTerms(): void
+    {
+        $byTopic = [];
+        foreach (PromptCatalog::all() as $entry) {
+            $byTopic[$entry['topic']] = $entry;
+        }
+
+        $keywords = strtolower((string) $byTopic['general']['keywords']);
+        $this->assertStringContainsString('php', $keywords);
+        $this->assertStringContainsString('python', $keywords);
+        $this->assertStringContainsString('debug', $keywords);
+        $this->assertStringContainsString('smalltalk', $keywords);
+    }
+
     public function testGeneralChatKeywordsCoverProgrammingTermsAfterCodingRetirement(): void
     {
         // Coding queries now ride on `general-chat` (#878). Make sure

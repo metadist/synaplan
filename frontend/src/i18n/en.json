@@ -1225,7 +1225,12 @@
       "confirmEnableConfirm": "Enable Beta",
       "confirmEnableCancel": "Keep AI Sorting",
       "toggleEnabledNotice": "Synapse Routing enabled. AI sorting will only be used as a fallback.",
-      "toggleDisabledNotice": "Synapse Routing disabled. All messages now use the AI sorter."
+      "toggleDisabledNotice": "Synapse Routing disabled. All messages now use the AI sorter.",
+      "granularTitle": "Granular routing topics",
+      "granularSubtitle": "Enable the granular routing aliases (general-chat, coding, image-generation, video-generation, audio-generation). Aliases of the canonical topics (general, mediamaker) — useful for Synapse Routing v2's embedding tier, but added as duplicate choices for the legacy AI sorter. Keep OFF unless you have Synapse Routing enabled above.",
+      "granularPromptHint": "Toggling this flag also flips the matching task prompts back and forth between BENABLED=1 and BENABLED=0.",
+      "granularToggleEnabledNotice": "Granular routing topics enabled. The matching task prompts have been re-enabled.",
+      "granularToggleDisabledNotice": "Granular routing topics disabled. The matching task prompts have been hidden — only canonical topics are active."
     },
     "sortingPrompt": {
       "title": "Preprocessor",

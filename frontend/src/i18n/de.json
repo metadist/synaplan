@@ -1329,7 +1329,12 @@
       "confirmEnableConfirm": "Beta aktivieren",
       "confirmEnableCancel": "Bei AI-Sortierung bleiben",
       "toggleEnabledNotice": "Synapse Routing aktiviert. AI-Sortierung wird nur noch als Fallback genutzt.",
-      "toggleDisabledNotice": "Synapse Routing deaktiviert. Alle Nachrichten verwenden jetzt den AI-Sorter."
+      "toggleDisabledNotice": "Synapse Routing deaktiviert. Alle Nachrichten verwenden jetzt den AI-Sorter.",
+      "granularTitle": "Granulare Routing-Themen",
+      "granularSubtitle": "Aktiviert die granularen Routing-Aliase (general-chat, coding, image-generation, video-generation, audio-generation). Sie sind Aliase der kanonischen Themen (general, mediamaker) – sinnvoll für die Embedding-Stufe von Synapse Routing v2, erscheinen für den klassischen AI-Sorter aber als doppelte Auswahloptionen. Lass diesen Schalter auf AUS, wenn du oben kein Synapse Routing aktiviert hast.",
+      "granularPromptHint": "Das Umlegen dieses Schalters setzt parallel das BENABLED-Flag der passenden Task-Prompts auf 1 bzw. 0.",
+      "granularToggleEnabledNotice": "Granulare Routing-Themen aktiviert. Die passenden Task-Prompts wurden wieder aktiviert.",
+      "granularToggleDisabledNotice": "Granulare Routing-Themen deaktiviert. Die passenden Task-Prompts sind ausgeblendet – nur kanonische Themen sind aktiv."
     },
     "sortingPrompt": {
       "title": "Preprocessor",

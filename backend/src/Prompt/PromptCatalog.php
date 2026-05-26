@@ -66,7 +66,13 @@ class PromptCatalog
                 'topic' => 'general',
                 'language' => 'en',
                 'shortDescription' => 'Catch-all topic for everyday questions, smalltalk, advice, opinions and any request that does not fit a more specific topic. Used as a routing fallback when no granular topic matches.',
-                'keywords' => 'fallback, default, catch-all, allgemein, frage, question',
+                // Keyword list intentionally broad: when the granular
+                // routing aliases are disabled (the default state), Synapse
+                // v2 embedding recall for chat / lifestyle / programming
+                // queries has to land here, so the canonical row carries
+                // the union of vocabulary that would otherwise be spread
+                // across `general-chat` and friends.
+                'keywords' => 'fallback, default, catch-all, allgemein, frage, question, chat, smalltalk, hello, hi, hallo, talk, conversation, opinion, advice, tip, lifestyle, travel, reise, health, gesundheit, recipe, rezept, recommendation, empfehlung, idea, idee, business, hobby, hobbies, plan, planning, planen, project, projekt, learning, lernen, study, school, university, student, code, coding, programming, programmieren, software, php, python, javascript, typescript, java, kotlin, swift, go, rust, ruby, sql, html, css, vue, react, angular, node, function, class, method, variable, error, fehler, exception, bug, debug, refactor, framework, library, api, rest, graphql, regex, algorithm, terminal, shell, bash, docker, kubernetes, fitness, gym, fitnessstudio, sport, food, essen, drink, getränk, shake, restaurant, shop, store, geschäft, idea for, möchte, will, want to',
                 'prompt' => self::generalPrompt(),
             ],
             [
@@ -80,13 +86,21 @@ class PromptCatalog
             // ──────────────────────────────────────────────
             //  Granular routing topics (Synapse v2)
             // ──────────────────────────────────────────────
-            // Retired (#878): the dedicated `coding` topic was retired
-            // because it overlapped too aggressively with everyday chat
-            // in the embedding space. Kept here as DISABLED so the seed
-            // run flips BENABLED=0 on existing installs and the indexer
-            // drops the orphan vector from Qdrant on its next pass.
-            // Removing the row from PromptCatalog entirely would NOT
-            // touch existing DBs.
+            //
+            // The five entries below are aliases of canonical legacy topics
+            // (`general` for chat/coding, `mediamaker` for the *-generation
+            // family — see TopicAliasResolver::TOPIC_ALIASES). They give
+            // Synapse Routing v2's embedding tier a finer-grained taxonomy;
+            // downstream handlers only ever see the canonical topic after
+            // TopicAliasResolver runs.
+            //
+            // Shipped DISABLED (BENABLED=0) so the legacy AI sorter sees
+            // only canonical topics and is not asked to disambiguate
+            // alias-vs-canonical near-duplicates. Admins enable them as a
+            // group via the `QDRANT_SEARCH.GRANULAR_TOPICS_ENABLED` BCONFIG
+            // toggle; GranularTopicsManager keeps BENABLED in lock-step,
+            // and PromptSeeder re-applies the toggle after every seed so a
+            // re-run cannot clobber an admin-enabled state.
             [
                 'topic' => 'coding',
                 'language' => 'en',
@@ -107,6 +121,7 @@ class PromptCatalog
                 'shortDescription' => 'Catch-all conversational topic. Use this for casual conversation, smalltalk, opinions, advice, lifestyle, travel, health, recipes, recommendations, business ideas, planning, hobbies, learning questions, programming and technical questions, debugging help, code review, software architecture, frameworks, libraries, errors and stack traces, and any other question that should be answered with a written reply.',
                 'keywords' => 'chat, smalltalk, hello, hi, hallo, talk, conversation, opinion, advice, tip, lifestyle, travel, reise, health, gesundheit, recipe, rezept, recommendation, empfehlung, frage, question, idea, idee, business, hobby, hobbies, plan, planning, planen, project, projekt, learning, lernen, study, school, university, student, code, coding, programming, programmieren, software, php, python, javascript, typescript, java, kotlin, swift, go, rust, ruby, sql, html, css, vue, react, angular, node, function, class, method, variable, error, fehler, exception, bug, debug, refactor, framework, library, api, rest, graphql, regex, algorithm, terminal, shell, bash, docker, kubernetes, fitness, gym, fitnessstudio, sport, food, essen, drink, getränk, shake, restaurant, shop, store, geschäft, idea for, möchte, will, want to',
                 'prompt' => self::generalPrompt(),
+                'enabled' => false,
             ],
             [
                 'topic' => 'image-generation',
@@ -126,6 +141,7 @@ class PromptCatalog
                 // were dead weight (caught by Copilot review on PR #884).
                 'keywords' => 'create an image, create a picture, create a photo, create an illustration, generate an image, generate a picture, make a picture, make an image, draw me, paint a picture, render a photo, render an image, render a picture, retouch this image, edit this image, replace the background, combine these images, merge these images, image to image, illustrate this, erstelle ein bild, erstelle ein foto, erstelle eine illustration, generiere ein bild, generiere ein foto, mache ein bild, male ein bild, male mir, zeichne ein bild, zeichne mir, render ein bild, hintergrund ersetzen, bild bearbeiten, bilder kombinieren',
                 'prompt' => self::mediaMakerPrompt(),
+                'enabled' => false,
             ],
             [
                 'topic' => 'video-generation',
@@ -143,6 +159,7 @@ class PromptCatalog
                 // anyway (caught by Copilot review on PR #884).
                 'keywords' => 'create a video, create a clip, create an animation, generate a video, generate a clip, make a video, make a clip, make an animation, render a video, render an animation, animate this, animate the, produce a video, shoot a short video, erstelle ein video, erstelle einen clip, erstelle eine animation, generiere ein video, generiere einen clip, mache ein video, mach mir ein video, mache einen clip, animiere, animiere mir, render ein video, render einen clip, render mir ein video',
                 'prompt' => self::mediaMakerPrompt(),
+                'enabled' => false,
             ],
             [
                 'topic' => 'audio-generation',
@@ -153,6 +170,7 @@ class PromptCatalog
                 'shortDescription' => 'User explicitly asks for AUDIO output: text-to-speech, narration, voice synthesis, voiceover or any spoken-audio rendering of provided text. Trigger only when the message contains an explicit speech/audio creation verb (for example "read this aloud", "convert to speech", "create an audio of …", "generate a voiceover saying …", "narrate this text", "vertone …", "lies das vor", "sprich folgenden Text", "erstelle ein Audio mit …"). Do NOT trigger for general conversation that mentions audio, voice, sound, music or podcasts without an unambiguous TTS request.',
                 'keywords' => 'read aloud, read this aloud, read it aloud, convert to speech, text to speech, generate audio of, generate a voiceover, generate a narration, create an audio, create a voiceover, create a narration, narrate this, narrate the following, voiceover saying, voice over saying, speak this, say the following, lies vor, lies das vor, lies dies vor, sprich folgenden text, sprich folgendes, sprich diesen text, erstelle ein audio, erstelle eine vertonung, generiere ein audio, generiere eine vertonung, mache ein audio, vertone, vertone diesen text, vertone folgenden text, vertonen, audio generieren',
                 'prompt' => self::mediaMakerPrompt(),
+                'enabled' => false,
             ],
 
             // ──────────────────────────────────────────────
