@@ -3,52 +3,43 @@
 namespace App\Tests\Unit;
 
 use App\AI\Service\AiFacade;
-use App\Repository\ConfigRepository;
 use App\Repository\PromptRepository;
 use App\Service\DiscordNotificationService;
 use App\Service\Message\MessageSorter;
-use App\Service\Message\TopicAliasResolver;
 use App\Service\ModelConfigService;
 use App\Service\PromptService;
 use App\Service\RateLimitService;
 use Doctrine\ORM\EntityManagerInterface;
 use PHPUnit\Framework\Attributes\DataProvider;
-use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
 
 class MessageSorterTest extends TestCase
 {
     private MessageSorter $sorter;
-    private ConfigRepository&MockObject $configRepository;
-    private PromptRepository&MockObject $promptRepository;
     private \ReflectionMethod $parseResponseMethod;
     private \ReflectionMethod $normalizeMediaTypeMethod;
-    private \ReflectionMethod $buildTopicPoolMethod;
 
     protected function setUp(): void
     {
         $aiFacade = $this->createMock(AiFacade::class);
-        $this->promptRepository = $this->createMock(PromptRepository::class);
+        $promptRepository = $this->createMock(PromptRepository::class);
         $modelConfigService = $this->createMock(ModelConfigService::class);
         $promptService = $this->createMock(PromptService::class);
         $rateLimitService = $this->createMock(RateLimitService::class);
         $em = $this->createMock(EntityManagerInterface::class);
         $logger = $this->createMock(LoggerInterface::class);
         $discord = $this->createMock(DiscordNotificationService::class);
-        $this->configRepository = $this->createMock(ConfigRepository::class);
 
         $this->sorter = new MessageSorter(
             $aiFacade,
-            $this->promptRepository,
+            $promptRepository,
             $modelConfigService,
             $promptService,
             $rateLimitService,
             $em,
             $logger,
-            $discord,
-            new TopicAliasResolver(),
-            $this->configRepository,
+            $discord
         );
 
         // Make private methods accessible for testing
@@ -59,9 +50,6 @@ class MessageSorterTest extends TestCase
 
         $this->normalizeMediaTypeMethod = $reflection->getMethod('normalizeMediaType');
         $this->normalizeMediaTypeMethod->setAccessible(true);
-
-        $this->buildTopicPoolMethod = $reflection->getMethod('buildTopicPool');
-        $this->buildTopicPoolMethod->setAccessible(true);
     }
 
     // ===========================================
@@ -481,123 +469,5 @@ class MessageSorterTest extends TestCase
         $this->assertSame(6, $result['duration']);
         $this->assertSame('4K', $result['resolution']);
         $this->assertSame('text_only', $result['input_mode']);
-    }
-
-    // ===========================================
-    // buildTopicPool — granular-aliases filter
-    // ===========================================
-
-    /**
-     * When `QDRANT_SEARCH.GRANULAR_TOPICS_ENABLED` is OFF (the default),
-     * the topic list fed to the AI sorter must drop every alias of a
-     * canonical topic (general-chat, coding, image-generation, ...). The
-     * canonical rows (general, mediamaker) and non-alias topics
-     * (officemaker, docsummary, custom user prompts) must pass through.
-     *
-     * This is the belt-and-suspenders gate next to the catalog ship state:
-     * even if an operator manually re-enabled a granular row in BPROMPTS
-     * while the BCONFIG toggle is still OFF, the AI sort pool stays clean.
-     */
-    public function testBuildTopicPoolFiltersAliasesWhenToggleIsOff(): void
-    {
-        $this->configRepository->method('getValue')
-            ->with(0, 'QDRANT_SEARCH', 'GRANULAR_TOPICS_ENABLED')
-            ->willReturn('false');
-
-        $this->promptRepository->method('getAllTopics')->willReturn([
-            'general', 'general-chat', 'coding',
-            'mediamaker', 'image-generation', 'video-generation', 'audio-generation',
-            'officemaker', 'docsummary', 'customer-support',
-        ]);
-        $this->promptRepository->method('getTopicsWithDescriptions')->willReturn([
-            ['topic' => 'general', 'description' => 'Catch-all', 'ownerId' => 0],
-            ['topic' => 'general-chat', 'description' => 'Granular chat alias', 'ownerId' => 0],
-            ['topic' => 'coding', 'description' => 'Retired', 'ownerId' => 0],
-            ['topic' => 'mediamaker', 'description' => 'Canonical media', 'ownerId' => 0],
-            ['topic' => 'image-generation', 'description' => 'Granular image alias', 'ownerId' => 0],
-            ['topic' => 'video-generation', 'description' => 'Granular video alias', 'ownerId' => 0],
-            ['topic' => 'audio-generation', 'description' => 'Granular audio alias', 'ownerId' => 0],
-            ['topic' => 'officemaker', 'description' => 'Doc generation', 'ownerId' => 0],
-            ['topic' => 'docsummary', 'description' => 'Summaries', 'ownerId' => 0],
-            ['topic' => 'customer-support', 'description' => 'Custom user prompt', 'ownerId' => 7],
-        ]);
-
-        [$topics, $topicsWithDesc] = $this->buildTopicPoolMethod->invoke($this->sorter, 7);
-
-        // Canonical and unrelated topics pass through.
-        $this->assertContains('general', $topics);
-        $this->assertContains('mediamaker', $topics);
-        $this->assertContains('officemaker', $topics);
-        $this->assertContains('docsummary', $topics);
-        $this->assertContains('customer-support', $topics);
-
-        // Every alias from TopicAliasResolver::TOPIC_ALIASES must be gone.
-        foreach (
-            ['general-chat', 'coding', 'image-generation', 'video-generation', 'audio-generation'] as $alias
-        ) {
-            $this->assertNotContains(
-                $alias,
-                $topics,
-                sprintf('Alias "%s" must be filtered out of the AI sort pool when the toggle is OFF.', $alias)
-            );
-            $aliasDescriptions = array_column($topicsWithDesc, 'topic');
-            $this->assertNotContains(
-                $alias,
-                $aliasDescriptions,
-                sprintf('Alias "%s" must also be filtered from the description list.', $alias)
-            );
-        }
-    }
-
-    /**
-     * When the admin flips `GRANULAR_TOPICS_ENABLED` to true, the AI sorter
-     * sees both canonical and granular rows — this is the path used when
-     * Synapse Routing v2 is enabled and the embedding tier benefits from
-     * the finer-grained taxonomy (and the AI fallback should agree with it).
-     */
-    public function testBuildTopicPoolKeepsAliasesWhenToggleIsOn(): void
-    {
-        $this->configRepository->method('getValue')
-            ->with(0, 'QDRANT_SEARCH', 'GRANULAR_TOPICS_ENABLED')
-            ->willReturn('true');
-
-        $this->promptRepository->method('getAllTopics')->willReturn([
-            'general', 'general-chat', 'image-generation', 'mediamaker',
-        ]);
-        $this->promptRepository->method('getTopicsWithDescriptions')->willReturn([
-            ['topic' => 'general', 'description' => 'Catch-all', 'ownerId' => 0],
-            ['topic' => 'general-chat', 'description' => 'Granular chat', 'ownerId' => 0],
-            ['topic' => 'image-generation', 'description' => 'Granular image', 'ownerId' => 0],
-            ['topic' => 'mediamaker', 'description' => 'Canonical media', 'ownerId' => 0],
-        ]);
-
-        [$topics, $topicsWithDesc] = $this->buildTopicPoolMethod->invoke($this->sorter, null);
-
-        $this->assertSame(
-            ['general', 'general-chat', 'image-generation', 'mediamaker'],
-            $topics
-        );
-        $this->assertCount(4, $topicsWithDesc);
-    }
-
-    /**
-     * Mirrors the SYNAPSE_ROUTING_ENABLED parser semantics — when the
-     * BCONFIG row is absent, the toggle defaults to OFF.
-     */
-    public function testBuildTopicPoolDefaultsToFilteredWhenConfigRowMissing(): void
-    {
-        $this->configRepository->method('getValue')
-            ->with(0, 'QDRANT_SEARCH', 'GRANULAR_TOPICS_ENABLED')
-            ->willReturn(null);
-
-        $this->promptRepository->method('getAllTopics')->willReturn(['general', 'general-chat']);
-        $this->promptRepository->method('getTopicsWithDescriptions')->willReturn([
-            ['topic' => 'general', 'description' => 'Catch-all', 'ownerId' => 0],
-            ['topic' => 'general-chat', 'description' => 'Granular', 'ownerId' => 0],
-        ]);
-
-        [$topics] = $this->buildTopicPoolMethod->invoke($this->sorter, 1);
-
-        $this->assertSame(['general'], $topics);
     }
 }

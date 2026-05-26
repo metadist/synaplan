@@ -7,7 +7,6 @@ namespace App\Service\Admin;
 use App\Repository\ConfigRepository;
 use App\Service\FeedbackConstants;
 use App\Service\Message\GranularTopicsManager;
-use App\Service\Message\MessageSorter;
 use Psr\Log\LoggerInterface;
 
 /**
@@ -30,8 +29,8 @@ final readonly class SystemConfigService
         private readonly string $projectDir,
         private readonly LoggerInterface $logger,
         private readonly ConfigRepository $configRepository,
+        private readonly string $defaultTtsUrl,
         private readonly GranularTopicsManager $granularTopicsManager,
-        private readonly string $defaultTtsUrl = 'http://localhost:10200',
     ) {
         $this->schema = $this->buildSchema();
     }
@@ -249,42 +248,50 @@ final readonly class SystemConfigService
             $this->configRepository->setValue(self::DB_OWNER_ID, self::DB_GROUP, $key, $value);
             $this->logChange($key, $value);
 
-            // Side-effect: when the granular-topics master switch is toggled,
-            // also flip BENABLED on the matching catalog rows so the AI sort
-            // pool and the Synapse indexer agree with the new state from the
-            // very next request. The manager is idempotent and only writes
-            // rows whose state actually changes.
-            if (MessageSorter::GRANULAR_TOPICS_CONFIG_KEY === $key) {
-                $enabled = (bool) (filter_var($value, FILTER_VALIDATE_BOOL, FILTER_NULL_ON_FAILURE) ?? false);
-                try {
-                    $report = $this->granularTopicsManager->applyState($enabled);
-                    $this->logger->info('SystemConfigService: granular routing topics toggled', [
-                        'enabled' => $enabled,
-                        'flipped' => $report['flipped'],
-                        'unchanged' => $report['unchanged'],
-                        'missing' => $report['missing'],
-                    ]);
-                } catch (\Throwable $sideEffect) {
-                    // The BCONFIG write itself succeeded — the prompt-state
-                    // sync failing is a soft error we surface in the log so
-                    // the operator can re-run `app:seed` to converge. We do
-                    // NOT roll back the config write, because the next read
-                    // of MessageSorter::granularTopicsEnabled() will already
-                    // reflect the new flag and the AI-sort filter is the
-                    // primary gate; BENABLED is belt-and-suspenders.
-                    $this->logger->error('SystemConfigService: granular topics state sync failed', [
-                        'key' => $key,
-                        'value' => $value,
-                        'error' => $sideEffect->getMessage(),
-                    ]);
-                }
-            }
+            $this->applyConfigSideEffects(self::DB_GROUP, $key, $value);
 
             return ['success' => true, 'requiresRestart' => false];
         } catch (\Throwable $e) {
             $this->logger->error('Failed to save DB config', ['key' => $key, 'error' => $e->getMessage()]);
 
             return ['success' => false, 'requiresRestart' => false, 'message' => 'Database write failed'];
+        }
+    }
+
+    /**
+     * Side-effects triggered by specific BCONFIG writes.
+     *
+     * Kept as an explicit, narrow dispatch table rather than an event
+     * subscriber: there is exactly one cross-module hook today
+     * (`GRANULAR_TOPICS_ENABLED` → flip BPROMPTS.BENABLED), and a full
+     * event/listener layer would add framework surface area without
+     * earning its keep. Add new entries here only when a config write
+     * has to mutate state outside BCONFIG.
+     *
+     * Failures are logged and swallowed: the primary BCONFIG write has
+     * already succeeded, and downstream readers will pick up the new
+     * value on their next request. Re-running `app:seed` converges any
+     * BPROMPTS state that the manager failed to flip.
+     */
+    private function applyConfigSideEffects(string $group, string $key, string $value): void
+    {
+        if (GranularTopicsManager::CONFIG_GROUP === $group && GranularTopicsManager::CONFIG_KEY === $key) {
+            $enabled = filter_var($value, FILTER_VALIDATE_BOOL, FILTER_NULL_ON_FAILURE) ?? false;
+            try {
+                $report = $this->granularTopicsManager->applyState($enabled);
+                $this->logger->info('SystemConfigService: granular routing topics toggled', [
+                    'enabled' => $enabled,
+                    'flipped' => $report['flipped'],
+                    'unchanged' => $report['unchanged'],
+                    'missing' => $report['missing'],
+                ]);
+            } catch (\Throwable $sideEffect) {
+                $this->logger->error('SystemConfigService: granular topics state sync failed', [
+                    'key' => $key,
+                    'value' => $value,
+                    'error' => $sideEffect->getMessage(),
+                ]);
+            }
         }
     }
 

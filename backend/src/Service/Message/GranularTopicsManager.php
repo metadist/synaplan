@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Service\Message;
 
+use App\Repository\ConfigRepository;
 use App\Repository\PromptRepository;
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;
@@ -32,12 +33,37 @@ use Psr\Log\LoggerInterface;
  */
 final readonly class GranularTopicsManager
 {
+    /**
+     * BCONFIG coordinates of the admin toggle that controls the granular
+     * routing aliases. Owned here (not on MessageSorter or
+     * SystemConfigService) because the manager is the conceptual home of
+     * the granular-topic state — every reader and writer in the codebase
+     * should refer to these constants instead of inlining the strings.
+     */
+    public const CONFIG_GROUP = 'QDRANT_SEARCH';
+    public const CONFIG_KEY = 'GRANULAR_TOPICS_ENABLED';
+
     public function __construct(
         private TopicAliasResolver $topicAliasResolver,
         private PromptRepository $promptRepository,
         private EntityManagerInterface $entityManager,
         private LoggerInterface $logger,
     ) {
+    }
+
+    /**
+     * Resolve the current admin intent from BCONFIG using the same truthy
+     * parser as `MessageClassifier::isSynapseEnabled()`. Absent row → false.
+     */
+    public static function resolveToggleState(ConfigRepository $configRepository): bool
+    {
+        $raw = $configRepository->getValue(0, self::CONFIG_GROUP, self::CONFIG_KEY);
+
+        if (null === $raw) {
+            return false;
+        }
+
+        return filter_var($raw, \FILTER_VALIDATE_BOOL, \FILTER_NULL_ON_FAILURE) ?? false;
     }
 
     /**

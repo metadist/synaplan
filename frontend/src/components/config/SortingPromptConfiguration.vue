@@ -1192,12 +1192,10 @@ const parseBoolConfigValue = (raw: string | undefined): boolean =>
   ['true', '1', 'yes', 'on'].includes((raw ?? 'false').toLowerCase())
 
 /**
- * Fetch every `QDRANT_SEARCH.*` BCONFIG row once and hydrate both the
- * Synapse Routing and the Granular Topics toggles from the same response.
- *
- * Replaces two independent `getConfigValues()` calls on mount — the
- * endpoint returns the full BCONFIG map either way, so paying for two
- * round-trips just to set two refs is wasted latency.
+ * Hydrate both the Synapse Routing and the Granular Topics toggles from
+ * a single `/api/v1/admin/config/values` response. The endpoint returns
+ * the full BCONFIG map either way, so reading once and routing the same
+ * payload into both refs avoids any duplicate fetch as the page grows.
  */
 const loadRoutingToggles = async () => {
   if (!isAdmin.value) return

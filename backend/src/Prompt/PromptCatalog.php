@@ -66,12 +66,12 @@ class PromptCatalog
                 'topic' => 'general',
                 'language' => 'en',
                 'shortDescription' => 'Catch-all topic for everyday questions, smalltalk, advice, opinions and any request that does not fit a more specific topic. Used as a routing fallback when no granular topic matches.',
-                // Folded the granular `general-chat` keyword list in here
-                // when the granular topic was shipped DISABLED by default
-                // (this commit). When Synapse v2 is OFF (the default) the
-                // legacy AI sorter only sees `general` — these keywords
-                // keep Synapse v2 embedding recall strong if it ever gets
-                // enabled without flipping the granular topics back on.
+                // Keyword list intentionally broad: when the granular
+                // routing aliases are disabled (the default state), Synapse
+                // v2 embedding recall for chat / lifestyle / programming
+                // queries has to land here, so the canonical row carries
+                // the union of vocabulary that would otherwise be spread
+                // across `general-chat` and friends.
                 'keywords' => 'fallback, default, catch-all, allgemein, frage, question, chat, smalltalk, hello, hi, hallo, talk, conversation, opinion, advice, tip, lifestyle, travel, reise, health, gesundheit, recipe, rezept, recommendation, empfehlung, idea, idee, business, hobby, hobbies, plan, planning, planen, project, projekt, learning, lernen, study, school, university, student, code, coding, programming, programmieren, software, php, python, javascript, typescript, java, kotlin, swift, go, rust, ruby, sql, html, css, vue, react, angular, node, function, class, method, variable, error, fehler, exception, bug, debug, refactor, framework, library, api, rest, graphql, regex, algorithm, terminal, shell, bash, docker, kubernetes, fitness, gym, fitnessstudio, sport, food, essen, drink, getränk, shake, restaurant, shop, store, geschäft, idea for, möchte, will, want to',
                 'prompt' => self::generalPrompt(),
             ],
@@ -87,25 +87,20 @@ class PromptCatalog
             //  Granular routing topics (Synapse v2)
             // ──────────────────────────────────────────────
             //
-            // All five entries below are aliases of canonical legacy topics
+            // The five entries below are aliases of canonical legacy topics
             // (`general` for chat/coding, `mediamaker` for the *-generation
-            // family — see TopicAliasResolver::TOPIC_ALIASES). They exist so
-            // Synapse Routing v2's embedding tier can discriminate at a
-            // finer granularity; downstream handlers only ever see the
-            // canonical topic after TopicAliasResolver runs.
+            // family — see TopicAliasResolver::TOPIC_ALIASES). They give
+            // Synapse Routing v2's embedding tier a finer-grained taxonomy;
+            // downstream handlers only ever see the canonical topic after
+            // TopicAliasResolver runs.
             //
-            // They are SHIPPED DISABLED (BENABLED=0). The legacy AI sorter
-            // otherwise sees both the canonical and the granular row in its
-            // choice list and produces brittle near-duplicate picks (e.g.
-            // `general` vs `general-chat`). Admins who enable Synapse v2
-            // can flip them all back on via the
-            // `QDRANT_SEARCH.GRANULAR_TOPICS_ENABLED` BCONFIG toggle, which
-            // also flips BENABLED on these rows via GranularTopicsManager.
-            //
-            // The catalog entry is kept (not removed) so:
-            //   - existing installs flip BENABLED=0 on the next seed
-            //   - the SynapseIndexer drops orphan vectors from Qdrant
-            //   - re-enabling restores keywords/description, no manual SQL
+            // Shipped DISABLED (BENABLED=0) so the legacy AI sorter sees
+            // only canonical topics and is not asked to disambiguate
+            // alias-vs-canonical near-duplicates. Admins enable them as a
+            // group via the `QDRANT_SEARCH.GRANULAR_TOPICS_ENABLED` BCONFIG
+            // toggle; GranularTopicsManager keeps BENABLED in lock-step,
+            // and PromptSeeder re-applies the toggle after every seed so a
+            // re-run cannot clobber an admin-enabled state.
             [
                 'topic' => 'coding',
                 'language' => 'en',

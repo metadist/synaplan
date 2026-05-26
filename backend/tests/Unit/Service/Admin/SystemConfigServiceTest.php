@@ -12,12 +12,6 @@ use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
 
-// The two collaborators are concrete classes; the test stores them as
-// intersection types so PHPStan sees the MockObject API (->method(),
-// ->expects()) alongside the production interface. Using `@var` PHPDoc on
-// a typed property does NOT propagate the mixin in PHPStan's view, while
-// native intersection-type properties do (PHP 8.1+).
-
 /**
  * Locks down the side-effect hook that runs when an admin toggles
  * `QDRANT_SEARCH.GRANULAR_TOPICS_ENABLED` via the admin UI: the BCONFIG
@@ -43,6 +37,7 @@ final class SystemConfigServiceTest extends TestCase
             projectDir: sys_get_temp_dir(),
             logger: new NullLogger(),
             configRepository: $this->configRepository,
+            defaultTtsUrl: 'http://localhost:10200',
             granularTopicsManager: $this->granularTopicsManager,
         );
     }
@@ -95,6 +90,27 @@ final class SystemConfigServiceTest extends TestCase
         $this->granularTopicsManager->expects($this->never())->method('applyState');
 
         $this->service->setValue('SYNAPSE_ROUTING_ENABLED', 'true');
+    }
+
+    /**
+     * Pin the hook target to the constants on GranularTopicsManager. If a
+     * future refactor moves the constants somewhere else or renames them,
+     * the hook would silently stop firing and an admin toggle would leave
+     * BPROMPTS in a stale state — the convergence in PromptSeeder would
+     * eventually catch up, but only on the next `app:seed` run. This test
+     * fails fast if the (group, key) contract breaks.
+     */
+    public function testHookFiresExactlyForTheManagerOwnedConfigKey(): void
+    {
+        $this->assertSame('QDRANT_SEARCH', GranularTopicsManager::CONFIG_GROUP);
+        $this->assertSame('GRANULAR_TOPICS_ENABLED', GranularTopicsManager::CONFIG_KEY);
+
+        $this->granularTopicsManager->expects($this->once())
+            ->method('applyState')
+            ->with(true)
+            ->willReturn(['flipped' => [], 'unchanged' => [], 'missing' => []]);
+
+        $this->service->setValue(GranularTopicsManager::CONFIG_KEY, 'true');
     }
 
     /**
