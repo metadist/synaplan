@@ -6,6 +6,8 @@ namespace App\Service\Admin;
 
 use App\Repository\ConfigRepository;
 use App\Service\FeedbackConstants;
+use App\Service\Message\GranularTopicsManager;
+use App\Service\Message\MessageSorter;
 use Psr\Log\LoggerInterface;
 
 /**
@@ -28,6 +30,7 @@ final readonly class SystemConfigService
         private readonly string $projectDir,
         private readonly LoggerInterface $logger,
         private readonly ConfigRepository $configRepository,
+        private readonly GranularTopicsManager $granularTopicsManager,
         private readonly string $defaultTtsUrl = 'http://localhost:10200',
     ) {
         $this->schema = $this->buildSchema();
@@ -87,6 +90,7 @@ final readonly class SystemConfigService
                     'qdrant' => ['label' => 'Qdrant', 'fields' => ['QDRANT_URL']],
                     'synapse' => ['label' => 'Synapse Routing', 'fields' => [
                         'SYNAPSE_ROUTING_ENABLED', 'SYNAPSE_CONFIDENCE_THRESHOLD',
+                        'GRANULAR_TOPICS_ENABLED',
                     ]],
                     'qdrant_search' => ['label' => 'Search Thresholds', 'fields' => [
                         'MIN_CHAT_FEEDBACK_SCORE', 'MIN_CHAT_MEMORY_SCORE', 'MIN_CONTRADICTION_SCORE',
@@ -244,6 +248,37 @@ final readonly class SystemConfigService
         try {
             $this->configRepository->setValue(self::DB_OWNER_ID, self::DB_GROUP, $key, $value);
             $this->logChange($key, $value);
+
+            // Side-effect: when the granular-topics master switch is toggled,
+            // also flip BENABLED on the matching catalog rows so the AI sort
+            // pool and the Synapse indexer agree with the new state from the
+            // very next request. The manager is idempotent and only writes
+            // rows whose state actually changes.
+            if (MessageSorter::GRANULAR_TOPICS_CONFIG_KEY === $key) {
+                $enabled = (bool) (filter_var($value, FILTER_VALIDATE_BOOL, FILTER_NULL_ON_FAILURE) ?? false);
+                try {
+                    $report = $this->granularTopicsManager->applyState($enabled);
+                    $this->logger->info('SystemConfigService: granular routing topics toggled', [
+                        'enabled' => $enabled,
+                        'flipped' => $report['flipped'],
+                        'unchanged' => $report['unchanged'],
+                        'missing' => $report['missing'],
+                    ]);
+                } catch (\Throwable $sideEffect) {
+                    // The BCONFIG write itself succeeded — the prompt-state
+                    // sync failing is a soft error we surface in the log so
+                    // the operator can re-run `app:seed` to converge. We do
+                    // NOT roll back the config write, because the next read
+                    // of MessageSorter::granularTopicsEnabled() will already
+                    // reflect the new flag and the AI-sort filter is the
+                    // primary gate; BENABLED is belt-and-suspenders.
+                    $this->logger->error('SystemConfigService: granular topics state sync failed', [
+                        'key' => $key,
+                        'value' => $value,
+                        'error' => $sideEffect->getMessage(),
+                    ]);
+                }
+            }
 
             return ['success' => true, 'requiresRestart' => false];
         } catch (\Throwable $e) {
@@ -820,6 +855,20 @@ final readonly class SystemConfigService
                 'tab' => 'vectordb', 'section' => 'synapse', 'type' => 'number',
                 'sensitive' => false, 'description' => 'Min cosine similarity score for Synapse to route directly (0.0–1.0). Below this threshold, the system falls back to AI-based sorting. Default: 0.78',
                 'default' => '0.78',
+                'source' => 'database',
+            ],
+            // Granular routing aliases (general-chat, coding, image-generation,
+            // video-generation, audio-generation) are aliases of the canonical
+            // legacy topics (`general`, `mediamaker`) — see TopicAliasResolver.
+            // They exist so Synapse Routing v2's embedding tier can discriminate
+            // more finely; the legacy AI sorter sees them as near-duplicate
+            // routing targets and produces brittle picks. Ships OFF; flipping
+            // this toggle also flips BENABLED on the matching BPROMPTS rows
+            // (see GranularTopicsManager + SystemConfigService::setDatabaseValue).
+            'GRANULAR_TOPICS_ENABLED' => [
+                'tab' => 'vectordb', 'section' => 'synapse', 'type' => 'boolean',
+                'sensitive' => false, 'description' => 'Include granular routing topics (general-chat, coding, image-generation, video-generation, audio-generation) in the routing pool. OFF (default) keeps only canonical topics (general, mediamaker) — cleaner choice list for the legacy AI sorter. Turn ON when Synapse Routing v2 is enabled so its embedding tier can discriminate finer-grained intents. Toggling automatically flips BENABLED on the corresponding BPROMPTS rows.',
+                'default' => 'false',
                 'source' => 'database',
             ],
             // === Search Thresholds (database-backed, no restart required) ===

@@ -36,6 +36,33 @@ class PromptRepository extends ServiceEntityRepository
     }
 
     /**
+     * Return EVERY prompt row matching a topic for a given owner, across
+     * all languages. Used by GranularTopicsManager to flip BENABLED on
+     * every variant of a topic in lock-step with the
+     * `QDRANT_SEARCH.GRANULAR_TOPICS_ENABLED` toggle.
+     *
+     * Differs from `findByTopic` (which returns the most recent single
+     * row): callers that need to mutate state must touch every row, not
+     * just the freshest, so per-language variants stay consistent.
+     *
+     * @return list<Prompt>
+     */
+    public function findAllByTopicAndOwner(string $topic, int $ownerId): array
+    {
+        /** @var list<Prompt> $rows */
+        $rows = $this->createQueryBuilder('p')
+            ->where('p.topic = :topic')
+            ->andWhere('p.ownerId = :ownerId')
+            ->setParameter('topic', $topic)
+            ->setParameter('ownerId', $ownerId)
+            ->orderBy('p.id', 'ASC')
+            ->getQuery()
+            ->getResult();
+
+        return $rows;
+    }
+
+    /**
      * Get all available topics for sorting
      * Includes both system (ownerId=0) AND user-specific prompts.
      *

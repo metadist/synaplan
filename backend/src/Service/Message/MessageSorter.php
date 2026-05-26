@@ -4,6 +4,7 @@ namespace App\Service\Message;
 
 use App\AI\Service\AiFacade;
 use App\Entity\User;
+use App\Repository\ConfigRepository;
 use App\Repository\PromptRepository;
 use App\Service\DiscordNotificationService;
 use App\Service\ModelConfigService;
@@ -68,6 +69,19 @@ final readonly class MessageSorter
         '2k' => '1080p',
     ];
 
+    /**
+     * BCONFIG key that controls whether the granular routing aliases
+     * (`general-chat`, `coding`, `image-generation`, `video-generation`,
+     * `audio-generation`) participate in the AI sorter's choice list.
+     *
+     * Stored at (BOWNERID=0, BGROUP=QDRANT_SEARCH). Mirrors the existing
+     * SYNAPSE_ROUTING_ENABLED toggle so admins can find both flags in the
+     * same Routing Configuration screen. Default OFF, matching the
+     * canonical-only experience the AI sort prompt is designed for.
+     */
+    public const GRANULAR_TOPICS_CONFIG_GROUP = 'QDRANT_SEARCH';
+    public const GRANULAR_TOPICS_CONFIG_KEY = 'GRANULAR_TOPICS_ENABLED';
+
     public function __construct(
         private AiFacade $aiFacade,
         private PromptRepository $promptRepository,
@@ -77,6 +91,8 @@ final readonly class MessageSorter
         private EntityManagerInterface $em,
         private LoggerInterface $logger,
         private DiscordNotificationService $discord,
+        private TopicAliasResolver $topicAliasResolver,
+        private ConfigRepository $configRepository,
     ) {
     }
 
@@ -144,11 +160,7 @@ final readonly class MessageSorter
         // Get all available topics (exclude tools:* internal topics)
         // Include user-specific prompts if userId is provided
         // Load prompts for ALL supported languages to ensure user prompts are included
-        $topics = $this->promptRepository->getAllTopics(0, $userId, excludeTools: true);
-
-        // Get topics with descriptions - all prompts included regardless of language
-        // so the sorter knows every available routing target
-        $topicsWithDesc = $this->promptRepository->getTopicsWithDescriptions(0, '', $userId, excludeTools: true);
+        [$topics, $topicsWithDesc] = $this->buildTopicPool($userId);
 
         // Build dynamic list and key list for prompt
         $dynamicList = $this->buildDynamicList($topicsWithDesc);
@@ -350,6 +362,67 @@ final readonly class MessageSorter
         }
 
         return null;
+    }
+
+    /**
+     * Build the AI sorter's choice list: the list of routable topic keys
+     * and the parallel list of `{ topic, description }` rows that get
+     * injected into the [KEYLIST] / [DYNAMICLIST] placeholders.
+     *
+     * Granular routing aliases (e.g. `general-chat`, `image-generation`)
+     * are filtered out when `QDRANT_SEARCH.GRANULAR_TOPICS_ENABLED` is
+     * false. They are aliases of canonical legacy topics (see
+     * TopicAliasResolver::TOPIC_ALIASES) and only exist to give Synapse
+     * Routing v2's embedding tier a finer-grained taxonomy; showing them
+     * to the LLM sorter creates near-duplicate routing targets ("general"
+     * vs "general-chat") and produces brittle, model-dependent picks.
+     *
+     * This filter is belt-and-suspenders next to the PromptCatalog ship-
+     * disabled defaults — even if an operator (or a stale seed) enabled
+     * a granular row in BPROMPTS while the toggle stays OFF, the AI sort
+     * pool stays clean.
+     *
+     * @return array{0: list<string>, 1: list<array{topic: string, description: string, ownerId: int}>}
+     */
+    private function buildTopicPool(?int $userId): array
+    {
+        $topics = $this->promptRepository->getAllTopics(0, $userId, excludeTools: true);
+        $topicsWithDesc = $this->promptRepository->getTopicsWithDescriptions(0, '', $userId, excludeTools: true);
+
+        if ($this->granularTopicsEnabled()) {
+            return [array_values($topics), array_values($topicsWithDesc)];
+        }
+
+        $resolver = $this->topicAliasResolver;
+        $topics = array_values(array_filter(
+            $topics,
+            static fn (string $topic): bool => !$resolver->isAlias($topic),
+        ));
+        $topicsWithDesc = array_values(array_filter(
+            $topicsWithDesc,
+            static fn (array $row): bool => !$resolver->isAlias((string) $row['topic']),
+        ));
+
+        return [$topics, $topicsWithDesc];
+    }
+
+    /**
+     * Whether granular routing aliases should be visible to the AI sorter.
+     *
+     * Default OFF — matches the catalog ship state and the post-hot-fix
+     * production behaviour. Admins flip this via the Routing Configuration
+     * UI; the SystemConfigService write hook also flips BENABLED on the
+     * matching BPROMPTS rows via GranularTopicsManager.
+     */
+    private function granularTopicsEnabled(): bool
+    {
+        $value = $this->configRepository->getValue(0, self::GRANULAR_TOPICS_CONFIG_GROUP, self::GRANULAR_TOPICS_CONFIG_KEY);
+
+        if (null === $value) {
+            return false;
+        }
+
+        return filter_var($value, \FILTER_VALIDATE_BOOL, \FILTER_NULL_ON_FAILURE) ?? false;
     }
 
     /**

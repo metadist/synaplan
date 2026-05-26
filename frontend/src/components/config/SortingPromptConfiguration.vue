@@ -123,6 +123,66 @@
     </div>
 
     <!--
+      Granular routing topics toggle — admin-only. Controls whether the
+      granular routing aliases (general-chat, coding, image-generation,
+      video-generation, audio-generation) are active in the routing pool.
+      Sibling of the Synapse Routing toggle above: when Synapse v2 is on,
+      enabling this lets the embedding tier discriminate finer-grained
+      intents; when Synapse is off, leaving this OFF keeps the legacy AI
+      sorter from seeing duplicate near-identical routing targets.
+      The backend flips BENABLED on the matching BPROMPTS rows in
+      lock-step via GranularTopicsManager.
+    -->
+    <div v-if="isAdmin" class="surface-card overflow-hidden" data-testid="section-routing-granular">
+      <div class="p-6">
+        <div class="flex items-start gap-4 flex-wrap">
+          <div
+            class="p-2 rounded-lg bg-[var(--brand)]/10 flex-shrink-0 flex items-center justify-center w-10 h-10"
+          >
+            <Icon icon="heroicons:squares-2x2" class="w-6 h-6 text-[var(--brand)]" />
+          </div>
+          <div class="flex-1 min-w-0">
+            <h3 class="text-lg font-semibold txt-primary mb-1">
+              {{ $t('config.routing.granularTitle') }}
+            </h3>
+            <p class="text-sm txt-secondary">
+              {{ $t('config.routing.granularSubtitle') }}
+            </p>
+            <p class="text-xs txt-secondary mt-2">
+              {{ $t('config.routing.granularPromptHint') }}
+            </p>
+          </div>
+          <label
+            class="inline-flex items-center gap-3 cursor-pointer flex-shrink-0"
+            data-testid="toggle-granular-enabled"
+          >
+            <span class="text-sm font-medium txt-primary">
+              {{
+                granularTopicsEnabled ? $t('config.routing.betaOn') : $t('config.routing.betaOff')
+              }}
+            </span>
+            <span class="relative inline-flex">
+              <input
+                type="checkbox"
+                class="sr-only peer"
+                :checked="granularTopicsEnabled"
+                :disabled="togglingGranular"
+                data-testid="toggle-granular-input"
+                @change="onToggleGranular(($event.target as HTMLInputElement).checked)"
+              />
+              <span
+                class="w-11 h-6 bg-gray-300 dark:bg-gray-700 rounded-full peer-checked:bg-[var(--brand)] peer-disabled:opacity-50 transition-colors"
+              ></span>
+              <span
+                class="absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform peer-checked:translate-x-5"
+              ></span>
+            </span>
+          </label>
+        </div>
+      </div>
+    </div>
+
+    <!--
       Embedding-model picker — admin-only. The whole card is wrapped in
       `v-if="isAdmin"` so non-admin users never receive the markup, not
       even disabled. The amber accents and ADMIN pill make it visually
@@ -843,6 +903,16 @@ const topicSearch = ref('')
 const synapseEnabled = ref(false)
 const togglingSynapse = ref(false)
 
+// --- Granular routing topics toggle ----------------------------------------
+// Sibling of `SYNAPSE_ROUTING_ENABLED`. When ON, the granular routing
+// aliases (general-chat, coding, image-generation, video-generation,
+// audio-generation) are included in the AI sort pool AND their matching
+// BPROMPTS rows are flipped to BENABLED=1 (the backend toggle hook does
+// this in lock-step via GranularTopicsManager). OFF (default) keeps the
+// canonical-only routing experience.
+const granularTopicsEnabled = ref(false)
+const togglingGranular = ref(false)
+
 // --- Synapse embedding-model state -----------------------------------------
 const synapseEmbeddingStatus = ref<SynapseEmbeddingStatusResponse | null>(null)
 const synapseEmbeddingSelection = ref<number | null>(null)
@@ -1168,6 +1238,48 @@ const onToggleSynapse = async (next: boolean) => {
   }
 }
 
+// --- Granular routing topics toggle -----------------------------------------
+const loadGranularTopics = async () => {
+  if (!isAdmin.value) return
+  try {
+    const values = await getConfigValues()
+    const raw = values['GRANULAR_TOPICS_ENABLED']?.value ?? 'false'
+    granularTopicsEnabled.value = ['true', '1', 'yes', 'on'].includes(raw.toLowerCase())
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Failed to load granular topics state'
+    showError(message)
+  }
+}
+
+const onToggleGranular = async (next: boolean) => {
+  if (!isAdmin.value) return
+
+  togglingGranular.value = true
+  const previous = granularTopicsEnabled.value
+  granularTopicsEnabled.value = next
+  try {
+    const result = await updateConfigValue('GRANULAR_TOPICS_ENABLED', next ? 'true' : 'false')
+    if (!result.success) {
+      throw new Error(result.error || 'Failed to update granular topics state')
+    }
+    // The backend hook (GranularTopicsManager) flips BENABLED on the
+    // matching catalog rows in the same write transaction. Reload the
+    // task-prompts cache the next time the user navigates there;
+    // nothing on this page depends on per-prompt BENABLED state.
+    success(
+      next
+        ? t('config.routing.granularToggleEnabledNotice')
+        : t('config.routing.granularToggleDisabledNotice')
+    )
+  } catch (err) {
+    granularTopicsEnabled.value = previous
+    const message = err instanceof Error ? err.message : 'Failed to update granular topics state'
+    showError(message)
+  } finally {
+    togglingGranular.value = false
+  }
+}
+
 const reindex = async (opts: { force?: boolean; recreate?: boolean }) => {
   if (!isAdmin.value) {
     warning('Admin access required.')
@@ -1398,6 +1510,7 @@ onMounted(async () => {
   loadSortingPrompt()
   if (isAdmin.value) {
     loadSynapseEnabled()
+    loadGranularTopics()
     loadStatus()
     await loadSynapseEmbedding()
     if (synapseActiveRun.value) {
