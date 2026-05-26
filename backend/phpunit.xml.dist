@@ -47,6 +47,8 @@
         <env name="STRIPE_PRICE_PRO" value="price_1TestSuitePro" force="true" />
         <env name="STRIPE_PRICE_TEAM" value="price_1TestSuiteTeam" force="true" />
         <env name="STRIPE_PRICE_BUSINESS" value="price_1TestSuiteBusiness" force="true" />
+        <!-- Force the SEPA-enabled allowlist so a developer's local .env can't suppress it. -->
+        <env name="STRIPE_PAYMENT_METHODS" value="card,link,sepa_debit,klarna" force="true" />
         <!-- Whisper / TTS (defaults for testing) -->
         <env name="WHISPER_BINARY" value="/usr/local/bin/whisper" />
         <env name="WHISPER_MODELS_PATH" value="/tmp/whisper-models" />
