@@ -82,7 +82,9 @@ final class GranularTopicsManagerTest extends TestCase
         }
 
         $this->promptRepository->method('findAllByTopicAndOwner')
-            ->willReturnCallback(static fn (string $topic): array => isset($rows[$topic]) ? [$rows[$topic]] : []);
+            ->willReturnCallback(static fn (string $topic, int $ownerId): array => isset($rows[$topic]) && 0 === $ownerId
+                ? [$rows[$topic]]
+                : []);
 
         $this->entityManager->expects($this->exactly(5))->method('persist');
         $this->entityManager->expects($this->once())->method('flush');
@@ -112,7 +114,9 @@ final class GranularTopicsManagerTest extends TestCase
         }
 
         $this->promptRepository->method('findAllByTopicAndOwner')
-            ->willReturnCallback(static fn (string $topic): array => isset($rows[$topic]) ? [$rows[$topic]] : []);
+            ->willReturnCallback(static fn (string $topic, int $ownerId): array => isset($rows[$topic]) && 0 === $ownerId
+                ? [$rows[$topic]]
+                : []);
 
         $this->entityManager->expects($this->never())->method('persist');
         $this->entityManager->expects($this->never())->method('flush');
@@ -134,8 +138,8 @@ final class GranularTopicsManagerTest extends TestCase
         $de = $this->makePrompt('general-chat', enabled: false, language: 'de');
 
         $this->promptRepository->method('findAllByTopicAndOwner')
-            ->willReturnCallback(static function (string $topic) use ($en, $de): array {
-                if ('general-chat' === $topic) {
+            ->willReturnCallback(static function (string $topic, int $ownerId) use ($en, $de): array {
+                if ('general-chat' === $topic && 0 === $ownerId) {
                     return [$en, $de];
                 }
 

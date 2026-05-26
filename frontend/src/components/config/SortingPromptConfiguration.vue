@@ -1188,14 +1188,25 @@ const loadStatus = async () => {
 }
 
 // --- Beta toggle loading + persistence -------------------------------------
-const loadSynapseEnabled = async () => {
+const parseBoolConfigValue = (raw: string | undefined): boolean =>
+  ['true', '1', 'yes', 'on'].includes((raw ?? 'false').toLowerCase())
+
+/**
+ * Fetch every `QDRANT_SEARCH.*` BCONFIG row once and hydrate both the
+ * Synapse Routing and the Granular Topics toggles from the same response.
+ *
+ * Replaces two independent `getConfigValues()` calls on mount — the
+ * endpoint returns the full BCONFIG map either way, so paying for two
+ * round-trips just to set two refs is wasted latency.
+ */
+const loadRoutingToggles = async () => {
   if (!isAdmin.value) return
   try {
     const values = await getConfigValues()
-    const raw = values['SYNAPSE_ROUTING_ENABLED']?.value ?? 'false'
-    synapseEnabled.value = ['true', '1', 'yes', 'on'].includes(raw.toLowerCase())
+    synapseEnabled.value = parseBoolConfigValue(values['SYNAPSE_ROUTING_ENABLED']?.value)
+    granularTopicsEnabled.value = parseBoolConfigValue(values['GRANULAR_TOPICS_ENABLED']?.value)
   } catch (err) {
-    const message = err instanceof Error ? err.message : 'Failed to load Synapse routing state'
+    const message = err instanceof Error ? err.message : 'Failed to load routing configuration'
     showError(message)
   }
 }
@@ -1239,18 +1250,6 @@ const onToggleSynapse = async (next: boolean) => {
 }
 
 // --- Granular routing topics toggle -----------------------------------------
-const loadGranularTopics = async () => {
-  if (!isAdmin.value) return
-  try {
-    const values = await getConfigValues()
-    const raw = values['GRANULAR_TOPICS_ENABLED']?.value ?? 'false'
-    granularTopicsEnabled.value = ['true', '1', 'yes', 'on'].includes(raw.toLowerCase())
-  } catch (err) {
-    const message = err instanceof Error ? err.message : 'Failed to load granular topics state'
-    showError(message)
-  }
-}
-
 const onToggleGranular = async (next: boolean) => {
   if (!isAdmin.value) return
 
@@ -1509,8 +1508,7 @@ const stopSynapseEmbeddingPolling = () => {
 onMounted(async () => {
   loadSortingPrompt()
   if (isAdmin.value) {
-    loadSynapseEnabled()
-    loadGranularTopics()
+    loadRoutingToggles()
     loadStatus()
     await loadSynapseEmbedding()
     if (synapseActiveRun.value) {
