@@ -552,6 +552,54 @@
               </div>
             </div>
 
+            <!-- Training Examples -->
+            <div data-testid="section-training-examples">
+              <label class="block text-sm font-semibold txt-primary mb-2 flex items-center gap-2">
+                <Icon icon="heroicons:academic-cap" class="w-4 h-4" />
+                {{ $t('config.taskPrompts.trainingExamplesLabel') }}
+              </label>
+              <textarea
+                v-model="formData.trainingExamples"
+                rows="5"
+                class="w-full px-4 py-3 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)] resize-y disabled:opacity-50"
+                :placeholder="$t('config.taskPrompts.trainingExamplesPlaceholder')"
+                data-testid="input-training-examples"
+              />
+              <div class="flex items-center justify-between mt-1.5 flex-wrap gap-2">
+                <p class="text-xs txt-secondary flex items-center gap-1">
+                  <Icon icon="heroicons:information-circle" class="w-3.5 h-3.5" />
+                  {{ $t('config.taskPrompts.trainingExamplesHelp') }}
+                </p>
+                <span
+                  v-if="trainingExampleCount > 0"
+                  class="text-[10px] txt-secondary"
+                  data-testid="text-training-examples-count"
+                >
+                  {{ $t('config.taskPrompts.trainingExamplesCount', { n: trainingExampleCount }) }}
+                </span>
+              </div>
+              <button
+                class="mt-2 inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md border border-light-border/30 dark:border-dark-border/20 txt-primary hover:bg-light-border/10 dark:hover:bg-dark-border/10 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                :disabled="isGeneratingExamples || !formData.shortDescription"
+                :title="
+                  !formData.shortDescription ? $t('config.taskPrompts.trainingExamplesEmpty') : ''
+                "
+                data-testid="btn-generate-examples"
+                @click="generateTrainingExamples"
+              >
+                <Icon
+                  :icon="isGeneratingExamples ? 'heroicons:arrow-path' : 'heroicons:sparkles'"
+                  class="w-3.5 h-3.5"
+                  :class="{ 'animate-spin': isGeneratingExamples }"
+                />
+                {{
+                  isGeneratingExamples
+                    ? $t('config.taskPrompts.trainingExamplesGenerating')
+                    : $t('config.taskPrompts.trainingExamplesGenerate')
+                }}
+              </button>
+            </div>
+
             <!-- Embedding preview -->
             <div
               class="surface-chip rounded-lg p-3 border border-dashed border-light-border/30 dark:border-dark-border/20"
@@ -1468,6 +1516,38 @@ const keywordCount = computed(() => {
     .filter(Boolean).length
 })
 
+const trainingExampleCount = computed(() => {
+  const raw = (formData.value.trainingExamples || '').trim()
+  if (!raw) return 0
+  return raw
+    .split(/\n/)
+    .map((l) => l.trim())
+    .filter(Boolean).length
+})
+
+const isGeneratingExamples = ref(false)
+
+const generateTrainingExamples = async () => {
+  if (!formData.value.shortDescription || isGeneratingExamples.value) return
+  isGeneratingExamples.value = true
+  try {
+    const examples = await promptsApi.generateTrainingExamples(
+      currentPrompt.value?.topic || '',
+      formData.value.shortDescription,
+      formData.value.keywords || undefined
+    )
+    if (examples.length > 0) {
+      const existing = (formData.value.trainingExamples || '').trim()
+      const newLines = examples.join('\n')
+      formData.value.trainingExamples = existing ? `${existing}\n${newLines}` : newLines
+    }
+  } catch {
+    // Toast/notification could be added here
+  } finally {
+    isGeneratingExamples.value = false
+  }
+}
+
 const contentLength = computed(() => (formData.value.content || '').length)
 const contentWordCount = computed(() => {
   const text = (formData.value.content || '').trim()
@@ -1902,6 +1982,7 @@ const loadPrompt = () => {
       shortDescription: prompt.shortDescription || '',
       selectionRules: prompt.selectionRules || '',
       keywords: prompt.keywords || '',
+      trainingExamples: prompt.trainingExamples || '',
       enabled: prompt.enabled !== false,
       aiModel: prompt.aiModel,
       availableTools: prompt.availableTools,
@@ -2026,6 +2107,7 @@ const handleSave = saveChanges(async () => {
         language: formData.value.language || locale.value || 'en',
         selectionRules: formData.value.selectionRules ?? null,
         keywords: formData.value.keywords ?? null,
+        trainingExamples: formData.value.trainingExamples ?? null,
         enabled: formData.value.enabled !== false,
         metadata,
       })
@@ -2051,6 +2133,7 @@ const handleSave = saveChanges(async () => {
         prompt: formData.value.content || '',
         selectionRules: formData.value.selectionRules ?? null,
         keywords: formData.value.keywords ?? null,
+        trainingExamples: formData.value.trainingExamples ?? null,
         enabled: formData.value.enabled !== false,
         metadata,
       }
@@ -2189,6 +2272,7 @@ const handleCreateNew = async () => {
       shortDescription: mappedPrompt.shortDescription || '',
       selectionRules: mappedPrompt.selectionRules || '',
       keywords: mappedPrompt.keywords || '',
+      trainingExamples: mappedPrompt.trainingExamples || '',
       enabled: mappedPrompt.enabled !== false,
       aiModel: mappedPrompt.aiModel,
       availableTools: mappedPrompt.availableTools,

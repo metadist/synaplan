@@ -193,6 +193,7 @@ class PromptController extends AbstractController
             'prompt' => $prompt->getPrompt(),
             'selectionRules' => $prompt->getSelectionRules(),
             'keywords' => $prompt->getKeywords(),
+            'trainingExamples' => $prompt->getTrainingExamples(),
             'enabled' => $prompt->isEnabled(),
             'language' => $prompt->getLanguage(),
             'isDefault' => $isDefault,
@@ -793,6 +794,7 @@ class PromptController extends AbstractController
             $language = $data['language'] ?? 'en';
             $selectionRules = isset($data['selectionRules']) ? trim($data['selectionRules']) : null;
             $keywords = isset($data['keywords']) ? trim((string) $data['keywords']) : null;
+            $trainingExamples = isset($data['trainingExamples']) ? trim((string) $data['trainingExamples']) : null;
             $enabled = isset($data['enabled']) ? (bool) $data['enabled'] : true;
             $metadata = $data['metadata'] ?? [];
 
@@ -829,6 +831,7 @@ class PromptController extends AbstractController
             $prompt->setLanguage($language);
             $prompt->setSelectionRules($selectionRules);
             $prompt->setKeywords('' === $keywords ? null : $keywords);
+            $prompt->setTrainingExamples('' === $trainingExamples ? null : $trainingExamples);
             $prompt->setEnabled($enabled);
 
             $this->em->persist($prompt);
@@ -1008,6 +1011,11 @@ class PromptController extends AbstractController
         if (array_key_exists('keywords', $data)) {
             $kw = is_string($data['keywords']) ? trim($data['keywords']) : '';
             $prompt->setKeywords('' === $kw ? null : $kw);
+        }
+
+        if (array_key_exists('trainingExamples', $data)) {
+            $te = is_string($data['trainingExamples']) ? trim($data['trainingExamples']) : '';
+            $prompt->setTrainingExamples('' === $te ? null : $te);
         }
 
         if (array_key_exists('enabled', $data)) {

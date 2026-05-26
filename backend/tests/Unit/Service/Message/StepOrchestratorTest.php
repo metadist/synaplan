@@ -9,6 +9,7 @@ use App\UseCase\PlannedStep;
 use App\UseCase\StepPlan;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
+use Symfony\Component\Messenger\MessageBusInterface;
 
 class StepOrchestratorTest extends TestCase
 {
@@ -17,6 +18,7 @@ class StepOrchestratorTest extends TestCase
     protected function setUp(): void
     {
         $this->orchestrator = new StepOrchestrator(
+            $this->createMock(MessageBusInterface::class),
             $this->createMock(LoggerInterface::class),
         );
     }

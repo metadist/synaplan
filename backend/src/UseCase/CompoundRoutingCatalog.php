@@ -141,6 +141,24 @@ final class CompoundRoutingCatalog
     }
 
     /**
+     * Check if a use case ID refers to a known compound.
+     */
+    public static function isCompound(string $useCaseId): bool
+    {
+        return isset(self::COMPOUNDS[$useCaseId]);
+    }
+
+    /**
+     * Get steps definition for a compound use case.
+     *
+     * @return list<array{capability: string, web_search?: bool, media_type?: string}>
+     */
+    public static function getSteps(string $useCaseId): array
+    {
+        return self::COMPOUNDS[$useCaseId]['steps'] ?? [];
+    }
+
+    /**
      * Export all training data in JSONL format for the external router.
      *
      * @return list<array{text: string, label: string, source: string}>

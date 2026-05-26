@@ -33,6 +33,7 @@ framework:
         routing:
             # Route your messages to the transports
             'App\Message\ProcessMessageCommand': async_ai_high
+            'App\Message\ProcessStepCommand': async_ai_high
             'App\Message\ExtractMemoriesCommand': async_ai_high
             'App\Message\ProvisionDefaultUserPluginsMessage': async_index
             'App\Message\CrawlWidgetUrlMessage': async_index

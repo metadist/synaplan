@@ -25,6 +25,8 @@ export interface TaskPrompt {
   selectionRules?: string | null
   /** Comma/newline-separated synonyms folded into the Synapse embedding text. */
   keywords?: string | null
+  /** Optional training examples for the external SetFit router (one per line). */
+  trainingExamples?: string | null
   /** Soft-disable flag — disabled topics are filtered out of the routing pool. */
   enabled?: boolean
   /** Server-side preview of the exact text that gets embedded for this topic. */
@@ -39,6 +41,7 @@ export interface CreatePromptRequest {
   language?: string
   selectionRules?: string | null
   keywords?: string | null
+  trainingExamples?: string | null
   enabled?: boolean
   metadata?: PromptMetadata
 }
@@ -49,6 +52,7 @@ export interface UpdatePromptRequest {
   language?: string
   selectionRules?: string | null
   keywords?: string | null
+  trainingExamples?: string | null
   enabled?: boolean
   metadata?: PromptMetadata
 }
@@ -316,6 +320,24 @@ class PromptsApi {
       method: 'POST',
       body: JSON.stringify({ text, limit }),
     })
+  }
+
+  /**
+   * Generate training examples for a use case using AI.
+   */
+  async generateTrainingExamples(
+    topic: string,
+    description: string,
+    keywords?: string
+  ): Promise<string[]> {
+    const data = await httpClient<{ examples: string[] }>(
+      '/api/v1/admin/routing/generate-examples',
+      {
+        method: 'POST',
+        body: JSON.stringify({ topic, description, keywords: keywords ?? '' }),
+      }
+    )
+    return data.examples
   }
 }
 

@@ -45,6 +45,15 @@ class Prompt
     private ?string $keywords = null;
 
     /**
+     * Optional training examples for the external SetFit router.
+     *
+     * One example message per line. Used together with user feedback
+     * to train the routing model for this use case.
+     */
+    #[ORM\Column(name: 'BTRAINING_EXAMPLES', type: 'text', nullable: true)]
+    private ?string $trainingExamples = null;
+
+    /**
      * Soft-disable flag.
      *
      * When false, the topic is hidden from the routing pool (both Synapse
@@ -139,6 +148,18 @@ class Prompt
     public function setKeywords(?string $keywords): self
     {
         $this->keywords = $keywords;
+
+        return $this;
+    }
+
+    public function getTrainingExamples(): ?string
+    {
+        return $this->trainingExamples;
+    }
+
+    public function setTrainingExamples(?string $trainingExamples): self
+    {
+        $this->trainingExamples = $trainingExamples;
 
         return $this;
     }

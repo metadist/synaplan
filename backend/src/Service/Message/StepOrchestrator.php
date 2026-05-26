@@ -4,24 +4,25 @@ declare(strict_types=1);
 
 namespace App\Service\Message;
 
+use App\Message\ProcessStepCommand;
 use App\UseCase\PlannedStep;
 use App\UseCase\StepPlan;
 use Psr\Log\LoggerInterface;
+use Symfony\Component\Messenger\MessageBusInterface;
 
 /**
  * Multi-step execution orchestrator.
  *
- * Given a StepPlan with multiple steps, executes them sequentially:
- * 1. Runs each step through the appropriate handler
- * 2. Feeds the output of step N as context into step N+1
- * 3. Collects all intermediate results
- * 4. Returns the aggregated response
+ * Given a StepPlan with multiple steps:
+ * - Step 1 is executed synchronously (streamed to the user)
+ * - Steps 2+ are dispatched to the Messenger queue
  *
  * For single-step plans, delegates directly without overhead.
  */
 final readonly class StepOrchestrator
 {
     public function __construct(
+        private MessageBusInterface $messageBus,
         private LoggerInterface $logger,
     ) {
     }
@@ -95,6 +96,57 @@ final readonly class StepOrchestrator
         }
 
         return $context;
+    }
+
+    /**
+     * Dispatch remaining steps (2+) to the Messenger queue.
+     *
+     * Called after Step 1 has been executed synchronously.
+     *
+     * @param StepPlan $plan            The full step plan
+     * @param int      $conversationId  The conversation/chat ID
+     * @param int      $originalMsgId   The user's original message ID
+     * @param int      $userId          User ID
+     * @param string   $firstStepOutput Output from step 1 (passed as context)
+     */
+    public function dispatchRemainingSteps(
+        StepPlan $plan,
+        int $conversationId,
+        int $originalMsgId,
+        int $userId,
+        string $firstStepOutput = '',
+    ): void {
+        $steps = $plan->steps;
+
+        if (count($steps) <= 1) {
+            return;
+        }
+
+        $previousOutput = $firstStepOutput;
+
+        for ($i = 1, $count = count($steps); $i < $count; ++$i) {
+            $step = $steps[$i];
+
+            $this->logger->info('StepOrchestrator: Dispatching step to queue', [
+                'step_index' => $i,
+                'step_id' => $step->id,
+                'capability' => $step->capability,
+                'conversation_id' => $conversationId,
+            ]);
+
+            $this->messageBus->dispatch(new ProcessStepCommand(
+                conversationId: $conversationId,
+                originalMsgId: $originalMsgId,
+                userId: $userId,
+                stepIndex: $i,
+                stepData: $step->toArray(),
+                previousOutput: $previousOutput,
+            ));
+
+            // Subsequent steps in the queue will receive their previous output
+            // from the handler — we only pass step 1's output to step 2 here.
+            $previousOutput = '';
+        }
     }
 
     /**

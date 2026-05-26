@@ -12,13 +12,14 @@ use Psr\Log\LoggerInterface;
  *
  * When a user reports that a message was routed to the wrong use case,
  * this service:
- * 1. Validates the correction
- * 2. Stores it in message metadata for audit
- * 3. Forwards it to the external synaplan-router for model retraining
+ * 1. Validates the message belongs to the user
+ * 2. Delegates to FeedbackVerifier for rate limiting + AI verification
+ * 3. Only verified feedback is persisted and forwarded for training
  */
 final readonly class RoutingFeedbackService
 {
     public function __construct(
+        private FeedbackVerifier $feedbackVerifier,
         private RouterClient $routerClient,
         private MessageRepository $messageRepository,
         private LoggerInterface $logger,
@@ -26,7 +27,7 @@ final readonly class RoutingFeedbackService
     }
 
     /**
-     * @return array{success: bool, error: ?string}
+     * @return array{success: bool, error: ?string, status?: string, reason?: ?string}
      */
     public function submitFeedback(int $messageId, string $correctUseCase, int $userId): array
     {
@@ -45,29 +46,44 @@ final readonly class RoutingFeedbackService
             return ['success' => false, 'error' => 'Message has no text content'];
         }
 
-        $predictedUseCase = $message->getTopic() ?: 'unknown';
+        $originalTopic = $message->getTopic() ?: 'unknown';
 
         $this->logger->info('RoutingFeedback: User correction received', [
             'message_id' => $messageId,
             'user_id' => $userId,
-            'predicted' => $predictedUseCase,
-            'correct' => $correctUseCase,
+            'original' => $originalTopic,
+            'suggested' => $correctUseCase,
         ]);
 
-        $forwarded = $this->routerClient->submitFeedback(
-            $messageText,
-            $predictedUseCase,
-            $correctUseCase,
-            $userId,
+        // Verify and persist via FeedbackVerifier (rate limit + AI check)
+        $result = $this->feedbackVerifier->submitAndVerify(
+            userId: $userId,
+            messageId: $messageId,
+            originalTopic: $originalTopic,
+            suggestedTopic: $correctUseCase,
+            messageText: $messageText,
         );
 
-        if (!$forwarded) {
-            $this->logger->warning('RoutingFeedback: Could not forward to external router (service may be unavailable)', [
-                'message_id' => $messageId,
-            ]);
+        if (!$result['success']) {
+            return ['success' => false, 'error' => $result['error']];
         }
 
-        return ['success' => true, 'error' => null];
+        // Forward verified feedback to external router for online learning
+        if ('verified' === $result['status']) {
+            $this->routerClient->submitFeedback(
+                $messageText,
+                $originalTopic,
+                $correctUseCase,
+                $userId,
+            );
+        }
+
+        return [
+            'success' => true,
+            'error' => null,
+            'status' => $result['status'],
+            'reason' => $result['reason'],
+        ];
     }
 
     /**
