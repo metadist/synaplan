@@ -295,6 +295,78 @@ class FileAnalysisHandlerMultiFileTest extends TestCase
     }
 
     /**
+     * Copilot review on PR #986 flagged that the previous routing
+     * happily fell through to the documents path as soon as ONE
+     * document had extracted text — silently dropping every other
+     * pending/failed attachment. For multi-file bubbles that was the
+     * exact regression we'd just fixed for #978: "evaluate both files"
+     * answers turning into "evaluated against whichever happened to be
+     * ready first". The new routing surfaces the slowest-prepared
+     * attachment instead so the user is told to wait, not lied to.
+     */
+    public function testMultiFileBubbleWithPendingDocumentRefusesPartialAnalysis(): void
+    {
+        $message = $this->buildMessageWithFiles([
+            $this->buildFile(id: 1, name: 'ready.md', type: 'md', path: '13/000/ready.md', text: 'Done.', status: 'processed'),
+            $this->buildFile(id: 2, name: 'busy.pdf', type: 'pdf', path: '13/000/busy.pdf', text: '', status: 'extracting'),
+        ], text: 'Compare both files please.');
+
+        // No chat call must reach the LLM — we don't want to answer
+        // half a question with the other half still extracting.
+        $this->aiFacade->expects($this->never())->method('chat');
+        $this->aiFacade->expects($this->never())->method('chatStream');
+
+        $result = $this->handler->handle($message, [], []);
+
+        $this->assertSame('document_extraction_in_progress', $result['metadata']['error']);
+        $this->assertStringContainsString('still being prepared', $result['content']);
+    }
+
+    /**
+     * Same regression for audio: a mixed bubble with one transcribed
+     * voice note and one whose transcription is still pending used
+     * to silently reply to only the first. The transcript-missing
+     * error must take priority so the user retries instead of
+     * acting on incomplete input.
+     */
+    public function testMultiFileBubbleWithUntranscribedAudioRefusesPartialAnalysis(): void
+    {
+        $message = $this->buildMessageWithFiles([
+            $this->buildFile(id: 1, name: 'first.ogg', type: 'ogg', path: '13/000/first.ogg', text: 'Hello there.', status: 'processed'),
+            $this->buildFile(id: 2, name: 'second.ogg', type: 'ogg', path: '13/000/second.ogg', text: '', status: 'processed'),
+        ], text: '');
+
+        $this->aiFacade->expects($this->never())->method('chat');
+        $this->aiFacade->expects($this->never())->method('chatStream');
+
+        $result = $this->handler->handle($message, [], []);
+
+        $this->assertSame('audio_not_transcribed', $result['metadata']['error']);
+        $this->assertStringContainsString('Audio transcription failed', $result['content']);
+    }
+
+    /**
+     * The mixed audio + document bubble must also be blocked when the
+     * audio's transcript is missing — the document path used to win
+     * priority and route directly to chat even though the spoken
+     * content was lost.
+     */
+    public function testDocumentPlusUntranscribedAudioBlocksDocumentPath(): void
+    {
+        $message = $this->buildMessageWithFiles([
+            $this->buildFile(id: 1, name: 'spec.md', type: 'md', path: '13/000/spec.md', text: 'Spec body.', status: 'processed'),
+            $this->buildFile(id: 2, name: 'note.ogg', type: 'ogg', path: '13/000/note.ogg', text: '', status: 'processed'),
+        ], text: 'Apply the spoken changes to the spec.');
+
+        $this->aiFacade->expects($this->never())->method('chat');
+        $this->aiFacade->expects($this->never())->method('chatStream');
+
+        $result = $this->handler->handle($message, [], []);
+
+        $this->assertSame('audio_not_transcribed', $result['metadata']['error']);
+    }
+
+    /**
      * If one image vision call fails, the other should still be
      * delivered so the user gets a useful partial response instead
      * of a hard error covering both files.

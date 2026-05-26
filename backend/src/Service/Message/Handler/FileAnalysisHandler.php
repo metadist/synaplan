@@ -388,13 +388,18 @@ final readonly class FileAnalysisHandler implements MessageHandlerInterface
             $modelName = $this->modelConfigService->getModelName($modelId);
         }
 
+        // Log the transcript length only — the system prompt also contains
+        // the "do NOT describe the recording" boilerplate and the
+        // === MARKERS ===, so logging strlen($prompts['system']) would
+        // overstate how much actual user content we sent to the model.
         $this->logger->info('FileAnalysisHandler: Replying to voice message', [
             'model_id' => $modelId,
             'provider' => $provider,
             'model' => $modelName,
             'user_id' => $message->getUserId(),
             'effective_user_id' => $effectiveUserId,
-            'transcript_length' => strlen($prompts['system']),
+            'transcript_length' => strlen($this->joinAudioTranscripts($audioFiles)),
+            'system_prompt_length' => strlen($prompts['system']),
             'voice_message_count' => count($audioFiles),
         ]);
 
@@ -1080,14 +1085,24 @@ final readonly class FileAnalysisHandler implements MessageHandlerInterface
      * categorization.
      *
      * Priority rules:
-     *  1. Documents with extracted text → chat-model "document" path.
+     *  1. Any audio attachment is missing its transcript → surface
+     *     `audio_not_transcribed` immediately. Audio is the slowest
+     *     attachment to prepare in a multi-file bubble; processing
+     *     only the subset that's ready silently drops the rest
+     *     (Copilot review on PR #986). The user needs to wait/retry.
+     *  2. Any document is still being extracted → surface
+     *     `document_extraction_pending`. Same reasoning: don't run
+     *     the chat model on half a bundle.
+     *  3. Any document finished extraction with no usable text →
+     *     surface `document_extraction_failed` so the user knows
+     *     the file is unusable.
+     *  4. Documents with extracted text → chat-model "document" path.
      *     Any transcribed audio is appended as virtual "transcript"
      *     documents so its content reaches the model too.
-     *  2. Otherwise audio-only (one or many) with transcripts → the
+     *  5. Otherwise audio-only (one or many) with transcripts → the
      *     conversational voice-reply path.
-     *  3. Otherwise images → the vision path.
-     *  4. Otherwise we surface the first applicable error
-     *     (missing transcript / document still extracting / unsupported).
+     *  6. Otherwise images → the vision path.
+     *  7. Otherwise → `unsupported`.
      *
      * @param list<array<string, mixed>> $filesInfo
      *
@@ -1143,44 +1158,30 @@ final readonly class FileAnalysisHandler implements MessageHandlerInterface
             }
         }
 
-        // 1. Documents (with text) take priority. Merge any transcribed
-        //    audio into the document set as a virtual transcript file so
-        //    the chat model still sees the spoken content alongside the
-        //    PDFs/MDs the user attached.
-        if ([] !== $documentsWithText) {
-            $documents = $documentsWithText;
-            foreach ($audioWithText as $audio) {
-                $documents[] = $this->wrapAudioAsTranscriptDocument($audio);
-            }
-
-            return ['kind' => 'documents', 'documents' => $documents];
-        }
-
-        // 2. Audio-only message(s) with usable transcripts → reply
-        //    conversationally to the spoken content.
-        if ([] !== $audioWithText && [] === $images) {
-            return ['kind' => 'audio', 'audio' => $audioWithText];
-        }
-
-        // 3. Images only → vision path. We tolerate transcribed audio
-        //    being present alongside images by passing the spoken
-        //    content as the per-image prompt below isn't ideal, so we
-        //    fall through to vision and rely on its prompt for now.
-        if ([] !== $images && [] === $audioWithText) {
-            return ['kind' => 'images', 'images' => $images];
-        }
-
-        // 3b. Mixed images + audio (no documents): describe the images
-        //     and still attempt to route audio sensibly. The simplest
-        //     pragmatic behaviour is to favour images so the user sees
-        //     something useful; audio without a document is rare in
-        //     this combination.
-        if ([] !== $images) {
-            return ['kind' => 'images', 'images' => $images];
-        }
-
-        // 4. No usable documents / audio / images — surface the most
-        //    specific error that explains why.
+        // Surface "files-still-processing" errors BEFORE happily
+        // proceeding with a partial set. Copilot review on PR #986
+        // flagged that the previous routing happily fell through to
+        // the documents/audio branches as soon as ONE file had
+        // extracted text, silently dropping every other attachment.
+        // For multi-file bubbles that's the exact data-loss bug we
+        // were fixing for #978: "evaluate based on both" answers
+        // turning into "evaluated against whichever file was ready
+        // first" without the user being told.
+        //
+        // Resolution priorities, in order:
+        //   1. Any audio attachment missing a transcript → tell the
+        //      user audio is still being prepared, regardless of how
+        //      many documents are ready. Audio transcription is
+        //      usually the slowest path in a multi-file bubble.
+        //   2. Any document still being extracted → tell the user
+        //      to wait. Acting on only the ready subset has caused
+        //      "where's the rest of my plan?" support escalations.
+        //   3. Any document that finished extraction with no text →
+        //      surface the extraction-failed message so the user
+        //      knows that file is unusable, even if other docs
+        //      succeeded.
+        // Only once every attached doc/audio is ready do we hand
+        // the bundle off to the documents/audio chat pipelines.
         if ([] !== $audioMissingText) {
             return [
                 'kind' => 'audio_not_transcribed',
@@ -1202,6 +1203,44 @@ final readonly class FileAnalysisHandler implements MessageHandlerInterface
                 'pending_documents' => $documentsPending,
                 'failed_documents' => $documentsFailed,
             ];
+        }
+
+        // Happy paths only run after every attached doc/audio is ready.
+        // 1. Documents (with text) take priority. Merge any transcribed
+        //    audio into the document set as a virtual transcript file so
+        //    the chat model still sees the spoken content alongside the
+        //    PDFs/MDs the user attached.
+        if ([] !== $documentsWithText) {
+            $documents = $documentsWithText;
+            foreach ($audioWithText as $audio) {
+                $documents[] = $this->wrapAudioAsTranscriptDocument($audio);
+            }
+
+            return ['kind' => 'documents', 'documents' => $documents];
+        }
+
+        // 2. Audio-only message(s) with usable transcripts → reply
+        //    conversationally to the spoken content.
+        if ([] !== $audioWithText && [] === $images) {
+            return ['kind' => 'audio', 'audio' => $audioWithText];
+        }
+
+        // 3. Images only → vision path. Pure image upload, no audio
+        //    transcripts mixed in (the next branch handles that case).
+        if ([] !== $images && [] === $audioWithText) {
+            return ['kind' => 'images', 'images' => $images];
+        }
+
+        // 3b. Mixed images + audio (no documents): we currently favour
+        //     the images and route to the vision path. The audio
+        //     transcript is dropped here because `analyzeImageBatch()`
+        //     only feeds the user prompt — not arbitrary side text — to
+        //     the model. Mixing the two combinations is rare; the
+        //     pragmatic choice is to give the user a useful image
+        //     description and accept that the spoken content is not
+        //     surfaced in this corner case.
+        if ([] !== $images) {
+            return ['kind' => 'images', 'images' => $images];
         }
 
         return ['kind' => 'unsupported'];

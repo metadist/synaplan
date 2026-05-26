@@ -9,6 +9,8 @@ use App\Message\ReVectorizeMessage;
 use App\Repository\RevectorizeRunRepository;
 use App\Service\Embedding\EmbeddingReindexService;
 use App\Service\Embedding\VectorizeBindingService;
+use App\Service\ModelConfigService;
+use App\Service\VectorSearch\QdrantClientInterface;
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\Messenger\Attribute\AsMessageHandler;
@@ -53,6 +55,8 @@ final readonly class ReVectorizeMessageHandler
         private RevectorizeRunRepository $runRepository,
         private EmbeddingReindexService $reindexService,
         private VectorizeBindingService $bindingService,
+        private QdrantClientInterface $qdrantClient,
+        private ModelConfigService $modelConfigService,
         private EntityManagerInterface $em,
         private LoggerInterface $logger,
     ) {
@@ -89,6 +93,7 @@ final readonly class ReVectorizeMessageHandler
             $this->em->flush();
 
             $this->rollbackBinding($run, $e->getMessage());
+            $this->rollbackMemoriesCollection($run, $e->getMessage());
 
             $this->logger->error('ReVectorize: failed', [
                 'run_id' => $run->getId(),
@@ -120,6 +125,7 @@ final readonly class ReVectorizeMessageHandler
             $this->em->flush();
 
             $this->rollbackBinding($run, $message);
+            $this->rollbackMemoriesCollection($run, $message);
 
             $this->logger->error('ReVectorize: all chunks failed — rolled back', [
                 'run_id' => $run->getId(),
@@ -181,6 +187,79 @@ final readonly class ReVectorizeMessageHandler
             ]);
         } catch (\Throwable $rollbackError) {
             $this->logger->critical('ReVectorize: rollback FAILED — operator must restore BCONFIG manually', [
+                'run_id' => $run->getId(),
+                'scope' => $scope,
+                'target_model_id' => $fromModelId,
+                'reason' => $reason,
+                'rollback_error' => $rollbackError->getMessage(),
+            ]);
+        }
+    }
+
+    /**
+     * Restore the memories collection to the previous model's vector
+     * dimension when a memories-touching run fails (#985).
+     *
+     * Why this exists: `EmbeddingReindexService::reindexMemories()`
+     * drops the existing collection and recreates it at the new model's
+     * dimension before upserting. If a later step throws — provider
+     * outage, dim mismatch slipping past the probe check, Qdrant
+     * connectivity blip — the BCONFIG rollback restores the old model,
+     * but the Qdrant collection stays at the broken dim, and every
+     * subsequent live-path write fails with "dimension mismatch:
+     * collection expects X but model produced Y". Best-effort restore:
+     * we recreate the collection with the rollback model's dim so the
+     * memory service is usable again immediately after a failure.
+     *
+     * Skipped for SCOPE_SYNAPSE (different collection, different
+     * recovery path) and SCOPE_DOCUMENTS (memories untouched).
+     */
+    private function rollbackMemoriesCollection(RevectorizeRun $run, string $reason): void
+    {
+        $scope = $run->getScope();
+        if (!in_array($scope, [RevectorizeRun::SCOPE_MEMORIES, RevectorizeRun::SCOPE_ALL], true)) {
+            return;
+        }
+
+        $fromModelId = $run->getModelFromId();
+        if ($fromModelId <= 0) {
+            $this->logger->info('ReVectorize: no previous model — memories collection rollback skipped', [
+                'run_id' => $run->getId(),
+            ]);
+
+            return;
+        }
+
+        try {
+            $fromDim = $this->modelConfigService->getVectorDimForModel($fromModelId);
+            if (null === $fromDim || $fromDim <= 0) {
+                $this->logger->warning('ReVectorize: cannot rollback memories collection — no dimension for rollback model', [
+                    'run_id' => $run->getId(),
+                    'model_id' => $fromModelId,
+                ]);
+
+                return;
+            }
+
+            $info = $this->qdrantClient->getMemoriesCollectionInfo();
+            if ($info['exists'] && $info['vector_dim'] === $fromDim) {
+                // Collection already matches the rollback dim. This is
+                // the happy "failure happened before the drop" branch —
+                // the probe check refused to recreate, so the old
+                // collection is untouched. Nothing to do.
+                return;
+            }
+
+            $this->qdrantClient->recreateMemoriesCollection($fromDim);
+
+            $this->logger->warning('ReVectorize: rolled back memories collection after failure', [
+                'run_id' => $run->getId(),
+                'scope' => $scope,
+                'restored_dim' => $fromDim,
+                'reason' => $reason,
+            ]);
+        } catch (\Throwable $rollbackError) {
+            $this->logger->critical('ReVectorize: memories collection rollback FAILED — operator must recreate manually', [
                 'run_id' => $run->getId(),
                 'scope' => $scope,
                 'target_model_id' => $fromModelId,

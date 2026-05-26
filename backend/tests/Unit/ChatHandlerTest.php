@@ -393,7 +393,14 @@ class ChatHandlerTest extends TestCase
         $this->em->method('getRepository')->with(User::class)->willReturn($userRepository);
 
         $this->userMemoryService->method('isAvailable')->willReturn(true);
+        // PR #985 follow-up: ChatHandler now embeds memory queries via
+        // `embedQueryForMemorySearch` (sticky memory model) instead of
+        // reusing the shared VECTORIZE embedding unconditionally. Mock
+        // both so the test stays valid whether or not the memory
+        // resolver decides to reuse the shared vector.
         $this->userMemoryService->method('embedUserQuery')->willReturn(['embedding' => [0.1, 0.2, 0.3]]);
+        $this->userMemoryService->method('embedQueryForMemorySearch')->willReturn(['embedding' => [0.1, 0.2, 0.3]]);
+        $this->userMemoryService->method('getMemoryEmbeddingModelId')->willReturn(10);
         $this->userMemoryService
             ->method('searchMemoriesByVector')
             ->willReturnCallback(function (int $userId, array $vec, ...$rest) {
@@ -536,9 +543,13 @@ class ChatHandlerTest extends TestCase
         $this->em->method('getRepository')->willReturn($userRepository);
 
         // If the disable flag is honoured we never reach Qdrant; if a
-        // future regression bypasses it, the mock's strict expectation
-        // below will fail the test.
+        // future regression bypasses it, the mock's strict expectations
+        // below will fail the test. Includes the memory-pinned embed
+        // path added in #985-followup so a future split that only
+        // disables the shared (RAG) branch can't accidentally re-enable
+        // memory reads.
         $this->userMemoryService->expects($this->never())->method('embedUserQuery');
+        $this->userMemoryService->expects($this->never())->method('embedQueryForMemorySearch');
         $this->userMemoryService->expects($this->never())->method('searchMemoriesByVector');
         $this->userMemoryService->expects($this->never())->method('searchRelevantMemories');
 

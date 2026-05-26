@@ -932,6 +932,7 @@
       "tokens": "tokens",
       "dimensions": "Vector dim",
       "dimMismatch": "Vector dimensions change from {from} to {to}. All existing vectors will be regenerated and old search scores are not comparable until the re-vectorize finishes.",
+      "memoriesFrozen": "User memories stay on their own embedding model and are NOT migrated by this switch. New memories are still saved correctly — they keep using the memories collection's original model so dimensions match. To re-embed existing memories under the new model, run a dedicated memories re-index (currently admin-only).",
       "scopes": {
         "documents": "Documents (RAG)",
         "memories": "User Memories",

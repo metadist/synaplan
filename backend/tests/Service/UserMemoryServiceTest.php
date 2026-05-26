@@ -8,6 +8,7 @@ use App\AI\Service\AiFacade;
 use App\Entity\User;
 use App\Service\Embedding\EmbeddingMetadataService;
 use App\Service\Exception\MemoryServiceUnavailableException;
+use App\Service\Memory\MemoryEmbeddingModelResolver;
 use App\Service\ModelConfigService;
 use App\Service\RateLimitService;
 use App\Service\UserMemoryService;
@@ -28,6 +29,7 @@ final class UserMemoryServiceTest extends TestCase
     private ModelConfigService&MockObject $modelConfigService;
     private RateLimitService&MockObject $rateLimitService;
     private EmbeddingMetadataService&MockObject $embeddingMetadata;
+    private MemoryEmbeddingModelResolver&MockObject $memoryEmbeddingResolver;
     private LoggerInterface&MockObject $logger;
     private UserMemoryService $service;
 
@@ -39,12 +41,25 @@ final class UserMemoryServiceTest extends TestCase
         $this->modelConfigService = $this->createMock(ModelConfigService::class);
         $this->rateLimitService = $this->createMock(RateLimitService::class);
         $this->embeddingMetadata = $this->createMock(EmbeddingMetadataService::class);
+        $this->memoryEmbeddingResolver = $this->createMock(MemoryEmbeddingModelResolver::class);
         $this->logger = $this->createMock(LoggerInterface::class);
 
         // Default: stale-filter pass-through so legacy tests behave as before.
         $this->embeddingMetadata->method('filterStaleHits')->willReturnCallback(
             static fn (array $hits) => ['fresh' => $hits, 'stale_count' => 0]
         );
+
+        // Default: resolver returns null model — the legacy tests don't
+        // care which model is used because they mock $aiFacade->embed()
+        // unconditionally. Specific tests below override this to assert
+        // the sticky-model behaviour.
+        $this->memoryEmbeddingResolver->method('resolve')->willReturn([
+            'provider' => null,
+            'model' => null,
+            'model_id' => null,
+            'vector_dim' => null,
+        ]);
+        $this->memoryEmbeddingResolver->method('getModelId')->willReturn(null);
 
         $this->service = new UserMemoryService(
             $this->em,
@@ -53,6 +68,7 @@ final class UserMemoryServiceTest extends TestCase
             $this->modelConfigService,
             $this->rateLimitService,
             $this->embeddingMetadata,
+            $this->memoryEmbeddingResolver,
             $this->logger
         );
     }
@@ -371,5 +387,93 @@ final class UserMemoryServiceTest extends TestCase
         $this->expectExceptionMessageMatches('/dimension mismatch/i');
 
         $this->service->createMemory($user, 'personal', 'city', 'Berlin');
+    }
+
+    /**
+     * Issue #985 follow-up: after a VECTORIZE swap that left the
+     * memories collection frozen, write paths must keep embedding
+     * against the *memory-pinned* (sticky) model — NOT the new
+     * VECTORIZE default. Without this distinction every new memory
+     * would either be rejected (dim mismatch with the still-old
+     * collection) or stored in a vector space that's incompatible
+     * with every existing point (useless for similarity search).
+     *
+     * The mock has VECTORIZE = 99 (1536-dim) but the sticky pointer
+     * is 42 (3072-dim, matching the collection). We must see embed()
+     * receive the STICKY model name, not VECTORIZE's.
+     */
+    public function testCreateMemoryEmbedsAgainstStickyMemoryModelNotVectorize(): void
+    {
+        // Override the per-class default to point at a real sticky model.
+        $resolver = $this->createMock(MemoryEmbeddingModelResolver::class);
+        $resolver->method('resolve')->willReturn([
+            'provider' => 'openai',
+            'model' => 'text-embedding-3-large',
+            'model_id' => 42,
+            'vector_dim' => 3072,
+        ]);
+        $resolver->method('getModelId')->willReturn(42);
+        $service = new UserMemoryService(
+            $this->em,
+            $this->qdrantClient,
+            $this->aiFacade,
+            $this->modelConfigService,
+            $this->rateLimitService,
+            $this->embeddingMetadata,
+            $resolver,
+            $this->logger,
+        );
+
+        $user = $this->createMock(User::class);
+        $user->method('getId')->willReturn(1);
+
+        $this->qdrantClient->method('isAvailable')->willReturn(true);
+        $this->qdrantClient->method('scrollMemories')->willReturn([]);
+        $this->qdrantClient->method('getMemoriesCollectionInfo')->willReturn([
+            'exists' => true,
+            'vector_dim' => 3072,
+            'points_count' => 10,
+            'distance' => 'Cosine',
+        ]);
+
+        // VECTORIZE points at a NARROWER model in BCONFIG (e.g. the
+        // operator just swapped to text-embedding-3-small) — the
+        // service must ignore it for memory writes.
+        $this->modelConfigService->method('getDefaultModel')->with('VECTORIZE')->willReturn(99);
+
+        // The crucial assertion: embed() is called with the sticky
+        // model's name, not the active VECTORIZE one. If the service
+        // ever falls back to VECTORIZE again, this expectation fails.
+        $this->aiFacade
+            ->expects($this->once())
+            ->method('embed')
+            ->with(
+                $this->anything(),
+                $this->anything(),
+                $this->callback(function (array $opts): bool {
+                    return ('text-embedding-3-large' === ($opts['model'] ?? null))
+                        && ('openai' === ($opts['provider'] ?? null));
+                })
+            )
+            ->willReturn([
+                'embedding' => array_fill(0, 3072, 0.1),
+                'usage' => ['total_tokens' => 4],
+            ]);
+
+        $upsertedPayload = null;
+        $this->qdrantClient
+            ->expects($this->once())
+            ->method('upsertMemory')
+            ->willReturnCallback(function (string $pointId, array $vector, array $payload) use (&$upsertedPayload): void {
+                $upsertedPayload = $payload;
+            });
+
+        $service->createMemory($user, 'personal', 'city', 'Berlin');
+
+        // The persisted payload must record the sticky model id so a
+        // later stale-filter pass keeps treating these as fresh.
+        $this->assertSame(42, $upsertedPayload['embedding_model_id']);
+        $this->assertSame(3072, $upsertedPayload['vector_dim']);
+        $this->assertSame('text-embedding-3-large', $upsertedPayload['embedding_model']);
     }
 }
