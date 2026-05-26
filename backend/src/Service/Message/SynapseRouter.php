@@ -164,6 +164,7 @@ final readonly class SynapseRouter
         private QdrantClientInterface $qdrantClient,
         private AiFacade $aiFacade,
         private MessageSorter $messageSorter,
+        private RouterClient $routerClient,
         private PromptService $promptService,
         private PromptRepository $promptRepository,
         private ModelConfigService $modelConfigService,
@@ -311,10 +312,16 @@ final readonly class SynapseRouter
             }
         }
 
-        // Step 2: Conversation-sticky — reuse topic if still relevant
+        // Step 2: External Router (SetFit/ONNX) — fast ML classification
+        $routerResult = $this->tryExternalRouter($messageText, $conversationHistory, $userId);
+        if (null !== $routerResult) {
+            return $routerResult;
+        }
+
+        // Step 3: Conversation-sticky — reuse topic if still relevant
         $lastTopic = $this->getLastTopicFromHistory($conversationHistory);
 
-        // Step 3: Embed message and search Qdrant
+        // Step 4: Embed message and search Qdrant
         try {
             $embeddingOptions = $this->getEmbeddingOptions();
             $result = $this->aiFacade->embed($messageText, $userId, $embeddingOptions);
@@ -510,6 +517,84 @@ final readonly class SynapseRouter
 
             return $this->fallbackToAi($messageData, $conversationHistory, $userId, 'exception');
         }
+    }
+
+    /**
+     * Try the external synaplan-router (SetFit/ONNX) for classification.
+     *
+     * Returns a full classification result array when the external router
+     * responds with sufficient confidence. Returns null when the router is
+     * unavailable, disabled, or below the confidence threshold — the caller
+     * should then fall through to Qdrant/LLM tiers.
+     */
+    private function tryExternalRouter(string $messageText, array $conversationHistory, ?int $userId): ?array
+    {
+        $lastTopic = $this->getLastTopicFromHistory($conversationHistory);
+        $result = $this->routerClient->classify($messageText, null, $lastTopic);
+
+        if (null === $result) {
+            return null;
+        }
+
+        $confidence = $result['confidence'];
+        $threshold = $this->routerClient->getConfidenceThreshold();
+
+        if ($confidence < $threshold) {
+            $this->logger->info('SynapseRouter: External router below threshold', [
+                'use_case' => $result['use_case'],
+                'confidence' => round($confidence, 4),
+                'threshold' => $threshold,
+            ]);
+
+            return null;
+        }
+
+        $useCase = $result['use_case'];
+        $alias = $this->topicAliasResolver->resolve($useCase);
+        $canonicalTopic = $alias['topic'];
+        $impliedMedia = $alias['media'];
+
+        $language = $this->detectLanguage($messageText, null);
+        $mediaType = $impliedMedia ?? ('mediamaker' === $canonicalTopic ? $this->detectMediaType($messageText) : null);
+        $promptMetadata = $this->loadPromptMetadata($canonicalTopic, $userId ?? 0);
+
+        $promptToolInternet = $promptMetadata['tool_internet'] ?? null;
+        $webSearch = WebSearchTopicPolicy::shouldSearch($canonicalTopic, $promptToolInternet);
+
+        $this->logger->info('SynapseRouter: External router classification', [
+            'use_case' => $useCase,
+            'canonical_topic' => $canonicalTopic,
+            'confidence' => round($confidence, 4),
+            'is_compound' => $result['is_compound'],
+            'steps_count' => count($result['steps']),
+            'model_version' => $result['model_version'],
+            'router_latency_ms' => $result['latency_ms'],
+        ]);
+
+        $classification = [
+            'topic' => $canonicalTopic,
+            'granular_topic' => $useCase,
+            'language' => $language,
+            'web_search' => $webSearch,
+            'media_type' => $mediaType,
+            'raw_response' => sprintf('Router: %s (%.4f)', $useCase, $confidence),
+            'prompt_metadata' => $promptMetadata,
+            'source' => 'synapse_external_router',
+            'synapse_score' => $confidence,
+            'synapse_latency_ms' => $result['latency_ms'],
+            'sorting_model_id' => null,
+            'sorting_provider' => 'synaplan-router',
+            'sorting_model_name' => $result['model_version'],
+            'classification_source' => 'setfit',
+            'classification_confidence' => $confidence,
+        ];
+
+        if ($result['is_compound'] && !empty($result['steps'])) {
+            $classification['router_steps'] = $result['steps'];
+            $classification['is_compound'] = true;
+        }
+
+        return $classification;
     }
 
     /**

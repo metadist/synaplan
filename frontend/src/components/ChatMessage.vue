@@ -723,6 +723,13 @@
             v-if="role === 'assistant' && !isStreaming && backendMessageId"
             class="flex items-center gap-2 flex-shrink-0"
           >
+            <!-- Routing Feedback Button - report wrong use case -->
+            <RoutingFeedback
+              v-if="backendMessageId && !isGuestMode"
+              :message-id="backendMessageId"
+              :disabled="isSuperseded"
+            />
+
             <!-- False Positive Button - only show if memory/feedback service is available -->
             <button
               v-if="isFeedbackServiceAvailable"
@@ -938,6 +945,7 @@ import MessagePart from './MessagePart.vue'
 import MessageMemories from './MessageMemories.vue'
 import MessageFeedbacks from './MessageFeedbacks.vue'
 import GroqIcon from '@/components/icons/GroqIcon.vue'
+import RoutingFeedback from '@/components/RoutingFeedback.vue'
 import ExternalLinkWarning from '@/components/common/ExternalLinkWarning.vue'
 import { useExternalLink } from '@/composables/useExternalLink'
 import { useDateFormat } from '@/composables/useDateFormat'

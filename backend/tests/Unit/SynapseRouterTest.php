@@ -8,6 +8,7 @@ use App\AI\Service\AiFacade;
 use App\Repository\ConfigRepository;
 use App\Repository\PromptRepository;
 use App\Service\Message\MessageSorter;
+use App\Service\Message\RouterClient;
 use App\Service\Message\SynapseRouter;
 use App\Service\Message\TopicAliasResolver;
 use App\Service\ModelConfigService;
@@ -22,6 +23,7 @@ class SynapseRouterTest extends TestCase
     private QdrantClientInterface&MockObject $qdrantClient;
     private AiFacade&MockObject $aiFacade;
     private MessageSorter&MockObject $messageSorter;
+    private RouterClient&MockObject $routerClient;
     private PromptService&MockObject $promptService;
     private PromptRepository&MockObject $promptRepository;
     private ModelConfigService&MockObject $modelConfigService;
@@ -32,15 +34,20 @@ class SynapseRouterTest extends TestCase
         $this->qdrantClient = $this->createMock(QdrantClientInterface::class);
         $this->aiFacade = $this->createMock(AiFacade::class);
         $this->messageSorter = $this->createMock(MessageSorter::class);
+        $this->routerClient = $this->createMock(RouterClient::class);
         $this->promptService = $this->createMock(PromptService::class);
         $this->promptRepository = $this->createMock(PromptRepository::class);
         $this->modelConfigService = $this->createMock(ModelConfigService::class);
         $configRepository = $this->createMock(ConfigRepository::class);
 
+        // RouterClient returns null by default (disabled/unavailable)
+        $this->routerClient->method('classify')->willReturn(null);
+
         $this->router = new SynapseRouter(
             $this->qdrantClient,
             $this->aiFacade,
             $this->messageSorter,
+            $this->routerClient,
             $this->promptService,
             $this->promptRepository,
             $this->modelConfigService,

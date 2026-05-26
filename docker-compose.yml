@@ -473,6 +473,31 @@ services:
     networks:
       - synaplan-network
 
+  # External ML Router (SetFit/ONNX — Use Case classification)
+  # Disabled by default (BCONFIG ROUTER.ENABLED = false).
+  # Enable via Admin UI → System Config → Router after deploying the service.
+  router:
+    image: ghcr.io/metadist/synaplan-router:latest
+    container_name: synaplan-router
+    environment:
+      MODEL_PATH: /data/model
+      RETRAIN_THRESHOLD: "50"
+      CONFIDENCE_THRESHOLD: "0.80"
+    volumes:
+      - router_data:/data
+    ports:
+      - "8100:8000"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+    profiles: [router]
+    restart: unless-stopped
+    networks:
+      - synaplan-network
+
   # Qdrant Vector Database (memories + document vectors)
   qdrant:
     image: qdrant/qdrant:v1.18.0@sha256:b3063c673f3973877c038eeecc392bad5011f072ee7892b56c9a8e204a3bdea9
@@ -490,6 +515,7 @@ volumes:
   ollama_data:
   whisper_models:
   qdrant_storage:
+  router_data:
   keycloak_certs:
 
 networks:
