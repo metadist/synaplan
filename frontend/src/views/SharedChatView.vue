@@ -608,5 +608,18 @@ const parseMessageParts = (message: Message): MessagePart[] => {
 </script>
 
 <style scoped>
-/* No additional styles needed - MessageText and MessageCode components have their own styles */
+/*
+ * The global stylesheet sets `html, body { overflow: hidden; height: 100% }`
+ * so the chat app can own its scroll regions. The shared-chat page is a
+ * long, document-style layout (sticky header + main + footer) that needs
+ * normal page scrolling, so we turn this root into its own scroll
+ * container. The sticky header sticks to the nearest scrolling ancestor,
+ * which is now `.shared-chat-root` — behavior is preserved.
+ */
+.shared-chat-root {
+  height: 100dvh;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+}
 </style>
