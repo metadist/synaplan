@@ -1349,7 +1349,12 @@ class OpenAIProvider implements ChatProviderInterface, EmbeddingProviderInterfac
                 'prompt_length' => strlen($prompt),
             ]);
 
-            $response = $this->client->chat()->create([
+            // Reasoning-tier models (o-series, gpt-5+) reject the legacy
+            // `max_tokens` parameter on chat.completions and require the
+            // newer `max_completion_tokens` instead. Pick the right key
+            // based on the same heuristic the rest of this class uses, so
+            // every catalog row that points at gpt-5*/o* vision works.
+            $payload = [
                 'model' => $model,
                 'messages' => [[
                     'role' => 'user',
@@ -1366,8 +1371,16 @@ class OpenAIProvider implements ChatProviderInterface, EmbeddingProviderInterfac
                         ],
                     ],
                 ]],
-                'max_tokens' => $options['max_tokens'] ?? 1000,
-            ]);
+            ];
+
+            $tokenLimit = $options['max_tokens'] ?? 1000;
+            if ($this->usesCompletionTokens($model)) {
+                $payload['max_completion_tokens'] = $tokenLimit;
+            } else {
+                $payload['max_tokens'] = $tokenLimit;
+            }
+
+            $response = $this->client->chat()->create($payload);
 
             return $response['choices'][0]['message']['content'] ?? '';
         } catch (\Exception $e) {
