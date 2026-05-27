@@ -323,7 +323,7 @@ services:
 
   # Apache Tika - Document Text Extraction
   tika:
-    image: apache/tika:3.3.0.0@sha256:2a565f1ea1290bdcb74a7d35957d16a989ed44ef98790dcdcc28121d728fa583
+    image: apache/tika:3.3.1.0@sha256:90b7fa1dc018434075fce9e1d9b88b1e3d0ea6979d0cf86e116c79a8073ae973
     container_name: synaplan-tika
     command: -h 0.0.0.0 -p 9998
     ports:
@@ -475,7 +475,7 @@ services:
 
   # Qdrant Vector Database (memories + document vectors)
   qdrant:
-    image: qdrant/qdrant:v1.18.0@sha256:b3063c673f3973877c038eeecc392bad5011f072ee7892b56c9a8e204a3bdea9
+    image: qdrant/qdrant:v1.18.1@sha256:45f8e3ddc2570a4d029877e1b5ec1045c19b3852b4e22a55c7f43b05aea0ca89
     container_name: synaplan-qdrant
     ports:
       - "6333:6333"
