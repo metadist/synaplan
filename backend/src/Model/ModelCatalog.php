@@ -504,6 +504,34 @@ class ModelCatalog
                 'meta' => ['context_window' => '131072', 'max_output' => '16384', 'license' => 'Apache-2.0', 'quantization' => 'TruePoint Numerics'],
             ],
         ],
+        [
+            // Snapshot 2026-05-27 (https://console.groq.com/docs/models).
+            'id' => 236,
+            'service' => 'Groq',
+            'name' => 'Llama 3.1 8B Instant',
+            'tag' => 'chat',
+            'selectable' => 1,
+            'active' => 1,
+            'providerId' => 'llama-3.1-8b-instant',
+            'priceIn' => 0.05,
+            'inUnit' => 'per1M',
+            'priceOut' => 0.08,
+            'outUnit' => 'per1M',
+            'quality' => 7,
+            'rating' => 1,
+            'json' => [
+                'description' => 'Groq Llama 3.1 8B Instant - fastest production-grade chat model on Groq (~560 t/s). 131K context, best for high-throughput / low-cost routing.',
+                'max_tokens' => 32768,
+                'params' => [
+                    'model' => 'llama-3.1-8b-instant',
+                    'reasoning_format' => 'hidden',
+                    'messages' => [],
+                ],
+                // max_output mirrors max_tokens (32768) — the model accepts
+                // 131K context in total but caps generated output at 32K.
+                'meta' => ['context_window' => '131072', 'max_output' => '32768'],
+            ],
+        ],
         // Phase 2d: dedicated MEM-tagged models for backgrounded memory
         // extraction. The MEM tag keeps these out of the user-facing chat
         // model picker so picking a heavy chat model (Gemini 3 Pro, Claude
@@ -914,6 +942,94 @@ class ModelCatalog
                 'meta' => ['api' => 'responses'],
             ],
         ],
+        // ----------------------------------------------------------------
+        // GPT-5.4 mini / nano (snapshot 2026-05-27, probed live before
+        // seeding via https://developers.openai.com/api/docs/models).
+        // ----------------------------------------------------------------
+        [
+            'id' => 232,
+            'service' => 'OpenAI',
+            'name' => 'GPT-5.4 mini',
+            'tag' => 'chat',
+            'selectable' => 1,
+            'active' => 1,
+            'providerId' => 'gpt-5.4-mini',
+            'priceIn' => 0.75,
+            'inUnit' => 'per1M',
+            'priceOut' => 4.50,
+            'outUnit' => 'per1M',
+            'quality' => 9,
+            'rating' => 1,
+            'json' => [
+                'description' => 'OpenAI GPT-5.4 mini - the strongest mini model yet for coding, computer use, and subagents. 400K context, low latency, configurable reasoning effort.',
+                'max_tokens' => 128000,
+                'params' => ['model' => 'gpt-5.4-mini'],
+                'features' => ['reasoning', 'vision'],
+                'meta' => [
+                    'api' => 'responses',
+                    'context_window' => '400000',
+                    'max_output' => '128000',
+                    'knowledge_cutoff' => '2025-08-31',
+                ],
+            ],
+        ],
+        [
+            'id' => 233,
+            'service' => 'OpenAI',
+            'name' => 'GPT-5.4 mini (Vision)',
+            'tag' => 'pic2text',
+            'selectable' => 1,
+            'active' => 1,
+            'providerId' => 'gpt-5.4-mini',
+            'priceIn' => 0.75,
+            'inUnit' => 'per1M',
+            'priceOut' => 4.50,
+            'outUnit' => 'per1M',
+            'quality' => 9,
+            'rating' => 1,
+            'json' => [
+                'description' => 'OpenAI GPT-5.4 mini for image analysis and vision tasks. Cost-efficient multimodal option.',
+                'prompt' => 'Describe the image in detail. Extract any text you see.',
+                'params' => ['model' => 'gpt-5.4-mini'],
+                'features' => ['reasoning', 'vision'],
+                'meta' => [
+                    'api' => 'responses',
+                    'supports_images' => true,
+                    'context_window' => '400000',
+                    'max_output' => '128000',
+                ],
+            ],
+        ],
+        [
+            'id' => 234,
+            'service' => 'OpenAI',
+            'name' => 'GPT-5.4 nano',
+            'tag' => 'chat',
+            'selectable' => 1,
+            'active' => 1,
+            'providerId' => 'gpt-5.4-nano',
+            // Tier-baselined against the published gpt-5.4-mini price
+            // (mini is $0.75/$4.50 per1M); nano is the smaller/cheaper
+            // sibling. SyncModelPricesCommand will normalise on next run.
+            'priceIn' => 0.20,
+            'inUnit' => 'per1M',
+            'priceOut' => 1.50,
+            'outUnit' => 'per1M',
+            'quality' => 7,
+            'rating' => 1,
+            'json' => [
+                'description' => 'OpenAI GPT-5.4 nano - lowest-latency, lowest-cost OpenAI tier for narrow, well-defined tasks.',
+                'max_tokens' => 128000,
+                'params' => ['model' => 'gpt-5.4-nano'],
+                'features' => ['reasoning'],
+                'meta' => [
+                    'api' => 'responses',
+                    'context_window' => '400000',
+                    'max_output' => '128000',
+                    'knowledge_cutoff' => '2025-08-31',
+                ],
+            ],
+        ],
         // ==================== ANTHROPIC MODELS ====================
         [
             'id' => 160,
@@ -1064,6 +1180,28 @@ class ModelCatalog
                 'prompt' => 'Describe the image in detail. Extract any text you see.',
                 'params' => ['model' => 'claude-opus-4-7'],
                 'meta' => ['supports_images' => true],
+            ],
+        ],
+        [
+            // Snapshot 2026-05-27 (https://platform.claude.com/docs/en/about-claude/models/overview).
+            'id' => 235,
+            'service' => 'Anthropic',
+            'name' => 'Claude Haiku 4.5 (Vision)',
+            'tag' => 'pic2text',
+            'selectable' => 1,
+            'active' => 1,
+            'providerId' => 'claude-haiku-4-5-20251001',
+            'priceIn' => 1,
+            'inUnit' => 'per1M',
+            'priceOut' => 5,
+            'outUnit' => 'per1M',
+            'quality' => 8,
+            'rating' => 1,
+            'json' => [
+                'description' => 'Claude Haiku 4.5 for image analysis and vision tasks. Fastest Anthropic vision tier with near-frontier intelligence.',
+                'prompt' => 'Describe the image in detail. Extract any text you see.',
+                'params' => ['model' => 'claude-haiku-4-5-20251001'],
+                'meta' => ['supports_images' => true, 'context_window' => '200000'],
             ],
         ],
         // ==================== GOOGLE MODELS ====================
@@ -1282,6 +1420,10 @@ class ModelCatalog
             ],
         ],
         [
+            // BID 170 stays pinned to Gemini 2.5 Flash. Existing widgets that
+            // reference BID 170 should keep talking to 2.5 Flash; the newer
+            // 3.5 Flash flagship is published as a separate slot (see BID 237
+            // below) so consumers opt in instead of being silently swapped.
             'id' => 170,
             'service' => 'Google',
             'name' => 'Gemini 2.5 Flash',
@@ -1304,6 +1446,8 @@ class ModelCatalog
             ],
         ],
         [
+            // BID 171 is the vision twin of BID 170 (Gemini 2.5 Flash). The
+            // 3.5 Flash vision pair lives at BID 223 below.
             'id' => 171,
             'service' => 'Google',
             'name' => 'Gemini 2.5 Flash (Vision)',
@@ -1373,7 +1517,10 @@ class ModelCatalog
             'tag' => 'chat',
             'selectable' => 1,
             'active' => 1,
-            'providerId' => 'gemini-3.1-flash-lite-preview',
+            // Google retired the `-preview` alias once 3.1 Flash-Lite went GA;
+            // calling it now returns HTTP 404 "no longer available". Use the
+            // stable id so the chat dropdown actually round-trips.
+            'providerId' => 'gemini-3.1-flash-lite',
             'priceIn' => 0.25,
             'inUnit' => 'per1M',
             'priceOut' => 1.50,
@@ -1383,7 +1530,7 @@ class ModelCatalog
             'json' => [
                 'description' => 'Google Gemini 3.1 Flash-Lite - most cost-efficient model, optimized for high-volume agentic tasks, translation, and data processing. 1M token context, multimodal input.',
                 'max_tokens' => 65536,
-                'params' => ['model' => 'gemini-3.1-flash-lite-preview'],
+                'params' => ['model' => 'gemini-3.1-flash-lite'],
                 'features' => ['vision', 'audio'],
                 'meta' => ['context_window' => '1048576', 'max_output' => '65536'],
             ],
@@ -1395,7 +1542,7 @@ class ModelCatalog
             'tag' => 'pic2text',
             'selectable' => 1,
             'active' => 1,
-            'providerId' => 'gemini-3.1-flash-lite-preview',
+            'providerId' => 'gemini-3.1-flash-lite',
             'priceIn' => 0.25,
             'inUnit' => 'per1M',
             'priceOut' => 1.50,
@@ -1405,8 +1552,246 @@ class ModelCatalog
             'json' => [
                 'description' => 'Google Gemini 3.1 Flash-Lite for image analysis and vision tasks. Cost-efficient multimodal model.',
                 'prompt' => 'Describe the image in detail. Extract any text you see.',
-                'params' => ['model' => 'gemini-3.1-flash-lite-preview'],
+                'params' => ['model' => 'gemini-3.1-flash-lite'],
                 'meta' => ['supports_images' => true, 'supports_video' => true],
+            ],
+        ],
+        // ----------------------------------------------------------------
+        // Google Gemini 3 Flash family + new image / TTS / Imagen variants
+        // surfaced on https://ai.google.dev/gemini-api/docs/models (snapshot
+        // 2026-05-19). 3.5 Flash itself gets a dedicated pair at BID 237
+        // (chat) + BID 223 (vision) so existing BID 170 / 171 references
+        // keep resolving to 2.5 Flash. Prices are tier-baselined against
+        // existing siblings; `SyncModelPricesCommand` will normalise them
+        // against the live Google price endpoint at next run.
+        // ----------------------------------------------------------------
+        [
+            // 3.5 Flash chat — opt-in upgrade over BID 170 (2.5 Flash). Same
+            // price tier and feature surface; chosen by the user via the
+            // model picker, never silently swapped.
+            'id' => 237,
+            'service' => 'Google',
+            'name' => 'Gemini 3.5 Flash',
+            'tag' => 'chat',
+            'selectable' => 1,
+            'active' => 1,
+            'providerId' => 'gemini-3.5-flash',
+            'priceIn' => 0.30,
+            'inUnit' => 'per1M',
+            'priceOut' => 2.50,
+            'outUnit' => 'per1M',
+            'quality' => 10,
+            'rating' => 1,
+            'json' => [
+                'description' => 'Google Gemini 3.5 Flash - flagship Flash chat tier with 1M token context, reasoning, vision, audio. Opt-in successor to Gemini 2.5 Flash (BID 170).',
+                'max_tokens' => 65536,
+                'params' => ['model' => 'gemini-3.5-flash'],
+                'features' => ['reasoning', 'vision', 'audio'],
+                'meta' => ['context_window' => '1000000', 'max_output' => '65536'],
+            ],
+        ],
+        [
+            'id' => 223,
+            'service' => 'Google',
+            'name' => 'Gemini 3.5 Flash (Vision)',
+            'tag' => 'pic2text',
+            'selectable' => 1,
+            'active' => 1,
+            'providerId' => 'gemini-3.5-flash',
+            'priceIn' => 0.30,
+            'inUnit' => 'per1M',
+            'priceOut' => 2.50,
+            'outUnit' => 'per1M',
+            'quality' => 10,
+            'rating' => 1,
+            'json' => [
+                'description' => 'Google Gemini 3.5 Flash for image analysis, video understanding, and multimodal tasks.',
+                'prompt' => 'Describe the image in detail. Extract any text you see.',
+                'params' => ['model' => 'gemini-3.5-flash'],
+                'meta' => ['supports_images' => true, 'supports_video' => true],
+            ],
+        ],
+        [
+            'id' => 224,
+            'service' => 'Google',
+            'name' => 'Gemini 3 Flash',
+            'tag' => 'chat',
+            'selectable' => 1,
+            'active' => 1,
+            'providerId' => 'gemini-3-flash-preview',
+            'priceIn' => 0.30,
+            'inUnit' => 'per1M',
+            'priceOut' => 2.50,
+            'outUnit' => 'per1M',
+            'quality' => 9,
+            'rating' => 1,
+            'json' => [
+                'description' => 'Google Gemini 3 Flash (preview) - frontier-level performance at a fraction of the cost of larger models. 1M token context, reasoning, vision, audio.',
+                'max_tokens' => 65536,
+                'params' => ['model' => 'gemini-3-flash-preview'],
+                'features' => ['reasoning', 'vision', 'audio'],
+                'meta' => ['context_window' => '1048576', 'max_output' => '65536'],
+            ],
+        ],
+        [
+            'id' => 225,
+            'service' => 'Google',
+            'name' => 'Gemini 3 Flash (Vision)',
+            'tag' => 'pic2text',
+            'selectable' => 1,
+            'active' => 1,
+            'providerId' => 'gemini-3-flash-preview',
+            'priceIn' => 0.30,
+            'inUnit' => 'per1M',
+            'priceOut' => 2.50,
+            'outUnit' => 'per1M',
+            'quality' => 9,
+            'rating' => 1,
+            'json' => [
+                'description' => 'Google Gemini 3 Flash for image analysis and vision tasks (preview).',
+                'prompt' => 'Describe the image in detail. Extract any text you see.',
+                'params' => ['model' => 'gemini-3-flash-preview'],
+                'meta' => ['supports_images' => true, 'supports_video' => true],
+            ],
+        ],
+        [
+            'id' => 226,
+            'service' => 'Google',
+            'name' => 'Gemini 2.5 Flash-Lite',
+            'tag' => 'chat',
+            'selectable' => 1,
+            'active' => 1,
+            'providerId' => 'gemini-2.5-flash-lite',
+            'priceIn' => 0.10,
+            'inUnit' => 'per1M',
+            'priceOut' => 0.40,
+            'outUnit' => 'per1M',
+            'quality' => 7,
+            'rating' => 1,
+            'json' => [
+                'description' => 'Google Gemini 2.5 Flash-Lite - fastest and cheapest multimodal model in the 2.5 family. Good for high-volume agentic / classification tasks.',
+                'max_tokens' => 65536,
+                'params' => ['model' => 'gemini-2.5-flash-lite'],
+                'features' => ['vision', 'audio'],
+                'meta' => ['context_window' => '1048576', 'max_output' => '65536'],
+            ],
+        ],
+        [
+            'id' => 227,
+            'service' => 'Google',
+            'name' => 'Gemini 2.5 Flash-Lite (Vision)',
+            'tag' => 'pic2text',
+            'selectable' => 1,
+            'active' => 1,
+            'providerId' => 'gemini-2.5-flash-lite',
+            'priceIn' => 0.10,
+            'inUnit' => 'per1M',
+            'priceOut' => 0.40,
+            'outUnit' => 'per1M',
+            'quality' => 7,
+            'rating' => 1,
+            'json' => [
+                'description' => 'Google Gemini 2.5 Flash-Lite for image analysis - cheapest multimodal option in the 2.5 family.',
+                'prompt' => 'Describe the image in detail. Extract any text you see.',
+                'params' => ['model' => 'gemini-2.5-flash-lite'],
+                'meta' => ['supports_images' => true, 'supports_video' => true],
+            ],
+        ],
+        [
+            'id' => 228,
+            'service' => 'Google',
+            'name' => 'Nano Banana Pro',
+            'tag' => 'text2pic',
+            'selectable' => 1,
+            'active' => 1,
+            // Gemini-native image model — GoogleProvider routes anything
+            // matching /^gemini-.*-image/ via generateImageWithGemini(); for
+            // nano-banana-pro-preview the routing lookup uses the catalog's
+            // json.api override below.
+            'providerId' => 'nano-banana-pro-preview',
+            'priceIn' => 0,
+            'inUnit' => 'perImage',
+            'priceOut' => 0.08,
+            'outUnit' => 'perImage',
+            'quality' => 10,
+            'rating' => 1,
+            'json' => [
+                'description' => 'Google Nano Banana Pro - professional design engine with a reasoning core for 4K studio-quality visuals, complex layouts, and precise text rendering.',
+                'pricing_mode' => 'per_image',
+                'mode_prices' => [
+                    'output_cost_per_image' => 0.08,
+                ],
+                'api' => 'gemini_native',
+                'params' => ['model' => 'nano-banana-pro-preview'],
+                'features' => ['image', 'pic2pic', 'text_rendering'],
+            ],
+        ],
+        [
+            'id' => 229,
+            'service' => 'Google',
+            'name' => 'Gemini 3.1 Flash TTS',
+            'tag' => 'text2sound',
+            'selectable' => 1,
+            'active' => 1,
+            'providerId' => 'gemini-3.1-flash-tts-preview',
+            'priceIn' => 0.10,
+            'inUnit' => 'per1M',
+            'priceOut' => 0.40,
+            'outUnit' => 'per1M',
+            'quality' => 10,
+            'rating' => 1,
+            'json' => [
+                'description' => 'Google Gemini 3.1 Flash TTS (preview) - powerful low-latency speech generation with expressive audio tags and natural prosody.',
+                'params' => ['model' => 'gemini-3.1-flash-tts-preview', 'voice' => 'Kore'],
+                'features' => ['tts', 'audio'],
+            ],
+        ],
+        [
+            'id' => 230,
+            'service' => 'Google',
+            'name' => 'Imagen 4.0 Fast',
+            'tag' => 'text2pic',
+            'selectable' => 1,
+            'active' => 1,
+            'providerId' => 'imagen-4.0-fast-generate-001',
+            'priceIn' => 0,
+            'inUnit' => 'perImage',
+            'priceOut' => 0.02,
+            'outUnit' => 'perImage',
+            'quality' => 8,
+            'rating' => 1,
+            'json' => [
+                'description' => 'Google Imagen 4.0 Fast - quicker, cheaper Imagen 4 tier optimised for high-volume image generation.',
+                'pricing_mode' => 'per_image',
+                'mode_prices' => [
+                    'output_cost_per_image' => 0.02,
+                ],
+                'params' => ['model' => 'imagen-4.0-fast-generate-001'],
+                'features' => ['image'],
+            ],
+        ],
+        [
+            'id' => 231,
+            'service' => 'Google',
+            'name' => 'Imagen 4.0 Ultra',
+            'tag' => 'text2pic',
+            'selectable' => 1,
+            'active' => 1,
+            'providerId' => 'imagen-4.0-ultra-generate-001',
+            'priceIn' => 0,
+            'inUnit' => 'perImage',
+            'priceOut' => 0.06,
+            'outUnit' => 'perImage',
+            'quality' => 10,
+            'rating' => 1,
+            'json' => [
+                'description' => 'Google Imagen 4.0 Ultra - top-quality Imagen 4 tier with exceptional clarity up to 2K resolution.',
+                'pricing_mode' => 'per_image',
+                'mode_prices' => [
+                    'output_cost_per_image' => 0.06,
+                ],
+                'params' => ['model' => 'imagen-4.0-ultra-generate-001'],
+                'features' => ['image'],
             ],
         ],
         [
