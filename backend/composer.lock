@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "f1c8b93b54ff8275206e8ef6f46efa38",
+    "content-hash": "98af32452f2a888603468e660d47f64d",
     "packages": [
         {
             "name": "api-platform/doctrine-common",
@@ -2910,16 +2910,16 @@
         },
         {
             "name": "doctrine/orm",
-            "version": "3.6.6",
+            "version": "3.6.7",
             "source": {
                 "type": "git",
                 "url": "https://github.com/doctrine/orm.git",
-                "reference": "471b12949ff9bc23ecdc809ce838613c1aa9a0b9"
+                "reference": "bc217c0e19c3a9eadfa67697143b87c9ba01272c"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/doctrine/orm/zipball/471b12949ff9bc23ecdc809ce838613c1aa9a0b9",
-                "reference": "471b12949ff9bc23ecdc809ce838613c1aa9a0b9",
+                "url": "https://api.github.com/repos/doctrine/orm/zipball/bc217c0e19c3a9eadfa67697143b87c9ba01272c",
+                "reference": "bc217c0e19c3a9eadfa67697143b87c9ba01272c",
                 "shasum": ""
             },
             "require": {
@@ -2992,9 +2992,9 @@
             ],
             "support": {
                 "issues": "https://github.com/doctrine/orm/issues",
-                "source": "https://github.com/doctrine/orm/tree/3.6.6"
+                "source": "https://github.com/doctrine/orm/tree/3.6.7"
             },
-            "time": "2026-05-21T06:05:47+00:00"
+            "time": "2026-05-25T16:45:47+00:00"
         },
         {
             "name": "doctrine/persistence",
@@ -11039,16 +11039,16 @@
         },
         {
             "name": "symfony/rate-limiter",
-            "version": "v8.0.10",
+            "version": "v8.0.13",
             "source": {
                 "type": "git",
                 "url": "https://github.com/symfony/rate-limiter.git",
-                "reference": "81146a00aacbc9f610f22391cc4ea170090dfb8a"
+                "reference": "6d9e6bbcc1ea9e0ad21be70d7fbfe0f0b898377a"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/symfony/rate-limiter/zipball/81146a00aacbc9f610f22391cc4ea170090dfb8a",
-                "reference": "81146a00aacbc9f610f22391cc4ea170090dfb8a",
+                "url": "https://api.github.com/repos/symfony/rate-limiter/zipball/6d9e6bbcc1ea9e0ad21be70d7fbfe0f0b898377a",
+                "reference": "6d9e6bbcc1ea9e0ad21be70d7fbfe0f0b898377a",
                 "shasum": ""
             },
             "require": {
@@ -11089,7 +11089,7 @@
                 "rate-limiter"
             ],
             "support": {
-                "source": "https://github.com/symfony/rate-limiter/tree/v8.0.10"
+                "source": "https://github.com/symfony/rate-limiter/tree/v8.0.13"
             },
             "funding": [
                 {
@@ -11109,7 +11109,7 @@
                     "type": "tidelift"
                 }
             ],
-            "time": "2026-05-04T13:41:39+00:00"
+            "time": "2026-05-23T18:05:53+00:00"
         },
         {
             "name": "symfony/routing",
