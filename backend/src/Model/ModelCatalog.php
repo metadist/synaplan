@@ -504,6 +504,34 @@ class ModelCatalog
                 'meta' => ['context_window' => '131072', 'max_output' => '16384', 'license' => 'Apache-2.0', 'quantization' => 'TruePoint Numerics'],
             ],
         ],
+        [
+            // Snapshot 2026-05-27 (https://console.groq.com/docs/models).
+            'id' => 236,
+            'service' => 'Groq',
+            'name' => 'Llama 3.1 8B Instant',
+            'tag' => 'chat',
+            'selectable' => 1,
+            'active' => 1,
+            'providerId' => 'llama-3.1-8b-instant',
+            'priceIn' => 0.05,
+            'inUnit' => 'per1M',
+            'priceOut' => 0.08,
+            'outUnit' => 'per1M',
+            'quality' => 7,
+            'rating' => 1,
+            'json' => [
+                'description' => 'Groq Llama 3.1 8B Instant - fastest production-grade chat model on Groq (~560 t/s). 131K context, best for high-throughput / low-cost routing.',
+                'max_tokens' => 32768,
+                'params' => [
+                    'model' => 'llama-3.1-8b-instant',
+                    'reasoning_format' => 'hidden',
+                    'messages' => [],
+                ],
+                // max_output mirrors max_tokens (32768) — the model accepts
+                // 131K context in total but caps generated output at 32K.
+                'meta' => ['context_window' => '131072', 'max_output' => '32768'],
+            ],
+        ],
         // Phase 2d: dedicated MEM-tagged models for backgrounded memory
         // extraction. The MEM tag keeps these out of the user-facing chat
         // model picker so picking a heavy chat model (Gemini 3 Pro, Claude
@@ -914,6 +942,94 @@ class ModelCatalog
                 'meta' => ['api' => 'responses'],
             ],
         ],
+        // ----------------------------------------------------------------
+        // GPT-5.4 mini / nano (snapshot 2026-05-27, probed live before
+        // seeding via https://developers.openai.com/api/docs/models).
+        // ----------------------------------------------------------------
+        [
+            'id' => 232,
+            'service' => 'OpenAI',
+            'name' => 'GPT-5.4 mini',
+            'tag' => 'chat',
+            'selectable' => 1,
+            'active' => 1,
+            'providerId' => 'gpt-5.4-mini',
+            'priceIn' => 0.75,
+            'inUnit' => 'per1M',
+            'priceOut' => 4.50,
+            'outUnit' => 'per1M',
+            'quality' => 9,
+            'rating' => 1,
+            'json' => [
+                'description' => 'OpenAI GPT-5.4 mini - the strongest mini model yet for coding, computer use, and subagents. 400K context, low latency, configurable reasoning effort.',
+                'max_tokens' => 128000,
+                'params' => ['model' => 'gpt-5.4-mini'],
+                'features' => ['reasoning', 'vision'],
+                'meta' => [
+                    'api' => 'responses',
+                    'context_window' => '400000',
+                    'max_output' => '128000',
+                    'knowledge_cutoff' => '2025-08-31',
+                ],
+            ],
+        ],
+        [
+            'id' => 233,
+            'service' => 'OpenAI',
+            'name' => 'GPT-5.4 mini (Vision)',
+            'tag' => 'pic2text',
+            'selectable' => 1,
+            'active' => 1,
+            'providerId' => 'gpt-5.4-mini',
+            'priceIn' => 0.75,
+            'inUnit' => 'per1M',
+            'priceOut' => 4.50,
+            'outUnit' => 'per1M',
+            'quality' => 9,
+            'rating' => 1,
+            'json' => [
+                'description' => 'OpenAI GPT-5.4 mini for image analysis and vision tasks. Cost-efficient multimodal option.',
+                'prompt' => 'Describe the image in detail. Extract any text you see.',
+                'params' => ['model' => 'gpt-5.4-mini'],
+                'features' => ['reasoning', 'vision'],
+                'meta' => [
+                    'api' => 'responses',
+                    'supports_images' => true,
+                    'context_window' => '400000',
+                    'max_output' => '128000',
+                ],
+            ],
+        ],
+        [
+            'id' => 234,
+            'service' => 'OpenAI',
+            'name' => 'GPT-5.4 nano',
+            'tag' => 'chat',
+            'selectable' => 1,
+            'active' => 1,
+            'providerId' => 'gpt-5.4-nano',
+            // Tier-baselined against the published gpt-5.4-mini price
+            // (mini is $0.75/$4.50 per1M); nano is the smaller/cheaper
+            // sibling. SyncModelPricesCommand will normalise on next run.
+            'priceIn' => 0.20,
+            'inUnit' => 'per1M',
+            'priceOut' => 1.50,
+            'outUnit' => 'per1M',
+            'quality' => 7,
+            'rating' => 1,
+            'json' => [
+                'description' => 'OpenAI GPT-5.4 nano - lowest-latency, lowest-cost OpenAI tier for narrow, well-defined tasks.',
+                'max_tokens' => 128000,
+                'params' => ['model' => 'gpt-5.4-nano'],
+                'features' => ['reasoning'],
+                'meta' => [
+                    'api' => 'responses',
+                    'context_window' => '400000',
+                    'max_output' => '128000',
+                    'knowledge_cutoff' => '2025-08-31',
+                ],
+            ],
+        ],
         // ==================== ANTHROPIC MODELS ====================
         [
             'id' => 160,
@@ -1064,6 +1180,28 @@ class ModelCatalog
                 'prompt' => 'Describe the image in detail. Extract any text you see.',
                 'params' => ['model' => 'claude-opus-4-7'],
                 'meta' => ['supports_images' => true],
+            ],
+        ],
+        [
+            // Snapshot 2026-05-27 (https://platform.claude.com/docs/en/about-claude/models/overview).
+            'id' => 235,
+            'service' => 'Anthropic',
+            'name' => 'Claude Haiku 4.5 (Vision)',
+            'tag' => 'pic2text',
+            'selectable' => 1,
+            'active' => 1,
+            'providerId' => 'claude-haiku-4-5-20251001',
+            'priceIn' => 1,
+            'inUnit' => 'per1M',
+            'priceOut' => 5,
+            'outUnit' => 'per1M',
+            'quality' => 8,
+            'rating' => 1,
+            'json' => [
+                'description' => 'Claude Haiku 4.5 for image analysis and vision tasks. Fastest Anthropic vision tier with near-frontier intelligence.',
+                'prompt' => 'Describe the image in detail. Extract any text you see.',
+                'params' => ['model' => 'claude-haiku-4-5-20251001'],
+                'meta' => ['supports_images' => true, 'context_window' => '200000'],
             ],
         ],
         // ==================== GOOGLE MODELS ====================
@@ -1282,16 +1420,17 @@ class ModelCatalog
             ],
         ],
         [
-            // BID 170 is the canonical Gemini 3.5 Flash chat entry in production.
-            // The catalog was previously pinned to 2.5 Flash here; we follow
-            // production now that 3.5 Flash is the stable Flash flagship.
+            // BID 170 stays pinned to Gemini 2.5 Flash. Existing widgets that
+            // reference BID 170 should keep talking to 2.5 Flash; the newer
+            // 3.5 Flash flagship is published as a separate slot (see BID 237
+            // below) so consumers opt in instead of being silently swapped.
             'id' => 170,
             'service' => 'Google',
-            'name' => 'Gemini 3.5 Flash',
+            'name' => 'Gemini 2.5 Flash',
             'tag' => 'chat',
             'selectable' => 1,
             'active' => 1,
-            'providerId' => 'gemini-3.5-flash',
+            'providerId' => 'gemini-2.5-flash',
             'priceIn' => 0.30,
             'inUnit' => 'per1M',
             'priceOut' => 2.50,
@@ -1299,16 +1438,16 @@ class ModelCatalog
             'quality' => 9,
             'rating' => 1,
             'json' => [
-                'description' => 'Google Gemini 3.5 Flash - best price-performance model, 1M token context, reasoning, vision, audio.',
+                'description' => 'Google Gemini 2.5 Flash - best price-performance model, 1M token context, reasoning, vision, audio.',
                 'max_tokens' => 65536,
-                'params' => ['model' => 'gemini-3.5-flash'],
+                'params' => ['model' => 'gemini-2.5-flash'],
                 'features' => ['reasoning', 'vision', 'audio'],
                 'meta' => ['context_window' => '1000000', 'max_output' => '65536'],
             ],
         ],
         [
-            // BID 171 stays on Gemini 2.5 Flash Vision to match the prod row
-            // — a separate 3.5 Flash vision pair is seeded below at BID 223.
+            // BID 171 is the vision twin of BID 170 (Gemini 2.5 Flash). The
+            // 3.5 Flash vision pair lives at BID 223 below.
             'id' => 171,
             'service' => 'Google',
             'name' => 'Gemini 2.5 Flash (Vision)',
@@ -1420,12 +1559,37 @@ class ModelCatalog
         // ----------------------------------------------------------------
         // Google Gemini 3 Flash family + new image / TTS / Imagen variants
         // surfaced on https://ai.google.dev/gemini-api/docs/models (snapshot
-        // 2026-05-19). Gemini 3.5 Flash chat itself lives at BID 170 above
-        // (the legacy 2.5 Flash slot was repurposed in production); the row
-        // here at BID 223 is just its vision twin. Prices are tier-baselined
-        // against existing siblings; `SyncModelPricesCommand` will normalise
-        // them against the live Google price endpoint at next run.
+        // 2026-05-19). 3.5 Flash itself gets a dedicated pair at BID 237
+        // (chat) + BID 223 (vision) so existing BID 170 / 171 references
+        // keep resolving to 2.5 Flash. Prices are tier-baselined against
+        // existing siblings; `SyncModelPricesCommand` will normalise them
+        // against the live Google price endpoint at next run.
         // ----------------------------------------------------------------
+        [
+            // 3.5 Flash chat — opt-in upgrade over BID 170 (2.5 Flash). Same
+            // price tier and feature surface; chosen by the user via the
+            // model picker, never silently swapped.
+            'id' => 237,
+            'service' => 'Google',
+            'name' => 'Gemini 3.5 Flash',
+            'tag' => 'chat',
+            'selectable' => 1,
+            'active' => 1,
+            'providerId' => 'gemini-3.5-flash',
+            'priceIn' => 0.30,
+            'inUnit' => 'per1M',
+            'priceOut' => 2.50,
+            'outUnit' => 'per1M',
+            'quality' => 10,
+            'rating' => 1,
+            'json' => [
+                'description' => 'Google Gemini 3.5 Flash - flagship Flash chat tier with 1M token context, reasoning, vision, audio. Opt-in successor to Gemini 2.5 Flash (BID 170).',
+                'max_tokens' => 65536,
+                'params' => ['model' => 'gemini-3.5-flash'],
+                'features' => ['reasoning', 'vision', 'audio'],
+                'meta' => ['context_window' => '1000000', 'max_output' => '65536'],
+            ],
+        ],
         [
             'id' => 223,
             'service' => 'Google',
@@ -1628,145 +1792,6 @@ class ModelCatalog
                 ],
                 'params' => ['model' => 'imagen-4.0-ultra-generate-001'],
                 'features' => ['image'],
-            ],
-        ],
-        // ----------------------------------------------------------------
-        // Latest must-have additions surfaced from the official provider
-        // model lists (snapshot 2026-05-27). Probed live before seeding:
-        //   - https://ai.google.dev/gemini-api/docs/models
-        //   - https://platform.claude.com/docs/en/about-claude/models/overview
-        //   - https://developers.openai.com/api/docs/models
-        //   - https://console.groq.com/docs/models
-        // Each providerId returned HTTP 200 from its live API at seed time.
-        // ----------------------------------------------------------------
-        [
-            'id' => 232,
-            'service' => 'OpenAI',
-            'name' => 'GPT-5.4 mini',
-            'tag' => 'chat',
-            'selectable' => 1,
-            'active' => 1,
-            'providerId' => 'gpt-5.4-mini',
-            'priceIn' => 0.75,
-            'inUnit' => 'per1M',
-            'priceOut' => 4.50,
-            'outUnit' => 'per1M',
-            'quality' => 9,
-            'rating' => 1,
-            'json' => [
-                'description' => 'OpenAI GPT-5.4 mini - the strongest mini model yet for coding, computer use, and subagents. 400K context, low latency, configurable reasoning effort.',
-                'max_tokens' => 128000,
-                'params' => ['model' => 'gpt-5.4-mini'],
-                'features' => ['reasoning', 'vision'],
-                'meta' => [
-                    'api' => 'responses',
-                    'context_window' => '400000',
-                    'max_output' => '128000',
-                    'knowledge_cutoff' => '2025-08-31',
-                ],
-            ],
-        ],
-        [
-            'id' => 233,
-            'service' => 'OpenAI',
-            'name' => 'GPT-5.4 mini (Vision)',
-            'tag' => 'pic2text',
-            'selectable' => 1,
-            'active' => 1,
-            'providerId' => 'gpt-5.4-mini',
-            'priceIn' => 0.75,
-            'inUnit' => 'per1M',
-            'priceOut' => 4.50,
-            'outUnit' => 'per1M',
-            'quality' => 9,
-            'rating' => 1,
-            'json' => [
-                'description' => 'OpenAI GPT-5.4 mini for image analysis and vision tasks. Cost-efficient multimodal option.',
-                'prompt' => 'Describe the image in detail. Extract any text you see.',
-                'params' => ['model' => 'gpt-5.4-mini'],
-                'features' => ['reasoning', 'vision'],
-                'meta' => [
-                    'api' => 'responses',
-                    'supports_images' => true,
-                    'context_window' => '400000',
-                    'max_output' => '128000',
-                ],
-            ],
-        ],
-        [
-            'id' => 234,
-            'service' => 'OpenAI',
-            'name' => 'GPT-5.4 nano',
-            'tag' => 'chat',
-            'selectable' => 1,
-            'active' => 1,
-            'providerId' => 'gpt-5.4-nano',
-            // Tier-baselined against the published gpt-5.4-mini price
-            // (mini is $0.75/$4.50 per1M); nano is the smaller/cheaper
-            // sibling. SyncModelPricesCommand will normalise on next run.
-            'priceIn' => 0.20,
-            'inUnit' => 'per1M',
-            'priceOut' => 1.50,
-            'outUnit' => 'per1M',
-            'quality' => 7,
-            'rating' => 1,
-            'json' => [
-                'description' => 'OpenAI GPT-5.4 nano - lowest-latency, lowest-cost OpenAI tier for narrow, well-defined tasks.',
-                'max_tokens' => 128000,
-                'params' => ['model' => 'gpt-5.4-nano'],
-                'features' => ['reasoning'],
-                'meta' => [
-                    'api' => 'responses',
-                    'context_window' => '400000',
-                    'max_output' => '128000',
-                    'knowledge_cutoff' => '2025-08-31',
-                ],
-            ],
-        ],
-        [
-            'id' => 235,
-            'service' => 'Anthropic',
-            'name' => 'Claude Haiku 4.5 (Vision)',
-            'tag' => 'pic2text',
-            'selectable' => 1,
-            'active' => 1,
-            'providerId' => 'claude-haiku-4-5-20251001',
-            'priceIn' => 1,
-            'inUnit' => 'per1M',
-            'priceOut' => 5,
-            'outUnit' => 'per1M',
-            'quality' => 8,
-            'rating' => 1,
-            'json' => [
-                'description' => 'Claude Haiku 4.5 for image analysis and vision tasks. Fastest Anthropic vision tier with near-frontier intelligence.',
-                'prompt' => 'Describe the image in detail. Extract any text you see.',
-                'params' => ['model' => 'claude-haiku-4-5-20251001'],
-                'meta' => ['supports_images' => true, 'context_window' => '200000'],
-            ],
-        ],
-        [
-            'id' => 236,
-            'service' => 'Groq',
-            'name' => 'Llama 3.1 8B Instant',
-            'tag' => 'chat',
-            'selectable' => 1,
-            'active' => 1,
-            'providerId' => 'llama-3.1-8b-instant',
-            'priceIn' => 0.05,
-            'inUnit' => 'per1M',
-            'priceOut' => 0.08,
-            'outUnit' => 'per1M',
-            'quality' => 7,
-            'rating' => 1,
-            'json' => [
-                'description' => 'Groq Llama 3.1 8B Instant - fastest production-grade chat model on Groq (~560 t/s). 131K context, best for high-throughput / low-cost routing.',
-                'max_tokens' => 32768,
-                'params' => [
-                    'model' => 'llama-3.1-8b-instant',
-                    'reasoning_format' => 'hidden',
-                    'messages' => [],
-                ],
-                'meta' => ['context_window' => '131072', 'max_output' => '131072'],
             ],
         ],
         [
