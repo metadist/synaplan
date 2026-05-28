@@ -44,6 +44,7 @@ class GuestSessionServiceTest extends TestCase
 
         $sessionRepo = $this->createStub(GuestSessionRepository::class);
         $sessionRepo->method('countActiveSessionsByIp')->willReturn(0);
+        $sessionRepo->method('sumActiveMessageCountByIp')->willReturn(0);
 
         $em = $this->createMock(EntityManagerInterface::class);
         $em->expects($this->once())->method('persist');
@@ -65,6 +66,7 @@ class GuestSessionServiceTest extends TestCase
 
         $sessionRepo = $this->createStub(GuestSessionRepository::class);
         $sessionRepo->method('countActiveSessionsByIp')->willReturn(0);
+        $sessionRepo->method('sumActiveMessageCountByIp')->willReturn(0);
 
         $em = $this->createMock(EntityManagerInterface::class);
         $em->expects($this->once())->method('persist');
@@ -85,6 +87,7 @@ class GuestSessionServiceTest extends TestCase
 
         $sessionRepo = $this->createStub(GuestSessionRepository::class);
         $sessionRepo->method('countActiveSessionsByIp')->willReturn(0);
+        $sessionRepo->method('sumActiveMessageCountByIp')->willReturn(0);
 
         $em = $this->createMock(EntityManagerInterface::class);
         $em->expects($this->once())->method('persist');
@@ -154,6 +157,7 @@ class GuestSessionServiceTest extends TestCase
             ->method('countActiveSessionsByIp')
             ->with('1.2.3.4')
             ->willReturn(4);
+        $sessionRepo->method('sumActiveMessageCountByIp')->willReturn(0);
 
         $em = $this->createMock(EntityManagerInterface::class);
         $em->expects($this->once())->method('persist');
@@ -163,6 +167,51 @@ class GuestSessionServiceTest extends TestCase
         $session = $service->createSession('allowed-uuid', $request);
 
         $this->assertSame('allowed-uuid', $session->getSessionId());
+    }
+
+    public function testCreateSessionCapsMaxMessagesByIpBudget(): void
+    {
+        $request = new Request();
+        $request->headers->set('CF-Connecting-IP', '1.2.3.4');
+
+        $sessionRepo = $this->createMock(GuestSessionRepository::class);
+        $sessionRepo->method('countActiveSessionsByIp')->willReturn(1);
+        $sessionRepo->method('sumActiveMessageCountByIp')
+            ->with('1.2.3.4')
+            ->willReturn(3);
+
+        $em = $this->createMock(EntityManagerInterface::class);
+        $em->expects($this->once())->method('persist');
+        $em->expects($this->once())->method('flush');
+
+        $service = $this->createService(em: $em, sessionRepo: $sessionRepo);
+        $session = $service->createSession('budget-capped', $request);
+
+        // 5 (cap) - 3 (already spent on this IP) = 2
+        $this->assertSame(2, $session->getMaxMessages());
+    }
+
+    public function testCreateSessionGivesZeroMaxMessagesWhenIpBudgetExhausted(): void
+    {
+        $request = new Request();
+        $request->headers->set('CF-Connecting-IP', '1.2.3.4');
+
+        $sessionRepo = $this->createMock(GuestSessionRepository::class);
+        $sessionRepo->method('countActiveSessionsByIp')->willReturn(2);
+        $sessionRepo->method('sumActiveMessageCountByIp')
+            ->with('1.2.3.4')
+            ->willReturn(5);
+
+        $em = $this->createMock(EntityManagerInterface::class);
+        $em->expects($this->once())->method('persist');
+        $em->expects($this->once())->method('flush');
+
+        $service = $this->createService(em: $em, sessionRepo: $sessionRepo);
+        $session = $service->createSession('budget-exhausted', $request);
+
+        $this->assertSame(0, $session->getMaxMessages());
+        $this->assertTrue($service->isLimitReached($session));
+        $this->assertFalse($service->checkLimit($session));
     }
 
     public function testGetSessionDelegatesToRepository(): void
@@ -228,6 +277,61 @@ class GuestSessionServiceTest extends TestCase
         $this->assertFalse($service->checkLimit($session));
     }
 
+    public function testCheckLimitConsidersAggregatedIpUsage(): void
+    {
+        // Reproduces issue #998: a fresh-looking session (count=0) must still be
+        // blocked when other active sessions on the same IP have already spent
+        // the per-IP message budget (5).
+        $session = new GuestSession();
+        $session->setMaxMessages(5);
+        $session->setMessageCount(0);
+        $session->setIpAddress('1.2.3.4');
+
+        $sessionRepo = $this->createMock(GuestSessionRepository::class);
+        $sessionRepo->method('sumActiveMessageCountByIp')
+            ->with('1.2.3.4')
+            ->willReturn(5);
+
+        $service = $this->createService(sessionRepo: $sessionRepo);
+
+        $this->assertFalse($service->checkLimit($session));
+        $this->assertTrue($service->isLimitReached($session));
+        $this->assertSame(0, $service->getRemainingMessages($session));
+    }
+
+    public function testGetRemainingMessagesUsesMinOfSessionAndIpBudget(): void
+    {
+        // Session itself has 4 left, but IP budget only 1 -> remaining = 1.
+        $session = new GuestSession();
+        $session->setMaxMessages(5);
+        $session->setMessageCount(1);
+        $session->setIpAddress('10.0.0.1');
+
+        $sessionRepo = $this->createMock(GuestSessionRepository::class);
+        $sessionRepo->method('sumActiveMessageCountByIp')
+            ->with('10.0.0.1')
+            ->willReturn(3);
+
+        $service = $this->createService(sessionRepo: $sessionRepo);
+
+        // 5 - (3 + 1) = 1; min(4, 1) = 1
+        $this->assertSame(1, $service->getRemainingMessages($session));
+    }
+
+    public function testGetRemainingMessagesIgnoresIpBudgetWhenIpMissing(): void
+    {
+        $session = new GuestSession();
+        $session->setMaxMessages(5);
+        $session->setMessageCount(2);
+
+        $sessionRepo = $this->createMock(GuestSessionRepository::class);
+        $sessionRepo->expects($this->never())->method('sumActiveMessageCountByIp');
+
+        $service = $this->createService(sessionRepo: $sessionRepo);
+
+        $this->assertSame(3, $service->getRemainingMessages($session));
+    }
+
     public function testIncrementCountFlushesEntityManager(): void
     {
         $session = new GuestSession();
@@ -248,7 +352,10 @@ class GuestSessionServiceTest extends TestCase
         $session->setMaxMessages(5);
         $session->setMessageCount(2);
 
-        $service = $this->createService();
+        $sessionRepo = $this->createStub(GuestSessionRepository::class);
+        $sessionRepo->method('sumActiveMessageCountByIp')->willReturn(0);
+
+        $service = $this->createService(sessionRepo: $sessionRepo);
 
         $this->assertSame(3, $service->getRemainingMessages($session));
     }

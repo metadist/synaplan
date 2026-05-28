@@ -1482,7 +1482,7 @@ class StreamController extends AbstractController
                     $this->sendSSE('guest_remaining', [
                         'remaining' => $this->guestSessionService->getRemainingMessages($guestSession),
                         'maxMessages' => $guestSession->getMaxMessages(),
-                        'limitReached' => $guestSession->isLimitReached(),
+                        'limitReached' => $this->guestSessionService->isLimitReached($guestSession),
                     ]);
                 }
 

@@ -78,9 +78,9 @@ class GuestChatController extends AbstractController
                 return $this->json([
                     'sessionId' => $session->getSessionId(),
                     'chatId' => $session->getChatId(),
-                    'remaining' => $session->getRemainingMessages(),
+                    'remaining' => $this->guestSessionService->getRemainingMessages($session),
                     'maxMessages' => $session->getMaxMessages(),
-                    'limitReached' => $session->isLimitReached(),
+                    'limitReached' => $this->guestSessionService->isLimitReached($session),
                 ]);
             }
         }
@@ -102,9 +102,9 @@ class GuestChatController extends AbstractController
         return $this->json([
             'sessionId' => $session->getSessionId(),
             'chatId' => null,
-            'remaining' => $session->getRemainingMessages(),
+            'remaining' => $this->guestSessionService->getRemainingMessages($session),
             'maxMessages' => $session->getMaxMessages(),
-            'limitReached' => false,
+            'limitReached' => $this->guestSessionService->isLimitReached($session),
         ]);
     }
 
@@ -154,9 +154,9 @@ class GuestChatController extends AbstractController
 
         return $this->json([
             'sessionId' => $session->getSessionId(),
-            'remaining' => $session->getRemainingMessages(),
+            'remaining' => $this->guestSessionService->getRemainingMessages($session),
             'maxMessages' => $session->getMaxMessages(),
-            'limitReached' => $session->isLimitReached(),
+            'limitReached' => $this->guestSessionService->isLimitReached($session),
         ]);
     }
 
