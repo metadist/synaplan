@@ -18,6 +18,7 @@ use App\Service\Media\GeneratedFileMetadataNormalizer;
 use App\Service\Message\MessageProcessor;
 use App\Service\PromptService;
 use App\Service\RateLimitService;
+use App\Service\SlackNotificationService;
 use App\Service\UrlContentService;
 use App\Service\WidgetEventCacheService;
 use App\Service\WidgetService;
@@ -59,9 +60,65 @@ class WidgetPublicController extends AbstractController
         private EntityManagerInterface $em,
         private LoggerInterface $logger,
         private DiscordNotificationService $discord,
+        private SlackNotificationService $slack,
         private GeneratedFileMetadataNormalizer $generatedFileMetadataNormalizer,
         private string $uploadDir,
     ) {
+    }
+
+    /**
+     * Resolve the URL operators land on when they click the "Take over"
+     * button in the Slack notification. Lives next to the controller (not in
+     * a service) because it's tied to the frontend route shape — same place
+     * that owns the public API surface.
+     *
+     * Matches the SPA route registered in `frontend/src/router/index.ts`
+     * (`/tools/chat-widget/:widgetId/chats`). The session id is passed via
+     * `?session=` so the dashboard can deep-link directly to the visitor's
+     * conversation instead of leaving the operator to scan the list.
+     */
+    private function buildHandoffTakeoverUrl(string $widgetId, string $sessionId): string
+    {
+        $frontendBase = $_ENV['FRONTEND_URL'] ?? $_ENV['APP_URL'] ?? 'https://app.synaplan.com';
+        $frontendBase = rtrim((string) $frontendBase, '/');
+
+        return sprintf(
+            '%s/tools/chat-widget/%s/chats?session=%s',
+            $frontendBase,
+            rawurlencode($widgetId),
+            rawurlencode($sessionId),
+        );
+    }
+
+    /**
+     * Match the visitor's latest message against the operator-configured
+     * trigger phrases (case-insensitive substring match). Returns the first
+     * matching trigger so we can include it in the Slack notification ("AI
+     * was paged because the visitor said: 'speak to a human'"), or null when
+     * no trigger fires.
+     *
+     * Trigger list is bounded to 20 entries by `WidgetService::sanitizeConfig`,
+     * so the linear scan stays cheap even on hot widget traffic.
+     *
+     * @param list<string> $triggers
+     */
+    private function detectHandoffTrigger(string $message, array $triggers): ?string
+    {
+        if ('' === $message || [] === $triggers) {
+            return null;
+        }
+        $haystack = mb_strtolower($message);
+        foreach ($triggers as $trigger) {
+            $needle = mb_strtolower(trim($trigger));
+            if ('' === $needle) {
+                continue;
+            }
+            if (str_contains($haystack, $needle)) {
+                return $trigger;
+            }
+        }
+
+        return null;
     }
 
     /**
@@ -128,6 +185,115 @@ class WidgetPublicController extends AbstractController
     }
 
     /**
+     * Request a human takeover: pings the operator's Slack channel and flips
+     * the session into WAITING so the dashboard surfaces it for pickup.
+     *
+     * PUBLIC endpoint — no authentication required, session-scoped throttling.
+     */
+    #[Route('/{widgetId}/human-handoff', name: 'human_handoff', methods: ['POST'])]
+    #[OA\Post(
+        path: '/api/v1/widget/{widgetId}/human-handoff',
+        summary: 'Request a human operator (posts to widget owner Slack + sets session to WAITING)',
+        tags: ['Widget (Public)']
+    )]
+    #[OA\RequestBody(
+        required: true,
+        content: new OA\JsonContent(
+            required: ['sessionId'],
+            properties: [
+                new OA\Property(property: 'sessionId', type: 'string', example: 'sess_xyz123...'),
+                new OA\Property(property: 'lastMessage', type: 'string', nullable: true, description: 'Optional last visitor message snippet for context (server falls back to its own last-message preview)'),
+            ]
+        )
+    )]
+    #[OA\Response(
+        response: 200,
+        description: 'Handoff request accepted',
+        content: new OA\JsonContent(
+            properties: [
+                new OA\Property(property: 'success', type: 'boolean', example: true),
+                new OA\Property(property: 'notified', type: 'boolean', example: true, description: 'true when Slack accepted the payload, false when delivery failed (session is still moved to WAITING)'),
+                new OA\Property(property: 'mode', type: 'string', example: 'waiting'),
+            ]
+        )
+    )]
+    #[OA\Response(response: 400, description: 'Missing sessionId / handoff disabled for this widget')]
+    #[OA\Response(response: 404, description: 'Widget or session not found')]
+    #[OA\Response(response: 429, description: 'Handoff already requested recently for this session')]
+    public function humanHandoff(string $widgetId, Request $request): JsonResponse
+    {
+        $data = json_decode($request->getContent(), true);
+        if (!is_array($data) || empty($data['sessionId'])) {
+            return $this->json(['error' => 'Missing required field: sessionId'], Response::HTTP_BAD_REQUEST);
+        }
+        $sessionId = (string) $data['sessionId'];
+
+        $widget = $this->widgetService->getWidgetById($widgetId);
+        if (!$widget) {
+            return $this->json(['error' => 'Widget not found'], Response::HTTP_NOT_FOUND);
+        }
+
+        $config = $widget->getConfig();
+        if ($domainError = $this->ensureDomainAllowed($config, $request, $widget->getOwnerId())) {
+            return $domainError;
+        }
+
+        $webhookUrl = (string) ($config['slackWebhookUrl'] ?? '');
+        $buttonEnabled = (bool) ($config['humanHandoffButtonEnabled'] ?? true);
+        if ('' === $webhookUrl || !$buttonEnabled) {
+            return $this->json([
+                'error' => 'Human handoff is not enabled for this widget',
+                'reason' => 'handoff_disabled',
+            ], Response::HTTP_BAD_REQUEST);
+        }
+
+        $session = $this->em->getRepository(WidgetSession::class)->findByWidgetAndSession($widgetId, $sessionId);
+        if (!$session) {
+            return $this->json(['error' => 'Session not found'], Response::HTTP_NOT_FOUND);
+        }
+
+        // Idempotence: once the session is already waiting for / talking to a
+        // human, swallow repeated button clicks instead of paging Slack
+        // again. The UI hides the button in those modes anyway, but a
+        // double-click race or a stale tab can still get through.
+        if (in_array($session->getMode(), [WidgetSession::MODE_WAITING, WidgetSession::MODE_HUMAN], true)) {
+            return $this->json([
+                'success' => true,
+                'notified' => false,
+                'mode' => $session->getMode(),
+                'message' => 'Handoff already pending or active.',
+            ], Response::HTTP_OK);
+        }
+
+        $lastMessage = isset($data['lastMessage']) && is_string($data['lastMessage'])
+            ? trim($data['lastMessage'])
+            : ($session->getLastMessagePreview() ?? '');
+
+        $notified = $this->slack->notifyHumanHandoff(
+            widget: $widget,
+            session: $session,
+            webhookUrl: $webhookUrl,
+            takeoverUrl: $this->buildHandoffTakeoverUrl($widgetId, $sessionId),
+            lastUserMessage: '' !== $lastMessage ? $lastMessage : null,
+            triggerReason: 'manual button click',
+            customFieldValues: $session->getCustomFieldValues() ?? [],
+        );
+
+        // Flip the session even if the Slack POST failed — the operator may
+        // still see the request via the dashboard's waiting-sessions filter,
+        // and we don't want a transient Slack outage to silently drop the
+        // visitor's escalation.
+        $session->setWaitingForHuman();
+        $this->em->flush();
+
+        return $this->json([
+            'success' => true,
+            'notified' => $notified,
+            'mode' => $session->getMode(),
+        ]);
+    }
+
+    /**
      * Return only runtime-safe config keys needed by the widget frontend.
      * Sensitive fields (API tokens, internal flags) are excluded.
      *
@@ -156,9 +322,22 @@ class WidgetPublicController extends AbstractController
             'privacyPolicyUrl',
             'detectTheme',
             'sessionMode',
+            'widgetSubtitle',
+            'aiAssistantName',
         ];
 
-        return \array_intersect_key($config, \array_flip($allowed));
+        $public = \array_intersect_key($config, \array_flip($allowed));
+
+        // Surface only the derived enabled-flag, never the raw Slack webhook
+        // URL or the trigger phrases. Both are server-side secrets/policy and
+        // would otherwise leak to every page that embeds the widget.
+        $hasSlackWebhook = isset($config['slackWebhookUrl'])
+            && \is_string($config['slackWebhookUrl'])
+            && '' !== $config['slackWebhookUrl'];
+        $buttonEnabled = (bool) ($config['humanHandoffButtonEnabled'] ?? true);
+        $public['humanHandoffEnabled'] = $hasSlackWebhook && $buttonEnabled;
+
+        return $public;
     }
 
     /**
@@ -363,6 +542,39 @@ class WidgetPublicController extends AbstractController
                 'sender' => 'user',
             ]);
 
+            // Auto-handoff: if the visitor's message matches any operator-defined
+            // trigger phrase, fire the Slack ping + flip the session to WAITING
+            // BEFORE we hand the message off to MessageProcessor. The visitor
+            // still gets an AI reply (we don't suppress it — better to keep the
+            // conversation moving while the operator picks up), but the
+            // dashboard now surfaces the session as "needs human" and Slack
+            // gets a clickable takeover button.
+            //
+            // Idempotence is mode-based: once the session is already WAITING
+            // or in HUMAN takeover, repeated triggers don't re-notify. The
+            // visitor's manual button click hits the same gate, so they can't
+            // double-page either.
+            $handoffWebhookUrl = (string) ($config['slackWebhookUrl'] ?? '');
+            if ('' !== $handoffWebhookUrl && WidgetSession::MODE_AI === $session->getMode()) {
+                $triggers = is_array($config['humanHandoffTriggers'] ?? null)
+                    ? array_values(array_filter($config['humanHandoffTriggers'], 'is_string'))
+                    : [];
+                $matchedTrigger = $this->detectHandoffTrigger((string) $data['text'], $triggers);
+                if (null !== $matchedTrigger) {
+                    $this->slack->notifyHumanHandoff(
+                        widget: $widget,
+                        session: $session,
+                        webhookUrl: $handoffWebhookUrl,
+                        takeoverUrl: $this->buildHandoffTakeoverUrl($widgetId, $session->getSessionId()),
+                        lastUserMessage: (string) $data['text'],
+                        triggerReason: sprintf('matched phrase: "%s"', $matchedTrigger),
+                        customFieldValues: $session->getCustomFieldValues() ?? [],
+                    );
+                    $session->setWaitingForHuman();
+                    $this->em->flush();
+                }
+            }
+
             // Attach uploaded files if provided
             $fileIds = [];
             if (!empty($data['files']) && is_array($data['files'])) {
@@ -460,10 +672,10 @@ class WidgetPublicController extends AbstractController
                 'skipSorting' => true,
                 'channel' => 'WIDGET',
                 'rag_group_key' => sprintf('WIDGET:%s', $widget->getWidgetId()),
-                'rag_limit' => (int) ($config['ragResultLimit'] ?? 5),
+                'rag_limit' => max(1, min(50, (int) ($config['ragResultLimit'] ?? 20))),
                 'rag_min_score' => isset($config['ragMinScore'])
                     ? max(0.0, min(1.0, (float) $config['ragMinScore']))
-                    : 0.3,
+                    : 0.2,
                 'widget_id' => $widget->getWidgetId(),
                 'disable_memories' => true,
                 'is_widget_mode' => true,

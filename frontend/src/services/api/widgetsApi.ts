@@ -77,6 +77,17 @@ export interface WidgetConfig {
   sessionMode?: 'browser' | 'user'
   privacyPolicyUrl?: string
   dataProcessingAccepted?: boolean
+  // Operator-controlled header subtitle. null = i18n default, '' = hide,
+  // string = render verbatim. See ChatWidget.vue::resolvedSubtitle.
+  widgetSubtitle?: string | null
+  // Operator-controlled display name for AI messages. null = i18n default
+  // ("AI Assistant" / "KI-Assistent"); non-empty string = render verbatim.
+  aiAssistantName?: string | null
+  // Human-handoff (Slack) configuration. Webhook URL stays on the server —
+  // only `humanHandoffEnabled` (derived) leaks to the public widget config.
+  slackWebhookUrl?: string
+  humanHandoffTriggers?: string[]
+  humanHandoffButtonEnabled?: boolean
 }
 
 export interface CreateWidgetRequest {
@@ -689,6 +700,29 @@ export interface TestApiResult {
   responsePreview?: string
   error?: string
   retryAfter?: number
+}
+
+/**
+ * Send a one-off test message to the configured Slack webhook so the operator
+ * can verify the integration before relying on it for live escalations.
+ *
+ * Server runs the actual POST so the webhook URL never has to be exposed to
+ * the dashboard origin (CORS) or sit in browser network logs.
+ */
+export async function testHandoffWebhook(widgetId: string, webhookUrl: string): Promise<boolean> {
+  try {
+    const data = await httpClient<{ success: boolean }>(
+      `/api/v1/widgets/${widgetId}/handoff/test`,
+      {
+        method: 'POST',
+        body: JSON.stringify({ webhookUrl }),
+      }
+    )
+    return Boolean(data.success)
+  } catch (err) {
+    console.debug('[widgetsApi] handoff webhook test failed', err)
+    return false
+  }
 }
 
 export async function testExternalApi(

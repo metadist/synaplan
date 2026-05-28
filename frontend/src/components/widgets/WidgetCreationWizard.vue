@@ -755,6 +755,17 @@ const formData = ref<WidgetFormData>({
     sessionMode: 'browser',
     privacyPolicyUrl: '',
     dataProcessingAccepted: false,
+    // null = fall back to the i18n default header subtitle in ChatWidget.vue;
+    // wizard users can switch to a custom string or hide via the advanced editor.
+    widgetSubtitle: null,
+    // null = use the i18n default AI sender label ("AI Assistant"). Operators
+    // can override this from the advanced editor (e.g. "Acme Bot").
+    aiAssistantName: null,
+    // Slack human-handoff defaults — surfaced in the advanced editor, not in
+    // the wizard's basic flow (most new widgets won't need this on day one).
+    slackWebhookUrl: '',
+    humanHandoffTriggers: [],
+    humanHandoffButtonEnabled: true,
   },
 })
 
