@@ -354,6 +354,8 @@ import type { ModelOption } from '@/composables/useModelSelection'
 import { parseAIResponse } from '@/utils/responseParser'
 import { normalizeMediaUrl } from '@/utils/urlHelper'
 import { generatePartId, pushMediaPart, extractMediaParts } from '@/utils/mediaParts'
+import { connectWs, disconnectWs, onStepEvent } from '@/services/wsClient'
+import type { StepCompleteEvent } from '@/services/wsClient'
 import { buildUploadUrl, isAudioFileType } from '@/utils/mediaTypes'
 import { isChannelSource } from '@/utils/channelSource'
 import { AudioStreamer } from '@/utils/AudioStreamer'
@@ -615,6 +617,9 @@ onMounted(async () => {
   prefetchSseToken()
   window.addEventListener('focus', prefetchSseToken)
   document.addEventListener('visibilitychange', handleVisibilityChangeForToken)
+
+  // WebSocket connection for real-time compound step notifications
+  connectWs()
 })
 
 const handleVisibilityChangeForToken = () => {
@@ -622,6 +627,44 @@ const handleVisibilityChangeForToken = () => {
     prefetchSseToken()
   }
 }
+
+// WebSocket handler for compound step completion notifications
+const wsUnsubscribe = onStepEvent((event: StepCompleteEvent) => {
+  const message = historyStore.messages.find(
+    (m) => m.backendMessageId === event.message_id
+  )
+  if (!message) return
+
+  if (event.type === 'step_complete' && event.result.status === 'complete') {
+    // Replace image_loading placeholder with actual media
+    const loadingIdx = message.parts.findIndex((p) => p.type === 'image_loading')
+    if (loadingIdx !== -1) {
+      if (event.result.file) {
+        const url = normalizeMediaUrl(event.result.file.path)
+        const mediaType = event.result.file.type === 'video' ? 'video' : 'image'
+        message.parts.splice(loadingIdx, 1)
+        pushMediaPart(message, mediaType, url)
+      } else if (event.result.content) {
+        message.parts.splice(loadingIdx, 1, {
+          type: 'text',
+          content: event.result.content,
+          partId: generatePartId(),
+        })
+      } else {
+        message.parts.splice(loadingIdx, 1)
+      }
+    }
+  } else if (event.type === 'step_error') {
+    const loadingIdx = message.parts.findIndex((p) => p.type === 'image_loading')
+    if (loadingIdx !== -1) {
+      message.parts.splice(loadingIdx, 1, {
+        type: 'text',
+        content: `⚠️ ${event.result.error || 'Step failed'}`,
+        partId: generatePartId(),
+      })
+    }
+  }
+})
 
 const handleViewportResize = () => {
   if (autoScroll.value && chatContainer.value) {
@@ -671,6 +714,8 @@ onBeforeUnmount(() => {
   document.removeEventListener('visibilitychange', handleVisibilityChangeForToken)
   clearDeleteDialogTimer()
   clearMemoryPollTimers()
+  disconnectWs()
+  if (wsUnsubscribe) wsUnsubscribe()
 })
 
 // Watch for active chat changes and load messages
@@ -1076,13 +1121,15 @@ function renderStreamingContent(content: string, msgId: string): void {
     }
   })
 
-  // Split current parts into (structural, media). Media parts (image / video
+  // Split current parts into (structural, media, loading). Media parts (image / video
   // / audio) are pushed by separate SSE events and not part of `desired`;
-  // we keep them appended after the structural section.
+  // we keep them appended after the structural section. Loading parts (image_loading)
+  // are preserved for compound step placeholders.
   const existingStructural = message.parts.filter(
     (p) => p.type === 'thinking' || p.type === 'text' || p.type === 'code' || p.type === 'links'
   )
   const existingMedia = extractMediaParts(message.parts)
+  const existingLoading = message.parts.filter((p) => p.type === 'image_loading')
 
   // Reconcile in-place so existing partIds (and therefore Vue keys) stay
   // stable. For each desired slot:
@@ -1124,7 +1171,7 @@ function renderStreamingContent(content: string, msgId: string): void {
     }
   }
 
-  message.parts = [...reconciled, ...existingMedia]
+  message.parts = [...reconciled, ...existingMedia, ...existingLoading]
 }
 
 const handleContinueResponse = async (message: Message) => {
@@ -2269,6 +2316,29 @@ const streamAIResponse = async (
             // store dispatch the legacy SSE events used.
             if (data.messageId) {
               schedulePostStreamMemoryPoll(data.messageId)
+            }
+
+            // Phase 3: Handle deferred compound steps (async image generation etc.)
+            // Insert loading placeholders and rely on WebSocket for completion notification.
+            if (data.deferredSteps && Array.isArray(data.deferredSteps) && data.deferredSteps.length > 0) {
+              const msg = historyStore.messages.find((m) => m.id === messageId)
+              if (msg) {
+                for (const step of data.deferredSteps) {
+                  if (
+                    step.capability === 'IMAGE_GENERATION' ||
+                    step.capability === 'VIDEO_GENERATION'
+                  ) {
+                    msg.parts = [
+                      ...msg.parts,
+                      { type: 'image_loading', partId: generatePartId() },
+                    ]
+                  }
+                }
+                // Store backend message ID for WebSocket matching
+                if (data.messageId && !msg.backendMessageId) {
+                  msg.backendMessageId = data.messageId
+                }
+              }
             }
 
             // Clean up streaming resources after successful completion

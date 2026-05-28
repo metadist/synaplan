@@ -72,6 +72,8 @@
     "showAll": "Alle anzeigen",
     "recent": "Letzte Unterhaltungen",
     "ttsGenerating": "Sprachantwort wird erstellt…",
+    "imageGenerating": "Bild wird generiert…",
+    "stepFailed": "Schritt fehlgeschlagen",
     "audioUnavailable": "Audio konnte nicht geladen werden",
     "audioUnavailableDescription": "Die Datei ist auf dem Server nicht verfügbar. Versuche es später erneut oder lade sie herunter.",
     "rename": "Chat umbenennen",

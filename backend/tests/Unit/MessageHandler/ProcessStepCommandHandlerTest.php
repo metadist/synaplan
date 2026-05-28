@@ -4,19 +4,61 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\MessageHandler;
 
+use App\Entity\Message;
 use App\Message\ProcessStepCommand;
 use App\MessageHandler\ProcessStepCommandHandler;
+use App\Repository\MessageRepository;
+use App\Service\Message\InferenceRouter;
+use Doctrine\ORM\EntityManagerInterface;
+use Doctrine\ORM\EntityRepository;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
+use Symfony\Contracts\HttpClient\HttpClientInterface;
+use Symfony\Contracts\HttpClient\ResponseInterface;
 
 class ProcessStepCommandHandlerTest extends TestCase
 {
-    public function testHandlesStepCommand(): void
+    public function testHandlesImageGenerationStep(): void
     {
-        $logger = $this->createMock(LoggerInterface::class);
-        $logger->expects($this->atLeastOnce())->method('info');
+        $originalMessage = $this->createMock(Message::class);
+        $originalMessage->method('getTrackingId')->willReturn(999);
+        $originalMessage->method('getLanguage')->willReturn('de');
+        $originalMessage->method('getUserId')->willReturn(1);
+        $originalMessage->method('getChatId')->willReturn(42);
 
-        $handler = new ProcessStepCommandHandler($logger);
+        $outMessage = $this->createMock(Message::class);
+        $outMessage->method('getId')->willReturn(200);
+        $outMessage->expects($this->once())->method('setMeta')
+            ->with('deferred_step_1', $this->isType('string'));
+
+        $messageRepo = $this->createMock(EntityRepository::class);
+        $messageRepo->method('find')->willReturn($originalMessage);
+        $messageRepo->method('findOneBy')->willReturn($outMessage);
+
+        $em = $this->createMock(EntityManagerInterface::class);
+        $em->method('getRepository')->willReturn($messageRepo);
+        $em->expects($this->once())->method('flush');
+
+        $router = $this->createMock(InferenceRouter::class);
+        $router->expects($this->once())->method('route')->willReturn([
+            'content' => '',
+            'metadata' => [
+                'file' => ['path' => '/api/v1/files/uploads/img.png', 'type' => 'image'],
+                'provider' => 'openai',
+                'model' => 'dall-e-3',
+            ],
+        ]);
+
+        $httpResponse = $this->createMock(ResponseInterface::class);
+        $httpClient = $this->createMock(HttpClientInterface::class);
+        $httpClient->method('request')->willReturn($httpResponse);
+
+        $historyRepo = $this->createMock(MessageRepository::class);
+        $historyRepo->method('findChatHistory')->willReturn([]);
+
+        $logger = $this->createMock(LoggerInterface::class);
+
+        $handler = new ProcessStepCommandHandler($em, $historyRepo, $router, $httpClient, $logger);
 
         $command = new ProcessStepCommand(
             conversationId: 42,
@@ -34,35 +76,33 @@ class ProcessStepCommandHandlerTest extends TestCase
         );
 
         $handler($command);
-
-        $this->assertSame(42, $command->getConversationId());
-        $this->assertSame(100, $command->getOriginalMsgId());
-        $this->assertSame(1, $command->getUserId());
-        $this->assertSame(1, $command->getStepIndex());
-        $this->assertSame('IMAGE_GENERATION', $command->getStepData()['capability']);
-        $this->assertSame('Previous step generated text about cats', $command->getPreviousOutput());
     }
 
-    public function testHandlesChatStep(): void
+    public function testSkipsWhenOriginalMessageNotFound(): void
     {
+        $messageRepo = $this->createMock(EntityRepository::class);
+        $messageRepo->method('find')->willReturn(null);
+
+        $em = $this->createMock(EntityManagerInterface::class);
+        $em->method('getRepository')->willReturn($messageRepo);
+
+        $router = $this->createMock(InferenceRouter::class);
+        $router->expects($this->never())->method('route');
+
+        $httpClient = $this->createMock(HttpClientInterface::class);
+        $historyRepo = $this->createMock(MessageRepository::class);
         $logger = $this->createMock(LoggerInterface::class);
-        $handler = new ProcessStepCommandHandler($logger);
+
+        $handler = new ProcessStepCommandHandler($em, $historyRepo, $router, $httpClient, $logger);
 
         $command = new ProcessStepCommand(
-            conversationId: 10,
-            originalMsgId: 50,
-            userId: 2,
-            stepIndex: 2,
-            stepData: [
-                'id' => 'step_3',
-                'capability' => 'CHAT',
-                'web_search' => true,
-                'metadata' => [],
-            ],
+            conversationId: 42,
+            originalMsgId: 999,
+            userId: 1,
+            stepIndex: 1,
+            stepData: ['id' => 'step_2', 'capability' => 'CHAT'],
         );
 
         $handler($command);
-
-        $this->assertSame('', $command->getPreviousOutput());
     }
 }

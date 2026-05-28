@@ -72,6 +72,8 @@
     "showAll": "Mostrar Todo",
     "recent": "Conversaciones Recientes",
     "ttsGenerating": "Añadiendo respuesta hablada…",
+    "imageGenerating": "Generando imagen…",
+    "stepFailed": "Paso fallido",
     "audioUnavailable": "El audio no se pudo cargar",
     "audioUnavailableDescription": "El archivo no está disponible en el servidor por el momento. Inténtalo de nuevo más tarde o descárgalo.",
     "rename": "Renombrar Chat",

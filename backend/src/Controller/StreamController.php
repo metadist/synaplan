@@ -1319,6 +1319,10 @@ class StreamController extends AbstractController
                     'aiModels' => $this->buildAiModelsPayload($outgoingMessage),
                 ];
 
+                if (!empty($result['deferred_steps'])) {
+                    $completeData['deferredSteps'] = $result['deferred_steps'];
+                }
+
                 if ('length' === $finishReason) {
                     $completeData['truncated'] = true;
                 }

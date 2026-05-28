@@ -208,6 +208,7 @@ services:
       WHISPER_ENABLED: "true"
       FFMPEG_BINARY: /usr/bin/ffmpeg
       SYNAPLAN_TTS_URL: ${SYNAPLAN_TTS_URL:-http://host.docker.internal:10200}
+      WS_NOTIFY_URL: http://ws-server:3002/internal/notify
     entrypoint: ["bash", "-c"]
     command:
       - |
@@ -256,6 +257,29 @@ services:
     extra_hosts:
       - "host.docker.internal:host-gateway"
       - "docker-host:host-gateway"
+    networks:
+      - synaplan-network
+
+  # WebSocket Notification Server
+  # Pushes real-time notifications to connected frontends when async
+  # compound steps (image generation, etc.) complete in the queue worker.
+  ws-server:
+    build:
+      context: ./ws-server
+      dockerfile: Dockerfile
+    container_name: synaplan-ws-server
+    environment:
+      WS_PORT: "3002"
+      WS_INTERNAL_PORT: "3002"
+      TOKEN_SECRET: ${TOKEN_SECRET:-change_me_in_production_use_openssl_rand_hex_32}
+    ports:
+      - "3002:3002"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3002/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
     networks:
       - synaplan-network
 

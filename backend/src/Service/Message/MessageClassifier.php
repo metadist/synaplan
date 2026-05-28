@@ -253,6 +253,10 @@ final readonly class MessageClassifier
             'model_id' => $result['sorting_model_id'] ?? null,
             'provider' => $result['sorting_provider'] ?? null,
             'model_name' => $result['sorting_model_name'] ?? null,
+            'router_steps' => $result['router_steps'] ?? null,
+            'is_compound' => $result['is_compound'] ?? false,
+            'classification_source' => $result['classification_source'] ?? null,
+            'classification_confidence' => $result['classification_confidence'] ?? null,
         ];
 
         if (null !== $alias['alias_source']) {

@@ -39,6 +39,7 @@ export type PartType =
   | 'commandList'
   | 'thinking'
   | 'tts_loading'
+  | 'image_loading'
 
 export interface Part {
   /**

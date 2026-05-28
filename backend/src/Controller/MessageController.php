@@ -885,6 +885,72 @@ class MessageController extends AbstractController
     }
 
     /**
+     * Poll endpoint for deferred compound-step results.
+     *
+     * After SSE `complete` with `deferredSteps`, the frontend uses WebSocket
+     * for real-time notifications. This endpoint serves as fallback and for
+     * loading completed steps when revisiting a conversation.
+     */
+    #[Route('/{messageId}/deferred-steps', name: 'deferred_steps', methods: ['GET'])]
+    #[OA\Get(
+        path: '/api/v1/messages/{messageId}/deferred-steps',
+        summary: 'Get deferred step results for a compound message',
+        security: [['Bearer' => []]],
+        tags: ['Messages']
+    )]
+    #[OA\Parameter(name: 'messageId', in: 'path', required: true, schema: new OA\Schema(type: 'integer'))]
+    #[OA\Response(response: 200, description: 'Deferred step status')]
+    public function getDeferredSteps(
+        int $messageId,
+        #[CurrentUser] ?User $user,
+    ): JsonResponse {
+        if (!$user) {
+            return $this->noStoreJson(['error' => 'Not authenticated'], Response::HTTP_UNAUTHORIZED);
+        }
+
+        $message = $this->em->getRepository(Message::class)->find($messageId);
+        if (!$message || $message->getUserId() !== $user->getId()) {
+            return $this->noStoreJson(['error' => 'Message not found'], Response::HTTP_NOT_FOUND);
+        }
+
+        try {
+            $this->em->refresh($message);
+        } catch (\Throwable) {
+        }
+
+        $steps = [];
+        $allComplete = true;
+
+        foreach ($message->getMetadata() as $meta) {
+            if (!str_starts_with($meta->getMetaKey(), 'deferred_step_')) {
+                continue;
+            }
+
+            try {
+                $stepData = json_decode($meta->getMetaValue(), true, 512, JSON_THROW_ON_ERROR);
+                $steps[] = $stepData;
+            } catch (\JsonException) {
+                continue;
+            }
+        }
+
+        if (empty($steps)) {
+            return $this->noStoreJson(['status' => 'pending', 'steps' => []]);
+        }
+
+        foreach ($steps as $stepResult) {
+            if ('complete' !== ($stepResult['status'] ?? '') && 'error' !== ($stepResult['status'] ?? '')) {
+                $allComplete = false;
+            }
+        }
+
+        return $this->noStoreJson([
+            'status' => $allComplete ? 'complete' : 'pending',
+            'steps' => $steps,
+        ]);
+    }
+
+    /**
      * Build a JsonResponse with explicit no-cache headers.
      *
      * Issue #881: the memory-poll endpoint defaults to

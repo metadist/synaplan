@@ -10,10 +10,12 @@ use App\Service\Message\MessageClassifier;
 use App\Service\Message\MessagePreProcessor;
 use App\Service\Message\MessageProcessor;
 use App\Service\Message\SearchQueryGenerator;
+use App\Service\Message\StepOrchestrator;
 use App\Service\ModelConfigService;
 use App\Service\PromptService;
 use App\Service\Search\BraveSearchService;
 use App\Service\UrlContentService;
+use App\UseCase\StepPlan;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
@@ -25,6 +27,7 @@ class MessageProcessorTest extends TestCase
     private MessagePreProcessor&MockObject $preProcessor;
     private MessageClassifier&MockObject $classifier;
     private InferenceRouter&MockObject $router;
+    private StepOrchestrator&MockObject $stepOrchestrator;
     private ModelConfigService&MockObject $modelConfigService;
     private PromptService&MockObject $promptService;
     private BraveSearchService&MockObject $braveSearchService;
@@ -39,11 +42,15 @@ class MessageProcessorTest extends TestCase
         $this->preProcessor = $this->createMock(MessagePreProcessor::class);
         $this->classifier = $this->createMock(MessageClassifier::class);
         $this->router = $this->createMock(InferenceRouter::class);
+        $this->stepOrchestrator = $this->createMock(StepOrchestrator::class);
         $this->modelConfigService = $this->createMock(ModelConfigService::class);
         $this->promptService = $this->createMock(PromptService::class);
         $this->braveSearchService = $this->createMock(BraveSearchService::class);
         $this->searchQueryGenerator = $this->createMock(SearchQueryGenerator::class);
         $this->logger = $this->createMock(LoggerInterface::class);
+
+        $this->stepOrchestrator->method('buildPlan')->willReturn(StepPlan::single('CHAT'));
+        $this->stepOrchestrator->method('requiresOrchestration')->willReturn(false);
 
         $this->processor = new MessageProcessor(
             $this->messageRepository,
@@ -51,6 +58,7 @@ class MessageProcessorTest extends TestCase
             $this->preProcessor,
             $this->classifier,
             $this->router,
+            $this->stepOrchestrator,
             $this->modelConfigService,
             $this->promptService,
             $this->braveSearchService,

@@ -72,6 +72,8 @@
     "showAll": "Tümünü Göster",
     "recent": "Son Konuşmalar",
     "ttsGenerating": "Sesli yanıt ekleniyor…",
+    "imageGenerating": "Görsel oluşturuluyor…",
+    "stepFailed": "Adım başarısız",
     "audioUnavailable": "Ses yüklenemedi",
     "audioUnavailableDescription": "Dosya şu anda sunucuda mevcut değil. Lütfen daha sonra tekrar deneyin veya indirin.",
     "rename": "Sohbeti Yeniden Adlandır",

@@ -1,0 +1,13 @@
+{
+  "name": "synaplan-ws-server",
+  "version": "1.0.0",
+  "description": "WebSocket notification server for Synaplan compound step results",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "ws": "^8.18.0",
+    "jsonwebtoken": "^9.0.2"
+  }
+}

@@ -11,6 +11,7 @@ use App\Service\PerfTimer;
 use App\Service\PromptService;
 use App\Service\Search\BraveSearchService;
 use App\Service\UrlContentService;
+use App\UseCase\StepPlan;
 use Psr\Log\LoggerInterface;
 
 /**
@@ -32,6 +33,7 @@ final readonly class MessageProcessor
         private MessagePreProcessor $preProcessor,
         private MessageClassifier $classifier,
         private InferenceRouter $router,
+        private StepOrchestrator $stepOrchestrator,
         private ModelConfigService $modelConfigService,
         private PromptService $promptService,
         private BraveSearchService $braveSearchService,
@@ -432,9 +434,41 @@ final readonly class MessageProcessor
                 $options['search_results'] = $searchResults;
             }
 
+            // Multi-step orchestration: check if this is a compound request
+            $stepPlan = $this->stepOrchestrator->buildPlan($classification);
+            $isCompound = $this->stepOrchestrator->requiresOrchestration($stepPlan);
+
+            if ($isCompound) {
+                $this->logger->info('MessageProcessor: Compound request detected, executing step 1 synchronously', [
+                    'message_id' => $message->getId(),
+                    'total_steps' => count($stepPlan->steps),
+                    'step1_capability' => $stepPlan->steps[0]->capability,
+                ]);
+            }
+
             $perfTimer->start('handler_total');
             $response = $this->router->routeStream($message, $conversationHistory, $classification, $streamCallback, $statusCallback, $options);
             $perfTimer->stop('handler_total');
+
+            // Dispatch remaining steps to queue if compound
+            $deferredSteps = null;
+            if ($isCompound) {
+                $conversationId = $message->getChatId() ?: 0;
+                $this->stepOrchestrator->dispatchRemainingSteps(
+                    $stepPlan,
+                    $conversationId,
+                    $message->getId(),
+                    $message->getUserId(),
+                    $response['content'] ?? '',
+                );
+
+                $deferredSteps = $this->buildDeferredStepsMetadata($stepPlan);
+
+                $this->logger->info('MessageProcessor: Deferred steps dispatched to queue', [
+                    'message_id' => $message->getId(),
+                    'deferred_count' => count($deferredSteps),
+                ]);
+            }
 
             // Re-add sorting model info to result (for StreamController to save)
             $classification['sorting_model_id'] = $sortingModelId;
@@ -447,7 +481,8 @@ final readonly class MessageProcessor
                 'classification' => $classification,
                 'response' => $response,
                 'preprocessed' => $preprocessed,
-                'search_results' => $searchResults, // Include search results in return
+                'search_results' => $searchResults,
+                'deferred_steps' => $deferredSteps,
             ];
         } catch (VisionModelRequiredException $e) {
             $this->logger->warning('Vision-capable model required for image attachments', [
@@ -973,5 +1008,28 @@ final readonly class MessageProcessor
             'document', 'officemaker', 'text2doc' => 'officemaker',
             default => $fallback ?: 'chat',
         };
+    }
+
+    /**
+     * Build metadata array describing deferred steps for the frontend.
+     *
+     * @return array<int, array{step_index: int, capability: string, media_type: string|null, status: string}>
+     */
+    private function buildDeferredStepsMetadata(StepPlan $plan): array
+    {
+        $deferred = [];
+        $steps = $plan->steps;
+
+        for ($i = 1, $count = count($steps); $i < $count; ++$i) {
+            $step = $steps[$i];
+            $deferred[] = [
+                'step_index' => $i,
+                'capability' => $step->capability,
+                'media_type' => $step->mediaType,
+                'status' => 'queued',
+            ];
+        }
+
+        return $deferred;
     }
 }

@@ -77,6 +77,8 @@
     "showAll": "Show All",
     "recent": "Recent Conversations",
     "ttsGenerating": "Adding spoken answer…",
+    "imageGenerating": "Generating image…",
+    "stepFailed": "Step failed",
     "audioUnavailable": "Audio could not be loaded",
     "audioUnavailableDescription": "The file is currently unavailable on the server. Please try again later or download it.",
     "rename": "Rename Chat",
