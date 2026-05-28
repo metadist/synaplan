@@ -84,6 +84,35 @@ class FileController extends AbstractController
         }
 
         $uploadedFiles = $request->files->get('files', []);
+
+        // Silent-truncation guard. PHP's `max_file_uploads` (default 20) drops
+        // any files past the limit from `$_FILES` without raising an error,
+        // and there is no signal in $_FILES that this happened. The
+        // file-manager / RAG UI lets users select hundreds of files, so the
+        // 21st…Nth file would simply vanish — exactly the silent failure the
+        // customer hit ("selected 50, only 20 uploaded, no error"). We now
+        // require the client to send the intended count as `file_count` and
+        // return 413 the moment PHP saw fewer files than declared, with the
+        // active server ceiling so the UI can chunk and retry.
+        $declaredCount = $request->request->getInt('file_count', 0);
+        $actualCount = is_array($uploadedFiles) ? count($uploadedFiles) : ($uploadedFiles ? 1 : 0);
+        $maxFileUploads = self::getMaxFileUploads();
+
+        if ($declaredCount > 0 && $declaredCount > $actualCount) {
+            return $this->json([
+                'error' => sprintf(
+                    'Server accepted %d of %d files in this request (PHP max_file_uploads = %d). Retry with smaller batches.',
+                    $actualCount,
+                    $declaredCount,
+                    $maxFileUploads,
+                ),
+                'reason' => 'max_file_uploads_exceeded',
+                'received' => $actualCount,
+                'declared' => $declaredCount,
+                'max_files_per_request' => $maxFileUploads,
+            ], Response::HTTP_REQUEST_ENTITY_TOO_LARGE);
+        }
+
         if (empty($uploadedFiles)) {
             return $this->json(['error' => 'No files uploaded. Use form-data with files[] field'], Response::HTTP_BAD_REQUEST);
         }
@@ -91,6 +120,25 @@ class FileController extends AbstractController
         $result = $this->uploadService->uploadBatch($uploadedFiles, $user, $groupKey, $processLevel);
 
         return $this->json($result, $result['success'] ? Response::HTTP_OK : Response::HTTP_PARTIAL_CONTENT);
+    }
+
+    /**
+     * Resolve PHP's effective `max_file_uploads` runtime limit.
+     *
+     * Returned to the client via the pre-flight check so the UI can chunk
+     * large selections into safe batches. Defensive against a misreported
+     * INI (some hosters return '' for unset values) — fall back to PHP's
+     * historical default of 20 in that case.
+     */
+    private static function getMaxFileUploads(): int
+    {
+        $raw = ini_get('max_file_uploads');
+        if (false === $raw || '' === $raw) {
+            return 20;
+        }
+        $value = (int) $raw;
+
+        return $value > 0 ? $value : 20;
     }
 
     #[Route('/check-upload', name: 'check_upload', methods: ['POST'], priority: 10)]
@@ -128,6 +176,7 @@ class FileController extends AbstractController
                         new OA\Property(property: 'remaining', type: 'integer', description: 'Remaining storage quota in bytes'),
                         new OA\Property(property: 'used', type: 'integer', nullable: true),
                         new OA\Property(property: 'limit', type: 'integer', nullable: true),
+                        new OA\Property(property: 'max_files_per_request', type: 'integer', description: 'Max files per multipart POST (PHP max_file_uploads). UI must batch above this.'),
                     ]
                 )
             ),
@@ -160,6 +209,11 @@ class FileController extends AbstractController
         }
 
         $result = $this->uploadService->checkUpload($user, $filename, $size);
+        // Surface PHP's runtime cap so the UI can chunk bulk selections
+        // BEFORE building the multipart body. Without this, the only signal
+        // is the 413 from the upload itself — which the user only sees AFTER
+        // streaming the request.
+        $result['max_files_per_request'] = self::getMaxFileUploads();
 
         return $this->json($result);
     }

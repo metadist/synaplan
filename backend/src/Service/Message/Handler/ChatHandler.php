@@ -96,8 +96,8 @@ final readonly class ChatHandler implements MessageHandlerInterface
         }
 
         $ragGroupKey = $classification['rag_group_key'] ?? null;
-        $ragLimit = isset($classification['rag_limit']) ? max(1, (int) $classification['rag_limit']) : 5;
-        $ragMinScore = isset($classification['rag_min_score']) ? max(0.0, min(1.0, (float) $classification['rag_min_score'])) : 0.3;
+        $ragLimit = isset($classification['rag_limit']) ? max(1, min(50, (int) $classification['rag_limit'])) : 20;
+        $ragMinScore = isset($classification['rag_min_score']) ? max(0.0, min(1.0, (float) $classification['rag_min_score'])) : 0.2;
         $ragContext = $this->loadRagContext($message, $topic, $ragGroupKey, $ragLimit, $ragMinScore);
 
         // Issue #615: the non-streaming path (email / generic webhook)
@@ -494,8 +494,8 @@ final readonly class ChatHandler implements MessageHandlerInterface
         $ragResultsCount = 0;
 
         $ragGroupKey = $options['rag_group_key'] ?? ($classification['rag_group_key'] ?? null);
-        $ragLimit = isset($options['rag_limit']) ? max(1, (int) $options['rag_limit']) : 5;
-        $ragMinScore = isset($options['rag_min_score']) ? max(0.0, min(1.0, (float) $options['rag_min_score'])) : 0.3;
+        $ragLimit = isset($options['rag_limit']) ? max(1, min(50, (int) $options['rag_limit'])) : 20;
+        $ragMinScore = isset($options['rag_min_score']) ? max(0.0, min(1.0, (float) $options['rag_min_score'])) : 0.2;
 
         if (!$ragGroupKey && 'general' !== $topic) {
             $ragGroupKey = "TASKPROMPT:{$topic}";
