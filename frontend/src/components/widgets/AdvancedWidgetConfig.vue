@@ -2856,7 +2856,12 @@ onMounted(async () => {
   widgetName.value = props.widget.name || ''
   widgetStatus.value = props.widget.status || 'active'
 
-  // Load current config from widget
+  // Load current config from widget. CRITICAL: every field this editor
+  // touches MUST be assigned here, otherwise the reactive() default wins,
+  // gets sent back on save, and silently overwrites the stored value. Bug
+  // that hit widgetSubtitle / aiAssistantName / slackWebhookUrl on first
+  // ship — they were rendered + saved by the form but never re-hydrated
+  // when the editor reopened, so the next save wrote the default back.
   const widgetConfig = props.widget.config || {}
   Object.assign(config, {
     position: widgetConfig.position || 'bottom-right',
@@ -2877,6 +2882,21 @@ onMounted(async () => {
     sessionMode: widgetConfig.sessionMode || (widgetConfig.externalApiUrl ? 'user' : 'browser'),
     privacyPolicyUrl: widgetConfig.privacyPolicyUrl || '',
     dataProcessingAccepted: widgetConfig.dataProcessingAccepted || false,
+    // Header text overrides — `??` (not `||`) so an intentional empty
+    // string ('' = "hide the subtitle line") survives the round-trip
+    // instead of falling back to the i18n default again.
+    widgetSubtitle: widgetConfig.widgetSubtitle ?? null,
+    aiAssistantName: widgetConfig.aiAssistantName ?? null,
+    // Slack handoff: webhook URL is server-stored and DOES round-trip via
+    // the authenticated GET /api/v1/widgets/{id} endpoint (only the public
+    // /widget/{id}/config strips it). Triggers and button flag must be
+    // re-hydrated too or the toggle would always default-to-on and the
+    // tag list would appear empty on reopen.
+    slackWebhookUrl: widgetConfig.slackWebhookUrl || '',
+    humanHandoffTriggers: Array.isArray(widgetConfig.humanHandoffTriggers)
+      ? [...widgetConfig.humanHandoffTriggers]
+      : [],
+    humanHandoffButtonEnabled: widgetConfig.humanHandoffButtonEnabled ?? true,
   })
 
   // Load custom fields

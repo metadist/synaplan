@@ -384,6 +384,12 @@
                 :max-file-size="testWidget.config?.maxFileSize || 10"
                 :default-theme="testWidget.config?.defaultTheme || 'light'"
                 :widget-title="testWidget.name"
+                :widget-subtitle="testWidget.config?.widgetSubtitle"
+                :ai-assistant-name="testWidget.config?.aiAssistantName"
+                :human-handoff-enabled="
+                  !!testWidget.config?.slackWebhookUrl &&
+                  (testWidget.config?.humanHandoffButtonEnabled ?? true)
+                "
                 :allow-file-upload="testWidget.config?.allowFileUpload || false"
                 :file-upload-limit="testWidget.config?.fileUploadLimit ?? 3"
                 :open-immediately="true"
