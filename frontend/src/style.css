@@ -265,17 +265,80 @@
     box-shadow: 0 1px 2px rgb(0 0 0 / 0.12);
   }
 
-  /* Ensure all text inside user bubble is white/high contrast */
-  .bubble-user,
-  .bubble-user * {
+  /* User bubble text — avoid universal * so markdown structure stays visible (#979) */
+  .bubble-user .markdown-content,
+  .bubble-user .markdown-content p,
+  .bubble-user .markdown-content li,
+  .bubble-user .markdown-content h1,
+  .bubble-user .markdown-content h2,
+  .bubble-user .markdown-content h3,
+  .bubble-user .markdown-content h4,
+  .bubble-user .markdown-content h5,
+  .bubble-user .markdown-content h6,
+  .bubble-user .markdown-content strong,
+  .bubble-user .markdown-content em,
+  .bubble-user .markdown-content del {
     color: #ffffff !important;
   }
 
-  /* Override for light mode if brand color is too light */
+  .bubble-user .markdown-content a {
+    color: #ffffff !important;
+    text-decoration: underline;
+    text-underline-offset: 2px;
+    text-decoration-color: rgba(255, 255, 255, 0.7);
+  }
+
+  .bubble-user .markdown-content a:hover {
+    text-decoration-color: #ffffff;
+  }
+
+  .bubble-user .markdown-content pre,
+  .bubble-user .markdown-content .code-block {
+    background: rgba(0, 0, 0, 0.22) !important;
+    border: 1px solid rgba(255, 255, 255, 0.28);
+    color: #ffffff !important;
+    box-shadow: none;
+  }
+
+  .bubble-user .markdown-content .code-block code,
+  .bubble-user .markdown-content pre code {
+    color: #ffffff !important;
+  }
+
+  .bubble-user .markdown-content .inline-code,
+  .bubble-user .markdown-content code:not(pre code) {
+    background: rgba(0, 0, 0, 0.18) !important;
+    color: #ffffff !important;
+    border: 1px solid rgba(255, 255, 255, 0.22);
+    box-shadow: none;
+  }
+
+  .bubble-user .markdown-content th,
+  .bubble-user .markdown-content td,
+  .bubble-user .markdown-content .markdown-table th,
+  .bubble-user .markdown-content .markdown-table td {
+    border-color: rgba(255, 255, 255, 0.35) !important;
+    color: #ffffff !important;
+  }
+
+  .bubble-user .markdown-content th,
+  .bubble-user .markdown-content .markdown-table th {
+    background: rgba(0, 0, 0, 0.15) !important;
+  }
+
+  .bubble-user .markdown-content blockquote,
+  .bubble-user .markdown-content .markdown-blockquote {
+    border-left-color: rgba(255, 255, 255, 0.5) !important;
+    color: rgba(255, 255, 255, 0.92) !important;
+  }
+
+  .bubble-user .markdown-content hr {
+    border-color: rgba(255, 255, 255, 0.35) !important;
+  }
+
   @media (prefers-color-scheme: light) {
-    .bubble-user,
-    .bubble-user * {
-      color: #ffffff !important;
+    .bubble-user .markdown-content,
+    .bubble-user .markdown-content p {
       text-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
     }
   }

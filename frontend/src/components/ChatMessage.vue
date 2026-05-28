@@ -310,7 +310,7 @@
         </div>
 
         <!-- Bubble content (only non-thinking parts) -->
-        <div class="px-4 py-3 overflow-x-clip overflow-y-visible space-y-3">
+        <div class="px-4 py-3 overflow-x-auto overflow-y-visible space-y-3 scroll-thin">
           <!-- Combined Badges: Files + Web Search + Tool (NEW) -->
           <div v-if="(files && files.length > 0) || webSearch || tool" class="space-y-2">
             <!-- Show badges with smart collapsing -->
