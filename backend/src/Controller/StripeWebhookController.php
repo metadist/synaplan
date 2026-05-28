@@ -90,14 +90,20 @@ class StripeWebhookController extends AbstractController
                 $this->stripeWebhookSecret
             );
         } catch (\Stripe\Exception\SignatureVerificationException $e) {
-            $this->logger->error('Stripe webhook signature verification failed', [
+            // Client-side rejection: bad signature from a scanner/attacker, a
+            // misconfigured third-party, or a Stripe-side secret rotation that
+            // hasn't reached us yet. None of these warrant `error` (which is
+            // reserved for actionable server-side faults per monolog.yaml).
+            $this->logger->warning('Stripe webhook signature verification failed', [
                 'error' => $e->getMessage(),
                 'ip' => $request->getClientIp(),
             ]);
 
             return $this->json(['error' => 'Invalid signature'], Response::HTTP_BAD_REQUEST);
         } catch (\Exception $e) {
-            $this->logger->error('Stripe webhook error', [
+            // Malformed payload from the caller — same reasoning as above:
+            // it's a 400, not an internal error.
+            $this->logger->warning('Stripe webhook invalid payload', [
                 'error' => $e->getMessage(),
             ]);
 
