@@ -188,7 +188,10 @@ class WidgetPublicController extends AbstractController
      * Request a human takeover: pings the operator's Slack channel and flips
      * the session into WAITING so the dashboard surfaces it for pickup.
      *
-     * PUBLIC endpoint — no authentication required, session-scoped throttling.
+     * PUBLIC endpoint — no authentication required. Idempotent at the
+     * session-mode level: a second click while the session is already
+     * WAITING or HUMAN returns 200 with `notified: false` instead of paging
+     * Slack again.
      */
     #[Route('/{widgetId}/human-handoff', name: 'human_handoff', methods: ['POST'])]
     #[OA\Post(
@@ -219,7 +222,6 @@ class WidgetPublicController extends AbstractController
     )]
     #[OA\Response(response: 400, description: 'Missing sessionId / handoff disabled for this widget')]
     #[OA\Response(response: 404, description: 'Widget or session not found')]
-    #[OA\Response(response: 429, description: 'Handoff already requested recently for this session')]
     public function humanHandoff(string $widgetId, Request $request): JsonResponse
     {
         $data = json_decode($request->getContent(), true);
@@ -269,6 +271,19 @@ class WidgetPublicController extends AbstractController
             ? trim($data['lastMessage'])
             : ($session->getLastMessagePreview() ?? '');
 
+        // Flip-and-flush BEFORE the Slack call. Two reasons:
+        //   1. Race window — `notifyHumanHandoff()` does a synchronous HTTP
+        //      POST with a 5 s timeout. Two simultaneous button clicks would
+        //      both observe MODE_AI through the idempotence check above and
+        //      double-page Slack. Persisting WAITING first shrinks the race
+        //      window from "Slack timeout" to "one DB flush" — concurrent
+        //      requests now see the new mode and short-circuit.
+        //   2. Operator visibility — even on a transient Slack outage the
+        //      dashboard's waiting-sessions filter surfaces the request,
+        //      so the visitor's escalation is never silently dropped.
+        $session->setWaitingForHuman();
+        $this->em->flush();
+
         $notified = $this->slack->notifyHumanHandoff(
             widget: $widget,
             session: $session,
@@ -278,13 +293,6 @@ class WidgetPublicController extends AbstractController
             triggerReason: 'manual button click',
             customFieldValues: $session->getCustomFieldValues() ?? [],
         );
-
-        // Flip the session even if the Slack POST failed — the operator may
-        // still see the request via the dashboard's waiting-sessions filter,
-        // and we don't want a transient Slack outage to silently drop the
-        // visitor's escalation.
-        $session->setWaitingForHuman();
-        $this->em->flush();
 
         return $this->json([
             'success' => true,
@@ -542,18 +550,20 @@ class WidgetPublicController extends AbstractController
                 'sender' => 'user',
             ]);
 
-            // Auto-handoff: if the visitor's message matches any operator-defined
-            // trigger phrase, fire the Slack ping + flip the session to WAITING
-            // BEFORE we hand the message off to MessageProcessor. The visitor
-            // still gets an AI reply (we don't suppress it — better to keep the
-            // conversation moving while the operator picks up), but the
-            // dashboard now surfaces the session as "needs human" and Slack
-            // gets a clickable takeover button.
+            // Auto-handoff: if the visitor's message matches any operator-
+            // defined trigger phrase, flip the session to WAITING and THEN
+            // page Slack. The visitor still gets an AI reply afterwards
+            // (we don't suppress it — better to keep the conversation moving
+            // while the operator picks up), but the dashboard immediately
+            // surfaces the session as "needs human" and Slack gets a
+            // clickable takeover button.
             //
-            // Idempotence is mode-based: once the session is already WAITING
-            // or in HUMAN takeover, repeated triggers don't re-notify. The
-            // visitor's manual button click hits the same gate, so they can't
-            // double-page either.
+            // Persisting WAITING before the 5 s Slack call shrinks the
+            // double-notify race window for concurrent visitor messages from
+            // "Slack HTTP timeout" to "one DB flush" — concurrent requests
+            // see the new mode through the idempotence check and skip the
+            // second ping. Same ordering rationale as the manual
+            // `humanHandoff` endpoint.
             $handoffWebhookUrl = (string) ($config['slackWebhookUrl'] ?? '');
             if ('' !== $handoffWebhookUrl && WidgetSession::MODE_AI === $session->getMode()) {
                 $triggers = is_array($config['humanHandoffTriggers'] ?? null)
@@ -561,6 +571,8 @@ class WidgetPublicController extends AbstractController
                     : [];
                 $matchedTrigger = $this->detectHandoffTrigger((string) $data['text'], $triggers);
                 if (null !== $matchedTrigger) {
+                    $session->setWaitingForHuman();
+                    $this->em->flush();
                     $this->slack->notifyHumanHandoff(
                         widget: $widget,
                         session: $session,
@@ -570,8 +582,6 @@ class WidgetPublicController extends AbstractController
                         triggerReason: sprintf('matched phrase: "%s"', $matchedTrigger),
                         customFieldValues: $session->getCustomFieldValues() ?? [],
                     );
-                    $session->setWaitingForHuman();
-                    $this->em->flush();
                 }
             }
 

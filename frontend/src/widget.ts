@@ -34,11 +34,14 @@ interface WidgetConfig {
   messageLimit?: number
   maxFileSize?: number
   widgetTitle?: string
-  // Header tagline below the title. Three states are meaningful:
-  //   undefined → fall back to the i18n default ("We typically reply in minutes")
-  //   ''        → hide the line entirely (operator opted out)
-  //   string    → render verbatim (operator-provided copy, not translated)
-  widgetSubtitle?: string
+  // Header tagline below the title. Four states are meaningful, matching
+  // what the public widget config endpoint can return for the field:
+  //   undefined / null → fall back to the i18n default
+  //                      ("We typically reply in minutes")
+  //   ''               → hide the line entirely (operator opted out)
+  //   string           → render verbatim (operator-provided copy, not translated)
+  // Backend sanitizer stores absence/null as `null`, so the type must accept it.
+  widgetSubtitle?: string | null
   // Display name shown next to AI message timestamps ("AI Assistant · 03:58 PM").
   // undefined / null = use the i18n default; non-empty string = render verbatim.
   // Empty string collapses to default — the timestamp line always needs a label.
