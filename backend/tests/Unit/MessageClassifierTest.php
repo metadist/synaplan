@@ -707,4 +707,184 @@ class MessageClassifierTest extends TestCase
         $this->assertSame('ai_sorting', $result['source']);
         $this->assertFalse($result['skip_sorting']);
     }
+
+    /**
+     * Regression for issue #980.
+     *
+     * Short German follow-up messages with few distinctive stopwords used
+     * to fall through the fast-path heuristic and snap the conversation
+     * to English. The classifier now uses the conversation's prior
+     * language (from earlier IN-direction messages) as a fallback when
+     * the heuristic's signal is weak, so the language stays sticky.
+     *
+     * @return iterable<string, array{0: string}>
+     */
+    public static function shortGermanFollowUpProvider(): iterable
+    {
+        // The exact phrase reported in the issue screenshot.
+        yield 'issue #980 phrase' => ['das habe ich dir gegeben'];
+        yield 'short acknowledgement' => ['ja genau'];
+        yield 'short imperative' => ['zeig mir das'];
+        yield 'short reply' => ['okay danke'];
+    }
+
+    #[\PHPUnit\Framework\Attributes\DataProvider('shortGermanFollowUpProvider')]
+    public function testFastPathInheritsLanguageFromConversationPrior(string $text): void
+    {
+        $classifier = $this->buildFastPathClassifier();
+
+        // Earlier user turn was clearly German — that's the prior the
+        // classifier should fall back to when the current message is
+        // too short to score confidently on its own.
+        $priorUserMessage = $this->createMock(Message::class);
+        $priorUserMessage->method('getDirection')->willReturn('IN');
+        $priorUserMessage->method('getLanguage')->willReturn('de');
+
+        $priorAssistantMessage = $this->createMock(Message::class);
+        $priorAssistantMessage->method('getDirection')->willReturn('OUT');
+        $priorAssistantMessage->method('getLanguage')->willReturn('de');
+
+        $history = [$priorUserMessage, $priorAssistantMessage];
+
+        $message = $this->buildFastPathTextMessage(980, $text);
+
+        $result = $classifier->classify($message, $history);
+
+        // Fast-path still took the request (the message has no media verbs).
+        $this->assertSame('fast_path_heuristic', $result['source']);
+        $this->assertTrue($result['skip_sorting']);
+        // ... but the language now inherits from the conversation prior
+        // instead of snapping to 'en'.
+        $this->assertSame('de', $result['language'], sprintf(
+            'Short German message "%s" must inherit "de" from the conversation history (#980)',
+            $text
+        ));
+    }
+
+    /**
+     * The classifier must not blindly copy the prior when the current
+     * message clearly switches language (e.g. user replies in English to
+     * an earlier German turn). The heuristic's confident hit wins.
+     */
+    public function testFastPathConfidentHeuristicWinsOverPrior(): void
+    {
+        $classifier = $this->buildFastPathClassifier();
+
+        $priorUserMessage = $this->createMock(Message::class);
+        $priorUserMessage->method('getDirection')->willReturn('IN');
+        $priorUserMessage->method('getLanguage')->willReturn('de');
+
+        $history = [$priorUserMessage];
+
+        // Plenty of distinctive English stopwords — easily over threshold.
+        $message = $this->buildFastPathTextMessage(981, 'Please tell me what you think and write back soon');
+
+        $result = $classifier->classify($message, $history);
+
+        $this->assertSame('fast_path_heuristic', $result['source']);
+        $this->assertSame('en', $result['language'], 'A confident English signal must override the German prior');
+    }
+
+    /**
+     * Assistant (OUT) messages must NOT contribute to the prior — only
+     * the user's own past turns count. Otherwise an early German
+     * assistant boilerplate would override a subsequent English user
+     * conversation.
+     */
+    public function testFastPathPriorIgnoresAssistantOutMessages(): void
+    {
+        $classifier = $this->buildFastPathClassifier();
+
+        $assistantOnly = $this->createMock(Message::class);
+        $assistantOnly->method('getDirection')->willReturn('OUT');
+        $assistantOnly->method('getLanguage')->willReturn('de');
+
+        $history = [$assistantOnly];
+
+        // Ambiguous short message with no useful heuristic hits.
+        $message = $this->buildFastPathTextMessage(982, 'ok');
+
+        $result = $classifier->classify($message, $history);
+
+        // No usable prior (assistant-only history is discarded), no
+        // heuristic signal → final fallback to 'en'.
+        $this->assertSame('en', $result['language']);
+    }
+
+    /**
+     * Sentinel BLANG values ('NN' = unclassified default, 'auto' =
+     * widget mode) must not contaminate the prior lookup. The classifier
+     * should treat them as "unknown" and fall through to the next signal.
+     */
+    public function testFastPathPriorRejectsSentinelLanguageValues(): void
+    {
+        $classifier = $this->buildFastPathClassifier();
+
+        $nnMessage = $this->createMock(Message::class);
+        $nnMessage->method('getDirection')->willReturn('IN');
+        $nnMessage->method('getLanguage')->willReturn('NN');
+
+        $autoMessage = $this->createMock(Message::class);
+        $autoMessage->method('getDirection')->willReturn('IN');
+        $autoMessage->method('getLanguage')->willReturn('auto');
+
+        $history = [$nnMessage, $autoMessage];
+
+        $message = $this->buildFastPathTextMessage(983, 'ok');
+
+        $result = $classifier->classify($message, $history);
+
+        // Both sentinels rejected → fall back to 'en'.
+        $this->assertSame('en', $result['language']);
+    }
+
+    /**
+     * Build a fast-path-ready classifier (Synapse off, fast-path on)
+     * suitable for exercising the prior-language fallback.
+     */
+    private function buildFastPathClassifier(): MessageClassifier
+    {
+        $configRepo = $this->createMock(ConfigRepository::class);
+        $configRepo->method('getValue')->willReturnCallback(static function (int $owner, string $group, string $setting): ?string {
+            return 'QDRANT_SEARCH' === $group ? '0' : null;
+        });
+
+        $sorter = $this->createMock(MessageSorter::class);
+        // None of these tests should hit the AI sorter — they all exercise
+        // the fast-path's language-inheritance behaviour.
+        $sorter->expects($this->never())->method('classify');
+
+        return new MessageClassifier(
+            $sorter,
+            $this->createMock(SynapseRouter::class),
+            new TopicAliasResolver(),
+            $this->createMock(MessageMetaRepository::class),
+            $this->createMock(ModelConfigService::class),
+            $configRepo,
+            $this->createMock(EntityManagerInterface::class),
+            $this->createMock(LoggerInterface::class),
+        );
+    }
+
+    /**
+     * Build a minimal Message mock that the fast-path will accept (no
+     * files, no tool prefix, short enough). Centralises the repeated
+     * setup the new test cases share.
+     */
+    private function buildFastPathTextMessage(int $id, string $text): Message&MockObject
+    {
+        $message = $this->createMock(Message::class);
+        $message->method('getId')->willReturn($id);
+        $message->method('getUserId')->willReturn(10);
+        $message->method('getText')->willReturn($text);
+        $message->method('getLanguage')->willReturn('en');
+        $message->method('getFile')->willReturn(0);
+        $message->method('getFiles')->willReturn(new \Doctrine\Common\Collections\ArrayCollection());
+        $message->method('getDateTime')->willReturn('20260528140000');
+        $message->method('getFilePath')->willReturn('');
+        $message->method('getTopic')->willReturn('');
+        $message->method('getFileText')->willReturn('');
+
+        return $message;
+    }
 }
