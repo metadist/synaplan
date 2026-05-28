@@ -273,6 +273,90 @@
                 <p class="text-xs txt-secondary mt-2">{{ $t('widgets.customIconHint') }}</p>
               </div>
             </div>
+
+            <!-- AI assistant display name. Replaces the default "AI Assistant"
+                 label next to AI message timestamps (operator branding —
+                 e.g. "Acme Bot" or a persona name like "Lara"). Empty input
+                 falls back to the locale default. -->
+            <div>
+              <label class="block text-sm font-medium txt-primary mb-2">
+                {{ $t('widgets.advancedConfig.aiAssistantName') }}
+              </label>
+              <input
+                :value="config.aiAssistantName ?? ''"
+                type="text"
+                maxlength="50"
+                :placeholder="$t('widgets.advancedConfig.aiAssistantNamePlaceholder')"
+                class="w-full px-4 py-2.5 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
+                data-testid="input-ai-assistant-name"
+                @input="
+                  config.aiAssistantName =
+                    ($event.target as HTMLInputElement).value.trim() === ''
+                      ? null
+                      : ($event.target as HTMLInputElement).value
+                "
+              />
+              <p class="text-xs txt-secondary mt-1">
+                {{ $t('widgets.advancedConfig.aiAssistantNameHelp') }}
+              </p>
+            </div>
+
+            <!-- Header subtitle: operator-controlled tagline shown under the
+                 widget title in the popup. Three states are meaningful — see
+                 the `resolvedSubtitle` computed in ChatWidget.vue for the
+                 contract. Null (the "—" radio) restores the i18n default; an
+                 empty custom value hides the line. -->
+            <div>
+              <label class="block text-sm font-medium txt-primary mb-2">
+                {{ $t('widgets.advancedConfig.subtitle') }}
+              </label>
+              <div class="space-y-2">
+                <label class="flex items-center gap-2 text-sm txt-secondary cursor-pointer">
+                  <input
+                    type="radio"
+                    :checked="config.widgetSubtitle === null || config.widgetSubtitle === undefined"
+                    class="accent-[var(--brand)]"
+                    data-testid="input-subtitle-default"
+                    @change="config.widgetSubtitle = null"
+                  />
+                  <span>{{ $t('widgets.advancedConfig.subtitleDefault') }}</span>
+                </label>
+                <label class="flex items-center gap-2 text-sm txt-secondary cursor-pointer">
+                  <input
+                    type="radio"
+                    :checked="config.widgetSubtitle === ''"
+                    class="accent-[var(--brand)]"
+                    data-testid="input-subtitle-hidden"
+                    @change="config.widgetSubtitle = ''"
+                  />
+                  <span>{{ $t('widgets.advancedConfig.subtitleHidden') }}</span>
+                </label>
+                <label class="flex items-center gap-2 text-sm txt-secondary cursor-pointer">
+                  <input
+                    type="radio"
+                    :checked="
+                      typeof config.widgetSubtitle === 'string' && config.widgetSubtitle !== ''
+                    "
+                    class="accent-[var(--brand)]"
+                    data-testid="input-subtitle-custom"
+                    @change="config.widgetSubtitle = config.widgetSubtitle || ' '"
+                  />
+                  <span>{{ $t('widgets.advancedConfig.subtitleCustom') }}</span>
+                </label>
+                <input
+                  v-if="typeof config.widgetSubtitle === 'string' && config.widgetSubtitle !== ''"
+                  v-model="config.widgetSubtitle"
+                  type="text"
+                  maxlength="200"
+                  :placeholder="$t('widgets.advancedConfig.subtitlePlaceholder')"
+                  class="w-full px-4 py-2.5 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
+                  data-testid="input-subtitle-text"
+                />
+              </div>
+              <p class="text-xs txt-secondary mt-2">
+                {{ $t('widgets.advancedConfig.subtitleHelp') }}
+              </p>
+            </div>
           </div>
 
           <!-- Behavior Tab (hidden in promptOnly mode) -->
@@ -442,6 +526,162 @@
                       </p>
                     </div>
                   </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Human handoff (Slack) — operator-configurable escalation
+                 channel. Webhook URL is server-side only; only the derived
+                 boolean `humanHandoffEnabled` ships to the embedded widget. -->
+            <div class="surface-chip rounded-lg" data-testid="section-human-handoff">
+              <div class="p-4 flex items-start justify-between gap-3">
+                <div>
+                  <p class="font-medium txt-primary flex items-center gap-2">
+                    <Icon icon="heroicons:bell-alert" class="w-5 h-5 txt-brand" />
+                    {{ $t('widgets.advancedConfig.handoff.title') }}
+                  </p>
+                  <p class="text-xs txt-secondary mt-1">
+                    {{ $t('widgets.advancedConfig.handoff.intro') }}
+                  </p>
+                </div>
+              </div>
+
+              <div class="px-4 pb-4 space-y-4">
+                <div>
+                  <label class="block text-sm font-medium txt-primary mb-2">
+                    {{ $t('widgets.advancedConfig.handoff.webhookUrl') }}
+                  </label>
+                  <input
+                    v-model="config.slackWebhookUrl"
+                    type="url"
+                    placeholder="https://hooks.slack.com/services/..."
+                    class="w-full px-4 py-2.5 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
+                    data-testid="input-slack-webhook"
+                  />
+                  <p
+                    v-if="
+                      config.slackWebhookUrl &&
+                      !/^https:\/\/hooks\.slack\.com\/services\//.test(config.slackWebhookUrl)
+                    "
+                    class="text-xs text-yellow-600 dark:text-yellow-400 mt-1"
+                  >
+                    {{ $t('widgets.advancedConfig.handoff.webhookInvalid') }}
+                  </p>
+                  <p v-else class="text-xs txt-secondary mt-1">
+                    {{ $t('widgets.advancedConfig.handoff.webhookHelp') }}
+                  </p>
+                </div>
+
+                <label
+                  class="flex items-center justify-between cursor-pointer"
+                  data-testid="label-handoff-button-enabled"
+                >
+                  <div>
+                    <p class="font-medium txt-primary text-sm">
+                      {{ $t('widgets.advancedConfig.handoff.buttonEnabled') }}
+                    </p>
+                    <p class="text-xs txt-secondary mt-1">
+                      {{ $t('widgets.advancedConfig.handoff.buttonEnabledHelp') }}
+                    </p>
+                  </div>
+                  <div class="relative inline-flex items-center flex-shrink-0">
+                    <input
+                      v-model="config.humanHandoffButtonEnabled"
+                      type="checkbox"
+                      class="sr-only peer"
+                      :disabled="!config.slackWebhookUrl"
+                      data-testid="input-handoff-button-enabled"
+                    />
+                    <div
+                      class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-[var(--brand)]/20 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[var(--brand)] peer-disabled:opacity-50"
+                    ></div>
+                  </div>
+                </label>
+
+                <div>
+                  <label class="block text-sm font-medium txt-primary mb-2">
+                    {{ $t('widgets.advancedConfig.handoff.triggers') }}
+                  </label>
+                  <div class="flex flex-wrap gap-2 mb-2">
+                    <span
+                      v-for="(trigger, idx) in config.humanHandoffTriggers || []"
+                      :key="idx"
+                      class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[var(--brand)]/10 text-[var(--brand)] text-xs"
+                    >
+                      {{ trigger }}
+                      <button
+                        type="button"
+                        class="hover:opacity-70"
+                        :aria-label="$t('common.remove')"
+                        data-testid="btn-remove-trigger"
+                        @click="removeHandoffTrigger(idx)"
+                      >
+                        <Icon icon="heroicons:x-mark" class="w-3.5 h-3.5" />
+                      </button>
+                    </span>
+                  </div>
+                  <div class="flex gap-2">
+                    <input
+                      v-model="newHandoffTrigger"
+                      type="text"
+                      maxlength="100"
+                      :placeholder="$t('widgets.advancedConfig.handoff.triggerPlaceholder')"
+                      class="flex-1 px-4 py-2 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
+                      data-testid="input-new-trigger"
+                      @keyup.enter="addHandoffTrigger"
+                    />
+                    <button
+                      type="button"
+                      :disabled="
+                        !newHandoffTrigger.trim() ||
+                        (config.humanHandoffTriggers?.length ?? 0) >= 20
+                      "
+                      class="btn-primary px-4 py-2 rounded-lg text-sm disabled:opacity-40 disabled:cursor-not-allowed"
+                      data-testid="btn-add-trigger"
+                      @click="addHandoffTrigger"
+                    >
+                      {{ $t('common.add') }}
+                    </button>
+                  </div>
+                  <p class="text-xs txt-secondary mt-2">
+                    {{ $t('widgets.advancedConfig.handoff.triggersHelp') }}
+                  </p>
+                </div>
+
+                <div
+                  class="flex flex-wrap items-center gap-3 pt-2 border-t border-light-border/20 dark:border-dark-border/10"
+                >
+                  <button
+                    type="button"
+                    :disabled="!config.slackWebhookUrl || handoffTestSubmitting"
+                    class="px-4 py-2 rounded-lg border border-[var(--brand)]/50 text-[var(--brand)] hover:bg-[var(--brand)]/10 text-sm flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                    data-testid="btn-handoff-test"
+                    @click="testHandoffWebhook"
+                  >
+                    <Icon
+                      :icon="
+                        handoffTestSubmitting ? 'heroicons:arrow-path' : 'heroicons:paper-airplane'
+                      "
+                      :class="['w-4 h-4', handoffTestSubmitting && 'animate-spin']"
+                    />
+                    {{ $t('widgets.advancedConfig.handoff.testButton') }}
+                  </button>
+                  <span
+                    v-if="handoffTestResult === 'success'"
+                    class="text-xs text-green-600 dark:text-green-400 flex items-center gap-1.5"
+                    data-testid="text-handoff-test-success"
+                  >
+                    <Icon icon="heroicons:check-circle" class="w-4 h-4" />
+                    {{ $t('widgets.advancedConfig.handoff.testSuccess') }}
+                  </span>
+                  <span
+                    v-else-if="handoffTestResult === 'error'"
+                    class="text-xs text-red-600 dark:text-red-400 flex items-center gap-1.5"
+                    data-testid="text-handoff-test-error"
+                  >
+                    <Icon icon="heroicons:x-circle" class="w-4 h-4" />
+                    {{ $t('widgets.advancedConfig.handoff.testFailed') }}
+                  </span>
                 </div>
               </div>
             </div>
@@ -1746,7 +1986,67 @@ const config = reactive<widgetsApi.WidgetConfig>({
   sessionMode: 'browser' as 'browser' | 'user',
   privacyPolicyUrl: '',
   dataProcessingAccepted: false,
+  // Subtitle: null = i18n default ("We typically reply in minutes"), '' = hide,
+  // string = operator-provided text (verbatim, not translated)
+  widgetSubtitle: null,
+  // AI assistant display name shown next to AI message timestamps
+  // ("Acme Bot · 03:58 PM"). null = fall back to the i18n default
+  // ("AI Assistant" / "KI-Assistent"); empty input collapses to null.
+  aiAssistantName: null,
+  // Human handoff: Slack webhook + trigger phrases for auto-escalation. The
+  // webhook URL stays on the server (sanitizer validates it's an
+  // hooks.slack.com URL), the triggers are evaluated server-side too. Only
+  // the derived `humanHandoffEnabled` boolean ships to the public widget.
+  slackWebhookUrl: '',
+  humanHandoffTriggers: [],
+  humanHandoffButtonEnabled: true,
 })
+
+// Human handoff: local UI state for the trigger-tag input + test webhook button.
+// Keeping it next to the config reactive so the section is self-contained when
+// we eventually split AdvancedWidgetConfig.vue into smaller per-tab components.
+const newHandoffTrigger = ref('')
+const handoffTestSubmitting = ref(false)
+const handoffTestResult = ref<'idle' | 'success' | 'error'>('idle')
+
+const addHandoffTrigger = () => {
+  const value = newHandoffTrigger.value.trim()
+  if (!value) return
+  if (!Array.isArray(config.humanHandoffTriggers)) {
+    config.humanHandoffTriggers = []
+  }
+  if (config.humanHandoffTriggers.length >= 20) return
+  if (config.humanHandoffTriggers.includes(value)) {
+    newHandoffTrigger.value = ''
+    return
+  }
+  config.humanHandoffTriggers.push(value)
+  newHandoffTrigger.value = ''
+}
+
+const removeHandoffTrigger = (idx: number) => {
+  if (!Array.isArray(config.humanHandoffTriggers)) return
+  config.humanHandoffTriggers.splice(idx, 1)
+}
+
+const testHandoffWebhook = async () => {
+  if (handoffTestSubmitting.value || !config.slackWebhookUrl) return
+  handoffTestSubmitting.value = true
+  handoffTestResult.value = 'idle'
+  try {
+    const ok = await widgetsApi.testHandoffWebhook(props.widget.widgetId, config.slackWebhookUrl)
+    handoffTestResult.value = ok ? 'success' : 'error'
+  } catch (err) {
+    console.error('Failed to test handoff webhook', err)
+    handoffTestResult.value = 'error'
+  } finally {
+    handoffTestSubmitting.value = false
+    // Auto-clear the inline status after a few seconds so the section stays tidy.
+    setTimeout(() => {
+      handoffTestResult.value = 'idle'
+    }, 6000)
+  }
+}
 
 // Custom fields
 const customFields = ref<widgetsApi.CustomFieldDef[]>([])
@@ -2556,7 +2856,12 @@ onMounted(async () => {
   widgetName.value = props.widget.name || ''
   widgetStatus.value = props.widget.status || 'active'
 
-  // Load current config from widget
+  // Load current config from widget. CRITICAL: every field this editor
+  // touches MUST be assigned here, otherwise the reactive() default wins,
+  // gets sent back on save, and silently overwrites the stored value. Bug
+  // that hit widgetSubtitle / aiAssistantName / slackWebhookUrl on first
+  // ship — they were rendered + saved by the form but never re-hydrated
+  // when the editor reopened, so the next save wrote the default back.
   const widgetConfig = props.widget.config || {}
   Object.assign(config, {
     position: widgetConfig.position || 'bottom-right',
@@ -2577,6 +2882,21 @@ onMounted(async () => {
     sessionMode: widgetConfig.sessionMode || (widgetConfig.externalApiUrl ? 'user' : 'browser'),
     privacyPolicyUrl: widgetConfig.privacyPolicyUrl || '',
     dataProcessingAccepted: widgetConfig.dataProcessingAccepted || false,
+    // Header text overrides — `??` (not `||`) so an intentional empty
+    // string ('' = "hide the subtitle line") survives the round-trip
+    // instead of falling back to the i18n default again.
+    widgetSubtitle: widgetConfig.widgetSubtitle ?? null,
+    aiAssistantName: widgetConfig.aiAssistantName ?? null,
+    // Slack handoff: webhook URL is server-stored and DOES round-trip via
+    // the authenticated GET /api/v1/widgets/{id} endpoint (only the public
+    // /widget/{id}/config strips it). Triggers and button flag must be
+    // re-hydrated too or the toggle would always default-to-on and the
+    // tag list would appear empty on reopen.
+    slackWebhookUrl: widgetConfig.slackWebhookUrl || '',
+    humanHandoffTriggers: Array.isArray(widgetConfig.humanHandoffTriggers)
+      ? [...widgetConfig.humanHandoffTriggers]
+      : [],
+    humanHandoffButtonEnabled: widgetConfig.humanHandoffButtonEnabled ?? true,
   })
 
   // Load custom fields

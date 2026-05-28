@@ -17,6 +17,12 @@ export interface UploadCheckResponse {
   remaining: number
   used?: number
   limit?: number
+  // Server-published PHP `max_file_uploads` ceiling for a single multipart
+  // request. The UI MUST batch larger selections into chunks of this size or
+  // PHP will silently truncate $_FILES and only the first N uploads survive.
+  // Optional for backwards compat with older servers — frontend falls back
+  // to a conservative 20 in that case.
+  max_files_per_request?: number
 }
 
 /**
@@ -120,6 +126,11 @@ export interface FileListResponse {
   }
 }
 
+// Fallback when the server pre-flight response doesn't include
+// `max_files_per_request` (older deployments) — match PHP's historical
+// default to stay on the safe side.
+const DEFAULT_MAX_FILES_PER_REQUEST = 20
+
 /**
  * Upload files with processing and progress tracking.
  *
@@ -131,10 +142,16 @@ export interface FileListResponse {
  * Throws {@link UploadBlockedError} when the pre-flight rejects a file. The UI
  * should catch this and surface the localized message to the user.
  *
+ * Splits the file list into batches sized by the server's published
+ * `max_files_per_request` (PHP `max_file_uploads`) so the user can drop 50+
+ * files into the RAG manager without PHP silently truncating $_FILES at
+ * the first 20. Batches run sequentially so per-file errors stay attributable
+ * and the visible progress bar advances monotonically.
+ *
  * Uses XMLHttpRequest for the actual transfer to support upload progress.
  *
  * @param options Upload options with files, processing level, and optional progress callback
- * @returns Upload response with file details
+ * @returns Aggregated upload response across all batches
  */
 export const uploadFiles = async (options: UploadFileOptions): Promise<UploadResponse> => {
   // Pre-flight all files concurrently — N small HEAD-style metadata
@@ -151,15 +168,80 @@ export const uploadFiles = async (options: UploadFileOptions): Promise<UploadRes
     }
   }
 
+  // Use the cap reported by the pre-flight (same value from every file —
+  // all checks hit the same backend). Falls back to 20 if absent.
+  const batchSize = Math.max(
+    1,
+    Number(checks[0]?.max_files_per_request) || DEFAULT_MAX_FILES_PER_REQUEST
+  )
+
+  // Total upload size in bytes — kept in real units across batches so the
+  // UI's `formatFileSize(loaded)` / `formatFileSize(total)` render truthful
+  // values. The first iteration used a synthetic `totalFiles * 1000` scale
+  // which made the Files-page progress label read as e.g. "50 KB of 50 KB"
+  // while uploading 50 files (flagged in PR #1013 review).
+  const totalBytes = options.files.reduce((sum, file) => sum + file.size, 0)
+
+  // Single-batch fast path: no chunking overhead when the selection already
+  // fits in one request (covers the vast majority of widget uploads).
+  if (options.files.length <= batchSize) {
+    return uploadFilesBatch(options, options.files, 0, totalBytes)
+  }
+
+  const aggregated: UploadResponse = {
+    success: true,
+    files: [],
+    errors: [],
+    total_time_ms: 0,
+    process_level: options.processLevel ?? 'vectorize',
+  }
+
+  let bytesUploaded = 0
+  for (let offset = 0; offset < options.files.length; offset += batchSize) {
+    const batch = options.files.slice(offset, offset + batchSize)
+
+    const batchResult = await uploadFilesBatch(options, batch, bytesUploaded, totalBytes)
+
+    bytesUploaded += batch.reduce((sum, file) => sum + file.size, 0)
+
+    aggregated.files.push(...batchResult.files)
+    aggregated.errors.push(...batchResult.errors)
+    aggregated.total_time_ms += batchResult.total_time_ms ?? 0
+    aggregated.process_level = batchResult.process_level ?? aggregated.process_level
+    if (!batchResult.success) {
+      aggregated.success = false
+    }
+  }
+
+  return aggregated
+}
+
+/**
+ * Upload a single batch of files (≤ server max_file_uploads).
+ *
+ * Reports progress in bytes within the parent call's `totalBytes` so the
+ * caller sees a single, monotonically-increasing progress bar across all
+ * batches AND can render `loaded`/`total` directly as file sizes.
+ */
+const uploadFilesBatch = async (
+  options: UploadFileOptions,
+  batch: File[],
+  bytesAlreadyUploaded: number,
+  totalBytes: number
+): Promise<UploadResponse> => {
   const buildFormData = (): FormData => {
     const fd = new FormData()
-    options.files.forEach((file) => fd.append('files[]', file))
+    batch.forEach((file) => fd.append('files[]', file))
     if (options.groupKey) fd.append('group_key', options.groupKey)
     if (options.processLevel) fd.append('process_level', options.processLevel)
+    // Explicit declared count lets the backend detect PHP's silent
+    // `max_file_uploads` truncation and respond 413 instead of swallowing
+    // the missing files.
+    fd.append('file_count', String(batch.length))
     return fd
   }
 
-  // If no progress callback, use simple fetch (with abort signal support)
+  // No progress callback → simple fetch path (no chunking visualisation needed).
   if (!options.onProgress) {
     return httpClient<UploadResponse>('/api/v1/files/upload', {
       method: 'POST',
@@ -168,7 +250,22 @@ export const uploadFiles = async (options: UploadFileOptions): Promise<UploadRes
     })
   }
 
-  // Use XMLHttpRequest for progress tracking with automatic token refresh on 401
+  // Translate per-batch xhr progress into a cumulative byte counter that
+  // spans the entire user-visible upload, so the caller's progress bar
+  // moves monotonically (0 → 100%) instead of jumping back to 0% on every
+  // batch boundary. `loaded`/`total` are real bytes — `FilesView.vue`
+  // formats them with `formatFileSize()` for the status text.
+  const reportProgress = (batchLoaded: number) => {
+    if (!options.onProgress) return
+    const safeTotal = totalBytes > 0 ? totalBytes : 1
+    const loaded = Math.min(safeTotal, bytesAlreadyUploaded + batchLoaded)
+    options.onProgress({
+      loaded,
+      total: safeTotal,
+      percentage: Math.min(100, Math.round((loaded / safeTotal) * 100)),
+    })
+  }
+
   const sendXhr = (isRetry = false): Promise<UploadResponse> =>
     new Promise<UploadResponse>((resolve, reject) => {
       const xhr = new XMLHttpRequest()
@@ -190,12 +287,8 @@ export const uploadFiles = async (options: UploadFileOptions): Promise<UploadRes
       }
 
       xhr.upload.addEventListener('progress', (event) => {
-        if (event.lengthComputable && options.onProgress) {
-          options.onProgress({
-            loaded: event.loaded,
-            total: event.total,
-            percentage: Math.round((event.loaded / event.total) * 100),
-          })
+        if (event.lengthComputable) {
+          reportProgress(event.loaded)
         }
       })
 

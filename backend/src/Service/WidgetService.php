@@ -308,6 +308,22 @@ HTML;
             'allowedDomains' => [],
             'allowFileUpload' => false,
             'fileUploadLimit' => 3,
+            // Header tagline. NULL = fallback to the i18n default
+            // ("We typically reply in minutes"). '' (empty string) = hide the
+            // line entirely. Non-empty string = render verbatim (customer copy).
+            'widgetSubtitle' => null,
+            // Per-widget display name for AI replies in the chat header
+            // ("AI Assistant · 03:58 PM"). NULL = use the i18n default
+            // ("AI Assistant" / "KI-Assistent"); non-empty string = render
+            // verbatim. Operator copy, NOT translated.
+            'aiAssistantName' => null,
+            // Slack human-handoff. Webhook URL is server-side only — never
+            // shipped to the embedded widget. Triggers run server-side too,
+            // so they also stay private. The widget receives only the derived
+            // boolean `humanHandoffEnabled` via WidgetPublicController.
+            'slackWebhookUrl' => '',
+            'humanHandoffTriggers' => [],
+            'humanHandoffButtonEnabled' => true,
         ];
 
         // Apply defaults only for missing keys (not for empty arrays!)
@@ -385,6 +401,71 @@ HTML;
         if (isset($config['aiModelId'])) {
             $config['aiModelId'] = (int) $config['aiModelId'];
         }
+
+        // Header subtitle: keep null (i18n default), empty string (hide),
+        // or a trimmed non-empty string (max 200 chars). Reject non-string values.
+        if (null === $config['widgetSubtitle']) {
+            // explicit "use i18n default" — keep as-is
+        } elseif (is_string($config['widgetSubtitle'])) {
+            $config['widgetSubtitle'] = mb_substr(trim($config['widgetSubtitle']), 0, 200);
+        } else {
+            $config['widgetSubtitle'] = null;
+        }
+
+        // AI assistant display name. Unlike `widgetSubtitle`, the "hide"
+        // option is meaningless here (the timestamp line always renders a
+        // sender label), so empty string collapses to null = i18n default.
+        // Max 50 chars keeps mobile widgets readable.
+        if (null === $config['aiAssistantName']) {
+            // keep null
+        } elseif (is_string($config['aiAssistantName'])) {
+            $trimmedName = trim($config['aiAssistantName']);
+            $config['aiAssistantName'] = '' === $trimmedName ? null : mb_substr($trimmedName, 0, 50);
+        } else {
+            $config['aiAssistantName'] = null;
+        }
+
+        // Slack webhook URL: only accept the canonical Slack incoming-webhook
+        // hostname over HTTPS. Reject anything else (including http://, empty
+        // value stays empty). Keeps operators from accidentally pasting a
+        // chat URL or a third-party service URL.
+        $rawSlackUrl = is_string($config['slackWebhookUrl'] ?? null)
+            ? trim($config['slackWebhookUrl'])
+            : '';
+        if ('' === $rawSlackUrl) {
+            $config['slackWebhookUrl'] = '';
+        } elseif (1 === preg_match('#^https://hooks\.slack\.com/services/[A-Za-z0-9/_-]+$#', $rawSlackUrl)) {
+            $config['slackWebhookUrl'] = $rawSlackUrl;
+        } else {
+            $this->logger->warning('Widget config: invalid Slack webhook URL rejected', [
+                'value_preview' => mb_substr($rawSlackUrl, 0, 32).'…',
+            ]);
+            $config['slackWebhookUrl'] = '';
+        }
+
+        // Trigger phrases: list of strings (case-insensitive substring match
+        // against incoming user messages). Cap count + length to prevent
+        // pathological config and oversized JSON payloads.
+        if (!is_array($config['humanHandoffTriggers'] ?? null)) {
+            $config['humanHandoffTriggers'] = [];
+        }
+        $sanitizedTriggers = [];
+        foreach ($config['humanHandoffTriggers'] as $trigger) {
+            if (!is_string($trigger)) {
+                continue;
+            }
+            $trimmed = trim($trigger);
+            if ('' === $trimmed) {
+                continue;
+            }
+            $sanitizedTriggers[] = mb_substr($trimmed, 0, 100);
+            if (count($sanitizedTriggers) >= 20) {
+                break;
+            }
+        }
+        $config['humanHandoffTriggers'] = array_values(array_unique($sanitizedTriggers));
+
+        $config['humanHandoffButtonEnabled'] = (bool) ($config['humanHandoffButtonEnabled'] ?? true);
 
         return $config;
     }

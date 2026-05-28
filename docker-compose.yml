@@ -135,6 +135,16 @@ services:
       FFMPEG_BINARY: /usr/bin/ffmpeg
       # Piper TTS Service (self-hosted, voice conversations)
       SYNAPLAN_TTS_URL: ${SYNAPLAN_TTS_URL:-http://host.docker.internal:10200}
+      # Raise PHP's `max_file_uploads` (base-php default is 20). The Files /
+      # RAG manager allows selecting any number of files but PHP silently
+      # truncates $_FILES at this limit, leaving the user with no error and
+      # missing uploads. 100 here, combined with the explicit overflow guard
+      # in FileController + client-side batching in filesService.ts, makes
+      # the failure mode loud and the happy path support up to ~100 files
+      # per request without batching. Override via PHP_MAX_FILE_UPLOADS in
+      # your env if you need more / less. Honored by base-php's
+      # 99-synaplan-env.ini render step.
+      PHP_MAX_FILE_UPLOADS: "100"
     depends_on:
       db:
         condition: service_healthy

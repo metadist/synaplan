@@ -8,6 +8,11 @@
         <!-- Storage Quota Widget -->
         <StorageQuotaWidget ref="storageWidget" @upgrade="handleUpgrade" />
 
+        <!-- Cross-promotion: Nextcloud + OpenCloud integrations. Lives only
+             on the Files page (the audience that already cares about
+             file-sharing tooling) and is user-dismissible. -->
+        <FilesIntegrationsBanner />
+
         <!-- Compact Upload Bar -->
         <div
           class="surface-card p-4 sm:p-5 relative"
@@ -1264,6 +1269,7 @@ import FileContentModal from '@/components/FileContentModal.vue'
 import ShareModal from '@/components/ShareModal.vue'
 import ConfirmDialog from '@/components/ConfirmDialog.vue'
 import StorageQuotaWidget from '@/components/StorageQuotaWidget.vue'
+import FilesIntegrationsBanner from '@/components/FilesIntegrationsBanner.vue'
 import FolderMoveMenu from '@/components/FolderMoveMenu.vue'
 import { Icon } from '@iconify/vue'
 import {

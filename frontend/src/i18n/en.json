@@ -588,6 +588,12 @@
     }
   },
   "files": {
+    "integrationsBanner": {
+      "title": "Synaplan integrates with leading file-sharing solutions",
+      "subtitle": "Add AI summaries, translation, and RAG-powered search to your existing file storage.",
+      "openLink": "Open {name} integration on GitHub",
+      "dismiss": "Hide this banner"
+    },
     "searchPlaceholder": "Search files...",
     "uploadTitle": "Upload Files",
     "groupKeyword": "Folder:",
@@ -1925,6 +1931,13 @@
     "senderAgent": "Support Agent",
     "senderSystem": "System",
     "senderAi": "AI Assistant",
+    "humanHandoff": {
+      "button": "Talk to a human",
+      "tooltip": "Notify our team — a human agent will join the chat",
+      "successNotified": "A human agent has been notified and will join you shortly.",
+      "successQueued": "Your request has been queued. An agent will join you as soon as possible.",
+      "failed": "We couldn't reach our team right now — please try again in a moment."
+    },
     "previewWidget": "Preview Widget",
     "configuration": "Widget Configuration",
     "closeEditor": "Close editor",
@@ -2305,6 +2318,30 @@
       "theme": "Default Theme",
       "primaryColor": "Primary Color",
       "iconColor": "Button Icon Color",
+      "aiAssistantName": "AI assistant display name",
+      "aiAssistantNamePlaceholder": "e.g. Acme Bot, Lara",
+      "aiAssistantNameHelp": "Shown next to AI message timestamps (\"Acme Bot · 03:58 PM\"). Leave empty to use the default \"AI Assistant\".",
+      "subtitle": "Header subtitle",
+      "subtitleDefault": "Use the default (\"We typically reply in minutes\")",
+      "subtitleHidden": "Hide the subtitle line",
+      "subtitleCustom": "Use a custom subtitle",
+      "subtitlePlaceholder": "e.g. \"Available 9–17 CET\"",
+      "subtitleHelp": "The text shown below the widget title in the chat header. Set it empty to hide the line entirely.",
+      "handoff": {
+        "title": "Slack human handoff",
+        "intro": "Page a human via Slack when the visitor needs help — a small button in the widget header lets them request a human, and incoming messages that match your trigger phrases also fire automatically.",
+        "webhookUrl": "Slack Incoming Webhook URL",
+        "webhookHelp": "Create one at https://api.slack.com/messaging/webhooks. Stored on the server and never exposed to the widget.",
+        "webhookInvalid": "Expected an https://hooks.slack.com/services/... URL.",
+        "buttonEnabled": "Show \"Talk to a human\" button in the widget",
+        "buttonEnabledHelp": "When off, only trigger phrases will page Slack.",
+        "triggers": "Auto-page trigger phrases",
+        "triggerPlaceholder": "e.g. talk to a human, real person",
+        "triggersHelp": "Case-insensitive substring match against each visitor message. Up to 20 phrases, 100 chars each. Once a handoff fires, repeat triggers stay quiet until the operator hands the chat back.",
+        "testButton": "Send Slack test",
+        "testSuccess": "Test message delivered.",
+        "testFailed": "Slack rejected the test — double-check the webhook URL."
+      },
       "widgetActive": "Widget Active",
       "widgetActiveHelp": "Enable or disable this widget. Inactive widgets won't respond to messages.",
       "widgetInactiveWarning": "This widget is currently inactive and won't respond to visitor messages.",

@@ -121,6 +121,8 @@ services:
       WHISPER_DEFAULT_MODEL: base
       WHISPER_ENABLED: "false"
       FFMPEG_BINARY: /usr/bin/ffmpeg
+      # See docker-compose.yml for context — raises PHP's silent 20-file cap.
+      PHP_MAX_FILE_UPLOADS: "100"
     depends_on:
       db:
         condition: service_healthy
