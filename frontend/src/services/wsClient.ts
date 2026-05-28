@@ -64,7 +64,10 @@ export function onStepEvent(handler: StepEventHandler): () => void {
 }
 
 export async function connectWs(): Promise<void> {
-  if (socket && (socket.readyState === WebSocket.OPEN || socket.readyState === WebSocket.CONNECTING)) {
+  if (
+    socket &&
+    (socket.readyState === WebSocket.OPEN || socket.readyState === WebSocket.CONNECTING)
+  ) {
     return
   }
 
@@ -129,8 +132,11 @@ function scheduleReconnect(): void {
   const delay = BASE_RECONNECT_DELAY * Math.pow(1.5, reconnectAttempts)
   reconnectAttempts++
 
-  reconnectTimer = setTimeout(() => {
-    reconnectTimer = null
-    connectWs()
-  }, Math.min(delay, 30000))
+  reconnectTimer = setTimeout(
+    () => {
+      reconnectTimer = null
+      connectWs()
+    },
+    Math.min(delay, 30000)
+  )
 }

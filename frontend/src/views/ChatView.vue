@@ -630,9 +630,7 @@ const handleVisibilityChangeForToken = () => {
 
 // WebSocket handler for compound step completion notifications
 const wsUnsubscribe = onStepEvent((event: StepCompleteEvent) => {
-  const message = historyStore.messages.find(
-    (m) => m.backendMessageId === event.message_id
-  )
+  const message = historyStore.messages.find((m) => m.backendMessageId === event.message_id)
   if (!message) return
 
   if (event.type === 'step_complete' && event.result.status === 'complete') {
@@ -2320,7 +2318,11 @@ const streamAIResponse = async (
 
             // Phase 3: Handle deferred compound steps (async image generation etc.)
             // Insert loading placeholders and rely on WebSocket for completion notification.
-            if (data.deferredSteps && Array.isArray(data.deferredSteps) && data.deferredSteps.length > 0) {
+            if (
+              data.deferredSteps &&
+              Array.isArray(data.deferredSteps) &&
+              data.deferredSteps.length > 0
+            ) {
               const msg = historyStore.messages.find((m) => m.id === messageId)
               if (msg) {
                 for (const step of data.deferredSteps) {
@@ -2328,10 +2330,7 @@ const streamAIResponse = async (
                     step.capability === 'IMAGE_GENERATION' ||
                     step.capability === 'VIDEO_GENERATION'
                   ) {
-                    msg.parts = [
-                      ...msg.parts,
-                      { type: 'image_loading', partId: generatePartId() },
-                    ]
+                    msg.parts = [...msg.parts, { type: 'image_loading', partId: generatePartId() }]
                   }
                 }
                 // Store backend message ID for WebSocket matching
