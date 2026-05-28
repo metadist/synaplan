@@ -2010,17 +2010,23 @@ const handoffTestSubmitting = ref(false)
 const handoffTestResult = ref<'idle' | 'success' | 'error'>('idle')
 
 const addHandoffTrigger = () => {
-  const value = newHandoffTrigger.value.trim()
-  if (!value) return
   if (!Array.isArray(config.humanHandoffTriggers)) {
     config.humanHandoffTriggers = []
   }
-  if (config.humanHandoffTriggers.length >= 20) return
-  if (config.humanHandoffTriggers.includes(value)) {
-    newHandoffTrigger.value = ''
-    return
+  // Split comma-separated bulk entries into individual trigger tags.
+  // Operators naturally paste comma-joined phrases from notes; storing
+  // them as one mega-string makes the backend's substring matcher
+  // search for the entire list verbatim, which never fires. Each piece
+  // becomes its own tag so the matcher works one phrase at a time.
+  const pieces = newHandoffTrigger.value
+    .split(',')
+    .map((piece) => piece.trim())
+    .filter((piece) => piece.length > 0)
+  for (const value of pieces) {
+    if (config.humanHandoffTriggers.length >= 20) break
+    if (config.humanHandoffTriggers.includes(value)) continue
+    config.humanHandoffTriggers.push(value)
   }
-  config.humanHandoffTriggers.push(value)
   newHandoffTrigger.value = ''
 }
 

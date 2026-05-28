@@ -446,6 +446,14 @@ HTML;
         // Trigger phrases: list of strings (case-insensitive substring match
         // against incoming user messages). Cap count + length to prevent
         // pathological config and oversized JSON payloads.
+        //
+        // We also split each stored entry on commas: operators occasionally
+        // pasted multi-phrase lists into a single tag (the v1 placeholder
+        // suggested that pattern), producing mega-strings like
+        // `"real person, human agent, talk to someone"` which the auto-handoff
+        // matcher would search for verbatim and never match. Splitting here
+        // self-heals those legacy entries on the next admin save AND makes
+        // the API more forgiving for clients that build the list themselves.
         if (!is_array($config['humanHandoffTriggers'] ?? null)) {
             $config['humanHandoffTriggers'] = [];
         }
@@ -454,13 +462,15 @@ HTML;
             if (!is_string($trigger)) {
                 continue;
             }
-            $trimmed = trim($trigger);
-            if ('' === $trimmed) {
-                continue;
-            }
-            $sanitizedTriggers[] = mb_substr($trimmed, 0, 100);
-            if (count($sanitizedTriggers) >= 20) {
-                break;
+            foreach (explode(',', $trigger) as $piece) {
+                $trimmed = trim($piece);
+                if ('' === $trimmed) {
+                    continue;
+                }
+                $sanitizedTriggers[] = mb_substr($trimmed, 0, 100);
+                if (count($sanitizedTriggers) >= 20) {
+                    break 2;
+                }
             }
         }
         $config['humanHandoffTriggers'] = array_values(array_unique($sanitizedTriggers));

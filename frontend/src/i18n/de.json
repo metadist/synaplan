@@ -2383,7 +2383,7 @@
         "buttonEnabled": "Button „Mit einem Menschen sprechen” im Widget anzeigen",
         "buttonEnabledHelp": "Wenn aus, lösen nur Trigger-Phrasen die Benachrichtigung aus.",
         "triggers": "Trigger-Phrasen für automatische Übergabe",
-        "triggerPlaceholder": "z. B. echter Mensch, Mitarbeiter sprechen",
+        "triggerPlaceholder": "z. B. mit Mitarbeiter sprechen (eine Phrase pro Tag oder komma-getrennt einfügen)",
         "triggersHelp": "Groß-/Kleinschreibung wird ignoriert, einfacher Teilstring-Vergleich pro Besuchernachricht. Bis zu 20 Phrasen à 100 Zeichen. Sobald eine Übergabe gefeuert ist, bleibt die Session ruhig, bis der Mitarbeiter sie zurückgibt.",
         "testButton": "Slack-Test senden",
         "testSuccess": "Test-Nachricht zugestellt.",
