@@ -74,8 +74,6 @@ plugins/brogent/
 plugins/synaform/
 plugins/synasort/
 plugins/synaads/
-plugins/sortx/
-plugins/marketeer/
 
 #local development stuff
 _devextras/local-ignore/
