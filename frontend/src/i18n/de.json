@@ -1710,6 +1710,12 @@
     "revoke": "Öffentlichen Zugriff Widerrufen"
   },
   "files": {
+    "integrationsBanner": {
+      "title": "Synaplan integriert sich mit führenden Filesharing-Lösungen",
+      "subtitle": "Erweitere deinen bestehenden Datei-Speicher um KI-Zusammenfassungen, Übersetzungen und RAG-Suche.",
+      "openLink": "{name}-Integration auf GitHub öffnen",
+      "dismiss": "Hinweis ausblenden"
+    },
     "searchPlaceholder": "Dateien suchen...",
     "uploadTitle": "Dateien hochladen",
     "groupKeyword": "Ordner:",

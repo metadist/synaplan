@@ -588,6 +588,12 @@
     }
   },
   "files": {
+    "integrationsBanner": {
+      "title": "Synaplan integrates with leading file-sharing solutions",
+      "subtitle": "Add AI summaries, translation, and RAG-powered search to your existing file storage.",
+      "openLink": "Open {name} integration on GitHub",
+      "dismiss": "Hide this banner"
+    },
     "searchPlaceholder": "Search files...",
     "uploadTitle": "Upload Files",
     "groupKeyword": "Folder:",
