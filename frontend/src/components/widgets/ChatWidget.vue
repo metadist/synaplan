@@ -1532,17 +1532,27 @@ const sendMessage = async () => {
   await scrollToBottom()
 
   isSending.value = true
-  isTyping.value = true
 
-  const assistantMessageId = Date.now().toString()
-  messages.value.push({
-    id: assistantMessageId,
-    role: 'assistant',
-    type: 'text',
-    content: '',
-    timestamp: new Date(),
-    sender: 'ai',
-  })
+  // During human takeover there is no AI reply: the backend only persists the
+  // visitor message and notifies the operator via SSE. Adding an empty assistant
+  // placeholder (and later reloading history to fill it) is what made the
+  // visitor's own message vanish until a manual reload. So skip it in human mode
+  // and keep the optimistic user message we just pushed.
+  const isHumanMode = chatMode.value === 'human' || chatMode.value === 'waiting'
+
+  let assistantMessageId: string | null = null
+  if (!isHumanMode) {
+    isTyping.value = true
+    assistantMessageId = Date.now().toString()
+    messages.value.push({
+      id: assistantMessageId,
+      role: 'assistant',
+      type: 'text',
+      content: '',
+      timestamp: new Date(),
+      sender: 'ai',
+    })
+  }
 
   try {
     const result = await sendWidgetMessage(props.widgetId, userMessage, sessionId.value, {

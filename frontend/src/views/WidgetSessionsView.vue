@@ -1751,12 +1751,43 @@ const sendMessage = async () => {
     if (selectedSession.value.mode === 'internal') {
       await sendInternalMessage(messageText.value.trim(), fileIds)
     } else {
-      await widgetSessionsApi.sendHumanMessage(
+      const outgoingText = messageText.value.trim() || t('widgetSessions.fileAttached')
+      const result = await widgetSessionsApi.sendHumanMessage(
         widgetId.value,
         selectedSession.value.sessionId,
-        messageText.value.trim() || t('widgetSessions.fileAttached'),
+        outgoingText,
         fileIds
       )
+
+      // Render the operator's own message immediately. We use the real message id
+      // returned by the API so the subsequent SSE echo is de-duplicated by
+      // handleSessionEvent() instead of being appended a second time.
+      if (result?.messageId && !sessionMessages.value.some((m) => m.id === result.messageId)) {
+        const optimisticFiles: widgetSessionsApi.SessionMessageFile[] = selectedFiles.value.map(
+          (file, index) => ({
+            id: fileIds[index],
+            filename: file.name,
+            mimeType: file.type,
+            size: file.size,
+          })
+        )
+        sessionMessages.value.push({
+          id: result.messageId,
+          direction: 'OUT',
+          text: outgoingText,
+          timestamp: Math.floor(Date.now() / 1000),
+          sender: 'human',
+          files: optimisticFiles.length > 0 ? optimisticFiles : undefined,
+        })
+
+        const previewText = outgoingText.substring(0, 100)
+        selectedSession.value.lastMessagePreview = previewText
+        const sessionIndex = sessions.value.findIndex((s) => s.id === selectedSession.value?.id)
+        if (sessionIndex !== -1) {
+          sessions.value[sessionIndex].lastMessagePreview = previewText
+        }
+        nextTick(() => scrollToBottom())
+      }
 
       if (selectedSession.value.mode === 'waiting') {
         selectedSession.value.mode = 'human'
