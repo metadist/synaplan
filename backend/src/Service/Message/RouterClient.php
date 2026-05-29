@@ -20,7 +20,7 @@ final class RouterClient
 {
     private const DEFAULT_URL = 'http://router:8000';
     private const DEFAULT_TIMEOUT_MS = 100;
-    private const DEFAULT_CONFIDENCE_THRESHOLD = 0.80;
+    private const DEFAULT_CONFIDENCE_THRESHOLD = 0.70;
     private const CIRCUIT_BREAKER_THRESHOLD = 3;
     private const CIRCUIT_BREAKER_RESET_SECONDS = 60;
 
@@ -44,10 +44,6 @@ final class RouterClient
      */
     public function classify(string $text, ?string $language = null, ?string $context = null): ?array
     {
-        if (!$this->isEnabled()) {
-            return null;
-        }
-
         if ($this->isCircuitOpen()) {
             $this->logger->debug('RouterClient: Circuit breaker open, skipping');
 
@@ -101,10 +97,6 @@ final class RouterClient
      */
     public function submitFeedback(string $text, string $predictedUseCase, string $correctUseCase, ?int $userId = null): bool
     {
-        if (!$this->isEnabled()) {
-            return false;
-        }
-
         $url = $this->getBaseUrl();
 
         try {
@@ -135,10 +127,6 @@ final class RouterClient
      */
     public function getUseCases(): array
     {
-        if (!$this->isEnabled()) {
-            return [];
-        }
-
         $url = $this->getBaseUrl();
 
         try {
@@ -189,17 +177,6 @@ final class RouterClient
         }
 
         return self::DEFAULT_CONFIDENCE_THRESHOLD;
-    }
-
-    private function isEnabled(): bool
-    {
-        $value = $this->configRepository->getValue(0, 'ROUTER', 'ENABLED');
-
-        if (null === $value) {
-            return false;
-        }
-
-        return filter_var($value, \FILTER_VALIDATE_BOOL, \FILTER_NULL_ON_FAILURE) ?? false;
     }
 
     private function getBaseUrl(): string

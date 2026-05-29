@@ -27,9 +27,12 @@ namespace App\Service\Message;
 final class WebSearchTopicPolicy
 {
     /**
-     * Topics whose handler does not consume web context. Asset/document
-     * generation only — chat, coding, summarisation and analysis can all
-     * benefit from live context and are therefore NOT listed here.
+     * Topics/use-cases whose handler does not consume web context.
+     *
+     * Includes:
+     *  - Asset/document generation topics (handler ignores web results)
+     *  - Simple chat labels (router explicitly means "no search needed";
+     *    queries needing live info are classified as `web_search` instead)
      *
      * @var list<string>
      */
@@ -37,10 +40,16 @@ final class WebSearchTopicPolicy
         // Canonical legacy topics
         'mediamaker',
         'officemaker',
-        // Granular Synapse-v2 topics
+        // Granular Synapse-v2 topics (kebab-case)
         'image-generation',
         'video-generation',
         'audio-generation',
+        // synaplan-router SetFit labels (snake_case)
+        'text_chat',
+        'image_generation',
+        'video_generation',
+        'audio_generation',
+        // Legacy provider-style
         'text2pic',
         'text2vid',
         'text2sound',

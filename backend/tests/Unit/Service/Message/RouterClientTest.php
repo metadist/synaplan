@@ -28,26 +28,10 @@ class RouterClientTest extends TestCase
         return new RouterClient($httpClient, $this->configRepository, $this->logger);
     }
 
-    public function testClassifyReturnsNullWhenDisabled(): void
-    {
-        $this->configRepository->method('getValue')
-            ->willReturnMap([
-                [0, 'ROUTER', 'ENABLED', null],
-            ]);
-
-        $client = $this->createClient(new MockHttpClient());
-        $result = $client->classify('Hello world');
-
-        $this->assertNull($result);
-    }
-
-    public function testClassifyReturnsResultWhenEnabled(): void
+    public function testClassifyReturnsResultOnSuccess(): void
     {
         $this->configRepository->method('getValue')
             ->willReturnCallback(function (int $ownerId, string $group, string $key): ?string {
-                if ('ENABLED' === $key) {
-                    return 'true';
-                }
                 if ('SERVICE_URL' === $key) {
                     return 'http://router:8000';
                 }
@@ -84,9 +68,6 @@ class RouterClientTest extends TestCase
     {
         $this->configRepository->method('getValue')
             ->willReturnCallback(function (int $ownerId, string $group, string $key): ?string {
-                if ('ENABLED' === $key) {
-                    return 'true';
-                }
                 if ('SERVICE_URL' === $key) {
                     return 'http://router:8000';
                 }
@@ -111,9 +92,6 @@ class RouterClientTest extends TestCase
     {
         $this->configRepository->method('getValue')
             ->willReturnCallback(function (int $ownerId, string $group, string $key): ?string {
-                if ('ENABLED' === $key) {
-                    return 'true';
-                }
                 if ('SERVICE_URL' === $key) {
                     return 'http://router:8000';
                 }
@@ -147,9 +125,6 @@ class RouterClientTest extends TestCase
     {
         $this->configRepository->method('getValue')
             ->willReturnCallback(function (int $ownerId, string $group, string $key): ?string {
-                if ('ENABLED' === $key) {
-                    return 'true';
-                }
                 if ('SERVICE_URL' === $key) {
                     return 'http://router:8000';
                 }
@@ -203,6 +178,6 @@ class RouterClientTest extends TestCase
             ->willReturn(null);
 
         $client = $this->createClient(new MockHttpClient());
-        $this->assertEquals(0.80, $client->getConfidenceThreshold());
+        $this->assertEquals(0.70, $client->getConfidenceThreshold());
     }
 }

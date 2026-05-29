@@ -137,4 +137,52 @@ final class TopicAliasResolverTest extends TestCase
         $this->assertSame('mediamaker', $map['video-generation']);
         $this->assertSame('mediamaker', $map['audio-generation']);
     }
+
+    public function testSetfitTextChatResolvesToGeneral(): void
+    {
+        $result = $this->resolver->resolve('text_chat');
+
+        $this->assertSame('general', $result['topic']);
+        $this->assertNull($result['media']);
+        $this->assertSame('text_chat', $result['alias_source']);
+    }
+
+    public function testSetfitImageGenerationResolvesToMediamakerWithImageMedia(): void
+    {
+        $result = $this->resolver->resolve('image_generation');
+
+        $this->assertSame('mediamaker', $result['topic']);
+        $this->assertSame('image', $result['media']);
+        $this->assertSame('image_generation', $result['alias_source']);
+    }
+
+    public function testSetfitWebSearchResolvesToGeneral(): void
+    {
+        $result = $this->resolver->resolve('web_search');
+
+        $this->assertSame('general', $result['topic']);
+        $this->assertNull($result['media']);
+    }
+
+    public function testCompoundResearchImageResolvesToGeneral(): void
+    {
+        $result = $this->resolver->resolve('compound_research_image');
+
+        $this->assertSame('general', $result['topic']);
+        $this->assertSame('compound_research_image', $result['alias_source']);
+    }
+
+    public function testCompoundImageEmailResolvesToMediamaker(): void
+    {
+        $result = $this->resolver->resolve('compound_image_email');
+
+        $this->assertSame('mediamaker', $result['topic']);
+    }
+
+    public function testCompoundFileAnalyzeReplyResolvesToAnalyzefile(): void
+    {
+        $result = $this->resolver->resolve('compound_file_analyze_reply');
+
+        $this->assertSame('analyzefile', $result['topic']);
+    }
 }

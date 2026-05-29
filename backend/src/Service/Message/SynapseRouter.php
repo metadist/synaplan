@@ -4,47 +4,22 @@ declare(strict_types=1);
 
 namespace App\Service\Message;
 
-use App\AI\Service\AiFacade;
-use App\Repository\ConfigRepository;
 use App\Repository\PromptRepository;
-use App\Service\ModelConfigService;
 use App\Service\PromptService;
-use App\Service\VectorSearch\QdrantClientInterface;
 use Psr\Log\LoggerInterface;
 
 /**
- * Synapse Router — embedding-based message classification with AI fallback.
+ * Synapse Router — tiered message classification pipeline.
  *
- * Tier 1: Embed the user message, search synapse_topics in Qdrant for the
- *         closest topic. If confidence is high enough, route immediately (~50ms).
- * Tier 2: Fall back to MessageSorter (full LLM call) when confidence is low.
+ * Tier 0: Rule-based routing (selection rules on prompts, 0 ms)
+ * Tier 1: External ML Router (SetFit/ONNX via synaplan-router, ~2-5 ms)
+ * Tier 2: AI Fallback (MessageSorter LLM call, ~200 ms)
  *
- * Also handles language detection, web-search intent, and media-type
- * classification via lightweight heuristics instead of LLM calls.
+ * Language detection, web-search intent, and media-type classification
+ * are handled via lightweight heuristics instead of LLM calls.
  */
 final readonly class SynapseRouter
 {
-    /**
-     * Code-side fallback for the Tier-1 confidence threshold, used only
-     * when no `QDRANT_SEARCH.SYNAPSE_CONFIDENCE_THRESHOLD` row is present
-     * in BCONFIG. Kept in lockstep with `SystemConfigService`'s UI default
-     * (`0.78`) so the runtime behaviour does not change depending on
-     * whether an admin has touched the setting (raised by Copilot review
-     * on PR #853).
-     */
-    private const DEFAULT_CONFIDENCE_THRESHOLD = 0.78;
-    private const STICKY_THRESHOLD = 0.32;
-    /**
-     * Fallback target dimension used only when the bound SYNAPSE_VECTORIZE
-     * model has no `meta.dimensions` in the catalog — matches the
-     * historical default the synapse_topics collection was created with.
-     * The real dimension is resolved per-request from the model row, see
-     * `getCurrentModelInfo()` (PR #853 review).
-     */
-    private const DEFAULT_VECTOR_DIMENSION = 1024;
-    private const SEARCH_LIMIT = 5;
-    private const MIN_SCORE = 0.3;
-
     private const MEDIA_KEYWORDS = [
         'image' => ['bild', 'image', 'foto', 'picture', 'illustration', 'picture', 'photo', 'pic',
             'erstelle ein bild', 'generate an image', 'create a picture', 'make a photo',
@@ -57,93 +32,7 @@ final readonly class SynapseRouter
     ];
 
     /**
-     * Generic creation verbs ("create", "erstelle", "render", …) that
-     * the media-intent guard pairs with a modality-specific noun.
-     *
-     * Kept narrow on purpose so messages with desire-only verbs ("ich
-     * möchte eine Kette gründen", "I want a small business") cannot pass.
-     * Anchored with `\b` at match time so "drawer" / "renderer" don't
-     * count as the verb. See {@see passesMediaIntentGuard()}.
-     */
-    private const MEDIA_INTENT_VERBS = [
-        // English
-        'create', 'creating', 'generate', 'generating', 'make', 'making',
-        'render', 'rendering', 'produce', 'producing',
-        'draw', 'drawing', 'paint', 'painting', 'sketch', 'sketching',
-        'illustrate', 'illustrating',
-        'animate', 'animating',
-        'edit', 'editing', 'retouch', 'retouching',
-        'compose', 'composing', 'composite', 'compositing',
-        'compile', 'compiling',
-        'narrate', 'narrating', 'speak', 'speaking', 'voiceover', 'voice-over',
-        'convert',
-        // German
-        'erstelle', 'erstell', 'erstellt', 'erstellen',
-        'generiere', 'generier', 'generiert', 'generieren',
-        'mache', 'mach', 'macht', 'machen',
-        'male', 'mal', 'malt', 'malen',
-        'zeichne', 'zeichn', 'zeichnet', 'zeichnen',
-        'animiere', 'animier', 'animiert', 'animieren',
-        'sprich', 'sprecht', 'sprechen',
-        'vertone', 'vertont', 'vertonen',
-    ];
-
-    /**
-     * Modality-specific media nouns. Paired with a creation verb (or a
-     * self-contained cue) the guard counts as passed. Singular tokens
-     * only — substring matching handles plurals/cases ("videos", "Bilder").
-     *
-     * @var array<string, list<string>>
-     */
-    private const MEDIA_INTENT_NOUNS = [
-        'image-generation' => [
-            'image', 'picture', 'photo', 'foto', 'bild', 'illustration', 'sketch',
-            'drawing', 'painting', 'render', 'logo', 'icon', 'wallpaper', 'avatar',
-            'thumbnail', 'cover', 'poster', 'artwork',
-        ],
-        'video-generation' => [
-            'video', 'clip', 'film', 'animation', 'animatic', 'cinemagraph',
-            'kurzfilm', 'reel',
-        ],
-        'audio-generation' => [
-            'audio', 'voice', 'voiceover', 'narration', 'speech',
-            'tts', 'mp3', 'wav', 'podcast', 'sprachausgabe', 'vertonung',
-        ],
-    ];
-
-    /**
-     * Self-contained cues that imply both verb AND noun on their own.
-     * Mostly TTS-style "read this aloud", "lies vor", "vorlesen" — these
-     * don't repeat the noun explicitly but unambiguously request audio
-     * output. Same for "text to speech" / "text-to-speech" wording.
-     *
-     * Matched with substring search after lowercasing.
-     *
-     * @var array<string, list<string>>
-     */
-    private const MEDIA_INTENT_SELF_CONTAINED = [
-        'image-generation' => [
-            'replace the background', 'hintergrund ersetzen', 'bild bearbeiten',
-            'edit this image', 'edit the image',
-        ],
-        'video-generation' => [
-            // Intentionally empty: video creation requests in the wild
-            // virtually always name "video"/"clip"/"film"/etc., so the
-            // verb+noun rule is sufficient.
-        ],
-        'audio-generation' => [
-            'read aloud', 'reading aloud', 'read it aloud', 'read this aloud',
-            'text to speech', 'text-to-speech', 'convert to speech',
-            'lies vor', 'lies mir vor', 'lies das vor', 'lies dies vor',
-            'vorlesen', 'vorzulesen',
-            'sprich folgenden text', 'sprich folgendes',
-            'vertone diesen text', 'vertone folgenden text', 'vertonen',
-        ],
-    ];
-
-    /**
      * Common language-specific words for n-gram-free detection.
-     * Ordered by frequency of occurrence in typical messages.
      *
      * @var array<string, list<string>>
      */
@@ -161,30 +50,27 @@ final readonly class SynapseRouter
     ];
 
     public function __construct(
-        private QdrantClientInterface $qdrantClient,
-        private AiFacade $aiFacade,
         private MessageSorter $messageSorter,
         private RouterClient $routerClient,
         private PromptService $promptService,
         private PromptRepository $promptRepository,
-        private ModelConfigService $modelConfigService,
-        private ConfigRepository $configRepository,
         private TopicAliasResolver $topicAliasResolver,
         private LoggerInterface $logger,
     ) {
     }
 
     /**
-     * Public entry point used by routing test/dry-run endpoints.
+     * Dry-run the routing pipeline for a sample message (admin testing).
      *
-     * Returns the Top-K candidate topics with raw Qdrant scores, **before**
-     * any confidence threshold or sticky logic is applied. Useful for the
-     * admin "Test Routing" box and CLI debugging.
+     * Calls the external router and returns the classification result
+     * without mutating any state. Falls back to reporting the AI sorter
+     * would be used if the router is unavailable.
      *
      * @return array{
      *     query: string,
-     *     model: array{provider: ?string, model: ?string, model_id: ?int},
-     *     candidates: list<array{topic: string, score: float, payload: array, stale: bool, alias_target: ?string}>,
+     *     router_available: bool,
+     *     classification: ?array,
+     *     fallback_reason: ?string,
      *     latency_ms: float,
      *     error: ?string,
      * }
@@ -192,12 +78,12 @@ final readonly class SynapseRouter
     public function dryRun(string $messageText, ?int $userId = null, int $limit = 5): array
     {
         $startTime = microtime(true);
-        $modelInfo = $this->getCurrentModelInfo();
 
         $base = [
             'query' => $messageText,
-            'model' => $modelInfo,
-            'candidates' => [],
+            'router_available' => false,
+            'classification' => null,
+            'fallback_reason' => null,
             'latency_ms' => 0.0,
             'error' => null,
         ];
@@ -206,62 +92,43 @@ final readonly class SynapseRouter
             return ['error' => 'empty_message'] + $base;
         }
 
-        try {
-            $embeddingOptions = $this->getEmbeddingOptions();
-            $result = $this->aiFacade->embed($messageText, $userId, $embeddingOptions);
-            /** @var float[] $vector */
-            $vector = $result['embedding'];
+        $result = $this->routerClient->classify($messageText);
 
-            if (empty($vector)) {
-                return ['error' => 'empty_embedding', 'latency_ms' => $this->elapsed($startTime)] + $base;
-            }
-
-            $vector = $this->normalizeVector($vector, $modelInfo['vector_dim']);
-
-            $hits = $this->qdrantClient->searchSynapseTopics(
-                $vector,
-                $userId ?? 0,
-                $limit,
-                self::MIN_SCORE,
-            );
-
-            $candidates = [];
-            $currentModelId = $modelInfo['model_id'];
-            foreach ($hits as $hit) {
-                $payload = $hit['payload'] ?? [];
-                $topic = (string) ($payload['topic'] ?? '');
-                $alias = $this->topicAliasResolver->resolve($topic);
-
-                $candidates[] = [
-                    'topic' => $topic,
-                    'score' => (float) $hit['score'],
-                    'payload' => $payload,
-                    'stale' => $this->isStaleEntry($payload, $currentModelId),
-                    'alias_target' => null !== $alias['alias_source'] ? $alias['topic'] : null,
-                ];
-            }
-
+        if (null === $result) {
             return [
                 'query' => $messageText,
-                'model' => $modelInfo,
-                'candidates' => $candidates,
+                'router_available' => false,
+                'classification' => null,
+                'fallback_reason' => 'router_unavailable_or_disabled',
                 'latency_ms' => $this->elapsed($startTime),
                 'error' => null,
             ];
-        } catch (\Throwable $e) {
-            $this->logger->error('SynapseRouter::dryRun failed', [
-                'error' => $e->getMessage(),
-            ]);
-
-            return [
-                'error' => 'exception: '.$e->getMessage(),
-                'latency_ms' => $this->elapsed($startTime),
-            ] + $base;
         }
+
+        $alias = $this->topicAliasResolver->resolve($result['use_case']);
+
+        return [
+            'query' => $messageText,
+            'router_available' => true,
+            'classification' => [
+                'use_case' => $result['use_case'],
+                'canonical_topic' => $alias['topic'],
+                'confidence' => $result['confidence'],
+                'is_compound' => $result['is_compound'],
+                'steps' => $result['steps'],
+                'model_version' => $result['model_version'],
+                'router_latency_ms' => $result['latency_ms'],
+                'alias_target' => null !== $alias['alias_source'] ? $alias['topic'] : null,
+                'implied_media' => $alias['media'],
+            ],
+            'fallback_reason' => null,
+            'latency_ms' => $this->elapsed($startTime),
+            'error' => null,
+        ];
     }
 
     /**
-     * Route a message using embedding similarity (Tier 1) with AI fallback (Tier 2).
+     * Route a message using the tiered classification pipeline.
      *
      * Returns the same structure as MessageSorter::classify() for drop-in compatibility.
      *
@@ -280,7 +147,7 @@ final readonly class SynapseRouter
             return $this->fallbackToAi($messageData, $conversationHistory, $userId, 'empty_message');
         }
 
-        // Step 1: Check rule-based routing (same as MessageSorter, takes priority)
+        // Tier 0: Rule-based routing (selection rules on prompts)
         if ($userId) {
             $ruleBasedTopic = $this->checkRuleBasedRouting($messageText, $conversationHistory, $userId);
             if ($ruleBasedTopic) {
@@ -291,10 +158,6 @@ final readonly class SynapseRouter
                     'latency_ms' => $this->elapsed($startTime),
                 ]);
 
-                // Use the canonical `sorting_*` keys so MessageClassifier
-                // can read them the same way it reads MessageSorter output.
-                // Rule-based routing matched without any AI/embedding call,
-                // so leave the model identifiers null — see issue #603.
                 return [
                     'topic' => $ruleBasedTopic,
                     'language' => $messageData['BLANG'] ?? 'en',
@@ -312,211 +175,14 @@ final readonly class SynapseRouter
             }
         }
 
-        // Step 2: External Router (SetFit/ONNX) — fast ML classification
+        // Tier 1: External ML Router (SetFit/ONNX)
         $routerResult = $this->tryExternalRouter($messageText, $conversationHistory, $userId);
         if (null !== $routerResult) {
             return $routerResult;
         }
 
-        // Step 3: Conversation-sticky — reuse topic if still relevant
-        $lastTopic = $this->getLastTopicFromHistory($conversationHistory);
-
-        // Step 4: Embed message and search Qdrant
-        try {
-            $embeddingOptions = $this->getEmbeddingOptions();
-            $result = $this->aiFacade->embed($messageText, $userId, $embeddingOptions);
-            /** @var float[] $queryVector */
-            $queryVector = $result['embedding'];
-
-            if (empty($queryVector)) {
-                return $this->fallbackToAi($messageData, $conversationHistory, $userId, 'empty_embedding');
-            }
-
-            $currentModelInfo = $this->getCurrentModelInfo();
-            $queryVector = $this->normalizeVector($queryVector, $currentModelInfo['vector_dim']);
-
-            $vectorSum = array_sum($queryVector);
-            if (abs($vectorSum) < 0.001) {
-                $this->logger->warning('SynapseRouter: Zero/degenerate vector detected', [
-                    'vector_sum' => $vectorSum,
-                    'first_5' => array_slice($queryVector, 0, 5),
-                    'text_length' => strlen($messageText),
-                ]);
-            }
-
-            $searchResults = $this->qdrantClient->searchSynapseTopics(
-                $queryVector,
-                $userId ?? 0,
-                self::SEARCH_LIMIT,
-                self::MIN_SCORE,
-            );
-
-            if (empty($searchResults)) {
-                return $this->fallbackToAi($messageData, $conversationHistory, $userId, 'no_search_results');
-            }
-
-            $currentModelId = $currentModelInfo['model_id'];
-            $freshResults = [];
-            $staleHits = 0;
-
-            foreach ($searchResults as $hit) {
-                if ($this->isStaleEntry($hit['payload'] ?? [], $currentModelId)) {
-                    ++$staleHits;
-                    continue;
-                }
-                $freshResults[] = $hit;
-            }
-
-            if ($staleHits > 0) {
-                $this->logger->info('SynapseRouter: Filtered stale-index hits', [
-                    'stale_hits' => $staleHits,
-                    'fresh_hits' => count($freshResults),
-                    'current_model_id' => $currentModelId,
-                ]);
-            }
-
-            if (empty($freshResults)) {
-                return $this->fallbackToAi(
-                    $messageData,
-                    $conversationHistory,
-                    $userId,
-                    'stale_index',
-                );
-            }
-
-            $searchResults = $freshResults;
-            $topResult = $searchResults[0];
-            $topScore = $topResult['score'];
-            $topTopic = $topResult['payload']['topic'] ?? 'general';
-
-            $confidenceThreshold = $this->getConfidenceThreshold();
-
-            $this->logger->info('SynapseRouter: Qdrant search result', [
-                'top_topic' => $topTopic,
-                'top_score' => round($topScore, 4),
-                'results_count' => count($searchResults),
-                'threshold' => $confidenceThreshold,
-            ]);
-
-            // Conversation-sticky: keep the topic if it's still among the candidates
-            if ($lastTopic && $topTopic !== $lastTopic) {
-                foreach ($searchResults as $candidate) {
-                    $candidateTopic = $candidate['payload']['topic'] ?? '';
-                    if ($candidateTopic === $lastTopic && $candidate['score'] >= self::STICKY_THRESHOLD) {
-                        $this->logger->info('SynapseRouter: Conversation-sticky applied', [
-                            'kept_topic' => $lastTopic,
-                            'would_have_been' => $topTopic,
-                            'sticky_score' => round($candidate['score'], 4),
-                        ]);
-
-                        $topTopic = $lastTopic;
-                        $topScore = $candidate['score'];
-
-                        break;
-                    }
-                }
-            }
-
-            // Confidence check
-            if ($topScore < $confidenceThreshold) {
-                return $this->fallbackToAi(
-                    $messageData,
-                    $conversationHistory,
-                    $userId,
-                    'low_confidence',
-                    $topScore,
-                    $topTopic,
-                );
-            }
-
-            // Media-intent guard (#878): even at high confidence, do NOT
-            // route to the dedicated media-generation topics unless the
-            // user's text actually pairs a creation verb with a media
-            // noun. This is what stops messages like "ich beschäftige
-            // mich mit Protein Shakes…" from being interpreted as a
-            // video request just because the embedding model happens to
-            // place them near the video-generation centroid. Slash
-            // commands never reach this code path — MessageClassifier
-            // routes them directly.
-            if (!$this->passesMediaIntentGuard($topTopic, $messageText)) {
-                return $this->fallbackToAi(
-                    $messageData,
-                    $conversationHistory,
-                    $userId,
-                    'media_intent_guard',
-                    $topScore,
-                    $topTopic,
-                );
-            }
-
-            // Resolve granular Synapse-v2 topic to canonical legacy topic
-            // (e.g. coding -> general, image-generation -> mediamaker).
-            // The granular topic stays in the synapse payload for analytics;
-            // downstream handlers only ever see the canonical topic.
-            $alias = $this->topicAliasResolver->resolve($topTopic);
-            $canonicalTopic = $alias['topic'];
-            $impliedMedia = $alias['media'];
-            $aliasSource = $alias['alias_source'];
-
-            // Tier 1 success: classify with heuristics
-            $language = $this->detectLanguage($messageText, $messageData['BLANG'] ?? null);
-            $mediaType = $impliedMedia ?? ('mediamaker' === $canonicalTopic ? $this->detectMediaType($messageText) : null);
-
-            $promptMetadata = $this->loadPromptMetadata($canonicalTopic, $userId ?? 0);
-
-            // Web-search activation: delegate to the shared policy so the
-            // streaming chat, non-streaming pipeline and embedding router
-            // all share one rule. Defaults to "search unless explicitly
-            // opted out or a non-web-search topic". The granular topic
-            // (`aliasSource`) is also fed through in case it sits on the
-            // NON_WEB_SEARCH list while the canonical topic does not.
-            $promptToolInternet = $promptMetadata['tool_internet'] ?? null;
-            $webSearch = WebSearchTopicPolicy::shouldSearch($canonicalTopic, $promptToolInternet)
-                && !WebSearchTopicPolicy::isNonWebSearchTopic($aliasSource);
-
-            $latencyMs = $this->elapsed($startTime);
-
-            $this->logger->info('SynapseRouter: Tier 1 classification', [
-                'topic' => $canonicalTopic,
-                'granular_topic' => $aliasSource,
-                'score' => round($topScore, 4),
-                'language' => $language,
-                'web_search' => $webSearch,
-                'prompt_tool_internet' => $promptToolInternet,
-                'media_type' => $mediaType,
-                'source' => 'synapse_embedding',
-                'latency_ms' => $latencyMs,
-            ]);
-
-            // The embedding model IS the model that produced the routing
-            // decision, so surface it under the `sorting_*` keys (drop-in
-            // compatible with MessageSorter::classify()). Without this, the
-            // outgoing message had no `ai_sorting_*` meta, so the Sorting
-            // Model badge only ever appeared after a page refresh once the
-            // backend was patched to also surface this from a different
-            // code path — see issue #603.
-            return [
-                'topic' => $canonicalTopic,
-                'granular_topic' => $aliasSource,
-                'language' => $language,
-                'web_search' => $webSearch,
-                'media_type' => $mediaType,
-                'raw_response' => sprintf('Synapse: %.4f confidence', $topScore),
-                'prompt_metadata' => $promptMetadata,
-                'source' => $lastTopic === $canonicalTopic ? 'synapse_sticky' : 'synapse_embedding',
-                'synapse_score' => $topScore,
-                'synapse_latency_ms' => $latencyMs,
-                'sorting_model_id' => $currentModelInfo['model_id'],
-                'sorting_provider' => $currentModelInfo['provider'],
-                'sorting_model_name' => $currentModelInfo['model'],
-            ];
-        } catch (\Throwable $e) {
-            $this->logger->error('SynapseRouter: Embedding/search failed, falling back to AI', [
-                'error' => $e->getMessage(),
-            ]);
-
-            return $this->fallbackToAi($messageData, $conversationHistory, $userId, 'exception');
-        }
+        // Tier 2: AI Fallback (MessageSorter LLM call)
+        return $this->fallbackToAi($messageData, $conversationHistory, $userId, 'router_miss');
     }
 
     /**
@@ -525,7 +191,7 @@ final readonly class SynapseRouter
      * Returns a full classification result array when the external router
      * responds with sufficient confidence. Returns null when the router is
      * unavailable, disabled, or below the confidence threshold — the caller
-     * should then fall through to Qdrant/LLM tiers.
+     * should then fall through to the AI fallback.
      */
     private function tryExternalRouter(string $messageText, array $conversationHistory, ?int $userId): ?array
     {
@@ -559,7 +225,17 @@ final readonly class SynapseRouter
         $promptMetadata = $this->loadPromptMetadata($canonicalTopic, $userId ?? 0);
 
         $promptToolInternet = $promptMetadata['tool_internet'] ?? null;
-        $webSearch = WebSearchTopicPolicy::shouldSearch($canonicalTopic, $promptToolInternet);
+
+        // For compound requests the policy applies to step 1 (executed
+        // synchronously). The router's step plan is the authoritative
+        // signal here — fall back to topic-based policy for single-step.
+        if ($result['is_compound'] && !empty($result['steps'])) {
+            $firstStep = $result['steps'][0];
+            $webSearch = (bool) ($firstStep['web_search'] ?? false);
+        } else {
+            $webSearch = WebSearchTopicPolicy::shouldSearch($canonicalTopic, $promptToolInternet)
+                && !WebSearchTopicPolicy::isNonWebSearchTopic($useCase);
+        }
 
         $this->logger->info('SynapseRouter: External router classification', [
             'use_case' => $useCase,
@@ -608,22 +284,14 @@ final readonly class SynapseRouter
         array $conversationHistory,
         ?int $userId,
         string $reason,
-        ?float $bestScore = null,
-        ?string $bestTopic = null,
     ): array {
         $this->logger->info('SynapseRouter: Falling back to AI sort', [
             'reason' => $reason,
-            'best_score' => $bestScore ? round($bestScore, 4) : null,
-            'best_topic' => $bestTopic,
         ]);
 
         $result = $this->messageSorter->classify($messageData, $conversationHistory, $userId);
         $result['source'] = 'synapse_ai_fallback';
         $result['synapse_fallback_reason'] = $reason;
-
-        if (null !== $bestScore) {
-            $result['synapse_best_score'] = $bestScore;
-        }
 
         $rawTopic = (string) ($result['topic'] ?? '');
         if ('' !== $rawTopic) {
@@ -638,84 +306,6 @@ final readonly class SynapseRouter
         }
 
         return $result;
-    }
-
-    /**
-     * Snapshot of the embedding model currently bound to Synapse Routing.
-     *
-     * `vector_dim` is read from the catalog (`BJSON.meta.dimensions`)
-     * so the router and indexer agree on the target dimension when the
-     * bound model is not 1024-wide, instead of slice/zero-padding the
-     * query vector down to 1024 and then searching a collection that
-     * was created with the model's native size (PR #853 review).
-     *
-     * @return array{provider: ?string, model: ?string, model_id: ?int, vector_dim: int}
-     */
-    private function getCurrentModelInfo(): array
-    {
-        $modelId = $this->resolveSynapseModelId();
-        if (!$modelId) {
-            return [
-                'provider' => null,
-                'model' => null,
-                'model_id' => null,
-                'vector_dim' => self::DEFAULT_VECTOR_DIMENSION,
-            ];
-        }
-
-        return [
-            'provider' => $this->modelConfigService->getProviderForModel($modelId),
-            'model' => $this->modelConfigService->getModelName($modelId),
-            'model_id' => $modelId,
-            'vector_dim' => $this->modelConfigService->getVectorDimForModel($modelId)
-                ?? self::DEFAULT_VECTOR_DIMENSION,
-        ];
-    }
-
-    /**
-     * Resolve the BMODELS row id for the embedding model used by
-     * Synapse Routing.
-     *
-     * Reads the global SYNAPSE_VECTORIZE binding so indexer and search
-     * side stay on the same vector space. Falls back to the VECTORIZE
-     * default for fresh installs that have not seeded the dedicated
-     * binding yet.
-     */
-    private function resolveSynapseModelId(): ?int
-    {
-        $synapseId = $this->modelConfigService->getDefaultModel(SynapseIndexer::SYNAPSE_CAPABILITY, null);
-        if ($synapseId) {
-            return $synapseId;
-        }
-
-        $this->logger->warning('SynapseRouter: SYNAPSE_VECTORIZE binding missing, falling back to VECTORIZE default');
-
-        return $this->modelConfigService->getDefaultModel('VECTORIZE', null);
-    }
-
-    /**
-     * A Synapse hit is "stale" when its payload was indexed under a different
-     * embedding model than the one currently configured. Without this check,
-     * cross-model cosine scores are meaningless and would produce silent
-     * mis-routing whenever an admin swaps the VECTORIZE default model.
-     *
-     * Backwards compatible: payloads without `embedding_model_id` (legacy
-     * v1 indexing) are treated as fresh — they will be re-indexed lazily
-     * the next time the topic content changes or the operator runs
-     * `synapse:index --force`.
-     */
-    private function isStaleEntry(array $payload, ?int $currentModelId): bool
-    {
-        $indexedModelId = $payload['embedding_model_id'] ?? null;
-        if (null === $indexedModelId) {
-            return false;
-        }
-
-        if (null === $currentModelId) {
-            return false;
-        }
-
-        return (int) $indexedModelId !== (int) $currentModelId;
     }
 
     private function checkRuleBasedRouting(string $messageText, array $conversationHistory, int $userId): ?string
@@ -767,11 +357,6 @@ final readonly class SynapseRouter
         $bestCount = 0;
 
         foreach (self::LANGUAGE_MARKERS as $lang => $markers) {
-            // array_intersect_key returns the matched markers; counting
-            // them sidesteps a PHPStan narrowing on PHP 8.4 that infers
-            // a manual `++$count` inside `if (isset(…))` as a 0|1 bool
-            // instead of the unbounded int it actually is. Net behaviour
-            // is identical — both forms count distinct marker hits.
             $count = count(array_intersect_key($wordSet, array_flip($markers)));
 
             if ($count > $bestCount) {
@@ -799,65 +384,6 @@ final readonly class SynapseRouter
     }
 
     /**
-     * Verify that a Tier-1 hit on a media-generation topic is justified
-     * by an explicit creation cue in the user's text (issue #878).
-     *
-     * Non-media topics are passed through unchanged. For media topics we
-     * accept the routing iff EITHER:
-     *   - the message contains a self-contained modality cue (e.g.
-     *     "lies vor" → audio is the only sensible interpretation), OR
-     *   - the message contains BOTH a generic creation verb AND a
-     *     media noun for the matching modality.
-     *
-     * Verb-and-noun do NOT have to be adjacent: "erstelle ein aktuelles
-     * Video von der Börse 2026" passes because "erstelle" + "video" are
-     * both present, even though they're separated by "ein aktuelles".
-     */
-    private function passesMediaIntentGuard(string $topic, string $messageText): bool
-    {
-        if (!isset(self::MEDIA_INTENT_NOUNS[$topic])) {
-            return true;
-        }
-
-        $lower = mb_strtolower($messageText);
-
-        foreach (self::MEDIA_INTENT_SELF_CONTAINED[$topic] as $cue) {
-            if (str_contains($lower, $cue)) {
-                return true;
-            }
-        }
-
-        if (!$this->containsCreationVerb($lower)) {
-            return false;
-        }
-
-        foreach (self::MEDIA_INTENT_NOUNS[$topic] as $noun) {
-            if (str_contains($lower, $noun)) {
-                return true;
-            }
-        }
-
-        return false;
-    }
-
-    /**
-     * True when the lowercased message contains any of {@see MEDIA_INTENT_VERBS}
-     * as a whole-word match. The word-boundary check stops "drawer" /
-     * "rendering of opinions" / "machart" from leaking through.
-     */
-    private function containsCreationVerb(string $lowerText): bool
-    {
-        foreach (self::MEDIA_INTENT_VERBS as $verb) {
-            $pattern = '/\b'.preg_quote($verb, '/').'\b/u';
-            if (1 === preg_match($pattern, $lowerText)) {
-                return true;
-            }
-        }
-
-        return false;
-    }
-
-    /**
      * @return array<string, mixed>
      */
     private function loadPromptMetadata(string $topic, int $userId): array
@@ -865,80 +391,6 @@ final readonly class SynapseRouter
         $promptData = $this->promptService->getPromptWithMetadata($topic, $userId);
 
         return $promptData['metadata'] ?? [];
-    }
-
-    private const QWEN3_QUERY_INSTRUCTION = 'Given a user message, retrieve the most relevant topic category for routing';
-
-    /**
-     * @return array{provider?: string, model?: string, instruction?: string}
-     */
-    private function getEmbeddingOptions(): array
-    {
-        $modelId = $this->resolveSynapseModelId();
-        if (!$modelId) {
-            return [];
-        }
-
-        $options = [];
-        $provider = $this->modelConfigService->getProviderForModel($modelId);
-        $model = $this->modelConfigService->getModelName($modelId);
-
-        if ($provider) {
-            $options['provider'] = $provider;
-        }
-        if ($model) {
-            $options['model'] = $model;
-
-            if (str_contains(strtolower($model), 'qwen')) {
-                $options['instruction'] = self::QWEN3_QUERY_INSTRUCTION;
-            }
-        }
-
-        return $options;
-    }
-
-    /**
-     * Coerce a query embedding to the target collection dimension.
-     *
-     * Happy path: the bound model returns its native dim (read from
-     * catalog metadata), the collection was created with the same dim,
-     * and this is a no-op. Slice/zero-pad is a last-resort safety net
-     * for catalog/provider mismatches; it is logged as a warning
-     * because cosine similarity across coerced dims is semantically
-     * weaker than across native ones (PR #853 review).
-     *
-     * @param float[] $vector
-     *
-     * @return float[]
-     */
-    private function normalizeVector(array $vector, int $targetDim): array
-    {
-        $len = count($vector);
-        if ($targetDim === $len) {
-            return $vector;
-        }
-
-        $this->logger->warning('SynapseRouter: query embedding dimension mismatch — coercing (catalog metadata likely wrong)', [
-            'expected' => $targetDim,
-            'actual' => $len,
-        ]);
-
-        if ($len > $targetDim) {
-            return array_slice($vector, 0, $targetDim);
-        }
-
-        return array_pad($vector, $targetDim, 0.0);
-    }
-
-    private function getConfidenceThreshold(): float
-    {
-        $value = $this->configRepository->getValue(0, 'QDRANT_SEARCH', 'SYNAPSE_CONFIDENCE_THRESHOLD');
-
-        if (null !== $value && is_numeric($value)) {
-            return (float) $value;
-        }
-
-        return self::DEFAULT_CONFIDENCE_THRESHOLD;
     }
 
     private function elapsed(float $start): float

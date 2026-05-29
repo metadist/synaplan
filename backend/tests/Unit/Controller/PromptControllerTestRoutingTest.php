@@ -26,9 +26,8 @@ use Symfony\Component\DependencyInjection\Container;
 use Symfony\Component\HttpFoundation\Request;
 
 /**
- * Focused unit tests for the new Synapse dry-run endpoint exposed by
- * PromptController (`POST /api/v1/prompts/test`). Heavier CRUD flows
- * are covered by the existing integration test suite.
+ * Focused unit tests for the Synapse dry-run endpoint exposed by
+ * PromptController (`POST /api/v1/prompts/test`).
  */
 final class PromptControllerTestRoutingTest extends TestCase
 {
@@ -94,25 +93,28 @@ final class PromptControllerTestRoutingTest extends TestCase
         self::assertStringContainsString('Missing required field: text', $body['error']);
     }
 
-    public function testTestRoutingDelegatesToRouterDryRunWithDefaultLimit(): void
+    public function testTestRoutingDelegatesToRouterDryRun(): void
     {
         $user = $this->makeUser(7);
 
         $this->router->expects($this->once())
             ->method('dryRun')
-            ->with('How do I write a PHP loop?', 7, 5)
+            ->with('How do I write a PHP loop?', 7)
             ->willReturn([
                 'query' => 'How do I write a PHP loop?',
-                'model' => ['provider' => 'cloudflare', 'model' => 'bge-m3', 'model_id' => 42],
-                'candidates' => [
-                    [
-                        'topic' => 'coding',
-                        'score' => 0.83,
-                        'payload' => [],
-                        'stale' => false,
-                        'alias_target' => 'general',
-                    ],
+                'router_available' => true,
+                'classification' => [
+                    'use_case' => 'coding',
+                    'canonical_topic' => 'general',
+                    'confidence' => 0.85,
+                    'is_compound' => false,
+                    'steps' => [],
+                    'model_version' => 'v20260528',
+                    'router_latency_ms' => 2.1,
+                    'alias_target' => 'general',
+                    'implied_media' => null,
                 ],
+                'fallback_reason' => null,
                 'latency_ms' => 11.4,
                 'error' => null,
             ]);
@@ -127,51 +129,36 @@ final class PromptControllerTestRoutingTest extends TestCase
 
         self::assertSame(200, $response->getStatusCode());
         self::assertTrue($body['success']);
-        self::assertSame('coding', $body['candidates'][0]['topic']);
-        self::assertSame('general', $body['candidates'][0]['alias_target']);
+        self::assertTrue($body['router_available']);
+        self::assertSame('coding', $body['classification']['use_case']);
+        self::assertSame('general', $body['classification']['canonical_topic']);
     }
 
-    public function testTestRoutingClampsLimitToMaximum(): void
+    public function testTestRoutingHandlesRouterUnavailable(): void
     {
         $this->router->expects($this->once())
             ->method('dryRun')
-            ->with('test', 1, 20); // 999 → clamped to 20
-
-        $this->router->method('dryRun')->willReturn([
-            'query' => 'test',
-            'model' => ['provider' => null, 'model' => null, 'model_id' => null],
-            'candidates' => [],
-            'latency_ms' => 0.0,
-            'error' => null,
-        ]);
+            ->with('test', 1)
+            ->willReturn([
+                'query' => 'test',
+                'router_available' => false,
+                'classification' => null,
+                'fallback_reason' => 'router_unavailable_or_disabled',
+                'latency_ms' => 0.5,
+                'error' => null,
+            ]);
 
         $request = Request::create(
             '/api/v1/prompts/test',
             'POST',
-            content: json_encode(['text' => 'test', 'limit' => 999])
+            content: json_encode(['text' => 'test'])
         );
-        $this->controller->testRouting($request, $this->makeUser());
-    }
+        $response = $this->controller->testRouting($request, $this->makeUser());
+        $body = json_decode((string) $response->getContent(), true);
 
-    public function testTestRoutingClampsLimitToMinimum(): void
-    {
-        $this->router->expects($this->once())
-            ->method('dryRun')
-            ->with('test', 1, 1); // 0 → clamped to 1
-
-        $this->router->method('dryRun')->willReturn([
-            'query' => 'test',
-            'model' => ['provider' => null, 'model' => null, 'model_id' => null],
-            'candidates' => [],
-            'latency_ms' => 0.0,
-            'error' => null,
-        ]);
-
-        $request = Request::create(
-            '/api/v1/prompts/test',
-            'POST',
-            content: json_encode(['text' => 'test', 'limit' => 0])
-        );
-        $this->controller->testRouting($request, $this->makeUser());
+        self::assertSame(200, $response->getStatusCode());
+        self::assertTrue($body['success']);
+        self::assertFalse($body['router_available']);
+        self::assertSame('router_unavailable_or_disabled', $body['fallback_reason']);
     }
 }

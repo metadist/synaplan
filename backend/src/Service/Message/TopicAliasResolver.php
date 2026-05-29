@@ -29,13 +29,32 @@ final class TopicAliasResolver
      * Granular topic ─► canonical legacy topic.
      *
      * Topics not listed here are passed through untouched.
+     * Includes both kebab-case (Synapse v2 / Qdrant indexer) and
+     * snake_case (synaplan-router SetFit labels) variants.
      */
     private const TOPIC_ALIASES = [
+        // Kebab-case (Synapse v2 / PromptCatalog)
         'general-chat' => 'general',
         'coding' => 'general',
         'image-generation' => 'mediamaker',
         'video-generation' => 'mediamaker',
         'audio-generation' => 'mediamaker',
+        // Snake_case (synaplan-router SetFit labels)
+        'text_chat' => 'general',
+        'web_search' => 'general',
+        'image_generation' => 'mediamaker',
+        'video_generation' => 'mediamaker',
+        'audio_generation' => 'mediamaker',
+        'file_analysis' => 'analyzefile',
+        'file_generation' => 'officemaker',
+        'email_send' => 'general',
+        // Compound use-cases — canonical topic is the first step's topic.
+        // The actual multi-step orchestration is driven by `router_steps`.
+        'compound_research_image' => 'general',
+        'compound_write_audio' => 'general',
+        'compound_image_email' => 'mediamaker',
+        'compound_research_file' => 'general',
+        'compound_file_analyze_reply' => 'analyzefile',
     ];
 
     /**
@@ -45,6 +64,9 @@ final class TopicAliasResolver
         'image-generation' => 'image',
         'video-generation' => 'video',
         'audio-generation' => 'audio',
+        'image_generation' => 'image',
+        'video_generation' => 'video',
+        'audio_generation' => 'audio',
     ];
 
     /**

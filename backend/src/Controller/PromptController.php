@@ -471,9 +471,8 @@ class PromptController extends AbstractController
         }
 
         $text = trim($data['text']);
-        $limit = isset($data['limit']) ? max(1, min(20, (int) $data['limit'])) : 5;
 
-        $result = $this->synapseRouter->dryRun($text, $user->getId(), $limit);
+        $result = $this->synapseRouter->dryRun($text, $user->getId());
 
         return $this->json(['success' => true] + $result);
     }

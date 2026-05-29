@@ -342,8 +342,8 @@ final class AdminSynapseController extends AbstractController
     #[Route('/dry-run', name: 'admin_synapse_dry_run', methods: ['POST'])]
     #[OA\Post(
         path: '/api/v1/admin/synapse/dry-run',
-        summary: 'Dry-run Synapse Routing for a sample message (admin only)',
-        description: 'Embeds the provided text and returns the Top-K Qdrant matches with stale-flag and alias resolution. No state mutation.',
+        summary: 'Dry-run routing for a sample message (admin only)',
+        description: 'Sends the text through the external ML router (SetFit/ONNX) and returns the classification result without state mutation. Falls back to reporting AI sorter availability when the router is unavailable.',
         security: [['Bearer' => []]],
         tags: ['Admin Synapse'],
         requestBody: new OA\RequestBody(
@@ -352,7 +352,6 @@ final class AdminSynapseController extends AbstractController
                 required: ['text'],
                 properties: [
                     new OA\Property(property: 'text', type: 'string'),
-                    new OA\Property(property: 'limit', type: 'integer', minimum: 1, maximum: 20, example: 5),
                 ]
             )
         )
@@ -369,12 +368,11 @@ final class AdminSynapseController extends AbstractController
         }
 
         $text = trim($body['text']);
-        $limit = isset($body['limit']) ? max(1, min(20, (int) $body['limit'])) : 5;
 
         $user = $this->getUser();
         $userId = method_exists($user, 'getId') ? $user->getId() : null;
 
-        $result = $this->synapseRouter->dryRun($text, $userId, $limit);
+        $result = $this->synapseRouter->dryRun($text, $userId);
 
         return $this->json(['success' => null === $result['error']] + $result);
     }

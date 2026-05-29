@@ -292,22 +292,23 @@ final readonly class MessageProcessor
             }
 
             // Step 2.5: Web Search
-            //
-            // Project-wide policy: search is the DEFAULT for every chat.
-            // The only ways to suppress it are:
-            //   (a) Topic is a pure asset/document generation topic where
-            //       the handler does not consume web context.
-            //   (b) The user has explicitly opted out by setting
-            //       `tool_internet=false` on the task prompt.
-            //
-            // All other signals (classifier `web_search` vote, AI BWEBSEARCH,
-            // legacy `tools:search` source) are now advisory only — they are
-            // recorded in the decision log for diagnostics, but no longer
-            // gate the decision.
+            // Web search decision hierarchy:
+            //   1. Prompt tool_internet=true  → always search (admin opt-in)
+            //   2. Prompt tool_internet=false → never search (admin opt-out)
+            //   3. Classification web_search  → trust the router's decision
+            //   4. Otherwise                  → policy default
             $searchResults = null;
             $topic = $classification['topic'] ?? 'general';
             $promptToolInternet = $promptMetadata['tool_internet'] ?? null;
-            $shouldSearch = WebSearchTopicPolicy::shouldSearch($topic, $promptToolInternet);
+            $classifierWebSearch = $classification['web_search'] ?? null;
+
+            if (null !== $promptToolInternet) {
+                $shouldSearch = $promptToolInternet;
+            } elseif (null !== $classifierWebSearch && is_bool($classifierWebSearch)) {
+                $shouldSearch = $classifierWebSearch;
+            } else {
+                $shouldSearch = WebSearchTopicPolicy::shouldSearch($topic, $promptToolInternet);
+            }
             $triggerReason = $this->triggerReasonFor($topic, $promptToolInternet, $shouldSearch);
 
             // Consolidated decision log: lets us diagnose "search didn't trigger"
@@ -751,7 +752,15 @@ final readonly class MessageProcessor
             $searchResults = null;
             $topic = $classification['topic'] ?? 'general';
             $promptToolInternet = $promptMetadata['tool_internet'] ?? null;
-            $shouldSearch = WebSearchTopicPolicy::shouldSearch($topic, $promptToolInternet);
+            $classifierWebSearch = $classification['web_search'] ?? null;
+
+            if (null !== $promptToolInternet) {
+                $shouldSearch = $promptToolInternet;
+            } elseif (null !== $classifierWebSearch && is_bool($classifierWebSearch)) {
+                $shouldSearch = $classifierWebSearch;
+            } else {
+                $shouldSearch = WebSearchTopicPolicy::shouldSearch($topic, $promptToolInternet);
+            }
             $triggerReason = $this->triggerReasonFor($topic, $promptToolInternet, $shouldSearch);
 
             $braveEnabled = $this->braveSearchService->isEnabled();
@@ -761,7 +770,7 @@ final readonly class MessageProcessor
                 'trigger_reason' => $triggerReason,
                 'force_web_search' => (bool) ($options['force_web_search'] ?? false),
                 'prompt_tool_internet' => $promptToolInternet,
-                'classifier_web_search_hint' => $classification['web_search'] ?? null,
+                'classifier_web_search' => $classifierWebSearch,
                 'classification_source' => $classification['source'] ?? null,
                 'classification_topic' => $topic,
                 'brave_enabled' => $braveEnabled,

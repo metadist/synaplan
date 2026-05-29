@@ -4,79 +4,58 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit;
 
-use App\AI\Service\AiFacade;
-use App\Repository\ConfigRepository;
 use App\Repository\PromptRepository;
 use App\Service\Message\MessageSorter;
 use App\Service\Message\RouterClient;
 use App\Service\Message\SynapseRouter;
 use App\Service\Message\TopicAliasResolver;
-use App\Service\ModelConfigService;
 use App\Service\PromptService;
-use App\Service\VectorSearch\QdrantClientInterface;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
 
 class SynapseRouterTest extends TestCase
 {
-    private QdrantClientInterface&MockObject $qdrantClient;
-    private AiFacade&MockObject $aiFacade;
     private MessageSorter&MockObject $messageSorter;
     private RouterClient&MockObject $routerClient;
     private PromptService&MockObject $promptService;
     private PromptRepository&MockObject $promptRepository;
-    private ModelConfigService&MockObject $modelConfigService;
     private SynapseRouter $router;
 
     protected function setUp(): void
     {
-        $this->qdrantClient = $this->createMock(QdrantClientInterface::class);
-        $this->aiFacade = $this->createMock(AiFacade::class);
         $this->messageSorter = $this->createMock(MessageSorter::class);
         $this->routerClient = $this->createMock(RouterClient::class);
         $this->promptService = $this->createMock(PromptService::class);
         $this->promptRepository = $this->createMock(PromptRepository::class);
-        $this->modelConfigService = $this->createMock(ModelConfigService::class);
-        $configRepository = $this->createMock(ConfigRepository::class);
 
-        // RouterClient returns null by default (disabled/unavailable)
-        $this->routerClient->method('classify')->willReturn(null);
+        $this->routerClient->method('getConfidenceThreshold')->willReturn(0.80);
 
         $this->router = new SynapseRouter(
-            $this->qdrantClient,
-            $this->aiFacade,
             $this->messageSorter,
             $this->routerClient,
             $this->promptService,
             $this->promptRepository,
-            $this->modelConfigService,
-            $configRepository,
             new TopicAliasResolver(),
             $this->createMock(LoggerInterface::class),
         );
     }
 
-    public function testHighConfidenceRoutesDirectly(): void
+    public function testExternalRouterHighConfidenceRoutesDirectly(): void
     {
-        $this->modelConfigService->method('getDefaultModel')->willReturn(null);
         $this->promptRepository->method('findPromptsWithSelectionRules')->willReturn([]);
 
-        $this->aiFacade->method('embed')->willReturn([
-            'embedding' => array_fill(0, 1024, 0.1),
-            'usage' => ['prompt_tokens' => 10, 'total_tokens' => 10],
-        ]);
-
-        $this->qdrantClient->method('searchSynapseTopics')->willReturn([
-            [
-                'id' => 'synapse_0_general',
-                'score' => 0.92,
-                'payload' => ['topic' => 'general', 'owner_id' => 0, 'short_description' => 'General chat'],
-            ],
+        $this->routerClient->method('classify')->willReturn([
+            'use_case' => 'text_chat',
+            'confidence' => 0.92,
+            'is_compound' => false,
+            'steps' => [],
+            'model_version' => 'v20260528',
+            'latency_ms' => 3.1,
         ]);
 
         $this->promptService->method('getPromptWithMetadata')->willReturn([
-            'metadata' => ['tool_internet' => false],
+            'metadata' => [],
         ]);
 
         $this->messageSorter->expects($this->never())->method('classify');
@@ -84,44 +63,52 @@ class SynapseRouterTest extends TestCase
         $result = $this->router->route(['BTEXT' => 'Hello, how are you?'], [], 1);
 
         $this->assertEquals('general', $result['topic']);
-        $this->assertStringStartsWith('synapse_', $result['source']);
-        $this->assertArrayHasKey('synapse_score', $result);
-        $this->assertGreaterThanOrEqual(0.78, $result['synapse_score']);
+        $this->assertEquals('synapse_external_router', $result['source']);
+        $this->assertEquals('synaplan-router', $result['sorting_provider']);
+        $this->assertGreaterThanOrEqual(0.80, $result['synapse_score']);
     }
 
-    public function testLowConfidenceFallsBackToAi(): void
+    public function testExternalRouterLowConfidenceFallsBackToAi(): void
     {
-        $this->modelConfigService->method('getDefaultModel')->willReturn(null);
         $this->promptRepository->method('findPromptsWithSelectionRules')->willReturn([]);
 
-        $this->aiFacade->method('embed')->willReturn([
-            'embedding' => array_fill(0, 1024, 0.1),
-            'usage' => ['prompt_tokens' => 10, 'total_tokens' => 10],
-        ]);
-
-        $this->qdrantClient->method('searchSynapseTopics')->willReturn([
-            [
-                'id' => 'synapse_0_general',
-                'score' => 0.35,
-                'payload' => ['topic' => 'general', 'owner_id' => 0],
-            ],
+        $this->routerClient->method('classify')->willReturn([
+            'use_case' => 'text_chat',
+            'confidence' => 0.55,
+            'is_compound' => false,
+            'steps' => [],
+            'model_version' => 'v20260528',
+            'latency_ms' => 2.8,
         ]);
 
         $this->messageSorter->expects($this->once())->method('classify')->willReturn([
-            'topic' => 'coding',
+            'topic' => 'general',
             'language' => 'en',
-            'web_search' => false,
+            'web_search' => true,
         ]);
 
         $result = $this->router->route(['BTEXT' => 'Some ambiguous message'], [], 1);
 
-        // After Synapse v2: AI sorter may emit granular topics, but the alias
-        // resolver normalises them to the canonical legacy topic before the
-        // result leaves the router. The granular topic is preserved.
         $this->assertEquals('general', $result['topic']);
-        $this->assertEquals('coding', $result['granular_topic']);
         $this->assertEquals('synapse_ai_fallback', $result['source']);
-        $this->assertEquals('low_confidence', $result['synapse_fallback_reason']);
+        $this->assertEquals('router_miss', $result['synapse_fallback_reason']);
+    }
+
+    public function testRouterUnavailableFallsBackToAi(): void
+    {
+        $this->promptRepository->method('findPromptsWithSelectionRules')->willReturn([]);
+        $this->routerClient->method('classify')->willReturn(null);
+
+        $this->messageSorter->expects($this->once())->method('classify')->willReturn([
+            'topic' => 'general',
+            'language' => 'en',
+            'web_search' => false,
+        ]);
+
+        $result = $this->router->route(['BTEXT' => 'Test message'], [], 1);
+
+        $this->assertEquals('synapse_ai_fallback', $result['source']);
+        $this->assertEquals('router_miss', $result['synapse_fallback_reason']);
     }
 
     public function testEmptyMessageFallsBackToAi(): void
@@ -138,145 +125,177 @@ class SynapseRouterTest extends TestCase
         $this->assertEquals('empty_message', $result['synapse_fallback_reason']);
     }
 
-    public function testEmptyEmbeddingFallsBackToAi(): void
+    public function testRuleBasedRoutingTakesPriority(): void
     {
-        $this->modelConfigService->method('getDefaultModel')->willReturn(null);
-        $this->promptRepository->method('findPromptsWithSelectionRules')->willReturn([]);
+        $rulePrompt = $this->createMock(\App\Entity\Prompt::class);
+        $rulePrompt->method('getTopic')->willReturn('support');
+        $rulePrompt->method('getSelectionRules')->willReturn('keyword:support');
 
-        $this->aiFacade->method('embed')->willReturn([
-            'embedding' => [],
-            'usage' => ['prompt_tokens' => 0, 'total_tokens' => 0],
+        $this->promptRepository->method('findPromptsWithSelectionRules')->willReturn([$rulePrompt]);
+        $this->promptService->method('matchesSelectionRules')->willReturn(true);
+        $this->promptService->method('getPromptWithMetadata')->willReturn([
+            'metadata' => ['tool_internet' => false],
         ]);
 
-        $this->messageSorter->expects($this->once())->method('classify')->willReturn([
-            'topic' => 'general',
-            'language' => 'en',
-            'web_search' => false,
-        ]);
+        $this->routerClient->expects($this->never())->method('classify');
+        $this->messageSorter->expects($this->never())->method('classify');
 
-        $result = $this->router->route(['BTEXT' => 'Test'], [], 1);
+        $result = $this->router->route(['BTEXT' => 'I need support please'], [], 1);
 
-        $this->assertEquals('synapse_ai_fallback', $result['source']);
-        $this->assertEquals('empty_embedding', $result['synapse_fallback_reason']);
+        $this->assertSame('synapse_rule', $result['source']);
+        $this->assertSame('support', $result['topic']);
+        $this->assertNull($result['sorting_model_id']);
+        $this->assertNull($result['sorting_provider']);
+        $this->assertNull($result['sorting_model_name']);
     }
 
-    public function testNoSearchResultsFallsBackToAi(): void
+    public function testImageGenerationRouting(): void
     {
-        $this->modelConfigService->method('getDefaultModel')->willReturn(null);
         $this->promptRepository->method('findPromptsWithSelectionRules')->willReturn([]);
 
-        $this->aiFacade->method('embed')->willReturn([
-            'embedding' => array_fill(0, 1024, 0.1),
-            'usage' => ['prompt_tokens' => 10, 'total_tokens' => 10],
+        $this->routerClient->method('classify')->willReturn([
+            'use_case' => 'image_generation',
+            'confidence' => 0.91,
+            'is_compound' => false,
+            'steps' => [],
+            'model_version' => 'v20260528',
+            'latency_ms' => 2.5,
         ]);
 
-        $this->qdrantClient->method('searchSynapseTopics')->willReturn([]);
-
-        $this->messageSorter->expects($this->once())->method('classify')->willReturn([
-            'topic' => 'general',
-            'language' => 'en',
-            'web_search' => false,
-        ]);
-
-        $result = $this->router->route(['BTEXT' => 'Test'], [], 1);
-
-        $this->assertEquals('synapse_ai_fallback', $result['source']);
-        $this->assertEquals('no_search_results', $result['synapse_fallback_reason']);
-    }
-
-    /**
-     * Under the project-wide WebSearchTopicPolicy, the default for any
-     * chat-style topic without an explicit `tool_internet=false` opt-out
-     * is to enable web search — regardless of the query text. This is
-     * the "rather search than not" mandate.
-     *
-     * The data provider covers a wide spectrum of phrasings that used
-     * to depend on the keyword heuristic but now succeed by default.
-     *
-     * @return iterable<string, array{0: string}>
-     */
-    public static function defaultRouteSearchQueryProvider(): iterable
-    {
-        // Time-sensitive / news-like (used to depend on `aktuell`, `wetter`, year)
-        yield 'weather' => ['Was ist das aktuelle Wetter in Berlin?'];
-        yield 'year_pattern' => ['Bundeskanzler 2026'];
-
-        // Cost queries — original #974 regression cases. Still pass under
-        // the simpler policy: default is search, period.
-        yield 'cost_kostet' => ['Was kostet ein Flug nach Bergen?'];
-        yield 'cost_wie_teuer' => ['Wie teuer ist ein iPhone 17?'];
-        yield 'cost_gekostet' => ['Was hat das Konzert gestern gekostet?'];
-
-        // Real-estate — original failing prompt that motivated this PR.
-        yield 'real_estate_eigentumswohnung' => ['Erzähl mir etwas über Eigentumswohnungen in München'];
-
-        // Travel / politics / finance / sports — sample one per domain.
-        yield 'travel_flug' => ['Wann geht der nächste Flug nach Rom?'];
-        yield 'politics_kanzler' => ['Wer ist der aktuelle Bundeskanzler von Deutschland?'];
-        yield 'finance_bitcoin' => ['Wie ist der Bitcoin Kurs gerade?'];
-        yield 'sports_bundesliga' => ['Wer führt die Bundesliga an?'];
-
-        // Casual / conceptual queries — under Variante B these ALSO
-        // trigger search by default. The model is trusted to ignore
-        // irrelevant Brave results when answering from training data.
-        yield 'concept_explanation' => ['Erkläre mir das Konzept der Vererbung in OOP'];
-        yield 'greeting' => ['Hallo, wie geht es dir?'];
-    }
-
-    #[\PHPUnit\Framework\Attributes\DataProvider('defaultRouteSearchQueryProvider')]
-    public function testDefaultRouteEnablesWebSearch(string $text): void
-    {
-        $this->modelConfigService->method('getDefaultModel')->willReturn(null);
-        $this->promptRepository->method('findPromptsWithSelectionRules')->willReturn([]);
-
-        $this->aiFacade->method('embed')->willReturn([
-            'embedding' => array_fill(0, 1024, 0.1),
-            'usage' => ['prompt_tokens' => 10, 'total_tokens' => 10],
-        ]);
-
-        $this->qdrantClient->method('searchSynapseTopics')->willReturn([
-            [
-                'id' => 'synapse_0_general',
-                'score' => 0.90,
-                'payload' => ['topic' => 'general', 'owner_id' => 0],
-            ],
-        ]);
-
-        // No `tool_internet` opinion on the prompt → falls through to
-        // the project default, which is "search".
         $this->promptService->method('getPromptWithMetadata')->willReturn([
             'metadata' => [],
         ]);
 
-        $result = $this->router->route(['BTEXT' => $text], [], 1);
+        $result = $this->router->route(['BTEXT' => 'Erstelle ein Bild von einem Sonnenuntergang'], [], 1);
 
-        $this->assertTrue(
-            $result['web_search'],
-            sprintf('Default policy must enable web search for "%s"', $text),
-        );
+        $this->assertSame('mediamaker', $result['topic']);
+        $this->assertSame('image_generation', $result['granular_topic']);
+        $this->assertSame('image', $result['media_type']);
+        $this->assertFalse($result['web_search']);
+    }
+
+    public function testCompoundRoutingWithSteps(): void
+    {
+        $this->promptRepository->method('findPromptsWithSelectionRules')->willReturn([]);
+
+        $this->routerClient->method('classify')->willReturn([
+            'use_case' => 'compound_research_image',
+            'confidence' => 0.88,
+            'is_compound' => true,
+            'steps' => [
+                ['id' => 'step_1', 'capability' => 'CHAT', 'web_search' => true],
+                ['id' => 'step_2', 'capability' => 'IMAGE_GENERATION', 'media_type' => 'image'],
+            ],
+            'model_version' => 'v20260528',
+            'latency_ms' => 3.2,
+        ]);
+
+        $this->promptService->method('getPromptWithMetadata')->willReturn([
+            'metadata' => [],
+        ]);
+
+        $result = $this->router->route(['BTEXT' => 'Recherchiere Katzen und erstelle ein Bild davon'], [], 1);
+
+        $this->assertTrue($result['is_compound']);
+        $this->assertCount(2, $result['router_steps']);
+        $this->assertEquals('setfit', $result['classification_source']);
+        // Step 1's web_search flag should drive the top-level decision.
+        $this->assertTrue($result['web_search']);
+        // Compound use-case resolves to step 1's canonical topic ("general").
+        $this->assertEquals('general', $result['topic']);
+        $this->assertEquals('compound_research_image', $result['granular_topic']);
+    }
+
+    public function testCompoundWithoutSearchInFirstStep(): void
+    {
+        $this->promptRepository->method('findPromptsWithSelectionRules')->willReturn([]);
+
+        $this->routerClient->method('classify')->willReturn([
+            'use_case' => 'compound_image_email',
+            'confidence' => 0.85,
+            'is_compound' => true,
+            'steps' => [
+                ['id' => 'step_1', 'capability' => 'IMAGE_GENERATION', 'media_type' => 'image'],
+                ['id' => 'step_2', 'capability' => 'EMAIL_SEND'],
+            ],
+            'model_version' => 'v20260528',
+            'latency_ms' => 2.8,
+        ]);
+
+        $this->promptService->method('getPromptWithMetadata')->willReturn([
+            'metadata' => [],
+        ]);
+
+        $result = $this->router->route(['BTEXT' => 'Erstelle ein Bild und sende es per Mail'], [], 1);
+
+        $this->assertTrue($result['is_compound']);
+        $this->assertFalse($result['web_search']);
+        $this->assertEquals('mediamaker', $result['topic']);
     }
 
     /**
-     * Explicit opt-out at the prompt level (`tool_internet=false`) is the
-     * one and only way to suppress search on a regular (non-media) topic
-     * under Variante B.
+     * When the router classifies as `text_chat`, web search is suppressed
+     * because the router explicitly distinguishes `text_chat` (no search)
+     * from `web_search` (search needed).
      */
-    public function testExplicitToolInternetFalseSuppressesSearch(): void
+    public function testTextChatSuppressesWebSearch(): void
     {
-        $this->modelConfigService->method('getDefaultModel')->willReturn(null);
         $this->promptRepository->method('findPromptsWithSelectionRules')->willReturn([]);
 
-        $this->aiFacade->method('embed')->willReturn([
-            'embedding' => array_fill(0, 1024, 0.1),
-            'usage' => ['prompt_tokens' => 10, 'total_tokens' => 10],
+        $this->routerClient->method('classify')->willReturn([
+            'use_case' => 'text_chat',
+            'confidence' => 0.90,
+            'is_compound' => false,
+            'steps' => [],
+            'model_version' => 'v20260528',
+            'latency_ms' => 2.0,
         ]);
 
-        $this->qdrantClient->method('searchSynapseTopics')->willReturn([
-            [
-                'id' => 'synapse_0_general',
-                'score' => 0.90,
-                'payload' => ['topic' => 'general', 'owner_id' => 0],
-            ],
+        $this->promptService->method('getPromptWithMetadata')->willReturn([
+            'metadata' => [],
+        ]);
+
+        $result = $this->router->route(['BTEXT' => 'Hey wie gehts dir?'], [], 1);
+
+        $this->assertFalse($result['web_search']);
+    }
+
+    /**
+     * When the router classifies as `web_search`, web search is enabled.
+     */
+    public function testWebSearchUseCaseEnablesWebSearch(): void
+    {
+        $this->promptRepository->method('findPromptsWithSelectionRules')->willReturn([]);
+
+        $this->routerClient->method('classify')->willReturn([
+            'use_case' => 'web_search',
+            'confidence' => 0.88,
+            'is_compound' => false,
+            'steps' => [],
+            'model_version' => 'v20260528',
+            'latency_ms' => 2.5,
+        ]);
+
+        $this->promptService->method('getPromptWithMetadata')->willReturn([
+            'metadata' => [],
+        ]);
+
+        $result = $this->router->route(['BTEXT' => 'Was ist das aktuelle Wetter in Berlin?'], [], 1);
+
+        $this->assertTrue($result['web_search']);
+    }
+
+    public function testExplicitToolInternetFalseSuppressesSearch(): void
+    {
+        $this->promptRepository->method('findPromptsWithSelectionRules')->willReturn([]);
+
+        $this->routerClient->method('classify')->willReturn([
+            'use_case' => 'text_chat',
+            'confidence' => 0.90,
+            'is_compound' => false,
+            'steps' => [],
+            'model_version' => 'v20260528',
+            'latency_ms' => 2.0,
         ]);
 
         $this->promptService->method('getPromptWithMetadata')->willReturn([
@@ -285,102 +304,42 @@ class SynapseRouterTest extends TestCase
 
         $result = $this->router->route(['BTEXT' => 'Was ist das aktuelle Wetter in Berlin?'], [], 1);
 
-        $this->assertFalse(
-            $result['web_search'],
-            'Explicit tool_internet=false must suppress search even on a chat-friendly query',
-        );
+        $this->assertFalse($result['web_search']);
     }
 
-    /**
-     * Pure asset/document generation topics never benefit from web context,
-     * so the keyword heuristic must be skipped — even when the message
-     * contains otherwise web-search-positive keywords ("aktuell", "live",
-     * year patterns). Web search must only be honored via explicit
-     * `tool_internet` opt-in on the prompt.
-     */
-    public function testMediaTopicSkipsWebSearchHeuristicEvenWithKeyword(): void
+    public function testMediaTopicSkipsWebSearch(): void
     {
-        $this->modelConfigService->method('getDefaultModel')->willReturn(null);
         $this->promptRepository->method('findPromptsWithSelectionRules')->willReturn([]);
 
-        $this->aiFacade->method('embed')->willReturn([
-            'embedding' => array_fill(0, 1024, 0.1),
-            'usage' => ['prompt_tokens' => 10, 'total_tokens' => 10],
-        ]);
-
-        $this->qdrantClient->method('searchSynapseTopics')->willReturn([
-            [
-                'id' => 'synapse_0_video-generation',
-                'score' => 0.85,
-                'payload' => ['topic' => 'video-generation', 'owner_id' => 0],
-            ],
+        $this->routerClient->method('classify')->willReturn([
+            'use_case' => 'video_generation',
+            'confidence' => 0.85,
+            'is_compound' => false,
+            'steps' => [],
+            'model_version' => 'v20260528',
+            'latency_ms' => 2.5,
         ]);
 
         $this->promptService->method('getPromptWithMetadata')->willReturn([
-            'metadata' => ['tool_internet' => false],
+            'metadata' => [],
         ]);
 
-        // Contains "aktuell" + year 2026 — would normally trigger web search,
-        // but topic resolves to mediamaker so the heuristic must be skipped.
-        $result = $this->router->route(
-            ['BTEXT' => 'erstelle ein aktuelles video von der börse 2026'],
-            [],
-            1,
-        );
+        $result = $this->router->route(['BTEXT' => 'Erstelle ein Video'], [], 1);
 
-        $this->assertEquals('mediamaker', $result['topic']);
-        $this->assertFalse($result['web_search'], 'Web search heuristic must be skipped for media-generation topics');
-    }
-
-    /**
-     * Even for a non-web-search topic, the explicit `tool_internet` opt-in
-     * via prompt metadata still wins. This keeps the editorial control of
-     * prompt authors intact.
-     */
-    public function testMediaTopicHonorsExplicitToolInternetOptIn(): void
-    {
-        $this->modelConfigService->method('getDefaultModel')->willReturn(null);
-        $this->promptRepository->method('findPromptsWithSelectionRules')->willReturn([]);
-
-        $this->aiFacade->method('embed')->willReturn([
-            'embedding' => array_fill(0, 1024, 0.1),
-            'usage' => ['prompt_tokens' => 10, 'total_tokens' => 10],
-        ]);
-
-        $this->qdrantClient->method('searchSynapseTopics')->willReturn([
-            [
-                'id' => 'synapse_0_mediamaker',
-                'score' => 0.85,
-                'payload' => ['topic' => 'mediamaker', 'owner_id' => 0],
-            ],
-        ]);
-
-        $this->promptService->method('getPromptWithMetadata')->willReturn([
-            'metadata' => ['tool_internet' => true],
-        ]);
-
-        $result = $this->router->route(['BTEXT' => 'erstelle ein bild'], [], 1);
-
-        $this->assertEquals('mediamaker', $result['topic']);
-        $this->assertTrue($result['web_search'], 'Explicit tool_internet=true must still enable web search');
+        $this->assertFalse($result['web_search']);
     }
 
     public function testLanguageDetectionGerman(): void
     {
-        $this->modelConfigService->method('getDefaultModel')->willReturn(null);
         $this->promptRepository->method('findPromptsWithSelectionRules')->willReturn([]);
 
-        $this->aiFacade->method('embed')->willReturn([
-            'embedding' => array_fill(0, 1024, 0.1),
-            'usage' => ['prompt_tokens' => 10, 'total_tokens' => 10],
-        ]);
-
-        $this->qdrantClient->method('searchSynapseTopics')->willReturn([
-            [
-                'id' => 'synapse_0_general',
-                'score' => 0.90,
-                'payload' => ['topic' => 'general', 'owner_id' => 0],
-            ],
+        $this->routerClient->method('classify')->willReturn([
+            'use_case' => 'text_chat',
+            'confidence' => 0.90,
+            'is_compound' => false,
+            'steps' => [],
+            'model_version' => 'v20260528',
+            'latency_ms' => 2.0,
         ]);
 
         $this->promptService->method('getPromptWithMetadata')->willReturn([
@@ -392,338 +351,10 @@ class SynapseRouterTest extends TestCase
         $this->assertEquals('de', $result['language']);
     }
 
-    public function testExistingLanguagePreserved(): void
-    {
-        $this->modelConfigService->method('getDefaultModel')->willReturn(null);
-        $this->promptRepository->method('findPromptsWithSelectionRules')->willReturn([]);
-
-        $this->aiFacade->method('embed')->willReturn([
-            'embedding' => array_fill(0, 1024, 0.1),
-            'usage' => ['prompt_tokens' => 10, 'total_tokens' => 10],
-        ]);
-
-        $this->qdrantClient->method('searchSynapseTopics')->willReturn([
-            [
-                'id' => 'synapse_0_general',
-                'score' => 0.90,
-                'payload' => ['topic' => 'general', 'owner_id' => 0],
-            ],
-        ]);
-
-        $this->promptService->method('getPromptWithMetadata')->willReturn([
-            'metadata' => ['tool_internet' => false],
-        ]);
-
-        $result = $this->router->route(['BTEXT' => 'Test', 'BLANG' => 'fr'], [], 1);
-
-        $this->assertEquals('fr', $result['language']);
-    }
-
-    public function testEmbeddingExceptionFallsBackToAi(): void
-    {
-        $this->modelConfigService->method('getDefaultModel')->willReturn(null);
-        $this->promptRepository->method('findPromptsWithSelectionRules')->willReturn([]);
-
-        $this->aiFacade->method('embed')->willThrowException(new \RuntimeException('Provider down'));
-
-        $this->messageSorter->expects($this->once())->method('classify')->willReturn([
-            'topic' => 'general',
-            'language' => 'en',
-            'web_search' => false,
-        ]);
-
-        $result = $this->router->route(['BTEXT' => 'Test'], [], 1);
-
-        $this->assertEquals('synapse_ai_fallback', $result['source']);
-        $this->assertEquals('exception', $result['synapse_fallback_reason']);
-    }
-
-    public function testVectorNormalizationPadsShortVectors(): void
-    {
-        $this->modelConfigService->method('getDefaultModel')->willReturn(null);
-        $this->promptRepository->method('findPromptsWithSelectionRules')->willReturn([]);
-
-        $shortVector = array_fill(0, 512, 0.1);
-        $this->aiFacade->method('embed')->willReturn([
-            'embedding' => $shortVector,
-            'usage' => ['prompt_tokens' => 10, 'total_tokens' => 10],
-        ]);
-
-        $this->qdrantClient->expects($this->once())
-            ->method('searchSynapseTopics')
-            ->with(
-                $this->callback(fn (array $v) => 1024 === count($v)),
-                $this->anything(),
-                $this->anything(),
-                $this->anything(),
-            )
-            ->willReturn([
-                [
-                    'id' => 'synapse_0_general',
-                    'score' => 0.90,
-                    'payload' => ['topic' => 'general', 'owner_id' => 0],
-                ],
-            ]);
-
-        $this->promptService->method('getPromptWithMetadata')->willReturn([
-            'metadata' => [],
-        ]);
-
-        $this->router->route(['BTEXT' => 'Test'], [], 1);
-    }
-
-    /**
-     * Stale-Index detection — an indexed point whose `embedding_model_id`
-     * differs from the active VECTORIZE model must NOT be routed to;
-     * the router has to fall back to AI sorting with reason `stale_index`.
-     */
-    public function testStaleIndexFallsBackToAi(): void
-    {
-        // Active model = id 42 …
-        $this->modelConfigService->method('getDefaultModel')->willReturn(42);
-        $this->modelConfigService->method('getProviderForModel')->willReturn('openai');
-        $this->modelConfigService->method('getModelName')->willReturn('text-embedding-3-large');
-
-        $this->promptRepository->method('findPromptsWithSelectionRules')->willReturn([]);
-
-        $this->aiFacade->method('embed')->willReturn([
-            'embedding' => array_fill(0, 1024, 0.1),
-            'usage' => ['prompt_tokens' => 10, 'total_tokens' => 10],
-        ]);
-
-        // … but the indexed point was embedded with model id 7 (stale).
-        $this->qdrantClient->method('searchSynapseTopics')->willReturn([
-            [
-                'id' => 'synapse_0_general',
-                'score' => 0.95,
-                'payload' => [
-                    'topic' => 'general',
-                    'owner_id' => 0,
-                    'embedding_model_id' => 7,
-                ],
-            ],
-        ]);
-
-        $this->messageSorter->expects($this->once())->method('classify')->willReturn([
-            'topic' => 'general',
-            'language' => 'en',
-            'web_search' => false,
-        ]);
-
-        $result = $this->router->route(['BTEXT' => 'Hello, how are you?'], [], 1);
-
-        $this->assertSame('synapse_ai_fallback', $result['source']);
-        $this->assertSame('stale_index', $result['synapse_fallback_reason']);
-    }
-
-    /**
-     * When indexed and current model match, the route should succeed.
-     */
-    public function testFreshIndexPassesStaleCheck(): void
-    {
-        $this->modelConfigService->method('getDefaultModel')->willReturn(42);
-        $this->promptRepository->method('findPromptsWithSelectionRules')->willReturn([]);
-
-        $this->aiFacade->method('embed')->willReturn([
-            'embedding' => array_fill(0, 1024, 0.1),
-            'usage' => ['prompt_tokens' => 10, 'total_tokens' => 10],
-        ]);
-
-        $this->qdrantClient->method('searchSynapseTopics')->willReturn([
-            [
-                'id' => 'synapse_0_general',
-                'score' => 0.92,
-                'payload' => [
-                    'topic' => 'general',
-                    'owner_id' => 0,
-                    'embedding_model_id' => 42,
-                ],
-            ],
-        ]);
-
-        $this->promptService->method('getPromptWithMetadata')->willReturn([
-            'metadata' => ['tool_internet' => false],
-        ]);
-
-        $this->messageSorter->expects($this->never())->method('classify');
-
-        $result = $this->router->route(['BTEXT' => 'Hello, how are you?'], [], 1);
-
-        $this->assertSame('general', $result['topic']);
-        $this->assertStringStartsWith('synapse_', $result['source']);
-    }
-
-    /**
-     * Topic alias resolution — granular `coding` topic produced by Tier-1
-     * must be mapped to canonical `general` for downstream handlers, while
-     * `granular_topic` keeps the original for analytics.
-     */
-    public function testGranularCodingTopicIsAliasedToGeneral(): void
-    {
-        $this->modelConfigService->method('getDefaultModel')->willReturn(null);
-        $this->promptRepository->method('findPromptsWithSelectionRules')->willReturn([]);
-
-        $this->aiFacade->method('embed')->willReturn([
-            'embedding' => array_fill(0, 1024, 0.1),
-            'usage' => ['prompt_tokens' => 10, 'total_tokens' => 10],
-        ]);
-
-        $this->qdrantClient->method('searchSynapseTopics')->willReturn([
-            [
-                'id' => 'synapse_0_coding',
-                'score' => 0.88,
-                'payload' => ['topic' => 'coding', 'owner_id' => 0],
-            ],
-        ]);
-
-        $this->promptService->method('getPromptWithMetadata')->willReturn([
-            'metadata' => ['tool_internet' => false],
-        ]);
-
-        $result = $this->router->route(['BTEXT' => 'How do I write a PHP loop?'], [], 1);
-
-        $this->assertSame('general', $result['topic']);
-        $this->assertSame('coding', $result['granular_topic']);
-    }
-
-    /**
-     * `image-generation` ─► `mediamaker` with implied media=image. The router
-     * must skip its own media-detection heuristics in this case.
-     *
-     * Updated for #878: the media-intent guard now requires the user's
-     * text to pair a creation verb with a media noun before Tier-1 can
-     * route to a granular media topic, so the message text below contains
-     * an unambiguous "create an image of …" cue.
-     */
-    public function testGranularImageGenerationTopicSetsMediaImage(): void
-    {
-        $this->modelConfigService->method('getDefaultModel')->willReturn(null);
-        $this->promptRepository->method('findPromptsWithSelectionRules')->willReturn([]);
-
-        $this->aiFacade->method('embed')->willReturn([
-            'embedding' => array_fill(0, 1024, 0.1),
-            'usage' => ['prompt_tokens' => 10, 'total_tokens' => 10],
-        ]);
-
-        $this->qdrantClient->method('searchSynapseTopics')->willReturn([
-            [
-                'id' => 'synapse_0_image-generation',
-                'score' => 0.91,
-                'payload' => ['topic' => 'image-generation', 'owner_id' => 0],
-            ],
-        ]);
-
-        $this->promptService->method('getPromptWithMetadata')->willReturn([
-            'metadata' => [],
-        ]);
-
-        $result = $this->router->route(['BTEXT' => 'Create an image of a small black cat'], [], 1);
-
-        $this->assertSame('mediamaker', $result['topic']);
-        $this->assertSame('image-generation', $result['granular_topic']);
-        $this->assertSame('image', $result['media_type']);
-    }
-
-    /**
-     * Issue #878: a high-confidence Tier-1 hit on `video-generation` must
-     * be rejected when the user's text contains no explicit video-creation
-     * cue. The original bug report shows messages about hobbies/business
-     * ("ich beschäftige mich mit Protein shakes und möchte eine Kette
-     * öffnen…") being routed to Veo because the embedding model places
-     * them near the video-generation centroid.
-     */
-    public function testMediaIntentGuardRejectsVideoGenerationWithoutCreationCue(): void
-    {
-        $this->modelConfigService->method('getDefaultModel')->willReturn(null);
-        $this->promptRepository->method('findPromptsWithSelectionRules')->willReturn([]);
-
-        $this->aiFacade->method('embed')->willReturn([
-            'embedding' => array_fill(0, 1024, 0.1),
-            'usage' => ['prompt_tokens' => 10, 'total_tokens' => 10],
-        ]);
-
-        $this->qdrantClient->method('searchSynapseTopics')->willReturn([
-            [
-                'id' => 'synapse_0_video-generation',
-                'score' => 0.86, // well above the 0.78 threshold
-                'payload' => ['topic' => 'video-generation', 'owner_id' => 0],
-            ],
-        ]);
-
-        $this->messageSorter->expects($this->once())->method('classify')->willReturn([
-            'topic' => 'general-chat',
-            'language' => 'de',
-            'web_search' => false,
-        ]);
-
-        $result = $this->router->route(
-            ['BTEXT' => 'ich habe ein neues hobby. ich beschäftige mich mit Protein shakes und möchte eine kette öffnen'],
-            [],
-            1,
-        );
-
-        $this->assertSame('synapse_ai_fallback', $result['source']);
-        $this->assertSame('media_intent_guard', $result['synapse_fallback_reason']);
-        // The granular alias is still attached on the AI-fallback path so
-        // analytics keep parity with previous behaviour.
-        $this->assertSame('general', $result['topic']);
-    }
-
-    /**
-     * Counterpart to the guard test: a clear video-creation request must
-     * pass through to mediamaker even though the embedding score is the
-     * same as in the rejection case. Together they prove the guard
-     * doesn't break the legitimate happy path.
-     */
-    public function testMediaIntentGuardAcceptsExplicitVideoCreationRequest(): void
-    {
-        $this->modelConfigService->method('getDefaultModel')->willReturn(null);
-        $this->promptRepository->method('findPromptsWithSelectionRules')->willReturn([]);
-
-        $this->aiFacade->method('embed')->willReturn([
-            'embedding' => array_fill(0, 1024, 0.1),
-            'usage' => ['prompt_tokens' => 10, 'total_tokens' => 10],
-        ]);
-
-        $this->qdrantClient->method('searchSynapseTopics')->willReturn([
-            [
-                'id' => 'synapse_0_video-generation',
-                'score' => 0.86,
-                'payload' => ['topic' => 'video-generation', 'owner_id' => 0],
-            ],
-        ]);
-
-        $this->promptService->method('getPromptWithMetadata')->willReturn([
-            'metadata' => [],
-        ]);
-
-        $result = $this->router->route(
-            ['BTEXT' => 'erstelle ein video von einem golden retriever'],
-            [],
-            1,
-        );
-
-        $this->assertSame('mediamaker', $result['topic']);
-        $this->assertSame('video-generation', $result['granular_topic']);
-        $this->assertSame('video', $result['media_type']);
-    }
-
-    /**
-     * AI fallback can also emit granular topics — the alias resolver must
-     * be re-applied on the way out.
-     */
     public function testAiFallbackGranularTopicIsAliased(): void
     {
-        $this->modelConfigService->method('getDefaultModel')->willReturn(null);
         $this->promptRepository->method('findPromptsWithSelectionRules')->willReturn([]);
-
-        $this->aiFacade->method('embed')->willReturn([
-            'embedding' => array_fill(0, 1024, 0.1),
-            'usage' => ['prompt_tokens' => 10, 'total_tokens' => 10],
-        ]);
-
-        // No search results → AI fallback
-        $this->qdrantClient->method('searchSynapseTopics')->willReturn([]);
+        $this->routerClient->method('classify')->willReturn(null);
 
         $this->messageSorter->expects($this->once())->method('classify')->willReturn([
             'topic' => 'video-generation',
@@ -731,7 +362,7 @@ class SynapseRouterTest extends TestCase
             'web_search' => false,
         ]);
 
-        $result = $this->router->route(['BTEXT' => 'Some message'], [], 1);
+        $result = $this->router->route(['BTEXT' => 'Make a video'], [], 1);
 
         $this->assertSame('mediamaker', $result['topic']);
         $this->assertSame('video-generation', $result['granular_topic']);
@@ -739,181 +370,43 @@ class SynapseRouterTest extends TestCase
         $this->assertSame('synapse_ai_fallback', $result['source']);
     }
 
-    /**
-     * Dry-run (used by the admin "Test Routing" widget) returns the raw
-     * Top-K candidates with scores, alias targets and stale-flags
-     * WITHOUT mutating any state.
-     */
-    public function testDryRunReturnsCandidatesWithStaleAndAliasFlags(): void
+    public function testDryRunWithRouterAvailable(): void
     {
-        $this->modelConfigService->method('getDefaultModel')->willReturn(42);
-        $this->modelConfigService->method('getProviderForModel')->willReturn('cloudflare');
-        $this->modelConfigService->method('getModelName')->willReturn('bge-m3');
-
-        $this->aiFacade->method('embed')->willReturn([
-            'embedding' => array_fill(0, 1024, 0.5),
-            'usage' => ['prompt_tokens' => 5, 'total_tokens' => 5],
+        $this->routerClient->method('classify')->willReturn([
+            'use_case' => 'coding',
+            'confidence' => 0.85,
+            'is_compound' => false,
+            'steps' => [],
+            'model_version' => 'v20260528',
+            'latency_ms' => 2.1,
         ]);
 
-        $this->qdrantClient->method('searchSynapseTopics')->willReturn([
-            [
-                'id' => 'synapse_0_coding',
-                'score' => 0.81,
-                'payload' => [
-                    'topic' => 'coding',
-                    'owner_id' => 0,
-                    'embedding_model_id' => 42,
-                ],
-            ],
-            [
-                'id' => 'synapse_0_general',
-                'score' => 0.55,
-                'payload' => [
-                    'topic' => 'general',
-                    'owner_id' => 0,
-                    'embedding_model_id' => 7, // stale
-                ],
-            ],
-        ]);
-
-        // Pure read-only — sorter must NEVER be invoked
-        $this->messageSorter->expects($this->never())->method('classify');
-
-        $result = $this->router->dryRun('How do I loop in Python?', 0, 5);
+        $result = $this->router->dryRun('How do I loop in Python?', 1);
 
         $this->assertNull($result['error']);
-        $this->assertCount(2, $result['candidates']);
+        $this->assertTrue($result['router_available']);
+        $this->assertNotNull($result['classification']);
+        $this->assertSame('coding', $result['classification']['use_case']);
+        $this->assertSame('general', $result['classification']['canonical_topic']);
+        $this->assertSame('general', $result['classification']['alias_target']);
+    }
 
-        $this->assertSame('coding', $result['candidates'][0]['topic']);
-        $this->assertFalse($result['candidates'][0]['stale']);
-        $this->assertSame('general', $result['candidates'][0]['alias_target']);
+    public function testDryRunWithRouterUnavailable(): void
+    {
+        $this->routerClient->method('classify')->willReturn(null);
 
-        $this->assertSame('general', $result['candidates'][1]['topic']);
-        $this->assertTrue($result['candidates'][1]['stale']);
-        $this->assertNull($result['candidates'][1]['alias_target']);
+        $result = $this->router->dryRun('Hello world', 1);
 
-        $this->assertSame(42, $result['model']['model_id']);
-        $this->assertSame('cloudflare', $result['model']['provider']);
-        $this->assertSame('bge-m3', $result['model']['model']);
+        $this->assertNull($result['error']);
+        $this->assertFalse($result['router_available']);
+        $this->assertNull($result['classification']);
+        $this->assertSame('router_unavailable_or_disabled', $result['fallback_reason']);
     }
 
     public function testDryRunHandlesEmptyMessage(): void
     {
-        $this->modelConfigService->method('getDefaultModel')->willReturn(null);
-
-        $result = $this->router->dryRun('', 0, 5);
+        $result = $this->router->dryRun('', 1);
 
         $this->assertSame('empty_message', $result['error']);
-        $this->assertSame([], $result['candidates']);
-    }
-
-    public function testDryRunHandlesEmptyEmbedding(): void
-    {
-        $this->modelConfigService->method('getDefaultModel')->willReturn(null);
-
-        $this->aiFacade->method('embed')->willReturn([
-            'embedding' => [],
-            'usage' => ['prompt_tokens' => 0, 'total_tokens' => 0],
-        ]);
-
-        $result = $this->router->dryRun('Hello world', 0, 5);
-
-        $this->assertSame('empty_embedding', $result['error']);
-    }
-
-    /**
-     * Issue #603: When Synapse embedding routing wins, the router used to
-     * return `model_id`/`provider`/`model_name` while MessageClassifier and
-     * the rest of the pipeline read `sorting_model_id`/`sorting_provider`/
-     * `sorting_model_name` (the keys MessageSorter emits). That mismatch
-     * dropped the sorting model on the floor, so no `ai_sorting_*` meta
-     * was persisted on the outgoing message — the Sorting Model badge
-     * stayed missing in the live SSE view AND after refresh.
-     *
-     * The fix: surface the embedding model under the canonical sorting_*
-     * keys, since the embedding model IS what produced the routing
-     * decision.
-     */
-    public function testEmbeddingRoutingSurfacesEmbeddingModelUnderSortingKeys(): void
-    {
-        // Bind a non-null embedding model so `getCurrentModelInfo()`
-        // resolves to a real id/provider/name instead of the null
-        // fallback used by most other tests.
-        $this->modelConfigService->method('getDefaultModel')->willReturn(42);
-        $this->modelConfigService->method('getProviderForModel')->willReturn('cloudflare');
-        $this->modelConfigService->method('getModelName')->willReturn('bge-m3');
-        $this->modelConfigService->method('getVectorDimForModel')->willReturn(1024);
-
-        $this->promptRepository->method('findPromptsWithSelectionRules')->willReturn([]);
-        $this->promptService->method('getPromptWithMetadata')->willReturn([
-            'metadata' => ['tool_internet' => false],
-        ]);
-
-        $this->aiFacade->method('embed')->willReturn([
-            'embedding' => array_fill(0, 1024, 0.1),
-            'usage' => ['prompt_tokens' => 10, 'total_tokens' => 10],
-        ]);
-
-        $this->qdrantClient->method('searchSynapseTopics')->willReturn([
-            [
-                'id' => 'synapse_0_general',
-                'score' => 0.92,
-                'payload' => [
-                    'topic' => 'general',
-                    'owner_id' => 0,
-                    'embedding_model_id' => 42,
-                ],
-            ],
-        ]);
-
-        $this->messageSorter->expects($this->never())->method('classify');
-
-        $result = $this->router->route(['BTEXT' => 'Hello, how are you?'], [], 1);
-
-        $this->assertSame(42, $result['sorting_model_id']);
-        $this->assertSame('cloudflare', $result['sorting_provider']);
-        $this->assertSame('bge-m3', $result['sorting_model_name']);
-
-        // Sanity check: the legacy keys (`model_id`, `provider`,
-        // `model_name`) must NOT be present — they were the source of
-        // the bug and downstream consumers should fail loudly rather
-        // than silently fall back to null again.
-        $this->assertArrayNotHasKey('model_id', $result);
-        $this->assertArrayNotHasKey('provider', $result);
-        $this->assertArrayNotHasKey('model_name', $result);
-    }
-
-    /**
-     * Issue #603: rule-based routing short-circuits before any embedding
-     * or AI call, so there is no concrete sorting model to surface. Keep
-     * the keys present (so MessageClassifier sees them consistently with
-     * the embedding/fallback paths) but null.
-     */
-    public function testRuleBasedRoutingReturnsNullSortingKeys(): void
-    {
-        $rulePrompt = $this->createMock(\App\Entity\Prompt::class);
-        $rulePrompt->method('getTopic')->willReturn('support');
-        $rulePrompt->method('getSelectionRules')->willReturn('keyword:support');
-
-        $this->promptRepository->method('findPromptsWithSelectionRules')->willReturn([$rulePrompt]);
-        $this->promptService
-            ->method('matchesSelectionRules')
-            ->willReturn(true);
-        $this->promptService->method('getPromptWithMetadata')->willReturn([
-            'metadata' => ['tool_internet' => false],
-        ]);
-
-        // Embedding must not be called for a rule-based match.
-        $this->aiFacade->expects($this->never())->method('embed');
-
-        $result = $this->router->route(['BTEXT' => 'I need support please'], [], 1);
-
-        $this->assertSame('synapse_rule', $result['source']);
-        $this->assertArrayHasKey('sorting_model_id', $result);
-        $this->assertArrayHasKey('sorting_provider', $result);
-        $this->assertArrayHasKey('sorting_model_name', $result);
-        $this->assertNull($result['sorting_model_id']);
-        $this->assertNull($result['sorting_provider']);
-        $this->assertNull($result['sorting_model_name']);
     }
 }

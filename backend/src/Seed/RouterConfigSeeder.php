@@ -23,7 +23,7 @@ final readonly class RouterConfigSeeder
     private const DEFAULTS = [
         ['ownerId' => 0, 'group' => 'ROUTER', 'setting' => 'ENABLED',                         'value' => 'false'],
         ['ownerId' => 0, 'group' => 'ROUTER', 'setting' => 'SERVICE_URL',                     'value' => 'http://router:8000'],
-        ['ownerId' => 0, 'group' => 'ROUTER', 'setting' => 'CONFIDENCE_THRESHOLD',            'value' => '0.80'],
+        ['ownerId' => 0, 'group' => 'ROUTER', 'setting' => 'CONFIDENCE_THRESHOLD',            'value' => '0.70'],
         ['ownerId' => 0, 'group' => 'ROUTER', 'setting' => 'TIMEOUT_MS',                      'value' => '100'],
         ['ownerId' => 0, 'group' => 'ROUTER', 'setting' => 'CIRCUIT_BREAKER_THRESHOLD',       'value' => '3'],
         ['ownerId' => 0, 'group' => 'ROUTER', 'setting' => 'CIRCUIT_BREAKER_RESET_S',         'value' => '60'],
