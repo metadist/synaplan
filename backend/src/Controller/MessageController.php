@@ -191,10 +191,25 @@ class MessageController extends AbstractController
             // Add user message
             $contextMessages[] = ['role' => 'user', 'content' => $messageText];
 
+            // Resolve the user's default CHAT model (same logic as /enhance and
+            // ChatHandler). Without an explicit model the provider receives no
+            // model name and throws "Model must be specified in options".
+            $modelId = $this->modelConfigService->getDefaultModel('CHAT', $user->getId());
+            $provider = null;
+            $modelName = null;
+            if ($modelId) {
+                $provider = $this->modelConfigService->getProviderForModel($modelId);
+                $modelName = $this->modelConfigService->getModelName($modelId);
+            }
+
             // Use AI Facade to get response
             $aiResponse = $this->aiFacade->chat(
                 $contextMessages,
-                $user->getId()
+                $user->getId(),
+                [
+                    'provider' => $provider,
+                    'model' => $modelName,
+                ]
             );
 
             // Parse response for special content markers
@@ -245,11 +260,9 @@ class MessageController extends AbstractController
                 $outgoingMessage->setMeta('ai_chat_usage', json_encode($aiResponse['usage']));
             }
 
-            // Record usage with full metadata.
-            // AiFacade::chat() does not return model_id, so resolve it
-            // from the user's DEFAULTMODEL config (same logic the facade
-            // itself uses to select the provider/model).
-            $resolvedModelId = $this->modelConfigService->getDefaultModel('CHAT', $user->getId());
+            // Record usage with full metadata. Reuse the model id resolved
+            // above (same DEFAULTMODEL/CHAT lookup the facade uses).
+            $resolvedModelId = $modelId;
 
             $this->rateLimitService->recordUsage($user, 'MESSAGES', [
                 'provider' => $aiResponse['provider'] ?? 'unknown',
@@ -275,18 +288,29 @@ class MessageController extends AbstractController
                 'provider' => $aiResponse['provider'] ?? 'test',
             ]);
 
+            $messagePayload = [
+                'id' => $outgoingMessage->getId(),
+                'text' => $outgoingMessage->getText(),
+                'hasFile' => (bool) $outgoingMessage->getFile(),
+                'filePath' => $outgoingMessage->getFilePath(),
+                'fileType' => $outgoingMessage->getFileType(),
+                'provider' => $outgoingMessage->getProviderIndex(),
+                'timestamp' => $outgoingMessage->getUnixTimestamp(),
+                'trackId' => $outgoingMessage->getTrackingId(),
+                'topic' => $incomingMessage->getTopic(),
+            ];
+
             return $this->json([
                 'success' => true,
-                'message' => [
-                    'id' => $outgoingMessage->getId(),
-                    'text' => $outgoingMessage->getText(),
-                    'hasFile' => (bool) $outgoingMessage->getFile(),
-                    'filePath' => $outgoingMessage->getFilePath(),
-                    'fileType' => $outgoingMessage->getFileType(),
-                    'provider' => $outgoingMessage->getProviderIndex(),
-                    'timestamp' => $outgoingMessage->getUnixTimestamp(),
-                    'trackId' => $outgoingMessage->getTrackingId(),
-                    'topic' => $incomingMessage->getTopic(),
+                // `message` kept for backward compatibility; `outgoingMessage`
+                // and `incomingMessage` match the OpenAPI schema and are what
+                // API clients (e.g. the Outlook add-in) read.
+                'message' => $messagePayload,
+                'outgoingMessage' => $messagePayload,
+                'incomingMessage' => [
+                    'id' => $incomingMessage->getId(),
+                    'text' => $incomingMessage->getText(),
+                    'trackId' => $incomingMessage->getTrackingId(),
                 ],
             ]);
         } catch (\Exception $e) {
