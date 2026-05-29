@@ -512,6 +512,13 @@ final readonly class SystemConfigService
                 CURLOPT_TIMEOUT => 5,
                 CURLOPT_CONNECTTIMEOUT => 3,
             ]);
+
+            // Send HTTP Basic Auth when Tika is protected (same pattern as TikaClient)
+            $httpUser = $this->getEnvValue('TIKA_HTTP_USER');
+            if (!empty($httpUser)) {
+                curl_setopt($ch, CURLOPT_USERPWD, $httpUser.':'.($this->getEnvValue('TIKA_HTTP_PASS') ?? ''));
+            }
+
             $response = curl_exec($ch);
             $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
             curl_close($ch);

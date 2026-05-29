@@ -1272,14 +1272,20 @@ class ConfigController extends AbstractController
 
         // Apache Tika (Document Processing)
         $tikaUrl = $_ENV['TIKA_BASE_URL'] ?? 'http://tika:9998';
-        $tikaHealthy = $this->checkServiceHealth($tikaUrl.'/tika');
+        $tikaHttpUser = $_ENV['TIKA_HTTP_USER'] ?? null;
+        $tikaHttpPass = $_ENV['TIKA_HTTP_PASS'] ?? null;
+        $tikaHealthy = $this->checkServiceHealth($tikaUrl.'/tika', $tikaHttpUser, $tikaHttpPass);
 
         // Try to get Tika version
         $tikaVersion = '';
         if ($tikaHealthy) {
             try {
+                $versionHttpOptions = ['timeout' => 2];
+                if (!empty($tikaHttpUser)) {
+                    $versionHttpOptions['header'] = 'Authorization: Basic '.base64_encode($tikaHttpUser.':'.($tikaHttpPass ?? ''));
+                }
                 $versionResponse = @file_get_contents($tikaUrl.'/version', false, stream_context_create([
-                    'http' => ['timeout' => 2],
+                    'http' => $versionHttpOptions,
                 ]));
                 if ($versionResponse) {
                     $tikaVersion = trim($versionResponse);
@@ -1404,15 +1410,21 @@ class ConfigController extends AbstractController
     /**
      * Check if a service is healthy by making a simple HTTP request.
      */
-    private function checkServiceHealth(string $url): bool
+    private function checkServiceHealth(string $url, ?string $httpUser = null, ?string $httpPass = null): bool
     {
         try {
-            $context = stream_context_create([
-                'http' => [
-                    'timeout' => 2,
-                    'ignore_errors' => true,
-                ],
-            ]);
+            $httpOptions = [
+                'timeout' => 2,
+                'ignore_errors' => true,
+            ];
+
+            // Send HTTP Basic Auth when the service is protected (e.g. Tika)
+            if (!empty($httpUser)) {
+                $credentials = base64_encode($httpUser.':'.($httpPass ?? ''));
+                $httpOptions['header'] = 'Authorization: Basic '.$credentials;
+            }
+
+            $context = stream_context_create(['http' => $httpOptions]);
 
             $response = @file_get_contents($url, false, $context);
 
@@ -1425,7 +1437,12 @@ class ConfigController extends AbstractController
                 preg_match('/\d{3}/', $http_response_header[0], $matches);
                 $statusCode = isset($matches[0]) ? (int) $matches[0] : 0;
 
-                return $statusCode >= 200 && $statusCode < 500; // Accept 2xx, 3xx, 4xx (not 5xx)
+                // Auth failures mean the service is misconfigured/unreachable for us
+                if (401 === $statusCode || 403 === $statusCode) {
+                    return false;
+                }
+
+                return $statusCode >= 200 && $statusCode < 500; // Accept 2xx, 3xx, other 4xx (not 5xx)
             }
 
             return true;
