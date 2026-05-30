@@ -579,6 +579,12 @@ services:
     App\Service\RAG\VectorStorage\VectorStorageInterface:
         alias: App\Service\RAG\VectorStorage\VectorStorageFacade
 
+    # Widget real-time event store (SSE backing).
+    # DB-backed (Galera-replicated) so events are visible cluster-wide; swap this
+    # alias to a Redis implementation when introduced.
+    App\Service\WidgetEventStoreInterface:
+        alias: App\Service\DatabaseWidgetEventStore
+
 # TestProvider: mock AI for dev/test only. Not registered in prod.
 # Duplicated because Symfony when@ blocks don't support when@dev,test.
 when@dev:

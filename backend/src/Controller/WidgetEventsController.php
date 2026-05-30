@@ -7,7 +7,7 @@ namespace App\Controller;
 use App\Entity\User;
 use App\Repository\WidgetRepository;
 use App\Repository\WidgetSessionRepository;
-use App\Service\WidgetEventCacheService;
+use App\Service\WidgetEventStoreInterface;
 use OpenApi\Attributes as OA;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
@@ -29,7 +29,7 @@ class WidgetEventsController extends AbstractController
     public function __construct(
         private WidgetRepository $widgetRepository,
         private WidgetSessionRepository $sessionRepository,
-        private WidgetEventCacheService $eventCache,
+        private WidgetEventStoreInterface $eventCache,
     ) {
     }
 
