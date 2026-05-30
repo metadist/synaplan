@@ -45,10 +45,11 @@ final readonly class DatabaseWidgetEventStore implements WidgetEventStoreInterfa
         $this->maybePurge($now);
     }
 
-    public function getNewEvents(string $widgetId, string $sessionId, int $lastEventId = 0): array
+    public function getNewEvents(string $widgetId, string $sessionId, int $lastEventId = 0, int $graceSeconds = 0): array
     {
         $now = time();
-        $events = $this->events->findStreamEventsSince($widgetId, $sessionId, $lastEventId, $now);
+        $graceCutoff = $graceSeconds > 0 ? $now - $graceSeconds : 0;
+        $events = $this->events->findStreamEventsSince($widgetId, $sessionId, $lastEventId, $now, $graceCutoff);
 
         return array_map(static fn (WidgetEvent $e): array => [
             'id' => (int) $e->getId(),

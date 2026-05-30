@@ -39,31 +39,42 @@ class WidgetEventRepository extends ServiceEntityRepository
      *
      * Ordered by the auto-increment id. Under Galera, ids are assigned per node
      * (interleaved offsets), so id order is not a strict commit order — a row
-     * committed slightly later on another node could carry a lower id. For a
-     * 1:1 takeover chat, simultaneous cross-node writes to the *same* session
-     * are rare, and consumers de-duplicate by message id and reconcile against
-     * persisted history on reconnect, so this is safe for the interim DB
-     * transport. A Redis stream will remove the caveat entirely.
+     * committed slightly later on another node can carry a *lower* id than one
+     * already read, and a pure `id > lastEventId` cursor would skip it forever.
+     *
+     * To close that gap, callers pass a $graceCutoff (unix seconds): in addition
+     * to `id > lastEventId`, we also return any non-expired row created within
+     * the grace window, regardless of id. The commit-order gap on Galera is
+     * sub-second, so a small window covers it. The SSE loop de-duplicates by id
+     * before echoing, so a re-scanned row is delivered exactly once. Pass
+     * $graceCutoff = 0 to disable (strict `id >` semantics).
      *
      * @return list<WidgetEvent>
      */
-    public function findStreamEventsSince(string $widgetId, string $sessionId, int $lastEventId, int $now): array
+    public function findStreamEventsSince(string $widgetId, string $sessionId, int $lastEventId, int $now, int $graceCutoff = 0): array
     {
-        /** @var list<WidgetEvent> $result */
-        $result = $this->createQueryBuilder('e')
+        $qb = $this->createQueryBuilder('e')
             ->where('e.widgetId = :widgetId')
             ->andWhere('e.sessionId = :sessionId')
-            ->andWhere('e.id > :lastEventId')
             ->andWhere('e.type != :typing')
             ->andWhere('e.expires > :now')
             ->setParameter('widgetId', $widgetId)
             ->setParameter('sessionId', $sessionId)
-            ->setParameter('lastEventId', $lastEventId)
             ->setParameter('typing', self::OPERATOR_TYPING_TYPE)
             ->setParameter('now', $now)
-            ->orderBy('e.id', 'ASC')
-            ->getQuery()
-            ->getResult();
+            ->orderBy('e.id', 'ASC');
+
+        if ($graceCutoff > 0) {
+            $qb->andWhere('(e.id > :lastEventId OR e.created >= :graceCutoff)')
+                ->setParameter('lastEventId', $lastEventId)
+                ->setParameter('graceCutoff', $graceCutoff);
+        } else {
+            $qb->andWhere('e.id > :lastEventId')
+                ->setParameter('lastEventId', $lastEventId);
+        }
+
+        /** @var list<WidgetEvent> $result */
+        $result = $qb->getQuery()->getResult();
 
         return $result;
     }

@@ -28,9 +28,14 @@ interface WidgetEventStoreInterface
     /**
      * Get events for a session newer than $lastEventId.
      *
+     * When $graceSeconds > 0, also returns non-expired events created within the
+     * last $graceSeconds regardless of id, so a late-committed lower-id event on
+     * another cluster node is not skipped by the id cursor. Callers must
+     * de-duplicate by id (see the SSE loop in WidgetEventsController).
+     *
      * @return list<array{id: int, type: string, timestamp: int, payload: array<string, mixed>}>
      */
-    public function getNewEvents(string $widgetId, string $sessionId, int $lastEventId = 0): array;
+    public function getNewEvents(string $widgetId, string $sessionId, int $lastEventId = 0, int $graceSeconds = 0): array;
 
     /**
      * Highest event id currently stored for a session (0 if none).

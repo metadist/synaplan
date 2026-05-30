@@ -83,6 +83,15 @@ class WidgetEventsController extends AbstractController
             $currentLastEventId = $lastEventId;
             $lastTypingTimestamp = 0;
 
+            // Grace window for the id cursor: under Galera, an event can be
+            // committed on another node with a lower id than one we already read.
+            // We re-scan events created in the last $graceSeconds (regardless of
+            // id) and de-duplicate by id here so each is echoed exactly once,
+            // closing the "skipped lower-id event" gap without a real stream.
+            $graceSeconds = 15;
+            /** @var array<int, int> $sentEventIds id => created timestamp */
+            $sentEventIds = [];
+
             // Send initial connection event
             echo "event: connected\n";
             echo "data: {\"status\":\"connected\"}\n\n";
@@ -100,10 +109,14 @@ class WidgetEventsController extends AbstractController
                     break;
                 }
 
-                // Get new events from cache
-                $events = $eventCache->getNewEvents($widgetId, $sessionId, $currentLastEventId);
+                // Get new events (with grace re-scan to catch late cross-node writes)
+                $events = $eventCache->getNewEvents($widgetId, $sessionId, $currentLastEventId, $graceSeconds);
 
                 foreach ($events as $event) {
+                    if (isset($sentEventIds[$event['id']])) {
+                        continue; // already delivered on this connection
+                    }
+
                     $data = [
                         'type' => $event['type'],
                         ...$event['payload'],
@@ -114,7 +127,19 @@ class WidgetEventsController extends AbstractController
                     echo 'data: '.json_encode($data, JSON_UNESCAPED_UNICODE)."\n\n";
                     flush();
 
-                    $currentLastEventId = $event['id'];
+                    $sentEventIds[$event['id']] = $event['timestamp'];
+                    if ($event['id'] > $currentLastEventId) {
+                        $currentLastEventId = $event['id'];
+                    }
+                }
+
+                // Bound memory: forget delivered ids once they fall outside the
+                // grace window (they can no longer be re-scanned).
+                $pruneBefore = time() - $graceSeconds - $checkInterval;
+                foreach ($sentEventIds as $id => $createdAt) {
+                    if ($createdAt < $pruneBefore) {
+                        unset($sentEventIds[$id]);
+                    }
                 }
 
                 // Check for typing indicator
