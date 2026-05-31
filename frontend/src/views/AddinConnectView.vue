@@ -428,11 +428,17 @@ async function bootstrap(): Promise<void> {
     await authReady
 
     if (!authStore.isAuthenticated) {
-      // Stash in sessionStorage too: a social-provider OAuth round-trip
-      // would otherwise drop the `redirect` query and strand the user.
-      const redirect =
-        `/addin/connect?state=${encodeURIComponent(stateNonce.value)}` +
-        `&baseUrl=${encodeURIComponent(targetBaseUrl.value)}`
+      // Preserve the ENTIRE original query (state, label, baseUrl, AND the
+      // add-in relay `redirect` target) across the login round-trip.
+      // Reconstructing only a subset previously DROPPED the `redirect` param,
+      // which made the post-Connect handshake fall back to a cross-origin
+      // messageParent — silently dropped by Outlook desktop — so the dialog
+      // reported success but never closed. Using route.fullPath keeps every
+      // param intact and is regression-proof against future param additions.
+      // See Synamail/docs/AUTH_FLOW.md ("login round-trip must preserve redirect").
+      const redirect = route.fullPath
+      // Stash in sessionStorage too: a social-provider OAuth round-trip would
+      // otherwise drop the `redirect` query and strand the user.
       setPendingRedirect(redirect)
       void router.push({ path: '/login', query: { redirect } })
       return
