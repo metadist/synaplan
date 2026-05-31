@@ -26,6 +26,19 @@ use Symfony\Component\Security\Http\Attribute\CurrentUser;
 #[OA\Tag(name: 'Widget Events')]
 class WidgetEventsController extends AbstractController
 {
+    /**
+     * Grace window (seconds) for the session-stream id cursor. Under Galera, an
+     * event can be committed on another node with a lower id than one already
+     * read, which a strict `id > lastEventId` cursor would skip forever. Both
+     * the SSE loop and the polling fallback re-scan events created within this
+     * window regardless of id; clients de-duplicate by message id. The
+     * cross-node commit-order gap is sub-second, so a small window covers it.
+     *
+     * Scoped to the session stream only — the notification stream keeps strict
+     * id semantics.
+     */
+    private const SESSION_STREAM_GRACE_SECONDS = 15;
+
     public function __construct(
         private WidgetRepository $widgetRepository,
         private WidgetSessionRepository $sessionRepository,
@@ -88,7 +101,7 @@ class WidgetEventsController extends AbstractController
             // We re-scan events created in the last $graceSeconds (regardless of
             // id) and de-duplicate by id here so each is echoed exactly once,
             // closing the "skipped lower-id event" gap without a real stream.
-            $graceSeconds = 15;
+            $graceSeconds = self::SESSION_STREAM_GRACE_SECONDS;
             /** @var array<int, int> $sentEventIds id => created timestamp */
             $sentEventIds = [];
 
@@ -213,8 +226,11 @@ class WidgetEventsController extends AbstractController
 
         $lastEventId = (int) $request->query->get('lastEventId', 0);
 
-        // Get new events from cache
-        $events = $this->eventCache->getNewEvents($widgetId, $sessionId, $lastEventId);
+        // Same grace re-scan as the SSE path so the polling fallback doesn't
+        // skip late cross-node writes. Stateless polls can't de-dup per
+        // connection, but clients de-duplicate by message id and the watermark
+        // below only ever advances (max), so re-delivered events are harmless.
+        $events = $this->eventCache->getNewEvents($widgetId, $sessionId, $lastEventId, self::SESSION_STREAM_GRACE_SECONDS);
 
         $eventData = [];
         $newLastEventId = $lastEventId;
