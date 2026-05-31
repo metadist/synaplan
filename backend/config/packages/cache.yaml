@@ -20,10 +20,8 @@ framework:
             cache.user_config:
                 adapter: cache.adapter.filesystem
                 default_lifetime: 1800
-            
-            # Widget events cache (replaces BWIDGET_EVENTS table)
-            # All real-time events (takeover, handback, message, typing, notification)
-            # Events auto-expire after 10 minutes (enough for reconnects)
-            cache.widget_events:
-                adapter: cache.adapter.filesystem
-                default_lifetime: 600
+
+            # NOTE: Widget real-time events are no longer cache-backed. A node-local
+            # filesystem cache is invisible to other nodes behind the load balancer,
+            # which dropped operator/visitor messages until a reload. They now live in
+            # the Galera-replicated BWIDGET_EVENTS table via DatabaseWidgetEventStore.

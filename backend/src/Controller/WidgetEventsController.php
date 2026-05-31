@@ -7,7 +7,7 @@ namespace App\Controller;
 use App\Entity\User;
 use App\Repository\WidgetRepository;
 use App\Repository\WidgetSessionRepository;
-use App\Service\WidgetEventCacheService;
+use App\Service\WidgetEventStoreInterface;
 use OpenApi\Attributes as OA;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
@@ -26,10 +26,23 @@ use Symfony\Component\Security\Http\Attribute\CurrentUser;
 #[OA\Tag(name: 'Widget Events')]
 class WidgetEventsController extends AbstractController
 {
+    /**
+     * Grace window (seconds) for the session-stream id cursor. Under Galera, an
+     * event can be committed on another node with a lower id than one already
+     * read, which a strict `id > lastEventId` cursor would skip forever. Both
+     * the SSE loop and the polling fallback re-scan events created within this
+     * window regardless of id; clients de-duplicate by message id. The
+     * cross-node commit-order gap is sub-second, so a small window covers it.
+     *
+     * Scoped to the session stream only — the notification stream keeps strict
+     * id semantics.
+     */
+    private const SESSION_STREAM_GRACE_SECONDS = 15;
+
     public function __construct(
         private WidgetRepository $widgetRepository,
         private WidgetSessionRepository $sessionRepository,
-        private WidgetEventCacheService $eventCache,
+        private WidgetEventStoreInterface $eventCache,
     ) {
     }
 
@@ -83,6 +96,15 @@ class WidgetEventsController extends AbstractController
             $currentLastEventId = $lastEventId;
             $lastTypingTimestamp = 0;
 
+            // Grace window for the id cursor: under Galera, an event can be
+            // committed on another node with a lower id than one we already read.
+            // We re-scan events created in the last $graceSeconds (regardless of
+            // id) and de-duplicate by id here so each is echoed exactly once,
+            // closing the "skipped lower-id event" gap without a real stream.
+            $graceSeconds = self::SESSION_STREAM_GRACE_SECONDS;
+            /** @var array<int, int> $sentEventIds id => created timestamp */
+            $sentEventIds = [];
+
             // Send initial connection event
             echo "event: connected\n";
             echo "data: {\"status\":\"connected\"}\n\n";
@@ -100,10 +122,14 @@ class WidgetEventsController extends AbstractController
                     break;
                 }
 
-                // Get new events from cache
-                $events = $eventCache->getNewEvents($widgetId, $sessionId, $currentLastEventId);
+                // Get new events (with grace re-scan to catch late cross-node writes)
+                $events = $eventCache->getNewEvents($widgetId, $sessionId, $currentLastEventId, $graceSeconds);
 
                 foreach ($events as $event) {
+                    if (isset($sentEventIds[$event['id']])) {
+                        continue; // already delivered on this connection
+                    }
+
                     $data = [
                         'type' => $event['type'],
                         ...$event['payload'],
@@ -114,7 +140,19 @@ class WidgetEventsController extends AbstractController
                     echo 'data: '.json_encode($data, JSON_UNESCAPED_UNICODE)."\n\n";
                     flush();
 
-                    $currentLastEventId = $event['id'];
+                    $sentEventIds[$event['id']] = $event['timestamp'];
+                    if ($event['id'] > $currentLastEventId) {
+                        $currentLastEventId = $event['id'];
+                    }
+                }
+
+                // Bound memory: forget delivered ids once they fall outside the
+                // grace window (they can no longer be re-scanned).
+                $pruneBefore = time() - $graceSeconds - $checkInterval;
+                foreach ($sentEventIds as $id => $createdAt) {
+                    if ($createdAt < $pruneBefore) {
+                        unset($sentEventIds[$id]);
+                    }
                 }
 
                 // Check for typing indicator
@@ -188,8 +226,11 @@ class WidgetEventsController extends AbstractController
 
         $lastEventId = (int) $request->query->get('lastEventId', 0);
 
-        // Get new events from cache
-        $events = $this->eventCache->getNewEvents($widgetId, $sessionId, $lastEventId);
+        // Same grace re-scan as the SSE path so the polling fallback doesn't
+        // skip late cross-node writes. Stateless polls can't de-dup per
+        // connection, but clients de-duplicate by message id and the watermark
+        // below only ever advances (max), so re-delivered events are harmless.
+        $events = $this->eventCache->getNewEvents($widgetId, $sessionId, $lastEventId, self::SESSION_STREAM_GRACE_SECONDS);
 
         $eventData = [];
         $newLastEventId = $lastEventId;

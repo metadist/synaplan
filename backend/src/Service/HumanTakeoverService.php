@@ -26,7 +26,7 @@ final readonly class HumanTakeoverService
         private WidgetSessionRepository $sessionRepository,
         private ChatRepository $chatRepository,
         private FileRepository $fileRepository,
-        private WidgetEventCacheService $eventCache,
+        private WidgetEventStoreInterface $eventCache,
         private LoggerInterface $logger,
     ) {
     }

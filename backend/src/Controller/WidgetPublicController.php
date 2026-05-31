@@ -20,7 +20,7 @@ use App\Service\PromptService;
 use App\Service\RateLimitService;
 use App\Service\SlackNotificationService;
 use App\Service\UrlContentService;
-use App\Service\WidgetEventCacheService;
+use App\Service\WidgetEventStoreInterface;
 use App\Service\WidgetService;
 use App\Service\WidgetSessionService;
 use Doctrine\ORM\EntityManagerInterface;
@@ -56,7 +56,7 @@ class WidgetPublicController extends AbstractController
         private ChatRepository $chatRepository,
         private MessageRepository $messageRepository,
         private FileRepository $fileRepository,
-        private WidgetEventCacheService $eventCache,
+        private WidgetEventStoreInterface $eventCache,
         private EntityManagerInterface $em,
         private LoggerInterface $logger,
         private DiscordNotificationService $discord,

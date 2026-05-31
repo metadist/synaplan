@@ -1741,29 +1741,40 @@ const sendMessage = async () => {
     return
 
   sendingMessage.value = true
+  // Capture the session that initiated this send. `selectedSession` is reactive and
+  // the operator may switch sessions while the request is in flight; mutating
+  // whatever happens to be selected *after* the await would write this message into
+  // the wrong conversation. Snapshot the target (and the files) up front.
+  const targetSession = selectedSession.value
+  const targetSessionId = targetSession.sessionId
+  const filesToSend = [...selectedFiles.value]
   try {
     // Upload files first if any
     let fileIds: number[] = []
-    if (selectedFiles.value.length > 0) {
+    if (filesToSend.length > 0) {
       fileIds = await uploadFiles()
     }
 
-    if (selectedSession.value.mode === 'internal') {
+    if (targetSession.mode === 'internal') {
       await sendInternalMessage(messageText.value.trim(), fileIds)
     } else {
       const outgoingText = messageText.value.trim() || t('widgetSessions.fileAttached')
       const result = await widgetSessionsApi.sendHumanMessage(
         widgetId.value,
-        selectedSession.value.sessionId,
+        targetSessionId,
         outgoingText,
         fileIds
       )
 
-      // Render the operator's own message immediately. We use the real message id
-      // returned by the API so the subsequent SSE echo is de-duplicated by
-      // handleSessionEvent() instead of being appended a second time.
-      if (result?.messageId && !sessionMessages.value.some((m) => m.id === result.messageId)) {
-        const optimisticFiles: widgetSessionsApi.SessionMessageFile[] = selectedFiles.value.map(
+      // Only render optimistically if the operator is still viewing the session we
+      // sent to. If they navigated away, the message is safely persisted and shows
+      // via SSE / on reload of the target session.
+      if (
+        selectedSession.value === targetSession &&
+        result?.messageId &&
+        !sessionMessages.value.some((m) => m.id === result.messageId)
+      ) {
+        const optimisticFiles: widgetSessionsApi.SessionMessageFile[] = filesToSend.map(
           (file, index) => ({
             id: fileIds[index],
             filename: file.name,
@@ -1779,19 +1790,20 @@ const sendMessage = async () => {
           sender: 'human',
           files: optimisticFiles.length > 0 ? optimisticFiles : undefined,
         })
-
-        const previewText = outgoingText.substring(0, 100)
-        selectedSession.value.lastMessagePreview = previewText
-        const sessionIndex = sessions.value.findIndex((s) => s.id === selectedSession.value?.id)
-        if (sessionIndex !== -1) {
-          sessions.value[sessionIndex].lastMessagePreview = previewText
-        }
         nextTick(() => scrollToBottom())
       }
 
-      if (selectedSession.value.mode === 'waiting') {
-        selectedSession.value.mode = 'human'
-        const sessionIndex = sessions.value.findIndex((s) => s.id === selectedSession.value?.id)
+      // The mode/preview transition applies to the originating session regardless of
+      // what is currently selected (it's keyed off the captured `targetSession`).
+      const previewText = outgoingText.substring(0, 100)
+      targetSession.lastMessagePreview = previewText
+      const sessionIndex = sessions.value.findIndex((s) => s.id === targetSession.id)
+      if (sessionIndex !== -1) {
+        sessions.value[sessionIndex].lastMessagePreview = previewText
+      }
+
+      if (targetSession.mode === 'waiting') {
+        targetSession.mode = 'human'
         if (sessionIndex !== -1) {
           sessions.value[sessionIndex].mode = 'human'
         }
@@ -1800,10 +1812,13 @@ const sendMessage = async () => {
       }
     }
 
-    // Clear state
-    messageText.value = ''
-    selectedFiles.value = []
-    uploadedFileIds.value = []
+    // Clear the composer only if still on the originating session, so we don't wipe
+    // a draft the operator started after switching to a different session.
+    if (selectedSession.value === targetSession) {
+      messageText.value = ''
+      selectedFiles.value = []
+      uploadedFileIds.value = []
+    }
   } catch (err: unknown) {
     error(err instanceof Error ? err.message : t('widgetSessions.sendFailed'))
   } finally {

@@ -10,7 +10,7 @@ use App\Repository\ChatRepository;
 use App\Repository\MessageRepository;
 use App\Repository\WidgetRepository;
 use App\Repository\WidgetSessionRepository;
-use App\Service\WidgetEventCacheService;
+use App\Service\WidgetEventStoreInterface;
 use App\Service\WidgetService;
 use App\Service\WidgetSessionService;
 use Doctrine\ORM\EntityManagerInterface;
@@ -38,7 +38,7 @@ class WidgetSessionController extends AbstractController
         private ChatRepository $chatRepository,
         private MessageRepository $messageRepository,
         private LoggerInterface $logger,
-        private WidgetEventCacheService $eventCache,
+        private WidgetEventStoreInterface $eventCache,
         private EntityManagerInterface $em,
         private WidgetService $widgetService,
         private WidgetSessionService $sessionService,
