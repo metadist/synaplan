@@ -1852,6 +1852,17 @@
     "uploadSuccess": "{count} Datei(en) erfolgreich hochgeladen",
     "uploadCancelled": "Upload abgebrochen",
     "uploadInterrupted": "Übertragung unterbrochen. Die Liste wurde aktualisiert — Dateien, die den Server schon erreicht hatten, können weiterhin erscheinen.",
+    "uploadSlow": "dauert länger als gewöhnlich…",
+    "uploadFailed": {
+      "transfer_stalled": "{filename}: Upload bei {percent}% stehengeblieben — die Verbindung hat aufgehört, Daten zu senden, bevor die Datei den Server erreicht hat. Meist liegt das an einer abgebrochenen Verbindung oder einem Größen-/Timeout-Limit eines Proxys. Bitte Verbindung prüfen und erneut versuchen; wenn es weiterhin fehlschlägt, ist die Datei möglicherweise zu groß für das aktuelle Serverlimit.",
+      "server_timeout": "{filename}: Die Datei wurde hochgeladen, aber der Server hat nicht rechtzeitig geantwortet. Sie wurde möglicherweise trotzdem gespeichert — bitte einen Moment warten und die Liste prüfen, bevor Sie es erneut versuchen.",
+      "too_large": "{filename}: Der Server hat diese Datei als zu groß abgelehnt. Bitte eine kleinere Datei verwenden oder die/den Administrator:in bitten, das Upload-Limit zu erhöhen.",
+      "gateway": "{filename}: Der Server ist vorübergehend nicht erreichbar (Fehler {status}). Bitte in einem Moment erneut versuchen.",
+      "server_error": "{filename}: Beim Speichern dieser Datei ist auf dem Server ein Fehler aufgetreten (Fehler {status}). Bitte erneut versuchen.",
+      "network": "{filename}: Die Verbindung wurde während des Uploads unterbrochen. Bitte Netzwerk prüfen und erneut versuchen.",
+      "invalid_response": "{filename}: Der Server hat eine unerwartete Antwort zurückgegeben. Bitte erneut versuchen.",
+      "http_error": "{filename}: Upload fehlgeschlagen (Fehler {status}). Bitte erneut versuchen."
+    },
     "uploadBlocked": {
       "storage_exceeded": "{filename}: Nicht genug Speicherplatz. {message}",
       "file_too_large": "{filename}: Datei ist zu groß. {message}",

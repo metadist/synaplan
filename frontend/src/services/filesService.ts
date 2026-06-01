@@ -65,13 +65,77 @@ export interface UploadFileOptions {
   groupKey?: string
   processLevel?: 'store' | 'extract' | 'vectorize' | 'full'
   onProgress?: (progress: UploadProgress) => void
+  /**
+   * Phase transitions during a single batch transfer. Lets the UI show
+   * actionable hints ("taking longer than usual…", "saving on server…")
+   * instead of a frozen percentage. Optional — callers that don't care can
+   * omit it.
+   */
+  onPhase?: (phase: UploadPhase) => void
   signal?: AbortSignal
+  /**
+   * Abort the transfer if NO upload-progress event fires for this many ms
+   * while the request body is still being sent. This is the guard against
+   * the "stuck at 89% forever" failure where a proxy / body-size / timeout
+   * limit silently stops draining the body (the request never reaches PHP,
+   * so no error ever comes back). A live connection always emits progress,
+   * so a genuinely slow-but-working upload is never cut off. Default 45s.
+   */
+  stallTimeoutMs?: number
+  /**
+   * Emit a 'slow' phase (soft, non-fatal warning) if no upload progress
+   * fires for this many ms — earlier than {@link stallTimeoutMs} — so the
+   * UI can reassure the user before we give up. Default 10s.
+   */
+  slowWarningMs?: number
+  /**
+   * Abort if the server sends no response within this many ms AFTER the
+   * body is fully uploaded. Defaults to disabled (undefined) because
+   * synchronous `vectorize`/`full` uploads can legitimately take minutes.
+   * Callers that only `store` (fast) should pass a tight value so a hung
+   * backend surfaces an error instead of spinning forever.
+   */
+  serverTimeoutMs?: number
 }
+
+export type UploadPhase = 'uploading' | 'slow' | 'finishing'
 
 export interface UploadProgress {
   loaded: number
   total: number
   percentage: number
+}
+
+/**
+ * Why an upload failed, in machine-readable form, so the UI can show a
+ * specific, localized, secret-free message + a remediation hint instead of
+ * a raw status code or — worse — nothing at all.
+ */
+export type UploadFailureCode =
+  | 'too_large' // 413 — file/body exceeds a server or proxy limit
+  | 'gateway' // 502 / 503 / 504 — LB or backend node unavailable
+  | 'server_error' // other 5xx
+  | 'network' // connection dropped / DNS / TLS (xhr error, status 0)
+  | 'transfer_stalled' // body stopped draining mid-flight (the 89% case)
+  | 'server_timeout' // body sent, backend never answered
+  | 'invalid_response' // 2xx but body wasn't valid JSON
+  | 'http_error' // any other non-2xx with a parseable message
+
+/**
+ * UploadFailedError — a transfer-level failure with a classified reason.
+ * Carries the HTTP status (when there was one) and the percentage reached
+ * so the UI can tell the user *where* it broke without leaking any payload.
+ */
+export class UploadFailedError extends Error {
+  constructor(
+    public readonly code: UploadFailureCode,
+    message: string,
+    public readonly status?: number,
+    public readonly percentReached?: number
+  ) {
+    super(message)
+    this.name = 'UploadFailedError'
+  }
 }
 
 export interface UploadedFile {
@@ -217,6 +281,46 @@ export const uploadFiles = async (options: UploadFileOptions): Promise<UploadRes
 }
 
 /**
+ * Classify a non-2xx XHR response into an {@link UploadFailedError} with a
+ * machine-readable code, preferring the backend's JSON `error` message when
+ * present (e.g. the max_file_uploads 413) and falling back to a clear,
+ * status-derived message when a proxy returns non-JSON (e.g. an HTML 413/502).
+ */
+const buildHttpError = (xhr: XMLHttpRequest): UploadFailedError => {
+  let serverMessage = ''
+  try {
+    const parsed = JSON.parse(xhr.responseText)
+    if (parsed && typeof parsed.error === 'string') serverMessage = parsed.error
+  } catch {
+    // Non-JSON body (proxy/HTML error page) — fall back to status mapping.
+  }
+
+  const status = xhr.status
+  if (status === 413) {
+    return new UploadFailedError(
+      'too_large',
+      serverMessage || 'The server or a proxy rejected this upload as too large',
+      status
+    )
+  }
+  if (status === 502 || status === 503 || status === 504) {
+    return new UploadFailedError(
+      'gateway',
+      serverMessage || `Server temporarily unavailable (${status})`,
+      status
+    )
+  }
+  if (status >= 500) {
+    return new UploadFailedError('server_error', serverMessage || `Server error (${status})`, status)
+  }
+  return new UploadFailedError(
+    'http_error',
+    serverMessage || `Upload failed: ${status} ${xhr.statusText}`,
+    status
+  )
+}
+
+/**
  * Upload a single batch of files (≤ server max_file_uploads).
  *
  * Reports progress in bytes within the parent call's `totalBytes` so the
@@ -266,13 +370,74 @@ const uploadFilesBatch = async (
     })
   }
 
+  const STALL_MS = options.stallTimeoutMs ?? 45_000
+  const SLOW_MS = options.slowWarningMs ?? 10_000
+  const SERVER_MS = options.serverTimeoutMs // undefined => no server-response deadline
+
+  const totalForLog = totalBytes > 0 ? totalBytes : 1
+  const startedAt = Date.now()
+  // Diagnostics are intentionally payload-free: only filename, size, phase
+  // and timing — never headers, body, or response text. Safe to leave on in
+  // production so support can reconstruct a stuck upload from the console.
+  const diag = (event: string, extra?: Record<string, unknown>) => {
+    const names = batch.map((f) => f.name).join(', ')
+    // eslint-disable-next-line no-console
+    console.info(
+      `[upload] ${event} — files="${names}" bytes=${totalForLog} +${Date.now() - startedAt}ms`,
+      extra ?? ''
+    )
+  }
+
   const sendXhr = (isRetry = false): Promise<UploadResponse> =>
     new Promise<UploadResponse>((resolve, reject) => {
       const xhr = new XMLHttpRequest()
       const baseUrl = getApiBaseUrl()
 
+      // Distinguish a watchdog-triggered abort from a user-triggered one so
+      // the UI can tell "you cancelled" apart from "the connection died".
+      let watchdogFailure: UploadFailedError | null = null
+      let lastPercent = 0
+      let stallTimer: ReturnType<typeof setTimeout> | null = null
+      let slowTimer: ReturnType<typeof setTimeout> | null = null
+      let serverTimer: ReturnType<typeof setTimeout> | null = null
+
+      const clearTimers = () => {
+        if (stallTimer) clearTimeout(stallTimer)
+        if (slowTimer) clearTimeout(slowTimer)
+        if (serverTimer) clearTimeout(serverTimer)
+        stallTimer = slowTimer = serverTimer = null
+      }
+
+      const failViaWatchdog = (err: UploadFailedError) => {
+        watchdogFailure = err
+        diag('watchdog-abort', { code: err.code, percent: lastPercent })
+        xhr.abort()
+      }
+
+      // (Re)arm the transfer-stall guard: fires only if NO progress arrives
+      // for STALL_MS while the body is still being sent.
+      const armTransferWatchdogs = () => {
+        if (stallTimer) clearTimeout(stallTimer)
+        if (slowTimer) clearTimeout(slowTimer)
+        slowTimer = setTimeout(() => {
+          options.onPhase?.('slow')
+          diag('slow', { percent: lastPercent })
+        }, SLOW_MS)
+        stallTimer = setTimeout(() => {
+          failViaWatchdog(
+            new UploadFailedError(
+              'transfer_stalled',
+              `Upload stalled at ${lastPercent}% — the connection stopped sending data`,
+              undefined,
+              lastPercent
+            )
+          )
+        }, STALL_MS)
+      }
+
       const onAbort = () => xhr.abort()
       const cleanup = () => {
+        clearTimers()
         if (options.signal) {
           options.signal.removeEventListener('abort', onAbort)
         }
@@ -288,18 +453,43 @@ const uploadFilesBatch = async (
 
       xhr.upload.addEventListener('progress', (event) => {
         if (event.lengthComputable) {
+          lastPercent = Math.min(100, Math.round((event.loaded / (event.total || 1)) * 100))
           reportProgress(event.loaded)
+          armTransferWatchdogs()
+        }
+      })
+
+      // Body fully flushed to the OS socket. Stop the transfer watchdog and,
+      // if the caller set a deadline, start the "server isn't answering" one.
+      xhr.upload.addEventListener('loadend', () => {
+        if (stallTimer) clearTimeout(stallTimer)
+        if (slowTimer) clearTimeout(slowTimer)
+        stallTimer = slowTimer = null
+        options.onPhase?.('finishing')
+        diag('body-sent')
+        if (SERVER_MS !== undefined) {
+          serverTimer = setTimeout(() => {
+            failViaWatchdog(
+              new UploadFailedError(
+                'server_timeout',
+                'File uploaded but the server did not respond in time',
+                undefined,
+                100
+              )
+            )
+          }, SERVER_MS)
         }
       })
 
       xhr.addEventListener('load', async () => {
         cleanup()
         if (xhr.status >= 200 && xhr.status < 300) {
+          diag('done', { status: xhr.status })
           try {
             const response = JSON.parse(xhr.responseText)
             resolve(response)
           } catch {
-            reject(new Error('Invalid response from server'))
+            reject(new UploadFailedError('invalid_response', 'Invalid response from server', xhr.status))
           }
         } else if (xhr.status === 401 && !isRetry) {
           try {
@@ -318,23 +508,33 @@ const uploadFilesBatch = async (
           window.location.href = '/login?reason=session_expired'
           reject(new Error('Session expired'))
         } else {
-          try {
-            const errorResponse = JSON.parse(xhr.responseText)
-            reject(new Error(errorResponse.error || `Upload failed: ${xhr.status}`))
-          } catch {
-            reject(new Error(`Upload failed: ${xhr.status} ${xhr.statusText}`))
-          }
+          diag('http-error', { status: xhr.status })
+          reject(buildHttpError(xhr))
         }
       })
 
       xhr.addEventListener('error', () => {
         cleanup()
-        reject(new Error('Network error during upload'))
+        diag('network-error', { percent: lastPercent })
+        reject(
+          new UploadFailedError(
+            'network',
+            'Network error during upload — the connection was lost',
+            undefined,
+            lastPercent
+          )
+        )
       })
 
       xhr.addEventListener('abort', () => {
         cleanup()
-        reject(new DOMException('Upload cancelled', 'AbortError'))
+        // A watchdog abort carries its own classified error; otherwise this
+        // was the user (or unmount) cancelling, which stays an AbortError.
+        if (watchdogFailure) {
+          reject(watchdogFailure)
+        } else {
+          reject(new DOMException('Upload cancelled', 'AbortError'))
+        }
       })
 
       xhr.open('POST', `${baseUrl}/api/v1/files/upload`)
@@ -345,6 +545,9 @@ const uploadFilesBatch = async (
         xhr.setRequestHeader('X-CSRF-Token', csrfToken)
       }
 
+      options.onPhase?.('uploading')
+      diag('start')
+      armTransferWatchdogs()
       xhr.send(buildFormData())
     })
 

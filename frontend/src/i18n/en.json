@@ -730,6 +730,17 @@
     "uploadSuccess": "{count} file(s) uploaded successfully",
     "uploadCancelled": "Upload cancelled",
     "uploadInterrupted": "Transfer interrupted. The file list was refreshed — anything that had already reached the server may still appear.",
+    "uploadSlow": "taking longer than usual…",
+    "uploadFailed": {
+      "transfer_stalled": "{filename}: Upload stalled at {percent}% — the connection stopped sending data before the file reached the server. This is usually a dropped connection or an upload size/timeout limit on a proxy. Check your connection and try again; if it keeps failing, the file may be too large for the current server limit.",
+      "server_timeout": "{filename}: The file finished uploading but the server did not respond in time. It may still have been saved — wait a moment and check the list before retrying.",
+      "too_large": "{filename}: The server rejected this file as too large. Try a smaller file or ask your administrator to raise the upload limit.",
+      "gateway": "{filename}: The server is temporarily unavailable (error {status}). Please try again in a moment.",
+      "server_error": "{filename}: The server hit an error while saving this file (error {status}). Please try again.",
+      "network": "{filename}: The connection was lost during the upload. Check your network and try again.",
+      "invalid_response": "{filename}: The server returned an unexpected response. Please try again.",
+      "http_error": "{filename}: Upload failed (error {status}). Please try again."
+    },
     "uploadBlocked": {
       "storage_exceeded": "{filename}: Not enough storage. {message}",
       "file_too_large": "{filename}: File is too large. {message}",
