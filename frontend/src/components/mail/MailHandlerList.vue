@@ -23,6 +23,7 @@
         <button
           v-if="handlers.length > 0"
           class="btn-primary px-5 py-2.5 rounded-xl flex items-center gap-2 shadow-lg shadow-[var(--brand)]/20 hover:shadow-xl hover:shadow-[var(--brand)]/30 transition-all shrink-0"
+          data-testid="btn-create-handler"
           @click="$emit('create')"
         >
           <PlusIcon class="w-5 h-5" />
@@ -100,6 +101,7 @@
         <p class="txt-secondary text-center max-w-md mb-8">{{ $t('mail.noHandlersDesc') }}</p>
         <button
           class="btn-primary px-8 py-3 rounded-xl inline-flex items-center gap-2 shadow-lg shadow-[var(--brand)]/20 hover:shadow-xl hover:shadow-[var(--brand)]/30 transition-all text-base font-medium"
+          data-testid="btn-create-handler"
           @click="$emit('create')"
         >
           <PlusIcon class="w-5 h-5" />
@@ -116,6 +118,7 @@
           'surface-card p-5 hover:shadow-lg transition-shadow cursor-pointer group relative',
           selectedHandlers.includes(handler.id) && 'ring-2 ring-[var(--brand)]',
         ]"
+        :data-testid="`card-handler-${handler.id}`"
         @click="handleCardClick($event, handler)"
       >
         <!-- Selection Checkbox -->
@@ -162,6 +165,7 @@
             <div class="flex-1 min-w-0">
               <h3
                 class="text-base font-semibold txt-primary truncate group-hover:text-[var(--brand)] transition-colors"
+                data-testid="text-handler-name"
               >
                 {{ handler.name }}
               </h3>
@@ -185,6 +189,7 @@
         <button
           class="absolute top-3 right-10 icon-ghost icon-ghost--danger opacity-0 group-hover:opacity-100 transition-all z-20"
           :aria-label="$t('mail.deleteHandler')"
+          :data-testid="`btn-delete-handler-${handler.id}`"
           @click.stop="$emit('delete', handler.id)"
         >
           <TrashIcon class="w-4 h-4" />
