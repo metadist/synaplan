@@ -34,6 +34,10 @@ test.describe('@ci @smoke Admin impersonation + chat', () => {
       await login(page, adminCreds)
 
       await page.locator(selectors.nav.sidebarV2Admin).click()
+      await page
+        .locator(selectors.nav.navDropdown)
+        .locator(selectors.nav.flyoutLinkAdminDashboard)
+        .click()
       await page.locator(selectors.pages.admin).waitFor({
         state: 'visible',
         timeout: TIMEOUTS.STANDARD,
