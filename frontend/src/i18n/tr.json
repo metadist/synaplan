@@ -508,7 +508,19 @@
     "dropHere": "Yüklemek için dosyaları buraya bırakın",
     "uploadSuccess": "{count} dosya başarıyla yüklendi",
     "uploadCancelled": "Yükleme iptal edildi",
-    "uploadInterrupted": "Aktarım kesildi. Liste yenilendi — sunucuya ulaşmış dosyalar görünmeye devam edebilir."
+    "uploadInterrupted": "Aktarım kesildi. Liste yenilendi — sunucuya ulaşmış dosyalar görünmeye devam edebilir.",
+    "uploadSlow": "normalden uzun sürüyor…",
+    "uploadFailed": {
+      "transfer_stalled": "{filename}: Yükleme %{percent} seviyesinde takıldı — dosya sunucuya ulaşmadan bağlantı veri göndermeyi durdurdu. Bu genellikle kopan bir bağlantıdan veya bir proxy üzerindeki boyut/zaman aşımı sınırından kaynaklanır. Bağlantınızı kontrol edip tekrar deneyin; sorun devam ederse dosya, mevcut sunucu sınırı için fazla büyük olabilir.",
+      "server_timeout": "{filename}: Dosya yüklendi ancak sunucu zamanında yanıt vermedi. Yine de kaydedilmiş olabilir — bir an bekleyip yeniden denemeden önce listeyi kontrol edin.",
+      "too_large": "{filename}: Sunucu bu dosyayı çok büyük olduğu için reddetti. Daha küçük bir dosya kullanın veya yöneticinizden yükleme sınırını artırmasını isteyin.",
+      "forbidden": "{filename}: Yükleme, sunucuya ulaşmadan önce bir güvenlik katmanı (güvenlik duvarı/proxy) tarafından engellendi. Bu genellikle sizin çözebileceğiniz bir şey değildir; bu yüklemeye izin verilmesi için lütfen ekiple iletişime geçin.",
+      "gateway": "{filename}: Sunucu geçici olarak kullanılamıyor (hata {status}). Lütfen birazdan tekrar deneyin.",
+      "server_error": "{filename}: Sunucu bu dosyayı kaydederken bir hatayla karşılaştı (hata {status}). Lütfen tekrar deneyin.",
+      "network": "{filename}: Yükleme sırasında bağlantı koptu. Ağınızı kontrol edip tekrar deneyin.",
+      "invalid_response": "{filename}: Sunucu beklenmeyen bir yanıt döndürdü. Lütfen tekrar deneyin.",
+      "http_error": "{filename}: Yükleme başarısız oldu (hata {status}). Lütfen tekrar deneyin."
+    }
   },
   "aiProvider": {
     "error": {
@@ -1231,6 +1243,15 @@
     "deleteSelected": "Seçilenleri Sil",
     "deleteSelectedConfirmTitle": "Seçili Dosyalar Silinsin mi?",
     "deleteSelectedConfirmMessage": "{count} seçili dosyayı silmek istediğinizden emin misiniz? Bu işlem geri alınamaz ve dosyalar kalıcı olarak silinecektir.",
+    "deleteFolder": "Klasörü sil",
+    "deleteFolderConfirmTitle": "“{folder}” klasörü silinsin mi?",
+    "deleteFolderConfirmMessage": "Bu işlem “{folder}” klasörünü ve içindeki {count} dosyayı, dizine eklenmiş içerikleriyle birlikte kalıcı olarak siler. Bu işlem geri alınamaz.",
+    "deleteFolderEmptyConfirmMessage": "Boş “{folder}” klasörü silinsin mi? İçinde dosya yok, bu yüzden başka bir şey kaldırılmaz.",
+    "deleteFolderConfirmButton": "Klasörü ve dosyaları sil",
+    "folderDeleted": "“{folder}” klasörü silindi ({count} dosya kaldırıldı)",
+    "folderEmptyDeleted": "“{folder}” klasörü silindi",
+    "deleteFolderFailed": "“{folder}” klasörü silinemedi",
+    "deleteFolderPartial": "“{folder}” klasörü: {success} dosya silindi, {failed} başarısız",
     "noFiles": "Henüz dosya yüklenmemiş",
     "page": "Sayfa",
     "showing": "Gösterilen",

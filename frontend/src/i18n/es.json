@@ -508,7 +508,19 @@
     "dropHere": "Suelta archivos aquí para subir",
     "uploadSuccess": "{count} archivo(s) subido(s) correctamente",
     "uploadCancelled": "Subida cancelada",
-    "uploadInterrupted": "Transferencia interrumpida. Se actualizó la lista: los archivos que ya llegaron al servidor pueden seguir apareciendo."
+    "uploadInterrupted": "Transferencia interrumpida. Se actualizó la lista: los archivos que ya llegaron al servidor pueden seguir apareciendo.",
+    "uploadSlow": "tardando más de lo habitual…",
+    "uploadFailed": {
+      "transfer_stalled": "{filename}: La subida se detuvo en {percent}%: la conexión dejó de enviar datos antes de que el archivo llegara al servidor. Suele deberse a una conexión interrumpida o a un límite de tamaño/tiempo de espera en un proxy. Revisa tu conexión e inténtalo de nuevo; si sigue fallando, el archivo puede ser demasiado grande para el límite actual del servidor.",
+      "server_timeout": "{filename}: El archivo terminó de subirse pero el servidor no respondió a tiempo. Es posible que se haya guardado de todos modos: espera un momento y revisa la lista antes de reintentar.",
+      "too_large": "{filename}: El servidor rechazó este archivo por ser demasiado grande. Usa un archivo más pequeño o pide a tu administrador que aumente el límite de subida.",
+      "forbidden": "{filename}: La subida fue bloqueada por una capa de seguridad (firewall/proxy) antes de llegar al servidor. Normalmente no es algo que puedas solucionar tú; contacta con el equipo para que permitan esta subida.",
+      "gateway": "{filename}: El servidor no está disponible temporalmente (error {status}). Inténtalo de nuevo en un momento.",
+      "server_error": "{filename}: El servidor tuvo un error al guardar este archivo (error {status}). Inténtalo de nuevo.",
+      "network": "{filename}: Se perdió la conexión durante la subida. Revisa tu red e inténtalo de nuevo.",
+      "invalid_response": "{filename}: El servidor devolvió una respuesta inesperada. Inténtalo de nuevo.",
+      "http_error": "{filename}: La subida falló (error {status}). Inténtalo de nuevo."
+    }
   },
   "aiProvider": {
     "error": {
@@ -1230,6 +1242,15 @@
     "deleteSelected": "Eliminar Seleccionados",
     "deleteSelectedConfirmTitle": "¿Eliminar Archivos Seleccionados?",
     "deleteSelectedConfirmMessage": "¿Estás seguro de que deseas eliminar {count} archivo(s) seleccionado(s)? Esta acción no se puede deshacer y los archivos se eliminarán permanentemente.",
+    "deleteFolder": "Eliminar carpeta",
+    "deleteFolderConfirmTitle": "¿Eliminar la carpeta «{folder}»?",
+    "deleteFolderConfirmMessage": "Esto elimina permanentemente la carpeta «{folder}» y los {count} archivo(s) que contiene, incluido su contenido indexado. Esta acción no se puede deshacer.",
+    "deleteFolderEmptyConfirmMessage": "¿Eliminar la carpeta vacía «{folder}»? No contiene archivos, por lo que no se elimina nada más.",
+    "deleteFolderConfirmButton": "Eliminar carpeta y archivos",
+    "folderDeleted": "Carpeta «{folder}» eliminada ({count} archivo(s) eliminados)",
+    "folderEmptyDeleted": "Carpeta «{folder}» eliminada",
+    "deleteFolderFailed": "No se pudo eliminar la carpeta «{folder}»",
+    "deleteFolderPartial": "Carpeta «{folder}»: {success} archivo(s) eliminados, {failed} con error",
     "noFiles": "Aún no hay archivos subidos",
     "page": "Página",
     "showing": "Mostrando",
