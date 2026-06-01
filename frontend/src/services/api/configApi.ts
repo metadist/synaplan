@@ -61,11 +61,27 @@ export const checkModelAvailability = async (modelId: number): Promise<ModelChec
   return httpClient<ModelCheckResponse>(`/api/v1/config/models/${modelId}/check`)
 }
 
+export interface ResetDefaultsResponse {
+  success: boolean
+  message: string
+  defaults: Record<string, number>
+}
+
+/**
+ * Reset all default models to the recommended factory defaults (admin-only)
+ */
+export const resetDefaultModels = async (): Promise<ResetDefaultsResponse> => {
+  return httpClient<ResetDefaultsResponse>('/api/v1/config/models/defaults/reset', {
+    method: 'POST',
+  })
+}
+
 export const configApi = {
   getModels,
   getDefaultModels,
   saveDefaultModels,
   checkModelAvailability,
+  resetDefaultModels,
 }
 
 // Qdrant Availability Check

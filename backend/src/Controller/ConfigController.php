@@ -8,6 +8,7 @@ use App\Entity\Config;
 use App\Entity\User;
 use App\Repository\ConfigRepository;
 use App\Repository\ModelRepository;
+use App\Seed\DefaultModelConfigSeeder;
 use App\Service\BillingService;
 use App\Service\Embedding\EmbeddingMetadataService;
 use App\Service\Embedding\EmbeddingModelChangeGuard;
@@ -801,6 +802,79 @@ class ConfigController extends AbstractController
         }
 
         return $this->json($response);
+    }
+
+    /**
+     * Reset all default models to the recommended factory defaults.
+     *
+     * Admin-only. Overwrites every DEFAULTMODEL capability in BCONFIG (ownerId=0)
+     * with the values from DefaultModelConfigSeeder::getRecommendedDefaults(),
+     * giving operators a one-click "undo" when their manual tuning goes wrong.
+     */
+    #[Route('/models/defaults/reset', name: 'models_defaults_reset', methods: ['POST'])]
+    #[OA\Post(
+        path: '/api/v1/config/models/defaults/reset',
+        summary: 'Reset default models to recommended factory defaults',
+        description: 'Admin-only. Overwrites all DEFAULTMODEL capability bindings (ownerId=0) with the built-in recommended defaults from DefaultModelConfigSeeder. Returns the new defaults map.',
+        security: [['Bearer' => []]],
+        tags: ['Configuration']
+    )]
+    #[OA\Response(
+        response: 200,
+        description: 'Defaults reset successfully',
+        content: new OA\JsonContent(
+            properties: [
+                new OA\Property(property: 'success', type: 'boolean', example: true),
+                new OA\Property(property: 'message', type: 'string', example: 'Default models reset to recommended defaults'),
+                new OA\Property(
+                    property: 'defaults',
+                    type: 'object',
+                    description: 'New default model IDs per capability',
+                    example: ['CHAT' => 180, 'SORT' => 76]
+                ),
+            ]
+        )
+    )]
+    #[OA\Response(response: 401, description: 'Not authenticated')]
+    #[OA\Response(response: 403, description: 'Admin access required')]
+    public function resetDefaultModels(#[CurrentUser] ?User $user): JsonResponse
+    {
+        if (!$user) {
+            return $this->json(['error' => 'Not authenticated'], Response::HTTP_UNAUTHORIZED);
+        }
+
+        if (!$this->isGranted('ROLE_ADMIN')) {
+            return $this->json(['error' => 'Admin access required'], Response::HTTP_FORBIDDEN);
+        }
+
+        $recommended = DefaultModelConfigSeeder::getRecommendedDefaults();
+
+        foreach ($recommended as $capability => $modelId) {
+            $config = $this->configRepository->findOneBy([
+                'ownerId' => 0,
+                'group' => 'DEFAULTMODEL',
+                'setting' => $capability,
+            ]);
+
+            if (!$config) {
+                $config = new Config();
+                $config->setOwnerId(0);
+                $config->setGroup('DEFAULTMODEL');
+                $config->setSetting($capability);
+            }
+
+            $config->setValue((string) $modelId);
+            $this->em->persist($config);
+        }
+
+        $this->em->flush();
+        $this->embeddingMetadata->invalidate();
+
+        return $this->json([
+            'success' => true,
+            'message' => 'Default models reset to recommended defaults',
+            'defaults' => $recommended,
+        ]);
     }
 
     /**

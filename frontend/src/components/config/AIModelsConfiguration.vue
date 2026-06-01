@@ -5,10 +5,23 @@
       :class="openDropdown ? 'z-20' : 'z-0'"
       data-testid="section-default-config"
     >
-      <h2 class="text-2xl font-semibold txt-primary mb-6 flex items-center gap-2">
-        <CpuChipIcon class="w-6 h-6 text-[var(--brand)]" />
-        {{ $t('config.aiModels.defaultConfigTitle') }}
-      </h2>
+      <div class="flex items-center justify-between mb-6">
+        <h2 class="text-2xl font-semibold txt-primary flex items-center gap-2">
+          <CpuChipIcon class="w-6 h-6 text-[var(--brand)]" />
+          {{ $t('config.aiModels.defaultConfigTitle') }}
+        </h2>
+        <button
+          v-if="authStore.isAdmin"
+          type="button"
+          class="inline-flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium border border-light-border/30 dark:border-dark-border/20 txt-secondary hover:txt-primary hover:border-[var(--brand)]/50 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+          :disabled="resetting"
+          data-testid="btn-reset-defaults"
+          @click="confirmResetDefaults"
+        >
+          <ArrowPathIcon :class="['w-4 h-4', resetting && 'animate-spin']" />
+          {{ $t('config.aiModels.resetDefaults') }}
+        </button>
+      </div>
 
       <div v-if="loading" class="text-center py-8" data-testid="section-loading">
         <div
@@ -439,6 +452,7 @@ import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { ChevronLeftIcon, ChevronRightIcon } from '@heroicons/vue/20/solid'
 import { useRoute } from 'vue-router'
 import {
+  ArrowPathIcon,
   ChevronDownIcon,
   CpuChipIcon,
   FunnelIcon,
@@ -459,6 +473,7 @@ import {
   getDefaultModels,
   saveDefaultModels,
   checkModelAvailability,
+  resetDefaultModels,
 } from '@/services/api/configApi'
 import { adminEmbeddingApi, type EmbeddingGuardStatus } from '@/services/api/adminEmbeddingApi'
 import { ApiError } from '@/services/api/httpClient'
@@ -497,6 +512,7 @@ const purposeLabels = computed<Record<Capability, string>>(() => ({
 
 const loading = ref(false)
 const saving = ref(false)
+const resetting = ref(false)
 const availableModels = ref<ModelsData>({})
 const defaultConfig = ref<Record<Capability, number | null>>({
   SORT: null,
@@ -1081,6 +1097,24 @@ const saveConfiguration = async () => {
     }
   } finally {
     saving.value = false
+  }
+}
+
+const confirmResetDefaults = async () => {
+  if (!confirm(t('config.aiModels.resetDefaultsConfirm'))) return
+
+  resetting.value = true
+  try {
+    const response = await resetDefaultModels()
+    if (response.success) {
+      success(t('config.aiModels.resetDefaultsSuccess'))
+      await loadData()
+    }
+  } catch (err) {
+    console.error('Failed to reset defaults:', err)
+    showError(t('config.aiModels.resetDefaultsError'))
+  } finally {
+    resetting.value = false
   }
 }
 </script>

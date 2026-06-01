@@ -113,6 +113,29 @@ final readonly class DefaultModelConfigSeeder
     }
 
     /**
+     * Resolve every PROD_MODEL_DEFAULTS entry to a `{capability => BID}` map.
+     *
+     * Used by the "reset to defaults" API endpoint so the frontend button
+     * restores exactly the same bindings that a fresh deployment receives.
+     * Throws if any key cannot be resolved (catalog/binding mismatch).
+     *
+     * @return array<string, int> e.g. ['CHAT' => 180, 'TOOLS' => 180, ...]
+     */
+    public static function getRecommendedDefaults(): array
+    {
+        $defaults = [];
+        foreach (self::PROD_MODEL_DEFAULTS as $row) {
+            $bid = ModelCatalog::findBidByKey($row['modelKey']);
+            if (null === $bid) {
+                throw new \RuntimeException(sprintf("DefaultModelConfigSeeder: model key '%s' does not resolve to exactly one entry in ModelCatalog (referenced by DEFAULTMODEL.%s).", $row['modelKey'], $row['setting']));
+            }
+            $defaults[$row['setting']] = $bid;
+        }
+
+        return $defaults;
+    }
+
+    /**
      * Resolve every modelKey in PROD_MODEL_DEFAULTS to a concrete BID at seed time.
      *
      * Throws if any key cannot be resolved — that would indicate the catalog and the
