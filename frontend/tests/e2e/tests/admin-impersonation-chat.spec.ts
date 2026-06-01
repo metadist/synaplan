@@ -21,13 +21,11 @@ test.describe('@ci @smoke Admin impersonation + chat', () => {
       const adminCookie = await loginViaApi(request, adminCreds)
       const usersRes = await request.get(
         `${getApiUrl()}/api/v1/admin/users?search=${encodeURIComponent(credentials.user)}`,
-        { headers: { Cookie: adminCookie } },
+        { headers: { Cookie: adminCookie } }
       )
       expect(usersRes.ok()).toBeTruthy()
       const body = await usersRes.json()
-      const target = body.users?.find(
-        (u: { email: string }) => u.email === credentials.user,
-      )
+      const target = body.users?.find((u: { email: string }) => u.email === credentials.user)
       expect(target, `Worker user ${credentials.user} must exist in admin user list`).toBeTruthy()
       targetUserId = target.id
     })
@@ -68,9 +66,7 @@ test.describe('@ci @smoke Admin impersonation + chat', () => {
         .locator(selectors.impersonation.banner)
         .waitFor({ state: 'visible', timeout: TIMEOUTS.STANDARD })
 
-      const targetText = await page
-        .locator(selectors.impersonation.bannerTarget)
-        .textContent()
+      const targetText = await page.locator(selectors.impersonation.bannerTarget).textContent()
       expect(targetText).toContain(credentials.user)
     })
 
@@ -84,7 +80,7 @@ test.describe('@ci @smoke Admin impersonation + chat', () => {
       const aiText = await chat.waitForAnswer(previousCount)
       expect(
         aiText.length,
-        'AI should respond with non-empty text while impersonated',
+        'AI should respond with non-empty text while impersonated'
       ).toBeGreaterThan(0)
     })
 
