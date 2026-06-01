@@ -311,7 +311,11 @@ const buildHttpError = (xhr: XMLHttpRequest): UploadFailedError => {
     )
   }
   if (status >= 500) {
-    return new UploadFailedError('server_error', serverMessage || `Server error (${status})`, status)
+    return new UploadFailedError(
+      'server_error',
+      serverMessage || `Server error (${status})`,
+      status
+    )
   }
   return new UploadFailedError(
     'http_error',
@@ -381,7 +385,6 @@ const uploadFilesBatch = async (
   // production so support can reconstruct a stuck upload from the console.
   const diag = (event: string, extra?: Record<string, unknown>) => {
     const names = batch.map((f) => f.name).join(', ')
-    // eslint-disable-next-line no-console
     console.info(
       `[upload] ${event} — files="${names}" bytes=${totalForLog} +${Date.now() - startedAt}ms`,
       extra ?? ''
@@ -489,7 +492,9 @@ const uploadFilesBatch = async (
             const response = JSON.parse(xhr.responseText)
             resolve(response)
           } catch {
-            reject(new UploadFailedError('invalid_response', 'Invalid response from server', xhr.status))
+            reject(
+              new UploadFailedError('invalid_response', 'Invalid response from server', xhr.status)
+            )
           }
         } else if (xhr.status === 401 && !isRetry) {
           try {
