@@ -560,6 +560,7 @@
                     class="group/f relative"
                   >
                     <button
+                      type="button"
                       class="w-full flex flex-col items-center gap-2 sm:gap-3 p-3 sm:p-5 rounded-xl sm:rounded-2xl border transition-all duration-200 cursor-pointer"
                       :class="
                         folderDropTarget === folder.name
@@ -2080,13 +2081,23 @@ const confirmDeleteFolder = async () => {
   try {
     // Resolve the folder's CURRENT contents, then delete each file. Reuses
     // the tested list + delete endpoints (no new server surface) and stays
-    // correct even if the cached folder `count` is stale.
-    const response = await filesService.listFiles({
-      groupKey: folder.name,
-      page: 1,
-      limit: 1000,
-    })
-    const ids = response.files.map((f) => f.id)
+    // correct even if the cached folder `count` is stale. The backend clamps
+    // `limit` to 100, so page through every result instead of assuming one
+    // request returns the whole folder.
+    const pageSize = 100
+    const ids: number[] = []
+    let page = 1
+    let totalPages = 1
+    do {
+      const response = await filesService.listFiles({
+        groupKey: folder.name,
+        page,
+        limit: pageSize,
+      })
+      ids.push(...response.files.map((f) => f.id))
+      totalPages = response.pagination.pages
+      page++
+    } while (page <= totalPages)
 
     if (ids.length === 0) {
       showSuccess(t('files.folderEmptyDeleted', { folder: folder.name }))

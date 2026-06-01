@@ -473,9 +473,12 @@ const uploadFilesBatch = async (
         }
       })
 
-      // Body fully flushed to the OS socket. Stop the transfer watchdog and,
-      // if the caller set a deadline, start the "server isn't answering" one.
-      xhr.upload.addEventListener('loadend', () => {
+      // Body fully flushed to the OS socket. `load` fires only on a successful
+      // upload (unlike `loadend`, which also fires on abort/error), so the
+      // "finishing" phase and the server-response deadline are armed only when
+      // the transfer actually completed. Abort/error are handled by their own
+      // listeners below, which run cleanup().
+      xhr.upload.addEventListener('load', () => {
         if (stallTimer) clearTimeout(stallTimer)
         if (slowTimer) clearTimeout(slowTimer)
         stallTimer = slowTimer = null
