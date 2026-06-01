@@ -113,6 +113,7 @@ export interface UploadProgress {
  */
 export type UploadFailureCode =
   | 'too_large' // 413 — file/body exceeds a server or proxy limit
+  | 'forbidden' // 403 — blocked by an edge layer (WAF / firewall / proxy)
   | 'gateway' // 502 / 503 / 504 — LB or backend node unavailable
   | 'server_error' // other 5xx
   | 'network' // connection dropped / DNS / TLS (xhr error, status 0)
@@ -300,6 +301,16 @@ const buildHttpError = (xhr: XMLHttpRequest): UploadFailedError => {
     return new UploadFailedError(
       'too_large',
       serverMessage || 'The server or a proxy rejected this upload as too large',
+      status
+    )
+  }
+  if (status === 403) {
+    // The upload endpoint itself never returns 403 (it answers 401/400/413),
+    // so a 403 here is an edge layer — WAF, firewall, or reverse proxy —
+    // blocking the request body before it reaches the backend.
+    return new UploadFailedError(
+      'forbidden',
+      serverMessage || 'Upload blocked by a security layer before reaching the server',
       status
     )
   }
