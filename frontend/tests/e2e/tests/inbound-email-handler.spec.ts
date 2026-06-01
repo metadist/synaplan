@@ -104,9 +104,7 @@ test.describe('@ci @smoke Inbound-Email-Handler UI', () => {
     })
 
     await test.step('Act: delete handler via UI', async () => {
-      const card = page
-        .locator('[data-testid^="card-handler-"]')
-        .filter({ hasText: updatedName })
+      const card = page.locator('[data-testid^="card-handler-"]').filter({ hasText: updatedName })
 
       await card.hover()
 
