@@ -45,6 +45,12 @@ test.describe('@ci @smoke Inbound-Email-Handler UI', () => {
         .locator(selectors.mailHandler.sectionDepartments)
         .waitFor({ state: 'visible', timeout: TIMEOUTS.SHORT })
 
+      await page.locator(selectors.mailHandler.btnAdd).click()
+
+      await page
+        .locator(selectors.mailHandler.inputDeptEmail)
+        .first()
+        .waitFor({ state: 'visible', timeout: TIMEOUTS.SHORT })
       await page.locator(selectors.mailHandler.inputDeptEmail).first().fill('support@e2e.invalid')
       await page.locator(selectors.mailHandler.inputDeptRules).first().fill('E2E test department')
     })

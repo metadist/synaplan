@@ -390,6 +390,7 @@ export const selectors = {
     inputSmtpPassword: '[data-testid="input-smtp-password"]',
     inputFilterNew: '[data-testid="input-filter-new"]',
     sectionDepartments: '[data-testid="section-step-departments"]',
+    btnAdd: '[data-testid="btn-add"]',
     inputDeptEmail: '[data-testid="input-dept-email"]',
     inputDeptRules: '[data-testid="input-dept-rules"]',
     btnNext: '[data-testid="btn-next"]',
