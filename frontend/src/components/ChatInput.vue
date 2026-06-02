@@ -247,8 +247,11 @@
         />
 
         <!-- Knowledge-base folder (RAG group) picker: scope the chat to a folder.
-             Always shown for signed-in users; when there are no groups yet the
-             "Manage" button links to the Files page to create one. -->
+             Rendered only in advanced mode (this whole block is gated by
+             `!appModeStore.isEasyMode` above) and only for signed-in users.
+             When there are no groups yet the picker just shows the "none"
+             option and the "Manage" button links to the Files page to create
+             one. -->
         <select
           v-if="!isGuestMode"
           v-model="selectedGroupKey"
@@ -1002,7 +1005,8 @@ onMounted(async () => {
   try {
     knowledgeGroups.value = await getFileGroups()
   } catch {
-    // Non-fatal — the picker just stays hidden if groups can't be loaded.
+    // Non-fatal — the picker still renders with just the "none" option, so a
+    // failed load simply means no folders are available to scope to.
   }
 })
 
