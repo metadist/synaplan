@@ -84,6 +84,11 @@ parameters:
     env(DEFAULT_USER_PLUGINS): '[]'
     default_user_plugins: '%env(json:DEFAULT_USER_PLUGINS)%'
 
+    # Anti-abuse cap on concurrent active guest sessions per IP.
+    # Production default is 5; the E2E suite raises it (all tests share one
+    # client IP, which would otherwise trip the limit and 429).
+    env(GUEST_MAX_SESSIONS_PER_IP): '5'
+
 services:
     _defaults:
         autowire: true
@@ -429,6 +434,11 @@ services:
             $minScore: '%env(string:default:recaptcha_min_score_default:RECAPTCHA_MIN_SCORE)%'
 
     App\Service\Message\AgainHandler: ~
+
+    # Guest trial chat session service (per-IP cap configurable for E2E)
+    App\Service\GuestSessionService:
+        arguments:
+            $maxSessionsPerIp: '%env(int:GUEST_MAX_SESSIONS_PER_IP)%'
 
     # File Processing Services
     App\Service\File\TikaClient:
