@@ -326,7 +326,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, nextTick, onMounted, onUnmounted, type Ref } from 'vue'
+import { ref, computed, watch, nextTick, onUnmounted, type Ref } from 'vue'
 import {
   PaperAirplaneIcon,
   XMarkIcon,
@@ -357,6 +357,7 @@ import { useAutoPersist } from '@/composables/useInputPersistence'
 import { useKeyboardOpen } from '@/composables/useKeyboardOpen'
 import { useChatsStore } from '@/stores/chats'
 import { useAppModeStore } from '@/stores/appMode'
+import { useAuthStore } from '@/stores/auth'
 
 interface UploadedFile {
   file_id: number
@@ -418,6 +419,7 @@ const aiConfigStore = useAiConfigStore()
 const chatsStore = useChatsStore()
 const configStore = useConfigStore()
 const appModeStore = useAppModeStore()
+const authStore = useAuthStore()
 const { warning, error: showError, success } = useNotification()
 const { t, locale } = useI18n()
 const router = useRouter()
@@ -999,16 +1001,30 @@ onUnmounted(() => {
 })
 
 // Load the user's knowledge-base folders so they can scope a chat to one.
-// Guests have no knowledge base; skip the (auth-gated) request for them.
-onMounted(async () => {
-  if (isGuestMode.value) return
+// `/api/v1/files/groups` is auth-gated: calling it as a guest (or before auth
+// has resolved) returns 401, which the http client turns into a hard redirect
+// to /login. Gate strictly on authentication — not on the `isGuestMode` prop,
+// which can still be false at mount while the guest session is initializing —
+// and (re)load whenever auth state flips to authenticated.
+async function loadKnowledgeGroups(): Promise<void> {
+  if (!authStore.isAuthenticated) return
   try {
     knowledgeGroups.value = await getFileGroups()
   } catch {
     // Non-fatal — the picker still renders with just the "none" option, so a
     // failed load simply means no folders are available to scope to.
   }
-})
+}
+
+watch(
+  () => authStore.isAuthenticated,
+  (authed) => {
+    if (authed) void loadKnowledgeGroups()
+  },
+  {
+    immediate: true,
+  }
+)
 
 /**
  * Toggle speech recording using hybrid approach.
