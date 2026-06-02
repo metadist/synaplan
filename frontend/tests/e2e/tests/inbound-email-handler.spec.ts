@@ -1,11 +1,30 @@
 import { test, expect } from '../test-setup'
 import { selectors } from '../helpers/selectors'
-import { login } from '../helpers/auth'
-import { TIMEOUTS } from '../config/config'
+import { login, getAuthHeaders } from '../helpers/auth'
+import { TIMEOUTS, getApiUrl } from '../config/config'
+
+const HANDLER_PREFIX = 'E2E Handler'
 
 test.describe('@ci @smoke Inbound-Email-Handler UI', () => {
+  test.afterEach(async ({ request }) => {
+    const auth = await getAuthHeaders(request)
+    const res = await request.get(`${getApiUrl()}/api/v1/inbound-email-handlers`, {
+      headers: auth,
+    })
+    if (!res.ok()) return
+
+    const { handlers } = await res.json()
+    for (const h of handlers ?? []) {
+      if (typeof h.name === 'string' && h.name.startsWith(HANDLER_PREFIX)) {
+        await request.delete(`${getApiUrl()}/api/v1/inbound-email-handlers/${h.id}`, {
+          headers: auth,
+        })
+      }
+    }
+  })
+
   test('create handler via wizard, verify in list, delete via UI', async ({ page }) => {
-    const handlerName = `E2E Handler ${Date.now()}`
+    const handlerName = `${HANDLER_PREFIX} ${Date.now()}`
     const updatedName = `${handlerName} Updated`
 
     await test.step('Arrange: login and navigate to mail handler page', async () => {
@@ -49,10 +68,9 @@ test.describe('@ci @smoke Inbound-Email-Handler UI', () => {
 
       await page
         .locator(selectors.mailHandler.inputDeptEmail)
-        .first()
         .waitFor({ state: 'visible', timeout: TIMEOUTS.SHORT })
-      await page.locator(selectors.mailHandler.inputDeptEmail).first().fill('support@e2e.invalid')
-      await page.locator(selectors.mailHandler.inputDeptRules).first().fill('E2E test department')
+      await page.locator(selectors.mailHandler.inputDeptEmail).fill('support@e2e.invalid')
+      await page.locator(selectors.mailHandler.inputDeptRules).fill('E2E test department')
     })
 
     await test.step('Act: advance to test step and save', async () => {
@@ -87,12 +105,19 @@ test.describe('@ci @smoke Inbound-Email-Handler UI', () => {
         .locator(selectors.mailHandler.config)
         .waitFor({ state: 'visible', timeout: TIMEOUTS.STANDARD })
 
-      const nameInput = page.locator(selectors.mailHandler.inputName)
-      await nameInput.clear()
-      await nameInput.fill(updatedName)
+      await page.locator(selectors.mailHandler.inputName).clear()
+      await page.locator(selectors.mailHandler.inputName).fill(updatedName)
 
       await page.locator(selectors.mailHandler.btnNext).click()
+      await page
+        .locator(selectors.mailHandler.sectionDepartments)
+        .waitFor({ state: 'visible', timeout: TIMEOUTS.SHORT })
+
       await page.locator(selectors.mailHandler.btnNext).click()
+      await page.locator(selectors.mailHandler.btnSave).waitFor({
+        state: 'visible',
+        timeout: TIMEOUTS.SHORT,
+      })
       await page.locator(selectors.mailHandler.btnSave).click()
     })
 
@@ -110,11 +135,13 @@ test.describe('@ci @smoke Inbound-Email-Handler UI', () => {
     })
 
     await test.step('Act: delete handler via UI', async () => {
-      const card = page.locator('[data-testid^="card-handler-"]').filter({ hasText: updatedName })
+      const card = page
+        .locator(selectors.mailHandler.anyHandlerCard)
+        .filter({ hasText: updatedName })
 
       await card.hover()
 
-      const deleteBtn = card.locator('[data-testid^="btn-delete-handler-"]')
+      const deleteBtn = card.locator(selectors.mailHandler.anyDeleteBtn)
       await deleteBtn.waitFor({ state: 'visible', timeout: TIMEOUTS.SHORT })
       await deleteBtn.click()
 
