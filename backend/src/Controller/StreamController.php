@@ -142,6 +142,13 @@ class StreamController extends AbstractController
         description: 'ID of a specific prompt to use. Takes precedence over promptTopic. The prompt must belong to the current user or be a system prompt.',
         schema: new OA\Schema(type: 'integer', example: 42)
     )]
+    #[OA\Parameter(
+        name: 'ragGroupKey',
+        in: 'query',
+        required: false,
+        description: 'Knowledge-base folder (file group key) to scope this message\'s RAG retrieval to. Use GET /api/v1/files/groups to list available folders.',
+        schema: new OA\Schema(type: 'string', example: 'project:helios')
+    )]
     #[OA\Response(
         response: 200,
         description: 'SSE stream of AI response chunks',
@@ -281,6 +288,7 @@ class StreamController extends AbstractController
         $fileIds = $request->query->get('fileIds', ''); // NEW: comma-separated list or single ID
         $promptTopic = $request->query->get('promptTopic');
         $promptId = $request->query->get('promptId');
+        $ragGroupKey = $request->query->get('ragGroupKey');
         $continueMessageId = $request->query->get('continueMessageId');
         // Explicit opt-out from memory loading + extraction (used by public demo via synaplan.com/try-chat)
         $disableMemories = '1' === $request->query->get('disableMemories', '0');
@@ -373,7 +381,7 @@ class StreamController extends AbstractController
         $response->headers->set('X-Accel-Buffering', 'no');
         $response->headers->set('Connection', 'keep-alive');
 
-        $response->setCallback(function () use ($user, $messageText, $trackId, $chatId, $includeReasoning, $webSearch, $modelId, $isAgain, $fileIdArray, $isWidgetMode, $isGuestMode, $fixedTaskPromptTopic, $widgetSession, $guestSession, $rateLimitError, $voiceReply, $continueMessageId, $disableMemories) {
+        $response->setCallback(function () use ($user, $messageText, $trackId, $chatId, $includeReasoning, $webSearch, $modelId, $isAgain, $fileIdArray, $isWidgetMode, $isGuestMode, $fixedTaskPromptTopic, $ragGroupKey, $widgetSession, $guestSession, $rateLimitError, $voiceReply, $continueMessageId, $disableMemories) {
             // Disable output buffering
             while (ob_get_level()) {
                 ob_end_clean();
@@ -640,6 +648,14 @@ class StreamController extends AbstractController
                     $processingOptions['fixed_task_prompt'] = $fixedTaskPromptTopic;
                     $this->logger->info('StreamController: Using API-selected task prompt', [
                         'task_prompt' => $fixedTaskPromptTopic,
+                    ]);
+                }
+
+                // User-selected knowledge-base folder (RAG group) from the chat composer.
+                if (!$isWidgetMode && !empty($ragGroupKey)) {
+                    $processingOptions['rag_group_key'] = $ragGroupKey;
+                    $this->logger->info('StreamController: Scoping RAG to user-selected group', [
+                        'rag_group_key' => $ragGroupKey,
                     ]);
                 }
 

@@ -276,6 +276,20 @@ final readonly class MessageProcessor
                 ]);
             }
 
+            // User-selected knowledge-base folder (RAG group key) from the chat
+            // composer. Scope this turn's retrieval to that group regardless of
+            // the classification path above (normal chat, again, widget, fixed
+            // prompt) so "add a knowledge group to the chat" works everywhere.
+            if (!empty($options['rag_group_key'])) {
+                $classification['rag_group_key'] = $options['rag_group_key'];
+            }
+            if (!empty($options['rag_limit'])) {
+                $classification['rag_limit'] = (int) $options['rag_limit'];
+            }
+            if (isset($options['rag_min_score'])) {
+                $classification['rag_min_score'] = (float) $options['rag_min_score'];
+            }
+
             // Step 2.3: Load Prompt Metadata and apply tool restrictions
             $topic = $classification['topic'] ?? 'general';
             $perfTimer->start('prompt');
