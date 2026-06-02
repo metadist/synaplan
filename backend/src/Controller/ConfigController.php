@@ -8,11 +8,11 @@ use App\Entity\Config;
 use App\Entity\User;
 use App\Repository\ConfigRepository;
 use App\Repository\ModelRepository;
-use App\Seed\DefaultModelConfigSeeder;
 use App\Service\BillingService;
 use App\Service\Embedding\EmbeddingMetadataService;
 use App\Service\Embedding\EmbeddingModelChangeGuard;
 use App\Service\Embedding\Exception\PremiumRequiredException;
+use App\Service\ModelConfigService;
 use App\Service\Plugin\PluginManager;
 use App\Service\Search\BraveSearchService;
 use App\Service\UserMemoryService;
@@ -43,6 +43,7 @@ class ConfigController extends AbstractController
         private UserMemoryService $memoryService,
         private EmbeddingModelChangeGuard $embeddingChangeGuard,
         private EmbeddingMetadataService $embeddingMetadata,
+        private ModelConfigService $modelConfigService,
         #[Autowire('%env(string:default::QDRANT_URL)%')]
         private readonly string $qdrantUrl,
     ) {
@@ -805,17 +806,19 @@ class ConfigController extends AbstractController
     }
 
     /**
-     * Reset all default models to the recommended factory defaults.
+     * Reset the calling user's model configuration to platform defaults.
      *
-     * Admin-only. Overwrites every DEFAULTMODEL capability in BCONFIG (ownerId=0)
-     * with the values from DefaultModelConfigSeeder::getRecommendedDefaults(),
-     * giving operators a one-click "undo" when their manual tuning goes wrong.
+     * Admin-only. Removes all per-user DEFAULTMODEL overrides for the calling
+     * admin so they fall back to the global defaults (ownerId=0). Does NOT
+     * modify the global defaults — other users are unaffected. This mirrors the
+     * scope of saveDefaultModels (which writes per-user) so that the button
+     * behaves exactly like manually reverting each dropdown.
      */
     #[Route('/models/defaults/reset', name: 'models_defaults_reset', methods: ['POST'])]
     #[OA\Post(
         path: '/api/v1/config/models/defaults/reset',
-        summary: 'Reset default models to recommended factory defaults',
-        description: 'Admin-only. Overwrites all DEFAULTMODEL capability bindings (ownerId=0) with the built-in recommended defaults from DefaultModelConfigSeeder. Returns the new defaults map.',
+        summary: 'Reset own model configuration to platform defaults',
+        description: 'Admin-only. Removes all per-user DEFAULTMODEL overrides for the calling admin so they fall back to the global defaults (ownerId=0). Does NOT modify global defaults — other users are unaffected. Returns the effective defaults after reset.',
         security: [['Bearer' => []]],
         tags: ['Configuration']
     )]
@@ -847,33 +850,12 @@ class ConfigController extends AbstractController
             return $this->json(['error' => 'Admin access required'], Response::HTTP_FORBIDDEN);
         }
 
-        $recommended = DefaultModelConfigSeeder::getRecommendedDefaults();
-
-        foreach ($recommended as $capability => $modelId) {
-            $config = $this->configRepository->findOneBy([
-                'ownerId' => 0,
-                'group' => 'DEFAULTMODEL',
-                'setting' => $capability,
-            ]);
-
-            if (!$config) {
-                $config = new Config();
-                $config->setOwnerId(0);
-                $config->setGroup('DEFAULTMODEL');
-                $config->setSetting($capability);
-            }
-
-            $config->setValue((string) $modelId);
-            $this->em->persist($config);
-        }
-
-        $this->em->flush();
-        $this->embeddingMetadata->invalidate();
+        $result = $this->modelConfigService->resetUserDefaults($user->getId());
 
         return $this->json([
             'success' => true,
-            'message' => 'Default models reset to recommended defaults',
-            'defaults' => $recommended,
+            'message' => sprintf('Removed %d user-specific override(s), now using platform defaults', $result['removed']),
+            'defaults' => $result['defaults'],
         ]);
     }
 
