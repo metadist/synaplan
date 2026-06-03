@@ -95,8 +95,8 @@ class AnthropicProvider implements ChatProviderInterface, VisionProviderInterfac
     public function getDefaultModels(): array
     {
         return [
-            'chat' => 'claude-3-5-sonnet-20241022',
-            'vision' => 'claude-3-5-sonnet-20241022',
+            'chat' => 'claude-sonnet-4-6',
+            'vision' => 'claude-sonnet-4-6',
         ];
     }
 
@@ -414,7 +414,7 @@ class AnthropicProvider implements ChatProviderInterface, VisionProviderInterfac
     public function compareImages(string $imageUrl1, string $imageUrl2): array
     {
         // Claude supports multiple images in a single request
-        $model = 'claude-3-5-sonnet-20241022';
+        $model = 'claude-sonnet-4-6';
 
         try {
             $image1Data = $this->prepareImageData($imageUrl1);
@@ -474,7 +474,7 @@ class AnthropicProvider implements ChatProviderInterface, VisionProviderInterfac
         }
 
         try {
-            $model = $options['model'] ?? 'claude-3-5-sonnet-20241022';
+            $model = $options['model'] ?? 'claude-sonnet-4-6';
 
             $imageData = $this->prepareImageData($imagePath);
 

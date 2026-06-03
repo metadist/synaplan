@@ -1347,7 +1347,7 @@ class GoogleProvider implements ChatProviderInterface, ImageGenerationProviderIn
             $mimeType1 = mime_content_type($fullPath1);
             $mimeType2 = mime_content_type($fullPath2);
 
-            $model = 'gemini-2.5-pro';
+            $model = 'gemini-2.5-flash';
             $url = self::API_BASE."/models/{$model}:generateContent";
 
             $payload = [
@@ -1404,7 +1404,7 @@ class GoogleProvider implements ChatProviderInterface, ImageGenerationProviderIn
         }
 
         try {
-            $model = $options['model'] ?? 'gemini-2.5-pro';
+            $model = $options['model'] ?? 'gemini-2.5-flash';
 
             $fullPath = $this->uploadDir.'/'.ltrim($imagePath, '/');
 

@@ -833,7 +833,7 @@ class ConfigController extends AbstractController
                     property: 'defaults',
                     type: 'object',
                     description: 'New default model IDs per capability',
-                    example: ['CHAT' => 180, 'SORT' => 76]
+                    example: ['CHAT' => 161, 'SORT' => 76]
                 ),
             ]
         )
