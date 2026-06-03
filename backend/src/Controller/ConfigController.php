@@ -808,17 +808,17 @@ class ConfigController extends AbstractController
     /**
      * Reset the calling user's model configuration to platform defaults.
      *
-     * Admin-only. Removes all per-user DEFAULTMODEL overrides for the calling
-     * admin so they fall back to the global defaults (ownerId=0). Does NOT
-     * modify the global defaults — other users are unaffected. This mirrors the
-     * scope of saveDefaultModels (which writes per-user) so that the button
-     * behaves exactly like manually reverting each dropdown.
+     * Removes all per-user DEFAULTMODEL overrides for the calling user so they
+     * fall back to the global defaults (ownerId=0). Does NOT modify the global
+     * defaults — other users are unaffected. This mirrors the scope of
+     * saveDefaultModels (which writes per-user) so that the button behaves
+     * exactly like manually reverting each dropdown.
      */
     #[Route('/models/defaults/reset', name: 'models_defaults_reset', methods: ['POST'])]
     #[OA\Post(
         path: '/api/v1/config/models/defaults/reset',
         summary: 'Reset own model configuration to platform defaults',
-        description: 'Admin-only. Removes all per-user DEFAULTMODEL overrides for the calling admin so they fall back to the global defaults (ownerId=0). Does NOT modify global defaults — other users are unaffected. Returns the effective defaults after reset.',
+        description: 'Removes all per-user DEFAULTMODEL overrides for the calling user so they fall back to the global defaults (ownerId=0). Does NOT modify global defaults — other users are unaffected. Returns the effective defaults after reset.',
         security: [['Bearer' => []]],
         tags: ['Configuration']
     )]
@@ -839,15 +839,10 @@ class ConfigController extends AbstractController
         )
     )]
     #[OA\Response(response: 401, description: 'Not authenticated')]
-    #[OA\Response(response: 403, description: 'Admin access required')]
     public function resetDefaultModels(#[CurrentUser] ?User $user): JsonResponse
     {
         if (!$user) {
             return $this->json(['error' => 'Not authenticated'], Response::HTTP_UNAUTHORIZED);
-        }
-
-        if (!$this->isGranted('ROLE_ADMIN')) {
-            return $this->json(['error' => 'Admin access required'], Response::HTTP_FORBIDDEN);
         }
 
         $result = $this->modelConfigService->resetUserDefaults($user->getId());

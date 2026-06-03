@@ -11,7 +11,6 @@
           {{ $t('config.aiModels.defaultConfigTitle') }}
         </h2>
         <button
-          v-if="authStore.isAdmin"
           type="button"
           class="inline-flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium border border-light-border/30 dark:border-dark-border/20 txt-secondary hover:txt-primary hover:border-[var(--brand)]/50 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
           :disabled="resetting"
@@ -466,6 +465,7 @@ import EmbeddingSwitchModal from '@/components/config/EmbeddingSwitchModal.vue'
 import SortIndicator from '@/components/config/SortIndicator.vue'
 import GroqIcon from '@/components/icons/GroqIcon.vue'
 import ModelCostBadge from '@/components/ModelCostBadge.vue'
+import { useDialog } from '@/composables/useDialog'
 import { useNotification } from '@/composables/useNotification'
 import { serviceColors } from '@/mocks/aiModels'
 import {
@@ -553,6 +553,7 @@ const switchModalTargetProvider = ref('')
 const switchModalGuardReason = ref<'requires_premium' | 'cooldown_active' | null>(null)
 
 const { success, error: showError, warning } = useNotification()
+const { confirm: confirmDialog } = useDialog()
 
 // Map URL parameter to actual capability name
 const normalizeHighlight = (highlight: string): Capability | 'ALL' | null => {
@@ -1101,7 +1102,13 @@ const saveConfiguration = async () => {
 }
 
 const confirmResetDefaults = async () => {
-  if (!confirm(t('config.aiModels.resetDefaultsConfirm'))) return
+  const confirmed = await confirmDialog({
+    title: t('config.aiModels.resetDefaults'),
+    message: t('config.aiModels.resetDefaultsConfirm'),
+    confirmText: t('config.aiModels.resetDefaults'),
+    cancelText: t('common.cancel'),
+  })
+  if (!confirmed) return
 
   resetting.value = true
   try {
@@ -1111,7 +1118,6 @@ const confirmResetDefaults = async () => {
       await loadData()
     }
   } catch (err) {
-    console.error('Failed to reset defaults:', err)
     showError(t('config.aiModels.resetDefaultsError'))
   } finally {
     resetting.value = false

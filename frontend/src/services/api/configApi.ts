@@ -69,7 +69,7 @@ export interface ResetDefaultsResponse {
 
 /**
  * Remove all user-specific model overrides so the user falls back
- * to the platform defaults (admin-only).
+ * to the platform defaults.
  */
 export const resetDefaultModels = async (): Promise<ResetDefaultsResponse> => {
   return httpClient<ResetDefaultsResponse>('/api/v1/config/models/defaults/reset', {
