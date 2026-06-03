@@ -1213,6 +1213,7 @@ const handleSendMessage = async (
     modelId?: number
     fileIds?: number[]
     voiceReply?: boolean
+    ragGroupKey?: string
   }
 ) => {
   autoScroll.value = true
@@ -1447,6 +1448,7 @@ const streamAIResponse = async (
     fileIds?: number[]
     voiceReply?: boolean
     isAgain?: boolean
+    ragGroupKey?: string
   }
 ) => {
   streamingAbortController = new AbortController()
@@ -1706,6 +1708,7 @@ const streamAIResponse = async (
         fileIds,
         voiceReply: options?.voiceReply,
         isAgain: options?.isAgain,
+        ragGroupKey: options?.ragGroupKey,
         onUpdate: (data) => {
           // CRITICAL: Check abort signal at the very beginning
           if (streamingAbortController?.signal.aborted) {

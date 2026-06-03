@@ -614,6 +614,7 @@ import { useRoute, useRouter } from 'vue-router'
 import {
   ChatBubbleLeftRightIcon,
   FolderIcon,
+  MagnifyingGlassIcon,
   Cog6ToothIcon,
   ChartBarIcon,
   ShieldCheckIcon,
@@ -777,6 +778,14 @@ const navItems = computed<NavItem[]>(() => {
     path: '/files',
     label: t('nav.files'),
     icon: FolderIcon,
+    requiresAuth: true,
+    gateFeature: 'files',
+  })
+
+  items.push({
+    path: '/rag',
+    label: t('nav.semanticSearch'),
+    icon: MagnifyingGlassIcon,
     requiresAuth: true,
     gateFeature: 'files',
   })

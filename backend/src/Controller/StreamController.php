@@ -142,6 +142,13 @@ class StreamController extends AbstractController
         description: 'ID of a specific prompt to use. Takes precedence over promptTopic. The prompt must belong to the current user or be a system prompt.',
         schema: new OA\Schema(type: 'integer', example: 42)
     )]
+    #[OA\Parameter(
+        name: 'ragGroupKey',
+        in: 'query',
+        required: false,
+        description: 'Knowledge-base folder (file group key) to scope this message\'s RAG retrieval to. Use GET /api/v1/files/groups to list available folders.',
+        schema: new OA\Schema(type: 'string', example: 'project:helios')
+    )]
     #[OA\Response(
         response: 200,
         description: 'SSE stream of AI response chunks',
@@ -281,6 +288,12 @@ class StreamController extends AbstractController
         $fileIds = $request->query->get('fileIds', ''); // NEW: comma-separated list or single ID
         $promptTopic = $request->query->get('promptTopic');
         $promptId = $request->query->get('promptId');
+        // Typed accessor: `get()` would hand back an array for `ragGroupKey[]=…`,
+        // which then flows into a string-typed processing option and 500s
+        // downstream. `getString()` rejects non-scalar input with a clean 400,
+        // and we normalize the empty string to null so "no folder selected"
+        // behaves the same as an absent parameter.
+        $ragGroupKey = $request->query->getString('ragGroupKey') ?: null;
         $continueMessageId = $request->query->get('continueMessageId');
         // Explicit opt-out from memory loading + extraction (used by public demo via synaplan.com/try-chat)
         $disableMemories = '1' === $request->query->get('disableMemories', '0');
@@ -373,7 +386,7 @@ class StreamController extends AbstractController
         $response->headers->set('X-Accel-Buffering', 'no');
         $response->headers->set('Connection', 'keep-alive');
 
-        $response->setCallback(function () use ($user, $messageText, $trackId, $chatId, $includeReasoning, $webSearch, $modelId, $isAgain, $fileIdArray, $isWidgetMode, $isGuestMode, $fixedTaskPromptTopic, $widgetSession, $guestSession, $rateLimitError, $voiceReply, $continueMessageId, $disableMemories) {
+        $response->setCallback(function () use ($user, $messageText, $trackId, $chatId, $includeReasoning, $webSearch, $modelId, $isAgain, $fileIdArray, $isWidgetMode, $isGuestMode, $fixedTaskPromptTopic, $ragGroupKey, $widgetSession, $guestSession, $rateLimitError, $voiceReply, $continueMessageId, $disableMemories) {
             // Disable output buffering
             while (ob_get_level()) {
                 ob_end_clean();
@@ -642,6 +655,9 @@ class StreamController extends AbstractController
                         'task_prompt' => $fixedTaskPromptTopic,
                     ]);
                 }
+
+                // User-selected knowledge-base folder (RAG group) from the chat composer.
+                $processingOptions = $this->applyRagGroupKey($processingOptions, $isWidgetMode, $ragGroupKey);
 
                 // Resolve the chat model that ChatHandler will eventually pick. We mirror its
                 // priority order (Again → override → fixed-prompt metadata → DB default) so the
@@ -1961,6 +1977,33 @@ class StreamController extends AbstractController
         }
 
         $this->memoryExtractionDispatcher->dispatch($payload);
+    }
+
+    /**
+     * Scope this turn's RAG retrieval to a user-selected knowledge-base
+     * folder (file group key) picked in the chat composer.
+     *
+     * Widget mode must never honour a caller-supplied group key: the widget
+     * is locked to its own configuration, so an embedded page cannot widen
+     * or redirect retrieval by sending `ragGroupKey`. An empty/absent key is
+     * a no-op (default, unscoped retrieval).
+     *
+     * @param array<string, mixed> $processingOptions
+     *
+     * @return array<string, mixed>
+     */
+    private function applyRagGroupKey(array $processingOptions, bool $isWidgetMode, ?string $ragGroupKey): array
+    {
+        if ($isWidgetMode || empty($ragGroupKey)) {
+            return $processingOptions;
+        }
+
+        $processingOptions['rag_group_key'] = $ragGroupKey;
+        $this->logger->info('StreamController: Scoping RAG to user-selected group', [
+            'rag_group_key' => $ragGroupKey,
+        ]);
+
+        return $processingOptions;
     }
 
     /**

@@ -122,16 +122,27 @@ final readonly class VectorizationService
 
             $chunkTexts = array_map(fn (array $c): string => $c['content'], $chunks);
 
-            $batchResult = $this->aiFacade->embedBatch($chunkTexts, $userId, $provider, [
-                'model' => $modelName,
-                'provider' => $provider,
-            ]);
-            $embeddings = $batchResult['embeddings'];
+            // Embed with a per-chunk fallback: if the batch call fails (e.g. a
+            // remote Ollama returns HTTP 500 because one chunk produced a NaN
+            // embedding) or returns invalid vectors, embed each chunk on its own
+            // and skip only the bad ones — so a single problematic chunk no
+            // longer drops the whole file to zero chunks.
+            $embedResult = $this->embedChunksResilient($chunkTexts, $userId, $provider, $modelName);
+            $embeddings = $embedResult['embeddings'];
+
+            if ($embedResult['failed'] > 0) {
+                $this->logger->warning('VectorizationService: some chunks could not be embedded and were skipped', [
+                    'user_id' => $userId,
+                    'message_id' => $messageId,
+                    'failed' => $embedResult['failed'],
+                    'total' => count($chunkTexts),
+                ]);
+            }
 
             $user = $this->em->getRepository(User::class)->find($userId);
             if ($user) {
                 $this->rateLimitService->recordUsage($user, 'EMBEDDINGS', [
-                    'usage' => $batchResult['usage'],
+                    'usage' => $embedResult['usage'],
                     'provider' => $provider,
                     'model' => $modelName,
                     'model_id' => $embeddingModelId,
@@ -220,5 +231,117 @@ final readonly class VectorizationService
                 'provider' => $this->vectorStorage->getProviderName(),
             ];
         }
+    }
+
+    /**
+     * Embed chunk texts resiliently.
+     *
+     * Tries one batch request first (fast path). If that throws (e.g. the
+     * remote Ollama returns HTTP 500 because a chunk produced a NaN embedding)
+     * or returns incomplete/invalid vectors, it falls back to embedding each
+     * chunk individually and skips only the ones that fail — so a single bad
+     * chunk no longer fails the whole file.
+     *
+     * @param array<int, string> $chunkTexts
+     *
+     * @return array{embeddings: array<int, array<float>>, usage: array{prompt_tokens: int, total_tokens: int}, failed: int}
+     */
+    private function embedChunksResilient(array $chunkTexts, int $userId, string $provider, string $modelName): array
+    {
+        $options = ['model' => $modelName, 'provider' => $provider];
+
+        // Fast path: a single batch request.
+        try {
+            $batch = $this->aiFacade->embedBatch($chunkTexts, $userId, $provider, $options);
+            $embeddings = $batch['embeddings'];
+
+            if (count($embeddings) === count($chunkTexts) && !$this->hasInvalidVector($embeddings)) {
+                return [
+                    'embeddings' => $embeddings,
+                    'usage' => $batch['usage'],
+                    'failed' => 0,
+                ];
+            }
+
+            $this->logger->warning('VectorizationService: batch embedding incomplete/invalid, falling back to per-chunk', [
+                'expected' => count($chunkTexts),
+                'returned' => count($embeddings),
+                'provider' => $provider,
+            ]);
+        } catch (\Throwable $e) {
+            $this->logger->warning('VectorizationService: batch embedding failed, falling back to per-chunk', [
+                'provider' => $provider,
+                'error' => $e->getMessage(),
+            ]);
+        }
+
+        // Fallback path: embed each chunk on its own, skipping failures.
+        $embeddings = [];
+        $usage = ['prompt_tokens' => 0, 'total_tokens' => 0];
+        $failed = 0;
+
+        foreach ($chunkTexts as $i => $text) {
+            if ('' === trim($text)) {
+                $embeddings[$i] = [];
+                continue;
+            }
+
+            try {
+                $result = $this->aiFacade->embed($text, $userId, $options);
+                $vector = $result['embedding'];
+
+                if (empty($vector) || $this->vectorHasInvalidValue($vector)) {
+                    $embeddings[$i] = [];
+                    ++$failed;
+                    $this->logger->warning('VectorizationService: skipping chunk with invalid embedding', ['chunk_index' => $i]);
+                    continue;
+                }
+
+                $embeddings[$i] = $vector;
+                $usage['prompt_tokens'] += (int) $result['usage']['prompt_tokens'];
+                $usage['total_tokens'] += (int) $result['usage']['total_tokens'];
+            } catch (\Throwable $e) {
+                $embeddings[$i] = [];
+                ++$failed;
+                $this->logger->warning('VectorizationService: chunk embedding failed, skipping', [
+                    'chunk_index' => $i,
+                    'error' => $e->getMessage(),
+                ]);
+            }
+        }
+
+        return ['embeddings' => $embeddings, 'usage' => $usage, 'failed' => $failed];
+    }
+
+    /**
+     * True if any vector in the list is empty or contains a non-finite (NaN/Inf) value.
+     *
+     * @param array<int, array<float>> $vectors
+     */
+    private function hasInvalidVector(array $vectors): bool
+    {
+        foreach ($vectors as $vector) {
+            if (empty($vector) || $this->vectorHasInvalidValue($vector)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * True if a single vector contains a non-finite (NaN/Inf) value.
+     *
+     * @param array<float> $vector
+     */
+    private function vectorHasInvalidValue(array $vector): bool
+    {
+        foreach ($vector as $value) {
+            if (!is_finite((float) $value)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 }

@@ -246,6 +246,41 @@
           @insert-command="handleInsertCommand"
         />
 
+        <!-- Knowledge-base folder (RAG group) picker: scope the chat to a folder.
+             Rendered only in advanced mode (this whole block is gated by
+             `!appModeStore.isEasyMode` above) and only for signed-in users.
+             When there are no groups yet the picker just shows the "none"
+             option and the "Manage" button links to the Files page to create
+             one. -->
+        <select
+          v-if="!isGuestMode"
+          v-model="selectedGroupKey"
+          :class="[
+            'pill flex-shrink-0 text-xs md:text-sm font-medium max-w-[40vw] md:max-w-[180px] truncate',
+            selectedGroupKey && 'pill--active',
+          ]"
+          :aria-label="$t('chatInput.knowledgeGroup')"
+          :title="$t('chatInput.knowledgeGroup')"
+          data-testid="select-chat-knowledge-group"
+        >
+          <option value="">{{ $t('chatInput.knowledgeGroupNone') }}</option>
+          <option v-for="g in knowledgeGroups" :key="g.name" :value="g.name">
+            {{ g.name }} ({{ g.count }})
+          </option>
+        </select>
+
+        <button
+          v-if="!isGuestMode"
+          type="button"
+          class="pill flex-shrink-0"
+          :aria-label="$t('chatInput.manageKnowledgeGroups')"
+          :title="$t('chatInput.manageKnowledgeGroups')"
+          data-testid="btn-manage-knowledge-groups"
+          @click="goToKnowledgeFiles"
+        >
+          <Icon icon="mdi:folder-cog-outline" class="w-4 h-4 md:w-5 md:h-5" />
+        </button>
+
         <button
           type="button"
           :disabled="!isGuestMode && !supportsReasoning"
@@ -312,14 +347,17 @@ import { useAiConfigStore } from '@/stores/aiConfig'
 import { useNotification } from '@/composables/useNotification'
 import { chatApi } from '@/services/api/chatApi'
 import type { FileItem } from '@/services/filesService'
+import { getFileGroups } from '@/services/filesService'
 import { AudioRecorder } from '@/services/audioRecorder'
 import { WebSpeechService, isWebSpeechSupported } from '@/services/webSpeechService'
 import { useConfigStore } from '@/stores/config'
 import { useI18n } from 'vue-i18n'
+import { useRouter } from 'vue-router'
 import { useAutoPersist } from '@/composables/useInputPersistence'
 import { useKeyboardOpen } from '@/composables/useKeyboardOpen'
 import { useChatsStore } from '@/stores/chats'
 import { useAppModeStore } from '@/stores/appMode'
+import { useAuthStore } from '@/stores/auth'
 
 interface UploadedFile {
   file_id: number
@@ -369,6 +407,9 @@ const fileSelectionModalVisible = ref(false)
 const voiceReply = ref(false)
 const discardNextRecording = ref(false)
 const selectedModelId = ref<number | null>(null)
+// Knowledge-base folder ("group key") to scope this chat's RAG retrieval to.
+const knowledgeGroups = ref<Array<{ name: string; count: number }>>([])
+const selectedGroupKey = ref<string>('')
 
 const SILENCE_TIMEOUT_MS = 4000
 const silenceTimer = ref<ReturnType<typeof setTimeout> | null>(null)
@@ -378,9 +419,16 @@ const aiConfigStore = useAiConfigStore()
 const chatsStore = useChatsStore()
 const configStore = useConfigStore()
 const appModeStore = useAppModeStore()
+const authStore = useAuthStore()
 const { warning, error: showError, success } = useNotification()
 const { t, locale } = useI18n()
+const router = useRouter()
 const isKeyboardOpen = useKeyboardOpen()
+
+/** Open the Files page where knowledge folders (RAG groups) are created/managed. */
+function goToKnowledgeFiles(): void {
+  router.push('/files')
+}
 
 /**
  * Get the speech recognition language code from the current UI locale.
@@ -459,6 +507,7 @@ const emit = defineEmits<{
       fileIds?: number[]
       voiceReply?: boolean
       modelId?: number
+      ragGroupKey?: string
     },
   ]
   stop: []
@@ -639,6 +688,7 @@ const sendMessage = () => {
     fileIds: uploadedFiles.value.filter((f) => !f.processing).map((f) => f.file_id),
     voiceReply: voiceReply.value,
     modelId: selectedModelId.value || undefined,
+    ragGroupKey: selectedGroupKey.value || undefined,
   }
   emit('send', messageToSend, options)
   message.value = ''
@@ -949,6 +999,32 @@ onUnmounted(() => {
     uploadAbortController.value = null
   }
 })
+
+// Load the user's knowledge-base folders so they can scope a chat to one.
+// `/api/v1/files/groups` is auth-gated: calling it as a guest (or before auth
+// has resolved) returns 401, which the http client turns into a hard redirect
+// to /login. Gate strictly on authentication — not on the `isGuestMode` prop,
+// which can still be false at mount while the guest session is initializing —
+// and (re)load whenever auth state flips to authenticated.
+async function loadKnowledgeGroups(): Promise<void> {
+  if (!authStore.isAuthenticated) return
+  try {
+    knowledgeGroups.value = await getFileGroups()
+  } catch {
+    // Non-fatal — the picker still renders with just the "none" option, so a
+    // failed load simply means no folders are available to scope to.
+  }
+}
+
+watch(
+  () => authStore.isAuthenticated,
+  (authed) => {
+    if (authed) void loadKnowledgeGroups()
+  },
+  {
+    immediate: true,
+  }
+)
 
 /**
  * Toggle speech recording using hybrid approach.

@@ -299,6 +299,7 @@ export const chatApi = {
     voiceReply?: boolean
     isAgain?: boolean
     continueMessageId?: number
+    ragGroupKey?: string
   }): () => void {
     const paramsObj: Record<string, string> = {
       message: opts.message,
@@ -313,6 +314,7 @@ export const chatApi = {
     if (opts.voiceReply) paramsObj.voiceReply = '1'
     if (opts.isAgain) paramsObj.isAgain = '1'
     if (opts.continueMessageId) paramsObj.continueMessageId = opts.continueMessageId.toString()
+    if (opts.ragGroupKey) paramsObj.ragGroupKey = opts.ragGroupKey
 
     if (opts.fileIds && opts.fileIds.length > 0) {
       paramsObj.fileIds = opts.fileIds.join(',')
