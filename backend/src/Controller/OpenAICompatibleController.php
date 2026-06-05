@@ -473,8 +473,8 @@ class OpenAICompatibleController extends AbstractController
 
         return [
             'provider' => 'openai',
-            'providerModelId' => $modelString ?? 'gpt-4o-mini',
-            'displayModel' => $modelString ?? 'gpt-4o-mini',
+            'providerModelId' => $modelString ?? 'gpt-4o',
+            'displayModel' => $modelString ?? 'gpt-4o',
             'model_id' => null,
         ];
     }

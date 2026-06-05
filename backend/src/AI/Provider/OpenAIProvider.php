@@ -1284,7 +1284,7 @@ class OpenAIProvider implements ChatProviderInterface, EmbeddingProviderInterfac
             $mimeType2 = mime_content_type($fullPath2);
 
             $response = $this->client->chat()->create([
-                'model' => 'gpt-4o-mini',
+                'model' => 'gpt-4o',
                 'messages' => [[
                     'role' => 'user',
                     'content' => [
@@ -1328,7 +1328,7 @@ class OpenAIProvider implements ChatProviderInterface, EmbeddingProviderInterfac
         }
 
         try {
-            $model = $options['model'] ?? 'gpt-4o-mini';
+            $model = $options['model'] ?? 'gpt-4o';
 
             // Build full path
             $fullPath = $this->uploadDir.'/'.ltrim($imagePath, '/');
