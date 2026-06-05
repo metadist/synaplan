@@ -224,7 +224,11 @@ services:
       TIKA_BASE_URL: http://tika:9998
       AI_DEFAULT_PROVIDER: ollama
       TOKEN_SECRET: 'change_me_in_production_use_openssl_rand_hex_32'
-      LOCK_DSN: ${LOCK_DSN:-flock}
+      LOCK_DSN: ${LOCK_DSN:-redis://redis:6379}
+      # Redis (general-purpose: cache, locks, rate-limiter, Messenger Redis Streams
+      # transport). The worker consumes async_ai_high/async_extract/async_index,
+      # all of which use the Redis transport, so REDIS_DSN is mandatory here.
+      REDIS_DSN: ${REDIS_DSN:-redis://redis:6379}
       MAILER_DSN: smtp://mailhog:1025
       AUTO_DOWNLOAD_MODELS: "false"
       ENABLE_LOCAL_GPT_OSS: ${ENABLE_LOCAL_GPT_OSS:-false}
@@ -268,6 +272,8 @@ services:
           --time-limit=3600 --memory-limit=512M -v
     depends_on:
       db:
+        condition: service_healthy
+      redis:
         condition: service_healthy
       backend:
         condition: service_started
@@ -370,6 +376,12 @@ services:
       # Space-separated list of origins allowed to upgrade to WebSocket.
       # Leave default for dev; in production set to your domain(s).
       CENTRIFUGO_CLIENT_ALLOWED_ORIGINS: ${REALTIME_ALLOWED_ORIGINS:-*}
+      # Redis engine address (cross-node pub/sub). Override REALTIME_REDIS_ADDRESS
+      # in production to point at the shared/managed Redis, e.g.
+      # redis://redis-prod.internal:6379/3. Keep the dedicated logical DB suffix
+      # (/3) — it isolates Centrifugo keys from Symfony cache/lock/messenger which
+      # use /0 via REDIS_DSN. (For Redis Cluster use a host without a DB suffix.)
+      CENTRIFUGO_ENGINE_REDIS_ADDRESS: ${REALTIME_REDIS_ADDRESS:-redis://redis:6379/3}
     ulimits:
       nofile:
         soft: 65536

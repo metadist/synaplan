@@ -200,10 +200,72 @@ running Centrifugo to be testable.
 | `REALTIME_API_KEY` | Shared secret protecting the publish endpoint. |
 | `REALTIME_TOKEN_SECRET` | HMAC secret used by the backend to sign connection / subscription JWTs (must match Centrifugo's `token_hmac_secret_key`). |
 | `REALTIME_PUBLIC_WS_URL` | Public WebSocket URL the browser dials (empty = same-origin via `/connection/websocket`). |
+| `REALTIME_ALLOWED_ORIGINS` | Comma/space-separated origins Centrifugo accepts WS upgrades from. `*` in dev only; set explicit `https://…` origins in production. |
+| `REALTIME_REDIS_ADDRESS` | Redis address for the Centrifugo engine (maps to `CENTRIFUGO_ENGINE_REDIS_ADDRESS`). Defaults to the local Redis on logical DB `/3`. |
+| `REALTIME_ADMIN_PASSWORD` / `REALTIME_ADMIN_SECRET` | Credentials for the Centrifugo admin UI. Expose `/centrifugo/*` on a private network only. |
 
 `REDIS_DSN` is required for cross-node Centrifugo fan-out and Symfony
 infrastructure (cache, lock, rate-limiter). Treat Redis as mandatory
 shared infrastructure.
+
+## Production deployment (multi-node)
+
+The realtime layer is built for a horizontally scaled cluster (e.g. 3 web
+nodes behind a load balancer, fronted by Cloudflare). The design goal: the
+browser always connects **same-origin** (`/connection/websocket`), and any
+node can serve any connection because all Centrifugo instances share state
+through Redis.
+
+### Topology: one Centrifugo per web node
+
+Run a Centrifugo sidecar next to the backend on **every** node. Caddy
+reverse-proxies `/connection/*` to the node-local Centrifugo (see
+`_docker/backend/Caddyfile`). Because every Centrifugo points at the same
+Redis engine, a publish issued by the PHP process on node A reaches a
+browser whose WebSocket happens to live on node C.
+
+```
+Cloudflare → Load Balancer ──┬─ Node 1: Caddy → Centrifugo ─┐
+                             ├─ Node 2: Caddy → Centrifugo ─┼─ shared Redis (engine, DB /3)
+                             └─ Node 3: Caddy → Centrifugo ─┘
+```
+
+### Shared Redis
+
+Point both PHP and Centrifugo at the same managed/shared Redis:
+
+- `REDIS_DSN=redis://redis-prod.internal:6379` — cache, lock, rate-limiter,
+  messenger (logical DB `/0`).
+- `REALTIME_REDIS_ADDRESS=redis://redis-prod.internal:6379/3` — Centrifugo
+  engine. Keep the dedicated `/3` suffix so engine keys never collide with
+  Symfony's. For **Redis Cluster** drop the DB suffix (cluster has no
+  numbered DBs) and rely on Centrifugo's key prefix instead.
+
+### Secrets — identical on all nodes (never the `changeme_*` defaults)
+
+`REALTIME_TOKEN_SECRET`, `REALTIME_API_KEY`, `REALTIME_ADMIN_PASSWORD` and
+`REALTIME_ADMIN_SECRET` must be set to strong random values
+(`openssl rand -hex 32`) and be **the same on every node**. The token
+secret is security-critical: PHP signs the browser's short-lived connect
+JWT with it, and every Centrifugo instance verifies it — a mismatch
+rejects all connections.
+
+Also set `REALTIME_ALLOWED_ORIGINS` to your real origin(s); never ship `*`
+to production.
+
+### Load balancer & Cloudflare checklist
+
+- **Forward the WebSocket upgrade** — pass `Connection: Upgrade` /
+  `Upgrade: websocket` through (explicit config on nginx/HAProxy; native on
+  ALB/Cloudflare).
+- **Raise idle timeouts** — WS connections are long-lived. Centrifugo pings
+  every 25s (`client.ping_interval`), so keep the LB idle timeout well above
+  that (≥ 60–120s recommended).
+- **No sticky sessions required** — Redis shares history + presence, so any
+  node can take over on reconnect.
+- **Lock down `/centrifugo/*`** — the admin UI and HTTP API must only be
+  reachable from the internal network; filter by source IP at the LB or
+  block the route externally.
 
 ## Channel naming conventions
 
