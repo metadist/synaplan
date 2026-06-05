@@ -12,6 +12,7 @@ use App\Repository\PromptRepository;
 use App\Service\Exception\VisionModelRequiredException;
 use App\Service\FeedbackConfigService;
 use App\Service\FeedbackConstants;
+use App\Service\File\DocumentGeneratorService;
 use App\Service\File\FileHelper;
 use App\Service\File\UserUploadPathBuilder;
 use App\Service\MemoryExtractionDispatcher;
@@ -55,6 +56,7 @@ final readonly class ChatHandler implements MessageHandlerInterface
         private RateLimitService $rateLimitService,
         private MemoryExtractionDispatcher $memoryExtractionDispatcher,
         private PerfPipelineFlag $perfPipelineFlag,
+        private DocumentGeneratorService $documentGenerator,
         iterable $pluginContextProviders = [],
     ) {
         $this->pluginContextProviders = $pluginContextProviders;
@@ -1740,9 +1742,21 @@ final readonly class ChatHandler implements MessageHandlerInterface
                 }
             }
 
-            // Write file content
-            if (!file_put_contents($absolutePath, $content)) {
-                $this->logger->error('ChatHandler: Failed to write file', ['path' => $absolutePath]);
+            // Write file content (real OOXML for docx/xlsx/pptx, text otherwise)
+            try {
+                $this->documentGenerator->write($content, $extension, $absolutePath);
+            } catch (\Throwable $e) {
+                $this->logger->error('ChatHandler: Failed to write file', [
+                    'path' => $absolutePath,
+                    'error' => $e->getMessage(),
+                ]);
+
+                return null;
+            }
+
+            $fileSize = filesize($absolutePath);
+            if (false === $fileSize) {
+                $this->logger->error('ChatHandler: Failed to read generated file size', ['path' => $absolutePath]);
 
                 return null;
             }
@@ -1756,7 +1770,7 @@ final readonly class ChatHandler implements MessageHandlerInterface
             $file->setFilePath($relativePath);
             $file->setFileType($extension);
             $file->setFileName($filename);
-            $file->setFileSize(strlen($content));
+            $file->setFileSize($fileSize);
             $file->setFileMime($mimeType);
             // Only store text content for text-based files (not binary formats)
             if (FileHelper::isTextBasedMimeType($mimeType)) {

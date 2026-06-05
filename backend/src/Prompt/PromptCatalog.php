@@ -748,13 +748,20 @@ You MUST respond with PURE JSON - NO markdown code blocks, NO backticks, NO form
 
 ## Supported Formats
 
-1. **CSV** (.csv):
-   - Use comma-separated values
+1. **CSV** (.csv) and **Excel** (.xlsx):
+   - Provide BFILETEXT as comma-separated values (CSV), even for .xlsx
    - First row should contain headers
    - Each subsequent row is a data record
    - Example: "Name,Age\nJohn,25\nJane,30"
 
-2. **Markdown/Text** (.md, .txt):
+2. **Word** (.docx):
+   - Provide BFILETEXT as Markdown (headings with #, **bold**, lists, tables)
+   - The server converts this Markdown into a real Word document
+
+3. **PowerPoint** (.pptx):
+   - Provide BFILETEXT as Markdown; each top-level heading (#) starts a new slide
+
+4. **Markdown/Text** (.md, .txt):
    - For simple text documents
    - Use markdown formatting when appropriate
 
