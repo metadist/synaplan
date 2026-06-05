@@ -114,6 +114,9 @@
 import { ref, computed, watch, nextTick, type ComponentPublicInstance } from 'vue'
 import { Icon } from '@iconify/vue'
 import filesService, { type FileItem } from '@/services/filesService'
+import { useAuthStore } from '@/stores/auth'
+
+const authStore = useAuthStore()
 
 interface Props {
   visible: boolean
@@ -145,6 +148,14 @@ const filteredFiles = computed(() => {
 })
 
 const loadFiles = async () => {
+  // /api/v1/files is auth-guarded — calling it as a guest returns 401 and the
+  // http client force-redirects to /login (issue #1037). Never fetch without a
+  // session; guests have no knowledge-base files to mention anyway.
+  if (!authStore.isAuthenticated) {
+    allFiles.value = []
+    return
+  }
+
   isLoading.value = true
   try {
     const response = await filesService.listFiles({ limit: 100 })
