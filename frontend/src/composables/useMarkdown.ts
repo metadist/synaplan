@@ -11,6 +11,28 @@ import { marked, type MarkedExtension, type Tokens } from 'marked'
 import DOMPurify from 'dompurify'
 import { escapeHtml, highlightCode, preloadHighlighter, ensureHighlighter } from './useHighlight'
 
+/**
+ * URI schemes that must never be rendered as clickable links.
+ *
+ * `data:` is the main offender: AI models like to offer "downloads" via
+ * `data:` URIs (e.g. a fake "DOCX herunterladen" button) that produce broken
+ * files containing raw text instead of the real format. The other schemes are
+ * blocked as a defense-in-depth measure against script execution.
+ */
+const UNSAFE_LINK_SCHEMES = ['data:', 'javascript:', 'vbscript:', 'file:'] as const
+
+/**
+ * Detects links whose scheme is unsafe and should be rendered as plain text.
+ *
+ * Whitespace and control characters are stripped before the check so that
+ * obfuscated values like `da\nta:` cannot bypass the scheme prefix match.
+ */
+function isUnsafeLinkHref(href: string): boolean {
+  // eslint-disable-next-line no-control-regex
+  const normalized = href.replace(/[\s\u0000-\u001f]/g, '').toLowerCase()
+  return UNSAFE_LINK_SCHEMES.some((scheme) => normalized.startsWith(scheme))
+}
+
 // Custom renderer for marked
 function createRenderer(): MarkedExtension {
   return {
@@ -39,6 +61,12 @@ function createRenderer(): MarkedExtension {
         const href = token.href || ''
         const title = token.title ? ` title="${escapeHtml(token.title)}"` : ''
         let text = this.parser?.parseInline(token.tokens) || token.text
+
+        // Block unsafe schemes (notably data: URIs used for fake file downloads).
+        // Render the label as plain text so users don't get a broken download button.
+        if (isUnsafeLinkHref(href)) {
+          return text
+        }
 
         // For mailto links, show just the email address if the text is the full mailto URL
         if (href.startsWith('mailto:') && text === href) {
