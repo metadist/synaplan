@@ -30,8 +30,8 @@ final readonly class DefaultModelConfigSeeder
      * @var list<array{group: string, setting: string, modelKey: string}>
      */
     private const PROD_MODEL_DEFAULTS = [
-        ['group' => 'DEFAULTMODEL', 'setting' => 'CHAT',       'modelKey' => 'openai:gpt-5.4:chat'],
-        ['group' => 'DEFAULTMODEL', 'setting' => 'TOOLS',      'modelKey' => 'openai:gpt-5.4:chat'],
+        ['group' => 'DEFAULTMODEL', 'setting' => 'CHAT',       'modelKey' => 'anthropic:claude-sonnet-4-6:chat'],
+        ['group' => 'DEFAULTMODEL', 'setting' => 'TOOLS',      'modelKey' => 'anthropic:claude-sonnet-4-6:chat'],
         ['group' => 'DEFAULTMODEL', 'setting' => 'SORT',       'modelKey' => 'groq:openai/gpt-oss-120b:chat'],
         ['group' => 'DEFAULTMODEL', 'setting' => 'SUMMARIZE',  'modelKey' => 'groq:openai/gpt-oss-120b:chat'],
         // Phase 2d: dedicated MEM tag so memory extraction never inherits the
@@ -45,7 +45,7 @@ final readonly class DefaultModelConfigSeeder
         ['group' => 'DEFAULTMODEL', 'setting' => 'TEXT2SOUND', 'modelKey' => 'piper:piper-multi:text2sound'],
         ['group' => 'DEFAULTMODEL', 'setting' => 'PIC2TEXT',   'modelKey' => 'groq:meta-llama/llama-4-scout-17b-16e-instruct:pic2text'],
         ['group' => 'DEFAULTMODEL', 'setting' => 'SOUND2TEXT', 'modelKey' => 'groq:whisper-large-v3:sound2text'],
-        ['group' => 'DEFAULTMODEL', 'setting' => 'ANALYZE',    'modelKey' => 'openai:gpt-5.4:chat'],
+        ['group' => 'DEFAULTMODEL', 'setting' => 'ANALYZE',    'modelKey' => 'anthropic:claude-sonnet-4-6:chat'],
         ['group' => 'DEFAULTMODEL', 'setting' => 'VECTORIZE',  'modelKey' => 'ollama:bge-m3:vectorize'],
         // Synapse Routing has its own embedding-model binding so admins can pin
         // it to the highest-quality option for short multilingual prompt
@@ -61,7 +61,7 @@ final readonly class DefaultModelConfigSeeder
      * @var list<array{ownerId: int, group: string, setting: string, value: string}>
      */
     private const PROD_FLAGS = [
-        ['ownerId' => 0, 'group' => 'ai', 'setting' => 'default_chat_provider', 'value' => 'openai'],
+        ['ownerId' => 0, 'group' => 'ai', 'setting' => 'default_chat_provider', 'value' => 'anthropic'],
     ];
 
     /**
@@ -110,6 +110,29 @@ final readonly class DefaultModelConfigSeeder
             'default_model_config',
             [...self::resolveProdDefaults(), ...self::PROD_FLAGS],
         );
+    }
+
+    /**
+     * Resolve every PROD_MODEL_DEFAULTS entry to a `{capability => BID}` map.
+     *
+     * Used by the "reset to defaults" API endpoint so the frontend button
+     * restores exactly the same bindings that a fresh deployment receives.
+     * Throws if any key cannot be resolved (catalog/binding mismatch).
+     *
+     * @return array<string, int> e.g. ['CHAT' => 180, 'TOOLS' => 180, ...]
+     */
+    public static function getRecommendedDefaults(): array
+    {
+        $defaults = [];
+        foreach (self::PROD_MODEL_DEFAULTS as $row) {
+            $bid = ModelCatalog::findBidByKey($row['modelKey']);
+            if (null === $bid) {
+                throw new \RuntimeException(sprintf("DefaultModelConfigSeeder: model key '%s' does not resolve to exactly one entry in ModelCatalog (referenced by DEFAULTMODEL.%s).", $row['modelKey'], $row['setting']));
+            }
+            $defaults[$row['setting']] = $bid;
+        }
+
+        return $defaults;
     }
 
     /**

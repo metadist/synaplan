@@ -90,4 +90,30 @@ class ConfigRepository extends ServiceEntityRepository
             $this->getEntityManager()->flush();
         }
     }
+
+    /**
+     * Remove config.
+     */
+    public function remove(Config $config, bool $flush = true): void
+    {
+        $this->getEntityManager()->remove($config);
+
+        if ($flush) {
+            $this->getEntityManager()->flush();
+        }
+    }
+
+    /**
+     * Remove multiple configs in a single flush.
+     *
+     * @param Config[] $configs
+     */
+    public function removeAll(array $configs): void
+    {
+        $em = $this->getEntityManager();
+        foreach ($configs as $config) {
+            $em->remove($config);
+        }
+        $em->flush();
+    }
 }
