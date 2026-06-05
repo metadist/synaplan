@@ -626,9 +626,39 @@ class AiFacade
     public function analyzeImage(string $imagePath, string $prompt, ?int $userId = null, array $options = []): array
     {
         $providerWasExplicit = array_key_exists('provider', $options);
-        $requestedProvider = $options['provider'] ?? $this->modelConfig->getDefaultProvider($userId, 'vision');
+        $callerSuppliedModel = array_key_exists('model', $options);
+        $resolvedVisionProvider = null;
+
+        // The settings UI persists the user's vision pick to
+        // BCONFIG.DEFAULTMODEL.PIC2TEXT. Honour that configured row before
+        // falling through to the legacy default-vision-provider chain.
+        if (!$providerWasExplicit && null !== $userId) {
+            $visionDefault = $this->modelConfig->resolveVisionDefault($userId);
+            $resolvedVisionProvider = $visionDefault['provider'];
+
+            if (null !== $visionDefault['model_id']) {
+                $options['provider'] = $visionDefault['provider'];
+                $providerWasExplicit = true;
+                if (null !== $visionDefault['model'] && !$callerSuppliedModel) {
+                    $options['model'] = $visionDefault['model'];
+                }
+            }
+        }
+
+        $requestedProvider = $options['provider'] ?? $resolvedVisionProvider ?? $this->modelConfig->getDefaultProvider($userId, 'vision');
         // Don't default to 'test' - let real providers be tried first via fallback logic
         $normalizedRequested = $requestedProvider ? strtolower($requestedProvider) : null;
+
+        // The model id stashed in $options is the API identifier of whichever
+        // provider we just picked as primary. When we fall back to a *different*
+        // provider, that string is meaningless (and often actively harmful: e.g.
+        // OpenAI/Google read $options['model'] verbatim and will 400 on a Groq
+        // model name). Remember whose model this is so we can strip it for any
+        // non-matching candidate further down — mirrors the embedding fallback's
+        // `unset($fallbackOptions['model'])` safeguard.
+        $modelOwnerProvider = (isset($options['model']) && $normalizedRequested)
+            ? $normalizedRequested
+            : null;
 
         $candidates = [];
 
@@ -712,15 +742,26 @@ class AiFacade
                 continue;
             }
 
+            // Build per-candidate options: drop the provider-specific `model`
+            // override whenever the candidate isn't the provider that string
+            // belongs to, so each provider gets either its own model or nothing
+            // (in which case it falls back to its internal default).
+            $candidateOptions = $options;
+            $candidateOptions['provider'] = $candidateName;
+            if (null !== $modelOwnerProvider && $modelOwnerProvider !== $normalizedCandidate) {
+                unset($candidateOptions['model']);
+            }
+
             $this->logger->info('AI vision request via '.$provider->getName(), [
                 'provider' => $provider->getName(),
                 'user_id' => $userId,
                 'image' => basename($imagePath),
+                'model' => $candidateOptions['model'] ?? null,
             ]);
 
             try {
                 $response = $this->circuitBreaker->execute(
-                    callback: fn () => $provider->explainImage($imagePath, $prompt, $options),
+                    callback: fn () => $provider->explainImage($imagePath, $prompt, $candidateOptions),
                     serviceName: 'ai_provider_vision_'.$provider->getName(),
                     fallback: null // NO FALLBACK
                 );
@@ -728,7 +769,7 @@ class AiFacade
                 return [
                     'content' => $response,
                     'provider' => $provider->getName(),
-                    'model' => $options['model'] ?? 'unknown',
+                    'model' => $candidateOptions['model'] ?? 'unknown',
                 ];
             } catch (ProviderException $e) {
                 $this->logger->warning('AI vision provider failed: '.$provider->getName().' - '.$e->getMessage(), [
@@ -959,10 +1000,28 @@ class AiFacade
     public function transcribe(string $audioPath, ?int $userId = null, array $options = []): array
     {
         $providerName = $options['provider'] ?? null;
+        $callerSuppliedModel = array_key_exists('model', $options);
+        $sttModelId = null;
 
-        // Fall back to user configuration when no provider is explicitly given
-        if (!$providerName && $userId > 0) {
-            $providerName = $this->modelConfig->getDefaultProvider($userId, 'speech_to_text');
+        // The settings UI persists the user's transcription pick to
+        // BCONFIG.DEFAULTMODEL.SOUND2TEXT. Honour that configured row before
+        // falling through to the legacy ai/default_speech_to_text_provider
+        // chain — that legacy key is never written by the UI, so prior to this
+        // we silently picked whichever provider the smart fallback returned
+        // (often OpenAI/whisper-1 instead of the user's Groq/whisper-large-v3).
+        // See issue #696.
+        if (!$providerName && null !== $userId && $userId > 0) {
+            $sttDefault = $this->modelConfig->resolveSttDefault($userId);
+            $providerName = $sttDefault['provider'];
+            $sttModelId = $sttDefault['model_id'];
+
+            // Only forward the SOUND2TEXT model name when it actually resolved
+            // to a BMODELS row — otherwise the provider would receive a stale
+            // string from a different provider's catalog and 400 (mirrors the
+            // PIC2TEXT safeguard in analyzeImage()).
+            if (null !== $sttDefault['model'] && !$callerSuppliedModel) {
+                $options['model'] = $sttDefault['model'];
+            }
         }
 
         $provider = $this->registry->getSpeechToTextProvider($providerName);
@@ -971,6 +1030,8 @@ class AiFacade
             'provider' => $provider->getName(),
             'user_id' => $userId,
             'audio' => basename($audioPath),
+            'model' => $options['model'] ?? null,
+            'model_id' => $sttModelId,
         ]);
 
         try {

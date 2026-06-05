@@ -4,11 +4,10 @@ declare(strict_types=1);
 
 namespace App\Controller;
 
-use App\Entity\Config;
+use App\AI\Service\ProviderRegistry;
 use App\Entity\RevectorizeRun;
 use App\Entity\User;
 use App\Message\ReVectorizeMessage;
-use App\Repository\ConfigRepository;
 use App\Repository\ModelRepository;
 use App\Repository\RevectorizeRunRepository;
 use App\Service\Embedding\EmbeddingCostEstimator;
@@ -16,8 +15,9 @@ use App\Service\Embedding\EmbeddingMetadataService;
 use App\Service\Embedding\EmbeddingModelChangeGuard;
 use App\Service\Embedding\Exception\CooldownActiveException;
 use App\Service\Embedding\Exception\PremiumRequiredException;
+use App\Service\Embedding\VectorizeBindingService;
 use App\Service\Message\SynapseIndexer;
-use Doctrine\ORM\EntityManagerInterface;
+use App\Service\ModelConfigService;
 use OpenApi\Attributes as OA;
 use Psr\Log\LoggerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -55,9 +55,10 @@ final class AdminEmbeddingController extends AbstractController
         private readonly EmbeddingModelChangeGuard $changeGuard,
         private readonly RevectorizeRunRepository $runRepository,
         private readonly ModelRepository $modelRepository,
-        private readonly ConfigRepository $configRepository,
+        private readonly ModelConfigService $modelConfigService,
+        private readonly ProviderRegistry $providerRegistry,
+        private readonly VectorizeBindingService $bindingService,
         private readonly SynapseIndexer $synapseIndexer,
-        private readonly EntityManagerInterface $em,
         private readonly MessageBusInterface $messageBus,
         private readonly LoggerInterface $logger,
     ) {
@@ -147,7 +148,7 @@ final class AdminEmbeddingController extends AbstractController
     #[OA\Response(response: 200, description: 'Switch queued', content: new OA\JsonContent(type: 'object'))]
     #[OA\Response(response: 400, description: 'Invalid request')]
     #[OA\Response(response: 403, description: 'Premium subscription required')]
-    #[OA\Response(response: 409, description: 'Critical severity requires confirmCritical=true')]
+    #[OA\Response(response: 409, description: 'Critical severity, active run, or other conflict')]
     #[OA\Response(response: 429, description: 'Cooldown active')]
     public function switch(Request $request, #[CurrentUser] ?User $user): JsonResponse
     {
@@ -157,7 +158,7 @@ final class AdminEmbeddingController extends AbstractController
 
         $body = json_decode((string) $request->getContent(), true) ?: [];
         $toModelId = (int) ($body['toModelId'] ?? 0);
-        $scope = (string) ($body['scope'] ?? RevectorizeRun::SCOPE_ALL);
+        $scope = (string) ($body['scope'] ?? RevectorizeRun::SCOPE_DOCUMENTS);
         $confirmCritical = (bool) ($body['confirmCritical'] ?? false);
 
         if ($toModelId <= 0) {
@@ -173,9 +174,54 @@ final class AdminEmbeddingController extends AbstractController
             return $this->json(['error' => 'Invalid field: scope'], Response::HTTP_BAD_REQUEST);
         }
 
+        // Issue #985 — re-vectorising the memories collection is
+        // temporarily refused because a model switch with a different
+        // output dimension destroys the entire user memory store before
+        // probe-time safety checks were added. The probe + collection
+        // rollback in EmbeddingReindexService / ReVectorizeMessageHandler
+        // protect against catastrophic dim mismatches now, but the team
+        // also agreed (see #985 discussion) that memory migration should
+        // stay disabled until a separate per-user collection design lands.
+        // Document and synapse scopes remain available.
+        if (RevectorizeRun::SCOPE_MEMORIES === $scope) {
+            return $this->json([
+                'error' => 'memories_switch_disabled',
+                'message' => 'Re-vectorising the memories collection is temporarily disabled (see #985). Use scope=documents or scope=synapse instead.',
+            ], Response::HTTP_FORBIDDEN);
+        }
+
         $model = $this->modelRepository->find($toModelId);
         if (!$model) {
             return $this->json(['error' => 'Model not found'], Response::HTTP_NOT_FOUND);
+        }
+
+        // Provider availability guard (#948).
+        //
+        // The target model's provider (Cloudflare, OpenAI, ...) must have
+        // a configured API key, otherwise every embedding call will fail
+        // 401 and the run completes with 0 processed / N failed — leaving
+        // BCONFIG stuck on a broken model. Catch that BEFORE we touch
+        // BCONFIG so the user gets a 400 they can act on, not a phantom
+        // "completed" run.
+        if (null !== ($providerError = $this->assertProviderConfigured($toModelId))) {
+            return $providerError;
+        }
+
+        // Concurrent-run guard (#948).
+        //
+        // Admins bypass the per-scope cooldown by design (they run scripted
+        // migrations during maintenance windows). That escape hatch let
+        // back-to-back clicks dispatch overlapping reindex jobs whose
+        // results overwrite each other. Reject when ANY run is already
+        // queued or running so the operator has to wait for the previous
+        // one to settle.
+        $active = $this->runRepository->findActive();
+        if (null !== $active) {
+            return $this->json([
+                'error' => 'run_in_progress',
+                'message' => 'A re-vectorize run is already in progress. Wait for it to finish before switching again.',
+                'activeRun' => $this->serializeRun($active),
+            ], Response::HTTP_CONFLICT);
         }
 
         try {
@@ -210,9 +256,9 @@ final class AdminEmbeddingController extends AbstractController
         // sees the new active model when it starts. Doing this in the
         // opposite order would mean fresh writes during the re-index
         // window land in the OLD vector space and immediately become
-        // stale.
-        $this->setVectorizeDefault($toModelId);
-        $this->embeddingMetadata->invalidate();
+        // stale. If the run later fails, ReVectorizeMessageHandler
+        // rolls this back to $fromModelId via VectorizeBindingService.
+        $this->bindingService->setVectorizeModel($toModelId);
 
         $run = (new RevectorizeRun())
             ->setUserId($user->getId() ?? 0)
@@ -338,6 +384,7 @@ final class AdminEmbeddingController extends AbstractController
     #[OA\Response(response: 200, description: 'Switch queued', content: new OA\JsonContent(type: 'object'))]
     #[OA\Response(response: 400, description: 'Invalid request')]
     #[OA\Response(response: 404, description: 'Model not found')]
+    #[OA\Response(response: 409, description: 'Run already in progress')]
     public function synapseSwitch(Request $request, #[CurrentUser] ?User $user): JsonResponse
     {
         if (!$user) {
@@ -355,6 +402,19 @@ final class AdminEmbeddingController extends AbstractController
             return $this->json(['error' => 'Model not found or not a vectorize model'], Response::HTTP_NOT_FOUND);
         }
 
+        if (null !== ($providerError = $this->assertProviderConfigured($toModelId))) {
+            return $providerError;
+        }
+
+        $active = $this->runRepository->findActive();
+        if (null !== $active) {
+            return $this->json([
+                'error' => 'run_in_progress',
+                'message' => 'A re-vectorize run is already in progress. Wait for it to finish before switching again.',
+                'activeRun' => $this->serializeRun($active),
+            ], Response::HTTP_CONFLICT);
+        }
+
         $currentBefore = $this->synapseIndexer->getEmbeddingModelInfo();
         $fromModelId = $currentBefore['model_id'];
 
@@ -362,7 +422,7 @@ final class AdminEmbeddingController extends AbstractController
         // sees the new active model when it boots; doing it the other
         // way around lets fresh writes during the switch window land
         // in the OLD vector space and get marked stale immediately.
-        $this->setSynapseDefault($toModelId);
+        $this->bindingService->setSynapseVectorizeModel($toModelId);
 
         $run = (new RevectorizeRun())
             ->setUserId($user->getId() ?? 0)
@@ -421,43 +481,52 @@ final class AdminEmbeddingController extends AbstractController
         ];
     }
 
-    private function setVectorizeDefault(int $modelId): void
+    /**
+     * Verify the target model's provider has its API key configured.
+     *
+     * Returns a 400 JsonResponse for the caller to bail out, or null when
+     * the provider looks healthy enough to attempt the switch. Falls back
+     * silently when the provider name doesn't resolve to a registered
+     * embedding provider (e.g. local Ollama variants whose registration
+     * is environment-dependent) — that's a soft signal, not a hard
+     * failure to switch.
+     */
+    private function assertProviderConfigured(int $modelId): ?JsonResponse
     {
-        $config = $this->configRepository->findOneBy([
-            'ownerId' => 0,
-            'group' => 'DEFAULTMODEL',
-            'setting' => 'VECTORIZE',
-        ]);
-
-        if (!$config) {
-            $config = new Config();
-            $config->setOwnerId(0);
-            $config->setGroup('DEFAULTMODEL');
-            $config->setSetting('VECTORIZE');
+        $providerName = $this->modelConfigService->getProviderForModel($modelId);
+        if (null === $providerName || '' === $providerName) {
+            return null;
         }
 
-        $config->setValue((string) $modelId);
-        $this->em->persist($config);
-        $this->em->flush();
-    }
+        try {
+            $provider = $this->providerRegistry->getEmbeddingProvider($providerName);
+        } catch (\Throwable $e) {
+            // Not a registered embedding provider for this environment —
+            // can't pre-flight, defer to the runtime failure path.
+            $this->logger->debug('Provider availability pre-flight skipped — not registered', [
+                'provider' => $providerName,
+                'error' => $e->getMessage(),
+            ]);
 
-    private function setSynapseDefault(int $modelId): void
-    {
-        $config = $this->configRepository->findOneBy([
-            'ownerId' => 0,
-            'group' => 'DEFAULTMODEL',
-            'setting' => SynapseIndexer::SYNAPSE_CAPABILITY,
-        ]);
-
-        if (!$config) {
-            $config = new Config();
-            $config->setOwnerId(0);
-            $config->setGroup('DEFAULTMODEL');
-            $config->setSetting(SynapseIndexer::SYNAPSE_CAPABILITY);
+            return null;
         }
 
-        $config->setValue((string) $modelId);
-        $this->em->persist($config);
-        $this->em->flush();
+        if ($provider->isAvailable()) {
+            return null;
+        }
+
+        $this->logger->warning('Admin: embedding switch refused — provider not configured', [
+            'provider' => $providerName,
+            'model_id' => $modelId,
+        ]);
+
+        return $this->json([
+            'error' => 'provider_not_configured',
+            'message' => sprintf(
+                'The provider "%s" is not configured (missing API key). Set the credentials in the admin panel before switching to this model.',
+                $providerName,
+            ),
+            'provider' => $providerName,
+        ], Response::HTTP_BAD_REQUEST);
     }
 }

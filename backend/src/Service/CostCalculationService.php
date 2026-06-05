@@ -140,6 +140,29 @@ final readonly class CostCalculationService
     /**
      * Calculate cost for non-token-based models (TTS, image gen, video gen, transcription).
      *
+     * Honours `BMODELS.BINUNIT` / `BMODELS.BOUTUNIT` and converts the catalog
+     * price into a "per single billable unit" amount before multiplying by
+     * `inputQuantity` / `outputQuantity`. The categories are dispatched off
+     * the model's `BTAG`:
+     *
+     *   tag=text2pic    →  bills `outputQuantity` images using `priceOut`
+     *                       interpreted via `outUnit` (perpic, per1M, …).
+     *   tag=text2sound  →  bills `inputQuantity` characters using `priceIn`
+     *                       interpreted via `inUnit` (per1000chars, per1M, …).
+     *   tag=text2vid    →  bills `outputQuantity` seconds using `priceOut`
+     *                       interpreted via `outUnit` (persec, …).
+     *   anything else   →  zero — token billing is the chat path.
+     *
+     * Issue #886a / Copilot review on PR #932 + #933: the previous
+     * implementation read `priceIn`/`priceOut` directly without converting,
+     * so a TTS model authored as `priceIn=0.015 per1000chars` would bill
+     * 12 000 chars at $180 (1000× too high), and an OpenAI image model
+     * authored at `priceOut=40 per1M` would bill 1 image at $40 (1000× too
+     * high in the other direction). Tag-driven dispatch + unit conversion
+     * keeps catalog entries in their natural authored units while billing
+     * stays correct on every install — including those that don't run
+     * `SyncModelPricesCommand` against LiteLLM.
+     *
      * @param float       $inputQuantity  Input quantity (characters for TTS, seconds for transcription)
      * @param float       $outputQuantity Output quantity (images for image gen, seconds for video gen)
      * @param string|null $resolution     Optional output resolution (e.g. '720p', '1080p', '4K').
@@ -172,13 +195,30 @@ final readonly class CostCalculationService
         }
 
         $priceSnapshot = $this->getPriceSnapshot($model, $timestamp);
-        $priceIn = (float) $priceSnapshot['price_in'];
-        $priceOut = (float) $priceSnapshot['price_out'];
+
+        // Honour the catalog-authored unit. e.g. OpenAI tts-1 is authored
+        // as $0.015 per 1000 chars; we want $0.000015 per char before
+        // multiplying by the spoken character count.
+        $priceIn = $this->normaliseToPerUnit(
+            (float) $priceSnapshot['price_in'],
+            (string) $priceSnapshot['in_unit'],
+        );
+        $priceOut = $this->normaliseToPerUnit(
+            (float) $priceSnapshot['price_out'],
+            (string) $priceSnapshot['out_unit'],
+        );
 
         $resolvedResolution = $this->resolveResolution($model, $resolution);
         $resolutionPrice = $this->lookupResolutionPrice($model, $resolvedResolution);
         if (null !== $resolutionPrice) {
-            $priceOut = $resolutionPrice;
+            // Resolution prices are authored in the same per-unit shape the
+            // ingest catalog uses for video (`persec`), so they need the
+            // same normalisation. lookupResolutionPrice returns the raw
+            // catalog value; if it's already per-1, this is a no-op.
+            $priceOut = $this->normaliseToPerUnit(
+                $resolutionPrice,
+                (string) $priceSnapshot['out_unit'],
+            );
             $priceSnapshot['resolution'] = $resolvedResolution;
             $priceSnapshot['price_out_resolution'] = number_format($resolutionPrice, 8, '.', '');
         }
@@ -195,6 +235,23 @@ final readonly class CostCalculationService
             priceSnapshot: $priceSnapshot,
             billedInputTokens: 0,
         );
+    }
+
+    /**
+     * Convert a catalog price authored in `inUnit` / `outUnit` into a
+     * "per single billable unit" price (per 1 character, per 1 image, per
+     * 1 second). Unknown units fall through unchanged so existing data
+     * stays billable; we log a warning so the gap is observable.
+     */
+    private function normaliseToPerUnit(float $price, string $unit): float
+    {
+        return match (strtolower($unit)) {
+            'per1m', 'per1mchars', 'per1mtokens' => $price / 1_000_000,
+            'per1k', 'per1000', 'per1000chars' => $price / 1_000,
+            'per1', 'perchar', 'perpic', 'perimage', 'persec', 'persecond', 'permin' => $price,
+            '-', '', 'free' => 0.0,
+            default => $price,
+        };
     }
 
     /**

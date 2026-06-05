@@ -84,6 +84,35 @@ class FileController extends AbstractController
         }
 
         $uploadedFiles = $request->files->get('files', []);
+
+        // Silent-truncation guard. PHP's `max_file_uploads` (default 20) drops
+        // any files past the limit from `$_FILES` without raising an error,
+        // and there is no signal in $_FILES that this happened. The
+        // file-manager / RAG UI lets users select hundreds of files, so the
+        // 21st…Nth file would simply vanish — exactly the silent failure the
+        // customer hit ("selected 50, only 20 uploaded, no error"). We now
+        // require the client to send the intended count as `file_count` and
+        // return 413 the moment PHP saw fewer files than declared, with the
+        // active server ceiling so the UI can chunk and retry.
+        $declaredCount = $request->request->getInt('file_count', 0);
+        $actualCount = is_array($uploadedFiles) ? count($uploadedFiles) : ($uploadedFiles ? 1 : 0);
+        $maxFileUploads = self::getMaxFileUploads();
+
+        if ($declaredCount > 0 && $declaredCount > $actualCount) {
+            return $this->json([
+                'error' => sprintf(
+                    'Server accepted %d of %d files in this request (PHP max_file_uploads = %d). Retry with smaller batches.',
+                    $actualCount,
+                    $declaredCount,
+                    $maxFileUploads,
+                ),
+                'reason' => 'max_file_uploads_exceeded',
+                'received' => $actualCount,
+                'declared' => $declaredCount,
+                'max_files_per_request' => $maxFileUploads,
+            ], Response::HTTP_REQUEST_ENTITY_TOO_LARGE);
+        }
+
         if (empty($uploadedFiles)) {
             return $this->json(['error' => 'No files uploaded. Use form-data with files[] field'], Response::HTTP_BAD_REQUEST);
         }
@@ -91,6 +120,102 @@ class FileController extends AbstractController
         $result = $this->uploadService->uploadBatch($uploadedFiles, $user, $groupKey, $processLevel);
 
         return $this->json($result, $result['success'] ? Response::HTTP_OK : Response::HTTP_PARTIAL_CONTENT);
+    }
+
+    /**
+     * Resolve PHP's effective `max_file_uploads` runtime limit.
+     *
+     * Returned to the client via the pre-flight check so the UI can chunk
+     * large selections into safe batches. Defensive against a misreported
+     * INI (some hosters return '' for unset values) — fall back to PHP's
+     * historical default of 20 in that case.
+     */
+    private static function getMaxFileUploads(): int
+    {
+        $raw = ini_get('max_file_uploads');
+        if (false === $raw || '' === $raw) {
+            return 20;
+        }
+        $value = (int) $raw;
+
+        return $value > 0 ? $value : 20;
+    }
+
+    #[Route('/check-upload', name: 'check_upload', methods: ['POST'], priority: 10)]
+    #[OA\Post(
+        path: '/api/v1/files/check-upload',
+        summary: 'Pre-flight check for an upload (quota, size, extension, rate limit)',
+        description: 'Lightweight metadata-only check that lets the UI fail fast BEFORE streaming the file body. Prevents timeouts when an upload would be rejected for quota reasons.',
+        tags: ['Files'],
+        requestBody: new OA\RequestBody(
+            required: true,
+            content: new OA\JsonContent(
+                required: ['filename', 'size'],
+                properties: [
+                    new OA\Property(property: 'filename', type: 'string', example: 'document.pdf'),
+                    new OA\Property(property: 'size', type: 'integer', example: 1048576, description: 'File size in bytes'),
+                    new OA\Property(property: 'mime', type: 'string', example: 'application/pdf', nullable: true),
+                ]
+            )
+        ),
+        responses: [
+            new OA\Response(
+                response: 200,
+                description: 'Pre-flight result. allowed=false includes a reason and message; allowed=true means the upload may proceed.',
+                content: new OA\JsonContent(
+                    properties: [
+                        new OA\Property(property: 'allowed', type: 'boolean', example: false),
+                        new OA\Property(property: 'reason', type: 'string', enum: ['rate_limit_exceeded', 'file_too_large', 'extension_not_allowed', 'storage_exceeded'], nullable: true),
+                        new OA\Property(property: 'message', type: 'string', nullable: true),
+                        new OA\Property(property: 'max_file_size', type: 'integer', description: 'Per-file size limit in bytes'),
+                        new OA\Property(
+                            property: 'allowed_extensions',
+                            type: 'array',
+                            items: new OA\Items(type: 'string'),
+                        ),
+                        new OA\Property(property: 'remaining', type: 'integer', description: 'Remaining storage quota in bytes'),
+                        new OA\Property(property: 'used', type: 'integer', nullable: true),
+                        new OA\Property(property: 'limit', type: 'integer', nullable: true),
+                        new OA\Property(property: 'max_files_per_request', type: 'integer', description: 'Max files per multipart POST (PHP max_file_uploads). UI must batch above this.'),
+                    ]
+                )
+            ),
+            new OA\Response(response: 400, description: 'Invalid input'),
+            new OA\Response(response: 401, description: 'Not authenticated'),
+        ]
+    )]
+    public function checkUpload(Request $request, #[CurrentUser] ?User $user): JsonResponse
+    {
+        if (!$user) {
+            return $this->json(['error' => 'Not authenticated'], Response::HTTP_UNAUTHORIZED);
+        }
+
+        $data = json_decode((string) $request->getContent(), true);
+        if (!is_array($data)) {
+            return $this->json(['error' => 'Invalid JSON body'], Response::HTTP_BAD_REQUEST);
+        }
+
+        $filename = isset($data['filename']) ? trim((string) $data['filename']) : '';
+        if ('' === $filename) {
+            return $this->json(['error' => 'filename is required'], Response::HTTP_BAD_REQUEST);
+        }
+
+        if (!isset($data['size']) || !is_numeric($data['size'])) {
+            return $this->json(['error' => 'size (integer, bytes) is required'], Response::HTTP_BAD_REQUEST);
+        }
+        $size = (int) $data['size'];
+        if ($size < 0) {
+            return $this->json(['error' => 'size must be a non-negative integer'], Response::HTTP_BAD_REQUEST);
+        }
+
+        $result = $this->uploadService->checkUpload($user, $filename, $size);
+        // Surface PHP's runtime cap so the UI can chunk bulk selections
+        // BEFORE building the multipart body. Without this, the only signal
+        // is the 413 from the upload itself — which the user only sees AFTER
+        // streaming the request.
+        $result['max_files_per_request'] = self::getMaxFileUploads();
+
+        return $this->json($result);
     }
 
     #[Route('/{id}/process', name: 'process', methods: ['POST'])]

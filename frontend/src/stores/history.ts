@@ -3,6 +3,14 @@ import { ref } from 'vue'
 import { normalizeMediaUrl } from '@/utils/urlHelper'
 import { extractBTextPayload } from '@/utils/jsonResponse'
 import { parseAIResponse } from '@/utils/responseParser'
+import { generatePartId } from '@/utils/mediaParts'
+import { isChannelSource } from '@/utils/channelSource'
+import {
+  buildUploadUrl,
+  isAudioFileType,
+  isImageFileType,
+  isVideoFileType,
+} from '@/utils/mediaTypes'
 import type { AgainData } from '@/types/ai-models'
 import { authService } from '@/services/authService'
 
@@ -114,6 +122,14 @@ export interface Message {
       model_id: number | null
     }
     sorting?: {
+      provider: string
+      model: string
+      model_id: number | null
+    }
+    // Audio (TTS) model used for voice replies. Sent independently
+    // from `chat` because the LLM authors the text and a separate TTS
+    // pipeline (e.g. Piper) synthesises it — see issue #583.
+    audio?: {
       provider: string
       model: string
       model_id: number | null
@@ -281,6 +297,12 @@ export const useHistoryStore = defineStore('history', () => {
   const hasMoreMessages = ref(false)
   const currentOffset = ref(0)
 
+  // Monotonic generation counter: incremented each time loadMessages is called
+  // for a fresh chat (offset === 0). Responses from older generations are
+  // discarded so a slow response for a previous chat never overwrites the
+  // messages of the current one.
+  let loadGeneration = 0
+
   const addMessage = (
     role: 'user' | 'assistant',
     parts: Part[],
@@ -402,6 +424,10 @@ export const useHistoryStore = defineStore('history', () => {
   const loadMessages = async (chatId: number, offset = 0, limit = 50) => {
     if (!checkAuthOrRedirect()) return
 
+    // Fresh load (offset 0) bumps the generation so any in-flight response
+    // for a *previous* chat is silently discarded when it lands.
+    const myGeneration = offset === 0 ? ++loadGeneration : loadGeneration
+
     isLoadingMessages.value = true
 
     // Reset pagination state when loading from start (prevents stale state on error)
@@ -418,35 +444,56 @@ export const useHistoryStore = defineStore('history', () => {
         pagination?: { hasMore?: boolean }
       }
 
+      if (myGeneration !== loadGeneration) return
+
       if (response.success && response.messages) {
         const loadedMessages: Message[] = response.messages.map((m) => {
           const role = m.direction === 'IN' ? 'user' : 'assistant'
 
           const parts = parseContentWithThinking(m.text || '', role)
 
-          // Add generated file (image/video/audio) as part if present
+          // Add generated file (image/video/audio) as part if present.
+          // Issue #625: assign a stable `partId` on load so the `<audio>` /
+          // `<video>` element keeps its identity if the message later gets
+          // re-parsed (e.g. continuation appends text). Without this, the
+          // index-based fallback key would remount the media player.
+          //
+          // Issue #955: detect audio/image/video by both the generic media
+          // kind (`audio`, `image`, `video` — used by TTS / MEDIAMAKER) and
+          // by the raw file extension (`ogg`, `mp3`, `png`, …) the backend
+          // stores for inbound WhatsApp voice notes and direct uploads.
+          // Without the extension-aware check, a WhatsApp voice reply was
+          // surfaced as a plain text bubble with no player.
+          //
+          // Relative `m.file.path` values (e.g. WhatsApp's `13/.../voice.ogg`)
+          // are first prefixed with the static-serve endpoint so the player
+          // can fetch them; absolute URLs and already-prefixed paths pass
+          // through `buildUploadUrl` unchanged before final normalization.
           if (m.file && m.file.path) {
-            const absoluteUrl = normalizeMediaUrl(m.file.path)
-            if (m.file.type === 'image') {
+            const absoluteUrl = normalizeMediaUrl(buildUploadUrl(m.file.path))
+            if (isImageFileType(m.file.type)) {
               parts.push({
+                partId: generatePartId(),
                 type: 'image',
                 url: absoluteUrl,
                 alt: m.text || 'Generated image',
               })
-            } else if (m.file.type === 'video') {
+            } else if (isVideoFileType(m.file.type)) {
               parts.push({
+                partId: generatePartId(),
                 type: 'video',
                 url: absoluteUrl,
               })
-            } else if (m.file.type === 'audio') {
+            } else if (isAudioFileType(m.file.type)) {
               parts.push({
+                partId: generatePartId(),
                 type: 'audio',
                 url: absoluteUrl,
               })
             }
           }
 
-          // Parse files from backend response (user uploads)
+          // Parse files from backend response (user uploads).
           const files: MessageFile[] = []
           if (m.files && Array.isArray(m.files)) {
             files.push(
@@ -459,6 +506,28 @@ export const useHistoryStore = defineStore('history', () => {
                 fileMime: f.fileMime ?? f.file_mime,
               }))
             )
+          }
+
+          // Issue #955: render uploaded audio attachments with the
+          // `MessageAudio` player instead of only as a download badge.
+          // The badge stays via `files[]` so the user can still see the
+          // filename / size and download the original recording. Inbound
+          // WhatsApp voice messages travel through this same `files`
+          // pipeline once they're persisted as a `File` entity.
+          //
+          // The MIME type is forwarded so that ambiguous containers like
+          // `.webm` get classified by the actual upload mime (`audio/webm`
+          // for voice notes, `video/webm` for screen recordings) instead
+          // of falling into the audio default purely by extension.
+          for (const file of files) {
+            if (!isAudioFileType(file.fileType, file.fileMime)) continue
+            const audioUrl = buildUploadUrl(file.filePath)
+            if (!audioUrl) continue
+            parts.push({
+              partId: generatePartId(),
+              type: 'audio',
+              url: normalizeMediaUrl(audioUrl),
+            })
           }
 
           // Reconstruct tool metadata from topic field for user messages
@@ -486,22 +555,37 @@ export const useHistoryStore = defineStore('history', () => {
             }
           }
 
+          // The backend reuses the `provider` column to also store the
+          // channel/source for inbound messages (`WHATSAPP`, `EMAIL`,
+          // `WEB`, `widget`, …). When that token leaks into the chat
+          // footer the user sees confusing labels like
+          // `Model: WHATSAPP · Provider: WHATSAPP`. Strip it here so
+          // only real AI provider names ever reach the UI — see #653.
+          const rawProvider = m.aiModels?.chat?.provider ?? m.provider
+          const cleanProvider = isChannelSource(rawProvider) ? undefined : rawProvider
+          const rawModelLabel = m.aiModels?.chat?.model ?? m.provider
+          const cleanModelLabel = isChannelSource(rawModelLabel)
+            ? role === 'assistant'
+              ? 'AI'
+              : undefined
+            : (rawModelLabel ?? (role === 'assistant' ? 'AI' : undefined))
+
           return {
             id: `backend-${m.id}`,
             role,
             parts,
             timestamp: new Date(m.timestamp * 1000),
-            provider: m.aiModels?.chat?.provider ?? m.provider,
-            modelLabel: m.aiModels?.chat?.model ?? m.provider ?? 'AI',
+            provider: cleanProvider,
+            modelLabel: cleanModelLabel,
             topic: m.topic,
             originalTopic: m.originalTopic || null,
             originalMediaType: m.originalMediaType ?? m.original_media_type ?? null,
             backendMessageId: m.id,
             files: files.length > 0 ? files : undefined,
-            aiModels: m.aiModels || null, // Parse AI model metadata from backend
-            webSearch: m.webSearch || null, // Parse web search metadata from backend
-            searchResults: m.searchResults || null, // Parse actual search results from backend
-            tool: toolData, // Reconstruct tool metadata from topic
+            aiModels: m.aiModels || null,
+            webSearch: m.webSearch || null,
+            searchResults: m.searchResults || null,
+            tool: toolData,
           }
         })
 
@@ -516,9 +600,12 @@ export const useHistoryStore = defineStore('history', () => {
         hasMoreMessages.value = response.pagination?.hasMore || false
       }
     } catch (error) {
+      if (myGeneration !== loadGeneration) return
       console.error('Failed to load messages:', error)
     } finally {
-      isLoadingMessages.value = false
+      if (myGeneration === loadGeneration) {
+        isLoadingMessages.value = false
+      }
     }
   }
 

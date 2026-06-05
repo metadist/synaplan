@@ -39,7 +39,16 @@
             <CpuChipIcon class="w-4 h-4 text-[var(--brand)]" />
             <span class="flex-1 min-w-0">{{ purposeLabels[capability as Capability] }}</span>
             <span
-              v-if="capability === 'VECTORIZE' && !canSwitchEmbedding"
+              v-if="capability === 'VECTORIZE' && isVectorizeAdminOnly"
+              class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wide bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/30"
+              :title="$t('config.embeddingSwitch.adminOnly.lockTooltip')"
+              data-testid="badge-embedding-admin-only"
+            >
+              <LockClosedIcon class="w-3 h-3" />
+              {{ $t('config.embeddingSwitch.adminOnly.badge') }}
+            </span>
+            <span
+              v-else-if="capability === 'VECTORIZE' && !canSwitchEmbedding"
               class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wide bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/30"
               :title="$t('config.embeddingSwitch.premium.lockTooltip')"
               data-testid="badge-embedding-premium"
@@ -55,7 +64,16 @@
                 'w-full px-4 py-3 pl-10 pr-10 rounded-lg surface-card border txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)] transition-all text-left',
                 'border-light-border/30 dark:border-dark-border/20 hover:border-[var(--brand)]/50',
                 openDropdown === capability && 'ring-2 ring-[var(--brand)]',
+                capability === 'VECTORIZE' &&
+                  isVectorizeAdminOnly &&
+                  'opacity-60 cursor-not-allowed hover:border-light-border/30 dark:hover:border-dark-border/20',
               ]"
+              :disabled="capability === 'VECTORIZE' && isVectorizeAdminOnly"
+              :title="
+                capability === 'VECTORIZE' && isVectorizeAdminOnly
+                  ? $t('config.embeddingSwitch.adminOnly.lockTooltip')
+                  : undefined
+              "
               data-testid="btn-model-dropdown"
               @click="toggleDropdown(capability as Capability)"
             >
@@ -272,9 +290,11 @@
           <tbody>
             <tr
               v-for="model in paginatedModels"
-              :key="`${model.id}-${model.purpose}`"
+              :key="`${model.service}\u0000${model.name}`"
               class="border-b border-light-border/10 dark:border-dark-border/10 hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
               data-testid="item-model"
+              :data-model-service="model.service"
+              :data-model-name="model.name"
             >
               <td class="py-3 px-2 sm:px-3">
                 <div class="flex items-center gap-2">
@@ -325,7 +345,33 @@
                 </div>
               </td>
               <td class="py-3 px-2 sm:px-3 hidden sm:table-cell">
-                <span class="pill pill--active text-xs">{{ model.purpose }}</span>
+                <div class="flex flex-wrap gap-1.5">
+                  <button
+                    v-for="chip in model.purposes"
+                    :key="chip.purpose"
+                    type="button"
+                    :class="[
+                      'inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium transition-colors border',
+                      isPurposeChipActive(chip)
+                        ? 'bg-[var(--brand)] text-white border-[var(--brand)] hover:bg-[var(--brand)]/90'
+                        : 'border-light-border/40 dark:border-dark-border/30 txt-secondary hover:border-[var(--brand)] hover:text-[var(--brand)]',
+                      isPurposeDisabled(chip.purpose) &&
+                        'opacity-50 cursor-not-allowed hover:border-light-border/40 hover:text-inherit',
+                      !isPurposeDisabled(chip.purpose) &&
+                        !isPurposeChipActive(chip) &&
+                        'cursor-pointer',
+                    ]"
+                    :disabled="isPurposeDisabled(chip.purpose)"
+                    :title="getPurposeChipTitle(model, chip)"
+                    :aria-pressed="isPurposeChipActive(chip)"
+                    data-testid="btn-purpose-chip"
+                    :data-purpose="chip.purpose"
+                    :data-model-id="chip.modelId"
+                    @click.stop="onPurposeChipClick(chip)"
+                  >
+                    {{ purposeLabels[chip.purpose] }}
+                  </button>
+                </div>
               </td>
               <td class="py-3 px-2 sm:px-3 txt-secondary text-sm hidden lg:table-cell">
                 {{ model.description }}
@@ -415,8 +461,14 @@ import {
   checkModelAvailability,
 } from '@/services/api/configApi'
 import { adminEmbeddingApi, type EmbeddingGuardStatus } from '@/services/api/adminEmbeddingApi'
+import { ApiError } from '@/services/api/httpClient'
 import { useAuthStore } from '@/stores/auth'
 import type { AIModel, Capability } from '@/types/ai-models'
+import {
+  dedupeModelsByPurpose,
+  type ModelWithPurposes,
+  type PurposeChip,
+} from '@/utils/aiModelDedupe'
 import { getProviderIcon } from '@/utils/providerIcons'
 import { useI18n } from 'vue-i18n'
 
@@ -514,10 +566,22 @@ const normalizeHighlight = (highlight: string): Capability | 'ALL' | null => {
   return aliasMap[highlight] || null
 }
 
+// VECTORIZE switching is not exclusively gated server-side by ROLE_ADMIN:
+// the admin embedding endpoint is admin-only, but
+// ConfigController::saveDefaultModels also allows eligible non-admin paid
+// users to change it, subject to premium/cooldown guards. This flag is a
+// frontend UX restriction for non-admins: they must still SEE the active
+// embedding model — they need that context to understand their RAG
+// behaviour — but the dropdown is disabled and shows an "Admin only"
+// badge so they don't trip into a failed cost-estimate pre-flight.
+const isVectorizeAdminOnly = computed(() => !authStore.isAdmin)
+
 // Optimistic UI flag for the VECTORIZE Premium-Lock badge: free users
 // see the badge immediately, paid users only see it if the backend
 // guard explicitly says no (e.g. cooldown). The badge is purely
 // informational — the modal re-confirms the gate before any switch.
+// (Only consulted when the user IS an admin; non-admins get the
+// stricter Admin-only treatment above.)
 const canSwitchEmbedding = computed(() => {
   if (embeddingGuard.value) return embeddingGuard.value.canChange
   return authStore.isPro || authStore.isAdmin
@@ -674,12 +738,26 @@ const getSelectedModelObj = (purpose: Capability): AIModel | null => {
 }
 
 const toggleDropdown = (capability: Capability) => {
+  // Belt-and-braces: the button has `:disabled` for non-admin VECTORIZE,
+  // but a determined user could still toggle the v-if dropdown via the
+  // devtools or a stale ref. Bail here so the dropdown never opens.
+  if (capability === 'VECTORIZE' && isVectorizeAdminOnly.value) {
+    openDropdown.value = null
+    return
+  }
   openDropdown.value = openDropdown.value === capability ? null : capability
 }
 
 const selectModel = async (capability: Capability, modelId: number | null) => {
   openDropdown.value = null
   const previousModelId = defaultConfig.value[capability]
+
+  // Same defensive guard as toggleDropdown: the cost-estimate +
+  // /switch endpoints both require ROLE_ADMIN and would 403, surfacing
+  // as a cryptic "Failed to load cost estimate" toast.
+  if (capability === 'VECTORIZE' && isVectorizeAdminOnly.value) {
+    return
+  }
 
   // VECTORIZE swaps require pre-flight cost confirmation + paid plan,
   // so we route through the dedicated EmbeddingSwitchModal instead of
@@ -690,15 +768,45 @@ const selectModel = async (capability: Capability, modelId: number | null) => {
   // model (no-op) or the "(none)" option.
   if (capability === 'VECTORIZE' && modelId !== null && modelId !== previousModelId) {
     const target = getModelsByPurpose(capability).find((m) => m.id === modelId)
-    if (target) {
-      switchModalTargetId.value = modelId
-      switchModalTargetName.value = target.name
-      switchModalTargetProvider.value = target.service
-      switchModalGuardReason.value = embeddingGuard.value?.canChange
-        ? null
-        : (embeddingGuard.value?.reason ?? null)
-      switchModalOpen.value = true
+    if (!target) return
+
+    // #949: Pre-flight provider key check BEFORE opening the modal.
+    // Without this guard, an admin can open the switch flow for a
+    // model whose API key is missing — the /switch endpoint would
+    // then 400 with "provider_unavailable", surfacing as a generic
+    // "Switch failed" toast deep in the modal. Catch it here so the
+    // user gets the same actionable "model not configured" warning
+    // they get for every other capability.
+    try {
+      const check = await checkModelAvailability(modelId)
+      if (!check.available) {
+        const modelName = target.name
+        if (check.env_var) {
+          warning(
+            t('config.aiModels.modelNotConfigured', {
+              model: modelName,
+              envVar: check.env_var,
+            })
+          )
+        } else {
+          showError(t('config.aiModels.modelNotAvailable', { model: modelName }))
+        }
+        return
+      }
+    } catch (err) {
+      console.error('Failed to check VECTORIZE model availability:', err)
+      // Network/server error: fall through and let the modal handle
+      // the failure with its full cost-estimate error UI rather than
+      // silently swallowing the click.
     }
+
+    switchModalTargetId.value = modelId
+    switchModalTargetName.value = target.name
+    switchModalTargetProvider.value = target.service
+    switchModalGuardReason.value = embeddingGuard.value?.canChange
+      ? null
+      : (embeddingGuard.value?.reason ?? null)
+    switchModalOpen.value = true
     return
   }
 
@@ -765,6 +873,60 @@ const loadEmbeddingGuard = async () => {
   }
 }
 
+/**
+ * True when this chip's underlying model id is the current default for
+ * its purpose. Each chip carries its own modelId because a dedup'd row
+ * can represent several BMODELS ids (e.g. "Claude Opus 4.6" — id 160
+ * for CHAT, id 222 for MEM); active state is therefore per-chip, not
+ * per-row.
+ */
+const isPurposeChipActive = (chip: PurposeChip): boolean => {
+  return defaultConfig.value[chip.purpose] === chip.modelId
+}
+
+/**
+ * VECTORIZE is admin-only at the UI layer (see `isVectorizeAdminOnly` for
+ * the rationale). Disabled chips render greyed and ignore clicks so a
+ * non-admin can still see what their model supports without being teased
+ * with an action they cannot perform.
+ */
+const isPurposeDisabled = (purpose: Capability): boolean => {
+  return purpose === 'VECTORIZE' && isVectorizeAdminOnly.value
+}
+
+/**
+ * Tooltip text for the purpose chip. Active = "already the default",
+ * inactive = "click to set as default for X". Translated via i18n so the
+ * user gets the German/English copy that matches their UI locale.
+ */
+const getPurposeChipTitle = (model: AIModel, chip: PurposeChip): string => {
+  if (isPurposeDisabled(chip.purpose)) {
+    return t('config.embeddingSwitch.adminOnly.lockTooltip')
+  }
+  const label = purposeLabels.value[chip.purpose]
+  if (isPurposeChipActive(chip)) {
+    return t('config.aiModels.purposeChip.activeTooltip', { purpose: label })
+  }
+  return t('config.aiModels.purposeChip.applyTooltip', {
+    purpose: label,
+    model: model.name,
+  })
+}
+
+/**
+ * Chip click handler: applies this chip's specific model id to the
+ * default config for the chip's purpose. We delegate to the existing
+ * `selectModel` flow so VECTORIZE keeps going through the embedding-
+ * switch modal and other purposes hit the same availability check +
+ * auto-save path as the dropdown. Clicking the already-active chip is
+ * a no-op — there is no value in re-saving the same configuration.
+ */
+const onPurposeChipClick = async (chip: PurposeChip): Promise<void> => {
+  if (isPurposeDisabled(chip.purpose)) return
+  if (isPurposeChipActive(chip)) return
+  await selectModel(chip.purpose, chip.modelId)
+}
+
 const handleClickOutside = (event: MouseEvent) => {
   if (!openDropdown.value) return
   const target = event.target as HTMLElement
@@ -780,21 +942,30 @@ const handleKeydown = (event: KeyboardEvent) => {
   }
 }
 
-const allModels = computed(() => {
-  const all: Array<AIModel & { purpose: Capability }> = []
-  for (const [cap, models] of Object.entries(availableModels.value)) {
-    models.forEach((model) => {
-      all.push({ ...model, purpose: cap as Capability })
-    })
-  }
-  return all
-})
+/**
+ * Issue #261: dedupe the table so each model surfaces ONCE with all its
+ * purposes listed as selectable chips. The backend returns models indexed
+ * by purpose so the same model shows up in multiple buckets — e.g.
+ * Claude Haiku 4.5 appears under SORT, CHAT and ANALYZE. That made the
+ * list painful to scan: 11 purposes × N models meant hundreds of rows
+ * that all referred to the same handful of models.
+ *
+ * The dedup helper is extracted to `@/utils/aiModelDedupe` so the rule is
+ * unit-testable without mounting this whole component.
+ */
+const PURPOSE_ORDER = computed<Capability[]>(() => Object.keys(purposeLabels.value) as Capability[])
 
-const filteredModels = computed(() => {
+const allModels = computed<ModelWithPurposes[]>(() =>
+  dedupeModelsByPurpose(availableModels.value, PURPOSE_ORDER.value)
+)
+
+const filteredModels = computed<ModelWithPurposes[]>(() => {
   if (selectedPurpose.value === null) {
     return allModels.value
   }
-  return allModels.value.filter((model) => model.purpose === selectedPurpose.value)
+  return allModels.value.filter((model) =>
+    model.purposes.some((chip) => chip.purpose === selectedPurpose.value)
+  )
 })
 
 /**
@@ -818,13 +989,25 @@ const getStarRating = (quality: number): number => {
   return Math.round(quality / 2)
 }
 
-type ModelWithPurpose = AIModel & { purpose: Capability }
-
-const sortedModels = computed(() => {
+const sortedModels = computed<ModelWithPurposes[]>(() => {
   const dir = sortDirection.value === 'asc' ? 1 : -1
   const col = sortBy.value
+  const order = PURPOSE_ORDER.value
 
-  const compareFn = (a: ModelWithPurpose, b: ModelWithPurpose): number => {
+  // Position of the model's "first" capability in the canonical order is
+  // the cleanest deterministic sort key for the dedup'd list: a generalist
+  // model with SORT+CHAT+ANALYZE sorts together with other SORT-capable
+  // models, while a TEXT2SOUND-only model lands near the bottom.
+  const primaryPurposeRank = (model: ModelWithPurposes): number => {
+    let min = Number.POSITIVE_INFINITY
+    for (const chip of model.purposes) {
+      const idx = order.indexOf(chip.purpose)
+      if (idx !== -1 && idx < min) min = idx
+    }
+    return Number.isFinite(min) ? min : order.length
+  }
+
+  const compareFn = (a: ModelWithPurposes, b: ModelWithPurposes): number => {
     let cmp = 0
     switch (col) {
       case 'alphabet':
@@ -838,7 +1021,7 @@ const sortedModels = computed(() => {
         cmp = a.quality - b.quality
         break
       case 'purpose':
-        cmp = a.purpose.localeCompare(b.purpose)
+        cmp = primaryPurposeRank(a) - primaryPurposeRank(b)
         break
     }
     return cmp !== 0 ? dir * cmp : dir * a.name.localeCompare(b.name)
@@ -879,7 +1062,23 @@ const saveConfiguration = async () => {
     }
   } catch (err: unknown) {
     console.error('Failed to save configuration:', err)
-    showError(t('config.aiModels.saveError'))
+    // Issue #883: surface the actual reason the backend gave us instead of
+    // a generic "Failed to save model configuration" toast. The premium
+    // gate on `ConfigController::saveDefaultModels` returns a structured
+    // 403 `{ error: 'requires_premium', message: 'Switching the embedding
+    // model requires an active paid subscription. Current level: NEW.', ... }`
+    // and `httpClient.ApiError` now exposes both the message and the code.
+    if (err instanceof ApiError && 403 === err.status) {
+      const reason =
+        'requires_premium' === err.code
+          ? t('config.aiModels.saveErrorPremiumRequired', { reason: err.message })
+          : err.message
+      showError(reason)
+    } else if (err instanceof Error && err.message) {
+      showError(err.message)
+    } else {
+      showError(t('config.aiModels.saveError'))
+    }
   } finally {
     saving.value = false
   }

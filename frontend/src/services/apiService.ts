@@ -1,5 +1,6 @@
 import type { AIModel } from '@/stores/models'
 import { getApiBaseUrl } from '@/services/api/httpClient'
+import { hasSessionHint, clearSessionHint } from '@/services/sessionHint'
 import type { z } from 'zod'
 
 export interface DefaultModelConfig {
@@ -44,9 +45,16 @@ function redirectToSessionExpired(): void {
 
 /**
  * Centralized token refresh - prevents concurrent refresh requests (stampede)
+ *
+ * Short-circuits when no session hint is present (issue #204) so that
+ * unauthenticated callers never trigger an `/api/v1/auth/refresh` round-trip
+ * just to get an expected 401 back.
  */
 async function refreshAccessToken(): Promise<boolean> {
-  // If already refreshing, wait for that promise
+  if (!hasSessionHint()) {
+    return false
+  }
+
   if (tokenRefreshPromise) {
     return tokenRefreshPromise
   }
@@ -58,6 +66,10 @@ async function refreshAccessToken(): Promise<boolean> {
         credentials: 'include',
       })
 
+      if (!refreshResponse.ok) {
+        // Stored cookie is dead - drop the hint so the next call short-circuits.
+        clearSessionHint()
+      }
       return refreshResponse.ok
     } catch (error) {
       console.error('Token refresh error:', error)

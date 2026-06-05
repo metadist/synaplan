@@ -170,6 +170,17 @@
           </div>
         </div>
 
+        <!-- Activity log button (visible on hover) -->
+        <button
+          class="absolute top-3 right-[4.25rem] icon-ghost opacity-0 group-hover:opacity-100 transition-all z-20"
+          :aria-label="$t('mail.activity.openButton')"
+          :title="$t('mail.activity.openButton')"
+          data-testid="btn-activity"
+          @click.stop="openActivity(handler)"
+        >
+          <ClockIcon class="w-4 h-4" />
+        </button>
+
         <!-- Delete button (separate from header to avoid overlap) -->
         <button
           class="absolute top-3 right-10 icon-ghost icon-ghost--danger opacity-0 group-hover:opacity-100 transition-all z-20"
@@ -229,6 +240,13 @@
         </div>
       </div>
     </div>
+
+    <MailHandlerActivityLogModal
+      :is-open="activityModalOpen"
+      :handler-id="activityModalHandlerId"
+      :handler-name="activityModalHandlerName"
+      @close="closeActivity"
+    />
   </div>
 </template>
 
@@ -248,6 +266,7 @@ import {
 } from '@heroicons/vue/24/outline'
 import type { SavedMailHandler } from '@/services/api/inboundEmailHandlersApi'
 import { useDateFormat } from '@/composables/useDateFormat'
+import MailHandlerActivityLogModal from './MailHandlerActivityLogModal.vue'
 
 interface Props {
   handlers: SavedMailHandler[]
@@ -297,5 +316,22 @@ const deleteSelected = () => {
 
 const formatDate = (date: Date) => {
   return formatRelativeTime(date)
+}
+
+// Project rule (docs/FRONTEND_CONVENTIONS.md): prefer `ref()` over
+// `reactive()` for modal state — keeps reactivity boundaries explicit
+// and matches how the rest of the codebase wires up dialogs.
+const activityModalOpen = ref(false)
+const activityModalHandlerId = ref<string | null>(null)
+const activityModalHandlerName = ref('')
+
+const openActivity = (handler: SavedMailHandler) => {
+  activityModalHandlerId.value = handler.id
+  activityModalHandlerName.value = handler.name
+  activityModalOpen.value = true
+}
+
+const closeActivity = () => {
+  activityModalOpen.value = false
 }
 </script>

@@ -118,6 +118,69 @@ class SubscriptionControllerStripeOutboundTest extends WebTestCase
         $this->assertSame(1, $this->stripeMock->countCalls('POST', 'checkout/sessions'));
     }
 
+    /**
+     * Locks in the env-configured payment methods on the outbound Checkout
+     * Session. STRIPE_PAYMENT_METHODS in .env.test must contain `sepa_debit`
+     * (IBAN) so EU customers can mandate Direct Debit alongside card / Link /
+     * Klarna. Apple Pay and Google Pay are NOT separate types — Stripe shows
+     * them automatically when `card` is present and the device supports it,
+     * so we only assert the explicitly-configured methods here.
+     *
+     * If this test fails after dropping a method from STRIPE_PAYMENT_METHODS,
+     * it's deliberate; update both `.env.test` and `.env.example` and adjust
+     * the assertion below.
+     */
+    public function testCheckoutForwardsConfiguredPaymentMethodsIncludingSepaDebit(): void
+    {
+        $customerId = 'cus_'.bin2hex(random_bytes(8));
+        $this->seedStripeCustomerId($customerId);
+
+        $this->stripeMock->expect('GET', 'customers/'.$customerId, [
+            'id' => $customerId,
+            'object' => 'customer',
+            'email' => $this->user->getMail(),
+        ]);
+
+        $this->stripeMock->expect('POST', 'checkout/sessions', [
+            'id' => 'cs_test_'.bin2hex(random_bytes(8)),
+            'object' => 'checkout.session',
+            'url' => 'https://checkout.stripe.com/c/pay/test',
+            'customer' => $customerId,
+        ]);
+
+        $this->postJson('/api/v1/subscription/checkout', ['planId' => 'PRO']);
+
+        $this->assertResponseIsSuccessful();
+
+        $checkoutCall = null;
+        foreach ($this->stripeMock->captured() as $call) {
+            if ('post' === $call['method'] && str_contains($call['url'], 'checkout/sessions')) {
+                $checkoutCall = $call;
+                break;
+            }
+        }
+        $this->assertNotNull($checkoutCall, 'Checkout session POST must be captured');
+
+        // Stripe's SDK passes payment_method_types as an array under one
+        // request path and as a form-encoded string under another — accept
+        // either so the test isn't coupled to SDK serialisation internals.
+        $paymentMethods = $checkoutCall['params']['payment_method_types'] ?? null;
+        $this->assertNotNull($paymentMethods, 'Checkout session must include payment_method_types');
+
+        $needles = ['card', 'link', 'sepa_debit', 'klarna'];
+        if (is_array($paymentMethods)) {
+            foreach ($needles as $method) {
+                $this->assertContains($method, $paymentMethods,
+                    sprintf('STRIPE_PAYMENT_METHODS must forward %s to Stripe Checkout', $method));
+            }
+        } else {
+            foreach ($needles as $method) {
+                $this->assertStringContainsString($method, (string) $paymentMethods,
+                    sprintf('STRIPE_PAYMENT_METHODS must forward %s to Stripe Checkout', $method));
+            }
+        }
+    }
+
     public function testCheckoutReusesExistingStripeCustomer(): void
     {
         $customerId = 'cus_existing_'.bin2hex(random_bytes(4));

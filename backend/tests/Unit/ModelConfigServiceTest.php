@@ -9,19 +9,24 @@ use App\Repository\ConfigRepository;
 use App\Repository\ModelRepository;
 use App\Repository\UserRepository;
 use App\Service\ModelConfigService;
+use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use Psr\Cache\CacheItemInterface;
 use Psr\Cache\CacheItemPoolInterface;
 
 class ModelConfigServiceTest extends TestCase
 {
-    private ConfigRepository $configRepository;
-    private ModelRepository $modelRepository;
-    private UserRepository $userRepository;
-    private CacheItemPoolInterface $cache;
-    private ProviderRegistry $providerRegistry;
+    // Intersection types so PHPStan understands that the mocks expose
+    // PHPUnit's `expects()`/`method()`. The previous concrete-only typing
+    // forced phpstan-baseline.neon to swallow ~50 "undefined method"
+    // entries for this file (Copilot review on PR #986).
+    private ConfigRepository&MockObject $configRepository;
+    private ModelRepository&MockObject $modelRepository;
+    private UserRepository&MockObject $userRepository;
+    private CacheItemPoolInterface&MockObject $cache;
+    private ProviderRegistry&MockObject $providerRegistry;
     private ModelConfigService $service;
-    private CacheItemInterface $cacheItem;
+    private CacheItemInterface&MockObject $cacheItem;
 
     protected function setUp(): void
     {
@@ -375,6 +380,52 @@ class ModelConfigServiceTest extends TestCase
         $this->assertEquals('openai', $result['chat']['provider']);
     }
 
+    public function testGetUserAiConfigFallsBackWhenPic2TextModelRowIsMissing(): void
+    {
+        // Cache miss for the chat/embedding getDefaultProvider lookups.
+        $this->cacheItem->method('isHit')->willReturn(false);
+        $this->cache->method('getItem')->willReturn($this->cacheItem);
+
+        // DEFAULTMODEL.PIC2TEXT points at id 999 — but that row was deleted.
+        $picTextConfig = $this->createMock(Config::class);
+        $picTextConfig->method('getValue')->willReturn('999');
+
+        $this->configRepository
+            ->method('findOneBy')
+            ->willReturnCallback(function (array $criteria) use ($picTextConfig) {
+                if (($criteria['group'] ?? null) === 'DEFAULTMODEL'
+                    && ($criteria['setting'] ?? null) === 'PIC2TEXT') {
+                    return $picTextConfig;
+                }
+
+                return null;
+            });
+
+        // Stale: model row no longer exists → provider lookup returns null.
+        $this->modelRepository->method('find')->with(999)->willReturn(null);
+
+        // Vision falls through to the capability default chain. There's no
+        // BCONFIG row, so it walks through findFallbackProvider() and lands
+        // on the first available provider from the registry mock.
+        $this->configRepository
+            ->method('findByOwnerGroupAndSetting')
+            ->willReturn(null);
+
+        // First available provider from setUp() is 'openai'; ensure modelRepository->findByTag
+        // returns a model owned by openai so findFallbackProvider returns it.
+        $openAiModel = $this->createMock(Model::class);
+        $openAiModel->method('getService')->willReturn('openai');
+        $this->modelRepository->method('findByTag')->willReturn([$openAiModel]);
+
+        $result = $this->service->getUserAiConfig(1);
+
+        $this->assertSame('openai', $result['vision']['provider']);
+        $this->assertNull(
+            $result['vision']['model'],
+            'Stale PIC2TEXT model id must be nulled out when the referenced row is gone'
+        );
+    }
+
     public function testGetEffectiveUserIdForMessageWithWhatsAppUnverifiedUser(): void
     {
         $userId = 1;
@@ -551,6 +602,120 @@ class ModelConfigServiceTest extends TestCase
         $result = $this->service->getEffectiveUserIdForMessage($message);
 
         $this->assertNull($result, 'User not found in database should return null');
+    }
+
+    /**
+     * Regression test for issue #973.
+     *
+     * The "New Memory" UI parse endpoint (UserMemoryController::parseMemory)
+     * and the async MemoryExtractionService MUST share the same MEM → CHAT
+     * fallback chain. Otherwise admins who configure a cheap MEM model see
+     * the UI silently fall back to the (expensive) CHAT default.
+     */
+    public function testGetMemoryModelConfigPrefersUserMemOverGlobalMemAndChat(): void
+    {
+        $userId = 42;
+        $userMemModelId = 220;
+
+        $userMemConfig = $this->createMock(Config::class);
+        $userMemConfig->method('getValue')->willReturn((string) $userMemModelId);
+
+        // findOneBy should be hit exactly once — the very first MEM lookup wins.
+        $this->configRepository
+            ->expects($this->once())
+            ->method('findOneBy')
+            ->with([
+                'ownerId' => $userId,
+                'group' => 'DEFAULTMODEL',
+                'setting' => 'MEM',
+            ])
+            ->willReturn($userMemConfig);
+
+        $model = $this->createMock(Model::class);
+        $model->method('getService')->willReturn('Groq');
+        $model->method('getProviderId')->willReturn('gpt-oss-120b');
+
+        $this->modelRepository
+            ->method('find')
+            ->with($userMemModelId)
+            ->willReturn($model);
+
+        $result = $this->service->getMemoryModelConfig($userId);
+
+        $this->assertSame([
+            'model' => 'gpt-oss-120b',
+            'provider' => 'groq',
+            'model_id' => $userMemModelId,
+        ], $result);
+    }
+
+    public function testGetMemoryModelConfigFallsThroughGlobalMemUserChatToGlobalChat(): void
+    {
+        $userId = 7;
+        $globalChatModelId = 160;
+
+        $globalChatConfig = $this->createMock(Config::class);
+        $globalChatConfig->method('getValue')->willReturn((string) $globalChatModelId);
+
+        // Walk the full chain: user MEM → global MEM → user CHAT → global CHAT.
+        // Only the very last lookup returns a config.
+        $this->configRepository
+            ->expects($this->exactly(4))
+            ->method('findOneBy')
+            ->willReturnCallback(
+                function (array $criteria) use ($userId, $globalChatConfig) {
+                    static $calls = 0;
+                    ++$calls;
+
+                    $expectedSequence = [
+                        ['ownerId' => $userId, 'group' => 'DEFAULTMODEL', 'setting' => 'MEM'],
+                        ['ownerId' => 0, 'group' => 'DEFAULTMODEL', 'setting' => 'MEM'],
+                        ['ownerId' => $userId, 'group' => 'DEFAULTMODEL', 'setting' => 'CHAT'],
+                        ['ownerId' => 0, 'group' => 'DEFAULTMODEL', 'setting' => 'CHAT'],
+                    ];
+
+                    self::assertSame(
+                        $expectedSequence[$calls - 1],
+                        $criteria,
+                        "Fallback chain step {$calls} called with unexpected criteria"
+                    );
+
+                    return 4 === $calls ? $globalChatConfig : null;
+                }
+            );
+
+        $model = $this->createMock(Model::class);
+        $model->method('getService')->willReturn('Anthropic');
+        $model->method('getProviderId')->willReturn('claude-opus-4-6');
+
+        $this->modelRepository
+            ->method('find')
+            ->with($globalChatModelId)
+            ->willReturn($model);
+
+        $result = $this->service->getMemoryModelConfig($userId);
+
+        $this->assertSame([
+            'model' => 'claude-opus-4-6',
+            'provider' => 'anthropic',
+            'model_id' => $globalChatModelId,
+        ], $result);
+    }
+
+    public function testGetMemoryModelConfigReturnsNullsWhenNothingConfigured(): void
+    {
+        $this->configRepository
+            ->method('findOneBy')
+            ->willReturn(null);
+
+        $this->modelRepository
+            ->expects($this->never())
+            ->method('find');
+
+        $this->assertSame(
+            ['model' => null, 'provider' => null, 'model_id' => null],
+            $this->service->getMemoryModelConfig(99)
+        );
     }
 
     public function testGetEffectiveUserIdForMessageWithWebChannelUnverifiedUser(): void

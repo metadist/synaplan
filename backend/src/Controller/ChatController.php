@@ -528,6 +528,21 @@ class ChatController extends AbstractController
                     ];
                 }
 
+                // Audio model (TTS pipeline used for voice reply, e.g. Piper).
+                // Surfaced separately from `chat` so a page reload also shows
+                // the actual TTS model under the "Audio Model" badge — see
+                // issue #583.
+                $audioProvider = $m->getMeta('ai_audio_provider');
+                $audioModel = $m->getMeta('ai_audio_model');
+                $audioModelId = $m->getMeta('ai_audio_model_id');
+                if ($audioProvider || $audioModel) {
+                    $aiModels['audio'] = [
+                        'provider' => $audioProvider,
+                        'model' => $audioModel,
+                        'model_id' => $audioModelId ? (int) $audioModelId : null,
+                    ];
+                }
+
                 // Web Search metadata
                 $searchQuery = $m->getMeta('web_search_query');
                 $searchResultsCount = $m->getMeta('web_search_results_count');

@@ -276,6 +276,20 @@ final readonly class MessageProcessor
                 ]);
             }
 
+            // User-selected knowledge-base folder (RAG group key) from the chat
+            // composer. Scope this turn's retrieval to that group regardless of
+            // the classification path above (normal chat, again, widget, fixed
+            // prompt) so "add a knowledge group to the chat" works everywhere.
+            if (!empty($options['rag_group_key'])) {
+                $classification['rag_group_key'] = $options['rag_group_key'];
+            }
+            if (!empty($options['rag_limit'])) {
+                $classification['rag_limit'] = (int) $options['rag_limit'];
+            }
+            if (isset($options['rag_min_score'])) {
+                $classification['rag_min_score'] = (float) $options['rag_min_score'];
+            }
+
             // Step 2.3: Load Prompt Metadata and apply tool restrictions
             $topic = $classification['topic'] ?? 'general';
             $perfTimer->start('prompt');
@@ -289,35 +303,48 @@ final readonly class MessageProcessor
                 $options['resolved_prompt_data'] = $promptData;
             }
 
-            // Apply tool restrictions from prompt metadata
-            // If prompt explicitly DISABLES a tool, override frontend request
-            if (isset($promptMetadata['tool_internet_search']) && !$promptMetadata['tool_internet_search']) {
-                $options['web_search'] = false;
-            }
-
-            // Step 2.5: Web Search (if requested or AI-classified)
+            // Step 2.5: Web Search
+            //
+            // Project-wide policy: search is the DEFAULT for every chat.
+            // The only ways to suppress it are:
+            //   (a) Topic is a pure asset/document generation topic where
+            //       the handler does not consume web context.
+            //   (b) The user has explicitly opted out by setting
+            //       `tool_internet=false` on the task prompt.
+            //
+            // All other signals (classifier `web_search` vote, AI BWEBSEARCH,
+            // legacy `tools:search` source) are now advisory only — they are
+            // recorded in the decision log for diagnostics, but no longer
+            // gate the decision.
             $searchResults = null;
-            $shouldSearch = $options['web_search'] ?? false;
+            $topic = $classification['topic'] ?? 'general';
+            $promptToolInternet = $promptMetadata['tool_internet'] ?? null;
+            $shouldSearch = WebSearchTopicPolicy::shouldSearch($topic, $promptToolInternet);
+            $triggerReason = $this->triggerReasonFor($topic, $promptToolInternet, $shouldSearch);
 
-            // Check if AI classifier detected search intent automatically
-            if (!$shouldSearch && isset($classification['web_search'])) {
-                $shouldSearch = (bool) $classification['web_search'];
+            // Consolidated decision log: lets us diagnose "search didn't trigger"
+            // reports without correlating multiple log lines from different services.
+            $braveEnabled = $this->braveSearchService->isEnabled();
+            $this->logger->info('MessageProcessor: Web search decision', [
+                'message_id' => $message->getId(),
+                'should_search' => $shouldSearch,
+                'trigger_reason' => $triggerReason,
+                'frontend_flag' => (bool) ($options['web_search'] ?? false),
+                'prompt_tool_internet' => $promptToolInternet,
+                'classifier_web_search_hint' => $classification['web_search'] ?? null,
+                'classification_source' => $classification['source'] ?? null,
+                'classification_topic' => $topic,
+                'brave_enabled' => $braveEnabled,
+            ]);
 
-                if ($shouldSearch) {
-                    $this->logger->info('🤖 AI Classifier activated web search automatically', [
-                        'message_id' => $message->getId(),
-                        'classification' => $classification,
-                    ]);
-                }
+            if ($shouldSearch && !$braveEnabled) {
+                $this->logger->warning('MessageProcessor: Web search requested but Brave Search is disabled', [
+                    'message_id' => $message->getId(),
+                    'trigger_reason' => $triggerReason,
+                ]);
             }
 
-            // Also check if classifier set a search-related topic (legacy fallback)
-            if (!$shouldSearch && isset($classification['source'])) {
-                $source = $classification['source'];
-                $shouldSearch = in_array($source, ['tools:search', 'tools:web'], true);
-            }
-
-            if ($shouldSearch && $this->braveSearchService->isEnabled()) {
+            if ($shouldSearch && $braveEnabled) {
                 $this->notify($statusCallback, 'searching', 'Searching the web...');
 
                 try {
@@ -701,32 +728,34 @@ final readonly class MessageProcessor
             }
 
             $searchResults = null;
-            $shouldSearch = isset($options['force_web_search']) ? (bool) $options['force_web_search'] : false;
+            $topic = $classification['topic'] ?? 'general';
+            $promptToolInternet = $promptMetadata['tool_internet'] ?? null;
+            $shouldSearch = WebSearchTopicPolicy::shouldSearch($topic, $promptToolInternet);
+            $triggerReason = $this->triggerReasonFor($topic, $promptToolInternet, $shouldSearch);
 
-            if (!$shouldSearch && ($promptMetadata['tool_internet'] ?? false)) {
-                $this->logger->info('MessageProcessor: Prompt metadata requests internet search', [
-                    'topic' => $classification['topic'] ?? 'unknown',
+            $braveEnabled = $this->braveSearchService->isEnabled();
+            $this->logger->info('MessageProcessor: Web search decision', [
+                'message_id' => $message->getId(),
+                'should_search' => $shouldSearch,
+                'trigger_reason' => $triggerReason,
+                'force_web_search' => (bool) ($options['force_web_search'] ?? false),
+                'prompt_tool_internet' => $promptToolInternet,
+                'classifier_web_search_hint' => $classification['web_search'] ?? null,
+                'classification_source' => $classification['source'] ?? null,
+                'classification_topic' => $topic,
+                'brave_enabled' => $braveEnabled,
+                'pipeline' => 'process',
+            ]);
+
+            if ($shouldSearch && !$braveEnabled) {
+                $this->logger->warning('MessageProcessor: Web search requested but Brave Search is disabled', [
+                    'message_id' => $message->getId(),
+                    'trigger_reason' => $triggerReason,
+                    'pipeline' => 'process',
                 ]);
-                $shouldSearch = true;
             }
 
-            if (!$shouldSearch && isset($classification['web_search'])) {
-                $shouldSearch = (bool) $classification['web_search'];
-
-                if ($shouldSearch) {
-                    $this->logger->info('🤖 AI Classifier activated web search automatically', [
-                        'message_id' => $message->getId(),
-                        'classification' => $classification,
-                    ]);
-                }
-            }
-
-            if (!$shouldSearch && isset($classification['source'])) {
-                $source = $classification['source'];
-                $shouldSearch = in_array($source, ['tools:search', 'tools:web'], true);
-            }
-
-            if ($shouldSearch && $this->braveSearchService->isEnabled()) {
+            if ($shouldSearch && $braveEnabled) {
                 $this->notify($statusCallback, 'searching', 'Searching the web...');
 
                 try {
@@ -898,6 +927,30 @@ final readonly class MessageProcessor
     /**
      * Send status notification to callback.
      */
+    /**
+     * Human-readable reason for the consolidated web-search decision log.
+     *
+     * Mirrors the precedence in {@see WebSearchTopicPolicy::shouldSearch()}
+     * so the log line directly explains the decision without a reader
+     * having to consult two services.
+     */
+    private function triggerReasonFor(?string $topic, ?bool $promptToolInternet, bool $shouldSearch): string
+    {
+        if (!$shouldSearch) {
+            if (WebSearchTopicPolicy::isNonWebSearchTopic($topic)) {
+                return 'non_web_search_topic';
+            }
+
+            return 'disabled_by_prompt_tool_internet';
+        }
+
+        if (true === $promptToolInternet) {
+            return 'prompt_tool_internet_opt_in';
+        }
+
+        return 'project_default';
+    }
+
     private function notify(?callable $callback, string $status, string $message, array $metadata = []): void
     {
         if ($callback) {

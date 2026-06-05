@@ -58,20 +58,51 @@ final readonly class MemoryExtractionService
      */
     private function extractMemoriesViaAi(Message $message, array $conversationHistory, array $existingMemories = []): array
     {
-        // Build context from conversation history (last 5 messages)
-        $contextMessages = array_slice($conversationHistory, -5);
+        // Issue #438: filter the conversation history to USER turns only
+        // BEFORE slicing. The extractor must never see the assistant's
+        // own replies, otherwise the LLM occasionally lifts a memory out
+        // of its own summary/recommendation instead of the user's actual
+        // statement. The current user message is still delivered via
+        // `Current Message:` below, so dropping assistant turns from
+        // history costs no real signal: it removes a known leak source
+        // (AI prose that reads like first-person facts) and keeps the
+        // user's prior statements intact for topical context.
+        //
+        // Filter first, THEN slice the last 5 — slicing first would let
+        // a chatty assistant push genuine user statements out of the
+        // window even though the budget is for user history.
+        $userOnlyHistory = [];
+        foreach ($conversationHistory as $msg) {
+            if ($msg instanceof Message) {
+                if ('IN' !== $msg->getDirection()) {
+                    continue;
+                }
+                $userOnlyHistory[] = ['role' => 'user', 'content' => (string) $msg->getText()];
+                continue;
+            }
+
+            // Array form. Treat anything that is NOT 'user' as untrusted
+            // (assistant / system / tool) and drop it. Use strict equality
+            // so we never accidentally extract from a malformed entry
+            // with a missing or unexpected role.
+            $role = $msg['role'] ?? 'user';
+            if ('user' !== $role) {
+                continue;
+            }
+            $userOnlyHistory[] = ['role' => 'user', 'content' => (string) ($msg['content'] ?? '')];
+        }
+
+        $contextMessages = array_slice($userOnlyHistory, -5);
         $contextText = '';
         foreach ($contextMessages as $msg) {
-            // Handle both Message objects and arrays
-            if ($msg instanceof Message) {
-                $role = 'IN' === $msg->getDirection() ? 'user' : 'assistant';
-                $content = $msg->getText();
-            } else {
-                $role = $msg['role'] ?? 'user';
-                $content = $msg['content'] ?? '';
-            }
-            $contextText .= "{$role}: {$content}\n";
+            $contextText .= "user: {$msg['content']}\n";
         }
+
+        $this->logger->debug('Memory extraction context filtered to user turns', [
+            'message_id' => $message->getId(),
+            'history_in' => count($conversationHistory),
+            'user_turns_in_context' => count($contextMessages),
+        ]);
 
         // System prompt for memory extraction (always English)
         $systemPrompt = $this->getExtractionPrompt();
@@ -106,11 +137,17 @@ final readonly class MemoryExtractionService
 
         // AI call — the JSON format MUST be in the user prompt because the system prompt
         // in the database only says "Return JSON array or null" without specifying the schema.
+        //
+        // The `Conversation:` block contains USER-ONLY turns (issue #438):
+        // the assistant's replies are deliberately excluded from the
+        // prompt and we restate that contract inline so a non-compliant
+        // model can't pretend it saw an "assistant:" line and lift facts
+        // from it.
         $userPrompt = <<<PROMPT
-Conversation:
+Conversation (USER turns only — assistant replies have been removed):
 {$contextText}
 
-Current Message:
+Current Message (from the user):
 {$message->getText()}
 {$existingMemoriesText}
 
@@ -124,6 +161,7 @@ Return [] if nothing to save, or null.
 
 RULES:
 - Only save facts the user states about THEMSELVES (name, age, preferences, skills, etc.)
+- The Conversation block is USER-only. Never invent or extract from anything you (the assistant) wrote in earlier replies — only the lines shown above are valid sources.
 - Questions about topics are NOT memories ("Who is X?" → null, "Is Y true?" → null)
 - One fact per memory, short keys (snake_case, <= 24 chars)
 - category: personal, preferences, work, projects, or other relevant category
@@ -359,44 +397,23 @@ PROMPT;
     /**
      * Resolve which model runs the memory-extraction LLM call.
      *
-     * Phase 2d priority:
-     *   1. User-scoped DEFAULTMODEL.MEM   (per-user override, set via the admin UI)
-     *   2. Global DEFAULTMODEL.MEM        (the new "Memory extraction model"
-     *                                       BMODELS row, BTAG=mem, default
-     *                                       points at Groq gpt-oss-120b for
-     *                                       ~200 ms TTFT)
-     *   3. User-scoped DEFAULTMODEL.CHAT  (legacy fallback — preserved for
-     *                                       installations that haven't seeded
-     *                                       the MEM tag yet)
-     *   4. Global DEFAULTMODEL.CHAT       (last resort)
-     *
-     * The MEM tag exists so picking a slow/expensive chat model (e.g. Gemini
-     * 3.x Pro) for the user-facing answer no longer cascades into the
-     * background memory extraction.
+     * Delegates to {@see ModelConfigService::getMemoryModelConfig()} so the
+     * same MEM → CHAT fallback chain is shared with the synchronous
+     * "New Memory" UI endpoint (UserMemoryController::parseMemory). See #973.
      *
      * @return array{model: string|null, provider: string|null, model_id: int|null}
      */
     private function getExtractionModelConfig(int $userId): array
     {
-        $modelId = $this->modelConfigService->getDefaultModel('MEM', $userId)
-            ?? $this->modelConfigService->getDefaultModel('MEM', 0)
-            ?? $this->modelConfigService->getDefaultModel('CHAT', $userId)
-            ?? $this->modelConfigService->getDefaultModel('CHAT', 0);
-
-        if (!$modelId) {
-            return ['model' => null, 'provider' => null, 'model_id' => null];
-        }
-
-        $model = $this->modelConfigService->getModelName($modelId);
-        $provider = $this->modelConfigService->getProviderForModel($modelId);
+        $config = $this->modelConfigService->getMemoryModelConfig($userId);
 
         $this->logger->debug('Memory extraction model resolved', [
             'user_id' => $userId,
-            'model_id' => $modelId,
-            'model' => $model,
-            'provider' => $provider,
+            'model_id' => $config['model_id'],
+            'model' => $config['model'],
+            'provider' => $config['provider'],
         ]);
 
-        return ['model' => $model, 'provider' => $provider, 'model_id' => $modelId];
+        return $config;
     }
 }

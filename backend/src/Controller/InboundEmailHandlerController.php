@@ -7,6 +7,7 @@ use App\Entity\User;
 use App\Repository\InboundEmailHandlerRepository;
 use App\Service\EncryptionService;
 use App\Service\InboundEmailHandlerService;
+use App\Service\MailHandlerLogService;
 use Doctrine\ORM\EntityManagerInterface;
 use OpenApi\Attributes as OA;
 use Psr\Log\LoggerInterface;
@@ -31,6 +32,7 @@ class InboundEmailHandlerController extends AbstractController
         private InboundEmailHandlerRepository $handlerRepository,
         private InboundEmailHandlerService $handlerService,
         private EncryptionService $encryptionService,
+        private MailHandlerLogService $activityLog,
         private EntityManagerInterface $em,
         private LoggerInterface $logger,
     ) {
@@ -186,6 +188,145 @@ class InboundEmailHandlerController extends AbstractController
     }
 
     /**
+     * Test mailbox (IMAP/POP3) connection with credentials from the request body.
+     * Does not persist changes or alter stored handler status (preview before save).
+     */
+    #[Route('/test-connection', name: 'test_connection_preview', methods: ['POST'], priority: 10)]
+    #[OA\Post(
+        path: '/api/v1/inbound-email-handlers/test-connection',
+        summary: 'Test mailbox connection without saving',
+        description: 'Tests IMAP/POP3 login using values from the form. When editing an existing handler, omit password or send the masked placeholder and pass handlerId to reuse the stored password while testing changed server settings.',
+        security: [['Bearer' => []]],
+        tags: ['Inbound Email Handlers']
+    )]
+    #[OA\RequestBody(
+        required: true,
+        content: new OA\JsonContent(
+            required: ['mailServer', 'port', 'protocol', 'security', 'username'],
+            properties: [
+                new OA\Property(property: 'mailServer', type: 'string', example: 'imap.example.com'),
+                new OA\Property(property: 'port', type: 'integer', example: 993),
+                new OA\Property(property: 'protocol', type: 'string', enum: ['IMAP', 'POP3']),
+                new OA\Property(property: 'security', type: 'string', enum: ['SSL/TLS', 'STARTTLS', 'None']),
+                new OA\Property(property: 'username', type: 'string', example: 'user@example.com'),
+                new OA\Property(property: 'password', type: 'string', nullable: true, description: 'Plain password; omit or mask when handlerId is set'),
+                new OA\Property(property: 'handlerId', type: 'integer', nullable: true, description: 'Existing handler ID to load stored password when password is omitted/masked'),
+            ]
+        )
+    )]
+    #[OA\Response(
+        response: 200,
+        description: 'Connection test result',
+        content: new OA\JsonContent(
+            properties: [
+                new OA\Property(property: 'success', type: 'boolean', example: true),
+                new OA\Property(property: 'message', type: 'string', example: 'Connection successful'),
+            ]
+        )
+    )]
+    #[OA\Response(response: 400, description: 'Invalid or incomplete parameters')]
+    #[OA\Response(response: 401, description: 'Not authenticated')]
+    #[OA\Response(response: 404, description: 'Handler not found')]
+    public function testConnectionPreview(Request $request, #[CurrentUser] ?User $user): JsonResponse
+    {
+        if (!$user) {
+            return $this->json(['error' => 'Not authenticated'], Response::HTTP_UNAUTHORIZED);
+        }
+
+        $data = json_decode($request->getContent(), true);
+        if (!is_array($data)) {
+            return $this->json([
+                'success' => false,
+                'message' => 'Invalid JSON body',
+            ], Response::HTTP_BAD_REQUEST);
+        }
+
+        $mailServer = isset($data['mailServer']) ? trim((string) $data['mailServer']) : '';
+        $username = isset($data['username']) ? trim((string) $data['username']) : '';
+        $port = isset($data['port']) ? (int) $data['port'] : 0;
+        $protocol = isset($data['protocol']) ? (string) $data['protocol'] : '';
+        $security = isset($data['security']) ? (string) $data['security'] : '';
+
+        if ('' === $mailServer || '' === $username || $port <= 0 || $port > 65535) {
+            return $this->json([
+                'success' => false,
+                'message' => 'mailServer, username, and a valid port (1–65535) are required',
+            ], Response::HTTP_BAD_REQUEST);
+        }
+
+        if (!in_array($protocol, ['IMAP', 'POP3'], true)) {
+            return $this->json([
+                'success' => false,
+                'message' => 'protocol must be IMAP or POP3',
+            ], Response::HTTP_BAD_REQUEST);
+        }
+
+        if (!in_array($security, ['SSL/TLS', 'STARTTLS', 'None'], true)) {
+            return $this->json([
+                'success' => false,
+                'message' => 'security must be SSL/TLS, STARTTLS, or None',
+            ], Response::HTTP_BAD_REQUEST);
+        }
+
+        $passwordInput = isset($data['password']) ? (string) $data['password'] : '';
+        $handlerId = isset($data['handlerId']) ? (int) $data['handlerId'] : 0;
+
+        $plainPassword = null;
+        if (!InboundEmailHandlerService::isMaskedPasswordPlaceholder($passwordInput)) {
+            $plainPassword = $passwordInput;
+        } elseif ($handlerId > 0) {
+            $stored = $this->handlerRepository->findByIdAndUser($handlerId, $user->getId());
+            if (!$stored) {
+                // Use `message` (not `error`) to match the 200/400 responses on
+                // the same endpoint — keeps the generated Zod schema stable
+                // and lets clients render a single field regardless of status.
+                return $this->json([
+                    'success' => false,
+                    'message' => 'Handler not found',
+                ], Response::HTTP_NOT_FOUND);
+            }
+            $plainPassword = $stored->getDecryptedPassword($this->encryptionService);
+        }
+
+        if (null === $plainPassword || '' === $plainPassword) {
+            return $this->json([
+                'success' => false,
+                'message' => 'Password is required, or provide handlerId to reuse the saved password',
+            ], Response::HTTP_BAD_REQUEST);
+        }
+
+        try {
+            $result = $this->handlerService->testMailboxCredentials(
+                $mailServer,
+                $port,
+                $protocol,
+                $security,
+                $username,
+                $plainPassword
+            );
+
+            return $this->json([
+                'success' => $result['success'],
+                'message' => $result['message'],
+            ]);
+        } catch (\Exception $e) {
+            // Log the raw exception (with hostname, library detail, stack
+            // trace, …) but return a generic message to the caller — we
+            // never want IMAP/POP3 library internals leaking into a
+            // user-facing toast.
+            $this->logger->error('Preview mailbox connection test failed', [
+                'user_id' => $user->getId(),
+                'exception' => $e,
+            ]);
+
+            return $this->json([
+                'success' => false,
+                'message' => 'Test connection failed. Please check your settings and try again.',
+            ], Response::HTTP_INTERNAL_SERVER_ERROR);
+        }
+    }
+
+    /**
      * Update handler.
      */
     #[Route('/{id}', name: 'update', methods: ['PUT'])]
@@ -332,6 +473,7 @@ class InboundEmailHandlerController extends AbstractController
             ], Response::HTTP_NOT_FOUND);
         }
 
+        $this->activityLog->deleteAll($user->getId(), $id);
         $this->em->remove($handler);
         $this->em->flush();
 
@@ -409,15 +551,17 @@ class InboundEmailHandlerController extends AbstractController
                 'message' => $result['message'],
             ]);
         } catch (\Exception $e) {
+            // Match `testConnectionPreview`: log the full exception (host,
+            // library details, stack trace) server-side, but never leak
+            // IMAP/POP3 library internals into a user-facing toast.
             $this->logger->error('Test connection failed', [
                 'handler_id' => $id,
-                'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString(),
+                'exception' => $e,
             ]);
 
             return $this->json([
                 'success' => false,
-                'message' => 'Test connection failed: '.$e->getMessage(),
+                'message' => 'Test connection failed. Please check your settings and try again.',
             ], Response::HTTP_INTERNAL_SERVER_ERROR);
         }
     }
@@ -595,6 +739,7 @@ class InboundEmailHandlerController extends AbstractController
         foreach ($handlerIds as $handlerId) {
             $handler = $this->handlerRepository->findOneBy(['id' => $handlerId, 'userId' => $user->getId()]);
             if ($handler) {
+                $this->activityLog->deleteAll($user->getId(), (int) $handlerId);
                 $this->em->remove($handler);
                 ++$deleted;
             }
@@ -603,5 +748,75 @@ class InboundEmailHandlerController extends AbstractController
         $this->em->flush();
 
         return $this->json(['success' => true, 'deleted' => $deleted]);
+    }
+
+    /**
+     * Recent activity log entries for a handler (newest first, capped at 10).
+     */
+    #[Route('/{id}/logs', name: 'logs', methods: ['GET'], requirements: ['id' => '\d+'])]
+    #[OA\Get(
+        path: '/api/v1/inbound-email-handlers/{id}/logs',
+        summary: 'Recent activity log for an email handler',
+        description: 'Returns the last 10 activity entries (connection checks, routing decisions, forward results) for the handler. Useful for diagnosing "marked seen but never forwarded" cases.',
+        security: [['Bearer' => []]],
+        tags: ['Inbound Email Handlers']
+    )]
+    #[OA\Parameter(
+        name: 'id',
+        in: 'path',
+        description: 'Handler ID',
+        required: true,
+        schema: new OA\Schema(type: 'integer')
+    )]
+    #[OA\Response(
+        response: 200,
+        description: 'Recent activity entries (newest first)',
+        content: new OA\JsonContent(
+            properties: [
+                new OA\Property(property: 'success', type: 'boolean', example: true),
+                new OA\Property(
+                    property: 'logs',
+                    type: 'array',
+                    items: new OA\Items(
+                        properties: [
+                            new OA\Property(property: 'id', type: 'integer'),
+                            new OA\Property(property: 'timestamp', type: 'integer', description: 'Unix epoch seconds'),
+                            new OA\Property(property: 'event', type: 'string', enum: ['check', 'connect_failed', 'forwarded', 'discarded', 'no_smtp', 'forward_failed', 'process_error']),
+                            new OA\Property(property: 'status', type: 'string', enum: ['success', 'warning', 'error']),
+                            new OA\Property(property: 'error', type: 'string'),
+                            new OA\Property(property: 'details', type: 'object', additionalProperties: true),
+                        ]
+                    )
+                ),
+            ]
+        )
+    )]
+    #[OA\Response(response: 401, description: 'Not authenticated')]
+    #[OA\Response(response: 404, description: 'Handler not found')]
+    public function logs(int $id, #[CurrentUser] ?User $user): JsonResponse
+    {
+        if (!$user) {
+            return $this->json(['error' => 'Not authenticated'], Response::HTTP_UNAUTHORIZED);
+        }
+
+        $handler = $this->handlerRepository->findByIdAndUser($id, $user->getId());
+
+        if (!$handler) {
+            return $this->json([
+                'success' => false,
+                'error' => 'Handler not found',
+            ], Response::HTTP_NOT_FOUND);
+        }
+
+        $logs = $this->activityLog->findRecent(
+            $user->getId(),
+            $id,
+            MailHandlerLogService::DEFAULT_KEEP
+        );
+
+        return $this->json([
+            'success' => true,
+            'logs' => $logs,
+        ]);
     }
 }

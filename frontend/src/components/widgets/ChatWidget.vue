@@ -59,12 +59,14 @@
             alt="Chat"
             class="w-9 h-9 object-contain"
           />
-          <component
-            :is="getButtonIconComponent"
+          <!-- eslint-disable vue/no-v-html -- inline svg mirrors lazy-loader; html source is bundled, not user input -->
+          <span
             v-else
             :style="{ color: iconColor }"
-            class="w-8 h-8"
-          />
+            class="w-8 h-8 inline-flex"
+            v-html="widgetIconSvg"
+          ></span>
+          <!-- eslint-enable vue/no-v-html -->
           <span
             v-if="unreadCount > 0"
             class="absolute -top-1 -right-1 w-6 h-6 bg-red-500 text-white text-xs font-bold rounded-full flex items-center justify-center"
@@ -107,14 +109,35 @@
         >
           <div class="flex items-center gap-3">
             <div class="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center">
-              <ChatBubbleLeftRightIcon class="w-6 h-6 text-white" />
+              <img
+                v-if="buttonIcon === 'custom' && buttonIconUrl"
+                :src="buttonIconUrl"
+                alt=""
+                class="w-7 h-7 object-contain"
+              />
+              <!-- eslint-disable-next-line vue/no-v-html -- inline svg mirrors floating button; html source is bundled, not user input -->
+              <span v-else class="w-6 h-6 text-white inline-flex" v-html="widgetIconSvg"></span>
             </div>
             <div>
               <h3 class="text-white font-semibold">{{ widgetTitle || $t('widget.title') }}</h3>
-              <p class="text-white/80 text-xs">{{ $t('widget.subtitle') }}</p>
+              <p v-if="resolvedSubtitle" class="text-white/80 text-xs">{{ resolvedSubtitle }}</p>
             </div>
           </div>
           <div class="flex items-center gap-2">
+            <!-- Human handoff: small bell button that pages the operator's
+                 Slack channel. Hidden once the session is already waiting for
+                 or talking to a human, so the visitor cannot double-page. -->
+            <button
+              v-if="humanHandoffEnabled && chatMode === 'ai' && !handoffRequested"
+              :disabled="handoffSubmitting"
+              class="w-8 h-8 rounded-lg bg-white/10 hover:bg-white/20 transition-colors flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed"
+              :aria-label="$t('widget.humanHandoff.button')"
+              :title="$t('widget.humanHandoff.tooltip')"
+              data-testid="btn-human-handoff"
+              @click="requestHumanHandoff"
+            >
+              <BellAlertIcon class="w-5 h-5 text-white" />
+            </button>
             <!-- Export button disabled - functionality preserved for future use -->
             <button
               v-if="false"
@@ -621,7 +644,6 @@
 import { getErrorMessage } from '@/utils/errorMessage'
 import { ref, computed, watch, nextTick, onMounted, onBeforeUnmount } from 'vue'
 import {
-  ChatBubbleLeftRightIcon,
   XMarkIcon,
   PaperClipIcon,
   PaperAirplaneIcon,
@@ -633,6 +655,7 @@ import {
   ArrowDownTrayIcon,
   ArrowsPointingOutIcon,
   ArrowsPointingInIcon,
+  BellAlertIcon,
 } from '@heroicons/vue/24/outline'
 
 import {
@@ -671,6 +694,8 @@ interface Props {
   defaultTheme?: 'light' | 'dark'
   isPreview?: boolean
   widgetTitle?: string
+  widgetSubtitle?: string | null
+  aiAssistantName?: string | null
   apiUrl: string
   allowFileUpload?: boolean
   fileUploadLimit?: number
@@ -680,6 +705,7 @@ interface Props {
   externalUserId?: string
   privacyPolicyUrl?: string
   sessionMode?: 'browser' | 'user'
+  humanHandoffEnabled?: boolean
   testMode?: boolean
   internalMode?: boolean
   /**
@@ -703,6 +729,8 @@ const props = withDefaults(defineProps<Props>(), {
   defaultTheme: 'light',
   isPreview: false,
   widgetTitle: '',
+  widgetSubtitle: undefined,
+  aiAssistantName: undefined,
   allowFileUpload: false,
   fileUploadLimit: 3,
   hideButton: false,
@@ -711,6 +739,7 @@ const props = withDefaults(defineProps<Props>(), {
   externalUserId: undefined,
   privacyPolicyUrl: undefined,
   sessionMode: 'browser',
+  humanHandoffEnabled: false,
   testMode: false,
   internalMode: false,
   realtime: undefined,
@@ -789,16 +818,42 @@ function dismissPrivacy() {
   }
 }
 
-// Get button icon component based on buttonIcon prop
-const getButtonIconComponent = computed(() => {
-  // If custom icon URL is provided, it will be handled by img tag in template
-  if (props.buttonIconUrl) {
-    return null
-  }
+// Inline SVG icons mirror `widget.ts::getIconContent()` so the lazy-loader
+// JS button, the in-Vue floating button, and the open-window header all show
+// the same config-driven icon. Prior versions hardcoded ChatBubbleLeftRightIcon
+// in both the floating button and the header — only the lazy-loader button
+// respected the operator's `buttonIcon` choice, which is why customers saw
+// their custom icon on the launcher but a generic chat bubble in the popup.
+const widgetIconSet: Record<string, string> = {
+  chat: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="100%" height="100%"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>',
+  headset:
+    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="100%" height="100%"><path d="M3 18v-6a9 9 0 0 1 18 0v6"></path><path d="M21 19a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3zM3 19a2 2 0 0 0 2 2h1a2 2 0 0 0 2-2v-3a2 2 0 0 0-2-2H3z"></path></svg>',
+  help: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="100%" height="100%"><circle cx="12" cy="12" r="10"></circle><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>',
+  robot:
+    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="100%" height="100%"><rect x="3" y="11" width="18" height="10" rx="2"></rect><circle cx="12" cy="5" r="2"></circle><path d="M12 7v4"></path><line x1="8" y1="16" x2="8" y2="16"></line><line x1="16" y1="16" x2="16" y2="16"></line></svg>',
+  message:
+    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="100%" height="100%"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"></path></svg>',
+  support:
+    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="100%" height="100%"><circle cx="12" cy="12" r="10"></circle><path d="M12 16v-4"></path><path d="M12 8h.01"></path></svg>',
+}
 
-  // For now, always return ChatBubbleLeftRightIcon
-  // In the full implementation, we would map buttonIcon values to different components
-  return ChatBubbleLeftRightIcon
+const widgetIconSvg = computed(() => {
+  const key = props.buttonIcon || 'chat'
+  return widgetIconSet[key] || widgetIconSet.chat
+})
+
+// Subtitle resolution. Three distinct config states must round-trip from
+// backend sanitizer (PHP null / '' / 'text') to the rendered DOM:
+//   undefined OR null  → legacy default ("We typically reply in minutes")
+//   '' (empty string)  → hide the <p> entirely (operator opted out)
+//   non-empty string   → render verbatim (operator copy, NOT translated)
+// `null` is the value the backend sends when the field was never touched, so
+// we must treat it identically to `undefined` (mere absence of the prop).
+const resolvedSubtitle = computed(() => {
+  if (props.widgetSubtitle === undefined || props.widgetSubtitle === null) {
+    return t('widget.subtitle')
+  }
+  return props.widgetSubtitle
 })
 const selectedFiles = ref<File[]>([])
 const fileSizeError = ref(false)
@@ -825,6 +880,14 @@ let eventSubscription: WidgetSubscription | null = null
 // visitor publishes its in-progress text, operator typing arrives here.
 let typingChannel: WidgetTypingHandle | null = null
 let operatorTypingTimer: ReturnType<typeof setTimeout> | null = null
+
+// Human handoff (Slack ping) state
+// `handoffRequested` mirrors the server-side WAITING/HUMAN mode so the bell
+// button hides after a successful click even before the SSE takeover event
+// arrives. `handoffSubmitting` guards against rapid double-clicks while the
+// POST is in flight.
+const handoffRequested = ref(false)
+const handoffSubmitting = ref(false)
 
 const isMobile = ref(false)
 const { t } = useI18n()
@@ -1489,17 +1552,27 @@ const sendMessage = async () => {
   await scrollToBottom()
 
   isSending.value = true
-  isTyping.value = true
 
-  const assistantMessageId = Date.now().toString()
-  messages.value.push({
-    id: assistantMessageId,
-    role: 'assistant',
-    type: 'text',
-    content: '',
-    timestamp: new Date(),
-    sender: 'ai',
-  })
+  // During human takeover there is no AI reply: the backend only persists the
+  // visitor message and notifies the operator via SSE. Adding an empty assistant
+  // placeholder (and later reloading history to fill it) is what made the
+  // visitor's own message vanish until a manual reload. So skip it in human mode
+  // and keep the optimistic user message we just pushed.
+  const isHumanMode = chatMode.value === 'human' || chatMode.value === 'waiting'
+
+  let assistantMessageId: string | null = null
+  if (!isHumanMode) {
+    isTyping.value = true
+    assistantMessageId = Date.now().toString()
+    messages.value.push({
+      id: assistantMessageId,
+      role: 'assistant',
+      type: 'text',
+      content: '',
+      timestamp: new Date(),
+      sender: 'ai',
+    })
+  }
 
   try {
     const result = await sendWidgetMessage(props.widgetId, userMessage, sessionId.value, {
@@ -1655,6 +1728,71 @@ const addBotMessage = (text: string) => {
   scrollToBottom()
 }
 
+// Send a manual human-handoff request. The button is only rendered when
+// the server reported `humanHandoffEnabled = true` (= widget owner wired
+// a Slack webhook AND left the in-widget button enabled), and only while
+// the session is still in AI mode. Failures fall back to an inline system
+// message instead of breaking the chat — Slack outages must not block the
+// visitor from continuing the conversation.
+const requestHumanHandoff = async () => {
+  if (handoffSubmitting.value || handoffRequested.value) return
+  if (!sessionId.value) return
+
+  handoffSubmitting.value = true
+
+  try {
+    const lastUserMessage = [...messages.value]
+      .reverse()
+      .find((m) => m.role === 'user' && m.type === 'text')
+    const response = await fetch(`${props.apiUrl}/api/v1/widget/${props.widgetId}/human-handoff`, {
+      method: 'POST',
+      headers: buildWidgetHeaders(),
+      body: JSON.stringify({
+        sessionId: sessionId.value,
+        lastMessage: lastUserMessage?.content ?? '',
+      }),
+    })
+
+    if (!response.ok) {
+      throw new Error(`Handoff request failed: ${response.status}`)
+    }
+
+    const result = await response.json()
+    handoffRequested.value = true
+    // Confirm in chat so the visitor sees they were heard, even before an
+    // operator picks the conversation up. Inline system message keeps the
+    // UX consistent with takeover / handback events that flow via SSE.
+    const messageKey = result?.notified
+      ? 'widget.humanHandoff.successNotified'
+      : 'widget.humanHandoff.successQueued'
+    messages.value.push({
+      id: `handoff-${Date.now()}`,
+      role: 'assistant',
+      type: 'text',
+      content: t(messageKey),
+      timestamp: new Date(),
+      sender: 'system',
+    })
+    if (result?.mode === 'waiting' || result?.mode === 'human') {
+      chatMode.value = result.mode
+    }
+    scrollToBottom()
+  } catch (err) {
+    console.debug('[Widget] Human handoff request failed', err)
+    messages.value.push({
+      id: `handoff-error-${Date.now()}`,
+      role: 'assistant',
+      type: 'text',
+      content: t('widget.humanHandoff.failed'),
+      timestamp: new Date(),
+      sender: 'system',
+    })
+    scrollToBottom()
+  } finally {
+    handoffSubmitting.value = false
+  }
+}
+
 const scrollToBottom = async () => {
   await nextTick()
   if (messagesContainer.value) {
@@ -1672,7 +1810,11 @@ const getSenderLabel = (message: Message): string => {
       return t('widget.senderSystem')
     case 'ai':
     default:
-      return t('widget.senderAi')
+      // Operator-controlled override (e.g. "Acme Bot", "Lara") — falls back
+      // to the i18n default ("AI Assistant" / "KI-Assistent") when the widget
+      // owner hasn't customised it. Backend stores '' as null, so a truthy
+      // check is the right boundary here.
+      return props.aiAssistantName ? props.aiAssistantName : t('widget.senderAi')
   }
 }
 
@@ -2340,6 +2482,19 @@ if (props.openImmediately) {
 watch(isOpen, (newVal) => {
   if (newVal) {
     scrollToBottom()
+  }
+})
+
+// Keep `handoffRequested` in sync with the server-authoritative session
+// mode. Once an operator takes over (or the session is already waiting),
+// the in-widget bell button must hide regardless of whether the user
+// clicked it locally — otherwise a stale tab could re-trigger Slack pings
+// after a handback / takeover cycle initiated from the dashboard side.
+watch(chatMode, (newMode) => {
+  if (newMode === 'waiting' || newMode === 'human') {
+    handoffRequested.value = true
+  } else if (newMode === 'ai') {
+    handoffRequested.value = false
   }
 })
 

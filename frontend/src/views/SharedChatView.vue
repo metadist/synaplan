@@ -142,12 +142,12 @@
           <div
             v-for="message in messages"
             :key="message.id"
-            class="flex gap-4"
+            class="flex gap-0 md:gap-4"
             :class="message.direction === 'IN' ? 'flex-row' : 'flex-row-reverse'"
             data-testid="item-message"
           >
-            <!-- Avatar -->
-            <div class="flex-shrink-0">
+            <!-- Avatar (tablet+) -->
+            <div class="hidden md:block flex-shrink-0">
               <div
                 class="w-10 h-10 rounded-full flex items-center justify-center"
                 :class="
@@ -608,5 +608,18 @@ const parseMessageParts = (message: Message): MessagePart[] => {
 </script>
 
 <style scoped>
-/* No additional styles needed - MessageText and MessageCode components have their own styles */
+/*
+ * The global stylesheet sets `html, body { overflow: hidden; height: 100% }`
+ * so the chat app can own its scroll regions. The shared-chat page is a
+ * long, document-style layout (sticky header + main + footer) that needs
+ * normal page scrolling, so we turn this root into its own scroll
+ * container. The sticky header sticks to the nearest scrolling ancestor,
+ * which is now `.shared-chat-root` — behavior is preserved.
+ */
+.shared-chat-root {
+  height: 100dvh;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+}
 </style>

@@ -7,6 +7,7 @@ use App\Entity\File;
 use App\Entity\User;
 use App\Repository\ConfigRepository;
 use App\Repository\FileRepository;
+use App\Service\File\FileStorageService;
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;
 
@@ -145,7 +146,9 @@ final readonly class StorageQuotaService
      *   percentage: float,
      *   limit_formatted: string,
      *   usage_formatted: string,
-     *   remaining_formatted: string
+     *   remaining_formatted: string,
+     *   max_file_size: int,
+     *   max_file_size_formatted: string
      * }
      */
     public function getStorageStats(User $user): array
@@ -154,6 +157,7 @@ final readonly class StorageQuotaService
         $usage = $this->getStorageUsage($user);
         $remaining = max(0, $limit - $usage);
         $percentage = $limit > 0 ? ($usage / $limit) * 100 : 0;
+        $maxFileSize = FileStorageService::getMaxFileSize();
 
         return [
             'limit' => $limit,
@@ -163,6 +167,8 @@ final readonly class StorageQuotaService
             'limit_formatted' => $this->formatBytes($limit),
             'usage_formatted' => $this->formatBytes($usage),
             'remaining_formatted' => $this->formatBytes($remaining),
+            'max_file_size' => $maxFileSize,
+            'max_file_size_formatted' => $this->formatBytes($maxFileSize),
         ];
     }
 

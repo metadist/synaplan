@@ -728,7 +728,7 @@ class OpenAIProvider implements ChatProviderInterface, EmbeddingProviderInterfac
             'completion_tokens' => $usage['output_tokens'] ?? 0,
             'total_tokens' => $usage['total_tokens'] ?? 0,
             'cached_tokens' => $usage['input_tokens_details']['cached_tokens'] ?? 0,
-            'cache_creation_tokens' => 0,
+            'cache_creation_tokens' => $usage['input_tokens_details']['cache_creation_tokens'] ?? 0,
         ];
     }
 
@@ -745,15 +745,7 @@ class OpenAIProvider implements ChatProviderInterface, EmbeddingProviderInterfac
         }
 
         try {
-            $params = [
-                'model' => $options['model'],
-                'input' => $text,
-            ];
-
-            // Force 1536 dimensions for v3 models to match MariaDB vector column size
-            if (str_contains($options['model'], 'text-embedding-3')) {
-                $params['dimensions'] = 1536;
-            }
+            $params = $this->buildEmbeddingParams($options['model'], $text, $options);
 
             $response = $this->client->embeddings()->create($params);
             $usage = $response->usage;
@@ -781,15 +773,7 @@ class OpenAIProvider implements ChatProviderInterface, EmbeddingProviderInterfac
         }
 
         try {
-            $params = [
-                'model' => $options['model'],
-                'input' => $texts,
-            ];
-
-            // Force 1536 dimensions for v3 models to match MariaDB vector column size
-            if (str_contains($options['model'], 'text-embedding-3')) {
-                $params['dimensions'] = 1536;
-            }
+            $params = $this->buildEmbeddingParams($options['model'], $texts, $options);
 
             $response = $this->client->embeddings()->create($params);
             $usage = $response->usage;
@@ -808,12 +792,54 @@ class OpenAIProvider implements ChatProviderInterface, EmbeddingProviderInterfac
 
     public function getDimensions(string $model): int
     {
+        // Native output dimensions per the OpenAI embedding catalog. The
+        // previous implementation lied here for `text-embedding-3-large`
+        // (claimed 1536) because `embed()` used to coerce v3 outputs to
+        // 1536 via the API `dimensions` parameter. That coercion is gone
+        // (issue #985 — it caused the documents/memories pipeline to
+        // recreate Qdrant collections at the WRONG dim because the
+        // catalog metadata said 3072 while the actual vectors came back
+        // as 1536, resulting in HTTP 400 on every upsert), so this
+        // method now reports the true model output.
         return match (true) {
             str_contains($model, 'text-embedding-3-small') => 1536,
-            str_contains($model, 'text-embedding-3-large') => 1536, // Forced to 1536 for compatibility
+            str_contains($model, 'text-embedding-3-large') => 3072,
             str_contains($model, 'text-embedding-ada-002') => 1536,
             default => 1536,
         };
+    }
+
+    /**
+     * Build the params for an OpenAI embeddings call.
+     *
+     * Caller may pass `dimensions` in `$options` to opt-in to the v3
+     * truncation feature (e.g. shrink `text-embedding-3-large` from
+     * 3072 → 1024 to match a fixed collection width). The provider
+     * never injects a default truncation on its own — that historical
+     * behaviour silently desynchronised catalog `vector_dim` metadata
+     * from the actual vector width and corrupted re-vectorize runs.
+     * Caller-provided values are forwarded verbatim; an empty/zero
+     * value is treated as "no override" so test fixtures stay simple.
+     *
+     * @param string|list<string>  $input
+     * @param array<string, mixed> $options
+     *
+     * @return array<string, mixed>
+     */
+    private function buildEmbeddingParams(string $model, string|array $input, array $options): array
+    {
+        $params = [
+            'model' => $model,
+            'input' => $input,
+        ];
+
+        $explicitDimensions = $options['dimensions'] ?? null;
+        if (is_int($explicitDimensions) && $explicitDimensions > 0
+            && str_contains($model, 'text-embedding-3')) {
+            $params['dimensions'] = $explicitDimensions;
+        }
+
+        return $params;
     }
 
     // ==================== IMAGE GENERATION ====================
@@ -1323,7 +1349,12 @@ class OpenAIProvider implements ChatProviderInterface, EmbeddingProviderInterfac
                 'prompt_length' => strlen($prompt),
             ]);
 
-            $response = $this->client->chat()->create([
+            // Reasoning-tier models (o-series, gpt-5+) reject the legacy
+            // `max_tokens` parameter on chat.completions and require the
+            // newer `max_completion_tokens` instead. Pick the right key
+            // based on the same heuristic the rest of this class uses, so
+            // every catalog row that points at gpt-5*/o* vision works.
+            $payload = [
                 'model' => $model,
                 'messages' => [[
                     'role' => 'user',
@@ -1340,8 +1371,16 @@ class OpenAIProvider implements ChatProviderInterface, EmbeddingProviderInterfac
                         ],
                     ],
                 ]],
-                'max_tokens' => $options['max_tokens'] ?? 1000,
-            ]);
+            ];
+
+            $tokenLimit = $options['max_tokens'] ?? 1000;
+            if ($this->usesCompletionTokens($model)) {
+                $payload['max_completion_tokens'] = $tokenLimit;
+            } else {
+                $payload['max_tokens'] = $tokenLimit;
+            }
+
+            $response = $this->client->chat()->create($payload);
 
             return $response['choices'][0]['message']['content'] ?? '';
         } catch (\Exception $e) {

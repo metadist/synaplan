@@ -14,6 +14,7 @@ use App\Service\FeedbackConfigService;
 use App\Service\FeedbackConstants;
 use App\Service\File\FileHelper;
 use App\Service\File\UserUploadPathBuilder;
+use App\Service\MemoryExtractionDispatcher;
 use App\Service\ModelConfigService;
 use App\Service\PerfPipelineFlag;
 use App\Service\PerfTimer;
@@ -26,7 +27,6 @@ use App\Service\UserMemoryService;
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\DependencyInjection\Attribute\AutoconfigureTag;
-use Symfony\Component\Messenger\MessageBusInterface;
 
 /**
  * Chat Handler - Normaler Konversations-Chat.
@@ -53,7 +53,7 @@ final readonly class ChatHandler implements MessageHandlerInterface
         private UserMemoryService $memoryService,
         private FeedbackConfigService $feedbackConfig,
         private RateLimitService $rateLimitService,
-        private MessageBusInterface $messageBus,
+        private MemoryExtractionDispatcher $memoryExtractionDispatcher,
         private PerfPipelineFlag $perfPipelineFlag,
         iterable $pluginContextProviders = [],
     ) {
@@ -65,13 +65,24 @@ final readonly class ChatHandler implements MessageHandlerInterface
         return 'chat';
     }
 
+    /**
+     * @param array<int, array{role: string, content: string}|Message> $thread
+     * @param array<string, mixed>                                     $classification
+     * @param array<string, mixed>                                     $options        forwarded by InferenceRouter (channel, disable_memories, …)
+     */
     public function handle(
         Message $message,
         array $thread,
         array $classification,
         ?callable $progressCallback = null,
+        array $options = [],
     ): array {
         $this->notify($progressCallback, 'generating', 'Generating response...');
+
+        // Local PerfTimer keeps the shared helpers (memory + feedback
+        // loaders) shape-compatible with the streaming path without
+        // forcing every non-streaming caller to construct one.
+        $perfTimer = new PerfTimer();
 
         $topic = $classification['topic'] ?? 'general';
         $language = $classification['language'] ?? 'en';
@@ -85,9 +96,46 @@ final readonly class ChatHandler implements MessageHandlerInterface
         }
 
         $ragGroupKey = $classification['rag_group_key'] ?? null;
-        $ragLimit = isset($classification['rag_limit']) ? max(1, (int) $classification['rag_limit']) : 5;
-        $ragMinScore = isset($classification['rag_min_score']) ? max(0.0, min(1.0, (float) $classification['rag_min_score'])) : 0.3;
+        $ragLimit = isset($classification['rag_limit']) ? max(1, min(50, (int) $classification['rag_limit'])) : 20;
+        $ragMinScore = isset($classification['rag_min_score']) ? max(0.0, min(1.0, (float) $classification['rag_min_score'])) : 0.2;
         $ragContext = $this->loadRagContext($message, $topic, $ragGroupKey, $ragLimit, $ragMinScore);
+
+        // Issue #615: the non-streaming path (email / generic webhook)
+        // used to skip memory loading entirely, so memories never
+        // influenced replies for those channels and new memories were
+        // never extracted from the conversation. Mirror the streaming
+        // path so every channel benefits from the user's stored
+        // memories + feedback corrections.
+        $user = $this->em->getRepository(User::class)->find($message->getUserId());
+        $resolveSharedVector = $this->createSharedVectorResolver($message, $perfTimer);
+        $resolveMemoryVector = $this->createMemoryVectorResolver($message, $resolveSharedVector, $perfTimer);
+
+        $memoriesResult = $this->loadMemoriesContext(
+            $message,
+            $user,
+            $options,
+            $classification,
+            $progressCallback,
+            $resolveMemoryVector,
+            $perfTimer,
+        );
+        $memoriesContext = $memoriesResult['context'];
+        $loadedMemories = $memoriesResult['memories'];
+        $memoriesDisabledByRequest = $memoriesResult['disabledByRequest'];
+        $memoriesDisabledByUser = $memoriesResult['disabledByUser'];
+        $memoriesRequestDisableContext = $memoriesResult['requestDisableContext'];
+
+        $feedbackResult = $this->loadFeedbackContext(
+            $message,
+            $user,
+            $options,
+            $classification,
+            $progressCallback,
+            $resolveMemoryVector,
+            $perfTimer,
+        );
+        $feedbackContext = $feedbackResult['context'];
+        $loadedFeedbacks = $feedbackResult['feedbacks'];
 
         // Determine model: Again > Widget config override > Prompt Metadata > DB default
         $modelId = null;
@@ -186,6 +234,25 @@ final readonly class ChatHandler implements MessageHandlerInterface
             ]);
         }
 
+        // Memories + feedback go between RAG and plugin/URL context so
+        // their ordering matches the streaming path. This keeps prompt
+        // shape consistent across Web UI and email/webhook channels
+        // (issue #615).
+        if (!empty($memoriesContext)) {
+            $systemPrompt .= $memoriesContext;
+            $this->logger->info('ChatHandler: Memories context appended to system prompt', [
+                'memories_count' => count($loadedMemories),
+                'memories_context_length' => strlen($memoriesContext),
+            ]);
+        }
+
+        if (!empty($feedbackContext)) {
+            $systemPrompt .= $feedbackContext;
+            $this->logger->info('ChatHandler: Feedback context appended to system prompt', [
+                'feedback_context_length' => strlen($feedbackContext),
+            ]);
+        }
+
         // Append plugin context (external data sources like casting platforms)
         $systemPrompt = $this->appendPluginContext($systemPrompt, $message, $classification, [
             'channel' => $classification['source'] ?? null,
@@ -237,8 +304,9 @@ final readonly class ChatHandler implements MessageHandlerInterface
             'temperature' => 0.7,
         ];
 
-        // Clamp max_tokens to min(plan_limit, model_max)
-        $user = $this->em->getRepository(User::class)->find($message->getUserId());
+        // Clamp max_tokens to min(plan_limit, model_max).
+        // Reuse the User entity loaded earlier for memories/feedback so
+        // we don't hit the repository twice per request.
         $planMaxTokens = null !== $user ? $this->rateLimitService->getMaxOutputTokens($user) : null;
         $tokenLimits = array_filter(
             [$planMaxTokens, $modelMaxTokens],
@@ -334,10 +402,41 @@ final readonly class ChatHandler implements MessageHandlerInterface
             }
         }
 
+        // Issue #615: extract new memories from the email/webhook
+        // exchange just like the streaming path does. We pass the final
+        // assistant text (post JSON unwrap, post file-generation marker)
+        // so the worker reasons about what the user actually saw.
+        //
+        // Issue #881: callers that persist a separate outgoing assistant
+        // message AFTER `handle()` returns (e.g. StreamController) MUST
+        // pass `defer_memory_extraction = true` so the dispatch happens
+        // after the outgoing flush. Otherwise the worker can run before
+        // the OUT row exists and `writeOutcomeMeta()` writes the meta to
+        // the IN row only — the frontend then polls the OUT id forever
+        // and the memory toast never appears.
+        $extractionResponseText = is_string($content) ? $content : '';
+        $deferExtraction = !empty($options['defer_memory_extraction']);
+        $extractionPayload = $this->buildPendingMemoryExtraction(
+            $message,
+            $extractionResponseText,
+            $thread,
+            $loadedMemories,
+            $memoriesDisabledByRequest,
+            $memoriesDisabledByUser,
+            $memoriesRequestDisableContext,
+        );
+
+        if (!$deferExtraction) {
+            $this->dispatchPendingMemoryExtraction($extractionPayload);
+        }
+
         return [
             'content' => $content,
             'metadata' => array_merge($metadata, [
                 'model_id' => $modelId, // Include resolved model_id for storage
+                'memories' => $loadedMemories,
+                'feedbacks' => $loadedFeedbacks,
+                'extraction_payload' => $deferExtraction ? $extractionPayload : null,
             ]),
         ];
     }
@@ -385,45 +484,18 @@ final readonly class ChatHandler implements MessageHandlerInterface
         // the biggest pre-LLM time sink before this change.
         //
         // Lazy-evaluated via a closure so requests with no text (e.g. file-
-        // only) or with memories disabled never trigger the embed.
-        $sharedQueryVector = null;
-        $sharedVectorComputed = false;
-        $resolveSharedVector = function () use ($message, &$sharedQueryVector, &$sharedVectorComputed, $perfTimer): ?array {
-            if ($sharedVectorComputed) {
-                return $sharedQueryVector;
-            }
-            $sharedVectorComputed = true;
-
-            $text = $message->getText();
-            if ('' === trim($text) || !$this->memoryService->isAvailable()) {
-                return null;
-            }
-
-            $perfTimer->start('shared_embedding');
-            try {
-                $embed = $this->memoryService->embedUserQuery($message->getUserId(), $text);
-            } catch (\Throwable $e) {
-                $this->logger->warning('ChatHandler: shared embed failed, falling back to per-call embeds', [
-                    'error' => $e->getMessage(),
-                ]);
-                $embed = null;
-            }
-            $perfTimer->stop('shared_embedding');
-
-            if (null !== $embed && !empty($embed['embedding'])) {
-                $sharedQueryVector = $embed['embedding'];
-            }
-
-            return $sharedQueryVector;
-        };
+        // only) or with memories disabled never trigger the embed. The
+        // closure is now shared with `handle()` so email/webhook callers
+        // benefit from the same caching behaviour (issue #615).
+        $resolveSharedVector = $this->createSharedVectorResolver($message, $perfTimer);
 
         // Load RAG context for task prompt (if files are associated)
         $ragContext = '';
         $ragResultsCount = 0;
 
         $ragGroupKey = $options['rag_group_key'] ?? ($classification['rag_group_key'] ?? null);
-        $ragLimit = isset($options['rag_limit']) ? max(1, (int) $options['rag_limit']) : 5;
-        $ragMinScore = isset($options['rag_min_score']) ? max(0.0, min(1.0, (float) $options['rag_min_score'])) : 0.3;
+        $ragLimit = isset($options['rag_limit']) ? max(1, min(50, (int) $options['rag_limit'])) : 20;
+        $ragMinScore = isset($options['rag_min_score']) ? max(0.0, min(1.0, (float) $options['rag_min_score'])) : 0.2;
 
         if (!$ragGroupKey && 'general' !== $topic) {
             $ragGroupKey = "TASKPROMPT:{$topic}";
@@ -534,197 +606,39 @@ final readonly class ChatHandler implements MessageHandlerInterface
             ));
         }
 
-        // Load user memories from Qdrant/Microservice
-        $memoriesContext = '';
-        $loadedMemories = [];
-        $memoriesDisabledByRequest = !empty($options['disable_memories'])
-            || ('WIDGET' === ($options['channel'] ?? null))
-            || ('widget' === ($classification['source'] ?? null));
-
-        // Load user entity (Message only has userId, not User object)
+        // Memory + feedback context now live in shared helpers so the
+        // non-streaming `handle()` (email/webhook) renders identical
+        // prompts (issue #615). User entity load is needed up-front for
+        // both helpers and for the rate-limit clamp further down.
         $user = $this->em->getRepository(User::class)->find($message->getUserId());
-        $memoriesEnabledForUser = $user?->isMemoriesEnabled() ?? true;
+        $resolveMemoryVector = $this->createMemoryVectorResolver($message, $resolveSharedVector, $perfTimer);
 
-        if ($memoriesDisabledByRequest) {
-            $this->logger->debug('ChatHandler: Memories disabled for widget request, skipping memories', [
-                'user_id' => $message->getUserId(),
-            ]);
-        } elseif (!$memoriesEnabledForUser) {
-            $this->logger->debug('ChatHandler: Memories disabled by user setting, skipping memories', [
-                'user_id' => $message->getUserId(),
-            ]);
-        } elseif ($this->memoryService->isAvailable()) {
-            try {
-                $this->logger->debug('ChatHandler: Loading user memories', [
-                    'user_id' => $message->getUserId(),
-                    'message_text' => substr($message->getText(), 0, 100),
-                ]);
+        $memoriesResult = $this->loadMemoriesContext(
+            $message,
+            $user,
+            $options,
+            $classification,
+            $progressCallback,
+            $resolveMemoryVector,
+            $perfTimer,
+        );
+        $memoriesContext = $memoriesResult['context'];
+        $loadedMemories = $memoriesResult['memories'];
+        $memoriesDisabledByRequest = $memoriesResult['disabledByRequest'];
+        $memoriesDisabledByUser = $memoriesResult['disabledByUser'];
+        $memoriesRequestDisableContext = $memoriesResult['requestDisableContext'];
 
-                // Search for relevant memories using Qdrant
-                // Balance between precision and recall
-                $perfTimer->start('memories_search');
-                $sharedVector = $resolveSharedVector();
-                if (null !== $sharedVector) {
-                    $rawMemories = $this->memoryService->searchMemoriesByVector(
-                        $message->getUserId(),
-                        $sharedVector,
-                        limit: $this->feedbackConfig->getMaxChatMemories(),
-                        minScore: $this->feedbackConfig->getMinChatMemoryScore()
-                    );
-                } else {
-                    $rawMemories = $this->memoryService->searchRelevantMemories(
-                        $message->getUserId(),
-                        $message->getText(),
-                        limit: $this->feedbackConfig->getMaxChatMemories(),
-                        minScore: $this->feedbackConfig->getMinChatMemoryScore()
-                    );
-                }
-                $perfTimer->stop('memories_search');
-
-                // Post-filter: Qdrant may return low-score results despite minScore
-                $loadedMemories = $this->filterByScore($rawMemories, $this->feedbackConfig->getMinChatMemoryScore());
-
-                $this->logger->debug('ChatHandler: Memories loaded from Qdrant', [
-                    'count' => count($loadedMemories),
-                    'filtered_out' => count($rawMemories) - count($loadedMemories),
-                    'memories' => array_map(fn ($m) => [
-                        'id' => $m['id'] ?? null,
-                        'key' => $m['key'] ?? null,
-                        'score' => $m['score'] ?? 0,
-                    ], $loadedMemories),
-                ]);
-            } catch (\Throwable $e) {
-                $this->logger->warning('ChatHandler: Failed to load memories, continuing without', [
-                    'error' => $e->getMessage(),
-                ]);
-                $loadedMemories = [];
-            }
-        } else {
-            $this->logger->debug('ChatHandler: Memory service not available, skipping memories');
-        }
-
-        if (!empty($loadedMemories)) {
-            $memoriesContext = "\n\n## User Memories (relevant to this conversation):\n";
-            foreach ($loadedMemories as $memory) {
-                $memoriesContext .= sprintf(
-                    "[ID: %d] %s: %s\n",
-                    $memory['id'],
-                    $memory['key'],
-                    $memory['value']
-                );
-            }
-            $memoriesContext .= "\nUse these memories to personalize your response.\n";
-            $memoriesContext .= "REFERENCES: Use [Memory:ID] (clickable). Rules:\n";
-            $memoriesContext .= "- ONE ID per bracket. Good: [Memory:42] and [Memory:15]. Bad: [Memory:42, 15].\n";
-            $memoriesContext .= "- Only use IDs from the list above. Never invent IDs.\n";
-
-            $this->logger->info('ChatHandler: User memories loaded', [
-                'user_id' => $message->getUserId(),
-                'memories_count' => count($loadedMemories),
-            ]);
-
-            // Send SSE event to frontend showing which memories are used
-            if ($progressCallback) {
-                $progressCallback([
-                    'status' => 'memories_loaded',
-                    'message' => 'Memories loaded',
-                    'metadata' => [
-                        'memories' => $loadedMemories,
-                        'count' => count($loadedMemories),
-                    ],
-                    'timestamp' => time(),
-                ]);
-            }
-        } else {
-            $this->logger->debug('ChatHandler: No relevant memories found', [
-                'user_id' => $message->getUserId(),
-            ]);
-        }
-
-        // Load feedback examples (false positives and positives) from Qdrant
-        // These help the AI avoid known mistakes and reinforce correct information
-        $feedbackContext = '';
-        $loadedFeedbacks = [];
-        if (!$memoriesDisabledByRequest && $memoriesEnabledForUser && $this->memoryService->isAvailable()) {
-            try {
-                // Search for relevant false positives (things to AVOID saying)
-                $perfTimer->start('feedback');
-                $sharedVector = $resolveSharedVector();
-                $falsePositives = $this->searchFeedback(
-                    $message->getUserId(),
-                    $message->getText(),
-                    'feedback_negative',
-                    FeedbackConstants::NAMESPACE_FALSE_POSITIVE,
-                    $sharedVector
-                );
-
-                // Search for relevant positive examples (correct information)
-                $positiveExamples = $this->searchFeedback(
-                    $message->getUserId(),
-                    $message->getText(),
-                    'feedback_positive',
-                    FeedbackConstants::NAMESPACE_POSITIVE,
-                    $sharedVector
-                );
-                $perfTimer->stop('feedback');
-
-                if (!empty($falsePositives) || !empty($positiveExamples)) {
-                    $feedbackContext = "\n\n## User Feedback (corrections from previous conversations):\n";
-
-                    if (!empty($falsePositives)) {
-                        $feedbackContext .= "\n### Things to AVOID (user-reported false positives) - Reference as [Feedback:ID]:\n";
-                        foreach ($falsePositives as $fp) {
-                            $feedbackContext .= sprintf("- ❌ [Feedback:%d] %s\n", $fp['id'], $fp['value']);
-                            $loadedFeedbacks[] = [
-                                'id' => $fp['id'],
-                                'type' => 'false_positive',
-                                'value' => $fp['value'],
-                            ];
-                        }
-                    }
-
-                    if (!empty($positiveExamples)) {
-                        $feedbackContext .= "\n### Correct information (user-confirmed) - Reference as [Feedback:ID]:\n";
-                        foreach ($positiveExamples as $pe) {
-                            $feedbackContext .= sprintf("- ✅ [Feedback:%d] %s\n", $pe['id'], $pe['value']);
-                            $loadedFeedbacks[] = [
-                                'id' => $pe['id'],
-                                'type' => 'positive',
-                                'value' => $pe['value'],
-                            ];
-                        }
-                    }
-
-                    $feedbackContext .= "\nREFERENCES: Use [Feedback:ID] (clickable). Rules:\n";
-                    $feedbackContext .= "- ONE ID per bracket. Good: [Feedback:123] and [Feedback:456]. Bad: [Feedback:123, 456].\n";
-                    $feedbackContext .= "- Avoid repeating ❌ claims. Prefer ✅ information.\n";
-                    $feedbackContext .= "- If ❌ and ✅ entries contradict each other, mention the conflict to the user.\n";
-
-                    // Send SSE event with loaded feedbacks
-                    if ($progressCallback) {
-                        $progressCallback([
-                            'status' => 'feedback_loaded',
-                            'message' => 'Feedback examples loaded',
-                            'metadata' => [
-                                'feedbacks' => $loadedFeedbacks,
-                                'count' => count($loadedFeedbacks),
-                            ],
-                            'timestamp' => time(),
-                        ]);
-                    }
-
-                    $this->logger->info('ChatHandler: Feedback examples loaded', [
-                        'user_id' => $message->getUserId(),
-                        'false_positives_count' => count($falsePositives),
-                        'positive_examples_count' => count($positiveExamples),
-                    ]);
-                }
-            } catch (\Throwable $e) {
-                $this->logger->warning('ChatHandler: Failed to load feedback examples', [
-                    'error' => $e->getMessage(),
-                ]);
-            }
-        }
+        $feedbackResult = $this->loadFeedbackContext(
+            $message,
+            $user,
+            $options,
+            $classification,
+            $progressCallback,
+            $resolveMemoryVector,
+            $perfTimer,
+        );
+        $feedbackContext = $feedbackResult['context'];
+        $loadedFeedbacks = $feedbackResult['feedbacks'];
 
         // Get model - Priority: Again > Widget config override > Prompt Metadata > DB default
         $modelId = null;
@@ -1004,61 +918,35 @@ final readonly class ChatHandler implements MessageHandlerInterface
 
         $this->notify($progressCallback, 'generating', 'Response generated.');
 
-        if ($memoriesDisabledByRequest) {
-            $this->logger->info('ChatHandler: Skipping memory extraction for widget request', [
-                'user_id' => $message->getUserId(),
-            ]);
-        } elseif (!$this->perfPipelineFlag->isEnabled($message->getUserId())) {
-            // Phase 4 kill switch: the operator has disabled the v2 perf
-            // pipeline for this user (or globally). Skip memory extraction
-            // entirely rather than reviving the inline path. Memories will
-            // still get picked up the next time the user sends a message
-            // with the flag re-enabled.
-            $this->logger->info('ChatHandler: PERF.V2_PIPELINE disabled — skipping memory extraction', [
-                'user_id' => $message->getUserId(),
-            ]);
-        } else {
-            // Phase 2b: dispatch memory extraction to the messenger worker
-            // instead of running it inline. This frees the SSE stream to send
-            // `complete` immediately after the answer text is delivered, so
-            // the user can type the next message without waiting 5-9 s for
-            // the post-stream extraction LLM call + Qdrant writes.
-            //
-            // The previous inline `searchRelevantMemories` for extraction
-            // context is now done inside the worker so it doesn't add
-            // latency to the user-visible request either.
-            try {
-                $threadSnapshot = $this->normalizeThreadForQueue($thread);
+        // Phase 2b: dispatch memory extraction to the messenger worker
+        // instead of running it inline. This frees the SSE stream to send
+        // `complete` immediately after the answer text is delivered, so
+        // the user can type the next message without waiting 5-9 s for
+        // the post-stream extraction LLM call + Qdrant writes. Same
+        // helper is now shared with `handle()` so the email/webhook
+        // channel also benefits (issue #615).
+        //
+        // Issue #881: when invoked from StreamController the dispatch is
+        // deferred (`defer_memory_extraction` option) until after the
+        // outgoing assistant message has been persisted and flushed.
+        // Otherwise the worker can race the StreamController flush and
+        // write the extracted-memories meta to the IN row only — the
+        // frontend polls the OUT id and never sees `complete`, so no
+        // toast appears. The dispatch payload is returned in `metadata`
+        // so the StreamController can fire it after the flush.
+        $deferExtraction = !empty($options['defer_memory_extraction']);
+        $extractionPayload = $this->buildPendingMemoryExtraction(
+            $message,
+            $fullResponseText,
+            $thread,
+            $loadedMemories,
+            $memoriesDisabledByRequest,
+            $memoriesDisabledByUser,
+            $memoriesRequestDisableContext,
+        );
 
-                $this->messageBus->dispatch(new ExtractMemoriesCommand(
-                    messageId: $message->getId(),
-                    userId: $message->getUserId(),
-                    aiResponse: $fullResponseText,
-                    threadSnapshot: $threadSnapshot,
-                    // Forward the in-scope memories so the extractor can
-                    // emit `update` instead of duplicate `create` actions
-                    // (issue #879). The worker still merges this with the
-                    // user's full memory list, but the relevant subset
-                    // carries semantic-search signal we don't want to
-                    // throw away.
-                    relevantMemories: $loadedMemories,
-                ));
-
-                $this->logger->info('ChatHandler: Dispatched ExtractMemoriesCommand', [
-                    'message_id' => $message->getId(),
-                    'user_id' => $message->getUserId(),
-                    'thread_length' => count($threadSnapshot),
-                ]);
-            } catch (\Throwable $e) {
-                // Never block the user's response on the dispatch failing —
-                // worst case is that one message worth of memories never
-                // gets extracted; the next message's extraction will pick up
-                // from where it left off.
-                $this->logger->warning('ChatHandler: Failed to dispatch ExtractMemoriesCommand', [
-                    'message_id' => $message->getId(),
-                    'error' => $e->getMessage(),
-                ]);
-            }
+        if (!$deferExtraction) {
+            $this->dispatchPendingMemoryExtraction($extractionPayload);
         }
 
         return [
@@ -1070,6 +958,7 @@ final readonly class ChatHandler implements MessageHandlerInterface
                 'response_id' => $metadata['response_id'] ?? null,
                 'memories' => $loadedMemories,
                 'feedbacks' => $loadedFeedbacks,
+                'extraction_payload' => $deferExtraction ? $extractionPayload : null,
             ],
         ];
     }
@@ -1955,6 +1844,514 @@ final readonly class ChatHandler implements MessageHandlerInterface
         }
 
         return $out;
+    }
+
+    /**
+     * Build the lazy embedding cache used across RAG, memory, and feedback
+     * lookups for a single chat request.
+     *
+     * The closure returns the user-query embedding once and reuses it on
+     * subsequent calls — paying the embed HTTP cost (50-250 ms) only once
+     * per request even when three independent vector searches happen.
+     * Returns null for empty-text messages or when the memory service is
+     * unavailable (callers then fall back to text-based search).
+     *
+     * Extracted from `handleStream()` so the email/generic webhook path
+     * (which lands in `handle()`) can share the same caching behaviour
+     * instead of paying the embed cost twice. See issue #615.
+     *
+     * @return \Closure(): ?array<int, float>
+     */
+    private function createSharedVectorResolver(Message $message, PerfTimer $perfTimer): \Closure
+    {
+        $sharedQueryVector = null;
+        $sharedVectorComputed = false;
+
+        return function () use ($message, &$sharedQueryVector, &$sharedVectorComputed, $perfTimer): ?array {
+            if ($sharedVectorComputed) {
+                return $sharedQueryVector;
+            }
+            $sharedVectorComputed = true;
+
+            $text = $message->getText();
+            if ('' === trim($text) || !$this->memoryService->isAvailable()) {
+                return null;
+            }
+
+            $perfTimer->start('shared_embedding');
+            try {
+                $embed = $this->memoryService->embedUserQuery($message->getUserId(), $text);
+            } catch (\Throwable $e) {
+                $this->logger->warning('ChatHandler: shared embed failed, falling back to per-call embeds', [
+                    'error' => $e->getMessage(),
+                ]);
+                $embed = null;
+            }
+            $perfTimer->stop('shared_embedding');
+
+            if (null !== $embed && !empty($embed['embedding'])) {
+                $sharedQueryVector = $embed['embedding'];
+            }
+
+            return $sharedQueryVector;
+        };
+    }
+
+    /**
+     * Lazily produce the embedding used for Qdrant *memory* searches.
+     *
+     * The memories collection is pinned to its own embedding model
+     * (see {@see UserMemoryService::getMemoryEmbeddingModelId()}) which
+     * may diverge from the active VECTORIZE default — that's the
+     * whole point of PR #985 (no data loss on switch). Memory and
+     * feedback searches therefore need a separate vector cache: using
+     * the shared VECTORIZE vector would be rejected by Qdrant (wrong
+     * dimension) or returned as zero hits (stale-filter mismatch).
+     *
+     * Optimisation: when the memory-pinned model happens to equal the
+     * active VECTORIZE model (the typical case for fresh installs and
+     * for ops who haven't switched yet), this resolver reuses the
+     * already-computed shared vector instead of paying for a second
+     * embed call.
+     *
+     * @return \Closure(): ?array<int, float>
+     */
+    private function createMemoryVectorResolver(
+        Message $message,
+        \Closure $resolveSharedVector,
+        PerfTimer $perfTimer,
+    ): \Closure {
+        $memoryQueryVector = null;
+        $memoryVectorComputed = false;
+
+        return function () use (
+            $message,
+            $resolveSharedVector,
+            $perfTimer,
+            &$memoryQueryVector,
+            &$memoryVectorComputed,
+        ): ?array {
+            if ($memoryVectorComputed) {
+                return $memoryQueryVector;
+            }
+            $memoryVectorComputed = true;
+
+            $text = $message->getText();
+            if ('' === trim($text) || !$this->memoryService->isAvailable()) {
+                return null;
+            }
+
+            // Reuse the VECTORIZE-embedded vector when the memory model
+            // matches VECTORIZE. Keeps the existing 1-embed-per-message
+            // performance for the 99% of installations that never swap.
+            $stickyMemoryModelId = $this->memoryService->getMemoryEmbeddingModelId();
+            $vectorizeModelId = $this->modelConfigService->getDefaultModel('VECTORIZE', $message->getUserId());
+            if (null !== $stickyMemoryModelId && $stickyMemoryModelId === $vectorizeModelId) {
+                $shared = $resolveSharedVector();
+                if (null !== $shared) {
+                    return $memoryQueryVector = $shared;
+                }
+            }
+
+            // Memory model diverges from VECTORIZE (or shared vector
+            // is unavailable) — embed the query against the memory
+            // model directly so reads land in the right vector space.
+            $perfTimer->start('memory_embedding');
+            try {
+                $embed = $this->memoryService->embedQueryForMemorySearch($message->getUserId(), $text);
+            } catch (\Throwable $e) {
+                $this->logger->warning('ChatHandler: memory embed failed, falling back to per-call embeds', [
+                    'error' => $e->getMessage(),
+                ]);
+                $embed = null;
+            }
+            $perfTimer->stop('memory_embedding');
+
+            if (null !== $embed && !empty($embed['embedding'])) {
+                $memoryQueryVector = $embed['embedding'];
+            }
+
+            return $memoryQueryVector;
+        };
+    }
+
+    /**
+     * Load relevant user memories from Qdrant and build the system-prompt
+     * fragment that injects them into the AI context.
+     *
+     * Shared by both `handle()` and `handleStream()` so every channel
+     * (Web UI, email, generic API webhook) treats memories the same way.
+     * Returns empty strings/arrays when memories are disabled by request,
+     * disabled per-user, or the memory service is unavailable.
+     *
+     * SSE-style memory-loaded events are forwarded to `$progressCallback`
+     * when one is supplied so the Web UI can render the memory badge.
+     * Email/webhook callers pass `null` and simply discard the event.
+     *
+     * @param array<string, mixed> $options
+     * @param array<string, mixed> $classification
+     *
+     * @return array{
+     *     context: string,
+     *     memories: array<int, array<string, mixed>>,
+     *     disabledByRequest: bool,
+     *     disabledByUser: bool,
+     *     requestDisableContext: array{
+     *         channel: string|null,
+     *         classification_source: string|null,
+     *         disable_memories_flag: bool
+     *     }
+     * }
+     *                                  `disabledByRequest` is true when the *caller* (widget channel /
+     *                                  `disable_memories` option) opted out; `disabledByUser` is true when
+     *                                  the user has disabled memories in their settings. They are returned
+     *                                  separately so {@see buildPendingMemoryExtraction()} can log the
+     *                                  specific reason (issue PR #925 Copilot review).
+     *                                  `requestDisableContext` carries which lever fired (widget channel,
+     *                                  classification source, or explicit `disable_memories` flag) so the
+     *                                  precise cause is visible in production logs.
+     */
+    private function loadMemoriesContext(
+        Message $message,
+        ?User $user,
+        array $options,
+        array $classification,
+        ?callable $progressCallback,
+        \Closure $resolveMemoryVector,
+        PerfTimer $perfTimer,
+    ): array {
+        $disabledByRequest = !empty($options['disable_memories'])
+            || ('WIDGET' === ($options['channel'] ?? null))
+            || ('widget' === ($classification['source'] ?? null));
+
+        $disabledByUser = !($user?->isMemoriesEnabled() ?? true);
+
+        // Captures *why* this request opted out (widget channel vs explicit
+        // disable_memories flag vs widget classification source). Surfaced
+        // in both the memories-load and the dispatch log so operators can
+        // tell apart widget embeds from e.g. a guest-mode UI toggle that
+        // also sets `disable_memories` — both share the same code path but
+        // need different debugging.
+        $requestDisableContext = [
+            'channel' => $options['channel'] ?? null,
+            'classification_source' => $classification['source'] ?? null,
+            'disable_memories_flag' => !empty($options['disable_memories']),
+        ];
+
+        $loadedMemories = [];
+
+        if ($disabledByRequest) {
+            $this->logger->debug('ChatHandler: Memories disabled by request, skipping memories', array_merge([
+                'user_id' => $message->getUserId(),
+            ], $requestDisableContext));
+        } elseif ($disabledByUser) {
+            $this->logger->debug('ChatHandler: Memories disabled by user setting, skipping memories', [
+                'user_id' => $message->getUserId(),
+            ]);
+        } elseif ($this->memoryService->isAvailable()) {
+            try {
+                $this->logger->debug('ChatHandler: Loading user memories', [
+                    'user_id' => $message->getUserId(),
+                    'message_text' => substr($message->getText(), 0, 100),
+                ]);
+
+                $perfTimer->start('memories_search');
+                $memoryVector = $resolveMemoryVector();
+                if (null !== $memoryVector) {
+                    $rawMemories = $this->memoryService->searchMemoriesByVector(
+                        $message->getUserId(),
+                        $memoryVector,
+                        limit: $this->feedbackConfig->getMaxChatMemories(),
+                        minScore: $this->feedbackConfig->getMinChatMemoryScore()
+                    );
+                } else {
+                    $rawMemories = $this->memoryService->searchRelevantMemories(
+                        $message->getUserId(),
+                        $message->getText(),
+                        limit: $this->feedbackConfig->getMaxChatMemories(),
+                        minScore: $this->feedbackConfig->getMinChatMemoryScore()
+                    );
+                }
+                $perfTimer->stop('memories_search');
+
+                $loadedMemories = $this->filterByScore($rawMemories, $this->feedbackConfig->getMinChatMemoryScore());
+
+                $this->logger->debug('ChatHandler: Memories loaded from Qdrant', [
+                    'count' => count($loadedMemories),
+                    'filtered_out' => count($rawMemories) - count($loadedMemories),
+                    'memories' => array_map(fn ($m) => [
+                        'id' => $m['id'] ?? null,
+                        'key' => $m['key'] ?? null,
+                        'score' => $m['score'] ?? 0,
+                    ], $loadedMemories),
+                ]);
+            } catch (\Throwable $e) {
+                $this->logger->warning('ChatHandler: Failed to load memories, continuing without', [
+                    'error' => $e->getMessage(),
+                ]);
+                $loadedMemories = [];
+            }
+        } else {
+            $this->logger->debug('ChatHandler: Memory service not available, skipping memories');
+        }
+
+        $memoriesContext = '';
+        if (!empty($loadedMemories)) {
+            $memoriesContext = "\n\n## User Memories (relevant to this conversation):\n";
+            foreach ($loadedMemories as $memory) {
+                $memoriesContext .= sprintf(
+                    "[ID: %d] %s: %s\n",
+                    $memory['id'],
+                    $memory['key'],
+                    $memory['value']
+                );
+            }
+            $memoriesContext .= "\nUse these memories to personalize your response.\n";
+            $memoriesContext .= "REFERENCES: Use [Memory:ID] (clickable). Rules:\n";
+            $memoriesContext .= "- ONE ID per bracket. Good: [Memory:42] and [Memory:15]. Bad: [Memory:42, 15].\n";
+            $memoriesContext .= "- Only use IDs from the list above. Never invent IDs.\n";
+
+            $this->logger->info('ChatHandler: User memories loaded', [
+                'user_id' => $message->getUserId(),
+                'memories_count' => count($loadedMemories),
+            ]);
+
+            if ($progressCallback) {
+                $progressCallback([
+                    'status' => 'memories_loaded',
+                    'message' => 'Memories loaded',
+                    'metadata' => [
+                        'memories' => $loadedMemories,
+                        'count' => count($loadedMemories),
+                    ],
+                    'timestamp' => time(),
+                ]);
+            }
+        } else {
+            $this->logger->debug('ChatHandler: No relevant memories found', [
+                'user_id' => $message->getUserId(),
+            ]);
+        }
+
+        return [
+            'context' => $memoriesContext,
+            'memories' => $loadedMemories,
+            'disabledByRequest' => $disabledByRequest,
+            'disabledByUser' => $disabledByUser,
+            'requestDisableContext' => $requestDisableContext,
+        ];
+    }
+
+    /**
+     * Load feedback (false positives + positives) from Qdrant and build the
+     * system-prompt fragment that injects them into the AI context.
+     *
+     * Same shape as {@see loadMemoriesContext}: shared between streaming
+     * and non-streaming chat paths so the email channel and the Web UI
+     * see identical feedback context.
+     *
+     * @param array<string, mixed> $options
+     * @param array<string, mixed> $classification
+     *
+     * @return array{context: string, feedbacks: array<int, array<string, mixed>>}
+     */
+    private function loadFeedbackContext(
+        Message $message,
+        ?User $user,
+        array $options,
+        array $classification,
+        ?callable $progressCallback,
+        \Closure $resolveMemoryVector,
+        PerfTimer $perfTimer,
+    ): array {
+        $disabledByRequest = !empty($options['disable_memories'])
+            || ('WIDGET' === ($options['channel'] ?? null))
+            || ('widget' === ($classification['source'] ?? null));
+
+        $disabledByUser = !($user?->isMemoriesEnabled() ?? true);
+
+        $feedbackContext = '';
+        $loadedFeedbacks = [];
+
+        if ($disabledByRequest || $disabledByUser || !$this->memoryService->isAvailable()) {
+            return [
+                'context' => $feedbackContext,
+                'feedbacks' => $loadedFeedbacks,
+            ];
+        }
+
+        try {
+            $perfTimer->start('feedback');
+            $memoryVector = $resolveMemoryVector();
+            $falsePositives = $this->searchFeedback(
+                $message->getUserId(),
+                $message->getText(),
+                'feedback_negative',
+                FeedbackConstants::NAMESPACE_FALSE_POSITIVE,
+                $memoryVector
+            );
+
+            $positiveExamples = $this->searchFeedback(
+                $message->getUserId(),
+                $message->getText(),
+                'feedback_positive',
+                FeedbackConstants::NAMESPACE_POSITIVE,
+                $memoryVector
+            );
+            $perfTimer->stop('feedback');
+
+            if (!empty($falsePositives) || !empty($positiveExamples)) {
+                $feedbackContext = "\n\n## User Feedback (corrections from previous conversations):\n";
+
+                if (!empty($falsePositives)) {
+                    $feedbackContext .= "\n### Things to AVOID (user-reported false positives) - Reference as [Feedback:ID]:\n";
+                    foreach ($falsePositives as $fp) {
+                        $feedbackContext .= sprintf("- ❌ [Feedback:%d] %s\n", $fp['id'], $fp['value']);
+                        $loadedFeedbacks[] = [
+                            'id' => $fp['id'],
+                            'type' => 'false_positive',
+                            'value' => $fp['value'],
+                        ];
+                    }
+                }
+
+                if (!empty($positiveExamples)) {
+                    $feedbackContext .= "\n### Correct information (user-confirmed) - Reference as [Feedback:ID]:\n";
+                    foreach ($positiveExamples as $pe) {
+                        $feedbackContext .= sprintf("- ✅ [Feedback:%d] %s\n", $pe['id'], $pe['value']);
+                        $loadedFeedbacks[] = [
+                            'id' => $pe['id'],
+                            'type' => 'positive',
+                            'value' => $pe['value'],
+                        ];
+                    }
+                }
+
+                $feedbackContext .= "\nREFERENCES: Use [Feedback:ID] (clickable). Rules:\n";
+                $feedbackContext .= "- ONE ID per bracket. Good: [Feedback:123] and [Feedback:456]. Bad: [Feedback:123, 456].\n";
+                $feedbackContext .= "- Avoid repeating ❌ claims. Prefer ✅ information.\n";
+                $feedbackContext .= "- If ❌ and ✅ entries contradict each other, mention the conflict to the user.\n";
+
+                if ($progressCallback) {
+                    $progressCallback([
+                        'status' => 'feedback_loaded',
+                        'message' => 'Feedback examples loaded',
+                        'metadata' => [
+                            'feedbacks' => $loadedFeedbacks,
+                            'count' => count($loadedFeedbacks),
+                        ],
+                        'timestamp' => time(),
+                    ]);
+                }
+
+                $this->logger->info('ChatHandler: Feedback examples loaded', [
+                    'user_id' => $message->getUserId(),
+                    'false_positives_count' => count($falsePositives),
+                    'positive_examples_count' => count($positiveExamples),
+                ]);
+            }
+        } catch (\Throwable $e) {
+            $this->logger->warning('ChatHandler: Failed to load feedback examples', [
+                'error' => $e->getMessage(),
+            ]);
+        }
+
+        return [
+            'context' => $feedbackContext,
+            'feedbacks' => $loadedFeedbacks,
+        ];
+    }
+
+    /**
+     * Build the (skip-aware) extraction payload without touching the bus.
+     *
+     * Honours the `PERF.V2_PIPELINE_ENABLED` kill switch and the same
+     * disable flags used during context loading, so widgets and
+     * operator-disabled users never trigger an extraction run.
+     *
+     * The reason for skipping is logged precisely. A request-level opt-out
+     * (widget embed, guest-mode UI toggle, explicit `disable_memories`)
+     * and a user disabling memories in their profile settings produce
+     * different log messages, and the request-level case also carries the
+     * specific lever (channel, classification source, flag value) in the
+     * log context — operators don't have to spelunk through user records
+     * to tell the cases apart.
+     *
+     * Returns either a ready-to-dispatch `ExtractMemoriesCommand` or
+     * `null` when extraction must be skipped. Pair with
+     * {@see dispatchPendingMemoryExtraction()} to actually fire it. The
+     * split exists so the StreamController can defer the dispatch until
+     * after the outgoing assistant message is persisted (issue #881
+     * race fix).
+     *
+     * @param array<int, array{role: string, content: string}|Message> $thread
+     * @param array<int, array<string, mixed>>                         $loadedMemories
+     * @param bool                                                     $disabledByRequest     true when the caller (widget channel / `disable_memories` option) opted out
+     * @param bool                                                     $disabledByUser        true when the user's profile setting has memories disabled
+     * @param array<string, mixed>                                     $requestDisableContext optional log context describing which request-level lever fired (channel, classification source, disable_memories flag) — built by {@see loadMemoriesContext()}
+     */
+    private function buildPendingMemoryExtraction(
+        Message $message,
+        string $aiResponse,
+        array $thread,
+        array $loadedMemories,
+        bool $disabledByRequest,
+        bool $disabledByUser,
+        array $requestDisableContext = [],
+    ): ?ExtractMemoriesCommand {
+        if ($disabledByRequest) {
+            $this->logger->info('ChatHandler: Memory extraction disabled by request, skipping', array_merge([
+                'user_id' => $message->getUserId(),
+            ], $requestDisableContext));
+
+            return null;
+        }
+
+        if ($disabledByUser) {
+            $this->logger->info('ChatHandler: Memory extraction disabled by user setting, skipping', [
+                'user_id' => $message->getUserId(),
+            ]);
+
+            return null;
+        }
+
+        if (!$this->perfPipelineFlag->isEnabled($message->getUserId())) {
+            // Phase 4 kill switch: the operator has disabled the v2 perf
+            // pipeline for this user (or globally). Skip memory extraction
+            // entirely rather than reviving the inline path. Memories will
+            // still get picked up the next time the user sends a message
+            // with the flag re-enabled.
+            $this->logger->info('ChatHandler: PERF.V2_PIPELINE disabled — skipping memory extraction', [
+                'user_id' => $message->getUserId(),
+            ]);
+
+            return null;
+        }
+
+        $threadSnapshot = $this->normalizeThreadForQueue($thread);
+
+        return new ExtractMemoriesCommand(
+            messageId: $message->getId(),
+            userId: $message->getUserId(),
+            aiResponse: $aiResponse,
+            threadSnapshot: $threadSnapshot,
+            relevantMemories: $loadedMemories,
+        );
+    }
+
+    /**
+     * Forward a prepared extraction command to the messenger bus.
+     *
+     * Thin proxy around {@see MemoryExtractionDispatcher::dispatch()} so
+     * the synchronous (non-deferred) handler paths inside this class can
+     * keep their existing call sites. The deferred SSE path lives in
+     * {@see \App\Controller\StreamController} and goes through the same
+     * dispatcher service directly to avoid duplicating the dispatch +
+     * log + swallow contract (Copilot review of PR #939).
+     */
+    public function dispatchPendingMemoryExtraction(?ExtractMemoriesCommand $command): void
+    {
+        $this->memoryExtractionDispatcher->dispatch($command);
     }
 
     /**

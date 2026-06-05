@@ -71,9 +71,9 @@ _devextras/screenvideo/.narration-tmp/
 
 # Plugins (developed externally, copied to server manually)
 plugins/brogent/
-plugins/templatex/
-plugins/sortx/
-plugins/marketeer/
+plugins/synaform/
+plugins/synasort/
+plugins/synaads/
 
 #local development stuff
 _devextras/local-ignore/

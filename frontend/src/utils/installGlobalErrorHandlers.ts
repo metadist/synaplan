@@ -1,6 +1,7 @@
 import type { App } from 'vue'
 import { useGlobalErrorStore, type GlobalErrorPayload } from '@/stores/globalError'
 import { getErrorMessage } from '@/utils/errorMessage'
+import { useNotification } from '@/composables/useNotification'
 
 /**
  * Patterns we deliberately ignore. These are typically benign noise produced by
@@ -22,9 +23,69 @@ const IGNORED_PATTERNS: RegExp[] = [
   /AbortError/i,
 ]
 
+/**
+ * Patterns that signal a *transient* failure (network blip, chunk cache
+ * eviction after a tab spent time in the background, SSE reconnection
+ * timeout). We do NOT want to nuke the entire UI with the full-screen
+ * ErrorView for these — they almost always self-recover on the next user
+ * action — but we DO want to surface a non-fatal toast so the user knows
+ * something just went wrong with their last operation.
+ *
+ * This was the root cause of issue #897 on mobile: dynamic-import failures
+ * after a backgrounded tab and SSE network errors hit the global handler
+ * and replaced the entire chat view with "Etwas ist schiefgelaufen", forcing
+ * a manual reload to recover. The chat view itself is healthy — only one
+ * async operation failed.
+ *
+ * Add patterns conservatively. Anything matched here is invisible to the
+ * full-screen ErrorView, so a *real* fatal bug whose message accidentally
+ * matches one of these regexes will be silently downgraded.
+ */
+const TRANSIENT_PATTERNS: RegExp[] = [
+  // Vite dynamic-import / chunk-load failures.
+  // Examples seen in the wild on a tab returning from background:
+  //   "Loading chunk 42 failed."
+  //   "Failed to fetch dynamically imported module: https://.../assets/foo-X.js"
+  //   "Importing a module script failed."
+  //   "ChunkLoadError: ..."
+  /Loading chunk \d+ failed/i,
+  /Failed to fetch dynamically imported module/i,
+  /Importing a module script failed/i,
+  /ChunkLoadError/i,
+  // Generic network / fetch / SSE errors. These happen on flaky cellular
+  // connections and during background-resume "stale connection" recovery.
+  /^Failed to fetch\.?$/i,
+  /^Load failed\.?$/i, // Safari's equivalent of "Failed to fetch"
+  /^NetworkError when attempting to fetch resource\.?$/i,
+  /^TypeError: NetworkError/i,
+  /EventSource.*failed/i,
+]
+
 function shouldIgnore(message: string | undefined | null): boolean {
   if (!message) return false
   return IGNORED_PATTERNS.some((pattern) => pattern.test(message))
+}
+
+function isTransient(message: string | undefined | null): boolean {
+  if (!message) return false
+  return TRANSIENT_PATTERNS.some((pattern) => pattern.test(message))
+}
+
+/**
+ * Surface a transient failure as a non-fatal warning toast instead of the
+ * full-screen ErrorView. Keeps the chat / view alive so the user can retry
+ * by re-sending the message or simply continue.
+ */
+function reportTransient(message: string, source: GlobalErrorPayload['source']): void {
+  // useNotification keeps its `notifications` ref at module scope, so calling
+  // it outside a Vue setup() is intentional and safe — no Vue context needed.
+  // We deliberately use `warning` (orange) rather than `error` (red): the
+  // operation that failed (a single `fetch`, a single chunk load) can be
+  // retried by the user's next interaction without engineering involvement.
+  const { warning } = useNotification()
+  warning(`Connection hiccup. Please try again. (${message})`)
+  // Still log so a Sentry-equivalent / console-watcher picks it up.
+  console.warn(`[transient:${source ?? 'unknown'}]`, message)
 }
 
 function toPayload(
@@ -74,7 +135,12 @@ export function installGlobalErrorHandlers(app: App): void {
 
   app.config.errorHandler = (err, _instance, info) => {
     console.error('Vue errorHandler caught:', err, '\nInfo:', info)
-    if (shouldIgnore(getErrorMessage(err))) return
+    const message = getErrorMessage(err)
+    if (shouldIgnore(message)) return
+    if (isTransient(message)) {
+      reportTransient(message ?? 'unknown', `vue:${info}`)
+      return
+    }
     store.setError(toPayload(err, `vue:${info}`, 'A Vue lifecycle hook failed'))
   }
 
@@ -83,6 +149,10 @@ export function installGlobalErrorHandlers(app: App): void {
   }
   windowErrorHandler = (event: ErrorEvent) => {
     if (shouldIgnore(event.message)) return
+    if (isTransient(event.message) || isTransient(getErrorMessage(event.error))) {
+      reportTransient(event.message || 'unknown', 'window:error')
+      return
+    }
     console.error('window error caught:', event.error ?? event.message)
     store.setError(toPayload(event.error ?? event.message, 'window:error', event.message))
   }
@@ -95,6 +165,10 @@ export function installGlobalErrorHandlers(app: App): void {
     const reason = event.reason
     const message = getErrorMessage(reason)
     if (shouldIgnore(message)) return
+    if (isTransient(message)) {
+      reportTransient(message ?? 'unknown', 'window:unhandledrejection')
+      return
+    }
     console.error('Unhandled promise rejection caught:', reason)
     store.setError(
       toPayload(reason, 'window:unhandledrejection', 'An async operation failed silently')

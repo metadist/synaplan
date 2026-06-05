@@ -64,9 +64,15 @@
               />
               <span
                 v-if="isUploading && uploadProgress"
-                class="text-xs sm:text-sm txt-secondary flex items-center gap-1.5 min-w-0"
+                class="text-xs sm:text-sm flex items-center gap-1.5 min-w-0"
+                :class="isUploadSlow ? 'text-yellow-600 dark:text-yellow-400' : 'txt-secondary'"
               >
                 <template v-if="uploadBytePercent !== null && uploadBytePercent < 100">
+                  <Icon
+                    v-if="isUploadSlow"
+                    icon="mdi:timer-sand"
+                    class="w-3.5 h-3.5 flex-shrink-0"
+                  />
                   {{
                     $t('fileSelection.uploadingFilePercent', {
                       current: uploadProgress.current,
@@ -74,6 +80,9 @@
                       percent: uploadBytePercent,
                     })
                   }}
+                  <span v-if="isUploadSlow" class="hidden sm:inline">
+                    — {{ $t('fileSelection.uploadSlow') }}
+                  </span>
                 </template>
                 <template v-else-if="isFinishingUpload">
                   {{ $t('fileSelection.storingFile') }}
@@ -114,12 +123,12 @@
                 v-model="searchQuery"
                 type="text"
                 :placeholder="$t('fileSelection.searchPlaceholder')"
-                class="flex-1 px-3 py-1.5 sm:px-4 sm:py-2 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
+                class="flex-1 min-w-0 px-3 py-1.5 sm:px-4 sm:py-2 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
                 data-testid="input-file-selection-search"
               />
               <select
                 v-model="filterStatus"
-                class="px-2 py-1.5 sm:px-4 sm:py-2 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
+                class="shrink-0 min-w-[7rem] px-2 py-1.5 sm:px-4 sm:py-2 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
                 data-testid="select-file-selection-status"
               >
                 <option value="all">{{ $t('fileSelection.allStatuses') }}</option>
@@ -255,25 +264,26 @@
             </div>
           </div>
 
-          <!-- Footer with actions — stacked on mobile -->
+          <!-- Footer with actions -->
           <div
-            class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between px-4 py-4 sm:p-6 border-t border-light-border/20 dark:border-dark-border/15"
+            class="flex items-center justify-between gap-3 px-3 py-3 sm:px-6 sm:py-4 border-t border-light-border/20 dark:border-dark-border/15"
           >
-            <span class="txt-secondary text-sm text-center sm:text-left">
+            <span class="txt-secondary text-xs sm:text-sm shrink-0">
               {{ $t('fileSelection.selectedCount', { count: selectedFiles.length }) }}
             </span>
-            <div class="flex flex-col sm:flex-row gap-2 sm:gap-3">
+            <div class="flex items-center gap-2 sm:gap-3">
               <button
                 v-if="selectedFiles.length > 0"
-                class="w-full sm:w-auto px-4 py-2.5 sm:py-1.5 rounded-lg bg-red-500/10 text-red-500 hover:bg-red-500/20 transition-colors text-sm flex items-center justify-center gap-2"
+                class="p-2 rounded-lg bg-red-500/10 text-red-500 hover:bg-red-500/20 transition-colors"
+                :title="$t('fileSelection.deleteSelected')"
+                :aria-label="$t('fileSelection.deleteSelected')"
                 data-testid="btn-file-selection-delete-selected"
                 @click="confirmDeleteSelected"
               >
                 <TrashIcon class="w-4 h-4" />
-                <span>{{ $t('fileSelection.deleteSelected') }}</span>
               </button>
               <button
-                class="w-full sm:w-auto btn-secondary px-4 py-2.5 sm:py-2 rounded-lg text-sm font-medium"
+                class="btn-secondary px-3 py-2 sm:px-4 rounded-lg text-sm font-medium"
                 data-testid="btn-file-selection-cancel"
                 @click="emit('close')"
               >
@@ -281,7 +291,7 @@
               </button>
               <button
                 :disabled="selectedFiles.length === 0"
-                class="w-full sm:w-auto btn-primary px-4 py-2.5 sm:py-2 rounded-lg text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                class="btn-primary px-3 py-2 sm:px-4 rounded-lg text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
                 data-testid="btn-file-selection-attach"
                 @click="attachFiles"
               >
@@ -318,7 +328,12 @@ import { ref, computed, watch, onUnmounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { XMarkIcon, ArrowDownTrayIcon, TrashIcon } from '@heroicons/vue/24/outline'
 import { Icon } from '@iconify/vue'
-import filesService, { type FileItem } from '@/services/filesService'
+import filesService, {
+  type FileItem,
+  type UploadPhase,
+  UploadBlockedError,
+  UploadFailedError,
+} from '@/services/filesService'
 import { getApiBaseUrl } from '@/services/api/httpClient'
 import { useNotification } from '@/composables/useNotification'
 import FileContentModal from './FileContentModal.vue'
@@ -337,6 +352,36 @@ const emit = defineEmits<{
 
 const { success, error: showError, warning } = useNotification()
 
+// Localized message for a pre-flight upload rejection, with a hard
+// non-i18n fallback so the user never sees a raw dot-path key when a
+// translation is missing in the active locale.
+const translateUploadBlocked = (err: UploadBlockedError): string => {
+  const params = {
+    filename: err.filename,
+    message: err.check.message ?? '',
+  }
+  const reasonKey = `files.uploadBlocked.${err.reason}`
+  const reasonTranslated = t(reasonKey, params)
+  if (reasonTranslated !== reasonKey) return reasonTranslated
+
+  const genericKey = 'files.uploadBlocked.generic'
+  const genericTranslated = t(genericKey, params)
+  if (genericTranslated !== genericKey) return genericTranslated
+
+  return params.message ? `${params.filename}: ${params.message}` : params.filename
+}
+
+// Localized message for a transfer-level failure (stall, timeout, proxy
+// limit, network drop). Keeps the user informed with a remediation hint
+// instead of a silent spinner, and never echoes server internals.
+const translateUploadFailed = (filename: string, err: UploadFailedError): string => {
+  const key = `fileSelection.uploadFailed.${err.code}`
+  const params = { filename, percent: err.percentReached ?? 0, status: err.status ?? 0 }
+  const translated = t(key, params)
+  if (translated !== key) return translated
+  return `${filename}: ${err.message}`
+}
+
 // State
 const isLoading = ref(false)
 const isUploading = ref(false)
@@ -351,6 +396,8 @@ const uploadProgress = ref<{ current: number; total: number } | null>(null)
 const uploadBytePercent = ref<number | null>(null)
 /** Bytes finished; waiting for HTTP response body (store) */
 const isFinishingUpload = ref(false)
+/** True once the transfer has gone quiet long enough to warn the user (#589) */
+const isUploadSlow = ref(false)
 const isDragging = ref(false)
 
 // Sub-dialog state
@@ -552,6 +599,7 @@ const uploadFiles = async (filesToUpload: File[]) => {
 
       uploadBytePercent.value = 0
       isFinishingUpload.value = false
+      isUploadSlow.value = false
 
       try {
         // XHR + onProgress: real byte progress vs server "store" response (#589)
@@ -565,6 +613,15 @@ const uploadFiles = async (filesToUpload: File[]) => {
               isFinishingUpload.value = true
             }
           },
+          onPhase: (phase: UploadPhase) => {
+            isUploadSlow.value = phase === 'slow'
+            if (phase === 'finishing') isFinishingUpload.value = true
+          },
+          // 'store' is just an NFS write — it should answer in seconds. If a
+          // node hangs (busy FrankenPHP worker, dead LB upstream), surface a
+          // timeout instead of spinning forever. The transfer-stall guard in
+          // filesService handles the "stuck at 89%" body-stall case.
+          serverTimeoutMs: 90_000,
         })
 
         if (result.success && result.files.length > 0) {
@@ -587,12 +644,27 @@ const uploadFiles = async (filesToUpload: File[]) => {
           await notifyUploadInterrupted()
           break
         }
+        if (err instanceof UploadBlockedError) {
+          showError(translateUploadBlocked(err))
+          continue
+        }
+        if (err instanceof UploadFailedError) {
+          // Stall / timeout failures may have left a partial file on the
+          // server (#589) — refresh the list so a stored-but-unfinished
+          // upload is visible rather than appearing lost.
+          if (err.code === 'transfer_stalled' || err.code === 'server_timeout') {
+            await loadFiles()
+          }
+          showError(translateUploadFailed(file.name, err))
+          continue
+        }
         console.error('Upload failed:', file.name, err)
         const msg = err instanceof Error ? err.message : 'Unknown error'
         showError(`${file.name}: ${msg}`)
       } finally {
         uploadBytePercent.value = null
         isFinishingUpload.value = false
+        isUploadSlow.value = false
       }
     }
 
@@ -628,6 +700,7 @@ const uploadFiles = async (filesToUpload: File[]) => {
     uploadProgress.value = null
     uploadBytePercent.value = null
     isFinishingUpload.value = false
+    isUploadSlow.value = false
     uploadAbortController.value = null
   }
 }
@@ -713,6 +786,7 @@ watch(
       pendingProcessingIds.value.clear()
       uploadBytePercent.value = null
       isFinishingUpload.value = false
+      isUploadSlow.value = false
       selectedFileIds.value.clear()
       contentModalOpen.value = false
       confirmDialogOpen.value = false

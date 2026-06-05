@@ -116,6 +116,8 @@ export const selectors = {
     /** Present inside assistant bubble when streaming finished (prefer over loader hidden) */
     messageDone: '[data-testid="message-done"]',
     loadIndicator: '[data-testid="loading-typing-indicator"]',
+    /** Fallback typing-dots shown before the first SSE status event arrives (issue #902) */
+    loadIndicatorInitial: '[data-testid="loading-initial-indicator"]',
     /** Wrapper that contains only the generated answer body (no timestamp, no footer). Use this for asserting reply text. */
     assistantAnswerBody: '[data-testid="section-message-text"]',
     messageText: '[data-testid="message-text"]',
@@ -301,6 +303,10 @@ export const selectors = {
     textCancelDate: '[data-testid="text-cancel-date"]',
     /** Visible inside section-current-plan during normal active periods (mutually exclusive with textCancelDate) */
     textNextBilling: '[data-testid="text-next-billing"]',
+    /** Visible above section-current-plan when paymentFailed=true OR status='past_due' (issue #856) */
+    sectionPaymentFailed: '[data-testid="section-payment-failed"]',
+    /** Inside sectionPaymentFailed — opens the Stripe customer portal so the user can update their card */
+    btnFixPayment: '[data-testid="btn-fix-payment"]',
   },
   subscriptionSuccess: {
     page: '[data-testid="page-subscription-success"]',

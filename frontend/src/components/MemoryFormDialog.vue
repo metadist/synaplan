@@ -297,7 +297,8 @@
             <div class="flex items-center gap-3">
               <button
                 type="button"
-                class="flex-1 btn-secondary px-4 py-2.5 rounded-xl font-medium transition-all"
+                class="flex-1 btn-secondary px-4 py-2.5 rounded-xl font-medium transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                :disabled="isSaving"
                 @click="step = 'input'"
               >
                 <Icon icon="mdi:arrow-left" class="w-4 h-4 inline mr-1" />
@@ -305,11 +306,17 @@
               </button>
               <button
                 type="button"
-                class="flex-1 btn-primary px-4 py-2.5 rounded-xl font-medium flex items-center justify-center gap-2"
+                class="flex-1 btn-primary px-4 py-2.5 rounded-xl font-medium flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                :disabled="isSaving"
+                :aria-busy="isSaving"
                 @click="confirmAndSave"
               >
-                <Icon icon="mdi:check" class="w-4 h-4" />
-                {{ $t('memories.form.confirm') }}
+                <Icon
+                  :icon="isSaving ? 'mdi:loading' : 'mdi:check'"
+                  class="w-4 h-4"
+                  :class="{ 'animate-spin': isSaving }"
+                />
+                {{ isSaving ? $t('memories.form.confirmSaving') : $t('memories.form.confirm') }}
               </button>
             </div>
           </div>
@@ -393,7 +400,59 @@ import type {
 } from '@/services/api/userMemoriesApi'
 import { useFullscreenTeleportTarget } from '@/composables/useFullscreenTeleportTarget'
 import { useNotification } from '@/composables/useNotification'
-import { httpClient } from '@/services/api/httpClient'
+import { httpClient, ApiError } from '@/services/api/httpClient'
+
+/**
+ * Stable error codes returned by POST /api/v1/user/memories/parse.
+ * Must stay in sync with App\Controller\UserMemoryController::ERROR_CODE_*
+ * on the backend. See issue #439 for the original UX bug this enables fixing.
+ *
+ * 'memory_storage_unavailable' (Qdrant down) is intentionally *not* in the
+ * fallback list — without storage we cannot persist anything, so the dialog
+ * surfaces a hard error instead of pretending to save.
+ */
+const PARSE_ERROR_CODE_AI_PARSER_UNAVAILABLE = 'ai_parser_unavailable'
+const PARSE_ERROR_CODE_AI_NO_CHAT_MODEL = 'ai_no_chat_model'
+
+/**
+ * Heuristic that turns the user's free-form input into a short, human-readable
+ * memory key (e.g. "I love TypeScript projects" → "i_love_typescript_projects").
+ *
+ * Used only by the AI-unavailable fallback in create mode: when the parse
+ * endpoint can't structure the input via AI, we still save the note so the
+ * user doesn't lose their input. Keep this conservative and deterministic —
+ * users can always rename the memory afterwards from the list view.
+ */
+function buildFallbackKey(input: string): string {
+  const slug = input
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}\s]/gu, '')
+    .trim()
+    .split(/\s+/u)
+    .slice(0, 6)
+    .join('_')
+    .slice(0, 60)
+  return slug || `note_${Date.now()}`
+}
+
+/**
+ * Determine whether an error from the parse endpoint should trigger the
+ * graceful "save as note / switch to manual" fallback. Returns the matching
+ * code (so callers can render a more specific message) or null when no
+ * fallback is possible (storage unreachable, validation error, ...).
+ */
+function getAiUnavailableCode(err: unknown): string | null {
+  if (!(err instanceof ApiError)) return null
+  if (err.status !== 503) return null
+  const code = typeof err.details?.code === 'string' ? err.details.code : null
+  if (
+    code === PARSE_ERROR_CODE_AI_PARSER_UNAVAILABLE ||
+    code === PARSE_ERROR_CODE_AI_NO_CHAT_MODEL
+  ) {
+    return code
+  }
+  return null
+}
 
 interface ParsedAction {
   action: 'create' | 'update' | 'delete'
@@ -422,11 +481,12 @@ const props = defineProps<Props>()
 const emit = defineEmits<Emits>()
 const { t } = useI18n()
 const { teleportTarget } = useFullscreenTeleportTarget()
-const { error } = useNotification()
+const { error, warning } = useNotification()
 
 const mode = ref<'easy' | 'advanced'>('easy')
 const step = ref<'input' | 'preview'>('input')
 const isProcessing = ref(false)
+const isSaving = ref(false)
 const easyInput = ref('')
 const easyCategory = ref('')
 const showCustomCategory = ref(false)
@@ -491,6 +551,7 @@ watch(
   (isOpen) => {
     if (!isOpen) {
       isProcessing.value = false
+      isSaving.value = false
       step.value = 'input'
     }
   }
@@ -556,18 +617,80 @@ async function handleEasySubmit() {
 
     similarMemories.value = response.similarMemories || []
     step.value = 'preview'
-  } catch {
-    // No fallback - show error and stay on input step
-    error(t('memories.form.aiUnavailable'))
+  } catch (err) {
+    // Issue #439: distinguish between "AI down but storage works" (graceful
+    // fallback possible) and "storage is down" (no fallback). Previously every
+    // error showed "AI structuring unavailable, saving as note" but nothing
+    // was actually saved, which is the misleading-message bug users reported.
+    handleParseFailure(err)
   } finally {
     isProcessing.value = false
   }
 }
 
+/**
+ * Graceful fallback when /memories/parse returns 503.
+ *
+ * AI down + storage up → save the input as a plain note (create) or switch
+ * the dialog to advanced mode with current values pre-filled (edit), so the
+ * user never loses their input. Storage down → surface a clear error.
+ */
+function handleParseFailure(err: unknown): void {
+  const aiUnavailableCode = getAiUnavailableCode(err)
+
+  if (!aiUnavailableCode) {
+    // Storage unreachable, unauthenticated, validation error, etc. — no
+    // fallback is safe; keep the user on the input step and explain.
+    if (err instanceof ApiError && err.status === 503) {
+      error(t('memories.form.storageUnavailable'))
+    } else {
+      error(t('memories.form.parseFailed'))
+    }
+    return
+  }
+
+  // AI structuring failed but persistence still works.
+  if (props.memory) {
+    // Edit mode: the input is a free-form instruction (e.g. "change colour to
+    // blue"), so we can't blindly save it as the new value. The least
+    // surprising path is to drop the user into advanced mode where they can
+    // edit the value directly — the form is already pre-populated with the
+    // current memory thanks to the watcher above.
+    mode.value = 'advanced'
+    step.value = 'input'
+    warning(t('memories.form.aiUnavailableEditFallback'))
+    return
+  }
+
+  // Create mode: persist the raw input as a single-action "create" so the user
+  // doesn't lose what they typed. We pick a sensible category (their selection,
+  // a custom one, or "notes") and derive a short key from the input.
+  const chosenCategory = easyCategory.value.trim() || customCategoryInput.value.trim() || 'notes'
+
+  parsedActions.value = [
+    {
+      action: 'create',
+      memory: {
+        category: chosenCategory,
+        key: buildFallbackKey(easyInput.value),
+        value: easyInput.value.trim(),
+      },
+      reason: t('memories.form.aiUnavailableCreateReason'),
+    },
+  ]
+  similarMemories.value = []
+  step.value = 'preview'
+  warning(t('memories.form.aiUnavailableCreateFallback'))
+}
+
 function confirmAndSave() {
   if (parsedActions.value.length === 0) return
+  // Guard against double-submits: parent's persistence loop is async (one
+  // request per action) and the dialog only closes after it finishes, so
+  // without this every extra click would create a full duplicate batch.
+  if (isSaving.value) return
+  isSaving.value = true
 
-  // Emit all actions for the parent to process
   emit('saveMultiple', parsedActions.value)
 }
 

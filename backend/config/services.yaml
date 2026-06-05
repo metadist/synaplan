@@ -84,6 +84,11 @@ parameters:
     env(DEFAULT_USER_PLUGINS): '[]'
     default_user_plugins: '%env(json:DEFAULT_USER_PLUGINS)%'
 
+    # Anti-abuse cap on concurrent active guest sessions per IP.
+    # Production default is 5; the E2E suite raises it (all tests share one
+    # client IP, which would otherwise trip the limit and 429).
+    env(GUEST_MAX_SESSIONS_PER_IP): '5'
+
 services:
     _defaults:
         autowire: true
@@ -502,6 +507,11 @@ services:
 
     App\Service\Message\AgainHandler: ~
 
+    # Guest trial chat session service (per-IP cap configurable for E2E)
+    App\Service\GuestSessionService:
+        arguments:
+            $maxSessionsPerIp: '%env(int:GUEST_MAX_SESSIONS_PER_IP)%'
+
     # File Processing Services
     App\Service\File\TikaClient:
         arguments:
@@ -650,6 +660,12 @@ services:
     # Alias for injection
     App\Service\RAG\VectorStorage\VectorStorageInterface:
         alias: App\Service\RAG\VectorStorage\VectorStorageFacade
+
+    # Widget real-time event store (SSE backing).
+    # DB-backed (Galera-replicated) so events are visible cluster-wide; swap this
+    # alias to a Redis implementation when introduced.
+    App\Service\WidgetEventStoreInterface:
+        alias: App\Service\DatabaseWidgetEventStore
 
 # TestProvider: mock AI for dev/test only. Not registered in prod.
 # Duplicated because Symfony when@ blocks don't support when@dev,test.

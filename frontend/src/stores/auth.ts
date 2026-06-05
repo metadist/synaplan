@@ -4,6 +4,7 @@ import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { authService, type AuthUser, type ImpersonatorInfo } from '@/services/authService'
 import { useConfigStore } from '@/stores/config'
+import { clearPendingRedirect } from '@/utils/pendingAuthRedirect'
 
 export type User = AuthUser
 export type { ImpersonatorInfo } from '@/services/authService'
@@ -79,7 +80,8 @@ export const useAuthStore = defineStore('auth', () => {
         error.value = result.error || 'Login failed'
         return false
       }
-    } catch {
+    } catch (err) {
+      console.error('Login failed after successful auth:', err)
       error.value = 'Network error'
       return false
     } finally {
@@ -117,6 +119,9 @@ export const useAuthStore = defineStore('auth', () => {
     user.value = null
     impersonator.value = null
     loading.value = true
+    // Drop any in-flight deep-link intent so the next login isn't hijacked
+    // by a stale entry from this session.
+    clearPendingRedirect()
 
     // Tear down the realtime client before the server-side session is
     // invalidated. Otherwise the client keeps trying to refresh its

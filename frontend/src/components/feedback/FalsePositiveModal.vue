@@ -266,8 +266,13 @@ async function enhanceText(
     const result = await chatApi.enhanceMessage(textRef.value.trim())
     textRef.value = result.enhanced
     hintRef.value = false
-  } catch {
-    showErrorToast(t('feedback.falsePositive.enhanceFailed'))
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : ''
+    showErrorToast(
+      msg === 'enhance_rejected'
+        ? t('chatInput.enhanceRejected')
+        : t('feedback.falsePositive.enhanceFailed')
+    )
   } finally {
     loadingRef.value = false
   }

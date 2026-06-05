@@ -10,6 +10,7 @@ use App\Service\File\FileProcessor;
 use App\Service\File\FileStorageService;
 use App\Service\File\VectorizationService;
 use App\Service\Message\AgainHandler;
+use App\Service\Message\EnhanceOutputGuard;
 use App\Service\Message\MessagePreProcessor;
 use App\Service\MessageEnqueueService;
 use App\Service\ModelConfigService;
@@ -19,6 +20,7 @@ use Doctrine\ORM\EntityManagerInterface;
 use OpenApi\Attributes as OA;
 use Psr\Log\LoggerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
+use Symfony\Component\DependencyInjection\Attribute\Autowire;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -40,6 +42,8 @@ class MessageController extends AbstractController
         private FileProcessor $fileProcessor,
         private VectorizationService $vectorizationService,
         private LoggerInterface $logger,
+        #[Autowire(env: 'default::bool:COST_BUDGET_GATE_ENABLED')]
+        private bool $costBudgetGateEnabled = false,
     ) {
     }
 
@@ -109,6 +113,20 @@ class MessageController extends AbstractController
                 // verification — not email verification (see #839).
                 'phone_verified' => $user->hasVerifiedPhone(),
             ], Response::HTTP_TOO_MANY_REQUESTS);
+        } elseif ($this->costBudgetGateEnabled) {
+            $budgetCheck = $this->rateLimitService->checkCostBudget($user);
+            if (!$budgetCheck['allowed']) {
+                return $this->json([
+                    'error' => 'Cost budget exceeded',
+                    'limit_type' => 'monthly',
+                    'action_type' => 'MESSAGES',
+                    'limit' => $budgetCheck['budget'],
+                    'used' => $budgetCheck['used_cost'],
+                    'remaining' => $budgetCheck['remaining'],
+                    'user_level' => $user->getUserLevel(),
+                    'phone_verified' => $user->hasVerifiedPhone(),
+                ], Response::HTTP_TOO_MANY_REQUESTS);
+            }
         }
 
         try {
@@ -144,9 +162,6 @@ class MessageController extends AbstractController
                 $this->em->flush();
             }
 
-            // Record usage
-            $this->rateLimitService->recordUsage($user, 'MESSAGES');
-
             // Prepare context with file contents
             $contextMessages = [];
 
@@ -176,10 +191,25 @@ class MessageController extends AbstractController
             // Add user message
             $contextMessages[] = ['role' => 'user', 'content' => $messageText];
 
+            // Resolve the user's default CHAT model (same logic as /enhance and
+            // ChatHandler). Without an explicit model the provider receives no
+            // model name and throws "Model must be specified in options".
+            $modelId = $this->modelConfigService->getDefaultModel('CHAT', $user->getId());
+            $provider = null;
+            $modelName = null;
+            if ($modelId) {
+                $provider = $this->modelConfigService->getProviderForModel($modelId);
+                $modelName = $this->modelConfigService->getModelName($modelId);
+            }
+
             // Use AI Facade to get response
             $aiResponse = $this->aiFacade->chat(
                 $contextMessages,
-                $user->getId()
+                $user->getId(),
+                [
+                    'provider' => $provider,
+                    'model' => $modelName,
+                ]
             );
 
             // Parse response for special content markers
@@ -230,6 +260,20 @@ class MessageController extends AbstractController
                 $outgoingMessage->setMeta('ai_chat_usage', json_encode($aiResponse['usage']));
             }
 
+            // Record usage with full metadata. Reuse the model id resolved
+            // above (same DEFAULTMODEL/CHAT lookup the facade uses).
+            $resolvedModelId = $modelId;
+
+            $this->rateLimitService->recordUsage($user, 'MESSAGES', [
+                'provider' => $aiResponse['provider'] ?? 'unknown',
+                'model' => $aiResponse['model'] ?? 'unknown',
+                'model_id' => $resolvedModelId,
+                'usage' => $aiResponse['usage'] ?? [],
+                'input_text' => $messageText,
+                'response_text' => $responseText,
+                'source' => 'WEB',
+            ]);
+
             // NOTE: MessageController doesn't use MessageProcessor, so there's no sorting model info here
             // Only StreamController (which uses MessageProcessor) has sorting model metadata
 
@@ -244,18 +288,29 @@ class MessageController extends AbstractController
                 'provider' => $aiResponse['provider'] ?? 'test',
             ]);
 
+            $messagePayload = [
+                'id' => $outgoingMessage->getId(),
+                'text' => $outgoingMessage->getText(),
+                'hasFile' => (bool) $outgoingMessage->getFile(),
+                'filePath' => $outgoingMessage->getFilePath(),
+                'fileType' => $outgoingMessage->getFileType(),
+                'provider' => $outgoingMessage->getProviderIndex(),
+                'timestamp' => $outgoingMessage->getUnixTimestamp(),
+                'trackId' => $outgoingMessage->getTrackingId(),
+                'topic' => $incomingMessage->getTopic(),
+            ];
+
             return $this->json([
                 'success' => true,
-                'message' => [
-                    'id' => $outgoingMessage->getId(),
-                    'text' => $outgoingMessage->getText(),
-                    'hasFile' => (bool) $outgoingMessage->getFile(),
-                    'filePath' => $outgoingMessage->getFilePath(),
-                    'fileType' => $outgoingMessage->getFileType(),
-                    'provider' => $outgoingMessage->getProviderIndex(),
-                    'timestamp' => $outgoingMessage->getUnixTimestamp(),
-                    'trackId' => $outgoingMessage->getTrackingId(),
-                    'topic' => $incomingMessage->getTopic(),
+                // `message` kept for backward compatibility; `outgoingMessage`
+                // and `incomingMessage` match the OpenAPI schema and are what
+                // API clients (e.g. the Outlook add-in) read.
+                'message' => $messagePayload,
+                'outgoingMessage' => $messagePayload,
+                'incomingMessage' => [
+                    'id' => $incomingMessage->getId(),
+                    'text' => $incomingMessage->getText(),
+                    'trackId' => $incomingMessage->getTrackingId(),
                 ],
             ]);
         } catch (\Exception $e) {
@@ -395,6 +450,18 @@ class MessageController extends AbstractController
 
             $enhancedText = trim($response['content'] ?? $inputText);
 
+            if (EnhanceOutputGuard::isRefusalOrNonEnhancement($inputText, $enhancedText)) {
+                $this->logger->info('Enhancement output treated as refusal or explanation', [
+                    'user_id' => $user->getId(),
+                    'input_length' => strlen($inputText),
+                    'output_length' => strlen($enhancedText),
+                ]);
+
+                return $this->json([
+                    'error' => 'enhance_rejected',
+                ], Response::HTTP_UNPROCESSABLE_ENTITY);
+            }
+
             return $this->json([
                 'success' => true,
                 'original' => $inputText,
@@ -519,12 +586,24 @@ class MessageController extends AbstractController
             $this->em->persist($messageFile);
             $this->em->flush();
 
-            // Extract text: audio files synchronously (user needs transcription in UI),
-            // other files deferred to MessagePreProcessor during stream to avoid timeouts
+            // Extract text synchronously for files the chat handler will analyze
+            // immediately (audio, documents). Image extraction is left to the
+            // vision-model pipeline, which reads the file directly at analyze
+            // time. Doing extraction here closes the race documented in
+            // issue #729: the stream used to run FileAnalysisHandler before
+            // the async/deferred extraction had populated BFILETEXT, yielding
+            // a false "Document text extraction failed" error on the user's
+            // first send. By the time uploadFileForChat returns, the file is
+            // either `extracted` (text available) or `error` (extraction
+            // failed) — never `uploaded` with empty text.
             $extractMeta = [];
             $isAudio = in_array($fileExtension, MessagePreProcessor::AUDIO_EXTENSIONS, true);
+            $isDocument = in_array($fileExtension, MessagePreProcessor::DOCUMENT_EXTENSIONS, true);
 
-            if ($isAudio) {
+            if ($isAudio || $isDocument) {
+                $messageFile->setStatus('extracting');
+                $this->em->flush();
+
                 try {
                     [$extractedText, $extractMeta] = $this->fileProcessor->extractText(
                         $relativePath,
@@ -536,9 +615,10 @@ class MessageController extends AbstractController
                     $messageFile->setStatus(empty(trim($extractedText)) ? 'error' : 'extracted');
                     $this->em->flush();
 
-                    $this->logger->info('Chat file extracted (audio)', [
+                    $this->logger->info('Chat file extracted', [
                         'user_id' => $user->getId(),
                         'file_id' => $messageFile->getId(),
+                        'kind' => $isAudio ? 'audio' : 'document',
                         'text_length' => strlen($extractedText),
                         'strategy' => $extractMeta['strategy'] ?? 'unknown',
                     ]);
@@ -546,6 +626,7 @@ class MessageController extends AbstractController
                     $this->logger->error('Chat file extraction failed', [
                         'user_id' => $user->getId(),
                         'file_id' => $messageFile->getId(),
+                        'kind' => $isAudio ? 'audio' : 'document',
                         'error' => $e->getMessage(),
                     ]);
 
@@ -562,12 +643,21 @@ class MessageController extends AbstractController
                 'status' => $messageFile->getStatus(),
             ]);
 
-            // Record FILE_ANALYSIS usage for statistics
-            $this->rateLimitService->recordUsage($user, 'FILE_ANALYSIS', [
-                'file_id' => $messageFile->getId(),
-                'filename' => $uploadedFile->getClientOriginalName(),
-                'source' => 'WEB',
-            ]);
+            // FILE_ANALYSIS recording is INTENTIONALLY deferred to
+            // MessagePreProcessor::processMessageFile() — a chat upload
+            // that the user never sends should not be billed (issue #887).
+            // The pre-upload `checkLimit('FILE_ANALYSIS')` above still
+            // rejects users who have already exhausted their quota, so the
+            // limit gate stays in place; we just no longer write a
+            // BUSELOG row at the point a file is staged.
+            //
+            // For audio files we extracted synchronously above, recording
+            // also happens via MessagePreProcessor: when the message is
+            // streamed (or when an audio-only upload triggers an immediate
+            // analysis through the standard pipeline), the file id is
+            // looked up by the preprocessor and routed through
+            // RateLimitService::recordFileAnalysisOnce(), which dedups so
+            // the same file never bills twice.
 
             $response = [
                 'success' => true,
@@ -579,6 +669,18 @@ class MessageController extends AbstractController
                 'extracted_text_length' => strlen($messageFile->getFileText()),
                 'status' => $messageFile->getStatus(),
             ];
+
+            // Surface a clean error code when synchronous extraction failed
+            // (issue #729). The frontend uses this to render a friendly
+            // notification and block sending the file until the user removes
+            // or replaces it, instead of getting the generic
+            // "Document text extraction failed" mid-stream.
+            if ('error' === $messageFile->getStatus() && ($isAudio || $isDocument)) {
+                $response['extraction_error'] = $isAudio
+                    ? 'audio_transcription_failed'
+                    : 'document_extraction_failed';
+                $response['extraction_strategy'] = $extractMeta['strategy'] ?? 'unknown';
+            }
 
             // Include transcribed text for audio files (for microphone input)
             if (!empty($messageFile->getFileText()) && in_array($fileExtension, ['ogg', 'mp3', 'wav', 'm4a', 'opus', 'flac', 'webm', 'aac', 'wma', 'mp4', 'avi', 'mov', 'mkv', 'mpeg', 'mpg'])) {
@@ -739,18 +841,42 @@ class MessageController extends AbstractController
         #[CurrentUser] ?User $user,
     ): JsonResponse {
         if (!$user) {
-            return $this->json(['error' => 'Not authenticated'], Response::HTTP_UNAUTHORIZED);
+            return $this->noStoreJson(['error' => 'Not authenticated'], Response::HTTP_UNAUTHORIZED);
         }
 
         $message = $this->em->getRepository(Message::class)->find($messageId);
         if (!$message || $message->getUserId() !== $user->getId()) {
-            return $this->json(['error' => 'Message not found'], Response::HTTP_NOT_FOUND);
+            return $this->noStoreJson(['error' => 'Message not found'], Response::HTTP_NOT_FOUND);
+        }
+
+        // Issue #881: invalidate any stale in-memory state before reading
+        // the meta. Under FrankenPHP/worker mode the EntityManager's
+        // identity map persists across the SSE-stream + poll requests
+        // served by the same PHP process, so a Message + its
+        // BMESSAGEMETA collection initialised during the SSE stream can
+        // remain in memory without ever seeing the row that the
+        // messenger worker just inserted. `refresh()` drops the cached
+        // entity (and its collection) and reloads from the DB so each
+        // poll observes the current persisted state. The repeated
+        // `find()` above is still useful: it scopes the user-ownership
+        // check before we touch the DB again.
+        try {
+            $this->em->refresh($message);
+        } catch (\Throwable $e) {
+            // Most refresh failures here are benign (entity removed
+            // mid-poll, transient DB hiccup). Log + continue with the
+            // already-loaded state — at worst the user sees one extra
+            // `pending` poll and the next attempt picks up the meta.
+            $this->logger->warning('getExtractedMemories: failed to refresh message entity, falling back to cached state', [
+                'message_id' => $messageId,
+                'error' => $e->getMessage(),
+            ]);
         }
 
         $raw = $message->getMeta('extracted_memories');
         if (null === $raw || '' === $raw) {
             // Worker hasn't finished yet — frontend keeps polling.
-            return $this->json([
+            return $this->noStoreJson([
                 'status' => 'pending',
                 'completed_at' => null,
                 'saved' => [],
@@ -766,7 +892,7 @@ class MessageController extends AbstractController
                 'error' => $e->getMessage(),
             ]);
 
-            return $this->json([
+            return $this->noStoreJson([
                 'status' => 'empty',
                 'completed_at' => null,
                 'saved' => [],
@@ -774,11 +900,36 @@ class MessageController extends AbstractController
             ]);
         }
 
-        return $this->json([
+        return $this->noStoreJson([
             'status' => $decoded['status'] ?? 'empty',
             'completed_at' => $decoded['completed_at'] ?? null,
             'saved' => $decoded['saved'] ?? [],
             'delete_suggestions' => $decoded['delete_suggestions'] ?? [],
         ]);
+    }
+
+    /**
+     * Build a JsonResponse with explicit no-cache headers.
+     *
+     * Issue #881: the memory-poll endpoint defaults to
+     * `Cache-Control: private, must-revalidate` in production, which is
+     * usually fine, but Cloudflare (or any HTTP intermediary that
+     * speculatively caches GETs by URL) plus a misbehaving keep-alive
+     * stack has been observed serving the very first `pending` body for
+     * every subsequent poll on the same `messageId`. The frontend then
+     * never sees `complete` and the memory toast never appears. We
+     * explicitly opt out of every layer of caching here so each poll
+     * goes back to PHP and observes the worker's progress.
+     *
+     * @param array<string, mixed> $payload
+     */
+    private function noStoreJson(array $payload, int $status = Response::HTTP_OK): JsonResponse
+    {
+        $response = $this->json($payload, $status);
+        $response->headers->set('Cache-Control', 'no-cache, no-store, must-revalidate, max-age=0');
+        $response->headers->set('Pragma', 'no-cache');
+        $response->headers->set('Expires', '0');
+
+        return $response;
     }
 }

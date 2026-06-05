@@ -180,6 +180,11 @@ function parseTextContent(text: string, parts: ParsedResponsePart[]) {
   }
 }
 
+// Markdown table separator row, e.g. `| --- | --- |` or `|:---|---:|`.
+// Used to detect markdown tables so we can keep their content (including
+// links inside cells) intact instead of extracting URLs as link cards.
+const MARKDOWN_TABLE_SEPARATOR_REGEX = /^\s*\|?\s*:?-{3,}:?\s*(\|\s*:?-{3,}:?\s*)+\|?\s*$/m
+
 /**
  * Detect whether the links form a compact list (e.g. web search results)
  * vs. being scattered across a long text (normal prose with inline URLs).
@@ -187,12 +192,21 @@ function parseTextContent(text: string, parts: ParsedResponsePart[]) {
  * Heuristic: links are "clustered" when the non-link text between the first
  * and last link is short relative to the span they cover. If there are large
  * blocks of prose between links, they are inline references, not a link list.
+ *
+ * Special case: if the text contains a markdown table, the URLs inside the
+ * table cells are naturally close together and would falsely trigger the
+ * clustered detection. Keep them inline so the markdown renderer can render
+ * the table with clickable links.
  */
 function isClusteredLinkList(
   text: string,
   links: Array<{ url: string; title: string; position: number }>
 ): boolean {
   if (links.length < 3) return false
+
+  // Markdown tables with links must stay intact: rip-out would destroy
+  // the table structure (see issue #953).
+  if (MARKDOWN_TABLE_SEPARATOR_REGEX.test(text)) return false
 
   const sorted = [...links].sort((a, b) => a.position - b.position)
   const first = sorted[0]

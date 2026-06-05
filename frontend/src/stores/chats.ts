@@ -318,6 +318,42 @@ export const useChatsStore = defineStore('chats', () => {
     updateActiveChatSelection(chatId)
   }
 
+  /**
+   * Mark a chat as recently active so it re-sorts to the top of sidebar lists.
+   *
+   * Sidebars (`SidebarV2`, `ChatDropdown`) order chats by `updatedAt DESC` so
+   * the most recently active conversation is always at the top. The backend
+   * keeps `updatedAt` in sync, but local in-memory chats only see that change
+   * after a full reload. Whenever a new message lands on a chat (web SSE,
+   * WhatsApp, email, widget), call this to bump the local chat so the UI
+   * reflects activity immediately without a round-trip to the server.
+   *
+   * @param chatId Target chat. No-op if the chat is not in the local store.
+   * @param options.incrementMessageCount Whether to add 1 to `messageCount`.
+   *   Useful when the caller knows a new message was just appended; pass
+   *   `false` if the count is being managed elsewhere.
+   * @param options.firstMessagePreview Optional first message preview to set
+   *   if the chat does not have one yet (used to lift "empty" chats out of
+   *   the empty-chat filter once they have real content).
+   */
+  function bumpChatActivity(
+    chatId: number,
+    options: { incrementMessageCount?: boolean; firstMessagePreview?: string } = {}
+  ) {
+    const chat = chats.value.find((c) => c.id === chatId)
+    if (!chat) return
+
+    chat.updatedAt = new Date().toISOString()
+
+    if (options.incrementMessageCount ?? true) {
+      chat.messageCount = (chat.messageCount ?? 0) + 1
+    }
+
+    if (options.firstMessagePreview && !chat.firstMessagePreview) {
+      chat.firstMessagePreview = options.firstMessagePreview
+    }
+  }
+
   function $reset() {
     chats.value = []
     updateActiveChatSelection(null)
@@ -339,6 +375,7 @@ export const useChatsStore = defineStore('chats', () => {
     shareChat,
     getShareInfo,
     setActiveChat,
+    bumpChatActivity,
     $reset,
   }
 })

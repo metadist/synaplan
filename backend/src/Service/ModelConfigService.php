@@ -251,19 +251,98 @@ final readonly class ModelConfigService
      */
     public function getUserAiConfig(?int $userId): array
     {
+        $visionDefault = $this->resolveVisionDefault($userId);
+
         return [
             'chat' => [
                 'provider' => $this->getDefaultProvider($userId, 'chat'),
                 'model' => $this->getDefaultModel('CHAT', $userId),
             ],
             'vision' => [
-                'provider' => $this->getDefaultProvider($userId, 'vision'),
-                'model' => $this->getDefaultModel('VISION', $userId),
+                'provider' => $visionDefault['provider'],
+                'model' => $visionDefault['model_id'],
             ],
             'embedding' => [
                 'provider' => $this->getDefaultProvider($userId, 'embedding'),
                 'model' => $this->getDefaultModel('EMBEDDING', $userId),
             ],
+        ];
+    }
+
+    /**
+     * Resolve the user's configured Pic→Text default model and provider.
+     *
+     * The settings UI writes image-recognition defaults to DEFAULTMODEL.PIC2TEXT
+     * as a numeric BMODELS id. Return both the DB id for config/debug surfaces
+     * and the provider-facing model name for runtime calls.
+     *
+     * @return array{provider: string, model: ?string, model_id: ?int}
+     */
+    public function resolveVisionDefault(?int $userId): array
+    {
+        $visionModelId = $this->getDefaultModel('PIC2TEXT', $userId);
+        $visionModelName = null;
+        $visionProvider = null;
+
+        if ($visionModelId) {
+            $visionProvider = $this->getProviderForModel((int) $visionModelId);
+            if (null === $visionProvider) {
+                $visionModelId = null;
+            } else {
+                $visionModelName = $this->getModelName((int) $visionModelId);
+            }
+        }
+
+        if (null === $visionProvider) {
+            $visionProvider = $this->getDefaultProvider($userId, 'vision');
+        }
+
+        return [
+            'provider' => $visionProvider,
+            'model' => $visionModelName,
+            'model_id' => $visionModelId,
+        ];
+    }
+
+    /**
+     * Resolve the user's configured Sound→Text default model and provider.
+     *
+     * The settings UI writes transcription defaults to DEFAULTMODEL.SOUND2TEXT
+     * as a numeric BMODELS id. Return both the DB id for config/debug surfaces
+     * and the provider-facing model name for runtime calls.
+     *
+     * Mirrors resolveVisionDefault() so AiFacade::transcribe() can honour the
+     * configured row instead of falling through to the legacy
+     * ai/default_speech_to_text_provider chain (which the settings UI never
+     * writes — see issue #696).
+     *
+     * @return array{provider: string, model: ?string, model_id: ?int}
+     */
+    public function resolveSttDefault(?int $userId): array
+    {
+        $sttModelId = $this->getDefaultModel('SOUND2TEXT', $userId);
+        $sttModelName = null;
+        $sttProvider = null;
+
+        if ($sttModelId) {
+            $sttProvider = $this->getProviderForModel((int) $sttModelId);
+            if (null === $sttProvider) {
+                // BMODELS row is gone (e.g. catalog reshuffle): drop the stale
+                // id so callers fall back to the capability-level provider chain.
+                $sttModelId = null;
+            } else {
+                $sttModelName = $this->getModelName((int) $sttModelId);
+            }
+        }
+
+        if (null === $sttProvider) {
+            $sttProvider = $this->getDefaultProvider($userId, 'speech_to_text');
+        }
+
+        return [
+            'provider' => $sttProvider,
+            'model' => $sttModelName,
+            'model_id' => $sttModelId,
         ];
     }
 
@@ -324,6 +403,47 @@ final readonly class ModelConfigService
         return [
             'provider' => $this->getProviderForModel($modelId),
             'model' => $this->getModelName($modelId),
+            'model_id' => $modelId,
+        ];
+    }
+
+    /**
+     * Resolve the model that should run memory-related AI calls (auto-extraction
+     * from chat messages AND the "New Memory" parse endpoint in the UI).
+     *
+     * Priority:
+     *   1. User-scoped DEFAULTMODEL.MEM   (per-user override, set via the admin UI)
+     *   2. Global DEFAULTMODEL.MEM        (the dedicated "Memory extraction model"
+     *                                       BMODELS row, BTAG=mem, default points at
+     *                                       Groq gpt-oss-120b for ~200 ms TTFT)
+     *   3. User-scoped DEFAULTMODEL.CHAT  (legacy fallback — preserved for
+     *                                       installations that haven't seeded
+     *                                       the MEM tag yet)
+     *   4. Global DEFAULTMODEL.CHAT       (last resort)
+     *
+     * The MEM tag exists so picking a slow/expensive chat model (e.g. Claude
+     * Opus 4) for the user-facing answer no longer cascades into the cheaper
+     * memory extraction path. Centralising the resolution here keeps the
+     * background MemoryExtractionService and the synchronous UserMemoryController
+     * parse endpoint in lockstep — see issue #973.
+     *
+     * @return array{model: ?string, provider: ?string, model_id: ?int}
+     */
+    public function getMemoryModelConfig(?int $userId = null): array
+    {
+        // getDefaultModel() already walks user-scope → global, so we only need
+        // two outer calls (MEM then CHAT) — not four. Hitting MEM/0 explicitly
+        // after MEM/$userId would just repeat the same global lookup.
+        $modelId = $this->getDefaultModel('MEM', $userId)
+            ?? $this->getDefaultModel('CHAT', $userId);
+
+        if (!$modelId) {
+            return ['model' => null, 'provider' => null, 'model_id' => null];
+        }
+
+        return [
+            'model' => $this->getModelName($modelId),
+            'provider' => $this->getProviderForModel($modelId),
             'model_id' => $modelId,
         ];
     }

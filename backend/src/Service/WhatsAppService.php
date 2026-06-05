@@ -5,6 +5,7 @@ namespace App\Service;
 use App\AI\Service\AiFacade;
 use App\DTO\WhatsApp\IncomingMessageDto;
 use App\Entity\Chat;
+use App\Entity\File;
 use App\Entity\Message;
 use App\Entity\User;
 use App\Service\File\FileProcessor;
@@ -45,6 +46,32 @@ final class WhatsAppService
      * WhatsApp retries typically happen within 1-2 minutes.
      */
     private const DUPLICATE_CACHE_TTL = 300;
+
+    /**
+     * Allow-list of WhatsApp webhook message types the AI pipeline knows
+     * how to handle. Anything outside this set is silently acknowledged
+     * to Meta (HTTP 200) without persisting a Message or invoking the
+     * AI — see {@see handleIncomingMessage()} and issue #633.
+     *
+     * Filtered-out types include `reaction`, `poll`, `poll_vote`,
+     * `ephemeral`, `request_welcome`, `system`, `unsupported`,
+     * `interactive`, `button` and `order`. These either carry no
+     * user-actionable text payload (reactions, polls) or require
+     * dedicated handlers the platform does not yet implement
+     * (interactive buttons, catalog orders). Acknowledging them
+     * silently keeps Meta from retrying the webhook and stops the
+     * "one poll → seven AI replies" cascade described in #633.
+     */
+    private const SUPPORTED_MESSAGE_TYPES = [
+        'text',
+        'image',
+        'sticker',
+        'audio',
+        'video',
+        'document',
+        'location',
+        'contacts',
+    ];
 
     private const DEFAULT_GRAPH_BASE = 'https://graph.facebook.com';
 
@@ -165,6 +192,55 @@ final class WhatsAppService
 
             return null;
         }
+    }
+
+    /**
+     * Drop non-actionable webhook message types before they enter the
+     * AI pipeline. Returns a webhook-success payload when the type is
+     * not in {@see SUPPORTED_MESSAGE_TYPES}, or `null` to continue
+     * normal processing.
+     *
+     * We also fire-and-forget a read receipt so the user's WhatsApp
+     * thread doesn't show an unread bubble for a poll/reaction the
+     * platform legitimately ignored — failures here are logged but
+     * never block the webhook acknowledgement (Meta would otherwise
+     * retry, compounding the original bug from issue #633).
+     */
+    private function handleUnsupportedTypeIfNeeded(IncomingMessageDto $dto): ?array
+    {
+        if (in_array($dto->type, self::SUPPORTED_MESSAGE_TYPES, true)) {
+            return null;
+        }
+
+        $this->logger->info('WhatsApp: Skipping unsupported message type', [
+            'message_id' => $dto->messageId,
+            'from' => $dto->from,
+            'type' => $dto->type,
+        ]);
+
+        if ($this->isAvailable() && '' !== $dto->phoneNumberId) {
+            try {
+                $this->markAsRead($dto->messageId, $dto->phoneNumberId);
+            } catch (\Throwable $e) {
+                // Read receipts are best-effort. A failure here must
+                // not bubble up: the webhook MUST still return 200
+                // so Meta doesn't retry and re-trigger the cascade.
+                $this->logger->warning('WhatsApp: Failed to mark unsupported message as read', [
+                    'message_id' => $dto->messageId,
+                    'type' => $dto->type,
+                    'error' => $e->getMessage(),
+                ]);
+            }
+        }
+
+        return [
+            'success' => true,
+            'message_id' => $dto->messageId,
+            'skipped' => true,
+            'reason' => 'unsupported_type',
+            'type' => $dto->type,
+            'response_sent' => false,
+        ];
     }
 
     /**
@@ -568,6 +644,17 @@ final class WhatsAppService
             return $duplicateResult;
         }
 
+        // Issue #633: silently acknowledge unsupported webhook types
+        // (poll, reaction, system, …) so the AI pipeline doesn't fire
+        // for non-user-actionable events. Duplicate detection cannot
+        // help here — each poll vote / reaction lands with a distinct
+        // wamid, so without this filter a single poll cascades into
+        // 7+ "[Unsupported message type: …]" messages and 7+ replies.
+        $unsupportedResult = $this->handleUnsupportedTypeIfNeeded($dto);
+        if (null !== $unsupportedResult) {
+            return $unsupportedResult;
+        }
+
         $effectiveUserId = $isAnonymous ? $this->whatsappUserId : $user->getId();
 
         // Determine input type for response mode selection
@@ -740,6 +827,25 @@ final class WhatsAppService
         $metadata = $result['response']['metadata'] ?? [];
         $fileData = $metadata['file'] ?? null;
 
+        // Issue #652: WhatsApp responses must surface web search citations
+        // alongside the answer instead of forcing the user to ask "wo sind die
+        // quellen?". We persist the search metadata on the incoming message so
+        // the platform chat view (ChatController::getMessages) and the
+        // outgoing message both expose the sources, mirroring the streaming
+        // flow used by the web UI (StreamController). For text replies we
+        // also append a short, WhatsApp-friendly source list to the message
+        // body so mobile users see the citations directly in WhatsApp.
+        $searchResults = $result['search_results'] ?? null;
+        $searchResultsItems = $searchResults['results'] ?? [];
+        $hasSearchResults = is_array($searchResultsItems) && [] !== $searchResultsItems;
+        if ($hasSearchResults) {
+            $searchQuery = (string) ($searchResults['query'] ?? '');
+            $searchCount = count($searchResultsItems);
+            $message->setMeta('web_search_query', $searchQuery);
+            $message->setMeta('web_search_results_count', (string) $searchCount);
+            $this->em->flush();
+        }
+
         $this->rateLimitService->recordUsage($user, 'MESSAGES', [
             'provider' => $metadata['provider'] ?? 'unknown',
             'model' => $metadata['model'] ?? 'unknown',
@@ -752,6 +858,14 @@ final class WhatsAppService
 
         // 8. Send Response based on input type
         $responseSent = false;
+
+        // Issue #652: For text-style replies we surface the citations inline.
+        // Media replies (image/video/AI audio) keep their caption clean —
+        // WhatsApp caps captions at 1024 chars and the platform view still
+        // shows the sources via the metadata mirrored in storeOutgoingMessage.
+        $textResponseWithSources = $hasSearchResults
+            ? $this->appendWhatsAppSources($responseText, $searchResultsItems)
+            : $responseText;
 
         // PRIORITY 1: Check if AI generated media (image, video, or audio from MediaGenerationHandler)
         if ($fileData) {
@@ -792,7 +906,22 @@ final class WhatsAppService
                         'video' => '[Video response]',
                         default => '[Audio response]', // audio is the remaining case
                     };
-                    $this->storeOutgoingMessage($user, $dto, $responseText ?: $placeholderText, $sendResult['message_id'], $chat);
+                    // Persist the generated media path so the web chat
+                    // history surfaces the player (issue #626) and mirror
+                    // the web-search citations onto the outgoing row so the
+                    // platform chat view exposes them too (issue #652).
+                    // WhatsApp itself already received the asset via
+                    // sendMedia(), but the cross-channel mirror lives in the
+                    // DB row.
+                    $this->storeOutgoingMessage(
+                        $user,
+                        $dto,
+                        $responseText ?: $placeholderText,
+                        $sendResult['message_id'],
+                        $chat,
+                        $searchResults,
+                        ['path' => $mediaPath, 'type' => $generatedMediaType],
+                    );
                     $responseSent = true;
 
                     // Discord notification: AI media generated and sent
@@ -843,7 +972,21 @@ final class WhatsAppService
 
                 $sendResult = $this->sendMedia($dto->from, 'audio', $audioUrl, $dto->phoneNumberId);
                 if ($sendResult['success']) {
-                    $this->storeOutgoingMessage($user, $dto, $responseText, $sendResult['message_id'], $chat);
+                    // Persist TTS audio on the DB row so the web chat
+                    // history surfaces the audio player (issue #626) and
+                    // mirror the web-search citations onto the outgoing row
+                    // so the platform chat view exposes them too
+                    // (issue #652).
+                    $ttsServePath = '/api/v1/files/uploads/'.$ttsResult['relativePath'];
+                    $this->storeOutgoingMessage(
+                        $user,
+                        $dto,
+                        $responseText,
+                        $sendResult['message_id'],
+                        $chat,
+                        $searchResults,
+                        ['path' => $ttsServePath, 'type' => 'audio'],
+                    );
                     $responseSent = true;
 
                     // Discord notification: TTS response sent
@@ -890,10 +1033,13 @@ final class WhatsAppService
         }
 
         // PRIORITY 3: Send text response (fallback or for text/image/video input)
-        if (!$responseSent && !empty($responseText)) {
-            $sendResult = $this->sendMessage($dto->from, $responseText, $dto->phoneNumberId);
+        if (!$responseSent && !empty($textResponseWithSources)) {
+            $sendResult = $this->sendMessage($dto->from, $textResponseWithSources, $dto->phoneNumberId);
             if ($sendResult['success']) {
-                $this->storeOutgoingMessage($user, $dto, $responseText, $sendResult['message_id'], $chat);
+                // Persist the response WITHOUT the appended source block — the
+                // platform UI renders sources from metadata, so duplicating
+                // them in the stored text would clutter the history view.
+                $this->storeOutgoingMessage($user, $dto, $responseText, $sendResult['message_id'], $chat, $searchResults);
                 $responseSent = true;
 
                 // Discord notification: Text response sent
@@ -1108,6 +1254,14 @@ final class WhatsAppService
      * Extract initial message text from the WhatsApp message.
      * For media messages, this returns captions or placeholders that will be
      * replaced with transcribed/extracted content during media processing.
+     *
+     * The `default` branch is defense-in-depth only: the outer
+     * {@see handleUnsupportedTypeIfNeeded()} filter (issue #633) already
+     * short-circuits any type that is not in {@see SUPPORTED_MESSAGE_TYPES},
+     * so this method should never see one in production. The fallback
+     * string stays around so direct callers (e.g. reflection-driven
+     * unit tests) still get a deterministic value instead of an
+     * UnhandledMatchError.
      */
     private function extractMessageText(IncomingMessageDto $dto): string
     {
@@ -1266,14 +1420,41 @@ final class WhatsAppService
                 return 'Failed to download media file';
             }
 
+            // Issue #976: persist the downloaded asset as a `File` entity
+            // attached to the message, mirroring how regular web uploads
+            // travel through `MessageController::uploadFileForChat` and
+            // `StreamController`. Without this, WhatsApp media bypassed the
+            // standard storage pipeline: `Message::filePath` carried a raw
+            // relative path while the static-serve controller only matched
+            // the `/api/v1/files/uploads/...` prefix, so the audio 404'd in
+            // the web chat. Storing it as a File entity also lets the
+            // recording show up in the user's Files page and travel through
+            // the same access-control path as any other upload.
+            $relativePath = $downloadResult['file_path'];
+            $file = new File();
+            $file->setUserId($effectiveUserId);
+            $file->setFilePath($relativePath);
+            $file->setFileType($downloadResult['file_type'] ?? 'unknown');
+            $file->setFileName(basename($relativePath));
+            $file->setFileSize((int) ($downloadResult['size'] ?? 0));
+            $file->setFileMime((string) ($downloadResult['mime_type'] ?? 'application/octet-stream'));
+            $file->setStatus('uploaded');
+
+            // Persist + attach without an inner flush — `handleIncomingMessage`
+            // performs a single flush right after we return, which now
+            // covers BOTH the File row AND the Message↔File association
+            // in one transaction. An earlier version flushed twice and
+            // wrote the M2M row in a separate INSERT, which was wasteful
+            // and could leave a half-attached File if the second flush
+            // failed.
+            $this->em->persist($file);
+            $message->addFile($file);
             $message->setFile(1);
-            $message->setFilePath($downloadResult['file_path']);
-            $message->setFileType($downloadResult['file_type'] ?? 'unknown');
 
             $this->logger->info('WhatsApp: Media downloaded successfully', [
                 'media_id' => $mediaId,
                 'type' => $dto->type,
-                'file_path' => $downloadResult['file_path'],
+                'file_path' => $relativePath,
                 'file_type' => $downloadResult['file_type'],
                 'size' => $downloadResult['size'] ?? 0,
             ]);
@@ -1291,13 +1472,14 @@ final class WhatsAppService
                     ]);
 
                     [$extractedText, $extractionDetails] = $this->fileProcessor->extractText(
-                        $downloadResult['file_path'],
+                        $relativePath,
                         $downloadResult['file_type'],
                         $effectiveUserId
                     );
 
                     if (!empty($extractedText)) {
-                        $message->setFileText($extractedText);
+                        $file->setFileText($extractedText);
+                        $file->setStatus('extracted');
 
                         // CRITICAL: For audio/video messages, replace placeholder text with transcription
                         // This ensures the AI receives the actual spoken content
@@ -1314,6 +1496,7 @@ final class WhatsAppService
                         }
                     } else {
                         // Extraction failed - return error to user instead of proceeding with placeholder
+                        $file->setStatus('error');
                         $this->logger->warning('WhatsApp: No text extracted from audio/video', [
                             'type' => $dto->type,
                             'details' => $extractionDetails ?? [],
@@ -1337,7 +1520,7 @@ final class WhatsAppService
                         $this->logger->info('WhatsApp: Image/sticker with caption, delegating to ChatHandler vision', [
                             'type' => $dto->type,
                             'caption' => $caption,
-                            'file_path' => $downloadResult['file_path'],
+                            'file_path' => $relativePath,
                         ]);
                     } else {
                         // No caption: ask for a description
@@ -1347,25 +1530,29 @@ final class WhatsAppService
                         $message->setText($prompt);
                         $this->logger->info('WhatsApp: Image/sticker without caption, requesting description', [
                             'type' => $dto->type,
-                            'file_path' => $downloadResult['file_path'],
+                            'file_path' => $relativePath,
                         ]);
                     }
-                // Note: fileText is intentionally NOT set - ChatHandler will include
-                // the image directly in the Vision API request for proper analysis
+                // Note: fileText is intentionally NOT set on the File entity
+                // here — ChatHandler reads the image straight off disk for
+                // the Vision API request, and storing a placeholder text
+                // would only confuse downstream classifiers.
                 } else {
                     // For documents and other types, use standard extraction
                     [$extractedText] = $this->fileProcessor->extractText(
-                        $downloadResult['file_path'],
+                        $relativePath,
                         $downloadResult['file_type'],
                         $effectiveUserId
                     );
 
                     if (!empty($extractedText)) {
-                        $message->setFileText($extractedText);
+                        $file->setFileText($extractedText);
+                        $file->setStatus('extracted');
                     }
                 }
             } catch (\Throwable $e) {
                 $extractionError = $e->getMessage();
+                $file->setStatus('error');
                 $this->logger->error('WhatsApp: Text extraction failed', [
                     'type' => $dto->type,
                     'file_type' => $downloadResult['file_type'],
@@ -1392,8 +1579,42 @@ final class WhatsAppService
         }
     }
 
-    private function storeOutgoingMessage(User $user, IncomingMessageDto $dto, string $text, string $externalId, ?Chat $chat = null): void
-    {
+    /**
+     * Persist an outgoing WhatsApp message.
+     *
+     * Mirrors the web-search metadata stored on the incoming message
+     * (issue #652). The chat history endpoint
+     * ({@see \App\Controller\ChatController::getMessages()}) renders the
+     * "Quellen" panel based on `web_search_query` + `web_search_results_count`
+     * on the OUTGOING message, then resolves the actual citations from the
+     * INCOMING message via `SearchResultRepository::findByMessage()`. Skipping
+     * this mirror was the root cause of issue #652 — the platform view simply
+     * didn't know that the WhatsApp answer was backed by citations.
+     *
+     * Also records the serve URL + type when the response carried
+     * AI-generated media so the web chat history can replay the
+     * image/video/audio player (issue #626). WhatsApp itself already received
+     * the asset via sendMedia(), but the cross-channel mirror lives in the DB
+     * row.
+     *
+     * @param array{query?: string, results?: array}|null $searchResults web-search payload
+     *                                                                   carried alongside the
+     *                                                                   AI response
+     * @param array{path: string, type: string}|null      $generatedFile optional file metadata
+     *                                                                   produced by
+     *                                                                   MediaGenerationHandler
+     *                                                                   (already normalized to a
+     *                                                                   serve URL)
+     */
+    private function storeOutgoingMessage(
+        User $user,
+        IncomingMessageDto $dto,
+        string $text,
+        string $externalId,
+        ?Chat $chat = null,
+        ?array $searchResults = null,
+        ?array $generatedFile = null,
+    ): void {
         $outgoingMessage = new Message();
         $outgoingMessage->setUserId($user->getId());
         if ($chat) {
@@ -1404,7 +1625,9 @@ final class WhatsAppService
         $outgoingMessage->setUnixTimestamp(time());
         $outgoingMessage->setDateTime(date('YmdHis'));
         $outgoingMessage->setMessageType('WTSP');
-        $outgoingMessage->setFile(0);
+        $outgoingMessage->setFile(null !== $generatedFile ? 1 : 0);
+        $outgoingMessage->setFilePath($generatedFile['path'] ?? '');
+        $outgoingMessage->setFileType($generatedFile['type'] ?? '');
         $outgoingMessage->setTopic('CHAT');
         $outgoingMessage->setLanguage('en');
         $outgoingMessage->setText($text);
@@ -1421,6 +1644,13 @@ final class WhatsAppService
             $outgoingMessage->setMeta('from_display_phone', $dto->displayPhoneNumber);
         }
         $outgoingMessage->setMeta('external_id', $externalId);
+
+        $resultsList = $searchResults['results'] ?? null;
+        if (is_array($resultsList) && [] !== $resultsList) {
+            $outgoingMessage->setMeta('web_search_query', (string) ($searchResults['query'] ?? ''));
+            $outgoingMessage->setMeta('web_search_results_count', (string) count($resultsList));
+        }
+
         $this->em->flush();
     }
 
@@ -1831,5 +2061,67 @@ final class WhatsAppService
         }
 
         return $text;
+    }
+
+    /**
+     * Maximum number of web sources appended to a WhatsApp reply.
+     *
+     * Keeping the list short prevents the 4096-char message limit from
+     * pushing the actual answer into the second chunk, and it matches the
+     * "top N" UX that the platform chat view already shows next to the
+     * response.
+     */
+    private const MAX_WHATSAPP_SOURCES = 5;
+
+    /**
+     * Append a compact list of web-search citations to a WhatsApp reply.
+     *
+     * Issue #652: WhatsApp users previously had to ask "wo sind die quellen?"
+     * to surface the references the AI relied on. The platform UI shows the
+     * sources via metadata; for the mobile channel we inline them so the
+     * citations travel with the answer.
+     *
+     * Each entry is rendered as "*[N] Title*\n<url>" — WhatsApp turns bare
+     * URLs into clickable previews and respects `*…*` as bold. Empty URLs
+     * are skipped so we never produce naked numbers in the citation block.
+     *
+     * @param string                           $responseText The AI's answer text (already converted to WhatsApp markdown by sendMessage())
+     * @param array<int, array<string, mixed>> $sources      Raw Brave-style search hits as returned by BraveSearchService
+     */
+    private function appendWhatsAppSources(string $responseText, array $sources): string
+    {
+        $entries = [];
+        $position = 1;
+
+        foreach ($sources as $source) {
+            if (count($entries) >= self::MAX_WHATSAPP_SOURCES) {
+                break;
+            }
+
+            $url = trim((string) ($source['url'] ?? ''));
+            if ('' === $url) {
+                continue;
+            }
+
+            $title = trim((string) ($source['title'] ?? ''));
+            if ('' === $title) {
+                $title = $url;
+            }
+
+            // Newlines inside the title would break WhatsApp's list rendering
+            // and confuse the markdown bold delimiters below.
+            $title = preg_replace('/\s+/', ' ', $title) ?? $title;
+
+            $entries[] = sprintf('*[%d] %s*'."\n".'%s', $position, $title, $url);
+            ++$position;
+        }
+
+        if ([] === $entries) {
+            return $responseText;
+        }
+
+        $separator = '' === trim($responseText) ? '' : "\n\n";
+
+        return $responseText.$separator.'🔗 *Quellen:*'."\n".implode("\n\n", $entries);
     }
 }

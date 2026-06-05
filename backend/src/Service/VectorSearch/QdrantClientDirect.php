@@ -279,6 +279,45 @@ final class QdrantClientDirect implements QdrantClientInterface
         }
     }
 
+    public function scrollAllMemoriesForReindex(int $limit = 5000): array
+    {
+        $collection = $this->memoriesCollection;
+
+        try {
+            $response = $this->qdrantRequest('POST', "/collections/{$collection}/points/scroll", [
+                // Only filter on `active`; the re-index runs once per
+                // VECTORIZE switch and must walk every user's memories.
+                'filter' => [
+                    'must' => [
+                        ['key' => 'active', 'match' => ['value' => true]],
+                    ],
+                ],
+                'limit' => $limit,
+                'with_payload' => true,
+                'with_vector' => false,
+            ]);
+
+            $memoriesByLogical = [];
+            foreach ($response['result']['points'] ?? [] as $point) {
+                $logical = $point['payload']['_point_id'] ?? (string) $point['id'];
+                if (!isset($memoriesByLogical[$logical])) {
+                    $memoriesByLogical[$logical] = [
+                        'id' => $logical,
+                        'payload' => $point['payload'] ?? [],
+                    ];
+                }
+            }
+
+            return array_values($memoriesByLogical);
+        } catch (\Throwable $e) {
+            $this->logger->error('Failed to scroll all memories for reindex', [
+                'error' => $e->getMessage(),
+            ]);
+
+            return [];
+        }
+    }
+
     public function deleteMemory(string $pointId, ?string $namespace = null): void
     {
         $collection = $this->resolveMemoriesCollection($namespace);
@@ -1111,6 +1150,83 @@ final class QdrantClientDirect implements QdrantClientInterface
             ]);
         } catch (\Throwable $e) {
             $this->logger->error('Failed to recreate synapse collection', [
+                'collection' => $collection,
+                'vector_dim' => $vectorDimension,
+                'error' => $e->getMessage(),
+            ]);
+
+            throw $e;
+        }
+    }
+
+    public function getMemoriesCollectionInfo(): array
+    {
+        $defaults = [
+            'exists' => false,
+            'vector_dim' => null,
+            'points_count' => null,
+            'distance' => null,
+        ];
+
+        try {
+            $response = $this->qdrantRequest('GET', "/collections/{$this->memoriesCollection}");
+            $result = $response['result'] ?? [];
+
+            $vectorsConfig = $result['config']['params']['vectors'] ?? [];
+
+            return [
+                'exists' => true,
+                'vector_dim' => isset($vectorsConfig['size']) ? (int) $vectorsConfig['size'] : null,
+                'points_count' => isset($result['points_count']) ? (int) $result['points_count'] : null,
+                'distance' => $vectorsConfig['distance'] ?? null,
+            ];
+        } catch (\Throwable $e) {
+            $this->logger->debug('getMemoriesCollectionInfo: collection missing or unreachable', [
+                'error' => $e->getMessage(),
+            ]);
+
+            return $defaults;
+        }
+    }
+
+    public function recreateMemoriesCollection(int $vectorDimension): void
+    {
+        $collection = $this->memoriesCollection;
+
+        try {
+            $this->qdrantRequest('DELETE', "/collections/{$collection}");
+            unset($this->ensuredCollections[$collection]);
+            $this->logger->info('Dropped existing memories collection', [
+                'collection' => $collection,
+            ]);
+        } catch (\Throwable $e) {
+            $this->logger->debug('recreateMemoriesCollection: drop skipped', [
+                'collection' => $collection,
+                'error' => $e->getMessage(),
+            ]);
+        }
+
+        try {
+            $this->qdrantRequest('PUT', "/collections/{$collection}", [
+                'vectors' => [
+                    'size' => $vectorDimension,
+                    'distance' => 'Cosine',
+                ],
+            ]);
+
+            $this->createPayloadIndex($collection, 'user_id', 'integer');
+            $this->createPayloadIndex($collection, 'category', 'keyword');
+            $this->createPayloadIndex($collection, 'active', 'bool');
+            $this->createPayloadIndex($collection, '_point_id', 'keyword');
+
+            $this->ensuredCollections[$collection] = true;
+
+            $this->logger->info('Recreated Qdrant memories collection', [
+                'collection' => $collection,
+                'vector_dim' => $vectorDimension,
+            ]);
+        } catch (\Throwable $e) {
+            $this->logger->error('Failed to recreate memories collection', [
                 'collection' => $collection,
                 'vector_dim' => $vectorDimension,
                 'error' => $e->getMessage(),

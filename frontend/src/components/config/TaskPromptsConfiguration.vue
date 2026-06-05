@@ -1335,6 +1335,7 @@ import { useDialog } from '@/composables/useDialog'
 import ModelSelectDropdown from '@/components/ModelSelectDropdown.vue'
 import { useAuthStore } from '@/stores/auth'
 import UnsavedChangesBar from '@/components/UnsavedChangesBar.vue'
+import { ApiError } from '@/services/api/httpClient'
 
 const SELECTION_RULES_TEMPLATE =
   'When the user mentions [TOPIC_NAME] or asks about [SPECIFIC_KEYWORDS], route to this prompt.'
@@ -1872,8 +1873,8 @@ const loadPrompts = async () => {
       }
 
       const tools: string[] = []
-      if (metadata.tool_internet_search) tools.push('internet-search')
-      if (metadata.tool_files_search) tools.push('files-search')
+      if (metadata.tool_internet ?? metadata.tool_internet_search) tools.push('internet-search')
+      if (metadata.tool_files ?? metadata.tool_files_search) tools.push('files-search')
       if (metadata.tool_url_screenshot) tools.push('url-screenshot')
 
       return {
@@ -2013,10 +2014,8 @@ const handleSave = saveChanges(async () => {
       metadata.aiModel = findModelIdByString(allModels.value, formData.value.aiModel)
     }
 
-    metadata.tool_internet_search = (formData.value.availableTools || []).includes(
-      'internet-search'
-    )
-    metadata.tool_files_search = (formData.value.availableTools || []).includes('files-search')
+    metadata.tool_internet = (formData.value.availableTools || []).includes('internet-search')
+    metadata.tool_files = (formData.value.availableTools || []).includes('files-search')
     metadata.tool_url_screenshot = (formData.value.availableTools || []).includes('url-screenshot')
 
     if (currentPrompt.value.isDefault && !currentPrompt.value.isUserOverride && !isAdmin.value) {
@@ -2074,6 +2073,16 @@ const handleSave = saveChanges(async () => {
       }
     }
   } catch (err: unknown) {
+    // Issue #891: the prompt save now mirrors ConfigController's premium
+    // gate. When the backend rejects the chosen aiModel for the current
+    // subscription tier, surface the structured reason instead of a
+    // generic "Failed to save" toast — same pattern as
+    // AIModelsConfiguration.vue (issue #883).
+    if (err instanceof ApiError && err.status === 403 && err.code === 'requires_premium') {
+      showError(t('config.taskPrompts.saveErrorPremiumRequired', { reason: err.message }))
+      throw err
+    }
+
     let errorMessage = err instanceof Error ? err.message : 'Failed to save prompt'
 
     if (errorMessage.includes('Validation failed')) {
@@ -2148,8 +2157,8 @@ const handleCreateNew = async () => {
     const metadata: PromptMetadata = {}
 
     metadata.aiModel = 0
-    metadata.tool_internet_search = true
-    metadata.tool_files_search = true
+    metadata.tool_internet = true
+    metadata.tool_files = true
     metadata.tool_url_screenshot = false
 
     const requestPayload = {
@@ -2236,6 +2245,13 @@ const handleCreateNew = async () => {
 
     await loadPromptFiles()
   } catch (err: unknown) {
+    // Issue #891: prompt create also gates the aiModel through the
+    // premium guard. Show the structured reason from the backend.
+    if (err instanceof ApiError && err.status === 403 && err.code === 'requires_premium') {
+      showError(t('config.taskPrompts.saveErrorPremiumRequired', { reason: err.message }))
+      return
+    }
+
     let errorMessage = err instanceof Error ? err.message : 'Failed to create prompt'
 
     if (errorMessage.includes('already have a prompt with this topic')) {

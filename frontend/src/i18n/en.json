@@ -37,7 +37,26 @@
     "widgetSessions": "Widget Sessions",
     "widgetChats": "Widget Chats",
     "widgetDetail": "Widget Detail",
-    "liveSupport": "Live Support"
+    "liveSupport": "Live Support",
+    "addinConnect": "Connect Outlook Add-in"
+  },
+  "addinConnect": {
+    "title": "Connect to Synaplan",
+    "subtitle": "Authorise the Synamail Outlook add-in to use this Synaplan account.",
+    "loading": "Checking your session…",
+    "confirmPrompt": "Connect this Outlook to:",
+    "connectButton": "Connect Outlook",
+    "scopesNote": "Grants access to messages, chats, files and RAG search.",
+    "connecting": "Issuing a secure API key…",
+    "successTitle": "Connected.",
+    "successSubtitle": "You can close this window if it doesn't close on its own.",
+    "errorTitle": "Couldn't connect",
+    "retry": "Try again",
+    "helpLine": "This window is opened by the Synamail add-in. It is safe to close.",
+    "errorMissingState": "Missing state parameter. Reopen the add-in and try again.",
+    "errorOfficeNotReady": "Office.js is not available. This page must be opened from inside Outlook.",
+    "errorNotSignedIn": "You are not signed in. Refresh the window and sign in again.",
+    "errorIssuanceFailed": "Synaplan could not issue an API key for this account."
   },
   "welcome": "Welcome",
   "chat": {
@@ -58,6 +77,8 @@
     "showAll": "Show All",
     "recent": "Recent Conversations",
     "ttsGenerating": "Adding spoken answer…",
+    "audioUnavailable": "Audio could not be loaded",
+    "audioUnavailableDescription": "The file is currently unavailable on the server. Please try again later or download it.",
     "rename": "Rename Chat",
     "enterNewName": "Enter a new title for this chat:",
     "renameNote": "This change only affects your view. The widget user won't see this title.",
@@ -106,7 +127,8 @@
       "share": "Share chat",
       "public": "Public"
     },
-    "fileOnlyDefaultMessage": "Please review the attached file."
+    "fileOnlyDefaultMessage": "Please review the attached file.",
+    "voiceMessageDefaultMessage": "Please respond to my voice message."
   },
   "admin": {
     "title": "Admin Panel",
@@ -288,6 +310,9 @@
     "provider": "Provider",
     "model": "Model",
     "configureModel": "Configure AI Model",
+    "knowledgeGroup": "Knowledge folder",
+    "knowledgeGroupNone": "No knowledge folder",
+    "manageKnowledgeGroups": "Manage knowledge folders",
     "attach": "Attach",
     "uploadFile": "Upload",
     "deepResearch": "Deep Research",
@@ -295,6 +320,7 @@
     "web": "Web",
     "webSearch": "Search the web for up-to-date information",
     "enhance": "Enhance",
+    "enhanceRejected": "This text could not be improved. Try a clearer sentence or question.",
     "thinking": "Thinking",
     "reasoningNotSupported": "Your current chat model does not support reasoning. Please select a reasoning-capable model (GPT-5, o3, DeepSeek-R1) in AI Config → Models.",
     "voice": "Start voice",
@@ -310,6 +336,9 @@
     "dropFiles": "Drop files here",
     "dropFilesHint": "Images, documents, audio files...",
     "filesPasted": "{count} file pasted | {count} files pasted",
+    "uploadError": "File upload failed. Please try again.",
+    "documentExtractionFailed": "Could not read text from \"{filename}\". The document may be empty, scanned without OCR, password-protected, or in an unsupported format.",
+    "audioTranscriptionFailed": "Could not transcribe \"{filename}\". The audio may be empty, corrupted, or in an unsupported format.",
     "voiceReply": "Voice reply",
     "voiceReplyTooltip": "Include audio response (MP3)",
     "send": "Send message",
@@ -337,7 +366,8 @@
     "messageDetails": "Message details",
     "infoTopic": "Topic",
     "infoModel": "Model",
-    "infoProvider": "Provider"
+    "infoProvider": "Provider",
+    "infoAudioModel": "Audio Model"
   },
   "commands": {
     "noResults": "No commands found",
@@ -470,6 +500,8 @@
     "testing": "Testing Connection...",
     "testSuccess": "Connection Successful",
     "testFailed": "Connection Failed",
+    "testPickUpIncomplete": "Enter mail server, port, and username before testing.",
+    "testPickUpPasswordRequired": "Enter the mailbox password to test this configuration.",
     "savedHandlers": "Email Agents",
     "savedHandlersDesc": "Automate your inbox with AI-powered email agents that read, sort, and forward messages.",
     "createHandler": "New Email Agent",
@@ -530,9 +562,41 @@
     "filterFromDateHelp": "Emails from this date onwards will be processed (including future emails)",
     "filterToDate": "To Date",
     "recommended": "Recommended",
-    "proOnly": "PRO+"
+    "proOnly": "PRO+",
+    "activity": {
+      "title": "Recent activity",
+      "description": "The last 10 things this email agent did. Use it to debug \"the message was marked seen but never forwarded\" cases.",
+      "openButton": "View activity log",
+      "refresh": "Reload activity",
+      "loadFailed": "Could not load activity log",
+      "empty": "No activity yet",
+      "emptyDescription": "Once this agent processes incoming mail, the most recent steps will appear here.",
+      "retentionNote": "Only the last 10 entries are kept; older entries are pruned automatically.",
+      "events": {
+        "check": "Mailbox checked",
+        "connect_failed": "Connection failed",
+        "forwarded": "Email forwarded",
+        "discarded": "Email discarded by AI",
+        "no_smtp": "Routed but not sent (no SMTP configured)",
+        "forward_failed": "Forward failed",
+        "process_error": "Could not process message"
+      },
+      "fields": {
+        "from": "From",
+        "subject": "Subject",
+        "routedTo": "Routed to",
+        "matched": "Matched",
+        "criteria": "IMAP criteria"
+      }
+    }
   },
   "files": {
+    "integrationsBanner": {
+      "title": "Synaplan integrates with leading file-sharing solutions",
+      "subtitle": "Add AI summaries, translation, and RAG-powered search to your existing file storage.",
+      "openLink": "Open {name} integration on GitHub",
+      "dismiss": "Hide this banner"
+    },
     "searchPlaceholder": "Search files...",
     "uploadTitle": "Upload Files",
     "groupKeyword": "Folder:",
@@ -592,6 +656,15 @@
     "deleteSelected": "Delete Selected",
     "deleteSelectedConfirmTitle": "Delete Selected Files?",
     "deleteSelectedConfirmMessage": "Are you sure you want to delete {count} selected file(s)? This action cannot be undone and the files will be permanently deleted.",
+    "deleteFolder": "Delete folder",
+    "deleteFolderConfirmTitle": "Delete folder \"{folder}\"?",
+    "deleteFolderConfirmMessage": "This permanently deletes the folder \"{folder}\" and all {count} file(s) inside it, including their indexed content. This action cannot be undone.",
+    "deleteFolderEmptyConfirmMessage": "Delete the empty folder \"{folder}\"? It contains no files, so nothing else is removed.",
+    "deleteFolderConfirmButton": "Delete folder & files",
+    "folderDeleted": "Folder \"{folder}\" deleted ({count} file(s) removed)",
+    "folderEmptyDeleted": "Folder \"{folder}\" deleted",
+    "deleteFolderFailed": "Failed to delete folder \"{folder}\"",
+    "deleteFolderPartial": "Folder \"{folder}\": {success} file(s) deleted, {failed} failed",
     "noFiles": "No files uploaded yet",
     "moveTo": "Move to",
     "movedSuccess": "File moved to \"{folder}\"",
@@ -668,7 +741,27 @@
     "reVectorizeFailed": "Reprocessing failed",
     "uploadSuccess": "{count} file(s) uploaded successfully",
     "uploadCancelled": "Upload cancelled",
-    "uploadInterrupted": "Transfer interrupted. The file list was refreshed — anything that had already reached the server may still appear."
+    "uploadInterrupted": "Transfer interrupted. The file list was refreshed — anything that had already reached the server may still appear.",
+    "uploadSlow": "taking longer than usual…",
+    "uploadFailed": {
+      "transfer_stalled": "{filename}: Upload stalled at {percent}% — the connection stopped sending data before the file reached the server. This is usually a dropped connection or an upload size/timeout limit on a proxy. Check your connection and try again; if it keeps failing, the file may be too large for the current server limit.",
+      "server_timeout": "{filename}: The file finished uploading but the server did not respond in time. It may still have been saved — wait a moment and check the list before retrying.",
+      "too_large": "{filename}: The server rejected this file as too large. Try a smaller file or ask your administrator to raise the upload limit.",
+      "forbidden": "{filename}: The upload was blocked by a security layer (firewall/proxy) before reaching the server. This usually isn't something you can fix — please contact the team so they can allow this upload.",
+      "gateway": "{filename}: The server is temporarily unavailable (error {status}). Please try again in a moment.",
+      "server_error": "{filename}: The server hit an error while saving this file (error {status}). Please try again.",
+      "network": "{filename}: The connection was lost during the upload. Check your network and try again.",
+      "invalid_response": "{filename}: The server returned an unexpected response. Please try again.",
+      "http_error": "{filename}: Upload failed (error {status}). Please try again."
+    },
+    "uploadBlocked": {
+      "storage_exceeded": "{filename}: Not enough storage. {message}",
+      "file_too_large": "{filename}: File is too large. {message}",
+      "file_empty": "{filename}: File is empty. {message}",
+      "extension_not_allowed": "{filename}: File type is not supported. {message}",
+      "rate_limit_exceeded": "{filename}: Upload rate limit reached. {message}",
+      "generic": "{filename}: Upload is not allowed. {message}"
+    }
   },
   "fileMention": {
     "hint": "Type to search files — press Enter to attach",
@@ -739,6 +832,7 @@
       "noModelsAvailable": "No models available for this purpose",
       "saveSuccess": "Model configuration saved",
       "saveError": "Failed to save model configuration",
+      "saveErrorPremiumRequired": "{reason} Please upgrade your plan, or pick a different model.",
       "tableName": "Name",
       "tableService": "Service",
       "tableRating": "Rating",
@@ -763,6 +857,10 @@
       "chatGeneration": "Response Generation",
       "messageClassification": "Message Classification",
       "clickToConfig": "Click to configure",
+      "purposeChip": {
+        "activeTooltip": "Already set as the default model for \"{purpose}\"",
+        "applyTooltip": "Set {model} as the default model for \"{purpose}\""
+      },
       "defaultConfig": "Default Model Configuration",
       "saveConfiguration": "Save Configuration",
       "resetForm": "Reset Form",
@@ -862,6 +960,9 @@
       "total": "Total",
       "chunks": "chunks",
       "tokens": "tokens",
+      "dimensions": "Vector dim",
+      "dimMismatch": "Vector dimensions change from {from} to {to}. All existing vectors will be regenerated and old search scores are not comparable until the re-vectorize finishes.",
+      "memoriesFrozen": "User memories stay on their own embedding model and are NOT migrated by this switch. New memories are still saved correctly — they keep using the memories collection's original model so dimensions match. To re-embed existing memories under the new model, run a dedicated memories re-index (currently admin-only).",
       "scopes": {
         "documents": "Documents (RAG)",
         "memories": "User Memories",
@@ -892,6 +993,10 @@
         "badge": "Premium",
         "lockTooltip": "Embedding-model switching requires a paid plan."
       },
+      "adminOnly": {
+        "badge": "Admin only",
+        "lockTooltip": "Switching the embedding model is restricted to administrators. The currently active model is shown for reference."
+      },
       "cooldown": {
         "title": "Cooldown active",
         "body": "Another switch was started recently. The next switch is possible in approx. {minutes} minutes."
@@ -905,6 +1010,10 @@
       "runningHint": "Updates automatically every few seconds.",
       "chunks": "chunks",
       "tokens": "tokens",
+      "errorLabel": "Error",
+      "statusPartialBadge": "Partial",
+      "statusPartial": "Completed with failures — {processed} processed, {failed} failed.",
+      "partialDetail": "This run finished but {failed} of the chunks could not be embedded ({processed} succeeded). The affected items keep their previous vectors and will be retried on the next switch.",
       "col": {
         "when": "When",
         "scope": "Scope",
@@ -1050,6 +1159,7 @@
       "errorTopicExists": "A prompt with this topic already exists. Please choose a different topic.",
       "errorToolsPrefix": "Cannot create prompts with \"tools:\" prefix — reserved for system.",
       "errorMissingFields": "Please fill in all required fields: Topic, Name and Prompt Content.",
+      "saveErrorPremiumRequired": "{reason} Please upgrade your plan, or pick a different AI model for this prompt.",
       "copy": "Copy",
       "copyToClipboard": "Copy to clipboard",
       "copySuccess": "Copied to clipboard.",
@@ -1146,7 +1256,12 @@
       "confirmEnableConfirm": "Enable Beta",
       "confirmEnableCancel": "Keep AI Sorting",
       "toggleEnabledNotice": "Synapse Routing enabled. AI sorting will only be used as a fallback.",
-      "toggleDisabledNotice": "Synapse Routing disabled. All messages now use the AI sorter."
+      "toggleDisabledNotice": "Synapse Routing disabled. All messages now use the AI sorter.",
+      "granularTitle": "Granular routing topics",
+      "granularSubtitle": "Enable the granular routing aliases (general-chat, coding, image-generation, video-generation, audio-generation). Aliases of the canonical topics (general, mediamaker) — useful for Synapse Routing v2's embedding tier, but added as duplicate choices for the legacy AI sorter. Keep OFF unless you have Synapse Routing enabled above.",
+      "granularPromptHint": "Toggling this flag also flips the matching task prompts back and forth between BENABLED=1 and BENABLED=0.",
+      "granularToggleEnabledNotice": "Granular routing topics enabled. The matching task prompts have been re-enabled.",
+      "granularToggleDisabledNotice": "Granular routing topics disabled. The matching task prompts have been hidden — only canonical topics are active."
     },
     "sortingPrompt": {
       "title": "Preprocessor",
@@ -1396,9 +1511,13 @@
       "statusCanceled": "Canceled",
       "statusPastDue": "Past Due",
       "statusIncomplete": "Incomplete",
+      "statusIncompleteExpired": "Incomplete (expired)",
       "statusTrialing": "Trialing",
       "statusUnpaid": "Unpaid",
       "statusPaused": "Paused",
+      "paymentFailedTitle": "Payment failed — please update your card",
+      "paymentFailedBody": "We couldn't process your last payment. Stripe will keep retrying for the next few weeks, but your subscription will be paused if the card isn't updated. Open the billing portal to fix it.",
+      "paymentFailedCta": "Update payment method",
       "nextBilling": "Next Billing Date",
       "cancelDate": "Cancels on",
       "billingPortal": "Billing Portal",
@@ -1836,6 +1955,13 @@
     "senderAgent": "Support Agent",
     "senderSystem": "System",
     "senderAi": "AI Assistant",
+    "humanHandoff": {
+      "button": "Talk to a human",
+      "tooltip": "Notify our team — a human agent will join the chat",
+      "successNotified": "A human agent has been notified and will join you shortly.",
+      "successQueued": "Your request has been queued. An agent will join you as soon as possible.",
+      "failed": "We couldn't reach our team right now — please try again in a moment."
+    },
     "previewWidget": "Preview Widget",
     "configuration": "Widget Configuration",
     "closeEditor": "Close editor",
@@ -2216,6 +2342,30 @@
       "theme": "Default Theme",
       "primaryColor": "Primary Color",
       "iconColor": "Button Icon Color",
+      "aiAssistantName": "AI assistant display name",
+      "aiAssistantNamePlaceholder": "e.g. Acme Bot, Lara",
+      "aiAssistantNameHelp": "Shown next to AI message timestamps (\"Acme Bot · 03:58 PM\"). Leave empty to use the default \"AI Assistant\".",
+      "subtitle": "Header subtitle",
+      "subtitleDefault": "Use the default (\"We typically reply in minutes\")",
+      "subtitleHidden": "Hide the subtitle line",
+      "subtitleCustom": "Use a custom subtitle",
+      "subtitlePlaceholder": "e.g. \"Available 9–17 CET\"",
+      "subtitleHelp": "The text shown below the widget title in the chat header. Set it empty to hide the line entirely.",
+      "handoff": {
+        "title": "Slack human handoff",
+        "intro": "Page a human via Slack when the visitor needs help — a small button in the widget header lets them request a human, and incoming messages that match your trigger phrases also fire automatically.",
+        "webhookUrl": "Slack Incoming Webhook URL",
+        "webhookHelp": "Create one at https://api.slack.com/messaging/webhooks. Stored on the server and never exposed to the widget.",
+        "webhookInvalid": "Expected an https://hooks.slack.com/services/... URL.",
+        "buttonEnabled": "Show \"Talk to a human\" button in the widget",
+        "buttonEnabledHelp": "When off, only trigger phrases will page Slack.",
+        "triggers": "Auto-page trigger phrases",
+        "triggerPlaceholder": "e.g. talk to a human (one phrase per tag, or paste comma-separated)",
+        "triggersHelp": "Case-insensitive substring match against each visitor message. Up to 20 phrases, 100 chars each. Once a handoff fires, repeat triggers stay quiet until the operator hands the chat back.",
+        "testButton": "Send Slack test",
+        "testSuccess": "Test message delivered.",
+        "testFailed": "Slack rejected the test — double-check the webhook URL."
+      },
       "widgetActive": "Widget Active",
       "widgetActiveHelp": "Enable or disable this widget. Inactive widgets won't respond to messages.",
       "widgetInactiveWarning": "This widget is currently inactive and won't respond to visitor messages.",
@@ -2642,7 +2792,9 @@
     "topic": "Topic",
     "language": "Language",
     "modelId": "Model ID",
-    "longRunningHint": "This request is taking a bit longer than usual — please hang tight."
+    "longRunningHint": "This request is taking a bit longer than usual — please hang tight.",
+    "waitingDesc": "Just a moment…",
+    "waitingAria": "Preparing response"
   },
   "message": {
     "thinking": "Thinking process",
@@ -2895,6 +3047,11 @@
       "customCategoryPlaceholder": "Enter custom category...",
       "createWithAI": "Create with AI",
       "aiUnavailable": "AI structuring unavailable, saving as note",
+      "aiUnavailableCreateFallback": "AI unavailable – your text has been prepared as a plain note. Confirm to save or adjust the category/key first.",
+      "aiUnavailableCreateReason": "Saved as a plain note because AI structuring was unavailable.",
+      "aiUnavailableEditFallback": "AI unavailable – please edit the memory directly in manual mode.",
+      "storageUnavailable": "Memory storage is currently unreachable. Please try again later.",
+      "parseFailed": "We couldn't process that. Please try again later or save manually.",
       "previewTitle": "Preview",
       "previewDescription": "Check if this looks correct before saving.",
       "actionCreate": "New Memory",
@@ -2902,6 +3059,7 @@
       "actionDelete": "Delete Memory",
       "similarFound": "Similar memories found - consider updating instead:",
       "confirm": "Confirm & Save",
+      "confirmSaving": "Saving…",
       "oneChange": "change",
       "multipleChanges": "changes"
     },
@@ -3159,8 +3317,8 @@
       "action": "View Plans"
     },
     "fileMention": {
-      "title": "Mention Files with @",
-      "description": "Type @ in the chat to quickly reference your uploaded files. The AI will read the file content and use it to answer your question.",
+      "title": "Mention Files with {'@'}",
+      "description": "Type {'@'} in the chat to quickly reference your uploaded files. The AI will read the file content and use it to answer your question.",
       "action": ""
     },
     "widgetPreview": {

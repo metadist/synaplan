@@ -1,10 +1,24 @@
 <template>
+  <!--
+    Sticky chat input bar — already follows the iOS soft keyboard via
+    `position: sticky; bottom: 0` against the visual viewport. The
+    `pb-[env(safe-area-inset-bottom)]` accounts for the iPhone home
+    indicator (~34px) when the keyboard is HIDDEN, but iOS Safari does not
+    zero that inset out when the keyboard is OPEN, leaving a permanent
+    ~50px gap below the textarea (inset + inner py-4). `useKeyboardOpen()`
+    flips off the home-indicator inset *only* while the keyboard is up,
+    and the inner wrapper drops to `py-2` on mobile. Net effect: ~40-50px
+    less dead space when typing on iPhone, no regression on desktop.
+  -->
   <div
-    class="sticky bottom-0 bg-chat-input-area pb-[env(safe-area-inset-bottom)]"
+    :class="[
+      'sticky bottom-0 bg-chat-input-area',
+      isKeyboardOpen ? 'pb-0' : 'pb-[env(safe-area-inset-bottom)]',
+    ]"
     data-testid="comp-chat-input"
     @paste="handlePaste"
   >
-    <div class="max-w-4xl mx-auto px-4 py-4">
+    <div class="max-w-4xl mx-auto px-4 py-2 md:py-4">
       <!-- Active Command and File Display (above input) -->
       <div v-if="activeCommand || uploadedFiles.length > 0" class="mb-3 flex flex-wrap gap-2">
         <!-- Uploaded Files -->
@@ -72,7 +86,7 @@
 
         <!-- Scrollable container with padding for scrollbar alignment -->
         <div class="max-h-[40vh] overflow-y-auto chat-input-scroll">
-          <div class="pl-[60px] pr-[140px] py-2">
+          <div class="pl-[60px] py-2" :style="{ paddingRight: `${textareaPaddingRightPx}px` }">
             <!-- Textarea -->
             <Textarea
               ref="textareaRef"
@@ -130,6 +144,36 @@
           class="absolute bottom-2 right-3 md:right-4 flex items-center gap-2 pointer-events-none"
           data-testid="section-chat-primary-actions"
         >
+          <button
+            v-if="showEnhanceInInput"
+            type="button"
+            :class="[
+              'h-[44px] min-w-[44px] flex items-center justify-center rounded-xl pointer-events-auto relative',
+              isGuestMode && 'opacity-50',
+              !isGuestMode && enhanceEnabled && 'pill pill--active',
+              !isGuestMode && !enhanceEnabled && 'icon-ghost',
+              !isGuestMode && enhanceLoading && 'pill--loading',
+              isGuestMode && 'icon-ghost',
+            ]"
+            :disabled="!isGuestMode && enhanceLoading"
+            :aria-label="$t('chatInput.enhance')"
+            :title="$t('chatInput.enhance')"
+            data-testid="btn-chat-enhance"
+            @click="toggleEnhance"
+          >
+            <Icon
+              v-if="!isGuestMode && enhanceLoading"
+              icon="mdi:loading"
+              class="w-5 h-5 animate-spin"
+            />
+            <SparklesIcon v-else class="w-5 h-5" />
+            <Icon
+              v-if="isGuestMode"
+              icon="mdi:lock-outline"
+              class="w-2.5 h-2.5 absolute -top-0.5 -right-0.5 text-amber-500"
+            />
+          </button>
+
           <button
             v-if="showMicrophoneButton"
             type="button"
@@ -202,25 +246,41 @@
           @insert-command="handleInsertCommand"
         />
 
-        <button
-          type="button"
+        <!-- Knowledge-base folder (RAG group) picker: scope the chat to a folder.
+             Rendered only in advanced mode (this whole block is gated by
+             `!appModeStore.isEasyMode` above) and only for signed-in users.
+             When there are no groups yet the picker just shows the "none"
+             option and the "Manage" button links to the Files page to create
+             one. -->
+        <select
+          v-if="!isGuestMode"
+          v-model="selectedGroupKey"
           :class="[
-            'pill flex-shrink-0',
-            !isGuestMode && enhanceLoading && 'pill--loading',
-            !isGuestMode && enhanceEnabled && 'pill--active',
-            isGuestMode && 'opacity-50',
+            'pill flex-shrink-0 text-xs md:text-sm font-medium max-w-[40vw] md:max-w-[180px] truncate',
+            selectedGroupKey && 'pill--active',
           ]"
-          :disabled="!isGuestMode && enhanceLoading"
-          :aria-label="$t('chatInput.enhance')"
-          data-testid="btn-chat-enhance"
-          @click="toggleEnhance"
+          :aria-label="$t('chatInput.knowledgeGroup')"
+          :title="$t('chatInput.knowledgeGroup')"
+          data-testid="select-chat-knowledge-group"
         >
-          <SparklesIcon class="w-4 h-4 md:w-5 md:h-5" />
-          <span class="text-xs md:text-sm font-medium hidden sm:inline">{{
-            $t('chatInput.enhance')
-          }}</span>
-          <Icon v-if="isGuestMode" icon="mdi:lock-outline" class="w-3 h-3 text-amber-500" />
+          <option value="">{{ $t('chatInput.knowledgeGroupNone') }}</option>
+          <option v-for="g in knowledgeGroups" :key="g.name" :value="g.name">
+            {{ g.name }} ({{ g.count }})
+          </option>
+        </select>
+
+        <button
+          v-if="!isGuestMode"
+          type="button"
+          class="pill flex-shrink-0"
+          :aria-label="$t('chatInput.manageKnowledgeGroups')"
+          :title="$t('chatInput.manageKnowledgeGroups')"
+          data-testid="btn-manage-knowledge-groups"
+          @click="goToKnowledgeFiles"
+        >
+          <Icon icon="mdi:folder-cog-outline" class="w-4 h-4 md:w-5 md:h-5" />
         </button>
+
         <button
           type="button"
           :disabled="!isGuestMode && !supportsReasoning"
@@ -287,13 +347,17 @@ import { useAiConfigStore } from '@/stores/aiConfig'
 import { useNotification } from '@/composables/useNotification'
 import { chatApi } from '@/services/api/chatApi'
 import type { FileItem } from '@/services/filesService'
+import { getFileGroups } from '@/services/filesService'
 import { AudioRecorder } from '@/services/audioRecorder'
 import { WebSpeechService, isWebSpeechSupported } from '@/services/webSpeechService'
 import { useConfigStore } from '@/stores/config'
 import { useI18n } from 'vue-i18n'
+import { useRouter } from 'vue-router'
 import { useAutoPersist } from '@/composables/useInputPersistence'
+import { useKeyboardOpen } from '@/composables/useKeyboardOpen'
 import { useChatsStore } from '@/stores/chats'
 import { useAppModeStore } from '@/stores/appMode'
+import { useAuthStore } from '@/stores/auth'
 
 interface UploadedFile {
   file_id: number
@@ -343,6 +407,9 @@ const fileSelectionModalVisible = ref(false)
 const voiceReply = ref(false)
 const discardNextRecording = ref(false)
 const selectedModelId = ref<number | null>(null)
+// Knowledge-base folder ("group key") to scope this chat's RAG retrieval to.
+const knowledgeGroups = ref<Array<{ name: string; count: number }>>([])
+const selectedGroupKey = ref<string>('')
 
 const SILENCE_TIMEOUT_MS = 4000
 const silenceTimer = ref<ReturnType<typeof setTimeout> | null>(null)
@@ -352,8 +419,16 @@ const aiConfigStore = useAiConfigStore()
 const chatsStore = useChatsStore()
 const configStore = useConfigStore()
 const appModeStore = useAppModeStore()
+const authStore = useAuthStore()
 const { warning, error: showError, success } = useNotification()
 const { t, locale } = useI18n()
+const router = useRouter()
+const isKeyboardOpen = useKeyboardOpen()
+
+/** Open the Files page where knowledge folders (RAG groups) are created/managed. */
+function goToKnowledgeFiles(): void {
+  router.push('/files')
+}
 
 /**
  * Get the speech recognition language code from the current UI locale.
@@ -392,6 +467,17 @@ const showMicrophoneButton = computed(() => {
   return webSpeechSupported || speechToTextAvailable
 })
 
+/** Icon-only enhance control inside the input shell; visible when there is text to act on. */
+const showEnhanceInInput = computed(() => message.value.trim().length > 0)
+
+/** Reserve horizontal space so the textarea does not sit under the absolute action buttons. */
+const textareaPaddingRightPx = computed(() => {
+  if (showMicrophoneButton.value) {
+    return showEnhanceInInput.value ? 192 : 140
+  }
+  return showEnhanceInInput.value ? 120 : 80
+})
+
 /**
  * Determine which speech recognition method to use.
  * Priority: Web Speech API FIRST (real-time streaming), Whisper as fallback.
@@ -421,6 +507,7 @@ const emit = defineEmits<{
       fileIds?: number[]
       voiceReply?: boolean
       modelId?: number
+      ragGroupKey?: string
     },
   ]
   stop: []
@@ -601,6 +688,7 @@ const sendMessage = () => {
     fileIds: uploadedFiles.value.filter((f) => !f.processing).map((f) => f.file_id),
     voiceReply: voiceReply.value,
     modelId: selectedModelId.value || undefined,
+    ragGroupKey: selectedGroupKey.value || undefined,
   }
   emit('send', messageToSend, options)
   message.value = ''
@@ -841,6 +929,25 @@ const uploadFiles = async (files: File[]) => {
     try {
       const result = await chatApi.uploadChatFile(file, controller.signal)
 
+      // Issue #729: when the synchronous extraction at upload time fails
+      // (corrupted DOCX, password-protected PDF, etc.), surface a clear
+      // error and drop the file instead of letting the user send a
+      // message that we already know will hit "extraction failed" in the
+      // stream.
+      if (result.extraction_error) {
+        const index = uploadedFiles.value.findIndex((f) => f.name === file.name && f.processing)
+        if (index !== -1) {
+          uploadedFiles.value.splice(index, 1)
+        }
+
+        const errorKey =
+          result.extraction_error === 'audio_transcription_failed'
+            ? 'chatInput.audioTranscriptionFailed'
+            : 'chatInput.documentExtractionFailed'
+        showError(t(errorKey, { filename: result.filename }))
+        continue
+      }
+
       const index = uploadedFiles.value.findIndex((f) => f.name === file.name && f.processing)
       if (index !== -1) {
         uploadedFiles.value[index] = {
@@ -892,6 +999,32 @@ onUnmounted(() => {
     uploadAbortController.value = null
   }
 })
+
+// Load the user's knowledge-base folders so they can scope a chat to one.
+// `/api/v1/files/groups` is auth-gated: calling it as a guest (or before auth
+// has resolved) returns 401, which the http client turns into a hard redirect
+// to /login. Gate strictly on authentication — not on the `isGuestMode` prop,
+// which can still be false at mount while the guest session is initializing —
+// and (re)load whenever auth state flips to authenticated.
+async function loadKnowledgeGroups(): Promise<void> {
+  if (!authStore.isAuthenticated) return
+  try {
+    knowledgeGroups.value = await getFileGroups()
+  } catch {
+    // Non-fatal — the picker still renders with just the "none" option, so a
+    // failed load simply means no folders are available to scope to.
+  }
+}
+
+watch(
+  () => authStore.isAuthenticated,
+  (authed) => {
+    if (authed) void loadKnowledgeGroups()
+  },
+  {
+    immediate: true,
+  }
+)
 
 /**
  * Toggle speech recording using hybrid approach.
@@ -972,27 +1105,23 @@ const startWebSpeechRecording = async () => {
           nextTick(() => sendMessage())
         }
       },
-      onResult: (text: string, isFinal: boolean) => {
+      onResult: ({ final, interim }) => {
+        // Snapshot semantics: the service hands us the *whole* recognition
+        // session so far. Assigning (never appending) the snapshot is what
+        // makes the consumer immune to Android Chrome re-emitting the same
+        // final segment across multiple events (issue #898).
         const base = speechBaseMessage.value
-        const separator = base ? ' ' : ''
+        const separator = base && (final || interim) ? ' ' : ''
 
         clearSilenceTimer()
 
-        if (isFinal) {
-          const finalSeparator = speechFinalTranscript.value ? ' ' : ''
-          speechFinalTranscript.value += finalSeparator + text
-          interimTranscript.value = ''
+        speechFinalTranscript.value = final
+        interimTranscript.value = interim
 
-          message.value = base + separator + speechFinalTranscript.value
-        } else {
-          interimTranscript.value = text
-          const finals = speechFinalTranscript.value
-          const interimSeparator = finals ? ' ' : ''
+        const finalInterimSeparator = final && interim ? ' ' : ''
+        message.value = base + separator + final + finalInterimSeparator + interim
 
-          message.value = base + separator + finals + interimSeparator + text
-        }
-
-        if (speechFinalTranscript.value.trim()) {
+        if (final.trim()) {
           silenceTimer.value = setTimeout(() => {
             if (speechFinalTranscript.value.trim()) {
               autoSendPending.value = true
@@ -1159,9 +1288,12 @@ const toggleEnhance = async () => {
     message.value = result.enhanced
     enhanceEnabled.value = true
   } catch (err) {
-    // Show detailed error message if available
     const errorMsg = err instanceof Error ? err.message : 'Failed to enhance message'
-    showError(errorMsg)
+    if (errorMsg === 'enhance_rejected') {
+      showError(t('chatInput.enhanceRejected'))
+    } else {
+      showError(errorMsg)
+    }
     console.error('Enhancement error:', err)
   } finally {
     enhanceLoading.value = false

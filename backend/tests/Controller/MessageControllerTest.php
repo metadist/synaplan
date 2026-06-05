@@ -307,7 +307,7 @@ class MessageControllerTest extends WebTestCase
         $this->assertResponseStatusCodeSame(Response::HTTP_BAD_REQUEST);
     }
 
-    public function testEnhanceSuccess(): void
+    public function testEnhanceReturnsDocumentedPayloadForOutcome(): void
     {
         $this->client->request(
             'POST',
@@ -324,13 +324,39 @@ class MessageControllerTest extends WebTestCase
             ])
         );
 
-        // Enhancement might succeed or return service unavailable depending on AI provider
         $statusCode = $this->client->getResponse()->getStatusCode();
         $this->assertContains($statusCode, [
             Response::HTTP_OK,
+            Response::HTTP_UNPROCESSABLE_ENTITY,
             Response::HTTP_SERVICE_UNAVAILABLE,
             Response::HTTP_INTERNAL_SERVER_ERROR,
         ]);
+
+        $payload = json_decode($this->client->getResponse()->getContent(), true);
+        $this->assertIsArray($payload);
+
+        if (Response::HTTP_OK === $statusCode) {
+            $this->assertTrue($payload['success'] ?? false);
+            $this->assertArrayHasKey('enhanced', $payload);
+            $this->assertIsString($payload['enhanced']);
+            $this->assertArrayHasKey('original', $payload);
+
+            return;
+        }
+
+        if (Response::HTTP_UNPROCESSABLE_ENTITY === $statusCode) {
+            $this->assertSame('enhance_rejected', $payload['error'] ?? null);
+
+            return;
+        }
+
+        if (Response::HTTP_SERVICE_UNAVAILABLE === $statusCode) {
+            $this->assertArrayHasKey('error', $payload);
+
+            return;
+        }
+
+        $this->assertArrayHasKey('error', $payload);
     }
 
     public function testAgainWithoutAuth(): void

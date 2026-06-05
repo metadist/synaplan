@@ -17,10 +17,17 @@ interface MessageHandlerInterface
     /**
      * Handled eine Message und gibt Response zurück.
      *
-     * @param Message       $message          Die zu verarbeitende Message
-     * @param array         $thread           Conversation Thread
-     * @param array         $classification   Klassifizierungs-Daten (topic, language, intent)
-     * @param callable|null $progressCallback Optional callback für Progress Updates
+     * Mirrors {@see handleStream()}'s `$options` so non-streaming callers
+     * (email/generic webhook) can forward the same channel/disable flags
+     * the Web UI sets — without those, channels like email lose access to
+     * memory + reasoning configuration the streaming path takes for
+     * granted (issue #615).
+     *
+     * @param Message              $message          Die zu verarbeitende Message
+     * @param array                $thread           Conversation Thread
+     * @param array<string, mixed> $classification   Klassifizierungs-Daten (topic, language, intent)
+     * @param callable|null        $progressCallback Optional callback für Progress Updates
+     * @param array<string, mixed> $options          Processing options (channel, disable_memories, reasoning, …)
      *
      * @return array ['content' => string, 'metadata' => array]
      */
@@ -29,6 +36,7 @@ interface MessageHandlerInterface
         array $thread,
         array $classification,
         ?callable $progressCallback = null,
+        array $options = [],
     ): array;
 
     /**

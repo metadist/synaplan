@@ -41,6 +41,7 @@ final readonly class MessageClassifier
     public function __construct(
         private MessageSorter $messageSorter,
         private SynapseRouter $synapseRouter,
+        private TopicAliasResolver $topicAliasResolver,
         private MessageMetaRepository $messageMetaRepository,
         private ModelConfigService $modelConfigService,
         private ConfigRepository $configRepository,
@@ -89,10 +90,17 @@ final readonly class MessageClassifier
                 'text_length' => strlen($text),
             ]);
 
+            // `web_search` is intentionally null on the fast-path: under
+            // the project-wide policy the actual decision is made later
+            // in `MessageProcessor::processStream()` via
+            // `WebSearchTopicPolicy::shouldSearch()`, which combines the
+            // resolved prompt's `tool_internet` flag with the topic
+            // exclusion list. The fast-path has no access to prompt
+            // metadata and must not pre-empt that decision (see #1000).
             return [
                 'topic' => 'general',
                 'language' => $detectedLanguage,
-                'web_search' => false,
+                'web_search' => null,
                 'source' => 'fast_path_heuristic',
                 'skip_sorting' => true,
                 'intent' => 'chat',
@@ -196,12 +204,38 @@ final readonly class MessageClassifier
 
         $source = $result['source'] ?? 'ai_sorting';
 
+        // Resolve granular Synapse-v2 topics (image-generation, video-generation,
+        // audio-generation, coding, general-chat) to their canonical legacy topics
+        // BEFORE mapping to intent. The AI sorter (used when Synapse Routing is
+        // OFF — the default) returns the granular topic from PromptCatalog, but
+        // downstream code (mapTopicToIntent, handler resolution, BFILEPATH keys)
+        // only understands canonical topics. Without this resolution all media-
+        // generation requests fall back to `chat`/ChatHandler (#952).
+        //
+        // SynapseRouter already runs this resolver internally, so calling it
+        // again here is idempotent for already-canonical topics — but it
+        // guarantees the contract for the AI-sorter path too.
+        $rawTopic = (string) ($result['topic'] ?? 'general');
+        $alias = $this->topicAliasResolver->resolve($rawTopic);
+        $canonicalTopic = $alias['topic'];
+        $impliedMedia = $alias['media'];
+
+        if (null !== $alias['alias_source']) {
+            $this->logger->info('MessageClassifier: Resolved granular topic to canonical', [
+                'message_id' => $messageId,
+                'granular_topic' => $alias['alias_source'],
+                'canonical_topic' => $canonicalTopic,
+                'implied_media' => $impliedMedia,
+            ]);
+        }
+
         $this->logger->info('MessageClassifier: Classification complete', [
             'message_id' => $messageId,
-            'topic' => $result['topic'],
+            'topic' => $canonicalTopic,
+            'granular_topic' => $alias['alias_source'],
             'language' => $result['language'],
             'web_search' => $result['web_search'] ?? false,
-            'media_type' => $result['media_type'] ?? null,
+            'media_type' => $result['media_type'] ?? $impliedMedia,
             'duration' => $result['duration'] ?? null,
             'resolution' => $result['resolution'] ?? null,
             'source' => $source,
@@ -210,23 +244,30 @@ final readonly class MessageClassifier
         ]);
 
         $classification = [
-            'topic' => $result['topic'],
+            'topic' => $canonicalTopic,
             'language' => $result['language'],
             'web_search' => $result['web_search'] ?? false,
             'source' => $source,
             'skip_sorting' => false,
-            'intent' => $this->mapTopicToIntent($result['topic']),
+            'intent' => $this->mapTopicToIntent($canonicalTopic),
             'model_id' => $result['sorting_model_id'] ?? null,
             'provider' => $result['sorting_provider'] ?? null,
             'model_name' => $result['sorting_model_name'] ?? null,
         ];
 
+        if (null !== $alias['alias_source']) {
+            $classification['granular_topic'] = $alias['alias_source'];
+        }
+
         if ($overrideModelId) {
             $classification['override_model_id'] = $overrideModelId;
         }
 
-        // Pass through media_type if detected (for mediamaker topic)
-        $mediaType = $result['media_type'] ?? null;
+        // Pass through media_type if detected (for mediamaker topic). Prefer
+        // the sorter's explicit BMEDIA value, fall back to the implied media
+        // from the granular topic alias (image-generation → 'image', etc.) so
+        // MediaGenerationHandler always knows which provider to invoke.
+        $mediaType = $result['media_type'] ?? $impliedMedia;
         if (null !== $mediaType) {
             $classification['media_type'] = $mediaType;
         }
@@ -514,7 +555,12 @@ final readonly class MessageClassifier
             'generate ', 'create ', 'draw ', 'paint ', 'sketch ', 'render ',
             'make a picture', 'make an image', 'make a video', 'make a song',
             'image of', 'picture of', 'photo of', 'illustration of',
+            // German imperatives. `generiere`/`generier` cover "generiere
+            // ein bild...", "generier mir...", "generiert eine grafik..."
+            // which would otherwise slip past the fast-path and get
+            // misclassified as `general`/chat (#952).
             'erstelle', 'erzeuge', 'zeichne', 'male ', 'rendere',
+            'generiere', 'generier ', 'generiert ',
             'genera ', 'crea ', 'dibuja ',
             'génère', 'crée', 'dessine',
         ];
@@ -525,20 +571,13 @@ final readonly class MessageClassifier
             }
         }
 
-        // Web-search hint phrases that the AI sorter would flip `web_search`
-        // for. Better to take the slow path so we surface results.
-        static $searchTriggers = [
-            'search the web', 'google ', 'latest news', 'current price',
-            'today\'s', "today's", 'right now', 'this week',
-            'aktuelle nachrichten', 'durchsuche das internet',
-            'busca en', 'recherche dans',
-        ];
-        foreach ($searchTriggers as $trigger) {
-            if (str_contains($lower, $trigger)) {
-                return false;
-            }
-        }
-
+        // Note: there is no longer a `$searchTriggers` blocklist here.
+        // It was a workaround for the fast-path's inability to decide
+        // `web_search` on its own — under the project-wide policy
+        // "search unless explicitly opted out", the fast-path no longer
+        // needs to defer to the slow AI sorter just to surface results
+        // (see issue #1000). The actual search decision is owned by
+        // `WebSearchTopicPolicy` and applied in `MessageProcessor`.
         return true;
     }
 

@@ -68,6 +68,25 @@ interface SpeechRecognitionConstructor {
   new (): SpeechRecognitionInstance
 }
 
+/**
+ * Snapshot of the entire recognition session at a single point in time.
+ *
+ * `final` is the concatenation of every result whose `isFinal` flag is true,
+ * `interim` is the most recent in-progress phrase (or empty string).
+ *
+ * Consumers should treat this as "the whole truth right now" and **assign**
+ * (`message.value = ...`) rather than append (`message.value += ...`). This
+ * is what makes the consumer immune to Android Chrome's broken behaviour
+ * where the same final segment can be re-emitted across multiple events with
+ * `event.resultIndex === 0` (issue #898).
+ */
+export interface WebSpeechSnapshot {
+  /** All finalized text since `start()`, joined with single spaces. */
+  final: string
+  /** The current interim (in-progress) phrase. Empty when no interim is pending. */
+  interim: string
+}
+
 export interface WebSpeechOptions {
   /** Language for recognition (e.g., 'en-US', 'de-DE'). Defaults to browser language. */
   language?: string
@@ -75,8 +94,13 @@ export interface WebSpeechOptions {
   interimResults?: boolean
   /** Keep listening after user stops speaking */
   continuous?: boolean
-  /** Called with transcribed text (interim or final) */
-  onResult?: (text: string, isFinal: boolean) => void
+  /**
+   * Called whenever the recognition state changes, with a full snapshot of
+   * the session so far. Replaces the legacy per-result `(text, isFinal)`
+   * signature, which was unsafe on Android: see `onresult` handler below
+   * and the `WebSpeechSnapshot` JSDoc for the rationale.
+   */
+  onResult?: (snapshot: WebSpeechSnapshot) => void
   /** Called when recognition starts */
   onStart?: () => void
   /** Called when recognition ends */
@@ -114,10 +138,11 @@ function getSpeechRecognition(): SpeechRecognitionConstructor | null {
  * Usage:
  * ```typescript
  * const speech = new WebSpeechService({
- *   onResult: (text, isFinal) => {
- *     if (isFinal) {
- *       messageInput.value += text
- *     }
+ *   onResult: ({ final, interim }) => {
+ *     // ALWAYS assign the snapshot — never append. The service rebuilds
+ *     // the cumulative final string on every event, so appending would
+ *     // duplicate text on Android Chrome (issue #898).
+ *     messageInput.value = `${final}${final && interim ? ' ' : ''}${interim}`
  *   },
  *   onError: (error) => {
  *     showError(error.userMessage)
@@ -190,14 +215,48 @@ export class WebSpeechService {
     }
 
     this.recognition.onresult = (event: SpeechRecognitionEventType) => {
-      const resultIndex = event.resultIndex
-      const result = event.results[resultIndex]
-
-      if (result) {
+      // The W3C spec says `event.results` is the cumulative list of all
+      // recognition results since the recogniser started. Final results are
+      // stable once their `isFinal` flag is true; the *last* result may still
+      // be interim. `event.resultIndex` is the first changed entry — but
+      // Android Chrome (and a handful of other engines) emit multiple events
+      // with the same `resultIndex` value and a growing final transcript at
+      // that index, which produced the duplicated text in #898.
+      //
+      // Treat `event.results` as the source of truth: rebuild the full final
+      // string on every event and emit a single snapshot. The consumer is
+      // then expected to *assign* (not append) the snapshot into the textbox,
+      // which makes duplicate emissions a no-op.
+      const finals: string[] = []
+      let interim = ''
+      for (let i = 0; i < event.results.length; i++) {
+        const result = event.results[i]
+        if (!result || result.length === 0) continue
         const transcript = result[0].transcript
-        const isFinal = result.isFinal
-        this.options.onResult?.(transcript, isFinal)
+        if (result.isFinal) {
+          finals.push(transcript)
+        } else {
+          // Per spec only one trailing interim is meaningful at a time, but
+          // some engines briefly report multiple in-progress entries. Keep
+          // the latest one — concatenation would inflate the visible text.
+          interim = transcript
+        }
       }
+
+      // Android Chrome (some versions) reports cumulative finals: each
+      // results[i].transcript contains ALL text from results[0..i], not just
+      // the new segment. Real Android sessions also mix patterns within a
+      // single recognition (e.g. ["hi", "hi wie wird", "neue session"]) where
+      // an all-or-nothing detection still leaks duplicates. Walk the list
+      // once and only keep the *new tail* whenever a final is a strict
+      // prefix-extension of the previous one — this collapses cumulative
+      // bursts while preserving genuinely independent segments.
+      const finalText = this.dedupeProgressiveFinals(finals)
+
+      this.options.onResult?.({
+        final: finalText.replace(/\s+/g, ' ').trim(),
+        interim: interim.replace(/\s+/g, ' ').trim(),
+      })
     }
 
     this.recognition.onerror = (event: SpeechRecognitionErrorEventType) => {
@@ -266,6 +325,52 @@ export class WebSpeechService {
    */
   get listening(): boolean {
     return this.isListening
+  }
+
+  /**
+   * Walk the list of final transcripts and emit a deduplicated, joined
+   * string that handles three intermixed patterns Android Chrome has been
+   * observed to produce in a single recognition session:
+   *
+   *  1. **Identical re-emit:** the same final shows up multiple times in a
+   *     row (`["hi wie", "hi wie"]`). Skip the duplicate.
+   *  2. **Cumulative growth:** `finals[i]` extends `finals[i-1]` with a
+   *     space-separated tail (`["hi", "hi wie", "hi wie wird"]`). Append
+   *     only the new tail.
+   *  3. **Independent segment:** `finals[i]` is unrelated to the previous
+   *     one (`["hello", "world"]`, the standard W3C desktop pattern, or
+   *     a fresh phrase after silence). Append it whole.
+   *
+   * The previous all-or-nothing detection collapsed everything to the last
+   * final whenever the list was strictly cumulative, but leaked duplicates
+   * the moment a single independent segment slipped in (issue #898 follow-up
+   * reported by Furkan on PR #935).
+   *
+   * The cumulative check requires an actual space (` `) between prev and
+   * the rest to avoid false positives like ["hi", "higher"].
+   */
+  private dedupeProgressiveFinals(finals: string[]): string {
+    const parts: string[] = []
+    let previousCumulative = ''
+
+    for (const raw of finals) {
+      const curr = raw.trim()
+      if ('' === curr) continue
+
+      if (curr === previousCumulative) continue
+
+      if ('' !== previousCumulative && curr.startsWith(previousCumulative + ' ')) {
+        const tail = curr.slice(previousCumulative.length + 1).trim()
+        if ('' !== tail) parts.push(tail)
+        previousCumulative = curr
+        continue
+      }
+
+      parts.push(curr)
+      previousCumulative = curr
+    }
+
+    return parts.join(' ')
   }
 
   /**

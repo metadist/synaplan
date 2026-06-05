@@ -19,6 +19,9 @@ use Symfony\Component\Mime\Email;
  */
 final readonly class InboundEmailHandlerService
 {
+    /** Masked password placeholder from API (same as frontend). */
+    private const MASKED_PASSWORD_PLACEHOLDER = '••••••••';
+
     public function __construct(
         private InboundEmailHandlerRepository $handlerRepository,
         private PromptRepository $promptRepository,
@@ -27,6 +30,7 @@ final readonly class InboundEmailHandlerService
         private ModelConfigService $modelConfigService,
         private RateLimitService $rateLimitService,
         private EncryptionService $encryptionService,
+        private MailHandlerLogService $activityLog,
         private LoggerInterface $logger,
     ) {
     }
@@ -36,7 +40,51 @@ final readonly class InboundEmailHandlerService
      */
     public function testConnection(InboundEmailHandler $handler): array
     {
-        // Check if IMAP extension is available
+        return $this->runMailboxConnectionTest(
+            $handler->getMailServer(),
+            $handler->getPort(),
+            $handler->getProtocol(),
+            $handler->getSecurity(),
+            $handler->getUsername(),
+            $handler->getDecryptedPassword($this->encryptionService),
+            ['handler_id' => $handler->getId()]
+        );
+    }
+
+    /**
+     * Test mailbox login using explicit credentials (no persisted handler required).
+     */
+    public function testMailboxCredentials(
+        string $mailServer,
+        int $port,
+        string $protocol,
+        string $security,
+        string $username,
+        string $plainPassword,
+    ): array {
+        return $this->runMailboxConnectionTest(
+            $mailServer,
+            $port,
+            $protocol,
+            $security,
+            $username,
+            $plainPassword,
+            []
+        );
+    }
+
+    /**
+     * @param array<string, mixed> $logContext
+     */
+    private function runMailboxConnectionTest(
+        string $mailServer,
+        int $port,
+        string $protocol,
+        string $security,
+        string $username,
+        string $plainPassword,
+        array $logContext,
+    ): array {
         if (!function_exists('imap_open')) {
             $this->logger->error('IMAP extension not available');
 
@@ -47,32 +95,36 @@ final readonly class InboundEmailHandlerService
         }
 
         try {
-            $connection = $this->connectImap($handler);
+            $connection = $this->connectMailbox(
+                $mailServer,
+                $port,
+                $protocol,
+                $security,
+                $username,
+                $plainPassword
+            );
 
-            if ($connection) {
-                imap_close($connection);
-
-                return [
-                    'success' => true,
-                    'message' => 'Connection successful',
-                ];
-            }
+            imap_close($connection);
 
             return [
-                'success' => false,
-                'message' => 'Failed to connect',
+                'success' => true,
+                'message' => 'Connection successful',
             ];
         } catch (\Exception $e) {
-            $this->logger->error('IMAP connection test failed', [
-                'handler_id' => $handler->getId(),
+            $this->logger->error('IMAP connection test failed', array_merge($logContext, [
                 'error' => $e->getMessage(),
-            ]);
+            ]));
 
             return [
                 'success' => false,
                 'message' => $e->getMessage(),
             ];
         }
+    }
+
+    public static function isMaskedPasswordPlaceholder(string $password): bool
+    {
+        return '' === $password || self::MASKED_PASSWORD_PLACEHOLDER === $password;
     }
 
     /**
@@ -136,88 +188,262 @@ final readonly class InboundEmailHandlerService
 
     /**
      * Extract clean email body from IMAP message.
-     * Handles multipart MIME messages and extracts text/plain or text/html.
+     * Recursively walks multipart MIME tree to extract the first text/plain
+     * (or text/html as fallback) body, ignoring attachments.
      */
-    private function extractEmailBody($connection, int $msgNumber): string
+    private function extractEmailBody(\IMAP\Connection $connection, int $msgNumber): string
     {
         $structure = imap_fetchstructure($connection, $msgNumber);
 
-        // Single part message (not multipart)
-        if (!isset($structure->parts)) {
+        if (!is_object($structure)) {
+            // imap_fetchstructure() returns false on protocol-level errors.
+            // Returning '' here would silently feed the AI router an empty
+            // body — fall back to the raw imap_body() (same "last resort"
+            // shape the deep-multipart path uses) and log the failure so
+            // the activity log can surface it.
+            $this->logger->warning('imap_fetchstructure failed; falling back to raw imap_body', [
+                'message_number' => $msgNumber,
+                'imap_errors' => imap_errors() ?: [],
+            ]);
+
+            return imap_body($connection, $msgNumber);
+        }
+
+        // Single-part message (not multipart): the whole body is the part.
+        if (empty($structure->parts)) {
             $body = imap_body($connection, $msgNumber);
 
-            // Decode based on encoding
-            return $this->decodeEmailBody($body, $structure->encoding ?? 0);
+            return $this->decodeEmailBody(
+                $body,
+                $structure->encoding ?? 0,
+                $this->getCharset($structure)
+            );
         }
 
-        // Multipart message - extract text/plain or text/html
-        $textPlain = '';
-        $textHtml = '';
+        $fetchBody = static fn (string $section): string => imap_fetchbody($connection, $msgNumber, $section);
+        $textParts = $this->collectTextParts($structure->parts, '', $fetchBody);
 
-        foreach ($structure->parts as $partNumber => $part) {
-            $partBody = imap_fetchbody($connection, $msgNumber, (string) ($partNumber + 1));
-
-            // Check MIME type
-            $mimeType = $this->getMimeType($part);
-
-            if ('text/plain' === $mimeType) {
-                $textPlain = $this->decodeEmailBody($partBody, $part->encoding ?? 0);
-            } elseif ('text/html' === $mimeType) {
-                $textHtml = $this->decodeEmailBody($partBody, $part->encoding ?? 0);
-            }
+        if ('' !== $textParts['plain']) {
+            return $textParts['plain'];
         }
 
-        // Prefer plain text, fallback to HTML (stripped)
-        if (!empty($textPlain)) {
-            return $textPlain;
+        if ('' !== $textParts['html']) {
+            return trim(strip_tags($textParts['html']));
         }
 
-        if (!empty($textHtml)) {
-            return strip_tags($textHtml);
-        }
-
-        // Fallback: return raw body
+        // Last resort: return the raw body so a downstream LLM at least
+        // has something to look at, even if it's MIME boundaries.
         return imap_body($connection, $msgNumber);
     }
 
     /**
-     * Get MIME type from IMAP body part.
+     * Recursively walk an IMAP body-structure tree and collect the first
+     * text/plain and text/html body parts, ignoring explicit attachments.
+     *
+     * Section numbers follow IMAP's dotted addressing (RFC 3501 §6.4.5):
+     * top-level parts are "1", "2", ...; nested parts are "1.1", "1.2", ...
+     *
+     * The walker takes a `$fetchBody` closure rather than calling
+     * `imap_fetchbody()` directly so it can be unit-tested against
+     * synthetic body-structure trees without a real IMAP connection.
+     *
+     * @param array<int, object>       $parts
+     * @param callable(string): string $fetchBody receives a dotted section
+     *                                            number and returns the
+     *                                            (still-encoded) body for
+     *                                            that section
+     *
+     * @return array{plain: string, html: string}
+     */
+    private function collectTextParts(
+        array $parts,
+        string $sectionPrefix,
+        callable $fetchBody,
+    ): array {
+        $textPlain = '';
+        $textHtml = '';
+
+        foreach ($parts as $partNumber => $part) {
+            $section = '' === $sectionPrefix
+                ? (string) ($partNumber + 1)
+                : $sectionPrefix.'.'.($partNumber + 1);
+
+            if ($this->isAttachment($part)) {
+                continue;
+            }
+
+            $mimeType = $this->getMimeType($part);
+            $isMultipart = !empty($part->parts);
+
+            if ('' === $textPlain && 'text/plain' === $mimeType && !$isMultipart) {
+                $textPlain = $this->decodeEmailBody(
+                    $fetchBody($section),
+                    $part->encoding ?? 0,
+                    $this->getCharset($part)
+                );
+            } elseif ('' === $textHtml && 'text/html' === $mimeType && !$isMultipart) {
+                $textHtml = $this->decodeEmailBody(
+                    $fetchBody($section),
+                    $part->encoding ?? 0,
+                    $this->getCharset($part)
+                );
+            } elseif ($isMultipart) {
+                $nested = $this->collectTextParts($part->parts, $section, $fetchBody);
+                if ('' === $textPlain) {
+                    $textPlain = $nested['plain'];
+                }
+                if ('' === $textHtml) {
+                    $textHtml = $nested['html'];
+                }
+            }
+
+            if ('' !== $textPlain && '' !== $textHtml) {
+                break;
+            }
+        }
+
+        return ['plain' => $textPlain, 'html' => $textHtml];
+    }
+
+    /**
+     * Get MIME type from IMAP body part (e.g. "text/plain", "multipart/alternative").
      */
     private function getMimeType(object $part): string
     {
         $primaryType = ['text', 'multipart', 'message', 'application', 'audio', 'image', 'video', 'other'];
-        $type = $primaryType[$part->type] ?? 'text';
+        $type = $primaryType[$part->type ?? 0] ?? 'text';
         $subtype = strtolower($part->subtype ?? 'plain');
 
         return $type.'/'.$subtype;
     }
 
     /**
-     * Decode email body based on encoding.
+     * Detect whether an IMAP body part is an explicit attachment so we
+     * don't accidentally treat an attached .txt or .html file as the body.
      */
-    private function decodeEmailBody(string $body, int $encoding): string
+    private function isAttachment(object $part): bool
     {
-        return match ($encoding) {
-            1 => imap_8bit($body),           // 8BIT
-            2 => imap_binary($body),         // BINARY
-            3 => base64_decode($body),       // BASE64
-            4 => quoted_printable_decode($body), // QUOTED-PRINTABLE
-            default => $body,                // 7BIT or OTHER
+        if (empty($part->ifdisposition)) {
+            return false;
+        }
+
+        return 'attachment' === strtolower($part->disposition ?? '');
+    }
+
+    /**
+     * Read the charset parameter from a part's Content-Type, if any.
+     */
+    private function getCharset(object $part): ?string
+    {
+        if (empty($part->ifparameters) || empty($part->parameters)) {
+            return null;
+        }
+
+        foreach ($part->parameters as $param) {
+            $attr = isset($param->attribute) ? strtolower($param->attribute) : '';
+            if ('charset' === $attr) {
+                $value = $param->value ?? null;
+
+                return ('' === $value || null === $value) ? null : (string) $value;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Decode an email body part according to its Content-Transfer-Encoding
+     * and convert to UTF-8 if a non-UTF-8 charset was declared.
+     *
+     * NOTE: Encodings 7BIT (0), 8BIT (1), BINARY (2) and "OTHER" all carry the
+     * payload as-is — the imap_8bit() / imap_binary() helpers *encode* (not
+     * decode) and would corrupt the body, so they are deliberately not used.
+     */
+    private function decodeEmailBody(string $body, int $encoding, ?string $charset = null): string
+    {
+        $decoded = match ($encoding) {
+            3 => base64_decode($body, false),
+            4 => quoted_printable_decode($body),
+            default => $body,
         };
+
+        if ('' === $decoded) {
+            return $decoded;
+        }
+
+        if (null !== $charset) {
+            $normalized = strtoupper($charset);
+            if ('UTF-8' !== $normalized && 'US-ASCII' !== $normalized && '' !== $normalized) {
+                $converted = @mb_convert_encoding($decoded, 'UTF-8', $normalized);
+                if (is_string($converted)) {
+                    $decoded = $converted;
+                }
+            }
+        }
+
+        return $decoded;
+    }
+
+    /**
+     * Decode RFC 2047 encoded-word headers (e.g. =?UTF-8?B?...?=) to a plain UTF-8 string.
+     */
+    private function decodeMimeHeader(string $header): string
+    {
+        if ('' === $header) {
+            return $header;
+        }
+
+        $elements = imap_mime_header_decode($header);
+        if (false === $elements || [] === $elements) {
+            return $header;
+        }
+
+        $decoded = '';
+        foreach ($elements as $element) {
+            $charset = isset($element->charset) ? strtolower((string) $element->charset) : 'default';
+            $text = (string) ($element->text ?? '');
+
+            if ('default' === $charset || '' === $charset || 'utf-8' === $charset || 'us-ascii' === $charset) {
+                $decoded .= $text;
+                continue;
+            }
+
+            $converted = @mb_convert_encoding($text, 'UTF-8', strtoupper($charset));
+            $decoded .= is_string($converted) ? $converted : $text;
+        }
+
+        return $decoded;
     }
 
     /**
      * Connect to IMAP/POP3 server.
      */
-    private function connectImap(InboundEmailHandler $handler): ?\IMAP\Connection
+    private function connectImap(InboundEmailHandler $handler): \IMAP\Connection
     {
-        $server = $this->buildServerString($handler);
-        $password = $handler->getDecryptedPassword($this->encryptionService);
+        return $this->connectMailbox(
+            $handler->getMailServer(),
+            $handler->getPort(),
+            $handler->getProtocol(),
+            $handler->getSecurity(),
+            $handler->getUsername(),
+            $handler->getDecryptedPassword($this->encryptionService)
+        );
+    }
+
+    private function connectMailbox(
+        string $mailServer,
+        int $port,
+        string $protocol,
+        string $security,
+        string $username,
+        string $plainPassword,
+    ): \IMAP\Connection {
+        $server = $this->buildMailboxServerString($mailServer, $port, $protocol, $security);
 
         $connection = @imap_open(
             $server,
-            $handler->getUsername(),
-            $password,
+            $username,
+            $plainPassword,
             0
         );
 
@@ -234,24 +460,21 @@ final readonly class InboundEmailHandlerService
         return $connection;
     }
 
-    /**
-     * Build IMAP server connection string.
-     */
-    private function buildServerString(InboundEmailHandler $handler): string
-    {
-        $server = $handler->getMailServer();
-        $port = $handler->getPort();
-        $protocol = strtolower($handler->getProtocol());
-        $security = $handler->getSecurity();
+    private function buildMailboxServerString(
+        string $mailServer,
+        int $port,
+        string $protocol,
+        string $security,
+    ): string {
+        $protocolKey = strtolower($protocol);
 
-        // Build connection string: {server:port/protocol/security}
         $securityFlag = match ($security) {
             'SSL/TLS' => 'ssl',
             'STARTTLS' => 'tls',
             default => 'notls',
         };
 
-        return sprintf('{%s:%d/%s/%s}INBOX', $server, $port, $protocol, $securityFlag);
+        return sprintf('{%s:%d/%s/%s}INBOX', $mailServer, $port, $protocolKey, $securityFlag);
     }
 
     /**
@@ -430,30 +653,29 @@ final readonly class InboundEmailHandlerService
     {
         $processed = 0;
         $errors = [];
+        $connection = null;
+        $userId = $handler->getUserId();
+        $handlerId = (int) ($handler->getId() ?? 0);
 
         try {
             $connection = $this->connectImap($handler);
-
-            if (!$connection) {
-                $handler->setStatus('error');
-                $handler->touch();
-
-                // Note: Need EntityManager to flush - will be handled by caller
-                return [
-                    'success' => false,
-                    'processed' => 0,
-                    'errors' => ['Failed to connect to mail server'],
-                ];
-            }
 
             // Build search criteria based on email filter
             $searchCriteria = $this->buildSearchCriteria($handler);
             $messages = imap_search($connection, $searchCriteria);
 
             if (!$messages) {
-                imap_close($connection);
                 $handler->setLastChecked(date('YmdHis'));
                 $handler->setStatus('active');
+                $this->activityLog->log(
+                    $userId,
+                    $handlerId,
+                    MailHandlerLogService::EVENT_CHECK,
+                    MailHandlerLogService::STATUS_SUCCESS,
+                    null,
+                    ['matched' => 0, 'criteria' => $searchCriteria],
+                );
+                $this->activityLog->prune($userId, $handlerId);
 
                 return [
                     'success' => true,
@@ -462,33 +684,74 @@ final readonly class InboundEmailHandlerService
                 ];
             }
 
+            $matched = count($messages);
+            $this->activityLog->log(
+                $userId,
+                $handlerId,
+                MailHandlerLogService::EVENT_CHECK,
+                MailHandlerLogService::STATUS_SUCCESS,
+                null,
+                ['matched' => $matched, 'criteria' => $searchCriteria],
+            );
+
             foreach ($messages as $msgNumber) {
                 try {
                     $header = imap_headerinfo($connection, $msgNumber);
                     $body = $this->extractEmailBody($connection, $msgNumber);
 
-                    $subject = $header->subject ?? '(no subject)';
+                    $rawSubject = (string) ($header->subject ?? '');
+                    $subject = '' === $rawSubject ? '(no subject)' : $this->decodeMimeHeader($rawSubject);
                     $from = $header->from[0]->mailbox.'@'.$header->from[0]->host;
 
                     // Route email to department
                     $routedEmail = $this->routeEmailToDepartment($handler, $subject, $body);
 
-                    if ($routedEmail) {
-                        // Forward email to routed department using SMTP
-                        $this->forwardEmail($handler, $from, $routedEmail, $subject, $body);
-
-                        $this->logger->info('Email processed and forwarded', [
-                            'handler_id' => $handler->getId(),
-                            'from' => $from,
-                            'subject' => $subject,
-                            'routed_to' => $routedEmail,
-                        ]);
-                    } else {
+                    if (null === $routedEmail) {
                         $this->logger->info('Email not forwarded (discarded as irrelevant)', [
-                            'handler_id' => $handler->getId(),
+                            'handler_id' => $handlerId,
                             'from' => $from,
                             'subject' => $subject,
                         ]);
+                        $this->activityLog->log(
+                            $userId,
+                            $handlerId,
+                            MailHandlerLogService::EVENT_DISCARDED,
+                            MailHandlerLogService::STATUS_SUCCESS,
+                            null,
+                            ['from' => $from, 'subject' => $subject],
+                        );
+                    } else {
+                        $forwardResult = $this->forwardEmail($handler, $from, $routedEmail, $subject, $body);
+
+                        if ('forwarded' === $forwardResult) {
+                            $this->logger->info('Email processed and forwarded', [
+                                'handler_id' => $handlerId,
+                                'from' => $from,
+                                'subject' => $subject,
+                                'routed_to' => $routedEmail,
+                            ]);
+                            $this->activityLog->log(
+                                $userId,
+                                $handlerId,
+                                MailHandlerLogService::EVENT_FORWARDED,
+                                MailHandlerLogService::STATUS_SUCCESS,
+                                null,
+                                ['from' => $from, 'subject' => $subject, 'routed_to' => $routedEmail],
+                            );
+                        } else {
+                            // "No SMTP configured" is a configuration gap, not a
+                            // runtime failure — surface it as a WARNING (yellow)
+                            // in the activity modal so users distinguish it from
+                            // genuine forward errors.
+                            $this->activityLog->log(
+                                $userId,
+                                $handlerId,
+                                MailHandlerLogService::EVENT_NO_SMTP,
+                                MailHandlerLogService::STATUS_WARNING,
+                                'SMTP credentials are not configured for this handler — the routing decision was made but the email could not be forwarded.',
+                                ['from' => $from, 'subject' => $subject, 'routed_to' => $routedEmail],
+                            );
+                        }
                     }
 
                     // Mark as read (or delete if configured)
@@ -501,11 +764,22 @@ final readonly class InboundEmailHandlerService
                     ++$processed;
                 } catch (\Exception $e) {
                     $errors[] = "Message {$msgNumber}: ".$e->getMessage();
+                    // IMAP sequence numbers (`$msgNumber`) are useful in the
+                    // framework logger for matching against a server-side
+                    // trace, but they're meaningless to end users — keep
+                    // them out of the activity modal details.
                     $this->logger->error('Failed to process email', [
-                        'handler_id' => $handler->getId(),
+                        'handler_id' => $handlerId,
                         'message_number' => $msgNumber,
                         'error' => $e->getMessage(),
                     ]);
+                    $this->activityLog->log(
+                        $userId,
+                        $handlerId,
+                        MailHandlerLogService::EVENT_PROCESS_ERROR,
+                        MailHandlerLogService::STATUS_ERROR,
+                        $e->getMessage(),
+                    );
                 }
             }
 
@@ -513,10 +787,10 @@ final readonly class InboundEmailHandlerService
                 imap_expunge($connection);
             }
 
-            imap_close($connection);
-
             $handler->setLastChecked(date('YmdHis'));
             $handler->setStatus('active');
+
+            $this->activityLog->prune($userId, $handlerId);
 
             return [
                 'success' => true,
@@ -526,20 +800,61 @@ final readonly class InboundEmailHandlerService
         } catch (\Exception $e) {
             $handler->setStatus('error');
             $this->logger->error('Handler processing failed', [
-                'handler_id' => $handler->getId(),
+                'handler_id' => $handlerId,
                 'error' => $e->getMessage(),
             ]);
+            if ($handlerId > 0) {
+                $this->activityLog->log(
+                    $userId,
+                    $handlerId,
+                    MailHandlerLogService::EVENT_CONNECT_FAILED,
+                    MailHandlerLogService::STATUS_ERROR,
+                    $e->getMessage(),
+                );
+                $this->activityLog->prune($userId, $handlerId);
+            }
 
             return [
                 'success' => false,
                 'processed' => $processed,
                 'errors' => [$e->getMessage()],
             ];
+        } finally {
+            if (null !== $connection) {
+                // Surface any IMAP-level failure on close (expired sessions,
+                // EXPUNGE conflicts, …) into the logger so it isn't lost.
+                // Errors here must never bubble out of `finally` — we have
+                // already returned/thrown the meaningful outcome above.
+                try {
+                    imap_close($connection);
+                } catch (\Throwable $e) {
+                    $this->logger->warning('imap_close failed', [
+                        'handler_id' => $handlerId,
+                        'error' => $e->getMessage(),
+                    ]);
+                }
+                $imapErrors = imap_errors();
+                if (false !== $imapErrors && [] !== $imapErrors) {
+                    $this->logger->warning('IMAP errors on close', [
+                        'handler_id' => $handlerId,
+                        'errors' => $imapErrors,
+                    ]);
+                }
+            }
         }
     }
 
     /**
      * Forward email to department using handler's SMTP credentials.
+     *
+     * Returns:
+     *   - "forwarded" when the SMTP send completed.
+     *   - "no_smtp"   when no SMTP credentials are configured (caller decides
+     *                 whether to mark the message seen anyway — keeping the
+     *                 historical "best-effort" behaviour).
+     *
+     * Throws on any other SMTP failure so the caller can log
+     * `forward_failed` and avoid marking the source message seen.
      */
     private function forwardEmail(
         InboundEmailHandler $handler,
@@ -547,7 +862,7 @@ final readonly class InboundEmailHandlerService
         string $toEmail,
         string $subject,
         string $body,
-    ): void {
+    ): string {
         // Get SMTP credentials (decrypted)
         $smtpConfig = $handler->getSmtpCredentials($this->encryptionService);
 
@@ -556,7 +871,7 @@ final readonly class InboundEmailHandlerService
                 'handler_id' => $handler->getId(),
             ]);
 
-            return;
+            return 'no_smtp';
         }
 
         try {
@@ -584,12 +899,25 @@ final readonly class InboundEmailHandlerService
                 'to' => $toEmail,
                 'subject' => $subject,
             ]);
+
+            return 'forwarded';
         } catch (\Exception $e) {
             $this->logger->error('Failed to forward email', [
                 'handler_id' => $handler->getId(),
                 'error' => $e->getMessage(),
                 'to' => $toEmail,
             ]);
+            $handlerId = (int) ($handler->getId() ?? 0);
+            if ($handlerId > 0) {
+                $this->activityLog->log(
+                    $handler->getUserId(),
+                    $handlerId,
+                    MailHandlerLogService::EVENT_FORWARD_FAILED,
+                    MailHandlerLogService::STATUS_ERROR,
+                    $e->getMessage(),
+                    ['from' => $fromEmail, 'subject' => $subject, 'routed_to' => $toEmail],
+                );
+            }
             throw $e;
         }
     }

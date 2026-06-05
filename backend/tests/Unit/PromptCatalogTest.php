@@ -88,6 +88,66 @@ final class PromptCatalogTest extends TestCase
         $this->assertFalse($byTopic['coding']['enabled']);
     }
 
+    /**
+     * Granular routing aliases ship DISABLED by default — they are aliases
+     * of canonical topics (TopicAliasResolver) that confuse the legacy AI
+     * sorter when active alongside the canonical row. Admins flip them all
+     * back on via the `QDRANT_SEARCH.GRANULAR_TOPICS_ENABLED` toggle when
+     * Synapse Routing v2 is in use.
+     *
+     * Keeping them in the catalog (rather than removing) lets the seed
+     * idempotently flip BENABLED=0 on existing installs and drives the
+     * SynapseIndexer to drop orphan vectors from Qdrant.
+     */
+    public function testGranularRoutingAliasesShipDisabledByDefault(): void
+    {
+        $byTopic = [];
+        foreach (PromptCatalog::all() as $entry) {
+            $byTopic[$entry['topic']] = $entry;
+        }
+
+        foreach (
+            ['coding', 'general-chat', 'image-generation', 'video-generation', 'audio-generation'] as $alias
+        ) {
+            $this->assertArrayHasKey($alias, $byTopic, sprintf(
+                'Expected granular alias "%s" to remain in the catalog so the seed flips BENABLED.',
+                $alias
+            ));
+            $this->assertArrayHasKey('enabled', $byTopic[$alias], sprintf(
+                'Granular alias "%s" must declare an explicit `enabled` flag so the seed write is deterministic.',
+                $alias
+            ));
+            $this->assertFalse(
+                $byTopic[$alias]['enabled'],
+                sprintf(
+                    'Granular alias "%s" must ship DISABLED — admins re-enable via the GRANULAR_TOPICS_ENABLED toggle.',
+                    $alias
+                )
+            );
+        }
+    }
+
+    /**
+     * The canonical `general` row carries the chat/coding/lifestyle keyword
+     * list because the granular `general-chat` topic ships disabled by
+     * default. Synapse Routing v2 embedding recall therefore relies on the
+     * canonical row's keywords, which must include the programming terms
+     * that previously lived under `general-chat`.
+     */
+    public function testCanonicalGeneralKeywordsCoverProgrammingTerms(): void
+    {
+        $byTopic = [];
+        foreach (PromptCatalog::all() as $entry) {
+            $byTopic[$entry['topic']] = $entry;
+        }
+
+        $keywords = strtolower((string) $byTopic['general']['keywords']);
+        $this->assertStringContainsString('php', $keywords);
+        $this->assertStringContainsString('python', $keywords);
+        $this->assertStringContainsString('debug', $keywords);
+        $this->assertStringContainsString('smalltalk', $keywords);
+    }
+
     public function testGeneralChatKeywordsCoverProgrammingTermsAfterCodingRetirement(): void
     {
         // Coding queries now ride on `general-chat` (#878). Make sure
@@ -124,5 +184,56 @@ final class PromptCatalogTest extends TestCase
             $this->assertArrayNotHasKey($key, $seen, sprintf('Duplicate (topic, language) pair: %s', $key));
             $seen[$key] = true;
         }
+    }
+
+    /**
+     * Issue #950 — the memory_parse prompt has to teach the model to
+     * resolve pronouns, otherwise sentences like "Now I don't need it
+     * anymore" land as standalone, context-free memories.
+     *
+     * Follow-up from FExB17 on PR #956: the first iteration also added
+     * a "MERGE related thoughts" rule plus a long multi-sentence German
+     * example. That regressed splitting on the production MEM model
+     * (`gpt-oss-120b` on Groq), which started dumping the whole input
+     * into a single memory. We keep the minimal pronoun fix, drop the
+     * merge directive, and pin its absence so it can't be reintroduced
+     * by accident.
+     */
+    public function testMemoryParsePromptResolvesPronounsWithoutMergingThoughts(): void
+    {
+        $byTopic = [];
+        foreach (PromptCatalog::all() as $entry) {
+            $byTopic[$entry['topic']] = $entry;
+        }
+
+        $this->assertArrayHasKey('tools:memory_parse', $byTopic);
+        $prompt = $byTopic['tools:memory_parse']['prompt'];
+
+        // Positive: the pronoun-resolution rule and its short example
+        // must be present — that is the entire #950 fix.
+        $this->assertStringContainsString('RESOLVE PRONOUNS', $prompt);
+        $this->assertStringContainsString('started boxing', $prompt);
+        $this->assertStringContainsString("doesn't need it anymore", $prompt);
+
+        // Positive: the language-preservation rule plugs the parse-mode
+        // gap where German input silently became an English memory value.
+        // The directive must explicitly forbid translation while keeping
+        // keys in English (snake_case stays the storage convention).
+        $this->assertStringContainsString('MATCH USER LANGUAGE', $prompt);
+        $this->assertStringContainsString('Never translate', $prompt);
+
+        // Negative: the original splitting behaviour must be preserved
+        // for smaller models. Anything that nudges the model towards a
+        // single combined memory is forbidden.
+        $this->assertStringNotContainsString('MERGE', $prompt);
+        $this->assertStringNotContainsString('combine them into ONE memory', $prompt);
+        $this->assertStringNotContainsString('context-free fragments', $prompt);
+
+        // Negative: the long German bodybuilding example was hardcoding
+        // the issue repro into every prompt run — drop it to keep the
+        // few-shot block consistent (English) and lean on tokens.
+        $this->assertStringNotContainsString('bodybuilding', $prompt);
+        $this->assertStringNotContainsString('reason_for_training', $prompt);
+        $this->assertStringNotContainsString('self_worth', $prompt);
     }
 }

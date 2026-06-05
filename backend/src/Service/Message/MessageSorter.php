@@ -115,7 +115,10 @@ final readonly class MessageSorter
                 return [
                     'topic' => $ruleBasedTopic,
                     'language' => $messageData['BLANG'] ?? 'en',
-                    'web_search' => $promptMetadata['tool_internet'] ?? false,
+                    'web_search' => WebSearchTopicPolicy::shouldSearch(
+                        $ruleBasedTopic,
+                        $promptMetadata['tool_internet'] ?? null,
+                    ),
                     'raw_response' => 'Rule-based routing',
                     'prompt_metadata' => $promptMetadata,
                     'sorting_model_id' => null,
@@ -138,13 +141,15 @@ final readonly class MessageSorter
             ];
         }
 
-        // Get all available topics (exclude tools:* internal topics)
-        // Include user-specific prompts if userId is provided
-        // Load prompts for ALL supported languages to ensure user prompts are included
+        // Get all available topics (exclude tools:* internal topics).
+        // Granular routing aliases (`general-chat`, `coding`,
+        // `image-generation`, `video-generation`, `audio-generation`) are
+        // gated by their `BENABLED` flag in BPROMPTS, which the admin
+        // controls via the `GRANULAR_TOPICS_ENABLED` toggle through
+        // GranularTopicsManager. When OFF (default) the disabled rows
+        // are filtered out at the SQL level by `excludeDisabled: true`,
+        // so the sorter sees only canonical topics with no extra plumbing.
         $topics = $this->promptRepository->getAllTopics(0, $userId, excludeTools: true);
-
-        // Get topics with descriptions - all prompts included regardless of language
-        // so the sorter knows every available routing target
         $topicsWithDesc = $this->promptRepository->getTopicsWithDescriptions(0, '', $userId, excludeTools: true);
 
         // Build dynamic list and key list for prompt
@@ -260,15 +265,19 @@ final readonly class MessageSorter
                 }
             }
 
-            $webSearch = $parsed['web_search'] ?? null;
-            if (null === $webSearch && ($promptMetadata['tool_internet'] ?? false)) {
-                $webSearch = true;
-            }
+            // The LLM's BWEBSEARCH vote is now advisory: the project
+            // default is "search unless the prompt opts out or the topic
+            // is asset/document generation". The vote is preserved in
+            // `raw_response` for diagnostics.
+            $webSearch = WebSearchTopicPolicy::shouldSearch(
+                $parsed['topic'] ?? null,
+                $promptMetadata['tool_internet'] ?? null,
+            );
 
             return [
                 'topic' => $parsed['topic'],
                 'language' => $parsed['language'],
-                'web_search' => $webSearch ?? false,
+                'web_search' => $webSearch,
                 'media_type' => $parsed['media_type'] ?? null,
                 'duration' => $parsed['duration'] ?? null,
                 'resolution' => $parsed['resolution'] ?? null,

@@ -4,6 +4,8 @@ namespace App\Tests\Service;
 
 use App\AI\Service\AiFacade;
 use App\Service\RAG\VectorSearchService;
+use App\Service\RAG\VectorStorage\DTO\SearchQuery;
+use App\Service\RAG\VectorStorage\VectorStorageFacade;
 use Symfony\Bundle\FrameworkBundle\Test\KernelTestCase;
 
 /**
@@ -225,6 +227,138 @@ class VectorSearchServiceTest extends KernelTestCase
 
         $this->assertIsArray($results);
         $this->assertEmpty($results);
+    }
+
+    /**
+     * Regression test for issues #346 / #755.
+     *
+     * Before the fix, a provider that returns embeddings wider than the
+     * documents collection's fixed 1024 dim (OpenAI `text-embedding-3-small`
+     * at 1536, `-large` at 3072) caused `VectorSearchService::semanticSearch`
+     * to hand a 1536-dim query vector to `VectorStorageFacade::search`. The
+     * storage layer either rejected it (Qdrant) or compared it against
+     * 1024-dim stored vectors and returned NULL distances (MariaDB
+     * `VEC_DISTANCE_COSINE`), producing zero search results for what should
+     * be a perfect match.
+     *
+     * Asserts that:
+     *   1. The vector handed to the storage facade is always 1024 floats
+     *      regardless of the provider's native dimension.
+     *   2. Wider vectors are truncated (first N elements preserved).
+     *   3. Same normalisation is applied to the precomputed-vector path
+     *      (`semanticSearchByVector`) so callers cannot accidentally bypass
+     *      the fix by skipping the embed round-trip.
+     */
+    public function testQueryVectorIsNormalizedToCollectionDimension(): void
+    {
+        // Reboot the kernel so we can install fresh mocks BEFORE the
+        // AiFacade has been resolved (the setUp() mock already counts as
+        // "initialised", and Symfony's TestContainer refuses to replace
+        // an already-resolved service).
+        static::ensureKernelShutdown();
+        self::bootKernel();
+        $container = static::getContainer();
+
+        // Return a 1536-dim vector with a recognisable signature so we can
+        // verify truncation rather than padding.
+        $aiFacadeMock = $this->createMock(AiFacade::class);
+        $aiFacadeMock->method('embed')
+            ->willReturnCallback(static function (): array {
+                $vector = [];
+                for ($i = 0; $i < 1536; ++$i) {
+                    $vector[] = ($i < 1024) ? 0.1 : 9.9; // sentinel values >1024
+                }
+
+                return [
+                    'embedding' => $vector,
+                    'usage' => ['prompt_tokens' => 0, 'total_tokens' => 0],
+                ];
+            });
+        $container->set(AiFacade::class, $aiFacadeMock);
+
+        /** @var list<SearchQuery> $capturedQueries */
+        $capturedQueries = [];
+        $vectorStorageMock = $this->createMock(VectorStorageFacade::class);
+        $vectorStorageMock->method('search')
+            ->willReturnCallback(static function (SearchQuery $q) use (&$capturedQueries): array {
+                $capturedQueries[] = $q;
+
+                return [];
+            });
+        $vectorStorageMock->method('getProviderName')->willReturn('test-storage');
+        $container->set(VectorStorageFacade::class, $vectorStorageMock);
+
+        // Re-resolve the service so it picks up the freshly-installed mocks.
+        $service = $container->get(VectorSearchService::class);
+
+        $service->semanticSearch('any query', $this->testUserId);
+
+        $this->assertCount(1, $capturedQueries, 'exactly one storage search per call');
+        /** @var SearchQuery $firstQuery */
+        $firstQuery = $capturedQueries[0];
+        $vector = $firstQuery->vector;
+        $this->assertCount(1024, $vector, 'query vector must be coerced to the collection width');
+        $this->assertEqualsWithDelta(0.1, $vector[0], 1e-9, 'first sentinel preserved');
+        $this->assertEqualsWithDelta(0.1, $vector[1023], 1e-9, 'truncation took the leading 1024 floats, not the trailing ones');
+
+        // Same guarantee on the precomputed-vector path.
+        /** @var list<SearchQuery> $capturedQueries */
+        $capturedQueries = [];
+        $widePrecomputedVector = array_fill(0, 1536, 0.5);
+        $service->semanticSearchByVector($this->testUserId, $widePrecomputedVector);
+        $this->assertCount(1, $capturedQueries);
+        /** @var SearchQuery $secondQuery */
+        $secondQuery = $capturedQueries[0];
+        $this->assertCount(
+            1024,
+            $secondQuery->vector,
+            'precomputed-vector path must apply the same normalisation'
+        );
+    }
+
+    /**
+     * Regression test for issues #346 / #755 — narrower providers must be
+     * zero-padded so the storage layer does not reject the query.
+     */
+    public function testQueryVectorIsPaddedWhenProviderReturnsNarrower(): void
+    {
+        // Same kernel reboot pattern as the truncation test above.
+        static::ensureKernelShutdown();
+        self::bootKernel();
+        $container = static::getContainer();
+
+        $aiFacadeMock = $this->createMock(AiFacade::class);
+        $aiFacadeMock->method('embed')->willReturn([
+            'embedding' => array_fill(0, 768, 0.5),
+            'usage' => ['prompt_tokens' => 0, 'total_tokens' => 0],
+        ]);
+        $container->set(AiFacade::class, $aiFacadeMock);
+
+        /** @var list<SearchQuery> $capturedQueries */
+        $capturedQueries = [];
+        $vectorStorageMock = $this->createMock(VectorStorageFacade::class);
+        $vectorStorageMock->method('search')
+            ->willReturnCallback(static function (SearchQuery $q) use (&$capturedQueries): array {
+                $capturedQueries[] = $q;
+
+                return [];
+            });
+        $vectorStorageMock->method('getProviderName')->willReturn('test-storage');
+        $container->set(VectorStorageFacade::class, $vectorStorageMock);
+
+        $service = $container->get(VectorSearchService::class);
+
+        $service->semanticSearch('any query', $this->testUserId);
+
+        $this->assertCount(1, $capturedQueries);
+        /** @var SearchQuery $captured */
+        $captured = $capturedQueries[0];
+        $vector = $captured->vector;
+        $this->assertCount(1024, $vector);
+        $this->assertEqualsWithDelta(0.5, $vector[0], 1e-9);
+        $this->assertEqualsWithDelta(0.5, $vector[767], 1e-9, 'real values preserved');
+        $this->assertEqualsWithDelta(0.0, $vector[768], 1e-9, 'tail padded with zeros');
+        $this->assertEqualsWithDelta(0.0, $vector[1023], 1e-9, 'tail padded all the way to the collection width');
     }
 
     protected function tearDown(): void

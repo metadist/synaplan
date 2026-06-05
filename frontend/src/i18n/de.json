@@ -37,7 +37,26 @@
     "widgetSessions": "Widget-Sitzungen",
     "widgetChats": "Widget-Chats",
     "widgetDetail": "Widget-Detail",
-    "liveSupport": "Live-Support"
+    "liveSupport": "Live-Support",
+    "addinConnect": "Outlook-Add-in verbinden"
+  },
+  "addinConnect": {
+    "title": "Mit Synaplan verbinden",
+    "subtitle": "Erlaube dem Synamail Outlook-Add-in, dieses Synaplan-Konto zu verwenden.",
+    "loading": "Sitzung wird geprüft…",
+    "confirmPrompt": "Dieses Outlook verbinden mit:",
+    "connectButton": "Outlook verbinden",
+    "scopesNote": "Gewährt Zugriff auf Nachrichten, Chats, Dateien und RAG-Suche.",
+    "connecting": "API-Schlüssel wird ausgestellt…",
+    "successTitle": "Verbunden.",
+    "successSubtitle": "Du kannst dieses Fenster schließen, falls es sich nicht selbst schließt.",
+    "errorTitle": "Verbindung fehlgeschlagen",
+    "retry": "Erneut versuchen",
+    "helpLine": "Dieses Fenster wird vom Synamail-Add-in geöffnet. Es kann gefahrlos geschlossen werden.",
+    "errorMissingState": "Fehlender state-Parameter. Add-in erneut öffnen und nochmal versuchen.",
+    "errorOfficeNotReady": "Office.js ist nicht verfügbar. Diese Seite muss aus Outlook heraus geöffnet werden.",
+    "errorNotSignedIn": "Du bist nicht angemeldet. Bitte das Fenster aktualisieren und erneut anmelden.",
+    "errorIssuanceFailed": "Synaplan konnte für dieses Konto keinen API-Schlüssel ausstellen."
   },
   "welcome": "Willkommen bei Synaplan",
   "chat": {
@@ -53,6 +72,8 @@
     "showAll": "Alle anzeigen",
     "recent": "Letzte Unterhaltungen",
     "ttsGenerating": "Sprachantwort wird erstellt…",
+    "audioUnavailable": "Audio konnte nicht geladen werden",
+    "audioUnavailableDescription": "Die Datei ist auf dem Server nicht verfügbar. Versuche es später erneut oder lade sie herunter.",
     "rename": "Chat umbenennen",
     "enterNewName": "Gib einen neuen Titel für diesen Chat ein:",
     "renameNote": "Diese Änderung gilt nur für deine Ansicht. Der Widget-Nutzer sieht diesen Titel nicht.",
@@ -101,7 +122,8 @@
       "share": "Chat teilen",
       "public": "Öffentlich"
     },
-    "fileOnlyDefaultMessage": "Bitte prüfe die angehängte Datei."
+    "fileOnlyDefaultMessage": "Bitte prüfe die angehängte Datei.",
+    "voiceMessageDefaultMessage": "Bitte antworte auf meine Sprachnachricht."
   },
   "admin": {
     "title": "Admin-Panel",
@@ -284,6 +306,9 @@
     "provider": "Anbieter",
     "model": "Modell",
     "configureModel": "KI-Modell konfigurieren",
+    "knowledgeGroup": "Wissensordner",
+    "knowledgeGroupNone": "Kein Wissensordner",
+    "manageKnowledgeGroups": "Wissensordner verwalten",
     "uploadFile": "Hochladen",
     "deepResearch": "Tiefenrecherche",
     "docs": "Dokumente",
@@ -295,6 +320,7 @@
     "waitForStreaming": "Bitte warten Sie, bis die aktuelle Antwort abgeschlossen ist, bevor Sie eine weitere Nachricht senden.",
     "share": "Teilen",
     "enhance": "Verbessern",
+    "enhanceRejected": "Dieser Text konnte nicht verbessert werden. Bitte formuliere einen klareren Satz oder eine konkretere Frage.",
     "thinking": "Denken",
     "reasoningNotSupported": "Dein aktuelles Chat-Modell unterstützt kein Reasoning. Bitte wähle ein Reasoning-fähiges Modell (GPT-5, o3, DeepSeek-R1) in der KI-Konfiguration → Modelle.",
     "voice": "Spracheingabe starten",
@@ -310,6 +336,9 @@
     "dropFiles": "Dateien hier ablegen",
     "dropFilesHint": "Bilder, Dokumente, Audiodateien...",
     "filesPasted": "{count} Datei eingefügt | {count} Dateien eingefügt",
+    "uploadError": "Datei-Upload fehlgeschlagen. Bitte erneut versuchen.",
+    "documentExtractionFailed": "Aus „{filename}\" konnte kein Text gelesen werden. Das Dokument ist möglicherweise leer, ein Scan ohne OCR, passwortgeschützt oder in einem nicht unterstützten Format.",
+    "audioTranscriptionFailed": "„{filename}\" konnte nicht transkribiert werden. Die Audiodatei ist möglicherweise leer, beschädigt oder in einem nicht unterstützten Format.",
     "tools": {
       "label": "Agents",
       "webSearch": "Web-Suche",
@@ -332,7 +361,8 @@
     "messageDetails": "Nachrichtendetails",
     "infoTopic": "Thema",
     "infoModel": "Modell",
-    "infoProvider": "Anbieter"
+    "infoProvider": "Anbieter",
+    "infoAudioModel": "Audio-Modell"
   },
   "commands": {
     "noResults": "Keine Befehle gefunden",
@@ -817,7 +847,9 @@
     "topic": "Thema",
     "language": "Sprache",
     "modelId": "Model ID",
-    "longRunningHint": "Diese Anfrage dauert etwas länger als üblich — bitte habe einen Moment Geduld."
+    "longRunningHint": "Diese Anfrage dauert etwas länger als üblich — bitte habe einen Moment Geduld.",
+    "waitingDesc": "Einen Moment…",
+    "waitingAria": "Antwort wird vorbereitet"
   },
   "message": {
     "thinking": "Denkprozess",
@@ -890,6 +922,7 @@
       "noModelsAvailable": "Keine Modelle für diesen Verwendungszweck verfügbar",
       "saveSuccess": "Modellkonfiguration gespeichert",
       "saveError": "Modellkonfiguration konnte nicht gespeichert werden",
+      "saveErrorPremiumRequired": "{reason} Bitte aktualisiere deinen Tarif oder wähle ein anderes Modell.",
       "tableName": "Name",
       "tableService": "Anbieter",
       "tableRating": "Bewertung",
@@ -914,6 +947,10 @@
       "chatGeneration": "Antwort-Generierung",
       "messageClassification": "Nachrichten-Klassifizierung",
       "clickToConfig": "Klicken zum Konfigurieren",
+      "purposeChip": {
+        "activeTooltip": "Bereits als Standardmodell für „{purpose}“ gesetzt",
+        "applyTooltip": "{model} als Standardmodell für „{purpose}“ festlegen"
+      },
       "modelNotAvailable": "{model} ist nicht verfügbar. Bitte prüfe die Provider-Konfiguration.",
       "modelNotConfigured": "{model} ist nicht bereit: Setze {envVar} in der Umgebung (z. B. .env.local).",
       "admin": {
@@ -1000,6 +1037,9 @@
       "total": "Gesamt",
       "chunks": "Chunks",
       "tokens": "Tokens",
+      "dimensions": "Vektor-Dim",
+      "dimMismatch": "Die Vektor-Dimensionen ändern sich von {from} auf {to}. Alle bestehenden Vektoren werden neu erzeugt; alte Such-Scores sind erst nach Abschluss der Re-Vektorisierung wieder vergleichbar.",
+      "memoriesFrozen": "Nutzer-Erinnerungen bleiben an ihr eigenes Embedding-Modell gekoppelt und werden bei diesem Wechsel NICHT migriert. Neue Erinnerungen werden weiterhin korrekt gespeichert — sie verwenden das ursprüngliche Modell der Memories-Collection, damit die Dimensionen passen. Um bestehende Erinnerungen unter dem neuen Modell neu zu vektorisieren, ist ein dedizierter Memories-Reindex nötig (derzeit nur Admin).",
       "scopes": {
         "documents": "Dokumente (RAG)",
         "memories": "Nutzer-Erinnerungen",
@@ -1030,6 +1070,10 @@
         "badge": "Premium",
         "lockTooltip": "Embedding-Modell-Wechsel erfordert ein bezahltes Abo."
       },
+      "adminOnly": {
+        "badge": "Nur Admin",
+        "lockTooltip": "Das Wechseln des Embedding-Modells ist Administrator:innen vorbehalten. Das derzeit aktive Modell wird zur Referenz angezeigt."
+      },
       "cooldown": {
         "title": "Cooldown aktiv",
         "body": "Ein anderer Wechsel wurde kürzlich gestartet. Der nächste Wechsel ist in ca. {minutes} Minuten möglich."
@@ -1043,6 +1087,10 @@
       "runningHint": "Aktualisiert sich automatisch alle paar Sekunden.",
       "chunks": "Chunks",
       "tokens": "Tokens",
+      "errorLabel": "Fehler",
+      "statusPartialBadge": "Teilweise",
+      "statusPartial": "Abgeschlossen mit Fehlern — {processed} verarbeitet, {failed} fehlgeschlagen.",
+      "partialDetail": "Dieser Lauf wurde beendet, aber {failed} der Chunks konnten nicht embeddet werden ({processed} erfolgreich). Die betroffenen Einträge behalten ihre vorherigen Vektoren und werden beim nächsten Wechsel erneut versucht.",
       "col": {
         "when": "Wann",
         "scope": "Bereich",
@@ -1188,6 +1236,7 @@
       "errorTopicExists": "Ein Prompt mit diesem Topic existiert bereits. Bitte wählen Sie ein anderes Topic.",
       "errorToolsPrefix": "Prompts mit \"tools:\"-Präfix können nicht erstellt werden — reserviert fürs System.",
       "errorMissingFields": "Bitte füllen Sie alle Pflichtfelder aus: Topic, Name und Prompt-Inhalt.",
+      "saveErrorPremiumRequired": "{reason} Bitte aktualisieren Sie Ihren Tarif oder wählen Sie ein anderes AI-Modell für diesen Prompt.",
       "copy": "Kopieren",
       "copyToClipboard": "In Zwischenablage kopieren",
       "copySuccess": "In Zwischenablage kopiert.",
@@ -1284,7 +1333,12 @@
       "confirmEnableConfirm": "Beta aktivieren",
       "confirmEnableCancel": "Bei AI-Sortierung bleiben",
       "toggleEnabledNotice": "Synapse Routing aktiviert. AI-Sortierung wird nur noch als Fallback genutzt.",
-      "toggleDisabledNotice": "Synapse Routing deaktiviert. Alle Nachrichten verwenden jetzt den AI-Sorter."
+      "toggleDisabledNotice": "Synapse Routing deaktiviert. Alle Nachrichten verwenden jetzt den AI-Sorter.",
+      "granularTitle": "Granulare Routing-Themen",
+      "granularSubtitle": "Aktiviert die granularen Routing-Aliase (general-chat, coding, image-generation, video-generation, audio-generation). Sie sind Aliase der kanonischen Themen (general, mediamaker) – sinnvoll für die Embedding-Stufe von Synapse Routing v2, erscheinen für den klassischen AI-Sorter aber als doppelte Auswahloptionen. Lass diesen Schalter auf AUS, wenn du oben kein Synapse Routing aktiviert hast.",
+      "granularPromptHint": "Das Umlegen dieses Schalters setzt parallel das BENABLED-Flag der passenden Task-Prompts auf 1 bzw. 0.",
+      "granularToggleEnabledNotice": "Granulare Routing-Themen aktiviert. Die passenden Task-Prompts wurden wieder aktiviert.",
+      "granularToggleDisabledNotice": "Granulare Routing-Themen deaktiviert. Die passenden Task-Prompts sind ausgeblendet – nur kanonische Themen sind aktiv."
     },
     "sortingPrompt": {
       "title": "Preprocessor",
@@ -1521,9 +1575,13 @@
       "statusCanceled": "Gekündigt",
       "statusPastDue": "Zahlung überfällig",
       "statusIncomplete": "Unvollständig",
+      "statusIncompleteExpired": "Unvollständig (abgelaufen)",
       "statusTrialing": "Testphase",
       "statusUnpaid": "Unbezahlt",
       "statusPaused": "Pausiert",
+      "paymentFailedTitle": "Zahlung fehlgeschlagen — bitte Karte aktualisieren",
+      "paymentFailedBody": "Wir konnten deine letzte Zahlung nicht verarbeiten. Stripe versucht es in den nächsten Wochen automatisch erneut, aber dein Abo wird pausiert, falls die Karte nicht aktualisiert wird. Öffne das Zahlungsportal, um das zu beheben.",
+      "paymentFailedCta": "Zahlungsmethode aktualisieren",
       "nextBilling": "Nächstes Abrechnungsdatum",
       "cancelDate": "Kündigung zum",
       "billingPortal": "Rechnungsportal",
@@ -1655,6 +1713,12 @@
     "revoke": "Öffentlichen Zugriff Widerrufen"
   },
   "files": {
+    "integrationsBanner": {
+      "title": "Synaplan integriert sich mit führenden Filesharing-Lösungen",
+      "subtitle": "Erweitere deinen bestehenden Datei-Speicher um KI-Zusammenfassungen, Übersetzungen und RAG-Suche.",
+      "openLink": "{name}-Integration auf GitHub öffnen",
+      "dismiss": "Hinweis ausblenden"
+    },
     "searchPlaceholder": "Dateien suchen...",
     "uploadTitle": "Dateien hochladen",
     "groupKeyword": "Ordner:",
@@ -1714,6 +1778,15 @@
     "deleteSelected": "Ausgewählte löschen",
     "deleteSelectedConfirmTitle": "Ausgewählte Dateien löschen?",
     "deleteSelectedConfirmMessage": "Möchten Sie wirklich {count} ausgewählte Datei(en) löschen? Diese Aktion kann nicht rückgängig gemacht werden und die Dateien werden dauerhaft gelöscht.",
+    "deleteFolder": "Ordner löschen",
+    "deleteFolderConfirmTitle": "Ordner „{folder}“ löschen?",
+    "deleteFolderConfirmMessage": "Dies löscht den Ordner „{folder}“ und alle {count} darin enthaltenen Datei(en) dauerhaft, einschließlich ihres indexierten Inhalts. Diese Aktion kann nicht rückgängig gemacht werden.",
+    "deleteFolderEmptyConfirmMessage": "Den leeren Ordner „{folder}“ löschen? Er enthält keine Dateien, es wird also nichts weiter entfernt.",
+    "deleteFolderConfirmButton": "Ordner & Dateien löschen",
+    "folderDeleted": "Ordner „{folder}“ gelöscht ({count} Datei(en) entfernt)",
+    "folderEmptyDeleted": "Ordner „{folder}“ gelöscht",
+    "deleteFolderFailed": "Ordner „{folder}“ konnte nicht gelöscht werden",
+    "deleteFolderPartial": "Ordner „{folder}“: {success} Datei(en) gelöscht, {failed} fehlgeschlagen",
     "noFiles": "Noch keine Dateien hochgeladen",
     "moveTo": "Verschieben nach",
     "movedSuccess": "Datei nach \"{folder}\" verschoben",
@@ -1790,7 +1863,27 @@
     "reVectorizeFailed": "Neuverarbeitung fehlgeschlagen",
     "uploadSuccess": "{count} Datei(en) erfolgreich hochgeladen",
     "uploadCancelled": "Upload abgebrochen",
-    "uploadInterrupted": "Übertragung unterbrochen. Die Liste wurde aktualisiert — Dateien, die den Server schon erreicht hatten, können weiterhin erscheinen."
+    "uploadInterrupted": "Übertragung unterbrochen. Die Liste wurde aktualisiert — Dateien, die den Server schon erreicht hatten, können weiterhin erscheinen.",
+    "uploadSlow": "dauert länger als gewöhnlich…",
+    "uploadFailed": {
+      "transfer_stalled": "{filename}: Upload bei {percent}% stehengeblieben — die Verbindung hat aufgehört, Daten zu senden, bevor die Datei den Server erreicht hat. Meist liegt das an einer abgebrochenen Verbindung oder einem Größen-/Timeout-Limit eines Proxys. Bitte Verbindung prüfen und erneut versuchen; wenn es weiterhin fehlschlägt, ist die Datei möglicherweise zu groß für das aktuelle Serverlimit.",
+      "server_timeout": "{filename}: Die Datei wurde hochgeladen, aber der Server hat nicht rechtzeitig geantwortet. Sie wurde möglicherweise trotzdem gespeichert — bitte einen Moment warten und die Liste prüfen, bevor Sie es erneut versuchen.",
+      "too_large": "{filename}: Der Server hat diese Datei als zu groß abgelehnt. Bitte eine kleinere Datei verwenden oder die/den Administrator:in bitten, das Upload-Limit zu erhöhen.",
+      "forbidden": "{filename}: Der Upload wurde von einer Sicherheitsebene (Firewall/Proxy) blockiert, bevor er den Server erreicht hat. Das können Sie in der Regel nicht selbst beheben – bitte wenden Sie sich an das Team, damit dieser Upload freigegeben wird.",
+      "gateway": "{filename}: Der Server ist vorübergehend nicht erreichbar (Fehler {status}). Bitte in einem Moment erneut versuchen.",
+      "server_error": "{filename}: Beim Speichern dieser Datei ist auf dem Server ein Fehler aufgetreten (Fehler {status}). Bitte erneut versuchen.",
+      "network": "{filename}: Die Verbindung wurde während des Uploads unterbrochen. Bitte Netzwerk prüfen und erneut versuchen.",
+      "invalid_response": "{filename}: Der Server hat eine unerwartete Antwort zurückgegeben. Bitte erneut versuchen.",
+      "http_error": "{filename}: Upload fehlgeschlagen (Fehler {status}). Bitte erneut versuchen."
+    },
+    "uploadBlocked": {
+      "storage_exceeded": "{filename}: Nicht genug Speicherplatz. {message}",
+      "file_too_large": "{filename}: Datei ist zu groß. {message}",
+      "file_empty": "{filename}: Datei ist leer. {message}",
+      "extension_not_allowed": "{filename}: Dateityp wird nicht unterstützt. {message}",
+      "rate_limit_exceeded": "{filename}: Upload-Limit erreicht. {message}",
+      "generic": "{filename}: Upload nicht erlaubt. {message}"
+    }
   },
   "fileMention": {
     "hint": "Tippen um Dateien zu suchen — Enter zum Anhängen",
@@ -1890,6 +1983,32 @@
     "filterToDate": "Bis Datum",
     "recommended": "Empfohlen",
     "proOnly": "PRO+",
+    "activity": {
+      "title": "Letzte Aktivitäten",
+      "description": "Die letzten 10 Aktionen dieses E-Mail-Agents. Hilft dabei, „als gelesen markiert, aber nicht weitergeleitet\"-Fälle zu untersuchen.",
+      "openButton": "Aktivitätsprotokoll anzeigen",
+      "refresh": "Aktivitäten neu laden",
+      "loadFailed": "Aktivitätsprotokoll konnte nicht geladen werden",
+      "empty": "Noch keine Aktivität",
+      "emptyDescription": "Sobald dieser Agent eingehende E-Mails verarbeitet, erscheinen die letzten Schritte hier.",
+      "retentionNote": "Es werden nur die letzten 10 Einträge gespeichert; ältere werden automatisch entfernt.",
+      "events": {
+        "check": "Postfach geprüft",
+        "connect_failed": "Verbindung fehlgeschlagen",
+        "forwarded": "E-Mail weitergeleitet",
+        "discarded": "E-Mail von KI verworfen",
+        "no_smtp": "Geroutet, aber nicht versendet (kein SMTP konfiguriert)",
+        "forward_failed": "Weiterleitung fehlgeschlagen",
+        "process_error": "Nachricht konnte nicht verarbeitet werden"
+      },
+      "fields": {
+        "from": "Von",
+        "subject": "Betreff",
+        "routedTo": "Weitergeleitet an",
+        "matched": "Treffer",
+        "criteria": "IMAP-Kriterien"
+      }
+    },
     "savedHandlers": "E-Mail-Agents",
     "savedHandlersDesc": "Automatisiere deinen Posteingang mit KI-gestützten E-Mail-Agents, die Nachrichten lesen, sortieren und weiterleiten.",
     "createHandler": "Neuer E-Mail-Agent",
@@ -1913,6 +2032,8 @@
     "bulkDeleteSuccess": "{count} Handler erfolgreich gelöscht",
     "bulkDeleteFailed": "Handler konnten nicht gelöscht werden",
     "connectionTestWarning": "Verbindungstest fehlgeschlagen",
+    "testPickUpIncomplete": "Bitte Mailserver, Port und Benutzername ausfüllen, bevor Sie testen.",
+    "testPickUpPasswordRequired": "Bitte geben Sie das Postfach-Passwort ein, um diese Konfiguration zu testen.",
     "handlerSavedTestFailed": "Handler gespeichert, aber Verbindungstest fehlgeschlagen",
     "handlerDeleted": "Mail-Handler erfolgreich gelöscht",
     "deleteFailed": "Fehler beim Löschen des Mail-Handlers",
@@ -2268,6 +2389,30 @@
       "theme": "Standard-Theme",
       "primaryColor": "Primärfarbe",
       "iconColor": "Button-Icon-Farbe",
+      "aiAssistantName": "Anzeigename des KI-Assistenten",
+      "aiAssistantNamePlaceholder": "z. B. Acme Bot, Lara",
+      "aiAssistantNameHelp": "Wird neben KI-Antworten in der Zeitstempel-Zeile angezeigt („Acme Bot · 03:58”). Leer lassen, um den Standard „KI-Assistent” zu verwenden.",
+      "subtitle": "Untertitel im Kopfbereich",
+      "subtitleDefault": "Standardtext verwenden („Wir antworten normalerweise innerhalb von Minuten”)",
+      "subtitleHidden": "Untertitel-Zeile ausblenden",
+      "subtitleCustom": "Eigenen Untertitel verwenden",
+      "subtitlePlaceholder": "z. B. „Erreichbar Mo–Fr 9–17 Uhr”",
+      "subtitleHelp": "Wird im Chat-Header unter dem Widget-Titel angezeigt. Auf leer setzen, um die Zeile komplett auszublenden.",
+      "handoff": {
+        "title": "Slack-Übergabe an Menschen",
+        "intro": "Benachrichtige dein Team per Slack, wenn der Besucher Hilfe braucht — ein kleiner Button im Widget-Header löst die Übergabe aus, und konfigurierte Trigger-Phrasen feuern automatisch.",
+        "webhookUrl": "Slack Incoming-Webhook-URL",
+        "webhookHelp": "Erstellen unter https://api.slack.com/messaging/webhooks. Wird serverseitig gespeichert und niemals an das Widget übertragen.",
+        "webhookInvalid": "Erwartet wird eine https://hooks.slack.com/services/... URL.",
+        "buttonEnabled": "Button „Mit einem Menschen sprechen” im Widget anzeigen",
+        "buttonEnabledHelp": "Wenn aus, lösen nur Trigger-Phrasen die Benachrichtigung aus.",
+        "triggers": "Trigger-Phrasen für automatische Übergabe",
+        "triggerPlaceholder": "z. B. mit Mitarbeiter sprechen (eine Phrase pro Tag oder komma-getrennt einfügen)",
+        "triggersHelp": "Groß-/Kleinschreibung wird ignoriert, einfacher Teilstring-Vergleich pro Besuchernachricht. Bis zu 20 Phrasen à 100 Zeichen. Sobald eine Übergabe gefeuert ist, bleibt die Session ruhig, bis der Mitarbeiter sie zurückgibt.",
+        "testButton": "Slack-Test senden",
+        "testSuccess": "Test-Nachricht zugestellt.",
+        "testFailed": "Slack hat den Test abgelehnt — bitte Webhook-URL prüfen."
+      },
       "widgetActive": "Widget aktiv",
       "widgetActiveHelp": "Aktivieren oder deaktivieren Sie dieses Widget. Inaktive Widgets reagieren nicht auf Nachrichten.",
       "widgetInactiveWarning": "Dieses Widget ist derzeit inaktiv und reagiert nicht auf Besuchernachrichten.",
@@ -2561,6 +2706,13 @@
     "senderAgent": "Support-Mitarbeiter",
     "senderSystem": "System",
     "senderAi": "KI-Assistent",
+    "humanHandoff": {
+      "button": "Mit einem Menschen sprechen",
+      "tooltip": "Unser Team benachrichtigen — ein Mitarbeiter übernimmt den Chat",
+      "successNotified": "Ein Mitarbeiter wurde benachrichtigt und meldet sich gleich.",
+      "successQueued": "Deine Anfrage wurde vorgemerkt. Ein Mitarbeiter meldet sich schnellstmöglich.",
+      "failed": "Wir konnten unser Team gerade nicht erreichen — bitte gleich nochmal versuchen."
+    },
     "previewWidget": "Widget-Vorschau",
     "configuration": "Widget-Konfiguration",
     "closeEditor": "Editor schließen",
@@ -2828,6 +2980,11 @@
       "customCategoryPlaceholder": "Eigene Kategorie eingeben...",
       "createWithAI": "Mit KI erstellen",
       "aiUnavailable": "KI-Strukturierung nicht verfügbar, wird als Notiz gespeichert",
+      "aiUnavailableCreateFallback": "KI nicht erreichbar – dein Text wird als Notiz vorbereitet. Bitte bestätigen oder Kategorie/Schlüssel anpassen.",
+      "aiUnavailableCreateReason": "Als einfache Notiz gespeichert, weil die KI gerade nicht erreichbar ist.",
+      "aiUnavailableEditFallback": "KI nicht erreichbar – bitte direkt im manuellen Modus anpassen.",
+      "storageUnavailable": "Erinnerungs-Speicher ist gerade nicht erreichbar. Bitte später erneut versuchen.",
+      "parseFailed": "Verarbeitung fehlgeschlagen. Bitte später erneut versuchen oder manuell speichern.",
       "previewTitle": "Vorschau",
       "previewDescription": "Prüfe ob das so passt, bevor es gespeichert wird.",
       "actionCreate": "Neue Erinnerung",
@@ -2835,6 +2992,7 @@
       "actionDelete": "Erinnerung löschen",
       "similarFound": "Ähnliche Erinnerungen gefunden - vielleicht lieber aktualisieren:",
       "confirm": "Bestätigen & Speichern",
+      "confirmSaving": "Speichere…",
       "oneChange": "Änderung",
       "multipleChanges": "Änderungen"
     },
@@ -3092,8 +3250,8 @@
       "action": "Pläne ansehen"
     },
     "fileMention": {
-      "title": "Dateien mit @ erwähnen",
-      "description": "Tippe @ im Chat, um schnell auf deine hochgeladenen Dateien zu verweisen. Die KI liest den Dateiinhalt und nutzt ihn zur Beantwortung deiner Frage.",
+      "title": "Dateien mit {'@'} erwähnen",
+      "description": "Tippe {'@'} im Chat, um schnell auf deine hochgeladenen Dateien zu verweisen. Die KI liest den Dateiinhalt und nutzt ihn zur Beantwortung deiner Frage.",
       "action": ""
     },
     "widgetPreview": {

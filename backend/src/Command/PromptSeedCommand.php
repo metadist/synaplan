@@ -4,8 +4,7 @@ declare(strict_types=1);
 
 namespace App\Command;
 
-use App\Prompt\PromptCatalog;
-use Doctrine\DBAL\Connection;
+use App\Seed\PromptSeeder;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputInterface;
@@ -19,7 +18,7 @@ use Symfony\Component\Console\Style\SymfonyStyle;
 final class PromptSeedCommand extends Command
 {
     public function __construct(
-        private readonly Connection $connection,
+        private readonly PromptSeeder $promptSeeder,
     ) {
         parent::__construct();
     }
@@ -29,8 +28,10 @@ final class PromptSeedCommand extends Command
         $this->setHelp(
             "Upserts all built-in system prompts (ownerId=0) into the database.\n\n".
             "New prompts are inserted, existing ones are updated with the latest text.\n".
-            "User-created prompts (ownerId>0) are never touched.\n\n".
-            'This command is idempotent and safe to run on every container start.'
+            "User-created prompts (ownerId>0) are never touched. After the catalog\n".
+            "write, the granular-topics admin toggle is re-applied so BPROMPTS.BENABLED\n".
+            "stays in lock-step with the operator's choice across re-seeds.\n\n".
+            'Idempotent and safe to run on every container start.'
         );
     }
 
@@ -38,20 +39,13 @@ final class PromptSeedCommand extends Command
     {
         $io = new SymfonyStyle($input, $output);
 
-        $result = PromptCatalog::seed($this->connection);
-
-        foreach ($result['inserted'] as $topic) {
-            $io->writeln("  <info>Inserted</info> $topic");
-        }
-        foreach ($result['updated'] as $topic) {
-            $io->writeln("  <comment>Updated</comment> $topic");
-        }
+        $result = $this->promptSeeder->seed();
 
         $io->success(sprintf(
             'Seeded %d system prompts (%d inserted, %d updated).',
-            count($result['inserted']) + count($result['updated']),
-            count($result['inserted']),
-            count($result['updated']),
+            $result->inserted + $result->updated,
+            $result->inserted,
+            $result->updated,
         ));
 
         return Command::SUCCESS;

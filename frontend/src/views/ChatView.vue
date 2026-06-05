@@ -28,7 +28,7 @@
 
       <div
         ref="chatContainer"
-        class="flex-1 overflow-y-auto bg-chat"
+        class="flex-1 overflow-y-auto bg-chat overscroll-contain"
         data-testid="section-messages"
         @scroll="handleScroll"
       >
@@ -353,6 +353,9 @@ import { prefetchSseToken } from '@/services/api/chatApi'
 import type { ModelOption } from '@/composables/useModelSelection'
 import { parseAIResponse } from '@/utils/responseParser'
 import { normalizeMediaUrl } from '@/utils/urlHelper'
+import { generatePartId, pushMediaPart, extractMediaParts } from '@/utils/mediaParts'
+import { buildUploadUrl, isAudioFileType } from '@/utils/mediaTypes'
+import { isChannelSource } from '@/utils/channelSource'
 import { AudioStreamer } from '@/utils/AudioStreamer'
 import { httpClient } from '@/services/api/httpClient'
 import { z } from 'zod'
@@ -620,6 +623,16 @@ const handleVisibilityChangeForToken = () => {
   }
 }
 
+const handleViewportResize = () => {
+  if (autoScroll.value && chatContainer.value) {
+    chatContainer.value.scrollTop = chatContainer.value.scrollHeight
+  }
+}
+
+if (window.visualViewport) {
+  window.visualViewport.addEventListener('resize', handleViewportResize)
+}
+
 // Window event handler for memory dialog (used by MessageText.vue)
 const handleOpenMemoryDialogEvent = (event: Event) => {
   const customEvent = event as CustomEvent<{ memory: UserMemory }>
@@ -649,6 +662,9 @@ onBeforeUnmount(() => {
     currentAudioStreamer = null
   }
   isAudioStreaming.value = false
+  if (window.visualViewport) {
+    window.visualViewport.removeEventListener('resize', handleViewportResize)
+  }
   window.removeEventListener('open-memory-dialog', handleOpenMemoryDialogEvent)
   window.removeEventListener('open-feedback-dialog', handleOpenFeedbackDialogEvent)
   window.removeEventListener('focus', prefetchSseToken)
@@ -988,13 +1004,6 @@ function schedulePostStreamMemoryPoll(messageId: number): void {
  *     Earlier parts (e.g. a finished code block followed by more streaming
  *     prose) keep their identity instead of being re-created each tick.
  */
-function generatePartId(): string {
-  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
-    return crypto.randomUUID()
-  }
-  return `p_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 10)}`
-}
-
 function renderStreamingContent(content: string, msgId: string): void {
   const trimmedContent = content.trim()
 
@@ -1012,7 +1021,12 @@ function renderStreamingContent(content: string, msgId: string): void {
     }
     const message = historyStore.messages.find((m) => m.id === msgId)
     if (message) {
-      message.parts = []
+      // Issue #625: structural wipe must not drop in-flight media. The
+      // SSE `file` event for image / video / audio can land before
+      // this branch (e.g. a MEDIAMAKER turn whose JSON markup arrives
+      // after the media was already uploaded) — preserving them here
+      // keeps the audio player visible in the live bubble.
+      message.parts = extractMediaParts(message.parts)
     }
     return
   }
@@ -1068,9 +1082,7 @@ function renderStreamingContent(content: string, msgId: string): void {
   const existingStructural = message.parts.filter(
     (p) => p.type === 'thinking' || p.type === 'text' || p.type === 'code' || p.type === 'links'
   )
-  const existingMedia = message.parts.filter(
-    (p) => p.type === 'image' || p.type === 'video' || p.type === 'audio'
-  )
+  const existingMedia = extractMediaParts(message.parts)
 
   // Reconcile in-place so existing partIds (and therefore Vue keys) stay
   // stable. For each desired slot:
@@ -1201,6 +1213,7 @@ const handleSendMessage = async (
     modelId?: number
     fileIds?: number[]
     voiceReply?: boolean
+    ragGroupKey?: string
   }
 ) => {
   autoScroll.value = true
@@ -1232,9 +1245,32 @@ const handleSendMessage = async (
     }
   }
 
-  // File-only submission: provide a default message when no text but files are attached
+  // File-only submission: provide a default message when no text but files are attached.
+  // Issue #955: an audio-only submission (e.g. voice note from mobile, drag & drop of an
+  // .ogg/.mp3) used to inherit the generic "Please review the attached file." default,
+  // which made the LLM treat the recording as a document to summarise and produced
+  // meta-commentary like "The OGG audio file contains…".
+  //
+  // For audio-only uploads we keep the localized voice placeholder for the
+  // optimistic user bubble (so the chat doesn't show an empty row while the
+  // transcription/streaming is in flight), but the value sent to the backend
+  // is an empty string. `FileAnalysisHandler::isGenericAudioPlaceholder()`
+  // matches the empty prompt structurally and routes the request through
+  // the conversational voice path — no language-specific magic strings on
+  // either side.
   const hasFiles = options?.fileIds && options.fileIds.length > 0
-  const messageToSend = !content.trim() && hasFiles ? t('chat.fileOnlyDefaultMessage') : content
+  const hasOnlyAudioFiles =
+    hasFiles &&
+    (files?.length ?? 0) > 0 &&
+    files!.every((f) => isAudioFileType(f.fileType, f.fileMime))
+  const displayMessage =
+    !content.trim() && hasFiles
+      ? hasOnlyAudioFiles
+        ? t('chat.voiceMessageDefaultMessage')
+        : t('chat.fileOnlyDefaultMessage')
+      : content
+  const backendMessage = !content.trim() && hasOnlyAudioFiles ? '' : displayMessage
+  const messageToSend = displayMessage
 
   // Prepare webSearch metadata for user message
   const webSearchData = options?.webSearch ? { enabled: true } : null
@@ -1243,7 +1279,7 @@ const handleSendMessage = async (
   // Also extract the clean content without command prefix for display
   let toolData: { command: string; label: string; icon: string } | null = null
   let displayContent = messageToSend
-  let backendContent = messageToSend
+  let backendContent = backendMessage
 
   if (messageToSend.startsWith('/')) {
     const commandMatch = messageToSend.match(/^\/(\w+)\s+(.*)$/)
@@ -1272,10 +1308,32 @@ const handleSendMessage = async (
   }
 
   // Add user message with files, webSearch, and tool info
-  // Use displayContent (without command) for the message text shown in UI
+  // Use displayContent (without command) for the message text shown in UI.
+  //
+  // Issue #955: when the upload contains audio files, surface them as an
+  // <audio> player on the user bubble immediately (in addition to the file
+  // badge). Without this the only visible artifact of a voice upload was
+  // the transcribed text — there was no way to replay the original
+  // recording from the web chat.
+  const optimisticParts: import('@/stores/history').Part[] = [
+    { type: 'text', content: displayContent },
+  ]
+  if (files && files.length > 0) {
+    for (const file of files) {
+      if (!isAudioFileType(file.fileType, file.fileMime)) continue
+      const audioUrl = buildUploadUrl(file.filePath)
+      if (!audioUrl) continue
+      optimisticParts.push({
+        partId: generatePartId(),
+        type: 'audio',
+        url: normalizeMediaUrl(audioUrl),
+      })
+    }
+  }
+
   historyStore.addMessage(
     'user',
-    [{ type: 'text', content: displayContent }],
+    optimisticParts,
     files,
     undefined, // provider
     undefined, // modelLabel
@@ -1285,6 +1343,19 @@ const handleSendMessage = async (
     webSearchData, // webSearch
     toolData // tool
   )
+
+  // Lift the active chat to the top of the sidebar lists right away so the
+  // conversation the user is interacting with is the most prominent one,
+  // matching the backend's `updatedAt DESC` order on the next reload.
+  // Mirrors the backend preview format (30 chars + ellipsis).
+  if (chatsStore.activeChatId) {
+    const previewSource = displayContent.trim()
+    const preview =
+      previewSource.length > 30 ? previewSource.slice(0, 30) + '…' : previewSource || undefined
+    chatsStore.bumpChatActivity(chatsStore.activeChatId, {
+      firstMessagePreview: preview,
+    })
+  }
 
   // Notify promo tip system
   promoTips.onMessageSent()
@@ -1315,9 +1386,18 @@ function applyAssistantChatModelFooter(
   streamFallback: { provider?: string; model?: string; model_id?: number | null }
 ) {
   const isBadModelToken = (m: unknown) =>
-    m === undefined || m === null || String(m).toLowerCase() === 'error'
+    m === undefined ||
+    m === null ||
+    String(m).toLowerCase() === 'error' ||
+    // Reject channel/source tokens (`WHATSAPP`, `EMAIL`, …) — they
+    // leak in from inbound-message `provider_index` and would otherwise
+    // surface as the AI model label in the chat footer (issue #653).
+    isChannelSource(typeof m === 'string' ? m : null)
   const isBadProviderToken = (p: unknown) =>
-    p === undefined || p === null || String(p).toLowerCase() === 'system'
+    p === undefined ||
+    p === null ||
+    String(p).toLowerCase() === 'system' ||
+    isChannelSource(typeof p === 'string' ? p : null)
 
   const resolvedModel = !isBadModelToken(data.model)
     ? String(data.model)
@@ -1333,6 +1413,10 @@ function applyAssistantChatModelFooter(
 
   const nestedChat = data.aiModels?.chat
   const nestedSorting = data.aiModels?.sorting
+  // Audio (TTS) model is independent of the chat model — pass it
+  // through whenever the backend ships it so the voice-reply badge
+  // appears live (no page reload required). See issue #583.
+  const nestedAudio = data.aiModels?.audio
 
   if (resolvedModel && resolvedProvider) {
     message.modelLabel = resolvedModel
@@ -1344,11 +1428,13 @@ function applyAssistantChatModelFooter(
         model_id: resolvedId,
       },
       ...(nestedSorting ? { sorting: nestedSorting } : {}),
+      ...(nestedAudio ? { audio: nestedAudio } : {}),
     }
-  } else if (nestedChat || nestedSorting) {
+  } else if (nestedChat || nestedSorting || nestedAudio) {
     message.aiModels = {
       ...(nestedChat ? { chat: nestedChat } : {}),
       ...(nestedSorting ? { sorting: nestedSorting } : {}),
+      ...(nestedAudio ? { audio: nestedAudio } : {}),
     }
   }
 }
@@ -1362,6 +1448,7 @@ const streamAIResponse = async (
     fileIds?: number[]
     voiceReply?: boolean
     isAgain?: boolean
+    ragGroupKey?: string
   }
 ) => {
   streamingAbortController = new AbortController()
@@ -1621,6 +1708,7 @@ const streamAIResponse = async (
         fileIds,
         voiceReply: options?.voiceReply,
         isAgain: options?.isAgain,
+        ragGroupKey: options?.ragGroupKey,
         onUpdate: (data) => {
           // CRITICAL: Check abort signal at the very beginning
           if (streamingAbortController?.signal.aborted) {
@@ -1804,16 +1892,19 @@ const streamAIResponse = async (
             }
           } else if (data.status === 'file') {
             // Handle file attachments (images, videos, audio, etc.)
+            //
+            // Issue #625: the live MEDIAMAKER audio player used to go
+            // missing whenever this push raced the streaming text
+            // reconciler. {@link pushMediaPart} now assigns a stable
+            // `partId` and re-assigns `message.parts` so we always
+            // mutate the current reactive proxy (a stale closure
+            // reference from a sibling handler would otherwise
+            // silently drop the push).
             const message = historyStore.messages.find((m) => m.id === messageId)
-            if (message) {
-              // Add file part based on type - normalize URLs to absolute
+            if (message && data.url) {
               const absoluteUrl = normalizeMediaUrl(data.url)
-              if (data.type === 'image') {
-                message.parts.push({ type: 'image', url: absoluteUrl })
-              } else if (data.type === 'video') {
-                message.parts.push({ type: 'video', url: absoluteUrl })
-              } else if (data.type === 'audio') {
-                message.parts.push({ type: 'audio', url: absoluteUrl })
+              if (data.type === 'image' || data.type === 'video' || data.type === 'audio') {
+                pushMediaPart(message, data.type, absoluteUrl)
               }
             }
           } else if (data.status === 'tts_generating') {
@@ -1835,7 +1926,7 @@ const streamAIResponse = async (
               const absoluteUrl = normalizeMediaUrl(data.url)
               // If we are already streaming audio (currentAudioStreamer exists), don't autoplay the file
               const shouldAutoplay = isVoiceReply && !currentAudioStreamer
-              message.parts.push({ type: 'audio', url: absoluteUrl, autoplay: shouldAutoplay })
+              pushMediaPart(message, 'audio', absoluteUrl, { autoplay: shouldAutoplay })
             }
           } else if (data.status === 'links') {
             // Handle web search results
@@ -2168,6 +2259,10 @@ const streamAIResponse = async (
 
             // Generate chat title from first message
             generateChatTitleFromFirstMessage(userMessage)
+
+            // Bump chat activity so the sidebar reflects the assistant message
+            // landing without waiting for a full reload.
+            chatsStore.bumpChatActivity(chatId)
 
             historyStore.finishStreamingMessage(messageId)
 

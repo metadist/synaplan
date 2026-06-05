@@ -177,8 +177,18 @@ Synapse Routing is a **beta feature and is OFF by default** — every install sh
 | ----------------------------- | ------- | ----------- |
 | `SYNAPSE_ROUTING_ENABLED`     | `false` | Enable/disable Synapse Routing entirely. While off, every message goes through `MessageSorter` (AI sort). |
 | `SYNAPSE_CONFIDENCE_THRESHOLD`| `0.78`  | Minimum cosine similarity for Tier-1 to win over the AI fallback. Kept conservative on purpose so beta installs only short-circuit on high-confidence hits; lower carefully if you want more Tier-1 wins at the cost of accuracy. |
+| `GRANULAR_TOPICS_ENABLED`     | `false` | Sibling toggle that controls whether the granular routing aliases (`general-chat`, `coding`, `image-generation`, `video-generation`, `audio-generation`) participate in routing. OFF (default) keeps the legacy AI sorter on the cleaner canonical-only choice list. Toggle ON when Synapse v2 is in use so the embedding tier can discriminate finer-grained intents. **Flipping this toggle also flips `BENABLED` on the matching `BPROMPTS` rows in lock-step** via `GranularTopicsManager`, so the AI sort pool, the Synapse Qdrant indexer, and the Task Prompts admin view all stay consistent without a manual reindex / seed run. |
 
 Changes take effect immediately — no restart required.
+
+### Why two separate toggles?
+
+`SYNAPSE_ROUTING_ENABLED` and `GRANULAR_TOPICS_ENABLED` solve different problems and admins may need to flip them independently:
+
+- **Synapse Routing ON, granular topics OFF** — the embedding tier runs against just the canonical taxonomy (`general`, `mediamaker`, `docsummary`, `officemaker`). Simpler, but coarse-grained intent signals.
+- **Synapse Routing ON, granular topics ON** — Tier-1 has all five granular vectors to match against; `TopicAliasResolver` canonicalizes the result before downstream handlers see it. **This is the recommended Synapse v2 configuration.**
+- **Synapse Routing OFF, granular topics OFF** — the legacy AI sorter sees only canonical topics. Matches the post-hot-fix production state and avoids duplicate-target confusion.
+- **Synapse Routing OFF, granular topics ON** — the legacy AI sorter sees both canonical and granular rows. Only useful for debugging or A/B comparisons; production traffic gets noisier picks.
 
 ## Observability
 

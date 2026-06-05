@@ -54,6 +54,13 @@ final class QdrantClientMock implements QdrantClientInterface
         return [];
     }
 
+    public function scrollAllMemoriesForReindex(int $limit = 5000): array
+    {
+        $this->logger->info('QdrantClientMock: scrollAllMemoriesForReindex', ['limit' => $limit]);
+
+        return [];
+    }
+
     public function deleteMemory(string $pointId, ?string $namespace = null): void
     {
         $this->logger->info('QdrantClientMock: deleteMemory', ['point_id' => $pointId]);
@@ -248,6 +255,21 @@ final class QdrantClientMock implements QdrantClientInterface
     {
         $this->logger->info('QdrantClientMock: recreateSynapseCollection', ['vector_dim' => $vectorDimension]);
         $this->synapsePoints = [];
+    }
+
+    public function getMemoriesCollectionInfo(): array
+    {
+        return [
+            'exists' => true,
+            'vector_dim' => 1024,
+            'points_count' => 0,
+            'distance' => 'Cosine',
+        ];
+    }
+
+    public function recreateMemoriesCollection(int $vectorDimension): void
+    {
+        $this->logger->info('QdrantClientMock: recreateMemoriesCollection', ['vector_dim' => $vectorDimension]);
     }
 
     public function getSynapseCollection(): string

@@ -16,7 +16,7 @@
 services:
   # Vue.js Frontend
   frontend:
-    image: node:22@sha256:9059d9d7db987b86299e052ff6630cd95e5a770336967c21110e53289a877433
+    image: node:22@sha256:1031993481795705055273f2eef0c24597abdcb277d6e058c82f78cbbdef92a6
     container_name: synaplan-frontend
     working_dir: /app
     entrypoint: ["/usr/local/bin/docker-entrypoint.sh"]
@@ -41,7 +41,7 @@ services:
   # Memory-limited to prevent unbounded growth from Chokidar polling (#515).
   # Container auto-restarts on OOM thanks to restart policy.
   frontend-widgets:
-    image: node:22@sha256:9059d9d7db987b86299e052ff6630cd95e5a770336967c21110e53289a877433
+    image: node:22@sha256:1031993481795705055273f2eef0c24597abdcb277d6e058c82f78cbbdef92a6
     container_name: synaplan-frontend-widgets
     working_dir: /app
     command: sh -c "npm ci && npm run build:widget -- --watch"
@@ -74,6 +74,7 @@ services:
       - "8000:80"
     volumes:
       - ./backend:/var/www/backend
+      - /var/www/backend/var/cache
       - ./frontend/dist:/var/www/frontend:ro
       - ./frontend/dist-widget:/var/www/widgets
       - ./plugins:/plugins:ro
@@ -120,6 +121,8 @@ services:
       WHISPER_DEFAULT_MODEL: base
       WHISPER_ENABLED: "false"
       FFMPEG_BINARY: /usr/bin/ffmpeg
+      # See docker-compose.yml for context — raises PHP's silent 20-file cap.
+      PHP_MAX_FILE_UPLOADS: "100"
     depends_on:
       db:
         condition: service_healthy
@@ -135,7 +138,7 @@ services:
 
   # MariaDB 11.8 Database
   db:
-    image: mariadb:12.2.2@sha256:e0236fc6386e7eacd9359e59d0a078bd7aa0d18280d36d13061121bedeaee903
+    image: mariadb:12.2.2@sha256:6a4c4bbf0447c2247801309513fcc0dd17c3f35390368139ce419387fdd1144d
     container_name: synaplan-db
     command: --max-allowed-packet=256M --innodb-buffer-pool-size=512M
     environment:
@@ -160,7 +163,7 @@ services:
 
   # Apache Tika - Document Text Extraction
   tika:
-    image: apache/tika:3.3.0.0@sha256:2a565f1ea1290bdcb74a7d35957d16a989ed44ef98790dcdcc28121d728fa583
+    image: apache/tika:3.3.1.0@sha256:90b7fa1dc018434075fce9e1d9b88b1e3d0ea6979d0cf86e116c79a8073ae973
     container_name: synaplan-tika
     command: -h 0.0.0.0 -p 9998
     ports:

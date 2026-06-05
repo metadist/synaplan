@@ -10,8 +10,11 @@ use App\Repository\FileRepository;
 use App\Repository\MessageRepository;
 use App\Repository\PromptMetaRepository;
 use App\Repository\PromptRepository;
+use App\Service\Embedding\Exception\PremiumRequiredException;
 use App\Service\Message\SynapseIndexer;
 use App\Service\Message\SynapseRouter;
+use App\Service\Model\Exception\InvalidPromptModelException;
+use App\Service\Model\PromptModelEligibilityValidator;
 use App\Service\ModelConfigService;
 use App\Service\PromptService;
 use App\Service\RAG\VectorStorage\VectorStorageFacade;
@@ -54,6 +57,7 @@ class PromptController extends AbstractController
         private VectorStorageFacade $vectorStorageFacade,
         private SynapseIndexer $synapseIndexer,
         private SynapseRouter $synapseRouter,
+        private PromptModelEligibilityValidator $modelEligibilityValidator,
     ) {
     }
 
@@ -741,6 +745,18 @@ class PromptController extends AbstractController
             ),
             new OA\Response(response: 400, description: 'Invalid input'),
             new OA\Response(response: 401, description: 'Not authenticated'),
+            new OA\Response(
+                response: 403,
+                description: 'The chosen aiModel is not allowed for the current subscription tier (e.g. selecting an embedding model as a free user).',
+                content: new OA\JsonContent(
+                    properties: [
+                        new OA\Property(property: 'error', type: 'string', example: 'requires_premium'),
+                        new OA\Property(property: 'capability', type: 'string', example: 'VECTORIZE'),
+                        new OA\Property(property: 'message', type: 'string', example: 'Switching the embedding model requires an active paid subscription. Current level: NEW.'),
+                        new OA\Property(property: 'currentLevel', type: 'string', example: 'NEW'),
+                    ]
+                )
+            ),
             new OA\Response(response: 409, description: 'Prompt with this topic already exists for this user'),
         ]
     )]
@@ -793,6 +809,15 @@ class PromptController extends AbstractController
                 return $this->json([
                     'error' => 'You already have a prompt with this topic. Use PUT /api/v1/prompts/{id} to update it.',
                 ], Response::HTTP_CONFLICT);
+            }
+
+            // Gate the aiModel before any persistence so a 4xx response
+            // leaves no half-written prompt behind (issue #891).
+            if (is_array($metadata) && !empty($metadata)) {
+                $eligibilityResponse = $this->validateModelEligibility($user, $metadata);
+                if (null !== $eligibilityResponse) {
+                    return $eligibilityResponse;
+                }
             }
 
             // Create new prompt
@@ -880,7 +905,29 @@ class PromptController extends AbstractController
             ),
             new OA\Response(response: 400, description: 'Invalid input'),
             new OA\Response(response: 401, description: 'Not authenticated'),
-            new OA\Response(response: 403, description: 'Cannot modify system prompts'),
+            new OA\Response(
+                response: 403,
+                description: 'Two cases: (1) the prompt belongs to another user / is a system prompt, (2) the chosen aiModel requires a higher subscription tier (e.g. embedding model for a free user).',
+                content: new OA\JsonContent(
+                    oneOf: [
+                        new OA\Schema(
+                            title: 'Ownership',
+                            properties: [
+                                new OA\Property(property: 'error', type: 'string', example: 'Cannot modify this prompt. You can only modify your own custom prompts.'),
+                            ]
+                        ),
+                        new OA\Schema(
+                            title: 'PremiumRequired',
+                            properties: [
+                                new OA\Property(property: 'error', type: 'string', example: 'requires_premium'),
+                                new OA\Property(property: 'capability', type: 'string', example: 'VECTORIZE'),
+                                new OA\Property(property: 'message', type: 'string', example: 'Switching the embedding model requires an active paid subscription. Current level: NEW.'),
+                                new OA\Property(property: 'currentLevel', type: 'string', example: 'NEW'),
+                            ]
+                        ),
+                    ]
+                )
+            ),
             new OA\Response(response: 404, description: 'Prompt not found'),
         ]
     )]
@@ -926,6 +973,15 @@ class PromptController extends AbstractController
             'has_metadata' => isset($data['metadata']),
             'metadata_keys' => isset($data['metadata']) ? array_keys($data['metadata']) : [],
         ]);
+
+        // Reject ineligible aiModel before mutating the entity so a
+        // 4xx response cannot leave the prompt half-updated (issue #891).
+        if (isset($data['metadata']) && is_array($data['metadata'])) {
+            $eligibilityResponse = $this->validateModelEligibility($user, $data['metadata']);
+            if (null !== $eligibilityResponse) {
+                return $eligibilityResponse;
+            }
+        }
 
         $oldTopic = $prompt->getTopic();
 
@@ -1647,6 +1703,46 @@ PROMPT;
             return $this->json([
                 'error' => 'Failed to generate summary',
             ], Response::HTTP_INTERNAL_SERVER_ERROR);
+        }
+    }
+
+    /**
+     * Validate that the user is allowed to pin the model referenced
+     * in `metadata.aiModel` (issue #891).
+     *
+     * Returns `null` when the metadata is acceptable, or a fully
+     * formed JsonResponse (400 / 403) that the caller MUST return to
+     * the client unchanged. Mirrors the shape of
+     * `ConfigController::saveDefaultModels` so the frontend's existing
+     * `ApiError` parsing (PR #908) lights up the same toast on both
+     * surfaces.
+     *
+     * @param array<string, mixed> $metadata
+     */
+    private function validateModelEligibility(User $user, array $metadata): ?JsonResponse
+    {
+        try {
+            $this->modelEligibilityValidator->assertMetadataAllowed($user, $metadata);
+
+            return null;
+        } catch (InvalidPromptModelException $e) {
+            return $this->json([
+                'error' => 'invalid_model',
+                'modelId' => $e->modelId,
+                'message' => $e->getMessage(),
+            ], Response::HTTP_BAD_REQUEST);
+        } catch (PremiumRequiredException $e) {
+            $this->logger->info('PromptController: blocked aiModel save — premium required', [
+                'user_id' => $user->getId(),
+                'current_level' => $e->currentLevel,
+            ]);
+
+            return $this->json([
+                'error' => 'requires_premium',
+                'capability' => 'VECTORIZE',
+                'message' => $e->getMessage(),
+                'currentLevel' => $e->currentLevel,
+            ], Response::HTTP_FORBIDDEN);
         }
     }
 

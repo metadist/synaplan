@@ -7,17 +7,17 @@
         "php": ">=8.3",
         "ext-ctype": "*",
         "ext-iconv": "*",
-        "api-platform/doctrine-orm": "^4.3.3",
-        "api-platform/symfony": "^4.3.3",
+        "api-platform/doctrine-orm": "^4.3.5",
+        "api-platform/symfony": "^4.3.5",
         "ardagnsrn/ollama-php": "^1.0.5",
         "codewithkyrian/whisper.php": "^1.1",
         "doctrine/dbal": "^4.4.3",
         "doctrine/doctrine-bundle": "^3.2.2",
         "doctrine/doctrine-fixtures-bundle": "^4.3.1",
         "doctrine/doctrine-migrations-bundle": "^4.0",
-        "doctrine/orm": "^3.6.3",
+        "doctrine/orm": "^3.6.5",
         "erusev/parsedown": "^1.8.0",
-        "firebase/php-jwt": "^6.11.1",
+        "firebase/php-jwt": "^7.0.5",
         "gemini-api-php/client": "^1.7.2",
         "google/apiclient": "^2.19.2",
         "google/protobuf": "^5.34.1",
@@ -38,29 +38,29 @@
         "predis/predis": "^2.4.1",
         "smalot/pdfparser": "^2.12.5",
         "stripe/stripe-php": "^20.1",
-        "symfony/asset": "8.0.*",
-        "symfony/console": "8.0.*",
-        "symfony/doctrine-messenger": "8.0.*",
-        "symfony/dotenv": "8.0.*",
-        "symfony/expression-language": "8.0.*",
+        "symfony/asset": "8.1.*",
+        "symfony/console": "8.1.*",
+        "symfony/doctrine-messenger": "8.1.*",
+        "symfony/dotenv": "8.1.*",
+        "symfony/expression-language": "8.1.*",
         "symfony/flex": "^2.10",
-        "symfony/framework-bundle": "8.0.*",
-        "symfony/http-client": "8.0.*",
-        "symfony/lock": "8.0.*",
-        "symfony/mailer": "8.0.*",
-        "symfony/messenger": "8.0.*",
+        "symfony/framework-bundle": "8.1.*",
+        "symfony/http-client": "8.1.*",
+        "symfony/lock": "8.1.*",
+        "symfony/mailer": "8.1.*",
+        "symfony/messenger": "8.1.*",
         "symfony/monolog-bundle": "^4.0.2",
-        "symfony/process": "8.0.*",
-        "symfony/property-access": "8.0.*",
-        "symfony/property-info": "8.0.*",
-        "symfony/rate-limiter": "8.0.*",
-        "symfony/redis-messenger": "8.0.*",
-        "symfony/runtime": "8.0.*",
-        "symfony/security-bundle": "8.0.*",
-        "symfony/serializer": "8.0.*",
-        "symfony/twig-bundle": "8.0.*",
-        "symfony/validator": "8.0.*",
-        "symfony/yaml": "8.0.*",
+        "symfony/process": "8.1.*",
+        "symfony/property-access": "8.1.*",
+        "symfony/property-info": "8.1.*",
+        "symfony/rate-limiter": "8.1.*",
+        "symfony/redis-messenger": "8.1.*",
+        "symfony/runtime": "8.1.*",
+        "symfony/security-bundle": "8.1.*",
+        "symfony/serializer": "8.1.*",
+        "symfony/twig-bundle": "8.1.*",
+        "symfony/validator": "8.1.*",
+        "symfony/yaml": "8.1.*",
         "web-token/jwt-library": "^4.1.6",
         "webklex/php-imap": "^6.2"
     },
@@ -72,7 +72,7 @@
             "codewithkyrian/platform-package-installer": true
         },
         "audit": {
-            "ignore": ["PKSA-365x-2zjk-pt47", "PKSA-64jn-3d9t-gncx", "PKSA-hznc-gbby-6w16", "PKSA-jtdk-dcr5-f11n"]
+            "ignore": ["PKSA-365x-2zjk-pt47", "PKSA-64jn-3d9t-gncx", "PKSA-hznc-gbby-6w16", "PKSA-jtdk-dcr5-f11n", "PKSA-y2cr-5h3j-g3ys"]
         },
         "bump-after-update": true,
         "sort-packages": true
@@ -129,7 +129,7 @@
     "extra": {
         "symfony": {
             "allow-contrib": false,
-            "require": "8.0.*"
+            "require": "8.1.*"
         }
     },
     "require-dev": {
@@ -139,8 +139,8 @@
         "phpstan/phpstan": "^2.1.53",
         "phpstan/phpstan-doctrine": "^2.0.21",
         "phpunit/phpunit": "^12.5.23",
-        "symfony/browser-kit": "8.0.*",
-        "symfony/css-selector": "8.0.*",
+        "symfony/browser-kit": "8.1.*",
+        "symfony/css-selector": "8.1.*",
         "symfony/maker-bundle": "^1.67.0"
     }
 }

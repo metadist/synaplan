@@ -8,6 +8,11 @@
         <!-- Storage Quota Widget -->
         <StorageQuotaWidget ref="storageWidget" @upgrade="handleUpgrade" />
 
+        <!-- Cross-promotion: Nextcloud + OpenCloud integrations. Lives only
+             on the Files page (the audience that already cares about
+             file-sharing tooling) and is user-dismissible. -->
+        <FilesIntegrationsBanner />
+
         <!-- Compact Upload Bar -->
         <div
           class="surface-card p-4 sm:p-5 relative"
@@ -549,71 +554,86 @@
                 <div
                   class="grid grid-cols-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-2 sm:gap-3"
                 >
-                  <button
+                  <div
                     v-for="folder in displayedFolders"
                     :key="folder.name"
-                    class="group/f flex flex-col items-center gap-2 sm:gap-3 p-3 sm:p-5 rounded-xl sm:rounded-2xl border transition-all duration-200 cursor-pointer"
-                    :class="
-                      folderDropTarget === folder.name
-                        ? 'border-[var(--brand)] bg-[var(--brand)]/10 shadow-lg shadow-[var(--brand)]/20 scale-[1.03]'
-                        : folder.pending
-                          ? 'border-dashed border-[var(--brand)]/40 hover:border-[var(--brand)]/60 hover:shadow-lg hover:shadow-[var(--brand)]/5 hover:bg-[var(--brand)]/[0.03]'
-                          : 'border-light-border/20 dark:border-dark-border/7 hover:border-[var(--brand)]/30 hover:shadow-lg hover:shadow-[var(--brand)]/5 hover:bg-[var(--brand)]/[0.03]'
-                    "
-                    :data-testid="`folder-card-${folder.name}`"
-                    @click="enterFolder(folder.name)"
-                    @dragenter.prevent="onFolderDragEnter(folder.name)"
-                    @dragover.prevent
-                    @dragleave="onFolderDragLeave(folder.name)"
-                    @drop.prevent.stop="onFolderDrop($event, folder.name)"
+                    class="group/f relative"
                   >
-                    <div class="relative">
-                      <Icon
-                        :icon="
-                          folderDropTarget === folder.name
-                            ? 'heroicons:folder-open-solid'
-                            : folder.pending
-                              ? 'heroicons:folder-plus'
-                              : 'heroicons:folder-solid'
-                        "
-                        class="w-9 h-9 sm:w-12 sm:h-12 transition-all duration-200"
-                        :class="
-                          folderDropTarget === folder.name
-                            ? 'text-[var(--brand)] scale-110'
-                            : folder.pending
-                              ? 'text-[var(--brand)]/40 group-hover/f:text-[var(--brand)] group-hover/f:scale-110'
-                              : 'text-[var(--brand)]/50 group-hover/f:text-[var(--brand)] group-hover/f:scale-110'
-                        "
-                      />
-                      <span
-                        v-if="!folder.pending"
-                        class="absolute -top-1 -right-2.5 inline-flex items-center justify-center min-w-[1.25rem] h-5 px-1.5 rounded-full text-[10px] font-bold transition-all duration-200"
-                        :class="
-                          folderDropTarget === folder.name
-                            ? 'bg-[var(--brand)] text-white'
-                            : 'bg-[var(--brand)]/15 text-[var(--brand)] group-hover/f:bg-[var(--brand)] group-hover/f:text-white'
-                        "
-                      >
-                        {{ folder.count }}
-                      </span>
-                    </div>
-                    <span
-                      class="text-xs font-medium truncate max-w-full text-center transition-colors"
+                    <button
+                      type="button"
+                      class="w-full flex flex-col items-center gap-2 sm:gap-3 p-3 sm:p-5 rounded-xl sm:rounded-2xl border transition-all duration-200 cursor-pointer"
                       :class="
                         folderDropTarget === folder.name
-                          ? 'text-[var(--brand)]'
-                          : 'txt-primary group-hover/f:text-[var(--brand)]'
+                          ? 'border-[var(--brand)] bg-[var(--brand)]/10 shadow-lg shadow-[var(--brand)]/20 scale-[1.03]'
+                          : folder.pending
+                            ? 'border-dashed border-[var(--brand)]/40 hover:border-[var(--brand)]/60 hover:shadow-lg hover:shadow-[var(--brand)]/5 hover:bg-[var(--brand)]/[0.03]'
+                            : 'border-light-border/20 dark:border-dark-border/7 hover:border-[var(--brand)]/30 hover:shadow-lg hover:shadow-[var(--brand)]/5 hover:bg-[var(--brand)]/[0.03]'
                       "
+                      :data-testid="`folder-card-${folder.name}`"
+                      @click="enterFolder(folder.name)"
+                      @dragenter.prevent="onFolderDragEnter(folder.name)"
+                      @dragover.prevent
+                      @dragleave="onFolderDragLeave(folder.name)"
+                      @drop.prevent.stop="onFolderDrop($event, folder.name)"
                     >
-                      {{ folder.name }}
-                    </span>
-                    <span
-                      v-if="folder.pending"
-                      class="text-[10px] uppercase tracking-wider font-semibold text-[var(--brand)]/70"
+                      <div class="relative">
+                        <Icon
+                          :icon="
+                            folderDropTarget === folder.name
+                              ? 'heroicons:folder-open-solid'
+                              : folder.pending
+                                ? 'heroicons:folder-plus'
+                                : 'heroicons:folder-solid'
+                          "
+                          class="w-9 h-9 sm:w-12 sm:h-12 transition-all duration-200"
+                          :class="
+                            folderDropTarget === folder.name
+                              ? 'text-[var(--brand)] scale-110'
+                              : folder.pending
+                                ? 'text-[var(--brand)]/40 group-hover/f:text-[var(--brand)] group-hover/f:scale-110'
+                                : 'text-[var(--brand)]/50 group-hover/f:text-[var(--brand)] group-hover/f:scale-110'
+                          "
+                        />
+                        <span
+                          v-if="!folder.pending"
+                          class="absolute -top-1 -right-2.5 inline-flex items-center justify-center min-w-[1.25rem] h-5 px-1.5 rounded-full text-[10px] font-bold transition-all duration-200"
+                          :class="
+                            folderDropTarget === folder.name
+                              ? 'bg-[var(--brand)] text-white'
+                              : 'bg-[var(--brand)]/15 text-[var(--brand)] group-hover/f:bg-[var(--brand)] group-hover/f:text-white'
+                          "
+                        >
+                          {{ folder.count }}
+                        </span>
+                      </div>
+                      <span
+                        class="text-xs font-medium truncate max-w-full text-center transition-colors"
+                        :class="
+                          folderDropTarget === folder.name
+                            ? 'text-[var(--brand)]'
+                            : 'txt-primary group-hover/f:text-[var(--brand)]'
+                        "
+                      >
+                        {{ folder.name }}
+                      </span>
+                      <span
+                        v-if="folder.pending"
+                        class="text-[10px] uppercase tracking-wider font-semibold text-[var(--brand)]/70"
+                      >
+                        {{ $t('files.newFolderEmpty') }}
+                      </span>
+                    </button>
+                    <button
+                      type="button"
+                      class="absolute top-1 right-1 p-1.5 rounded-lg text-red-500 bg-black/[0.03] dark:bg-white/[0.04] opacity-0 group-hover/f:opacity-100 focus:opacity-100 hover:bg-red-500/15 transition-all"
+                      :title="$t('files.deleteFolder')"
+                      :aria-label="$t('files.deleteFolder')"
+                      :data-testid="`btn-delete-folder-${folder.name}`"
+                      @click.stop="requestDeleteFolder(folder)"
                     >
-                      {{ $t('files.newFolderEmpty') }}
-                    </span>
-                  </button>
+                      <TrashIcon class="w-3.5 h-3.5" />
+                    </button>
+                  </div>
                 </div>
               </div>
 
@@ -664,7 +684,7 @@
                   <div
                     v-for="file in paginatedFiles"
                     :key="file.id"
-                    class="flex items-center gap-3 p-3 rounded-xl border border-light-border/15 dark:border-dark-border/5 hover:bg-black/[0.02] dark:hover:bg-white/[0.02] transition-colors"
+                    class="flex items-center gap-1.5 sm:gap-2 p-2.5 sm:p-3 rounded-xl border border-light-border/15 dark:border-dark-border/5 hover:bg-black/[0.02] dark:hover:bg-white/[0.02] transition-colors"
                     data-testid="item-file"
                   >
                     <input
@@ -674,15 +694,15 @@
                       @change="toggleFileSelection(file.id)"
                     />
                     <div
-                      class="w-9 h-9 rounded-lg flex items-center justify-center shrink-0"
+                      class="w-7 h-7 sm:w-8 sm:h-8 rounded-lg flex items-center justify-center shrink-0"
                       :class="getFileColorClass(file.filename)"
                     >
-                      <Icon :icon="getFileIcon(file.filename)" class="w-4.5 h-4.5" />
+                      <Icon :icon="getFileIcon(file.filename)" class="w-4 h-4" />
                     </div>
                     <div class="flex-1 min-w-0">
-                      <p class="text-sm txt-primary truncate">{{ file.filename }}</p>
-                      <div class="flex items-center gap-2 mt-0.5 min-w-0">
-                        <span class="text-[11px] txt-secondary shrink-0">{{
+                      <p class="text-xs font-medium txt-primary truncate">{{ file.filename }}</p>
+                      <div class="flex items-center gap-1.5 mt-0.5 min-w-0">
+                        <span class="text-[10px] txt-secondary shrink-0">{{
                           formatFileSize(file.file_size)
                         }}</span>
                         <button
@@ -695,16 +715,29 @@
                         </button>
                       </div>
                     </div>
-                    <div class="flex items-center gap-0.5 shrink-0">
+                    <div class="flex items-center gap-0 shrink-0">
+                      <FolderMoveMenu
+                        :open="folderMenuOpen === file.id"
+                        :folders="displayedFolders"
+                        @toggle="toggleFolderMenu(file.id)"
+                        @move="moveFileToFolder(file.id, $event)"
+                      />
                       <button
-                        class="p-2 rounded-lg hover:bg-black/5 dark:hover:bg-white/5 txt-secondary transition-colors"
+                        class="p-1.5 rounded-lg hover:bg-black/5 dark:hover:bg-white/5 txt-secondary transition-colors"
+                        :title="$t('common.view')"
+                        @click="viewFileContent(file.id)"
+                      >
+                        <Icon icon="heroicons:eye" class="w-4 h-4" />
+                      </button>
+                      <button
+                        class="p-1.5 rounded-lg hover:bg-black/5 dark:hover:bg-white/5 txt-secondary transition-colors"
                         :title="$t('files.download')"
                         @click="downloadFile(file.id, file.filename)"
                       >
                         <ArrowDownTrayIcon class="w-4 h-4" />
                       </button>
                       <button
-                        class="p-2 rounded-lg hover:bg-red-500/10 text-red-400/70 hover:text-red-500 transition-colors"
+                        class="p-1.5 rounded-lg hover:bg-red-500/10 text-red-400/70 hover:text-red-500 transition-colors"
                         :title="$t('files.delete')"
                         @click="deleteFile(file.id)"
                       >
@@ -790,7 +823,7 @@
                       </td>
                       <td class="py-2.5 px-3">
                         <div
-                          class="flex gap-0.5 justify-end opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity"
+                          class="flex gap-0.5 justify-end opacity-0 pointer-coarse:opacity-100 group-hover:opacity-100 focus-within:opacity-100 transition-opacity"
                         >
                           <FolderMoveMenu
                             :open="folderMenuOpen === file.id"
@@ -882,6 +915,15 @@
               >
                 {{ totalCount }}
               </span>
+              <button
+                type="button"
+                class="ml-auto shrink-0 inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium text-red-500 hover:bg-red-500/10 transition-colors"
+                data-testid="btn-delete-current-folder"
+                @click="requestDeleteCurrentFolder"
+              >
+                <TrashIcon class="w-3.5 h-3.5" />
+                <span class="hidden sm:inline">{{ $t('files.deleteFolder') }}</span>
+              </button>
             </div>
 
             <!-- Bulk actions -->
@@ -962,7 +1004,7 @@
                 <div
                   v-for="file in paginatedFiles"
                   :key="file.id"
-                  class="flex items-center gap-3 p-3 rounded-xl border border-light-border/15 dark:border-dark-border/5 hover:bg-black/[0.02] dark:hover:bg-white/[0.02] transition-colors"
+                  class="flex items-center gap-1.5 sm:gap-2 p-2.5 sm:p-3 rounded-xl border border-light-border/15 dark:border-dark-border/5 hover:bg-black/[0.02] dark:hover:bg-white/[0.02] transition-colors"
                   data-testid="item-file"
                 >
                   <input
@@ -972,20 +1014,35 @@
                     @change="toggleFileSelection(file.id)"
                   />
                   <div
-                    class="w-9 h-9 rounded-lg flex items-center justify-center shrink-0"
+                    class="w-7 h-7 sm:w-8 sm:h-8 rounded-lg flex items-center justify-center shrink-0"
                     :class="getFileColorClass(file.filename)"
                   >
-                    <Icon :icon="getFileIcon(file.filename)" class="w-4.5 h-4.5" />
+                    <Icon :icon="getFileIcon(file.filename)" class="w-4 h-4" />
                   </div>
                   <div class="flex-1 min-w-0">
-                    <p class="text-sm txt-primary truncate">{{ file.filename }}</p>
-                    <span class="text-[11px] txt-secondary">{{
+                    <p class="text-xs font-medium txt-primary truncate">{{ file.filename }}</p>
+                    <span class="text-[10px] txt-secondary">{{
                       formatFileSize(file.file_size)
                     }}</span>
                   </div>
-                  <div class="flex items-center gap-0.5 shrink-0">
+                  <div class="flex items-center gap-0 shrink-0">
+                    <FolderMoveMenu
+                      :open="folderMenuOpen === file.id"
+                      :folders="displayedFolders"
+                      :current-folder="openFolder"
+                      @toggle="toggleFolderMenu(file.id)"
+                      @move="moveFileToFolder(file.id, $event)"
+                    />
                     <button
-                      class="p-2 rounded-lg hover:bg-black/5 dark:hover:bg-white/5 txt-secondary transition-colors"
+                      class="p-1.5 rounded-lg hover:bg-black/5 dark:hover:bg-white/5 txt-secondary transition-colors"
+                      :title="$t('common.view')"
+                      data-testid="btn-view"
+                      @click="viewFileContent(file.id)"
+                    >
+                      <Icon icon="heroicons:eye" class="w-4 h-4" />
+                    </button>
+                    <button
+                      class="p-1.5 rounded-lg hover:bg-black/5 dark:hover:bg-white/5 txt-secondary transition-colors"
                       :title="$t('files.download')"
                       data-testid="btn-download"
                       @click="downloadFile(file.id, file.filename)"
@@ -993,7 +1050,7 @@
                       <ArrowDownTrayIcon class="w-4 h-4" />
                     </button>
                     <button
-                      class="p-2 rounded-lg hover:bg-red-500/10 text-red-400/70 hover:text-red-500 transition-colors"
+                      class="p-1.5 rounded-lg hover:bg-red-500/10 text-red-400/70 hover:text-red-500 transition-colors"
                       :title="$t('files.delete')"
                       data-testid="btn-delete"
                       @click="deleteFile(file.id)"
@@ -1070,7 +1127,7 @@
                     </td>
                     <td class="py-2.5 px-3">
                       <div
-                        class="flex gap-0.5 justify-end opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity"
+                        class="flex gap-0.5 justify-end opacity-0 pointer-coarse:opacity-100 group-hover:opacity-100 focus-within:opacity-100 transition-opacity"
                       >
                         <FolderMoveMenu
                           :open="folderMenuOpen === file.id"
@@ -1164,6 +1221,20 @@
       @cancel="cancelDelete"
     />
 
+    <!-- Confirm Delete Dialog (Folder + contained files) -->
+    <ConfirmDialog
+      :is-open="isDeleteFolderOpen"
+      :title="
+        folderToDelete ? $t('files.deleteFolderConfirmTitle', { folder: folderToDelete.name }) : ''
+      "
+      :message="folderDeleteMessage"
+      :confirm-text="$t('files.deleteFolderConfirmButton')"
+      :cancel-text="$t('common.cancel')"
+      variant="danger"
+      @confirm="confirmDeleteFolder"
+      @cancel="cancelDeleteFolder"
+    />
+
     <!-- Confirm Delete Selected Dialog (Multiple Files) -->
     <Teleport to="#app">
       <Transition name="dialog-fade">
@@ -1236,6 +1307,7 @@ import FileContentModal from '@/components/FileContentModal.vue'
 import ShareModal from '@/components/ShareModal.vue'
 import ConfirmDialog from '@/components/ConfirmDialog.vue'
 import StorageQuotaWidget from '@/components/StorageQuotaWidget.vue'
+import FilesIntegrationsBanner from '@/components/FilesIntegrationsBanner.vue'
 import FolderMoveMenu from '@/components/FolderMoveMenu.vue'
 import { Icon } from '@iconify/vue'
 import {
@@ -1245,7 +1317,11 @@ import {
   XMarkIcon,
   ExclamationTriangleIcon,
 } from '@heroicons/vue/24/outline'
-import filesService, { type FileItem, type UploadProgress } from '@/services/filesService'
+import filesService, {
+  type FileItem,
+  type UploadProgress,
+  UploadBlockedError,
+} from '@/services/filesService'
 import { useNotification } from '@/composables/useNotification'
 import { useFilePersistence } from '@/composables/useInputPersistence'
 
@@ -1423,6 +1499,11 @@ const isConfirmOpen = ref(false)
 const fileToDelete = ref<number | null>(null)
 const isDeleteSelectedOpen = ref(false)
 const totalCount = ref(0)
+
+// Folder (group) deletion — careful delete of a whole folder + its files.
+const isDeleteFolderOpen = ref(false)
+const folderToDelete = ref<DisplayedFolder | null>(null)
+const isDeletingFolder = ref(false)
 
 const totalPages = computed(() => {
   return Math.ceil(totalCount.value / itemsPerPage)
@@ -1639,8 +1720,13 @@ const onFolderDrop = async (event: DragEvent, folderName: string) => {
       result.errors.forEach((err) => showError(`${err.filename}: ${err.error}`))
     }
   } catch (err) {
-    console.error('Upload error:', err)
-    showError('Failed to upload files: ' + (err as Error).message)
+    if (err instanceof UploadBlockedError) {
+      showError(translateUploadBlocked(err))
+      if (storageWidget.value) await storageWidget.value.refresh()
+    } else {
+      console.error('Upload error:', err)
+      showError('Failed to upload files: ' + (err as Error).message)
+    }
   } finally {
     isUploading.value = false
     uploadProgress.value = null
@@ -1714,12 +1800,38 @@ const uploadFiles = async () => {
       })
     }
   } catch (error) {
-    console.error('Upload error:', error)
-    showError('Failed to upload files: ' + (error as Error).message)
+    if (error instanceof UploadBlockedError) {
+      showError(translateUploadBlocked(error))
+      if (storageWidget.value) await storageWidget.value.refresh()
+    } else {
+      console.error('Upload error:', error)
+      showError('Failed to upload files: ' + (error as Error).message)
+    }
   } finally {
     isUploading.value = false
     uploadProgress.value = null
   }
+}
+
+const translateUploadBlocked = (err: UploadBlockedError): string => {
+  const params = {
+    filename: err.filename,
+    message: err.check.message ?? '',
+  }
+  const reasonKey = `files.uploadBlocked.${err.reason}`
+  const reasonTranslated = t(reasonKey, params)
+  if (reasonTranslated !== reasonKey) return reasonTranslated
+
+  // Reason-specific copy missing in the active locale → try the generic
+  // localized template.
+  const genericKey = 'files.uploadBlocked.generic'
+  const genericTranslated = t(genericKey, params)
+  if (genericTranslated !== genericKey) return genericTranslated
+
+  // Both keys missing → never show the raw `files.uploadBlocked.x`
+  // dot-path to the user. Fall back to a non-i18n string that still
+  // carries the filename + backend message.
+  return params.message ? `${params.filename}: ${params.message}` : params.filename
 }
 
 const handleUpgrade = () => {
@@ -1912,6 +2024,117 @@ const confirmDelete = async () => {
 const cancelDelete = () => {
   isConfirmOpen.value = false
   fileToDelete.value = null
+}
+
+// ====== Folder (group) deletion ======
+
+const folderDeleteMessage = computed(() => {
+  const f = folderToDelete.value
+  if (!f) return ''
+  if (f.pending || f.count === 0) {
+    return t('files.deleteFolderEmptyConfirmMessage', { folder: f.name })
+  }
+  return t('files.deleteFolderConfirmMessage', { folder: f.name, count: f.count })
+})
+
+const requestDeleteFolder = (folder: DisplayedFolder) => {
+  folderToDelete.value = folder
+  isDeleteFolderOpen.value = true
+}
+
+const requestDeleteCurrentFolder = () => {
+  if (!openFolder.value) return
+  const name = openFolder.value
+  const match = displayedFolders.value.find((f) => f.name === name)
+  requestDeleteFolder(match ?? { name, count: totalCount.value, pending: false })
+}
+
+const cancelDeleteFolder = () => {
+  if (isDeletingFolder.value) return
+  isDeleteFolderOpen.value = false
+  folderToDelete.value = null
+}
+
+const removePendingFolder = (name: string) => {
+  const remaining = pendingFolders.value.filter((f) => f !== name)
+  if (remaining.length !== pendingFolders.value.length) {
+    pendingFolders.value = remaining
+    savePendingFolders(remaining)
+  }
+}
+
+const confirmDeleteFolder = async () => {
+  const folder = folderToDelete.value
+  if (!folder || isDeletingFolder.value) return
+
+  // Pending (empty, local-only) folder — nothing on the server to delete.
+  if (folder.pending) {
+    removePendingFolder(folder.name)
+    if (openFolder.value === folder.name) exitFolder()
+    showSuccess(t('files.folderEmptyDeleted', { folder: folder.name }))
+    isDeleteFolderOpen.value = false
+    folderToDelete.value = null
+    return
+  }
+
+  isDeletingFolder.value = true
+  try {
+    // Resolve the folder's CURRENT contents, then delete each file. Reuses
+    // the tested list + delete endpoints (no new server surface) and stays
+    // correct even if the cached folder `count` is stale. The backend clamps
+    // `limit` to 100, so page through every result instead of assuming one
+    // request returns the whole folder.
+    const pageSize = 100
+    const ids: number[] = []
+    let page = 1
+    let totalPages = 1
+    do {
+      const response = await filesService.listFiles({
+        groupKey: folder.name,
+        page,
+        limit: pageSize,
+      })
+      ids.push(...response.files.map((f) => f.id))
+      totalPages = response.pagination.pages
+      page++
+    } while (page <= totalPages)
+
+    if (ids.length === 0) {
+      showSuccess(t('files.folderEmptyDeleted', { folder: folder.name }))
+    } else {
+      const results = await filesService.deleteMultipleFiles(ids)
+      const successCount = results.filter((r) => r.success).length
+      const failCount = results.filter((r) => !r.success).length
+      if (failCount > 0) {
+        showError(
+          t('files.deleteFolderPartial', {
+            folder: folder.name,
+            success: successCount,
+            failed: failCount,
+          })
+        )
+      } else {
+        showSuccess(t('files.folderDeleted', { folder: folder.name, count: successCount }))
+      }
+    }
+
+    removePendingFolder(folder.name)
+    selectedFileIds.value = []
+    if (openFolder.value === folder.name) {
+      exitFolder()
+    } else {
+      await loadFiles()
+    }
+    await loadFileGroups()
+    if (storageWidget.value) await storageWidget.value.refresh()
+  } catch (error) {
+    console.error('Folder delete error:', error)
+    showError(t('files.deleteFolderFailed', { folder: folder.name }))
+  } finally {
+    isDeletingFolder.value = false
+    isDeleteFolderOpen.value = false
+    folderToDelete.value = null
+  }
 }
 
 const viewFileContent = (fileId: number) => {

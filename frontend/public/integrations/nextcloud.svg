@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Nextcloud brand mark (simplified).
+  Reproduced from publicly distributed Nextcloud branding material; used here
+  only as a recognition icon for our integration link. Brand colour: #0082C9.
+  If Nextcloud's brand team objects, swap with the official asset from
+  https://nextcloud.com/de/press/.
+-->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" role="img" aria-label="Nextcloud">
+  <title>Nextcloud</title>
+  <path fill="#0082C9" d="M16 6.4c-3.05 0-5.62 2.06-6.4 4.86-.68-1.5-2.19-2.55-3.94-2.55C3.27 8.71 1 10.98 1 13.77s2.27 5.06 5.06 5.06c1.74 0 3.26-1.05 3.94-2.55.78 2.81 3.35 4.86 6.4 4.86 3.05 0 5.62-2.06 6.4-4.86.68 1.5 2.19 2.55 3.94 2.55 2.79 0 5.06-2.27 5.06-5.06s-2.27-5.06-5.06-5.06c-1.75 0-3.26 1.05-3.94 2.55-.78-2.8-3.35-4.86-6.4-4.86zm0 2.74a4.62 4.62 0 0 1 4.63 4.63A4.62 4.62 0 0 1 16 18.4a4.62 4.62 0 0 1-4.63-4.63A4.62 4.62 0 0 1 16 9.14zM6.06 11.46c1.28 0 2.31 1.03 2.31 2.31s-1.03 2.31-2.31 2.31a2.3 2.3 0 0 1-2.31-2.31 2.3 2.3 0 0 1 2.31-2.31zm19.88 0c1.28 0 2.31 1.03 2.31 2.31s-1.03 2.31-2.31 2.31a2.3 2.3 0 0 1-2.31-2.31 2.3 2.3 0 0 1 2.31-2.31z"/>
+</svg>

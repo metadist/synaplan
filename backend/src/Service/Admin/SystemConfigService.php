@@ -6,6 +6,7 @@ namespace App\Service\Admin;
 
 use App\Repository\ConfigRepository;
 use App\Service\FeedbackConstants;
+use App\Service\Message\GranularTopicsManager;
 use Psr\Log\LoggerInterface;
 
 /**
@@ -28,7 +29,8 @@ final readonly class SystemConfigService
         private readonly string $projectDir,
         private readonly LoggerInterface $logger,
         private readonly ConfigRepository $configRepository,
-        private readonly string $defaultTtsUrl = 'http://localhost:10200',
+        private readonly string $defaultTtsUrl,
+        private readonly GranularTopicsManager $granularTopicsManager,
     ) {
         $this->schema = $this->buildSchema();
     }
@@ -87,6 +89,7 @@ final readonly class SystemConfigService
                     'qdrant' => ['label' => 'Qdrant', 'fields' => ['QDRANT_URL']],
                     'synapse' => ['label' => 'Synapse Routing', 'fields' => [
                         'SYNAPSE_ROUTING_ENABLED', 'SYNAPSE_CONFIDENCE_THRESHOLD',
+                        'GRANULAR_TOPICS_ENABLED',
                     ]],
                     'qdrant_search' => ['label' => 'Search Thresholds', 'fields' => [
                         'MIN_CHAT_FEEDBACK_SCORE', 'MIN_CHAT_MEMORY_SCORE', 'MIN_CONTRADICTION_SCORE',
@@ -245,11 +248,50 @@ final readonly class SystemConfigService
             $this->configRepository->setValue(self::DB_OWNER_ID, self::DB_GROUP, $key, $value);
             $this->logChange($key, $value);
 
+            $this->applyConfigSideEffects(self::DB_GROUP, $key, $value);
+
             return ['success' => true, 'requiresRestart' => false];
         } catch (\Throwable $e) {
             $this->logger->error('Failed to save DB config', ['key' => $key, 'error' => $e->getMessage()]);
 
             return ['success' => false, 'requiresRestart' => false, 'message' => 'Database write failed'];
+        }
+    }
+
+    /**
+     * Side-effects triggered by specific BCONFIG writes.
+     *
+     * Kept as an explicit, narrow dispatch table rather than an event
+     * subscriber: there is exactly one cross-module hook today
+     * (`GRANULAR_TOPICS_ENABLED` → flip BPROMPTS.BENABLED), and a full
+     * event/listener layer would add framework surface area without
+     * earning its keep. Add new entries here only when a config write
+     * has to mutate state outside BCONFIG.
+     *
+     * Failures are logged and swallowed: the primary BCONFIG write has
+     * already succeeded, and downstream readers will pick up the new
+     * value on their next request. Re-running `app:seed` converges any
+     * BPROMPTS state that the manager failed to flip.
+     */
+    private function applyConfigSideEffects(string $group, string $key, string $value): void
+    {
+        if (GranularTopicsManager::CONFIG_GROUP === $group && GranularTopicsManager::CONFIG_KEY === $key) {
+            $enabled = filter_var($value, FILTER_VALIDATE_BOOL, FILTER_NULL_ON_FAILURE) ?? false;
+            try {
+                $report = $this->granularTopicsManager->applyState($enabled);
+                $this->logger->info('SystemConfigService: granular routing topics toggled', [
+                    'enabled' => $enabled,
+                    'flipped' => $report['flipped'],
+                    'unchanged' => $report['unchanged'],
+                    'missing' => $report['missing'],
+                ]);
+            } catch (\Throwable $sideEffect) {
+                $this->logger->error('SystemConfigService: granular topics state sync failed', [
+                    'key' => $key,
+                    'value' => $value,
+                    'error' => $sideEffect->getMessage(),
+                ]);
+            }
         }
     }
 
@@ -820,6 +862,20 @@ final readonly class SystemConfigService
                 'tab' => 'vectordb', 'section' => 'synapse', 'type' => 'number',
                 'sensitive' => false, 'description' => 'Min cosine similarity score for Synapse to route directly (0.0–1.0). Below this threshold, the system falls back to AI-based sorting. Default: 0.78',
                 'default' => '0.78',
+                'source' => 'database',
+            ],
+            // Granular routing aliases (general-chat, coding, image-generation,
+            // video-generation, audio-generation) are aliases of the canonical
+            // legacy topics (`general`, `mediamaker`) — see TopicAliasResolver.
+            // They exist so Synapse Routing v2's embedding tier can discriminate
+            // more finely; the legacy AI sorter sees them as near-duplicate
+            // routing targets and produces brittle picks. Ships OFF; flipping
+            // this toggle also flips BENABLED on the matching BPROMPTS rows
+            // (see GranularTopicsManager + SystemConfigService::setDatabaseValue).
+            'GRANULAR_TOPICS_ENABLED' => [
+                'tab' => 'vectordb', 'section' => 'synapse', 'type' => 'boolean',
+                'sensitive' => false, 'description' => 'Include granular routing topics (general-chat, coding, image-generation, video-generation, audio-generation) in the routing pool. OFF (default) keeps only canonical topics (general, mediamaker) — cleaner choice list for the legacy AI sorter. Turn ON when Synapse Routing v2 is enabled so its embedding tier can discriminate finer-grained intents. Toggling automatically flips BENABLED on the corresponding BPROMPTS rows.',
+                'default' => 'false',
                 'source' => 'database',
             ],
             // === Search Thresholds (database-backed, no restart required) ===

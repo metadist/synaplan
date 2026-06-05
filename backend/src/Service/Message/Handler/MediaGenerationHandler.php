@@ -52,12 +52,18 @@ final readonly class MediaGenerationHandler implements MessageHandlerInterface
     /**
      * Non-streaming handle method (required by interface).
      * Delegates to handleStream with a blocking accumulator.
+     *
+     * @param array<string, mixed> $classification
+     * @param array<string, mixed> $options        forwarded to {@see handleStream()} so callers (email
+     *                                             webhook, generic API) can disable memories or set the
+     *                                             channel exactly like the SSE path
      */
     public function handle(
         Message $message,
         array $thread,
         array $classification,
         ?callable $progressCallback = null,
+        array $options = [],
     ): array {
         $content = '';
         $metadata = [];
@@ -75,13 +81,15 @@ final readonly class MediaGenerationHandler implements MessageHandlerInterface
             }
         };
 
-        // Call streaming handler
+        // Call streaming handler — forward options so non-streaming callers
+        // (email/webhook) preserve the same channel/disable flags as SSE.
         $result = $this->handleStream(
             $message,
             $thread,
             $classification,
             $streamCallback,
-            $progressCallback
+            $progressCallback,
+            $options
         );
 
         // Return accumulated result
@@ -511,7 +519,18 @@ final readonly class MediaGenerationHandler implements MessageHandlerInterface
             if ('image' === $mediaType) {
                 $mediaUsage['images'] = $result['image_count'] ?? 1;
             } elseif ('video' === $mediaType) {
-                $mediaUsage['duration_seconds'] = $result['duration_seconds'] ?? null;
+                $requestedDuration = $options['duration'] ?? $classification['duration'] ?? 8;
+                $duration = $result['duration_seconds'] ?? null;
+                if (null === $duration) {
+                    $this->logger->warning('MediaGenerationHandler: Provider omitted duration_seconds for video generation. Falling back to requested duration.', [
+                        'provider' => $provider,
+                        'model' => $modelName,
+                        'requested_duration' => $requestedDuration,
+                    ]);
+                    $duration = (float) $requestedDuration;
+                    $mediaUsage['duration_missing_fallback'] = true;
+                }
+                $mediaUsage['duration_seconds'] = $duration;
                 $videoResolution = $this->extractVideoResolution($result);
                 if (null !== $videoResolution) {
                     $mediaUsage['resolution'] = $videoResolution;

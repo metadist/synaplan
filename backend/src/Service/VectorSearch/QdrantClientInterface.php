@@ -64,6 +64,22 @@ interface QdrantClientInterface
     ): array;
 
     /**
+     * Scroll ALL active memories across ALL users without vector search.
+     *
+     * Used exclusively by the SafeModelChange re-vectorize pipeline so a
+     * VECTORIZE model switch actually re-embeds the entire memories
+     * collection (the per-user `scrollMemories(int $userId)` filters by
+     * `user_id` and is therefore unusable for system-wide reindex).
+     *
+     * Deliberately exposed as a separate method (not `scrollMemories(?int)`)
+     * so the privacy-relevant "across all users" mode cannot be triggered
+     * accidentally by callers that forget to pass a user id.
+     *
+     * @return array Array of memories: [['id' => string, 'payload' => array], ...]
+     */
+    public function scrollAllMemoriesForReindex(int $limit = 5000): array;
+
+    /**
      * Delete a memory point from Qdrant collection.
      */
     public function deleteMemory(string $pointId, ?string $namespace = null): void;
@@ -270,6 +286,24 @@ interface QdrantClientInterface
      * Idempotent — safe to call when the collection does not yet exist.
      */
     public function recreateSynapseCollection(int $vectorDimension): void;
+
+    // --- Memory Collection Management ---
+
+    /**
+     * Get information about the memories collection (vector size, point count, status).
+     *
+     * @return array{exists: bool, vector_dim: ?int, points_count: ?int, distance: ?string}
+     */
+    public function getMemoriesCollectionInfo(): array;
+
+    /**
+     * Drop the memories collection (if present) and recreate it with the given
+     * vector dimension. Used when the embedding model is swapped to one with
+     * a different output dimension (e.g. 1024 ─► 1536).
+     *
+     * Idempotent — safe to call when the collection does not yet exist.
+     */
+    public function recreateMemoriesCollection(int $vectorDimension): void;
 
     /**
      * Get the synapse collection name.

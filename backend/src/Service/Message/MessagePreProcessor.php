@@ -6,7 +6,10 @@ use App\AI\Service\AiFacade;
 use App\Entity\File;
 use App\Entity\Message;
 use App\Repository\MessageRepository;
+use App\Repository\UserRepository;
+use App\Service\File\FileProcessor;
 use App\Service\File\TikaClient;
+use App\Service\RateLimitService;
 use App\Service\WhisperService;
 use Psr\Log\LoggerInterface;
 
@@ -20,8 +23,16 @@ use Psr\Log\LoggerInterface;
  */
 final readonly class MessagePreProcessor
 {
-    // Supported file types for preprocessing
-    public const DOCUMENT_EXTENSIONS = ['pdf', 'docx', 'doc', 'xlsx', 'xls', 'pptx', 'txt'];
+    // Supported file types for preprocessing.
+    //
+    // Issue #954: 'md', 'csv', and 'ppt' were missing here even though they
+    // are accepted uploads (FileStorageService::ALLOWED_EXTENSIONS) and are
+    // fully handled by FileProcessor::extractText() — 'md'/'csv' as native
+    // plain text and 'ppt' via Tika using OFFICE_EXT_TO_MIME. Without these
+    // entries the chat preprocessor silently skipped the file, leaving
+    // BFILETEXT empty and FileAnalysisHandler reporting "unsupported file
+    // type" for legitimately uploaded documents.
+    public const DOCUMENT_EXTENSIONS = ['pdf', 'docx', 'doc', 'xlsx', 'xls', 'pptx', 'ppt', 'txt', 'md', 'csv'];
     public const AUDIO_EXTENSIONS = ['ogg', 'mp3', 'wav', 'm4a', 'opus', 'flac', 'webm', 'amr'];
     public const IMAGE_EXTENSIONS = ['jpg', 'jpeg', 'png', 'webp', 'gif'];
 
@@ -41,6 +52,9 @@ final readonly class MessagePreProcessor
         private AiFacade $aiFacade,
         private LoggerInterface $logger,
         private string $uploadsDir,
+        private RateLimitService $rateLimitService,
+        private UserRepository $userRepository,
+        private FileProcessor $fileProcessor,
     ) {
     }
 
@@ -128,6 +142,12 @@ final readonly class MessagePreProcessor
             ]);
             $messageFile->setStatus('processed');
 
+            // Issue #887: even when extraction was already done at upload
+            // time, the analysis-billing event fires HERE (the message is
+            // actually being sent / consumed). The dedup helper makes this
+            // safe across re-runs of the preprocessor.
+            $this->billFileAnalysis($messageFile, $message, 'reuse_extracted');
+
             return;
         }
 
@@ -137,17 +157,51 @@ final readonly class MessagePreProcessor
             'size' => $messageFile->getFileSize(),
         ]);
 
-        // Parse File mit Tika (für PDFs, DOCX, etc.)
+        // Parse File mit FileProcessor (Tika + Vision-Fallback für PDFs).
+        //
+        // Issue #729: this used to call parseWithTika() directly, which has no
+        // vision fallback and no MIME normalisation. When Tika reported the
+        // DOCX as application/zip or returned an empty body, the file was
+        // marked `processed` with empty BFILETEXT and the chat surfaced a
+        // generic "Document text extraction failed" error. The shared
+        // FileProcessor::extractText() pipeline (Tika -> PDF rasterise +
+        // Vision AI fallback for low-quality output) is the same strategy
+        // the /api/v1/files upload path already uses, so we get one
+        // consistent extraction behaviour across upload entry points.
         if (in_array($fileType, self::DOCUMENT_EXTENSIONS)) {
-            $text = $this->parseWithTika($fullPath);
-            if ($text) {
-                $messageFile->setFileText($text);
-                $this->logger->info('PreProcessor: Document parsed', [
+            $messageFile->setStatus('extracting');
+
+            try {
+                [$text, $extractMeta] = $this->fileProcessor->extractText(
+                    $filePath,
+                    $fileType,
+                    $messageFile->getUserId(),
+                );
+
+                if ('' !== trim((string) $text)) {
+                    $messageFile->setFileText($text);
+                    $messageFile->setStatus('processed');
+                    $this->logger->info('PreProcessor: Document parsed', [
+                        'file_id' => $messageFile->getId(),
+                        'text_length' => strlen($text),
+                        'strategy' => $extractMeta['strategy'] ?? 'unknown',
+                    ]);
+                } else {
+                    $messageFile->setStatus('error');
+                    $this->logger->warning('PreProcessor: Document extraction produced empty text', [
+                        'file_id' => $messageFile->getId(),
+                        'strategy' => $extractMeta['strategy'] ?? 'unknown',
+                    ]);
+                }
+            } catch (\Throwable $e) {
+                $messageFile->setStatus('error');
+                $this->logger->error('PreProcessor: Document extraction failed', [
                     'file_id' => $messageFile->getId(),
-                    'text_length' => strlen($text),
+                    'error' => $e->getMessage(),
                 ]);
             }
-            $messageFile->setStatus('processed');
+
+            $this->billFileAnalysis($messageFile, $message, 'document');
         }
 
         // Audio mit Whisper (or external STT if user configured one)
@@ -185,6 +239,8 @@ final readonly class MessagePreProcessor
                         'text_length' => strlen($transcribedText),
                         'language' => $result['language'],
                     ]);
+
+                    $this->billFileAnalysis($messageFile, $message, 'audio');
                 }
             } catch (\Exception $e) {
                 $this->logger->error('PreProcessor: Audio transcription failed', [
@@ -207,6 +263,8 @@ final readonly class MessagePreProcessor
                     'file_id' => $messageFile->getId(),
                     'text_length' => strlen($text ?? ''),
                 ]);
+
+                $this->billFileAnalysis($messageFile, $message, 'image');
             } catch (\Exception $e) {
                 $this->logger->error('PreProcessor: Vision AI failed', [
                     'file_id' => $messageFile->getId(),
@@ -214,6 +272,51 @@ final readonly class MessagePreProcessor
                 ]);
                 $messageFile->setStatus('error');
             }
+        }
+    }
+
+    /**
+     * Bill exactly one FILE_ANALYSIS event per file the user actually used.
+     *
+     * Issue #887: the chat upload no longer writes a BUSELOG row up front,
+     * so the moment of analysis (here, during the streamed message turn)
+     * is the correct billing event. RateLimitService::recordFileAnalysisOnce
+     * is idempotent on (user_id, file_id) — re-runs of the preprocessor
+     * (chunked stream retries, Vue HMR replays in dev, etc.) are no-ops.
+     *
+     * Failures here MUST NOT block the message from completing — usage
+     * recording is best-effort accounting, not a hard prerequisite. We log
+     * and swallow.
+     */
+    private function billFileAnalysis(File $messageFile, Message $message, string $stage): void
+    {
+        $fileId = $messageFile->getId();
+        if (null === $fileId) {
+            return;
+        }
+
+        $userId = $messageFile->getUserId() ?: $message->getUserId();
+        if ($userId <= 0) {
+            return;
+        }
+
+        $user = $this->userRepository->find($userId);
+        if (null === $user) {
+            return;
+        }
+
+        try {
+            $this->rateLimitService->recordFileAnalysisOnce($user, $fileId, [
+                'filename' => $messageFile->getFileName(),
+                'source' => 'WEB',
+                'stage' => $stage,
+            ]);
+        } catch (\Throwable $e) {
+            $this->logger->warning('PreProcessor: FILE_ANALYSIS recording failed (non-fatal)', [
+                'file_id' => $fileId,
+                'user_id' => $userId,
+                'error' => $e->getMessage(),
+            ]);
         }
     }
 

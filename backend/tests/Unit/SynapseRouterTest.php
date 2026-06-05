@@ -177,7 +177,84 @@ class SynapseRouterTest extends TestCase
         $this->assertEquals('no_search_results', $result['synapse_fallback_reason']);
     }
 
-    public function testDetectsWebSearchKeywords(): void
+    /**
+     * Under the project-wide WebSearchTopicPolicy, the default for any
+     * chat-style topic without an explicit `tool_internet=false` opt-out
+     * is to enable web search — regardless of the query text. This is
+     * the "rather search than not" mandate.
+     *
+     * The data provider covers a wide spectrum of phrasings that used
+     * to depend on the keyword heuristic but now succeed by default.
+     *
+     * @return iterable<string, array{0: string}>
+     */
+    public static function defaultRouteSearchQueryProvider(): iterable
+    {
+        // Time-sensitive / news-like (used to depend on `aktuell`, `wetter`, year)
+        yield 'weather' => ['Was ist das aktuelle Wetter in Berlin?'];
+        yield 'year_pattern' => ['Bundeskanzler 2026'];
+
+        // Cost queries — original #974 regression cases. Still pass under
+        // the simpler policy: default is search, period.
+        yield 'cost_kostet' => ['Was kostet ein Flug nach Bergen?'];
+        yield 'cost_wie_teuer' => ['Wie teuer ist ein iPhone 17?'];
+        yield 'cost_gekostet' => ['Was hat das Konzert gestern gekostet?'];
+
+        // Real-estate — original failing prompt that motivated this PR.
+        yield 'real_estate_eigentumswohnung' => ['Erzähl mir etwas über Eigentumswohnungen in München'];
+
+        // Travel / politics / finance / sports — sample one per domain.
+        yield 'travel_flug' => ['Wann geht der nächste Flug nach Rom?'];
+        yield 'politics_kanzler' => ['Wer ist der aktuelle Bundeskanzler von Deutschland?'];
+        yield 'finance_bitcoin' => ['Wie ist der Bitcoin Kurs gerade?'];
+        yield 'sports_bundesliga' => ['Wer führt die Bundesliga an?'];
+
+        // Casual / conceptual queries — under Variante B these ALSO
+        // trigger search by default. The model is trusted to ignore
+        // irrelevant Brave results when answering from training data.
+        yield 'concept_explanation' => ['Erkläre mir das Konzept der Vererbung in OOP'];
+        yield 'greeting' => ['Hallo, wie geht es dir?'];
+    }
+
+    #[\PHPUnit\Framework\Attributes\DataProvider('defaultRouteSearchQueryProvider')]
+    public function testDefaultRouteEnablesWebSearch(string $text): void
+    {
+        $this->modelConfigService->method('getDefaultModel')->willReturn(null);
+        $this->promptRepository->method('findPromptsWithSelectionRules')->willReturn([]);
+
+        $this->aiFacade->method('embed')->willReturn([
+            'embedding' => array_fill(0, 1024, 0.1),
+            'usage' => ['prompt_tokens' => 10, 'total_tokens' => 10],
+        ]);
+
+        $this->qdrantClient->method('searchSynapseTopics')->willReturn([
+            [
+                'id' => 'synapse_0_general',
+                'score' => 0.90,
+                'payload' => ['topic' => 'general', 'owner_id' => 0],
+            ],
+        ]);
+
+        // No `tool_internet` opinion on the prompt → falls through to
+        // the project default, which is "search".
+        $this->promptService->method('getPromptWithMetadata')->willReturn([
+            'metadata' => [],
+        ]);
+
+        $result = $this->router->route(['BTEXT' => $text], [], 1);
+
+        $this->assertTrue(
+            $result['web_search'],
+            sprintf('Default policy must enable web search for "%s"', $text),
+        );
+    }
+
+    /**
+     * Explicit opt-out at the prompt level (`tool_internet=false`) is the
+     * one and only way to suppress search on a regular (non-media) topic
+     * under Variante B.
+     */
+    public function testExplicitToolInternetFalseSuppressesSearch(): void
     {
         $this->modelConfigService->method('getDefaultModel')->willReturn(null);
         $this->promptRepository->method('findPromptsWithSelectionRules')->willReturn([]);
@@ -201,71 +278,10 @@ class SynapseRouterTest extends TestCase
 
         $result = $this->router->route(['BTEXT' => 'Was ist das aktuelle Wetter in Berlin?'], [], 1);
 
-        $this->assertTrue($result['web_search']);
-    }
-
-    public function testDetectsYearPatternAsWebSearch(): void
-    {
-        $this->modelConfigService->method('getDefaultModel')->willReturn(null);
-        $this->promptRepository->method('findPromptsWithSelectionRules')->willReturn([]);
-
-        $this->aiFacade->method('embed')->willReturn([
-            'embedding' => array_fill(0, 1024, 0.1),
-            'usage' => ['prompt_tokens' => 10, 'total_tokens' => 10],
-        ]);
-
-        $this->qdrantClient->method('searchSynapseTopics')->willReturn([
-            [
-                'id' => 'synapse_0_general',
-                'score' => 0.90,
-                'payload' => ['topic' => 'general', 'owner_id' => 0],
-            ],
-        ]);
-
-        $this->promptService->method('getPromptWithMetadata')->willReturn([
-            'metadata' => ['tool_internet' => false],
-        ]);
-
-        $result = $this->router->route(['BTEXT' => 'Bundeskanzler 2026'], [], 1);
-
-        $this->assertTrue($result['web_search']);
-    }
-
-    /**
-     * Regression test: deictic time markers like "jetzt" (German) and "now"
-     * (English) are extremely common in follow-up messages such as
-     *   - "jetzt ein video davon"
-     *   - "now make it 4K"
-     *   - "jetzt das Gleiche in blau"
-     * and must not trigger a web search.
-     */
-    public function testFollowUpJetztDoesNotTriggerWebSearch(): void
-    {
-        $this->modelConfigService->method('getDefaultModel')->willReturn(null);
-        $this->promptRepository->method('findPromptsWithSelectionRules')->willReturn([]);
-
-        $this->aiFacade->method('embed')->willReturn([
-            'embedding' => array_fill(0, 1024, 0.1),
-            'usage' => ['prompt_tokens' => 10, 'total_tokens' => 10],
-        ]);
-
-        $this->qdrantClient->method('searchSynapseTopics')->willReturn([
-            [
-                'id' => 'synapse_0_general',
-                'score' => 0.90,
-                'payload' => ['topic' => 'general', 'owner_id' => 0],
-            ],
-        ]);
-
-        $this->promptService->method('getPromptWithMetadata')->willReturn([
-            'metadata' => ['tool_internet' => false],
-        ]);
-
-        $resultDe = $this->router->route(['BTEXT' => 'jetzt das gleiche in blau'], [], 1);
-        $this->assertFalse($resultDe['web_search'], '"jetzt" alone must not trigger web search');
-
-        $resultEn = $this->router->route(['BTEXT' => 'now make it 4K'], [], 1);
-        $this->assertFalse($resultEn['web_search'], '"now" alone must not trigger web search');
+        $this->assertFalse(
+            $result['web_search'],
+            'Explicit tool_internet=false must suppress search even on a chat-friendly query',
+        );
     }
 
     /**
@@ -796,5 +812,101 @@ class SynapseRouterTest extends TestCase
         $result = $this->router->dryRun('Hello world', 0, 5);
 
         $this->assertSame('empty_embedding', $result['error']);
+    }
+
+    /**
+     * Issue #603: When Synapse embedding routing wins, the router used to
+     * return `model_id`/`provider`/`model_name` while MessageClassifier and
+     * the rest of the pipeline read `sorting_model_id`/`sorting_provider`/
+     * `sorting_model_name` (the keys MessageSorter emits). That mismatch
+     * dropped the sorting model on the floor, so no `ai_sorting_*` meta
+     * was persisted on the outgoing message — the Sorting Model badge
+     * stayed missing in the live SSE view AND after refresh.
+     *
+     * The fix: surface the embedding model under the canonical sorting_*
+     * keys, since the embedding model IS what produced the routing
+     * decision.
+     */
+    public function testEmbeddingRoutingSurfacesEmbeddingModelUnderSortingKeys(): void
+    {
+        // Bind a non-null embedding model so `getCurrentModelInfo()`
+        // resolves to a real id/provider/name instead of the null
+        // fallback used by most other tests.
+        $this->modelConfigService->method('getDefaultModel')->willReturn(42);
+        $this->modelConfigService->method('getProviderForModel')->willReturn('cloudflare');
+        $this->modelConfigService->method('getModelName')->willReturn('bge-m3');
+        $this->modelConfigService->method('getVectorDimForModel')->willReturn(1024);
+
+        $this->promptRepository->method('findPromptsWithSelectionRules')->willReturn([]);
+        $this->promptService->method('getPromptWithMetadata')->willReturn([
+            'metadata' => ['tool_internet' => false],
+        ]);
+
+        $this->aiFacade->method('embed')->willReturn([
+            'embedding' => array_fill(0, 1024, 0.1),
+            'usage' => ['prompt_tokens' => 10, 'total_tokens' => 10],
+        ]);
+
+        $this->qdrantClient->method('searchSynapseTopics')->willReturn([
+            [
+                'id' => 'synapse_0_general',
+                'score' => 0.92,
+                'payload' => [
+                    'topic' => 'general',
+                    'owner_id' => 0,
+                    'embedding_model_id' => 42,
+                ],
+            ],
+        ]);
+
+        $this->messageSorter->expects($this->never())->method('classify');
+
+        $result = $this->router->route(['BTEXT' => 'Hello, how are you?'], [], 1);
+
+        $this->assertSame(42, $result['sorting_model_id']);
+        $this->assertSame('cloudflare', $result['sorting_provider']);
+        $this->assertSame('bge-m3', $result['sorting_model_name']);
+
+        // Sanity check: the legacy keys (`model_id`, `provider`,
+        // `model_name`) must NOT be present — they were the source of
+        // the bug and downstream consumers should fail loudly rather
+        // than silently fall back to null again.
+        $this->assertArrayNotHasKey('model_id', $result);
+        $this->assertArrayNotHasKey('provider', $result);
+        $this->assertArrayNotHasKey('model_name', $result);
+    }
+
+    /**
+     * Issue #603: rule-based routing short-circuits before any embedding
+     * or AI call, so there is no concrete sorting model to surface. Keep
+     * the keys present (so MessageClassifier sees them consistently with
+     * the embedding/fallback paths) but null.
+     */
+    public function testRuleBasedRoutingReturnsNullSortingKeys(): void
+    {
+        $rulePrompt = $this->createMock(\App\Entity\Prompt::class);
+        $rulePrompt->method('getTopic')->willReturn('support');
+        $rulePrompt->method('getSelectionRules')->willReturn('keyword:support');
+
+        $this->promptRepository->method('findPromptsWithSelectionRules')->willReturn([$rulePrompt]);
+        $this->promptService
+            ->method('matchesSelectionRules')
+            ->willReturn(true);
+        $this->promptService->method('getPromptWithMetadata')->willReturn([
+            'metadata' => ['tool_internet' => false],
+        ]);
+
+        // Embedding must not be called for a rule-based match.
+        $this->aiFacade->expects($this->never())->method('embed');
+
+        $result = $this->router->route(['BTEXT' => 'I need support please'], [], 1);
+
+        $this->assertSame('synapse_rule', $result['source']);
+        $this->assertArrayHasKey('sorting_model_id', $result);
+        $this->assertArrayHasKey('sorting_provider', $result);
+        $this->assertArrayHasKey('sorting_model_name', $result);
+        $this->assertNull($result['sorting_model_id']);
+        $this->assertNull($result['sorting_provider']);
+        $this->assertNull($result['sorting_model_name']);
     }
 }

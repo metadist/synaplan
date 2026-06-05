@@ -108,6 +108,14 @@
                   {{ estimate?.fromModel.model || $t('config.embeddingSwitch.unknown') }}
                 </p>
                 <p class="text-xs txt-secondary">{{ estimate?.fromModel.provider || '—' }}</p>
+                <p
+                  v-if="estimate?.fromModel"
+                  class="text-xs txt-secondary mt-1 font-mono"
+                  data-testid="dim-from"
+                >
+                  {{ $t('config.embeddingSwitch.dimensions') }}:
+                  <span class="txt-primary">{{ estimate.fromModel.vectorDim }}</span>
+                </p>
               </div>
               <div class="surface-card p-3 ring-2 ring-[var(--brand)]/40">
                 <p class="text-xs uppercase tracking-wide txt-secondary mb-1">
@@ -117,7 +125,49 @@
                   {{ targetModelName }}
                 </p>
                 <p class="text-xs txt-secondary">{{ targetModelProvider }}</p>
+                <p
+                  v-if="estimate?.toModel"
+                  class="text-xs txt-secondary mt-1 font-mono"
+                  data-testid="dim-to"
+                >
+                  {{ $t('config.embeddingSwitch.dimensions') }}:
+                  <span class="txt-primary">{{ estimate.toModel.vectorDim }}</span>
+                </p>
               </div>
+            </div>
+
+            <!-- Dimension-mismatch banner: the storage layer reindexes
+                 with the new dim, but the admin should know that every
+                 vector physically changes shape — old/new cosine scores
+                 are not comparable until reindex finishes. -->
+            <div
+              v-if="dimensionMismatch"
+              class="rounded-lg border border-amber-500/40 bg-amber-500/10 p-3 mb-4 flex items-start gap-2"
+              data-testid="banner-dim-mismatch"
+            >
+              <ExclamationTriangleIcon class="w-5 h-5 text-amber-500 flex-shrink-0 mt-0.5" />
+              <p class="text-sm txt-primary">
+                {{
+                  $t('config.embeddingSwitch.dimMismatch', {
+                    from: estimate?.fromModel.vectorDim,
+                    to: estimate?.toModel.vectorDim,
+                  })
+                }}
+              </p>
+            </div>
+
+            <!-- #985: user memories are intentionally NOT part of this
+                 switch flow. Surfacing this prominently so the admin
+                 doesn't expect their stored memories to follow the
+                 new embedding model. -->
+            <div
+              class="rounded-lg border border-blue-500/40 bg-blue-500/10 p-3 mb-4 flex items-start gap-2"
+              data-testid="banner-memories-frozen"
+            >
+              <InformationCircleIcon class="w-5 h-5 text-blue-500 flex-shrink-0 mt-0.5" />
+              <p class="text-sm txt-primary">
+                {{ $t('config.embeddingSwitch.memoriesFrozen') }}
+              </p>
             </div>
 
             <!-- Loading state -->
@@ -382,6 +432,18 @@ const canSubmit = computed(() => {
   return true
 })
 
+// #949: surface the dim change so the admin understands what the
+// switch physically does to the vector space. Both dims fall back to
+// EmbeddingMetadataService::DEFAULT_VECTOR_DIM (1024) on the backend
+// when the catalog row has no `meta.dimensions`, in which case there
+// is nothing to warn about.
+const dimensionMismatch = computed(() => {
+  const from = estimate.value?.fromModel.vectorDim
+  const to = estimate.value?.toModel.vectorDim
+  if (typeof from !== 'number' || typeof to !== 'number') return false
+  return from !== to
+})
+
 const formatTokens = (tokens: number): string => {
   if (tokens >= 1_000_000) return `${(tokens / 1_000_000).toFixed(2)}M`
   if (tokens >= 1_000) return `${(tokens / 1_000).toFixed(1)}k`
@@ -413,9 +475,16 @@ const onConfirm = async () => {
 
   submitting.value = true
   try {
+    // Issue #985 — explicitly migrate only the documents scope. The
+    // memories collection is left untouched on purpose: switching its
+    // embedding model atomically used to wipe every stored memory
+    // before the probe + rollback safety net landed, and the team
+    // agreed to keep that scope disabled in the UI until a per-user
+    // memory collection design replaces the global one. Synapse
+    // Routing has its own dedicated admin panel and is unaffected.
     const response = await adminEmbeddingApi.switch({
       toModelId: props.toModelId,
-      scope: 'all',
+      scope: 'documents',
       confirmCritical: estimate.value.severity === 'critical' ? true : undefined,
     })
     emit('switched', response.runId)

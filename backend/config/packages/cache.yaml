@@ -55,6 +55,10 @@ framework:
                 adapter: cache.adapter.redis
                 default_lifetime: 3600
 
+            # NOTE: Widget real-time events are delivered via Centrifugo
+            # WebSockets (see docs/REALTIME.md), not via a Symfony cache pool
+            # or the legacy BWIDGET_EVENTS table.
+
 # Test profile uses an in-memory cache so we don't require Redis to run unit
 # tests. Pools that PHPUnit hits via DI inherit this default.
 when@test:

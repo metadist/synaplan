@@ -11,6 +11,7 @@ use App\Repository\PromptRepository;
 use App\Repository\WidgetRepository;
 use App\Service\BillingService;
 use App\Service\File\UserUploadPathBuilder;
+use App\Service\SlackNotificationService;
 use App\Service\UrlContentService;
 use App\Service\UserMemoryService;
 use App\Service\WidgetService;
@@ -54,6 +55,7 @@ class WidgetController extends AbstractController
         private UrlContentService $urlContentService,
         private CacheItemPoolInterface $cache,
         private LoggerInterface $logger,
+        private SlackNotificationService $slack,
         private string $uploadDir,
     ) {
     }
@@ -1275,6 +1277,86 @@ class WidgetController extends AbstractController
         $item->set($data);
         $item->expiresAfter(self::TEST_API_RATE_WINDOW);
         $this->cache->save($item);
+    }
+
+    /**
+     * Send a one-off Slack test message to verify the widget's handoff webhook
+     * before the operator relies on it for live customer escalations.
+     *
+     * Runs server-side so the webhook URL never has to be exposed to the
+     * dashboard origin (CORS) or sit in browser network logs. Rate-limit
+     * sharing with `testApi` is fine — both are infrequent admin actions.
+     */
+    #[Route('/{widgetId}/handoff/test', name: 'handoff_test', methods: ['POST'])]
+    #[OA\Post(
+        path: '/api/v1/widgets/{widgetId}/handoff/test',
+        summary: 'Send a test message to the widget Slack handoff webhook (rate limited: 5/min)',
+        security: [['Bearer' => []]],
+        tags: ['Widgets']
+    )]
+    #[OA\Parameter(name: 'widgetId', in: 'path', required: true, schema: new OA\Schema(type: 'string'))]
+    #[OA\RequestBody(
+        required: false,
+        content: new OA\JsonContent(
+            properties: [
+                new OA\Property(property: 'webhookUrl', type: 'string', example: 'https://hooks.slack.com/services/T.../B.../...', description: 'Override the saved webhook URL (lets the operator validate before saving)'),
+            ]
+        )
+    )]
+    #[OA\Response(
+        response: 200,
+        description: 'Test result',
+        content: new OA\JsonContent(properties: [
+            new OA\Property(property: 'success', type: 'boolean'),
+        ])
+    )]
+    #[OA\Response(response: 400, description: 'Invalid or missing webhook URL')]
+    #[OA\Response(response: 403, description: 'Access denied')]
+    #[OA\Response(response: 404, description: 'Widget not found')]
+    #[OA\Response(response: 429, description: 'Rate limit exceeded')]
+    public function testHandoffWebhook(string $widgetId, Request $request, #[CurrentUser] ?User $user): JsonResponse
+    {
+        if (!$user) {
+            return $this->json(['error' => 'Not authenticated'], Response::HTTP_UNAUTHORIZED);
+        }
+
+        $widget = $this->widgetRepository->findByWidgetId($widgetId);
+        if (!$widget) {
+            return $this->json(['error' => 'Widget not found'], Response::HTTP_NOT_FOUND);
+        }
+        if ($widget->getOwnerId() !== $user->getId()) {
+            return $this->json(['error' => 'Access denied'], Response::HTTP_FORBIDDEN);
+        }
+
+        $rateLimitResult = $this->checkTestApiRateLimit($user->getId());
+        if (!$rateLimitResult['allowed']) {
+            return $this->json([
+                'success' => false,
+                'error' => 'Rate limit exceeded. Please wait before testing again.',
+                'retryAfter' => $rateLimitResult['retry_after'],
+            ], Response::HTTP_TOO_MANY_REQUESTS);
+        }
+
+        $data = json_decode($request->getContent(), true) ?? [];
+        $config = $widget->getConfig();
+        $webhookUrl = isset($data['webhookUrl']) && \is_string($data['webhookUrl']) && '' !== trim($data['webhookUrl'])
+            ? trim($data['webhookUrl'])
+            : (\is_string($config['slackWebhookUrl'] ?? null) ? trim($config['slackWebhookUrl']) : '');
+
+        if ('' === $webhookUrl || !$this->slack->isWebhookUrlValid($webhookUrl)) {
+            return $this->json([
+                'success' => false,
+                'error' => 'Invalid or missing Slack webhook URL (expected https://hooks.slack.com/services/...).',
+            ], Response::HTTP_BAD_REQUEST);
+        }
+
+        $this->incrementTestApiRateLimit($user->getId());
+        $widgetName = $widget->getName();
+        $delivered = $this->slack->sendTestMessage($webhookUrl, '' !== $widgetName ? $widgetName : '(unnamed widget)');
+
+        return $this->json([
+            'success' => $delivered,
+        ]);
     }
 
     /**

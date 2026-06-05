@@ -1474,13 +1474,15 @@ class GoogleProvider implements ChatProviderInterface, ImageGenerationProviderIn
         }
 
         try {
-            $allowedTtsModels = [
-                'gemini-2.5-flash-preview-tts',
-                'gemini-2.5-pro-preview-tts',
-            ];
-            $model = $options['model'] ?? 'gemini-2.5-flash-preview-tts';
-            if (!in_array($model, $allowedTtsModels, true)) {
-                $model = 'gemini-2.5-flash-preview-tts';
+            // Accept any Gemini TTS variant Google ships so newer catalog rows
+            // (e.g. gemini-3.1-flash-tts-preview) reach the API instead of
+            // being silently downgraded to the 2.5 fallback. We still gate on
+            // the "gemini-...-tts*" shape so a typo or non-TTS model can never
+            // reach :generateContent with audio modality enabled.
+            $defaultTtsModel = 'gemini-2.5-flash-preview-tts';
+            $model = $options['model'] ?? $defaultTtsModel;
+            if (!is_string($model) || !$this->isGeminiTtsModelId($model)) {
+                $model = $defaultTtsModel;
             }
             $voiceName = $options['voice'] ?? 'Kore';
 
@@ -1681,6 +1683,21 @@ class GoogleProvider implements ChatProviderInterface, ImageGenerationProviderIn
         return str_contains($mimeType, 'pcm')
             || str_contains($mimeType, 'x-raw')
             || str_contains($mimeType, 'linear16');
+    }
+
+    /**
+     * Recognise the Gemini TTS model family so the catalog can ship new
+     * preview ids (gemini-2.5-flash-preview-tts, gemini-2.5-pro-preview-tts,
+     * gemini-3.1-flash-tts-preview, …) without a code change. We keep the
+     * shape strict enough that non-TTS Gemini models still get rejected.
+     */
+    private function isGeminiTtsModelId(string $model): bool
+    {
+        if (!str_starts_with($model, 'gemini-')) {
+            return false;
+        }
+
+        return str_contains($model, '-tts');
     }
 
     /**

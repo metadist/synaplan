@@ -20,6 +20,8 @@
         <env name="SYMFONY_DEPRECATIONS_HELPER" value="weak" />
         <env name="MAILER_DSN" value="null://null" />
         <env name="AI_DEFAULT_PROVIDER" value="test" />
+        <!-- Docker/backend/.env may set flock:///var/www/uploads (not writable for www-data under bind mounts). -->
+        <env name="LOCK_DSN" value="flock:///tmp" force="true" />
         <!-- AI Provider API Keys (defaults for testing) -->
         <env name="ANTHROPIC_API_KEY" value="" />
         <env name="OPENAI_API_KEY" value="" />
@@ -40,9 +42,13 @@
         <env name="HEALTH_MONITOR_USER_PASSWORD" value="" />
         <!-- Stripe / Billing (force valid-looking keys so BillingService::isEnabled()=true in tests) -->
         <env name="STRIPE_SECRET_KEY" value="sk_test_fakeKeyForTestSuite000000000000" force="true" />
+        <!-- Must match StripeWebhookControllerTest + StripeSignatureHelper; Docker/backend/.env must not win -->
+        <env name="STRIPE_WEBHOOK_SECRET" value="whsec_fakeWebhookSecretForTests" force="true" />
         <env name="STRIPE_PRICE_PRO" value="price_1TestSuitePro" force="true" />
         <env name="STRIPE_PRICE_TEAM" value="price_1TestSuiteTeam" force="true" />
         <env name="STRIPE_PRICE_BUSINESS" value="price_1TestSuiteBusiness" force="true" />
+        <!-- Force the SEPA-enabled allowlist so a developer's local .env can't suppress it. -->
+        <env name="STRIPE_PAYMENT_METHODS" value="card,link,sepa_debit,klarna" force="true" />
         <!-- Whisper / TTS (defaults for testing) -->
         <env name="WHISPER_BINARY" value="/usr/local/bin/whisper" />
         <env name="WHISPER_MODELS_PATH" value="/tmp/whisper-models" />

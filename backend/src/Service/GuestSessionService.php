@@ -20,11 +20,20 @@ final class GuestSessionService
 
     private ?User $cachedProcessingUser = null;
 
+    /**
+     * @param int $maxSessionsPerIp anti-abuse cap on concurrent active guest
+     *                              sessions per IP. Defaults to
+     *                              self::MAX_SESSIONS_PER_IP in production; the
+     *                              E2E suite raises it via GUEST_MAX_SESSIONS_PER_IP
+     *                              because every test hits the server from the
+     *                              same client IP and would otherwise 429.
+     */
     public function __construct(
         private EntityManagerInterface $em,
         private GuestSessionRepository $sessionRepository,
         private UserRepository $userRepository,
         private LoggerInterface $logger,
+        private int $maxSessionsPerIp = self::MAX_SESSIONS_PER_IP,
     ) {
     }
 
@@ -50,7 +59,7 @@ final class GuestSessionService
 
         if ($ip) {
             $activeCount = $this->sessionRepository->countActiveSessionsByIp($ip);
-            if ($activeCount >= self::MAX_SESSIONS_PER_IP) {
+            if ($activeCount >= $this->maxSessionsPerIp) {
                 $this->logger->warning('Guest session IP rate limit exceeded', [
                     'ip' => $ip,
                     'active_sessions' => $activeCount,

@@ -36,7 +36,26 @@
     "feedback": "Comentarios",
     "widgetSessions": "Sesiones de Widget",
     "widgetChats": "Chats de Widget",
-    "liveSupport": "Soporte en vivo"
+    "liveSupport": "Soporte en vivo",
+    "addinConnect": "Conectar complemento de Outlook"
+  },
+  "addinConnect": {
+    "title": "Conectar a Synaplan",
+    "subtitle": "Autoriza al complemento Synamail de Outlook a usar esta cuenta de Synaplan.",
+    "loading": "Comprobando tu sesión…",
+    "confirmPrompt": "Conectar este Outlook a:",
+    "connectButton": "Conectar Outlook",
+    "scopesNote": "Concede acceso a mensajes, chats, archivos y búsqueda RAG.",
+    "connecting": "Emitiendo una clave de API segura…",
+    "successTitle": "Conectado.",
+    "successSubtitle": "Puedes cerrar esta ventana si no se cierra por sí sola.",
+    "errorTitle": "No se pudo conectar",
+    "retry": "Reintentar",
+    "helpLine": "Esta ventana se abre desde el complemento Synamail. Es seguro cerrarla.",
+    "errorMissingState": "Falta el parámetro state. Vuelve a abrir el complemento e inténtalo de nuevo.",
+    "errorOfficeNotReady": "Office.js no está disponible. Esta página debe abrirse desde Outlook.",
+    "errorNotSignedIn": "No has iniciado sesión. Actualiza la ventana y vuelve a iniciar sesión.",
+    "errorIssuanceFailed": "Synaplan no pudo emitir una clave de API para esta cuenta."
   },
   "welcome": "Bienvenido",
   "chat": {
@@ -53,6 +72,8 @@
     "showAll": "Mostrar Todo",
     "recent": "Conversaciones Recientes",
     "ttsGenerating": "Añadiendo respuesta hablada…",
+    "audioUnavailable": "El audio no se pudo cargar",
+    "audioUnavailableDescription": "El archivo no está disponible en el servidor por el momento. Inténtalo de nuevo más tarde o descárgalo.",
     "rename": "Renombrar Chat",
     "enterNewName": "Ingresa un nuevo título para este chat:",
     "namePlaceholder": "Título del chat...",
@@ -99,7 +120,8 @@
       "share": "Compartir chat",
       "public": "Público"
     },
-    "fileOnlyDefaultMessage": "Por favor, revisa el archivo adjunto."
+    "fileOnlyDefaultMessage": "Por favor, revisa el archivo adjunto.",
+    "voiceMessageDefaultMessage": "Por favor, responde a mi mensaje de voz."
   },
   "admin": {
     "title": "Panel de Administración",
@@ -260,6 +282,7 @@
     "web": "Web",
     "webSearch": "Buscar información actualizada en la web",
     "enhance": "Mejorar",
+    "enhanceRejected": "No se pudo mejorar este texto. Prueba con una frase o pregunta más clara.",
     "thinking": "Pensamiento",
     "reasoningNotSupported": "Tu modelo de chat actual no soporta razonamiento. Por favor selecciona un modelo con capacidad de razonamiento (GPT-5, o3, DeepSeek-R1) en Configuración de IA → Modelos.",
     "voice": "Iniciar voz",
@@ -275,6 +298,9 @@
     "dropFiles": "Suelta los archivos aquí",
     "dropFilesHint": "Imágenes, documentos, archivos de audio...",
     "filesPasted": "{count} archivo pegado | {count} archivos pegados",
+    "uploadError": "Error al subir el archivo. Inténtalo de nuevo.",
+    "documentExtractionFailed": "No se pudo leer el texto de \"{filename}\". El documento puede estar vacío, escaneado sin OCR, protegido con contraseña o en un formato no compatible.",
+    "audioTranscriptionFailed": "No se pudo transcribir \"{filename}\". El audio puede estar vacío, dañado o en un formato no compatible.",
     "voiceReply": "Escuchar",
     "voiceReplyTooltip": "La IA lee la respuesta en voz alta",
     "send": "Enviar mensaje",
@@ -298,7 +324,8 @@
     "again": "Otra vez",
     "againWith": "Otra vez con",
     "regenerateWith": "Regenerar con",
-    "copy": "Copiar mensaje"
+    "copy": "Copiar mensaje",
+    "infoAudioModel": "Modelo de audio"
   },
   "commands": {
     "noResults": "No se encontraron comandos",
@@ -481,7 +508,19 @@
     "dropHere": "Suelta archivos aquí para subir",
     "uploadSuccess": "{count} archivo(s) subido(s) correctamente",
     "uploadCancelled": "Subida cancelada",
-    "uploadInterrupted": "Transferencia interrumpida. Se actualizó la lista: los archivos que ya llegaron al servidor pueden seguir apareciendo."
+    "uploadInterrupted": "Transferencia interrumpida. Se actualizó la lista: los archivos que ya llegaron al servidor pueden seguir apareciendo.",
+    "uploadSlow": "tardando más de lo habitual…",
+    "uploadFailed": {
+      "transfer_stalled": "{filename}: La subida se detuvo en {percent}%: la conexión dejó de enviar datos antes de que el archivo llegara al servidor. Suele deberse a una conexión interrumpida o a un límite de tamaño/tiempo de espera en un proxy. Revisa tu conexión e inténtalo de nuevo; si sigue fallando, el archivo puede ser demasiado grande para el límite actual del servidor.",
+      "server_timeout": "{filename}: El archivo terminó de subirse pero el servidor no respondió a tiempo. Es posible que se haya guardado de todos modos: espera un momento y revisa la lista antes de reintentar.",
+      "too_large": "{filename}: El servidor rechazó este archivo por ser demasiado grande. Usa un archivo más pequeño o pide a tu administrador que aumente el límite de subida.",
+      "forbidden": "{filename}: La subida fue bloqueada por una capa de seguridad (firewall/proxy) antes de llegar al servidor. Normalmente no es algo que puedas solucionar tú; contacta con el equipo para que permitan esta subida.",
+      "gateway": "{filename}: El servidor no está disponible temporalmente (error {status}). Inténtalo de nuevo en un momento.",
+      "server_error": "{filename}: El servidor tuvo un error al guardar este archivo (error {status}). Inténtalo de nuevo.",
+      "network": "{filename}: Se perdió la conexión durante la subida. Revisa tu red e inténtalo de nuevo.",
+      "invalid_response": "{filename}: El servidor devolvió una respuesta inesperada. Inténtalo de nuevo.",
+      "http_error": "{filename}: La subida falló (error {status}). Inténtalo de nuevo."
+    }
   },
   "aiProvider": {
     "error": {
@@ -967,7 +1006,9 @@
     "topic": "Tema",
     "language": "Idioma",
     "modelId": "ID de Modelo",
-    "longRunningHint": "Esta solicitud está tardando un poco más de lo habitual — por favor, ten paciencia."
+    "longRunningHint": "Esta solicitud está tardando un poco más de lo habitual — por favor, ten paciencia.",
+    "waitingDesc": "Un momento…",
+    "waitingAria": "Preparando respuesta"
   },
   "message": {
     "thinking": "Proceso de pensamiento",
@@ -1201,6 +1242,15 @@
     "deleteSelected": "Eliminar Seleccionados",
     "deleteSelectedConfirmTitle": "¿Eliminar Archivos Seleccionados?",
     "deleteSelectedConfirmMessage": "¿Estás seguro de que deseas eliminar {count} archivo(s) seleccionado(s)? Esta acción no se puede deshacer y los archivos se eliminarán permanentemente.",
+    "deleteFolder": "Eliminar carpeta",
+    "deleteFolderConfirmTitle": "¿Eliminar la carpeta «{folder}»?",
+    "deleteFolderConfirmMessage": "Esto elimina permanentemente la carpeta «{folder}» y los {count} archivo(s) que contiene, incluido su contenido indexado. Esta acción no se puede deshacer.",
+    "deleteFolderEmptyConfirmMessage": "¿Eliminar la carpeta vacía «{folder}»? No contiene archivos, por lo que no se elimina nada más.",
+    "deleteFolderConfirmButton": "Eliminar carpeta y archivos",
+    "folderDeleted": "Carpeta «{folder}» eliminada ({count} archivo(s) eliminados)",
+    "folderEmptyDeleted": "Carpeta «{folder}» eliminada",
+    "deleteFolderFailed": "No se pudo eliminar la carpeta «{folder}»",
+    "deleteFolderPartial": "Carpeta «{folder}»: {success} archivo(s) eliminados, {failed} con error",
     "noFiles": "Aún no hay archivos subidos",
     "page": "Página",
     "showing": "Mostrando",
@@ -1309,6 +1359,10 @@
       "chatGeneration": "Generación de Respuestas",
       "messageClassification": "Clasificación de Mensajes",
       "clickToConfig": "Clic para configurar",
+      "purposeChip": {
+        "activeTooltip": "Ya establecido como modelo predeterminado para «{purpose}»",
+        "applyTooltip": "Establecer {model} como modelo predeterminado para «{purpose}»"
+      },
       "defaultConfig": "Configuración de Modelo Predeterminado",
       "saveConfiguration": "Guardar Configuración",
       "resetForm": "Restablecer Formulario",
@@ -1590,7 +1644,33 @@
     "deleteHandler": "Eliminar Gestor",
     "handlerName": "Nombre del Gestor",
     "handlerNamePlaceholder": "ej. Bandeja de Soporte, Correo de Ventas",
-    "handlerNameHelp": "Dale un nombre descriptivo a este gestor de correo"
+    "handlerNameHelp": "Dale un nombre descriptivo a este gestor de correo",
+    "activity": {
+      "title": "Actividad reciente",
+      "description": "Las últimas 10 acciones de este agente de correo. Útil para investigar casos de «marcado como leído pero nunca reenviado».",
+      "openButton": "Ver registro de actividad",
+      "refresh": "Recargar actividad",
+      "loadFailed": "No se pudo cargar el registro de actividad",
+      "empty": "Aún no hay actividad",
+      "emptyDescription": "Cuando este agente procese correos entrantes, los pasos más recientes aparecerán aquí.",
+      "retentionNote": "Solo se conservan las últimas 10 entradas; las más antiguas se eliminan automáticamente.",
+      "events": {
+        "check": "Buzón comprobado",
+        "connect_failed": "Error de conexión",
+        "forwarded": "Correo reenviado",
+        "discarded": "Correo descartado por la IA",
+        "no_smtp": "Enrutado pero no enviado (SMTP no configurado)",
+        "forward_failed": "Error al reenviar",
+        "process_error": "No se pudo procesar el mensaje"
+      },
+      "fields": {
+        "from": "De",
+        "subject": "Asunto",
+        "routedTo": "Enrutado a",
+        "matched": "Coincidencias",
+        "criteria": "Criterios IMAP"
+      }
+    }
   },
   "shared": {
     "title": "Chat Compartido",
@@ -1817,6 +1897,11 @@
       "customCategoryPlaceholder": "Introducir categoría personalizada...",
       "createWithAI": "Crear con IA",
       "aiUnavailable": "Estructuración por IA no disponible, guardando como nota",
+      "aiUnavailableCreateFallback": "IA no disponible: tu texto se ha preparado como una nota simple. Confirma para guardar o ajusta la categoría/clave primero.",
+      "aiUnavailableCreateReason": "Guardado como nota simple porque la estructuración por IA no estaba disponible.",
+      "aiUnavailableEditFallback": "IA no disponible: edita la memoria directamente en el modo manual.",
+      "storageUnavailable": "El almacenamiento de memorias no está accesible ahora mismo. Inténtalo de nuevo más tarde.",
+      "parseFailed": "No se pudo procesar. Inténtalo de nuevo más tarde o guarda manualmente.",
       "previewTitle": "Vista previa",
       "previewDescription": "Comprueba si esto es correcto antes de guardar.",
       "actionCreate": "Nuevo recuerdo",

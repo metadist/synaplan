@@ -379,6 +379,19 @@ class GuestChatController extends AbstractController
                     ];
                 }
 
+                // Audio (TTS) model — separate from chat so the badge after
+                // a page reload also shows the actual TTS model (#583).
+                $audioProvider = $m->getMeta('ai_audio_provider');
+                $audioModel = $m->getMeta('ai_audio_model');
+                $audioModelId = $m->getMeta('ai_audio_model_id');
+                if ($audioProvider || $audioModel) {
+                    $aiModels['audio'] = [
+                        'provider' => $audioProvider,
+                        'model' => $audioModel,
+                        'model_id' => $audioModelId ? (int) $audioModelId : null,
+                    ];
+                }
+
                 $searchQuery = $m->getMeta('web_search_query');
                 $searchResultsCount = $m->getMeta('web_search_results_count');
                 if ($searchQuery || $searchResultsCount) {

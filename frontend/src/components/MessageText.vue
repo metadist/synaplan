@@ -20,6 +20,7 @@ import { useMemoriesStore } from '@/stores/userMemories'
 import { useFeedbackStore } from '@/stores/userFeedback'
 import { useConfigStore } from '@/stores/config'
 import { useNotification } from '@/composables/useNotification'
+import { findStableMarkdownBoundary } from '@/utils/streamingBoundary'
 import type { UserMemory } from '@/services/api/userMemoriesApi'
 
 interface Props {
@@ -551,20 +552,57 @@ async function processContent(content: string, version: number): Promise<string 
   return processContentSync(content)
 }
 
-// Phase 3c: during streaming, render the prose with a CHEAP path (HTML
-// escape + newline-to-<br>) and skip marked + DOMPurify + highlight.js
-// entirely. The full pipeline costs 5-30 ms per call which compounds
-// every 80 ms throughout the stream — we used to burn most of the
-// frontend CPU on a render that gets thrown away as soon as the next
-// chunk arrives. We run the full pipeline once when streaming ends.
+// Streaming render strategy (issue #903):
 //
-// The streaming path still calls processContent indirectly via the
-// existing memory/feedback badge resolution paths, but only on a
-// 250 ms interval (vs 80 ms before) so reactive updates from the
-// memory store still resolve `[Memory:ID]` placeholders — just less
-// often during the hot streaming window.
+// We split the in-progress content into a STABLE PREFIX (everything up
+// to the last paragraph break / closed code fence) and a TRAILING TAIL
+// (the in-progress paragraph). The prefix runs through the full
+// markdown + DOMPurify + highlight.js pipeline ONCE per paragraph and
+// is cached, so already-rendered headings, tables, and code blocks stay
+// byte-identical between chunks — no flicker. The tail uses the cheap
+// escape + <br> path because it would be rewritten by every chunk
+// anyway. Memory / feedback badges still resolve in the tail in real
+// time so [Memory:ID] tokens turn into pills as they arrive.
+//
+// Math content keeps the legacy debounced-async path because KaTeX is
+// genuinely async and an in-progress formula must not be partially
+// rendered.
 let renderDebounceTimer: ReturnType<typeof setTimeout> | null = null
 const RENDER_DEBOUNCE_STREAMING_MS = 250
+
+// Cache of the most recently rendered stable prefix during streaming.
+// Cleared whenever streaming ends, the message is replaced, or the
+// memory / feedback stores update (so freshly-resolved badges replace
+// any stale loading pills in the cached HTML).
+let streamingStableCache: { rawPrefix: string; html: string } | null = null
+
+function invalidateStreamingCache(): void {
+  streamingStableCache = null
+}
+
+function renderStreamingIncremental(content: string): string {
+  const boundary = findStableMarkdownBoundary(content)
+  const stablePrefix = boundary > 0 ? content.slice(0, boundary) : ''
+  const trailingTail = boundary < content.length ? content.slice(boundary) : ''
+
+  let stableHtml = ''
+  if (stablePrefix.length > 0) {
+    if (streamingStableCache && streamingStableCache.rawPrefix === stablePrefix) {
+      stableHtml = streamingStableCache.html
+    } else {
+      stableHtml = processContentSync(stablePrefix)
+      streamingStableCache = { rawPrefix: stablePrefix, html: stableHtml }
+    }
+  }
+
+  let tailHtml = ''
+  if (trailingTail.length > 0) {
+    tailHtml = renderStreamingFast(trailingTail)
+    tailHtml = processFeedbackBadges(processMemoryBadges(tailHtml))
+  }
+
+  return stableHtml + tailHtml
+}
 
 function escapeHtml(input: string): string {
   return input
@@ -621,50 +659,54 @@ function renderStreamingFast(content: string): string {
 // happens in the same Vue tick as the `isStreaming = false` flip that makes
 // `data-testid="message-done"` visible in the DOM. If we awaited even one
 // microtask here, Vue would commit `message-done` first and Playwright's
-// `waitForAnswer` would read the stale cheap-render HTML left behind from
-// the streaming phase. Math content still routes through the async path
-// (KaTeX is genuinely async); for that case the cheap render stays on
-// screen until the math render completes — better than blocking the paint.
+// `waitForAnswer` would read stale streaming HTML. Math content still routes
+// through the async path (KaTeX is genuinely async); for that case the
+// cheap render stays on screen until the math render completes — better
+// than blocking the paint.
+//
+// During streaming, plain content uses `renderStreamingIncremental` which
+// keeps the stable prefix (everything up to the last `\n\n` outside a code
+// fence) byte-identical between chunks — no flicker (issue #903). Only the
+// trailing in-progress paragraph is re-rendered with each chunk.
 watch(
   () => props.content,
   (newContent) => {
     const currentVersion = ++renderVersion
 
     if (props.isStreaming) {
-      // Cheap streaming path — synchronous, no debounce delay.
-      let html = renderStreamingFast(newContent)
-      // Still resolve memory + feedback badges in real time.
-      html = processFeedbackBadges(processMemoryBadges(html))
-      renderedContent.value = html
+      // Issue #903: math content keeps the legacy debounced-async path
+      // because KaTeX is genuinely async and we must not show partial
+      // formulas. Plain content uses the incremental renderer so stable
+      // paragraphs do not flicker between raw and rendered markdown.
+      if (hasMathFormulas(newContent)) {
+        let html = renderStreamingFast(newContent)
+        html = processFeedbackBadges(processMemoryBadges(html))
+        renderedContent.value = html
 
-      // Schedule a low-frequency full re-render so memory store updates
-      // (badges arriving via the polled extraction endpoint, etc.) still
-      // surface during long streams. 250 ms is much cheaper than the
-      // previous 80 ms while still feeling responsive.
-      if (renderDebounceTimer !== null) {
-        clearTimeout(renderDebounceTimer)
-      }
-      renderDebounceTimer = setTimeout(() => {
-        renderDebounceTimer = null
-        if (currentVersion !== renderVersion) return
-        if (!props.isStreaming) return // streaming ended → final pass below handles it
-
-        if (hasMathFormulas(newContent)) {
+        if (renderDebounceTimer !== null) {
+          clearTimeout(renderDebounceTimer)
+        }
+        renderDebounceTimer = setTimeout(() => {
+          renderDebounceTimer = null
+          if (currentVersion !== renderVersion) return
+          if (!props.isStreaming) return
           void processContentAsync(newContent, currentVersion).then((result) => {
             if (result !== null) {
               renderedContent.value = result
             }
           })
-        } else {
-          renderedContent.value = processContentSync(newContent)
-        }
-      }, RENDER_DEBOUNCE_STREAMING_MS)
+        }, RENDER_DEBOUNCE_STREAMING_MS)
+        return
+      }
+
+      renderedContent.value = renderStreamingIncremental(newContent)
       return
     }
 
     // Not streaming — full markdown pipeline. Sync for non-math (the common
     // case) so `message-done` and the final bubble HTML land in the same
     // Vue render commit; async only when KaTeX needs it.
+    invalidateStreamingCache()
     if (hasMathFormulas(newContent)) {
       void processContentAsync(newContent, currentVersion).then((result) => {
         if (result !== null) {
@@ -693,6 +735,7 @@ watch(
       clearTimeout(renderDebounceTimer)
       renderDebounceTimer = null
     }
+    invalidateStreamingCache()
 
     const currentVersion = ++renderVersion
     if (hasMathFormulas(props.content)) {
@@ -822,6 +865,9 @@ watch(
   () => feedbackStore.feedbacks,
   async () => {
     if (props.content.includes('[Feedback:') || props.content.includes('[feedback:')) {
+      // Drop the cached stable prefix so the next streaming chunk picks
+      // up freshly-resolved feedback badges instead of stale loading pills.
+      invalidateStreamingCache()
       const currentVersion = ++renderVersion
       const result = await processContent(props.content, currentVersion)
       if (result !== null) {
@@ -837,6 +883,7 @@ watch(
   () => memoriesStore.memories,
   async () => {
     if (props.content.includes('[Memory:') || props.content.includes('[memory:')) {
+      invalidateStreamingCache()
       const currentVersion = ++renderVersion
       const result = await processContent(props.content, currentVersion)
       if (result !== null) {

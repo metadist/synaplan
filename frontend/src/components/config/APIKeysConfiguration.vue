@@ -7,7 +7,7 @@
       data-testid="alert-error"
     >
       <svg
-        class="w-5 h-5 text-red-500 mt-0.5"
+        class="w-5 h-5 text-red-500 mt-0.5 shrink-0"
         fill="none"
         viewBox="0 0 24 24"
         stroke="currentColor"
@@ -22,6 +22,13 @@
       <div class="flex-1">
         <p class="text-red-500 text-sm font-medium">{{ error }}</p>
       </div>
+      <button
+        class="text-red-500 hover:text-red-600 text-sm font-medium underline mr-2"
+        data-testid="btn-alert-retry"
+        @click="loadAPIKeys"
+      >
+        {{ $t('common.retry') }}
+      </button>
       <button
         class="text-red-500 hover:text-red-600"
         data-testid="btn-alert-close"
@@ -371,7 +378,8 @@
 
 <script setup lang="ts">
 import { getErrorMessage } from '@/utils/errorMessage'
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, onActivated, watch } from 'vue'
+import { useRoute } from 'vue-router'
 import {
   PlusIcon,
   KeyIcon,
@@ -394,6 +402,7 @@ const dialog = useDialog()
 const { success, error: showError } = useNotification()
 const { t } = useI18n()
 const { formatDateTime } = useDateFormat()
+const route = useRoute()
 
 interface UIApiKey {
   id: number
@@ -596,4 +605,21 @@ const formatDate = (timestamp: number): string => {
 onMounted(() => {
   loadAPIKeys()
 })
+
+// Re-load when navigating back to this tab from api-documentation or other sub-pages.
+// ConfigView uses v-else-if so this component unmounts on navigation and remounts on return,
+// but keep-alive would use onActivated instead — we handle both.
+onActivated(() => {
+  loadAPIKeys()
+})
+
+// Watch for route changes within ConfigView (same component instance kept alive)
+watch(
+  () => route.path,
+  (newPath, oldPath) => {
+    if (newPath === '/config/api-keys' && oldPath !== '/config/api-keys') {
+      loadAPIKeys()
+    }
+  }
+)
 </script>

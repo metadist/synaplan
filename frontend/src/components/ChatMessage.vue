@@ -1,7 +1,7 @@
 <template>
   <div
     :class="[
-      'flex gap-4 p-4 text-[16px] leading-6',
+      'flex gap-0 md:gap-4 p-3 md:p-4 text-[16px] leading-6',
       role === 'user' ? 'justify-end' : '',
       isSuperseded && 'opacity-50',
     ]"
@@ -12,14 +12,19 @@
     <!-- Avatar with provider logo for assistant -->
     <div
       v-if="role === 'assistant'"
-      class="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 surface-card"
+      class="hidden md:flex w-10 h-10 rounded-full items-center justify-center flex-shrink-0 surface-card"
     >
       <GroqIcon v-if="displayProvider.toLowerCase().includes('groq')" :size="24" class-name="" />
       <Icon v-else :icon="getProviderIcon(displayProvider)" class="w-6 h-6" />
     </div>
 
     <!-- Wrapper for thinking blocks + bubble -->
-    <div class="flex flex-col max-w-3xl min-w-0 gap-2">
+    <div
+      :class="[
+        'flex flex-col flex-1 min-w-0 md:flex-none md:max-w-3xl gap-2',
+        role === 'user' ? 'items-end' : '',
+      ]"
+    >
       <!-- Thinking blocks (ABOVE bubble, only for assistant) -->
       <template v-if="role === 'assistant'">
         <MessagePart
@@ -72,6 +77,35 @@
           <CheckIcon v-if="copied" class="w-4 h-4 text-green-500" />
           <ClipboardDocumentIcon v-else class="w-4 h-4" />
         </button>
+
+        <!--
+          Fallback loading indicator (issue #902).
+          Shown while the assistant bubble is on screen but the backend has
+          not yet emitted any processing status event and no content has
+          streamed in. Without this fallback the bubble is visually empty
+          (just copy button, timestamp, provider avatar) for the seconds
+          (or minutes, with slow vision models) it takes the server to send
+          the first SSE status event, leaving the user with no indication
+          that anything is happening.
+        -->
+        <div
+          v-if="
+            isStreaming && !processingStatus && role === 'assistant' && contentParts.length === 0
+          "
+          class="px-4 pt-3 pb-3 processing-enter"
+          data-testid="loading-initial-indicator"
+          role="status"
+          :aria-label="t('processing.waitingAria')"
+        >
+          <div class="flex items-center gap-3">
+            <div class="typing-dots flex items-center gap-1.5" aria-hidden="true">
+              <span class="typing-dot"></span>
+              <span class="typing-dot"></span>
+              <span class="typing-dot"></span>
+            </div>
+            <div class="text-sm txt-tertiary">{{ t('processing.waitingDesc') }}</div>
+          </div>
+        </div>
 
         <!-- Processing Status (inside bubble, before content) -->
         <div
@@ -622,6 +656,30 @@
                       </button>
                     </div>
 
+                    <!-- Audio (TTS) Model -->
+                    <!-- Shown as a separate badge so the LLM that generated the
+                         text and the TTS engine that voiced it are visually
+                         distinguishable — see issue #583. -->
+                    <div
+                      v-if="aiModels?.audio"
+                      class="flex items-center justify-between gap-2"
+                      data-testid="info-audio-model"
+                    >
+                      <span class="text-xs txt-tertiary">{{
+                        $t('chatMessage.infoAudioModel')
+                      }}</span>
+                      <button
+                        type="button"
+                        class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-xs font-medium bg-sky-500/10 hover:bg-sky-500/20 text-sky-600 dark:text-sky-400 transition-colors cursor-pointer"
+                        @click="handleInfoModelClick('audio')"
+                      >
+                        <Icon icon="mdi:music" class="w-3.5 h-3.5" />
+                        <span class="font-semibold truncate max-w-[10rem]">{{
+                          shortenModel(aiModels.audio.model)
+                        }}</span>
+                      </button>
+                    </div>
+
                     <!-- Sorting Model -->
                     <div v-if="aiModels?.sorting" class="flex items-center justify-between gap-2">
                       <span class="text-xs txt-tertiary">{{ $t('config.aiModels.sorting') }}</span>
@@ -637,17 +695,20 @@
                       </button>
                     </div>
 
-                    <!-- Legacy model/provider (when aiModels not available) -->
-                    <template v-if="!aiModels && modelLabel && provider">
+                    <!-- Legacy model/provider (when aiModels not available).
+                         Filters out channel-source tokens (WHATSAPP, EMAIL, …)
+                         so the metadata bar is consistent across channels
+                         instead of showing redundant labels — see #653. -->
+                    <template v-if="!aiModels && legacyModelLabel && legacyProviderLabel">
                       <div class="flex items-center justify-between gap-2">
                         <span class="text-xs txt-tertiary">{{ t('chatMessage.infoModel') }}</span>
-                        <span class="text-xs font-medium txt-primary">{{ modelLabel }}</span>
+                        <span class="text-xs font-medium txt-primary">{{ legacyModelLabel }}</span>
                       </div>
                       <div class="flex items-center justify-between gap-2">
                         <span class="text-xs txt-tertiary">{{
                           t('chatMessage.infoProvider')
                         }}</span>
-                        <span class="text-xs txt-secondary">{{ provider }}</span>
+                        <span class="text-xs txt-secondary">{{ legacyProviderLabel }}</span>
                       </div>
                     </template>
                   </div>
@@ -841,7 +902,7 @@
     <!-- Avatar on right for user -->
     <div
       v-if="role === 'user'"
-      class="w-10 h-10 rounded-full surface-chip flex items-center justify-center flex-shrink-0"
+      class="hidden md:flex w-10 h-10 rounded-full surface-chip items-center justify-center flex-shrink-0"
     >
       <UserIcon class="w-5 h-5 txt-secondary" />
     </div>
@@ -868,6 +929,7 @@ import { useAiConfigStore } from '@/stores/aiConfig'
 import type { AIModel } from '@/types/ai-models'
 import { useNotification } from '@/composables/useNotification'
 import { getProviderIcon } from '@/utils/providerIcons'
+import { isChannelSource } from '@/utils/channelSource'
 import { useMemoriesStore } from '@/stores/userMemories'
 import { useFeedbackStore } from '@/stores/userFeedback'
 import { useConfigStore } from '@/stores/config'
@@ -882,6 +944,7 @@ import { useDateFormat } from '@/composables/useDateFormat'
 import type { Part, MessageFile } from '@/stores/history'
 import type { AgainData } from '@/types/ai-models'
 import { mediaHintFromClassificationTopic } from '@/utils/mediaGenerationHint'
+import { chatBadgeIcon, chatBadgeLabel } from '@/utils/chatModelBadge'
 
 const { t } = useI18n()
 const { error: showError } = useNotification()
@@ -928,6 +991,14 @@ interface Props {
       model_id: number | null
     }
     sorting?: {
+      provider: string
+      model: string
+      model_id: number | null
+    }
+    // Audio (TTS) model used to synthesize the voice reply.
+    // Sent independently from `chat` because voice reply pipes the
+    // LLM's text through a separate TTS pipeline — see issue #583.
+    audio?: {
       provider: string
       model: string
       model_id: number | null
@@ -1107,13 +1178,31 @@ const contentParts = computed(() => {
   })
 })
 
-// Get provider for avatar icon (prefer aiModels.chat, fallback to legacy provider prop)
+// Get provider for avatar icon (prefer aiModels.chat, fallback to legacy provider prop).
+// Channel-source tokens like `WHATSAPP` / `EMAIL` / `widget` must never reach
+// `getProviderIcon` — they would silently fall through to the default robot
+// icon AND surface the channel name in the metadata bar (issue #653).
 const displayProvider = computed(() => {
-  if (props.aiModels?.chat?.provider) {
-    return props.aiModels.chat.provider
+  const nested = props.aiModels?.chat?.provider
+  if (nested && !isChannelSource(nested)) {
+    return nested
   }
-  return props.provider || 'OpenAI'
+  const legacy = props.provider
+  if (legacy && !isChannelSource(legacy)) {
+    return legacy
+  }
+  return 'OpenAI'
 })
+
+// Real AI provider/model values for the legacy popover row. Hides
+// channel-source tokens entirely instead of showing redundant labels
+// like `Model: WHATSAPP · Provider: WHATSAPP` (issue #653).
+const legacyProviderLabel = computed(() =>
+  props.provider && !isChannelSource(props.provider) ? props.provider : null
+)
+const legacyModelLabel = computed(() =>
+  props.modelLabel && !isChannelSource(props.modelLabel) ? props.modelLabel : null
+)
 
 // Determine model type based on message topic and content
 const hasImageContent = computed(() => props.parts.some((p) => p.type === 'image'))
@@ -1156,39 +1245,15 @@ const mediaHint = computed(() => {
   return null
 })
 
-// Dynamic label for model badge based on content type
-const getModelTypeLabel = computed(() => {
-  if (isFileAnalysisResponse.value) return 'Analyze Model'
-  switch (mediaHint.value) {
-    case 'vision':
-      return 'Vision Model'
-    case 'image':
-      return 'Image Model'
-    case 'video':
-      return 'Video Model'
-    case 'audio':
-      return 'Audio Model'
-    default:
-      return 'Chat Model'
-  }
-})
-
-// Dynamic icon for model badge
-const getModelTypeIcon = computed(() => {
-  if (isFileAnalysisResponse.value) return 'mdi:file-search'
-  switch (mediaHint.value) {
-    case 'vision':
-      return 'mdi:eye'
-    case 'image':
-      return 'mdi:image'
-    case 'video':
-      return 'mdi:video'
-    case 'audio':
-      return 'mdi:music'
-    default:
-      return 'mdi:chat'
-  }
-})
+// Pure-function helpers live in chatModelBadge.ts so the voice-reply
+// label rule (#583) is unit-testable in isolation. The computed
+// wrappers below just bind them to reactive component state.
+const getModelTypeLabel = computed(() =>
+  chatBadgeLabel(mediaHint.value, !!props.aiModels?.audio, isFileAnalysisResponse.value)
+)
+const getModelTypeIcon = computed(() =>
+  chatBadgeIcon(mediaHint.value, !!props.aiModels?.audio, isFileAnalysisResponse.value)
+)
 
 const formattedTime = computed(() => formatTime(props.timestamp))
 
@@ -1249,8 +1314,11 @@ const infoPopoverOpen = ref(false)
 
 const hasMessageMetadata = computed(() => {
   if (props.topic) return true
-  if (props.aiModels?.chat || props.aiModels?.sorting) return true
-  if (props.modelLabel && props.provider) return true
+  if (props.aiModels?.chat || props.aiModels?.sorting || props.aiModels?.audio) return true
+  // Only count legacy model/provider as metadata when neither is a
+  // channel-source token, otherwise we'd light up the info popover
+  // with nothing meaningful to show (issue #653).
+  if (legacyModelLabel.value && legacyProviderLabel.value) return true
   return false
 })
 
@@ -1258,7 +1326,7 @@ const closeInfoPopover = () => {
   infoPopoverOpen.value = false
 }
 
-const handleInfoModelClick = (modelType: 'chat' | 'sorting') => {
+const handleInfoModelClick = (modelType: 'chat' | 'sorting' | 'audio') => {
   showModelDetails(modelType)
   closeInfoPopover()
 }
@@ -1270,10 +1338,15 @@ const shortenModel = (name: string): string => {
 }
 
 // Use model selection composable
+// Prefer the structured `aiModels.chat` metadata (current source of truth) and
+// fall back to the legacy flat `provider` / `modelLabel` props for older messages
+// that pre-date the structured metadata. Without this preference the round-robin
+// recommendation cannot identify the current model and always returns the
+// second-highest-rated model. See issue #922.
 const againDataComputed = computed(() => props.againData)
 const filesComputed = computed(() => props.files)
-const currentProviderComputed = computed(() => props.provider)
-const currentModelNameComputed = computed(() => props.modelLabel)
+const currentProviderComputed = computed(() => props.aiModels?.chat?.provider ?? props.provider)
+const currentModelNameComputed = computed(() => props.aiModels?.chat?.model ?? props.modelLabel)
 const { modelOptions, predictedModel, hasModels } = useModelSelection(
   againDataComputed,
   filesComputed,
@@ -1304,18 +1377,23 @@ const getModelForOption = (option: ModelOption): AIModel | undefined => {
 }
 
 // Navigate to AI models configuration with highlight
-const showModelDetails = (modelType?: 'chat' | 'sorting') => {
+const showModelDetails = (modelType?: 'chat' | 'sorting' | 'audio') => {
   if (modelType === 'chat') {
     const capabilityMap: Record<string, string> = {
       vision: 'PIC2TEXT',
       image: 'TEXT2PIC',
       video: 'TEXT2VID',
-      audio: 'TEXT2SOUND',
+      // Only point CHAT badge at TEXT2SOUND when the chat handler itself
+      // produced the audio (no separate `audio` row exists). For voice
+      // replies the chat row is the LLM — keep it pointing at CHAT.
+      audio: props.aiModels?.audio ? 'CHAT' : 'TEXT2SOUND',
     }
     const capability = capabilityMap[mediaHint.value ?? ''] ?? 'CHAT'
     router.push({ path: '/config/ai-models', query: { highlight: capability } })
   } else if (modelType === 'sorting') {
     router.push({ path: '/config/ai-models', query: { highlight: 'SORT' } })
+  } else if (modelType === 'audio') {
+    router.push({ path: '/config/ai-models', query: { highlight: 'TEXT2SOUND' } })
   } else {
     router.push('/config/ai-models')
   }
@@ -1517,5 +1595,48 @@ onUnmounted(() => {
 .long-running-enter-from {
   opacity: 0;
   transform: translateY(-4px);
+}
+
+/*
+ * Typing dots used by the initial loading indicator (issue #902).
+ * Three brand-coloured dots with staggered bounce animation — the
+ * universal "AI is typing" cue. Falls back to a static, slightly faded
+ * appearance when the user prefers reduced motion.
+ */
+.typing-dot {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: 9999px;
+  background-color: var(--brand);
+  animation: typing-bounce 1.2s infinite ease-in-out both;
+}
+
+.typing-dot:nth-child(1) {
+  animation-delay: -0.32s;
+}
+
+.typing-dot:nth-child(2) {
+  animation-delay: -0.16s;
+}
+
+@keyframes typing-bounce {
+  0%,
+  80%,
+  100% {
+    transform: scale(0.6);
+    opacity: 0.4;
+  }
+  40% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .typing-dot {
+    animation: none;
+    opacity: 0.75;
+  }
 }
 </style>

@@ -1,6 +1,9 @@
 <template>
   <MainLayout>
-    <div class="flex flex-col h-full overflow-y-auto bg-chat scroll-thin" data-testid="page-tools">
+    <div
+      class="flex flex-col h-full overflow-y-auto bg-chat scroll-thin overscroll-contain"
+      data-testid="page-tools"
+    >
       <div class="max-w-[1400px] mx-auto w-full px-6 py-8">
         <div
           v-if="currentPage !== 'mail-handler' && currentPage !== 'doc-summary'"
@@ -225,6 +228,7 @@ const config = useConfigStore()
 const aiConfigStore = useAiConfigStore()
 const { success, error: showError, warning: showWarning } = useNotification()
 const dialog = useDialog()
+
 const widgets = ref<Widget[]>(mockWidgets)
 const showWidgetEditor = ref(false)
 const showPreview = ref(false)
