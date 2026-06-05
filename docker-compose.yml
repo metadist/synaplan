@@ -23,6 +23,9 @@ services:
     environment:
       NODE_ENV: development
       BACKEND_URL: http://backend
+      # Hosts the Vite dev server will accept (comma-separated), or "true"/"all".
+      # Needed when reaching the dev server via a custom domain / reverse proxy.
+      ALLOWED_HOSTS: ${ALLOWED_HOSTS:-aisystem.network.sunnet}
     ports:
       - "5173:5173"
     volumes:

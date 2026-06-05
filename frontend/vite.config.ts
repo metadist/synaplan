@@ -36,6 +36,16 @@ export default defineConfig(({ mode }) => {
   const basePath = env.VITE_BASE_PATH || '/'
   const backendUrl = env.BACKEND_URL || 'http://localhost:8000'
 
+  // Dev server allowed hosts. Set ALLOWED_HOSTS to a comma-separated list,
+  // or "true"/"all" to allow any host (handy behind a reverse proxy / custom domain).
+  const allowedHostsEnv = (env.ALLOWED_HOSTS || '').trim()
+  const allowedHosts =
+    allowedHostsEnv === 'true' || allowedHostsEnv === 'all'
+      ? true
+      : allowedHostsEnv
+        ? allowedHostsEnv.split(',').map((h) => h.trim()).filter(Boolean)
+        : undefined
+
   return {
     base: basePath,
     plugins: [vue(), gitkeepPlugin()],
@@ -87,6 +97,7 @@ export default defineConfig(({ mode }) => {
       },
     },
     server: {
+      ...(allowedHosts !== undefined ? { allowedHosts } : {}),
       proxy: {
         '/api': {
           target: backendUrl,

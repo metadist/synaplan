@@ -71,6 +71,25 @@ _mysql_legacy_stripped_baseline() {
     printf '%s' "${BASELINE_MIGRATION//\\/}"
 }
 
+# Drop every table in the current database.
+#
+# Used exclusively to recover from a half-applied baseline (see the partial
+# detection in bootstrap_migrations_metadata). The whole batch runs as a single
+# dbal:run-sql call: pdo_mysql executes the `;`-separated statements as one
+# multi-statement, so `SET FOREIGN_KEY_CHECKS=0` stays in effect for the DROP
+# and we don't have to know the FK dependency order. The table list is built
+# dynamically from information_schema so it never goes stale as the schema
+# evolves. 0x60 is a backtick — quoting the identifiers without tangling with
+# the surrounding shell/SQL quoting.
+#
+# Overridable in tests by redefining after sourcing this file.
+_drop_all_tables() {
+    local _env_flag="${1:-}"
+    php bin/console dbal:run-sql ${_env_flag} \
+        "SET FOREIGN_KEY_CHECKS=0; SET @tbls = (SELECT GROUP_CONCAT(CONCAT(0x60, table_name, 0x60)) FROM information_schema.tables WHERE table_schema = DATABASE()); SET @sql = IF(@tbls IS NULL, 'DO 0', CONCAT('DROP TABLE ', @tbls)); PREPARE s FROM @sql; EXECUTE s; DEALLOCATE PREPARE s; SET FOREIGN_KEY_CHECKS=1" \
+        >/dev/null 2>&1 || true
+}
+
 # INSERT IGNORE the baseline migration row. No-op if the row already exists.
 #
 # Also self-heals databases bootstrapped by the previous release where the
@@ -114,8 +133,33 @@ bootstrap_migrations_metadata() {
         "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = 'BUSER'" \
         "$_env_flag")
 
-    # Fresh database: let doctrine:migrations:migrate create the full schema.
     if [ "${_has_buser:-0}" -eq 0 ]; then
+        # Before treating a BUSER-less database as fresh, guard against a
+        # half-applied baseline. The baseline migration (Version20260417000000)
+        # is non-transactional — MariaDB can't roll back DDL — and creates
+        # BAPIKEYS as its FIRST statement but BUSER only near the END. If that
+        # first migrate run dies in between (transient DB drop, OOM/kill, ^C,
+        # an unsupported column type, ...) the early tables persist while
+        # Doctrine never records the version row. On the next start the naive
+        # "no BUSER => fresh" check would let migrate replay the baseline, which
+        # then crashes on `CREATE TABLE BAPIKEYS ... already exists` — and with
+        # `restart: unless-stopped` that becomes an infinite crash loop.
+        #
+        # "BAPIKEYS present but BUSER absent" is an unambiguous fingerprint of
+        # this broken state on an otherwise-fresh DB: no BUSER means no user
+        # data to lose, so we recover by dropping every orphan table and letting
+        # the migrate below rebuild the schema from scratch.
+        local _has_partial_baseline
+        _has_partial_baseline=$(_count_sql \
+            "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = 'BAPIKEYS'" \
+            "$_env_flag")
+        if [ "${_has_partial_baseline:-0}" -gt 0 ]; then
+            echo "⚠️  [$_label] Half-applied baseline detected (BAPIKEYS exists but BUSER does not) — dropping orphan tables so migrations can re-run cleanly"
+            _drop_all_tables "$_env_flag"
+        fi
+
+        # Fresh (or just-cleaned) database: let doctrine:migrations:migrate
+        # create the full schema.
         return 0
     fi
 

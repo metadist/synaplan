@@ -9,6 +9,7 @@
 #   3. Legacy DB, empty tbl  (metadata table empty)                  → register baseline
 #   4. Legacy DB, unrelated  (metadata table has non-baseline rows)  → register baseline
 #   5. Legacy DB, healthy    (baseline row already present)          → no-op
+#   8. Half-applied baseline (BAPIKEYS present, BUSER absent)        → drop orphan tables, then no-op
 #
 # The test doubles simulate the DB by maintaining $DB_STATE in-process. `php`
 # (and therefore `dbal:run-sql`) is shadowed via a function override, and
@@ -47,20 +48,24 @@ fi
 
 # DB_STATE fields:
 #   HAS_BUSER          1 if BUSER table exists
+#   HAS_BAPIKEYS       1 if BAPIKEYS table exists (baseline's first table)
 #   HAS_VERSIONS_TABLE 1 if doctrine_migration_versions table exists
 #   HAS_BASELINE_ROW   1 if baseline version is registered
 #   VERSION_ROW_COUNT  total number of rows in the versions table
 #   CREATE_CALLS       number of times _create_metadata_table was invoked
 #   REGISTER_CALLS     number of times _register_baseline_migration was invoked
+#   DROP_CALLS         number of times _drop_all_tables was invoked
 declare -A DB_STATE
 
 reset_state() {
     DB_STATE[HAS_BUSER]=0
+    DB_STATE[HAS_BAPIKEYS]=0
     DB_STATE[HAS_VERSIONS_TABLE]=0
     DB_STATE[HAS_BASELINE_ROW]=0
     DB_STATE[VERSION_ROW_COUNT]=0
     DB_STATE[CREATE_CALLS]=0
     DB_STATE[REGISTER_CALLS]=0
+    DB_STATE[DROP_CALLS]=0
 }
 
 # Override _count_sql to answer from DB_STATE based on which query it sees.
@@ -69,6 +74,9 @@ _count_sql() {
     case "$_sql" in
         *"table_name = 'BUSER'"*)
             echo "${DB_STATE[HAS_BUSER]}"
+            ;;
+        *"table_name = 'BAPIKEYS'"*)
+            echo "${DB_STATE[HAS_BAPIKEYS]}"
             ;;
         *"table_name = 'doctrine_migration_versions'"*)
             echo "${DB_STATE[HAS_VERSIONS_TABLE]}"
@@ -92,6 +100,16 @@ _register_baseline_migration() {
     DB_STATE[REGISTER_CALLS]=$((DB_STATE[REGISTER_CALLS] + 1))
     DB_STATE[HAS_BASELINE_ROW]=1
     DB_STATE[VERSION_ROW_COUNT]=$((DB_STATE[VERSION_ROW_COUNT] + 1))
+}
+
+_drop_all_tables() {
+    DB_STATE[DROP_CALLS]=$((DB_STATE[DROP_CALLS] + 1))
+    # Simulate the post-drop state: the schema is now empty.
+    DB_STATE[HAS_BUSER]=0
+    DB_STATE[HAS_BAPIKEYS]=0
+    DB_STATE[HAS_VERSIONS_TABLE]=0
+    DB_STATE[HAS_BASELINE_ROW]=0
+    DB_STATE[VERSION_ROW_COUNT]=0
 }
 
 # ---------------------------------------------------------------------------
@@ -118,11 +136,12 @@ assert_eq() {
 # Test cases
 # ---------------------------------------------------------------------------
 
-echo "▶ Case 1: fresh DB (no BUSER) — bootstrap must be a no-op"
+echo "▶ Case 1: fresh DB (no BUSER, no BAPIKEYS) — bootstrap must be a no-op"
 reset_state
 bootstrap_migrations_metadata "" "test-fresh" >/dev/null
 assert_eq 0 "${DB_STATE[CREATE_CALLS]}"   "_create_metadata_table NOT called"
 assert_eq 0 "${DB_STATE[REGISTER_CALLS]}" "_register_baseline_migration NOT called"
+assert_eq 0 "${DB_STATE[DROP_CALLS]}"     "_drop_all_tables NOT called"
 
 echo "▶ Case 2: legacy DB, no metadata table — bootstrap must create table AND register baseline"
 reset_state
@@ -174,6 +193,26 @@ bootstrap_migrations_metadata "" "test-double-1" >/dev/null
 bootstrap_migrations_metadata "" "test-double-2" >/dev/null
 assert_eq 1 "${DB_STATE[CREATE_CALLS]}"   "_create_metadata_table called exactly once across two invocations"
 assert_eq 1 "${DB_STATE[REGISTER_CALLS]}" "_register_baseline_migration called exactly once across two invocations"
+
+echo "▶ Case 8: half-applied baseline (BAPIKEYS present, BUSER absent) — bootstrap must drop orphan tables then no-op"
+reset_state
+DB_STATE[HAS_BUSER]=0
+DB_STATE[HAS_BAPIKEYS]=1            # baseline's first table got created
+DB_STATE[HAS_VERSIONS_TABLE]=0     # ...but the run died before recording the version
+bootstrap_migrations_metadata "" "test-partial-baseline" >/dev/null
+assert_eq 1 "${DB_STATE[DROP_CALLS]}"     "_drop_all_tables called exactly once"
+assert_eq 0 "${DB_STATE[CREATE_CALLS]}"   "_create_metadata_table NOT called (left to migrate)"
+assert_eq 0 "${DB_STATE[REGISTER_CALLS]}" "_register_baseline_migration NOT called (left to migrate)"
+assert_eq 0 "${DB_STATE[HAS_BAPIKEYS]}"   "orphan tables cleared so migrate re-runs clean"
+
+echo "▶ Case 9: double invocation on a half-applied baseline is safe (second call is a no-op)"
+reset_state
+DB_STATE[HAS_BUSER]=0
+DB_STATE[HAS_BAPIKEYS]=1
+DB_STATE[HAS_VERSIONS_TABLE]=0
+bootstrap_migrations_metadata "" "test-partial-1" >/dev/null
+bootstrap_migrations_metadata "" "test-partial-2" >/dev/null
+assert_eq 1 "${DB_STATE[DROP_CALLS]}"     "_drop_all_tables called exactly once across two invocations"
 
 # ---------------------------------------------------------------------------
 # Case 7: MySQL backslash escape regression test
