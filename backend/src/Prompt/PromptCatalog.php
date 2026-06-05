@@ -198,8 +198,8 @@ class PromptCatalog
             [
                 'topic' => 'officemaker',
                 'language' => 'en',
-                'shortDescription' => 'The user asks for the generation of an Excel, Powerpoint or Word document. Not for any other format. This prompt can only handle the generation of ONE document with a clear prompt.',
-                'keywords' => 'excel, xlsx, spreadsheet, tabellenkalkulation, csv, word, docx, document, dokument, powerpoint, pptx, presentation, praesentation, slide, folie, sheet, tabelle, office document, office datei, generate excel, erstelle excel, create spreadsheet, create document, dokument erstellen',
+                'shortDescription' => 'The user asks to generate OR to modify/reformat a single Excel, PowerPoint or Word document (CSV, XLSX, DOCX, PPTX). This includes follow-up requests that change the content or formatting of a document the assistant generated earlier in the same conversation (e.g. "make the title bold/bigger in the file", "add a column", "change the document"). Not for any other format. Handles exactly ONE document.',
+                'keywords' => 'excel, xlsx, spreadsheet, tabellenkalkulation, csv, word, docx, document, dokument, powerpoint, pptx, presentation, praesentation, slide, folie, sheet, tabelle, office document, office datei, generate excel, erstelle excel, create spreadsheet, create document, dokument erstellen, dokument aendern, dokument bearbeiten, dokument anpassen, datei aendern, datei bearbeiten, datei anpassen, in der datei, in dem dokument, edit document, modify document, update document, reformat document, change the document, change the file, update the file',
                 'prompt' => self::officeMakerPrompt(),
             ],
             [
@@ -748,13 +748,20 @@ You MUST respond with PURE JSON - NO markdown code blocks, NO backticks, NO form
 
 ## Supported Formats
 
-1. **CSV** (.csv):
-   - Use comma-separated values
+1. **CSV** (.csv) and **Excel** (.xlsx):
+   - Provide BFILETEXT as comma-separated values (CSV), even for .xlsx
    - First row should contain headers
    - Each subsequent row is a data record
    - Example: "Name,Age\nJohn,25\nJane,30"
 
-2. **Markdown/Text** (.md, .txt):
+2. **Word** (.docx):
+   - Provide BFILETEXT as Markdown (headings with #, **bold**, lists, tables)
+   - The server converts this Markdown into a real Word document
+
+3. **PowerPoint** (.pptx):
+   - Provide BFILETEXT as Markdown; each top-level heading (#) starts a new slide
+
+4. **Markdown/Text** (.md, .txt):
    - For simple text documents
    - Use markdown formatting when appropriate
 
@@ -764,6 +771,28 @@ You MUST respond with PURE JSON - NO markdown code blocks, NO backticks, NO form
 - For tables/spreadsheets: Include headers and at least 5-10 sample rows
 - For documents: Include proper sections, headings, and formatted text
 - Use appropriate formatting for the file type
+
+## Editing a document from earlier in the conversation
+
+This is a frequent case — handle it carefully. The conversation contains the
+current content of the document, shown either as the user's original text or as
+a block labeled "Current content of the file you previously generated".
+
+When the user asks to change, add to, or reformat that document
+(e.g. "make the title bold/bigger", "add a column", "insert a heading"):
+- START from the existing content. Keep ALL parts the user did not ask to change
+  exactly as they are.
+- Apply EXACTLY the requested change and nothing else.
+- Output the COMPLETE updated document in BFILETEXT. NEVER return only the
+  changed part, and NEVER return the unchanged original — the result must
+  visibly contain the requested change.
+- Keep the same BFILEPATH filename as before.
+- Express all formatting as Markdown in BFILETEXT: `# Title` for a large, bold
+  heading, `**bold**`, `*italic*`, `-` for lists, and Markdown tables.
+
+Example — user says "add a bold, bigger title 'Report' to the file" and the
+current content is "Some body text.":
+{"BFILEPATH":"report.docx","BFILETEXT":"# Report\n\nSome body text."}
 
 ## Example Output
 

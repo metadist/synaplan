@@ -80,7 +80,7 @@ final readonly class MessageClassifier
         if (null === $overrideModelId
             && !empty($text)
             && $this->isClassifierFastPathEnabled($userId)
-            && $this->canFastPathClassify($message, $text)
+            && $this->canFastPathClassify($message, $text, $conversationHistory)
         ) {
             $detectedLanguage = $this->detectLanguageHeuristic($text);
 
@@ -514,8 +514,10 @@ final readonly class MessageClassifier
      * The conservative checks below mean only "obviously chat" messages take
      * the fast path. Anything ambiguous — files, tool prefixes, media verbs,
      * Synapse-enabled accounts — still gets the full classifier.
+     *
+     * @param array<int, Message> $conversationHistory oldest-first thread
      */
-    private function canFastPathClassify(Message $message, string $text): bool
+    private function canFastPathClassify(Message $message, string $text, array $conversationHistory = []): bool
     {
         // Synapse routing has its own embedding-based classifier and may surface
         // intent we'd lose with the heuristic (e.g. 'mediamaker' for "draw a
@@ -543,6 +545,37 @@ final readonly class MessageClassifier
         // Long messages can hide intent — keep the full sorter for anything
         // over ~280 characters (Twitter limit feels right for a chat one-liner).
         if (mb_strlen($trimmed) > 280) {
+            return false;
+        }
+
+        // Document-generation requests are usually very short and would
+        // otherwise be shortcut to `general` ("schreibe es als docx",
+        // "mach eine excel tabelle", #1042 review). If the message names a
+        // supported office format/extension, defer to the AI sorter so it can
+        // pick `officemaker`. PDF is intentionally excluded: we cannot produce
+        // real PDFs, so we must not route PDF requests to the office maker.
+        if (preg_match('/\b(docx|xlsx|pptx|csv|word|excel|powerpoint|spreadsheet|tabellenkalkulation|praesentation|präsentation)\b/iu', $trimmed)) {
+            return false;
+        }
+
+        // Follow-up edits to a just-generated document are usually phrased
+        // without naming the format again ("mach den Titel fett", "ändere das
+        // in der Datei"). Two cases defer to the AI sorter so the edit reaches
+        // `officemaker` instead of being shortcut to `general` (#1042 review):
+        //
+        // (a) The most recent assistant turn produced a file — the very next
+        //     turn is almost certainly a follow-up about it, regardless of
+        //     wording.
+        // (b) A file was generated earlier in the thread and the current
+        //     message references a document or its structure. This covers
+        //     multi-message editing where normal chat is interleaved between
+        //     edits ("...kannst du in der Datei den Titel ändern").
+        if ($this->lastAssistantGeneratedFile($conversationHistory)) {
+            return false;
+        }
+
+        if ($this->threadHasGeneratedFile($conversationHistory)
+            && $this->mentionsDocumentReference($trimmed)) {
             return false;
         }
 
@@ -579,6 +612,63 @@ final readonly class MessageClassifier
         // (see issue #1000). The actual search decision is owned by
         // `WebSearchTopicPolicy` and applied in `MessageProcessor`.
         return true;
+    }
+
+    /**
+     * Whether the most recent assistant turn in the thread produced a generated
+     * file (its stored content is the "__FILE_GENERATED__:filename" marker).
+     *
+     * Only the latest assistant message is considered so the deferral is
+     * limited to the turn directly following a file generation.
+     *
+     * @param array<int, Message> $conversationHistory oldest-first thread
+     */
+    private function lastAssistantGeneratedFile(array $conversationHistory): bool
+    {
+        for ($i = count($conversationHistory) - 1; $i >= 0; --$i) {
+            $msg = $conversationHistory[$i];
+            if ('OUT' !== $msg->getDirection()) {
+                continue;
+            }
+
+            return str_starts_with((string) $msg->getText(), '__FILE_GENERATED__:');
+        }
+
+        return false;
+    }
+
+    /**
+     * Whether any assistant turn in the thread produced a generated file.
+     *
+     * @param array<int, Message> $conversationHistory
+     */
+    private function threadHasGeneratedFile(array $conversationHistory): bool
+    {
+        foreach ($conversationHistory as $msg) {
+            if ('OUT' === $msg->getDirection()
+                && str_starts_with((string) $msg->getText(), '__FILE_GENERATED__:')) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * Whether the message refers to a document or one of its structural parts.
+     *
+     * Used together with {@see threadHasGeneratedFile()} to detect document
+     * edits that span multiple turns. The noun list is intentionally
+     * document-specific to keep false positives in normal chat low; the worst
+     * case of a false positive is one extra AI-sorter call.
+     */
+    private function mentionsDocumentReference(string $text): bool
+    {
+        return 1 === preg_match(
+            '/\b(datei|dokument|file|document|doc|tabelle|sheet|spreadsheet|folie|slide|'
+            .'titel|title|überschrift|ueberschrift|heading|spalte|column|zeile|row|zelle|cell)\b/iu',
+            $text
+        );
     }
 
     /**

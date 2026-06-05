@@ -12,6 +12,7 @@ use App\Repository\PromptRepository;
 use App\Service\Exception\VisionModelRequiredException;
 use App\Service\FeedbackConfigService;
 use App\Service\FeedbackConstants;
+use App\Service\File\DocumentGeneratorService;
 use App\Service\File\FileHelper;
 use App\Service\File\UserUploadPathBuilder;
 use App\Service\MemoryExtractionDispatcher;
@@ -55,6 +56,7 @@ final readonly class ChatHandler implements MessageHandlerInterface
         private RateLimitService $rateLimitService,
         private MemoryExtractionDispatcher $memoryExtractionDispatcher,
         private PerfPipelineFlag $perfPipelineFlag,
+        private DocumentGeneratorService $documentGenerator,
         iterable $pluginContextProviders = [],
     ) {
         $this->pluginContextProviders = $pluginContextProviders;
@@ -1063,7 +1065,7 @@ final readonly class ChatHandler implements MessageHandlerInterface
             }
 
             $role = 'IN' === $msg->getDirection() ? 'user' : 'assistant';
-            $content = $msg->getText();
+            $content = $this->humanizeFileMarkersForModel($msg->getText());
 
             // File Text inkludieren wenn vorhanden (Legacy + NEW MessageFiles)
             $allFilesText = $msg->getAllFilesText(); // Combines legacy + file texts
@@ -1075,7 +1077,14 @@ final readonly class ChatHandler implements MessageHandlerInterface
                     $fileInfo = $msg->getFileType().' file';
                 }
 
-                $content .= "\n\n\n---\n\n\nUser provided $fileInfo:\n\n".
+                // Role-aware label: for assistant turns this is the file the
+                // assistant generated earlier, so present it as the current
+                // document the model can transform when the user asks for edits.
+                $label = 'assistant' === $role
+                    ? "Current content of the file you previously generated ($fileInfo):"
+                    : "User provided $fileInfo:";
+
+                $content .= "\n\n\n---\n\n\n$label\n\n".
                            substr($allFilesText, 0, 10000). // Increased limit for multiple files
                            "\n\n";
             }
@@ -1289,7 +1298,7 @@ final readonly class ChatHandler implements MessageHandlerInterface
         // Thread Messages (JSON encoded wie im alten System)
         foreach ($thread as $msg) {
             $role = 'IN' === $msg->getDirection() ? 'user' : 'assistant';
-            $content = $msg->getText();
+            $content = $this->humanizeFileMarkersForModel($msg->getText());
 
             // For user messages in thread, include images for vision (if enabled)
             if ('user' === $role && $includeImages) {
@@ -1643,6 +1652,33 @@ final readonly class ChatHandler implements MessageHandlerInterface
      *
      * @return array|null ['filename' => string, 'content' => string, 'extension' => string] or null
      */
+    /**
+     * Replace internal file-generation markers with human-readable text before a
+     * prior assistant turn is sent back to the model as conversation history.
+     *
+     * The stored assistant content for a generated file is the internal marker
+     * "__FILE_GENERATED__:filename". If that raw marker is fed back into the
+     * model context, the model starts imitating it and leaks strings such as
+     * "FILE_GENERATED:report.docx" into its replies. Converting it to plain
+     * prose keeps the context (a file was generated) without the marker syntax.
+     */
+    public function humanizeFileMarkersForModel(?string $content): string
+    {
+        $content = (string) $content;
+
+        if (str_starts_with($content, '__FILE_GENERATED__:')) {
+            $filename = trim(substr($content, strlen('__FILE_GENERATED__:')));
+
+            return sprintf('(I generated the file "%s" and provided it to the user as a download.)', $filename);
+        }
+
+        if ('__FILE_GENERATION_FAILED__' === $content) {
+            return '(The requested file could not be generated.)';
+        }
+
+        return $content;
+    }
+
     private function extractFileGenerationData(string $content): ?array
     {
         // Check if content looks like JSON or is wrapped in markdown code blocks
@@ -1740,9 +1776,21 @@ final readonly class ChatHandler implements MessageHandlerInterface
                 }
             }
 
-            // Write file content
-            if (!file_put_contents($absolutePath, $content)) {
-                $this->logger->error('ChatHandler: Failed to write file', ['path' => $absolutePath]);
+            // Write file content (real OOXML for docx/xlsx/pptx, text otherwise)
+            try {
+                $this->documentGenerator->write($content, $extension, $absolutePath);
+            } catch (\Throwable $e) {
+                $this->logger->error('ChatHandler: Failed to write file', [
+                    'path' => $absolutePath,
+                    'error' => $e->getMessage(),
+                ]);
+
+                return null;
+            }
+
+            $fileSize = filesize($absolutePath);
+            if (false === $fileSize) {
+                $this->logger->error('ChatHandler: Failed to read generated file size', ['path' => $absolutePath]);
 
                 return null;
             }
@@ -1756,12 +1804,13 @@ final readonly class ChatHandler implements MessageHandlerInterface
             $file->setFilePath($relativePath);
             $file->setFileType($extension);
             $file->setFileName($filename);
-            $file->setFileSize(strlen($content));
+            $file->setFileSize($fileSize);
             $file->setFileMime($mimeType);
-            // Only store text content for text-based files (not binary formats)
-            if (FileHelper::isTextBasedMimeType($mimeType)) {
-                $file->setFileText($content);
-            }
+            // Persist the source content (Markdown/CSV/text) the document was
+            // built from — even for binary office formats. It is the document's
+            // text for search and, crucially, lets a later edit transform the
+            // exact current content instead of re-deriving it.
+            $file->setFileText($content);
             $file->setStatus('generated');
 
             $this->em->persist($file);
