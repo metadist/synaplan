@@ -560,10 +560,22 @@ final readonly class MessageClassifier
 
         // Follow-up edits to a just-generated document are usually phrased
         // without naming the format again ("mach den Titel fett", "ändere das
-        // in der Datei"). If the most recent assistant turn produced a
-        // generated file, defer to the AI sorter so it can route the edit to
-        // `officemaker` instead of shortcutting to `general` (#1042 review).
+        // in der Datei"). Two cases defer to the AI sorter so the edit reaches
+        // `officemaker` instead of being shortcut to `general` (#1042 review):
+        //
+        // (a) The most recent assistant turn produced a file — the very next
+        //     turn is almost certainly a follow-up about it, regardless of
+        //     wording.
+        // (b) A file was generated earlier in the thread and the current
+        //     message references a document or its structure. This covers
+        //     multi-message editing where normal chat is interleaved between
+        //     edits ("...kannst du in der Datei den Titel ändern").
         if ($this->lastAssistantGeneratedFile($conversationHistory)) {
+            return false;
+        }
+
+        if ($this->threadHasGeneratedFile($conversationHistory)
+            && $this->mentionsDocumentReference($trimmed)) {
             return false;
         }
 
@@ -623,6 +635,40 @@ final readonly class MessageClassifier
         }
 
         return false;
+    }
+
+    /**
+     * Whether any assistant turn in the thread produced a generated file.
+     *
+     * @param array<int, Message> $conversationHistory
+     */
+    private function threadHasGeneratedFile(array $conversationHistory): bool
+    {
+        foreach ($conversationHistory as $msg) {
+            if ('OUT' === $msg->getDirection()
+                && str_starts_with((string) $msg->getText(), '__FILE_GENERATED__:')) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * Whether the message refers to a document or one of its structural parts.
+     *
+     * Used together with {@see threadHasGeneratedFile()} to detect document
+     * edits that span multiple turns. The noun list is intentionally
+     * document-specific to keep false positives in normal chat low; the worst
+     * case of a false positive is one extra AI-sorter call.
+     */
+    private function mentionsDocumentReference(string $text): bool
+    {
+        return 1 === preg_match(
+            '/\b(datei|dokument|file|document|doc|tabelle|sheet|spreadsheet|folie|slide|'
+            .'titel|title|überschrift|ueberschrift|heading|spalte|column|zeile|row|zelle|cell)\b/iu',
+            $text
+        );
     }
 
     /**

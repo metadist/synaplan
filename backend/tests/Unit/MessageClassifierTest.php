@@ -868,4 +868,109 @@ class MessageClassifierTest extends TestCase
         $this->assertSame('fast_path_heuristic', $result['source']);
         $this->assertTrue($result['skip_sorting']);
     }
+
+    /**
+     * Multi-message editing: a normal chat turn is interleaved after the file
+     * was generated. A later edit that references the document must still reach
+     * the AI sorter (tier b), even though the most recent assistant turn was a
+     * plain reply.
+     */
+    public function testFastPathDefersForLaterDocumentEditAfterInterleavedChat(): void
+    {
+        $configRepo = $this->createMock(ConfigRepository::class);
+        $configRepo->method('getValue')->willReturnCallback(static function (int $owner, string $group, string $setting): ?string {
+            return 'QDRANT_SEARCH' === $group ? '0' : null;
+        });
+
+        $sorter = $this->createMock(MessageSorter::class);
+        $sorter->expects($this->once())
+            ->method('classify')
+            ->willReturn(['topic' => 'officemaker', 'language' => 'de']);
+
+        $classifier = new MessageClassifier(
+            $sorter,
+            $this->createMock(SynapseRouter::class),
+            new TopicAliasResolver(),
+            $this->createMock(MessageMetaRepository::class),
+            $this->createMock(ModelConfigService::class),
+            $configRepo,
+            $this->createMock(EntityManagerInterface::class),
+            $this->createMock(LoggerInterface::class),
+        );
+
+        $fileTurn = $this->createMock(Message::class);
+        $fileTurn->method('getDirection')->willReturn('OUT');
+        $fileTurn->method('getText')->willReturn('__FILE_GENERATED__:Zweiter_Weltkrieg.docx');
+
+        $interleavedReply = $this->createMock(Message::class);
+        $interleavedReply->method('getDirection')->willReturn('OUT');
+        $interleavedReply->method('getText')->willReturn('Das bedeutet, dass sehr viele Menschen betroffen waren.');
+
+        $message = $this->createMock(Message::class);
+        $message->method('getId')->willReturn(207);
+        $message->method('getUserId')->willReturn(10);
+        $message->method('getText')->willReturn('Kannst du den Titel in der Datei jetzt zentrieren');
+        $message->method('getLanguage')->willReturn('de');
+        $message->method('getFile')->willReturn(0);
+        $message->method('getFiles')->willReturn(new \Doctrine\Common\Collections\ArrayCollection());
+        $message->method('getDateTime')->willReturn('20260518120000');
+        $message->method('getFilePath')->willReturn('');
+        $message->method('getTopic')->willReturn('');
+        $message->method('getFileText')->willReturn('');
+
+        $result = $classifier->classify($message, [$fileTurn, $interleavedReply]);
+
+        $this->assertSame('officemaker', $result['topic']);
+        $this->assertSame('ai_sorting', $result['source']);
+        $this->assertFalse($result['skip_sorting']);
+    }
+
+    /**
+     * Counterpart: after a file exists earlier and an interleaved reply, a plain
+     * chat message with no document reference still takes the fast path (no
+     * over-deferral).
+     */
+    public function testFastPathTakenForUnrelatedChatAfterEarlierFile(): void
+    {
+        $configRepo = $this->createMock(ConfigRepository::class);
+        $configRepo->method('getValue')->willReturnCallback(static function (int $owner, string $group, string $setting): ?string {
+            return 'QDRANT_SEARCH' === $group ? '0' : null;
+        });
+
+        $sorter = $this->createMock(MessageSorter::class);
+        $sorter->expects($this->never())->method('classify');
+
+        $classifier = new MessageClassifier(
+            $sorter,
+            $this->createMock(SynapseRouter::class),
+            new TopicAliasResolver(),
+            $this->createMock(MessageMetaRepository::class),
+            $this->createMock(ModelConfigService::class),
+            $configRepo,
+            $this->createMock(EntityManagerInterface::class),
+            $this->createMock(LoggerInterface::class),
+        );
+
+        $fileTurn = $this->createMock(Message::class);
+        $fileTurn->method('getDirection')->willReturn('OUT');
+        $fileTurn->method('getText')->willReturn('__FILE_GENERATED__:report.docx');
+
+        $interleavedReply = $this->createMock(Message::class);
+        $interleavedReply->method('getDirection')->willReturn('OUT');
+        $interleavedReply->method('getText')->willReturn('Gerne, hier ist die Erklärung.');
+
+        $message = $this->createMock(Message::class);
+        $message->method('getId')->willReturn(208);
+        $message->method('getUserId')->willReturn(10);
+        $message->method('getText')->willReturn('Super, danke dir vielmals');
+        $message->method('getLanguage')->willReturn('de');
+        $message->method('getFile')->willReturn(0);
+        $message->method('getFiles')->willReturn(new \Doctrine\Common\Collections\ArrayCollection());
+
+        $result = $classifier->classify($message, [$fileTurn, $interleavedReply]);
+
+        $this->assertSame('general', $result['topic']);
+        $this->assertSame('fast_path_heuristic', $result['source']);
+        $this->assertTrue($result['skip_sorting']);
+    }
 }
