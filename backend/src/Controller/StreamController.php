@@ -10,7 +10,6 @@ use App\Entity\Prompt;
 use App\Entity\User;
 use App\Message\ExtractMemoriesCommand;
 use App\Service\File\DocumentGeneratorService;
-use App\Service\File\FileHelper;
 use App\Service\File\UserUploadPathBuilder;
 use App\Service\GuestSessionService;
 use App\Service\MemoryExtractionDispatcher;
@@ -2311,10 +2310,11 @@ class StreamController extends AbstractController
             $file->setFileName($filename);
             $file->setFileSize($fileSize);
             $file->setFileMime($mimeType);
-            // Only store text content for text-based files (not binary formats)
-            if (FileHelper::isTextBasedMimeType($mimeType)) {
-                $file->setFileText($content);
-            }
+            // Persist the source content (Markdown/CSV/text) the document was
+            // built from — even for binary office formats. It is the document's
+            // text for search and, crucially, lets a later edit transform the
+            // exact current content instead of re-deriving it.
+            $file->setFileText($content);
             $file->setStatus('generated');
 
             $this->em->persist($file);

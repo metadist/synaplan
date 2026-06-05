@@ -1077,7 +1077,14 @@ final readonly class ChatHandler implements MessageHandlerInterface
                     $fileInfo = $msg->getFileType().' file';
                 }
 
-                $content .= "\n\n\n---\n\n\nUser provided $fileInfo:\n\n".
+                // Role-aware label: for assistant turns this is the file the
+                // assistant generated earlier, so present it as the current
+                // document the model can transform when the user asks for edits.
+                $label = 'assistant' === $role
+                    ? "Current content of the file you previously generated ($fileInfo):"
+                    : "User provided $fileInfo:";
+
+                $content .= "\n\n\n---\n\n\n$label\n\n".
                            substr($allFilesText, 0, 10000). // Increased limit for multiple files
                            "\n\n";
             }
@@ -1799,10 +1806,11 @@ final readonly class ChatHandler implements MessageHandlerInterface
             $file->setFileName($filename);
             $file->setFileSize($fileSize);
             $file->setFileMime($mimeType);
-            // Only store text content for text-based files (not binary formats)
-            if (FileHelper::isTextBasedMimeType($mimeType)) {
-                $file->setFileText($content);
-            }
+            // Persist the source content (Markdown/CSV/text) the document was
+            // built from — even for binary office formats. It is the document's
+            // text for search and, crucially, lets a later edit transform the
+            // exact current content instead of re-deriving it.
+            $file->setFileText($content);
             $file->setStatus('generated');
 
             $this->em->persist($file);

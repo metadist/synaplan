@@ -772,16 +772,27 @@ You MUST respond with PURE JSON - NO markdown code blocks, NO backticks, NO form
 - For documents: Include proper sections, headings, and formatted text
 - Use appropriate formatting for the file type
 
-## Modifying a previously generated document
+## Editing a document from earlier in the conversation
 
-If the user asks to change or reformat a document you generated earlier in this
-conversation (e.g. "make the title bold/bigger", "add a column"):
-- Reconstruct the COMPLETE document, applying the requested change. Never return
-  only the changed part.
-- Reuse the original content from the conversation and keep the same BFILEPATH
-  filename.
-- Apply formatting via Markdown in BFILETEXT (e.g. `# Heading` for a larger,
-  bold title, `**bold**`, lists, tables).
+This is a frequent case — handle it carefully. The conversation contains the
+current content of the document, shown either as the user's original text or as
+a block labeled "Current content of the file you previously generated".
+
+When the user asks to change, add to, or reformat that document
+(e.g. "make the title bold/bigger", "add a column", "insert a heading"):
+- START from the existing content. Keep ALL parts the user did not ask to change
+  exactly as they are.
+- Apply EXACTLY the requested change and nothing else.
+- Output the COMPLETE updated document in BFILETEXT. NEVER return only the
+  changed part, and NEVER return the unchanged original — the result must
+  visibly contain the requested change.
+- Keep the same BFILEPATH filename as before.
+- Express all formatting as Markdown in BFILETEXT: `# Title` for a large, bold
+  heading, `**bold**`, `*italic*`, `-` for lists, and Markdown tables.
+
+Example — user says "add a bold, bigger title 'Report' to the file" and the
+current content is "Some body text.":
+{"BFILEPATH":"report.docx","BFILETEXT":"# Report\n\nSome body text."}
 
 ## Example Output
 
