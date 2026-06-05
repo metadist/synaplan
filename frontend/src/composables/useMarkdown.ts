@@ -28,8 +28,10 @@ const UNSAFE_LINK_SCHEMES = ['data:', 'javascript:', 'vbscript:', 'file:'] as co
  * obfuscated values like `da\nta:` cannot bypass the scheme prefix match.
  */
 function isUnsafeLinkHref(href: string): boolean {
+  // Strip whitespace plus C0 (\u0000-\u001f), DEL (\u007f) and C1 (\u0080-\u009f)
+  // control characters so obfuscated values like `da\u007fta:` cannot bypass the check.
   // eslint-disable-next-line no-control-regex
-  const normalized = href.replace(/[\s\u0000-\u001f]/g, '').toLowerCase()
+  const normalized = href.replace(/[\s\u0000-\u001f\u007f-\u009f]/g, '').toLowerCase()
   return UNSAFE_LINK_SCHEMES.some((scheme) => normalized.startsWith(scheme))
 }
 

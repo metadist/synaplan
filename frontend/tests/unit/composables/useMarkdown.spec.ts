@@ -235,6 +235,13 @@ describe('useMarkdown', () => {
       expect(html).not.toContain('href="data:')
     })
 
+    it('should not render data: URI links obfuscated with DEL/C1 control chars', () => {
+      const del = markdown.render('[fake](da\u007fta:text/plain,broken)')
+      expect(del).not.toContain('<a')
+      const c1 = markdown.render('[fake](da\u0085ta:text/plain,broken)')
+      expect(c1).not.toContain('<a')
+    })
+
     it('should not render vbscript: or file: links', () => {
       const vbscript = markdown.render('[click](vbscript:msgbox(1))')
       expect(vbscript).not.toContain('href="vbscript:')
