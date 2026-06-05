@@ -707,4 +707,67 @@ class MessageClassifierTest extends TestCase
         $this->assertSame('ai_sorting', $result['source']);
         $this->assertFalse($result['skip_sorting']);
     }
+
+    /**
+     * Regression for #1042 review (FExB17).
+     *
+     * Short document-generation requests must not be shortcut to `general` by
+     * the fast-path. When a supported office format/extension is mentioned, the
+     * AI sorter has to run so it can route to `officemaker`.
+     *
+     * @return iterable<string, array{0: string}>
+     */
+    public static function documentFormatProvider(): iterable
+    {
+        yield 'docx extension' => ['schreibe es erneut in eine docx datei'];
+        yield 'als docx' => ['gib es mir als docx'];
+        yield 'excel word' => ['mach eine excel tabelle daraus'];
+        yield 'powerpoint' => ['erstelle daraus eine powerpoint'];
+        yield 'csv' => ['exportiere das als csv'];
+    }
+
+    #[\PHPUnit\Framework\Attributes\DataProvider('documentFormatProvider')]
+    public function testFastPathYieldsToAiSorterOnDocumentFormats(string $text): void
+    {
+        $configRepo = $this->createMock(ConfigRepository::class);
+        // Synapse off, fast-path on (default).
+        $configRepo->method('getValue')->willReturnCallback(static function (int $owner, string $group, string $setting): ?string {
+            return 'QDRANT_SEARCH' === $group ? '0' : null;
+        });
+
+        $sorter = $this->createMock(MessageSorter::class);
+        $sorter->expects($this->once())
+            ->method('classify')
+            ->willReturn(['topic' => 'officemaker', 'language' => 'de']);
+
+        $classifier = new MessageClassifier(
+            $sorter,
+            $this->createMock(SynapseRouter::class),
+            new TopicAliasResolver(),
+            $this->createMock(MessageMetaRepository::class),
+            $this->createMock(ModelConfigService::class),
+            $configRepo,
+            $this->createMock(EntityManagerInterface::class),
+            $this->createMock(LoggerInterface::class),
+        );
+
+        $message = $this->createMock(Message::class);
+        $message->method('getId')->willReturn(204);
+        $message->method('getUserId')->willReturn(10);
+        $message->method('getText')->willReturn($text);
+        $message->method('getLanguage')->willReturn('de');
+        $message->method('getFile')->willReturn(0);
+        $message->method('getFiles')->willReturn(new \Doctrine\Common\Collections\ArrayCollection());
+        $message->method('getDateTime')->willReturn('20260518120000');
+        $message->method('getFilePath')->willReturn('');
+        $message->method('getTopic')->willReturn('');
+        $message->method('getFileText')->willReturn('');
+
+        $result = $classifier->classify($message);
+
+        // Sorter ran → topic comes from the sorter, fast-path was skipped.
+        $this->assertSame('officemaker', $result['topic']);
+        $this->assertSame('ai_sorting', $result['source']);
+        $this->assertFalse($result['skip_sorting']);
+    }
 }

@@ -546,6 +546,16 @@ final readonly class MessageClassifier
             return false;
         }
 
+        // Document-generation requests are usually very short and would
+        // otherwise be shortcut to `general` ("schreibe es als docx",
+        // "mach eine excel tabelle", #1042 review). If the message names a
+        // supported office format/extension, defer to the AI sorter so it can
+        // pick `officemaker`. PDF is intentionally excluded: we cannot produce
+        // real PDFs, so we must not route PDF requests to the office maker.
+        if (preg_match('/\b(docx|xlsx|pptx|csv|word|excel|powerpoint|spreadsheet|tabellenkalkulation|praesentation|präsentation)\b/iu', $trimmed)) {
+            return false;
+        }
+
         // Media / media-generation verbs in EN/DE/ES/FR. If any appear, the
         // sorter may pick a topic other than `general`/`chat` (e.g.
         // mediamaker → image_generation), so don't shortcut.
