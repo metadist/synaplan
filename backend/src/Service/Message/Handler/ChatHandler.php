@@ -1065,7 +1065,7 @@ final readonly class ChatHandler implements MessageHandlerInterface
             }
 
             $role = 'IN' === $msg->getDirection() ? 'user' : 'assistant';
-            $content = $msg->getText();
+            $content = $this->humanizeFileMarkersForModel($msg->getText());
 
             // File Text inkludieren wenn vorhanden (Legacy + NEW MessageFiles)
             $allFilesText = $msg->getAllFilesText(); // Combines legacy + file texts
@@ -1291,7 +1291,7 @@ final readonly class ChatHandler implements MessageHandlerInterface
         // Thread Messages (JSON encoded wie im alten System)
         foreach ($thread as $msg) {
             $role = 'IN' === $msg->getDirection() ? 'user' : 'assistant';
-            $content = $msg->getText();
+            $content = $this->humanizeFileMarkersForModel($msg->getText());
 
             // For user messages in thread, include images for vision (if enabled)
             if ('user' === $role && $includeImages) {
@@ -1645,6 +1645,33 @@ final readonly class ChatHandler implements MessageHandlerInterface
      *
      * @return array|null ['filename' => string, 'content' => string, 'extension' => string] or null
      */
+    /**
+     * Replace internal file-generation markers with human-readable text before a
+     * prior assistant turn is sent back to the model as conversation history.
+     *
+     * The stored assistant content for a generated file is the internal marker
+     * "__FILE_GENERATED__:filename". If that raw marker is fed back into the
+     * model context, the model starts imitating it and leaks strings such as
+     * "FILE_GENERATED:report.docx" into its replies. Converting it to plain
+     * prose keeps the context (a file was generated) without the marker syntax.
+     */
+    public function humanizeFileMarkersForModel(?string $content): string
+    {
+        $content = (string) $content;
+
+        if (str_starts_with($content, '__FILE_GENERATED__:')) {
+            $filename = trim(substr($content, strlen('__FILE_GENERATED__:')));
+
+            return sprintf('(I generated the file "%s" and provided it to the user as a download.)', $filename);
+        }
+
+        if ('__FILE_GENERATION_FAILED__' === $content) {
+            return '(The requested file could not be generated.)';
+        }
+
+        return $content;
+    }
+
     private function extractFileGenerationData(string $content): ?array
     {
         // Check if content looks like JSON or is wrapped in markdown code blocks

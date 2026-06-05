@@ -88,6 +88,35 @@ class ChatHandlerTest extends TestCase
         $this->assertEquals('chat', $this->handler->getName());
     }
 
+    public function testHumanizeFileMarkersReplacesGeneratedMarker(): void
+    {
+        $result = $this->handler->humanizeFileMarkersForModel('__FILE_GENERATED__:Zweiter_Weltkrieg.docx');
+
+        $this->assertStringNotContainsString('__FILE_GENERATED__', $result);
+        $this->assertStringNotContainsString('FILE_GENERATED', $result);
+        $this->assertStringContainsString('Zweiter_Weltkrieg.docx', $result);
+    }
+
+    public function testHumanizeFileMarkersReplacesFailedMarker(): void
+    {
+        $result = $this->handler->humanizeFileMarkersForModel('__FILE_GENERATION_FAILED__');
+
+        $this->assertStringNotContainsString('__FILE_GENERATION_FAILED__', $result);
+        $this->assertStringContainsString('could not be generated', $result);
+    }
+
+    public function testHumanizeFileMarkersLeavesRegularContentUntouched(): void
+    {
+        $text = 'Here is a normal assistant reply with no markers.';
+
+        $this->assertSame($text, $this->handler->humanizeFileMarkersForModel($text));
+    }
+
+    public function testHumanizeFileMarkersHandlesNull(): void
+    {
+        $this->assertSame('', $this->handler->humanizeFileMarkersForModel(null));
+    }
+
     public function testHandleUsesUserSelectedModel(): void
     {
         $message = $this->createMock(Message::class);

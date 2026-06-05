@@ -198,8 +198,8 @@ class PromptCatalog
             [
                 'topic' => 'officemaker',
                 'language' => 'en',
-                'shortDescription' => 'The user asks for the generation of an Excel, Powerpoint or Word document. Not for any other format. This prompt can only handle the generation of ONE document with a clear prompt.',
-                'keywords' => 'excel, xlsx, spreadsheet, tabellenkalkulation, csv, word, docx, document, dokument, powerpoint, pptx, presentation, praesentation, slide, folie, sheet, tabelle, office document, office datei, generate excel, erstelle excel, create spreadsheet, create document, dokument erstellen',
+                'shortDescription' => 'The user asks to generate OR to modify/reformat a single Excel, PowerPoint or Word document (CSV, XLSX, DOCX, PPTX). This includes follow-up requests that change the content or formatting of a document the assistant generated earlier in the same conversation (e.g. "make the title bold/bigger in the file", "add a column", "change the document"). Not for any other format. Handles exactly ONE document.',
+                'keywords' => 'excel, xlsx, spreadsheet, tabellenkalkulation, csv, word, docx, document, dokument, powerpoint, pptx, presentation, praesentation, slide, folie, sheet, tabelle, office document, office datei, generate excel, erstelle excel, create spreadsheet, create document, dokument erstellen, dokument aendern, dokument bearbeiten, dokument anpassen, datei aendern, datei bearbeiten, datei anpassen, in der datei, in dem dokument, edit document, modify document, update document, reformat document, change the document, change the file, update the file',
                 'prompt' => self::officeMakerPrompt(),
             ],
             [
@@ -771,6 +771,17 @@ You MUST respond with PURE JSON - NO markdown code blocks, NO backticks, NO form
 - For tables/spreadsheets: Include headers and at least 5-10 sample rows
 - For documents: Include proper sections, headings, and formatted text
 - Use appropriate formatting for the file type
+
+## Modifying a previously generated document
+
+If the user asks to change or reformat a document you generated earlier in this
+conversation (e.g. "make the title bold/bigger", "add a column"):
+- Reconstruct the COMPLETE document, applying the requested change. Never return
+  only the changed part.
+- Reuse the original content from the conversation and keep the same BFILEPATH
+  filename.
+- Apply formatting via Markdown in BFILETEXT (e.g. `# Heading` for a larger,
+  bold title, `**bold**`, lists, tables).
 
 ## Example Output
 
