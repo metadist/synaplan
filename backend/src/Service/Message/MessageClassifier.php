@@ -80,7 +80,7 @@ final readonly class MessageClassifier
         if (null === $overrideModelId
             && !empty($text)
             && $this->isClassifierFastPathEnabled($userId)
-            && $this->canFastPathClassify($message, $text)
+            && $this->canFastPathClassify($message, $text, $conversationHistory)
         ) {
             $detectedLanguage = $this->detectLanguageHeuristic($text);
 
@@ -514,8 +514,10 @@ final readonly class MessageClassifier
      * The conservative checks below mean only "obviously chat" messages take
      * the fast path. Anything ambiguous — files, tool prefixes, media verbs,
      * Synapse-enabled accounts — still gets the full classifier.
+     *
+     * @param array<int, Message> $conversationHistory oldest-first thread
      */
-    private function canFastPathClassify(Message $message, string $text): bool
+    private function canFastPathClassify(Message $message, string $text, array $conversationHistory = []): bool
     {
         // Synapse routing has its own embedding-based classifier and may surface
         // intent we'd lose with the heuristic (e.g. 'mediamaker' for "draw a
@@ -556,6 +558,15 @@ final readonly class MessageClassifier
             return false;
         }
 
+        // Follow-up edits to a just-generated document are usually phrased
+        // without naming the format again ("mach den Titel fett", "ändere das
+        // in der Datei"). If the most recent assistant turn produced a
+        // generated file, defer to the AI sorter so it can route the edit to
+        // `officemaker` instead of shortcutting to `general` (#1042 review).
+        if ($this->lastAssistantGeneratedFile($conversationHistory)) {
+            return false;
+        }
+
         // Media / media-generation verbs in EN/DE/ES/FR. If any appear, the
         // sorter may pick a topic other than `general`/`chat` (e.g.
         // mediamaker → image_generation), so don't shortcut.
@@ -589,6 +600,29 @@ final readonly class MessageClassifier
         // (see issue #1000). The actual search decision is owned by
         // `WebSearchTopicPolicy` and applied in `MessageProcessor`.
         return true;
+    }
+
+    /**
+     * Whether the most recent assistant turn in the thread produced a generated
+     * file (its stored content is the "__FILE_GENERATED__:filename" marker).
+     *
+     * Only the latest assistant message is considered so the deferral is
+     * limited to the turn directly following a file generation.
+     *
+     * @param array<int, Message> $conversationHistory oldest-first thread
+     */
+    private function lastAssistantGeneratedFile(array $conversationHistory): bool
+    {
+        for ($i = count($conversationHistory) - 1; $i >= 0; --$i) {
+            $msg = $conversationHistory[$i];
+            if ('OUT' !== $msg->getDirection()) {
+                continue;
+            }
+
+            return str_starts_with((string) $msg->getText(), '__FILE_GENERATED__:');
+        }
+
+        return false;
     }
 
     /**

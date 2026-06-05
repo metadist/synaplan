@@ -770,4 +770,102 @@ class MessageClassifierTest extends TestCase
         $this->assertSame('ai_sorting', $result['source']);
         $this->assertFalse($result['skip_sorting']);
     }
+
+    /**
+     * Regression for #1042 review follow-up.
+     *
+     * A short edit request without a format keyword ("mach den Titel fett")
+     * must NOT be fast-pathed to `general` when the previous assistant turn
+     * generated a file — it has to reach the AI sorter so the edit can be
+     * routed to `officemaker`.
+     */
+    public function testFastPathDefersWhenPreviousTurnGeneratedFile(): void
+    {
+        $configRepo = $this->createMock(ConfigRepository::class);
+        $configRepo->method('getValue')->willReturnCallback(static function (int $owner, string $group, string $setting): ?string {
+            return 'QDRANT_SEARCH' === $group ? '0' : null;
+        });
+
+        $sorter = $this->createMock(MessageSorter::class);
+        $sorter->expects($this->once())
+            ->method('classify')
+            ->willReturn(['topic' => 'officemaker', 'language' => 'de']);
+
+        $classifier = new MessageClassifier(
+            $sorter,
+            $this->createMock(SynapseRouter::class),
+            new TopicAliasResolver(),
+            $this->createMock(MessageMetaRepository::class),
+            $this->createMock(ModelConfigService::class),
+            $configRepo,
+            $this->createMock(EntityManagerInterface::class),
+            $this->createMock(LoggerInterface::class),
+        );
+
+        $previousFileMessage = $this->createMock(Message::class);
+        $previousFileMessage->method('getDirection')->willReturn('OUT');
+        $previousFileMessage->method('getText')->willReturn('__FILE_GENERATED__:Zweiter_Weltkrieg.docx');
+
+        $message = $this->createMock(Message::class);
+        $message->method('getId')->willReturn(205);
+        $message->method('getUserId')->willReturn(10);
+        $message->method('getText')->willReturn('Kannst du den Titel bitte fett machen');
+        $message->method('getLanguage')->willReturn('de');
+        $message->method('getFile')->willReturn(0);
+        $message->method('getFiles')->willReturn(new \Doctrine\Common\Collections\ArrayCollection());
+        $message->method('getDateTime')->willReturn('20260518120000');
+        $message->method('getFilePath')->willReturn('');
+        $message->method('getTopic')->willReturn('');
+        $message->method('getFileText')->willReturn('');
+
+        $result = $classifier->classify($message, [$previousFileMessage]);
+
+        $this->assertSame('officemaker', $result['topic']);
+        $this->assertSame('ai_sorting', $result['source']);
+        $this->assertFalse($result['skip_sorting']);
+    }
+
+    /**
+     * Counterpart: when the previous assistant turn was a normal reply (no
+     * generated file), a plain chat message still takes the fast path.
+     */
+    public function testFastPathTakenWhenPreviousTurnIsNormalReply(): void
+    {
+        $configRepo = $this->createMock(ConfigRepository::class);
+        $configRepo->method('getValue')->willReturnCallback(static function (int $owner, string $group, string $setting): ?string {
+            return 'QDRANT_SEARCH' === $group ? '0' : null;
+        });
+
+        $sorter = $this->createMock(MessageSorter::class);
+        $sorter->expects($this->never())->method('classify');
+
+        $classifier = new MessageClassifier(
+            $sorter,
+            $this->createMock(SynapseRouter::class),
+            new TopicAliasResolver(),
+            $this->createMock(MessageMetaRepository::class),
+            $this->createMock(ModelConfigService::class),
+            $configRepo,
+            $this->createMock(EntityManagerInterface::class),
+            $this->createMock(LoggerInterface::class),
+        );
+
+        $previousReply = $this->createMock(Message::class);
+        $previousReply->method('getDirection')->willReturn('OUT');
+        $previousReply->method('getText')->willReturn('Sure, here is the answer to your question.');
+
+        $message = $this->createMock(Message::class);
+        $message->method('getId')->willReturn(206);
+        $message->method('getUserId')->willReturn(10);
+        $message->method('getText')->willReturn('Thanks, that helps a lot!');
+        $message->method('getLanguage')->willReturn('en');
+        $message->method('getFile')->willReturn(0);
+        $message->method('getFiles')->willReturn(new \Doctrine\Common\Collections\ArrayCollection());
+
+        $result = $classifier->classify($message, [$previousReply]);
+
+        $this->assertSame('general', $result['topic']);
+        $this->assertSame('fast_path_heuristic', $result['source']);
+        $this->assertTrue($result['skip_sorting']);
+    }
 }
