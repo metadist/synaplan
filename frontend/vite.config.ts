@@ -46,7 +46,10 @@ export default defineConfig(({ mode }) => {
   const allowedHosts =
     allowedHostsEnv === '' || allowedHostsEnv === 'true' || allowedHostsEnv === 'all'
       ? true
-      : allowedHostsEnv.split(',').map((h) => h.trim()).filter(Boolean)
+      : allowedHostsEnv
+          .split(',')
+          .map((h) => h.trim())
+          .filter(Boolean)
 
   return {
     base: basePath,

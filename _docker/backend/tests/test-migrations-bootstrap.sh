@@ -214,6 +214,31 @@ bootstrap_migrations_metadata "" "test-partial-1" >/dev/null
 bootstrap_migrations_metadata "" "test-partial-2" >/dev/null
 assert_eq 1 "${DB_STATE[DROP_CALLS]}"     "_drop_all_tables called exactly once across two invocations"
 
+echo "▶ Case 9b: half-applied baseline where the orphan-table drop FAILS — bootstrap must abort (non-zero), not fall through to migrate"
+reset_state
+DB_STATE[HAS_BUSER]=0
+DB_STATE[HAS_BAPIKEYS]=1
+DB_STATE[HAS_VERSIONS_TABLE]=0
+# Temporarily shadow the drop helper with a failing variant.
+_drop_all_tables() {
+    DB_STATE[DROP_CALLS]=$((DB_STATE[DROP_CALLS] + 1))
+    return 1
+}
+bootstrap_migrations_metadata "" "test-partial-drop-fails" >/dev/null 2>&1
+_rc=$?
+assert_eq 1 "$_rc"                        "bootstrap returns non-zero when the orphan-table drop fails"
+assert_eq 1 "${DB_STATE[DROP_CALLS]}"     "_drop_all_tables attempted exactly once"
+assert_eq 1 "${DB_STATE[HAS_BAPIKEYS]}"   "orphan tables left intact (drop failed) — failure is surfaced, not masked"
+# Restore the success variant for any later cases relying on it.
+_drop_all_tables() {
+    DB_STATE[DROP_CALLS]=$((DB_STATE[DROP_CALLS] + 1))
+    DB_STATE[HAS_BUSER]=0
+    DB_STATE[HAS_BAPIKEYS]=0
+    DB_STATE[HAS_VERSIONS_TABLE]=0
+    DB_STATE[HAS_BASELINE_ROW]=0
+    DB_STATE[VERSION_ROW_COUNT]=0
+}
+
 # ---------------------------------------------------------------------------
 # Retry wrapper (run_migrations_with_retry)
 #
@@ -226,9 +251,14 @@ assert_eq 1 "${DB_STATE[DROP_CALLS]}"     "_drop_all_tables called exactly once 
 BOOTSTRAP_CALLS=0
 MIGRATE_CALLS=0
 MIGRATE_FAIL_UNTIL=0   # _run_doctrine_migrate fails while MIGRATE_CALLS <= this
+BOOTSTRAP_FAILS=0      # when 1, bootstrap_migrations_metadata returns non-zero
 
 bootstrap_migrations_metadata() {
     BOOTSTRAP_CALLS=$((BOOTSTRAP_CALLS + 1))
+    if [ "$BOOTSTRAP_FAILS" -eq 1 ]; then
+        return 1
+    fi
+    return 0
 }
 
 _run_doctrine_migrate() {
@@ -259,12 +289,21 @@ assert_eq 3 "$MIGRATE_CALLS"     "migrate retried until success (3 calls)"
 assert_eq 3 "$BOOTSTRAP_CALLS"   "bootstrap re-ran before every attempt (3 calls)"
 
 echo "▶ Case 12: migrate always fails — gives up after MIGRATION_MAX_ATTEMPTS, returns 1"
-BOOTSTRAP_CALLS=0 ; MIGRATE_CALLS=0 ; MIGRATE_FAIL_UNTIL=999
+BOOTSTRAP_CALLS=0 ; MIGRATE_CALLS=0 ; MIGRATE_FAIL_UNTIL=999 ; BOOTSTRAP_FAILS=0
 MIGRATION_MAX_ATTEMPTS=3 run_migrations_with_retry "" "test-retry-broken" >/dev/null
 _rc=$?
 assert_eq 1 "$_rc"               "run_migrations_with_retry returns 1 after exhausting attempts"
 assert_eq 3 "$MIGRATE_CALLS"     "migrate attempted exactly MIGRATION_MAX_ATTEMPTS times"
 assert_eq 3 "$BOOTSTRAP_CALLS"   "bootstrap ran before every attempt"
+
+echo "▶ Case 13: bootstrap itself fails — retry wrapper aborts immediately without ever calling migrate"
+BOOTSTRAP_CALLS=0 ; MIGRATE_CALLS=0 ; MIGRATE_FAIL_UNTIL=0 ; BOOTSTRAP_FAILS=1
+MIGRATION_MAX_ATTEMPTS=5 run_migrations_with_retry "" "test-retry-bootstrap-fail" >/dev/null 2>&1
+_rc=$?
+BOOTSTRAP_FAILS=0
+assert_eq 1 "$_rc"               "run_migrations_with_retry returns 1 when bootstrap fails"
+assert_eq 1 "$BOOTSTRAP_CALLS"   "bootstrap attempted exactly once (no retry on unrecoverable setup failure)"
+assert_eq 0 "$MIGRATE_CALLS"     "migrate never attempted after a failed bootstrap"
 
 # ---------------------------------------------------------------------------
 # Case 7: MySQL backslash escape regression test
