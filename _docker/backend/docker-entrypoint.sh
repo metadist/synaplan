@@ -219,15 +219,18 @@ fi
 # shellcheck disable=SC1090
 . "$_MIGRATIONS_LIB"
 
-bootstrap_migrations_metadata "" "main"
-php bin/console doctrine:migrations:migrate --no-interaction --allow-no-migration
+# run_migrations_with_retry re-runs the idempotent bootstrap before each attempt,
+# so a failed first start (transient DB error, or a crash mid-baseline that left
+# orphan tables) self-heals within this same start instead of crash-looping.
+run_migrations_with_retry "" "main"
 echo "✅ Database migrations applied!"
 
-# Same flow for the test database (PHPUnit + DAMA transaction rollback)
+# Same flow for the test database (PHPUnit + DAMA transaction rollback).
+# Non-fatal: a broken test DB must never block the dev backend from starting.
 if [ "$APP_ENV" = "dev" ]; then
     echo "🔄 Migrating test database..."
-    bootstrap_migrations_metadata "--env=test" "test"
-    php bin/console doctrine:migrations:migrate --no-interaction --allow-no-migration --env=test 2>/dev/null || true
+    run_migrations_with_retry "--env=test" "test" || \
+        echo "⚠️  Test database migrations failed — continuing (dev backend still starts)"
     echo "✅ Test database migrations applied!"
 fi
 

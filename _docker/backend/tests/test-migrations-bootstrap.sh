@@ -215,6 +215,58 @@ bootstrap_migrations_metadata "" "test-partial-2" >/dev/null
 assert_eq 1 "${DB_STATE[DROP_CALLS]}"     "_drop_all_tables called exactly once across two invocations"
 
 # ---------------------------------------------------------------------------
+# Retry wrapper (run_migrations_with_retry)
+#
+# Stub both the metadata bootstrap and the migrate call so we can drive the
+# control flow deterministically: count how many times each runs and make the
+# migrate succeed/fail on demand. No sleeps (delay forced to 0).
+# ---------------------------------------------------------------------------
+
+# Counters + scripted behaviour for the stubs.
+BOOTSTRAP_CALLS=0
+MIGRATE_CALLS=0
+MIGRATE_FAIL_UNTIL=0   # _run_doctrine_migrate fails while MIGRATE_CALLS <= this
+
+bootstrap_migrations_metadata() {
+    BOOTSTRAP_CALLS=$((BOOTSTRAP_CALLS + 1))
+}
+
+_run_doctrine_migrate() {
+    MIGRATE_CALLS=$((MIGRATE_CALLS + 1))
+    if [ "$MIGRATE_CALLS" -le "$MIGRATE_FAIL_UNTIL" ]; then
+        return 1
+    fi
+    return 0
+}
+
+# Keep the suite fast — no real backoff sleeps.
+export MIGRATION_RETRY_DELAY_SECONDS=0
+
+echo "▶ Case 10: migrate succeeds first try — bootstrap + migrate run exactly once, returns 0"
+BOOTSTRAP_CALLS=0 ; MIGRATE_CALLS=0 ; MIGRATE_FAIL_UNTIL=0
+MIGRATION_MAX_ATTEMPTS=5 run_migrations_with_retry "" "test-retry-ok" >/dev/null
+_rc=$?
+assert_eq 0 "$_rc"               "run_migrations_with_retry returns 0"
+assert_eq 1 "$BOOTSTRAP_CALLS"   "bootstrap run once"
+assert_eq 1 "$MIGRATE_CALLS"     "migrate run once"
+
+echo "▶ Case 11: migrate fails twice then succeeds — bootstrap re-runs before EACH attempt, returns 0"
+BOOTSTRAP_CALLS=0 ; MIGRATE_CALLS=0 ; MIGRATE_FAIL_UNTIL=2
+MIGRATION_MAX_ATTEMPTS=5 run_migrations_with_retry "" "test-retry-transient" >/dev/null
+_rc=$?
+assert_eq 0 "$_rc"               "run_migrations_with_retry eventually returns 0"
+assert_eq 3 "$MIGRATE_CALLS"     "migrate retried until success (3 calls)"
+assert_eq 3 "$BOOTSTRAP_CALLS"   "bootstrap re-ran before every attempt (3 calls)"
+
+echo "▶ Case 12: migrate always fails — gives up after MIGRATION_MAX_ATTEMPTS, returns 1"
+BOOTSTRAP_CALLS=0 ; MIGRATE_CALLS=0 ; MIGRATE_FAIL_UNTIL=999
+MIGRATION_MAX_ATTEMPTS=3 run_migrations_with_retry "" "test-retry-broken" >/dev/null
+_rc=$?
+assert_eq 1 "$_rc"               "run_migrations_with_retry returns 1 after exhausting attempts"
+assert_eq 3 "$MIGRATE_CALLS"     "migrate attempted exactly MIGRATION_MAX_ATTEMPTS times"
+assert_eq 3 "$BOOTSTRAP_CALLS"   "bootstrap ran before every attempt"
+
+# ---------------------------------------------------------------------------
 # Case 7: MySQL backslash escape regression test
 #
 # Re-source the library so we get the REAL _register_baseline_migration /

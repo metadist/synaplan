@@ -218,3 +218,58 @@ bootstrap_migrations_metadata() {
         fi
     fi
 }
+
+# Run doctrine:migrations:migrate once. Isolated in its own function so the
+# retry wrapper below stays pure control-flow and the bash test suite can
+# override it to simulate transient failures without a real database.
+#
+# Returns the migrate command's own exit status.
+_run_doctrine_migrate() {
+    local _env_flag="${1:-}"
+    php bin/console doctrine:migrations:migrate --no-interaction --allow-no-migration ${_env_flag}
+}
+
+# Apply migrations with bounded retries, re-running the idempotent metadata
+# bootstrap before EACH attempt. This is what makes a failed first start
+# self-healing *within a single container start* rather than relying on the
+# Docker restart loop:
+#
+#   - Transient failures (DB still warming up behind the SELECT 1 probe, lock
+#     contention, deadlocks, two app instances racing the same migration) get
+#     a few more chances instead of crash-exiting the container immediately.
+#   - A crash mid-baseline leaves "BAPIKEYS without BUSER"; because the
+#     bootstrap re-runs before the next attempt it drops the orphan tables and
+#     the retry rebuilds the schema cleanly — no operator action, no restart.
+#
+# Tunables (env): MIGRATION_MAX_ATTEMPTS (default 5),
+#                 MIGRATION_RETRY_DELAY_SECONDS (default 5).
+#
+# Returns 0 once migrations apply cleanly, 1 after exhausting all attempts.
+#
+# Args:
+#   $1 - optional Symfony env flag (e.g. "--env=test"); pass "" for the main DB.
+#   $2 - optional human label for log output (e.g. "main" / "test").
+run_migrations_with_retry() {
+    local _env_flag="${1:-}"
+    local _label="${2:-database}"
+    local _max_attempts="${MIGRATION_MAX_ATTEMPTS:-5}"
+    local _delay="${MIGRATION_RETRY_DELAY_SECONDS:-5}"
+    local _attempt=1
+
+    while :; do
+        bootstrap_migrations_metadata "$_env_flag" "$_label"
+
+        if _run_doctrine_migrate "$_env_flag"; then
+            return 0
+        fi
+
+        if [ "$_attempt" -ge "$_max_attempts" ]; then
+            echo "❌ [$_label] Migrations still failing after ${_attempt} attempt(s) — giving up"
+            return 1
+        fi
+
+        echo "⚠️  [$_label] Migration attempt ${_attempt}/${_max_attempts} failed — re-checking metadata and retrying in ${_delay}s..."
+        sleep "$_delay"
+        _attempt=$((_attempt + 1))
+    done
+}

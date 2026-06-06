@@ -23,9 +23,11 @@ services:
     environment:
       NODE_ENV: development
       BACKEND_URL: http://backend
-      # Hosts the Vite dev server will accept (comma-separated), or "true"/"all".
-      # Needed when reaching the dev server via a custom domain / reverse proxy.
-      ALLOWED_HOSTS: ${ALLOWED_HOSTS:-aisystem.network.sunnet}
+      # Vite dev-server host check (anti DNS-rebinding). EMPTY by default →
+      # ignored, so the dev server answers to ALL hosts out of the box (works
+      # behind any domain / reverse proxy). Set ALLOWED_HOSTS to a
+      # comma-separated allow-list to restrict to ONLY those hosts.
+      ALLOWED_HOSTS: ${ALLOWED_HOSTS:-}
     ports:
       - "5173:5173"
     volumes:

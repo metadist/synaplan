@@ -36,15 +36,17 @@ export default defineConfig(({ mode }) => {
   const basePath = env.VITE_BASE_PATH || '/'
   const backendUrl = env.BACKEND_URL || 'http://localhost:8000'
 
-  // Dev server allowed hosts. Set ALLOWED_HOSTS to a comma-separated list,
-  // or "true"/"all" to allow any host (handy behind a reverse proxy / custom domain).
-  const allowedHostsEnv = (env.ALLOWED_HOSTS || '').trim()
+  // Dev server allowed hosts (Vite's anti DNS-rebinding guard).
+  // EMPTY (default) → the guard is ignored and EVERY host is accepted, so the
+  // dev server answers to all requests out of the box (any domain / reverse
+  // proxy). SET to a comma-separated list (e.g. "app.example.com,dev.example.com")
+  // → ONLY those hosts may connect; everything else is rejected.
+  // "true"/"all" are explicit aliases for "allow every host".
+  const allowedHostsEnv = (env.ALLOWED_HOSTS ?? '').trim()
   const allowedHosts =
-    allowedHostsEnv === 'true' || allowedHostsEnv === 'all'
+    allowedHostsEnv === '' || allowedHostsEnv === 'true' || allowedHostsEnv === 'all'
       ? true
-      : allowedHostsEnv
-        ? allowedHostsEnv.split(',').map((h) => h.trim()).filter(Boolean)
-        : undefined
+      : allowedHostsEnv.split(',').map((h) => h.trim()).filter(Boolean)
 
   return {
     base: basePath,
@@ -97,7 +99,7 @@ export default defineConfig(({ mode }) => {
       },
     },
     server: {
-      ...(allowedHosts !== undefined ? { allowedHosts } : {}),
+      allowedHosts,
       proxy: {
         '/api': {
           target: backendUrl,
