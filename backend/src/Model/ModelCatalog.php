@@ -27,6 +27,9 @@ class ModelCatalog
         'CHAT' => 'chat',
         'TOOLS' => 'chat',
         'SORT' => 'chat',
+        // PLAN: multi-task router model (gpt-oss-120b on Groq). Tuned
+        // independently of SORT; resolves to a chat-tagged model.
+        'PLAN' => 'chat',
         'SUMMARIZE' => 'chat',
         'ANALYZE' => 'chat',
         'TEXT2PIC' => 'text2pic',

@@ -33,6 +33,10 @@ final readonly class DefaultModelConfigSeeder
         ['group' => 'DEFAULTMODEL', 'setting' => 'CHAT',       'modelKey' => 'anthropic:claude-sonnet-4-6:chat'],
         ['group' => 'DEFAULTMODEL', 'setting' => 'TOOLS',      'modelKey' => 'anthropic:claude-sonnet-4-6:chat'],
         ['group' => 'DEFAULTMODEL', 'setting' => 'SORT',       'modelKey' => 'groq:openai/gpt-oss-120b:chat'],
+        // Multi-task routing planner. Same fast/cheap tier as SORT but a
+        // dedicated binding so it can be tuned without touching the legacy
+        // sorter. TaskPlanner falls back to SORT if this row is absent.
+        ['group' => 'DEFAULTMODEL', 'setting' => 'PLAN',       'modelKey' => 'groq:openai/gpt-oss-120b:chat'],
         ['group' => 'DEFAULTMODEL', 'setting' => 'SUMMARIZE',  'modelKey' => 'groq:openai/gpt-oss-120b:chat'],
         // Phase 2d: dedicated MEM tag so memory extraction never inherits the
         // user's heavy chat model (Gemini Pro etc.). Resolves to the new
@@ -76,6 +80,7 @@ final readonly class DefaultModelConfigSeeder
         ['ownerId' => 0, 'group' => 'DEFAULTMODEL', 'setting' => 'CHAT',       'value' => '-1'],
         ['ownerId' => 0, 'group' => 'DEFAULTMODEL', 'setting' => 'TOOLS',      'value' => '-1'],
         ['ownerId' => 0, 'group' => 'DEFAULTMODEL', 'setting' => 'SORT',       'value' => '-1'],
+        ['ownerId' => 0, 'group' => 'DEFAULTMODEL', 'setting' => 'PLAN',       'value' => '-1'],
         ['ownerId' => 0, 'group' => 'DEFAULTMODEL', 'setting' => 'SUMMARIZE',  'value' => '-1'],
         // Phase 2d: MEM tag in test routes through the test stub chat model
         // so PHPUnit doesn't need real Groq access for memory extraction.

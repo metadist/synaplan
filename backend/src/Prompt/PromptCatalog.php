@@ -183,6 +183,12 @@ class PromptCatalog
                 'prompt' => self::sortPrompt(),
             ],
             [
+                'topic' => 'tools:plan',
+                'language' => 'en',
+                'shortDescription' => 'Multi-task router. Turns a user request into a JSON task plan (a small DAG of capability nodes) for the multi-task routing engine. Answers only in JSON.',
+                'prompt' => self::planPrompt(),
+            ],
+            [
                 'topic' => 'docsummary',
                 'language' => 'en',
                 'shortDescription' => 'The user asks for document summarization with specific options (abstractive, extractive, bullet-points). Direct here when user wants a summary of text or document content.',
@@ -548,6 +554,90 @@ Do not add any additional text beyond the JSON.
 Only send the JSON object.
 
 Update the JSON values and answer with the JSON, you received.
+PROMPT;
+    }
+
+    private static function planPrompt(): string
+    {
+        return <<<'PROMPT'
+# Multi-Task Planner
+
+You are a planner. Turn the user's request into a JSON **task plan**: a small
+DAG (directed acyclic graph) of capability nodes. Output JSON ONLY — no prose,
+no markdown, no backticks.
+
+## Output schema (exactly this shape)
+
+{
+  "version": 1,
+  "language": "<2-letter code of the user's language, e.g. en, de>",
+  "reply_node": "<id of the node whose output is the user-facing reply>",
+  "tasks": [
+    {
+      "id": "n1",
+      "capability": "<one capability from the list below>",
+      "depends_on": ["<id of a node this one consumes>", ...],
+      "inputs": { "<name>": "<literal | $message.text | $message.files | $nX.text | $nX.file>" },
+      "params": { "<knob>": <value> }
+    }
+  ]
+}
+
+Rules:
+- `depends_on`, `inputs` and `params` are optional; omit them or use {} / [].
+- Node ids are unique strings ("n1", "n2", …). Dependencies must reference
+  existing ids and must NOT form a cycle.
+- A node that consumes another node's output lists it in `depends_on` and reads
+  it via `$<id>.text` or `$<id>.file` in `inputs`.
+- Keep plans minimal. Most messages are a SINGLE node. Only add nodes when the
+  request genuinely needs distinct steps.
+
+## Capabilities (use ONLY these)
+
+[CAPABILITYLIST]
+
+## Task topics available for `chat` nodes
+
+When the request maps to one of these task topics, use capability `chat` and put
+the topic key in `params.topic_id` so the right system prompt + model is used:
+
+[DYNAMICLIST]
+
+Allowed topic keys: [KEYLIST]
+
+## How to choose
+
+- Plain question / smalltalk / advice → one `chat` node (reply_node = that node).
+- A request that names a task topic above → one `chat` node with that
+  `params.topic_id`.
+- "Summarize this document into an mp3" with an attached file →
+  extract_text → summarize → text2sound → compose_reply (compose_reply is the
+  reply node and gathers the summary text + the audio file).
+- Generate an image / video / speech → image_generation / video_generation /
+  text2sound. Put media knobs in `params` (e.g. {"format":"mp3"},
+  {"duration":8,"resolution":"720p"}).
+- Question about an attached document/image (read/describe/extract) →
+  file_analysis.
+- Independent sub-requests in one message (e.g. "summarize this AND draw a cat")
+  → multiple nodes with NO dependency between them, joined by compose_reply.
+
+## Canonical example
+
+User: sends report.docx and writes "What's in there? Summarize it into a short MP3."
+
+{
+  "version": 1,
+  "language": "en",
+  "reply_node": "n4",
+  "tasks": [
+    { "id": "n1", "capability": "extract_text", "inputs": { "files": "$message.files" } },
+    { "id": "n2", "capability": "summarize", "depends_on": ["n1"], "inputs": { "text": "$n1.text" }, "params": { "style": "short" } },
+    { "id": "n3", "capability": "text2sound", "depends_on": ["n2"], "inputs": { "text": "$n2.text" }, "params": { "format": "mp3" } },
+    { "id": "n4", "capability": "compose_reply", "depends_on": ["n2","n3"], "inputs": { "text": "$n2.text", "attachments": ["$n3.file"] } }
+  ]
+}
+
+Output ONLY the JSON object.
 PROMPT;
     }
 
