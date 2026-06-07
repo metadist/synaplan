@@ -2751,6 +2751,40 @@
     "default": "Loading...",
     "pleaseWait": "Please wait"
   },
+  "taskPlan": {
+    "title": "Task plan",
+    "download": "Download",
+    "failedBody": "This step couldn't be completed.",
+    "state": {
+      "pending": "Queued",
+      "running": "Working…",
+      "done": "Done",
+      "failed": "Failed",
+      "skipped": "Skipped"
+    },
+    "kind": {
+      "text": "Text",
+      "image": "Image",
+      "video": "Video",
+      "audio": "Audio",
+      "document": "Document",
+      "search": "Web search",
+      "extract": "Text extraction"
+    },
+    "capability": {
+      "extract_text": "Extracting text",
+      "chat": "Answer",
+      "summarize": "Summary",
+      "translate": "Translation",
+      "rag_query": "Knowledge answer",
+      "web_search": "Web search",
+      "file_analysis": "File analysis",
+      "image_generation": "Image",
+      "video_generation": "Video",
+      "text2sound": "Audio",
+      "document_generation": "Document"
+    }
+  },
   "processing": {
     "started": "Starting processing...",
     "startedTitle": "Processing your message",

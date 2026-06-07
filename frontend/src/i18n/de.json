@@ -802,6 +802,40 @@
     "saveChanges": "Änderungen speichern",
     "cancel": "Abbrechen"
   },
+  "taskPlan": {
+    "title": "Aufgabenplan",
+    "download": "Herunterladen",
+    "failedBody": "Dieser Schritt konnte nicht abgeschlossen werden.",
+    "state": {
+      "pending": "Wartet",
+      "running": "Läuft…",
+      "done": "Fertig",
+      "failed": "Fehlgeschlagen",
+      "skipped": "Übersprungen"
+    },
+    "kind": {
+      "text": "Text",
+      "image": "Bild",
+      "video": "Video",
+      "audio": "Audio",
+      "document": "Dokument",
+      "search": "Websuche",
+      "extract": "Textextraktion"
+    },
+    "capability": {
+      "extract_text": "Text wird extrahiert",
+      "chat": "Antwort",
+      "summarize": "Zusammenfassung",
+      "translate": "Übersetzung",
+      "rag_query": "Wissensantwort",
+      "web_search": "Websuche",
+      "file_analysis": "Dateianalyse",
+      "image_generation": "Bild",
+      "video_generation": "Video",
+      "text2sound": "Audio",
+      "document_generation": "Dokument"
+    }
+  },
   "processing": {
     "started": "Starte Verarbeitung...",
     "startedTitle": "Verarbeite deine Nachricht",

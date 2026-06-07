@@ -163,6 +163,7 @@
               :error-type="message.errorType"
               :error-data="message.errorData"
               :truncated="message.truncated"
+              :task-plan="message.taskPlan"
               :is-guest-mode="isGuestMode"
               @regenerate="handleRegenerate(message, $event)"
               @again="handleAgain"
@@ -338,6 +339,8 @@ import {
   parseContentWithThinking,
   type Message,
   type Part,
+  type TaskCardKind,
+  type TaskCardState,
 } from '@/stores/history'
 import { useChatsStore, isDefaultChatTitle } from '@/stores/chats'
 import { useModelsStore } from '@/stores/models'
@@ -1809,6 +1812,59 @@ const streamAIResponse = async (
             }, 2000)
           } else if (data.status === 'status') {
             // Generic status message
+          } else if (data.status === 'plan') {
+            // Multitask routing: a multi-node plan was recognized. Render a task
+            // card per node. Single-node turns never emit this, so normal chat
+            // is unaffected.
+            const message = historyStore.messages.find((m) => m.id === messageId)
+            const tasks = data.metadata?.plan
+            if (message && Array.isArray(tasks) && tasks.length > 0) {
+              processingStatus.value = ''
+              processingMetadata.value = {}
+              message.taskPlan = {
+                active: true,
+                replyNode:
+                  typeof data.metadata?.reply_node === 'string' ? data.metadata.reply_node : '',
+                cards: tasks.map((t) => ({
+                  nodeId: t.node_id,
+                  capability: t.capability,
+                  kind: (t.kind as TaskCardKind) ?? 'text',
+                  state: 'pending' as TaskCardState,
+                })),
+              }
+            }
+          } else if (data.status === 'task_update') {
+            const message = historyStore.messages.find((m) => m.id === messageId)
+            const card = message?.taskPlan?.cards.find((c) => c.nodeId === data.metadata?.node_id)
+            if (card && typeof data.metadata?.state === 'string') {
+              card.state = data.metadata.state as TaskCardState
+            }
+          } else if (data.status === 'task_chunk') {
+            const message = historyStore.messages.find((m) => m.id === messageId)
+            const card = message?.taskPlan?.cards.find((c) => c.nodeId === data.metadata?.node_id)
+            if (card && typeof data.metadata?.chunk === 'string') {
+              card.text = (card.text ?? '') + data.metadata.chunk
+            }
+          } else if (data.status === 'task_file') {
+            const message = historyStore.messages.find((m) => m.id === messageId)
+            const card = message?.taskPlan?.cards.find((c) => c.nodeId === data.metadata?.node_id)
+            if (card && typeof data.metadata?.url === 'string') {
+              card.url = normalizeMediaUrl(data.metadata.url)
+              card.mediaType =
+                typeof data.metadata?.type === 'string' ? data.metadata.type : card.kind
+            }
+          } else if (
+            (data.status === 'data' ||
+              data.status === 'file' ||
+              data.status === 'audio' ||
+              data.status === 'tts_generating' ||
+              data.status === 'links') &&
+            historyStore.messages.find((m) => m.id === messageId)?.taskPlan?.active
+          ) {
+            // Multitask mode: the task cards are the live surface, so suppress
+            // the normal single-bubble content/media events. They still flow so
+            // the OUT message text + files persist; history renders the flattened
+            // bubble on reload.
           } else if (data.status === 'data' && data.chunk) {
             if (processingStatus.value) {
               processingStatus.value = ''

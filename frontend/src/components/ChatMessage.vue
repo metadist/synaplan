@@ -392,6 +392,10 @@
             on plain text. Falling back to `${type}-${index}` keeps backward
             compatibility for parts without partId (legacy stored messages).
           -->
+          <!-- Multitask routing: live task cards (only while a multi-node plan
+               streams). On reload the turn is flattened to normal parts below. -->
+          <TaskPlanBubble v-if="taskPlan?.active" :plan="taskPlan" />
+
           <MessagePart
             v-for="(part, index) in contentParts"
             :key="part.partId ?? `${part.type}-${index}`"
@@ -941,7 +945,8 @@ import GroqIcon from '@/components/icons/GroqIcon.vue'
 import ExternalLinkWarning from '@/components/common/ExternalLinkWarning.vue'
 import { useExternalLink } from '@/composables/useExternalLink'
 import { useDateFormat } from '@/composables/useDateFormat'
-import type { Part, MessageFile } from '@/stores/history'
+import type { Part, MessageFile, TaskPlanState } from '@/stores/history'
+import TaskPlanBubble from '@/components/multitask/TaskPlanBubble.vue'
 import type { AgainData } from '@/types/ai-models'
 import { mediaHintFromClassificationTopic } from '@/utils/mediaGenerationHint'
 import { chatBadgeIcon, chatBadgeLabel } from '@/utils/chatModelBadge'
@@ -1016,6 +1021,8 @@ interface Props {
   memoryIds?: number[] | null // IDs of memories used (resolved from memoriesStore)
   feedbackIds?: number[] | null // IDs of feedbacks used (resolved from feedbackStore)
   truncated?: boolean
+  // Multitask routing: live task-card state while a multi-node plan streams.
+  taskPlan?: TaskPlanState | null
   // Status for failed/pending messages
   isGuestMode?: boolean
   status?: 'sent' | 'failed' | 'rate_limited'
