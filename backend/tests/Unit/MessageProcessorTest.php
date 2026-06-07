@@ -12,6 +12,7 @@ use App\Service\Message\MessageProcessor;
 use App\Service\Message\SearchQueryGenerator;
 use App\Service\ModelConfigService;
 use App\Service\Multitask\MultitaskRoutingConfig;
+use App\Service\Multitask\TaskPlanExecutor;
 use App\Service\Multitask\TaskPlanner;
 use App\Service\Multitask\TaskPlanStore;
 use App\Service\PromptService;
@@ -62,7 +63,8 @@ class MessageProcessorTest extends TestCase
             $this->logger,
             $this->createMock(MultitaskRoutingConfig::class),
             $this->createMock(TaskPlanner::class),
-            $this->createMock(TaskPlanStore::class)
+            $this->createMock(TaskPlanStore::class),
+            $this->createMock(TaskPlanExecutor::class)
         );
     }
 

@@ -8,6 +8,7 @@ use App\Repository\SearchResultRepository;
 use App\Service\Exception\VisionModelRequiredException;
 use App\Service\ModelConfigService;
 use App\Service\Multitask\MultitaskRoutingConfig;
+use App\Service\Multitask\TaskPlanExecutor;
 use App\Service\Multitask\TaskPlanner;
 use App\Service\Multitask\TaskPlanStore;
 use App\Service\PerfTimer;
@@ -44,6 +45,7 @@ final readonly class MessageProcessor
         private MultitaskRoutingConfig $multitaskConfig,
         private TaskPlanner $taskPlanner,
         private TaskPlanStore $taskPlanStore,
+        private TaskPlanExecutor $taskPlanExecutor,
     ) {
     }
 
@@ -460,7 +462,15 @@ final readonly class MessageProcessor
             }
 
             $perfTimer->start('handler_total');
-            $response = $this->router->routeStream($message, $conversationHistory, $classification, $streamCallback, $statusCallback, $options);
+            // MULTITASK_ROUTING_ENABLED (Sprint 2): route execution through the
+            // task-plan executor. For single-node plans it delegates to the same
+            // InferenceRouter with the same classification — behaviour is
+            // identical; it only additionally persists the executed plan.
+            // (Single $cls alias keeps the PHPStan "might not be defined" count stable.)
+            $cls = $classification;
+            $response = $this->isMultitaskRoutingEnabled($message)
+                ? $this->taskPlanExecutor->executeStream($message, $conversationHistory, $cls, $streamCallback, $statusCallback, $options)
+                : $this->router->routeStream($message, $conversationHistory, $cls, $streamCallback, $statusCallback, $options);
             $perfTimer->stop('handler_total');
 
             // Re-add sorting model info to result (for StreamController to save)
@@ -859,7 +869,10 @@ final readonly class MessageProcessor
                 'model_name' => $chatModelName,
             ]);
 
-            $response = $this->router->route($message, $conversationHistory, $classification, $statusCallback);
+            $clsForRoute = $classification;
+            $response = $this->isMultitaskRoutingEnabled($message)
+                ? $this->taskPlanExecutor->execute($message, $conversationHistory, $clsForRoute, $statusCallback)
+                : $this->router->route($message, $conversationHistory, $clsForRoute, $statusCallback);
 
             $this->notify($statusCallback, 'complete', 'Response generated', [
                 'provider' => $response['metadata']['provider'] ?? 'unknown',
@@ -977,9 +990,29 @@ final readonly class MessageProcessor
      * any error is logged and swallowed so the user turn is never affected.
      *
      * Resolution uses the effective user id (email/WhatsApp remapping parity).
-     *
-     * @param array<int, Message> $conversationHistory
      */
+    /**
+     * Whether the task-plan executor should run for this message, resolved for
+     * the EFFECTIVE user id (email/WhatsApp remapping parity with model
+     * selection). Defaults to false on any error so a lookup glitch can never
+     * break a turn.
+     */
+    private function isMultitaskRoutingEnabled(Message $message): bool
+    {
+        try {
+            $userId = $this->modelConfigService->getEffectiveUserIdForMessage($message);
+
+            return $this->multitaskConfig->isRoutingEnabled($userId);
+        } catch (\Throwable $e) {
+            $this->logger->warning('MessageProcessor: routing-flag lookup failed, using legacy path', [
+                'message_id' => $message->getId(),
+                'error' => $e->getMessage(),
+            ]);
+
+            return false;
+        }
+    }
+
     private function maybeShadowPlan(Message $message, array $conversationHistory): void
     {
         try {
