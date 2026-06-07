@@ -11,6 +11,9 @@ use App\Service\Message\MessagePreProcessor;
 use App\Service\Message\MessageProcessor;
 use App\Service\Message\SearchQueryGenerator;
 use App\Service\ModelConfigService;
+use App\Service\Multitask\MultitaskRoutingConfig;
+use App\Service\Multitask\TaskPlanner;
+use App\Service\Multitask\TaskPlanStore;
 use App\Service\PromptService;
 use App\Service\Search\BraveSearchService;
 use App\Service\UrlContentService;
@@ -56,7 +59,10 @@ class MessageProcessorTest extends TestCase
             $this->braveSearchService,
             $this->searchQueryGenerator,
             $this->createMock(UrlContentService::class),
-            $this->logger
+            $this->logger,
+            $this->createMock(MultitaskRoutingConfig::class),
+            $this->createMock(TaskPlanner::class),
+            $this->createMock(TaskPlanStore::class)
         );
     }
 

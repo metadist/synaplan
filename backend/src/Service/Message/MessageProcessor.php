@@ -7,6 +7,9 @@ use App\Repository\MessageRepository;
 use App\Repository\SearchResultRepository;
 use App\Service\Exception\VisionModelRequiredException;
 use App\Service\ModelConfigService;
+use App\Service\Multitask\MultitaskRoutingConfig;
+use App\Service\Multitask\TaskPlanner;
+use App\Service\Multitask\TaskPlanStore;
 use App\Service\PerfTimer;
 use App\Service\PromptService;
 use App\Service\Search\BraveSearchService;
@@ -38,6 +41,9 @@ final readonly class MessageProcessor
         private SearchQueryGenerator $searchQueryGenerator,
         private UrlContentService $urlContentService,
         private LoggerInterface $logger,
+        private MultitaskRoutingConfig $multitaskConfig,
+        private TaskPlanner $taskPlanner,
+        private TaskPlanStore $taskPlanStore,
     ) {
     }
 
@@ -274,6 +280,13 @@ final readonly class MessageProcessor
                     'sorting_provider' => $sortingProvider,
                     'sorting_model_name' => $sortingModelName,
                 ]);
+
+                // Shadow mode (Sprint 1): generate + persist a task plan for
+                // real traffic WITHOUT executing it. The legacy path above still
+                // answers the user. Inert unless MULTITASK_SHADOW_MODE is on, and
+                // wrapped so it can never affect the turn. Runs only on the
+                // normal-classification branch (never widget/fixed-prompt/again).
+                $this->maybeShadowPlan($message, $conversationHistory);
             }
 
             // User-selected knowledge-base folder (RAG group key) from the chat
@@ -709,6 +722,10 @@ final readonly class MessageProcessor
                     'sorting_provider' => $sortingProvider,
                     'sorting_model_name' => $sortingModelName,
                 ]);
+
+                // Shadow mode (Sprint 1): see processStream() for rationale.
+                // Inert unless MULTITASK_SHADOW_MODE is on; never affects the turn.
+                $this->maybeShadowPlan($message, $conversationHistory);
             }
 
             if (isset($classification['prompt_metadata']) && is_array($classification['prompt_metadata'])) {
@@ -949,6 +966,50 @@ final readonly class MessageProcessor
         }
 
         return 'project_default';
+    }
+
+    /**
+     * Shadow-mode task planning (Sprint 1).
+     *
+     * When MULTITASK_SHADOW_MODE is on, generate a task plan for the message and
+     * persist it to BMESSAGE_TASKS for analysis — but DO NOT execute it; the
+     * legacy pipeline still produces the user's answer. Entirely best-effort:
+     * any error is logged and swallowed so the user turn is never affected.
+     *
+     * Resolution uses the effective user id (email/WhatsApp remapping parity).
+     *
+     * @param array<int, Message> $conversationHistory
+     */
+    private function maybeShadowPlan(Message $message, array $conversationHistory): void
+    {
+        try {
+            if (!$this->multitaskConfig->isShadowMode()) {
+                return;
+            }
+
+            $userId = $this->modelConfigService->getEffectiveUserIdForMessage($message);
+            $result = $this->taskPlanner->plan($message, $conversationHistory, $userId);
+
+            $messageId = $message->getId();
+            if (null !== $messageId) {
+                $this->taskPlanStore->persist($messageId, $result->plan, $result->modelId);
+            }
+
+            $this->logger->info('MessageProcessor: shadow task plan generated', [
+                'message_id' => $messageId,
+                'fallback' => $result->fallback,
+                'node_count' => count($result->plan->nodes),
+                'capabilities' => array_map(static fn ($n) => $n->capability->value, $result->plan->nodes),
+                'plan_model_id' => $result->modelId,
+                'validation_errors' => $result->errors,
+            ]);
+        } catch (\Throwable $e) {
+            // Shadow mode must never affect the turn.
+            $this->logger->warning('MessageProcessor: shadow task planning failed (ignored)', [
+                'message_id' => $message->getId(),
+                'error' => $e->getMessage(),
+            ]);
+        }
     }
 
     private function notify(?callable $callback, string $status, string $message, array $metadata = []): void
