@@ -98,6 +98,10 @@ services:
     _instanceof:
         App\Service\Plugin\PluginContextProviderInterface:
             tags: ['app.plugin.context_provider']
+        # Multi-task routing: capability runners (Sprint 3). Concrete runners
+        # are added in Sprint 3b; this tag wires them into the RunnerRegistry.
+        App\Service\Multitask\Execution\TaskRunner:
+            tags: ['app.multitask.runner']
 
     App\:
         resource: '../src/'
