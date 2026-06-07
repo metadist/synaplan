@@ -1,0 +1,289 @@
+{
+    "again_model_override_chat": {
+        "intent": "chat",
+        "language": "en",
+        "model_id": 42,
+        "skip_sorting": true,
+        "source": "model_override_auto",
+        "topic": "general"
+    },
+    "again_model_override_text2pic": {
+        "intent": "image_generation",
+        "language": "en",
+        "model_id": 77,
+        "skip_sorting": true,
+        "source": "model_override_auto",
+        "topic": "mediamaker"
+    },
+    "again_prompt_override": {
+        "intent": "image_generation",
+        "language": "en",
+        "skip_sorting": true,
+        "source": "prompt_override",
+        "topic": "tools:pic"
+    },
+    "attach_audio_mp3": {
+        "intent": "file_analysis",
+        "language": "de",
+        "skip_sorting": true,
+        "source": "attachment_document_or_audio",
+        "topic": "analyzefile"
+    },
+    "attach_docx": {
+        "intent": "file_analysis",
+        "language": "en",
+        "skip_sorting": true,
+        "source": "attachment_document_or_audio",
+        "topic": "analyzefile"
+    },
+    "attach_pdf": {
+        "intent": "file_analysis",
+        "language": "en",
+        "skip_sorting": true,
+        "source": "attachment_document_or_audio",
+        "topic": "analyzefile"
+    },
+    "chat_plain_de": {
+        "intent": "chat",
+        "language": "de",
+        "model_id": null,
+        "model_name": null,
+        "provider": null,
+        "skip_sorting": true,
+        "source": "fast_path_heuristic",
+        "topic": "general",
+        "web_search": null
+    },
+    "chat_plain_en": {
+        "intent": "chat",
+        "language": "en",
+        "model_id": null,
+        "model_name": null,
+        "provider": null,
+        "skip_sorting": true,
+        "source": "fast_path_heuristic",
+        "topic": "general",
+        "web_search": null
+    },
+    "chat_plain_es": {
+        "intent": "chat",
+        "language": "es",
+        "model_id": null,
+        "model_name": null,
+        "provider": null,
+        "skip_sorting": true,
+        "source": "fast_path_heuristic",
+        "topic": "general",
+        "web_search": null
+    },
+    "chat_plain_fr": {
+        "intent": "chat",
+        "language": "fr",
+        "model_id": null,
+        "model_name": null,
+        "provider": null,
+        "skip_sorting": true,
+        "source": "fast_path_heuristic",
+        "topic": "general",
+        "web_search": null
+    },
+    "chat_thanks": {
+        "intent": "chat",
+        "language": "en",
+        "model_id": null,
+        "model_name": null,
+        "provider": null,
+        "skip_sorting": true,
+        "source": "fast_path_heuristic",
+        "topic": "general",
+        "web_search": null
+    },
+    "cmd_docs": {
+        "intent": "chat",
+        "language": "en",
+        "skip_sorting": true,
+        "source": "tool_command",
+        "topic": "tools:filesort"
+    },
+    "cmd_lang": {
+        "intent": "chat",
+        "language": "en",
+        "skip_sorting": true,
+        "source": "tool_command",
+        "topic": "tools:lang"
+    },
+    "cmd_list": {
+        "intent": "chat",
+        "language": "en",
+        "skip_sorting": true,
+        "source": "tool_command",
+        "topic": "tools:list"
+    },
+    "cmd_pic": {
+        "intent": "image_generation",
+        "language": "en",
+        "skip_sorting": true,
+        "source": "tool_command",
+        "topic": "tools:pic"
+    },
+    "cmd_search": {
+        "intent": "chat",
+        "language": "en",
+        "skip_sorting": true,
+        "source": "tool_command",
+        "topic": "tools:search"
+    },
+    "cmd_tts": {
+        "intent": "image_generation",
+        "language": "en",
+        "skip_sorting": true,
+        "source": "tool_command",
+        "topic": "tools:tts"
+    },
+    "cmd_vid": {
+        "intent": "image_generation",
+        "language": "en",
+        "skip_sorting": true,
+        "source": "tool_command",
+        "topic": "tools:vid"
+    },
+    "cmd_web": {
+        "intent": "chat",
+        "language": "en",
+        "skip_sorting": true,
+        "source": "tool_command",
+        "topic": "tools:web"
+    },
+    "sort_analyze": {
+        "intent": "file_analysis",
+        "language": "en",
+        "model_id": null,
+        "model_name": null,
+        "provider": null,
+        "skip_sorting": false,
+        "source": "ai_sorting",
+        "topic": "analyze",
+        "web_search": false
+    },
+    "sort_audio": {
+        "intent": "image_generation",
+        "language": "de",
+        "media_type": "audio",
+        "model_id": null,
+        "model_name": null,
+        "provider": null,
+        "skip_sorting": false,
+        "source": "ai_sorting",
+        "topic": "mediamaker",
+        "web_search": false
+    },
+    "sort_custom_topic": {
+        "intent": "chat",
+        "language": "en",
+        "model_id": null,
+        "model_name": null,
+        "provider": null,
+        "skip_sorting": false,
+        "source": "ai_sorting",
+        "topic": "legal-review",
+        "web_search": false
+    },
+    "sort_general": {
+        "intent": "chat",
+        "language": "en",
+        "model_id": 5,
+        "model_name": "llama3",
+        "provider": "ollama",
+        "skip_sorting": false,
+        "source": "ai_sorting",
+        "topic": "general",
+        "web_search": false
+    },
+    "sort_granular_audio": {
+        "granular_topic": "audio-generation",
+        "intent": "image_generation",
+        "language": "de",
+        "media_type": "audio",
+        "model_id": null,
+        "model_name": null,
+        "provider": null,
+        "skip_sorting": false,
+        "source": "ai_sorting",
+        "topic": "mediamaker",
+        "web_search": false
+    },
+    "sort_granular_image": {
+        "granular_topic": "image-generation",
+        "intent": "image_generation",
+        "language": "de",
+        "media_type": "image",
+        "model_id": null,
+        "model_name": null,
+        "provider": null,
+        "skip_sorting": false,
+        "source": "ai_sorting",
+        "topic": "mediamaker",
+        "web_search": false
+    },
+    "sort_granular_video": {
+        "granular_topic": "video-generation",
+        "intent": "image_generation",
+        "language": "de",
+        "media_type": "video",
+        "model_id": null,
+        "model_name": null,
+        "provider": null,
+        "skip_sorting": false,
+        "source": "ai_sorting",
+        "topic": "mediamaker",
+        "web_search": false
+    },
+    "sort_image": {
+        "intent": "image_generation",
+        "language": "en",
+        "media_type": "image",
+        "model_id": null,
+        "model_name": null,
+        "provider": null,
+        "skip_sorting": false,
+        "source": "ai_sorting",
+        "topic": "mediamaker",
+        "web_search": false
+    },
+    "sort_officemaker": {
+        "intent": "document_generation",
+        "language": "de",
+        "model_id": null,
+        "model_name": null,
+        "provider": null,
+        "skip_sorting": false,
+        "source": "ai_sorting",
+        "topic": "officemaker",
+        "web_search": false
+    },
+    "sort_video_params": {
+        "duration": 8,
+        "intent": "image_generation",
+        "language": "en",
+        "media_type": "video",
+        "model_id": null,
+        "model_name": null,
+        "provider": null,
+        "resolution": "720p",
+        "skip_sorting": false,
+        "source": "ai_sorting",
+        "topic": "mediamaker",
+        "web_search": false
+    },
+    "sort_websearch": {
+        "intent": "chat",
+        "language": "en",
+        "model_id": null,
+        "model_name": null,
+        "provider": null,
+        "skip_sorting": false,
+        "source": "ai_sorting",
+        "topic": "general",
+        "web_search": true
+    }
+}
