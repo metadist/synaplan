@@ -7,6 +7,7 @@ namespace App\Command;
 use App\Seed\DefaultModelConfigSeeder;
 use App\Seed\DemoWidgetConfigSeeder;
 use App\Seed\ModelSeeder;
+use App\Seed\MultitaskConfigSeeder;
 use App\Seed\PromptSeeder;
 use App\Seed\RateLimitConfigSeeder;
 use App\Seed\SeedResult;
@@ -43,6 +44,7 @@ final class SeedAllCommand extends Command
         private readonly RateLimitConfigSeeder $rateLimitConfigSeeder,
         private readonly DemoWidgetConfigSeeder $demoWidgetConfigSeeder,
         private readonly SubscriptionPlanSeeder $subscriptionPlanSeeder,
+        private readonly MultitaskConfigSeeder $multitaskConfigSeeder,
     ) {
         parent::__construct();
     }
@@ -71,6 +73,7 @@ final class SeedAllCommand extends Command
             ['defaults',    fn (): SeedResult => $this->defaultModelConfigSeeder->seed()],
             ['rate-limits', fn (): SeedResult => $this->rateLimitConfigSeeder->seed()],
             ['subscriptions', fn (): SeedResult => $this->subscriptionPlanSeeder->seed()],
+            ['multitask',   fn (): SeedResult => $this->multitaskConfigSeeder->seed()],
             ['demo-widget', fn (): SeedResult => $this->demoWidgetConfigSeeder->seed()],
         ];
 
