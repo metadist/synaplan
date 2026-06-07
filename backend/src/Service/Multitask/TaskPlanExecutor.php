@@ -180,18 +180,23 @@ final readonly class TaskPlanExecutor
         $userId = $plan->modelId ? $this->modelConfigService->getEffectiveUserIdForMessage($message) : $message->getUserId();
         $context = new NodeContext($message, $thread, $userId, $classification, $options);
 
-        // Translate per-node DAG events into the existing 'generating' status so
-        // the frontend shows step progress ("Summarising…") without new event types.
-        $stepCallback = null === $progressCallback ? null : static function (array $event) use ($progressCallback): void {
+        // Announce the plan so the web client can render task cards up front. The
+        // DagExecutor then emits task_update / task_chunk / task_file directly via
+        // the same progress channel (all structured data rides in metadata, which
+        // the SSE status callback forwards verbatim).
+        if (null !== $progressCallback) {
             $progressCallback([
-                'status' => 'generating',
-                'message' => $event['message'] ?? 'Working…',
-                'metadata' => $event['metadata'] ?? [],
+                'status' => 'plan',
+                'message' => '',
+                'metadata' => [
+                    'plan' => $this->planForClient($plan->plan),
+                    'reply_node' => $plan->plan->replyNode,
+                ],
                 'timestamp' => time(),
             ]);
-        };
+        }
 
-        $assembled = $this->dagExecutor->execute($plan->plan, $context, $stepCallback);
+        $assembled = $this->dagExecutor->execute($plan->plan, $context, $progressCallback);
 
         $messageId = $message->getId();
         if (null !== $messageId) {
@@ -206,6 +211,30 @@ final readonly class TaskPlanExecutor
         }
 
         return $assembled;
+    }
+
+    /**
+     * Build the client-facing task list for the `plan` event. Hidden nodes
+     * (compose_reply — the assembler) are excluded; they are not user cards.
+     *
+     * @return list<array{node_id: string, capability: string, kind: string}>
+     */
+    private function planForClient(Plan\TaskPlan $plan): array
+    {
+        $tasks = [];
+        foreach ($plan->nodes as $node) {
+            $kind = $node->capability->uiKind();
+            if ('hidden' === $kind) {
+                continue;
+            }
+            $tasks[] = [
+                'node_id' => $node->id,
+                'capability' => $node->capability->value,
+                'kind' => $kind,
+            ];
+        }
+
+        return $tasks;
     }
 
     /**

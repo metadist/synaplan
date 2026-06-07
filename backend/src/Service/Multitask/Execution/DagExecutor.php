@@ -42,18 +42,32 @@ final readonly class DagExecutor
      */
     public function execute(TaskPlan $plan, NodeContext $context, ?callable $progressCallback = null): array
     {
+        // Wire the per-node token-chunk sink so streaming runners can emit
+        // task_chunk events tagged with the running node id.
+        if (null !== $progressCallback) {
+            $context->setChunkSink(static function (string $nodeId, string $chunk) use ($progressCallback): void {
+                $progressCallback([
+                    'status' => 'task_chunk',
+                    'message' => '',
+                    'metadata' => ['node_id' => $nodeId, 'chunk' => $chunk],
+                    'timestamp' => time(),
+                ]);
+            });
+        }
+
         foreach ($plan->topologicalOrder() as $node) {
             // Skip if a dependency did not complete successfully.
             $blockedBy = $this->unmetDependency($plan, $context, $node->id);
             if (null !== $blockedBy) {
                 $context->setResult($node->id, NodeResult::skipped("dependency '{$blockedBy}' did not complete"));
-                $this->notify($progressCallback, 'task_skipped', $node->id, $node->capability->value);
+                $this->emitState($progressCallback, $node, 'skipped');
                 continue;
             }
 
             $runner = $this->registry->get($node->capability);
             if (null === $runner) {
                 $context->setResult($node->id, NodeResult::failed("no runner for capability '{$node->capability->value}'"));
+                $this->emitState($progressCallback, $node, 'failed');
                 $this->logger->warning('DagExecutor: no runner for capability', [
                     'node' => $node->id,
                     'capability' => $node->capability->value,
@@ -61,7 +75,8 @@ final readonly class DagExecutor
                 continue;
             }
 
-            $this->notify($progressCallback, 'task_running', $node->id, $node->capability->value);
+            $context->beginNode($node->id);
+            $this->emitState($progressCallback, $node, 'running');
 
             try {
                 $result = $runner->run($node, $context);
@@ -75,12 +90,17 @@ final readonly class DagExecutor
             }
 
             $context->setResult($node->id, $result);
-            $this->notify(
-                $progressCallback,
-                $result->isSuccessful() ? 'task_done' : 'task_failed',
-                $node->id,
-                $node->capability->value,
-            );
+
+            // Surface produced files to their card before the state update.
+            if ($result->isSuccessful()) {
+                foreach ($result->files as $file) {
+                    if (isset($file['path'])) {
+                        $this->emitFile($progressCallback, $node->id, is_string($file['type'] ?? null) ? $file['type'] : 'file', (string) $file['path']);
+                    }
+                }
+            }
+
+            $this->emitState($progressCallback, $node, $result->isSuccessful() ? 'done' : 'failed');
         }
 
         return $this->assembler->assemble($plan, $context);
@@ -105,42 +125,39 @@ final readonly class DagExecutor
         return null;
     }
 
-    private function notify(?callable $callback, string $status, string $nodeId, string $capability): void
+    /**
+     * Emit a per-node state change as a `task_update` SSE event. The frontend
+     * uses node_id + state + kind to drive each task card; labels are i18n'd
+     * client-side.
+     */
+    private function emitState(?callable $callback, \App\Service\Multitask\Plan\TaskNode $node, string $state): void
     {
         if (null === $callback) {
             return;
         }
         $callback([
-            'status' => $status,
-            'message' => $this->humanLabel($status, $capability),
-            'metadata' => ['node_id' => $nodeId, 'capability' => $capability],
+            'status' => 'task_update',
+            'message' => '',
+            'metadata' => [
+                'node_id' => $node->id,
+                'capability' => $node->capability->value,
+                'kind' => $node->capability->uiKind(),
+                'state' => $state,
+            ],
             'timestamp' => time(),
         ]);
     }
 
-    private function humanLabel(string $status, string $capability): string
+    private function emitFile(?callable $callback, string $nodeId, string $type, string $url): void
     {
-        $verb = match ($capability) {
-            'extract_text' => 'Extracting text',
-            'summarize' => 'Summarising',
-            'translate' => 'Translating',
-            'chat', 'rag_query' => 'Thinking',
-            'web_search' => 'Searching the web',
-            'file_analysis' => 'Analysing file',
-            'image_generation' => 'Generating image',
-            'video_generation' => 'Generating video',
-            'text2sound' => 'Generating audio',
-            'document_generation' => 'Generating document',
-            'compose_reply' => 'Composing reply',
-            default => 'Working',
-        };
-
-        return match ($status) {
-            'task_running' => $verb.'…',
-            'task_done' => $verb.' — done',
-            'task_failed' => $verb.' — failed',
-            'task_skipped' => $verb.' — skipped',
-            default => $verb,
-        };
+        if (null === $callback) {
+            return;
+        }
+        $callback([
+            'status' => 'task_file',
+            'message' => '',
+            'metadata' => ['node_id' => $nodeId, 'type' => $type, 'url' => $url],
+            'timestamp' => time(),
+        ]);
     }
 }

@@ -29,6 +29,11 @@ final class NodeContext
     /** @var array<string, NodeResult> nodeId => result */
     private array $results = [];
 
+    /** @var (callable(string, string): void)|null sink for streamed token chunks: (nodeId, chunk) */
+    private $chunkSink;
+
+    private ?string $currentNodeId = null;
+
     /**
      * @param array<int, Message>  $thread
      * @param array<string, mixed> $classification
@@ -41,6 +46,31 @@ final class NodeContext
         public readonly array $classification,
         public readonly array $options = [],
     ) {
+    }
+
+    /**
+     * Register a sink for streamed token chunks. The executor wires this to emit
+     * `task_chunk` SSE events tagged with the running node id.
+     *
+     * @param (callable(string, string): void)|null $sink
+     */
+    public function setChunkSink(?callable $sink): void
+    {
+        $this->chunkSink = $sink;
+    }
+
+    /** Mark which node is currently executing (so streamed chunks are tagged). */
+    public function beginNode(string $nodeId): void
+    {
+        $this->currentNodeId = $nodeId;
+    }
+
+    /** Forward a streamed token chunk for the current node, if a sink is set. */
+    public function streamChunk(string $chunk): void
+    {
+        if (null !== $this->chunkSink && null !== $this->currentNodeId && '' !== $chunk) {
+            ($this->chunkSink)($this->currentNodeId, $chunk);
+        }
     }
 
     public function setResult(string $nodeId, NodeResult $result): void

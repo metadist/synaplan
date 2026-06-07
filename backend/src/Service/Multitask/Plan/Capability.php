@@ -62,6 +62,24 @@ enum Capability: string
         return array_map(static fn (self $c): string => $c->value, self::cases());
     }
 
+    /**
+     * The UI card kind for this capability (drives the frontend task-card body).
+     * `compose_reply` returns 'hidden' — it is the assembler, not a visible card.
+     */
+    public function uiKind(): string
+    {
+        return match ($this) {
+            self::ExtractText => 'extract',
+            self::Chat, self::Summarize, self::Translate, self::RagQuery, self::FileAnalysis => 'text',
+            self::WebSearch => 'search',
+            self::ImageGeneration => 'image',
+            self::VideoGeneration => 'video',
+            self::Text2Sound => 'audio',
+            self::DocumentGeneration => 'document',
+            self::ComposeReply => 'hidden',
+        };
+    }
+
     public static function tryFromString(string $value): ?self
     {
         return self::tryFrom($value);

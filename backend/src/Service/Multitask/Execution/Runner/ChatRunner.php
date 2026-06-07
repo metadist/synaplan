@@ -61,12 +61,27 @@ final readonly class ChatRunner implements TaskRunner
             ['role' => 'user', 'content' => $text],
         ];
 
+        // Stream tokens into the node's card (task_chunk) while accumulating the
+        // full text so dependent nodes + assembly still receive the complete output.
+        $full = '';
         try {
-            $response = $this->aiFacade->chat($messages, $context->userId, array_filter([
-                'provider' => $provider,
-                'model' => $modelName,
-                'temperature' => 0.3,
-            ], static fn ($v) => null !== $v));
+            $response = $this->aiFacade->chatStream(
+                $messages,
+                static function ($chunk) use (&$full, $context): void {
+                    $piece = is_array($chunk) ? (string) ($chunk['content'] ?? '') : (string) $chunk;
+                    if ('' === $piece) {
+                        return;
+                    }
+                    $full .= $piece;
+                    $context->streamChunk($piece);
+                },
+                $context->userId,
+                array_filter([
+                    'provider' => $provider,
+                    'model' => $modelName,
+                    'temperature' => 0.3,
+                ], static fn ($v) => null !== $v),
+            );
         } catch (\Throwable $e) {
             $this->logger->warning('ChatRunner: model call failed', [
                 'capability' => $node->capability->value,
@@ -76,12 +91,11 @@ final readonly class ChatRunner implements TaskRunner
             return NodeResult::failed($node->capability->value.' failed: '.$e->getMessage());
         }
 
-        $content = (string) ($response['content'] ?? '');
-        if ('' === trim($content)) {
+        if ('' === trim($full)) {
             return NodeResult::failed($node->capability->value.' produced empty output');
         }
 
-        return NodeResult::ok($content, [], [
+        return NodeResult::ok($full, [], [
             'provider' => $response['provider'] ?? $provider,
             'model' => $response['model'] ?? $modelName,
             'model_id' => $modelId,

@@ -81,10 +81,13 @@ final class RunnersTest extends TestCase
         $modelConfig->method('getModelName')->willReturn('gpt-oss-120b');
 
         $captured = null;
-        $aiFacade->method('chat')->willReturnCallback(function (array $messages) use (&$captured): array {
+        // chatStream(messages, callback, userId, options) streams chunks then returns metadata.
+        $aiFacade->method('chatStream')->willReturnCallback(function (array $messages, callable $cb) use (&$captured): array {
             $captured = $messages;
+            $cb('THE ');
+            $cb('SUMMARY');
 
-            return ['content' => 'THE SUMMARY', 'provider' => 'groq', 'model' => 'gpt-oss-120b'];
+            return ['provider' => 'groq', 'model' => 'gpt-oss-120b'];
         });
 
         $runner = new ChatRunner($aiFacade, $modelConfig, $this->createMock(LoggerInterface::class));
@@ -111,7 +114,7 @@ final class RunnersTest extends TestCase
     public function testChatRunnerIsolatesModelFailure(): void
     {
         $aiFacade = $this->createMock(AiFacade::class);
-        $aiFacade->method('chat')->willThrowException(new \RuntimeException('groq 500'));
+        $aiFacade->method('chatStream')->willThrowException(new \RuntimeException('groq 500'));
         $modelConfig = $this->createMock(ModelConfigService::class);
 
         $runner = new ChatRunner($aiFacade, $modelConfig, $this->createMock(LoggerInterface::class));

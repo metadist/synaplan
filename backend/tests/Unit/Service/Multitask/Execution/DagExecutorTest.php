@@ -161,17 +161,60 @@ final class DagExecutorTest extends TestCase
         self::assertNotSame('', $result['content']);
     }
 
-    public function testProgressCallbackEmitsPerNodeStatus(): void
+    public function testProgressCallbackEmitsPerNodeStateUpdates(): void
     {
         $plan = TaskPlan::singleChatPlan('en');
         $runner = $this->runner(fn (): NodeResult => NodeResult::ok('hi'));
 
-        $events = [];
-        $this->executor($runner)->execute($plan, $this->context(), function (array $e) use (&$events): void {
-            $events[] = $e['status'];
+        $states = [];
+        $this->executor($runner)->execute($plan, $this->context(), function (array $e) use (&$states): void {
+            if ('task_update' === $e['status']) {
+                $states[] = $e['metadata']['state'];
+            }
         });
 
-        self::assertContains('task_running', $events);
-        self::assertContains('task_done', $events);
+        self::assertContains('running', $states);
+        self::assertContains('done', $states);
+    }
+
+    public function testProgressCallbackEmitsTaskFileForMediaNode(): void
+    {
+        $plan = TaskPlan::fromArray([
+            'version' => 1, 'language' => 'en', 'reply_node' => 'n1',
+            'tasks' => [['id' => 'n1', 'capability' => 'text2sound']],
+        ]);
+        $runner = $this->runner(fn (): NodeResult => NodeResult::ok(null, [['path' => '/api/v1/files/uploads/x.mp3', 'type' => 'audio']]));
+
+        $fileEvents = [];
+        $this->executor($runner)->execute($plan, $this->context(), function (array $e) use (&$fileEvents): void {
+            if ('task_file' === $e['status']) {
+                $fileEvents[] = $e['metadata'];
+            }
+        });
+
+        self::assertCount(1, $fileEvents);
+        self::assertSame('audio', $fileEvents[0]['type']);
+        self::assertSame('n1', $fileEvents[0]['node_id']);
+    }
+
+    public function testStreamingChunkSinkTagsCurrentNode(): void
+    {
+        $plan = TaskPlan::singleChatPlan('en');
+        // A runner that streams two chunks via the context sink.
+        $runner = $this->runner(function ($node, NodeContext $ctx): NodeResult {
+            $ctx->streamChunk('Hel');
+            $ctx->streamChunk('lo');
+
+            return NodeResult::ok('Hello');
+        });
+
+        $chunks = [];
+        $this->executor($runner)->execute($plan, $this->context(), function (array $e) use (&$chunks): void {
+            if ('task_chunk' === $e['status']) {
+                $chunks[] = $e['metadata'];
+            }
+        });
+
+        self::assertSame([['node_id' => 'n1', 'chunk' => 'Hel'], ['node_id' => 'n1', 'chunk' => 'lo']], $chunks);
     }
 }
