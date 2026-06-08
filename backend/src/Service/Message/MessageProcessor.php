@@ -312,22 +312,20 @@ final readonly class MessageProcessor
 
             // Step 2.5: Web Search
             //
-            // Project-wide policy: search is the DEFAULT for every chat.
-            // The only ways to suppress it are:
-            //   (a) Topic is a pure asset/document generation topic where
-            //       the handler does not consume web context.
-            //   (b) The user has explicitly opted out by setting
-            //       `tool_internet=false` on the task prompt.
-            //
-            // All other signals (classifier `web_search` vote, AI BWEBSEARCH,
-            // legacy `tools:search` source) are now advisory only — they are
-            // recorded in the decision log for diagnostics, but no longer
-            // gate the decision.
+            // Web-search decision (trust the model):
+            //   (a) Prompt opts in (`tool_internet=true`)        → always search.
+            //   (b) Asset/document-generation topic              → never search.
+            //   (c) Prompt opts out (`tool_internet=false`)      → never search.
+            //   (d) Otherwise → trust the classifier's BWEBSEARCH vote. The AI
+            //       sorter judges whether the message needs live information;
+            //       the fast-path (no model call) carries no vote, so trivial
+            //       chats stay fast and skip the search round-trip.
             $searchResults = null;
             $topic = $classification['topic'] ?? 'general';
             $promptToolInternet = $promptMetadata['tool_internet'] ?? null;
-            $shouldSearch = WebSearchTopicPolicy::shouldSearch($topic, $promptToolInternet);
-            $triggerReason = $this->triggerReasonFor($topic, $promptToolInternet, $shouldSearch);
+            $classifierVote = $classification['web_search'] ?? null;
+            $shouldSearch = WebSearchTopicPolicy::shouldSearch($topic, $promptToolInternet, $classifierVote);
+            $triggerReason = $this->triggerReasonFor($topic, $promptToolInternet, $classifierVote, $shouldSearch);
 
             // Consolidated decision log: lets us diagnose "search didn't trigger"
             // reports without correlating multiple log lines from different services.
@@ -741,8 +739,9 @@ final readonly class MessageProcessor
             $searchResults = null;
             $topic = $classification['topic'] ?? 'general';
             $promptToolInternet = $promptMetadata['tool_internet'] ?? null;
-            $shouldSearch = WebSearchTopicPolicy::shouldSearch($topic, $promptToolInternet);
-            $triggerReason = $this->triggerReasonFor($topic, $promptToolInternet, $shouldSearch);
+            $classifierVote = $classification['web_search'] ?? null;
+            $shouldSearch = WebSearchTopicPolicy::shouldSearch($topic, $promptToolInternet, $classifierVote);
+            $triggerReason = $this->triggerReasonFor($topic, $promptToolInternet, $classifierVote, $shouldSearch);
 
             $braveEnabled = $this->braveSearchService->isEnabled();
             $this->logger->info('MessageProcessor: Web search decision', [
@@ -948,21 +947,25 @@ final readonly class MessageProcessor
      * so the log line directly explains the decision without a reader
      * having to consult two services.
      */
-    private function triggerReasonFor(?string $topic, ?bool $promptToolInternet, bool $shouldSearch): string
+    private function triggerReasonFor(?string $topic, ?bool $promptToolInternet, ?bool $classifierVote, bool $shouldSearch): string
     {
         if (!$shouldSearch) {
-            if (WebSearchTopicPolicy::isNonWebSearchTopic($topic)) {
+            if (true !== $promptToolInternet && WebSearchTopicPolicy::isNonWebSearchTopic($topic)) {
                 return 'non_web_search_topic';
             }
 
-            return 'disabled_by_prompt_tool_internet';
+            if (false === $promptToolInternet) {
+                return 'disabled_by_prompt_tool_internet';
+            }
+
+            return 'classifier_vote_no_search';
         }
 
         if (true === $promptToolInternet) {
             return 'prompt_tool_internet_opt_in';
         }
 
-        return 'project_default';
+        return 'classifier_vote_search';
     }
 
     /**

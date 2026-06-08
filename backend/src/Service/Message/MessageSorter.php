@@ -115,10 +115,11 @@ final readonly class MessageSorter
                 return [
                     'topic' => $ruleBasedTopic,
                     'language' => $messageData['BLANG'] ?? 'en',
-                    'web_search' => WebSearchTopicPolicy::shouldSearch(
-                        $ruleBasedTopic,
-                        $promptMetadata['tool_internet'] ?? null,
-                    ),
+                    // No LLM ran on the rule-based path, so there is no
+                    // BWEBSEARCH vote. The final web-search decision is made by
+                    // WebSearchTopicPolicy in MessageProcessor (a custom topic
+                    // that needs live data can set tool_internet=true).
+                    'web_search' => false,
                     'raw_response' => 'Rule-based routing',
                     'prompt_metadata' => $promptMetadata,
                     'sorting_model_id' => null,
@@ -258,19 +259,14 @@ final readonly class MessageSorter
                 }
             }
 
-            // The LLM's BWEBSEARCH vote is now advisory: the project
-            // default is "search unless the prompt opts out or the topic
-            // is asset/document generation". The vote is preserved in
-            // `raw_response` for diagnostics.
-            $webSearch = WebSearchTopicPolicy::shouldSearch(
-                $parsed['topic'] ?? null,
-                $promptMetadata['tool_internet'] ?? null,
-            );
-
+            // Carry the LLM's BWEBSEARCH vote through unchanged. The final
+            // web-search decision is made by WebSearchTopicPolicy in
+            // MessageProcessor, which trusts this vote unless the prompt
+            // explicitly opts in/out or the topic cannot consume web context.
             return [
                 'topic' => $parsed['topic'],
                 'language' => $parsed['language'],
-                'web_search' => $webSearch,
+                'web_search' => $parsed['web_search'] ?? false,
                 'media_type' => $parsed['media_type'] ?? null,
                 'duration' => $parsed['duration'] ?? null,
                 'resolution' => $parsed['resolution'] ?? null,

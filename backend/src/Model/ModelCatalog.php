@@ -66,10 +66,14 @@ class ModelCatalog
      *   - **Operator-owned** (only set on INSERT, NEVER overwritten):
      *     BSELECTABLE, BACTIVE, BISDEFAULT, BSHOWWHENFREE. These can be toggled
      *     by admins via the AdminModelsService UI; container restarts must not
-     *     wipe those choices. BSHOWWHENFREE is not part of this statement at all
-     *     (no INSERT column / no UPDATE clause) — it is managed exclusively by
-     *     the admin UI and migrations. Test fixtures that need to force a value
-     *     should issue an explicit UPDATE after the upsert (see ModelSeeder::seed()).
+     *     wipe those choices. They are seeded from the catalog on INSERT only
+     *     (so a FRESH install reflects the catalog default) and are absent from
+     *     the ON DUPLICATE KEY UPDATE clause (so an admin override on an EXISTING
+     *     row survives every restart). For BSHOWWHENFREE the catalog default is 0;
+     *     a catalog row may opt in with `showWhenFree => 1` (e.g. the free,
+     *     self-hosted Ollama bge-m3 embedding model that must stay visible despite
+     *     having no per-token price). Bringing existing installs to a new
+     *     visibility default is a migration's job, not the seeder's.
      *
      * Every write embeds the catalog fingerprint into BJSON under
      * self::FINGERPRINT_KEY. ModelSeeder reads this back to detect manual UI edits
@@ -88,8 +92,8 @@ class ModelCatalog
         $json[self::FINGERPRINT_KEY] = self::fingerprint($model);
 
         return (int) $connection->executeStatement(
-            'INSERT INTO BMODELS (BID, BSERVICE, BNAME, BTAG, BSELECTABLE, BACTIVE, BPROVID, BPRICEIN, BINUNIT, BPRICEOUT, BOUTUNIT, BQUALITY, BRATING, BISDEFAULT, BJSON)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            'INSERT INTO BMODELS (BID, BSERVICE, BNAME, BTAG, BSELECTABLE, BACTIVE, BPROVID, BPRICEIN, BINUNIT, BPRICEOUT, BOUTUNIT, BQUALITY, BRATING, BISDEFAULT, BSHOWWHENFREE, BJSON)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON DUPLICATE KEY UPDATE
                 BSERVICE = VALUES(BSERVICE), BNAME = VALUES(BNAME), BTAG = VALUES(BTAG),
                 BPROVID = VALUES(BPROVID), BPRICEIN = VALUES(BPRICEIN),
@@ -103,6 +107,7 @@ class ModelCatalog
                 $model['priceIn'], $model['inUnit'], $model['priceOut'],
                 $model['outUnit'], $model['quality'], $model['rating'],
                 $system ? 1 : 0,
+                (int) ($model['showWhenFree'] ?? 0),
                 json_encode($json, \JSON_UNESCAPED_SLASHES | \JSON_UNESCAPED_UNICODE),
             ]
         );
@@ -248,6 +253,12 @@ class ModelCatalog
             // is a "free" change from the collection's point of view.
             'selectable' => 1,
             'active' => 1,
+            // This is the default VECTORIZE model for self-hosted / local-dev
+            // installs (see DefaultModelConfigSeeder). It has no per-token price,
+            // so without this opt-in `isHiddenBecauseFree()` would strip it from
+            // the user-facing model list at /config/ai-models even though RAG
+            // actually depends on it. Keep it visible.
+            'showWhenFree' => 1,
             'providerId' => 'bge-m3',
             'priceIn' => 0,
             'inUnit' => 'free',

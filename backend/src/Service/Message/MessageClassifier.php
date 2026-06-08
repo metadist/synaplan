@@ -88,13 +88,12 @@ final readonly class MessageClassifier
                 'text_length' => strlen($text),
             ]);
 
-            // `web_search` is intentionally null on the fast-path: under
-            // the project-wide policy the actual decision is made later
-            // in `MessageProcessor::processStream()` via
-            // `WebSearchTopicPolicy::shouldSearch()`, which combines the
-            // resolved prompt's `tool_internet` flag with the topic
-            // exclusion list. The fast-path has no access to prompt
-            // metadata and must not pre-empt that decision (see #1000).
+            // `web_search` is intentionally null on the fast-path: it never
+            // calls the AI sorter, so there is no BWEBSEARCH vote. With the
+            // "trust the model" policy a missing vote means no search, so
+            // these trivial chats answer immediately without a web round-trip.
+            // An explicit prompt `tool_internet=true` still forces search
+            // later in `MessageProcessor` via `WebSearchTopicPolicy`.
             return [
                 'topic' => 'general',
                 'language' => $detectedLanguage,
@@ -565,13 +564,12 @@ final readonly class MessageClassifier
             }
         }
 
-        // Note: there is no longer a `$searchTriggers` blocklist here.
-        // It was a workaround for the fast-path's inability to decide
-        // `web_search` on its own — under the project-wide policy
-        // "search unless explicitly opted out", the fast-path no longer
-        // needs to defer to the slow AI sorter just to surface results
-        // (see issue #1000). The actual search decision is owned by
-        // `WebSearchTopicPolicy` and applied in `MessageProcessor`.
+        // Note: there is no `$searchTriggers` blocklist here. The fast-path
+        // deliberately answers trivial chats without a web search — under the
+        // "trust the model" policy a fast-pathed message carries no BWEBSEARCH
+        // vote and therefore does not search. Messages that genuinely need
+        // live data are longer / less trivial and fall through to the AI
+        // sorter, which votes for search itself.
         return true;
     }
 
@@ -650,39 +648,70 @@ final readonly class MessageClassifier
      */
     private function detectLanguageHeuristic(string $text): string
     {
-        $lower = ' '.mb_strtolower($text).' ';
+        // Normalize first: collapse every run of non-letters to a single
+        // space, then pad with spaces. Without this, punctuation-hugging
+        // tokens defeat the space-delimited anchors below — e.g.
+        // "wer bist du?" lowercases to " wer bist du? " and the " du " /
+        // "du?" mismatch meant the most common German phrase scored 0 and
+        // fell back to English. Letters (incl. umlauts) survive; everything
+        // else becomes a separator.
+        $normalized = preg_replace('/[^\p{L}]+/u', ' ', mb_strtolower($text)) ?? '';
+        $lower = ' '.trim($normalized).' ';
 
-        // Order matters: check stopwords with low ambiguity first.
         $hits = [
             'de' => 0, 'en' => 0, 'fr' => 0, 'es' => 0, 'it' => 0,
         ];
 
-        // German stopwords with diacritics or German-only forms.
-        foreach (['ich ', ' der ', ' die ', ' und ', ' nicht ', ' ist ', 'für ', 'können', 'möchte', 'über', 'wäre'] as $w) {
+        // German: stopwords, question words, pronouns, common verbs and
+        // greetings. These short function words are what carry the signal in
+        // a one-line chat ("wer bist du?", "wie geht es dir?", "danke").
+        foreach ([
+            ' ich ', ' der ', ' die ', ' das ', ' und ', ' nicht ', ' ist ', ' für ',
+            ' können ', ' kannst ', ' möchte ', ' über ', ' wäre ', ' mit ', ' auch ',
+            ' wer ', ' wie ', ' was ', ' warum ', ' wo ', ' wann ', ' welche ', ' welcher ',
+            ' du ', ' bist ', ' bin ', ' sind ', ' hast ', ' habe ', ' mir ', ' mich ',
+            ' dich ', ' dein ', ' deine ', ' machst ', ' heißt ', ' gibt ', ' soll ',
+            ' mein ', ' eine ', ' einen ', ' hallo ', ' danke ', ' bitte ', ' guten ',
+        ] as $w) {
             if (str_contains($lower, $w)) {
                 $hits['de'] += 2;
             }
         }
-        // English (commonest stopwords).
-        foreach ([' the ', ' and ', ' you ', ' please ', ' what ', ' write ', 'don\'t ', 'i\'m ', 'i\'ll '] as $w) {
+        // English: stopwords, question words, pronouns, common verbs and
+        // greetings.
+        foreach ([
+            ' the ', ' and ', ' you ', ' please ', ' what ', ' write ', ' dont ', ' im ', ' ill ',
+            ' who ', ' how ', ' why ', ' where ', ' when ', ' which ',
+            ' are ', ' is ', ' do ', ' does ', ' can ', ' your ', ' me ', ' my ', ' a ', ' an ',
+            ' hello ', ' hi ', ' hey ', ' thanks ', ' thank ',
+        ] as $w) {
             if (str_contains($lower, $w)) {
                 $hits['en'] += 2;
             }
         }
         // French.
-        foreach ([' le ', ' la ', ' les ', ' un ', ' une ', ' est ', ' pour ', ' avec ', 'écrire', 'merci'] as $w) {
+        foreach ([
+            ' le ', ' la ', ' les ', ' un ', ' une ', ' est ', ' pour ', ' avec ', ' écrire ',
+            ' qui ', ' quoi ', ' comment ', ' pourquoi ', ' es ', ' tu ', ' merci ', ' bonjour ',
+        ] as $w) {
             if (str_contains($lower, $w)) {
                 $hits['fr'] += 2;
             }
         }
         // Spanish.
-        foreach ([' el ', ' la ', ' los ', ' las ', ' por ', ' para ', 'escribir', 'gracias'] as $w) {
+        foreach ([
+            ' el ', ' la ', ' los ', ' las ', ' por ', ' para ', ' escribir ',
+            ' quién ', ' qué ', ' cómo ', ' por qué ', ' eres ', ' gracias ', ' hola ',
+        ] as $w) {
             if (str_contains($lower, $w)) {
                 $hits['es'] += 2;
             }
         }
         // Italian.
-        foreach ([' il ', ' lo ', ' la ', ' gli ', ' una ', ' per ', 'scrivere', 'grazie'] as $w) {
+        foreach ([
+            ' il ', ' lo ', ' la ', ' gli ', ' una ', ' per ', ' scrivere ',
+            ' chi ', ' cosa ', ' come ', ' perché ', ' sei ', ' grazie ', ' ciao ',
+        ] as $w) {
             if (str_contains($lower, $w)) {
                 $hits['it'] += 2;
             }
@@ -692,11 +721,13 @@ final readonly class MessageClassifier
         $best = array_key_first($hits);
         $bestScore = $hits[$best];
 
-        // Below 4 hits we have no strong signal — fall back to 'en'. The 2-
-        // char constraint matters: BMESSAGES.BLANG is varchar(2), so even
-        // though the existing 'auto' sentinel works for in-memory routing,
-        // it'd break any downstream code that persists $classification['language']
-        // to BLANG (email webhook reply, queue-mode chat persistence, ...).
-        return $bestScore >= 4 ? $best : 'en';
+        // A single distinctive anchor (score 2) is already a strong signal
+        // for a short chat one-liner, so we trust it; below that we have no
+        // signal and fall back to 'en'. The 2-char constraint matters:
+        // BMESSAGES.BLANG is varchar(2), so even though the 'auto' sentinel
+        // works for in-memory routing, it'd break any downstream code that
+        // persists $classification['language'] to BLANG (email webhook reply,
+        // queue-mode chat persistence, ...).
+        return $bestScore >= 2 ? $best : 'en';
     }
 }
