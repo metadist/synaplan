@@ -103,13 +103,6 @@ services:
         App\Service\Multitask\Execution\TaskRunner:
             tags: ['app.multitask.runner']
 
-    # Multi-task parallel media offload (Sprint 4): subprocess dispatcher.
-    App\Service\Multitask\Execution\Parallel\ProcessMediaNodeDispatcher:
-        arguments:
-            $projectDir: '%kernel.project_dir%'
-    App\Service\Multitask\Execution\Parallel\MediaNodeDispatcher:
-        alias: App\Service\Multitask\Execution\Parallel\ProcessMediaNodeDispatcher
-
     App\:
         resource: '../src/'
         exclude:
@@ -117,6 +110,14 @@ services:
             - '../src/Entity/'
             - '../src/Kernel.php'
             - '../src/Test/'
+
+    # Multi-task parallel media offload (Sprint 4): subprocess dispatcher needs
+    # the project dir for Symfony Process cwd. Alias binds the interface.
+    App\Service\Multitask\Execution\Parallel\ProcessMediaNodeDispatcher:
+        arguments:
+            $projectDir: '%kernel.project_dir%'
+    App\Service\Multitask\Execution\Parallel\MediaNodeDispatcher:
+        alias: App\Service\Multitask\Execution\Parallel\ProcessMediaNodeDispatcher
 
     # Idempotent seeders for production-essential catalog data.
     # Run from docker-entrypoint.sh after migrations (app:seed) and re-runnable from CLI.

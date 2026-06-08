@@ -4,28 +4,36 @@ declare(strict_types=1);
 
 namespace App\Service\Multitask\Execution;
 
+use App\Service\Multitask\Execution\Parallel\MediaNodeDispatcher;
+use App\Service\Multitask\Execution\Parallel\MediaNodeRequest;
+use App\Service\Multitask\MultitaskRoutingConfig;
+use App\Service\Multitask\Plan\TaskNode;
 use App\Service\Multitask\Plan\TaskPlan;
 use Psr\Log\LoggerInterface;
 
 /**
- * Sequential DAG executor (Sprint 3).
+ * DAG executor for multi-task plans.
  *
- * Runs a plan's nodes in topological order. Each node:
- *   - is skipped (NodeStatus::Skipped) if any dependency did not finish Done —
- *     failure isolation: a broken branch never poisons an independent branch;
- *   - otherwise runs via the capability's {@see TaskRunner}, guarded by
- *     try/catch as a backstop so a runner that throws can't crash the turn;
- *   - emits a per-node progress status (for SSE "Extracting… Summarising…").
+ * Sequential mode (default): runs nodes in topological order; a failed node
+ * skips its dependents (failure isolation); per-node progress is emitted.
  *
- * The assembled response (text + files + per-node statuses) is returned via
- * {@see ResultAssembler}. Parallelism of independent nodes is Sprint 4; this
- * executor is purely sequential.
+ * Parallel mode (Sprint 4, gated by MULTITASK_PARALLEL_ENABLED): hybrid —
+ * heavy media nodes (image/video/audio) are offloaded to concurrent subprocesses
+ * via {@see MediaNodeDispatcher} while text/other nodes run inline (preserving
+ * token streaming). Bounded by a concurrency cap; results are assembled in plan
+ * order regardless of completion order (deterministic). Failure isolation and
+ * the per-node SSE events are identical to sequential mode.
+ *
+ * The assembled response (text + files + per-node statuses) comes from
+ * {@see ResultAssembler}.
  */
 final readonly class DagExecutor
 {
     public function __construct(
         private RunnerRegistry $registry,
         private ResultAssembler $assembler,
+        private MediaNodeDispatcher $mediaDispatcher,
+        private MultitaskRoutingConfig $config,
         private LoggerInterface $logger,
     ) {
     }
@@ -55,8 +63,18 @@ final readonly class DagExecutor
             });
         }
 
+        if ($this->config->isParallelEnabled()) {
+            $this->executeParallel($plan, $context, $progressCallback);
+        } else {
+            $this->executeSequential($plan, $context, $progressCallback);
+        }
+
+        return $this->assembler->assemble($plan, $context);
+    }
+
+    private function executeSequential(TaskPlan $plan, NodeContext $context, ?callable $progressCallback): void
+    {
         foreach ($plan->topologicalOrder() as $node) {
-            // Skip if a dependency did not complete successfully.
             $blockedBy = $this->unmetDependency($plan, $context, $node->id);
             if (null !== $blockedBy) {
                 $context->setResult($node->id, NodeResult::skipped("dependency '{$blockedBy}' did not complete"));
@@ -64,46 +82,196 @@ final readonly class DagExecutor
                 continue;
             }
 
-            $runner = $this->registry->get($node->capability);
-            if (null === $runner) {
-                $context->setResult($node->id, NodeResult::failed("no runner for capability '{$node->capability->value}'"));
-                $this->emitState($progressCallback, $node, 'failed');
-                $this->logger->warning('DagExecutor: no runner for capability', [
-                    'node' => $node->id,
-                    'capability' => $node->capability->value,
-                ]);
-                continue;
-            }
+            $this->runNodeInline($context, $node, $progressCallback);
+        }
+    }
 
-            $context->beginNode($node->id);
-            $this->emitState($progressCallback, $node, 'running');
+    /**
+     * Hybrid parallel scheduler: media nodes offloaded concurrently (capped),
+     * everything else inline. Progress is monotonic each iteration (settle a
+     * skip, start a node, or collect an in-flight job), so the loop terminates.
+     */
+    private function executeParallel(TaskPlan $plan, NodeContext $context, ?callable $progressCallback): void
+    {
+        $order = $plan->topologicalOrder();
+        $total = count($order);
+        $cap = $this->config->maxParallel();
+        $timeout = $this->config->nodeTimeoutSeconds();
 
-            try {
-                $result = $runner->run($node, $context);
-            } catch (\Throwable $e) {
-                $result = NodeResult::failed($e->getMessage());
-                $this->logger->warning('DagExecutor: runner threw', [
-                    'node' => $node->id,
-                    'capability' => $node->capability->value,
-                    'error' => $e->getMessage(),
-                ]);
-            }
+        /** @var array<string, Parallel\MediaNodeJob> $inflight */
+        $inflight = [];
 
-            $context->setResult($node->id, $result);
+        while (count($context->allResults()) < $total) {
+            $progressed = false;
 
-            // Surface produced files to their card before the state update.
-            if ($result->isSuccessful()) {
-                foreach ($result->files as $file) {
-                    if (isset($file['path'])) {
-                        $this->emitFile($progressCallback, $node->id, is_string($file['type'] ?? null) ? $file['type'] : 'file', (string) $file['path']);
-                    }
+            // 1) Skip nodes whose dependency has settled unsuccessfully.
+            foreach ($order as $node) {
+                if (null !== $context->getResult($node->id) || isset($inflight[$node->id])) {
+                    continue;
+                }
+                $blocked = $this->settledFailedDependency($context, $node);
+                if (null !== $blocked) {
+                    $context->setResult($node->id, NodeResult::skipped("dependency '{$blocked}' did not complete"));
+                    $this->emitState($progressCallback, $node, 'skipped');
+                    $progressed = true;
                 }
             }
 
-            $this->emitState($progressCallback, $node, $result->isSuccessful() ? 'done' : 'failed');
+            // 2) Start every ready node: media → dispatch (capped), else inline.
+            foreach ($order as $node) {
+                if (null !== $context->getResult($node->id) || isset($inflight[$node->id])) {
+                    continue;
+                }
+                if (!$this->dependenciesSatisfied($context, $node)) {
+                    continue;
+                }
+
+                if ($this->isMediaKind($node)) {
+                    if (count($inflight) >= $cap) {
+                        continue; // wait for a slot
+                    }
+                    $inflight[$node->id] = $this->mediaDispatcher->dispatch($this->mediaRequest($node, $context));
+                    $this->emitState($progressCallback, $node, 'running');
+                    $progressed = true;
+                } else {
+                    $this->runNodeInline($context, $node, $progressCallback);
+                    $progressed = true;
+                }
+            }
+
+            // 3) Nothing else could start → collect one in-flight media job.
+            if (!$progressed) {
+                if ([] === $inflight) {
+                    break; // deadlock guard (shouldn't happen for a valid DAG)
+                }
+                $this->collectOne($order, $inflight, $context, $progressCallback, $timeout);
+            }
         }
 
-        return $this->assembler->assemble($plan, $context);
+        // Drain any remaining in-flight jobs (when only media nodes are left).
+        while ([] !== $inflight) {
+            $this->collectOne($order, $inflight, $context, $progressCallback, $timeout);
+        }
+    }
+
+    /**
+     * Run a node synchronously in the current process (text/other; and the media
+     * fallback in sequential mode). Sets the result and emits files + state.
+     */
+    private function runNodeInline(NodeContext $context, TaskNode $node, ?callable $progressCallback): void
+    {
+        $runner = $this->registry->get($node->capability);
+        if (null === $runner) {
+            $context->setResult($node->id, NodeResult::failed("no runner for capability '{$node->capability->value}'"));
+            $this->emitState($progressCallback, $node, 'failed');
+            $this->logger->warning('DagExecutor: no runner for capability', [
+                'node' => $node->id,
+                'capability' => $node->capability->value,
+            ]);
+
+            return;
+        }
+
+        $context->beginNode($node->id);
+        $this->emitState($progressCallback, $node, 'running');
+
+        try {
+            $result = $runner->run($node, $context);
+        } catch (\Throwable $e) {
+            $result = NodeResult::failed($e->getMessage());
+            $this->logger->warning('DagExecutor: runner threw', [
+                'node' => $node->id,
+                'capability' => $node->capability->value,
+                'error' => $e->getMessage(),
+            ]);
+        }
+
+        $context->setResult($node->id, $result);
+        $this->emitFilesFor($node, $result, $progressCallback);
+        $this->emitState($progressCallback, $node, $result->isSuccessful() ? 'done' : 'failed');
+    }
+
+    /**
+     * Wait for (and settle) the first in-flight node in topological order.
+     *
+     * @param list<TaskNode>                       $order
+     * @param array<string, Parallel\MediaNodeJob> $inflight
+     */
+    private function collectOne(array $order, array &$inflight, NodeContext $context, ?callable $progressCallback, int $timeout): void
+    {
+        foreach ($order as $node) {
+            if (!isset($inflight[$node->id])) {
+                continue;
+            }
+            $result = $inflight[$node->id]->wait($timeout);
+            unset($inflight[$node->id]);
+            $context->setResult($node->id, $result);
+            $this->emitFilesFor($node, $result, $progressCallback);
+            $this->emitState($progressCallback, $node, $result->isSuccessful() ? 'done' : 'failed');
+
+            return;
+        }
+    }
+
+    private function mediaRequest(TaskNode $node, NodeContext $context): MediaNodeRequest
+    {
+        $inputs = $context->resolveInputs($node);
+        $prompt = $this->stringInput($inputs['prompt'] ?? $inputs['text'] ?? null) ?? (string) $context->message->getText();
+        $language = is_string($context->classification['language'] ?? null)
+            ? $context->classification['language']
+            : ($context->message->getLanguage() ?: 'en');
+
+        return new MediaNodeRequest(
+            nodeId: $node->id,
+            capability: $node->capability->value,
+            prompt: $prompt,
+            userId: $context->userId,
+            language: $language,
+            params: $node->params,
+        );
+    }
+
+    private function isMediaKind(TaskNode $node): bool
+    {
+        return in_array($node->capability->uiKind(), ['image', 'video', 'audio'], true);
+    }
+
+    private function dependenciesSatisfied(NodeContext $context, TaskNode $node): bool
+    {
+        foreach ($node->dependsOn as $dep) {
+            $r = $context->getResult($dep);
+            if (null === $r || !$r->isSuccessful()) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    private function settledFailedDependency(NodeContext $context, TaskNode $node): ?string
+    {
+        foreach ($node->dependsOn as $dep) {
+            $r = $context->getResult($dep);
+            if (null !== $r && !$r->isSuccessful()) {
+                return $dep;
+            }
+        }
+
+        return null;
+    }
+
+    private function stringInput(mixed $value): ?string
+    {
+        if (is_string($value)) {
+            return $value;
+        }
+        if (is_array($value)) {
+            $parts = array_filter($value, 'is_string');
+
+            return [] === $parts ? null : implode("\n\n", $parts);
+        }
+
+        return null;
     }
 
     /**
@@ -125,12 +293,24 @@ final readonly class DagExecutor
         return null;
     }
 
+    private function emitFilesFor(TaskNode $node, NodeResult $result, ?callable $progressCallback): void
+    {
+        if (!$result->isSuccessful()) {
+            return;
+        }
+        foreach ($result->files as $file) {
+            if (isset($file['path'])) {
+                $this->emitFile($progressCallback, $node->id, is_string($file['type'] ?? null) ? $file['type'] : 'file', (string) $file['path']);
+            }
+        }
+    }
+
     /**
      * Emit a per-node state change as a `task_update` SSE event. The frontend
      * uses node_id + state + kind to drive each task card; labels are i18n'd
      * client-side.
      */
-    private function emitState(?callable $callback, \App\Service\Multitask\Plan\TaskNode $node, string $state): void
+    private function emitState(?callable $callback, TaskNode $node, string $state): void
     {
         if (null === $callback) {
             return;
