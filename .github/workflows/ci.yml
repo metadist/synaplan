@@ -68,6 +68,21 @@ jobs:
           --health-timeout=5s
           --health-retries=5
 
+      # Redis backs cache.app, the lock + rate-limiter components and the
+      # Messenger Redis Streams transport. PHPUnit needs a live instance so the
+      # HealthController Redis probe and any transport-backed tests pass instead
+      # of failing on a refused connection. `.env.test` points REDIS_DSN at
+      # 127.0.0.1:6379. Digest pinned to match docker-compose.yml for parity.
+      redis:
+        image: redis:8-alpine@sha256:69f2c586c8a7e9cce4ae1ee9bbaf60bc4bb5f4bb3880e4ed022b1fd758a7cab9
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd="redis-cli ping"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
+
     steps:
       - name: Checkout
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6

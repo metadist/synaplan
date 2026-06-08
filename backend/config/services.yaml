@@ -24,6 +24,17 @@ parameters:
     env(HEALTH_MONITOR_USER_EMAIL): ''
     env(HEALTH_MONITOR_USER_PASSWORD): ''
 
+    # Realtime (Centrifugo) defaults so the backend boots even when no realtime
+    # gateway is configured (bare/custom deployment). With these unset,
+    # CentrifugoPublisher short-circuits (enabled=false → no publish, never
+    # throws) and the runtime-config endpoint reports realtime as disabled, so
+    # the frontend never opens a WebSocket and the chat falls back to REST.
+    # The official docker-compose files set REALTIME_ENABLED=true explicitly.
+    env(REALTIME_ENABLED): 'false'
+    env(REALTIME_API_URL): ''
+    env(REALTIME_API_KEY): ''
+    env(REALTIME_TOKEN_SECRET): ''
+
     # Logging
     # LOG_FORMAT: json (default) or line (human-readable)
     # LOG_LEVEL: debug, info, notice, warning, error (see monolog.yaml)

@@ -316,7 +316,11 @@ class ConfigController extends AbstractController
         // There is no fallback transport: when realtime is disabled the dashboard
         // simply skips its subscriptions (operators still see fresh data via the
         // existing REST endpoints, just without push updates).
-        $realtimeEnabled = 'false' !== ($_ENV['REALTIME_ENABLED'] ?? 'true');
+        // Default OFF when unset: realtime needs a configured Centrifugo gateway,
+        // so a bare deployment without REALTIME_ENABLED must not advertise WS to
+        // the frontend (otherwise it would loop on connection errors). The
+        // official docker-compose files set REALTIME_ENABLED=true explicitly.
+        $realtimeEnabled = 'true' === ($_ENV['REALTIME_ENABLED'] ?? 'false');
         $realtimeWsUrl = (string) ($_ENV['REALTIME_PUBLIC_WS_URL'] ?? '');
         $realtimeConfig = [
             'enabled' => $realtimeEnabled,

@@ -205,8 +205,10 @@ class WidgetPublicController extends AbstractController
                 // operator UI (see ConfigController::getRuntimeConfig). Empty
                 // wsUrl tells the widget to derive the endpoint from apiUrl,
                 // which is the right default for both same-origin and
-                // cross-origin embeds.
-                'enabled' => 'false' !== ($_ENV['REALTIME_ENABLED'] ?? 'true'),
+                // cross-origin embeds. Default OFF when unset so a bare
+                // deployment without a Centrifugo gateway doesn't make the
+                // embedded widget loop on connection errors.
+                'enabled' => 'true' === ($_ENV['REALTIME_ENABLED'] ?? 'false'),
                 'wsUrl' => (string) ($_ENV['REALTIME_PUBLIC_WS_URL'] ?? ''),
             ],
         ]);
