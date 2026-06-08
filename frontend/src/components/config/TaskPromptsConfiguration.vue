@@ -258,7 +258,6 @@
                         {{ prompt.topic }}
                       </p>
                     </div>
-
                   </button>
                 </li>
               </ul>
@@ -1984,7 +1983,6 @@ const handleCreateNew = async () => {
     newPromptTopic.value = ''
     newPromptContent.value = ''
     newPromptRules.value = ''
-    newPromptKeywords.value = ''
     newPromptDescription.value = ''
     newPromptLanguage.value = locale.value || 'en'
     newPromptSelectedFiles.value = []
