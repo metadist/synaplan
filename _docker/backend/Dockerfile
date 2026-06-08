@@ -8,13 +8,11 @@
 # Sizing overrides are surfaced as PHP_*/FRANKENPHP_* env vars; see the
 # base image README at /usr/local/share/synaplan-base-php/README.md.
 #
-# TEMPORARY: tracking the floating `latest` tag while the PHP 8.5 base
-# (metadist/synaplan-base-php#10) lands on main. Once that PR is merged and the
-# new image is published, RE-PIN this to the immutable digest for reproducible
-# builds:
+# Pinned to an immutable digest so reproducible builds don't depend on a
+# moving floating tag. To bump:
 #   docker buildx imagetools inspect ghcr.io/metadist/synaplan-base-php:latest
-#   FROM ghcr.io/metadist/synaplan-base-php:<version>@sha256:<digest>
-FROM ghcr.io/metadist/synaplan-base-php:latest
+# and replace the @sha256:... below.
+FROM ghcr.io/metadist/synaplan-base-php:latest@sha256:e50b70622fb69f2854808efbfcdcf4ce65ebd98dc0c6fc4c83f9cf669639f6e7
 
 WORKDIR /var/www/backend
 
