@@ -171,7 +171,7 @@ class PromptController extends AbstractController
     /**
      * Serialise a Prompt entity into the API response shape used by both
      * the list endpoint and the single-get endpoint. Centralised so the
-     * shape stays in sync (enabled, selectionRules, ...).
+     * shape stays in sync (selectionRules, ...).
      *
      * @param array<string, mixed> $metadata
      *
@@ -190,7 +190,6 @@ class PromptController extends AbstractController
             'shortDescription' => $prompt->getShortDescription(),
             'prompt' => $prompt->getPrompt(),
             'selectionRules' => $prompt->getSelectionRules(),
-            'enabled' => $prompt->isEnabled(),
             'language' => $prompt->getLanguage(),
             'isDefault' => $isDefault,
             'isUserOverride' => $isUserOverride,
@@ -828,7 +827,6 @@ class PromptController extends AbstractController
             $promptContent = trim($data['prompt']);
             $language = $data['language'] ?? 'en';
             $selectionRules = isset($data['selectionRules']) ? trim($data['selectionRules']) : null;
-            $enabled = isset($data['enabled']) ? (bool) $data['enabled'] : true;
             $metadata = $data['metadata'] ?? [];
 
             // Prevent creating tool prompts (reserved for system)
@@ -863,7 +861,6 @@ class PromptController extends AbstractController
             $prompt->setPrompt($promptContent);
             $prompt->setLanguage($language);
             $prompt->setSelectionRules($selectionRules);
-            $prompt->setEnabled($enabled);
 
             $this->em->persist($prompt);
             $this->em->flush();
@@ -1032,10 +1029,6 @@ class PromptController extends AbstractController
 
         if (isset($data['selectionRules'])) {
             $prompt->setSelectionRules(trim($data['selectionRules']) ?: null);
-        }
-
-        if (array_key_exists('enabled', $data)) {
-            $prompt->setEnabled((bool) $data['enabled']);
         }
 
         // Only update language for user-owned prompts (not system prompts)

@@ -84,7 +84,7 @@ final readonly class EmbeddingReindexService
         // layer for now (a dim-mismatched recreate used to wipe every
         // user memory, see AdminEmbeddingController::switch and the
         // probe check in reindexMemories()). `SCOPE_ALL` is still
-        // accepted for synapse + documents but skips memories so the
+        // accepted for documents but skips memories so the
         // legacy "switch everything at once" UX cannot trip the same
         // data-loss path. The reindex stays callable directly with
         // `SCOPE_MEMORIES` from a CLI / messenger replay once the
@@ -173,7 +173,7 @@ final readonly class EmbeddingReindexService
                 }
 
                 // Mirror `VectorizationService::VECTOR_DIMENSION` handling:
-                // the synapse_documents collection is created with a fixed
+                // the documents collection is created with a fixed
                 // dimension at install time, so any new model whose native
                 // output is wider/narrower must be sliced or zero-padded
                 // before upsert — otherwise Qdrant rejects the point and

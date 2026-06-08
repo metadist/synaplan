@@ -199,45 +199,6 @@
         "topic": "general",
         "web_search": false
     },
-    "sort_granular_audio": {
-        "granular_topic": "audio-generation",
-        "intent": "image_generation",
-        "language": "de",
-        "media_type": "audio",
-        "model_id": null,
-        "model_name": null,
-        "provider": null,
-        "skip_sorting": false,
-        "source": "ai_sorting",
-        "topic": "mediamaker",
-        "web_search": false
-    },
-    "sort_granular_image": {
-        "granular_topic": "image-generation",
-        "intent": "image_generation",
-        "language": "de",
-        "media_type": "image",
-        "model_id": null,
-        "model_name": null,
-        "provider": null,
-        "skip_sorting": false,
-        "source": "ai_sorting",
-        "topic": "mediamaker",
-        "web_search": false
-    },
-    "sort_granular_video": {
-        "granular_topic": "video-generation",
-        "intent": "image_generation",
-        "language": "de",
-        "media_type": "video",
-        "model_id": null,
-        "model_name": null,
-        "provider": null,
-        "skip_sorting": false,
-        "source": "ai_sorting",
-        "topic": "mediamaker",
-        "web_search": false
-    },
     "sort_image": {
         "intent": "image_generation",
         "language": "en",

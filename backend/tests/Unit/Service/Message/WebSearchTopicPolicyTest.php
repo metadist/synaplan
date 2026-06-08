@@ -27,11 +27,9 @@ final class WebSearchTopicPolicyTest extends TestCase
         // Rule 1: explicit opt-in is absolute, beats the NON_WEB_SEARCH gate.
         yield 'opt_in_on_chat_topic_searches' => ['general', true, true, 'rule 1: explicit opt-in'];
         yield 'opt_in_on_media_topic_searches' => ['mediamaker', true, true, 'rule 1: opt-in overrides NON_WEB_SEARCH gate'];
-        yield 'opt_in_on_image_generation_searches' => ['image-generation', true, true, 'rule 1: granular opt-in'];
 
         // Rule 2: NON_WEB_SEARCH topics suppress search when no opt-in is set.
         yield 'mediamaker_no_opinion' => ['mediamaker', null, false, 'rule 2: media topic without opt-in'];
-        yield 'image_generation_no_opinion' => ['image-generation', null, false, 'rule 2: granular media topic'];
         yield 'officemaker_no_opinion' => ['officemaker', null, false, 'rule 2: document topic'];
 
         // Rule 3: explicit opt-out suppresses search on chat-friendly topics.
@@ -59,16 +57,10 @@ final class WebSearchTopicPolicyTest extends TestCase
         );
     }
 
-    public function testIsNonWebSearchTopicCoversCanonicalAndGranularTopics(): void
+    public function testIsNonWebSearchTopicCoversMediaAndDocumentTopics(): void
     {
-        // Canonical legacy topics
         self::assertTrue(WebSearchTopicPolicy::isNonWebSearchTopic('mediamaker'));
         self::assertTrue(WebSearchTopicPolicy::isNonWebSearchTopic('officemaker'));
-
-        // Granular Synapse-v2 topics
-        self::assertTrue(WebSearchTopicPolicy::isNonWebSearchTopic('image-generation'));
-        self::assertTrue(WebSearchTopicPolicy::isNonWebSearchTopic('video-generation'));
-        self::assertTrue(WebSearchTopicPolicy::isNonWebSearchTopic('audio-generation'));
         self::assertTrue(WebSearchTopicPolicy::isNonWebSearchTopic('text2pic'));
         self::assertTrue(WebSearchTopicPolicy::isNonWebSearchTopic('text2vid'));
         self::assertTrue(WebSearchTopicPolicy::isNonWebSearchTopic('text2sound'));
@@ -77,7 +69,6 @@ final class WebSearchTopicPolicyTest extends TestCase
         // Chat-friendly topics
         self::assertFalse(WebSearchTopicPolicy::isNonWebSearchTopic('general'));
         self::assertFalse(WebSearchTopicPolicy::isNonWebSearchTopic('chat'));
-        self::assertFalse(WebSearchTopicPolicy::isNonWebSearchTopic('coding'));
         self::assertFalse(WebSearchTopicPolicy::isNonWebSearchTopic('analyzefile'));
 
         // Edge cases

@@ -380,6 +380,14 @@ class StreamController extends AbstractController
             }
         }
 
+        // Approximate user country from the Cloudflare edge geolocation header
+        // (CF-IPCountry). Resolved here, while the Request is in scope, and
+        // forwarded into the processing options so the chat handler can add a
+        // country-only location-awareness line to the system prompt. Country
+        // only by design — it is an imprecise, IP-derived signal. Empty/sentinel
+        // values ("XX" unknown, "T1" Tor) are dropped by the handler.
+        $clientCountry = $request->headers->get('CF-IPCountry');
+
         // StreamedResponse für SSE
         $response = new StreamedResponse();
         $response->headers->set('Content-Type', 'text/event-stream');
@@ -387,7 +395,7 @@ class StreamController extends AbstractController
         $response->headers->set('X-Accel-Buffering', 'no');
         $response->headers->set('Connection', 'keep-alive');
 
-        $response->setCallback(function () use ($user, $messageText, $trackId, $chatId, $includeReasoning, $webSearch, $modelId, $isAgain, $fileIdArray, $isWidgetMode, $isGuestMode, $fixedTaskPromptTopic, $ragGroupKey, $widgetSession, $guestSession, $rateLimitError, $voiceReply, $continueMessageId, $disableMemories) {
+        $response->setCallback(function () use ($user, $messageText, $trackId, $chatId, $includeReasoning, $webSearch, $modelId, $isAgain, $fileIdArray, $isWidgetMode, $isGuestMode, $fixedTaskPromptTopic, $ragGroupKey, $widgetSession, $guestSession, $rateLimitError, $voiceReply, $continueMessageId, $disableMemories, $clientCountry) {
             // Disable output buffering
             while (ob_get_level()) {
                 ob_end_clean();
@@ -618,6 +626,9 @@ class StreamController extends AbstractController
                     // ExtractMemoriesCommand in `metadata.extraction_payload`
                     // so we can fire it after the flush.
                     'defer_memory_extraction' => true,
+                    // Approximate country (Cloudflare CF-IPCountry header) for the
+                    // location-awareness line appended to the chat system prompt.
+                    'client_country' => $clientCountry,
                 ];
 
                 if ($isWidgetMode || $isGuestMode || $disableMemories) {

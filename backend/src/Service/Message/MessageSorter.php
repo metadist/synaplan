@@ -142,13 +142,6 @@ final readonly class MessageSorter
         }
 
         // Get all available topics (exclude tools:* internal topics).
-        // Granular routing aliases (`general-chat`, `coding`,
-        // `image-generation`, `video-generation`, `audio-generation`) are
-        // gated by their `BENABLED` flag in BPROMPTS, which the admin
-        // controls via the `GRANULAR_TOPICS_ENABLED` toggle through
-        // GranularTopicsManager. When OFF (default) the disabled rows
-        // are filtered out at the SQL level by `excludeDisabled: true`,
-        // so the sorter sees only canonical topics with no extra plumbing.
         $topics = $this->promptRepository->getAllTopics(0, $userId, excludeTools: true);
         $topicsWithDesc = $this->promptRepository->getTopicsWithDescriptions(0, '', $userId, excludeTools: true);
 

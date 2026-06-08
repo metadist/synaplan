@@ -9,7 +9,7 @@ use App\Service\ModelConfigService;
 /**
  * EmbeddingMetadataService — single source of truth for the *currently
  * active* VECTORIZE model and stale-detection across all embedding
- * consumers (Synapse Routing, Document RAG, User Memories).
+ * consumers (Document RAG, User Memories).
  *
  * Three concerns it answers:
  *

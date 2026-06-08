@@ -329,7 +329,6 @@ import {
   LockClosedIcon,
   XMarkIcon,
   DocumentTextIcon,
-  CpuChipIcon,
   Square2StackIcon,
 } from '@heroicons/vue/24/outline'
 import { adminEmbeddingApi, type EmbeddingCostEstimate } from '@/services/api/adminEmbeddingApi'
@@ -366,7 +365,6 @@ const cooldownMinutes = computed(() => {
 const scopeIcons = {
   documents: DocumentTextIcon,
   memories: Square2StackIcon,
-  synapse: CpuChipIcon,
 }
 
 const severityIcon = computed(() => {
@@ -480,8 +478,7 @@ const onConfirm = async () => {
     // embedding model atomically used to wipe every stored memory
     // before the probe + rollback safety net landed, and the team
     // agreed to keep that scope disabled in the UI until a per-user
-    // memory collection design replaces the global one. Synapse
-    // Routing has its own dedicated admin panel and is unaffected.
+    // memory collection design replaces the global one.
     const response = await adminEmbeddingApi.switch({
       toModelId: props.toModelId,
       scope: 'documents',

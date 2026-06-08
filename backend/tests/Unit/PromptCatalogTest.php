@@ -35,25 +35,6 @@ final class PromptCatalogTest extends TestCase
         $this->assertContains('tools:enhance', $topics);
     }
 
-    /**
-     * The canonical `general` row carries the chat/coding/lifestyle keyword
-     * list so the AI sorter has rich vocabulary for everyday and programming
-     * questions in one place.
-     */
-    public function testCanonicalGeneralKeywordsCoverProgrammingTerms(): void
-    {
-        $byTopic = [];
-        foreach (PromptCatalog::all() as $entry) {
-            $byTopic[$entry['topic']] = $entry;
-        }
-
-        $keywords = strtolower((string) $byTopic['general']['keywords']);
-        $this->assertStringContainsString('php', $keywords);
-        $this->assertStringContainsString('python', $keywords);
-        $this->assertStringContainsString('debug', $keywords);
-        $this->assertStringContainsString('smalltalk', $keywords);
-    }
-
     public function testTopicsAreUniquePerLanguage(): void
     {
         $seen = [];

@@ -68,6 +68,35 @@ final readonly class ChatHandler implements MessageHandlerInterface
     }
 
     /**
+     * Build a short, country-only location-awareness line for the chat system
+     * prompt from the Cloudflare CF-IPCountry header (forwarded by the
+     * controller as $options['client_country']).
+     *
+     * Country only by design — this is an approximate, IP/edge-derived signal,
+     * never a precise location. Returns '' when no usable country is present so
+     * the prompt shape is unchanged for non-Cloudflare deployments and for the
+     * Cloudflare sentinel values (XX = unknown, T1 = Tor exit).
+     *
+     * @param array<string, mixed> $options
+     */
+    private function buildLocationContext(array $options): string
+    {
+        $country = $options['client_country'] ?? null;
+        if (!is_string($country)) {
+            return '';
+        }
+
+        $country = strtoupper(trim($country));
+        if ('' === $country || in_array($country, ['XX', 'T1'], true)) {
+            return '';
+        }
+
+        return "\n\n## User location context\n"
+            ."- Approximate country (from network geolocation, ISO 3166-1 alpha-2): {$country}.\n"
+            .'- This is an approximate, IP-based signal — not a precise location. If the exact location matters, ask the user to confirm.';
+    }
+
+    /**
      * @param array<int, array{role: string, content: string}|Message> $thread
      * @param array<string, mixed>                                     $classification
      * @param array<string, mixed>                                     $options        forwarded by InferenceRouter (channel, disable_memories, …)
@@ -276,6 +305,9 @@ final readonly class ChatHandler implements MessageHandlerInterface
         $systemPrompt .= 'auto' === $language
             ? LanguageDirectiveBuilder::buildAutoDirective()
             : LanguageDirectiveBuilder::buildForLanguage($language);
+
+        // Country-only location awareness from the Cloudflare CF-IPCountry header.
+        $systemPrompt .= $this->buildLocationContext($options);
 
         $modelMaxTokens = null;
         if ($modelId) {
@@ -785,6 +817,9 @@ final readonly class ChatHandler implements MessageHandlerInterface
         if (!empty($options['voice_reply'])) {
             $systemPrompt .= "\n\n**VOICE MODE: Your response will be spoken aloud as audio. Keep your answer concise and conversational — maximum 4-5 sentences. Avoid markdown formatting, code blocks, bullet lists, and tables. Write in natural, flowing prose suitable for speech.**";
         }
+
+        // Country-only location awareness from the Cloudflare CF-IPCountry header.
+        $systemPrompt .= $this->buildLocationContext($options);
 
         // Check if model supports system messages (o1 models don't)
         if ($modelId) {

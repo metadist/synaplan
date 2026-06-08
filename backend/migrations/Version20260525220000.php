@@ -11,10 +11,10 @@ use Doctrine\Migrations\AbstractMigration;
  * Canonicalise tool-flag keys in BPROMPTMETA.
  *
  * Historic Vue config wrote `tool_internet_search` and `tool_files_search`
- * to `BPROMPTMETA`, while the routing layer (`SynapseRouter`,
- * `MessageSorter`, `MessageProcessor`) only reads the canonical short
- * names `tool_internet` and `tool_files`. The user-facing "Internet
- * Search" / "Files Search" toggles in the Task Prompts settings page
+ * to `BPROMPTMETA`, while the routing layer (`MessageSorter`,
+ * `MessageProcessor`) only reads the canonical short names `tool_internet`
+ * and `tool_files`. The user-facing "Internet Search" / "Files Search"
+ * toggles in the Task Prompts settings page
  * therefore never enabled web search via the streaming chat pipeline
  * (the negative gate in `MessageProcessor::processStream()` honoured
  * `tool_internet_search`, but no positive trigger ever did).

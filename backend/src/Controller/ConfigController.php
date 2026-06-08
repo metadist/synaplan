@@ -751,13 +751,9 @@ class ConfigController extends AbstractController
             }
 
             // VECTORIZE controls how the user's OWN files/memories get
-            // embedded — explicitly user-scoped now that Synapse Routing
-            // has its own admin-only system-wide setting (see
-            // `DEFAULTMODEL.SYNAPSE_VECTORIZE`, managed via
-            // `AdminEmbeddingController`). Routing therefore can no longer
-            // disagree with a per-user VECTORIZE choice, and we must NOT
-            // silently escalate a user-scoped write into a global config
-            // change (raised by Copilot review on PR #853).
+            // embedded — explicitly user-scoped. We must NOT silently
+            // escalate a user-scoped write into a global config change
+            // (raised by Copilot review on PR #853).
             //
             // The only path that may write to ownerId=0 is the `global`
             // flag above, which already requires `ROLE_ADMIN`.
@@ -783,8 +779,8 @@ class ConfigController extends AbstractController
         $this->em->flush();
 
         // Drop cached active-model snapshot so the very next read
-        // (Synapse status, RAG search, /admin/embedding/status) sees
-        // the new VECTORIZE model immediately. Skip the invalidation
+        // (RAG search, /admin/embedding/status) sees the new VECTORIZE
+        // model immediately. Skip the invalidation
         // when VECTORIZE didn't actually change — the cache already
         // holds the correct value and there's no point thrashing it
         // on every CHAT-only save (#891).

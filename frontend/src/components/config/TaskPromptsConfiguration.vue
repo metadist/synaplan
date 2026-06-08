@@ -50,15 +50,6 @@
               <span class="text-sm font-semibold txt-primary">{{ customPromptCount }}</span>
               <span class="text-xs txt-secondary">{{ $t('config.taskPrompts.statCustom') }}</span>
             </div>
-            <div
-              v-if="disabledPromptCount > 0"
-              class="px-3 py-2 rounded-lg surface-chip flex items-center gap-2"
-              data-testid="stat-disabled"
-            >
-              <Icon icon="heroicons:eye-slash" class="w-4 h-4 text-gray-500" />
-              <span class="text-sm font-semibold txt-primary">{{ disabledPromptCount }}</span>
-              <span class="text-xs txt-secondary">{{ $t('config.taskPrompts.statDisabled') }}</span>
-            </div>
           </div>
 
           <button
@@ -217,7 +208,6 @@
                       selectedPromptId === prompt.id
                         ? 'bg-[var(--brand)]/10 text-[var(--brand)]'
                         : 'hover:bg-light-border/10 dark:hover:bg-dark-border/10 txt-primary',
-                      prompt.enabled === false && 'opacity-60',
                     ]"
                     :data-testid="`card-prompt-${prompt.topic}`"
                     :title="prompt.shortDescription || prompt.topic"
@@ -269,13 +259,6 @@
                       </p>
                     </div>
 
-                    <!-- Status dot (right side) -->
-                    <span
-                      v-if="prompt.enabled === false"
-                      class="w-1.5 h-1.5 rounded-full bg-gray-400 flex-shrink-0"
-                      :title="$t('config.taskPrompts.badgeDisabled')"
-                      data-testid="dot-disabled"
-                    />
                   </button>
                 </li>
               </ul>
@@ -351,12 +334,6 @@
                   class="px-1.5 py-0.5 rounded text-[10px] font-medium uppercase bg-purple-500/10 text-purple-600 dark:text-purple-400 leading-none"
                 >
                   {{ $t('config.taskPrompts.badgeCustom') }}
-                </span>
-                <span
-                  v-if="formData.enabled === false"
-                  class="px-1.5 py-0.5 rounded text-[10px] font-medium uppercase bg-gray-500/10 text-gray-500 leading-none"
-                >
-                  {{ $t('config.taskPrompts.badgeDisabled') }}
                 </span>
               </div>
               <p class="text-xs txt-secondary font-mono truncate">{{ currentPrompt.topic }}</p>
@@ -478,56 +455,33 @@
               </p>
             </div>
 
-            <!-- Enabled + language -->
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <label
-                for="prompt-enabled-toggle"
-                class="flex items-start gap-3 surface-chip rounded-lg p-3 cursor-pointer hover:bg-[var(--brand)]/5 transition-colors"
-              >
-                <input
-                  id="prompt-enabled-toggle"
-                  v-model="formData.enabled"
-                  type="checkbox"
-                  class="mt-0.5 w-5 h-5 rounded border-light-border/30 dark:border-dark-border/20 text-[var(--brand)] focus:ring-2 focus:ring-[var(--brand)]"
-                  data-testid="input-enabled"
-                />
-                <span class="flex-1">
-                  <span class="block text-sm font-semibold txt-primary">
-                    {{ $t('config.taskPrompts.enabledLabel') }}
-                  </span>
-                  <span class="block text-xs txt-secondary mt-0.5">
-                    {{ $t('config.taskPrompts.enabledHelp') }}
-                  </span>
-                </span>
+            <!-- Language -->
+            <div>
+              <label class="block text-sm font-semibold txt-primary mb-2 flex items-center gap-2">
+                <Icon icon="heroicons:language" class="w-4 h-4" />
+                {{ $t('config.taskPrompts.language') }}
               </label>
-
-              <div>
-                <label class="block text-sm font-semibold txt-primary mb-2 flex items-center gap-2">
-                  <Icon icon="heroicons:language" class="w-4 h-4" />
-                  {{ $t('config.taskPrompts.language') }}
-                </label>
-                <select
-                  v-model="formData.language"
-                  :disabled="currentPrompt.isDefault && isAdmin"
-                  class="w-full px-4 py-3 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)] disabled:opacity-50 disabled:cursor-not-allowed"
-                  data-testid="input-language"
-                >
-                  <option v-for="lang in PROMPT_LANGUAGES" :key="lang.value" :value="lang.value">
-                    {{ lang.label }}
-                  </option>
-                </select>
-                <p
-                  v-if="currentPrompt.isDefault && isAdmin"
-                  class="text-xs text-amber-600 dark:text-amber-400 mt-1.5 flex items-center gap-1"
-                >
-                  <Icon icon="heroicons:lock-closed" class="w-3.5 h-3.5" />
-                  {{ $t('config.taskPrompts.systemPromptLanguageFixed') }}
-                </p>
-                <p v-else class="text-xs txt-secondary mt-1.5 flex items-center gap-1">
-                  <Icon icon="heroicons:information-circle" class="w-3.5 h-3.5" />
-                  {{ $t('config.taskPrompts.customPromptLanguageNote') }}
-                </p>
-              </div>
+              <select
+                v-model="formData.language"
+                :disabled="currentPrompt.isDefault && isAdmin"
+                class="w-full px-4 py-3 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)] disabled:opacity-50 disabled:cursor-not-allowed"
+                data-testid="input-language"
+              >
+                <option v-for="lang in PROMPT_LANGUAGES" :key="lang.value" :value="lang.value">
+                  {{ lang.label }}
+                </option>
+              </select>
+              <p
+                v-if="currentPrompt.isDefault && isAdmin"
+                class="text-xs text-amber-600 dark:text-amber-400 mt-1.5 flex items-center gap-1"
+              >
+                <Icon icon="heroicons:lock-closed" class="w-3.5 h-3.5" />
+                {{ $t('config.taskPrompts.systemPromptLanguageFixed') }}
+              </p>
+              <p v-else class="text-xs txt-secondary mt-1.5 flex items-center gap-1">
+                <Icon icon="heroicons:information-circle" class="w-3.5 h-3.5" />
+                {{ $t('config.taskPrompts.customPromptLanguageNote') }}
+              </p>
             </div>
           </div>
 
@@ -1272,14 +1226,13 @@ const newPromptName = ref('')
 const newPromptTopic = ref('')
 const newPromptContent = ref('')
 const newPromptRules = ref('')
-const newPromptKeywords = ref('')
 const newPromptDescription = ref('')
 const newPromptLanguage = ref(locale.value || 'en')
 const newPromptSelectedFiles = ref<number[]>([])
 const newPromptFilesSearch = ref('')
 const showCreateModal = ref(false)
 const promptListSearch = ref('')
-const promptListFilter = ref<'all' | 'system' | 'custom' | 'disabled'>('all')
+const promptListFilter = ref<'all' | 'system' | 'custom'>('all')
 const activeTab = ref<EditorTabId>('routing')
 const viewDensity = ref<'compact' | 'detailed'>('compact')
 const collapsedGroups = ref<Set<string>>(new Set())
@@ -1292,7 +1245,6 @@ const systemPromptCount = computed(
   () => prompts.value.filter((p) => p.isDefault && !p.isUserOverride).length
 )
 const customPromptCount = computed(() => prompts.value.filter((p) => !p.isDefault).length)
-const disabledPromptCount = computed(() => prompts.value.filter((p) => p.enabled === false).length)
 
 const promptListFilters = computed(() => [
   {
@@ -1309,11 +1261,6 @@ const promptListFilters = computed(() => [
     value: 'custom' as const,
     label: t('config.taskPrompts.filterCustom'),
     count: customPromptCount.value,
-  },
-  {
-    value: 'disabled' as const,
-    label: t('config.taskPrompts.filterDisabled'),
-    count: disabledPromptCount.value,
   },
 ])
 
@@ -1333,19 +1280,14 @@ const filteredPrompts = computed(() => {
     if (promptListFilter.value === 'custom' && p.isDefault && !p.isUserOverride) {
       return false
     }
-    if (promptListFilter.value === 'disabled' && p.enabled !== false) {
-      return false
-    }
     if (search === '') return true
-    const haystack = [p.name, p.topic, p.shortDescription, p.keywords ?? ''].join(' ').toLowerCase()
+    const haystack = [p.name, p.topic, p.shortDescription].join(' ').toLowerCase()
     return haystack.includes(search)
   })
 })
 
 /**
- * Map a prompt to a display category. Disabled topics live in their own bucket
- * so they always sink to the bottom and stay out of the way until the user
- * specifically wants to see them.
+ * Map a prompt to a display category for grouping in the sidebar list.
  */
 type CategoryId =
   | 'conversation'
@@ -1354,7 +1296,6 @@ type CategoryId =
   | 'productivity'
   | 'other-system'
   | 'custom'
-  | 'disabled'
 
 interface CategoryDef {
   id: CategoryId
@@ -1363,7 +1304,6 @@ interface CategoryDef {
 }
 
 function topicCategory(prompt: TaskPrompt): CategoryId {
-  if (prompt.enabled === false) return 'disabled'
   if (!prompt.isDefault) return 'custom'
   const t = prompt.topic.toLowerCase()
   if (
@@ -1389,7 +1329,7 @@ function topicCategory(prompt: TaskPrompt): CategoryId {
   ) {
     return 'productivity'
   }
-  if (t.includes('chat') || t === 'general' || t === 'general-chat' || t.includes('smalltalk')) {
+  if (t.includes('chat') || t === 'general' || t.includes('smalltalk')) {
     return 'conversation'
   }
   return 'other-system'
@@ -1427,11 +1367,6 @@ const categorizedPrompts = computed(() => {
       label: t('config.taskPrompts.categoryCustom'),
       icon: 'heroicons:user',
     },
-    {
-      id: 'disabled',
-      label: t('config.taskPrompts.categoryDisabled'),
-      icon: 'heroicons:eye-slash',
-    },
   ]
 
   const buckets: Record<CategoryId, TaskPrompt[]> = {
@@ -1441,7 +1376,6 @@ const categorizedPrompts = computed(() => {
     productivity: [],
     'other-system': [],
     custom: [],
-    disabled: [],
   }
 
   for (const prompt of filteredPrompts.value) {
@@ -1630,8 +1564,7 @@ const markdownTools = [
 
 /**
  * Map a topic slug to a heroicon. Falls back to a generic chat icon.
- * Synapse-routed topics (general-chat, coding, image-generation, ...)
- * get distinct visuals so the list scans well at a glance.
+ * Topics get distinct visuals so the list scans well at a glance.
  */
 function topicIcon(topic: string): string {
   const t = topic.toLowerCase()
@@ -1655,7 +1588,7 @@ function topicIcon(topic: string): string {
   if (t.includes('mail') || t.includes('email')) return 'heroicons:envelope'
   if (t.includes('translate') || t.includes('language')) return 'heroicons:language'
   if (t.startsWith('w_')) return 'heroicons:rectangle-group'
-  if (t.includes('chat') || t === 'general' || t === 'general-chat') {
+  if (t.includes('chat') || t === 'general') {
     return 'heroicons:chat-bubble-left-right'
   }
   return 'heroicons:sparkles'
@@ -1735,8 +1668,6 @@ const loadPrompt = () => {
     formData.value = {
       shortDescription: prompt.shortDescription || '',
       selectionRules: prompt.selectionRules || '',
-      keywords: prompt.keywords || '',
-      enabled: prompt.enabled !== false,
       aiModel: prompt.aiModel,
       availableTools: prompt.availableTools,
       content: prompt.content,
@@ -1850,8 +1781,6 @@ const handleSave = saveChanges(async () => {
         prompt: formData.value.content || '',
         language: formData.value.language || locale.value || 'en',
         selectionRules: formData.value.selectionRules ?? null,
-        keywords: formData.value.keywords ?? null,
-        enabled: formData.value.enabled !== false,
         metadata,
       })
 
@@ -1875,8 +1804,6 @@ const handleSave = saveChanges(async () => {
         shortDescription: formData.value.shortDescription || currentPrompt.value.shortDescription,
         prompt: formData.value.content || '',
         selectionRules: formData.value.selectionRules ?? null,
-        keywords: formData.value.keywords ?? null,
-        enabled: formData.value.enabled !== false,
         metadata,
       }
       if (!isSystemPrompt) {
@@ -1992,8 +1919,6 @@ const handleCreateNew = async () => {
       prompt: newPromptContent.value.trim(),
       language: newPromptLanguage.value || locale.value || 'en',
       selectionRules: newPromptRules.value.trim() || null,
-      keywords: newPromptKeywords.value.trim() || null,
-      enabled: true,
       metadata,
     }
 
@@ -2013,8 +1938,6 @@ const handleCreateNew = async () => {
     formData.value = {
       shortDescription: mappedPrompt.shortDescription || '',
       selectionRules: mappedPrompt.selectionRules || '',
-      keywords: mappedPrompt.keywords || '',
-      enabled: mappedPrompt.enabled !== false,
       aiModel: mappedPrompt.aiModel,
       availableTools: mappedPrompt.availableTools,
       content: mappedPrompt.content,
@@ -2215,9 +2138,6 @@ watch(locale, () => {
 
 onMounted(() => {
   cleanupGuard = setupNavigationGuard()
-  // Disabled topics are demoted to a separate group that is collapsed by default
-  // — they only matter when actively triaging the routing pool.
-  collapsedGroups.value = new Set(['disabled'])
   Promise.all([loadAIModels(), loadPrompts(), loadAvailableFiles()]).then(() => {
     const urlParams = new URLSearchParams(window.location.search)
     const topicParam = urlParams.get('topic')

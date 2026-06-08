@@ -40,7 +40,6 @@ final readonly class MessageClassifier
 
     public function __construct(
         private MessageSorter $messageSorter,
-        private TopicAliasResolver $topicAliasResolver,
         private MessageMetaRepository $messageMetaRepository,
         private ModelConfigService $modelConfigService,
         private ConfigRepository $configRepository,
@@ -201,32 +200,17 @@ final readonly class MessageClassifier
 
         $source = $result['source'] ?? 'ai_sorting';
 
-        // Resolve any alias topics to their canonical legacy topics BEFORE mapping
-        // to intent. Downstream code (mapTopicToIntent, handler resolution,
-        // BFILEPATH keys) only understands canonical topics; without this an
-        // aliased media-generation request would fall back to `chat` (#952).
-        // Idempotent for already-canonical topics.
-        $rawTopic = (string) ($result['topic'] ?? 'general');
-        $alias = $this->topicAliasResolver->resolve($rawTopic);
-        $canonicalTopic = $alias['topic'];
-        $impliedMedia = $alias['media'];
-
-        if (null !== $alias['alias_source']) {
-            $this->logger->info('MessageClassifier: Resolved granular topic to canonical', [
-                'message_id' => $messageId,
-                'granular_topic' => $alias['alias_source'],
-                'canonical_topic' => $canonicalTopic,
-                'implied_media' => $impliedMedia,
-            ]);
-        }
+        // The AI sorter returns a canonical topic (general, mediamaker,
+        // officemaker, docsummary, …) that downstream code (mapTopicToIntent,
+        // handler resolution, BFILEPATH keys) understands directly.
+        $canonicalTopic = (string) ($result['topic'] ?? 'general');
 
         $this->logger->info('MessageClassifier: Classification complete', [
             'message_id' => $messageId,
             'topic' => $canonicalTopic,
-            'granular_topic' => $alias['alias_source'],
             'language' => $result['language'],
             'web_search' => $result['web_search'] ?? false,
-            'media_type' => $result['media_type'] ?? $impliedMedia,
+            'media_type' => $result['media_type'] ?? null,
             'duration' => $result['duration'] ?? null,
             'resolution' => $result['resolution'] ?? null,
             'source' => $source,
@@ -245,19 +229,13 @@ final readonly class MessageClassifier
             'model_name' => $result['sorting_model_name'] ?? null,
         ];
 
-        if (null !== $alias['alias_source']) {
-            $classification['granular_topic'] = $alias['alias_source'];
-        }
-
         if ($overrideModelId) {
             $classification['override_model_id'] = $overrideModelId;
         }
 
-        // Pass through media_type if detected (for mediamaker topic). Prefer
-        // the sorter's explicit BMEDIA value, fall back to the implied media
-        // from the granular topic alias (image-generation → 'image', etc.) so
-        // MediaGenerationHandler always knows which provider to invoke.
-        $mediaType = $result['media_type'] ?? $impliedMedia;
+        // Pass through media_type if the sorter set BMEDIA (for the mediamaker
+        // topic) so MediaGenerationHandler knows which provider to invoke.
+        $mediaType = $result['media_type'] ?? null;
         if (null !== $mediaType) {
             $classification['media_type'] = $mediaType;
         }

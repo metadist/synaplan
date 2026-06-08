@@ -28,9 +28,7 @@ final class PromptSeedCommand extends Command
         $this->setHelp(
             "Upserts all built-in system prompts (ownerId=0) into the database.\n\n".
             "New prompts are inserted, existing ones are updated with the latest text.\n".
-            "User-created prompts (ownerId>0) are never touched. After the catalog\n".
-            "write, the granular-topics admin toggle is re-applied so BPROMPTS.BENABLED\n".
-            "stays in lock-step with the operator's choice across re-seeds.\n\n".
+            "User-created prompts (ownerId>0) are never touched.\n\n".
             'Idempotent and safe to run on every container start.'
         );
     }

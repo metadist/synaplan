@@ -241,8 +241,8 @@ class ModelCatalog
             'name' => 'bge-m3 (Ollama, self-hosted)',
             'tag' => 'vectorize',
             // Selectable in the admin "switch embedding model" dropdown so
-            // operators running a private Ollama / GPU server can pin RAG and
-            // Synapse routing to their own bge-m3 deployment instead of paying
+            // operators running a private Ollama / GPU server can pin RAG
+            // to their own bge-m3 deployment instead of paying
             // per-token to Cloudflare or OpenAI. Same 1024-dim vector space as
             // the Cloudflare bge-m3 (BID 187), so switching between the two
             // is a "free" change from the collection's point of view.

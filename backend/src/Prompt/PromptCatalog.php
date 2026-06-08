@@ -21,32 +21,16 @@ class PromptCatalog
     /**
      * Return all built-in system prompt definitions.
      *
-     * Topic taxonomy (Synapse Routing v2):
+     * Topic taxonomy:
      *
-     *  Granular routing topics (preferred for embedding-based Tier-1):
-     *    - general-chat        ← smalltalk, lifestyle, coding, technical Q&A, everything that resolves to a chat answer
-     *    - image-generation    ← create/edit images, photos, illustrations
-     *    - video-generation    ← create video clips, animations
-     *    - audio-generation    ← TTS, voice output, audio synthesis
+     *  Routing topics (offered to the AI sorter / DYNAMICLIST):
+     *    - general             ← smalltalk, lifestyle, coding, technical Q&A, everything that resolves to a chat answer
+     *    - mediamaker          ← create/edit images, videos and audio
      *    - docsummary          ← summarize a document or attached file text
      *    - officemaker         ← generate XLSX/DOCX/PPTX/CSV documents
      *
-     *  Note (#878): the previously dedicated `coding` topic was retired.
-     *  Programming questions overlapped too aggressively with everyday
-     *  chat in the embedding space (any "how do I…" sentence scored close
-     *  to it), pulling routine messages off `general-chat`. Coding now
-     *  rides on `general-chat` and the LLM picks the depth from context.
-     *  The legacy alias `coding` → `general` is retained in
-     *  TopicAliasResolver so older AI-fallback responses still resolve.
-     *
-     *  Legacy canonical topics (still used by downstream handlers; the
-     *  TopicAliasResolver maps the granular topics back to these for
-     *  intent routing and groupKey backwards compatibility):
-     *    - general             ← canonical for general-chat
-     *    - mediamaker          ← canonical for *-generation
-     *
      *  Internal helper prompts (excluded from the routing pool):
-     *    - tools:sort          ← AI fallback classifier (DYNAMICLIST template)
+     *    - tools:sort          ← AI classifier (DYNAMICLIST template)
      *    - tools:enhance       ← message rewriter
      *    - tools:search        ← search query optimizer
      *    - tools:mailhandler   ← email routing
@@ -54,32 +38,24 @@ class PromptCatalog
      *    - tools:memory_*      ← memory extraction/parsing
      *    - tools:feedback_*    ← feedback contradiction checks
      *
-     * @return array<array{topic: string, language: string, shortDescription: string, prompt: string, keywords?: string, enabled?: bool}>
+     * @return array<array{topic: string, language: string, shortDescription: string, prompt: string}>
      */
     public static function all(): array
     {
         return [
             // ──────────────────────────────────────────────
-            //  Legacy canonical topics (kept for backward compat)
+            //  Routing topics
             // ──────────────────────────────────────────────
             [
                 'topic' => 'general',
                 'language' => 'en',
-                'shortDescription' => 'Catch-all topic for everyday questions, smalltalk, advice, opinions and any request that does not fit a more specific topic. Used as a routing fallback when no granular topic matches.',
-                // Keyword list intentionally broad: when the granular
-                // routing aliases are disabled (the default state), Synapse
-                // v2 embedding recall for chat / lifestyle / programming
-                // queries has to land here, so the canonical row carries
-                // the union of vocabulary that would otherwise be spread
-                // across `general-chat` and friends.
-                'keywords' => 'fallback, default, catch-all, allgemein, frage, question, chat, smalltalk, hello, hi, hallo, talk, conversation, opinion, advice, tip, lifestyle, travel, reise, health, gesundheit, recipe, rezept, recommendation, empfehlung, idea, idee, business, hobby, hobbies, plan, planning, planen, project, projekt, learning, lernen, study, school, university, student, code, coding, programming, programmieren, software, php, python, javascript, typescript, java, kotlin, swift, go, rust, ruby, sql, html, css, vue, react, angular, node, function, class, method, variable, error, fehler, exception, bug, debug, refactor, framework, library, api, rest, graphql, regex, algorithm, terminal, shell, bash, docker, kubernetes, fitness, gym, fitnessstudio, sport, food, essen, drink, getränk, shake, restaurant, shop, store, geschäft, idea for, möchte, will, want to',
+                'shortDescription' => 'Catch-all topic for everyday questions, smalltalk, advice, opinions and any request that does not fit a more specific topic. Used as a routing fallback when no other topic matches.',
                 'prompt' => self::generalPrompt(),
             ],
             [
                 'topic' => 'mediamaker',
                 'language' => 'en',
-                'shortDescription' => 'Canonical media-generation topic that handles all create/edit requests for images, videos and audio. Prefer the more specific image-generation, video-generation or audio-generation topics for routing; this entry stays as a catch-all and downstream handler key.',
-                'keywords' => 'media generation, mediengenerierung, bild, video, audio, image, picture, photo, sound, voice',
+                'shortDescription' => 'Media-generation topic that handles all create/edit requests for images, videos and audio.',
                 'prompt' => self::mediaMakerPrompt(),
             ],
 
@@ -102,7 +78,6 @@ class PromptCatalog
                 'topic' => 'docsummary',
                 'language' => 'en',
                 'shortDescription' => 'The user asks for document summarization with specific options (abstractive, extractive, bullet-points). Direct here when user wants a summary of text or document content.',
-                'keywords' => 'summary, summarize, summarise, zusammenfassung, zusammenfassen, fasse zusammen, abstract, bullet points, key points, executive summary, kurzfassung, tldr, tl;dr, document summary, dokument zusammenfassen',
                 'prompt' => self::docSummaryPrompt(),
             ],
             [
@@ -115,7 +90,6 @@ class PromptCatalog
                 'topic' => 'officemaker',
                 'language' => 'en',
                 'shortDescription' => 'The user asks to generate OR to modify/reformat a single Excel, PowerPoint or Word document (CSV, XLSX, DOCX, PPTX). This includes follow-up requests that change the content or formatting of a document the assistant generated earlier in the same conversation (e.g. "make the title bold/bigger in the file", "add a column", "change the document"). Not for any other format. Handles exactly ONE document.',
-                'keywords' => 'excel, xlsx, spreadsheet, tabellenkalkulation, csv, word, docx, document, dokument, powerpoint, pptx, presentation, praesentation, slide, folie, sheet, tabelle, office document, office datei, generate excel, erstelle excel, create spreadsheet, create document, dokument erstellen, dokument aendern, dokument bearbeiten, dokument anpassen, datei aendern, datei bearbeiten, datei anpassen, in der datei, in dem dokument, edit document, modify document, update document, reformat document, change the document, change the file, update the file',
                 'prompt' => self::officeMakerPrompt(),
             ],
             [
@@ -187,17 +161,14 @@ class PromptCatalog
      * Inserts new prompts or updates existing ones matched by (ownerId=0, topic, language).
      * User-created prompts (ownerId>0) are never touched.
      *
-     * Idempotent: re-running the seed updates BSHORTDESC, BPROMPT, BKEYWORDS and
-     * BENABLED for existing system prompts but never touches BSELECTION_RULES so
-     * admins can keep their custom rule overrides.
+     * Idempotent: re-running the seed updates BSHORTDESC and BPROMPT for existing
+     * system prompts but never touches BSELECTION_RULES so admins can keep their
+     * custom rule overrides.
      *
      * @return array{inserted: list<string>, updated: list<string>} topic keys per outcome
      */
     public static function seed(Connection $connection): array
     {
-        $hasKeywordColumn = self::columnExists($connection, 'BPROMPTS', 'BKEYWORDS');
-        $hasEnabledColumn = self::columnExists($connection, 'BPROMPTS', 'BENABLED');
-
         $inserted = [];
         $updated = [];
 
@@ -207,75 +178,22 @@ class PromptCatalog
                 [$prompt['topic'], $prompt['language']]
             );
 
-            $keywords = $prompt['keywords'] ?? null;
-            $enabled = (bool) ($prompt['enabled'] ?? true);
-
             if (false !== $existing) {
-                $sql = 'UPDATE BPROMPTS SET BSHORTDESC = ?, BPROMPT = ?';
-                $params = [$prompt['shortDescription'], $prompt['prompt']];
-
-                if ($hasKeywordColumn) {
-                    $sql .= ', BKEYWORDS = ?';
-                    $params[] = $keywords;
-                }
-                if ($hasEnabledColumn) {
-                    $sql .= ', BENABLED = ?';
-                    $params[] = $enabled ? 1 : 0;
-                }
-
-                $sql .= ' WHERE BID = ?';
-                $params[] = $existing;
-
-                $connection->executeStatement($sql, $params);
+                $connection->executeStatement(
+                    'UPDATE BPROMPTS SET BSHORTDESC = ?, BPROMPT = ? WHERE BID = ?',
+                    [$prompt['shortDescription'], $prompt['prompt'], $existing]
+                );
                 $updated[] = $prompt['topic'];
             } else {
-                $columns = ['BOWNERID', 'BLANG', 'BTOPIC', 'BSHORTDESC', 'BPROMPT'];
-                $placeholders = ['0', '?', '?', '?', '?'];
-                $params = [$prompt['language'], $prompt['topic'], $prompt['shortDescription'], $prompt['prompt']];
-
-                if ($hasKeywordColumn) {
-                    $columns[] = 'BKEYWORDS';
-                    $placeholders[] = '?';
-                    $params[] = $keywords;
-                }
-                if ($hasEnabledColumn) {
-                    $columns[] = 'BENABLED';
-                    $placeholders[] = '?';
-                    $params[] = $enabled ? 1 : 0;
-                }
-
-                $sql = sprintf(
-                    'INSERT INTO BPROMPTS (%s) VALUES (%s)',
-                    implode(', ', $columns),
-                    implode(', ', $placeholders)
+                $connection->executeStatement(
+                    'INSERT INTO BPROMPTS (BOWNERID, BLANG, BTOPIC, BSHORTDESC, BPROMPT) VALUES (0, ?, ?, ?, ?)',
+                    [$prompt['language'], $prompt['topic'], $prompt['shortDescription'], $prompt['prompt']]
                 );
-
-                $connection->executeStatement($sql, $params);
                 $inserted[] = $prompt['topic'];
             }
         }
 
         return ['inserted' => $inserted, 'updated' => $updated];
-    }
-
-    private static function columnExists(Connection $connection, string $table, string $column): bool
-    {
-        try {
-            $sm = $connection->createSchemaManager();
-            if (!$sm->tablesExist([$table])) {
-                return false;
-            }
-
-            foreach ($sm->listTableColumns($table) as $col) {
-                if (0 === strcasecmp($col->getName(), $column)) {
-                    return true;
-                }
-            }
-        } catch (\Throwable) {
-            // Fall through to false
-        }
-
-        return false;
     }
 
     private static function generalPrompt(): string

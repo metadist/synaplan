@@ -15,14 +15,8 @@ namespace App\Service\Message;
  * explicit `tool_internet=true` opt-in: there is nothing useful to do
  * with the results).
  *
- * Used by:
- *   - `SynapseRouter`         — Tier-1 web-search decision
- *   - `MessageProcessor`      — final decision in both streaming and
- *                                non-streaming pipelines
- *
- * The list intentionally includes BOTH canonical legacy topics and the
- * granular Synapse-v2 topics, so the check stays correct even when
- * `TopicAliasResolver` is bypassed (e.g. on the AI-sorter path).
+ * Used by `MessageProcessor` as the final web-search decision in both the
+ * streaming and non-streaming pipelines.
  */
 final class WebSearchTopicPolicy
 {
@@ -34,13 +28,8 @@ final class WebSearchTopicPolicy
      * @var list<string>
      */
     public const NON_WEB_SEARCH_TOPICS = [
-        // Canonical legacy topics
         'mediamaker',
         'officemaker',
-        // Granular Synapse-v2 topics
-        'image-generation',
-        'video-generation',
-        'audio-generation',
         'text2pic',
         'text2vid',
         'text2sound',

@@ -12,7 +12,6 @@ use App\Repository\ConfigRepository;
 use App\Repository\MessageMetaRepository;
 use App\Service\Message\MessageClassifier;
 use App\Service\Message\MessageSorter;
-use App\Service\Message\TopicAliasResolver;
 use App\Service\ModelConfigService;
 use App\Tests\Characterization\Support\RoutingSnapshot;
 use Doctrine\Common\Collections\ArrayCollection;
@@ -35,9 +34,9 @@ use Psr\Log\LoggerInterface;
  *     attachments) run through the REAL classifier end-to-end — these are the
  *     routes we explicitly keep pre-planner, so they must never drift.
  *   - SORTER-DRIVEN inputs inject the sorter's raw output and snapshot how the
- *     classifier transforms it (alias resolution, intent mapping, media/duration/
- *     resolution passthrough, custom-topic → chat fallback). This is the exact
- *     transform the planner adapter must reproduce.
+ *     classifier transforms it (intent mapping, media/duration/resolution
+ *     passthrough, custom-topic → chat fallback). This is the exact transform
+ *     the planner adapter must reproduce.
  *
  * The snapshot also intentionally documents the 4 migration-risk areas from the
  * plan: custom user topic, analyzefile, mediamaker params, override paths.
@@ -137,11 +136,6 @@ final class RoutingCharacterizationTest extends TestCase
             ['id' => 'sort_video_params', 'text' => 'make a 8s 720p clip', 'language' => 'en', 'fastPath' => false, 'sorter' => ['topic' => 'mediamaker', 'language' => 'en', 'media_type' => 'video', 'duration' => 8, 'resolution' => '720p']],
             ['id' => 'sort_audio', 'text' => 'make a song', 'language' => 'de', 'fastPath' => false, 'sorter' => ['topic' => 'mediamaker', 'language' => 'de', 'media_type' => 'audio']],
 
-            // ---- Sorter-driven: granular topic alias resolution ----
-            ['id' => 'sort_granular_image', 'text' => 'erstelle ein bild', 'language' => 'de', 'fastPath' => false, 'sorter' => ['topic' => 'image-generation', 'language' => 'de']],
-            ['id' => 'sort_granular_video', 'text' => 'erstelle ein video', 'language' => 'de', 'fastPath' => false, 'sorter' => ['topic' => 'video-generation', 'language' => 'de']],
-            ['id' => 'sort_granular_audio', 'text' => 'mach einen song', 'language' => 'de', 'fastPath' => false, 'sorter' => ['topic' => 'audio-generation', 'language' => 'de']],
-
             // ---- Sorter-driven: other canonical topics ----
             ['id' => 'sort_officemaker', 'text' => 'mach eine excel tabelle', 'language' => 'de', 'fastPath' => false, 'sorter' => ['topic' => 'officemaker', 'language' => 'de']],
             ['id' => 'sort_general', 'text' => 'tell me a joke', 'language' => 'en', 'fastPath' => false, 'sorter' => ['topic' => 'general', 'language' => 'en', 'sorting_model_id' => 5, 'sorting_provider' => 'ollama', 'sorting_model_name' => 'llama3']],
@@ -173,7 +167,7 @@ final class RoutingCharacterizationTest extends TestCase
         $configRepo->method('getValue')->willReturnCallback(
             static function (int $owner, string $group, string $setting) use ($fastPath): ?string {
                 if ('QDRANT_SEARCH' === $group) {
-                    return '0'; // Synapse routing OFF (default)
+                    return '0';
                 }
                 if ('CLASSIFIER' === $group && 'FAST_PATH_ENABLED' === $setting) {
                     return $fastPath ? null : '0'; // null => default-on
@@ -215,7 +209,6 @@ final class RoutingCharacterizationTest extends TestCase
 
         $classifier = new MessageClassifier(
             $sorter,
-            new TopicAliasResolver(),
             $metaRepo,
             $this->createMock(ModelConfigService::class),
             $configRepo,

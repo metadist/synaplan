@@ -311,7 +311,7 @@ class AiFacade
 
         // Use `error` (not `warning`) so this shows up in the same log
         // bucket as production incidents — silent failovers were called
-        // out as a risk in the Synapse Routing v2 review. The success
+        // out as a risk in the embedding-stack review. The success
         // path further down logs `notice` so on-call can correlate
         // "primary failed" with "fallback succeeded" without grepping
         // two channels.

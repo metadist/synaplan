@@ -1,0 +1,146 @@
+==============================================================================
+ SYNAPLAN RELEASE TEST SCRATCHPAD — 2026-06-08
+ TEMPORARY FILE. DELETE BEFORE ANY git add / commit / push.
+ (No code changes. This is a manual, multi-tab test plan + notes.)
+==============================================================================
+
+GOAL
+----
+Exercise the new release's MULTITASKING by sending combined "niche" prompts
+that should fan out into several capability nodes in one turn (chat +
+web_search + image_generation + calendar_event + text2sound + ...), and then
+confirm the model was actually given the basic user context it needs:
+  - OS
+  - browser + version
+  - whether location is allowed (geolocation permission)
+  - the location itself (ideally from Cloudflare edge headers)
+  - current date/time + timezone
+
+Run each prompt in its OWN tab/chat so plans don't bleed into each other.
+For each: note model used, the task cards that appeared, and whether the
+answer reflects the real OS/browser/location/date — NOT a generic guess.
+
+------------------------------------------------------------------------------
+CAPABILITY VOCABULARY (what the planner can emit — for reference while judging)
+------------------------------------------------------------------------------
+chat, summarize, translate, rag_query, web_search, file_analysis,
+image_generation, video_generation, text2sound, document_generation,
+calendar_event, compose_reply, extract_text
+  (source: backend/src/Service/Multitask/Plan/Capability.php)
+
+==============================================================================
+ THE 6 TEST PROMPTS (multi-task content)
+==============================================================================
+
+PROMPT 1 — location + date + maps link + calendar image (the canonical one)
+  "Where am I currently and what date is it? Can you link to Google Maps for
+   my location and create a calendar image for a team standup tomorrow at
+   09:00."
+  Expect to fan out into:
+    - chat            -> states OS / browser / location / today's date
+    - web_search OR chat -> a real maps.google.com link for the detected place
+    - calendar_event  -> downloadable .ics for "tomorrow 09:00" (resolved
+                         against the injected time-context block)
+    - image_generation -> a "calendar" image
+    - compose_reply   -> assembles text + .ics + image into one reply
+  WATCH: does it KNOW the location, or does it ask / hallucinate a city?
+  WATCH: is "tomorrow" resolved to 2026-06-09, correct timezone?
+
+PROMPT 2 — love poem + read it aloud (TTS)
+  "Create a love poem and read it to me."
+  Expect:
+    - chat            -> the poem
+    - text2sound      -> audio (mp3) of the poem, playable inline
+    - compose_reply
+  WATCH: is the audio actually attached/playable? Right language/voice?
+
+PROMPT 3 — environment self-report (pure context probe)
+  "What operating system and browser am I using right now, is my location
+   sharing turned on, and where am I roughly located? Then tell me the exact
+   local date and time."
+  Expect: a single chat answer that reflects REAL values.
+  WATCH (the important one): does the system prompt actually contain OS,
+   browser+version, geolocation-permission state, and a location? Today the
+   backend only captures Cloudflare CF-IPCountry (country code) for guest/
+   widget sessions and injects a server time/timezone block — there is NO
+   OS/browser/"location allowed"/city injection into the chat system prompt.
+   If the answer is vague or generic, that's the gap to flag (NOT to fix here).
+
+PROMPT 4 — weather + image + spoken summary (search + media + tts)
+  "Look up today's weather where I am, draw me a picture that matches that
+   weather, and read me a one-sentence summary of the forecast."
+  Expect:
+    - web_search      -> weather for the detected location
+    - image_generation -> scene matching the weather
+    - text2sound      -> spoken one-line summary
+    - compose_reply
+  WATCH: search must use the REAL location (ties back to context injection).
+
+PROMPT 5 — translate + document + calendar (multi-artifact)
+  "Translate this into German: 'Project kickoff next Monday at 14:00'. Put it
+   in a Word document, and also create a calendar invite for that meeting in
+   my timezone."
+  Expect:
+    - translate
+    - document_generation -> .docx
+    - calendar_event      -> .ics, "next Monday 14:00" resolved in user's tz
+    - compose_reply
+  WATCH: timezone used for the .ics — server tz fallback vs. the user's real
+   tz (no client tz is injected today, so it likely falls back to server tz).
+
+PROMPT 6 — directions + map image + reminder (location-heavy combo)
+  "Give me walking directions from where I am to the nearest train station,
+   show it on a map image, and set a reminder/calendar event to leave in
+   45 minutes."
+  Expect:
+    - web_search / chat   -> directions using the detected location
+    - image_generation    -> a map-style image
+    - calendar_event      -> .ics 45 min from "now" (relative-time resolution)
+    - compose_reply
+  WATCH: "nearest station" requires a precise location; country-only
+   CF-IPCountry is NOT enough. Does it ask, guess, or use a real place?
+
+==============================================================================
+ CONTEXT-INJECTION VERIFICATION CHECKLIST (the core of this test)
+==============================================================================
+For prompts 1, 3, 4, 6 specifically, confirm whether the model received:
+
+  [ ] OS (e.g. "Windows 11" / "macOS" / "Linux") .......... currently NOT injected?
+  [ ] Browser + version (e.g. "Chrome 126") ............... currently NOT injected?
+  [ ] Location permission state (allowed / denied / n/a) ... currently NOT injected?
+  [ ] Location value:
+        - Country (CF-IPCountry) .......... captured for guest/widget sessions
+        - City / region / lat-long ........ currently NOT captured?
+  [x] Current date/time + timezone ......... injected as a time-context block
+                                             (TaskPlanner::timeContextBlock)
+
+Where the code stands today (read-only findings, do NOT change here):
+  - backend/src/Service/GuestSessionService.php       -> CF-IPCountry -> session country
+  - backend/src/Controller/WidgetPublicController.php -> CF-IPCountry -> session country
+  - backend/src/Service/Multitask/TaskPlanner.php     -> injects server time + tz
+  - No code path found that injects OS / browser / geolocation-permission /
+    city into the chat or planner system prompt.
+
+  Cloudflare headers that COULD provide richer location if we chose to use them
+  (for the eventual fix discussion — not implemented yet):
+    CF-IPCountry, CF-IPCity, CF-Region, CF-IPLatitude, CF-IPLongitude,
+    CF-Timezone   (require the corresponding managed transform / Workers to be on)
+
+==============================================================================
+ PER-RUN LOG (fill in while testing across tabs)
+==============================================================================
+Tab | Prompt# | Model | Task cards seen | Location correct? | Date/tz correct? | Artifacts OK? | Notes
+----+---------+-------+-----------------+-------------------+------------------+---------------+------
+ 1  |         |       |                 |                   |                  |               |
+ 2  |         |       |                 |                   |                  |               |
+ 3  |         |       |                 |                   |                  |               |
+ 4  |         |       |                 |                   |                  |               |
+ 5  |         |       |                 |                   |                  |               |
+ 6  |         |       |                 |                   |                  |               |
+
+OPEN QUESTIONS / BUGS FOUND
+---------------------------
+- 
+
+REMINDER: delete this file (testing20260608.txt) before committing.
+==============================================================================

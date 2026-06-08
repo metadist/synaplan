@@ -15,7 +15,7 @@ export interface EmbeddingGuardStatus {
   cooldownSecondsRemaining: number
 }
 
-export type EmbeddingRunScope = 'documents' | 'memories' | 'synapse' | 'all'
+export type EmbeddingRunScope = 'documents' | 'memories' | 'all'
 
 export type EmbeddingRunStatus = 'queued' | 'running' | 'completed' | 'failed' | 'cancelled'
 
@@ -77,7 +77,6 @@ export interface EmbeddingCostEstimate {
   scopes: {
     documents: EmbeddingScopeEstimate
     memories: EmbeddingScopeEstimate
-    synapse: EmbeddingScopeEstimate
   }
   totals: {
     chunks: number

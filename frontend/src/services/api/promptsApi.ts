@@ -23,12 +23,6 @@ export interface TaskPrompt {
   isDefault: boolean
   isUserOverride?: boolean
   selectionRules?: string | null
-  /** Comma/newline-separated synonyms folded into the Synapse embedding text. */
-  keywords?: string | null
-  /** Soft-disable flag — disabled topics are filtered out of the routing pool. */
-  enabled?: boolean
-  /** Server-side preview of the exact text that gets embedded for this topic. */
-  embeddingPreview?: string
   metadata?: PromptMetadata
 }
 
@@ -38,8 +32,6 @@ export interface CreatePromptRequest {
   prompt: string
   language?: string
   selectionRules?: string | null
-  keywords?: string | null
-  enabled?: boolean
   metadata?: PromptMetadata
 }
 
@@ -48,8 +40,6 @@ export interface UpdatePromptRequest {
   prompt?: string
   language?: string
   selectionRules?: string | null
-  keywords?: string | null
-  enabled?: boolean
   metadata?: PromptMetadata
 }
 

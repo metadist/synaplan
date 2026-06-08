@@ -665,7 +665,7 @@ final readonly class DiscordNotificationService
      *
      * This is treated as a P1 incident — the primary embedding stack
      * (e.g. local Ollama / OpenAI) is down and the system is now
-     * burning Cloudflare quota for every RAG/Memory/Synapse request.
+     * burning Cloudflare quota for every RAG/Memory request.
      * Operators MUST ack this fast, so we:
      *   - mention `@everyone` (requires `allowed_mentions.parse`,
      *     handled in `sendEmbed`),
