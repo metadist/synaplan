@@ -35,6 +35,60 @@ function isUnsafeLinkHref(href: string): boolean {
   return UNSAFE_LINK_SCHEMES.some((scheme) => normalized.startsWith(scheme))
 }
 
+/**
+ * Decides whether a Markdown image source may be rendered as a real `<img>`.
+ *
+ * Chat models routinely *fabricate* image embeds: asked for "a picture of a
+ * cat" a text-only model that cannot generate images will happily emit
+ * `![Katze](https://…/cat.jpg)` or `![Katze](sandbox:/cat.png)` pointing at a
+ * URL that does not exist, which the browser then shows as a broken-image icon.
+ *
+ * In Synaplan, genuinely generated/uploaded images are delivered as file
+ * attachments rendered by dedicated components — never as Markdown inside the
+ * assistant's text. So a real image only ever lives under our own origin (the
+ * `/api/v1/files/...` file API). We therefore render an `<img>` only for
+ * same-origin / relative app paths and degrade everything else to the alt text,
+ * so a hallucinated image becomes a readable caption instead of a broken icon.
+ *
+ * This mirrors the existing conservative `link` policy (which blocks `data:`
+ * fake-download links).
+ */
+function isTrustedImageSrc(src: string): boolean {
+  // eslint-disable-next-line no-control-regex
+  const normalized = src.replace(/[\s\u0000-\u001f\u007f-\u009f]/g, '')
+  if (normalized === '') {
+    return false
+  }
+  // Unsafe schemes (data:, javascript:, …) are never rendered as images.
+  if (isUnsafeLinkHref(normalized)) {
+    return false
+  }
+  // Absolute app paths ("/api/v1/files/uploads/…"). Protocol-relative URLs
+  // ("//host/…") are treated as external and rejected. A bare filename
+  // ("cat.jpg") does not start with "/" and is rejected too — exactly the
+  // shape a hallucinating model tends to produce.
+  if (normalized.startsWith('/') && !normalized.startsWith('//')) {
+    return true
+  }
+  // Same-origin absolute http(s) URLs only. The explicit-scheme requirement
+  // rejects scheme-less relative refs ("cat.jpg", "img/cat.png") that would
+  // otherwise resolve to our origin yet point at nothing — a common shape of a
+  // hallucinated image. External hosts are rejected because a real Synaplan
+  // image never arrives as Markdown pointing at a third-party host.
+  if (
+    /^https?:\/\//i.test(normalized) &&
+    typeof window !== 'undefined' &&
+    window.location?.origin
+  ) {
+    try {
+      return new URL(normalized).origin === window.location.origin
+    } catch {
+      return false
+    }
+  }
+  return false
+}
+
 // Custom renderer for marked
 function createRenderer(): MarkedExtension {
   return {
@@ -81,6 +135,22 @@ function createRenderer(): MarkedExtension {
         }
 
         return `<a href="${escapeHtml(href)}"${title}>${text}</a>`
+      },
+
+      // Custom image rendering. Only same-origin / relative app images are
+      // rendered; fabricated or broken sources (the typical "here is a picture
+      // of a cat" hallucination from a text model) degrade to the alt text so
+      // the user never sees a broken-image icon. See isTrustedImageSrc().
+      image(token: Tokens.Image): string {
+        const href = token.href || ''
+        const alt = token.text || ''
+
+        if (!isTrustedImageSrc(href)) {
+          return alt ? `<span class="markdown-img-fallback">${escapeHtml(alt)}</span>` : ''
+        }
+
+        const title = token.title ? ` title="${escapeHtml(token.title)}"` : ''
+        return `<img src="${escapeHtml(href)}" alt="${escapeHtml(alt)}"${title} class="markdown-img">`
       },
 
       // Custom table rendering with styling classes

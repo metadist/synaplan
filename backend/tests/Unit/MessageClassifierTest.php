@@ -300,13 +300,14 @@ class MessageClassifierTest extends TestCase
     public function testFastPathClassificationSkipsAiSorter(): void
     {
         $configRepo = $this->createMock(ConfigRepository::class);
-        // Fast-path on (the default).
+        // Fast-path is default-OFF now, so opt IN explicitly to exercise the
+        // heuristic path that this test covers.
         $configRepo->method('getValue')->willReturnCallback(static function (int $owner, string $group, string $setting): ?string {
             if ('QDRANT_SEARCH' === $group) {
                 return '0';
             }
             if ('CLASSIFIER' === $group && 'FAST_PATH_ENABLED' === $setting) {
-                return null; // null → default-on
+                return '1'; // explicitly enable the fast-path
             }
 
             return null;
@@ -508,9 +509,13 @@ class MessageClassifierTest extends TestCase
     public function testFastPathReturnsNullWebSearchHintForGermanCostQueries(string $text): void
     {
         $configRepo = $this->createMock(ConfigRepository::class);
-        // Fast-path on (default).
+        // Fast-path is default-OFF now, so opt IN explicitly for this test.
         $configRepo->method('getValue')->willReturnCallback(static function (int $owner, string $group, string $setting): ?string {
-            return 'QDRANT_SEARCH' === $group ? '0' : null;
+            if ('QDRANT_SEARCH' === $group) {
+                return '0';
+            }
+
+            return 'CLASSIFIER' === $group && 'FAST_PATH_ENABLED' === $setting ? '1' : null;
         });
 
         $sorter = $this->createMock(MessageSorter::class);
@@ -545,6 +550,75 @@ class MessageClassifierTest extends TestCase
         self::assertSame('fast_path_heuristic', $result['source'], sprintf('Fast-path must take "%s" (no blocklist deferral)', $text));
         self::assertTrue($result['skip_sorting']);
         self::assertNull($result['web_search'], 'Fast-path must NOT pre-empt the WebSearchTopicPolicy decision');
+    }
+
+    /**
+     * Bug: polite / declarative image requests that carry NO imperative verb
+     * (e.g. "hätte ich gerne das bild einer katze") slipped past the
+     * fast-path's media-trigger list, were classified as `general`/chat, and
+     * the chat model fabricated a broken markdown image instead of routing to
+     * the media generator. Same class of bug as #952's German imperative miss.
+     *
+     * These declarative NOUN-phrase requests across the major UI languages
+     * must now defer to the full AI sorter so they reach MediaGenerationHandler.
+     *
+     * @return iterable<string, array{0: string, 1: string}>
+     */
+    public static function declarativeImageRequestProvider(): iterable
+    {
+        // The exact phrasing from the reported bug.
+        yield 'de: hätte ich gerne das bild' => ['hätte ich gerne das bild einer katze', 'de'];
+        yield 'de: ein bild von' => ['kannst du mir ein bild von einem hund zeigen', 'de'];
+        yield 'de: foto einer' => ['ich möchte das foto einer landschaft', 'de'];
+        yield 'en: an image of' => ['i would like an image of a cat', 'en'];
+        yield 'en: a picture of' => ['could you give me a picture of a sunset', 'en'];
+        yield 'es: una imagen de' => ['quiero una imagen de un gato', 'es'];
+        yield 'fr: une image de' => ['je voudrais une image de chat', 'fr'];
+        yield 'it: immagine di' => ['vorrei un\'immagine di un gatto', 'it'];
+        yield 'tr: resim' => ['bana bir kedi resmi verir misin', 'tr'];
+    }
+
+    #[\PHPUnit\Framework\Attributes\DataProvider('declarativeImageRequestProvider')]
+    public function testFastPathYieldsToAiSorterOnDeclarativeImageRequests(string $text, string $lang): void
+    {
+        $configRepo = $this->createMock(ConfigRepository::class);
+        // Fast-path on (default).
+        $configRepo->method('getValue')->willReturnCallback(static function (int $owner, string $group, string $setting): ?string {
+            return 'QDRANT_SEARCH' === $group ? '0' : null;
+        });
+
+        $sorter = $this->createMock(MessageSorter::class);
+        $sorter->expects($this->once())
+            ->method('classify')
+            ->willReturn(['topic' => 'mediamaker', 'language' => $lang, 'media_type' => 'image']);
+
+        $classifier = new MessageClassifier(
+            $sorter,
+            $this->createMock(MessageMetaRepository::class),
+            $this->createMock(ModelConfigService::class),
+            $configRepo,
+            $this->createMock(EntityManagerInterface::class),
+            $this->createMock(LoggerInterface::class),
+        );
+
+        $message = $this->createMock(Message::class);
+        $message->method('getId')->willReturn(209);
+        $message->method('getUserId')->willReturn(10);
+        $message->method('getText')->willReturn($text);
+        $message->method('getLanguage')->willReturn($lang);
+        $message->method('getFile')->willReturn(0);
+        $message->method('getFiles')->willReturn(new \Doctrine\Common\Collections\ArrayCollection());
+        $message->method('getDateTime')->willReturn('20260518120000');
+        $message->method('getFilePath')->willReturn('');
+        $message->method('getTopic')->willReturn('');
+        $message->method('getFileText')->willReturn('');
+
+        $result = $classifier->classify($message);
+
+        $this->assertSame('mediamaker', $result['topic'], sprintf('"%s" must reach the media generator, not chat', $text));
+        $this->assertSame('image_generation', $result['intent']);
+        $this->assertSame('ai_sorting', $result['source']);
+        $this->assertFalse($result['skip_sorting']);
     }
 
     #[\PHPUnit\Framework\Attributes\DataProvider('germanMediaImperativeProvider')]
@@ -713,8 +787,13 @@ class MessageClassifierTest extends TestCase
     public function testFastPathTakenWhenPreviousTurnIsNormalReply(): void
     {
         $configRepo = $this->createMock(ConfigRepository::class);
+        // Fast-path is default-OFF now, so opt IN explicitly for this test.
         $configRepo->method('getValue')->willReturnCallback(static function (int $owner, string $group, string $setting): ?string {
-            return 'QDRANT_SEARCH' === $group ? '0' : null;
+            if ('QDRANT_SEARCH' === $group) {
+                return '0';
+            }
+
+            return 'CLASSIFIER' === $group && 'FAST_PATH_ENABLED' === $setting ? '1' : null;
         });
 
         $sorter = $this->createMock(MessageSorter::class);
@@ -810,8 +889,13 @@ class MessageClassifierTest extends TestCase
     public function testFastPathTakenForUnrelatedChatAfterEarlierFile(): void
     {
         $configRepo = $this->createMock(ConfigRepository::class);
+        // Fast-path is default-OFF now, so opt IN explicitly for this test.
         $configRepo->method('getValue')->willReturnCallback(static function (int $owner, string $group, string $setting): ?string {
-            return 'QDRANT_SEARCH' === $group ? '0' : null;
+            if ('QDRANT_SEARCH' === $group) {
+                return '0';
+            }
+
+            return 'CLASSIFIER' === $group && 'FAST_PATH_ENABLED' === $setting ? '1' : null;
         });
 
         $sorter = $this->createMock(MessageSorter::class);

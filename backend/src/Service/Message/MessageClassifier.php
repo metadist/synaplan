@@ -80,31 +80,58 @@ final readonly class MessageClassifier
             && $this->isClassifierFastPathEnabled($userId)
             && $this->canFastPathClassify($message, $text, $conversationHistory)
         ) {
-            $detectedLanguage = $this->detectLanguageHeuristic($text);
+            // The fast-path skips the AI sorter, so it has to determine the
+            // language itself. We only keep the latency win when we can
+            // establish the language *without guessing*:
+            //   1. a confident local text heuristic, else
+            //   2. a language already pinned on the message (frontend UI
+            //      locale or a previously detected turn; 'NN' is the entity
+            //      default = unknown).
+            // If neither is available we deliberately do NOT default to 'en'
+            // — we fall through to the AI sorter below so the sorting model
+            // defines BLANG. Guessing 'en' here is exactly how a German
+            // "wer bist du?" got an English answer: the directive built
+            // downstream from this value told the chat model to reply in
+            // English.
+            $confidentLanguage = $this->detectLanguageConfident($text);
 
-            $this->logger->info('MessageClassifier: Fast-path classification (skipped AI sorter)', [
+            if (null === $confidentLanguage) {
+                $existingLanguage = strtolower(trim($message->getLanguage()));
+                if ('nn' !== $existingLanguage && 1 === preg_match('/^[a-z]{2}$/', $existingLanguage)) {
+                    $confidentLanguage = $existingLanguage;
+                }
+            }
+
+            if (null !== $confidentLanguage) {
+                $this->logger->info('MessageClassifier: Fast-path classification (skipped AI sorter)', [
+                    'message_id' => $messageId,
+                    'language' => $confidentLanguage,
+                    'text_length' => strlen($text),
+                ]);
+
+                // `web_search` is intentionally null on the fast-path: it never
+                // calls the AI sorter, so there is no BWEBSEARCH vote. With the
+                // "trust the model" policy a missing vote means no search, so
+                // these trivial chats answer immediately without a web round-trip.
+                // An explicit prompt `tool_internet=true` still forces search
+                // later in `MessageProcessor` via `WebSearchTopicPolicy`.
+                return [
+                    'topic' => 'general',
+                    'language' => $confidentLanguage,
+                    'web_search' => null,
+                    'source' => 'fast_path_heuristic',
+                    'skip_sorting' => true,
+                    'intent' => 'chat',
+                    'model_id' => null,
+                    'provider' => null,
+                    'model_name' => null,
+                ];
+            }
+
+            $this->logger->info('MessageClassifier: Fast-path declined (language ambiguous) — deferring to AI sorter', [
                 'message_id' => $messageId,
-                'language' => $detectedLanguage,
                 'text_length' => strlen($text),
             ]);
-
-            // `web_search` is intentionally null on the fast-path: it never
-            // calls the AI sorter, so there is no BWEBSEARCH vote. With the
-            // "trust the model" policy a missing vote means no search, so
-            // these trivial chats answer immediately without a web round-trip.
-            // An explicit prompt `tool_internet=true` still forces search
-            // later in `MessageProcessor` via `WebSearchTopicPolicy`.
-            return [
-                'topic' => 'general',
-                'language' => $detectedLanguage,
-                'web_search' => null,
-                'source' => 'fast_path_heuristic',
-                'skip_sorting' => true,
-                'intent' => 'chat',
-                'model_id' => null,
-                'provider' => null,
-                'model_name' => null,
-            ];
         }
 
         // 1. Check for "Again" function - user-selected AI/prompt
@@ -447,32 +474,39 @@ final readonly class MessageClassifier
     }
 
     /**
-     * Whether the Phase 1c fast-path is enabled (default: true).
+     * Whether the Phase 1c fast-path is enabled (default: OFF — see below).
+     *
+     * TEMPORARILY DISABLED BY DEFAULT. The local regex/keyword heuristic
+     * mis-routes requests it doesn't recognise (e.g. polite/declarative
+     * media requests like "hätte ich gerne das bild einer katze") to
+     * `general`/chat instead of the proper handler. Until the heuristic is
+     * reworked we send EVERY message through the AI sorter (DEFAULTMODEL.SORT
+     * = Groq gpt-oss-120b), which classifies far more reliably. The heuristic
+     * code is intentionally KEPT, not removed — flip the default back to
+     * `true` (or set BCONFIG `CLASSIFIER.FAST_PATH_ENABLED=1`) to re-enable.
      *
      * Read from BCONFIG group `CLASSIFIER`, key `FAST_PATH_ENABLED`. A
      * per-user row (BOWNERID = $userId) takes precedence over the global
-     * row (BOWNERID = 0). Operators who notice mis-routing can disable
-     * globally; users who need richer classification (e.g. heavy
-     * media-generation traffic that shouldn't go through the chat
-     * handler) can opt out per-account by inserting their own BCONFIG
-     * row.
+     * row (BOWNERID = 0). Operators can therefore still opt INTO the
+     * fast-path globally or per-account by inserting an explicit
+     * `FAST_PATH_ENABLED=1` row, without touching this code.
      */
     private function isClassifierFastPathEnabled(int $userId): bool
     {
         if ($userId > 0) {
             $perUser = $this->configRepository->getValue($userId, 'CLASSIFIER', 'FAST_PATH_ENABLED');
             if (null !== $perUser) {
-                return filter_var($perUser, \FILTER_VALIDATE_BOOL, \FILTER_NULL_ON_FAILURE) ?? true;
+                return filter_var($perUser, \FILTER_VALIDATE_BOOL, \FILTER_NULL_ON_FAILURE) ?? false;
             }
         }
 
         $value = $this->configRepository->getValue(0, 'CLASSIFIER', 'FAST_PATH_ENABLED');
 
         if (null === $value) {
-            return true; // default-on
+            return false; // default-off (temporarily disabled — route everything via the AI sorter)
         }
 
-        return filter_var($value, \FILTER_VALIDATE_BOOL, \FILTER_NULL_ON_FAILURE) ?? true;
+        return filter_var($value, \FILTER_VALIDATE_BOOL, \FILTER_NULL_ON_FAILURE) ?? false;
     }
 
     /**
@@ -539,23 +573,55 @@ final readonly class MessageClassifier
             return false;
         }
 
-        // Media / media-generation verbs in EN/DE/ES/FR. If any appear, the
-        // sorter may pick a topic other than `general`/`chat` (e.g.
-        // mediamaker → image_generation), so don't shortcut.
-        // The list is intentionally narrow to avoid false negatives in normal
-        // chat ("describe the picture I just saw" → fine to fast-path).
+        // Media / media-generation triggers across the major UI languages
+        // (EN/DE/ES/FR/IT/TR + a little PT). If any appear, the sorter may
+        // pick a topic other than `general`/`chat` (e.g. mediamaker →
+        // image_generation), so don't shortcut.
+        //
+        // Two families of trigger:
+        //   1. Imperative verbs ("generate", "zeichne", "dibuja", …).
+        //   2. Declarative / polite NOUN phrases ("image of", "bild einer",
+        //      "una imagen de", …). These matter because a request like
+        //      "hätte ich gerne das bild einer katze" carries NO imperative
+        //      verb, so without the noun phrases it slipped past the
+        //      fast-path, got classified as `general`/chat, and the chat
+        //      model fabricated a (broken) markdown image instead of routing
+        //      to the media generator. Same class of bug as the German
+        //      imperative miss in #952, just a different phrasing.
+        //
+        // A false positive here only costs one extra AI-sorter call (it will
+        // correctly fall back to chat), so we err on the generous side.
         static $mediaTriggers = [
+            // English
             'generate ', 'create ', 'draw ', 'paint ', 'sketch ', 'render ',
             'make a picture', 'make an image', 'make a video', 'make a song',
             'image of', 'picture of', 'photo of', 'illustration of',
-            // German imperatives. `generiere`/`generier` cover "generiere
-            // ein bild...", "generier mir...", "generiert eine grafik..."
-            // which would otherwise slip past the fast-path and get
-            // misclassified as `general`/chat (#952).
+            'an image', 'a picture', 'a photo', 'a drawing', 'an illustration',
+            'a wallpaper', 'a logo', 'an icon',
+            // German. `generiere`/`generier` cover the imperatives from #952;
+            // the `bild …`/`foto …` noun phrases cover polite/declarative
+            // requests like "hätte ich gerne das bild einer katze".
             'erstelle', 'erzeuge', 'zeichne', 'male ', 'rendere',
             'generiere', 'generier ', 'generiert ',
-            'genera ', 'crea ', 'dibuja ',
-            'génère', 'crée', 'dessine',
+            'bild von', 'bild einer', 'bild eines', 'bild der', 'bild des',
+            'bild mit', ' ein bild', 'foto von', 'foto einer', 'foto eines',
+            ' ein foto', 'grafik von', 'grafik einer', 'zeichnung von',
+            'illustration von', 'logo von', 'logo für', 'logo mit',
+            // Spanish
+            'genera ', 'crea ', 'dibuja ', 'imagen de', 'una imagen',
+            'una foto', 'foto de', 'dibujo de', 'ilustración de', 'un logo',
+            // French
+            'génère', 'crée', 'dessine', 'image de', 'une image',
+            'une photo', 'photo de', 'dessin de', 'illustration de', 'un logo',
+            // Italian
+            'crea un', 'genera un', 'disegna', 'immagine di', "un'immagine",
+            'una immagine', 'foto di', 'disegno di',
+            // Turkish (resim/görsel/fotoğraf = picture/visual/photo)
+            'resim', 'resmi', 'resmini', 'görsel', 'görseli', 'fotoğraf',
+            'çiz ', 'çizer misin', 'oluştur',
+            // Portuguese
+            'imagem de', 'uma imagem', 'uma foto', 'desenho de',
+            'desenha', 'gera uma',
         ];
         $lower = mb_strtolower($trimmed);
         foreach ($mediaTriggers as $trigger) {
@@ -631,22 +697,24 @@ final readonly class MessageClassifier
     }
 
     /**
-     * Cheap language heuristic for fast-path classification.
+     * Cheap, confidence-aware language heuristic for the fast-path.
      *
      * The full AI sorter detects language too — we lose that signal when we
-     * skip it, so reproduce a "good enough" guess locally. Uses common
-     * stopwords as anchors, falls back to `'en'` when too ambiguous.
+     * skip it, so reproduce a "good enough" guess locally from distinctive
+     * stopwords / question words / greetings.
      *
-     * IMPORTANT: returns a 2-character ISO code, NEVER `'auto'`. The
-     * `'auto'` sentinel is used elsewhere in the pipeline (fixed-prompt
-     * widget mode) for the system-prompt directive only and is NOT
-     * persistable to `BMESSAGES.BLANG` (varchar(2)). My fast-path
-     * classification result flows through paths that DO persist BLANG
-     * (e.g. WebhookController email reply), so leaking `'auto'` here
-     * triggers SQLSTATE[22001] "Data too long for column 'BLANG'" on the
-     * outgoing message insert. Stick to ISO codes.
+     * Returns a 2-character ISO code when a distinctive anchor matched, or
+     * `null` when there is no signal — the fast-path caller treats `null` as
+     * "defer to the AI sorter" rather than guessing the wrong language.
+     *
+     * IMPORTANT: never returns `'auto'`. The `'auto'` sentinel is used
+     * elsewhere in the pipeline (fixed-prompt widget mode) for the
+     * system-prompt directive only and is NOT persistable to
+     * `BMESSAGES.BLANG` (varchar(2)); leaking it here would trigger
+     * SQLSTATE[22001] "Data too long for column 'BLANG'" on the outgoing
+     * message insert. Stick to ISO codes (or null).
      */
-    private function detectLanguageHeuristic(string $text): string
+    private function detectLanguageConfident(string $text): ?string
     {
         // Normalize first: collapse every run of non-letters to a single
         // space, then pad with spaces. Without this, punctuation-hugging
@@ -723,11 +791,12 @@ final readonly class MessageClassifier
 
         // A single distinctive anchor (score 2) is already a strong signal
         // for a short chat one-liner, so we trust it; below that we have no
-        // signal and fall back to 'en'. The 2-char constraint matters:
+        // signal and return null so the caller can decide (persist 'en', or
+        // defer to the AI sorter). The 2-char constraint matters elsewhere:
         // BMESSAGES.BLANG is varchar(2), so even though the 'auto' sentinel
         // works for in-memory routing, it'd break any downstream code that
         // persists $classification['language'] to BLANG (email webhook reply,
         // queue-mode chat persistence, ...).
-        return $bestScore >= 2 ? $best : 'en';
+        return $bestScore >= 2 ? $best : null;
     }
 }

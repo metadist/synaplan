@@ -197,6 +197,58 @@ describe('useMarkdown', () => {
         expect(html).toContain('report.pdf')
       })
     })
+
+    describe('images (fabricated/broken guard)', () => {
+      it('should render same-origin absolute-path images as <img>', () => {
+        const html = markdown.render('![Katze](/api/v1/files/uploads/10/cat.png)')
+        expect(html).toContain('<img')
+        expect(html).toContain('src="/api/v1/files/uploads/10/cat.png"')
+        expect(html).toContain('alt="Katze"')
+      })
+
+      it('should render same-origin absolute URLs as <img>', () => {
+        const src = `${window.location.origin}/api/v1/files/uploads/10/cat.png`
+        const html = markdown.render(`![Katze](${src})`)
+        expect(html).toContain('<img')
+        expect(html).toContain(`src="${src}"`)
+      })
+
+      it('should degrade fabricated external images to the alt text', () => {
+        // A text model hallucinating "here is a cat" emits a dead external URL.
+        const html = markdown.render('![Katze](https://example.com/made-up-cat.jpg)')
+        expect(html).not.toContain('<img')
+        expect(html).not.toContain('made-up-cat.jpg')
+        expect(html).toContain('markdown-img-fallback')
+        expect(html).toContain('Katze')
+      })
+
+      it('should degrade bare-filename images to the alt text', () => {
+        const html = markdown.render('![Katze](cat.jpg)')
+        expect(html).not.toContain('<img')
+        expect(html).toContain('markdown-img-fallback')
+        expect(html).toContain('Katze')
+      })
+
+      it('should degrade sandbox:/attachment: images to the alt text', () => {
+        const sandbox = markdown.render('![Katze](sandbox:/mnt/cat.png)')
+        expect(sandbox).not.toContain('<img')
+        expect(sandbox).toContain('Katze')
+        const attachment = markdown.render('![Katze](attachment://cat.png)')
+        expect(attachment).not.toContain('<img')
+        expect(attachment).toContain('Katze')
+      })
+
+      it('should never render data: images', () => {
+        const html = markdown.render('![x](data:image/png;base64,iVBORw0KGgo=)')
+        expect(html).not.toContain('<img')
+      })
+
+      it('should reject protocol-relative image URLs', () => {
+        const html = markdown.render('![Katze](//evil.example.com/cat.jpg)')
+        expect(html).not.toContain('<img')
+        expect(html).toContain('Katze')
+      })
+    })
   })
 
   describe('XSS prevention', () => {
