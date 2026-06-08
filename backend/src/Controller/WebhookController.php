@@ -836,6 +836,12 @@ class WebhookController extends AbstractController
                 'message_id' => $message->getId(),
                 'response' => [
                     'text' => $responseContent,
+                    // Multi-task routing (Sprint 5): explicit file list for API
+                    // clients. Falls back to the single metadata['file'] for
+                    // legacy single-file turns; empty array when there is none.
+                    'files' => is_array($responseMeta['files'] ?? null)
+                        ? $responseMeta['files']
+                        : (isset($responseMeta['file']) ? [$responseMeta['file']] : []),
                     'metadata' => $responseMeta,
                 ],
             ]);

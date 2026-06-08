@@ -954,6 +954,32 @@ final class WhatsAppService
                     );
                 }
             }
+
+            // Multi-task routing (Sprint 5): a multi-node plan can produce more
+            // than one output file. metadata['file'] (index 0) was just handled
+            // above; send the remaining files as separate WhatsApp media
+            // messages. Only the executor sets metadata['files'], so single-file
+            // turns are unaffected.
+            $extraFiles = $metadata['files'] ?? null;
+            if (is_array($extraFiles) && count($extraFiles) > 1 && !empty($this->appUrl)) {
+                foreach (array_values($extraFiles) as $idx => $taskFile) {
+                    if (0 === $idx || !is_array($taskFile)) {
+                        continue;
+                    }
+                    $type = $taskFile['type'] ?? null;
+                    $path = $taskFile['path'] ?? null;
+                    if (!is_string($path) || '' === $path || !in_array($type, ['audio', 'video', 'image'], true)) {
+                        continue;
+                    }
+                    $url = rtrim($this->appUrl, '/').'/'.ltrim($path, '/');
+                    $this->logger->info('WhatsApp: Sending additional multi-task media', [
+                        'to' => $dto->from,
+                        'media_type' => $type,
+                        'index' => $idx,
+                    ]);
+                    $this->sendMedia($dto->from, $type, $url, $dto->phoneNumberId, null);
+                }
+            }
         }
 
         // PRIORITY 2: Audio/Video input → Generate TTS response
