@@ -45,58 +45,58 @@
     },
     "chat_plain_de": {
         "intent": "chat",
-        "language": "de",
+        "language": null,
         "model_id": null,
         "model_name": null,
         "provider": null,
-        "skip_sorting": true,
-        "source": "fast_path_heuristic",
+        "skip_sorting": false,
+        "source": "ai_sorting",
         "topic": "general",
-        "web_search": null
+        "web_search": false
     },
     "chat_plain_en": {
         "intent": "chat",
-        "language": "en",
+        "language": null,
         "model_id": null,
         "model_name": null,
         "provider": null,
-        "skip_sorting": true,
-        "source": "fast_path_heuristic",
+        "skip_sorting": false,
+        "source": "ai_sorting",
         "topic": "general",
-        "web_search": null
+        "web_search": false
     },
     "chat_plain_es": {
         "intent": "chat",
-        "language": "es",
+        "language": null,
         "model_id": null,
         "model_name": null,
         "provider": null,
-        "skip_sorting": true,
-        "source": "fast_path_heuristic",
+        "skip_sorting": false,
+        "source": "ai_sorting",
         "topic": "general",
-        "web_search": null
+        "web_search": false
     },
     "chat_plain_fr": {
         "intent": "chat",
-        "language": "fr",
+        "language": null,
         "model_id": null,
         "model_name": null,
         "provider": null,
-        "skip_sorting": true,
-        "source": "fast_path_heuristic",
+        "skip_sorting": false,
+        "source": "ai_sorting",
         "topic": "general",
-        "web_search": null
+        "web_search": false
     },
     "chat_thanks": {
         "intent": "chat",
-        "language": "en",
+        "language": null,
         "model_id": null,
         "model_name": null,
         "provider": null,
-        "skip_sorting": true,
-        "source": "fast_path_heuristic",
+        "skip_sorting": false,
+        "source": "ai_sorting",
         "topic": "general",
-        "web_search": null
+        "web_search": false
     },
     "cmd_docs": {
         "intent": "chat",
