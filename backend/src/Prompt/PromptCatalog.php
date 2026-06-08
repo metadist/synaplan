@@ -84,96 +84,6 @@ class PromptCatalog
             ],
 
             // ──────────────────────────────────────────────
-            //  Granular routing topics (Synapse v2)
-            // ──────────────────────────────────────────────
-            //
-            // The five entries below are aliases of canonical legacy topics
-            // (`general` for chat/coding, `mediamaker` for the *-generation
-            // family — see TopicAliasResolver::TOPIC_ALIASES). They give
-            // Synapse Routing v2's embedding tier a finer-grained taxonomy;
-            // downstream handlers only ever see the canonical topic after
-            // TopicAliasResolver runs.
-            //
-            // Shipped DISABLED (BENABLED=0) so the legacy AI sorter sees
-            // only canonical topics and is not asked to disambiguate
-            // alias-vs-canonical near-duplicates. Admins enable them as a
-            // group via the `QDRANT_SEARCH.GRANULAR_TOPICS_ENABLED` BCONFIG
-            // toggle; GranularTopicsManager keeps BENABLED in lock-step,
-            // and PromptSeeder re-applies the toggle after every seed so a
-            // re-run cannot clobber an admin-enabled state.
-            [
-                'topic' => 'coding',
-                'language' => 'en',
-                'shortDescription' => 'RETIRED. Coding/programming questions are answered by the general-chat topic.',
-                'keywords' => '',
-                'prompt' => self::generalPrompt(),
-                'enabled' => false,
-            ],
-            [
-                'topic' => 'general-chat',
-                'language' => 'en',
-                // Broadened on purpose (#878): everyday business ideas,
-                // hobbies, planning, smalltalk, programming questions and
-                // technical Q&A all fall here so they can't be sucked into
-                // the much narrower media-generation buckets by a stray
-                // embedding match. The dedicated `coding` topic was
-                // retired for the same reason.
-                'shortDescription' => 'Catch-all conversational topic. Use this for casual conversation, smalltalk, opinions, advice, lifestyle, travel, health, recipes, recommendations, business ideas, planning, hobbies, learning questions, programming and technical questions, debugging help, code review, software architecture, frameworks, libraries, errors and stack traces, and any other question that should be answered with a written reply.',
-                'keywords' => 'chat, smalltalk, hello, hi, hallo, talk, conversation, opinion, advice, tip, lifestyle, travel, reise, health, gesundheit, recipe, rezept, recommendation, empfehlung, frage, question, idea, idee, business, hobby, hobbies, plan, planning, planen, project, projekt, learning, lernen, study, school, university, student, code, coding, programming, programmieren, software, php, python, javascript, typescript, java, kotlin, swift, go, rust, ruby, sql, html, css, vue, react, angular, node, function, class, method, variable, error, fehler, exception, bug, debug, refactor, framework, library, api, rest, graphql, regex, algorithm, terminal, shell, bash, docker, kubernetes, fitness, gym, fitnessstudio, sport, food, essen, drink, getränk, shake, restaurant, shop, store, geschäft, idea for, möchte, will, want to',
-                'prompt' => self::generalPrompt(),
-                'enabled' => false,
-            ],
-            [
-                'topic' => 'image-generation',
-                'language' => 'en',
-                // Tightened (#878): only fire when the user *explicitly*
-                // asks for an image to be CREATED, RENDERED or EDITED.
-                // Bare nouns like "Foto" or "Bild" must not pull general
-                // chat in here — that's why every keyword pair includes
-                // a creation verb.
-                'shortDescription' => 'User explicitly asks to CREATE, GENERATE, RENDER or EDIT an image, picture, illustration, drawing, painting, photo or photo-realistic render from a text prompt and/or reference images. Trigger only when the message contains an explicit creation verb directly addressed at an image (for example "create an image of …", "generate a picture of …", "draw me a …", "render a photo of …", "edit this image so that …", "replace the background with …", "merge these two images"). Do NOT trigger for casual conversation that merely mentions a picture, a photo, an illustration or a "Bild" without a clear creation/edit request, and do NOT trigger for vision/OCR questions about an attached image.',
-                // Every entry below pairs a creation verb with a media
-                // noun (or is a self-contained edit verb). Bare noun
-                // phrases like "bild von" / "foto von" have been removed
-                // — they previously matched perfectly innocuous "ich
-                // habe ein bild von gestern" turns and would also fail
-                // the SynapseRouter media-intent guard anyway, so they
-                // were dead weight (caught by Copilot review on PR #884).
-                'keywords' => 'create an image, create a picture, create a photo, create an illustration, generate an image, generate a picture, make a picture, make an image, draw me, paint a picture, render a photo, render an image, render a picture, retouch this image, edit this image, replace the background, combine these images, merge these images, image to image, illustrate this, erstelle ein bild, erstelle ein foto, erstelle eine illustration, generiere ein bild, generiere ein foto, mache ein bild, male ein bild, male mir, zeichne ein bild, zeichne mir, render ein bild, hintergrund ersetzen, bild bearbeiten, bilder kombinieren',
-                'prompt' => self::mediaMakerPrompt(),
-                'enabled' => false,
-            ],
-            [
-                'topic' => 'video-generation',
-                'language' => 'en',
-                // Heavily tightened (#878). The previous entry pulled in
-                // anything mentioning "Kette", "shake", "Wagon" etc.
-                // because the description leaned on common nouns. This
-                // version only matches messages that *imperatively*
-                // request a video to be produced.
-                'shortDescription' => 'User explicitly asks to GENERATE a video, film, clip, animation, motion graphic or moving image from a prompt. Trigger only when the message contains an explicit creation verb directly addressed at video output (for example "create a video of …", "generate a clip of …", "make a short film of …", "animate …", "render a video of …", "erstelle ein Video von …", "mach mir ein Video von …"). Do NOT trigger for general conversation that merely mentions video, film, clips, YouTube, TV, fitness, hobbies, business ideas or anything else that is not an unambiguous request to render a new video file. Duration and resolution may be specified inside the request.',
-                // Verb+noun pairs only; bare phrases like "kurzes video
-                // von …" have been dropped because they ambiguously
-                // match non-creation turns ("ich habe ein kurzes Video
-                // von gestern") and would fail the media-intent guard
-                // anyway (caught by Copilot review on PR #884).
-                'keywords' => 'create a video, create a clip, create an animation, generate a video, generate a clip, make a video, make a clip, make an animation, render a video, render an animation, animate this, animate the, produce a video, shoot a short video, erstelle ein video, erstelle einen clip, erstelle eine animation, generiere ein video, generiere einen clip, mache ein video, mach mir ein video, mache einen clip, animiere, animiere mir, render ein video, render einen clip, render mir ein video',
-                'prompt' => self::mediaMakerPrompt(),
-                'enabled' => false,
-            ],
-            [
-                'topic' => 'audio-generation',
-                'language' => 'en',
-                // Tightened (#878): only fire on explicit speech-output
-                // requests. Bare nouns like "Stimme" or "Audio" must not
-                // be enough.
-                'shortDescription' => 'User explicitly asks for AUDIO output: text-to-speech, narration, voice synthesis, voiceover or any spoken-audio rendering of provided text. Trigger only when the message contains an explicit speech/audio creation verb (for example "read this aloud", "convert to speech", "create an audio of …", "generate a voiceover saying …", "narrate this text", "vertone …", "lies das vor", "sprich folgenden Text", "erstelle ein Audio mit …"). Do NOT trigger for general conversation that mentions audio, voice, sound, music or podcasts without an unambiguous TTS request.',
-                'keywords' => 'read aloud, read this aloud, read it aloud, convert to speech, text to speech, generate audio of, generate a voiceover, generate a narration, create an audio, create a voiceover, create a narration, narrate this, narrate the following, voiceover saying, voice over saying, speak this, say the following, lies vor, lies das vor, lies dies vor, sprich folgenden text, sprich folgendes, sprich diesen text, erstelle ein audio, erstelle eine vertonung, generiere ein audio, generiere eine vertonung, mache ein audio, vertone, vertone diesen text, vertone folgenden text, vertonen, audio generieren',
-                'prompt' => self::mediaMakerPrompt(),
-                'enabled' => false,
-            ],
-
-            // ──────────────────────────────────────────────
             //  Internal helper prompts (excluded from routing pool)
             // ──────────────────────────────────────────────
             [
@@ -618,6 +528,10 @@ Allowed topic keys: [KEYLIST]
   {"duration":8,"resolution":"720p"}).
 - Question about an attached document/image (read/describe/extract) →
   file_analysis.
+- A meeting/appointment/calendar request ("set up a meeting", "mail me a meeting
+  note for tomorrow at 15:00 with Tom") → one `calendar_event` node. Resolve the
+  relative time against the time context below into an absolute `start` (ISO-8601
+  local datetime) + IANA `timezone`, and fill title/attendees/location/duration.
 - Independent sub-requests in one message (e.g. "summarize this AND draw a cat")
   → multiple nodes with NO dependency between them, joined by compose_reply.
 

@@ -861,6 +861,12 @@ class WebhookController extends AbstractController
     private function resolveAttachmentPathFromAiMetadata(array $metadata): ?string
     {
         $mediaType = strtolower((string) ($metadata['media_type'] ?? ''));
+        // Multi-task plans set the per-file type on metadata['file'] but not always
+        // a top-level media_type — fall back to the file descriptor's own type so
+        // documents (e.g. .ics calendar files) still attach.
+        if ('' === $mediaType && is_string($metadata['file']['type'] ?? null)) {
+            $mediaType = strtolower($metadata['file']['type']);
+        }
         $relativePath = is_string($metadata['local_path'] ?? null) ? $metadata['local_path'] : null;
         $filePathUrl = is_string($metadata['file']['path'] ?? null) ? $metadata['file']['path'] : null;
 
@@ -907,7 +913,7 @@ class WebhookController extends AbstractController
      */
     private function resolveUploadAbsolutePath(string $mediaType, ?string $relativePath, ?string $filePathUrl): ?string
     {
-        if (!in_array($mediaType, ['image', 'video', 'audio'], true)) {
+        if (!in_array($mediaType, ['image', 'video', 'audio', 'document'], true)) {
             return null;
         }
 

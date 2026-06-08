@@ -30,7 +30,6 @@ class RevectorizeRun
 {
     public const SCOPE_DOCUMENTS = 'documents';
     public const SCOPE_MEMORIES = 'memories';
-    public const SCOPE_SYNAPSE = 'synapse';
     public const SCOPE_ALL = 'all';
 
     public const STATUS_QUEUED = 'queued';

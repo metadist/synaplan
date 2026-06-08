@@ -42,13 +42,6 @@ final class EmbeddingCostEstimator
     public const TOKENS_PER_CHUNK_HEURISTIC = 500;
 
     /**
-     * Tokens per Synapse topic — they are short (description + keywords),
-     * usually well under 200 tokens. We round up to 200 to keep the
-     * estimate conservative.
-     */
-    public const TOKENS_PER_TOPIC_HEURISTIC = 200;
-
-    /**
      * Default pricing in USD per 1M tokens. Overridable per environment
      * via BCONFIG[group=EMBEDDING_PRICING, setting=PROVIDER:MODEL].
      *
@@ -109,7 +102,6 @@ final class EmbeddingCostEstimator
         $scopes = [
             'documents' => $this->estimateDocumentsScope($toModel['pricePerMTokens']),
             'memories' => $this->estimateMemoriesScope($toModel['pricePerMTokens']),
-            'synapse' => $this->estimateSynapseScope($toModel['pricePerMTokens']),
         ];
 
         $totalChunks = 0;
@@ -206,22 +198,6 @@ final class EmbeddingCostEstimator
 
         $chunks = count($points);
         $tokens = $chunks * self::TOKENS_PER_CHUNK_HEURISTIC;
-
-        return [
-            'chunks' => $chunks,
-            'tokensEstimated' => $tokens,
-            'costEstimatedUsd' => $this->calcCost($tokens, $pricePerMTokens),
-        ];
-    }
-
-    /**
-     * @return array{chunks: int, tokensEstimated: int, costEstimatedUsd: float}
-     */
-    private function estimateSynapseScope(float $pricePerMTokens): array
-    {
-        $info = $this->qdrantClient->getSynapseCollectionInfo();
-        $chunks = (int) ($info['points_count'] ?? 0);
-        $tokens = $chunks * self::TOKENS_PER_TOPIC_HEURISTIC;
 
         return [
             'chunks' => $chunks,

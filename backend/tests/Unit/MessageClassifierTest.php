@@ -8,7 +8,6 @@ use App\Repository\ConfigRepository;
 use App\Repository\MessageMetaRepository;
 use App\Service\Message\MessageClassifier;
 use App\Service\Message\MessageSorter;
-use App\Service\Message\SynapseRouter;
 use App\Service\Message\TopicAliasResolver;
 use App\Service\ModelConfigService;
 use Doctrine\ORM\EntityManagerInterface;
@@ -23,7 +22,6 @@ class MessageClassifierTest extends TestCase
     // Without this PHPStan emits `method.notFound` for every `->method()`
     // / `->expects()` call, forcing baseline bumps on every new test case.
     private MessageSorter&MockObject $messageSorter;
-    private SynapseRouter&MockObject $synapseRouter;
     private TopicAliasResolver $topicAliasResolver;
     private MessageMetaRepository&MockObject $messageMetaRepository;
     private ModelConfigService&MockObject $modelConfigService;
@@ -35,7 +33,6 @@ class MessageClassifierTest extends TestCase
     protected function setUp(): void
     {
         $this->messageSorter = $this->createMock(MessageSorter::class);
-        $this->synapseRouter = $this->createMock(SynapseRouter::class);
         // Real resolver — it's pure logic with no collaborators, so a stub
         // would add noise without protecting any boundary.
         $this->topicAliasResolver = new TopicAliasResolver();
@@ -50,7 +47,6 @@ class MessageClassifierTest extends TestCase
 
         $this->service = new MessageClassifier(
             $this->messageSorter,
-            $this->synapseRouter,
             $this->topicAliasResolver,
             $this->messageMetaRepository,
             $this->modelConfigService,
@@ -302,47 +298,6 @@ class MessageClassifierTest extends TestCase
         $this->assertSame('file_analysis', $result['intent']);
     }
 
-    #[\PHPUnit\Framework\Attributes\DataProvider('synapseEnabledFlagProvider')]
-    public function testIsSynapseEnabledParsesVariousValues(?string $configValue, bool $expected): void
-    {
-        /** @var ConfigRepository&MockObject $configRepo */
-        $configRepo = $this->createMock(ConfigRepository::class);
-        $configRepo->method('getValue')->willReturn($configValue);
-
-        $classifier = new MessageClassifier(
-            $this->createMock(MessageSorter::class),
-            $this->createMock(SynapseRouter::class),
-            new TopicAliasResolver(),
-            $this->createMock(MessageMetaRepository::class),
-            $this->createMock(ModelConfigService::class),
-            $configRepo,
-            $this->createMock(EntityManagerInterface::class),
-            $this->createMock(LoggerInterface::class),
-        );
-
-        $this->assertSame($expected, $classifier->isSynapseEnabled());
-    }
-
-    /**
-     * @return iterable<string, array{0: ?string, 1: bool}>
-     */
-    public static function synapseEnabledFlagProvider(): iterable
-    {
-        // BETA: Synapse Routing is OFF by default. Operators must opt-in via
-        // the admin UI / system config (`SYNAPSE_ROUTING_ENABLED` = 'true').
-        yield 'null defaults to disabled (beta)' => [null, false];
-        yield 'string true' => ['true', true];
-        yield 'string 1' => ['1', true];
-        yield 'string yes' => ['yes', true];
-        yield 'string on' => ['on', true];
-        yield 'string false' => ['false', false];
-        yield 'string 0' => ['0', false];
-        yield 'string no' => ['no', false];
-        yield 'string off' => ['off', false];
-        yield 'empty string' => ['', false];
-        yield 'random string' => ['banana', false];
-    }
-
     /**
      * Phase 1c: short, plain-chat messages should skip the AI sorter when the
      * fast-path BCONFIG flag is enabled (default-on in production). Builds an
@@ -369,7 +324,6 @@ class MessageClassifierTest extends TestCase
 
         $classifier = new MessageClassifier(
             $sorter,
-            $this->createMock(SynapseRouter::class),
             new TopicAliasResolver(),
             $this->createMock(MessageMetaRepository::class),
             $this->createMock(ModelConfigService::class),
@@ -413,7 +367,6 @@ class MessageClassifierTest extends TestCase
 
         $classifier = new MessageClassifier(
             $sorter,
-            $this->createMock(SynapseRouter::class),
             new TopicAliasResolver(),
             $this->createMock(MessageMetaRepository::class),
             $this->createMock(ModelConfigService::class),
@@ -632,7 +585,6 @@ class MessageClassifierTest extends TestCase
 
         $classifier = new MessageClassifier(
             $sorter,
-            $this->createMock(SynapseRouter::class),
             new TopicAliasResolver(),
             $this->createMock(MessageMetaRepository::class),
             $this->createMock(ModelConfigService::class),
@@ -676,7 +628,6 @@ class MessageClassifierTest extends TestCase
 
         $classifier = new MessageClassifier(
             $sorter,
-            $this->createMock(SynapseRouter::class),
             new TopicAliasResolver(),
             $this->createMock(MessageMetaRepository::class),
             $this->createMock(ModelConfigService::class),
@@ -742,7 +693,6 @@ class MessageClassifierTest extends TestCase
 
         $classifier = new MessageClassifier(
             $sorter,
-            $this->createMock(SynapseRouter::class),
             new TopicAliasResolver(),
             $this->createMock(MessageMetaRepository::class),
             $this->createMock(ModelConfigService::class),
@@ -793,7 +743,6 @@ class MessageClassifierTest extends TestCase
 
         $classifier = new MessageClassifier(
             $sorter,
-            $this->createMock(SynapseRouter::class),
             new TopicAliasResolver(),
             $this->createMock(MessageMetaRepository::class),
             $this->createMock(ModelConfigService::class),
@@ -841,7 +790,6 @@ class MessageClassifierTest extends TestCase
 
         $classifier = new MessageClassifier(
             $sorter,
-            $this->createMock(SynapseRouter::class),
             new TopicAliasResolver(),
             $this->createMock(MessageMetaRepository::class),
             $this->createMock(ModelConfigService::class),
@@ -889,7 +837,6 @@ class MessageClassifierTest extends TestCase
 
         $classifier = new MessageClassifier(
             $sorter,
-            $this->createMock(SynapseRouter::class),
             new TopicAliasResolver(),
             $this->createMock(MessageMetaRepository::class),
             $this->createMock(ModelConfigService::class),
@@ -942,7 +889,6 @@ class MessageClassifierTest extends TestCase
 
         $classifier = new MessageClassifier(
             $sorter,
-            $this->createMock(SynapseRouter::class),
             new TopicAliasResolver(),
             $this->createMock(MessageMetaRepository::class),
             $this->createMock(ModelConfigService::class),

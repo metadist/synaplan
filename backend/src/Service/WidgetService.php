@@ -28,31 +28,45 @@ final readonly class WidgetService
     public const DEFAULT_WIDGET_PROMPT = 'tools:widget-default';
 
     /**
+     * Sentinel meaning "no fixed prompt": the widget runs the owner's standard
+     * routing (AI sorter / multi-task planner) instead of a pinned task prompt.
+     * Stored as an empty topic on the entity; the public widget chat then sends
+     * no fixed_task_prompt and the normal classifier handles the turn.
+     */
+    public const STANDARD_SORTING_TOPIC = '__standard__';
+
+    /**
      * Create a new widget.
      *
      * @param User        $owner           The widget owner
      * @param string      $name            Widget display name
-     * @param string|null $taskPromptTopic Optional task prompt topic (defaults to 'widget-default')
+     * @param string|null $taskPromptTopic Task prompt topic; null/empty defaults to the widget-default prompt, the STANDARD_SORTING_TOPIC sentinel means "use standard routing"
      * @param array       $config          Optional widget configuration
      * @param string|null $websiteUrl      Optional website URL to add to allowed domains
      */
     public function createWidget(User $owner, string $name, ?string $taskPromptTopic = null, array $config = [], ?string $websiteUrl = null): Widget
     {
-        // Use default prompt if not specified
-        $taskPromptTopic = $taskPromptTopic ?: self::DEFAULT_WIDGET_PROMPT;
+        if (self::STANDARD_SORTING_TOPIC === $taskPromptTopic) {
+            // Standard sorting: store an empty topic so the widget runs the
+            // normal routing instead of a pinned prompt. No prompt to validate.
+            $taskPromptTopic = '';
+        } else {
+            // Use default prompt if not specified
+            $taskPromptTopic = $taskPromptTopic ?: self::DEFAULT_WIDGET_PROMPT;
 
-        // Validate task prompt exists (check user-specific first, then default)
-        $prompt = $this->promptRepository->findByTopic($taskPromptTopic, $owner->getId());
-        if (!$prompt) {
-            // Try default prompt (BOWNERID = 0)
-            $prompt = $this->promptRepository->findByTopic($taskPromptTopic, 0);
+            // Validate task prompt exists (check user-specific first, then default)
+            $prompt = $this->promptRepository->findByTopic($taskPromptTopic, $owner->getId());
             if (!$prompt) {
-                throw new \InvalidArgumentException('Task prompt not found: '.$taskPromptTopic);
+                // Try default prompt (BOWNERID = 0)
+                $prompt = $this->promptRepository->findByTopic($taskPromptTopic, 0);
+                if (!$prompt) {
+                    throw new \InvalidArgumentException('Task prompt not found: '.$taskPromptTopic);
+                }
+                $this->logger->info('Using default prompt for widget', [
+                    'prompt_topic' => $taskPromptTopic,
+                    'owner_id' => $owner->getId(),
+                ]);
             }
-            $this->logger->info('Using default prompt for widget', [
-                'prompt_topic' => $taskPromptTopic,
-                'owner_id' => $owner->getId(),
-            ]);
         }
 
         // If websiteUrl is provided, add the domain to allowed domains

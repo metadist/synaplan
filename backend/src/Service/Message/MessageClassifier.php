@@ -40,7 +40,6 @@ final readonly class MessageClassifier
 
     public function __construct(
         private MessageSorter $messageSorter,
-        private SynapseRouter $synapseRouter,
         private TopicAliasResolver $topicAliasResolver,
         private MessageMetaRepository $messageMetaRepository,
         private ModelConfigService $modelConfigService,
@@ -196,25 +195,17 @@ final readonly class MessageClassifier
             ];
         }
 
-        // 4. Use Synapse Routing (embedding-based with AI fallback)
+        // 4. Classify with the LLM AI sorter (DEFAULTMODEL.SORT).
         $messageData = $this->buildMessageData($message);
-        $result = $this->isSynapseEnabled()
-            ? $this->synapseRouter->route($messageData, $conversationHistory, $userId)
-            : $this->messageSorter->classify($messageData, $conversationHistory, $userId);
+        $result = $this->messageSorter->classify($messageData, $conversationHistory, $userId);
 
         $source = $result['source'] ?? 'ai_sorting';
 
-        // Resolve granular Synapse-v2 topics (image-generation, video-generation,
-        // audio-generation, coding, general-chat) to their canonical legacy topics
-        // BEFORE mapping to intent. The AI sorter (used when Synapse Routing is
-        // OFF — the default) returns the granular topic from PromptCatalog, but
-        // downstream code (mapTopicToIntent, handler resolution, BFILEPATH keys)
-        // only understands canonical topics. Without this resolution all media-
-        // generation requests fall back to `chat`/ChatHandler (#952).
-        //
-        // SynapseRouter already runs this resolver internally, so calling it
-        // again here is idempotent for already-canonical topics — but it
-        // guarantees the contract for the AI-sorter path too.
+        // Resolve any alias topics to their canonical legacy topics BEFORE mapping
+        // to intent. Downstream code (mapTopicToIntent, handler resolution,
+        // BFILEPATH keys) only understands canonical topics; without this an
+        // aliased media-generation request would fall back to `chat` (#952).
+        // Idempotent for already-canonical topics.
         $rawTopic = (string) ($result['topic'] ?? 'general');
         $alias = $this->topicAliasResolver->resolve($rawTopic);
         $canonicalTopic = $alias['topic'];
@@ -239,7 +230,6 @@ final readonly class MessageClassifier
             'duration' => $result['duration'] ?? null,
             'resolution' => $result['resolution'] ?? null,
             'source' => $source,
-            'synapse_score' => $result['synapse_score'] ?? null,
             'raw_ai_response' => $result['raw_response'] ?? 'N/A',
         ]);
 
@@ -512,20 +502,13 @@ final readonly class MessageClassifier
      * Decide whether a message can skip the AI sorter without risk of misroute.
      *
      * The conservative checks below mean only "obviously chat" messages take
-     * the fast path. Anything ambiguous — files, tool prefixes, media verbs,
-     * Synapse-enabled accounts — still gets the full classifier.
+     * the fast path. Anything ambiguous — files, tool prefixes, media verbs —
+     * still gets the full classifier.
      *
      * @param array<int, Message> $conversationHistory oldest-first thread
      */
     private function canFastPathClassify(Message $message, string $text, array $conversationHistory = []): bool
     {
-        // Synapse routing has its own embedding-based classifier and may surface
-        // intent we'd lose with the heuristic (e.g. 'mediamaker' for "draw a
-        // cat"). Defer to it when enabled.
-        if ($this->isSynapseEnabled()) {
-            return false;
-        }
-
         // Files of any kind go through the full pipeline (vision/analyze/etc).
         if ($message->getFile() > 0 || $message->getFiles()->count() > 0) {
             return false;
@@ -737,29 +720,5 @@ final readonly class MessageClassifier
         // it'd break any downstream code that persists $classification['language']
         // to BLANG (email webhook reply, queue-mode chat persistence, ...).
         return $bestScore >= 4 ? $best : 'en';
-    }
-
-    /**
-     * Synapse Routing is currently a BETA feature and OFF by default.
-     *
-     * Why off-by-default:
-     *   - The embedding-based router can mis-route in edge cases (sticky topic
-     *     after a file analysis turn, granular vs canonical topics, models
-     *     with mismatched dimensions, ...).
-     *   - Operators must explicitly opt-in via the admin UI / system config.
-     *
-     * The proven AI-sorter (`MessageSorter`) remains the default routing
-     * path. The toggle is read from BCONFIG group `QDRANT_SEARCH`, key
-     * `SYNAPSE_ROUTING_ENABLED`.
-     */
-    public function isSynapseEnabled(): bool
-    {
-        $value = $this->configRepository->getValue(0, 'QDRANT_SEARCH', 'SYNAPSE_ROUTING_ENABLED');
-
-        if (null === $value) {
-            return false;
-        }
-
-        return filter_var($value, \FILTER_VALIDATE_BOOL, \FILTER_NULL_ON_FAILURE) ?? false;
     }
 }

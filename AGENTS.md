@@ -113,7 +113,7 @@ make -C frontend help
 
 ### i18n
 - All UI text through `vue-i18n`
-- **Always update BOTH** `en.json` AND `de.json`
+- **Always update ALL four locales**: `en.json`, `de.json`, `es.json`, `tr.json` (registered in `frontend/src/i18n/index.ts` as `supportedLanguages = ['de', 'en', 'es', 'tr']`). A key missing from a locale silently falls back to English.
 
 ## Code Style Quick Reference
 

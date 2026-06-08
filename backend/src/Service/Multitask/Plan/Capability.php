@@ -51,6 +51,9 @@ enum Capability: string
     /** Office document generation (ChatHandler officemaker + DocumentGeneratorService). */
     case DocumentGeneration = 'document_generation';
 
+    /** Calendar event / meeting invite as a downloadable .ics file (CalendarEventService, no model). */
+    case CalendarEvent = 'calendar_event';
+
     /** Final assembly of text + N file attachments into one OUT message (ResultAssembler, no model). */
     case ComposeReply = 'compose_reply';
 
@@ -76,6 +79,7 @@ enum Capability: string
             self::VideoGeneration => 'video',
             self::Text2Sound => 'audio',
             self::DocumentGeneration => 'document',
+            self::CalendarEvent => 'document',
             self::ComposeReply => 'hidden',
         };
     }

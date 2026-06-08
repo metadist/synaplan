@@ -1214,35 +1214,6 @@ class ConfigController extends AbstractController
             'models_available' => count($imageModels),
         ];
 
-        // Synapse Routing (embedding-based intent classification).
-        //
-        // Off-by-default: Synapse is a beta feature. The `null` (no row)
-        // case used to be reported as enabled here, which contradicted
-        // `MessageClassifier::isSynapseEnabled()` and would have caused
-        // `/features/status` to lie about the runtime classifier (raised
-        // by Copilot review on PR #853). We mirror MessageClassifier's
-        // parser exactly so this endpoint and the actual routing path
-        // never disagree.
-        $synapseValue = $this->configRepository->getValue(0, 'QDRANT_SEARCH', 'SYNAPSE_ROUTING_ENABLED');
-        $synapseEnabled = null !== $synapseValue
-            && '' !== $synapseValue
-            && true === filter_var($synapseValue, FILTER_VALIDATE_BOOL, FILTER_NULL_ON_FAILURE);
-        $qdrantConfigured = !empty($_ENV['QDRANT_URL'] ?? '');
-        $synapseReady = $synapseEnabled && $qdrantConfigured;
-        $features['synapse-routing'] = [
-            'id' => 'synapse-routing',
-            'category' => 'AI Features',
-            'name' => 'Synapse Routing',
-            'enabled' => $synapseEnabled,
-            'status' => $synapseReady ? 'active' : ($synapseEnabled ? 'unhealthy' : 'disabled'),
-            'message' => $synapseReady
-                ? 'Embedding-based intent routing is active (Tier 1: ~50ms, AI fallback for low confidence)'
-                : ($synapseEnabled
-                    ? 'Synapse is enabled but Qdrant is not configured'
-                    : 'Synapse Routing is disabled — using AI-based sorting for every message'),
-            'setup_required' => !$qdrantConfigured,
-        ];
-
         // ========== AI Providers (Dynamic from ProviderRegistry) ==========
 
         $providersMetadata = $this->providerRegistry->getProvidersMetadata();

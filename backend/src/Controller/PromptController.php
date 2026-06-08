@@ -11,11 +11,10 @@ use App\Repository\MessageRepository;
 use App\Repository\PromptMetaRepository;
 use App\Repository\PromptRepository;
 use App\Service\Embedding\Exception\PremiumRequiredException;
-use App\Service\Message\SynapseIndexer;
-use App\Service\Message\SynapseRouter;
 use App\Service\Model\Exception\InvalidPromptModelException;
 use App\Service\Model\PromptModelEligibilityValidator;
 use App\Service\ModelConfigService;
+use App\Service\Multitask\TaskPlanner;
 use App\Service\PromptService;
 use App\Service\RAG\VectorStorage\VectorStorageFacade;
 use App\Service\RateLimitService;
@@ -55,9 +54,8 @@ class PromptController extends AbstractController
         private FileRepository $fileRepository,
         private ModelConfigService $modelConfigService,
         private VectorStorageFacade $vectorStorageFacade,
-        private SynapseIndexer $synapseIndexer,
-        private SynapseRouter $synapseRouter,
         private PromptModelEligibilityValidator $modelEligibilityValidator,
+        private TaskPlanner $taskPlanner,
     ) {
     }
 
@@ -173,7 +171,7 @@ class PromptController extends AbstractController
     /**
      * Serialise a Prompt entity into the API response shape used by both
      * the list endpoint and the single-get endpoint. Centralised so the
-     * shape stays in sync (keywords, enabled, embeddingPreview, ...).
+     * shape stays in sync (enabled, selectionRules, ...).
      *
      * @param array<string, mixed> $metadata
      *
@@ -192,13 +190,11 @@ class PromptController extends AbstractController
             'shortDescription' => $prompt->getShortDescription(),
             'prompt' => $prompt->getPrompt(),
             'selectionRules' => $prompt->getSelectionRules(),
-            'keywords' => $prompt->getKeywords(),
             'enabled' => $prompt->isEnabled(),
             'language' => $prompt->getLanguage(),
             'isDefault' => $isDefault,
             'isUserOverride' => $isUserOverride,
             'metadata' => $metadata,
-            'embeddingPreview' => $this->synapseIndexer->buildEmbeddingText($prompt),
         ];
     }
 
@@ -388,75 +384,96 @@ class PromptController extends AbstractController
     }
 
     /**
-     * Dry-run the Synapse Router for a given message text.
+     * Get the multi-task planner prompt (tools:plan) with a rendered preview.
      *
-     * Returns the Top-K topic candidates with raw cosine scores, the active
-     * embedding model and per-candidate stale-flag. Used by the admin "Test
-     * Routing" box and CLI debugging — does NOT actually route or persist
-     * anything.
-     *
-     * IMPORTANT: This route must be BEFORE /{id} route to avoid conflicts!
-     *
-     * POST /api/v1/prompts/test
-     * Body: { "text": "How do I write a PHP function?", "limit": 5 }
+     * GET /api/v1/prompts/planning
      */
-    #[Route('/test', name: 'test_routing', methods: ['POST'])]
-    #[OA\Post(
-        path: '/api/v1/prompts/test',
-        summary: 'Dry-run the Synapse Router for a given message',
-        description: 'Embeds the provided text with the active VECTORIZE model and returns the Top-K matching topics with raw cosine scores. Does not affect any state.',
+    #[Route('/planning', name: 'planning_get', methods: ['GET'])]
+    #[OA\Get(
+        path: '/api/v1/prompts/planning',
+        summary: 'Get the multi-task planner prompt',
+        description: 'Returns the tools:plan prompt (raw + rendered with the live capability/topic lists) used by the multi-task routing engine.',
+        tags: ['Task Prompts'],
+        responses: [
+            new OA\Response(
+                response: 200,
+                description: 'Planner prompt data',
+                content: new OA\JsonContent(
+                    properties: [
+                        new OA\Property(property: 'success', type: 'boolean'),
+                        new OA\Property(
+                            property: 'prompt',
+                            type: 'object',
+                            properties: [
+                                new OA\Property(property: 'id', type: 'integer', example: 3),
+                                new OA\Property(property: 'topic', type: 'string', example: 'tools:plan'),
+                                new OA\Property(property: 'shortDescription', type: 'string'),
+                                new OA\Property(property: 'prompt', type: 'string'),
+                                new OA\Property(property: 'renderedPrompt', type: 'string'),
+                            ]
+                        ),
+                    ]
+                )
+            ),
+            new OA\Response(response: 401, description: 'Not authenticated'),
+            new OA\Response(response: 404, description: 'Planner prompt not found'),
+        ]
+    )]
+    public function getPlanningPrompt(
+        #[CurrentUser] ?User $user,
+    ): JsonResponse {
+        if (!$user) {
+            return $this->json(['error' => 'Not authenticated'], Response::HTTP_UNAUTHORIZED);
+        }
+
+        $planPrompt = $this->promptRepository->findByTopic('tools:plan', 0);
+        if (!$planPrompt) {
+            return $this->json(['error' => 'Planner prompt not found'], Response::HTTP_NOT_FOUND);
+        }
+
+        return $this->json([
+            'success' => true,
+            'prompt' => [
+                'id' => $planPrompt->getId(),
+                'topic' => $planPrompt->getTopic(),
+                'shortDescription' => $planPrompt->getShortDescription(),
+                'prompt' => $planPrompt->getPrompt(),
+                'renderedPrompt' => $this->taskPlanner->renderSystemPrompt($planPrompt->getPrompt(), $user->getId()),
+            ],
+        ]);
+    }
+
+    /**
+     * Update the multi-task planner prompt (admin only).
+     *
+     * PUT /api/v1/prompts/planning
+     */
+    #[Route('/planning', name: 'planning_update', methods: ['PUT'])]
+    #[OA\Put(
+        path: '/api/v1/prompts/planning',
+        summary: 'Update the multi-task planner prompt',
+        description: 'Update the tools:plan prompt content (admin only).',
         security: [['Bearer' => []]],
         tags: ['Task Prompts'],
         requestBody: new OA\RequestBody(
             required: true,
             content: new OA\JsonContent(
-                required: ['text'],
+                required: ['prompt'],
                 properties: [
-                    new OA\Property(property: 'text', type: 'string', example: 'Wie schreibe ich eine Schleife in Python?'),
-                    new OA\Property(property: 'limit', type: 'integer', example: 5, minimum: 1, maximum: 20),
+                    new OA\Property(property: 'prompt', type: 'string'),
+                    new OA\Property(property: 'shortDescription', type: 'string'),
                 ]
             )
         ),
         responses: [
-            new OA\Response(
-                response: 200,
-                description: 'Routing dry-run result',
-                content: new OA\JsonContent(
-                    properties: [
-                        new OA\Property(property: 'success', type: 'boolean'),
-                        new OA\Property(property: 'query', type: 'string'),
-                        new OA\Property(
-                            property: 'model',
-                            type: 'object',
-                            properties: [
-                                new OA\Property(property: 'provider', type: 'string', nullable: true),
-                                new OA\Property(property: 'model', type: 'string', nullable: true),
-                                new OA\Property(property: 'model_id', type: 'integer', nullable: true),
-                            ]
-                        ),
-                        new OA\Property(
-                            property: 'candidates',
-                            type: 'array',
-                            items: new OA\Items(
-                                properties: [
-                                    new OA\Property(property: 'topic', type: 'string'),
-                                    new OA\Property(property: 'score', type: 'number', format: 'float'),
-                                    new OA\Property(property: 'stale', type: 'boolean'),
-                                    new OA\Property(property: 'alias_target', type: 'string', nullable: true),
-                                    new OA\Property(property: 'payload', type: 'object'),
-                                ]
-                            )
-                        ),
-                        new OA\Property(property: 'latency_ms', type: 'number', format: 'float'),
-                        new OA\Property(property: 'error', type: 'string', nullable: true),
-                    ]
-                )
-            ),
-            new OA\Response(response: 400, description: 'Missing text field'),
+            new OA\Response(response: 200, description: 'Planner prompt updated'),
+            new OA\Response(response: 400, description: 'Invalid payload'),
             new OA\Response(response: 401, description: 'Not authenticated'),
+            new OA\Response(response: 403, description: 'Admin access required'),
+            new OA\Response(response: 404, description: 'Planner prompt not found'),
         ]
     )]
-    public function testRouting(
+    public function updatePlanningPrompt(
         Request $request,
         #[CurrentUser] ?User $user,
     ): JsonResponse {
@@ -464,17 +481,36 @@ class PromptController extends AbstractController
             return $this->json(['error' => 'Not authenticated'], Response::HTTP_UNAUTHORIZED);
         }
 
-        $data = json_decode($request->getContent(), true);
-        if (!is_array($data) || empty($data['text']) || !is_string($data['text'])) {
-            return $this->json(['error' => 'Missing required field: text'], Response::HTTP_BAD_REQUEST);
+        if (!$user->isAdmin()) {
+            return $this->json(['error' => 'Admin access required'], Response::HTTP_FORBIDDEN);
         }
 
-        $text = trim($data['text']);
-        $limit = isset($data['limit']) ? max(1, min(20, (int) $data['limit'])) : 5;
+        $data = json_decode($request->getContent(), true);
+        if (!is_array($data) || empty($data['prompt']) || !is_string($data['prompt'])) {
+            return $this->json(['error' => 'Missing required field: prompt'], Response::HTTP_BAD_REQUEST);
+        }
 
-        $result = $this->synapseRouter->dryRun($text, $user->getId(), $limit);
+        $planPrompt = $this->promptRepository->findByTopic('tools:plan', 0);
+        if (!$planPrompt) {
+            return $this->json(['error' => 'Planner prompt not found'], Response::HTTP_NOT_FOUND);
+        }
 
-        return $this->json(['success' => true] + $result);
+        $planPrompt->setPrompt($data['prompt']);
+        if (!empty($data['shortDescription']) && is_string($data['shortDescription'])) {
+            $planPrompt->setShortDescription($data['shortDescription']);
+        }
+
+        $this->em->flush();
+
+        return $this->json([
+            'success' => true,
+            'prompt' => [
+                'id' => $planPrompt->getId(),
+                'topic' => $planPrompt->getTopic(),
+                'shortDescription' => $planPrompt->getShortDescription(),
+                'prompt' => $planPrompt->getPrompt(),
+            ],
+        ]);
     }
 
     /**
@@ -792,7 +828,6 @@ class PromptController extends AbstractController
             $promptContent = trim($data['prompt']);
             $language = $data['language'] ?? 'en';
             $selectionRules = isset($data['selectionRules']) ? trim($data['selectionRules']) : null;
-            $keywords = isset($data['keywords']) ? trim((string) $data['keywords']) : null;
             $enabled = isset($data['enabled']) ? (bool) $data['enabled'] : true;
             $metadata = $data['metadata'] ?? [];
 
@@ -828,7 +863,6 @@ class PromptController extends AbstractController
             $prompt->setPrompt($promptContent);
             $prompt->setLanguage($language);
             $prompt->setSelectionRules($selectionRules);
-            $prompt->setKeywords('' === $keywords ? null : $keywords);
             $prompt->setEnabled($enabled);
 
             $this->em->persist($prompt);
@@ -836,9 +870,6 @@ class PromptController extends AbstractController
 
             // Refresh to ensure ID is populated
             $this->em->refresh($prompt);
-
-            // Update Synapse Routing index
-            $this->reindexSynapseTopic($prompt->getTopic(), $prompt->getOwnerId());
 
             // Save metadata (AI model, tools)
             if (!empty($metadata)) {
@@ -983,8 +1014,6 @@ class PromptController extends AbstractController
             }
         }
 
-        $oldTopic = $prompt->getTopic();
-
         // Update fields if provided
         if (isset($data['shortDescription'])) {
             $prompt->setShortDescription(trim($data['shortDescription']));
@@ -1005,11 +1034,6 @@ class PromptController extends AbstractController
             $prompt->setSelectionRules(trim($data['selectionRules']) ?: null);
         }
 
-        if (array_key_exists('keywords', $data)) {
-            $kw = is_string($data['keywords']) ? trim($data['keywords']) : '';
-            $prompt->setKeywords('' === $kw ? null : $kw);
-        }
-
         if (array_key_exists('enabled', $data)) {
             $prompt->setEnabled((bool) $data['enabled']);
         }
@@ -1026,12 +1050,6 @@ class PromptController extends AbstractController
         try {
             $this->em->flush();
             $this->logger->info('Prompt entity flushed successfully', ['prompt_id' => $id]);
-
-            $newTopic = $prompt->getTopic();
-            if ($oldTopic !== $newTopic) {
-                $this->removeSynapseTopic($oldTopic, $prompt->getOwnerId());
-            }
-            $this->reindexSynapseTopic($newTopic, $prompt->getOwnerId());
         } catch (\Exception $e) {
             $this->logger->error('Failed to flush prompt entity', [
                 'prompt_id' => $id,
@@ -1144,8 +1162,6 @@ class PromptController extends AbstractController
         $ownerId = $prompt->getOwnerId();
         $this->em->remove($prompt);
         $this->em->flush();
-
-        $this->removeSynapseTopic($topic, $ownerId);
 
         $this->logger->info('User deleted custom prompt', [
             'user_id' => $user->getId(),
@@ -1743,46 +1759,6 @@ PROMPT;
                 'message' => $e->getMessage(),
                 'currentLevel' => $e->currentLevel,
             ], Response::HTTP_FORBIDDEN);
-        }
-    }
-
-    /**
-     * Re-index a topic in the Synapse Routing collection (fire-and-forget).
-     */
-    private function reindexSynapseTopic(string $topic, int $ownerId): void
-    {
-        if (str_starts_with($topic, 'tools:')) {
-            return;
-        }
-
-        try {
-            $this->synapseIndexer->indexTopic($topic, $ownerId);
-        } catch (\Throwable $e) {
-            $this->logger->warning('Synapse re-index failed (non-critical)', [
-                'topic' => $topic,
-                'owner_id' => $ownerId,
-                'error' => $e->getMessage(),
-            ]);
-        }
-    }
-
-    /**
-     * Remove a topic from the Synapse Routing collection (fire-and-forget).
-     */
-    private function removeSynapseTopic(string $topic, int $ownerId): void
-    {
-        if (str_starts_with($topic, 'tools:')) {
-            return;
-        }
-
-        try {
-            $this->synapseIndexer->removeTopic($topic, $ownerId);
-        } catch (\Throwable $e) {
-            $this->logger->warning('Synapse topic removal failed (non-critical)', [
-                'topic' => $topic,
-                'owner_id' => $ownerId,
-                'error' => $e->getMessage(),
-            ]);
         }
     }
 }

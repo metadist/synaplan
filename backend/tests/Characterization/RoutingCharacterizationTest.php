@@ -12,7 +12,6 @@ use App\Repository\ConfigRepository;
 use App\Repository\MessageMetaRepository;
 use App\Service\Message\MessageClassifier;
 use App\Service\Message\MessageSorter;
-use App\Service\Message\SynapseRouter;
 use App\Service\Message\TopicAliasResolver;
 use App\Service\ModelConfigService;
 use App\Tests\Characterization\Support\RoutingSnapshot;
@@ -216,7 +215,6 @@ final class RoutingCharacterizationTest extends TestCase
 
         $classifier = new MessageClassifier(
             $sorter,
-            $this->createMock(SynapseRouter::class),
             new TopicAliasResolver(),
             $metaRepo,
             $this->createMock(ModelConfigService::class),

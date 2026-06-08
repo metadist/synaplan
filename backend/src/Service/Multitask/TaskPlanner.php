@@ -40,6 +40,7 @@ final readonly class TaskPlanner
         'video_generation' => 'Generate a video clip (params.duration, params.resolution).',
         'text2sound' => 'Synthesize speech/audio from text (params.format, e.g. mp3).',
         'document_generation' => 'Generate an Office document (CSV/XLSX/DOCX/PPTX).',
+        'calendar_event' => 'Create a calendar meeting/invite as a downloadable .ics file. params: title, start (ISO-8601 local datetime, e.g. "2026-06-09T15:00:00"), end (ISO-8601) or duration_minutes, timezone (IANA, e.g. "Europe/Berlin"), location, description, attendees (list of names/emails). Resolve relative times against the current time context below.',
         'compose_reply' => 'Assemble final reply: text + N file attachments from other nodes.',
     ];
 
@@ -74,7 +75,7 @@ final readonly class TaskPlanner
         $provider = $modelId ? $this->modelConfigService->getProviderForModel($modelId) : null;
         $modelName = $modelId ? $this->modelConfigService->getModelName($modelId) : null;
 
-        $systemPrompt = $this->buildSystemPrompt($promptRow->getPrompt(), $userId);
+        $systemPrompt = $this->buildSystemPrompt($promptRow->getPrompt(), $userId, $message);
         $messages = $this->buildMessages($systemPrompt, $message, $conversationHistory);
 
         try {
@@ -131,7 +132,17 @@ final readonly class TaskPlanner
         );
     }
 
-    private function buildSystemPrompt(string $template, ?int $userId): string
+    /**
+     * Render a planner prompt template the same way the live planner does
+     * ([CAPABILITYLIST]/[DYNAMICLIST]/[KEYLIST] substitution). Exposed so the
+     * admin config UI can show an accurate preview of what the model receives.
+     */
+    public function renderSystemPrompt(string $template, ?int $userId): string
+    {
+        return $this->buildSystemPrompt($template, $userId);
+    }
+
+    private function buildSystemPrompt(string $template, ?int $userId, ?Message $message = null): string
     {
         $topics = $this->promptRepository->getAllTopics(0, $userId, excludeTools: true);
         $topicsWithDesc = $this->promptRepository->getTopicsWithDescriptions(0, '', $userId, excludeTools: true);
@@ -150,8 +161,38 @@ final readonly class TaskPlanner
 
         $text = str_replace('[CAPABILITYLIST]', implode("\n", $capabilityList), $template);
         $text = str_replace('[DYNAMICLIST]', implode("\n", $dynamicList), $text);
+        $text = str_replace('[KEYLIST]', $keyList, $text);
 
-        return str_replace('[KEYLIST]', $keyList, $text);
+        return $text."\n\n".$this->timeContextBlock($message);
+    }
+
+    /**
+     * A short block giving the planner the current server time + timezone and,
+     * when available, when this message was received. The planner uses it to
+     * resolve relative dates/times ("tomorrow at 15:00") into the absolute
+     * `start`/`timezone` a `calendar_event` node needs. Appended unconditionally
+     * so it works regardless of the stored prompt template version.
+     */
+    private function timeContextBlock(?Message $message): string
+    {
+        $now = new \DateTimeImmutable('now');
+        $tz = date_default_timezone_get();
+
+        $lines = [
+            '## Current time context (resolve relative dates/times against this)',
+            '- Server time now: '.$now->format(\DateTimeInterface::ATOM).' (timezone: '.$tz.')',
+        ];
+
+        if (null !== $message) {
+            $received = $message->getDateTime();
+            if ('' !== $received) {
+                $lines[] = '- This message was received at: '.$received.' (server time)';
+            }
+        }
+
+        $lines[] = 'For a calendar/meeting request, emit a "calendar_event" node with an absolute "start" (ISO-8601 local datetime) and an IANA "timezone". If the user\'s timezone is unknown, use the server timezone above.';
+
+        return implode("\n", $lines);
     }
 
     /**

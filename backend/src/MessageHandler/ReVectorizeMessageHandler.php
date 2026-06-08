@@ -41,9 +41,7 @@ use Symfony\Component\Messenger\Attribute\AsMessageHandler;
 final readonly class ReVectorizeMessageHandler
 {
     /**
-     * Scopes whose BCONFIG binding should be rolled back when the run
-     * fails. `synapse` switches a different binding (SYNAPSE_VECTORIZE)
-     * which is handled by the same `setSynapseVectorizeModel` flow.
+     * Scopes whose BCONFIG binding should be rolled back when the run fails.
      */
     private const VECTORIZE_BOUND_SCOPES = [
         RevectorizeRun::SCOPE_DOCUMENTS,
@@ -171,9 +169,7 @@ final readonly class ReVectorizeMessageHandler
         $scope = $run->getScope();
 
         try {
-            if (RevectorizeRun::SCOPE_SYNAPSE === $scope) {
-                $this->bindingService->setSynapseVectorizeModel($fromModelId);
-            } elseif (in_array($scope, self::VECTORIZE_BOUND_SCOPES, true)) {
+            if (in_array($scope, self::VECTORIZE_BOUND_SCOPES, true)) {
                 $this->bindingService->setVectorizeModel($fromModelId);
             } else {
                 return;
@@ -211,8 +207,7 @@ final readonly class ReVectorizeMessageHandler
      * we recreate the collection with the rollback model's dim so the
      * memory service is usable again immediately after a failure.
      *
-     * Skipped for SCOPE_SYNAPSE (different collection, different
-     * recovery path) and SCOPE_DOCUMENTS (memories untouched).
+     * Skipped for SCOPE_DOCUMENTS (memories untouched).
      */
     private function rollbackMemoriesCollection(RevectorizeRun $run, string $reason): void
     {

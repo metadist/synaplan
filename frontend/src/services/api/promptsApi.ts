@@ -53,23 +53,6 @@ export interface UpdatePromptRequest {
   metadata?: PromptMetadata
 }
 
-export interface RoutingTestCandidate {
-  topic: string
-  score: number
-  stale: boolean
-  alias_target?: string | null
-  payload?: Record<string, unknown>
-}
-
-export interface RoutingTestResult {
-  success: boolean
-  query: string
-  model: { provider: string | null; model: string | null; model_id: number | null }
-  candidates: RoutingTestCandidate[]
-  latency_ms: number
-  error: string | null
-}
-
 export interface PromptFile {
   messageId: number
   fileName: string
@@ -114,6 +97,29 @@ const UpdateSortingPromptResponseSchema = z.object({
 export type SortingPromptCategory = z.infer<typeof SortingPromptCategorySchema>
 export type SortingPromptPayload = z.infer<typeof SortingPromptSchema>
 export type SortingPromptUpdatePayload = z.infer<typeof UpdateSortingPromptResponseSchema>['prompt']
+
+const PlanningPromptSchema = z.object({
+  id: z.number(),
+  topic: z.string(),
+  shortDescription: z.string(),
+  prompt: z.string(),
+  renderedPrompt: z.string(),
+})
+
+const GetPlanningPromptResponseSchema = z.object({
+  success: z.boolean(),
+  prompt: PlanningPromptSchema,
+})
+
+const UpdatePlanningPromptResponseSchema = z.object({
+  success: z.boolean(),
+  prompt: PlanningPromptSchema.omit({ renderedPrompt: true }),
+})
+
+export type PlanningPromptPayload = z.infer<typeof PlanningPromptSchema>
+export type PlanningPromptUpdatePayload = z.infer<
+  typeof UpdatePlanningPromptResponseSchema
+>['prompt']
 
 class PromptsApi {
   /**
@@ -164,6 +170,29 @@ class PromptsApi {
       method: 'PUT',
       body: JSON.stringify({ prompt }),
       schema: UpdateSortingPromptResponseSchema,
+    })
+    return data.prompt
+  }
+
+  /**
+   * Get the multi-task planner prompt (tools:plan) with a rendered preview.
+   */
+  async getPlanningPrompt(): Promise<PlanningPromptPayload> {
+    const data = await httpClient('/api/v1/prompts/planning', {
+      method: 'GET',
+      schema: GetPlanningPromptResponseSchema,
+    })
+    return data.prompt
+  }
+
+  /**
+   * Update the multi-task planner prompt content (admin only).
+   */
+  async updatePlanningPrompt(prompt: string): Promise<PlanningPromptUpdatePayload> {
+    const data = await httpClient('/api/v1/prompts/planning', {
+      method: 'PUT',
+      body: JSON.stringify({ prompt }),
+      schema: UpdatePlanningPromptResponseSchema,
     })
     return data.prompt
   }
@@ -302,20 +331,6 @@ class PromptsApi {
    */
   async listPrompts(language: string = 'en'): Promise<TaskPrompt[]> {
     return this.getPrompts(language)
-  }
-
-  /**
-   * Dry-run the SynapseRouter for the given message text.
-   *
-   * Used by the in-app "Test Routing" widget. Embeds the message with the
-   * active VECTORIZE model and returns the Top-K topic matches with raw
-   * cosine scores. Does NOT mutate any state.
-   */
-  async testRouting(text: string, limit: number = 5): Promise<RoutingTestResult> {
-    return await httpClient<RoutingTestResult>('/api/v1/prompts/test', {
-      method: 'POST',
-      body: JSON.stringify({ text, limit }),
-    })
   }
 }
 

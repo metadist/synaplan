@@ -51,12 +51,6 @@ final readonly class DefaultModelConfigSeeder
         ['group' => 'DEFAULTMODEL', 'setting' => 'SOUND2TEXT', 'modelKey' => 'groq:whisper-large-v3:sound2text'],
         ['group' => 'DEFAULTMODEL', 'setting' => 'ANALYZE',    'modelKey' => 'anthropic:claude-sonnet-4-6:chat'],
         ['group' => 'DEFAULTMODEL', 'setting' => 'VECTORIZE',  'modelKey' => 'ollama:bge-m3:vectorize'],
-        // Synapse Routing has its own embedding-model binding so admins can pin
-        // it to the highest-quality option for short multilingual prompt
-        // classification (Qwen3) without forcing every user's RAG stack to
-        // re-embed. SynapseIndexer / SynapseRouter read this key directly;
-        // a missing row falls back to DEFAULTMODEL.VECTORIZE.
-        ['group' => 'DEFAULTMODEL', 'setting' => 'SYNAPSE_VECTORIZE', 'modelKey' => 'cloudflare:@cf/qwen/qwen3-embedding-0.6b:vectorize'],
     ];
 
     /**
@@ -87,7 +81,6 @@ final readonly class DefaultModelConfigSeeder
         ['ownerId' => 0, 'group' => 'DEFAULTMODEL', 'setting' => 'MEM',        'value' => '-1'],
         ['ownerId' => 0, 'group' => 'DEFAULTMODEL', 'setting' => 'ANALYZE',    'value' => '-1'],
         ['ownerId' => 0, 'group' => 'DEFAULTMODEL', 'setting' => 'VECTORIZE',         'value' => '-2'],
-        ['ownerId' => 0, 'group' => 'DEFAULTMODEL', 'setting' => 'SYNAPSE_VECTORIZE', 'value' => '-2'],
         ['ownerId' => 0, 'group' => 'DEFAULTMODEL', 'setting' => 'PIC2TEXT',          'value' => '-3'],
         ['ownerId' => 0, 'group' => 'DEFAULTMODEL', 'setting' => 'TEXT2PIC',   'value' => '-4'],
         ['ownerId' => 0, 'group' => 'DEFAULTMODEL', 'setting' => 'PIC2PIC',    'value' => '-4'],

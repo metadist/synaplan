@@ -8,32 +8,13 @@ use App\Prompt\PromptCatalog;
 use PHPUnit\Framework\TestCase;
 
 /**
- * Verifies the static catalog stays in sync with Synapse Routing v2:
- *  - all granular topics from the alias resolver are present
- *  - keywords/enabled fields are well-formed
- *  - tools:* helpers are not surfaced for routing
+ * Verifies the static prompt catalog:
+ *  - canonical routing topics are present
+ *  - tools:* helpers exist but are not surfaced for routing
+ *  - (topic, language) pairs are unique
  */
 final class PromptCatalogTest extends TestCase
 {
-    public function testAllReturnsTheGranularRoutingTopics(): void
-    {
-        $topics = array_column(PromptCatalog::all(), 'topic');
-
-        // Note (#878): `coding` was retired as a routing target. The
-        // catalog still carries the row (so existing installs can flip
-        // BENABLED=0 on the next seed), but it no longer participates in
-        // Tier-1 recall.
-        foreach (
-            ['general-chat', 'image-generation', 'video-generation', 'audio-generation'] as $expected
-        ) {
-            $this->assertContains(
-                $expected,
-                $topics,
-                sprintf('Expected granular topic "%s" to be defined in PromptCatalog', $expected)
-            );
-        }
-    }
-
     public function testLegacyCanonicalTopicsRemainForBackwardCompat(): void
     {
         $topics = array_column(PromptCatalog::all(), 'topic');
@@ -54,85 +35,10 @@ final class PromptCatalogTest extends TestCase
         $this->assertContains('tools:enhance', $topics);
     }
 
-    public function testRoutingTopicsHaveKeywords(): void
-    {
-        $byTopic = [];
-        foreach (PromptCatalog::all() as $entry) {
-            $byTopic[$entry['topic']] = $entry;
-        }
-
-        foreach (
-            ['general-chat', 'image-generation', 'video-generation', 'audio-generation', 'docsummary', 'officemaker'] as $routable
-        ) {
-            $this->assertArrayHasKey('keywords', $byTopic[$routable], sprintf(
-                'Routable topic "%s" must declare keywords for Synapse recall',
-                $routable
-            ));
-            $this->assertNotSame('', trim((string) $byTopic[$routable]['keywords']));
-        }
-    }
-
-    public function testRetiredCodingTopicIsDisabled(): void
-    {
-        // Issue #878: the coding topic was retired but stays in the
-        // catalog so existing installs flip BENABLED=0 on the next seed
-        // run. The keywords are intentionally blank; the row exists
-        // purely to drive the seed update.
-        $byTopic = [];
-        foreach (PromptCatalog::all() as $entry) {
-            $byTopic[$entry['topic']] = $entry;
-        }
-
-        $this->assertArrayHasKey('coding', $byTopic);
-        $this->assertArrayHasKey('enabled', $byTopic['coding']);
-        $this->assertFalse($byTopic['coding']['enabled']);
-    }
-
-    /**
-     * Granular routing aliases ship DISABLED by default — they are aliases
-     * of canonical topics (TopicAliasResolver) that confuse the legacy AI
-     * sorter when active alongside the canonical row. Admins flip them all
-     * back on via the `QDRANT_SEARCH.GRANULAR_TOPICS_ENABLED` toggle when
-     * Synapse Routing v2 is in use.
-     *
-     * Keeping them in the catalog (rather than removing) lets the seed
-     * idempotently flip BENABLED=0 on existing installs and drives the
-     * SynapseIndexer to drop orphan vectors from Qdrant.
-     */
-    public function testGranularRoutingAliasesShipDisabledByDefault(): void
-    {
-        $byTopic = [];
-        foreach (PromptCatalog::all() as $entry) {
-            $byTopic[$entry['topic']] = $entry;
-        }
-
-        foreach (
-            ['coding', 'general-chat', 'image-generation', 'video-generation', 'audio-generation'] as $alias
-        ) {
-            $this->assertArrayHasKey($alias, $byTopic, sprintf(
-                'Expected granular alias "%s" to remain in the catalog so the seed flips BENABLED.',
-                $alias
-            ));
-            $this->assertArrayHasKey('enabled', $byTopic[$alias], sprintf(
-                'Granular alias "%s" must declare an explicit `enabled` flag so the seed write is deterministic.',
-                $alias
-            ));
-            $this->assertFalse(
-                $byTopic[$alias]['enabled'],
-                sprintf(
-                    'Granular alias "%s" must ship DISABLED — admins re-enable via the GRANULAR_TOPICS_ENABLED toggle.',
-                    $alias
-                )
-            );
-        }
-    }
-
     /**
      * The canonical `general` row carries the chat/coding/lifestyle keyword
-     * list because the granular `general-chat` topic ships disabled by
-     * default. Synapse Routing v2 embedding recall therefore relies on the
-     * canonical row's keywords, which must include the programming terms
-     * that previously lived under `general-chat`.
+     * list so the AI sorter has rich vocabulary for everyday and programming
+     * questions in one place.
      */
     public function testCanonicalGeneralKeywordsCoverProgrammingTerms(): void
     {
@@ -146,34 +52,6 @@ final class PromptCatalogTest extends TestCase
         $this->assertStringContainsString('python', $keywords);
         $this->assertStringContainsString('debug', $keywords);
         $this->assertStringContainsString('smalltalk', $keywords);
-    }
-
-    public function testGeneralChatKeywordsCoverProgrammingTermsAfterCodingRetirement(): void
-    {
-        // Coding queries now ride on `general-chat` (#878). Make sure
-        // the general-chat keyword list pulled the relevant tokens over
-        // so embedding recall doesn't regress.
-        $byTopic = [];
-        foreach (PromptCatalog::all() as $entry) {
-            $byTopic[$entry['topic']] = $entry;
-        }
-
-        $keywords = strtolower((string) $byTopic['general-chat']['keywords']);
-        $this->assertStringContainsString('php', $keywords);
-        $this->assertStringContainsString('python', $keywords);
-        $this->assertStringContainsString('debug', $keywords);
-    }
-
-    public function testImageGenerationKeywordsContainBilingualTerms(): void
-    {
-        $byTopic = [];
-        foreach (PromptCatalog::all() as $entry) {
-            $byTopic[$entry['topic']] = $entry;
-        }
-
-        $kw = strtolower((string) $byTopic['image-generation']['keywords']);
-        $this->assertStringContainsString('image', $kw);
-        $this->assertStringContainsString('bild', $kw);
     }
 
     public function testTopicsAreUniquePerLanguage(): void

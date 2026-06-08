@@ -269,39 +269,13 @@
                       </p>
                     </div>
 
-                    <!-- Status dots (right side, always visible) -->
+                    <!-- Status dot (right side) -->
                     <span
                       v-if="prompt.enabled === false"
                       class="w-1.5 h-1.5 rounded-full bg-gray-400 flex-shrink-0"
                       :title="$t('config.taskPrompts.badgeDisabled')"
                       data-testid="dot-disabled"
                     />
-                    <template v-else-if="topicStatusFor(prompt.topic)">
-                      <span
-                        v-if="
-                          topicStatusFor(prompt.topic)?.indexed &&
-                          !topicStatusFor(prompt.topic)?.stale
-                        "
-                        class="w-1.5 h-1.5 rounded-full bg-emerald-500 flex-shrink-0"
-                        :title="$t('config.taskPrompts.indexedTooltip')"
-                        data-testid="dot-indexed"
-                      />
-                      <span
-                        v-else-if="
-                          topicStatusFor(prompt.topic)?.indexed &&
-                          topicStatusFor(prompt.topic)?.stale
-                        "
-                        class="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse flex-shrink-0"
-                        :title="$t('config.taskPrompts.staleTooltip')"
-                        data-testid="dot-stale"
-                      />
-                      <span
-                        v-else
-                        class="w-1.5 h-1.5 rounded-full bg-rose-500 flex-shrink-0"
-                        :title="$t('config.taskPrompts.notIndexedTooltip')"
-                        data-testid="dot-not-indexed"
-                      />
-                    </template>
                   </button>
                 </li>
               </ul>
@@ -324,26 +298,6 @@
               {{ $t('config.taskPrompts.clearFilters') }}
             </button>
           </div>
-        </div>
-
-        <!-- Status legend (admin only) -->
-        <div
-          v-if="isAdmin && synapseStatus && filteredPrompts.length > 0"
-          class="px-4 py-2 border-t border-light-border/30 dark:border-dark-border/20 flex items-center gap-3 text-[10px] txt-secondary flex-shrink-0"
-          data-testid="section-list-legend"
-        >
-          <span class="flex items-center gap-1">
-            <span class="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-            {{ $t('config.taskPrompts.statusIndexed') }}
-          </span>
-          <span class="flex items-center gap-1">
-            <span class="w-1.5 h-1.5 rounded-full bg-amber-500" />
-            {{ $t('config.taskPrompts.statusStale') }}
-          </span>
-          <span class="flex items-center gap-1">
-            <span class="w-1.5 h-1.5 rounded-full bg-rose-500" />
-            {{ $t('config.taskPrompts.statusNotIndexed') }}
-          </span>
         </div>
 
         <!-- Hidden compat select for legacy automation tools -->
@@ -521,67 +475,6 @@
               <p class="text-xs txt-secondary mt-1.5 flex items-center gap-1">
                 <Icon icon="heroicons:information-circle" class="w-3.5 h-3.5" />
                 {{ $t('config.taskPrompts.rulesHelp') }}
-              </p>
-            </div>
-
-            <!-- Keywords -->
-            <div>
-              <label class="block text-sm font-semibold txt-primary mb-2 flex items-center gap-2">
-                <Icon icon="heroicons:tag" class="w-4 h-4" />
-                {{ $t('config.taskPrompts.keywordsLabel') }}
-              </label>
-              <textarea
-                v-model="formData.keywords"
-                rows="2"
-                class="w-full px-4 py-3 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)] resize-none disabled:opacity-50"
-                :placeholder="$t('config.taskPrompts.keywordsPlaceholder')"
-                data-testid="input-keywords"
-              />
-              <div class="flex items-center justify-between mt-1.5 flex-wrap gap-2">
-                <p class="text-xs txt-secondary flex items-center gap-1">
-                  <Icon icon="heroicons:information-circle" class="w-3.5 h-3.5" />
-                  {{ $t('config.taskPrompts.keywordsHelp') }}
-                </p>
-                <span
-                  v-if="keywordCount > 0"
-                  class="text-[10px] txt-secondary"
-                  data-testid="text-keyword-count"
-                >
-                  {{ $t('config.taskPrompts.keywordCount', { n: keywordCount }) }}
-                </span>
-              </div>
-            </div>
-
-            <!-- Embedding preview -->
-            <div
-              class="surface-chip rounded-lg p-3 border border-dashed border-light-border/30 dark:border-dark-border/20"
-              data-testid="section-embedding-preview"
-            >
-              <div class="flex items-center justify-between gap-2 mb-2">
-                <span
-                  class="text-xs font-semibold txt-primary uppercase tracking-wide flex items-center gap-1.5"
-                >
-                  <Icon icon="heroicons:eye" class="w-4 h-4 text-[var(--brand)]" />
-                  {{ $t('config.taskPrompts.embeddingPreviewTitle') }}
-                </span>
-                <button
-                  class="text-[10px] uppercase tracking-wide txt-secondary hover:txt-primary flex items-center gap-1 px-2 py-1 rounded hover:bg-light-border/10 dark:hover:bg-dark-border/10"
-                  :title="$t('config.taskPrompts.copyToClipboard')"
-                  data-testid="btn-copy-embedding"
-                  @click="copyToClipboard(embeddingPreview)"
-                >
-                  <Icon icon="heroicons:clipboard" class="w-3.5 h-3.5" />
-                  {{ $t('config.taskPrompts.copy') }}
-                </button>
-              </div>
-              <pre
-                class="text-xs txt-secondary whitespace-pre-wrap font-mono leading-relaxed"
-                data-testid="text-embedding-preview"
-                >{{ embeddingPreview }}</pre
-              >
-              <p class="text-[11px] txt-secondary mt-2 flex items-center gap-1">
-                <Icon icon="heroicons:information-circle" class="w-3 h-3" />
-                {{ $t('config.taskPrompts.embeddingPreviewHelp') }}
               </p>
             </div>
 
@@ -1142,21 +1035,6 @@
 
           <div>
             <label class="block text-sm font-semibold txt-primary mb-2 flex items-center gap-2">
-              <Icon icon="heroicons:tag" class="w-4 h-4" />
-              {{ $t('config.taskPrompts.keywordsLabel') }}
-            </label>
-            <textarea
-              v-model="newPromptKeywords"
-              rows="2"
-              class="w-full px-4 py-2.5 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)] resize-y"
-              :placeholder="$t('config.taskPrompts.keywordsPlaceholder')"
-              data-testid="input-new-keywords"
-            ></textarea>
-            <p class="text-xs txt-secondary mt-1.5">{{ $t('config.taskPrompts.keywordsHelp') }}</p>
-          </div>
-
-          <div>
-            <label class="block text-sm font-semibold txt-primary mb-2 flex items-center gap-2">
               <Icon icon="heroicons:document-text" class="w-4 h-4" />
               {{ $t('config.taskPrompts.promptContent') }}
             </label>
@@ -1322,11 +1200,6 @@ import {
   type UpdatePromptRequest,
 } from '@/services/api/promptsApi'
 import { configApi } from '@/services/api/configApi'
-import {
-  adminSynapseApi,
-  type SynapseStatusResponse,
-  type SynapseTopicEntry,
-} from '@/services/api/adminSynapseApi'
 import type { AIModel, Capability } from '@/types/ai-models'
 import { findModelIdByString } from '@/utils/aiModelDefaults'
 import { useNotification } from '@/composables/useNotification'
@@ -1408,7 +1281,6 @@ const showCreateModal = ref(false)
 const promptListSearch = ref('')
 const promptListFilter = ref<'all' | 'system' | 'custom' | 'disabled'>('all')
 const activeTab = ref<EditorTabId>('routing')
-const synapseStatus = ref<SynapseStatusResponse | null>(null)
 const viewDensity = ref<'compact' | 'detailed'>('compact')
 const collapsedGroups = ref<Set<string>>(new Set())
 // Mobile: when an editor is open, the list slides out of view; the back button
@@ -1444,29 +1316,6 @@ const promptListFilters = computed(() => [
     count: disabledPromptCount.value,
   },
 ])
-
-/**
- * Live preview of the exact text that gets embedded for Synapse Routing.
- * Mirrors `SynapseIndexer::buildEmbeddingText()` on the backend.
- */
-const embeddingPreview = computed(() => {
-  const topic = currentPrompt.value?.topic || ''
-  const desc = (formData.value.shortDescription || '').trim()
-  const keywords = (formData.value.keywords || '').trim()
-  const lines: string[] = [`Topic: ${topic}`]
-  if (desc) lines.push(`Description: ${desc}`)
-  if (keywords) lines.push(`Keywords: ${keywords}`)
-  return lines.join('\n')
-})
-
-const keywordCount = computed(() => {
-  const raw = (formData.value.keywords || '').trim()
-  if (!raw) return 0
-  return raw
-    .split(/[\n,]+/)
-    .map((k) => k.trim())
-    .filter(Boolean).length
-})
 
 const contentLength = computed(() => (formData.value.content || '').length)
 const contentWordCount = computed(() => {
@@ -1812,11 +1661,6 @@ function topicIcon(topic: string): string {
   return 'heroicons:sparkles'
 }
 
-const topicStatusFor = (topic: string): SynapseTopicEntry | undefined => {
-  if (!isAdmin.value || !synapseStatus.value) return undefined
-  return synapseStatus.value.topics.find((entry) => entry.topic === topic)
-}
-
 const { hasUnsavedChanges, saveChanges, discardChanges, setupNavigationGuard } = useUnsavedChanges(
   formData,
   originalData
@@ -1835,16 +1679,6 @@ const loadAIModels = async () => {
     console.error('Failed to load AI models:', err)
   } finally {
     loadingModels.value = false
-  }
-}
-
-const loadSynapseStatus = async () => {
-  if (!isAdmin.value) return
-  try {
-    synapseStatus.value = await adminSynapseApi.getStatus()
-  } catch (err) {
-    // Status enrichment is optional — never block the page on it
-    console.warn('Failed to load Synapse status:', err)
   }
 }
 
@@ -1991,15 +1825,6 @@ const insertMarkdown = (before: string, after: string) => {
     textarea.focus()
     textarea.setSelectionRange(start + before.length, end + before.length)
   }, 0)
-}
-
-const copyToClipboard = async (text: string) => {
-  try {
-    await navigator.clipboard.writeText(text)
-    success(t('config.taskPrompts.copySuccess'))
-  } catch {
-    showError(t('config.taskPrompts.copyError'))
-  }
 }
 
 const handleSave = saveChanges(async () => {
@@ -2393,21 +2218,19 @@ onMounted(() => {
   // Disabled topics are demoted to a separate group that is collapsed by default
   // — they only matter when actively triaging the routing pool.
   collapsedGroups.value = new Set(['disabled'])
-  Promise.all([loadAIModels(), loadPrompts(), loadAvailableFiles(), loadSynapseStatus()]).then(
-    () => {
-      const urlParams = new URLSearchParams(window.location.search)
-      const topicParam = urlParams.get('topic')
-      if (topicParam) {
-        const prompt = prompts.value.find((p) => p.topic === topicParam)
-        if (prompt) {
-          selectedPromptId.value = prompt.id
-          loadPrompt()
-          // Deep link from another page: open the editor and stash the list (mobile)
-          listVisibleMobile.value = false
-        }
+  Promise.all([loadAIModels(), loadPrompts(), loadAvailableFiles()]).then(() => {
+    const urlParams = new URLSearchParams(window.location.search)
+    const topicParam = urlParams.get('topic')
+    if (topicParam) {
+      const prompt = prompts.value.find((p) => p.topic === topicParam)
+      if (prompt) {
+        selectedPromptId.value = prompt.id
+        loadPrompt()
+        // Deep link from another page: open the editor and stash the list (mobile)
+        listVisibleMobile.value = false
       }
     }
-  )
+  })
 })
 
 onUnmounted(() => {

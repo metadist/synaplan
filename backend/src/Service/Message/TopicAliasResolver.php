@@ -5,23 +5,20 @@ declare(strict_types=1);
 namespace App\Service\Message;
 
 /**
- * Maps fine-grained Synapse Routing topic names to the canonical legacy
- * topics that downstream handlers (MessageClassifier, SynapseRouter,
- * file group keys, intent mapping) understand.
+ * Maps fine-grained alias topic names to the canonical legacy topics that
+ * downstream handlers (MessageClassifier, file group keys, intent mapping)
+ * understand.
  *
- * Synapse Routing v2 introduces granular topics (`coding`, `general-chat`,
- * `image-generation`, `video-generation`, `audio-generation`) so the
- * embedding-based router can discriminate better. Downstream handlers
- * however still key off the legacy topics (`general`, `mediamaker`).
+ * Some older AI-sorter outputs / legacy data may still carry granular topic
+ * names (`coding`, `general-chat`, `image-generation`, `video-generation`,
+ * `audio-generation`); downstream handlers key off the canonical topics
+ * (`general`, `mediamaker`). This resolver runs at the end of classification:
+ *   - a granular topic e.g. `coding` ─► resolves to `general`
+ *   - `mediamaker` / `general` ─► pass through
+ *   - resolution also returns the implied media context (BMEDIA) for
+ *     `image|video|audio-generation` so callers don't reapply heuristics.
  *
- * This resolver runs at the very end of the routing pipeline:
- *   - SynapseRouter Tier-1 produces e.g. `coding` ─► resolve to `general`
- *   - AI fallback (`tools:sort`) may still produce `mediamaker` ─► passes through
- *   - Resolution also returns the implied media context (BMEDIA) for
- *     `image|video|audio-generation` so callers don't have to reapply heuristics.
- *
- * The mapping is intentionally kept here (not in PromptCatalog) so the
- * routing layer is the single source of truth for the alias contract.
+ * Kept as the single source of truth for the alias contract.
  */
 final class TopicAliasResolver
 {
@@ -48,8 +45,8 @@ final class TopicAliasResolver
     ];
 
     /**
-     * Resolve a topic produced by Tier-1 (Synapse) or Tier-2 (AI) routing
-     * to the canonical topic + implied media type.
+     * Resolve a topic produced by AI-sorter classification to the canonical
+     * topic + implied media type.
      *
      * @return array{topic: string, media: ?string, alias_source: ?string}
      *                                                                     `alias_source` carries the original granular topic when

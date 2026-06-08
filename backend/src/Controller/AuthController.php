@@ -10,7 +10,6 @@ use App\Repository\UserRepository;
 use App\Repository\VerificationTokenRepository;
 use App\Service\ImpersonationService;
 use App\Service\InternalEmailService;
-use App\Service\Message\SynapseAutoIndexService;
 use App\Service\OidcTokenService;
 use App\Service\RecaptchaService;
 use App\Service\TokenService;
@@ -47,7 +46,6 @@ class AuthController extends AbstractController
         private ValidatorInterface $validator,
         private LoggerInterface $logger,
         private ImpersonationService $impersonationService,
-        private SynapseAutoIndexService $synapseAutoIndex,
     ) {
         $this->resendCooldownMinutes = (int) ($_ENV['EMAIL_VERIFICATION_COOLDOWN_MINUTES'] ?? 2);
         $this->maxResendAttempts = (int) ($_ENV['EMAIL_VERIFICATION_MAX_ATTEMPTS'] ?? 5);
@@ -244,11 +242,6 @@ class AuthController extends AbstractController
         $refreshToken = $this->tokenService->generateRefreshToken($user, $request->getClientIp());
 
         $this->logger->info('User logged in', ['user_id' => $user->getId()]);
-
-        // Best-effort: refresh Synapse Routing topics for this user so any
-        // stale embeddings (admin model swap, prompt edits from other
-        // sessions) get rebuilt before the next chat turn lands.
-        $this->synapseAutoIndex->scheduleForUser($user);
 
         // Create response with cookies
         $response = new JsonResponse([
