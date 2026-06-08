@@ -82,4 +82,71 @@ class InternalEmailServiceTest extends TestCase
             originalRecipient: 'smart@synaplan.net',
         );
     }
+
+    /**
+     * Sprint 5: a multi-task turn can produce several files. The primary
+     * attachment plus each additional attachment must be attached to the email.
+     */
+    public function testAiResponseEmailAttachesPrimaryAndAdditionalFiles(): void
+    {
+        $mailer = $this->createMock(MailerInterface::class);
+        $twig = $this->createMock(Environment::class);
+        $translator = $this->createMock(TranslatorInterface::class);
+        $logger = $this->createMock(LoggerInterface::class);
+
+        $primary = (string) tempnam(sys_get_temp_dir(), 'mt_audio_');
+        $extra = (string) tempnam(sys_get_temp_dir(), 'mt_img_');
+        file_put_contents($primary, 'audio-bytes');
+        file_put_contents($extra, 'image-bytes');
+
+        $captured = null;
+        $mailer->expects($this->once())
+            ->method('send')
+            ->willReturnCallback(function ($email) use (&$captured): void {
+                $captured = $email;
+            });
+
+        $service = new InternalEmailService($mailer, $twig, $translator, $logger);
+        $service->sendAiResponseEmail(
+            'user@example.com',
+            'Test Subject',
+            'Here are your results.',
+            attachmentPath: $primary,
+            mediaType: 'audio',
+            additionalAttachmentPaths: [$extra],
+        );
+
+        self::assertNotNull($captured);
+        // Primary (audio) + one additional (image) = 2 attachments.
+        self::assertCount(2, $captured->getAttachments());
+
+        @unlink($primary);
+        @unlink($extra);
+    }
+
+    public function testAiResponseEmailSkipsMissingAdditionalFiles(): void
+    {
+        $mailer = $this->createMock(MailerInterface::class);
+        $twig = $this->createMock(Environment::class);
+        $translator = $this->createMock(TranslatorInterface::class);
+        $logger = $this->createMock(LoggerInterface::class);
+
+        $captured = null;
+        $mailer->expects($this->once())
+            ->method('send')
+            ->willReturnCallback(function ($email) use (&$captured): void {
+                $captured = $email;
+            });
+
+        $service = new InternalEmailService($mailer, $twig, $translator, $logger);
+        $service->sendAiResponseEmail(
+            'user@example.com',
+            'Test Subject',
+            'No attachments here.',
+            additionalAttachmentPaths: ['/tmp/does-not-exist-'.uniqid().'.mp3', ''],
+        );
+
+        self::assertNotNull($captured);
+        self::assertCount(0, $captured->getAttachments());
+    }
 }

@@ -505,7 +505,8 @@ class WebhookController extends AbstractController
                     $processingTime,
                     $attachmentPath,
                     $toEmail,
-                    $responseMediaType
+                    $responseMediaType,
+                    $this->resolveAdditionalAttachmentPathsFromAiMetadata($metadata)
                 );
 
                 $this->logger->info('Email response sent', [
@@ -860,20 +861,61 @@ class WebhookController extends AbstractController
     private function resolveAttachmentPathFromAiMetadata(array $metadata): ?string
     {
         $mediaType = strtolower((string) ($metadata['media_type'] ?? ''));
+        $relativePath = is_string($metadata['local_path'] ?? null) ? $metadata['local_path'] : null;
+        $filePathUrl = is_string($metadata['file']['path'] ?? null) ? $metadata['file']['path'] : null;
+
+        return $this->resolveUploadAbsolutePath($mediaType, $relativePath, $filePathUrl);
+    }
+
+    /**
+     * Multi-task routing (Sprint 5): resolve the ADDITIONAL output files (beyond
+     * the primary one) to absolute upload paths, for attaching to an email reply.
+     * Returns [] for single-file turns (no metadata['files']).
+     *
+     * @param array<string, mixed> $metadata
+     *
+     * @return list<string>
+     */
+    private function resolveAdditionalAttachmentPathsFromAiMetadata(array $metadata): array
+    {
+        $files = $metadata['files'] ?? null;
+        if (!is_array($files) || count($files) < 2) {
+            return [];
+        }
+
+        $paths = [];
+        foreach (array_values($files) as $idx => $file) {
+            if (0 === $idx || !is_array($file)) {
+                continue; // index 0 is the primary, handled separately
+            }
+            $type = strtolower((string) ($file['type'] ?? ''));
+            $relativePath = is_string($file['local_path'] ?? null) ? $file['local_path'] : null;
+            $filePathUrl = is_string($file['path'] ?? null) ? $file['path'] : null;
+            $abs = $this->resolveUploadAbsolutePath($type, $relativePath, $filePathUrl);
+            if (null !== $abs) {
+                $paths[] = $abs;
+            }
+        }
+
+        return $paths;
+    }
+
+    /**
+     * Resolve a media file (by relative path or serve URL) to an absolute path
+     * under var/uploads, with a path-traversal guard. Returns null when the type
+     * is not attachable, the path is missing, or the file is outside/absent.
+     */
+    private function resolveUploadAbsolutePath(string $mediaType, ?string $relativePath, ?string $filePathUrl): ?string
+    {
         if (!in_array($mediaType, ['image', 'video', 'audio'], true)) {
             return null;
         }
 
-        $relativePath = $metadata['local_path'] ?? null;
-
-        // Fallback: derive relative path from StreamController-compatible file.path.
+        // Fallback: derive relative path from a StreamController-compatible serve URL.
         if (!is_string($relativePath) || '' === trim($relativePath)) {
-            $filePath = $metadata['file']['path'] ?? null;
-            if (is_string($filePath)) {
-                $prefix = '/api/v1/files/uploads/';
-                if (str_starts_with($filePath, $prefix)) {
-                    $relativePath = substr($filePath, strlen($prefix));
-                }
+            $prefix = '/api/v1/files/uploads/';
+            if (is_string($filePathUrl) && str_starts_with($filePathUrl, $prefix)) {
+                $relativePath = substr($filePathUrl, strlen($prefix));
             }
         }
 
