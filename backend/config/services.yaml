@@ -103,6 +103,13 @@ services:
         App\Service\Multitask\Execution\TaskRunner:
             tags: ['app.multitask.runner']
 
+    # Multi-task parallel media offload (Sprint 4): subprocess dispatcher.
+    App\Service\Multitask\Execution\Parallel\ProcessMediaNodeDispatcher:
+        arguments:
+            $projectDir: '%kernel.project_dir%'
+    App\Service\Multitask\Execution\Parallel\MediaNodeDispatcher:
+        alias: App\Service\Multitask\Execution\Parallel\ProcessMediaNodeDispatcher
+
     App\:
         resource: '../src/'
         exclude:

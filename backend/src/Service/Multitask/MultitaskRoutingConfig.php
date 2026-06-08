@@ -38,10 +38,14 @@ final readonly class MultitaskRoutingConfig
     public const KEY_ROUTING_ENABLED = 'ROUTING_ENABLED';
     public const KEY_SHADOW_MODE = 'SHADOW_MODE';
     public const KEY_PARALLEL_ENABLED = 'PARALLEL_ENABLED';
+    public const KEY_MAX_PARALLEL = 'MAX_PARALLEL';
+    public const KEY_NODE_TIMEOUT = 'NODE_TIMEOUT';
 
     private const DEFAULT_ROUTING_ENABLED = true;
     private const DEFAULT_SHADOW_MODE = false;
     private const DEFAULT_PARALLEL_ENABLED = false;
+    private const DEFAULT_MAX_PARALLEL = 3;
+    private const DEFAULT_NODE_TIMEOUT = 120;
 
     public function __construct(
         private ConfigRepository $configRepository,
@@ -76,6 +80,30 @@ final readonly class MultitaskRoutingConfig
     public function isParallelEnabled(): bool
     {
         return $this->resolveFlag(self::KEY_PARALLEL_ENABLED, null, self::DEFAULT_PARALLEL_ENABLED);
+    }
+
+    /**
+     * Max media nodes executed concurrently (subprocess offload). Bounds provider
+     * rate-limit exposure and memory. Global-only; clamped to a sane range.
+     */
+    public function maxParallel(): int
+    {
+        $value = $this->configRepository->getValue(0, self::CONFIG_GROUP, self::KEY_MAX_PARALLEL);
+        $n = null !== $value ? (int) $value : self::DEFAULT_MAX_PARALLEL;
+
+        return max(1, min(8, $n));
+    }
+
+    /**
+     * Per-node hard timeout (seconds) for an offloaded media subprocess. A node
+     * that exceeds it is marked failed and isolated (never hangs the turn).
+     */
+    public function nodeTimeoutSeconds(): int
+    {
+        $value = $this->configRepository->getValue(0, self::CONFIG_GROUP, self::KEY_NODE_TIMEOUT);
+        $n = null !== $value ? (int) $value : self::DEFAULT_NODE_TIMEOUT;
+
+        return max(10, min(600, $n));
     }
 
     private function resolveFlag(string $setting, ?int $userId, bool $default): bool

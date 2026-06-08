@@ -109,6 +109,18 @@ final readonly class MediaGenerationRunner implements TaskRunner
         $m->setDirection('IN');
         $m->setFile(0);
 
+        // MediaGenerationHandler uses the message id only to build the output
+        // filename and requires a non-null int. This synthetic message is never
+        // persisted, so assign a unique pseudo-id (reflection; entity has no
+        // setId) to keep filenames unique across concurrent media nodes.
+        $realId = $context->message->getId();
+        try {
+            $ref = new \ReflectionProperty(Message::class, 'id');
+            $ref->setValue($m, $realId ?? random_int(1, 2_000_000_000));
+        } catch (\Throwable) {
+            // If reflection ever fails, the handler will surface a clear error.
+        }
+
         return $m;
     }
 
