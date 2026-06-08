@@ -630,6 +630,40 @@ final readonly class MessageClassifier
             }
         }
 
+        // Audio / text-to-speech triggers. A request to read something aloud,
+        // produce an MP3, narrate, or "say" something must reach the AI sorter
+        // (→ mediamaker / BMEDIA=audio) AND, when it combines a content request
+        // with an audio output ("write a love poem AND read it to me as an MP3"),
+        // the multi-task planner. The fast-path emits source=fast_path_heuristic,
+        // which TaskPlanExecutor treats as "single-node, no planning" — so a
+        // shortcut here meant the chat model answered in prose and FABRICATED a
+        // fake download link (https://files.example.com/...mp3) instead of
+        // generating real audio. Deferring costs at most one extra sorter call.
+        static $audioTriggers = [
+            // English
+            'mp3', 'wav', '.ogg', ' audio', 'audio ', 'read aloud', 'read it aloud',
+            'read this aloud', 'say it', 'say this', 'speak ', 'spoken', 'voice over',
+            'voiceover', 'text to speech', 'text-to-speech', ' tts', 'podcast',
+            'narrate', 'narration', 'voice message', 'as speech', 'into speech',
+            'out loud',
+            // German
+            'vorlesen', 'vorlies', 'lies vor', 'lies mir', 'lies das', 'vorgelesen',
+            'sprich ', 'sprachausgabe', 'als sprache', 'audiodatei', 'audio datei',
+            'sprachnachricht', 'vertone', 'vertonen', 'vertont', 'als hörbuch',
+            'sprachversion', 'laut vor',
+            // Spanish
+            'en voz alta', 'léelo', 'leelo', 'lee en voz', 'audio de', 'a voz',
+            // French
+            'à voix haute', 'lis-moi', 'lis le', 'lire à voix', 'en audio',
+            // Italian
+            'ad alta voce', 'leggi ad', 'in audio',
+        ];
+        foreach ($audioTriggers as $trigger) {
+            if (str_contains($lower, $trigger)) {
+                return false;
+            }
+        }
+
         // Note: there is no `$searchTriggers` blocklist here. The fast-path
         // deliberately answers trivial chats without a web search — under the
         // "trust the model" policy a fast-pathed message carries no BWEBSEARCH
