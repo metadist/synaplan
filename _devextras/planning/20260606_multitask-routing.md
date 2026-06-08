@@ -45,7 +45,7 @@ extract_text(doc)  ──►  summarize(text)  ──►  tts(summary) ──►
 `MessageProcessor` orchestrates: **preprocess → classify → (web search) → route → single handler**.
 
 - **Preprocess** — `Service/Message/MessagePreProcessor.php`: downloads attachments and extracts text. Documents via Apache Tika (`Service/File/FileProcessor.php`), audio via Whisper, images stored for later vision. Text lands in `Message.fileText` / `File.fileText`. **Text extraction already happens here** — that is important: it means the first node of our canonical example is largely an existing capability.
-- **Classify** — `Service/Message/MessageClassifier.php` runs a decision tree: fast-path heuristics → slash commands (`/pic`, `/vid`, `/tts`, `/search`, …) → file/audio shortcut (`analyzefile`) → `SynapseRouter` (embedding) → `MessageSorter` (LLM). It returns a single `{topic, intent, language, media_type, …}`.
+- **Classify** — `Service/Message/MessageClassifier.php` runs a decision tree: fast-path heuristics → slash commands (`/pic`, `/vid`, `/tts`, `/search`, …) → file/audio shortcut (`analyzefile`) → `MessageSorter` (LLM AI sorter). It returns a single `{topic, intent, language, media_type, …}`.
 - **AI sorter** — `Service/Message/MessageSorter.php` loads the `tools:sort` prompt (`Prompt/PromptCatalog.php::sortPrompt()`), injects `[DYNAMICLIST]` (enabled `BPROMPTS` topics), and calls `DEFAULTMODEL.SORT` (= **gpt-oss-120b on Groq** in prod) at `temperature 0.1`, parsing one JSON object with `BTOPIC/BLANG/BWEBSEARCH/BMEDIA/BDURATION/BRESOLUTION/BINPUTMODE`.
 - **Route** — `Service/Message/InferenceRouter.php` maps `intent` → one of **three** registered handlers tagged `app.message.handler`:
   - `ChatHandler` (chat, RAG, summarize, officemaker, vision-in-chat)
