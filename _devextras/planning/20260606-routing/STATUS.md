@@ -15,6 +15,42 @@ Branch: **`feat/mult-routing-update`** (all work committed, tree clean, nothing 
   image gen in the in-process runner too).
 - Next: **Sprint 5 (cross-channel)** — WhatsApp/email/API multi-file delivery.
 
+## Sprint 5 — READY TO IMPLEMENT (mapped, not started)
+
+Goal: deliver ALL `metadata['files']` (text + N files from a multi-node plan) on
+WhatsApp, email, and the generic API. Today only web SSE (Sprint 3b) consumes
+`metadata['files']`; other channels read the singular `metadata['file']` (=files[0]).
+`TaskPlanExecutor` already sets `metadata['file']=files[0]` AND `metadata['files']`,
+so single-file behaviour stays unchanged everywhere.
+
+Exact edit points (verified via recon):
+
+1. **WhatsApp** — `backend/src/Service/WhatsAppService.php`, after the PRIORITY-1
+   single-file send block (around line ~957, inside `if ($fileData)`): loop
+   `metadata['files']`, skip index 0, build `$url = rtrim($appUrl,'/').'/'.ltrim($path,'/')`,
+   `sendMedia($dto->from, $type, $url, $dto->phoneNumberId, null)` for each extra
+   (type ∈ image/video/audio). (Edit was designed but blocked by a tooling outage.)
+
+2. **Email** — `backend/src/Controller/WebhookController.php::email` (~line 377/498)
+   + `backend/src/Service/InternalEmailService.php::sendAiResponseEmail` (~line 144).
+   Add a multi-path resolver (reuse `resolveAttachmentPathFromAiMetadata` logic at
+   ~854–897: `local_path` or strip `/api/v1/files/uploads/` → `var/uploads/<rel>`)
+   that maps `metadata['files']`; extend `sendAiResponseEmail` to accept N
+   attachments (loop `attachFromPath`; images can still inline-embed the first).
+   Keep the single `$attachmentPath` from `metadata['file']` working.
+
+3. **Generic API** — `backend/src/Controller/WebhookController.php::generic` (~834):
+   add explicit `'files' => $meta['files'] ?? (isset($meta['file']) ? [$meta['file']] : [])`
+   to the JSON. (metadata already passes through, this is the clean contract.)
+
+4. **Async/enqueue** path is poll-only (no outbound) → out of scope.
+
+Tests: per-channel multi-file assembly (mock transports), widget invariant intact.
+Then live smoke + commit + show interface changes (WhatsApp media msgs, email
+attachments, API `files[]`).
+
+Resume command after reboot: re-probe shell, then implement 1→3, gate, commit.
+
 ## TL;DR (Sprints 0–4)
 
 Sprints 0–4 + the multitask chat UX are **done and committed**. Everything is
