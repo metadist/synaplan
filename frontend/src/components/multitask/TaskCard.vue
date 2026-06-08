@@ -2,6 +2,7 @@
 import { computed } from 'vue'
 import { Icon } from '@iconify/vue'
 import type { TaskCard } from '@/stores/history'
+import MessageText from '@/components/MessageText.vue'
 
 const props = defineProps<{ card: TaskCard }>()
 
@@ -32,6 +33,14 @@ const isMediaKind = computed(() => ['image', 'video', 'audio'].includes(props.ca
 const showSkeleton = computed(
   () => isMediaKind.value && !props.card.url && props.card.state !== 'failed'
 )
+
+// Render the body as full markdown for text-bearing nodes (chat / summarize /
+// translate / rag_query / file_analysis = kind 'text', plus 'extract'). Without
+// this the DAG-emitted body shows as raw "**bold**" / "---" / numbered prose
+// because the previous template did `{{ card.text }}` inside a plain <p>. The
+// other kinds (audio/image/video/document/search) hold short status strings
+// where markdown is unnecessary, so we keep the plain text path for them.
+const isProseKind = computed(() => ['text', 'extract'].includes(props.card.kind))
 </script>
 
 <template>
@@ -90,9 +99,16 @@ const showSkeleton = computed(
 
     <template v-else>
       <!-- Streaming / final text -->
-      <p v-if="card.text" class="text-sm txt-primary whitespace-pre-wrap break-words">
-        {{ card.text }}<span v-if="card.state === 'running'" class="task-card__cursor">▍</span>
-      </p>
+      <div v-if="card.text" class="task-card__body text-sm txt-primary break-words">
+        <MessageText
+          v-if="isProseKind"
+          :content="card.text"
+          :is-streaming="card.state === 'running'"
+          readonly
+        />
+        <p v-else class="whitespace-pre-wrap">{{ card.text }}</p>
+        <span v-if="card.state === 'running'" class="task-card__cursor" aria-hidden="true">▍</span>
+      </div>
 
       <!-- Resolved media -->
       <div v-if="card.url" class="mt-2">

@@ -1064,8 +1064,12 @@ const copyMessageText = async () => {
 // Badge collapse state
 const showAllBadges = ref(false)
 
-// Sources expand/collapse state
-const sourcesExpanded = ref(false)
+// Sources expand/collapse state.
+// Default OPEN: when the assistant ran a web search, the sources are part of
+// the answer's citation context, so they should be visible without an extra
+// click. Users can still collapse the section via the chevron toggle if they
+// want a denser thread view.
+const sourcesExpanded = ref(true)
 
 // Carousel state for search results
 const carouselPage = ref(0) // Which "page" we're on (0-based)

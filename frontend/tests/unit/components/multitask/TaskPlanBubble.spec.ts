@@ -3,10 +3,21 @@ import { mount } from '@vue/test-utils'
 import TaskPlanBubble from '@/components/multitask/TaskPlanBubble.vue'
 import type { TaskPlanState } from '@/stores/history'
 
+// `MessageText` is stubbed because the real component pulls in Pinia stores
+// and the markdown pipeline; both are tested elsewhere. The stub preserves
+// the visible text so the existing `text()` assertions still pass after
+// TaskCard switched the body of text-kind cards to render through
+// `MessageText` (markdown parity with the legacy chat bubble).
+const messageTextStub = {
+  name: 'MessageText',
+  props: ['content', 'isStreaming', 'readonly'],
+  template: '<div data-testid="message-text-stub">{{ content }}</div>',
+}
+
 const mountOptions = {
   global: {
     mocks: { $t: (key: string, fallback?: string) => fallback ?? key },
-    stubs: { Icon: true },
+    stubs: { Icon: true, MessageText: messageTextStub },
   },
 }
 
