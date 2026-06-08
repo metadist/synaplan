@@ -1,11 +1,23 @@
-# Multi-Task Routing — Status & Handoff (2026-06-07)
+# Multi-Task Routing — Status & Handoff (updated 2026-06-08)
 
 Branch: **`feat/mult-routing-update`** (all work committed, tree clean, nothing pushed).
-Pick up tomorrow from here.
 
-## TL;DR
+## 2026-06-08 update
+- **Sprint 4 (hybrid parallel execution) DONE & committed.** Media nodes
+  (image/video/audio) offloaded to concurrent subprocesses; text stays inline +
+  streaming. Gated by `MULTITASK_PARALLEL_ENABLED` (default OFF). New BCONFIG keys
+  `MULTITASK.MAX_PARALLEL` (3) and `MULTITASK.NODE_TIMEOUT` (120). Live: dog+mp3
+  **19s parallel vs 34s sequential**.
+- **Dev DB image/audio un-stubbed**: `DEFAULTMODEL.TEXT2PIC=190` (Gemini Nano
+  Banana) and `TEXT2SOUND=41` (OpenAI tts-1) — both verified producing real files.
+  (Other caps — CHAT/SORT/ANALYZE/etc. — are still test-provider in dev.)
+- Bug fixed: media synthetic message now carries a non-null id (was breaking
+  image gen in the in-process runner too).
+- Next: **Sprint 5 (cross-channel)** — WhatsApp/email/API multi-file delivery.
 
-Sprints 0–3 + the multitask chat UX are **done and committed**. Everything is
+## TL;DR (Sprints 0–4)
+
+Sprints 0–4 + the multitask chat UX are **done and committed**. Everything is
 behind feature flags. Existing users are grandfathered OFF; new installs/dev/new
 signups default ON. Backend suite **1893 green**, phpstan + lint clean, frontend
 **560 vitest green** + vue-tsc clean. The only thing not verified live is the new
