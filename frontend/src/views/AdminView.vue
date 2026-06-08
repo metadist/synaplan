@@ -35,6 +35,7 @@
       <div class="space-y-6">
         <!-- Overview Tab -->
         <div v-if="activeTab === 'overview'" data-testid="section-overview">
+          <AdminSystemInfoPanel class="mb-6" />
           <div v-if="overviewLoading" class="text-center py-12">
             <Icon icon="mdi:loading" class="w-8 h-8 animate-spin mx-auto txt-secondary" />
           </div>
@@ -711,6 +712,9 @@ import {
 } from '@/services/api/adminApi'
 const AdminSubscriptionsPanel = defineAsyncComponent(
   () => import('@/components/admin/AdminSubscriptionsPanel.vue')
+)
+const AdminSystemInfoPanel = defineAsyncComponent(
+  () => import('@/components/admin/AdminSystemInfoPanel.vue')
 )
 
 import { useRouter } from 'vue-router'

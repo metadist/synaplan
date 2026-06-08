@@ -573,6 +573,11 @@ services:
             $projectDir: '%kernel.project_dir%'
             $defaultTtsUrl: '%synaplan_tts_url_default%'
 
+    # System Info Service (Admin server diagnostics: PHP / memory / disk)
+    App\Service\Admin\SystemInfoService:
+        arguments:
+            $projectDir: '%kernel.project_dir%'
+
     # Vector Storage Configuration
     App\Service\RAG\VectorStorage\VectorStorageConfig:
         arguments:

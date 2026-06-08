@@ -136,6 +136,27 @@
       "totalUsers": "Usuarios Totales",
       "recentUsers": "Usuarios Recientes"
     },
+    "systemInfo": {
+      "title": "Información del Sistema",
+      "refresh": "Actualizar",
+      "loadError": "Error al cargar la información del sistema",
+      "phpVersion": "Versión de PHP",
+      "memoryLimit": "Límite de Memoria",
+      "inUse": "{value} en uso",
+      "diskFree": "Disco Libre",
+      "ofTotal": "de {value} en total",
+      "diskUsage": "Uso del disco",
+      "opcache": "OPcache",
+      "enabled": "Activado",
+      "disabled": "Desactivado",
+      "peakMemory": "Memoria Máxima",
+      "uploadMax": "Tamaño Máx. de Subida",
+      "postMax": "Tamaño Máx. de POST",
+      "maxExecTime": "Tiempo Máx. de Ejecución",
+      "os": "Sistema Operativo",
+      "server": "Servidor",
+      "hostname": "Nombre de Host"
+    },
     "analytics": {
       "registrations": "Registros de Usuarios",
       "usageByAction": "Uso por Acción",

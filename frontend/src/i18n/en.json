@@ -144,6 +144,27 @@
       "totalUsers": "Total Users",
       "recentUsers": "Recent Users"
     },
+    "systemInfo": {
+      "title": "System Info",
+      "refresh": "Refresh",
+      "loadError": "Failed to load system info",
+      "phpVersion": "PHP Version",
+      "memoryLimit": "Memory Limit",
+      "inUse": "{value} in use",
+      "diskFree": "Disk Free",
+      "ofTotal": "of {value} total",
+      "diskUsage": "Disk usage",
+      "opcache": "OPcache",
+      "enabled": "Enabled",
+      "disabled": "Disabled",
+      "peakMemory": "Peak Memory",
+      "uploadMax": "Max Upload Size",
+      "postMax": "Max POST Size",
+      "maxExecTime": "Max Execution Time",
+      "os": "Operating System",
+      "server": "Server",
+      "hostname": "Hostname"
+    },
     "analytics": {
       "registrations": "User Registrations",
       "usageByAction": "Usage by Action",
