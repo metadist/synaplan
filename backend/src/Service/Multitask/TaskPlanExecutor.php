@@ -88,6 +88,11 @@ final readonly class TaskPlanExecutor
                 'message_id' => $message->getId(),
             ]);
 
+            // The legacy router is about to produce a clean answer, so retract the
+            // failed task cards — otherwise the user sees a misleading
+            // "step failed" box sitting above a correct reply.
+            $this->discardPlan($progressCallback);
+
             return $this->runSingleNode(
                 fn () => $this->router->routeStream($message, $thread, $this->effectiveClassification($classification), $streamCallback, $progressCallback, $options),
                 $message,
@@ -131,6 +136,8 @@ final readonly class TaskPlanExecutor
         $assembled = $this->runDag($message, $thread, $classification, $options, $plan, $progressCallback);
 
         if ($assembled['all_failed']) {
+            $this->discardPlan($progressCallback);
+
             return $this->runSingleNode(
                 fn () => $this->router->route($message, $thread, $this->effectiveClassification($classification), $progressCallback, $options),
                 $message,
@@ -252,6 +259,26 @@ final readonly class TaskPlanExecutor
         }
 
         return $assembled;
+    }
+
+    /**
+     * Tell the client to retract the task plan it rendered from the `plan` event.
+     * Emitted right before the legacy fallback streams its answer so a fully
+     * failed plan does not leave a misleading "step failed" card above the
+     * correct reply. No-op off the streaming/progress channel.
+     */
+    private function discardPlan(?callable $progressCallback): void
+    {
+        if (null === $progressCallback) {
+            return;
+        }
+
+        $progressCallback([
+            'status' => 'plan_discarded',
+            'message' => '',
+            'metadata' => ['reason' => 'all_failed_fallback'],
+            'timestamp' => time(),
+        ]);
     }
 
     /**

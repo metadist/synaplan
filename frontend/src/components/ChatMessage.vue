@@ -751,49 +751,25 @@
               />
             </button>
 
-            <button
-              type="button"
-              :disabled="isSuperseded || isGuestMode || !selectedModel || !hasModels"
-              :class="[
-                'pill text-xs whitespace-nowrap relative',
-                isSuperseded || isGuestMode || !selectedModel || !hasModels
-                  ? 'opacity-50 cursor-not-allowed'
-                  : '',
-              ]"
-              :aria-label="$t('chatMessage.again')"
-              data-testid="btn-message-again"
-              @click="!isGuestMode && handleAgain()"
-            >
-              <ArrowPathIcon class="w-4 h-4" />
-              <span v-if="!isGuestMode && selectedModel" class="font-medium hidden sm:inline"
-                >{{ $t('chatMessage.againWith') }} {{ selectedModel.label }}</span
-              >
-              <span v-else-if="!isGuestMode" class="font-medium hidden sm:inline">{{
-                $t('chatMessage.again')
-              }}</span>
-              <span :class="isGuestMode ? 'font-medium' : 'font-medium sm:hidden'">{{
-                $t('chatMessage.again')
-              }}</span>
-              <Icon
-                v-if="isGuestMode"
-                icon="mdi:lock-outline"
-                class="w-3 h-3 text-amber-500 absolute -top-1 -right-1"
-              />
-            </button>
-
             <div class="relative">
+              <!-- Single "Again with… ▾" control: opening the dropdown and
+                   picking a model re-runs the prompt (see selectModel). The old
+                   standalone "Again with <model>" button was merged into this to
+                   save horizontal space. -->
               <button
                 type="button"
-                :disabled="isSuperseded || isGuestMode"
+                :disabled="isSuperseded || isGuestMode || !hasModels"
                 :class="[
-                  'pill text-xs relative',
-                  isSuperseded || isGuestMode ? 'opacity-50 cursor-not-allowed' : '',
+                  'pill text-xs whitespace-nowrap relative',
+                  isSuperseded || isGuestMode || !hasModels ? 'opacity-50 cursor-not-allowed' : '',
                 ]"
                 :aria-label="$t('chatMessage.regenerateWith')"
-                data-testid="btn-message-model-toggle"
+                data-testid="btn-message-again"
                 @click.stop="!isGuestMode && toggleModelDropdown()"
                 @keydown.escape="closeModelDropdown"
               >
+                <ArrowPathIcon class="w-4 h-4" />
+                <span class="font-medium">{{ $t('chatMessage.againWith') }}…</span>
                 <ChevronDownIcon class="w-4 h-4" />
                 <Icon
                   v-if="isGuestMode"
@@ -1420,21 +1396,6 @@ const handleRetry = () => {
 
   if (textContent) {
     emit('retry', textContent)
-  }
-}
-
-const handleAgain = () => {
-  const model = selectedModel.value
-  if (!model) {
-    return
-  }
-
-  if (props.backendMessageId && model.id) {
-    // New backend-driven again
-    emit('again', props.backendMessageId, model.id)
-  } else {
-    // Fallback to old regenerate
-    emit('regenerate', model)
   }
 }
 

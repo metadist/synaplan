@@ -389,11 +389,18 @@ final readonly class MessageProcessor
                     if ($searchResults && !empty($searchResults['results']) && $this->searchResultRepository) {
                         $this->searchResultRepository->saveSearchResults($message, $searchResults, $searchQuery);
 
+                        // Surface the actual sources (not just the count) the
+                        // moment the search returns, so the client can render the
+                        // "sources" box within seconds — while the answer is still
+                        // generating — instead of waiting for the final `complete`
+                        // event. Shape matches StreamController::formatSearchResultsForSse().
                         $this->notify($statusCallback, 'search_complete', sprintf(
                             'Found %d web results',
                             count($searchResults['results'])
                         ), [
                             'results_count' => count($searchResults['results']),
+                            'query' => $searchQuery,
+                            'results' => $this->formatSearchResultsForClient($searchResults['results']),
                         ]);
                     } else {
                         $this->logger->warning('No search results found or repository not available', [
@@ -793,11 +800,18 @@ final readonly class MessageProcessor
                     if ($searchResults && !empty($searchResults['results']) && $this->searchResultRepository) {
                         $this->searchResultRepository->saveSearchResults($message, $searchResults, $searchQuery);
 
+                        // Surface the actual sources (not just the count) the
+                        // moment the search returns, so the client can render the
+                        // "sources" box within seconds — while the answer is still
+                        // generating — instead of waiting for the final `complete`
+                        // event. Shape matches StreamController::formatSearchResultsForSse().
                         $this->notify($statusCallback, 'search_complete', sprintf(
                             'Found %d web results',
                             count($searchResults['results'])
                         ), [
                             'results_count' => count($searchResults['results']),
+                            'query' => $searchQuery,
+                            'results' => $this->formatSearchResultsForClient($searchResults['results']),
                         ]);
                     } else {
                         $this->logger->warning('No search results found or repository not available', [
@@ -1030,6 +1044,39 @@ final readonly class MessageProcessor
                 'error' => $e->getMessage(),
             ]);
         }
+    }
+
+    /**
+     * Map raw Brave results into the client source-card shape. Kept in sync with
+     * {@see \App\Controller\StreamController::formatSearchResultsForSse()} so the
+     * early `search_complete` payload and the final `complete` payload render
+     * identically.
+     *
+     * @return list<array<string, mixed>>
+     */
+    private function formatSearchResultsForClient(mixed $results): array
+    {
+        if (!is_array($results)) {
+            return [];
+        }
+
+        $out = [];
+        foreach ($results as $result) {
+            if (!is_array($result)) {
+                continue;
+            }
+            $profile = $result['profile'] ?? null;
+            $out[] = [
+                'title' => is_string($result['title'] ?? null) ? $result['title'] : '',
+                'url' => is_string($result['url'] ?? null) ? $result['url'] : '',
+                'description' => is_string($result['description'] ?? null) ? $result['description'] : '',
+                'published' => $result['age'] ?? null,
+                'source' => is_array($profile) ? ($profile['name'] ?? null) : null,
+                'thumbnail' => $result['thumbnail'] ?? null,
+            ];
+        }
+
+        return $out;
     }
 
     private function notify(?callable $callback, string $status, string $message, array $metadata = []): void

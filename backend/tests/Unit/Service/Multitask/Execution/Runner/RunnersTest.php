@@ -8,18 +8,25 @@ use App\AI\Service\AiFacade;
 use App\Entity\Message;
 use App\Service\Calendar\CalendarEventService;
 use App\Service\File\FileStorageService;
+use App\Service\Message\Handler\ChatHandler;
+use App\Service\Message\Handler\FileAnalysisHandler;
 use App\Service\Message\Handler\MediaGenerationHandler;
+use App\Service\Message\SearchQueryGenerator;
 use App\Service\ModelConfigService;
 use App\Service\Multitask\Execution\NodeContext;
 use App\Service\Multitask\Execution\NodeResult;
 use App\Service\Multitask\Execution\Runner\CalendarEventRunner;
 use App\Service\Multitask\Execution\Runner\ChatRunner;
 use App\Service\Multitask\Execution\Runner\ComposeReplyRunner;
+use App\Service\Multitask\Execution\Runner\DocumentGenerationRunner;
 use App\Service\Multitask\Execution\Runner\ExtractTextRunner;
+use App\Service\Multitask\Execution\Runner\FileAnalysisRunner;
 use App\Service\Multitask\Execution\Runner\MediaGenerationRunner;
 use App\Service\Multitask\Execution\Runner\Text2SoundRunner;
+use App\Service\Multitask\Execution\Runner\WebSearchRunner;
 use App\Service\Multitask\Plan\Capability;
 use App\Service\Multitask\Plan\TaskNode;
+use App\Service\Search\BraveSearchService;
 use Doctrine\Common\Collections\ArrayCollection;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
@@ -35,6 +42,20 @@ final class RunnersTest extends TestCase
         $m->method('getLanguage')->willReturn('en');
         $m->method('getFile')->willReturn(0);
         $m->method('getFilePath')->willReturn('');
+        $m->method('getFiles')->willReturn(new ArrayCollection());
+
+        return $m;
+    }
+
+    private function messageWithFile(string $text = ''): Message&MockObject
+    {
+        $m = $this->createMock(Message::class);
+        $m->method('getText')->willReturn($text);
+        $m->method('getFileText')->willReturn('');
+        $m->method('getLanguage')->willReturn('en');
+        $m->method('getFile')->willReturn(1);
+        $m->method('getFilePath')->willReturn('01/000/00001/2026/06/cat.png');
+        $m->method('getFileType')->willReturn('png');
         $m->method('getFiles')->willReturn(new ArrayCollection());
 
         return $m;
@@ -277,6 +298,126 @@ final class RunnersTest extends TestCase
 
         self::assertFalse($result->isSuccessful());
         self::assertStringContainsString('missing start time', (string) $result->error);
+    }
+
+    public function testDocumentGenerationLiftsGeneratedFileFromHandler(): void
+    {
+        $handler = $this->createMock(ChatHandler::class);
+        $captured = null;
+        $handler->method('handle')->willReturnCallback(function ($msg, $thread, $classification) use (&$captured): array {
+            $captured = $classification;
+
+            return [
+                'content' => '__FILE_GENERATED__:WM_Spielplan.docx',
+                'metadata' => [
+                    'generated_file' => [
+                        'id' => 9,
+                        'filename' => 'WM_Spielplan.docx',
+                        'path' => '01/000/00001/2026/06/WM_Spielplan_1.docx',
+                        'size' => 7400,
+                        'type' => 'docx',
+                    ],
+                ],
+            ];
+        });
+
+        $runner = new DocumentGenerationRunner($handler, $this->createMock(LoggerInterface::class));
+        $node = new TaskNode('n1', Capability::DocumentGeneration, [], ['text' => 'Create a docx with a table']);
+
+        $result = $runner->run($node, $this->context($this->message('Create a docx with a table')));
+
+        self::assertTrue($result->isSuccessful());
+        self::assertCount(1, $result->files);
+        self::assertSame('document', $result->files[0]['type']);
+        self::assertSame('/api/v1/files/uploads/01/000/00001/2026/06/WM_Spielplan_1.docx', $result->files[0]['path']);
+        self::assertSame('01/000/00001/2026/06/WM_Spielplan_1.docx', $result->files[0]['local_path']);
+        // ChatHandler must be steered to the officemaker file-generation prompt.
+        self::assertSame('officemaker', $captured['topic']);
+        self::assertSame('document_generation', $captured['intent']);
+    }
+
+    public function testDocumentGenerationFailsWhenNoFileProduced(): void
+    {
+        $handler = $this->createMock(ChatHandler::class);
+        $handler->method('handle')->willReturn(['content' => '__FILE_GENERATION_FAILED__', 'metadata' => ['error' => 'llm error']]);
+
+        $runner = new DocumentGenerationRunner($handler, $this->createMock(LoggerInterface::class));
+        $node = new TaskNode('n1', Capability::DocumentGeneration, [], ['text' => 'make a doc']);
+
+        $result = $runner->run($node, $this->context($this->message('make a doc')));
+
+        self::assertFalse($result->isSuccessful());
+        self::assertStringContainsString('no file', (string) $result->error);
+    }
+
+    public function testWebSearchReturnsFormattedResults(): void
+    {
+        $brave = $this->createMock(BraveSearchService::class);
+        $brave->method('isEnabled')->willReturn(true);
+        $brave->method('search')->willReturn(['query' => 'mars news', 'results' => [['title' => 'X']], 'query_metadata' => ['total' => 1]]);
+        $brave->method('formatResultsForAI')->willReturn('Web Search Results for: "mars news"');
+
+        $queryGen = $this->createMock(SearchQueryGenerator::class);
+        $queryGen->method('generate')->willReturn('mars news');
+
+        $runner = new WebSearchRunner($queryGen, $brave, $this->createMock(LoggerInterface::class));
+        $node = new TaskNode('n1', Capability::WebSearch, [], ['query' => 'latest mars news']);
+
+        $result = $runner->run($node, $this->context($this->message('latest mars news')));
+
+        self::assertTrue($result->isSuccessful());
+        self::assertStringContainsString('Web Search Results', (string) $result->text);
+        self::assertTrue($result->metadata['web_search'] ?? false);
+        self::assertSame('mars news', $result->metadata['query'] ?? null);
+    }
+
+    public function testWebSearchFailsWhenDisabled(): void
+    {
+        $brave = $this->createMock(BraveSearchService::class);
+        $brave->method('isEnabled')->willReturn(false);
+
+        $runner = new WebSearchRunner($this->createMock(SearchQueryGenerator::class), $brave, $this->createMock(LoggerInterface::class));
+        $node = new TaskNode('n1', Capability::WebSearch, [], ['query' => 'anything']);
+
+        $result = $runner->run($node, $this->context($this->message('anything')));
+
+        self::assertFalse($result->isSuccessful());
+        self::assertStringContainsString('not configured', (string) $result->error);
+    }
+
+    public function testFileAnalysisAnswersAboutAttachment(): void
+    {
+        $handler = $this->createMock(FileAnalysisHandler::class);
+        $captured = null;
+        $handler->method('handle')->willReturnCallback(function ($msg, $thread, $classification) use (&$captured): array {
+            $captured = $classification;
+
+            return ['content' => 'The image shows a cat.', 'metadata' => ['analysis_type' => 'vision']];
+        });
+
+        $runner = new FileAnalysisRunner($handler, $this->createMock(LoggerInterface::class));
+        $node = new TaskNode('n1', Capability::FileAnalysis, [], ['prompt' => 'What is in this image?']);
+
+        $result = $runner->run($node, $this->context($this->messageWithFile('What is in this image?')));
+
+        self::assertTrue($result->isSuccessful());
+        self::assertSame('The image shows a cat.', $result->text);
+        self::assertSame('analyzefile', $captured['topic']);
+        self::assertSame('file_analysis', $captured['intent']);
+    }
+
+    public function testFileAnalysisFailsWithoutAttachment(): void
+    {
+        $handler = $this->createMock(FileAnalysisHandler::class);
+        $handler->expects(self::never())->method('handle');
+
+        $runner = new FileAnalysisRunner($handler, $this->createMock(LoggerInterface::class));
+        $node = new TaskNode('n1', Capability::FileAnalysis, [], ['prompt' => 'describe it']);
+
+        $result = $runner->run($node, $this->context($this->message('describe it')));
+
+        self::assertFalse($result->isSuccessful());
+        self::assertStringContainsString('no file', (string) $result->error);
     }
 
     public function testComposeReplyGathersTextAndAttachments(): void

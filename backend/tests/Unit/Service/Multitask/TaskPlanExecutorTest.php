@@ -208,14 +208,19 @@ final class TaskPlanExecutorTest extends TestCase
         // Whole-plan failure → legacy router answers.
         $this->router->expects(self::once())->method('routeStream')->willReturn(['content' => 'legacy answer']);
 
+        $statuses = [];
         $result = $this->executor->executeStream(
             $this->message(),
             [],
             ['intent' => 'chat', 'language' => 'en', 'source' => 'ai_sorting'],
             static function (): void {},
+            function (array $event) use (&$statuses): void { $statuses[] = $event['status'] ?? null; },
         );
 
         self::assertSame(['content' => 'legacy answer'], $result);
+        // The UI must be told to retract the failed task cards before the clean
+        // fallback answer streams.
+        self::assertContains('plan_discarded', $statuses);
     }
 
     public function testSingleNodePlanFromPlannerUsesLegacyPath(): void

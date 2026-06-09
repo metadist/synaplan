@@ -124,8 +124,11 @@ export const selectors = {
     messageText: '[data-testid="message-text"]',
     /** Present when message topic is ERROR (backend error path); use to assert no error in bubble */
     messageTopicError: '[data-testid="message-topic-error"]',
+    // The "Again with… ▾" control is a single button that opens the model
+    // dropdown; picking a model re-runs the prompt. (Previously a split button +
+    // separate toggle — now unified, so both aliases point to the same element.)
     againBtn: '[data-testid="btn-message-again"]',
-    againDropdown: '[data-testid="btn-message-model-toggle"]',
+    againDropdown: '[data-testid="btn-message-again"]',
     againDropdownPanel: '[data-testid="dropdown-again-models"]',
     againDropdownItem: 'button.dropdown-item',
   },

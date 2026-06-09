@@ -81,6 +81,10 @@ export interface StreamEventMetadata {
   state?: string
   kind?: string
   chunk?: string
+  /** Web search (status === 'search_complete'): early sources + query. */
+  results_count?: number
+  query?: string
+  results?: StreamSearchResult[]
   [key: string]: unknown
 }
 

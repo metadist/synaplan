@@ -1555,6 +1555,20 @@ const streamAIResponse = async (
           } else if (data.status === 'search_complete') {
             processingStatus.value = 'search_complete'
             processingMetadata.value = data.metadata || {}
+            // Surface the sources immediately (they arrive seconds before the
+            // answer) so the "sources" box renders now, with the generating
+            // indicator acting as the placeholder above the soon-to-stream text.
+            const earlySources = data.metadata?.results
+            if (Array.isArray(earlySources) && earlySources.length > 0) {
+              const searchMsg = historyStore.messages.find((m) => m.id === messageId)
+              if (searchMsg) {
+                searchMsg.searchResults = earlySources as NonNullable<Message['searchResults']>
+                searchMsg.webSearch = {
+                  query: typeof data.metadata?.query === 'string' ? data.metadata.query : '',
+                  resultsCount: earlySources.length,
+                }
+              }
+            }
           } else if (data.status === 'generating') {
             processingStatus.value = 'generating'
             processingMetadata.value = {
@@ -1759,6 +1773,20 @@ const streamAIResponse = async (
           } else if (data.status === 'search_complete') {
             processingStatus.value = 'search_complete'
             processingMetadata.value = data.metadata || {}
+            // Surface the sources immediately (they arrive seconds before the
+            // answer) so the "sources" box renders now, with the generating
+            // indicator acting as the placeholder above the soon-to-stream text.
+            const earlySources = data.metadata?.results
+            if (Array.isArray(earlySources) && earlySources.length > 0) {
+              const searchMsg = historyStore.messages.find((m) => m.id === messageId)
+              if (searchMsg) {
+                searchMsg.searchResults = earlySources as NonNullable<Message['searchResults']>
+                searchMsg.webSearch = {
+                  query: typeof data.metadata?.query === 'string' ? data.metadata.query : '',
+                  resultsCount: earlySources.length,
+                }
+              }
+            }
           } else if (data.status === 'generating') {
             processingStatus.value = 'generating'
             // Use custom message from backend if available, otherwise default
@@ -1832,6 +1860,14 @@ const streamAIResponse = async (
                   state: 'pending' as TaskCardState,
                 })),
               }
+            }
+          } else if (data.status === 'plan_discarded') {
+            // The DAG failed entirely and the backend is falling back to a normal
+            // single-bubble answer. Retract the (now misleading) failed task cards
+            // so the clean reply below isn't sitting under a "step failed" box.
+            const message = historyStore.messages.find((m) => m.id === messageId)
+            if (message) {
+              message.taskPlan = null
             }
           } else if (data.status === 'task_update') {
             const message = historyStore.messages.find((m) => m.id === messageId)
