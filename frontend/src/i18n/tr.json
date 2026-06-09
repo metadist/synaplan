@@ -1039,6 +1039,7 @@
     "reasoning": "AI Akıl Yürütme",
     "fileGenerated": "Sizin için '{filename}' dosyasını oluşturdum. Şimdi indirebilirsiniz.",
     "fileGenerationFailed": "Dosya oluşturulurken bir sorun oluştu. Lütfen tekrar deneyin.",
+    "audioGenerated": "İstediğiniz ses burada. Aşağıdan oynatabilir veya indirebilirsiniz.",
     "cancelledByUser": "⚠️ Kullanıcı tarafından iptal edildi",
     "truncated": "Bu yanıt, model token sınırına ulaştığı için kesildi.",
     "continueButton": "Yanıtı sürdür"

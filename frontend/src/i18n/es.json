@@ -1039,6 +1039,7 @@
     "reasoning": "Razonamiento de IA",
     "fileGenerated": "He creado el archivo '{filename}' para ti. Ahora puedes descargarlo.",
     "fileGenerationFailed": "Hubo un problema al crear el archivo. Por favor intenta de nuevo.",
+    "audioGenerated": "Aquí está el audio que solicitaste. Puedes reproducirlo o descargarlo abajo.",
     "cancelledByUser": "⚠️ Cancelado por el usuario",
     "truncated": "Esta respuesta fue cortada porque el modelo alcanzó su límite de tokens.",
     "continueButton": "Continuar respuesta"

@@ -386,8 +386,12 @@ final readonly class MediaGenerationHandler implements MessageHandlerInterface
                 // Build display URL for StaticUploadController
                 $displayUrl = '/api/v1/files/uploads/'.$relativePath;
 
-                // Stream response
-                $responseText = "Generated audio: {$prompt}";
+                // Clean, localized confirmation (the audio player + download is the
+                // deliverable). Emitting a token — rendered by the frontend via
+                // i18n, like __FILE_GENERATED__ for documents — avoids leaking the
+                // raw English "Generated audio:" prefix and the synthesized prompt
+                // text (which could contain internal markers) into the bubble.
+                $responseText = '__AUDIO_GENERATED__';
                 $streamCallback($responseText);
 
                 $this->notify($progressCallback, 'generating', 'Audio generated successfully.');
