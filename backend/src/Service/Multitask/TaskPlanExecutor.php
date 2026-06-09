@@ -9,6 +9,8 @@ use App\Service\Message\InferenceRouter;
 use App\Service\ModelConfigService;
 use App\Service\Multitask\Execution\DagExecutor;
 use App\Service\Multitask\Execution\NodeContext;
+use App\Service\Multitask\Plan\Capability;
+use App\Service\Multitask\Plan\TaskPlan;
 use Psr\Log\LoggerInterface;
 
 /**
@@ -34,6 +36,13 @@ use Psr\Log\LoggerInterface;
  */
 final readonly class TaskPlanExecutor
 {
+    /**
+     * Capabilities that have NO legacy InferenceRouter equivalent and therefore
+     * must run through the DAG even as a lone single node (see
+     * {@see shouldUseLegacyRouter()}).
+     */
+    private const DAG_ONLY_CAPABILITIES = [Capability::CalendarEvent];
+
     public function __construct(
         private InferenceRouter $router,
         private ClassificationPlanMapper $mapper,
@@ -64,7 +73,7 @@ final readonly class TaskPlanExecutor
     ): array {
         $plan = $this->planForExecution($message, $thread, $classification);
 
-        if (null === $plan || $plan->plan->isSingleNode()) {
+        if (null === $plan || $this->shouldUseLegacyRouter($plan->plan)) {
             return $this->runSingleNode(
                 fn () => $this->router->routeStream($message, $thread, $this->effectiveClassification($classification), $streamCallback, $progressCallback, $options),
                 $message,
@@ -111,7 +120,7 @@ final readonly class TaskPlanExecutor
     ): array {
         $plan = $this->planForExecution($message, $thread, $classification);
 
-        if (null === $plan || $plan->plan->isSingleNode()) {
+        if (null === $plan || $this->shouldUseLegacyRouter($plan->plan)) {
             return $this->runSingleNode(
                 fn () => $this->router->route($message, $thread, $this->effectiveClassification($classification), $progressCallback, $options),
                 $message,
@@ -130,6 +139,27 @@ final readonly class TaskPlanExecutor
         }
 
         return $this->toHandlerResult($assembled);
+    }
+
+    /**
+     * Whether a planned single-node plan should delegate to the legacy
+     * InferenceRouter (the behaviour-identical Sprint-2 degenerate path).
+     *
+     * Multi-node plans always run the DAG. A single-node plan also runs the DAG
+     * when its capability has NO legacy router equivalent — otherwise the legacy
+     * router, fed the original (calendar-unaware) classification, silently
+     * degrades a lone `calendar_event` into a plain chat answer that merely
+     * *describes* adding the event (e.g. emitting a literal "{{date:tomorrow}}")
+     * instead of producing the .ics. Chat/media/file capabilities keep the
+     * legacy path (the legacy classifier already handles them).
+     */
+    private function shouldUseLegacyRouter(TaskPlan $plan): bool
+    {
+        if (!$plan->isSingleNode()) {
+            return false;
+        }
+
+        return !in_array($plan->nodes[0]->capability, self::DAG_ONLY_CAPABILITIES, true);
     }
 
     /**
@@ -178,7 +208,18 @@ final readonly class TaskPlanExecutor
         ?callable $progressCallback,
     ): array {
         $userId = $plan->modelId ? $this->modelConfigService->getEffectiveUserIdForMessage($message) : $message->getUserId();
-        $context = new NodeContext($message, $thread, $userId, $classification, $options);
+
+        // Sibling awareness: give every runner the full set of capabilities in
+        // this plan so a content node (chat/summarize) knows that media/file
+        // delivery is handled by ANOTHER node and must not refuse or apologise
+        // for it (e.g. "write a poem AND read it as MP3" — the chat node must
+        // not say "I can't create audio").
+        $planCapabilities = array_values(array_unique(array_map(
+            static fn ($node) => $node->capability->value,
+            $plan->plan->nodes,
+        )));
+
+        $context = new NodeContext($message, $thread, $userId, $classification, $options, $planCapabilities);
 
         // Announce the plan so the web client can render task cards up front. The
         // DagExecutor then emits task_update / task_chunk / task_file directly via
@@ -219,7 +260,7 @@ final readonly class TaskPlanExecutor
      *
      * @return list<array{node_id: string, capability: string, kind: string}>
      */
-    private function planForClient(Plan\TaskPlan $plan): array
+    private function planForClient(TaskPlan $plan): array
     {
         $tasks = [];
         foreach ($plan->nodes as $node) {

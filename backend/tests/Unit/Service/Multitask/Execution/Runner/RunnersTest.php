@@ -6,10 +6,13 @@ namespace App\Tests\Unit\Service\Multitask\Execution\Runner;
 
 use App\AI\Service\AiFacade;
 use App\Entity\Message;
+use App\Service\Calendar\CalendarEventService;
+use App\Service\File\FileStorageService;
 use App\Service\Message\Handler\MediaGenerationHandler;
 use App\Service\ModelConfigService;
 use App\Service\Multitask\Execution\NodeContext;
 use App\Service\Multitask\Execution\NodeResult;
+use App\Service\Multitask\Execution\Runner\CalendarEventRunner;
 use App\Service\Multitask\Execution\Runner\ChatRunner;
 use App\Service\Multitask\Execution\Runner\ComposeReplyRunner;
 use App\Service\Multitask\Execution\Runner\ExtractTextRunner;
@@ -197,6 +200,83 @@ final class RunnersTest extends TestCase
         $result = $runner->run($node, $this->context($this->message('a dog')));
 
         self::assertFalse($result->isSuccessful());
+    }
+
+    private function calendarRunner(): CalendarEventRunner
+    {
+        $storage = $this->createMock(FileStorageService::class);
+        $storage->method('storeRawContent')->willReturn([
+            'success' => true,
+            'path' => '1/000/2026/06/meeting.ics',
+            'size' => 123,
+            'mime' => 'text/calendar',
+            'error' => null,
+        ]);
+
+        return new CalendarEventRunner(new CalendarEventService(), $storage, $this->createMock(LoggerInterface::class));
+    }
+
+    /**
+     * Regression: the planner routinely emits the event fields under `inputs`
+     * (not `params`) — the runner must still build the invite instead of
+     * failing with "missing start time".
+     */
+    public function testCalendarEventReadsFieldsFromInputs(): void
+    {
+        $node = new TaskNode('n1', Capability::CalendarEvent, [], [
+            'title' => 'Meeting with Sanam',
+            'start' => '2026-06-10T09:00:00',
+            'timezone' => 'UTC',
+            'duration_minutes' => 60,
+            'attendees' => ['Sanam'],
+        ]);
+
+        $result = $this->calendarRunner()->run($node, $this->context($this->message()));
+
+        self::assertTrue($result->isSuccessful());
+        self::assertCount(1, $result->files);
+        self::assertSame('1/000/2026/06/meeting.ics', $result->files[0]['local_path']);
+        self::assertSame('Meeting with Sanam', $result->metadata['calendar_event']['title'] ?? null);
+    }
+
+    public function testCalendarEventReadsFieldsFromParams(): void
+    {
+        $node = new TaskNode('n1', Capability::CalendarEvent, [], [], [
+            'title' => 'Sync',
+            'start' => '2026-06-10T15:00:00',
+            'timezone' => 'Europe/Berlin',
+        ]);
+
+        $result = $this->calendarRunner()->run($node, $this->context($this->message()));
+
+        self::assertTrue($result->isSuccessful());
+        self::assertCount(1, $result->files);
+    }
+
+    public function testCalendarEventParamsWinOverInputs(): void
+    {
+        $node = new TaskNode('n1', Capability::CalendarEvent, [], [
+            'title' => 'From inputs',
+        ], [
+            'title' => 'From params',
+            'start' => '2026-06-10T09:00:00',
+            'timezone' => 'UTC',
+        ]);
+
+        $result = $this->calendarRunner()->run($node, $this->context($this->message()));
+
+        self::assertTrue($result->isSuccessful());
+        self::assertSame('From params', $result->metadata['calendar_event']['title'] ?? null);
+    }
+
+    public function testCalendarEventFailsWhenStartMissingEverywhere(): void
+    {
+        $node = new TaskNode('n1', Capability::CalendarEvent, [], ['title' => 'No time']);
+
+        $result = $this->calendarRunner()->run($node, $this->context($this->message()));
+
+        self::assertFalse($result->isSuccessful());
+        self::assertStringContainsString('missing start time', (string) $result->error);
     }
 
     public function testComposeReplyGathersTextAndAttachments(): void

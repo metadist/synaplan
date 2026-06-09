@@ -234,4 +234,38 @@ final class TaskPlanExecutorTest extends TestCase
 
         self::assertSame(['content' => 'router answer'], $result);
     }
+
+    public function testSingleCalendarEventNodeRunsDagNotLegacyRouter(): void
+    {
+        // A lone calendar_event has NO legacy router equivalent — running it
+        // through the legacy router (with the calendar-unaware classification)
+        // degrades it into a plain chat answer. It MUST run the DAG instead.
+        $singleCalendar = TaskPlan::fromArray([
+            'version' => 1, 'language' => 'de', 'reply_node' => 'n1',
+            'tasks' => [[
+                'id' => 'n1',
+                'capability' => 'calendar_event',
+                'params' => ['title' => 'Meeting mit Oliver', 'start' => '2026-06-10T13:30:00', 'timezone' => 'UTC'],
+            ]],
+        ]);
+        $this->planner->method('plan')->willReturn(new TaskPlanResult($singleCalendar, fallback: false, modelId: 76));
+        $this->dagExecutor->expects(self::once())->method('execute')->willReturn($this->assembled([
+            'content' => 'Calendar invite "Meeting mit Oliver"',
+            'files' => [['path' => '/api/v1/files/uploads/meeting.ics', 'type' => 'document']],
+        ]));
+
+        // The legacy router must NOT be touched.
+        $this->router->expects(self::never())->method('routeStream');
+
+        $streamed = '';
+        $result = $this->executor->executeStream(
+            $this->message(),
+            [],
+            ['intent' => 'chat', 'language' => 'de', 'source' => 'ai_sorting'],
+            function (string $chunk) use (&$streamed): void { $streamed .= $chunk; },
+        );
+
+        self::assertSame('Calendar invite "Meeting mit Oliver"', $result['content']);
+        self::assertSame('document', $result['metadata']['file']['type']);
+    }
 }

@@ -49,7 +49,11 @@ final readonly class CalendarEventRunner implements TaskRunner
 
     public function run(TaskNode $node, NodeContext $context): NodeResult
     {
-        $params = $node->params;
+        // The planner is free to place the event fields under `params` OR under
+        // `inputs` — even strong models routinely emit
+        // {title, start, timezone, …} as `inputs` because they read like data.
+        // Accept both: resolved inputs first, then params override.
+        $params = $this->effectiveParams($node, $context);
 
         $title = is_string($params['title'] ?? null) && '' !== trim($params['title'])
             ? trim($params['title'])
@@ -113,6 +117,28 @@ final readonly class CalendarEventRunner implements TaskRunner
                 'timezone' => $tzName,
             ],
         ]);
+    }
+
+    /**
+     * Merge a node's resolved `inputs` and `params` into a single field bag the
+     * runner reads from. `params` wins on key collision; null-valued resolved
+     * inputs (unresolved references) are ignored so they never mask a real param.
+     *
+     * @return array<string, mixed>
+     */
+    private function effectiveParams(TaskNode $node, NodeContext $context): array
+    {
+        $merged = [];
+        foreach ($context->resolveInputs($node) as $key => $value) {
+            if (null !== $value) {
+                $merged[$key] = $value;
+            }
+        }
+        foreach ($node->params as $key => $value) {
+            $merged[$key] = $value;
+        }
+
+        return $merged;
     }
 
     /**

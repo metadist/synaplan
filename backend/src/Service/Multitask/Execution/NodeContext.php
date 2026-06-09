@@ -38,6 +38,10 @@ final class NodeContext
      * @param array<int, Message>  $thread
      * @param array<string, mixed> $classification
      * @param array<string, mixed> $options
+     * @param list<string>         $planCapabilities capability string values of ALL nodes in this plan
+     *                                               (sibling awareness — lets a runner know that, e.g.,
+     *                                               a `text2sound` step will handle the audio so a `chat`
+     *                                               node must not refuse/own that part)
      */
     public function __construct(
         public readonly Message $message,
@@ -45,6 +49,7 @@ final class NodeContext
         public readonly ?int $userId,
         public readonly array $classification,
         public readonly array $options = [],
+        public readonly array $planCapabilities = [],
     ) {
     }
 

@@ -448,6 +448,13 @@ Output JSON ONLY. No prose. No markdown. No backticks. No commentary.
 6. Plans are MINIMAL but COMPLETE. Most messages are 1 node. Combo requests
    ("write X AND read it as MP3", "summarize AND email", "translate AND speak")
    are ALWAYS multi-node — never collapse them into a single chat node.
+7. SCOPE each node's input to ITS OWN sub-task. For content nodes (chat,
+   summarize, translate) set `inputs.text` to a literal instruction in the
+   user's language containing ONLY that node's part of the request — STRIP the
+   clauses handled by sibling nodes. Example: for "Schreib mir ein Gedicht und
+   lies es als MP3 vor", the chat node's text is "Schreib mir ein Gedicht."
+   (NOT the whole sentence), and the text2sound node consumes `$n1.text`. Only
+   use `$message.text` when the entire message is that single node's job.
 
 ## Capabilities (use ONLY these)
 
@@ -501,11 +508,15 @@ User: "Schreib mir ein Liebesgedicht und lies es mir als MP3 vor."
   "language": "de",
   "reply_node": "n3",
   "tasks": [
-    { "id": "n1", "capability": "chat", "inputs": { "text": "$message.text" }, "params": { "topic_id": "general" } },
+    { "id": "n1", "capability": "chat", "inputs": { "text": "Schreib mir ein Liebesgedicht." }, "params": { "topic_id": "general" } },
     { "id": "n2", "capability": "text2sound", "depends_on": ["n1"], "inputs": { "text": "$n1.text" }, "params": { "format": "mp3" } },
     { "id": "n3", "capability": "compose_reply", "depends_on": ["n1","n2"], "inputs": { "text": "$n1.text", "attachments": ["$n2.file"] } }
   ]
 }
+
+Note how the chat node's input is the SCOPED instruction "Schreib mir ein
+Liebesgedicht." — the "und lies es mir als MP3 vor" clause is dropped because
+the text2sound node handles it.
 
 ### Document → short MP3 summary
 User: sends report.docx and writes "What's in there? Summarize it into a short MP3."
@@ -529,6 +540,20 @@ User: sends report.docx and writes "What's in there? Summarize it into a short M
   "reply_node": "n1",
   "tasks": [
     { "id": "n1", "capability": "text2sound", "inputs": { "text": "Hello world" }, "params": { "format": "mp3" } }
+  ]
+}
+
+### Calendar invite ("I need a meeting reminder for tomorrow at 9:00 with Sanam")
+The event fields go in `params`. Resolve the relative time against the time
+context into an absolute ISO-8601 local `start` + IANA `timezone`.
+
+{
+  "version": 1,
+  "language": "en",
+  "reply_node": "n2",
+  "tasks": [
+    { "id": "n1", "capability": "calendar_event", "params": { "title": "Meeting with Sanam", "start": "2026-06-10T09:00:00", "timezone": "UTC", "duration_minutes": 60, "attendees": ["Sanam"] } },
+    { "id": "n2", "capability": "compose_reply", "depends_on": ["n1"], "inputs": { "text": "Here is your meeting invite for tomorrow at 09:00 with Sanam.", "attachments": ["$n1.file"] } }
   ]
 }
 

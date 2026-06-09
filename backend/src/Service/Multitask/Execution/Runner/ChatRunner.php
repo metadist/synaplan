@@ -57,7 +57,7 @@ final readonly class ChatRunner implements TaskRunner
         $modelName = $modelId ? $this->modelConfigService->getModelName($modelId) : null;
 
         $messages = [
-            ['role' => 'system', 'content' => $this->systemPrompt($node, $language)],
+            ['role' => 'system', 'content' => $this->systemPrompt($node, $language, $context)],
             ['role' => 'user', 'content' => $text],
         ];
 
@@ -102,9 +102,9 @@ final readonly class ChatRunner implements TaskRunner
         ]);
     }
 
-    private function systemPrompt(TaskNode $node, string $language): string
+    private function systemPrompt(TaskNode $node, string $language, NodeContext $context): string
     {
-        return match ($node->capability) {
+        $base = match ($node->capability) {
             Capability::Summarize => sprintf(
                 'You are a precise summarizer. Summarize the user text concisely%s in language "%s". Return ONLY the summary, no preamble.',
                 isset($node->params['max_words']) && is_numeric($node->params['max_words']) ? ' in about '.(int) $node->params['max_words'].' words' : '',
@@ -116,6 +116,53 @@ final readonly class ChatRunner implements TaskRunner
             ),
             default => sprintf('You are a helpful assistant. Answer in language "%s".', $language),
         };
+
+        return $base.$this->pipelineDirective($context);
+    }
+
+    /**
+     * Hard guardrail appended to EVERY chat-node prompt.
+     *
+     * A ChatRunner node only ever executes as one step of a multi-node task
+     * plan (single-node chats take the legacy ChatHandler path). The node
+     * frequently receives the user's FULL request — e.g. "write a love poem
+     * AND read it to me as an MP3" — while a sibling node (text2sound,
+     * image_generation, document_generation, …) actually produces and
+     * delivers the file. Without this directive the chat model "helpfully"
+     * apologises for the part it cannot do ("Es tut mir leid, ich kann keine
+     * Audiodateien erstellen …"), even though the MP3 is generated right next
+     * to it. The directive tells the model to own ONLY its slice and never
+     * disclaim capabilities handled elsewhere. It is deterministic — it does
+     * not rely on the planner having stripped the sibling clauses.
+     */
+    private function pipelineDirective(NodeContext $context): string
+    {
+        $directive = "\n\nYou are ONE automated step in a larger multi-step pipeline that together fulfils the user's request."
+            ."\nProduce ONLY your own part: the requested text content."
+            .' Other automated steps create and deliver any files, audio, images, videos, documents or messages.'
+            .' NEVER claim you cannot create or provide audio, images, files, videos or documents.'
+            .' NEVER apologise, add disclaimers, or comment on your own capabilities or limitations.'
+            .' NEVER mention these other steps or that the request was split.'
+            .' Output only the requested content — no preamble, no closing remarks, no meta-commentary.';
+
+        $siblings = $context->planCapabilities;
+        $hints = [];
+        if (in_array(Capability::Text2Sound->value, $siblings, true)) {
+            $hints[] = 'A later step will read your text aloud as audio, so write natural, speakable prose.';
+        }
+        if (in_array(Capability::ImageGeneration->value, $siblings, true)
+            || in_array(Capability::VideoGeneration->value, $siblings, true)) {
+            $hints[] = 'A separate step generates the requested image/video; do not describe it as if you produced it.';
+        }
+        if (in_array(Capability::DocumentGeneration->value, $siblings, true)) {
+            $hints[] = 'A separate step builds the requested document file from your text.';
+        }
+
+        if ([] !== $hints) {
+            $directive .= "\n".implode(' ', $hints);
+        }
+
+        return $directive;
     }
 
     private function stringInput(mixed $value): ?string
