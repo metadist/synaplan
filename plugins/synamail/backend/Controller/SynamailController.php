@@ -101,7 +101,7 @@ class SynamailController extends AbstractController
 
         return $this->json([
             'success' => true,
-            'profile' => $this->pluginData->get($userId, self::PLUGIN_NAME, self::DATA_TYPE_PROFILE, $email),
+            'profile' => $this->pluginData->get($userId, self::PLUGIN_NAME, self::DATA_TYPE_PROFILE, $this->profileKey($email)),
         ]);
     }
 
@@ -153,7 +153,7 @@ class SynamailController extends AbstractController
         $date = $this->normalizeDate((string) ($payload['date'] ?? ''));
         $name = trim((string) ($payload['name'] ?? ''));
 
-        $existing = $this->pluginData->get($userId, self::PLUGIN_NAME, self::DATA_TYPE_PROFILE, $email);
+        $existing = $this->pluginData->get($userId, self::PLUGIN_NAME, self::DATA_TYPE_PROFILE, $this->profileKey($email));
         $profile = $existing ?? $this->emptyProfile($email);
 
         // --- AI pass: merge the new email into the rolling narrative. -------
@@ -203,7 +203,7 @@ class SynamailController extends AbstractController
         $profile['org'] = $this->orgFromEmail($email);
         $profile['updatedAt'] = $now;
 
-        $this->pluginData->set($userId, self::PLUGIN_NAME, self::DATA_TYPE_PROFILE, $email, $profile);
+        $this->pluginData->set($userId, self::PLUGIN_NAME, self::DATA_TYPE_PROFILE, $this->profileKey($email), $profile);
 
         return $this->json(['success' => true, 'profile' => $profile]);
     }
@@ -227,7 +227,7 @@ class SynamailController extends AbstractController
             return $this->json(['success' => false, 'error' => 'Invalid email'], Response::HTTP_BAD_REQUEST);
         }
 
-        $deleted = $this->pluginData->delete($userId, self::PLUGIN_NAME, self::DATA_TYPE_PROFILE, $email);
+        $deleted = $this->pluginData->delete($userId, self::PLUGIN_NAME, self::DATA_TYPE_PROFILE, $this->profileKey($email));
 
         return $this->json(['success' => true, 'deleted' => $deleted]);
     }
@@ -348,6 +348,18 @@ class SynamailController extends AbstractController
         $email = mb_strtolower(trim(rawurldecode($email)));
 
         return false !== filter_var($email, FILTER_VALIDATE_EMAIL) ? $email : null;
+    }
+
+    /**
+     * Storage key for one contact's profile. `plugin_data` sanitizes keys to
+     * `[a-z0-9_]` on write (PluginData::sanitizeKey), which would mangle a raw
+     * email ('alice@example.com' → 'aliceexamplecom') and silently break
+     * read-after-write. A hex hash survives sanitization untouched and cannot
+     * collide; the full email lives inside the profile JSON itself.
+     */
+    private function profileKey(string $email): string
+    {
+        return 'p_'.sha1($email);
     }
 
     private function normalizeDate(string $date): ?string
