@@ -201,6 +201,22 @@ class ModelCatalogTest extends TestCase
         }
     }
 
+    public function testClaudeFable5ModelsAreAvailableWithExpectedApiIds(): void
+    {
+        $fable5 = ModelCatalog::find('anthropic:claude-fable-5');
+
+        $this->assertCount(2, $fable5, 'Expected claude-fable-5 chat + vision variants');
+        $this->assertSame(['chat', 'pic2text'], array_column($fable5, 'tag'));
+
+        foreach ($fable5 as $variant) {
+            $this->assertSame('Anthropic', $variant['service']);
+            $this->assertSame('claude-fable-5', $variant['providerId']);
+            $this->assertSame('claude-fable-5', $variant['json']['params']['model'] ?? null);
+            $this->assertEqualsWithDelta(10.0, (float) $variant['priceIn'], 1e-9);
+            $this->assertEqualsWithDelta(50.0, (float) $variant['priceOut'], 1e-9);
+        }
+    }
+
     public function testGpt55ProModelsAreMarkedAsNonStreaming(): void
     {
         $chat = ModelCatalog::find('openai:gpt-5.5-pro:chat')[0];

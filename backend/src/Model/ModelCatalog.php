@@ -1184,6 +1184,52 @@ class ModelCatalog
             ],
         ],
         [
+            // Snapshot 2026-06-09 (https://platform.claude.com/docs/en/about-claude/models/overview).
+            // Claude Fable 5 — Anthropic's most capable widely released model.
+            // Generally available on the Claude API since 2026-06-09.
+            'id' => 240,
+            'service' => 'Anthropic',
+            'name' => 'Claude Fable 5',
+            'tag' => 'chat',
+            'selectable' => 1,
+            'active' => 1,
+            'providerId' => 'claude-fable-5',
+            'priceIn' => 10,
+            'inUnit' => 'per1M',
+            'priceOut' => 50,
+            'outUnit' => 'per1M',
+            'quality' => 10,
+            'rating' => 1,
+            'json' => [
+                'description' => 'Claude Fable 5 - Anthropic\'s most capable widely released model for the most demanding reasoning and long-horizon agentic work. Adaptive thinking (always on). 1M context, 128K max output.',
+                'max_tokens' => 128000,
+                'params' => ['model' => 'claude-fable-5'],
+                'features' => ['vision', 'reasoning'],
+                'meta' => ['context_window' => '1000000', 'max_output' => '128000'],
+            ],
+        ],
+        [
+            'id' => 241,
+            'service' => 'Anthropic',
+            'name' => 'Claude Fable 5 (Vision)',
+            'tag' => 'pic2text',
+            'selectable' => 1,
+            'active' => 1,
+            'providerId' => 'claude-fable-5',
+            'priceIn' => 10,
+            'inUnit' => 'per1M',
+            'priceOut' => 50,
+            'outUnit' => 'per1M',
+            'quality' => 10,
+            'rating' => 1,
+            'json' => [
+                'description' => 'Claude Fable 5 for image analysis and vision tasks. Anthropic\'s most capable widely released vision model.',
+                'prompt' => 'Describe the image in detail. Extract any text you see.',
+                'params' => ['model' => 'claude-fable-5'],
+                'meta' => ['supports_images' => true],
+            ],
+        ],
+        [
             // Snapshot 2026-05-27 (https://platform.claude.com/docs/en/about-claude/models/overview).
             'id' => 235,
             'service' => 'Anthropic',
