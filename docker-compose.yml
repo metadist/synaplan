@@ -344,7 +344,11 @@ services:
   # mind once persistent caches grow beyond a few hundred MB.
   # ----------------------------------------------------------------------------
   redis:
-    image: redis:8-alpine@sha256:69f2c586c8a7e9cce4ae1ee9bbaf60bc4bb5f4bb3880e4ed022b1fd758a7cab9
+    # Pinned to Redis 7.4: Centrifugo v6.4.0 (rueidis/RESP3) reliably receives
+    # client publications from 7.x, whereas Redis 8.x dropped pub/sub fan-out to
+    # the Centrifugo node (control messages arrived, publications did not),
+    # which silently broke realtime delivery to dashboard + widget clients.
+    image: redis:7.4-alpine@sha256:6ab0b6e7381779332f97b8ca76193e45b0756f38d4c0dcda72dbb3c32061ab99
     container_name: synaplan-redis
     command: >-
       redis-server

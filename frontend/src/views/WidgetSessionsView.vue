@@ -1526,8 +1526,15 @@ const handleSessionEvent = (event: WidgetEvent) => {
         sessions.value[sessionIndex].mode = 'human'
       }
     }
-    const takeoverMsgId = event.messageId as number
-    if (takeoverMsgId && !sessionMessages.value.some((m) => m.id === takeoverMsgId)) {
+    // Drop any optimistic local placeholder (negative id) now that the
+    // authoritative takeover message has arrived, then render it. Falling back
+    // to a synthetic id keeps the notice visible even if the backend ever
+    // omits messageId.
+    sessionMessages.value = sessionMessages.value.filter(
+      (m) => !(m.sender === 'system' && m.id < 0)
+    )
+    const takeoverMsgId = (event.messageId as number) || -Date.now()
+    if (!sessionMessages.value.some((m) => m.id === takeoverMsgId)) {
       sessionMessages.value.push({
         id: takeoverMsgId,
         direction: 'OUT',
@@ -1560,8 +1567,11 @@ const handleSessionEvent = (event: WidgetEvent) => {
         sessions.value[sessionIndex].mode = 'ai'
       }
     }
-    const handbackMsgId = event.messageId as number
-    if (handbackMsgId && !sessionMessages.value.some((m) => m.id === handbackMsgId)) {
+    sessionMessages.value = sessionMessages.value.filter(
+      (m) => !(m.sender === 'system' && m.id < 0)
+    )
+    const handbackMsgId = (event.messageId as number) || -Date.now()
+    if (!sessionMessages.value.some((m) => m.id === handbackMsgId)) {
       sessionMessages.value.push({
         id: handbackMsgId,
         direction: 'OUT',
@@ -1610,6 +1620,18 @@ const takeOver = async (session: widgetSessionsApi.WidgetSession) => {
     // Update selectedSession if it's the current one
     if (selectedSession.value?.id === session.id) {
       selectedSession.value.mode = 'human'
+
+      // Optimistic system notice so the operator gets immediate feedback for
+      // their own action. The authoritative message (with a real id) arrives
+      // via the `takeover` WS event and replaces this negative-id placeholder.
+      sessionMessages.value.push({
+        id: -Date.now(),
+        direction: 'OUT',
+        text: t('widgetSessions.takeoverNotice'),
+        timestamp: Math.floor(Date.now() / 1000),
+        sender: 'system',
+      })
+      nextTick(() => scrollToBottom())
     }
 
     // Update the session in the list
@@ -1647,6 +1669,17 @@ const handBack = async (session: widgetSessionsApi.WidgetSession) => {
     // Update selectedSession if it's the current one
     if (selectedSession.value?.id === session.id) {
       selectedSession.value.mode = 'ai'
+
+      // Optimistic system notice (replaced by the authoritative `handback` WS
+      // event carrying a real id).
+      sessionMessages.value.push({
+        id: -Date.now(),
+        direction: 'OUT',
+        text: t('widgetSessions.handbackNotice'),
+        timestamp: Math.floor(Date.now() / 1000),
+        sender: 'system',
+      })
+      nextTick(() => scrollToBottom())
     }
 
     // Update the session in the list
