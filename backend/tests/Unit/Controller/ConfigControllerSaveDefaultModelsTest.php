@@ -15,6 +15,7 @@ use App\Service\BillingService;
 use App\Service\Embedding\EmbeddingMetadataService;
 use App\Service\Embedding\EmbeddingModelChangeGuard;
 use App\Service\Embedding\Exception\PremiumRequiredException;
+use App\Service\Infrastructure\RedisService;
 use App\Service\ModelConfigService;
 use App\Service\Plugin\PluginManager;
 use App\Service\Search\BraveSearchService;
@@ -23,6 +24,7 @@ use App\Service\WhisperService;
 use Doctrine\ORM\EntityManagerInterface;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
+use Psr\Log\NullLogger;
 use Symfony\Component\DependencyInjection\Container;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -70,6 +72,9 @@ final class ConfigControllerSaveDefaultModelsTest extends TestCase
             $this->embeddingChangeGuard,
             $this->embeddingMetadata,
             $this->createStub(ModelConfigService::class),
+            // RedisService is final (not stubbable); a real instance with an
+            // empty DSN is inert and saveDefaultModels never touches it.
+            new RedisService('', 'test', new NullLogger()),
             'http://qdrant.example',
         );
 
