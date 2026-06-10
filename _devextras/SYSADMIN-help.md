@@ -363,15 +363,75 @@ after the cleanup phase.
 docker compose exec backend php bin/console redis:health 2>/dev/null || \
   docker compose exec redis redis-cli ping
 
-# Centrifugo
-curl -fsS http://localhost:8000/health
+# Centrifugo (internal-only — the admin UI / HTTP API are NOT proxied
+# publicly; run these from inside the Docker network)
+docker compose exec backend curl -fsS http://centrifugo:8000/health
 
 # Backend → Centrifugo HTTP publish
-curl -fsS -X POST http://localhost:8000/centrifugo/api \
+docker compose exec backend curl -fsS -X POST http://centrifugo:8000/api \
   -H "X-API-Key: ${REALTIME_API_KEY}" \
   -H "Content-Type: application/json" \
   -d '{"method":"info"}'
 ```
+
+---
+
+# UPGRADING: DOCTRINE → REDIS QUEUE CUTOVER
+
+This revision switches every Symfony Messenger transport from the Doctrine
+`messenger_messages` table to **Redis Streams** (see
+`backend/config/packages/messenger.yaml`). Jobs that were still queued in
+the table when you deploy are **NOT migrated automatically** — without the
+runbook below, in-flight async work (AI processing, file extraction,
+indexing, the dead-letter queue) is silently orphaned.
+
+## Redis is now mandatory infrastructure
+
+There is **no filesystem/doctrine fallback** in dev or prod anymore:
+
+* Symfony cache pools, locks, rate-limiter, Messenger and Centrifugo all
+  require `REDIS_DSN` to be reachable.
+* `/api/health` (HealthController) reports **503 when Redis is down** — the
+  LB will take the node out of rotation. Run Redis with HA (Sentinel /
+  managed) in production; a Redis outage degrades the whole node, by design.
+* Single-node installs: the bundled `redis` compose service is enough,
+  but it must be running — `docker compose up -d redis`.
+
+## Cutover runbook (one-time, per environment)
+
+```bash
+# 0. BEFORE deploying: note the legacy queue depth
+mysql -e "SELECT queue_name, COUNT(*) FROM messenger_messages GROUP BY queue_name;"
+
+# 1. Stop producing new jobs (maintenance window / remove node from LB)
+#    and stop the old messenger:consume workers.
+
+# 2. Deploy this revision. New jobs now go to Redis Streams.
+
+# 3. Drain the legacy Doctrine queues. The legacy_* transports are
+#    drain-only aliases of the old queue names — nothing routes to them.
+docker compose exec backend php bin/console messenger:consume \
+  legacy_async_ai_high legacy_async_extract legacy_async_index \
+  --time-limit=3600 -vv
+# Repeat until it idles at "no messages". A job that fails during the
+# drain lands in the NEW Redis `failed` transport (inspect as usual with
+# messenger:failed:show).
+
+# 4. Old dead-letter queue: inspect, then either re-run or discard.
+docker compose exec backend php bin/console messenger:consume legacy_failed -vv   # re-run
+# …or accept the loss consciously and truncate in step 5.
+
+# 5. Verify the table is empty, then it can be dropped at leisure.
+mysql -e "SELECT COUNT(*) FROM messenger_messages;"   # must be 0
+
+# 6. Start the new workers (one per priority, scale per node):
+docker compose exec -d backend php bin/console messenger:consume async_ai_high --time-limit=3600
+docker compose exec -d backend php bin/console messenger:consume async_extract async_index --time-limit=3600
+```
+
+Skipping step 3 on an install with a non-empty `messenger_messages` table
+**loses queued user work** — treat the runbook as part of the deploy, not
+as optional housekeeping.
 
 ---
 

@@ -8,7 +8,6 @@ use App\AI\Service\AiFacade;
 use App\Entity\RevectorizeRun;
 use App\Repository\RevectorizeRunRepository;
 use App\Service\Memory\MemoryEmbeddingModelResolver;
-use App\Service\Message\SynapseIndexer;
 use App\Service\VectorSearch\QdrantClientInterface;
 use Doctrine\DBAL\Connection;
 use Doctrine\DBAL\ParameterType;
@@ -50,7 +49,6 @@ final readonly class EmbeddingReindexService
     public function __construct(
         private QdrantClientInterface $qdrantClient,
         private AiFacade $aiFacade,
-        private SynapseIndexer $synapseIndexer,
         private EmbeddingMetadataService $embeddingMetadata,
         private MemoryEmbeddingModelResolver $memoryEmbeddingResolver,
         private RevectorizeRunRepository $runRepository,
@@ -78,10 +76,6 @@ final readonly class EmbeddingReindexService
             'model' => $modelInfo['model'],
         ]);
 
-        if (RevectorizeRun::SCOPE_SYNAPSE === $scope || RevectorizeRun::SCOPE_ALL === $scope) {
-            $this->reindexSynapse($run);
-        }
-
         if (RevectorizeRun::SCOPE_DOCUMENTS === $scope || RevectorizeRun::SCOPE_ALL === $scope) {
             $this->reindexDocuments($run, $modelInfo);
         }
@@ -90,7 +84,7 @@ final readonly class EmbeddingReindexService
         // layer for now (a dim-mismatched recreate used to wipe every
         // user memory, see AdminEmbeddingController::switch and the
         // probe check in reindexMemories()). `SCOPE_ALL` is still
-        // accepted for synapse + documents but skips memories so the
+        // accepted for documents but skips memories so the
         // legacy "switch everything at once" UX cannot trip the same
         // data-loss path. The reindex stays callable directly with
         // `SCOPE_MEMORIES` from a CLI / messenger replay once the
@@ -103,23 +97,6 @@ final readonly class EmbeddingReindexService
                 'run_id' => $run->getId(),
             ]);
         }
-    }
-
-    /**
-     * Synapse re-index uses the dedicated SYNAPSE_VECTORIZE binding
-     * (read via SynapseIndexer) — *not* the global VECTORIZE default
-     * which only governs documents/memories. Without this distinction
-     * the collection would be recreated with the wrong vector dim
-     * whenever Routing and RAG are pinned to different models.
-     */
-    private function reindexSynapse(RevectorizeRun $run): void
-    {
-        $synapseInfo = $this->synapseIndexer->getEmbeddingModelInfo();
-        $this->qdrantClient->recreateSynapseCollection($synapseInfo['vector_dim']);
-        $result = $this->synapseIndexer->indexAllTopics(null, true);
-        $run->incrementChunksProcessed($result['indexed']);
-        $run->incrementChunksFailed($result['errors']);
-        $this->runRepository->save($run);
     }
 
     /**
@@ -196,7 +173,7 @@ final readonly class EmbeddingReindexService
                 }
 
                 // Mirror `VectorizationService::VECTOR_DIMENSION` handling:
-                // the synapse_documents collection is created with a fixed
+                // the documents collection is created with a fixed
                 // dimension at install time, so any new model whose native
                 // output is wider/narrower must be sliced or zero-padded
                 // before upsert — otherwise Qdrant rejects the point and

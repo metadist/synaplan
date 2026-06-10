@@ -50,6 +50,46 @@ final class CentrifugoPublisherTest extends TestCase
         $this->assertSame(0, $client->getRequestsCount());
     }
 
+    public function testSkipsPlaceholderApiKeyInProd(): void
+    {
+        $client = new MockHttpClient();
+        $logger = $this->createMock(LoggerInterface::class);
+        $logger->expects($this->once())
+            ->method('error')
+            ->with($this->stringContains('changeme'));
+
+        $publisher = new CentrifugoPublisher(
+            httpClient: $client,
+            logger: $logger,
+            apiUrl: 'http://centrifugo:8000/api',
+            apiKey: 'changeme_centrifugo_api_key',
+            enabled: true,
+            environment: 'prod',
+        );
+
+        $publisher->publish(new WidgetSessionChannel('w', 's'), 'message.received', []);
+
+        $this->assertSame(0, $client->getRequestsCount());
+    }
+
+    public function testAllowsPlaceholderApiKeyInDev(): void
+    {
+        $client = new MockHttpClient(static fn (): MockResponse => new MockResponse(json_encode(['result' => []]), ['http_code' => 200]));
+
+        $publisher = new CentrifugoPublisher(
+            httpClient: $client,
+            logger: $this->createStub(LoggerInterface::class),
+            apiUrl: 'http://centrifugo:8000/api',
+            apiKey: 'changeme_centrifugo_api_key',
+            enabled: true,
+            environment: 'dev',
+        );
+
+        $publisher->publish(new WidgetSessionChannel('w', 's'), 'message.received', []);
+
+        $this->assertSame(1, $client->getRequestsCount());
+    }
+
     public function testEmitsCanonicalEnvelope(): void
     {
         $captured = null;

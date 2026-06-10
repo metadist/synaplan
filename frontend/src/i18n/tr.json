@@ -18,7 +18,7 @@
     "configInbound": "Giriş Kanalları",
     "configAiModels": "AI Modelleri",
     "configTaskPrompts": "Görev Promptları",
-    "configSortingPrompt": "Sıralama Promptu",
+    "configSortingPrompt": "Yönlendirme",
     "configApiKeys": "API Anahtarları",
     "configApiDocs": "API Dokümantasyonu",
     "statistics": "İstatistikler",
@@ -135,6 +135,27 @@
     "overview": {
       "totalUsers": "Toplam Kullanıcı",
       "recentUsers": "Son Kullanıcılar"
+    },
+    "systemInfo": {
+      "title": "Sistem Bilgisi",
+      "refresh": "Yenile",
+      "loadError": "Sistem bilgisi yüklenemedi",
+      "phpVersion": "PHP Sürümü",
+      "memoryLimit": "Bellek Sınırı",
+      "inUse": "{value} kullanımda",
+      "diskFree": "Boş Disk",
+      "ofTotal": "toplam {value} içinden",
+      "diskUsage": "Disk kullanımı",
+      "opcache": "OPcache",
+      "enabled": "Etkin",
+      "disabled": "Devre dışı",
+      "peakMemory": "En Yüksek Bellek",
+      "uploadMax": "Maks. Yükleme Boyutu",
+      "postMax": "Maks. POST Boyutu",
+      "maxExecTime": "Maks. Çalışma Süresi",
+      "os": "İşletim Sistemi",
+      "server": "Sunucu",
+      "hostname": "Ana Bilgisayar Adı"
     },
     "analytics": {
       "registrations": "Kullanıcı Kayıtları",
@@ -260,7 +281,7 @@
     "configInbound": "Gelen",
     "configAiModels": "AI Modelleri",
     "configTaskPrompts": "Görev Promptları",
-    "configSortingPrompt": "Sıralama Promptu",
+    "configSortingPrompt": "Yönlendirme",
     "configApiKeys": "API Anahtarları",
     "statistics": "İstatistikler",
     "subscription": "Abonelik",
@@ -678,6 +699,16 @@
     "sendFailed": "Üzgünüz, bir hatayla karşılaştık. Lütfen tekrar deneyin.",
     "continueFailed": "Yanıt sürdürülemedi. Lütfen tekrar deneyin.",
     "defaultAssistantReply": "Mesajınız için teşekkürler! Hemen size döneceğim.",
+    "openChat": "Sohbeti aç",
+    "closeChat": "Sohbeti kapat",
+    "switchToLight": "Açık moda geç",
+    "switchToDark": "Koyu moda geç",
+    "maximize": "Büyüt",
+    "minimize": "Küçült",
+    "operatorFallbackName": "Destek",
+    "takeoverNotice": "Artık bir destek temsilcisine bağlısınız.",
+    "handbackNotice": "Artık yapay zeka asistanımızla sohbet ediyorsunuz.",
+    "autoMessage": "Merhaba! Bugün size nasıl yardımcı olabilirim?",
     "previewWidget": "Widget Önizlemesi",
     "configuration": "Widget Yapılandırması",
     "closeEditor": "Editörü kapat",
@@ -744,8 +775,11 @@
     "widgetNamePlaceholder": "ör. Destek Sohbeti",
     "taskPrompt": "Görev Promptu",
     "selectTaskPrompt": "Bir görev promptu seçin",
-    "taskPromptHelp": "Widgetlar için yalnızca özel görev promptları kullanılabilir. Sistem promptları kullanılamaz.",
+    "standardSorting": "Standart yönlendirme (normal yönlendirmemi kullan)",
+    "customPromptsGroup": "Özel promptlar",
+    "taskPromptHelp": "Bu widget'ı özel promptlarınızdan birine sabitleyin veya her yanıta normal yönlendirmenizin karar vermesi için Standart yönlendirmeyi seçin (bu durumda varsayılan sohbet modelleriniz kullanılır). Sistem promptları kullanılamaz.",
     "noCustomPrompts": "Özel görev promptu yok. Lütfen önce bir özel görev promptu oluşturun.",
+    "noCustomPromptsHint": "Henüz özel prompt yok — yine de Standart yönlendirmeyi kullanabilirsiniz veya",
     "createTaskPrompt": "Görev Promptu Oluştur",
     "status": "Durum",
     "appearance": "Görünüm",
@@ -970,6 +1004,41 @@
     "default": "Yükleniyor...",
     "pleaseWait": "Lütfen bekleyin"
   },
+  "taskPlan": {
+    "title": "Görev planı",
+    "download": "İndir",
+    "failedBody": "Bu adım tamamlanamadı.",
+    "state": {
+      "pending": "Sırada",
+      "running": "Çalışıyor…",
+      "done": "Tamamlandı",
+      "failed": "Başarısız",
+      "skipped": "Atlandı"
+    },
+    "kind": {
+      "text": "Metin",
+      "image": "Görsel",
+      "video": "Video",
+      "audio": "Ses",
+      "document": "Belge",
+      "search": "Web araması",
+      "extract": "Metin çıkarma"
+    },
+    "capability": {
+      "extract_text": "Metin çıkarılıyor",
+      "chat": "Yanıt",
+      "summarize": "Özet",
+      "translate": "Çeviri",
+      "rag_query": "Bilgi yanıtı",
+      "web_search": "Web araması",
+      "file_analysis": "Dosya analizi",
+      "image_generation": "Görsel",
+      "video_generation": "Video",
+      "text2sound": "Ses",
+      "document_generation": "Belge",
+      "calendar_event": "Takvim daveti"
+    }
+  },
   "processing": {
     "started": "İşlem başlatılıyor...",
     "startedTitle": "Mesajınız işleniyor",
@@ -1015,6 +1084,7 @@
     "reasoning": "AI Akıl Yürütme",
     "fileGenerated": "Sizin için '{filename}' dosyasını oluşturdum. Şimdi indirebilirsiniz.",
     "fileGenerationFailed": "Dosya oluşturulurken bir sorun oluştu. Lütfen tekrar deneyin.",
+    "audioGenerated": "İstediğiniz ses burada. Aşağıdan oynatabilir veya indirebilirsiniz.",
     "cancelledByUser": "⚠️ Kullanıcı tarafından iptal edildi",
     "truncated": "Bu yanıt, model token sınırına ulaştığı için kesildi.",
     "continueButton": "Yanıtı sürdür"
@@ -1412,6 +1482,35 @@
       "saveChanges": "Değişiklikleri Kaydet",
       "noPrompts": "Prompt yok"
     },
+    "routing": {
+      "title": "Yönlendirme",
+      "flowBody": "Bir mesaj geldiğinde planlayıcı onu okur ve küçük bir görev kümesine dönüştürür (örneğin: bir görsel oluştur, ardından onu ses olarak özetle). Her görev uygun yetenek tarafından işlenir ve sonuçlar tek bir yanıtta birleştirilir.",
+      "customCalloutBody": "Kendi konularınızı ve sistem promptlarınızı mı istiyorsunuz? Bunları Görev Promptları sayfasında oluşturup düzenleyin — planlayıcı bunları otomatik olarak alır.",
+      "customCalloutLink": "Görev Promptlarını aç",
+      "masterTitle": "Çoklu görev yönlendirmesi",
+      "masterDesc": "Bir isteğin aynı anda birden fazla görevi tetikleyebilmesi için mesajları planlayıcı üzerinden yönlendirin. Kapalıyken, eski tek konulu yapay zeka sıralayıcısı yönlendirmeyi üstlenir.",
+      "masterHint": "Çalışma alanı için genel varsayılan. Mevcut kullanıcılar kendi tercih edene kadar kendi ayarlarını korur; bunu burada açmak kendi hesabınız için de etkinleştirir.",
+      "masterOn": "Açık",
+      "masterOff": "Kapalı",
+      "masterEnabledNotice": "Çoklu görev yönlendirmesi etkinleştirildi.",
+      "masterDisabledNotice": "Çoklu görev yönlendirmesi devre dışı bırakıldı.",
+      "masterUpdateFailed": "Çoklu görev yönlendirme durumu güncellenemedi.",
+      "togglesLoadFailed": "Yönlendirme yapılandırması yüklenemedi.",
+      "plannerTitle": "Planlayıcı promptu",
+      "plannerDesc": "Planlayıcının bir isteği görevlere ayırmak için izlediği talimatlar. Önizleme, modele gönderilen tam metni, etkin yeteneklerinizi ve konularınızı dahil ederek gösterir.",
+      "plannerRendered": "Önizleme",
+      "plannerSource": "Kaynak",
+      "plannerEdit": "Düzenle",
+      "plannerView": "Görüntüle",
+      "plannerSave": "Planlayıcı promptunu kaydet",
+      "plannerReset": "Sıfırla",
+      "plannerSaved": "Planlayıcı promptu kaydedildi.",
+      "plannerSaveFailed": "Planlayıcı promptu kaydedilemedi.",
+      "plannerLoadFailed": "Planlayıcı promptu yüklenemedi.",
+      "plannerAdminRequired": "Planlayıcı promptunu düzenlemek için yönetici erişimi gerekir.",
+      "legacyTitle": "Eski yedek (yönetici)",
+      "legacyDesc": "Tek konulu yapay zeka sıralayıcı promptu; yalnızca çoklu görev yönlendirmesi kapalıyken kullanılır."
+    },
     "sortingPrompt": {
       "title": "Önişlemci",
       "description": "Önişlemci gelen mesajı işler. Mesajı JSON nesnesi olarak alır ve JSON nesnesi döndürür.",
@@ -1429,7 +1528,13 @@
       "jsonExample": "JSON nesnesi örneği:",
       "btopicNote": "Önişlemci yeni bir JSON nesnesi de döndürebilir.",
       "savePrompt": "Promptu Kaydet",
-      "resetPrompt": "Promptu Sıfırla"
+      "resetPrompt": "Promptu Sıfırla",
+      "viewMode": "Görünüm modu",
+      "editMode": "Düzenleme modu",
+      "adminRequired": "Sıralama istemini düzenlemek için yönetici erişimi gereklidir.",
+      "saved": "Sıralama istemi kaydedildi.",
+      "loadFailed": "Sıralama istemi yüklenemedi.",
+      "saveFailed": "Sıralama istemi kaydedilemedi."
     },
     "apiKeys": {
       "title": "API Anahtarları",
@@ -2163,11 +2268,6 @@
       "disconnected": "Gerçek zamanlı bağlantı kapalı",
       "disabled": "Bu ortamda canlı güncellemeler kapalı. En güncel verileri görmek için sayfayı yenileyin.",
       "error": "Gerçek zamanlı bağlantı başarısız: {message}"
-    },
-    "notification": {
-      "reconnecting": "Bağlantı kesildi — yeniden bağlanılıyor…",
-      "reconnected": "Tekrar çevrimiçisin.",
-      "error": "Canlı güncellemeler şu anda kullanılamıyor. En son etkinliği görmek için sayfayı yenileyin."
     }
   }
 }

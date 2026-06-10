@@ -18,7 +18,7 @@
     "configInbound": "Canales de entrada",
     "configAiModels": "Modelos de IA",
     "configTaskPrompts": "Prompts de tareas",
-    "configSortingPrompt": "Prompt de ordenación",
+    "configSortingPrompt": "Enrutamiento",
     "configApiKeys": "Claves API",
     "configApiDocs": "Documentación API",
     "statistics": "Estadísticas",
@@ -135,6 +135,27 @@
     "overview": {
       "totalUsers": "Usuarios Totales",
       "recentUsers": "Usuarios Recientes"
+    },
+    "systemInfo": {
+      "title": "Información del Sistema",
+      "refresh": "Actualizar",
+      "loadError": "Error al cargar la información del sistema",
+      "phpVersion": "Versión de PHP",
+      "memoryLimit": "Límite de Memoria",
+      "inUse": "{value} en uso",
+      "diskFree": "Disco Libre",
+      "ofTotal": "de {value} en total",
+      "diskUsage": "Uso del disco",
+      "opcache": "OPcache",
+      "enabled": "Activado",
+      "disabled": "Desactivado",
+      "peakMemory": "Memoria Máxima",
+      "uploadMax": "Tamaño Máx. de Subida",
+      "postMax": "Tamaño Máx. de POST",
+      "maxExecTime": "Tiempo Máx. de Ejecución",
+      "os": "Sistema Operativo",
+      "server": "Servidor",
+      "hostname": "Nombre de Host"
     },
     "analytics": {
       "registrations": "Registros de Usuarios",
@@ -260,7 +281,7 @@
     "configInbound": "Entrante",
     "configAiModels": "Modelos IA",
     "configTaskPrompts": "Prompts de Tareas",
-    "configSortingPrompt": "Prompt de Clasificación",
+    "configSortingPrompt": "Enrutamiento",
     "configApiKeys": "Claves API",
     "statistics": "Estadísticas",
     "subscription": "Suscripción",
@@ -678,6 +699,16 @@
     "sendFailed": "Lo siento, ocurrió un error. Por favor intenta de nuevo.",
     "continueFailed": "No se pudo continuar la respuesta. Por favor intenta de nuevo.",
     "defaultAssistantReply": "¡Gracias por tu mensaje! Te responderé de inmediato.",
+    "openChat": "Abrir chat",
+    "closeChat": "Cerrar chat",
+    "switchToLight": "Cambiar al modo claro",
+    "switchToDark": "Cambiar al modo oscuro",
+    "maximize": "Maximizar",
+    "minimize": "Minimizar",
+    "operatorFallbackName": "Soporte",
+    "takeoverNotice": "Ahora estás conectado con un agente de soporte.",
+    "handbackNotice": "Ahora estás chateando con nuestro asistente de IA.",
+    "autoMessage": "¡Hola! ¿Cómo puedo ayudarte hoy?",
     "previewWidget": "Vista Previa del Widget",
     "configuration": "Configuración del Widget",
     "closeEditor": "Cerrar editor",
@@ -744,8 +775,11 @@
     "widgetNamePlaceholder": "ej. Chat de Soporte",
     "taskPrompt": "Prompt de Tarea",
     "selectTaskPrompt": "Selecciona un prompt de tarea",
-    "taskPromptHelp": "Solo prompts de tarea personalizados pueden usarse para widgets. Los prompts del sistema no están disponibles.",
+    "standardSorting": "Clasificación estándar (usar mi enrutamiento normal)",
+    "customPromptsGroup": "Prompts personalizados",
+    "taskPromptHelp": "Fija este widget a uno de tus prompts personalizados, o elige Clasificación estándar para que tu enrutamiento normal decida cada respuesta (entonces usa tus modelos de chat predeterminados). Los prompts del sistema no están disponibles.",
     "noCustomPrompts": "No hay prompts de tarea personalizados. Por favor crea uno primero.",
+    "noCustomPromptsHint": "Aún no tienes prompts personalizados — puedes usar Clasificación estándar, o",
     "createTaskPrompt": "Crear Prompt de Tarea",
     "status": "Estado",
     "appearance": "Apariencia",
@@ -970,6 +1004,41 @@
     "default": "Cargando...",
     "pleaseWait": "Por favor espera"
   },
+  "taskPlan": {
+    "title": "Plan de tareas",
+    "download": "Descargar",
+    "failedBody": "Este paso no se pudo completar.",
+    "state": {
+      "pending": "En cola",
+      "running": "Trabajando…",
+      "done": "Hecho",
+      "failed": "Fallido",
+      "skipped": "Omitido"
+    },
+    "kind": {
+      "text": "Texto",
+      "image": "Imagen",
+      "video": "Vídeo",
+      "audio": "Audio",
+      "document": "Documento",
+      "search": "Búsqueda web",
+      "extract": "Extracción de texto"
+    },
+    "capability": {
+      "extract_text": "Extrayendo texto",
+      "chat": "Respuesta",
+      "summarize": "Resumen",
+      "translate": "Traducción",
+      "rag_query": "Respuesta de conocimiento",
+      "web_search": "Búsqueda web",
+      "file_analysis": "Análisis de archivo",
+      "image_generation": "Imagen",
+      "video_generation": "Vídeo",
+      "text2sound": "Audio",
+      "document_generation": "Documento",
+      "calendar_event": "Invitación de calendario"
+    }
+  },
   "processing": {
     "started": "Iniciando procesamiento...",
     "startedTitle": "Procesando tu mensaje",
@@ -1015,6 +1084,7 @@
     "reasoning": "Razonamiento de IA",
     "fileGenerated": "He creado el archivo '{filename}' para ti. Ahora puedes descargarlo.",
     "fileGenerationFailed": "Hubo un problema al crear el archivo. Por favor intenta de nuevo.",
+    "audioGenerated": "Aquí está el audio que solicitaste. Puedes reproducirlo o descargarlo abajo.",
     "cancelledByUser": "⚠️ Cancelado por el usuario",
     "truncated": "Esta respuesta fue cortada porque el modelo alcanzó su límite de tokens.",
     "continueButton": "Continuar respuesta"
@@ -1411,6 +1481,35 @@
       "saveChanges": "Guardar Cambios",
       "noPrompts": "No hay prompts disponibles"
     },
+    "routing": {
+      "title": "Enrutamiento",
+      "flowBody": "Cuando llega un mensaje, el planificador lo lee y lo convierte en un pequeño conjunto de tareas (por ejemplo: generar una imagen y luego resumirla como audio). Cada tarea la realiza la capacidad adecuada y los resultados se combinan en una sola respuesta.",
+      "customCalloutBody": "¿Quieres tus propios temas y prompts de sistema? Créalos y edítalos en la página de Prompts de tareas — el planificador los detecta automáticamente.",
+      "customCalloutLink": "Abrir Prompts de tareas",
+      "masterTitle": "Enrutamiento multitarea",
+      "masterDesc": "Enruta los mensajes a través del planificador para que una solicitud pueda desencadenar varias tareas a la vez. Si está desactivado, el clasificador de IA de un solo tema se encarga del enrutamiento.",
+      "masterHint": "Valor predeterminado global del espacio de trabajo. Los usuarios existentes conservan su propia configuración hasta que opten por activarlo; activarlo aquí también lo habilita para tu propia cuenta.",
+      "masterOn": "Activado",
+      "masterOff": "Desactivado",
+      "masterEnabledNotice": "Enrutamiento multitarea activado.",
+      "masterDisabledNotice": "Enrutamiento multitarea desactivado.",
+      "masterUpdateFailed": "No se pudo actualizar el estado del enrutamiento multitarea.",
+      "togglesLoadFailed": "No se pudo cargar la configuración de enrutamiento.",
+      "plannerTitle": "Prompt del planificador",
+      "plannerDesc": "Las instrucciones que sigue el planificador para dividir una solicitud en tareas. La vista previa muestra el texto exacto que recibe el modelo, incluidas tus capacidades y temas actuales.",
+      "plannerRendered": "Vista previa",
+      "plannerSource": "Código fuente",
+      "plannerEdit": "Editar",
+      "plannerView": "Ver",
+      "plannerSave": "Guardar prompt del planificador",
+      "plannerReset": "Restablecer",
+      "plannerSaved": "Prompt del planificador guardado.",
+      "plannerSaveFailed": "No se pudo guardar el prompt del planificador.",
+      "plannerLoadFailed": "No se pudo cargar el prompt del planificador.",
+      "plannerAdminRequired": "Se requiere acceso de administrador para editar el prompt del planificador.",
+      "legacyTitle": "Alternativa heredada (admin)",
+      "legacyDesc": "El prompt del clasificador de IA de un solo tema, usado cuando el enrutamiento multitarea está desactivado."
+    },
     "sortingPrompt": {
       "title": "Preprocesador",
       "description": "El preprocesador maneja el mensaje entrante. Recibe el mensaje como objeto JSON y devuelve un objeto JSON.",
@@ -1428,7 +1527,13 @@
       "jsonExample": "Aquí hay un ejemplo del objeto JSON:",
       "btopicNote": "El preprocesador también puede devolver un nuevo objeto JSON.",
       "savePrompt": "Guardar Prompt",
-      "resetPrompt": "Restablecer Prompt"
+      "resetPrompt": "Restablecer Prompt",
+      "viewMode": "Modo de vista",
+      "editMode": "Modo de edición",
+      "adminRequired": "Se requiere acceso de administrador para editar el prompt de clasificación.",
+      "saved": "Prompt de clasificación guardado.",
+      "loadFailed": "No se pudo cargar el prompt de clasificación.",
+      "saveFailed": "No se pudo guardar el prompt de clasificación."
     },
     "apiKeys": {
       "title": "Claves API",
@@ -2162,11 +2267,6 @@
       "disconnected": "La conexión en tiempo real está cerrada",
       "disabled": "Las actualizaciones en vivo están desactivadas en este entorno. Recarga la página para ver los datos más recientes.",
       "error": "Falló la conexión en tiempo real: {message}"
-    },
-    "notification": {
-      "reconnecting": "Conexión perdida — reconectando…",
-      "reconnected": "Estás conectado de nuevo.",
-      "error": "Las actualizaciones en vivo no están disponibles temporalmente. Recarga la página para ver la actividad más reciente."
     }
   }
 }

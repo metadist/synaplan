@@ -9,8 +9,8 @@
  *      reactive state.
  *
  * The class is intentionally framework-agnostic — Vue-specific glue lives
- * in `useRealtimeChannel.ts` and the realtime Pinia store. That makes it
- * trivial to reuse from the embedded widget bundle (which doesn't load
+ * in the realtime Pinia store and `widgetOperatorRealtime.ts`. That makes
+ * it trivial to reuse from the embedded widget bundle (which doesn't load
  * Pinia).
  */
 
@@ -20,11 +20,12 @@ import {
   fetchVisitorConnectionToken,
   fetchSubscriptionToken,
 } from './tokenApi'
-import type {
-  ConnectionState,
-  RealtimeEnvelope,
-  RealtimeRuntimeConfig,
-  SubscribeOptions,
+import {
+  RealtimeEnvelopeSchema,
+  type ConnectionState,
+  type RealtimeEnvelope,
+  type RealtimeRuntimeConfig,
+  type SubscribeOptions,
 } from './types'
 
 export interface RealtimeClientOptions {
@@ -216,8 +217,14 @@ export class RealtimeClient {
     })
 
     sub.on('publication', (ctx: PublicationContext) => {
-      const data = ctx.data as RealtimeEnvelope<TPayload>
-      handlers.onPublication(data)
+      // Validate the wire envelope (type/ts/data) before handing it to app
+      // code; the payload type itself stays a compile-time contract.
+      const parsed = RealtimeEnvelopeSchema.safeParse(ctx.data)
+      if (!parsed.success) {
+        handlers.onError?.(`malformed realtime envelope on ${channel}`)
+        return
+      }
+      handlers.onPublication(parsed.data as RealtimeEnvelope<TPayload>)
     })
     if (handlers.onJoin)
       sub.on('join', (ctx) =>

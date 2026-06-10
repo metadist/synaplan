@@ -60,34 +60,35 @@ const tooltip = computed(() => {
   return t(`realtime.tooltip.${state.value}`)
 })
 
+// Theme-aware status colors from style.css (light + dark handled by the vars).
 const badgeClass = computed(() => {
   if (props.hideWhenConnected && state.value === 'connected') return 'sr-only'
   switch (state.value) {
     case 'connected':
-      return 'bg-emerald-50 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300'
+      return 'bg-[var(--status-success-muted)] text-[var(--status-success-text)]'
     case 'connecting':
     case 'reconnecting':
-      return 'bg-amber-50 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300'
+      return 'bg-[var(--status-warning-muted)] text-[var(--status-warning-text)]'
     case 'error':
-      return 'bg-red-50 text-red-700 dark:bg-red-900/30 dark:text-red-300'
+      return 'bg-[var(--status-error-muted)] text-[var(--status-error-text)]'
     case 'disabled':
     default:
-      return 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300'
+      return 'bg-[var(--status-neutral-muted)] text-[var(--status-neutral-text)]'
   }
 })
 
 const dotClass = computed(() => {
   switch (state.value) {
     case 'connected':
-      return 'bg-emerald-500'
+      return 'bg-[var(--status-success)]'
     case 'connecting':
     case 'reconnecting':
-      return 'bg-amber-500'
+      return 'bg-[var(--status-warning)]'
     case 'error':
-      return 'bg-red-500'
+      return 'bg-[var(--status-error)]'
     case 'disabled':
     default:
-      return 'bg-slate-400'
+      return 'bg-[var(--status-neutral)]'
   }
 })
 </script>

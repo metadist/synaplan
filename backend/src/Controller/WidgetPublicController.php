@@ -15,6 +15,7 @@ use App\Service\File\FileProcessor;
 use App\Service\File\FileStorageService;
 use App\Service\File\VectorizationService;
 use App\Service\Media\GeneratedFileMetadataNormalizer;
+use App\Service\Media\GeneratedFileRegistrar;
 use App\Service\Message\MessageProcessor;
 use App\Service\PromptService;
 use App\Service\RateLimitService;
@@ -62,6 +63,7 @@ class WidgetPublicController extends AbstractController
         private DiscordNotificationService $discord,
         private SlackNotificationService $slack,
         private GeneratedFileMetadataNormalizer $generatedFileMetadataNormalizer,
+        private GeneratedFileRegistrar $generatedFileRegistrar,
         private string $uploadDir,
     ) {
     }
@@ -675,6 +677,17 @@ class WidgetPublicController extends AbstractController
 
                 $this->em->flush();
 
+                // Ping every dashboard tab subscribed to widget:operators.{id}
+                // so the LiveSupportView session list refreshes in real time
+                // (this replaced the legacy 3-second polling loop). Envelope
+                // type is 'notification'; `kind` discriminates the payload.
+                $this->broadcaster->publishOperatorNotification($widgetId, [
+                    'kind' => 'new_message',
+                    'sessionId' => $session->getSessionId(),
+                    'preview' => mb_substr((string) $data['text'], 0, 100),
+                    'timestamp' => time(),
+                ]);
+
                 // Generate title if needed (also works in human mode)
                 $this->sessionService->generateTitleIfNeeded($session, $owner->getId());
 
@@ -942,6 +955,25 @@ class WidgetPublicController extends AbstractController
 
                     $this->em->persist($outgoingMessage);
                     $this->em->flush();
+
+                    // Attach the generated file as a real Message<->File relation:
+                    // the history endpoint and the embedded client only surface
+                    // files via getFiles() + the /files/{id}/download route (which
+                    // requires the attachment), so the legacy BFILEPATH/BFILETYPE
+                    // columns alone leave generated media invisible after a reload
+                    // (mirrors StreamController for the authenticated web channel).
+                    if (null !== $generatedFile) {
+                        $localPath = $responseMetadata['local_path'] ?? null;
+                        $fileEntity = $this->generatedFileRegistrar->register(
+                            $owner->getId(),
+                            is_string($localPath) ? $localPath : null,
+                            $generatedFile['type'],
+                        );
+                        if (null !== $fileEntity) {
+                            $outgoingMessage->addFile($fileEntity);
+                            $this->em->flush();
+                        }
+                    }
 
                     // Update session's last message time and preview with AI response
                     // Re-fetch session to ensure it's managed by the EntityManager
@@ -1838,7 +1870,10 @@ class WidgetPublicController extends AbstractController
     #[OA\Response(response: 200, description: 'Accepted (deprecated, no-op)')]
     public function typing(string $widgetId): JsonResponse
     {
-        $this->logger->info('Deprecated visitor typing endpoint hit (no-op)', [
+        // debug, not info: the endpoint is unauthenticated, so an attacker
+        // could otherwise flood production logs with arbitrary widget_id
+        // strings at zero cost.
+        $this->logger->debug('Deprecated visitor typing endpoint hit (no-op)', [
             'widget_id' => $widgetId,
         ]);
 

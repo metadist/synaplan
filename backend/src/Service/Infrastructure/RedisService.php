@@ -246,6 +246,33 @@ final class RedisService
         }
     }
 
+    /**
+     * Redis server version from `INFO server`, or null when unavailable.
+     *
+     * Uses executeRaw so we don't depend on Predis' INFO section parsing —
+     * the raw reply is a single bulk string we grep for `redis_version:`.
+     */
+    public function serverVersion(): ?string
+    {
+        $client = $this->client();
+        if (null === $client) {
+            return null;
+        }
+
+        try {
+            $raw = $client->executeRaw(['INFO', 'server']);
+            if (is_string($raw) && 1 === preg_match('/^redis_version:(\S+)/m', $raw, $matches)) {
+                return $matches[1];
+            }
+
+            return null;
+        } catch (\Throwable $e) {
+            $this->logCommandFailure('INFO', 'server', $e);
+
+            return null;
+        }
+    }
+
     public function getLastConnectionError(): ?\Throwable
     {
         return $this->connectionFailure;

@@ -504,6 +504,9 @@ function normalizeContentForRender(input: string): string {
   if (input === '__FILE_GENERATION_FAILED__') {
     return t('message.fileGenerationFailed')
   }
+  if (input === '__AUDIO_GENERATED__') {
+    return t('message.audioGenerated')
+  }
   return input
 }
 

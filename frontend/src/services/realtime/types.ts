@@ -55,14 +55,16 @@ export interface SubscribeOptions<TPayload = Record<string, unknown>> {
 }
 
 /** Minimal HTTP API contract used by `tokenApi.ts`. */
-export interface ConnectionTokenResponse {
-  token: string
-  expiresIn: number
-  subject: string
-}
+export const ConnectionTokenResponseSchema = z.object({
+  token: z.string(),
+  expiresIn: z.number(),
+  subject: z.string(),
+})
+export type ConnectionTokenResponse = z.infer<typeof ConnectionTokenResponseSchema>
 
-export interface SubscriptionTokenResponse {
-  token: string
-  channel: string
-  expiresIn: number
-}
+export const SubscriptionTokenResponseSchema = z.object({
+  token: z.string(),
+  channel: z.string(),
+  expiresIn: z.number(),
+})
+export type SubscriptionTokenResponse = z.infer<typeof SubscriptionTokenResponseSchema>

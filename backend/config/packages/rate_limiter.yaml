@@ -16,3 +16,24 @@
 #               limit: 5
 #               interval: '15 minutes'
 #               cache_pool: 'cache.rate_limiter'
+
+framework:
+    rate_limiter:
+        # Anonymous Centrifugo token endpoints (PUBLIC_ACCESS). Keyed per
+        # client IP in RealtimeTokenController. Sized for legitimate traffic —
+        # one active visitor needs ~3 requests/minute (connection token +
+        # session/typing subscription refreshes at 60s TTL), so 60/120 per
+        # minute tolerates dozens of visitors behind one NAT while making
+        # widget/session id enumeration useless (client-generated
+        # `sess_{ts}_{~46 random bits}` ids are infeasible to hit at ≤2
+        # guesses per second).
+        realtime_widget_token:
+            policy: 'sliding_window'
+            limit: 60
+            interval: '1 minute'
+            cache_pool: 'cache.rate_limiter'
+        realtime_subscribe_anon:
+            policy: 'sliding_window'
+            limit: 120
+            interval: '1 minute'
+            cache_pool: 'cache.rate_limiter'

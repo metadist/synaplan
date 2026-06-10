@@ -18,6 +18,15 @@ class FileRepository extends ServiceEntityRepository
         parent::__construct($registry, File::class);
     }
 
+    public function save(File $file, bool $flush = true): void
+    {
+        $this->getEntityManager()->persist($file);
+
+        if ($flush) {
+            $this->getEntityManager()->flush();
+        }
+    }
+
     /**
      * @param array<int>                                                                     $vectorFileIds
      * @param array{search?: ?string, file_type?: ?string, date_from?: ?int, date_to?: ?int} $filters

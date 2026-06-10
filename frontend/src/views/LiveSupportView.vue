@@ -379,8 +379,11 @@ const handBackToAi = async () => {
   }
 }
 
-const handleNotification = (data: { type?: string }) => {
-  if (data.type === 'new_message') {
+// Operator-channel envelopes arrive flattened as { type, ...data }. The
+// backend publishes with envelope type 'notification' and discriminates the
+// payload via `kind` (see WidgetPublicController's human-mode branch).
+const handleNotification = (data: { type?: string; kind?: string }) => {
+  if (data.type === 'notification' && data.kind === 'new_message') {
     // Reload sessions to show new messages
     loadSessions()
   }

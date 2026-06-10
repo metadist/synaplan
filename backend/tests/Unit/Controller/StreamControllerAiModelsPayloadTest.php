@@ -30,7 +30,7 @@ use Psr\Log\NullLogger;
  * audio badges populate live instead of only after a page refresh.
  *
  * The helper itself just reads from message meta — the real fix lives
- * in {@see \App\Service\Message\SynapseRouter} (which now writes the
+ * in {@see \App\Service\Message\MessageSorter} (which writes the
  * sorting model under the canonical `sorting_*` keys) and in the
  * controller error path (which now also persists `ai_sorting_*`). This
  * test pins the contract so future refactors do not silently regress
@@ -87,7 +87,7 @@ class StreamControllerAiModelsPayloadTest extends TestCase
     }
 
     /**
-     * The core regression: once SynapseRouter writes the embedding model
+     * The core regression: once the sorter writes the sorting model
      * under `sorting_*` keys, the StreamController stores them as
      * `ai_sorting_*` meta. This helper must then surface them in the
      * SSE complete event so the Sorting Model badge appears live —

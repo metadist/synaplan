@@ -380,6 +380,14 @@ class StreamController extends AbstractController
             }
         }
 
+        // Approximate user country from the Cloudflare edge geolocation header
+        // (CF-IPCountry). Resolved here, while the Request is in scope, and
+        // forwarded into the processing options so the chat handler can add a
+        // country-only location-awareness line to the system prompt. Country
+        // only by design — it is an imprecise, IP-derived signal. Empty/sentinel
+        // values ("XX" unknown, "T1" Tor) are dropped by the handler.
+        $clientCountry = $request->headers->get('CF-IPCountry');
+
         // StreamedResponse für SSE
         $response = new StreamedResponse();
         $response->headers->set('Content-Type', 'text/event-stream');
@@ -387,7 +395,7 @@ class StreamController extends AbstractController
         $response->headers->set('X-Accel-Buffering', 'no');
         $response->headers->set('Connection', 'keep-alive');
 
-        $response->setCallback(function () use ($user, $messageText, $trackId, $chatId, $includeReasoning, $webSearch, $modelId, $isAgain, $fileIdArray, $isWidgetMode, $isGuestMode, $fixedTaskPromptTopic, $ragGroupKey, $widgetSession, $guestSession, $rateLimitError, $voiceReply, $continueMessageId, $disableMemories) {
+        $response->setCallback(function () use ($user, $messageText, $trackId, $chatId, $includeReasoning, $webSearch, $modelId, $isAgain, $fileIdArray, $isWidgetMode, $isGuestMode, $fixedTaskPromptTopic, $ragGroupKey, $widgetSession, $guestSession, $rateLimitError, $voiceReply, $continueMessageId, $disableMemories, $clientCountry) {
             // Disable output buffering
             while (ob_get_level()) {
                 ob_end_clean();
@@ -618,6 +626,9 @@ class StreamController extends AbstractController
                     // ExtractMemoriesCommand in `metadata.extraction_payload`
                     // so we can fire it after the flush.
                     'defer_memory_extraction' => true,
+                    // Approximate country (Cloudflare CF-IPCountry header) for the
+                    // location-awareness line appended to the chat system prompt.
+                    'client_country' => $clientCountry,
                 ];
 
                 if ($isWidgetMode || $isGuestMode || $disableMemories) {
@@ -1046,6 +1057,32 @@ class StreamController extends AbstractController
                     ]);
                 }
 
+                // Multi-task routing (Sprint 3b): a multi-node plan can produce
+                // MORE than one output file. Only the task-plan executor sets
+                // metadata['files'] (legacy handlers never do), so the single-file
+                // path above is unchanged. The first file is already surfaced via
+                // metadata['file']; here we surface + persist the remaining files.
+                $extraTaskFiles = [];
+                if (isset($response['metadata']['files']) && is_array($response['metadata']['files'])) {
+                    foreach (array_values($response['metadata']['files']) as $idx => $taskFile) {
+                        if (0 === $idx || !is_array($taskFile) || empty($taskFile['path'])) {
+                            continue;
+                        }
+                        $this->sendSSE('file', [
+                            'type' => is_string($taskFile['type'] ?? null) ? $taskFile['type'] : 'file',
+                            'url' => $taskFile['path'],
+                        ]);
+                        $entity = $this->registerExistingGeneratedFile(
+                            $user->getId(),
+                            is_string($taskFile['local_path'] ?? null) ? $taskFile['local_path'] : null,
+                            is_string($taskFile['type'] ?? null) ? $taskFile['type'] : '',
+                        );
+                        if ($entity instanceof File) {
+                            $extraTaskFiles[] = $entity;
+                        }
+                    }
+                }
+
                 if (isset($response['metadata']['links'])) {
                     $this->sendSSE('links', [
                         'links' => $response['metadata']['links'],
@@ -1152,6 +1189,15 @@ class StreamController extends AbstractController
 
                     if ($generatedFile) {
                         $outgoingMessage->addFile($generatedFile);
+                        $this->em->flush();
+                    }
+
+                    // Attach extra multi-task output files (Sprint 3b) so they
+                    // appear in history (getFiles()/files[]) after a reload.
+                    if ([] !== $extraTaskFiles) {
+                        foreach ($extraTaskFiles as $taskFileEntity) {
+                            $outgoingMessage->addFile($taskFileEntity);
+                        }
                         $this->em->flush();
                     }
                 }
@@ -2244,6 +2290,46 @@ class StreamController extends AbstractController
      * Store AI-generated file in the file system and create File entity
      * Same logic as ChatHandler::storeGeneratedFile.
      */
+    /**
+     * Register a File row for an already-on-disk generated file (multi-task
+     * extra output, Sprint 3b). The media/TTS runners save bytes to the user's
+     * upload path; this only records the DB row so the file shows in history and
+     * is access-controlled. Best-effort — never throws.
+     */
+    private function registerExistingGeneratedFile(int $userId, ?string $relativePath, string $type): ?File
+    {
+        if (null === $relativePath || '' === $relativePath) {
+            return null;
+        }
+
+        try {
+            $absolutePath = $this->uploadDir.'/'.$relativePath;
+            $fileSize = is_file($absolutePath) ? (filesize($absolutePath) ?: 0) : 0;
+            $extension = strtolower(pathinfo($relativePath, PATHINFO_EXTENSION));
+
+            $file = new File();
+            $file->setUserId($userId);
+            $file->setFilePath($relativePath);
+            $file->setFileType('' !== $type ? $type : $extension);
+            $file->setFileName(basename($relativePath));
+            $file->setFileSize($fileSize);
+            $file->setFileMime($this->getMimeTypeForExtension($extension));
+            $file->setStatus('generated');
+
+            $this->em->persist($file);
+            $this->em->flush();
+
+            return $file;
+        } catch (\Throwable $e) {
+            $this->logger->warning('StreamController: failed to register multi-task file', [
+                'path' => $relativePath,
+                'error' => $e->getMessage(),
+            ]);
+
+            return null;
+        }
+    }
+
     private function storeGeneratedFileInStream(array $fileData, Message $message): ?File
     {
         $userId = $message->getUserId();

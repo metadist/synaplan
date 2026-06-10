@@ -34,22 +34,18 @@ class Prompt
     private ?string $selectionRules = null;
 
     /**
-     * Comma- or newline-separated keywords/synonyms.
-     *
-     * Used together with `shortDescription` when the topic is embedded into
-     * the synapse_topics Qdrant collection. Adding domain-specific synonyms
-     * here improves recall for the SynapseRouter without bloating the
-     * AI fallback sort prompt.
+     * @deprecated Retired embedding-routing experiment field. No code reads or
+     *             writes it any more — it stays MAPPED (with a safe default) only so the
+     *             column can survive the rolling-deploy window where previous-release
+     *             nodes still SELECT it, without failing CI's schema-sync validation.
+     *             Mapping + column are removed together in the phase-2 release (see
+     *             Version20260608000000 and docs/MIGRATIONS.md "two-phase" note).
      */
     #[ORM\Column(name: 'BKEYWORDS', type: 'text', nullable: true)]
     private ?string $keywords = null;
 
     /**
-     * Soft-disable flag.
-     *
-     * When false, the topic is hidden from the routing pool (both Synapse
-     * embedding search and the AI fallback DYNAMICLIST). Existing messages
-     * that reference the topic remain unaffected.
+     * @deprecated see $keywords — same phase-2 removal
      */
     #[ORM\Column(name: 'BENABLED', type: 'boolean', options: ['default' => true])]
     private bool $enabled = true;
@@ -131,27 +127,15 @@ class Prompt
         return $this;
     }
 
+    /** @deprecated retired experiment field — see property docblock */
     public function getKeywords(): ?string
     {
         return $this->keywords;
     }
 
-    public function setKeywords(?string $keywords): self
-    {
-        $this->keywords = $keywords;
-
-        return $this;
-    }
-
+    /** @deprecated retired experiment field — see property docblock */
     public function isEnabled(): bool
     {
         return $this->enabled;
-    }
-
-    public function setEnabled(bool $enabled): self
-    {
-        $this->enabled = $enabled;
-
-        return $this;
     }
 }

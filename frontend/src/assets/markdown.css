@@ -239,6 +239,16 @@
   margin: 0.5rem 0;
 }
 
+/*
+ * Fallback for fabricated/untrusted markdown images: a text model that cannot
+ * generate images sometimes emits a broken ![alt](url). useMarkdown renders the
+ * alt text in this span instead of a broken-image icon.
+ */
+.markdown-content .markdown-img-fallback {
+  font-style: italic;
+  color: var(--text-secondary, #6b7280);
+}
+
 /* Marked/highlighted text */
 .markdown-content mark,
 .markdown-content .markdown-mark {

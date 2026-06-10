@@ -75,6 +75,25 @@ make lint && make -C backend phpstan && make test && docker compose exec -T fron
 - If you changed backend OpenAPI annotations, run `make -C frontend generate-schemas` then re-run `vue-tsc`
 - **NEVER** commit with failing tests — this blocks the entire CI/CD pipeline
 
+### Common pre-commit traps (read once, save yourself a red CI)
+
+These are real failure modes that have caused a red PR more than once. Each one is invisible if you only run a filtered subset of tests.
+
+- **`--filter` ≠ `make test`.** `phpunit --filter ClassA|ClassB` is great for the inner dev loop, but it does NOT replace the gate. Characterization, integration, and feature tests live OUTSIDE the namespace you usually filter on. Always re-run unfiltered (`make -C backend test`) before committing.
+- **Snapshot / characterization tests.** `backend/tests/Characterization/` (e.g. `RoutingCharacterizationTest`) locks the routing/classifier contract via JSON snapshots in `__snapshots__/`. ANY change to `MessageClassifier`, `MessageSorter`, the fast-path heuristic, or the AI sorter response shape WILL drift these. Re-record with the supported flag and commit the diff:
+  ```bash
+  docker compose exec -T -e UPDATE_ROUTING_SNAPSHOTS=1 backend ./vendor/bin/phpunit tests/Characterization/RoutingCharacterizationTest.php
+  git diff backend/tests/Characterization/__snapshots__/   # review every changed line
+  ```
+  Never silently re-record without reading the diff — a wrong snapshot bakes the regression in.
+- **Frontend tests need Pinia + i18n + `useMarkdown` set up.** If you mount a component that uses `MessageText`, `useMemoriesStore`, `useFeedbackStore`, or any markdown-pipeline composable, the existing test scaffolding around `TaskPlanBubble` / `ChatMessage` doesn't auto-bootstrap them. **Stub the heavy dependency** in the test (`stubs: { MessageText: { template: '...', props: ['content', 'isStreaming', 'readonly'] } }`) instead of pulling the full app context into a unit test.
+- **Docker-restart cache permissions.** After `docker compose down` (or restarting Docker Desktop) the bind-mounted `backend/var/cache/test` can lose write perms and EVERY kernel-booting integration test fails with `Unable to write in the "cache" directory`. This is NOT your code:
+  ```bash
+  docker compose exec -T backend sh -c 'rm -rf var/cache/test && mkdir -p var/cache/test && chmod -R 777 var/cache/test'
+  ```
+  Then re-run `make -C backend test`. Don't push until the suite is actually clean.
+- **Heuristic changes ≠ production effect.** If a config flag (e.g. `CLASSIFIER.FAST_PATH_ENABLED`) defaults the surrounding code path OFF, your new logic in that path can pass every targeted test and still be a no-op in prod. Always check the default in `BCONFIG` (or the code's hard-coded fallback) and confirm the path is reachable before claiming a fix.
+
 ## Essential Commands
 
 ```bash
@@ -113,7 +132,7 @@ make -C frontend help
 
 ### i18n
 - All UI text through `vue-i18n`
-- **Always update BOTH** `en.json` AND `de.json`
+- **Always update ALL four locales**: `en.json`, `de.json`, `es.json`, `tr.json` (registered in `frontend/src/i18n/index.ts` as `supportedLanguages = ['de', 'en', 'es', 'tr']`). A key missing from a locale silently falls back to English.
 
 ## Code Style Quick Reference
 

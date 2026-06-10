@@ -380,7 +380,7 @@ final readonly class WidgetExportService
             $sheet->getStyle($col.'1')->getFill()
                 ->setFillType(Fill::FILL_SOLID)
                 ->getStartColor()->setRGB('E2E8F0');
-            ++$col;
+            $col = str_increment($col);
         }
 
         $lastCol = chr(ord('E') + count($customFields));
@@ -424,7 +424,7 @@ final readonly class WidgetExportService
                         $val = $cfValues[$field['id']] ?? ('boolean' === $field['type'] ? false : '');
                         $displayVal = is_bool($val) ? ($val ? 'Yes' : 'No') : $this->sanitizeCellValue((string) $val);
                         $sheet->setCellValue($cfCol.$row, $displayVal);
-                        ++$cfCol;
+                        $cfCol = str_increment($cfCol);
                     }
                 }
 
@@ -449,7 +449,7 @@ final readonly class WidgetExportService
         $cfCol = chr(ord('E') + 1);
         foreach ($customFields as $field) {
             $sheet->getColumnDimension($cfCol)->setAutoSize(true);
-            ++$cfCol;
+            $cfCol = str_increment($cfCol);
         }
 
         // Wrap text in message column
@@ -468,7 +468,7 @@ final readonly class WidgetExportService
             $sheet->getStyle($col.'1')->getFill()
                 ->setFillType(Fill::FILL_SOLID)
                 ->getStartColor()->setRGB('E2E8F0');
-            ++$col;
+            $col = str_increment($col);
         }
 
         // Get sessions

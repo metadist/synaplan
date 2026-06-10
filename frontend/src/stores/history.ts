@@ -148,6 +148,49 @@ export interface Message {
   feedbackIds?: number[] | null // IDs of feedbacks used (resolved from feedbackStore)
   processingStatus?: string
   processingMetadata?: Record<string, unknown> | null
+  // Multitask routing: live task-card state while a multi-node plan streams.
+  // Only set when a `plan` SSE event arrives (multi-node turns). On reload the
+  // turn is flattened (text + media parts), so this is a streaming-time affordance.
+  taskPlan?: TaskPlanState | null
+}
+
+export const TASK_CARD_KINDS = [
+  'text',
+  'image',
+  'video',
+  'audio',
+  'document',
+  'search',
+  'extract',
+] as const
+export type TaskCardKind = (typeof TASK_CARD_KINDS)[number]
+
+export const TASK_CARD_STATES = ['pending', 'running', 'done', 'failed', 'skipped'] as const
+export type TaskCardState = (typeof TASK_CARD_STATES)[number]
+
+/** Runtime guards for values arriving over SSE — never trust the wire. */
+export function isTaskCardKind(value: unknown): value is TaskCardKind {
+  return typeof value === 'string' && (TASK_CARD_KINDS as readonly string[]).includes(value)
+}
+
+export function isTaskCardState(value: unknown): value is TaskCardState {
+  return typeof value === 'string' && (TASK_CARD_STATES as readonly string[]).includes(value)
+}
+
+export interface TaskCard {
+  nodeId: string
+  capability: string
+  kind: TaskCardKind
+  state: TaskCardState
+  text?: string
+  url?: string
+  mediaType?: string
+}
+
+export interface TaskPlanState {
+  active: boolean
+  replyNode: string
+  cards: TaskCard[]
 }
 
 /** Attachment row from chat messages API */

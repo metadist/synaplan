@@ -23,16 +23,24 @@ use Symfony\Component\Clock\Clock;
  * `CENTRIFUGO_TOKEN_HMAC_SECRET_KEY`.
  *
  * IMPORTANT: never reuse tokens across users — the cache is per-call only.
+ *
+ * Production guard: minting refuses to sign with an empty secret (any env)
+ * or with the shipped `changeme_*` placeholder (prod only). A known HMAC
+ * secret would let anyone forge connection/subscription JWTs for arbitrary
+ * channels, so failing loudly at the token endpoint beats running silently
+ * forgeable. Dev/test keep working with the compose defaults.
  */
 final readonly class RealtimeTokenService
 {
     private const ALGO = 'HS256';
     private const DEFAULT_TTL_SECONDS = 60;
+    private const PLACEHOLDER_PREFIX = 'changeme';
 
     public function __construct(
         private string $hmacSecret,
         private ClockInterface $clock = new Clock(),
         private int $ttlSeconds = self::DEFAULT_TTL_SECONDS,
+        private string $environment = 'prod',
     ) {
     }
 
@@ -91,6 +99,10 @@ final readonly class RealtimeTokenService
     {
         if ('' === trim($this->hmacSecret)) {
             throw new \LogicException('REALTIME_TOKEN_SECRET is empty — refusing to mint unsigned token');
+        }
+
+        if ('prod' === $this->environment && str_starts_with($this->hmacSecret, self::PLACEHOLDER_PREFIX)) {
+            throw new \LogicException('REALTIME_TOKEN_SECRET still has the "changeme" placeholder value — set a strong random secret (openssl rand -hex 32) before enabling realtime in production');
         }
 
         return JWT::encode($claims, $this->hmacSecret, self::ALGO);

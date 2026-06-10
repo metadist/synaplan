@@ -263,24 +263,6 @@ final readonly class HumanTakeoverService
     }
 
     /**
-     * Notify widget owner about a new message in waiting session.
-     *
-     * Fan-out happens on the dedicated operator channel
-     * ({@see \App\Realtime\Channel\WidgetOperatorsChannel}) so every
-     * dashboard tab subscribed for this widget receives the notification
-     * in real time without polling.
-     */
-    public function notifyOperator(string $widgetId, int $operatorId, string $sessionId, string $messagePreview): void
-    {
-        $this->broadcaster->publishOperatorNotification($widgetId, [
-            'sessionId' => $sessionId,
-            'preview' => mb_substr($messagePreview, 0, 100),
-            'timestamp' => time(),
-            'operatorId' => $operatorId,
-        ]);
-    }
-
-    /**
      * Publish a session-scoped realtime event via {@see WidgetRealtimeBroadcaster}.
      *
      * Kept as a thin wrapper because every call site supplies the same

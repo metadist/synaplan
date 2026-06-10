@@ -392,6 +392,10 @@
             on plain text. Falling back to `${type}-${index}` keeps backward
             compatibility for parts without partId (legacy stored messages).
           -->
+          <!-- Multitask routing: live task cards (only while a multi-node plan
+               streams). On reload the turn is flattened to normal parts below. -->
+          <TaskPlanBubble v-if="taskPlan?.active" :plan="taskPlan" />
+
           <MessagePart
             v-for="(part, index) in contentParts"
             :key="part.partId ?? `${part.type}-${index}`"
@@ -747,49 +751,25 @@
               />
             </button>
 
-            <button
-              type="button"
-              :disabled="isSuperseded || isGuestMode || !selectedModel || !hasModels"
-              :class="[
-                'pill text-xs whitespace-nowrap relative',
-                isSuperseded || isGuestMode || !selectedModel || !hasModels
-                  ? 'opacity-50 cursor-not-allowed'
-                  : '',
-              ]"
-              :aria-label="$t('chatMessage.again')"
-              data-testid="btn-message-again"
-              @click="!isGuestMode && handleAgain()"
-            >
-              <ArrowPathIcon class="w-4 h-4" />
-              <span v-if="!isGuestMode && selectedModel" class="font-medium hidden sm:inline"
-                >{{ $t('chatMessage.againWith') }} {{ selectedModel.label }}</span
-              >
-              <span v-else-if="!isGuestMode" class="font-medium hidden sm:inline">{{
-                $t('chatMessage.again')
-              }}</span>
-              <span :class="isGuestMode ? 'font-medium' : 'font-medium sm:hidden'">{{
-                $t('chatMessage.again')
-              }}</span>
-              <Icon
-                v-if="isGuestMode"
-                icon="mdi:lock-outline"
-                class="w-3 h-3 text-amber-500 absolute -top-1 -right-1"
-              />
-            </button>
-
             <div class="relative">
+              <!-- Single "Again with… ▾" control: opening the dropdown and
+                   picking a model re-runs the prompt (see selectModel). The old
+                   standalone "Again with <model>" button was merged into this to
+                   save horizontal space. -->
               <button
                 type="button"
-                :disabled="isSuperseded || isGuestMode"
+                :disabled="isSuperseded || isGuestMode || !hasModels"
                 :class="[
-                  'pill text-xs relative',
-                  isSuperseded || isGuestMode ? 'opacity-50 cursor-not-allowed' : '',
+                  'pill text-xs whitespace-nowrap relative',
+                  isSuperseded || isGuestMode || !hasModels ? 'opacity-50 cursor-not-allowed' : '',
                 ]"
                 :aria-label="$t('chatMessage.regenerateWith')"
-                data-testid="btn-message-model-toggle"
+                data-testid="btn-message-again"
                 @click.stop="!isGuestMode && toggleModelDropdown()"
                 @keydown.escape="closeModelDropdown"
               >
+                <ArrowPathIcon class="w-4 h-4" />
+                <span class="font-medium">{{ $t('chatMessage.againWith') }}…</span>
                 <ChevronDownIcon class="w-4 h-4" />
                 <Icon
                   v-if="isGuestMode"
@@ -941,7 +921,8 @@ import GroqIcon from '@/components/icons/GroqIcon.vue'
 import ExternalLinkWarning from '@/components/common/ExternalLinkWarning.vue'
 import { useExternalLink } from '@/composables/useExternalLink'
 import { useDateFormat } from '@/composables/useDateFormat'
-import type { Part, MessageFile } from '@/stores/history'
+import type { Part, MessageFile, TaskPlanState } from '@/stores/history'
+import TaskPlanBubble from '@/components/multitask/TaskPlanBubble.vue'
 import type { AgainData } from '@/types/ai-models'
 import { mediaHintFromClassificationTopic } from '@/utils/mediaGenerationHint'
 import { chatBadgeIcon, chatBadgeLabel } from '@/utils/chatModelBadge'
@@ -1016,6 +997,8 @@ interface Props {
   memoryIds?: number[] | null // IDs of memories used (resolved from memoriesStore)
   feedbackIds?: number[] | null // IDs of feedbacks used (resolved from feedbackStore)
   truncated?: boolean
+  // Multitask routing: live task-card state while a multi-node plan streams.
+  taskPlan?: TaskPlanState | null
   // Status for failed/pending messages
   isGuestMode?: boolean
   status?: 'sent' | 'failed' | 'rate_limited'
@@ -1057,8 +1040,12 @@ const copyMessageText = async () => {
 // Badge collapse state
 const showAllBadges = ref(false)
 
-// Sources expand/collapse state
-const sourcesExpanded = ref(false)
+// Sources expand/collapse state.
+// Default OPEN: when the assistant ran a web search, the sources are part of
+// the answer's citation context, so they should be visible without an extra
+// click. Users can still collapse the section via the chevron toggle if they
+// want a denser thread view.
+const sourcesExpanded = ref(true)
 
 // Carousel state for search results
 const carouselPage = ref(0) // Which "page" we're on (0-based)
@@ -1409,21 +1396,6 @@ const handleRetry = () => {
 
   if (textContent) {
     emit('retry', textContent)
-  }
-}
-
-const handleAgain = () => {
-  const model = selectedModel.value
-  if (!model) {
-    return
-  }
-
-  if (props.backendMessageId && model.id) {
-    // New backend-driven again
-    emit('again', props.backendMessageId, model.id)
-  } else {
-    // Fallback to old regenerate
-    emit('regenerate', model)
   }
 }
 

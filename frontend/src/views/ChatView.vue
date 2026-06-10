@@ -163,6 +163,7 @@
               :error-type="message.errorType"
               :error-data="message.errorData"
               :truncated="message.truncated"
+              :task-plan="message.taskPlan"
               :is-guest-mode="isGuestMode"
               @regenerate="handleRegenerate(message, $event)"
               @again="handleAgain"
@@ -336,6 +337,8 @@ import LimitReachedModal from '@/components/common/LimitReachedModal.vue'
 import {
   useHistoryStore,
   parseContentWithThinking,
+  isTaskCardKind,
+  isTaskCardState,
   type Message,
   type Part,
 } from '@/stores/history'
@@ -1552,6 +1555,20 @@ const streamAIResponse = async (
           } else if (data.status === 'search_complete') {
             processingStatus.value = 'search_complete'
             processingMetadata.value = data.metadata || {}
+            // Surface the sources immediately (they arrive seconds before the
+            // answer) so the "sources" box renders now, with the generating
+            // indicator acting as the placeholder above the soon-to-stream text.
+            const earlySources = data.metadata?.results
+            if (Array.isArray(earlySources) && earlySources.length > 0) {
+              const searchMsg = historyStore.messages.find((m) => m.id === messageId)
+              if (searchMsg) {
+                searchMsg.searchResults = earlySources as NonNullable<Message['searchResults']>
+                searchMsg.webSearch = {
+                  query: typeof data.metadata?.query === 'string' ? data.metadata.query : '',
+                  resultsCount: earlySources.length,
+                }
+              }
+            }
           } else if (data.status === 'generating') {
             processingStatus.value = 'generating'
             processingMetadata.value = {
@@ -1756,6 +1773,20 @@ const streamAIResponse = async (
           } else if (data.status === 'search_complete') {
             processingStatus.value = 'search_complete'
             processingMetadata.value = data.metadata || {}
+            // Surface the sources immediately (they arrive seconds before the
+            // answer) so the "sources" box renders now, with the generating
+            // indicator acting as the placeholder above the soon-to-stream text.
+            const earlySources = data.metadata?.results
+            if (Array.isArray(earlySources) && earlySources.length > 0) {
+              const searchMsg = historyStore.messages.find((m) => m.id === messageId)
+              if (searchMsg) {
+                searchMsg.searchResults = earlySources as NonNullable<Message['searchResults']>
+                searchMsg.webSearch = {
+                  query: typeof data.metadata?.query === 'string' ? data.metadata.query : '',
+                  resultsCount: earlySources.length,
+                }
+              }
+            }
           } else if (data.status === 'generating') {
             processingStatus.value = 'generating'
             // Use custom message from backend if available, otherwise default
@@ -1809,6 +1840,67 @@ const streamAIResponse = async (
             }, 2000)
           } else if (data.status === 'status') {
             // Generic status message
+          } else if (data.status === 'plan') {
+            // Multitask routing: a multi-node plan was recognized. Render a task
+            // card per node. Single-node turns never emit this, so normal chat
+            // is unaffected.
+            const message = historyStore.messages.find((m) => m.id === messageId)
+            const tasks = data.metadata?.plan
+            if (message && Array.isArray(tasks) && tasks.length > 0) {
+              processingStatus.value = ''
+              processingMetadata.value = {}
+              message.taskPlan = {
+                active: true,
+                replyNode:
+                  typeof data.metadata?.reply_node === 'string' ? data.metadata.reply_node : '',
+                cards: tasks.map((t) => ({
+                  nodeId: t.node_id,
+                  capability: t.capability,
+                  kind: isTaskCardKind(t.kind) ? t.kind : 'text',
+                  state: 'pending' as const,
+                })),
+              }
+            }
+          } else if (data.status === 'plan_discarded') {
+            // The DAG failed entirely and the backend is falling back to a normal
+            // single-bubble answer. Retract the (now misleading) failed task cards
+            // so the clean reply below isn't sitting under a "step failed" box.
+            const message = historyStore.messages.find((m) => m.id === messageId)
+            if (message) {
+              message.taskPlan = null
+            }
+          } else if (data.status === 'task_update') {
+            const message = historyStore.messages.find((m) => m.id === messageId)
+            const card = message?.taskPlan?.cards.find((c) => c.nodeId === data.metadata?.node_id)
+            if (card && isTaskCardState(data.metadata?.state)) {
+              card.state = data.metadata.state
+            }
+          } else if (data.status === 'task_chunk') {
+            const message = historyStore.messages.find((m) => m.id === messageId)
+            const card = message?.taskPlan?.cards.find((c) => c.nodeId === data.metadata?.node_id)
+            if (card && typeof data.metadata?.chunk === 'string') {
+              card.text = (card.text ?? '') + data.metadata.chunk
+            }
+          } else if (data.status === 'task_file') {
+            const message = historyStore.messages.find((m) => m.id === messageId)
+            const card = message?.taskPlan?.cards.find((c) => c.nodeId === data.metadata?.node_id)
+            if (card && typeof data.metadata?.url === 'string') {
+              card.url = normalizeMediaUrl(data.metadata.url)
+              card.mediaType =
+                typeof data.metadata?.type === 'string' ? data.metadata.type : card.kind
+            }
+          } else if (
+            (data.status === 'data' ||
+              data.status === 'file' ||
+              data.status === 'audio' ||
+              data.status === 'tts_generating' ||
+              data.status === 'links') &&
+            historyStore.messages.find((m) => m.id === messageId)?.taskPlan?.active
+          ) {
+            // Multitask mode: the task cards are the live surface, so suppress
+            // the normal single-bubble content/media events. They still flow so
+            // the OUT message text + files persist; history renders the flattened
+            // bubble on reload.
           } else if (data.status === 'data' && data.chunk) {
             if (processingStatus.value) {
               processingStatus.value = ''

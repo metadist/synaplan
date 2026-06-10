@@ -16,7 +16,7 @@ use Psr\Log\LoggerInterface;
  * Background (PR #985 follow-up):
  *
  *   The VECTORIZE default model can be swapped via the admin UI. For
- *   documents/synapse that triggers a full re-index against the new
+ *   documents that triggers a full re-index against the new
  *   model. For *memories* it does NOT, because dropping the collection
  *   would destroy user-curated long-term context (see #985). The
  *   memories collection therefore keeps its original vector dimension

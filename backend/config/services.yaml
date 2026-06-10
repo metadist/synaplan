@@ -63,7 +63,6 @@ parameters:
     env(QDRANT_URL): ''
     env(QDRANT_MEMORIES_COLLECTION): ''
     env(QDRANT_DOCUMENTS_COLLECTION): ''
-    env(QDRANT_SYNAPSE_COLLECTION): ''
     env(TRITON_SERVER_URL): ''
     env(GOOGLE_CLIENT_ID): ''
     env(GITHUB_CLIENT_ID): ''
@@ -111,6 +110,10 @@ services:
     _instanceof:
         App\Service\Plugin\PluginContextProviderInterface:
             tags: ['app.plugin.context_provider']
+        # Multi-task routing: capability runners (Sprint 3). Concrete runners
+        # are added in Sprint 3b; this tag wires them into the RunnerRegistry.
+        App\Service\Multitask\Execution\TaskRunner:
+            tags: ['app.multitask.runner']
         App\Realtime\Authorizer\ChannelAuthorizerInterface:
             tags: ['app.realtime.authorizer']
 
@@ -121,6 +124,14 @@ services:
             - '../src/Entity/'
             - '../src/Kernel.php'
             - '../src/Test/'
+
+    # Multi-task parallel media offload (Sprint 4): subprocess dispatcher needs
+    # the project dir for Symfony Process cwd. Alias binds the interface.
+    App\Service\Multitask\Execution\Parallel\ProcessMediaNodeDispatcher:
+        arguments:
+            $projectDir: '%kernel.project_dir%'
+    App\Service\Multitask\Execution\Parallel\MediaNodeDispatcher:
+        alias: App\Service\Multitask\Execution\Parallel\ProcessMediaNodeDispatcher
 
     # Idempotent seeders for production-essential catalog data.
     # Run from docker-entrypoint.sh after migrations (app:seed) and re-runnable from CLI.
@@ -274,11 +285,14 @@ services:
         arguments:
             $authorizers: !tagged_iterator app.realtime.authorizer
 
-    # JWT minting service used by RealtimeTokenController.
+    # JWT minting service used by RealtimeTokenController. The environment is
+    # injected so minting can hard-fail in prod when REALTIME_TOKEN_SECRET is
+    # still the shipped changeme_* placeholder (forgeable JWTs otherwise).
     App\Realtime\Token\RealtimeTokenService:
         arguments:
             $hmacSecret: '%env(REALTIME_TOKEN_SECRET)%'
             $ttlSeconds: 60
+            $environment: '%kernel.environment%'
 
     # Default publisher: HTTP POST to Centrifugo. NullPublisher is bound in
     # the test profile below so unit tests don't need a running gateway.
@@ -287,6 +301,7 @@ services:
             $apiUrl: '%env(REALTIME_API_URL)%'
             $apiKey: '%env(REALTIME_API_KEY)%'
             $enabled: '%env(bool:REALTIME_ENABLED)%'
+            $environment: '%kernel.environment%'
 
     App\Realtime\Publisher\RealtimePublisherInterface:
         alias: App\Realtime\Publisher\CentrifugoPublisher
@@ -339,8 +354,6 @@ services:
             $uploadsDir: '%kernel.project_dir%/var/uploads'
     App\Service\Message\MessageSorter: ~
     App\Service\Message\MessageClassifier: ~
-    App\Service\Message\SynapseRouter: ~
-    App\Service\Message\SynapseIndexer: ~
     App\Service\Message\InferenceRouter: ~
     App\Service\Message\MessageProcessor: ~
 
@@ -374,6 +387,10 @@ services:
 
     App\Service\MediaGenerationServiceInterface:
         alias: App\Service\MediaGenerationService
+
+    App\Service\Media\GeneratedFileRegistrar:
+        arguments:
+            $uploadDir: '%kernel.project_dir%/var/uploads'
 
     # Model Configuration Service. Pinned to its own cache pool so the 5-min
     # per-key TTL the service sets in code lives alongside the pool's own
@@ -613,7 +630,6 @@ services:
             $qdrantUrl: '%env(QDRANT_URL)%'
             $memoriesCollection: '%env(default::QDRANT_MEMORIES_COLLECTION)%'
             $documentsCollection: '%env(default::QDRANT_DOCUMENTS_COLLECTION)%'
-            $synapseCollection: '%env(default::QDRANT_SYNAPSE_COLLECTION)%'
 
     App\Service\VectorSearch\QdrantClientInterface:
         alias: App\Service\VectorSearch\QdrantClientDirect
@@ -643,6 +659,11 @@ services:
         arguments:
             $projectDir: '%kernel.project_dir%'
             $defaultTtsUrl: '%synaplan_tts_url_default%'
+
+    # System Info Service (Admin server diagnostics: PHP / memory / disk)
+    App\Service\Admin\SystemInfoService:
+        arguments:
+            $projectDir: '%kernel.project_dir%'
 
     # Vector Storage Configuration
     App\Service\RAG\VectorStorage\VectorStorageConfig:

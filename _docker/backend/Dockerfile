@@ -10,21 +10,9 @@
 #
 # Pinned to an immutable digest so reproducible builds don't depend on a
 # moving floating tag. To bump:
-#   docker buildx imagetools inspect ghcr.io/metadist/synaplan-base-php:<new>
+#   docker buildx imagetools inspect ghcr.io/metadist/synaplan-base-php:latest
 # and replace the @sha256:... below.
-#
-# Multi-stage layout:
-#   - `dev`  : base image + phpredis + baked ENV defaults ONLY. The dev/worker
-#              containers bind-mount the application code, vendor and entrypoint
-#              scripts at runtime, so they need nothing more from the image than
-#              the PHP runtime with ext-redis. Building this stage is independent
-#              of backend source, so `docker compose up -d` stays a cache hit
-#              after the first build (no composer install / COPY backend churn).
-#   - `prod` : full self-contained image (app + composer install + frontend).
-#              This is the LAST stage, so a build without an explicit `target`
-#              (CI, the published :latest, docker-compose.test.yml) still yields
-#              the complete production image.
-FROM ghcr.io/metadist/synaplan-base-php:1.0.1@sha256:35e81beba0b8b09f8b43cd3a371df1e91e6b7c34c9c02e37d263f63308c022d9 AS dev
+FROM ghcr.io/metadist/synaplan-base-php:1.0.2@sha256:e5d52125b95862bc6f544f09f2ba15b6f7607f870b7149695ab64dbcf8dc4d51 AS dev
 
 WORKDIR /var/www/backend
 

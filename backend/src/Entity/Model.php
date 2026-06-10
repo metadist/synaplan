@@ -327,7 +327,7 @@ class Model
      * Native output dimension for embedding/vectorize models.
      *
      * Read from `BJSON.meta.dimensions` (the catalog field) so the
-     * Synapse indexer/router can configure the Qdrant collection with
+     * embedding indexer can configure the Qdrant collection with
      * the correct vector size instead of hard-coding 1024 and silently
      * slice/zero-padding mismatched outputs (PR #853 review).
      *

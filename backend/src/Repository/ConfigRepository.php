@@ -68,6 +68,30 @@ class ConfigRepository extends ServiceEntityRepository
     }
 
     /**
+     * Delete a configuration row if it exists (no-op when absent).
+     *
+     * Returns true when a row was removed. Used to drop a per-user override so
+     * the owner falls back to the global/default value again.
+     */
+    public function deleteValue(int $ownerId, string $group, string $setting): bool
+    {
+        $config = $this->findOneBy([
+            'ownerId' => $ownerId,
+            'group' => $group,
+            'setting' => $setting,
+        ]);
+
+        if (!$config) {
+            return false;
+        }
+
+        $this->getEntityManager()->remove($config);
+        $this->getEntityManager()->flush();
+
+        return true;
+    }
+
+    /**
      * Find config by owner, group and setting.
      */
     public function findByOwnerGroupAndSetting(int $ownerId, string $group, string $setting): ?Config

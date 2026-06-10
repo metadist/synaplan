@@ -152,6 +152,7 @@ final readonly class InternalEmailService
         ?string $attachmentPath = null,
         ?string $originalRecipient = null,
         ?string $mediaType = null,
+        ?array $additionalAttachmentPaths = null,
     ): void {
         $fallbackAddress = $_ENV['SMART_EMAIL_ADDRESS'] ?? \App\Service\Email\SmartEmailHelper::getBaseAddress();
         $smartAddress = ($originalRecipient && \App\Service\Email\SmartEmailHelper::isValidSmartAddress($originalRecipient))
@@ -234,6 +235,15 @@ final readonly class InternalEmailService
                 $email->embedFromPath($attachmentPath, 'generated-image');
             } else {
                 $email->attachFromPath($attachmentPath);
+            }
+        }
+
+        // Multi-task routing (Sprint 5): attach any additional output files
+        // beyond the primary one. Single-file turns pass null here, so behaviour
+        // is unchanged.
+        foreach ($additionalAttachmentPaths ?? [] as $extraPath) {
+            if (is_string($extraPath) && '' !== $extraPath && file_exists($extraPath)) {
+                $email->attachFromPath($extraPath);
             }
         }
 

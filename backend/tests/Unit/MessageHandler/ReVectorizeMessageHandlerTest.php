@@ -24,7 +24,6 @@ use Psr\Log\NullLogger;
  *   - throw      → failed + binding rolled back
  *   - 0/N        → failed + binding rolled back (zero-success guard)
  *   - 9990/10    → completed, partial failures tolerated
- *   - non-vec scope (synapse) → rollback uses setSynapseVectorizeModel
  *   - fromModelId === 0 → skip rollback (no previous binding to restore).
  *
  * Plus #985 coverage:
@@ -82,6 +81,24 @@ final class ReVectorizeMessageHandlerTest extends TestCase
         $this->assertSame(RevectorizeRun::STATUS_RUNNING, $run->getStatus(), 'status must not be reset on a re-delivered message');
     }
 
+    public function testLegacyUnknownScopeFailsInsteadOfSilentlyCompleting(): void
+    {
+        // A run queued by a previous release with the retired `synapse`
+        // scope used to fall through every branch of the reindex service
+        // and come back COMPLETED with 0 chunks — a green badge for a no-op.
+        $run = $this->makeRun('synapse', RevectorizeRun::STATUS_QUEUED, fromId: 10, toId: 20);
+        $this->runRepository->method('find')->willReturn($run);
+
+        $this->reindexService->expects($this->never())->method('execute');
+        $this->bindingService->expects($this->never())->method('setVectorizeModel');
+
+        $this->handler->__invoke(new ReVectorizeMessage(1));
+
+        $this->assertSame(RevectorizeRun::STATUS_FAILED, $run->getStatus());
+        $this->assertNotNull($run->getFinishedAt());
+        $this->assertStringContainsString('Unsupported scope "synapse"', (string) $run->getError());
+    }
+
     public function testHappyPathMarksCompletedWithoutRollback(): void
     {
         $run = $this->makeRun(RevectorizeRun::SCOPE_ALL, RevectorizeRun::STATUS_QUEUED, fromId: 10, toId: 20);
@@ -95,7 +112,6 @@ final class ReVectorizeMessageHandlerTest extends TestCase
             });
 
         $this->bindingService->expects($this->never())->method('setVectorizeModel');
-        $this->bindingService->expects($this->never())->method('setSynapseVectorizeModel');
 
         $this->handler->__invoke(new ReVectorizeMessage(1));
 
@@ -147,26 +163,6 @@ final class ReVectorizeMessageHandlerTest extends TestCase
         $this->assertSame(RevectorizeRun::STATUS_FAILED, $run->getStatus());
         $this->assertNotNull($run->getError());
         $this->assertStringContainsString('30 failures', (string) $run->getError());
-    }
-
-    public function testZeroSuccessOnSynapseScopeRollsBackSynapseBinding(): void
-    {
-        $run = $this->makeRun(RevectorizeRun::SCOPE_SYNAPSE, RevectorizeRun::STATUS_QUEUED, fromId: 10, toId: 20);
-        $this->runRepository->method('find')->willReturn($run);
-
-        $this->reindexService->method('execute')->willReturnCallback(function (RevectorizeRun $r): void {
-            $r->incrementChunksFailed(5);
-        });
-
-        $this->bindingService->expects($this->never())->method('setVectorizeModel');
-        $this->bindingService
-            ->expects($this->once())
-            ->method('setSynapseVectorizeModel')
-            ->with(10);
-
-        $this->handler->__invoke(new ReVectorizeMessage(1));
-
-        $this->assertSame(RevectorizeRun::STATUS_FAILED, $run->getStatus());
     }
 
     public function testRollbackSkippedWhenNoPreviousModelKnown(): void
@@ -290,24 +286,6 @@ final class ReVectorizeMessageHandlerTest extends TestCase
             ->method('getMemoriesCollectionInfo')
             ->willReturn(['exists' => true, 'vector_dim' => 1536, 'points_count' => 12, 'distance' => 'Cosine']);
 
-        $this->qdrantClient->expects($this->never())->method('recreateMemoriesCollection');
-
-        $this->expectException(\RuntimeException::class);
-        $this->handler->__invoke(new ReVectorizeMessage(1));
-    }
-
-    /**
-     * Synapse runs use a different collection and recovery path — the
-     * memories rollback must not fire on synapse failures or we'd
-     * needlessly recreate an unrelated collection.
-     */
-    public function testSynapseScopeFailureDoesNotTouchMemoriesCollection(): void
-    {
-        $run = $this->makeRun(RevectorizeRun::SCOPE_SYNAPSE, RevectorizeRun::STATUS_QUEUED, fromId: 10, toId: 20);
-        $this->runRepository->method('find')->willReturn($run);
-        $this->reindexService->method('execute')->willThrowException(new \RuntimeException('boom'));
-
-        $this->qdrantClient->expects($this->never())->method('getMemoriesCollectionInfo');
         $this->qdrantClient->expects($this->never())->method('recreateMemoriesCollection');
 
         $this->expectException(\RuntimeException::class);

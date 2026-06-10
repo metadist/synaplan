@@ -92,6 +92,12 @@ class TestProvider implements ChatProviderInterface, EmbeddingProviderInterface,
             return $this->mockSortClassification($userContent, $systemContent);
         }
 
+        // Multi-task planner prompt (tools:plan): return a schema-valid task plan.
+        // Deterministic so E2E can exercise the multi-node DAG + task cards.
+        if (str_contains($systemContent, 'Multi-Task Planner')) {
+            return $this->mockTaskPlan($userContent);
+        }
+
         // Search-query-style request (e.g. SearchQueryGenerator with tools:search prompt): return cleaned query like fallbackExtraction
         if (str_contains($systemContent, 'search') && str_contains($systemContent, 'query')) {
             return $this->mockSearchQueryExtraction($userContent);
@@ -169,6 +175,43 @@ class TestProvider implements ChatProviderInterface, EmbeddingProviderInterface,
         }
 
         return json_encode($data, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR);
+    }
+
+    /**
+     * Mock task plan for the multi-task router (tools:plan prompt).
+     *
+     * A "summarize … and translate …" request yields a 2-node text chain
+     * (summarize → translate → compose_reply) so E2E can verify the task cards
+     * with deterministic, TTS-free streaming. Everything else returns a safe
+     * single-node chat plan (executor then uses the legacy single-node path —
+     * identical to a fallback, so existing tests are unaffected).
+     */
+    private function mockTaskPlan(string $userContent): string
+    {
+        $data = json_decode($userContent, true);
+        $text = is_array($data) ? strtolower((string) ($data['BTEXT'] ?? '')) : strtolower($userContent);
+
+        if (str_contains($text, 'summ') && str_contains($text, 'translat')) {
+            return json_encode([
+                'version' => 1,
+                'language' => 'en',
+                'reply_node' => 'n3',
+                'tasks' => [
+                    ['id' => 'n1', 'capability' => 'summarize', 'inputs' => ['text' => '$message.text']],
+                    ['id' => 'n2', 'capability' => 'translate', 'depends_on' => ['n1'], 'inputs' => ['text' => '$n1.text'], 'params' => ['target' => 'de']],
+                    ['id' => 'n3', 'capability' => 'compose_reply', 'depends_on' => ['n2'], 'inputs' => ['text' => '$n2.text']],
+                ],
+            ], JSON_THROW_ON_ERROR);
+        }
+
+        return json_encode([
+            'version' => 1,
+            'language' => 'en',
+            'reply_node' => 'n1',
+            'tasks' => [
+                ['id' => 'n1', 'capability' => 'chat', 'inputs' => ['text' => '$message.text']],
+            ],
+        ], JSON_THROW_ON_ERROR);
     }
 
     private function detectLanguage(string $text): string

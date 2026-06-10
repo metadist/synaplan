@@ -124,8 +124,11 @@ export const selectors = {
     messageText: '[data-testid="message-text"]',
     /** Present when message topic is ERROR (backend error path); use to assert no error in bubble */
     messageTopicError: '[data-testid="message-topic-error"]',
+    // The "Again with… ▾" control is a single button that opens the model
+    // dropdown; picking a model re-runs the prompt. (Previously a split button +
+    // separate toggle — now unified, so both aliases point to the same element.)
     againBtn: '[data-testid="btn-message-again"]',
-    againDropdown: '[data-testid="btn-message-model-toggle"]',
+    againDropdown: '[data-testid="btn-message-again"]',
     againDropdownPanel: '[data-testid="dropdown-again-models"]',
     againDropdownItem: 'button.dropdown-item',
   },
@@ -328,7 +331,6 @@ export const selectors = {
     filterAll: '[data-testid="filter-all"]',
     filterSystem: '[data-testid="filter-system"]',
     filterCustom: '[data-testid="filter-custom"]',
-    filterDisabled: '[data-testid="filter-disabled"]',
     statTotal: '[data-testid="stat-total"]',
     statSystem: '[data-testid="stat-system"]',
     statCustom: '[data-testid="stat-custom"]',
@@ -339,12 +341,9 @@ export const selectors = {
     tabDanger: '[data-testid="tab-danger"]',
     promptDetails: '[data-testid="section-prompt-details"]',
     promptConfig: '[data-testid="section-prompt-config"]',
-    embeddingPreview: '[data-testid="text-embedding-preview"]',
     aiModel: '[data-testid="input-ai-model"]',
     rules: '[data-testid="input-rules"]',
-    keywords: '[data-testid="input-keywords"]',
     description: '[data-testid="input-description"]',
-    enabled: '[data-testid="input-enabled"]',
     content: '[data-testid="input-content"]',
     btnCreate: '[data-testid="btn-create-prompt"]',
     btnDelete: '[data-testid="btn-delete"]',

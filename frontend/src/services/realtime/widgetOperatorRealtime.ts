@@ -15,8 +15,7 @@
  *
  * Both helpers return a subscription handle compatible with the imperative
  * usage pattern of the operator views (subscribe in `onMounted`, drop in
- * `onBeforeUnmount`). Components that prefer a Vue-friendly composable
- * should use {@link useRealtimeChannel} instead.
+ * `onBeforeUnmount`).
  *
  * If `runtime.realtime.enabled` is `false` the helpers degrade to no-ops —
  * there is intentionally no fallback transport.

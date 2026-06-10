@@ -50,6 +50,13 @@ export interface StreamFeedbackRow {
   value?: string
 }
 
+/** A task node as announced in the `plan` event (multitask routing). */
+export interface StreamTaskNode {
+  node_id: string
+  capability: string
+  kind: string
+}
+
 export interface StreamEventMetadata {
   id?: number
   category?: string
@@ -66,6 +73,18 @@ export interface StreamEventMetadata {
   language?: string
   memories?: StreamMemoryRow[]
   feedbacks?: StreamFeedbackRow[]
+  /** Multitask routing (status === 'plan'): the visible task list + reply node. */
+  plan?: StreamTaskNode[]
+  reply_node?: string
+  /** Multitask per-task events (task_update / task_chunk / task_file). */
+  node_id?: string
+  state?: string
+  kind?: string
+  chunk?: string
+  /** Web search (status === 'search_complete'): early sources + query. */
+  results_count?: number
+  query?: string
+  results?: StreamSearchResult[]
   [key: string]: unknown
 }
 

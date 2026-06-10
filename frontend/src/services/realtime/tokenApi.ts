@@ -13,16 +13,23 @@
  *
  * Networking note: we deliberately use raw `fetch` (not the project's
  * `httpClient`) for the widget visitor flow because the embedded widget
- * runs cross-origin and must NOT depend on cookie-based auth or schema
- * validation that assume a logged-in user.
+ * runs cross-origin and must NOT depend on cookie-based auth or the 401
+ * refresh/redirect machinery that assumes a logged-in user. Responses are
+ * still Zod-validated in both flavours.
  */
 
 import { httpClient, getApiBaseUrl } from '@/services/api/httpClient'
-import type { ConnectionTokenResponse, SubscriptionTokenResponse } from './types'
+import {
+  ConnectionTokenResponseSchema,
+  SubscriptionTokenResponseSchema,
+  type ConnectionTokenResponse,
+  type SubscriptionTokenResponse,
+} from './types'
 
 export async function fetchOperatorConnectionToken(): Promise<ConnectionTokenResponse> {
-  return httpClient<ConnectionTokenResponse>('/api/v1/realtime/token', {
+  return httpClient('/api/v1/realtime/token', {
     method: 'POST',
+    schema: ConnectionTokenResponseSchema,
   })
 }
 
@@ -36,7 +43,9 @@ export async function fetchVisitorConnectionToken(
     `${base}/api/v1/realtime/widget/${encodeURIComponent(widgetId)}/sessions/${encodeURIComponent(sessionId)}/token`,
     {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      // X-Widget-Host mirrors the chat endpoints: the backend validates the
+      // embedding host against the widget's domain allowlist.
+      headers: { 'Content-Type': 'application/json', 'X-Widget-Host': window.location.host },
       // Embedded widget never has session cookies for the parent app.
       credentials: 'omit',
     }
@@ -44,7 +53,7 @@ export async function fetchVisitorConnectionToken(
   if (!response.ok) {
     throw new Error(`Failed to issue widget connection token: HTTP ${response.status}`)
   }
-  return (await response.json()) as ConnectionTokenResponse
+  return ConnectionTokenResponseSchema.parse(await response.json())
 }
 
 export async function fetchSubscriptionToken(
@@ -69,11 +78,12 @@ export async function fetchSubscriptionToken(
     if (!response.ok) {
       throw new Error(`Failed to issue subscription token: HTTP ${response.status}`)
     }
-    return (await response.json()) as SubscriptionTokenResponse
+    return SubscriptionTokenResponseSchema.parse(await response.json())
   }
 
-  return httpClient<SubscriptionTokenResponse>('/api/v1/realtime/subscribe', {
+  return httpClient('/api/v1/realtime/subscribe', {
     method: 'POST',
     body: JSON.stringify({ channel }),
+    schema: SubscriptionTokenResponseSchema,
   })
 }

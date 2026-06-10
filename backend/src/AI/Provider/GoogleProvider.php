@@ -1582,9 +1582,12 @@ class GoogleProvider implements ChatProviderInterface, ImageGenerationProviderIn
             }
 
             // Gemini TTS returns signed 16-bit PCM data by default (see docs)
-            // Convert PCM payload to a proper WAV container so browsers can play it
+            // Convert PCM payload to a proper WAV container so browsers can play it.
+            // The mime carries the actual format, e.g. "audio/L16;rate=24000;channels=1"
+            // (RFC 2586) — parse the rate/channels rather than assuming defaults.
             if ($this->isRawPcmMimeType($mimeType)) {
-                $audioData = $this->convertPcmToWav($audioData);
+                [$sampleRate, $channels] = $this->parsePcmParams($mimeType);
+                $audioData = $this->convertPcmToWav($audioData, $sampleRate, $channels);
                 $mimeType = 'audio/wav';
             }
 
@@ -1682,7 +1685,34 @@ class GoogleProvider implements ChatProviderInterface, ImageGenerationProviderIn
 
         return str_contains($mimeType, 'pcm')
             || str_contains($mimeType, 'x-raw')
-            || str_contains($mimeType, 'linear16');
+            || str_contains($mimeType, 'linear16')
+            // RFC 2586: "audio/L16" is headerless linear 16-bit PCM — what Gemini
+            // TTS actually returns ("audio/l16;rate=24000;channels=1"). Without
+            // this, the raw bytes were saved as .wav with no RIFF header and no
+            // browser could decode them ("audio not available").
+            || str_contains($mimeType, 'l16');
+    }
+
+    /**
+     * Parse sample rate + channel count from a PCM mime type such as
+     * "audio/l16;rate=24000;channels=1" (RFC 2586). Falls back to the Gemini
+     * defaults (24 kHz mono) when a parameter is absent.
+     *
+     * @return array{0: int, 1: int} [sampleRate, channels]
+     */
+    private function parsePcmParams(string $mimeType): array
+    {
+        $sampleRate = 24000;
+        $channels = 1;
+
+        if (preg_match('/rate=(\d+)/', $mimeType, $m)) {
+            $sampleRate = max(8000, min(192000, (int) $m[1]));
+        }
+        if (preg_match('/channels=(\d+)/', $mimeType, $m)) {
+            $channels = max(1, min(8, (int) $m[1]));
+        }
+
+        return [$sampleRate, $channels];
     }
 
     /**

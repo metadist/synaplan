@@ -73,7 +73,6 @@ final class ChannelAuthorizerLocatorTest extends TestCase
 
         $user = new User();
         $reflection = new \ReflectionProperty(User::class, 'id');
-        $reflection->setAccessible(true);
         $reflection->setValue($user, 7);
 
         $locator->authorize(new UserChannel(7), new SubscriberContext(user: $user));
@@ -94,7 +93,6 @@ final class ChannelAuthorizerLocatorTest extends TestCase
 
         $user = new User();
         $reflection = new \ReflectionProperty(User::class, 'id');
-        $reflection->setAccessible(true);
         $reflection->setValue($user, 99);
 
         $this->expectException(UnauthorizedSubscriptionException::class);

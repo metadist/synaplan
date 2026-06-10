@@ -63,10 +63,7 @@ test.describe('@ci Task Prompts', () => {
     })
   })
 
-  test('overview shows stats, search filters cards and embedding preview reflects keywords', async ({
-    page,
-    credentials,
-  }) => {
+  test('overview shows stats and search filters cards', async ({ page, credentials }) => {
     await test.step('Arrange: login and open task prompts page', async () => {
       await login(page, credentials)
       await page.goto(PAGE)
@@ -94,13 +91,6 @@ test.describe('@ci Task Prompts', () => {
       await expect(firstCard).toBeVisible({ timeout: TIMEOUTS.SHORT })
       await firstCard.click()
       await expect(page.locator(SEL.promptDetails)).toBeVisible({ timeout: TIMEOUTS.STANDARD })
-    })
-
-    await test.step('Assert: typing into Keywords updates the embedding preview', async () => {
-      await page.locator(SEL.keywords).fill('e2e-keyword-marker, another-marker')
-      await expect(page.locator(SEL.embeddingPreview)).toContainText('e2e-keyword-marker', {
-        timeout: TIMEOUTS.SHORT,
-      })
     })
   })
 })

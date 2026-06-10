@@ -11,6 +11,8 @@ All configuration is done via environment variables in `backend/.env`.
 | `APP_ENV` | `dev` | Environment: `dev`, `prod`, `test` |
 | `APP_URL` | `http://localhost:8000` | Public URL for widgets/embeds/OAuth |
 | `FRONTEND_URL` | `http://localhost:5173` | Frontend URL for email links |
+| `REDIS_DSN` | `redis://redis:6379` | **Required.** Cache, sessions, locks, queues, realtime engine ([details](#redis-required)) |
+| `REALTIME_ENABLED` | `true` | WebSocket realtime layer (Centrifugo) — see [REALTIME.md](REALTIME.md) |
 
 ---
 
@@ -63,6 +65,55 @@ DATABASE_READ_URL=mysql://user:password@db:3306/synaplan
 ```
 
 Default Docker setup uses these internally. Only change for external databases.
+
+---
+
+## Redis (required)
+
+```bash
+REDIS_DSN=redis://redis:6379
+LOCK_DSN=redis://redis:6379
+```
+
+Redis is **mandatory infrastructure** (no filesystem fallback): it backs the
+Symfony cache pools, locks, rate-limiter, sessions, the Messenger queues
+(Redis Streams) and the Centrifugo realtime engine. `/api/health` returns
+**HTTP 503 while Redis is unreachable** so load balancers drop the node.
+
+- All compose files ship a `redis` service — it must be running.
+- Multi-node production: point every node at the same managed/HA Redis.
+- Upgrading an existing install from the old Doctrine queue? Follow the
+  cutover runbook in `_devextras/SYSADMIN-help.md`
+  ("Upgrading: Doctrine → Redis queue cutover") — queued jobs are **not**
+  migrated automatically.
+
+Realtime (Centrifugo) secrets live next to it — `REALTIME_TOKEN_SECRET` and
+`REALTIME_API_KEY` **must** be replaced in production: with `APP_ENV=prod`
+the backend refuses to mint WebSocket tokens (and skips publishes) while
+they still have the shipped `changeme_*` placeholders. See
+[REALTIME.md](REALTIME.md).
+
+---
+
+## Multi-Task Routing (BCONFIG)
+
+The multi-task routing pipeline (AI planner + task DAG, see
+[DEVELOPMENT.md](DEVELOPMENT.md#message-routing-multi-task)) is configured via
+**BCONFIG** database settings, not environment variables. Admins manage the
+master switch in the UI (**Settings → Routing**); the rest can be set per
+group in the `BCONFIG` table.
+
+| Group / Key | Default | Description |
+|-------------|---------|-------------|
+| `MULTITASK / ROUTING_ENABLED` | `true` (new installs)¹ | Master switch: plan multi-step requests as a task DAG |
+| `MULTITASK / SHADOW_MODE` | `false` | Generate + persist plans for analysis, but answer via the legacy path |
+| `MULTITASK / PARALLEL_ENABLED` | `false` | Execute independent media nodes concurrently (subprocess offload) |
+| `MULTITASK / MAX_PARALLEL` | `3` | Concurrency cap for parallel media nodes |
+| `MULTITASK / NODE_TIMEOUT` | `120` | Per-node subprocess timeout (seconds) |
+| `CLASSIFIER / FAST_PATH_ENABLED` | `false` | Skip the AI sorter for trivial chat messages (heuristic) |
+
+¹ Existing installations are grandfathered to `0` by migration so behavior
+doesn't change on upgrade — enable it per user or globally when ready.
 
 ---
 

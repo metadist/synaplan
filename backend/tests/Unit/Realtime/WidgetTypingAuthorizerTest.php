@@ -82,7 +82,7 @@ final class WidgetTypingAuthorizerTest extends TestCase
 
         $this->authorizer->authorize(
             new WidgetTypingChannel('w', 'sid_xyz'),
-            new SubscriberContext(visitorId: 'sid_xyz')
+            new SubscriberContext(visitorId: 'sid_xyz', extra: ['widgetId' => 'w'])
         );
         $this->expectNotToPerformAssertions();
     }
@@ -95,7 +95,21 @@ final class WidgetTypingAuthorizerTest extends TestCase
         $this->expectException(UnauthorizedSubscriptionException::class);
         $this->authorizer->authorize(
             new WidgetTypingChannel('w', 'sid_xyz'),
-            new SubscriberContext(visitorId: 'sid_other')
+            new SubscriberContext(visitorId: 'sid_other', extra: ['widgetId' => 'w'])
+        );
+    }
+
+    public function testRejectsVisitorWhoseClaimedWidgetIdDiffersFromChannel(): void
+    {
+        // Mirrors the session-channel check: publish rights on the typing
+        // channel must never be grantable across widget boundaries.
+        $this->widgetRepo->method('findByWidgetId')->willReturn($this->buildWidget(7));
+        $this->sessionRepo->method('findByWidgetAndSession')->willReturn(new WidgetSession());
+
+        $this->expectException(UnauthorizedSubscriptionException::class);
+        $this->authorizer->authorize(
+            new WidgetTypingChannel('w', 'sid_xyz'),
+            new SubscriberContext(visitorId: 'sid_xyz', extra: ['widgetId' => 'other_widget'])
         );
     }
 
@@ -151,7 +165,6 @@ final class WidgetTypingAuthorizerTest extends TestCase
     {
         $user = new User();
         $reflection = new \ReflectionProperty(User::class, 'id');
-        $reflection->setAccessible(true);
         $reflection->setValue($user, $id);
 
         return $user;

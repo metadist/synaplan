@@ -29,7 +29,7 @@ Full-featured installation with local AI models and audio transcription.
 
 | Component | Size | Description |
 |-----------|------|-------------|
-| Base services | ~5 GB | Backend, frontend, database, Tika |
+| Base services | ~5 GB | Backend, frontend, worker, database, Redis, Centrifugo, Tika, Qdrant |
 | Ollama models | ~4 GB | Local AI (gpt-oss:20b, bge-m3) |
 | **Total** | **~9 GB** | Everything included |
 
@@ -45,9 +45,13 @@ docker compose up -d
 - Full web app and REST API
 - Document processing (Apache Tika)
 - MariaDB database with VECTOR support
+- Redis (cache, sessions, locks, message queues, realtime engine)
+- Centrifugo WebSocket gateway (live chat takeover, realtime events)
+- Background worker (Symfony Messenger consumer for async AI/indexing jobs)
 - Local Ollama AI models
 - Whisper audio transcription
 - Cloud AI support (Groq, OpenAI, Anthropic, Gemini)
+- Qdrant vector database (AI memories, RAG, feedback)
 - Dev tools (phpMyAdmin, MailHog)
 
 ### Minimal Install (Cloud AI Only)
@@ -56,7 +60,7 @@ Fastest way to start—uses cloud AI providers, skips large local models.
 
 | Component | Size | Description |
 |-----------|------|-------------|
-| Base services | ~5 GB | Backend, frontend, database, Tika |
+| Base services | ~5 GB | Backend, frontend, worker, database, Redis, Centrifugo, Tika |
 | **Total** | **~5 GB** | No local AI models |
 
 ```bash
@@ -175,9 +179,25 @@ docker compose exec ollama ollama pull bge-m3
 ```
 
 ### Port conflicts
-Default ports: 5173 (frontend), 8000 (backend), 3306 (database)
+Default host ports: 5173 (frontend), 8000 (backend), 3307 (database), 8082 (phpMyAdmin), 8025/1025 (MailHog), 6333 (Qdrant), 11435 (Ollama), 9999 (Tika)
+
+Redis, Centrifugo, and the worker are internal-only services — they expose no host ports and cannot conflict.
 
 Edit `docker-compose.yml` to change ports if needed.
+
+### Worker / queue issues
+Async jobs (AI processing, document indexing) run in the `worker` container:
+
+```bash
+# Worker logs — should show "messenger:consume" processing messages
+docker compose logs -f worker
+
+# Realtime gateway logs
+docker compose logs -f centrifugo
+
+# Redis connectivity
+docker compose exec redis redis-cli ping   # expects PONG
+```
 
 ---
 

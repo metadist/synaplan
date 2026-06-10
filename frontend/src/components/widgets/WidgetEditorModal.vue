@@ -67,6 +67,7 @@
               data-testid="input-task-prompt"
             >
               <option value="">{{ $t('widgets.selectTaskPrompt') }}</option>
+              <option :value="STANDARD_SORTING">{{ $t('widgets.standardSorting') }}</option>
               <option v-for="prompt in taskPrompts" :key="prompt.topic" :value="prompt.topic">
                 {{ prompt.name }}
               </option>
@@ -509,6 +510,10 @@ const emit = defineEmits<{
 }>()
 
 const isEdit = computed(() => !!props.widget)
+
+// Sentinel for the "Standard sorting" choice (no fixed prompt). Must match
+// WidgetService::STANDARD_SORTING_TOPIC on the backend.
+const STANDARD_SORTING = '__standard__'
 
 const taskPrompts = ref<TaskPrompt[]>([])
 const { t, locale } = useI18n()
