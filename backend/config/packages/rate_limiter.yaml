@@ -1,0 +1,18 @@
+# Rate-limiter named-limiter definitions.
+#
+# The shared cache pool that backs every limiter (`cache.rate_limiter`) is
+# declared in `config/packages/cache.yaml` alongside all other pools so the
+# `when@test` override path is consistent. Defining the pool in two YAML
+# files made Symfony's CachePass retain the prod Redis `provider` argument
+# as ctor arg 0 even when the test profile swapped the adapter, which then
+# crashed kernel boot with "argument 1 doesn't exist in" the test adapter.
+#
+# Add named limiters here when needed (login attempts, message quotas, etc.):
+#
+#   framework:
+#       rate_limiter:
+#           login:
+#               policy: 'fixed_window'
+#               limit: 5
+#               interval: '15 minutes'
+#               cache_pool: 'cache.rate_limiter'

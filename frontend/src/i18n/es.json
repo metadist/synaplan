@@ -2145,5 +2145,28 @@
       "mid": "Mid Cost",
       "high": "High Cost"
     }
+  },
+  "realtime": {
+    "status": {
+      "connected": "En vivo",
+      "connecting": "Conectando…",
+      "reconnecting": "Reconectando…",
+      "disconnected": "Sin conexión",
+      "disabled": "Actualizaciones en vivo desactivadas",
+      "error": "Error de conexión"
+    },
+    "tooltip": {
+      "connected": "La conexión en tiempo real funciona",
+      "connecting": "Estableciendo conexión en tiempo real…",
+      "reconnecting": "Conexión perdida — reintentando automáticamente",
+      "disconnected": "La conexión en tiempo real está cerrada",
+      "disabled": "Las actualizaciones en vivo están desactivadas en este entorno. Recarga la página para ver los datos más recientes.",
+      "error": "Falló la conexión en tiempo real: {message}"
+    },
+    "notification": {
+      "reconnecting": "Conexión perdida — reconectando…",
+      "reconnected": "Estás conectado de nuevo.",
+      "error": "Las actualizaciones en vivo no están disponibles temporalmente. Recarga la página para ver la actividad más reciente."
+    }
   }
 }

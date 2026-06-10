@@ -24,7 +24,9 @@ jobs:
         uses: shivammathur/setup-php@7c071dfe9dc99bdf297fa79cb49ea005b9fcadbc # v2
         with:
           php-version: "8.4"
-          extensions: mbstring, xml, ctype, iconv, intl
+          # `redis` (phpredis) is in composer.json's require for `symfony/redis-messenger`,
+          # so installing without it would force `--ignore-platform-req=ext-redis` here too.
+          extensions: mbstring, xml, ctype, iconv, intl, redis
           coverage: none
 
       - name: Cache composer dependencies
@@ -66,6 +68,22 @@ jobs:
           --health-timeout=5s
           --health-retries=5
 
+      # Redis backs cache.app, the lock + rate-limiter components and the
+      # Messenger Redis Streams transport. PHPUnit needs a live instance so the
+      # HealthController Redis probe and any transport-backed tests pass instead
+      # of failing on a refused connection. `.env.test` points REDIS_DSN at
+      # 127.0.0.1:6379. Digest pinned to match docker-compose.yml for parity
+      # (Redis 7.4 — see docker-compose.yml for the Centrifugo pub/sub rationale).
+      redis:
+        image: redis:7.4-alpine@sha256:6ab0b6e7381779332f97b8ca76193e45b0756f38d4c0dcda72dbb3c32061ab99
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd="redis-cli ping"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
+
     steps:
       - name: Checkout
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
@@ -74,7 +92,10 @@ jobs:
         uses: shivammathur/setup-php@7c071dfe9dc99bdf297fa79cb49ea005b9fcadbc # v2
         with:
           php-version: "8.4"
-          extensions: mbstring, xml, ctype, iconv, intl, pdo, pdo_mysql, zip, gd, curl, bcmath, exif, pcntl, opcache, readline, soap, sodium, ffi, imagick, grpc
+          # `redis` (phpredis) is required by `symfony/redis-messenger`. Sessions
+          # and cache.app use Predis (pure PHP) so they don't need it, but `composer
+          # install` would refuse to run without it on the platform-req check.
+          extensions: mbstring, xml, ctype, iconv, intl, pdo, pdo_mysql, zip, gd, curl, bcmath, exif, pcntl, opcache, readline, soap, sodium, ffi, imagick, grpc, redis
           coverage: none
 
       - name: Cache composer dependencies

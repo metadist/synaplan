@@ -2146,5 +2146,28 @@
       "mid": "Mid Cost",
       "high": "High Cost"
     }
+  },
+  "realtime": {
+    "status": {
+      "connected": "Canlı",
+      "connecting": "Bağlanıyor…",
+      "reconnecting": "Yeniden bağlanıyor…",
+      "disconnected": "Çevrimdışı",
+      "disabled": "Canlı güncellemeler kapalı",
+      "error": "Bağlantı hatası"
+    },
+    "tooltip": {
+      "connected": "Gerçek zamanlı bağlantı sağlıklı",
+      "connecting": "Gerçek zamanlı bağlantı kuruluyor…",
+      "reconnecting": "Bağlantı kesildi — otomatik olarak yeniden deneniyor",
+      "disconnected": "Gerçek zamanlı bağlantı kapalı",
+      "disabled": "Bu ortamda canlı güncellemeler kapalı. En güncel verileri görmek için sayfayı yenileyin.",
+      "error": "Gerçek zamanlı bağlantı başarısız: {message}"
+    },
+    "notification": {
+      "reconnecting": "Bağlantı kesildi — yeniden bağlanılıyor…",
+      "reconnected": "Tekrar çevrimiçisin.",
+      "error": "Canlı güncellemeler şu anda kullanılamıyor. En son etkinliği görmek için sayfayı yenileyin."
+    }
   }
 }

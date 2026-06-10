@@ -16,13 +16,15 @@
 }
 
 :80 {
-	# Enable compression — but NOT for SSE streaming endpoints.
-	# Caddy's encode directive buffers output for gzip/zstd, which breaks
-	# real-time Server-Sent Events delivery.
-	@not_sse {
-		not path /api/v1/messages/stream /api/v1/widget/*/message /api/v1/widgets/*/sessions/*/events
+	# Enable compression — but NOT for the AI token streaming endpoints.
+	# Caddy's encode directive buffers output for gzip/zstd, which would
+	# defeat real-time delivery for chat token streams. The legacy widget
+	# SSE/poll routes were removed in the realtime/Centrifugo migration,
+	# so only the AI streaming endpoints stay on this exclusion list.
+	@not_streaming {
+		not path /api/v1/messages/stream /api/v1/widget/*/message
 	}
-	encode @not_sse zstd gzip
+	encode @not_streaming zstd gzip
 
 	# Security headers (applied to all responses)
 	header {
@@ -75,6 +77,25 @@
 		Cache-Control "no-cache, no-store, must-revalidate"
 		Pragma "no-cache"
 		Expires "0"
+	}
+
+	# ------------------------------------------------------------------
+	# Realtime / WebSockets — proxied to the local Centrifugo instance.
+	#
+	# Browsers connect to /connection/websocket on the same origin so we
+	# don't need CORS gymnastics or a separate subdomain. Centrifugo is
+	# horizontally scaled across all 3 backend nodes via shared Redis,
+	# so any node can accept the upgrade and still see publishes from
+	# the other nodes.
+	#
+	# /centrifugo/ exposes the admin UI and HTTP API; restrict by source
+	# IP at the load-balancer / firewall in production.
+	# ------------------------------------------------------------------
+	handle /connection/* {
+		reverse_proxy centrifugo:8000
+	}
+	handle /centrifugo/* {
+		reverse_proxy centrifugo:8000
 	}
 
 	# Widgets first (to catch widget.js, chunks/*, etc.)

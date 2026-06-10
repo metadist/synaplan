@@ -226,12 +226,30 @@ run_migrations_with_retry "" "main"
 echo "✅ Database migrations applied!"
 
 # Same flow for the test database (PHPUnit + DAMA transaction rollback).
-# Non-fatal: a broken test DB must never block the dev backend from starting.
+#
+# Best-effort and non-fatal in dev: a broken OR missing test DB must never
+# block the dev backend from starting. Depending on which compose file is
+# active, the `db_test` host referenced in backend/.env.test may not exist
+# (it ships with docker-compose.test.yml's separate test-stack, not the
+# default dev stack). When it is missing, every `--env=test` console call
+# fails to connect — so we run the self-healing bootstrap inside a subshell
+# whose non-zero exit is swallowed, and capture its output so a missing test
+# DB doesn't spam the dev log with confusing `Connection refused` traces. To
+# debug the test bootstrap, run the same commands manually inside the container.
 if [ "$APP_ENV" = "dev" ]; then
-    echo "🔄 Migrating test database..."
-    run_migrations_with_retry "--env=test" "test" || \
-        echo "⚠️  Test database migrations failed — continuing (dev backend still starts)"
-    echo "✅ Test database migrations applied!"
+    echo "🔄 Migrating test database (best-effort)..."
+    _test_bootstrap_failed=0
+    (
+        set -e
+        run_migrations_with_retry "--env=test" "test"
+    ) >/dev/null 2>&1 || _test_bootstrap_failed=1
+
+    if [ "$_test_bootstrap_failed" -eq 0 ]; then
+        echo "✅ Test database migrations applied!"
+    else
+        echo "ℹ️  Test database unreachable — skipping (expected unless docker-compose.test.yml is active)."
+    fi
+    unset _test_bootstrap_failed
 fi
 
 # Load demo user fixtures FIRST (dev/test only, when DB is fresh).
