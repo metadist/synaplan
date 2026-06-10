@@ -21,7 +21,7 @@ use Symfony\Component\HttpFoundation\Request;
  *     `:port` suffixes.
  *
  * This is defence-in-depth, not a hard auth boundary: a scripted client can
- * forge any of these headers. The unguessable session UUID plus per-IP rate
+ * forge any of these headers. The hard-to-guess session id plus per-IP rate
  * limiting carry the real weight; the origin check stops casual cross-site
  * reuse from browsers, where Origin cannot be forged.
  */

@@ -44,7 +44,7 @@ use Symfony\Component\Security\Http\Attribute\CurrentUser;
  * Hardening on the anonymous (PUBLIC_ACCESS) endpoints:
  *
  *   - per-IP rate limits (see config/packages/rate_limiter.yaml) keep
- *     widget/session UUID enumeration impractical;
+ *     widget/session id enumeration impractical;
  *   - the visitor token endpoint validates the request origin against the
  *     widget's domain allowlist (same semantics as the chat endpoints);
  *   - error responses are deliberately generic — a probe cannot tell a
@@ -109,14 +109,17 @@ final class RealtimeTokenController extends AbstractController
      * Issue a connection token for an anonymous widget visitor.
      *
      * The visitor proves possession of the (widgetId, sessionId) pair.
-     * The session id is a guess-resistant UUID minted server-side, so
-     * possession is treated as proof of ownership for the purposes of
-     * subscribing to that one session's channel — no sensitive data is
-     * exposed via the channel that is not already part of the chat.
+     * The session id is generated CLIENT-side by the widget
+     * (`sess_{timestamp}_{~9 random chars}`, see ChatWidget.vue) — random
+     * enough that guessing a live one is impractical under the per-IP rate
+     * limit, but NOT a server-minted UUID and not cryptographically strong.
+     * The origin allowlist, rate limit, expiry check and generic errors
+     * below are therefore load-bearing, not belt-and-suspenders.
+     * (Future hardening: mint session ids server-side.)
      *
-     * Defence-in-depth on top of the UUID: per-IP rate limit, origin
-     * allowlist check, session-expiry check, and a single generic 404 so
-     * probes cannot distinguish "widget exists" from "session exists".
+     * Per-IP rate limit, origin allowlist check, session-expiry check, and
+     * a single generic 404 so probes cannot distinguish "widget exists"
+     * from "session exists".
      */
     #[Route('/api/v1/realtime/widget/{widgetId}/sessions/{sessionId}/token', name: 'api_realtime_token_widget', methods: ['POST'])]
     #[OA\Post(

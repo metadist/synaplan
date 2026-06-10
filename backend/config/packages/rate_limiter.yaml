@@ -24,8 +24,9 @@ framework:
         # one active visitor needs ~3 requests/minute (connection token +
         # session/typing subscription refreshes at 60s TTL), so 60/120 per
         # minute tolerates dozens of visitors behind one NAT while making
-        # widget/session UUID enumeration useless (UUIDv4 space at ≤2 guesses
-        # per second).
+        # widget/session id enumeration useless (client-generated
+        # `sess_{ts}_{~46 random bits}` ids are infeasible to hit at ≤2
+        # guesses per second).
         realtime_widget_token:
             policy: 'sliding_window'
             limit: 60
