@@ -14,8 +14,13 @@
 # docker-compose file (and the production env). It has no application-level
 # fallback in dev/prod: a load-balanced cluster MUST share its cache, so a
 # silent downgrade to a node-local adapter would reintroduce cross-node desync.
-# The ONLY override is the `when@test` block below, which swaps every pool to an
-# in-memory array adapter so PHPUnit runs without a Redis server.
+# The ONLY override is the `when@test` block below, which swaps every pool to a
+# node-local filesystem adapter so PHPUnit runs without a Redis server. We use
+# the filesystem (not array) adapter on purpose: the array adapter implements
+# ResettableInterface and is wiped by Symfony's ServicesResetter on every
+# `kernel.reset` (fired after each test request), which breaks cross-request
+# cache semantics like webhook idempotency and rate limiting. Filesystem cache
+# survives between requests within a test, matching production behaviour.
 framework:
     cache:
         prefix_seed: synaplan_sf
@@ -62,18 +67,20 @@ framework:
             # WebSockets (see docs/REALTIME.md), not via a Symfony cache pool
             # or the legacy BWIDGET_EVENTS table.
 
-# Test profile uses an in-memory cache so we don't require Redis to run unit
-# tests. Pools that PHPUnit hits via DI inherit this default.
+# Test profile uses a node-local filesystem cache so we don't require Redis to
+# run unit tests, while still persisting entries across requests within a test
+# (see the rationale in the header comment). Pools that PHPUnit hits via DI
+# inherit this default.
 when@test:
     framework:
         cache:
-            app: cache.adapter.array
+            app: cache.adapter.filesystem
             pools:
                 cache.provider_status:
-                    adapter: cache.adapter.array
+                    adapter: cache.adapter.filesystem
                 cache.model_config:
-                    adapter: cache.adapter.array
+                    adapter: cache.adapter.filesystem
                 cache.user_config:
-                    adapter: cache.adapter.array
+                    adapter: cache.adapter.filesystem
                 cache.rate_limiter:
-                    adapter: cache.adapter.array
+                    adapter: cache.adapter.filesystem
