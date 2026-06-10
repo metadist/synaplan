@@ -2490,8 +2490,14 @@ const handleStopStreaming = async () => {
     stopStreamingFn = null
   }
 
-  // Notify backend to stop streaming
-  if (currentTrackId) {
+  // Notify backend to stop streaming.
+  // Guests have no auth session: the auth-guarded /stop-stream endpoint would
+  // return 401 and the http client would force a "session expired" redirect to
+  // /login (issue #1037). For guests, closing the EventSource above is enough —
+  // the backend detects the abort via connection_aborted() in the stream loop.
+  if (isGuestMode.value) {
+    // No backend notification needed for guests.
+  } else if (currentTrackId) {
     try {
       await chatApi.stopStream(currentTrackId)
     } catch (error) {
@@ -2558,7 +2564,11 @@ const handleStopStreaming = async () => {
     const trackIdToSave = currentTrackId
     const chatIdToSave = currentStreamingChatId
 
-    if (trackIdToSave && chatIdToSave) {
+    if (isGuestMode.value) {
+      // Guests can't persist messages via the auth-guarded /save-cancelled
+      // endpoint (issue #1037). The cancellation notice is already shown
+      // locally above, so we simply skip the backend save.
+    } else if (trackIdToSave && chatIdToSave) {
       // Save and update message with backend ID, pass current metadata
       const metadata = {
         provider: streamingMessage.provider,

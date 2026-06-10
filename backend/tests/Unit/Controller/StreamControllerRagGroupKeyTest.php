@@ -6,6 +6,7 @@ namespace App\Tests\Unit\Controller;
 
 use App\AI\Service\AiFacade;
 use App\Controller\StreamController;
+use App\Service\File\DocumentGeneratorService;
 use App\Service\File\UserUploadPathBuilder;
 use App\Service\GuestSessionService;
 use App\Service\MemoryExtractionDispatcher;
@@ -57,6 +58,7 @@ final class StreamControllerRagGroupKeyTest extends TestCase
             $this->createMock(PromptService::class),
             $this->createMock(MessageForwardingService::class),
             $this->createMock(MemoryExtractionDispatcher::class),
+            $this->createMock(DocumentGeneratorService::class),
         );
     }
 

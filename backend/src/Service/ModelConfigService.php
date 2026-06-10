@@ -504,6 +504,37 @@ final readonly class ModelConfigService
         return true;
     }
 
+    /**
+     * Remove all per-user DEFAULTMODEL overrides so the user falls back to
+     * the global platform defaults (ownerId=0).
+     *
+     * @return array{removed: int, defaults: array<string, int>}
+     */
+    public function resetUserDefaults(int $userId): array
+    {
+        $userOverrides = $this->configRepository->findBy([
+            'ownerId' => $userId,
+            'group' => 'DEFAULTMODEL',
+        ]);
+
+        $this->configRepository->removeAll($userOverrides);
+
+        $globalRows = $this->configRepository->findBy([
+            'ownerId' => 0,
+            'group' => 'DEFAULTMODEL',
+        ]);
+
+        $defaults = [];
+        foreach ($globalRows as $row) {
+            $defaults[$row->getSetting()] = (int) $row->getValue();
+        }
+
+        return [
+            'removed' => count($userOverrides),
+            'defaults' => $defaults,
+        ];
+    }
+
     public function getModelTag(int $modelId): ?string
     {
         $model = $this->modelRepository->find($modelId);

@@ -130,7 +130,26 @@ docker compose up -d         # entrypoint runs migrations + fixtures + seed
     ```bash
     bash _docker/backend/tests/test-migrations-bootstrap.sh
     ```
-3. Run `doctrine:migrations:migrate` (fresh DB → full schema; legacy DB → every migration newer than the baseline).
+3. Run `doctrine:migrations:migrate` (fresh DB → full schema; legacy DB → every migration
+   newer than the baseline) **via `run_migrations_with_retry`** — a bounded retry wrapper
+   that makes a failed first start self-heal *within the same container start* instead of
+   crash-looping under `restart: unless-stopped`:
+
+   - It re-runs the idempotent metadata bootstrap (step 2) **before every attempt**. So if
+     the very first `migrate` dies mid-baseline (the baseline is non-transactional —
+     MariaDB can't roll back DDL — and creates `BAPIKEYS` first, `BUSER` last), the next
+     attempt's bootstrap detects the "`BAPIKEYS` without `BUSER`" half-applied state, drops
+     the orphan tables, and the retry rebuilds the schema cleanly — no operator action.
+   - Transient failures (DB still warming up behind the `SELECT 1` probe, lock contention,
+     deadlocks, two instances racing the same migration) get a few more chances rather than
+     instantly killing the container.
+   - Tunable via env: `MIGRATION_MAX_ATTEMPTS` (default `5`) and
+     `MIGRATION_RETRY_DELAY_SECONDS` (default `5`). After the attempts are exhausted the
+     container exits non-zero (so a genuinely broken migration is still loud and visible).
+
+   The retry wrapper is covered by the same bash test suite (cases 10–12): first-try
+   success, fail-twice-then-succeed (asserts the bootstrap re-runs before each attempt),
+   and always-fail (asserts it gives up after `MIGRATION_MAX_ATTEMPTS`).
 4. Repeat steps 2 and 3 for the test DB (dev only).
 5. **Dev/test only:** load `UserFixtures` if `BUSER` is empty (this purges entity tables first).
 6. **Always:** run `app:seed` to (re-)populate models/prompts/config catalogs.

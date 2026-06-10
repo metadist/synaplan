@@ -603,9 +603,16 @@ watch(
       activeCommand.value = null
     }
 
-    // Detect @mention trigger: match @ preceded by start-of-string or whitespace, at end of input
+    // Detect @mention trigger: match @ preceded by start-of-string or whitespace, at end of input.
+    // The mention palette lists the user's knowledge-base files via the
+    // auth-guarded /api/v1/files endpoint. Opening it as a guest returns 401
+    // and the http client force-redirects to /login (issue #1037). Guests have
+    // no knowledge-base files anyway, so we never open the palette for them and
+    // let "@" stay as plain text (e.g. when typing an email address). Gate on
+    // authentication rather than the isGuestMode prop, which can still be false
+    // at mount while the guest session is initializing.
     const mentionMatch = newValue.match(/(?:^|\s)@(\S*)$/)
-    if (mentionMatch && !paletteVisible.value) {
+    if (mentionMatch && !paletteVisible.value && authStore.isAuthenticated) {
       mentionQuery.value = mentionMatch[1]
       mentionPaletteVisible.value = true
     } else if (!mentionMatch) {

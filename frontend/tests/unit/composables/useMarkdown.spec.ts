@@ -220,6 +220,42 @@ describe('useMarkdown', () => {
       expect(html).not.toContain('<script')
     })
 
+    it('should not render data: URI links as clickable downloads', () => {
+      const html = markdown.render(
+        '[DOCX herunterladen](data:text/markdown;charset=utf-8,raw%20text)'
+      )
+      expect(html).not.toContain('href="data:')
+      expect(html).not.toContain('<a')
+      // The label is preserved as plain text so no broken download button is shown
+      expect(html).toContain('DOCX herunterladen')
+    })
+
+    it('should not render obfuscated data: URI links (whitespace/control chars)', () => {
+      const html = markdown.render('[fake](data:\n text/plain,broken)')
+      expect(html).not.toContain('href="data:')
+    })
+
+    it('should not render data: URI links obfuscated with DEL/C1 control chars', () => {
+      const del = markdown.render('[fake](da\u007fta:text/plain,broken)')
+      expect(del).not.toContain('<a')
+      const c1 = markdown.render('[fake](da\u0085ta:text/plain,broken)')
+      expect(c1).not.toContain('<a')
+    })
+
+    it('should not render vbscript: or file: links', () => {
+      const vbscript = markdown.render('[click](vbscript:msgbox(1))')
+      expect(vbscript).not.toContain('href="vbscript:')
+      const file = markdown.render('[open](file:///etc/passwd)')
+      expect(file).not.toContain('href="file:')
+    })
+
+    it('should still render safe http and mailto links', () => {
+      const http = markdown.render('[External](https://example.com)')
+      expect(http).toContain('href="https://example.com"')
+      const mailto = markdown.render('[Mail](mailto:test@example.com)')
+      expect(mailto).toContain('href="mailto:test@example.com"')
+    })
+
     it('should allow safe HTML elements', () => {
       const html = markdown.render('**bold** and *italic*')
       expect(html).toContain('<strong')

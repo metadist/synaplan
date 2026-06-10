@@ -71,6 +71,34 @@ _mysql_legacy_stripped_baseline() {
     printf '%s' "${BASELINE_MIGRATION//\\/}"
 }
 
+# Drop every table in the current database.
+#
+# Used exclusively to recover from a half-applied baseline (see the partial
+# detection in bootstrap_migrations_metadata). The whole batch runs as a single
+# dbal:run-sql call: pdo_mysql executes the `;`-separated statements as one
+# multi-statement, so `SET FOREIGN_KEY_CHECKS=0` stays in effect for the DROP
+# and we don't have to know the FK dependency order. The table list is built
+# dynamically from information_schema so it never goes stale as the schema
+# evolves. 0x60 is a backtick — quoting the identifiers without tangling with
+# the surrounding shell/SQL quoting.
+#
+# `group_concat_max_len` is bumped first: its default (1024 bytes) can silently
+# truncate the GROUP_CONCAT() table list on a larger schema, which would leave
+# some tables undropped and reintroduce the very crash loop this recovery exists
+# to prevent. 1 GiB is far more than any realistic schema needs.
+#
+# Returns the underlying dbal:run-sql exit status (non-zero on failure) so the
+# caller can surface the problem instead of silently continuing into a migrate
+# that would crash-loop on "table already exists".
+#
+# Overridable in tests by redefining after sourcing this file.
+_drop_all_tables() {
+    local _env_flag="${1:-}"
+    php bin/console dbal:run-sql ${_env_flag} \
+        "SET SESSION group_concat_max_len = 1073741824; SET FOREIGN_KEY_CHECKS=0; SET @tbls = (SELECT GROUP_CONCAT(CONCAT(0x60, table_name, 0x60)) FROM information_schema.tables WHERE table_schema = DATABASE()); SET @sql = IF(@tbls IS NULL, 'DO 0', CONCAT('DROP TABLE ', @tbls)); PREPARE s FROM @sql; EXECUTE s; DEALLOCATE PREPARE s; SET FOREIGN_KEY_CHECKS=1" \
+        >/dev/null 2>&1
+}
+
 # INSERT IGNORE the baseline migration row. No-op if the row already exists.
 #
 # Also self-heals databases bootstrapped by the previous release where the
@@ -114,8 +142,40 @@ bootstrap_migrations_metadata() {
         "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = 'BUSER'" \
         "$_env_flag")
 
-    # Fresh database: let doctrine:migrations:migrate create the full schema.
     if [ "${_has_buser:-0}" -eq 0 ]; then
+        # Before treating a BUSER-less database as fresh, guard against a
+        # half-applied baseline. The baseline migration (Version20260417000000)
+        # is non-transactional — MariaDB can't roll back DDL — and creates
+        # BAPIKEYS as its FIRST statement but BUSER only near the END. If that
+        # first migrate run dies in between (transient DB drop, OOM/kill, ^C,
+        # an unsupported column type, ...) the early tables persist while
+        # Doctrine never records the version row. On the next start the naive
+        # "no BUSER => fresh" check would let migrate replay the baseline, which
+        # then crashes on `CREATE TABLE BAPIKEYS ... already exists` — and with
+        # `restart: unless-stopped` that becomes an infinite crash loop.
+        #
+        # "BAPIKEYS present but BUSER absent" is an unambiguous fingerprint of
+        # this broken state on an otherwise-fresh DB: no BUSER means no user
+        # data to lose, so we recover by dropping every orphan table and letting
+        # the migrate below rebuild the schema from scratch.
+        local _has_partial_baseline
+        _has_partial_baseline=$(_count_sql \
+            "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = 'BAPIKEYS'" \
+            "$_env_flag")
+        if [ "${_has_partial_baseline:-0}" -gt 0 ]; then
+            echo "⚠️  [$_label] Half-applied baseline detected (BAPIKEYS exists but BUSER does not) — dropping orphan tables so migrations can re-run cleanly"
+            if ! _drop_all_tables "$_env_flag"; then
+                # If the drop fails we must NOT fall through to migrate: it would
+                # replay the baseline DDL and crash on "table already exists",
+                # crash-looping under `restart: unless-stopped` with no hint why.
+                # Surface the real failure and abort the bootstrap instead.
+                echo "❌ [$_label] Failed to drop orphan tables during half-applied baseline recovery — aborting bootstrap" >&2
+                return 1
+            fi
+        fi
+
+        # Fresh (or just-cleaned) database: let doctrine:migrations:migrate
+        # create the full schema.
         return 0
     fi
 
@@ -173,4 +233,71 @@ bootstrap_migrations_metadata() {
                 >/dev/null 2>&1 || true
         fi
     fi
+
+    # Explicit success: the trailing `if` above evaluates to a non-zero status
+    # whenever the baseline row already exists (healthy DB), so without this the
+    # function would falsely report failure to run_migrations_with_retry.
+    return 0
+}
+
+# Run doctrine:migrations:migrate once. Isolated in its own function so the
+# retry wrapper below stays pure control-flow and the bash test suite can
+# override it to simulate transient failures without a real database.
+#
+# Returns the migrate command's own exit status.
+_run_doctrine_migrate() {
+    local _env_flag="${1:-}"
+    php bin/console doctrine:migrations:migrate --no-interaction --allow-no-migration ${_env_flag}
+}
+
+# Apply migrations with bounded retries, re-running the idempotent metadata
+# bootstrap before EACH attempt. This is what makes a failed first start
+# self-healing *within a single container start* rather than relying on the
+# Docker restart loop:
+#
+#   - Transient failures (DB still warming up behind the SELECT 1 probe, lock
+#     contention, deadlocks, two app instances racing the same migration) get
+#     a few more chances instead of crash-exiting the container immediately.
+#   - A crash mid-baseline leaves "BAPIKEYS without BUSER"; because the
+#     bootstrap re-runs before the next attempt it drops the orphan tables and
+#     the retry rebuilds the schema cleanly — no operator action, no restart.
+#
+# Tunables (env): MIGRATION_MAX_ATTEMPTS (default 5),
+#                 MIGRATION_RETRY_DELAY_SECONDS (default 5).
+#
+# Returns 0 once migrations apply cleanly, 1 after exhausting all attempts.
+#
+# Args:
+#   $1 - optional Symfony env flag (e.g. "--env=test"); pass "" for the main DB.
+#   $2 - optional human label for log output (e.g. "main" / "test").
+run_migrations_with_retry() {
+    local _env_flag="${1:-}"
+    local _label="${2:-database}"
+    local _max_attempts="${MIGRATION_MAX_ATTEMPTS:-5}"
+    local _delay="${MIGRATION_RETRY_DELAY_SECONDS:-5}"
+    local _attempt=1
+
+    while :; do
+        # A non-zero bootstrap means an unrecoverable setup failure (e.g. the
+        # half-applied-baseline orphan-table drop failed). Retrying would only
+        # crash-loop on the same error, so abort immediately and let the failure
+        # be visible rather than swallowed.
+        if ! bootstrap_migrations_metadata "$_env_flag" "$_label"; then
+            echo "❌ [$_label] Migration metadata bootstrap failed — aborting" >&2
+            return 1
+        fi
+
+        if _run_doctrine_migrate "$_env_flag"; then
+            return 0
+        fi
+
+        if [ "$_attempt" -ge "$_max_attempts" ]; then
+            echo "❌ [$_label] Migrations still failing after ${_attempt} attempt(s) — giving up"
+            return 1
+        fi
+
+        echo "⚠️  [$_label] Migration attempt ${_attempt}/${_max_attempts} failed — re-checking metadata and retrying in ${_delay}s..."
+        sleep "$_delay"
+        _attempt=$((_attempt + 1))
+    done
 }

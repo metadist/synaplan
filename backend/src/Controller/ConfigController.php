@@ -12,6 +12,7 @@ use App\Service\BillingService;
 use App\Service\Embedding\EmbeddingMetadataService;
 use App\Service\Embedding\EmbeddingModelChangeGuard;
 use App\Service\Embedding\Exception\PremiumRequiredException;
+use App\Service\ModelConfigService;
 use App\Service\Plugin\PluginManager;
 use App\Service\Search\BraveSearchService;
 use App\Service\UserMemoryService;
@@ -42,6 +43,7 @@ class ConfigController extends AbstractController
         private UserMemoryService $memoryService,
         private EmbeddingModelChangeGuard $embeddingChangeGuard,
         private EmbeddingMetadataService $embeddingMetadata,
+        private ModelConfigService $modelConfigService,
         #[Autowire('%env(string:default::QDRANT_URL)%')]
         private readonly string $qdrantUrl,
     ) {
@@ -840,6 +842,55 @@ class ConfigController extends AbstractController
         }
 
         return $this->json($response);
+    }
+
+    /**
+     * Reset the calling user's model configuration to platform defaults.
+     *
+     * Removes all per-user DEFAULTMODEL overrides for the calling user so they
+     * fall back to the global defaults (ownerId=0). Does NOT modify the global
+     * defaults — other users are unaffected. This mirrors the scope of
+     * saveDefaultModels (which writes per-user) so that the button behaves
+     * exactly like manually reverting each dropdown.
+     */
+    #[Route('/models/defaults/reset', name: 'models_defaults_reset', methods: ['POST'])]
+    #[OA\Post(
+        path: '/api/v1/config/models/defaults/reset',
+        summary: 'Reset own model configuration to platform defaults',
+        description: 'Removes all per-user DEFAULTMODEL overrides for the calling user so they fall back to the global defaults (ownerId=0). Does NOT modify global defaults — other users are unaffected. Returns the effective defaults after reset.',
+        security: [['Bearer' => []]],
+        tags: ['Configuration']
+    )]
+    #[OA\Response(
+        response: 200,
+        description: 'Defaults reset successfully',
+        content: new OA\JsonContent(
+            properties: [
+                new OA\Property(property: 'success', type: 'boolean', example: true),
+                new OA\Property(property: 'message', type: 'string', example: 'Default models reset to recommended defaults'),
+                new OA\Property(
+                    property: 'defaults',
+                    type: 'object',
+                    description: 'New default model IDs per capability',
+                    example: ['CHAT' => 161, 'SORT' => 76]
+                ),
+            ]
+        )
+    )]
+    #[OA\Response(response: 401, description: 'Not authenticated')]
+    public function resetDefaultModels(#[CurrentUser] ?User $user): JsonResponse
+    {
+        if (!$user) {
+            return $this->json(['error' => 'Not authenticated'], Response::HTTP_UNAUTHORIZED);
+        }
+
+        $result = $this->modelConfigService->resetUserDefaults($user->getId());
+
+        return $this->json([
+            'success' => true,
+            'message' => sprintf('Removed %d user-specific override(s), now using platform defaults', $result['removed']),
+            'defaults' => $result['defaults'],
+        ]);
     }
 
     /**
