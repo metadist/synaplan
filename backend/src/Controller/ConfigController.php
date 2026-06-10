@@ -12,6 +12,7 @@ use App\Service\BillingService;
 use App\Service\Embedding\EmbeddingMetadataService;
 use App\Service\Embedding\EmbeddingModelChangeGuard;
 use App\Service\Embedding\Exception\PremiumRequiredException;
+use App\Service\Infrastructure\RedisService;
 use App\Service\ModelConfigService;
 use App\Service\Plugin\PluginManager;
 use App\Service\Search\BraveSearchService;
@@ -44,6 +45,7 @@ class ConfigController extends AbstractController
         private EmbeddingModelChangeGuard $embeddingChangeGuard,
         private EmbeddingMetadataService $embeddingMetadata,
         private ModelConfigService $modelConfigService,
+        private RedisService $redisService,
         #[Autowire('%env(string:default::QDRANT_URL)%')]
         private readonly string $qdrantUrl,
     ) {
@@ -1442,6 +1444,82 @@ class ConfigController extends AbstractController
             'version' => $dbVersion,
         ];
 
+        // Redis (cache, locks, rate-limiter, sessions, realtime fan-out)
+        $redisHealthy = $this->redisService->ping();
+        $redisError = $this->redisService->getLastConnectionError();
+        $redisDsn = (string) ($_ENV['REDIS_DSN'] ?? '');
+
+        $features['redis'] = [
+            'id' => 'redis',
+            'category' => 'Infrastructure',
+            'name' => 'Redis',
+            'enabled' => true,
+            'status' => $redisHealthy ? 'healthy' : 'unhealthy',
+            'message' => $redisHealthy
+                ? 'Cache, locks, rate-limiter, sessions and realtime fan-out are operational'
+                // Dev-only endpoint (403 in prod), so the raw connection
+                // error is safe and far more useful than a generic message.
+                : 'Redis unreachable'.(null !== $redisError ? ': '.$redisError->getMessage() : ''),
+            'setup_required' => !$redisHealthy,
+            'url' => '' !== $redisDsn ? $this->redactDsn($redisDsn) : 'not configured',
+            'version' => $redisHealthy ? ($this->redisService->serverVersion() ?? '') : '',
+            'env_vars' => [
+                'REDIS_DSN' => [
+                    'required' => true,
+                    'set' => '' !== $redisDsn,
+                    'hint' => 'Redis connection DSN shared by cache, locks, rate-limiter and Messenger (e.g. redis://redis:6379)',
+                ],
+            ],
+        ];
+
+        // Centrifugo (realtime WebSocket gateway)
+        $realtimeEnabled = 'true' === ($_ENV['REALTIME_ENABLED'] ?? 'false');
+        $realtimeApiUrl = (string) ($_ENV['REALTIME_API_URL'] ?? '');
+        // REALTIME_API_URL points at the server API (…/api); the health
+        // endpoint lives at the server root (health.enabled in config.json).
+        $centrifugoBaseUrl = '' !== $realtimeApiUrl
+            ? (string) preg_replace('#/api/?$#', '', $realtimeApiUrl)
+            : '';
+        $centrifugoHealthy = $realtimeEnabled
+            && '' !== $centrifugoBaseUrl
+            && $this->checkServiceHealth($centrifugoBaseUrl.'/health');
+
+        if (!$realtimeEnabled) {
+            $centrifugoStatus = 'disabled';
+            $centrifugoMessage = 'Realtime is disabled (REALTIME_ENABLED=false) — clients see fresh data via REST only, without push updates';
+        } elseif ($centrifugoHealthy) {
+            $centrifugoStatus = 'healthy';
+            $centrifugoMessage = 'Realtime WebSocket gateway is running (chat streaming, widget events, presence)';
+        } else {
+            $centrifugoStatus = 'unhealthy';
+            $centrifugoMessage = '' === $centrifugoBaseUrl
+                ? 'REALTIME_API_URL not configured'
+                : 'Centrifugo is not responding';
+        }
+
+        $features['centrifugo'] = [
+            'id' => 'centrifugo',
+            'category' => 'Infrastructure',
+            'name' => 'Centrifugo',
+            'enabled' => $realtimeEnabled,
+            'status' => $centrifugoStatus,
+            'message' => $centrifugoMessage,
+            'setup_required' => !$centrifugoHealthy,
+            'url' => '' !== $centrifugoBaseUrl ? $centrifugoBaseUrl : 'not configured',
+            'env_vars' => [
+                'REALTIME_ENABLED' => [
+                    'required' => true,
+                    'set' => $realtimeEnabled,
+                    'hint' => 'Master switch for WebSocket publishing (no SSE fallback)',
+                ],
+                'REALTIME_API_URL' => [
+                    'required' => true,
+                    'set' => '' !== $realtimeApiUrl,
+                    'hint' => 'Centrifugo server API endpoint, e.g. http://centrifugo:8000/api',
+                ],
+            ],
+        ];
+
         // Count ready services
         $totalServices = count($features);
         $healthyServices = count(array_filter($features, fn ($f) => in_array($f['status'], ['active', 'healthy'])
@@ -1456,6 +1534,14 @@ class ConfigController extends AbstractController
                 'all_ready' => $healthyServices === $totalServices,
             ],
         ]);
+    }
+
+    /**
+     * Strip credentials from a DSN before exposing it (`redis://user:pass@host` → `redis://***@host`).
+     */
+    private function redactDsn(string $dsn): string
+    {
+        return (string) preg_replace('#://[^@/]*@#', '://***@', $dsn);
     }
 
     /**
