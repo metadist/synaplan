@@ -133,6 +133,67 @@ make -C backend test
 - ⚠️ **`BCONFIG` defaults are bootstrap-only.** Changing a value in `DefaultModelConfigSeeder` / `RateLimitConfigSeeder` does NOT propagate to existing installs (the `INSERT IGNORE` skips rows that already exist). To force-roll-out a new default everywhere, ship a dedicated migration that explicitly UPDATEs the affected `BCONFIG` rows.
 - ✅ On first boot against a legacy prod DB (`BUSER` exists but `doctrine_migration_versions` does not): the entrypoint registers ONLY the baseline migration. Every post-baseline migration runs normally via `doctrine:migrations:migrate`, so legacy installs receive new schema changes the same way fresh installs do.
 
+### ⚠️ Production Platform Specifics (`synaplan-platform` + external Galera cluster)
+
+Production is **NOT** the `synaplan/` docker-compose stack. It is the `synaplan-platform/`
+repo deploying the pre-built `ghcr.io/metadist/synaplan:latest` image, talking to a
+**MariaDB Galera cluster that runs OUTSIDE Docker**. These facts have caused several
+production-only migration failures that never reproduce in local dev. Internalize them.
+
+**Topology**
+- Nodes `web1` / `web2` / `web3` all point at the **same** Galera database
+  (`host.docker.internal:3306` from each node's backend container). There is **one**
+  shared schema, not three. Galera replicates DDL **synchronously**, so any manual SQL
+  fix only needs to run on **one** node.
+- Migrations run on backend container start. On the shared DB the first node to come up
+  runs them; the others then see them already applied.
+- Galera node IPs: `web1=10.0.0.2`, `web2=10.0.0.7`, `web3=10.0.0.8`.
+
+**1. `DATABASE_*_URL` MUST use the `mariadb-` serverVersion prefix**
+- `synaplan-platform/.env` sets `DATABASE_WRITE_URL` / `DATABASE_READ_URL`. The
+  `serverVersion=` query param **overrides** `doctrine.yaml` per connection.
+- It **must** read `serverVersion=mariadb-<x.y.z>` (e.g. `mariadb-12.1.2`). DBAL picks
+  `MariaDBPlatform` only when the version string contains `mariadb`
+  (`AbstractMySQLDriver` does `stripos($version, 'mariadb')`). A bare `12.1.2` falls
+  through to the **MySQL** platform, whose introspection mishandles identifiers and
+  MariaDB's quoted string defaults → phantom diffs and lowercase `TableDoesNotExist`.
+- The cluster version string is `12.1.2-MariaDB-...` — confirm with `SELECT VERSION();`
+  and keep the number in sync, but the **prefix** is what selects the platform.
+
+**2. Migrations that may run incrementally on prod MUST NOT touch `Schema $schema`**
+- Reading the injected schema (`$schema->hasTable()/getTable()/hasColumn()`) forces
+  doctrine/migrations' `LazySchemaDiffProvider` to introspect and run the **DBAL schema
+  comparator**. On this Galera DB the comparator throws
+  `There is no table with name "<x>" in the schema.` — a MariaDB FK identifier-resolution
+  quirk. The named table **varies per run** (`buser`, `bsessions`, `bprompts`, …) because
+  `information_schema` is returned unordered across the cluster, which is the fingerprint
+  of this bug. Pure `addSql()` migrations never materialize the diff and are unaffected.
+- ✅ Use raw, comparator-free, **idempotent** SQL instead of Schema reads:
+  - `CREATE TABLE IF NOT EXISTS ...`
+  - `ALTER TABLE x ADD COLUMN IF NOT EXISTS ...` / `DROP COLUMN IF EXISTS ...`
+  - `DROP TABLE IF EXISTS ...`
+  - For conditional DML, guard with a plain query on `$this->connection` (NOT the Schema
+    API), e.g.
+    `((int) $this->connection->fetchOne("SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'X' AND COLUMN_NAME = 'Y')) > 0`.
+- ❌ Never gate prod-reachable migration DDL on `$schema->hasTable(...)` etc.
+
+**3. Foreign keys without `ON DELETE CASCADE`**
+- Several FKs (e.g. `BPROMPTMETA.BPROMPTID → BPROMPTS.BID`) have **no** cascade. A
+  migration that deletes parent rows must delete the child rows **first**, or it fails
+  with `1451 Cannot delete or update a parent row`. Local dev often has no child rows, so
+  this only surfaces on prod.
+
+**4. Manual cluster heal scripts live in `synaplan-platform/`**
+- `heal-migrations-baseline.sh` — fixes the baseline `doctrine_migration_versions` row
+  (stripped namespace separator).
+- `heal-migration-state-20260608.sh` — applies the 2026-06-08 batch idempotently and
+  registers its version rows (use when the deployed image still has Schema-reading
+  migrations).
+- Pattern for any future heal: run idempotent effect SQL, then
+  `INSERT IGNORE INTO doctrine_migration_versions (version, executed_at, execution_time)`
+  with the **escaped** FQN `DoctrineMigrations\\Version...` (double backslash in a
+  single-quoted SQL heredoc), on one node only.
+
 ### API Documentation (Swagger UI)
 - **ALWAYS use Swagger UI** to test endpoints: `http://localhost:8000/api/doc`
 - Interactive API testing (no need for Postman/curl)
