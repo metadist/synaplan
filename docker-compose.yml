@@ -311,7 +311,7 @@ services:
 
   # MariaDB 11.8 Database
   db:
-    image: mariadb:12.2.2@sha256:6a4c4bbf0447c2247801309513fcc0dd17c3f35390368139ce419387fdd1144d
+    image: mariadb:12.3.2@sha256:b1c7bf836e64ed9406a8984af29509f40089d55cea14b32f12c4726a1f17104b
     container_name: synaplan-db
     command: --max-allowed-packet=256M --innodb-buffer-pool-size=512M
     environment:
@@ -382,7 +382,7 @@ services:
   # Authentication uses short-lived JWTs issued by the PHP backend.
   # ----------------------------------------------------------------------------
   centrifugo:
-    image: centrifugo/centrifugo:v6.4.0@sha256:fdc0a9f29bb300578e41263f1084108cca50113837f7c09b4c803ec0eb0ade4f
+    image: centrifugo/centrifugo:v6.8.2@sha256:fbe9a36e870fca382dfaa1afac6e6ea433e79414ad2f8fa3083619660cdd4cad
     container_name: synaplan-centrifugo
     command: ["centrifugo", "-c", "/centrifugo/config.json"]
     volumes:
@@ -488,7 +488,7 @@ services:
 
   # Whisper Models Download (runs once)
   whisper-models:
-    image: alpine:3.23@sha256:5b10f432ef3da1b8d4c7eb6c487f2f5a8f096bc91145e68878dd4a5019afde11
+    image: alpine:3.24@sha256:a2d49ea686c2adfe3c992e47dc3b5e7fa6e6b5055609400dc2acaeb241c829f4
     container_name: synaplan-whisper-models
     command: >
       sh -c '
@@ -541,7 +541,7 @@ services:
 
   # Generates a self-signed TLS certificate for Keycloak HTTPS (runs once)
   keycloak_certs:
-    image: alpine:3.23@sha256:5b10f432ef3da1b8d4c7eb6c487f2f5a8f096bc91145e68878dd4a5019afde11
+    image: alpine:3.24@sha256:a2d49ea686c2adfe3c992e47dc3b5e7fa6e6b5055609400dc2acaeb241c829f4
     container_name: synaplan-keycloak-certs
     command: sh -c 'if [ -f /certs/cert.pem ]; then echo "Keycloak TLS cert exists"; exit 0; fi && apk add --no-cache openssl && openssl req -x509 -newkey rsa:2048 -keyout /certs/key.pem -out /certs/cert.pem -days 3650 -nodes -subj "/CN=host.docker.internal" -addext "subjectAltName=DNS:host.docker.internal,DNS:keycloak,DNS:localhost" && chmod 644 /certs/*.pem && echo "Keycloak TLS cert generated"'
     volumes:
@@ -607,7 +607,7 @@ services:
 
   # Qdrant Vector Database (memories + document vectors)
   qdrant:
-    image: qdrant/qdrant:v1.18.1@sha256:45f8e3ddc2570a4d029877e1b5ec1045c19b3852b4e22a55c7f43b05aea0ca89
+    image: qdrant/qdrant:v1.18.2@sha256:75eab8c4ba42096724fdcfde8b4de0b5713d529dde32f285a1f86fdcb2c9e50c
     container_name: synaplan-qdrant
     ports:
       - "6333:6333"
