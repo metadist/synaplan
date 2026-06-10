@@ -1,0 +1,10 @@
+{
+  "title": "Perfiles de contacto",
+  "intro": "Perfiles de IA continuos de sus contactos de correo, creados desde el complemento Synamail para Outlook. Viven solo en su espacio de trabajo: elimine cualquiera de ellos aquí en cualquier momento.",
+  "loading": "Cargando perfiles…",
+  "empty": "Aún no hay perfiles. Abra un correo en Outlook y use Contact AI Profiling en el complemento Synamail.",
+  "updated": "Actualizado",
+  "emails": "correos",
+  "delete": "Eliminar perfil",
+  "confirmDelete": "¿Eliminar este perfil de forma permanente?"
+}

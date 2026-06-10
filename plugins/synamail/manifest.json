@@ -1,0 +1,59 @@
+{
+  "id": "synamail",
+  "name": "synamail",
+  "namespace": "Plugin\\Synamail",
+  "version": "1.0.0",
+  "displayName": "Synamail",
+  "description": "Server-side companion for the Synamail Outlook add-in: rolling AI profiles of your mailing partners, stored in your own Synaplan workspace.",
+  "author": "Synaplan",
+  "homepage": "https://github.com/metadist/Synamail",
+  "license": "MIT",
+  "minSynaplanVersion": "1.0.0",
+  "capabilities": ["api", "frontend", "migrations"],
+  "routes": [
+    {
+      "method": "GET",
+      "path": "/api/v1/user/{userId}/plugins/synamail/profiles",
+      "description": "List all contact profiles (summary preview, counts, timestamps)"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/user/{userId}/plugins/synamail/profiles/{email}",
+      "description": "Fetch the rolling profile of one contact (null when none exists yet)"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/user/{userId}/plugins/synamail/profiles/{email}/update",
+      "description": "Roll one email into the contact's profile (AI merge of summary, tone, facts, open loops)"
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/v1/user/{userId}/plugins/synamail/profiles/{email}",
+      "description": "Delete a contact's profile entirely (privacy / GDPR)"
+    }
+  ],
+  "migrations": ["001_setup.sql"],
+  "config": {
+    "group": "P_synamail",
+    "settings": [
+      {
+        "key": "enabled",
+        "type": "boolean",
+        "default": true,
+        "description": "Enable the Synamail plugin"
+      },
+      {
+        "key": "profile_language",
+        "type": "string",
+        "default": "auto",
+        "description": "Language for profile summaries (auto = follow the correspondence)"
+      },
+      {
+        "key": "max_summary_words",
+        "type": "string",
+        "default": "150",
+        "description": "Upper bound for the rolling summary length in words"
+      }
+    ]
+  }
+}
