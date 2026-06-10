@@ -154,8 +154,28 @@ export interface Message {
   taskPlan?: TaskPlanState | null
 }
 
-export type TaskCardKind = 'text' | 'image' | 'video' | 'audio' | 'document' | 'search' | 'extract'
-export type TaskCardState = 'pending' | 'running' | 'done' | 'failed' | 'skipped'
+export const TASK_CARD_KINDS = [
+  'text',
+  'image',
+  'video',
+  'audio',
+  'document',
+  'search',
+  'extract',
+] as const
+export type TaskCardKind = (typeof TASK_CARD_KINDS)[number]
+
+export const TASK_CARD_STATES = ['pending', 'running', 'done', 'failed', 'skipped'] as const
+export type TaskCardState = (typeof TASK_CARD_STATES)[number]
+
+/** Runtime guards for values arriving over SSE — never trust the wire. */
+export function isTaskCardKind(value: unknown): value is TaskCardKind {
+  return typeof value === 'string' && (TASK_CARD_KINDS as readonly string[]).includes(value)
+}
+
+export function isTaskCardState(value: unknown): value is TaskCardState {
+  return typeof value === 'string' && (TASK_CARD_STATES as readonly string[]).includes(value)
+}
 
 export interface TaskCard {
   nodeId: string

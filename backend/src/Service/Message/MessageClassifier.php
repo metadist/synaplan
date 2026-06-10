@@ -480,8 +480,8 @@ final readonly class MessageClassifier
      * mis-routes requests it doesn't recognise (e.g. polite/declarative
      * media requests like "hätte ich gerne das bild einer katze") to
      * `general`/chat instead of the proper handler. Until the heuristic is
-     * reworked we send EVERY message through the AI sorter (DEFAULTMODEL.SORT
-     * = Groq gpt-oss-120b), which classifies far more reliably. The heuristic
+     * reworked we send EVERY message through the AI sorter (the model bound
+     * to DEFAULTMODEL.SORT), which classifies far more reliably. The heuristic
      * code is intentionally KEPT, not removed — flip the default back to
      * `true` (or set BCONFIG `CLASSIFIER.FAST_PATH_ENABLED=1`) to re-enable.
      *

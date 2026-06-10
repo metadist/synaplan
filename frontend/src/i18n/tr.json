@@ -699,6 +699,16 @@
     "sendFailed": "Üzgünüz, bir hatayla karşılaştık. Lütfen tekrar deneyin.",
     "continueFailed": "Yanıt sürdürülemedi. Lütfen tekrar deneyin.",
     "defaultAssistantReply": "Mesajınız için teşekkürler! Hemen size döneceğim.",
+    "openChat": "Sohbeti aç",
+    "closeChat": "Sohbeti kapat",
+    "switchToLight": "Açık moda geç",
+    "switchToDark": "Koyu moda geç",
+    "maximize": "Büyüt",
+    "minimize": "Küçült",
+    "operatorFallbackName": "Destek",
+    "takeoverNotice": "Artık bir destek temsilcisine bağlısınız.",
+    "handbackNotice": "Artık yapay zeka asistanımızla sohbet ediyorsunuz.",
+    "autoMessage": "Merhaba! Bugün size nasıl yardımcı olabilirim?",
     "previewWidget": "Widget Önizlemesi",
     "configuration": "Widget Yapılandırması",
     "closeEditor": "Editörü kapat",
@@ -993,6 +1003,41 @@
   "loading": {
     "default": "Yükleniyor...",
     "pleaseWait": "Lütfen bekleyin"
+  },
+  "taskPlan": {
+    "title": "Görev planı",
+    "download": "İndir",
+    "failedBody": "Bu adım tamamlanamadı.",
+    "state": {
+      "pending": "Sırada",
+      "running": "Çalışıyor…",
+      "done": "Tamamlandı",
+      "failed": "Başarısız",
+      "skipped": "Atlandı"
+    },
+    "kind": {
+      "text": "Metin",
+      "image": "Görsel",
+      "video": "Video",
+      "audio": "Ses",
+      "document": "Belge",
+      "search": "Web araması",
+      "extract": "Metin çıkarma"
+    },
+    "capability": {
+      "extract_text": "Metin çıkarılıyor",
+      "chat": "Yanıt",
+      "summarize": "Özet",
+      "translate": "Çeviri",
+      "rag_query": "Bilgi yanıtı",
+      "web_search": "Web araması",
+      "file_analysis": "Dosya analizi",
+      "image_generation": "Görsel",
+      "video_generation": "Video",
+      "text2sound": "Ses",
+      "document_generation": "Belge",
+      "calendar_event": "Takvim daveti"
+    }
   },
   "processing": {
     "started": "İşlem başlatılıyor...",
@@ -1449,6 +1494,8 @@
       "masterOff": "Kapalı",
       "masterEnabledNotice": "Çoklu görev yönlendirmesi etkinleştirildi.",
       "masterDisabledNotice": "Çoklu görev yönlendirmesi devre dışı bırakıldı.",
+      "masterUpdateFailed": "Çoklu görev yönlendirme durumu güncellenemedi.",
+      "togglesLoadFailed": "Yönlendirme yapılandırması yüklenemedi.",
       "plannerTitle": "Planlayıcı promptu",
       "plannerDesc": "Planlayıcının bir isteği görevlere ayırmak için izlediği talimatlar. Önizleme, modele gönderilen tam metni, etkin yeteneklerinizi ve konularınızı dahil ederek gösterir.",
       "plannerRendered": "Önizleme",
@@ -1481,7 +1528,13 @@
       "jsonExample": "JSON nesnesi örneği:",
       "btopicNote": "Önişlemci yeni bir JSON nesnesi de döndürebilir.",
       "savePrompt": "Promptu Kaydet",
-      "resetPrompt": "Promptu Sıfırla"
+      "resetPrompt": "Promptu Sıfırla",
+      "viewMode": "Görünüm modu",
+      "editMode": "Düzenleme modu",
+      "adminRequired": "Sıralama istemini düzenlemek için yönetici erişimi gereklidir.",
+      "saved": "Sıralama istemi kaydedildi.",
+      "loadFailed": "Sıralama istemi yüklenemedi.",
+      "saveFailed": "Sıralama istemi kaydedilemedi."
     },
     "apiKeys": {
       "title": "API Anahtarları",
@@ -2215,11 +2268,6 @@
       "disconnected": "Gerçek zamanlı bağlantı kapalı",
       "disabled": "Bu ortamda canlı güncellemeler kapalı. En güncel verileri görmek için sayfayı yenileyin.",
       "error": "Gerçek zamanlı bağlantı başarısız: {message}"
-    },
-    "notification": {
-      "reconnecting": "Bağlantı kesildi — yeniden bağlanılıyor…",
-      "reconnected": "Tekrar çevrimiçisin.",
-      "error": "Canlı güncellemeler şu anda kullanılamıyor. En son etkinliği görmek için sayfayı yenileyin."
     }
   }
 }

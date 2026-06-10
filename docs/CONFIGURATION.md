@@ -11,6 +11,8 @@ All configuration is done via environment variables in `backend/.env`.
 | `APP_ENV` | `dev` | Environment: `dev`, `prod`, `test` |
 | `APP_URL` | `http://localhost:8000` | Public URL for widgets/embeds/OAuth |
 | `FRONTEND_URL` | `http://localhost:5173` | Frontend URL for email links |
+| `REDIS_DSN` | `redis://redis:6379` | **Required.** Cache, sessions, locks, queues, realtime engine ([details](#redis-required)) |
+| `REALTIME_ENABLED` | `true` | WebSocket realtime layer (Centrifugo) — see [REALTIME.md](REALTIME.md) |
 
 ---
 
@@ -90,6 +92,28 @@ Realtime (Centrifugo) secrets live next to it — `REALTIME_TOKEN_SECRET` and
 the backend refuses to mint WebSocket tokens (and skips publishes) while
 they still have the shipped `changeme_*` placeholders. See
 [REALTIME.md](REALTIME.md).
+
+---
+
+## Multi-Task Routing (BCONFIG)
+
+The multi-task routing pipeline (AI planner + task DAG, see
+[DEVELOPMENT.md](DEVELOPMENT.md#message-routing-multi-task)) is configured via
+**BCONFIG** database settings, not environment variables. Admins manage the
+master switch in the UI (**Settings → Routing**); the rest can be set per
+group in the `BCONFIG` table.
+
+| Group / Key | Default | Description |
+|-------------|---------|-------------|
+| `MULTITASK / ROUTING_ENABLED` | `true` (new installs)¹ | Master switch: plan multi-step requests as a task DAG |
+| `MULTITASK / SHADOW_MODE` | `false` | Generate + persist plans for analysis, but answer via the legacy path |
+| `MULTITASK / PARALLEL_ENABLED` | `false` | Execute independent media nodes concurrently (subprocess offload) |
+| `MULTITASK / MAX_PARALLEL` | `3` | Concurrency cap for parallel media nodes |
+| `MULTITASK / NODE_TIMEOUT` | `120` | Per-node subprocess timeout (seconds) |
+| `CLASSIFIER / FAST_PATH_ENABLED` | `false` | Skip the AI sorter for trivial chat messages (heuristic) |
+
+¹ Existing installations are grandfathered to `0` by migration so behavior
+doesn't change on upgrade — enable it per user or globally when ready.
 
 ---
 

@@ -26,6 +26,7 @@ use App\Service\Multitask\Execution\Runner\Text2SoundRunner;
 use App\Service\Multitask\Execution\Runner\WebSearchRunner;
 use App\Service\Multitask\Plan\Capability;
 use App\Service\Multitask\Plan\TaskNode;
+use App\Service\RAG\VectorSearchService;
 use App\Service\Search\BraveSearchService;
 use Doctrine\Common\Collections\ArrayCollection;
 use PHPUnit\Framework\MockObject\MockObject;
@@ -114,7 +115,7 @@ final class RunnersTest extends TestCase
             return ['provider' => 'groq', 'model' => 'gpt-oss-120b'];
         });
 
-        $runner = new ChatRunner($aiFacade, $modelConfig, $this->createMock(LoggerInterface::class));
+        $runner = new ChatRunner($aiFacade, $modelConfig, $this->createMock(VectorSearchService::class), $this->createMock(LoggerInterface::class));
         $node = new TaskNode('n2', Capability::Summarize, ['n1'], ['text' => 'long input text']);
 
         $result = $runner->run($node, $this->context($this->message()));
@@ -127,12 +128,73 @@ final class RunnersTest extends TestCase
 
     public function testChatRunnerFailsOnEmptyInput(): void
     {
-        $runner = new ChatRunner($this->createMock(AiFacade::class), $this->createMock(ModelConfigService::class), $this->createMock(LoggerInterface::class));
+        $runner = new ChatRunner($this->createMock(AiFacade::class), $this->createMock(ModelConfigService::class), $this->createMock(VectorSearchService::class), $this->createMock(LoggerInterface::class));
         $node = new TaskNode('n1', Capability::Chat, [], ['text' => '']);
 
         $result = $runner->run($node, $this->context($this->message()));
 
         self::assertFalse($result->isSuccessful());
+    }
+
+    public function testRagQueryRetrievesKnowledgeBaseContext(): void
+    {
+        $aiFacade = $this->createMock(AiFacade::class);
+        $modelConfig = $this->createMock(ModelConfigService::class);
+
+        $vectorSearch = $this->createMock(VectorSearchService::class);
+        $vectorSearch->expects(self::once())
+            ->method('semanticSearch')
+            ->with('what does our contract say about notice periods?', 1, 'GROUP:legal')
+            ->willReturn([
+                ['chunk_text' => 'Notice period is 3 months.'],
+                ['chunk_text' => 'Termination must be in writing.'],
+            ]);
+
+        $capturedSystem = null;
+        $aiFacade->method('chatStream')->willReturnCallback(function (array $messages, callable $cb) use (&$capturedSystem): array {
+            $capturedSystem = $messages[0]['content'];
+            $cb('3 months, in writing.');
+
+            return [];
+        });
+
+        $runner = new ChatRunner($aiFacade, $modelConfig, $vectorSearch, $this->createMock(LoggerInterface::class));
+        $node = new TaskNode('n1', Capability::RagQuery, [], ['text' => 'what does our contract say about notice periods?']);
+
+        $context = new NodeContext(
+            $this->message('what does our contract say about notice periods?'),
+            [],
+            1,
+            ['language' => 'en', 'rag_group_key' => 'GROUP:legal'],
+        );
+        $result = $runner->run($node, $context);
+
+        self::assertTrue($result->isSuccessful());
+        self::assertStringContainsString('Knowledge Base Context', (string) $capturedSystem);
+        self::assertStringContainsString('Notice period is 3 months.', (string) $capturedSystem);
+        self::assertSame(2, $result->metadata['rag_chunks'] ?? null);
+    }
+
+    public function testRagQueryDegradesToPlainAnswerWhenRetrievalFails(): void
+    {
+        $aiFacade = $this->createMock(AiFacade::class);
+        $aiFacade->method('chatStream')->willReturnCallback(function (array $messages, callable $cb): array {
+            $cb('plain answer');
+
+            return [];
+        });
+
+        $vectorSearch = $this->createMock(VectorSearchService::class);
+        $vectorSearch->method('semanticSearch')->willThrowException(new \RuntimeException('qdrant down'));
+
+        $runner = new ChatRunner($aiFacade, $this->createMock(ModelConfigService::class), $vectorSearch, $this->createMock(LoggerInterface::class));
+        $node = new TaskNode('n1', Capability::RagQuery, [], ['text' => 'question']);
+
+        $result = $runner->run($node, $this->context($this->message('question')));
+
+        self::assertTrue($result->isSuccessful());
+        self::assertSame('plain answer', $result->text);
+        self::assertSame(0, $result->metadata['rag_chunks'] ?? null);
     }
 
     public function testChatRunnerIsolatesModelFailure(): void
@@ -141,7 +203,7 @@ final class RunnersTest extends TestCase
         $aiFacade->method('chatStream')->willThrowException(new \RuntimeException('groq 500'));
         $modelConfig = $this->createMock(ModelConfigService::class);
 
-        $runner = new ChatRunner($aiFacade, $modelConfig, $this->createMock(LoggerInterface::class));
+        $runner = new ChatRunner($aiFacade, $modelConfig, $this->createMock(VectorSearchService::class), $this->createMock(LoggerInterface::class));
         $node = new TaskNode('n2', Capability::Summarize, [], ['text' => 'input']);
 
         $result = $runner->run($node, $this->context($this->message()));
@@ -418,6 +480,64 @@ final class RunnersTest extends TestCase
 
         self::assertFalse($result->isSuccessful());
         self::assertStringContainsString('not configured', (string) $result->error);
+    }
+
+    public function testWebSearchReusesPrefetchedResultsForWholeMessageQuery(): void
+    {
+        $preFetched = ['query' => 'mars news', 'results' => [['title' => 'X']]];
+
+        $brave = $this->createMock(BraveSearchService::class);
+        $brave->method('isEnabled')->willReturn(true);
+        $brave->expects(self::never())->method('search');
+        $brave->method('formatResultsForAI')->with($preFetched)->willReturn('Web Search Results for: "mars news"');
+
+        $queryGen = $this->createMock(SearchQueryGenerator::class);
+        $queryGen->expects(self::never())->method('generate');
+
+        $runner = new WebSearchRunner($queryGen, $brave, $this->createMock(LoggerInterface::class));
+        $node = new TaskNode('n1', Capability::WebSearch, [], ['query' => '$message.text']);
+
+        $context = new NodeContext(
+            $this->message('latest mars news'),
+            [],
+            1,
+            ['language' => 'en'],
+            ['search_results' => $preFetched],
+        );
+        $result = $runner->run($node, $context);
+
+        self::assertTrue($result->isSuccessful());
+        self::assertTrue($result->metadata['reused_prefetched'] ?? false);
+        self::assertSame($preFetched, $result->metadata['search_results'] ?? null);
+    }
+
+    public function testWebSearchRunsFreshForPlannerNarrowedQuery(): void
+    {
+        $preFetched = ['query' => 'mars news', 'results' => [['title' => 'X']]];
+
+        $brave = $this->createMock(BraveSearchService::class);
+        $brave->method('isEnabled')->willReturn(true);
+        $brave->expects(self::once())->method('search')->willReturn(['query' => 'rover landing', 'results' => [['title' => 'Y']]]);
+        $brave->method('formatResultsForAI')->willReturn('Web Search Results for: "rover landing"');
+
+        $queryGen = $this->createMock(SearchQueryGenerator::class);
+        $queryGen->method('generate')->willReturn('rover landing');
+
+        $runner = new WebSearchRunner($queryGen, $brave, $this->createMock(LoggerInterface::class));
+        // Planner narrowed this node to a sub-aspect of the request.
+        $node = new TaskNode('n1', Capability::WebSearch, [], ['query' => 'only the rover landing part']);
+
+        $context = new NodeContext(
+            $this->message('rover landing news plus weather forecast'),
+            [],
+            1,
+            ['language' => 'en'],
+            ['search_results' => $preFetched],
+        );
+        $result = $runner->run($node, $context);
+
+        self::assertTrue($result->isSuccessful());
+        self::assertArrayNotHasKey('reused_prefetched', $result->metadata);
     }
 
     public function testFileAnalysisAnswersAboutAttachment(): void

@@ -5,8 +5,8 @@ declare(strict_types=1);
 namespace App\Tests\Unit\Service\Media;
 
 use App\Entity\File;
+use App\Repository\FileRepository;
 use App\Service\Media\GeneratedFileRegistrar;
-use Doctrine\ORM\EntityManagerInterface;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
@@ -14,13 +14,13 @@ use Psr\Log\NullLogger;
 final class GeneratedFileRegistrarTest extends TestCase
 {
     private string $uploadDir;
-    private EntityManagerInterface&MockObject $em;
+    private FileRepository&MockObject $files;
 
     protected function setUp(): void
     {
         $this->uploadDir = sys_get_temp_dir().'/registrar_test_'.bin2hex(random_bytes(4));
         mkdir($this->uploadDir, 0777, true);
-        $this->em = $this->createMock(EntityManagerInterface::class);
+        $this->files = $this->createMock(FileRepository::class);
     }
 
     protected function tearDown(): void
@@ -33,15 +33,14 @@ final class GeneratedFileRegistrarTest extends TestCase
 
     private function registrar(): GeneratedFileRegistrar
     {
-        return new GeneratedFileRegistrar($this->em, new NullLogger(), $this->uploadDir);
+        return new GeneratedFileRegistrar($this->files, new NullLogger(), $this->uploadDir);
     }
 
     public function testRegistersFileOnDiskWithMetadata(): void
     {
         file_put_contents($this->uploadDir.'/voice_123.mp3', 'mp3-bytes');
 
-        $this->em->expects(self::once())->method('persist')->with(self::isInstanceOf(File::class));
-        $this->em->expects(self::once())->method('flush');
+        $this->files->expects(self::once())->method('save')->with(self::isInstanceOf(File::class));
 
         $file = $this->registrar()->register(42, 'voice_123.mp3', 'audio');
 
@@ -79,7 +78,7 @@ final class GeneratedFileRegistrarTest extends TestCase
 
     public function testNullOrEmptyPathReturnsNull(): void
     {
-        $this->em->expects(self::never())->method('persist');
+        $this->files->expects(self::never())->method('save');
 
         self::assertNull($this->registrar()->register(1, null, 'audio'));
         self::assertNull($this->registrar()->register(1, '', 'audio'));
@@ -87,7 +86,7 @@ final class GeneratedFileRegistrarTest extends TestCase
 
     public function testPersistenceFailureReturnsNullInsteadOfThrowing(): void
     {
-        $this->em->method('flush')->willThrowException(new \RuntimeException('db down'));
+        $this->files->method('save')->willThrowException(new \RuntimeException('db down'));
 
         self::assertNull($this->registrar()->register(1, 'voice.mp3', 'audio'));
     }

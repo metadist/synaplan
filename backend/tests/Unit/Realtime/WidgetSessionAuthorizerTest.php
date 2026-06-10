@@ -71,7 +71,7 @@ final class WidgetSessionAuthorizerTest extends TestCase
 
         $this->authorizer->authorize(
             new WidgetSessionChannel('w', 'sid_xyz'),
-            new SubscriberContext(visitorId: 'sid_xyz')
+            new SubscriberContext(visitorId: 'sid_xyz', extra: ['widgetId' => 'w'])
         );
         $this->expectNotToPerformAssertions();
     }
@@ -84,7 +84,34 @@ final class WidgetSessionAuthorizerTest extends TestCase
         $this->expectException(UnauthorizedSubscriptionException::class);
         $this->authorizer->authorize(
             new WidgetSessionChannel('w', 'sid_xyz'),
-            new SubscriberContext(visitorId: 'sid_other')
+            new SubscriberContext(visitorId: 'sid_other', extra: ['widgetId' => 'w'])
+        );
+    }
+
+    public function testRejectsVisitorWhoseClaimedWidgetIdDiffersFromChannel(): void
+    {
+        // The token's `sub` claim is built from the PAYLOAD widgetId while
+        // access is granted for the CHANNEL widgetId — they must be the same
+        // widget or a colliding session id would open a cross-widget hole.
+        $this->widgetRepo->method('findByWidgetId')->willReturn($this->buildWidget(7));
+        $this->sessionRepo->method('findByWidgetAndSession')->willReturn(new WidgetSession());
+
+        $this->expectException(UnauthorizedSubscriptionException::class);
+        $this->authorizer->authorize(
+            new WidgetSessionChannel('w', 'sid_xyz'),
+            new SubscriberContext(visitorId: 'sid_xyz', extra: ['widgetId' => 'other_widget'])
+        );
+    }
+
+    public function testRejectsVisitorWithoutClaimedWidgetId(): void
+    {
+        $this->widgetRepo->method('findByWidgetId')->willReturn($this->buildWidget(7));
+        $this->sessionRepo->method('findByWidgetAndSession')->willReturn(new WidgetSession());
+
+        $this->expectException(UnauthorizedSubscriptionException::class);
+        $this->authorizer->authorize(
+            new WidgetSessionChannel('w', 'sid_xyz'),
+            new SubscriberContext(visitorId: 'sid_xyz')
         );
     }
 
@@ -126,7 +153,6 @@ final class WidgetSessionAuthorizerTest extends TestCase
     {
         $user = new User();
         $reflection = new \ReflectionProperty(User::class, 'id');
-        $reflection->setAccessible(true);
         $reflection->setValue($user, $id);
 
         return $user;

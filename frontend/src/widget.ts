@@ -194,12 +194,17 @@ class SynaplanWidget {
           ...this.config,
           ...data.config,
           widgetTitle: data.name || this.config.widgetTitle,
+          // Fail closed: only dial WebSockets when the backend explicitly says
+          // realtime is on. An older backend that omits the `realtime` block
+          // can't serve token/WS endpoints, so attempting to connect would
+          // just produce console noise (matches ChatWidget's `enabled: false`
+          // fallback).
           realtime: data.realtime
             ? {
-                enabled: Boolean(data.realtime.enabled ?? true),
+                enabled: Boolean(data.realtime.enabled ?? false),
                 wsUrl: typeof data.realtime.wsUrl === 'string' ? data.realtime.wsUrl : '',
               }
-            : { enabled: true, wsUrl: '' },
+            : { enabled: false, wsUrl: '' },
         }
         return true
       }

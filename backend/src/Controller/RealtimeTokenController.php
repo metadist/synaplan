@@ -10,15 +10,17 @@ use App\Realtime\Authorizer\SubscriberContext;
 use App\Realtime\Channel\ChannelParser;
 use App\Realtime\Exception\InvalidChannelException;
 use App\Realtime\Exception\UnauthorizedSubscriptionException;
+use App\Realtime\Token\RealtimeSubject;
 use App\Realtime\Token\RealtimeTokenService;
-use App\Repository\WidgetRepository;
-use App\Repository\WidgetSessionRepository;
+use App\Realtime\Token\WidgetVisitorAccess;
+use App\Realtime\Token\WidgetVisitorAccessChecker;
 use OpenApi\Attributes as OA;
 use Psr\Log\LoggerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
+use Symfony\Component\RateLimiter\RateLimiterFactoryInterface;
 use Symfony\Component\Routing\Attribute\Route;
 use Symfony\Component\Security\Http\Attribute\CurrentUser;
 
@@ -38,16 +40,26 @@ use Symfony\Component\Security\Http\Attribute\CurrentUser;
  * Tokens are intentionally short-lived (60s) so revocation is implicit:
  * pull privileges from the user and their next refresh fails, kicking
  * them off the channel within a minute.
+ *
+ * Hardening on the anonymous (PUBLIC_ACCESS) endpoints:
+ *
+ *   - per-IP rate limits (see config/packages/rate_limiter.yaml) keep
+ *     widget/session UUID enumeration impractical;
+ *   - the visitor token endpoint validates the request origin against the
+ *     widget's domain allowlist (same semantics as the chat endpoints);
+ *   - error responses are deliberately generic — a probe cannot tell a
+ *     missing widget from a missing/expired session.
  */
 #[OA\Tag(name: 'Realtime')]
-class RealtimeTokenController extends AbstractController
+final class RealtimeTokenController extends AbstractController
 {
     public function __construct(
         private readonly RealtimeTokenService $tokenService,
         private readonly ChannelAuthorizerLocator $authorizerLocator,
         private readonly ChannelParser $channelParser,
-        private readonly WidgetRepository $widgetRepository,
-        private readonly WidgetSessionRepository $sessionRepository,
+        private readonly WidgetVisitorAccessChecker $visitorAccessChecker,
+        private readonly RateLimiterFactoryInterface $realtimeWidgetTokenLimiter,
+        private readonly RateLimiterFactoryInterface $realtimeSubscribeAnonLimiter,
         private readonly LoggerInterface $logger,
     ) {
     }
@@ -81,7 +93,7 @@ class RealtimeTokenController extends AbstractController
             return $this->json(['error' => 'Not authenticated'], Response::HTTP_UNAUTHORIZED);
         }
 
-        $subject = sprintf('user:%d', $user->getId());
+        $subject = RealtimeSubject::forOperator((int) $user->getId());
         $token = $this->tokenService->issueConnectionToken($subject, [
             'kind' => 'operator',
         ]);
@@ -101,31 +113,45 @@ class RealtimeTokenController extends AbstractController
      * possession is treated as proof of ownership for the purposes of
      * subscribing to that one session's channel — no sensitive data is
      * exposed via the channel that is not already part of the chat.
+     *
+     * Defence-in-depth on top of the UUID: per-IP rate limit, origin
+     * allowlist check, session-expiry check, and a single generic 404 so
+     * probes cannot distinguish "widget exists" from "session exists".
      */
     #[Route('/api/v1/realtime/widget/{widgetId}/sessions/{sessionId}/token', name: 'api_realtime_token_widget', methods: ['POST'])]
     #[OA\Post(
         path: '/api/v1/realtime/widget/{widgetId}/sessions/{sessionId}/token',
         summary: 'Issue Centrifugo connection token (widget visitor)',
-        description: 'Anonymous visitor token. The (widgetId, sessionId) pair is verified against the existing widget session store before a token is minted.',
+        description: 'Anonymous visitor token. The (widgetId, sessionId) pair is verified against the existing widget session store and the request origin against the widget domain allowlist before a token is minted.',
         tags: ['Realtime']
     )]
     #[OA\Parameter(name: 'widgetId', in: 'path', required: true, schema: new OA\Schema(type: 'string'))]
     #[OA\Parameter(name: 'sessionId', in: 'path', required: true, schema: new OA\Schema(type: 'string'))]
     #[OA\Response(response: 200, description: 'Connection token (same shape as operator)')]
-    #[OA\Response(response: 404, description: 'Widget or session not found')]
-    public function issueWidgetToken(string $widgetId, string $sessionId): JsonResponse
+    #[OA\Response(response: 403, description: 'Request origin not on the widget domain allowlist')]
+    #[OA\Response(response: 404, description: 'Unknown widget/session pair (deliberately indistinguishable)')]
+    #[OA\Response(response: 429, description: 'Rate limit exceeded')]
+    public function issueWidgetToken(Request $request, string $widgetId, string $sessionId): JsonResponse
     {
-        $widget = $this->widgetRepository->findByWidgetId($widgetId);
-        if (null === $widget) {
-            return $this->json(['error' => 'Widget not found'], Response::HTTP_NOT_FOUND);
+        $limit = $this->realtimeWidgetTokenLimiter
+            ->create($request->getClientIp() ?? 'unknown')
+            ->consume();
+        if (!$limit->isAccepted()) {
+            return $this->json(['error' => 'too_many_requests'], Response::HTTP_TOO_MANY_REQUESTS);
         }
 
-        $session = $this->sessionRepository->findByWidgetAndSession($widgetId, $sessionId);
-        if (null === $session) {
-            return $this->json(['error' => 'Session not found'], Response::HTTP_NOT_FOUND);
+        $access = $this->visitorAccessChecker->check($request, $widgetId, $sessionId);
+        if (WidgetVisitorAccess::NotFound === $access) {
+            // One generic 404 for every lookup failure — separate "widget not
+            // found" / "session not found" bodies turn this public endpoint
+            // into an enumeration oracle. Details are logged by the checker.
+            return $this->json(['error' => 'not_found'], Response::HTTP_NOT_FOUND);
+        }
+        if (WidgetVisitorAccess::OriginDenied === $access) {
+            return $this->json(['error' => 'forbidden'], Response::HTTP_FORBIDDEN);
         }
 
-        $subject = sprintf('widget:%s:%s', $widgetId, $sessionId);
+        $subject = RealtimeSubject::forVisitor($widgetId, $sessionId);
         $token = $this->tokenService->issueConnectionToken($subject, [
             'kind' => 'widget-visitor',
             'widgetId' => $widgetId,
@@ -185,8 +211,20 @@ class RealtimeTokenController extends AbstractController
     )]
     #[OA\Response(response: 400, description: 'Invalid channel name')]
     #[OA\Response(response: 403, description: 'Subscription not authorised')]
+    #[OA\Response(response: 429, description: 'Rate limit exceeded (anonymous callers)')]
     public function issueSubscriptionToken(Request $request, #[CurrentUser] ?User $user): JsonResponse
     {
+        // Operators are already authenticated and accountable; only the
+        // anonymous visitor path needs the per-IP brake.
+        if (null === $user) {
+            $limit = $this->realtimeSubscribeAnonLimiter
+                ->create($request->getClientIp() ?? 'unknown')
+                ->consume();
+            if (!$limit->isAccepted()) {
+                return $this->json(['error' => 'too_many_requests'], Response::HTTP_TOO_MANY_REQUESTS);
+            }
+        }
+
         $payload = json_decode($request->getContent(), true);
         if (!is_array($payload)) {
             return $this->json(['error' => 'Invalid JSON body'], Response::HTTP_BAD_REQUEST);
@@ -200,7 +238,16 @@ class RealtimeTokenController extends AbstractController
         try {
             $channel = $this->channelParser->parse($channelName);
         } catch (InvalidChannelException $e) {
-            return $this->json(['error' => $e->getMessage()], Response::HTTP_BAD_REQUEST);
+            // Parser messages name valid namespaces and expected formats —
+            // useful in logs, but free recon when echoed to an anonymous
+            // caller. Keep the wire response generic.
+            $this->logger->info('Realtime subscribe rejected: invalid channel', [
+                'channel' => $channelName,
+                'user_id' => $user?->getId(),
+                'reason' => $e->getMessage(),
+            ]);
+
+            return $this->json(['error' => 'invalid_channel'], Response::HTTP_BAD_REQUEST);
         }
 
         $subscriber = $this->buildSubscriberContext($user, $payload);
@@ -217,7 +264,7 @@ class RealtimeTokenController extends AbstractController
             return $this->json(['error' => 'forbidden'], Response::HTTP_FORBIDDEN);
         }
 
-        $subject = $this->subjectFor($subscriber);
+        $subject = RealtimeSubject::forSubscriber($subscriber);
         $token = $this->tokenService->issueSubscriptionToken($subject, $channel->name());
 
         return $this->json([
@@ -246,42 +293,5 @@ class RealtimeTokenController extends AbstractController
                 'sessionId' => $sessionId,
             ],
         );
-    }
-
-    /**
-     * Build the JWT `sub` claim for a subscription token.
-     *
-     * Centrifugo enforces that the `sub` claim of a subscription token
-     * matches the `sub` claim of the connection token — otherwise it
-     * rejects the subscribe with `bad subscription token`. We therefore
-     * MUST mirror exactly what {@see self::issueOperatorToken()} and
-     * {@see self::issueWidgetToken()} put on the wire:
-     *
-     *   * operator → `user:{id}`
-     *   * visitor  → `widget:{widgetId}:{sessionId}`
-     *
-     * Anything else here is a latent bug — the WS client would connect
-     * fine and then silently fail to subscribe to any channel.
-     */
-    private function subjectFor(SubscriberContext $subscriber): string
-    {
-        if ($subscriber->isAuthenticatedUser()) {
-            return sprintf('user:%d', (int) $subscriber->user?->getId());
-        }
-
-        $widgetId = isset($subscriber->extra['widgetId']) && is_string($subscriber->extra['widgetId'])
-            ? $subscriber->extra['widgetId']
-            : null;
-        $sessionId = $subscriber->visitorId;
-
-        if (null === $widgetId || null === $sessionId) {
-            // Defence-in-depth: the authorizer should already have rejected
-            // a subscriber that doesn't carry both fields. If we get here
-            // anyway, fall back to a value that will never match a real
-            // connection token's sub so Centrifugo refuses the subscribe.
-            return 'widget:invalid';
-        }
-
-        return sprintf('widget:%s:%s', $widgetId, $sessionId);
     }
 }

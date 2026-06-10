@@ -1196,6 +1196,8 @@
       "masterOff": "Off",
       "masterEnabledNotice": "Multi-task routing enabled.",
       "masterDisabledNotice": "Multi-task routing disabled.",
+      "masterUpdateFailed": "Failed to update multi-task routing state.",
+      "togglesLoadFailed": "Failed to load routing configuration.",
       "plannerTitle": "Planner prompt",
       "plannerDesc": "The instructions the planner follows to break a request into tasks. The preview shows the exact text the model receives, including your live capabilities and topics.",
       "plannerRendered": "Preview",
@@ -1230,7 +1232,13 @@
       "jsonExample": "Here is an example of the JSON object:",
       "btopicNote": "The preprocessor can also return a new JSON object. That is setting the topic and by that, directing the message to a specific prompt. The BTOPIC is the name of YOUR TARGET prompt!",
       "savePrompt": "Save Prompt",
-      "resetPrompt": "Reset Prompt"
+      "resetPrompt": "Reset Prompt",
+      "viewMode": "View Mode",
+      "editMode": "Edit Mode",
+      "adminRequired": "Admin access required to edit the sorting prompt.",
+      "saved": "Sorting prompt saved.",
+      "loadFailed": "Failed to load sorting prompt.",
+      "saveFailed": "Failed to save sorting prompt."
     },
     "apiKeys": {
       "title": "API Keys",
@@ -1890,6 +1898,16 @@
     "chatUnavailable": "Chat is currently unavailable.",
     "chatUnavailablePlaceholder": "Chat unavailable",
     "defaultAssistantReply": "Thanks for your message! I'll get right back to you.",
+    "openChat": "Open chat",
+    "closeChat": "Close chat",
+    "switchToLight": "Switch to light mode",
+    "switchToDark": "Switch to dark mode",
+    "maximize": "Maximize",
+    "minimize": "Minimize",
+    "operatorFallbackName": "Support",
+    "takeoverNotice": "You are now connected with a support agent.",
+    "handbackNotice": "You are now chatting with our AI assistant.",
+    "autoMessage": "Hello! How can I help you today?",
     "exportChat": "Export Chat",
     "exportChatId": "Chat ID",
     "exportDate": "Exported on",
@@ -3395,11 +3413,6 @@
       "disconnected": "Realtime connection is closed",
       "disabled": "Live updates are turned off in this environment. Refresh to see the latest data.",
       "error": "Realtime connection failed: {message}"
-    },
-    "notification": {
-      "reconnecting": "Connection lost — reconnecting…",
-      "reconnected": "You're back online.",
-      "error": "Live updates are temporarily unavailable. Refresh to see the latest activity."
     }
   }
 }

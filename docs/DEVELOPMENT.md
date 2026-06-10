@@ -14,11 +14,19 @@ docker compose down
 # View logs (follow mode)
 docker compose logs -f
 docker compose logs -f backend    # specific service
+docker compose logs -f worker     # async job consumer (Messenger)
 
 # Restart a service
 docker compose restart backend
 docker compose restart frontend
+docker compose restart worker
 ```
+
+### The `worker` service (async jobs)
+
+Async jobs — chat `ProcessMessageCommand`, re-vectorization, plugin installs, widget crawling — run in the dedicated `worker` container, which consumes the Redis Streams transports (`async_ai_high`, `async_extract`, `async_index`) via `messenger:consume`. Without it, queued work never executes and the UI hangs on any "running in background" flow.
+
+The worker runs with `APP_ENV=prod` on purpose (dev-mode event dispatcher kills the consumer); it clears and re-warms its own prod cache on every boot, so after switching branches a `docker compose restart worker` is enough to pick up code changes.
 
 ### Redis (cache, sessions, locks, messenger, realtime)
 
@@ -222,18 +230,41 @@ synaplan/
 │   │   ├── Controller/   # API endpoints
 │   │   ├── Entity/       # Doctrine entities
 │   │   ├── Repository/   # Database queries
+│   │   ├── Realtime/     # Centrifugo publisher, channels, authorizers, JWT minting
 │   │   └── Service/      # Business logic
+│   │       └── Message/  # Routing pipeline (classifier, sorter, Multitask/ planner + DAG)
 │   └── tests/
 ├── frontend/          # Vue.js SPA
 │   ├── src/
-│   │   ├── components/   # Vue components
+│   │   ├── components/   # Vue components (incl. multitask/ task-plan cards)
 │   │   ├── views/        # Page views
-│   │   ├── stores/       # Pinia state
-│   │   └── services/api/ # API clients
+│   │   ├── stores/       # Pinia state (incl. realtime connection store)
+│   │   ├── services/api/ # API clients
+│   │   └── services/realtime/ # Centrifugo WebSocket client + channel helpers
 │   └── dist-widget/      # Built widget
-├── _docker/           # Docker configs
+├── _docker/           # Docker configs (backend, centrifugo, frontend)
 └── docs/              # Documentation
 ```
+
+---
+
+## Message Routing (Multi-Task)
+
+Inbound messages (chat, widget, WhatsApp, email, API) flow through a routing pipeline before any AI handler runs:
+
+```
+MessagePreProcessor → MessageClassifier ─┬→ rule-based routing (user task prompts)
+                                         └→ MessageSorter (AI, tools:sort)
+        → [MULTITASK enabled?] TaskPlanner (tools:plan) → DagExecutor → ResultAssembler
+          [else / single-node]  InferenceRouter → ChatHandler | MediaGenerationHandler | FileAnalysisHandler
+```
+
+- **Multi-task plans**: for complex requests the planner decomposes the message into a small DAG of capability nodes (e.g. extract → summarize → text-to-speech → compose reply). Progress streams to the chat UI over the existing SSE channel as `plan` / `task_update` / `task_chunk` / `task_file` events, rendered as live task cards.
+- **Feature flags** live in BCONFIG group `MULTITASK` (`ROUTING_ENABLED`, `SHADOW_MODE`, `PARALLEL_ENABLED`, `MAX_PARALLEL`, `NODE_TIMEOUT`) plus `CLASSIFIER.FAST_PATH_ENABLED` — see [CONFIGURATION.md](CONFIGURATION.md#multi-task-routing-bconfig).
+- **Key classes**: `Service/Message/MessageProcessor`, `MessageClassifier`, `MessageSorter`, `InferenceRouter`, and `Service/Message/Multitask/` (`TaskPlanner`, `TaskPlanExecutor`, `Execution/DagExecutor`, `TaskPlanStore`).
+- **Snapshot tests**: any change to the classifier/sorter contract drifts `tests/Characterization/RoutingCharacterizationTest.php` — re-record with `UPDATE_ROUTING_SNAPSHOTS=1` and review the diff (see [AGENTS.md](../AGENTS.md)).
+
+**Streaming split**: AI chat tokens + task-plan progress use **SSE** (`/api/v1/messages/stream`); widget live-support events (takeover, typing, operator notifications) use **WebSockets** via Centrifugo (see [REALTIME.md](REALTIME.md)).
 
 ---
 

@@ -33,6 +33,23 @@ class Prompt
     #[ORM\Column(name: 'BSELECTION_RULES', type: 'text', nullable: true)]
     private ?string $selectionRules = null;
 
+    /**
+     * @deprecated Retired embedding-routing experiment field. No code reads or
+     *             writes it any more — it stays MAPPED (with a safe default) only so the
+     *             column can survive the rolling-deploy window where previous-release
+     *             nodes still SELECT it, without failing CI's schema-sync validation.
+     *             Mapping + column are removed together in the phase-2 release (see
+     *             Version20260608000000 and docs/MIGRATIONS.md "two-phase" note).
+     */
+    #[ORM\Column(name: 'BKEYWORDS', type: 'text', nullable: true)]
+    private ?string $keywords = null;
+
+    /**
+     * @deprecated see $keywords — same phase-2 removal
+     */
+    #[ORM\Column(name: 'BENABLED', type: 'boolean', options: ['default' => true])]
+    private bool $enabled = true;
+
     public function getId(): ?int
     {
         return $this->id;
@@ -108,5 +125,17 @@ class Prompt
         $this->selectionRules = $selectionRules;
 
         return $this;
+    }
+
+    /** @deprecated retired experiment field — see property docblock */
+    public function getKeywords(): ?string
+    {
+        return $this->keywords;
+    }
+
+    /** @deprecated retired experiment field — see property docblock */
+    public function isEnabled(): bool
+    {
+        return $this->enabled;
     }
 }

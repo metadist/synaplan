@@ -8,8 +8,9 @@ use Doctrine\DBAL\Schema\Schema;
 use Doctrine\Migrations\AbstractMigration;
 
 /**
- * Make the self-hosted Ollama bge-m3 (BMODELS BID 13) visible in the
- * user-facing model list at /config/ai-models by setting BSHOWWHENFREE = 1.
+ * Make the self-hosted Ollama bge-m3 (catalog key `Ollama:bge-m3:vectorize`)
+ * visible in the user-facing model list at /config/ai-models by setting
+ * BSHOWWHENFREE = 1.
  *
  * Why this is needed:
  *   bge-m3 is the default VECTORIZE (file-embedding) model for self-hosted and
@@ -37,7 +38,7 @@ final class Version20260608120000 extends AbstractMigration
 {
     public function getDescription(): string
     {
-        return 'Show self-hosted Ollama bge-m3 (BID 13) in the model list (BSHOWWHENFREE = 1)';
+        return 'Show self-hosted Ollama bge-m3 in the model list (BSHOWWHENFREE = 1)';
     }
 
     public function isTransactional(): bool
@@ -47,11 +48,13 @@ final class Version20260608120000 extends AbstractMigration
 
     public function up(Schema $schema): void
     {
+        // Catalog-first: match by the natural catalog key (service:providerId:tag)
+        // instead of a hard-coded numeric BID, which differs across installs.
         $this->addSql(<<<'SQL'
             UPDATE BMODELS
                SET BSHOWWHENFREE = 1
-             WHERE BID = 13
-               AND BSERVICE = 'Ollama'
+             WHERE BSERVICE = 'Ollama'
+               AND BPROVID = 'bge-m3'
                AND BTAG = 'vectorize'
         SQL);
     }
@@ -61,8 +64,8 @@ final class Version20260608120000 extends AbstractMigration
         $this->addSql(<<<'SQL'
             UPDATE BMODELS
                SET BSHOWWHENFREE = 0
-             WHERE BID = 13
-               AND BSERVICE = 'Ollama'
+             WHERE BSERVICE = 'Ollama'
+               AND BPROVID = 'bge-m3'
                AND BTAG = 'vectorize'
         SQL);
     }

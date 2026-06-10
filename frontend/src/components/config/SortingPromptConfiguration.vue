@@ -330,7 +330,11 @@
                     >
                       <PencilIcon v-if="!editMode" class="w-4 h-4 inline mr-1" />
                       <EyeIcon v-else class="w-4 h-4 inline mr-1" />
-                      {{ editMode ? 'View Mode' : 'Edit Mode' }}
+                      {{
+                        editMode
+                          ? $t('config.sortingPrompt.viewMode')
+                          : $t('config.sortingPrompt.editMode')
+                      }}
                     </button>
                   </div>
 
@@ -607,7 +611,7 @@ const loadSortingPrompt = async () => {
     sortingPrompt.value = { ...mapped }
     originalPrompt.value = { ...mapped }
   } catch (err) {
-    const message = err instanceof Error ? err.message : 'Failed to load sorting prompt'
+    const message = err instanceof Error ? err.message : t('config.sortingPrompt.loadFailed')
     showError(message)
     sortingPrompt.value = { ...mockSortingPrompt }
     originalPrompt.value = { ...mockSortingPrompt }
@@ -618,7 +622,7 @@ const loadSortingPrompt = async () => {
 
 const toggleEditMode = () => {
   if (!canEdit.value) {
-    warning('Admin access required to edit the sorting prompt.')
+    warning(t('config.sortingPrompt.adminRequired'))
     return
   }
   editMode.value = !editMode.value
@@ -626,18 +630,18 @@ const toggleEditMode = () => {
 
 const savePrompt = async () => {
   if (!canEdit.value) {
-    warning('Admin access required to edit the sorting prompt.')
+    warning(t('config.sortingPrompt.adminRequired'))
     return
   }
 
   saving.value = true
   try {
     await promptsApi.updateSortingPrompt(sortingPrompt.value.promptContent)
-    success('Sorting prompt saved.')
+    success(t('config.sortingPrompt.saved'))
     await loadSortingPrompt()
     editMode.value = false
   } catch (err) {
-    const message = err instanceof Error ? err.message : 'Failed to save sorting prompt'
+    const message = err instanceof Error ? err.message : t('config.sortingPrompt.saveFailed')
     showError(message)
   } finally {
     saving.value = false
@@ -659,7 +663,7 @@ const loadRoutingToggles = async () => {
     const values = await getConfigValues()
     multitaskEnabled.value = parseBoolConfigValue(values['MULTITASK_ROUTING_ENABLED']?.value)
   } catch (err) {
-    const message = err instanceof Error ? err.message : 'Failed to load routing configuration'
+    const message = err instanceof Error ? err.message : t('config.routing.togglesLoadFailed')
     showError(message)
   }
 }
@@ -674,14 +678,14 @@ const onToggleMultitask = async (next: boolean) => {
   try {
     const result = await updateConfigValue('MULTITASK_ROUTING_ENABLED', next ? 'true' : 'false')
     if (!result.success) {
-      throw new Error(result.error || 'Failed to update multi-task routing state')
+      throw new Error(result.error || t('config.routing.masterUpdateFailed'))
     }
     success(
       next ? t('config.routing.masterEnabledNotice') : t('config.routing.masterDisabledNotice')
     )
   } catch (err) {
     multitaskEnabled.value = previous
-    const message = err instanceof Error ? err.message : 'Failed to update multi-task routing state'
+    const message = err instanceof Error ? err.message : t('config.routing.masterUpdateFailed')
     showError(message)
   } finally {
     togglingMultitask.value = false

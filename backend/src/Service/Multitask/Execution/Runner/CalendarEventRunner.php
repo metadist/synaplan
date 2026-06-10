@@ -35,6 +35,18 @@ use Psr\Log\LoggerInterface;
  */
 final readonly class CalendarEventRunner implements TaskRunner
 {
+    /**
+     * User-facing confirmation line, keyed by detected message language
+     * (frontend-supported set, English fallback). The datetime is rendered
+     * in a locale-neutral ISO shape on purpose — no intl dependency.
+     */
+    private const INVITE_TEXT = [
+        'en' => 'Calendar invite "%s" — %s (%s).',
+        'de' => 'Kalendereinladung "%s" — %s (%s).',
+        'es' => 'Invitación de calendario "%s" — %s (%s).',
+        'tr' => 'Takvim daveti "%s" — %s (%s).',
+    ];
+
     public function __construct(
         private CalendarEventService $calendarService,
         private FileStorageService $fileStorage,
@@ -106,7 +118,11 @@ final readonly class CalendarEventRunner implements TaskRunner
             'local_path' => $stored['path'],
         ];
 
-        $text = sprintf('Calendar invite "%s" — %s (%s).', $title, $start->format('D, d M Y H:i'), $tzName);
+        $language = is_string($context->classification['language'] ?? null)
+            ? $context->classification['language']
+            : ($context->message->getLanguage() ?: 'en');
+        $template = self::INVITE_TEXT[$language] ?? self::INVITE_TEXT['en'];
+        $text = sprintf($template, $title, $start->format('Y-m-d H:i'), $tzName);
 
         return NodeResult::ok($text, [$file], [
             'media_type' => 'document',

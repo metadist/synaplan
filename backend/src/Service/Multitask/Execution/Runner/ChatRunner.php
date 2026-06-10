@@ -11,6 +11,7 @@ use App\Service\Multitask\Execution\NodeResult;
 use App\Service\Multitask\Execution\TaskRunner;
 use App\Service\Multitask\Plan\Capability;
 use App\Service\Multitask\Plan\TaskNode;
+use App\Service\RAG\VectorSearchService;
 use Psr\Log\LoggerInterface;
 
 /**
@@ -21,16 +22,23 @@ use Psr\Log\LoggerInterface;
  * principle: the planner picks the task, the model resolution stays here. It
  * runs the transform through AiFacade::chat on the upstream text input.
  *
+ * `rag_query` nodes additionally retrieve knowledge-base context through the
+ * same {@see VectorSearchService} the legacy ChatHandler uses (user-selected
+ * `rag_group_key` scope when present, whole knowledge base otherwise) and
+ * inject it into the system prompt. Retrieval failure degrades to a plain
+ * answer — never fails the node.
+ *
  * NOTE (Sprint 3b): a multi-node `chat` node uses a generic system prompt. Full
  * custom-topic (params.topic_id → PromptMeta) binding for INTERMEDIATE nodes is
  * a later refinement; single-node custom topics already work via the Sprint 2
- * path. RAG retrieval for `rag_query` intermediate nodes is also deferred.
+ * path.
  */
 final readonly class ChatRunner implements TaskRunner
 {
     public function __construct(
         private AiFacade $aiFacade,
         private ModelConfigService $modelConfigService,
+        private VectorSearchService $vectorSearchService,
         private LoggerInterface $logger,
     ) {
     }
@@ -56,8 +64,15 @@ final readonly class ChatRunner implements TaskRunner
         $provider = $modelId ? $this->modelConfigService->getProviderForModel($modelId) : null;
         $modelName = $modelId ? $this->modelConfigService->getModelName($modelId) : null;
 
+        $systemPrompt = $this->systemPrompt($node, $language, $context);
+        $ragChunks = 0;
+        if (Capability::RagQuery === $node->capability) {
+            $ragContext = $this->ragContext($text, $context, $ragChunks);
+            $systemPrompt .= $ragContext;
+        }
+
         $messages = [
-            ['role' => 'system', 'content' => $this->systemPrompt($node, $language, $context)],
+            ['role' => 'system', 'content' => $systemPrompt],
             ['role' => 'user', 'content' => $text],
         ];
 
@@ -95,11 +110,65 @@ final readonly class ChatRunner implements TaskRunner
             return NodeResult::failed($node->capability->value.' produced empty output');
         }
 
-        return NodeResult::ok($full, [], [
+        $metadata = [
             'provider' => $response['provider'] ?? $provider,
             'model' => $response['model'] ?? $modelName,
             'model_id' => $modelId,
-        ]);
+        ];
+        if (Capability::RagQuery === $node->capability) {
+            $metadata['rag_chunks'] = $ragChunks;
+        }
+
+        return NodeResult::ok($full, [], $metadata);
+    }
+
+    /**
+     * Retrieve knowledge-base context for a `rag_query` node.
+     *
+     * Scope: the user-selected knowledge group (`rag_group_key` from the chat
+     * composer, riding in classification/options) when present, otherwise the
+     * user's whole knowledge base. Mirrors the legacy ChatHandler integration
+     * (same service, same context block format); any retrieval failure is
+     * logged and the node answers without context instead of failing.
+     */
+    private function ragContext(string $query, NodeContext $context, int &$chunks): string
+    {
+        $groupKey = $context->classification['rag_group_key']
+            ?? $context->options['rag_group_key']
+            ?? null;
+        $groupKey = is_string($groupKey) && '' !== $groupKey ? $groupKey : null;
+
+        $limit = isset($context->options['rag_limit']) ? max(1, min(50, (int) $context->options['rag_limit'])) : 20;
+        $minScore = isset($context->options['rag_min_score']) ? max(0.0, min(1.0, (float) $context->options['rag_min_score'])) : 0.2;
+
+        try {
+            $results = $this->vectorSearchService->semanticSearch(
+                $query,
+                $context->userId ?? $context->message->getUserId(),
+                $groupKey,
+                limit: $limit,
+                minScore: $minScore,
+            );
+        } catch (\Throwable $e) {
+            $this->logger->warning('ChatRunner: RAG retrieval failed, answering without context', [
+                'error' => $e->getMessage(),
+                'group_key' => $groupKey,
+            ]);
+
+            return '';
+        }
+
+        if ([] === $results) {
+            return '';
+        }
+
+        $chunks = count($results);
+        $block = "\n\n## Knowledge Base Context (relevant to your task):\n";
+        foreach ($results as $idx => $result) {
+            $block .= sprintf("[Source %d] %s\n", $idx + 1, trim((string) ($result['chunk_text'] ?? '')));
+        }
+
+        return $block."\nUse this context to provide accurate and specific answers.\n";
     }
 
     private function systemPrompt(TaskNode $node, string $language, NodeContext $context): string

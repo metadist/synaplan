@@ -11,8 +11,10 @@ use App\Entity\WidgetSession;
 use App\Realtime\Authorizer\ChannelAuthorizerLocator;
 use App\Realtime\Channel\ChannelParser;
 use App\Realtime\Token\RealtimeTokenService;
+use App\Realtime\Token\WidgetVisitorAccessChecker;
 use App\Repository\WidgetRepository;
 use App\Repository\WidgetSessionRepository;
+use App\Service\Widget\WidgetOriginValidator;
 use Firebase\JWT\JWT;
 use Firebase\JWT\Key;
 use PHPUnit\Framework\Attributes\AllowMockObjectsWithoutExpectations;
@@ -21,6 +23,8 @@ use Psr\Clock\ClockInterface;
 use Psr\Log\NullLogger;
 use Symfony\Component\DependencyInjection\Container;
 use Symfony\Component\HttpFoundation\Request;
+use Symfony\Component\RateLimiter\RateLimiterFactory;
+use Symfony\Component\RateLimiter\Storage\InMemoryStorage;
 
 /**
  * The controller is the trust boundary for browser-issued WS tokens, so
@@ -32,26 +36,28 @@ use Symfony\Component\HttpFoundation\Request;
  *   * Anonymous visitors cannot smuggle authenticated identity by
  *     supplying a stray widgetId/sessionId.
  *   * Channel parser failures and authorizer rejections surface as
- *     well-defined HTTP errors instead of leaking exceptions.
+ *     well-defined, GENERIC HTTP errors instead of leaking internals.
+ *   * The widget token endpoint cannot be used as an enumeration oracle:
+ *     unknown widget, unknown session and expired session all yield the
+ *     same 404 body; requests from non-allowlisted origins are refused;
+ *     per-IP rate limiting kicks in.
  */
 #[AllowMockObjectsWithoutExpectations]
 final class RealtimeTokenControllerTest extends TestCase
 {
     private const SECRET = 'a-very-secret-key-of-sufficient-length-for-hs256';
+    private const ALLOWED_HOST = 'shop.example.test';
 
     public function testVisitorSubscriptionTokenSubMatchesConnectionTokenSub(): void
     {
         $widgetId = 'wdg_abc';
         $sessionId = 'sid_xyz';
 
-        $widget = new Widget();
-        $widget->setOwnerId(7);
-
         $widgetRepo = $this->createMock(WidgetRepository::class);
-        $widgetRepo->method('findByWidgetId')->willReturn($widget);
+        $widgetRepo->method('findByWidgetId')->willReturn($this->buildWidget());
 
         $sessionRepo = $this->createMock(WidgetSessionRepository::class);
-        $sessionRepo->method('findByWidgetAndSession')->willReturn(new WidgetSession());
+        $sessionRepo->method('findByWidgetAndSession')->willReturn($this->buildSession());
 
         $tokenService = $this->buildTokenService();
         $controller = $this->buildController(
@@ -61,7 +67,7 @@ final class RealtimeTokenControllerTest extends TestCase
         );
 
         // 1. Visitor obtains a connection token.
-        $connectionResponse = $controller->issueWidgetToken($widgetId, $sessionId);
+        $connectionResponse = $controller->issueWidgetToken($this->widgetTokenRequest(), $widgetId, $sessionId);
         $connectionPayload = json_decode((string) $connectionResponse->getContent(), true);
         $this->assertIsArray($connectionPayload);
         $connectionToken = (string) $connectionPayload['token'];
@@ -92,14 +98,11 @@ final class RealtimeTokenControllerTest extends TestCase
     {
         $owner = $this->buildUser(7);
 
-        $widget = new Widget();
-        $widget->setOwnerId(7);
-
         $widgetRepo = $this->createMock(WidgetRepository::class);
-        $widgetRepo->method('findByWidgetId')->willReturn($widget);
+        $widgetRepo->method('findByWidgetId')->willReturn($this->buildWidget());
 
         $sessionRepo = $this->createMock(WidgetSessionRepository::class);
-        $sessionRepo->method('findByWidgetAndSession')->willReturn(new WidgetSession());
+        $sessionRepo->method('findByWidgetAndSession')->willReturn($this->buildSession());
 
         $tokenService = $this->buildTokenService();
         $controller = $this->buildController(
@@ -125,7 +128,7 @@ final class RealtimeTokenControllerTest extends TestCase
         $this->assertSame('user:7', $subscribeDecoded['sub']);
     }
 
-    public function testRejectsInvalidChannelName(): void
+    public function testRejectsInvalidChannelNameWithGenericError(): void
     {
         $controller = $this->buildController(
             tokenService: $this->buildTokenService(),
@@ -137,6 +140,12 @@ final class RealtimeTokenControllerTest extends TestCase
         $response = $controller->issueSubscriptionToken($request, null);
 
         $this->assertSame(400, $response->getStatusCode());
+
+        // Parser messages enumerate valid namespaces — they must never reach
+        // an anonymous caller.
+        $payload = json_decode((string) $response->getContent(), true);
+        $this->assertIsArray($payload);
+        $this->assertSame('invalid_channel', $payload['error']);
     }
 
     public function testRejectsMissingChannelClaim(): void
@@ -161,13 +170,10 @@ final class RealtimeTokenControllerTest extends TestCase
         $widgetId = 'wdg_abc';
         $sessionId = 'sid_xyz';
 
-        $widget = new Widget();
-        $widget->setOwnerId(7);
-
         $widgetRepo = $this->createMock(WidgetRepository::class);
-        $widgetRepo->method('findByWidgetId')->willReturn($widget);
+        $widgetRepo->method('findByWidgetId')->willReturn($this->buildWidget());
         $sessionRepo = $this->createMock(WidgetSessionRepository::class);
-        $sessionRepo->method('findByWidgetAndSession')->willReturn(new WidgetSession());
+        $sessionRepo->method('findByWidgetAndSession')->willReturn($this->buildSession());
 
         $tokenService = $this->buildTokenService();
         $controller = $this->buildController(
@@ -176,7 +182,7 @@ final class RealtimeTokenControllerTest extends TestCase
             sessionRepo: $sessionRepo,
         );
 
-        $connectionResponse = $controller->issueWidgetToken($widgetId, $sessionId);
+        $connectionResponse = $controller->issueWidgetToken($this->widgetTokenRequest(), $widgetId, $sessionId);
         $connectionPayload = json_decode((string) $connectionResponse->getContent(), true);
         $this->assertIsArray($connectionPayload);
         $connectionDecoded = (array) JWT::decode((string) $connectionPayload['token'], new Key(self::SECRET, 'HS256'));
@@ -204,9 +210,9 @@ final class RealtimeTokenControllerTest extends TestCase
         // subscriber, the controller refuses to mint a subscription token
         // whose `sub` claim cannot match a real connection token.
         $widgetRepo = $this->createMock(WidgetRepository::class);
-        $widgetRepo->method('findByWidgetId')->willReturn((new Widget())->setOwnerId(7));
+        $widgetRepo->method('findByWidgetId')->willReturn($this->buildWidget());
         $sessionRepo = $this->createMock(WidgetSessionRepository::class);
-        $sessionRepo->method('findByWidgetAndSession')->willReturn(new WidgetSession());
+        $sessionRepo->method('findByWidgetAndSession')->willReturn($this->buildSession());
 
         $controller = $this->buildController(
             tokenService: $this->buildTokenService(),
@@ -222,6 +228,148 @@ final class RealtimeTokenControllerTest extends TestCase
         $response = $controller->issueSubscriptionToken($request, null);
 
         $this->assertSame(403, $response->getStatusCode());
+    }
+
+    public function testWidgetTokenLookupFailuresAreIndistinguishable(): void
+    {
+        // Unknown widget.
+        $widgetRepo = $this->createMock(WidgetRepository::class);
+        $widgetRepo->method('findByWidgetId')->willReturn(null);
+        $sessionRepo = $this->createMock(WidgetSessionRepository::class);
+
+        $controller = $this->buildController(
+            tokenService: $this->buildTokenService(),
+            widgetRepo: $widgetRepo,
+            sessionRepo: $sessionRepo,
+        );
+        $unknownWidget = $controller->issueWidgetToken($this->widgetTokenRequest(), 'wdg_nope', 'sid_xyz');
+
+        // Known widget, unknown session.
+        $widgetRepo = $this->createMock(WidgetRepository::class);
+        $widgetRepo->method('findByWidgetId')->willReturn($this->buildWidget());
+        $sessionRepo = $this->createMock(WidgetSessionRepository::class);
+        $sessionRepo->method('findByWidgetAndSession')->willReturn(null);
+
+        $controller = $this->buildController(
+            tokenService: $this->buildTokenService(),
+            widgetRepo: $widgetRepo,
+            sessionRepo: $sessionRepo,
+        );
+        $unknownSession = $controller->issueWidgetToken($this->widgetTokenRequest(), 'wdg_abc', 'sid_nope');
+
+        // Known widget, expired session.
+        $widgetRepo = $this->createMock(WidgetRepository::class);
+        $widgetRepo->method('findByWidgetId')->willReturn($this->buildWidget());
+        $sessionRepo = $this->createMock(WidgetSessionRepository::class);
+        $sessionRepo->method('findByWidgetAndSession')->willReturn($this->buildSession(expiresIn: -60));
+
+        $controller = $this->buildController(
+            tokenService: $this->buildTokenService(),
+            widgetRepo: $widgetRepo,
+            sessionRepo: $sessionRepo,
+        );
+        $expiredSession = $controller->issueWidgetToken($this->widgetTokenRequest(), 'wdg_abc', 'sid_xyz');
+
+        foreach ([$unknownWidget, $unknownSession, $expiredSession] as $response) {
+            $this->assertSame(404, $response->getStatusCode());
+        }
+
+        // Identical bodies — a probe must not be able to learn WHICH part of
+        // the (widgetId, sessionId) pair was wrong.
+        $this->assertSame((string) $unknownWidget->getContent(), (string) $unknownSession->getContent());
+        $this->assertSame((string) $unknownWidget->getContent(), (string) $expiredSession->getContent());
+    }
+
+    public function testWidgetTokenRefusedForDisallowedOrigin(): void
+    {
+        $widgetRepo = $this->createMock(WidgetRepository::class);
+        $widgetRepo->method('findByWidgetId')->willReturn($this->buildWidget());
+        $sessionRepo = $this->createMock(WidgetSessionRepository::class);
+        $sessionRepo->method('findByWidgetAndSession')->willReturn($this->buildSession());
+
+        $controller = $this->buildController(
+            tokenService: $this->buildTokenService(),
+            widgetRepo: $widgetRepo,
+            sessionRepo: $sessionRepo,
+        );
+
+        $evilOrigin = new Request(server: ['HTTP_ORIGIN' => 'https://evil.test']);
+        $this->assertSame(403, $controller->issueWidgetToken($evilOrigin, 'wdg_abc', 'sid_xyz')->getStatusCode());
+
+        $noOrigin = new Request();
+        $this->assertSame(403, $controller->issueWidgetToken($noOrigin, 'wdg_abc', 'sid_xyz')->getStatusCode());
+    }
+
+    public function testWidgetTokenRefusedWhenWidgetHasNoAllowedDomains(): void
+    {
+        $widgetRepo = $this->createMock(WidgetRepository::class);
+        $widgetRepo->method('findByWidgetId')->willReturn($this->buildWidget(allowedDomains: []));
+        $sessionRepo = $this->createMock(WidgetSessionRepository::class);
+        $sessionRepo->method('findByWidgetAndSession')->willReturn($this->buildSession());
+
+        $controller = $this->buildController(
+            tokenService: $this->buildTokenService(),
+            widgetRepo: $widgetRepo,
+            sessionRepo: $sessionRepo,
+        );
+
+        // Same fail-closed rule as the chat endpoints: no allowlist, no embed.
+        $this->assertSame(403, $controller->issueWidgetToken($this->widgetTokenRequest(), 'wdg_abc', 'sid_xyz')->getStatusCode());
+    }
+
+    public function testWidgetTokenEndpointIsRateLimitedPerIp(): void
+    {
+        $widgetRepo = $this->createMock(WidgetRepository::class);
+        $widgetRepo->method('findByWidgetId')->willReturn(null);
+        $sessionRepo = $this->createMock(WidgetSessionRepository::class);
+
+        $controller = $this->buildController(
+            tokenService: $this->buildTokenService(),
+            widgetRepo: $widgetRepo,
+            sessionRepo: $sessionRepo,
+            widgetTokenLimit: 2,
+        );
+
+        // Even failed lookups consume budget — enumeration IS the failure case.
+        $first = $controller->issueWidgetToken($this->widgetTokenRequest(), 'wdg_guess1', 'sid_guess1');
+        $second = $controller->issueWidgetToken($this->widgetTokenRequest(), 'wdg_guess2', 'sid_guess2');
+        $third = $controller->issueWidgetToken($this->widgetTokenRequest(), 'wdg_guess3', 'sid_guess3');
+
+        $this->assertSame(404, $first->getStatusCode());
+        $this->assertSame(404, $second->getStatusCode());
+        $this->assertSame(429, $third->getStatusCode());
+    }
+
+    public function testAnonymousSubscribeIsRateLimitedButOperatorIsNot(): void
+    {
+        $widgetRepo = $this->createMock(WidgetRepository::class);
+        $widgetRepo->method('findByWidgetId')->willReturn($this->buildWidget());
+        $sessionRepo = $this->createMock(WidgetSessionRepository::class);
+        $sessionRepo->method('findByWidgetAndSession')->willReturn($this->buildSession());
+
+        $controller = $this->buildController(
+            tokenService: $this->buildTokenService(),
+            widgetRepo: $widgetRepo,
+            sessionRepo: $sessionRepo,
+            subscribeAnonLimit: 1,
+        );
+
+        $makeRequest = static fn (): Request => new Request(content: (string) json_encode([
+            'channel' => 'widget:session.wdg_abc.sid_xyz',
+            'widgetId' => 'wdg_abc',
+            'sessionId' => 'sid_xyz',
+        ]));
+
+        $this->assertSame(200, $controller->issueSubscriptionToken($makeRequest(), null)->getStatusCode());
+        $this->assertSame(429, $controller->issueSubscriptionToken($makeRequest(), null)->getStatusCode());
+
+        // The authenticated operator path must NOT consume the anonymous
+        // budget — operators are identified and accountable.
+        $owner = $this->buildUser(7);
+        $operatorRequest = new Request(content: (string) json_encode([
+            'channel' => 'widget:session.wdg_abc.sid_xyz',
+        ]));
+        $this->assertSame(200, $controller->issueSubscriptionToken($operatorRequest, $owner)->getStatusCode());
     }
 
     private function buildTokenService(): RealtimeTokenService
@@ -260,13 +408,21 @@ final class RealtimeTokenControllerTest extends TestCase
         RealtimeTokenService $tokenService,
         WidgetRepository $widgetRepo,
         WidgetSessionRepository $sessionRepo,
+        int $widgetTokenLimit = 1000,
+        int $subscribeAnonLimit = 1000,
     ): RealtimeTokenController {
         $controller = new RealtimeTokenController(
             tokenService: $tokenService,
             authorizerLocator: $this->buildLocator($widgetRepo, $sessionRepo),
             channelParser: new ChannelParser(),
-            widgetRepository: $widgetRepo,
-            sessionRepository: $sessionRepo,
+            visitorAccessChecker: new WidgetVisitorAccessChecker(
+                $widgetRepo,
+                $sessionRepo,
+                new WidgetOriginValidator(),
+                new NullLogger(),
+            ),
+            realtimeWidgetTokenLimiter: $this->buildLimiterFactory('widget_token', $widgetTokenLimit),
+            realtimeSubscribeAnonLimiter: $this->buildLimiterFactory('subscribe_anon', $subscribeAnonLimit),
             logger: new NullLogger(),
         );
 
@@ -283,11 +439,41 @@ final class RealtimeTokenControllerTest extends TestCase
         return $controller;
     }
 
+    private function buildLimiterFactory(string $id, int $limit): RateLimiterFactory
+    {
+        return new RateLimiterFactory(
+            ['id' => $id, 'policy' => 'fixed_window', 'limit' => $limit, 'interval' => '1 minute'],
+            new InMemoryStorage(),
+        );
+    }
+
+    /**
+     * @param list<string>|null $allowedDomains
+     */
+    private function buildWidget(?array $allowedDomains = null): Widget
+    {
+        return (new Widget())
+            ->setOwnerId(7)
+            ->setAllowedDomains($allowedDomains ?? [self::ALLOWED_HOST]);
+    }
+
+    private function buildSession(int $expiresIn = 3600): WidgetSession
+    {
+        return (new WidgetSession())->setExpires(time() + $expiresIn);
+    }
+
+    /**
+     * A request that passes the origin allowlist for {@see self::buildWidget()}.
+     */
+    private function widgetTokenRequest(): Request
+    {
+        return new Request(server: ['HTTP_ORIGIN' => 'https://'.self::ALLOWED_HOST]);
+    }
+
     private function buildUser(int $id): User
     {
         $user = new User();
         $reflection = new \ReflectionProperty(User::class, 'id');
-        $reflection->setAccessible(true);
         $reflection->setValue($user, $id);
 
         return $user;

@@ -208,6 +208,14 @@ running Centrifugo to be testable.
 infrastructure (cache, lock, rate-limiter). Treat Redis as mandatory
 shared infrastructure.
 
+### Composer dependencies introduced by this layer
+
+| Package | Why |
+| --- | --- |
+| `firebase/php-jwt` | Signs the short-lived HS256 connection/subscription JWTs (`RealtimeTokenService`). Reference implementation Centrifugo documents against; we only use `JWT::encode`. |
+| `predis/predis` | Pure-PHP Redis client backing cache, sessions, locks and `RedisService` — no PECL extension needed for web requests. |
+| `symfony/redis-messenger` | Redis Streams transport for Messenger queues (requires `ext-redis` in the worker image — see `docs/DEVELOPMENT.md`). |
+
 ## Production deployment (multi-node)
 
 The realtime layer is built for a horizontally scaled cluster (e.g. 3 web

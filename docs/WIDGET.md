@@ -28,6 +28,19 @@ That's it! A chat button appears on your page.
 - **Customizable** - Colors, position, icons, themes
 - **CORS-ready** - Works across domains
 - **Rate limited** - Per subscription level
+- **Live support** - Human takeover, typing indicators, and operator notifications over WebSockets (Centrifugo)
+
+---
+
+## Live Support (Realtime)
+
+When the realtime layer is enabled (`REALTIME_ENABLED`, default on), the widget upgrades from plain request/response to a live channel:
+
+- **Human takeover** — operators take over a conversation from the AI in the Synaplan **Live Support** view; visitors see operator replies instantly
+- **Typing indicators** — both directions, ephemeral (never persisted)
+- **Operator notifications** — widget owners get realtime alerts for new sessions/messages
+
+The embedded widget connects to the same Synaplan origin via `/connection/websocket` — no extra CORS or firewall configuration on the host page. AI answer streaming itself still uses SSE; WebSockets carry the live-support events. Architecture and channel details: [REALTIME.md](REALTIME.md).
 
 ---
 

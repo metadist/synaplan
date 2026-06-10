@@ -49,7 +49,7 @@
         <button
           :style="{ backgroundColor: primaryColor }"
           class="w-16 h-16 rounded-full shadow-2xl hover:scale-110 transition-transform flex items-center justify-center group"
-          aria-label="Open chat"
+          :aria-label="$t('widget.openChat')"
           data-testid="btn-open"
           @click="toggleChat"
         >
@@ -151,7 +151,9 @@
             </button>
             <button
               class="w-8 h-8 rounded-lg bg-white/10 hover:bg-white/20 transition-colors flex items-center justify-center"
-              :aria-label="widgetTheme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'"
+              :aria-label="
+                widgetTheme === 'dark' ? $t('widget.switchToLight') : $t('widget.switchToDark')
+              "
               data-testid="btn-theme"
               @click="toggleTheme"
             >
@@ -161,7 +163,7 @@
             <button
               v-if="allowFullscreen && !isMobile"
               class="w-8 h-8 rounded-lg bg-white/10 hover:bg-white/20 transition-colors flex items-center justify-center"
-              :aria-label="isFullscreen ? 'Minimize' : 'Maximize'"
+              :aria-label="isFullscreen ? $t('widget.minimize') : $t('widget.maximize')"
               data-testid="btn-fullscreen"
               @click="toggleFullscreen"
             >
@@ -170,7 +172,7 @@
             </button>
             <button
               class="w-8 h-8 rounded-lg bg-white/10 hover:bg-white/20 transition-colors flex items-center justify-center"
-              aria-label="Close chat"
+              :aria-label="$t('widget.closeChat')"
               data-testid="btn-close"
               @click="toggleChat"
             >
@@ -723,7 +725,10 @@ const props = withDefaults(defineProps<Props>(), {
   buttonIconUrl: undefined,
   position: 'bottom-right',
   autoOpen: false,
-  autoMessage: 'Hello! How can I help you today?',
+  // No literal default: when unset, `ensureAutoMessage` falls back to the
+  // localized widget.autoMessage. An explicitly empty string still means
+  // "no greeting".
+  autoMessage: undefined,
   messageLimit: 50,
   maxFileSize: 10,
   defaultTheme: 'light',
@@ -1021,8 +1026,11 @@ const limitReached = computed(() => {
 
 const ensureAutoMessage = () => {
   if (!historyLoaded.value) return
-  if (messages.value.length === 0 && props.autoMessage) {
-    addBotMessage(props.autoMessage)
+  if (messages.value.length === 0) {
+    const greeting = props.autoMessage ?? t('widget.autoMessage')
+    if (greeting) {
+      addBotMessage(greeting)
+    }
   }
 }
 
@@ -2306,7 +2314,7 @@ function handleWidgetEvent(data: WidgetEvent) {
     case 'takeover': {
       // Human operator took over the chat
       chatMode.value = 'human'
-      operatorName.value = (data.operatorName as string) ?? 'Support'
+      operatorName.value = (data.operatorName as string) ?? t('widget.operatorFallbackName')
       // Add system message (use messageId to prevent duplicates)
       const takeoverMsgId = data.messageId ? String(data.messageId) : `system-${Date.now()}`
       if (!messages.value.some((m) => String(m.id) === takeoverMsgId)) {
@@ -2314,7 +2322,7 @@ function handleWidgetEvent(data: WidgetEvent) {
           id: takeoverMsgId,
           role: 'assistant',
           type: 'text',
-          content: (data.message as string) ?? 'You are now connected with a support agent.',
+          content: (data.message as string) ?? t('widget.takeoverNotice'),
           timestamp: new Date(),
           sender: 'system',
         })
@@ -2334,7 +2342,7 @@ function handleWidgetEvent(data: WidgetEvent) {
           id: handbackMsgId,
           role: 'assistant',
           type: 'text',
-          content: (data.message as string) ?? 'You are now chatting with our AI assistant.',
+          content: (data.message as string) ?? t('widget.handbackNotice'),
           timestamp: new Date(),
           sender: 'system',
         })

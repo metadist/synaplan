@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Service\Media;
 
 use App\Entity\File;
-use Doctrine\ORM\EntityManagerInterface;
+use App\Repository\FileRepository;
 use Psr\Log\LoggerInterface;
 
 /**
@@ -17,7 +17,7 @@ use Psr\Log\LoggerInterface;
 final readonly class GeneratedFileRegistrar
 {
     public function __construct(
-        private EntityManagerInterface $em,
+        private FileRepository $files,
         private LoggerInterface $logger,
         private string $uploadDir,
     ) {
@@ -47,8 +47,7 @@ final readonly class GeneratedFileRegistrar
             $file->setFileMime($this->mimeForExtension($extension));
             $file->setStatus('generated');
 
-            $this->em->persist($file);
-            $this->em->flush();
+            $this->files->save($file);
 
             return $file;
         } catch (\Throwable $e) {

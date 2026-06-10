@@ -51,6 +51,29 @@ final readonly class WebSearchRunner implements TaskRunner
             return NodeResult::failed('no query for web_search');
         }
 
+        // MessageProcessor (step 2.5) may have already searched for this turn —
+        // it runs BEFORE the planner, so a classifier `BWEBSEARCH` vote plus a
+        // planned web_search node would otherwise hit Brave twice for the same
+        // message. Reuse the pre-fetched results, but only when this node is
+        // searching the whole message (no planner-narrowed sub-query).
+        $preFetched = $context->options['search_results'] ?? null;
+        if (
+            is_array($preFetched)
+            && !empty($preFetched['results'])
+            && trim($request) === trim((string) $context->message->getText())
+        ) {
+            $this->logger->info('WebSearchRunner: reusing pre-fetched search results', [
+                'query' => $preFetched['query'] ?? null,
+            ]);
+
+            return NodeResult::ok($this->braveSearch->formatResultsForAI($preFetched), [], [
+                'web_search' => true,
+                'query' => is_string($preFetched['query'] ?? null) ? $preFetched['query'] : '',
+                'search_results' => $preFetched,
+                'reused_prefetched' => true,
+            ]);
+        }
+
         $language = is_string($context->classification['language'] ?? null)
             ? $context->classification['language']
             : ($context->message->getLanguage() ?: 'en');

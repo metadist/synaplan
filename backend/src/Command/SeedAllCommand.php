@@ -22,11 +22,13 @@ use Symfony\Component\Console\Style\SymfonyStyle;
  * Run every idempotent app:*:seed step in dependency order.
  *
  * Order:
- *   1. models      (BMODELS — referenced by DEFAULTMODEL config)
- *   2. prompts     (BPROMPTS)
- *   3. defaults    (BCONFIG: DEFAULTMODEL → references model IDs from step 1)
- *   4. ratelimit   (BCONFIG: SYSTEM_FLAGS, RATELIMITS_*)
- *   5. demo-widget (BCONFIG: example widget for ownerId=2 — dev/test only, no-op in prod)
+ *   1. models        (BMODELS — referenced by DEFAULTMODEL config)
+ *   2. prompts       (BPROMPTS)
+ *   3. defaults      (BCONFIG: DEFAULTMODEL → references model IDs from step 1)
+ *   4. rate-limits   (BCONFIG: SYSTEM_FLAGS, RATELIMITS_*)
+ *   5. subscriptions (BSUBSCRIPTIONS — plan cost budgets)
+ *   6. multitask     (BCONFIG: MULTITASK routing flags)
+ *   7. demo-widget   (BCONFIG: example widget for ownerId=2 — dev/test only, no-op in prod)
  *
  * Wired into the Docker entrypoint after `doctrine:migrations:migrate`, so it runs
  * on every container startup in dev AND prod.
@@ -57,7 +59,9 @@ final class SeedAllCommand extends Command
             "  2. app:prompt:seed             (BPROMPTS, ownerId=0)\n".
             "  3. app:config:seed-defaults    (BCONFIG, group=DEFAULTMODEL/ai)\n".
             "  4. app:ratelimit:seed-defaults (BCONFIG, group=RATELIMITS_*/SYSTEM_FLAGS)\n".
-            "  5. demo widget config          (BCONFIG, group=widget_1, ownerId=2 — dev/test only)\n\n".
+            "  5. subscription cost budgets   (BSUBSCRIPTIONS)\n".
+            "  6. multitask routing flags     (BCONFIG, group=MULTITASK)\n".
+            "  7. demo widget config          (BCONFIG, group=widget_1, ownerId=2 — dev/test only)\n\n".
             'All steps are idempotent and safe to run on every deploy. The demo-widget step is a no-op in prod.'
         );
     }

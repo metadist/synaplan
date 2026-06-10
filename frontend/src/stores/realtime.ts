@@ -5,7 +5,7 @@
  * channel subscriptions. The store exposes:
  *
  *   * connection state (badge in the topbar)
- *   * a `getOrCreateClient()` factory used by `useRealtimeChannel`
+ *   * a `getOrCreateClient()` factory used by `widgetOperatorRealtime.ts`
  *   * a `disconnect()` action used on logout
  *
  * The visitor (widget) flow uses RealtimeClient directly — it doesn't

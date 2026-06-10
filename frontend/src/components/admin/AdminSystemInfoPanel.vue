@@ -153,8 +153,8 @@ const error = ref(false)
 
 const diskBarClass = computed(() => {
   const pct = info.value?.disk.usedPercent ?? 0
-  if (pct >= 90) return 'bg-red-500'
-  if (pct >= 75) return 'bg-amber-500'
+  if (pct >= 90) return 'bg-[var(--status-error)]'
+  if (pct >= 75) return 'bg-[var(--status-warning)]'
   return 'bg-[var(--brand)]'
 })
 

@@ -337,10 +337,10 @@ import LimitReachedModal from '@/components/common/LimitReachedModal.vue'
 import {
   useHistoryStore,
   parseContentWithThinking,
+  isTaskCardKind,
+  isTaskCardState,
   type Message,
   type Part,
-  type TaskCardKind,
-  type TaskCardState,
 } from '@/stores/history'
 import { useChatsStore, isDefaultChatTitle } from '@/stores/chats'
 import { useModelsStore } from '@/stores/models'
@@ -1856,8 +1856,8 @@ const streamAIResponse = async (
                 cards: tasks.map((t) => ({
                   nodeId: t.node_id,
                   capability: t.capability,
-                  kind: (t.kind as TaskCardKind) ?? 'text',
-                  state: 'pending' as TaskCardState,
+                  kind: isTaskCardKind(t.kind) ? t.kind : 'text',
+                  state: 'pending' as const,
                 })),
               }
             }
@@ -1872,8 +1872,8 @@ const streamAIResponse = async (
           } else if (data.status === 'task_update') {
             const message = historyStore.messages.find((m) => m.id === messageId)
             const card = message?.taskPlan?.cards.find((c) => c.nodeId === data.metadata?.node_id)
-            if (card && typeof data.metadata?.state === 'string') {
-              card.state = data.metadata.state as TaskCardState
+            if (card && isTaskCardState(data.metadata?.state)) {
+              card.state = data.metadata.state
             }
           } else if (data.status === 'task_chunk') {
             const message = historyStore.messages.find((m) => m.id === messageId)

@@ -49,6 +49,19 @@ final readonly class ReVectorizeMessageHandler
         RevectorizeRun::SCOPE_ALL,
     ];
 
+    /**
+     * Every scope this release knows how to execute. A queued run with any
+     * other scope (e.g. the retired `synapse` scope from before the embedding-
+     * routing removal) used to fall through every branch in
+     * EmbeddingReindexService::execute() and come back as a green
+     * `COMPLETED (0 chunks)` — fail it loudly instead.
+     */
+    private const KNOWN_SCOPES = [
+        RevectorizeRun::SCOPE_DOCUMENTS,
+        RevectorizeRun::SCOPE_MEMORIES,
+        RevectorizeRun::SCOPE_ALL,
+    ];
+
     public function __construct(
         private RevectorizeRunRepository $runRepository,
         private EmbeddingReindexService $reindexService,
@@ -73,6 +86,23 @@ final readonly class ReVectorizeMessageHandler
             $this->logger->info('ReVectorize: skipping already-handled run', [
                 'run_id' => $run->getId(),
                 'status' => $run->getStatus(),
+            ]);
+
+            return;
+        }
+
+        if (!in_array($run->getScope(), self::KNOWN_SCOPES, true)) {
+            $run->setStatus(RevectorizeRun::STATUS_FAILED);
+            $run->setError(sprintf(
+                'Unsupported scope "%s" — this run was queued by a previous release and cannot be replayed. Start a new re-vectorize run.',
+                $run->getScope(),
+            ));
+            $run->setFinishedAt(time());
+            $this->em->flush();
+
+            $this->logger->warning('ReVectorize: rejected run with unknown scope', [
+                'run_id' => $run->getId(),
+                'scope' => $run->getScope(),
             ]);
 
             return;

@@ -18,6 +18,20 @@ use App\Service\Multitask\Plan\TaskPlan;
 final class ResultAssembler
 {
     /**
+     * Static fallback shown when no node produced any text. Keyed by the
+     * detected message language (the frontend-supported set); English is the
+     * fallback for everything else. The backend has no translator service —
+     * normal replies are localized by the model itself, so only this
+     * degraded-path constant needs a map.
+     */
+    private const FALLBACK_TEXT = [
+        'en' => "I couldn't fully complete that request.",
+        'de' => 'Ich konnte diese Anfrage leider nicht vollständig abschließen.',
+        'es' => 'No pude completar esa solicitud por completo.',
+        'tr' => 'Bu isteği tamamen tamamlayamadım.',
+    ];
+
+    /**
      * @return array{
      *     content: string,
      *     files: list<array<string, mixed>>,
@@ -96,7 +110,10 @@ final class ResultAssembler
         }
 
         if ('' === $text) {
-            $text = "I couldn't fully complete that request.";
+            $language = is_string($context->classification['language'] ?? null)
+                ? $context->classification['language']
+                : ($context->message->getLanguage() ?: 'en');
+            $text = self::FALLBACK_TEXT[$language] ?? self::FALLBACK_TEXT['en'];
         }
 
         return [$text, $files, $metadata];

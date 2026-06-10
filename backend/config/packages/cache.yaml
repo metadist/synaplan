@@ -8,7 +8,8 @@
 #   * Symfony Rate-Limiter (`framework.rate_limiter`)
 #   * Centrifugo realtime engine (different Redis logical DB, see
 #     `_docker/centrifugo/config.json`)
-#   * Future: Symfony Messenger transport, sessions, presence
+#   * Symfony Messenger transports (Redis Streams, see `messenger.yaml`)
+#   * Native PHP sessions (`RedisSessionHandler`, see `framework.yaml`)
 #
 # `REDIS_DSN` is mandatory infrastructure and is provided by every official
 # docker-compose file (and the production env). It has no application-level

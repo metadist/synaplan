@@ -12,6 +12,19 @@ Multi-provider AI conversations:
 - **Cloud**: OpenAI, Anthropic, Groq, Google Gemini
 - **Switching**: Change models per conversation
 - **Context**: Maintains conversation history
+- **Streaming**: Token-by-token responses over SSE
+
+## Multi-Task Routing
+
+Complex requests are decomposed into a plan instead of a single AI call:
+
+- **AI planner** — splits a message into capability nodes (extract → summarize → generate media → compose reply) as a small task DAG
+- **Live task cards** — each step streams its progress into the chat UI while it runs
+- **Smart classification** — rule-based routing (per-topic task prompts) plus an AI sorter for topic + language detection
+- **Multi-file delivery** — a single request can return several generated files, across chat, WhatsApp, email, and webhooks
+- **Safe rollout** — shadow mode plans without executing; existing installs keep the classic single-handler path until enabled
+
+Configuration: [CONFIGURATION.md → Multi-Task Routing](CONFIGURATION.md#multi-task-routing-bconfig)
 
 ## RAG System
 
@@ -34,8 +47,21 @@ Embeddable chat for any website:
 - Lazy loading
 - Rate limiting
 - Domain whitelisting
+- Live support: human takeover + typing indicators (WebSockets)
 
 → [Full Widget documentation](WIDGET.md)
+
+## Live Support & Realtime
+
+WebSocket layer built on **Centrifugo + Redis**:
+
+- **Human takeover** — operators can take over any widget conversation from the AI, live
+- **Typing indicators** — visitors and operators see each other typing in real time
+- **Operator notifications** — instant alerts for new widget messages
+- **Same-origin WebSockets** — browsers connect via `/connection/websocket`, no CORS setup
+- **Cluster-ready** — all nodes share one Redis, so events reach browsers on any node
+
+→ [Full Realtime documentation](REALTIME.md)
 
 ## WhatsApp Integration
 

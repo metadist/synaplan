@@ -11,12 +11,14 @@ commands** for production-essential catalog data. Demo/test data lives in DataFi
 | System prompts (`BPROMPTS`)      | `App\Seed\PromptSeeder` / `app:prompt:seed`                      | dev + prod      |
 | Default model config (`BCONFIG`) | `App\Seed\DefaultModelConfigSeeder` / `app:config:seed-defaults` | dev + prod      |
 | Rate-limit config (`BCONFIG`)    | `App\Seed\RateLimitConfigSeeder` / `app:ratelimit:seed-defaults` | dev + prod      |
+| Subscription budgets (`BSUBSCRIPTIONS`) | `App\Seed\SubscriptionPlanSeeder`                         | dev + prod      |
+| Multitask routing flags (`BCONFIG`) | `App\Seed\MultitaskConfigSeeder`                              | dev + prod      |
 | Demo widget config (`BCONFIG`)   | `App\Seed\DemoWidgetConfigSeeder`                                | dev + test only |
 | Demo users (`BUSER`)             | `App\DataFixtures\UserFixtures`                                  | dev + test only |
 
 
 The orchestrator `app:seed` runs all idempotent seeders in the correct dependency order
-(models → prompts → defaults → rate-limits → demo-widget).
+(models → prompts → defaults → rate-limits → subscriptions → multitask → demo-widget).
 
 ## Daily Workflow
 
@@ -215,6 +217,13 @@ constant in `_docker/backend/lib/migrations-bootstrap.sh` MUST be updated in the
 same commit to point at the new rolled-up version. Otherwise the self-healing
 bootstrap will try to mark a version that no longer exists as applied, and
 `doctrine:migrations:migrate` will fail on legacy DBs with "unknown version".
+- **Dropping a column the previous release still maps must be two-phase**
+(expand/contract). Migrations run on the FIRST new container start against the
+shared Galera DB while web1/web2/web3 roll one node at a time — a `DROP COLUMN`
+instantly breaks every node still running the old entity (its SELECTs name the
+column). Phase 1: stop mapping/using the column, ship defaults that keep old
+code working. Phase 2 (next release): drop the column. Current open phase-2
+item: `BPROMPTS.BKEYWORDS` + `BPROMPTS.BENABLED` (see `Version20260608000000`).
 
 ## Testing the Migration Path Locally
 
@@ -266,6 +275,8 @@ backend/
 │   │   ├── PromptSeeder.php
 │   │   ├── DefaultModelConfigSeeder.php
 │   │   ├── RateLimitConfigSeeder.php
+│   │   ├── SubscriptionPlanSeeder.php
+│   │   ├── MultitaskConfigSeeder.php
 │   │   └── DemoWidgetConfigSeeder.php
 │   ├── Model/ModelCatalog.php        # Source of truth for AI models
 │   └── Prompt/PromptCatalog.php      # Source of truth for system prompts

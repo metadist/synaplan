@@ -1311,6 +1311,8 @@
       "masterOff": "Aus",
       "masterEnabledNotice": "Multi-Task-Routing aktiviert.",
       "masterDisabledNotice": "Multi-Task-Routing deaktiviert.",
+      "masterUpdateFailed": "Multi-Task-Routing-Status konnte nicht aktualisiert werden.",
+      "togglesLoadFailed": "Routing-Konfiguration konnte nicht geladen werden.",
       "plannerTitle": "Planer-Prompt",
       "plannerDesc": "Die Anweisungen, nach denen der Planer eine Anfrage in Aufgaben zerlegt. Die Vorschau zeigt den genauen Text, den das Modell erhält, inklusive deiner aktiven Fähigkeiten und Themen.",
       "plannerRendered": "Vorschau",
@@ -1332,7 +1334,13 @@
       "title": "Preprocessor",
       "description": "Der Preprocessor verarbeitet eingehende Nachrichten",
       "promptEditorLink": "um bestehende Prompts zu ändern ODER neue Prompts hinzuzufügen",
-      "yourTasks": "Ihre Aufgaben"
+      "yourTasks": "Ihre Aufgaben",
+      "viewMode": "Ansichtsmodus",
+      "editMode": "Bearbeitungsmodus",
+      "adminRequired": "Zum Bearbeiten des Sortier-Prompts sind Admin-Rechte erforderlich.",
+      "saved": "Sortier-Prompt gespeichert.",
+      "loadFailed": "Sortier-Prompt konnte nicht geladen werden.",
+      "saveFailed": "Sortier-Prompt konnte nicht gespeichert werden."
     },
     "apiKeys": {
       "title": "API-Schlüssel",
@@ -2680,6 +2688,16 @@
     "chatUnavailable": "Der Chat ist derzeit nicht verfügbar.",
     "chatUnavailablePlaceholder": "Chat nicht verfügbar",
     "defaultAssistantReply": "Vielen Dank für Ihre Nachricht! Ich melde mich gleich bei Ihnen zurück.",
+    "openChat": "Chat öffnen",
+    "closeChat": "Chat schließen",
+    "switchToLight": "Zum hellen Modus wechseln",
+    "switchToDark": "Zum dunklen Modus wechseln",
+    "maximize": "Maximieren",
+    "minimize": "Minimieren",
+    "operatorFallbackName": "Support",
+    "takeoverNotice": "Sie sind jetzt mit einem Support-Mitarbeiter verbunden.",
+    "handbackNotice": "Sie chatten jetzt wieder mit unserem KI-Assistenten.",
+    "autoMessage": "Hallo! Wie kann ich Ihnen heute helfen?",
     "exportChat": "Chat exportieren",
     "exportChatId": "Chat-ID",
     "exportDate": "Exportiert am",
@@ -3328,11 +3346,6 @@
       "disconnected": "Echtzeit-Verbindung ist geschlossen",
       "disabled": "Live-Updates sind in dieser Umgebung deaktiviert. Lade die Seite neu, um die neuesten Daten zu sehen.",
       "error": "Echtzeit-Verbindung fehlgeschlagen: {message}"
-    },
-    "notification": {
-      "reconnecting": "Verbindung verloren — wird wiederhergestellt…",
-      "reconnected": "Du bist wieder online.",
-      "error": "Live-Updates sind aktuell nicht verfügbar. Lade die Seite neu, um die neuesten Aktivitäten zu sehen."
     }
   }
 }

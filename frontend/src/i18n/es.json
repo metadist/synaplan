@@ -699,6 +699,16 @@
     "sendFailed": "Lo siento, ocurrió un error. Por favor intenta de nuevo.",
     "continueFailed": "No se pudo continuar la respuesta. Por favor intenta de nuevo.",
     "defaultAssistantReply": "¡Gracias por tu mensaje! Te responderé de inmediato.",
+    "openChat": "Abrir chat",
+    "closeChat": "Cerrar chat",
+    "switchToLight": "Cambiar al modo claro",
+    "switchToDark": "Cambiar al modo oscuro",
+    "maximize": "Maximizar",
+    "minimize": "Minimizar",
+    "operatorFallbackName": "Soporte",
+    "takeoverNotice": "Ahora estás conectado con un agente de soporte.",
+    "handbackNotice": "Ahora estás chateando con nuestro asistente de IA.",
+    "autoMessage": "¡Hola! ¿Cómo puedo ayudarte hoy?",
     "previewWidget": "Vista Previa del Widget",
     "configuration": "Configuración del Widget",
     "closeEditor": "Cerrar editor",
@@ -993,6 +1003,41 @@
   "loading": {
     "default": "Cargando...",
     "pleaseWait": "Por favor espera"
+  },
+  "taskPlan": {
+    "title": "Plan de tareas",
+    "download": "Descargar",
+    "failedBody": "Este paso no se pudo completar.",
+    "state": {
+      "pending": "En cola",
+      "running": "Trabajando…",
+      "done": "Hecho",
+      "failed": "Fallido",
+      "skipped": "Omitido"
+    },
+    "kind": {
+      "text": "Texto",
+      "image": "Imagen",
+      "video": "Vídeo",
+      "audio": "Audio",
+      "document": "Documento",
+      "search": "Búsqueda web",
+      "extract": "Extracción de texto"
+    },
+    "capability": {
+      "extract_text": "Extrayendo texto",
+      "chat": "Respuesta",
+      "summarize": "Resumen",
+      "translate": "Traducción",
+      "rag_query": "Respuesta de conocimiento",
+      "web_search": "Búsqueda web",
+      "file_analysis": "Análisis de archivo",
+      "image_generation": "Imagen",
+      "video_generation": "Vídeo",
+      "text2sound": "Audio",
+      "document_generation": "Documento",
+      "calendar_event": "Invitación de calendario"
+    }
   },
   "processing": {
     "started": "Iniciando procesamiento...",
@@ -1448,6 +1493,8 @@
       "masterOff": "Desactivado",
       "masterEnabledNotice": "Enrutamiento multitarea activado.",
       "masterDisabledNotice": "Enrutamiento multitarea desactivado.",
+      "masterUpdateFailed": "No se pudo actualizar el estado del enrutamiento multitarea.",
+      "togglesLoadFailed": "No se pudo cargar la configuración de enrutamiento.",
       "plannerTitle": "Prompt del planificador",
       "plannerDesc": "Las instrucciones que sigue el planificador para dividir una solicitud en tareas. La vista previa muestra el texto exacto que recibe el modelo, incluidas tus capacidades y temas actuales.",
       "plannerRendered": "Vista previa",
@@ -1480,7 +1527,13 @@
       "jsonExample": "Aquí hay un ejemplo del objeto JSON:",
       "btopicNote": "El preprocesador también puede devolver un nuevo objeto JSON.",
       "savePrompt": "Guardar Prompt",
-      "resetPrompt": "Restablecer Prompt"
+      "resetPrompt": "Restablecer Prompt",
+      "viewMode": "Modo de vista",
+      "editMode": "Modo de edición",
+      "adminRequired": "Se requiere acceso de administrador para editar el prompt de clasificación.",
+      "saved": "Prompt de clasificación guardado.",
+      "loadFailed": "No se pudo cargar el prompt de clasificación.",
+      "saveFailed": "No se pudo guardar el prompt de clasificación."
     },
     "apiKeys": {
       "title": "Claves API",
@@ -2214,11 +2267,6 @@
       "disconnected": "La conexión en tiempo real está cerrada",
       "disabled": "Las actualizaciones en vivo están desactivadas en este entorno. Recarga la página para ver los datos más recientes.",
       "error": "Falló la conexión en tiempo real: {message}"
-    },
-    "notification": {
-      "reconnecting": "Conexión perdida — reconectando…",
-      "reconnected": "Estás conectado de nuevo.",
-      "error": "Las actualizaciones en vivo no están disponibles temporalmente. Recarga la página para ver la actividad más reciente."
     }
   }
 }

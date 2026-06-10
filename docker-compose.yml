@@ -342,7 +342,8 @@ services:
   #   * Symfony Lock component (LOCK_DSN=redis://redis:6379)
   #   * Symfony Rate-Limiter storage (per-user quotas)
   #   * Centrifugo Redis engine (cross-node WebSocket pub/sub)
-  #   * Future: Symfony Messenger transport, sessions, presence
+  #   * Symfony Messenger transports (Redis Streams, consumed by the worker)
+  #   * Native PHP sessions (RedisSessionHandler)
   #
   # Production note: replace with managed/clustered Redis (e.g. one shared
   # instance for all 3 web nodes). Keep --maxmemory and eviction policy in

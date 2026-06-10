@@ -1870,7 +1870,10 @@ class WidgetPublicController extends AbstractController
     #[OA\Response(response: 200, description: 'Accepted (deprecated, no-op)')]
     public function typing(string $widgetId): JsonResponse
     {
-        $this->logger->info('Deprecated visitor typing endpoint hit (no-op)', [
+        // debug, not info: the endpoint is unauthenticated, so an attacker
+        // could otherwise flood production logs with arbitrary widget_id
+        // strings at zero cost.
+        $this->logger->debug('Deprecated visitor typing endpoint hit (no-op)', [
             'widget_id' => $widgetId,
         ]);
 

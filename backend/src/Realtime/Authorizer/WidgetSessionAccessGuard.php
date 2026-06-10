@@ -18,7 +18,8 @@ use App\Repository\WidgetSessionRepository;
  *   * The widget exists.
  *   * The session exists for that widget.
  *   * The subscriber is either the widget owner OR an anonymous visitor
- *     whose visitorId matches the sessionId.
+ *     whose visitorId matches the sessionId AND whose claimed widgetId
+ *     matches the channel's widgetId.
  *
  * Centralising the rule prevents the two authorizers from drifting apart
  * (a subtle drift would let one channel widen access compared to the other,
@@ -63,6 +64,18 @@ final readonly class WidgetSessionAccessGuard
         }
 
         if ($subscriber->isAnonymousVisitor()) {
+            // The widgetId the visitor claimed in the request payload must be
+            // the widget of the channel being subscribed. Without this check
+            // the minted token's `sub` is built from the PAYLOAD pair while
+            // access was granted for the CHANNEL pair — Centrifugo's
+            // sub-binding would then accept a cross-widget subscribe whenever
+            // a session id collided across widgets. Belt-and-suspenders, but
+            // free.
+            $claimedWidgetId = $subscriber->extra['widgetId'] ?? null;
+            if (!is_string($claimedWidgetId) || $claimedWidgetId !== $widgetId) {
+                throw new UnauthorizedSubscriptionException('Visitor widget id mismatch');
+            }
+
             // The visitorId IS the sessionId — possession is the bearer
             // because the upstream token controller only accepts a
             // sessionId after looking it up in the widget session store.
