@@ -107,7 +107,19 @@ final readonly class MediaGenerationRunner implements TaskRunner
         $m->setText($prompt);
         $m->setLanguage($language);
         $m->setDirection('IN');
-        $m->setFile(0);
+
+        // Carry the inbound message's attachments over: MediaGenerationHandler
+        // detects pic2pic (image edit with reference images) purely from the
+        // files on the message it receives — without this copy, "edit this
+        // image" silently degrades to plain text2pic. The synthetic message is
+        // never persisted, so sharing the File entities is safe.
+        $m->setFile($context->message->getFile());
+        $m->setFilePath($context->message->getFilePath());
+        $m->setFileType($context->message->getFileType());
+        $m->setFileText($context->message->getFileText());
+        foreach ($context->message->getFiles() as $file) {
+            $m->addFile($file);
+        }
 
         // MediaGenerationHandler uses the message id only to build the output
         // filename and requires a non-null int. This synthetic message is never

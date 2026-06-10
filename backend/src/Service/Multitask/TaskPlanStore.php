@@ -11,12 +11,17 @@ use Psr\Log\LoggerInterface;
 /**
  * Persists a {@see TaskPlan} to BMESSAGE_TASKS (one row per node).
  *
- * v1 uses plain DBAL inserts rather than a Doctrine entity: the table is
+ * v1 uses plain DBAL rather than a Doctrine entity: the table is
  * observability/derived data and shadow mode only needs append-on-create. A
  * proper entity/repository can come with the Sprint 6 admin view.
  *
- * Best-effort: persistence failures are logged and swallowed by callers — they
- * must never break a user turn (shadow mode especially).
+ * REPLACE semantics: a message has exactly one row per plan node (enforced by
+ * the UNIQUE (BMESSAGEID, BNODEID) constraint). Persisting again for the same
+ * message — shadow run followed by executed run, or an /again re-turn —
+ * atomically replaces the previous rows instead of stacking duplicates.
+ *
+ * Best-effort: persistence failures are logged and swallowed — they must
+ * never break a user turn (shadow mode especially).
  */
 final readonly class TaskPlanStore
 {
@@ -27,8 +32,9 @@ final readonly class TaskPlanStore
     }
 
     /**
-     * Insert one row per plan node. In shadow mode nodes are recorded as
-     * 'pending' (they are never executed). Returns the number of rows written.
+     * Replace the plan rows for a message, one row per plan node. In shadow
+     * mode nodes are recorded as 'pending' (they are never executed). Returns
+     * the number of rows written (0 when persistence failed).
      */
     public function persist(int $messageId, TaskPlan $plan, ?int $modelId = null, string $status = 'pending'): int
     {
@@ -36,35 +42,41 @@ final readonly class TaskPlanStore
     }
 
     /**
-     * Insert one row per node using a per-node status map (nodeId => status),
-     * defaulting to $default for nodes not present in the map. Used by the DAG
-     * executor to record each node's final outcome. Best-effort.
+     * Replace the plan rows for a message using a per-node status map
+     * (nodeId => status), defaulting to $default for nodes not present in the
+     * map. Used by the DAG executor to record each node's final outcome.
+     * Atomic (delete + inserts in one transaction) and best-effort.
      *
      * @param array<string, string> $statuses
      */
     public function persistWithStatuses(int $messageId, TaskPlan $plan, ?int $modelId, array $statuses, string $default = 'pending'): int
     {
-        $written = 0;
-        foreach ($plan->nodes as $node) {
-            try {
-                $this->connection->insert('BMESSAGE_TASKS', [
-                    'BMESSAGEID' => $messageId,
-                    'BNODEID' => $node->id,
-                    'BCAPABILITY' => $node->capability->value,
-                    'BDEPENDSON' => json_encode($node->dependsOn, \JSON_UNESCAPED_SLASHES) ?: '[]',
-                    'BSTATUS' => $statuses[$node->id] ?? $default,
-                    'BMODELID' => $modelId,
-                ]);
-                ++$written;
-            } catch (\Throwable $e) {
-                $this->logger->warning('TaskPlanStore: failed to persist task node', [
-                    'message_id' => $messageId,
-                    'node_id' => $node->id,
-                    'error' => $e->getMessage(),
-                ]);
-            }
-        }
+        try {
+            return (int) $this->connection->transactional(function (Connection $connection) use ($messageId, $plan, $modelId, $statuses, $default): int {
+                $connection->delete('BMESSAGE_TASKS', ['BMESSAGEID' => $messageId]);
 
-        return $written;
+                $written = 0;
+                foreach ($plan->nodes as $node) {
+                    $connection->insert('BMESSAGE_TASKS', [
+                        'BMESSAGEID' => $messageId,
+                        'BNODEID' => $node->id,
+                        'BCAPABILITY' => $node->capability->value,
+                        'BDEPENDSON' => json_encode($node->dependsOn, \JSON_UNESCAPED_SLASHES) ?: '[]',
+                        'BSTATUS' => $statuses[$node->id] ?? $default,
+                        'BMODELID' => $modelId,
+                    ]);
+                    ++$written;
+                }
+
+                return $written;
+            });
+        } catch (\Throwable $e) {
+            $this->logger->warning('TaskPlanStore: failed to persist task plan', [
+                'message_id' => $messageId,
+                'error' => $e->getMessage(),
+            ]);
+
+            return 0;
+        }
     }
 }

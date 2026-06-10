@@ -28,6 +28,21 @@ final class ProcessMediaNodeJob implements MediaNodeJob
     ) {
     }
 
+    public function cancel(): void
+    {
+        try {
+            if ($this->process->isRunning()) {
+                $this->process->stop(0);
+                $this->logger->info('ProcessMediaNodeJob: media node cancelled', ['node' => $this->nodeId]);
+            }
+        } catch (\Throwable $e) {
+            $this->logger->warning('ProcessMediaNodeJob: cancel failed', [
+                'node' => $this->nodeId,
+                'error' => $e->getMessage(),
+            ]);
+        }
+    }
+
     public function wait(int $timeoutSeconds): NodeResult
     {
         try {

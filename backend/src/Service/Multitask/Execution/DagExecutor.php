@@ -90,6 +90,11 @@ final readonly class DagExecutor
      * Hybrid parallel scheduler: media nodes offloaded concurrently (capped),
      * everything else inline. Progress is monotonic each iteration (settle a
      * skip, start a node, or collect an in-flight job), so the loop terminates.
+     *
+     * If the turn aborts mid-flight (most commonly the progress callback
+     * throwing because the streaming client disconnected), every still-running
+     * media job is cancelled before the exception propagates — otherwise the
+     * subprocesses would keep generating (and billing) into the void.
      */
     private function executeParallel(TaskPlan $plan, NodeContext $context, ?callable $progressCallback): void
     {
@@ -101,56 +106,63 @@ final readonly class DagExecutor
         /** @var array<string, Parallel\MediaNodeJob> $inflight */
         $inflight = [];
 
-        while (count($context->allResults()) < $total) {
-            $progressed = false;
+        try {
+            while (count($context->allResults()) < $total) {
+                $progressed = false;
 
-            // 1) Skip nodes whose dependency has settled unsuccessfully.
-            foreach ($order as $node) {
-                if (null !== $context->getResult($node->id) || isset($inflight[$node->id])) {
-                    continue;
-                }
-                $blocked = $this->settledFailedDependency($context, $node);
-                if (null !== $blocked) {
-                    $context->setResult($node->id, NodeResult::skipped("dependency '{$blocked}' did not complete"));
-                    $this->emitState($progressCallback, $node, 'skipped');
-                    $progressed = true;
-                }
-            }
-
-            // 2) Start every ready node: media → dispatch (capped), else inline.
-            foreach ($order as $node) {
-                if (null !== $context->getResult($node->id) || isset($inflight[$node->id])) {
-                    continue;
-                }
-                if (!$this->dependenciesSatisfied($context, $node)) {
-                    continue;
-                }
-
-                if ($this->isMediaKind($node)) {
-                    if (count($inflight) >= $cap) {
-                        continue; // wait for a slot
+                // 1) Skip nodes whose dependency has settled unsuccessfully.
+                foreach ($order as $node) {
+                    if (null !== $context->getResult($node->id) || isset($inflight[$node->id])) {
+                        continue;
                     }
-                    $inflight[$node->id] = $this->mediaDispatcher->dispatch($this->mediaRequest($node, $context));
-                    $this->emitState($progressCallback, $node, 'running');
-                    $progressed = true;
-                } else {
-                    $this->runNodeInline($context, $node, $progressCallback);
-                    $progressed = true;
+                    $blocked = $this->settledFailedDependency($context, $node);
+                    if (null !== $blocked) {
+                        $context->setResult($node->id, NodeResult::skipped("dependency '{$blocked}' did not complete"));
+                        $this->emitState($progressCallback, $node, 'skipped');
+                        $progressed = true;
+                    }
+                }
+
+                // 2) Start every ready node: media → dispatch (capped), else inline.
+                foreach ($order as $node) {
+                    if (null !== $context->getResult($node->id) || isset($inflight[$node->id])) {
+                        continue;
+                    }
+                    if (!$this->dependenciesSatisfied($context, $node)) {
+                        continue;
+                    }
+
+                    if ($this->isMediaKind($node)) {
+                        if (count($inflight) >= $cap) {
+                            continue; // wait for a slot
+                        }
+                        $inflight[$node->id] = $this->mediaDispatcher->dispatch($this->mediaRequest($node, $context));
+                        $this->emitState($progressCallback, $node, 'running');
+                        $progressed = true;
+                    } else {
+                        $this->runNodeInline($context, $node, $progressCallback);
+                        $progressed = true;
+                    }
+                }
+
+                // 3) Nothing else could start → collect one in-flight media job.
+                if (!$progressed) {
+                    if ([] === $inflight) {
+                        break; // deadlock guard (shouldn't happen for a valid DAG)
+                    }
+                    $this->collectOne($order, $inflight, $context, $progressCallback, $timeout);
                 }
             }
 
-            // 3) Nothing else could start → collect one in-flight media job.
-            if (!$progressed) {
-                if ([] === $inflight) {
-                    break; // deadlock guard (shouldn't happen for a valid DAG)
-                }
+            // Drain any remaining in-flight jobs (when only media nodes are left).
+            while ([] !== $inflight) {
                 $this->collectOne($order, $inflight, $context, $progressCallback, $timeout);
             }
-        }
-
-        // Drain any remaining in-flight jobs (when only media nodes are left).
-        while ([] !== $inflight) {
-            $this->collectOne($order, $inflight, $context, $progressCallback, $timeout);
+        } finally {
+            foreach ($inflight as $nodeId => $job) {
+                $job->cancel();
+                $this->logger->info('DagExecutor: cancelled in-flight media node after abort', ['node' => $nodeId]);
+            }
         }
     }
 
@@ -228,7 +240,40 @@ final readonly class DagExecutor
             userId: $context->userId,
             language: $language,
             params: $node->params,
+            // The subprocess reloads the real message by id so attachments
+            // (pic2pic reference images) survive the process boundary; thread
+            // and options ride along for handler parity with the inline path.
+            messageId: $context->message->getId(),
+            thread: $this->normalizeThread($context->thread),
+            options: $context->options,
         );
+    }
+
+    /**
+     * Flatten the thread into JSON-serialisable `{role, content}` pairs for the
+     * subprocess (Doctrine entities cannot cross the process boundary). Mirrors
+     * the normalisation the queue path uses in MediaGenerationHandler.
+     *
+     * @param array<int, \App\Entity\Message|array{role: string, content: string}> $thread
+     *
+     * @return list<array{role: string, content: string}>
+     */
+    private function normalizeThread(array $thread): array
+    {
+        $out = [];
+        foreach ($thread as $entry) {
+            if ($entry instanceof \App\Entity\Message) {
+                $out[] = [
+                    'role' => 'IN' === $entry->getDirection() ? 'user' : 'assistant',
+                    'content' => $entry->getText(),
+                ];
+                continue;
+            }
+
+            $out[] = ['role' => $entry['role'], 'content' => $entry['content']];
+        }
+
+        return $out;
     }
 
     private function isMediaKind(TaskNode $node): bool

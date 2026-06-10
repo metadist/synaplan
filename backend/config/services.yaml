@@ -285,11 +285,14 @@ services:
         arguments:
             $authorizers: !tagged_iterator app.realtime.authorizer
 
-    # JWT minting service used by RealtimeTokenController.
+    # JWT minting service used by RealtimeTokenController. The environment is
+    # injected so minting can hard-fail in prod when REALTIME_TOKEN_SECRET is
+    # still the shipped changeme_* placeholder (forgeable JWTs otherwise).
     App\Realtime\Token\RealtimeTokenService:
         arguments:
             $hmacSecret: '%env(REALTIME_TOKEN_SECRET)%'
             $ttlSeconds: 60
+            $environment: '%kernel.environment%'
 
     # Default publisher: HTTP POST to Centrifugo. NullPublisher is bound in
     # the test profile below so unit tests don't need a running gateway.
@@ -298,6 +301,7 @@ services:
             $apiUrl: '%env(REALTIME_API_URL)%'
             $apiKey: '%env(REALTIME_API_KEY)%'
             $enabled: '%env(bool:REALTIME_ENABLED)%'
+            $environment: '%kernel.environment%'
 
     App\Realtime\Publisher\RealtimePublisherInterface:
         alias: App\Realtime\Publisher\CentrifugoPublisher

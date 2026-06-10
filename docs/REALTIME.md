@@ -202,7 +202,7 @@ running Centrifugo to be testable.
 | `REALTIME_PUBLIC_WS_URL` | Public WebSocket URL the browser dials (empty = same-origin via `/connection/websocket`). |
 | `REALTIME_ALLOWED_ORIGINS` | Comma/space-separated origins Centrifugo accepts WS upgrades from. `*` in dev only; set explicit `https://…` origins in production. |
 | `REALTIME_REDIS_ADDRESS` | Redis address for the Centrifugo engine (maps to `CENTRIFUGO_ENGINE_REDIS_ADDRESS`). Defaults to the local Redis on logical DB `/3`. |
-| `REALTIME_ADMIN_PASSWORD` / `REALTIME_ADMIN_SECRET` | Credentials for the Centrifugo admin UI. Expose `/centrifugo/*` on a private network only. |
+| `REALTIME_ADMIN_PASSWORD` / `REALTIME_ADMIN_SECRET` | Credentials for the Centrifugo admin UI. The admin UI is **not** proxied publicly — reach it via the internal network only (SSH tunnel / localhost-bound port mapping). |
 
 `REDIS_DSN` is required for cross-node Centrifugo fan-out and Symfony
 infrastructure (cache, lock, rate-limiter). Treat Redis as mandatory
@@ -263,9 +263,13 @@ to production.
   that (≥ 60–120s recommended).
 - **No sticky sessions required** — Redis shares history + presence, so any
   node can take over on reconnect.
-- **Lock down `/centrifugo/*`** — the admin UI and HTTP API must only be
-  reachable from the internal network; filter by source IP at the LB or
-  block the route externally.
+- **Admin UI / HTTP API are internal-only** — Caddy proxies **only**
+  `/connection/*` (the client WebSocket endpoint). The Centrifugo admin UI,
+  HTTP server API and Prometheus endpoints are never exposed through the
+  public proxy; the PHP backend publishes container-to-container via
+  `REALTIME_API_URL`. To use the admin UI, tunnel to the node (e.g.
+  `ssh -L 8401:localhost:8401 node1` with a localhost-bound port mapping
+  for the Centrifugo container) — do not re-add a public route.
 
 ## Channel naming conventions
 

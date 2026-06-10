@@ -19,4 +19,9 @@ final readonly class SettledMediaNodeJob implements MediaNodeJob
     {
         return $this->result;
     }
+
+    public function cancel(): void
+    {
+        // Already settled — nothing to terminate.
+    }
 }

@@ -223,6 +223,41 @@ final class RunnersTest extends TestCase
         self::assertFalse($result->isSuccessful());
     }
 
+    /**
+     * Regression: the synthetic message handed to MediaGenerationHandler must
+     * carry the inbound message's attachments — the handler detects pic2pic
+     * (image edit with a reference image) purely from the files on the message
+     * it receives. Dropping them silently degraded "edit this image" to a
+     * plain text2pic generation.
+     */
+    public function testMediaGenerationRunnerForwardsAttachmentsForPic2Pic(): void
+    {
+        $handler = $this->createMock(MediaGenerationHandler::class);
+        $seenMessage = null;
+        $handler->method('handle')->willReturnCallback(function (Message $msg) use (&$seenMessage): array {
+            $seenMessage = $msg;
+
+            return [
+                'content' => 'edited!',
+                'metadata' => [
+                    'file' => ['path' => '/api/v1/files/uploads/1/000/cat-hat.png', 'type' => 'image'],
+                    'local_path' => '1/000/cat-hat.png',
+                ],
+            ];
+        });
+
+        $runner = new MediaGenerationRunner($handler, $this->createMock(LoggerInterface::class));
+        $node = new TaskNode('n1', Capability::ImageGeneration, [], ['prompt' => 'put a hat on this cat']);
+
+        $result = $runner->run($node, $this->context($this->messageWithFile('put a hat on this cat')));
+
+        self::assertTrue($result->isSuccessful());
+        self::assertInstanceOf(Message::class, $seenMessage);
+        self::assertSame(1, $seenMessage->getFile());
+        self::assertSame('01/000/00001/2026/06/cat.png', $seenMessage->getFilePath());
+        self::assertSame('png', $seenMessage->getFileType());
+    }
+
     private function calendarRunner(): CalendarEventRunner
     {
         $storage = $this->createMock(FileStorageService::class);

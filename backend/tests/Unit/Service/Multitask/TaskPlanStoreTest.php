@@ -19,6 +19,10 @@ final class TaskPlanStoreTest extends TestCase
     protected function setUp(): void
     {
         $this->connection = $this->createMock(Connection::class);
+        // Mirror DBAL semantics: transactional() invokes the closure with the
+        // connection and returns its result; an exception inside propagates.
+        $this->connection->method('transactional')
+            ->willReturnCallback(fn (callable $fn): mixed => $fn($this->connection));
         $this->store = new TaskPlanStore($this->connection, $this->createMock(LoggerInterface::class));
     }
 
@@ -53,6 +57,34 @@ final class TaskPlanStoreTest extends TestCase
         self::assertSame('pending', $captured[0]['BSTATUS']);
         self::assertSame(76, $captured[0]['BMODELID']);
         self::assertSame('["n1"]', $captured[1]['BDEPENDSON']);
+    }
+
+    public function testReplacesExistingRowsForMessage(): void
+    {
+        $plan = TaskPlan::singleChatPlan('en');
+
+        $calls = [];
+        $this->connection->expects(self::once())
+            ->method('delete')
+            ->willReturnCallback(function (string $table, array $criteria) use (&$calls): int {
+                self::assertSame('BMESSAGE_TASKS', $table);
+                self::assertSame(['BMESSAGEID' => 99], $criteria);
+                $calls[] = 'delete';
+
+                return 1;
+            });
+        $this->connection->method('insert')
+            ->willReturnCallback(function () use (&$calls): int {
+                $calls[] = 'insert';
+
+                return 1;
+            });
+
+        $this->store->persist(99, $plan);
+
+        // Replace semantics: old rows go first, then the fresh plan rows.
+        self::assertSame('delete', $calls[0]);
+        self::assertContains('insert', $calls);
     }
 
     public function testSwallowsInsertFailures(): void

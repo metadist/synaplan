@@ -35,13 +35,16 @@ final class NodeContext
     private ?string $currentNodeId = null;
 
     /**
-     * @param array<int, Message>  $thread
-     * @param array<string, mixed> $classification
-     * @param array<string, mixed> $options
-     * @param list<string>         $planCapabilities capability string values of ALL nodes in this plan
-     *                                               (sibling awareness — lets a runner know that, e.g.,
-     *                                               a `text2sound` step will handle the audio so a `chat`
-     *                                               node must not refuse/own that part)
+     * @param array<int, Message|array{role: string, content: string}> $thread
+     *                                                                                   Message entities in-process; plain `{role, content}`
+     *                                                                                   snapshots inside a media-node subprocess (entities cannot
+     *                                                                                   cross the process boundary — handlers accept both shapes)
+     * @param array<string, mixed>                                     $classification
+     * @param array<string, mixed>                                     $options
+     * @param list<string>                                             $planCapabilities capability string values of ALL nodes in this plan
+     *                                                                                   (sibling awareness — lets a runner know that, e.g.,
+     *                                                                                   a `text2sound` step will handle the audio so a `chat`
+     *                                                                                   node must not refuse/own that part)
      */
     public function __construct(
         public readonly Message $message,

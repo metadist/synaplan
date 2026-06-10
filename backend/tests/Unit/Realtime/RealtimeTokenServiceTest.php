@@ -51,6 +51,35 @@ final class RealtimeTokenServiceTest extends TestCase
         $service->issueConnectionToken('user:42');
     }
 
+    public function testRefusesPlaceholderSecretInProd(): void
+    {
+        $service = new RealtimeTokenService(
+            hmacSecret: 'changeme_centrifugo_token_secret',
+            clock: $this->fixedClock(),
+            ttlSeconds: 60,
+            environment: 'prod',
+        );
+
+        $this->expectException(\LogicException::class);
+        $this->expectExceptionMessageMatches('/changeme/');
+        $service->issueConnectionToken('user:42');
+    }
+
+    public function testAllowsPlaceholderSecretInDev(): void
+    {
+        $service = new RealtimeTokenService(
+            hmacSecret: 'changeme_centrifugo_token_secret',
+            clock: $this->fixedClock(),
+            ttlSeconds: 60,
+            environment: 'dev',
+        );
+
+        $token = $service->issueConnectionToken('user:42');
+        $decoded = (array) JWT::decode($token, new Key('changeme_centrifugo_token_secret', 'HS256'));
+
+        $this->assertSame('user:42', $decoded['sub']);
+    }
+
     public function testTokenExpiresWithConfiguredTtl(): void
     {
         $service = new RealtimeTokenService(

@@ -364,6 +364,10 @@ final class DagExecutorTest extends TestCase
 
                         return NodeResult::ok(null, [['path' => '/'.$this->nodeId.'.png', 'type' => 'image']]);
                     }
+
+                    public function cancel(): void
+                    {
+                    }
                 };
             }
         };
@@ -374,6 +378,103 @@ final class DagExecutorTest extends TestCase
         self::assertSame('done', $result['node_statuses']['n1']);
         self::assertSame('done', $result['node_statuses']['n2']);
         self::assertLessThanOrEqual(1, $maxConcurrent, 'cap=1 must never run two media nodes at once');
+    }
+
+    public function testParallelRequestCarriesMessageContext(): void
+    {
+        // The subprocess needs the message id, thread snapshot and options to
+        // reload attachments (pic2pic) — assert they survive into the request.
+        $captured = null;
+        $dispatcher = $this->dispatcher(function (MediaNodeRequest $req) use (&$captured): NodeResult {
+            $captured = $req;
+
+            return NodeResult::ok(null, [['path' => '/n1.png', 'type' => 'image']]);
+        });
+
+        $plan = TaskPlan::fromArray([
+            'version' => 1, 'language' => 'en', 'reply_node' => 'n2',
+            'tasks' => [
+                ['id' => 'n1', 'capability' => 'image_generation', 'inputs' => ['prompt' => 'a dog']],
+                ['id' => 'n2', 'capability' => 'compose_reply', 'depends_on' => ['n1'], 'inputs' => ['attachments' => ['$n1.file']]],
+            ],
+        ]);
+
+        $message = $this->createMock(Message::class);
+        $message->method('getId')->willReturn(4711);
+        $message->method('getText')->willReturn('draw a dog');
+        $thread = [['role' => 'user', 'content' => 'earlier turn']];
+        $context = new NodeContext($message, $thread, 1, ['language' => 'en'], ['quality' => 'high']);
+
+        $this->executor($this->textRunner(), parallel: true, dispatcher: $dispatcher)
+            ->execute($plan, $context);
+
+        self::assertInstanceOf(MediaNodeRequest::class, $captured);
+        self::assertSame(4711, $captured->messageId);
+        self::assertSame([['role' => 'user', 'content' => 'earlier turn']], $captured->thread);
+        self::assertSame(['quality' => 'high'], $captured->options);
+    }
+
+    public function testAbortCancelsInflightMediaJobs(): void
+    {
+        // The streaming client disconnecting surfaces as a throw from the
+        // progress callback. Any in-flight media subprocess must be cancelled
+        // before the exception propagates (cost/resource leak otherwise).
+        $cancelled = [];
+        $onCancel = function (string $nodeId) use (&$cancelled): void {
+            $cancelled[] = $nodeId;
+        };
+        $dispatcher = new class($onCancel) implements MediaNodeDispatcher {
+            /** @param callable(string): void $onCancel */
+            public function __construct(private $onCancel)
+            {
+            }
+
+            public function dispatch(MediaNodeRequest $request): MediaNodeJob
+            {
+                return new class($this->onCancel, $request->nodeId) implements MediaNodeJob {
+                    /** @param callable(string): void $onCancel */
+                    public function __construct(private $onCancel, private string $nodeId)
+                    {
+                    }
+
+                    public function wait(int $timeoutSeconds): NodeResult
+                    {
+                        return NodeResult::ok(null, [['path' => '/'.$this->nodeId.'.png', 'type' => 'image']]);
+                    }
+
+                    public function cancel(): void
+                    {
+                        ($this->onCancel)($this->nodeId);
+                    }
+                };
+            }
+        };
+
+        $plan = TaskPlan::fromArray([
+            'version' => 1, 'language' => 'en', 'reply_node' => 'n2',
+            'tasks' => [
+                ['id' => 'n1', 'capability' => 'image_generation', 'inputs' => ['prompt' => 'a dog']],
+                ['id' => 'n2', 'capability' => 'compose_reply', 'depends_on' => ['n1'], 'inputs' => ['attachments' => ['$n1.file']]],
+            ],
+        ]);
+
+        // First progress event arrives after n1 was dispatched ('running') —
+        // throwing there simulates the disconnected SSE client.
+        $progress = static function (array $e): void {
+            if ('task_update' === $e['status'] && 'running' === $e['metadata']['state']) {
+                throw new \RuntimeException('client disconnected');
+            }
+        };
+
+        try {
+            $this->executor($this->textRunner(), parallel: true, dispatcher: $dispatcher)
+                ->execute($plan, $this->context(), $progress);
+            self::fail('abort must propagate');
+        } catch (\RuntimeException) {
+            // expected
+        }
+
+        self::assertSame(['n1'], $cancelled);
     }
 
     public function testParallelAndSequentialProduceSameResult(): void

@@ -66,6 +66,33 @@ Default Docker setup uses these internally. Only change for external databases.
 
 ---
 
+## Redis (required)
+
+```bash
+REDIS_DSN=redis://redis:6379
+LOCK_DSN=redis://redis:6379
+```
+
+Redis is **mandatory infrastructure** (no filesystem fallback): it backs the
+Symfony cache pools, locks, rate-limiter, sessions, the Messenger queues
+(Redis Streams) and the Centrifugo realtime engine. `/api/health` returns
+**HTTP 503 while Redis is unreachable** so load balancers drop the node.
+
+- All compose files ship a `redis` service — it must be running.
+- Multi-node production: point every node at the same managed/HA Redis.
+- Upgrading an existing install from the old Doctrine queue? Follow the
+  cutover runbook in `_devextras/SYSADMIN-help.md`
+  ("Upgrading: Doctrine → Redis queue cutover") — queued jobs are **not**
+  migrated automatically.
+
+Realtime (Centrifugo) secrets live next to it — `REALTIME_TOKEN_SECRET` and
+`REALTIME_API_KEY` **must** be replaced in production: with `APP_ENV=prod`
+the backend refuses to mint WebSocket tokens (and skips publishes) while
+they still have the shipped `changeme_*` placeholders. See
+[REALTIME.md](REALTIME.md).
+
+---
+
 ## Audio Transcription (Whisper)
 
 ```bash

@@ -25,6 +25,15 @@ use Doctrine\Migrations\AbstractMigration;
  *   - BERROR       nullable error detail for a failed node
  *   - BSTARTED / BFINISHED  nullable unix timestamps
  *
+ * Integrity:
+ *   - UNIQUE (BMESSAGEID, BNODEID) — a message has exactly ONE row per plan
+ *     node. {@see \App\Service\Multitask\TaskPlanStore} re-persists with
+ *     replace semantics (shadow run, executed run, /again re-turns), so
+ *     duplicates are a bug, not a state.
+ *   - FK → BMESSAGES (BID) ON DELETE CASCADE — task rows are derived data
+ *     and must never outlive their message (no orphans). Same FK pattern as
+ *     BMESSAGEMETA / BMESSAGE_FILE_ATTACHMENTS in Version20260417000000.
+ *
  * down() drops the table — it holds derived operational data, never the only
  * copy of user content (messages/files live in BMESSAGES / BMESSAGE_FILE_ATTACHMENTS).
  */
@@ -60,9 +69,11 @@ final class Version20260607010000 extends AbstractMigration
               BERROR TEXT DEFAULT NULL,
               BSTARTED BIGINT DEFAULT NULL,
               BFINISHED BIGINT DEFAULT NULL,
-              INDEX idx_message_task_message (BMESSAGEID),
+              UNIQUE INDEX uniq_message_task_node (BMESSAGEID, BNODEID),
               INDEX idx_message_task_status (BSTATUS),
-              PRIMARY KEY(BID)
+              PRIMARY KEY(BID),
+              CONSTRAINT FK_MESSAGE_TASK_MESSAGE FOREIGN KEY (BMESSAGEID)
+                REFERENCES BMESSAGES (BID) ON DELETE CASCADE
             ) DEFAULT CHARACTER SET utf8mb4 COLLATE `utf8mb4_unicode_ci` ENGINE = InnoDB
         SQL);
     }

@@ -88,13 +88,14 @@
 	# so any node can accept the upgrade and still see publishes from
 	# the other nodes.
 	#
-	# /centrifugo/ exposes the admin UI and HTTP API; restrict by source
-	# IP at the load-balancer / firewall in production.
+	# ONLY the client WebSocket endpoint is exposed. The Centrifugo admin
+	# UI, HTTP server API and Prometheus endpoints are deliberately NOT
+	# proxied: the PHP backend publishes container-to-container via
+	# REALTIME_API_URL (http://centrifugo:8000/api), and operators reach
+	# the admin UI through the internal network only (e.g. an SSH tunnel
+	# or a docker port mapping bound to localhost) — see docs/REALTIME.md.
 	# ------------------------------------------------------------------
 	handle /connection/* {
-		reverse_proxy centrifugo:8000
-	}
-	handle /centrifugo/* {
 		reverse_proxy centrifugo:8000
 	}
 

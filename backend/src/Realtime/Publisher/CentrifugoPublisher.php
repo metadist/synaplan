@@ -36,6 +36,7 @@ final readonly class CentrifugoPublisher implements RealtimePublisherInterface
         private string $apiUrl,
         private string $apiKey,
         private bool $enabled,
+        private string $environment = 'prod',
     ) {
     }
 
@@ -47,6 +48,16 @@ final readonly class CentrifugoPublisher implements RealtimePublisherInterface
 
         if ('' === trim($this->apiUrl) || '' === trim($this->apiKey)) {
             $this->logger->warning('Centrifugo publish skipped: REALTIME_API_URL or REALTIME_API_KEY missing');
+
+            return;
+        }
+
+        // Refuse to operate against a gateway still using the shipped
+        // placeholder API key in production — a publicly known key means
+        // anyone can publish into user/widget channels. Realtime degrades
+        // (REST stays the source of truth) instead of running forgeable.
+        if ('prod' === $this->environment && str_starts_with($this->apiKey, 'changeme')) {
+            $this->logger->error('Centrifugo publish skipped: REALTIME_API_KEY still has the "changeme" placeholder value — set a strong random key before enabling realtime in production');
 
             return;
         }

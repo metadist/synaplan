@@ -27,8 +27,18 @@
 # tables in pre-Redis production DBs don't trigger schema validation noise.
 #
 # Migration note: jobs already in `messenger_messages` will NOT be auto-moved
-# to Redis. Drain the legacy queue (or schedule a maintenance window) before
-# cutting over in production.
+# to Redis. The `legacy_*` transports below exist ONLY so an upgraded install
+# can drain that table — nothing routes to them. Cutover runbook (mandatory
+# before the first prod deploy of this revision):
+# _devextras/SYSADMIN-help.md § "Upgrading: Doctrine → Redis queue cutover".
+#
+#   1. Stop dispatching:    take the app out of the LB / maintenance window
+#   2. Deploy this revision (Redis transports active for new messages)
+#   3. Drain the old table: php bin/console messenger:consume \
+#        legacy_async_ai_high legacy_async_extract legacy_async_index -vv
+#      …until "no messages" — then inspect legacy_failed and either consume
+#      or discard it.
+#   4. Verify:              SELECT COUNT(*) FROM messenger_messages; → 0
 framework:
     messenger:
         failure_transport: failed
@@ -62,6 +72,31 @@ framework:
             failed:
                 dsn: '%env(resolve:REDIS_DSN)%/failed'
 
+            # ----------------------------------------------------------------
+            # Drain-only transports for the pre-Redis Doctrine queue
+            # (`messenger_messages`). NOTHING routes to these — they exist so
+            # `messenger:consume legacy_…` can process jobs that were still
+            # queued when an installation upgrades to the Redis transports.
+            # Safe to remove once every production install has completed the
+            # cutover runbook (see header comment).
+            # ----------------------------------------------------------------
+            legacy_async_ai_high:
+                dsn: 'doctrine://default?queue_name=async_ai_high'
+                retry_strategy:
+                    max_retries: 1
+            legacy_async_extract:
+                dsn: 'doctrine://default?queue_name=async_extract'
+                retry_strategy:
+                    max_retries: 1
+            legacy_async_index:
+                dsn: 'doctrine://default?queue_name=async_index'
+                retry_strategy:
+                    max_retries: 1
+            legacy_failed:
+                dsn: 'doctrine://default?queue_name=failed'
+                retry_strategy:
+                    max_retries: 0
+
         routing:
             # Route your messages to the transports
             'App\Message\ProcessMessageCommand': async_ai_high
@@ -78,3 +113,7 @@ when@test:
                 async_extract: 'in-memory://'
                 async_index: 'in-memory://'
                 failed: 'in-memory://'
+                legacy_async_ai_high: 'in-memory://'
+                legacy_async_extract: 'in-memory://'
+                legacy_async_index: 'in-memory://'
+                legacy_failed: 'in-memory://'

@@ -677,6 +677,17 @@ class WidgetPublicController extends AbstractController
 
                 $this->em->flush();
 
+                // Ping every dashboard tab subscribed to widget:operators.{id}
+                // so the LiveSupportView session list refreshes in real time
+                // (this replaced the legacy 3-second polling loop). Envelope
+                // type is 'notification'; `kind` discriminates the payload.
+                $this->broadcaster->publishOperatorNotification($widgetId, [
+                    'kind' => 'new_message',
+                    'sessionId' => $session->getSessionId(),
+                    'preview' => mb_substr((string) $data['text'], 0, 100),
+                    'timestamp' => time(),
+                ]);
+
                 // Generate title if needed (also works in human mode)
                 $this->sessionService->generateTitleIfNeeded($session, $owner->getId());
 
