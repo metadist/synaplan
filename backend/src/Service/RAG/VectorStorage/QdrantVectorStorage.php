@@ -118,13 +118,17 @@ final readonly class QdrantVectorStorage implements VectorStorageInterface
             minScore: $query->minScore,
         );
 
-        $filtered = $this->embeddingMetadata->filterStaleHits($rawHits);
+        // Resolve the expected model per-user: the query vector was embedded
+        // with the user's VECTORIZE binding (see embedUserQuery), so filtering
+        // against the global default would discard every hit for users whose
+        // override differs from it.
+        $filtered = $this->embeddingMetadata->filterStaleHits($rawHits, userId: $query->userId);
         if ($filtered['stale_count'] > 0) {
             $this->logger->info('QdrantVectorStorage: Filtered stale RAG hits', [
                 'user_id' => $query->userId,
                 'stale_count' => $filtered['stale_count'],
                 'fresh_count' => count($filtered['fresh']),
-                'current_model_id' => $this->embeddingMetadata->getCurrentModelId(),
+                'current_model_id' => $this->embeddingMetadata->getCurrentModelId($query->userId),
             ]);
         }
 

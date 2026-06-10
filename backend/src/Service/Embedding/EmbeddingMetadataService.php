@@ -24,6 +24,15 @@ use App\Service\ModelConfigService;
  *   3. "How many stale hits exist per scope?" — used by the admin UI
  *      to surface a "Re-vectorize required" banner after a model swap.
  *
+ * Per-user resolution: VECTORIZE is a per-user overridable binding
+ * (BCONFIG ownerId=N beats ownerId=0). The document indexer
+ * (VectorizationService) and the query embedder (embedUserQuery) both
+ * resolve it user-scoped, so stale-detection MUST resolve the same way —
+ * comparing a user's hits against the *global* default wrongly discards
+ * every hit for users whose override differs from it. Pass the userId
+ * whenever the compared vectors belong to a user's index; omit it only
+ * for genuinely global concerns (admin banner, re-index runs).
+ *
  * Backwards compatible: payloads without any embedding metadata (legacy
  * vectors stored before the SafeModelChange feature) are treated as
  * fresh. They will be lazily re-indexed when their content changes or
@@ -33,8 +42,11 @@ final class EmbeddingMetadataService
 {
     public const DEFAULT_VECTOR_DIM = 1024;
 
-    /** @var array{provider: ?string, model: ?string, model_id: ?int, vector_dim: int}|null */
-    private ?array $cachedCurrentModel = null;
+    /** @var array<int, array{provider: ?string, model: ?string, model_id: ?int, vector_dim: int}> keyed by userId (0 = global) */
+    private array $cachedCurrentModel = [];
+
+    /** @var array<int, int> vector dim per explicit model id */
+    private array $cachedVectorDim = [];
 
     public function __construct(
         private readonly ModelConfigService $modelConfigService,
@@ -42,7 +54,9 @@ final class EmbeddingMetadataService
     }
 
     /**
-     * Snapshot of the active VECTORIZE model.
+     * Snapshot of the active VECTORIZE model for the given user
+     * (falls back to the global default when the user has no override,
+     * mirroring ModelConfigService::getDefaultModel).
      *
      * `vector_dim` is read from the catalog (`BJSON.meta.dimensions`)
      * so the stale-hit filter correctly invalidates points indexed
@@ -53,15 +67,16 @@ final class EmbeddingMetadataService
      *
      * @return array{provider: ?string, model: ?string, model_id: ?int, vector_dim: int}
      */
-    public function getCurrentModel(): array
+    public function getCurrentModel(?int $userId = null): array
     {
-        if (null !== $this->cachedCurrentModel) {
-            return $this->cachedCurrentModel;
+        $cacheKey = $userId ?? 0;
+        if (isset($this->cachedCurrentModel[$cacheKey])) {
+            return $this->cachedCurrentModel[$cacheKey];
         }
 
-        $modelId = $this->modelConfigService->getDefaultModel('VECTORIZE', null);
+        $modelId = $this->modelConfigService->getDefaultModel('VECTORIZE', $userId);
         if (!$modelId) {
-            return $this->cachedCurrentModel = [
+            return $this->cachedCurrentModel[$cacheKey] = [
                 'provider' => null,
                 'model' => null,
                 'model_id' => null,
@@ -69,12 +84,11 @@ final class EmbeddingMetadataService
             ];
         }
 
-        return $this->cachedCurrentModel = [
+        return $this->cachedCurrentModel[$cacheKey] = [
             'provider' => $this->modelConfigService->getProviderForModel($modelId),
             'model' => $this->modelConfigService->getModelName($modelId),
             'model_id' => $modelId,
-            'vector_dim' => $this->modelConfigService->getVectorDimForModel($modelId)
-                ?? self::DEFAULT_VECTOR_DIM,
+            'vector_dim' => $this->getVectorDimFor($modelId),
         ];
     }
 
@@ -85,24 +99,38 @@ final class EmbeddingMetadataService
      */
     public function invalidate(): void
     {
-        $this->cachedCurrentModel = null;
+        $this->cachedCurrentModel = [];
+        $this->cachedVectorDim = [];
     }
 
-    public function getCurrentModelId(): ?int
+    public function getCurrentModelId(?int $userId = null): ?int
     {
-        return $this->getCurrentModel()['model_id'];
+        return $this->getCurrentModel($userId)['model_id'];
     }
 
-    public function getCurrentVectorDim(): int
+    public function getCurrentVectorDim(?int $userId = null): int
     {
-        return $this->getCurrentModel()['vector_dim'];
+        return $this->getCurrentModel($userId)['vector_dim'];
+    }
+
+    private function getVectorDimFor(int $modelId): int
+    {
+        return $this->cachedVectorDim[$modelId] ??=
+            $this->modelConfigService->getVectorDimForModel($modelId) ?? self::DEFAULT_VECTOR_DIM;
     }
 
     /**
      * A hit is stale when its payload was indexed with a different
-     * embedding model than the currently active one. Cross-model cosine
-     * similarity is physically meaningless, so stale hits must be
-     * filtered before returning search results.
+     * embedding model than the one the query vector was produced with.
+     * Cross-model cosine similarity is physically meaningless, so stale
+     * hits must be filtered before returning search results.
+     *
+     * The expected model is, in priority order: the explicit
+     * `$currentModelId` (e.g. the memory-pinned model), the user's
+     * VECTORIZE binding, the global VECTORIZE default. The dim check
+     * follows the same resolved model — comparing against the global
+     * model's dim while matching a pinned/user model id would re-open
+     * the cross-model gap for any non-1024-dim setup.
      *
      * Treats legacy hits (no `embedding_model_id` AND no `vector_dim`
      * in payload) as fresh for backwards compatibility — they'll be
@@ -111,9 +139,9 @@ final class EmbeddingMetadataService
      *
      * @param array<string, mixed> $payload
      */
-    public function isStale(array $payload, ?int $currentModelId = null): bool
+    public function isStale(array $payload, ?int $currentModelId = null, ?int $userId = null): bool
     {
-        $modelId = $currentModelId ?? $this->getCurrentModelId();
+        $modelId = $currentModelId ?? $this->getCurrentModelId($userId);
         if (null === $modelId) {
             return false;
         }
@@ -130,7 +158,7 @@ final class EmbeddingMetadataService
             return true;
         }
 
-        if (null !== $indexedVectorDim && (int) $indexedVectorDim !== $this->getCurrentVectorDim()) {
+        if (null !== $indexedVectorDim && (int) $indexedVectorDim !== $this->getVectorDimFor($modelId)) {
             return true;
         }
 
@@ -140,15 +168,20 @@ final class EmbeddingMetadataService
     /**
      * Partition hits into fresh + stale buckets.
      *
+     * Pass `$userId` when filtering hits from a user's document index so
+     * the comparison honours their VECTORIZE override; pass an explicit
+     * `$currentModelId` when the collection is pinned to a specific model
+     * (user memories).
+     *
      * @template T of array<string, mixed>
      *
      * @param list<T> $hits
      *
      * @return array{fresh: list<T>, stale_count: int}
      */
-    public function filterStaleHits(array $hits, string $payloadKey = 'payload', ?int $currentModelId = null): array
+    public function filterStaleHits(array $hits, string $payloadKey = 'payload', ?int $currentModelId = null, ?int $userId = null): array
     {
-        $modelId = $currentModelId ?? $this->getCurrentModelId();
+        $modelId = $currentModelId ?? $this->getCurrentModelId($userId);
         $fresh = [];
         $stale = 0;
 
