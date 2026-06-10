@@ -23,9 +23,10 @@ use Doctrine\Migrations\AbstractMigration;
  *
  *   This migration brings every install — fresh or existing — to the same
  *   state: Ollama bge-m3 listed alongside the Cloudflare and OpenAI
- *   embedding options in `/api/v1/admin/embedding/status` and the
+ *   embedding options in `/api/v1/admin/embedding/synapse/status` and the
  *   matching switch endpoint, so operators with their own GPU server can
- *   pin RAG to it instead of paying per-token to a cloud provider.
+ *   pin RAG and Synapse routing to it instead of paying per-token to a
+ *   cloud provider.
  *
  * Idempotent: running on an install where BID=13 already has BSELECTABLE=1
  * is a 0-row UPDATE and a no-op. Running on an install where the row does

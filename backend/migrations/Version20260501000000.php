@@ -8,7 +8,7 @@ use Doctrine\DBAL\Schema\Schema;
 use Doctrine\Migrations\AbstractMigration;
 
 /**
- * Normalize BPROMPTS / BREVECTORIZE_RUNS columns so `doctrine:schema:validate`
+ * Normalize Synapse Routing v2 columns so `doctrine:schema:validate`
  * stays green on every install.
  *
  * This migration ALTERS columns introduced by:
@@ -19,11 +19,11 @@ use Doctrine\Migrations\AbstractMigration;
  *                            BERROR})
  *
  * Why a separate migration instead of editing the originals:
- *   - The originals were already merged and may have run on staging/dev
- *     databases. Per Doctrine policy ("never modify applied migrations") we
- *     never rewrite them in place — we ship a follow-up migration that brings
- *     every install to the same final state, regardless of the path it took
- *     to get there.
+ *   - The originals were already merged onto feat/synapse-routing and may
+ *     have run on staging/dev databases. Per Doctrine policy ("never modify
+ *     applied migrations") we never rewrite them in place — we ship a
+ *     follow-up migration that brings every install to the same final
+ *     state, regardless of the path it took to get there.
  *   - Each ALTER below is idempotent at the schema level: re-running it
  *     against a column that is already in the target shape produces the
  *     same column definition (MariaDB CHANGE COLUMN with identical type
@@ -54,7 +54,7 @@ final class Version20260501000000 extends AbstractMigration
 {
     public function getDescription(): string
     {
-        return 'Normalize BPROMPTS.BKEYWORDS and BREVECTORIZE_RUNS.* columns to match Doctrine ORM mapping';
+        return 'Normalize Synapse Routing v2 columns to match Doctrine ORM mapping (BPROMPTS.BKEYWORDS, BREVECTORIZE_RUNS.*)';
     }
 
     public function isTransactional(): bool
