@@ -30,7 +30,7 @@ Synaplan uses a multi-repository architecture:
 
 | Aspect    | Local (`synaplan/`)        | Production (`synaplan-platform/`)  |
 | --------- | -------------------------- | ---------------------------------- |
-| Image     | Built from source          | `ghcr.io/metadist/synaplan:latest` |
+| Image     | Built locally (dev stage, incl. phpredis) | `ghcr.io/metadist/synaplan:latest` |
 | Database  | Local MariaDB container    | Galera cluster (multi-node)        |
 | Ollama    | Local container            | Shared server (10.0.1.10)          |
 | Frontend  | Vite dev server (5173)     | Built assets in Docker image       |

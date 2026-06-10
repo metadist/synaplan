@@ -12,7 +12,19 @@
 # moving floating tag. To bump:
 #   docker buildx imagetools inspect ghcr.io/metadist/synaplan-base-php:<new>
 # and replace the @sha256:... below.
-FROM ghcr.io/metadist/synaplan-base-php:1.0.1@sha256:35e81beba0b8b09f8b43cd3a371df1e91e6b7c34c9c02e37d263f63308c022d9
+#
+# Multi-stage layout:
+#   - `dev`  : base image + phpredis + baked ENV defaults ONLY. The dev/worker
+#              containers bind-mount the application code, vendor and entrypoint
+#              scripts at runtime, so they need nothing more from the image than
+#              the PHP runtime with ext-redis. Building this stage is independent
+#              of backend source, so `docker compose up -d` stays a cache hit
+#              after the first build (no composer install / COPY backend churn).
+#   - `prod` : full self-contained image (app + composer install + frontend).
+#              This is the LAST stage, so a build without an explicit `target`
+#              (CI, the published :latest, docker-compose.test.yml) still yields
+#              the complete production image.
+FROM ghcr.io/metadist/synaplan-base-php:1.0.1@sha256:35e81beba0b8b09f8b43cd3a371df1e91e6b7c34c9c02e37d263f63308c022d9 AS dev
 
 WORKDIR /var/www/backend
 
@@ -41,6 +53,13 @@ ENV BRAVE_SEARCH_API_URL=https://api.search.brave.com/res/v1 \
     RASTERIZE_DPI=150 \
     RASTERIZE_PAGE_CAP=10 \
     RASTERIZE_TIMEOUT_MS=30000
+
+# ---------------------------------------------------------------------------
+# `dev` target ends here: base image + phpredis + ENV defaults. Everything
+# below builds the self-contained `prod` image and is skipped for dev/worker
+# containers (they bind-mount code/vendor/entrypoint via docker-compose).
+# ---------------------------------------------------------------------------
+FROM dev AS prod
 
 # Copy application (exclude .env files - use environment variables instead)
 COPY --chown=www-data:www-data backend/ .

@@ -70,9 +70,16 @@ services:
       - 8.8.8.8
       - 8.8.4.4
     image: ghcr.io/metadist/synaplan:latest
+    # Always build the lightweight `dev` stage locally so the image carries
+    # ext-redis (phpredis) without baking the app. The published :latest can be
+    # stale; reusing it breaks composer install (symfony/redis-messenger platform
+    # req) and the worker's Redis Streams consumer. The dev stage is independent
+    # of backend source, so every `up -d` is a cache hit after the first build.
+    pull_policy: build
     build:
       context: .
       dockerfile: _docker/backend/Dockerfile
+      target: dev
     container_name: synaplan-backend
     # Optional: Load extra config from backend/.env (for API keys, etc.)
     env_file:
@@ -201,9 +208,15 @@ services:
   # Symfony pattern to bound Doctrine EM growth on long-lived consumers.
   worker:
     image: ghcr.io/metadist/synaplan:latest
+    # Build the same lightweight `dev` stage as the backend (base + phpredis).
+    # The worker bind-mounts ./backend and consumes Redis Streams via
+    # messenger:consume, which needs phpredis at runtime; the dev stage is
+    # source-independent so `up -d` stays a cache hit after the first build.
+    pull_policy: build
     build:
       context: .
       dockerfile: _docker/backend/Dockerfile
+      target: dev
     container_name: synaplan-worker
     env_file:
       - path: backend/.env
