@@ -14,6 +14,7 @@ use App\Service\InternalEmailService;
 use App\Service\ModelConfigService;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
+use Psr\Cache\CacheItemPoolInterface;
 use Psr\Log\NullLogger;
 use Symfony\Contracts\Cache\CacheInterface;
 
@@ -41,6 +42,7 @@ class AiFacadeAsyncVideoTest extends TestCase
             $this->createMock(DiscordNotificationService::class),
             $this->createMock(InternalEmailService::class),
             $this->createMock(CacheInterface::class),
+            $this->createMock(CacheItemPoolInterface::class),
             '/tmp'
         );
     }

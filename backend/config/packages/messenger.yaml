@@ -1,34 +1,66 @@
+# Symfony Messenger
+#
+# Transports use Redis Streams (`symfony/redis-messenger`) instead of the
+# Doctrine table that earlier revisions of this app shipped with. Reasons:
+#
+#   * MariaDB Galera (production) replicates every queue write across all
+#     three nodes — a hot AI-processing queue would amplify Galera write
+#     conflicts. Redis is single-master and orders of magnitude cheaper for
+#     the high-frequency dequeue path.
+#   * The Redis instance is already shared with cache.app, locks, sessions,
+#     and Centrifugo — no new infrastructure footprint.
+#   * Redis Streams give us blocking consumers + at-least-once delivery
+#     with consumer groups baked in (no doctrine row locking).
+#
+# DSN format (`symfony/redis-messenger`): `redis://[host[:port]]/<stream-name>`
+# — the path AFTER the host is the **stream name**, not a logical DB index.
+# Each transport must therefore live on its own stream so consumers can be
+# scoped per priority. We resolve %REDIS_DSN% at compile-time so the same
+# host/port is reused everywhere (cache, locks, sessions, messenger).
+#
+# Consumer command (one process per priority, scale per node):
+#   php bin/console messenger:consume async_ai_high --time-limit=3600 --memory-limit=128M
+#
+# `APP_ENV=test` overrides every transport to in-memory:// so PHPUnit does
+# not need a running Redis. The Doctrine `messenger_messages` table is still
+# in `app.doctrine.schema_filter` (config/packages/doctrine.yaml) so leftover
+# tables in pre-Redis production DBs don't trigger schema validation noise.
+#
+# Migration note: jobs already in `messenger_messages` will NOT be auto-moved
+# to Redis. Drain the legacy queue (or schedule a maintenance window) before
+# cutting over in production.
 framework:
     messenger:
         failure_transport: failed
 
         transports:
-            # High Priority: AI Processing
+            # High Priority: AI Processing (chat completions, vision, embeddings).
             async_ai_high:
-                dsn: 'doctrine://default?queue_name=async_ai_high'
+                dsn: '%env(resolve:REDIS_DSN)%/async_ai_high'
                 retry_strategy:
                     max_retries: 3
                     delay: 1000
                     multiplier: 2
                     max_delay: 10000
 
-            # Medium Priority: File Extraction
+            # Medium Priority: File Extraction (Tika, OCR, transcription dispatch).
             async_extract:
-                dsn: 'doctrine://default?queue_name=async_extract'
+                dsn: '%env(resolve:REDIS_DSN)%/async_extract'
                 retry_strategy:
                     max_retries: 2
                     delay: 2000
 
-            # Low Priority: Indexing
+            # Low Priority: Indexing / vectorisation / crawl jobs.
             async_index:
-                dsn: 'doctrine://default?queue_name=async_index'
+                dsn: '%env(resolve:REDIS_DSN)%/async_index'
                 retry_strategy:
                     max_retries: 5
                     delay: 5000
 
-            # Failed Messages (Dead-Letter-Queue)
+            # Failed Messages (Dead-Letter-Queue). Inspect with
+            # `messenger:failed:show` / replay with `messenger:failed:retry`.
             failed:
-                dsn: 'doctrine://default?queue_name=failed'
+                dsn: '%env(resolve:REDIS_DSN)%/failed'
 
         routing:
             # Route your messages to the transports

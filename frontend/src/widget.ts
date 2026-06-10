@@ -20,6 +20,13 @@
 import type { App } from 'vue'
 import { detectApiUrl } from './widget-utils'
 
+interface WidgetRealtimeConfig {
+  /** Master kill-switch echoed by the backend. Defaults to true. */
+  enabled: boolean
+  /** Empty string ⇒ derive from `apiUrl` (recommended). */
+  wsUrl: string
+}
+
 interface WidgetConfig {
   widgetId: string
   position?: 'bottom-left' | 'bottom-right' | 'top-left' | 'top-right'
@@ -59,6 +66,8 @@ interface WidgetConfig {
   externalUserId?: string
   privacyPolicyUrl?: string
   sessionMode?: 'browser' | 'user'
+  /** Populated from /api/v1/widget/{id}/config — never sent in by callers. */
+  realtime?: WidgetRealtimeConfig
   // Server-derived flag (true when widget has a Slack webhook configured AND
   // the operator left the in-widget button enabled). Surfaced via the public
   // /widget/{id}/config endpoint, never the raw Slack URL itself.
@@ -185,6 +194,12 @@ class SynaplanWidget {
           ...this.config,
           ...data.config,
           widgetTitle: data.name || this.config.widgetTitle,
+          realtime: data.realtime
+            ? {
+                enabled: Boolean(data.realtime.enabled ?? true),
+                wsUrl: typeof data.realtime.wsUrl === 'string' ? data.realtime.wsUrl : '',
+              }
+            : { enabled: true, wsUrl: '' },
         }
         return true
       }
@@ -448,6 +463,7 @@ class SynaplanWidget {
         buttonIcon: this.config!.buttonIcon,
         buttonIconUrl: this.config!.buttonIconUrl,
         isPreview: false,
+        realtime: this.config!.realtime,
       })
 
       this.app.use(i18n)

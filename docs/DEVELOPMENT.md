@@ -20,6 +20,37 @@ docker compose restart backend
 docker compose restart frontend
 ```
 
+### Redis (cache, sessions, locks, messenger, realtime)
+
+The backend uses **Redis** (`redis` service in Compose) as the canonical cross-node platform store. One Redis instance, five concerns:
+
+| Concern | Where it's wired | Why Redis (vs alternative) |
+|---------|------------------|----------------------------|
+| Symfony Cache (`cache.app` + `cache.provider_status` / `cache.model_config` / `cache.user_config`) | `backend/config/packages/cache.yaml` | A node-local filesystem cache silently desyncs when ≥3 backend nodes are behind a load balancer (production setup). Redis keeps Stripe idempotency, WhatsApp dedupe, JWKS, CircuitBreaker, etc. consistent across the cluster. |
+| **Native PHP sessions** (`Symfony\Component\HttpFoundation\Session\Storage\Handler\RedisSessionHandler`) | `backend/config/packages/framework.yaml` + `backend/config/services.yaml` | File-based sessions force sticky routing or silently log users out as they bounce between backend nodes. Prefix `synaplan_sess_`, TTL 7 days. |
+| `LOCK_DSN` (cron-style commands, WhatsApp dedupe) | `backend/.env.example` | Cluster-wide mutex; `flock` would only synchronise one node. |
+| **Async Messenger** transports (`async_ai_high`, `async_extract`, `async_index`, `failed`) | `backend/config/packages/messenger.yaml` | Redis Streams give blocking consumers + at-least-once delivery without amplifying writes across the Galera cluster. |
+| Centrifugo realtime engine (logical separation through Centrifugo's own key prefix) | `_docker/centrifugo/config.json` | Cross-node WebSocket fan-out. |
+| **Embedding cache** (`AiFacade::embed()` and `AiFacade::embedBatch()` share `embed.v1.*` keys, TTL 7 days) | `backend/src/AI/Service/AiFacade.php` | Same `(text, provider, model)` tuple is deterministic. `embedBatch()` looks up every input text individually against the same pool, sends only the misses to the provider as one batch call, and writes the new vectors back so a later `embed()` (or another batch) reuses them. The fallback path is intentionally NOT cached under the primary key — different model spaces must never mix. |
+
+**phpredis (`ext-redis`)** is required by `symfony/redis-messenger` (the messenger consumer speaks the binary Redis protocol). Cache, sessions, locks, and the platform `App\Service\Infrastructure\RedisService` use **Predis** (pure PHP) and do **not** need it. The backend Docker image installs phpredis via `pecl install redis`. After pulling Dockerfile changes, **rebuild the backend image** so dev containers pick it up:
+
+```bash
+# Rebuild after Dockerfile changes
+docker compose build backend && docker compose up -d backend
+
+# Quick connectivity check inside the stack
+docker compose exec redis redis-cli ping       # expects PONG
+
+# Public health probe — reports `redis: { available, ... }`; returns 503
+# in dev/prod if Redis is unreachable. PHPUnit reports `skipped: true`.
+curl -sf http://localhost:8000/api/health | jq .redis
+```
+
+If you run PHP on the host without Compose, install Redis yourself (e.g. `brew install redis && brew services start redis`) and set `REDIS_DSN=redis://127.0.0.1:6379` in `backend/.env`. Without phpredis on the host, `composer install` will refuse to run unless you pass `--ignore-platform-req=ext-redis`; that's only safe if you do **not** plan to run `messenger:consume` from the host (cache + sessions still work via Predis).
+
+**Production cutover note:** jobs that already sit in the legacy MariaDB `messenger_messages` table will **not** be auto-moved to Redis. Drain the queue (`messenger:consume … --limit=…`) or schedule a maintenance window before flipping `REDIS_DSN` in production.
+
 ### Connecting to services on the host
 
 The backend container exposes **two** aliases for the Docker host (via `extra_hosts` in `docker-compose.yml`):

@@ -41,6 +41,7 @@ class AnthropicProvider implements ChatProviderInterface, VisionProviderInterfac
         'claude-opus-4-8',
         'claude-sonnet-4-6',
         'claude-haiku-4-5',
+        'claude-fable-5',
     ];
 
     /** Models that require adaptive thinking format instead of manual budget_tokens. */
@@ -49,6 +50,7 @@ class AnthropicProvider implements ChatProviderInterface, VisionProviderInterfac
         'claude-opus-4-7',
         'claude-opus-4-8',
         'claude-sonnet-4-6',
+        'claude-fable-5',
     ];
 
     /**
@@ -61,6 +63,7 @@ class AnthropicProvider implements ChatProviderInterface, VisionProviderInterfac
     private const TEMPERATURE_DEPRECATED_MODELS = [
         'claude-opus-4-7',
         'claude-opus-4-8',
+        'claude-fable-5',
     ];
 
     public function __construct(

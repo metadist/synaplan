@@ -623,8 +623,10 @@
     "takeOverConfirm": "Die KI wird für diesen Chat deaktiviert. Der Besucher kommuniziert ab jetzt direkt mit Ihnen. Sie können die KI jederzeit wieder aktivieren.",
     "takeOverButton": "Übernehmen",
     "takeOverSuccess": "Sitzung erfolgreich übernommen",
+    "takeoverNotice": "Sie sind jetzt mit einem Support-Mitarbeiter verbunden.",
     "handBack": "An KI zurückgeben",
     "handBackSuccess": "Sitzung an KI zurückgegeben",
+    "handbackNotice": "Sie chatten jetzt mit unserem KI-Assistenten.",
     "respond": "Antworten",
     "typeMessage": "Nachricht eingeben...",
     "messageSent": "Nachricht gesendet",
@@ -3309,5 +3311,28 @@
     "rateLimitedDescription": "Du hast das Sitzungslimit erreicht. Bitte versuche es später erneut oder erstelle einen kostenlosen Account.",
     "retry": "Erneut versuchen",
     "createAccount": "Account erstellen"
+  },
+  "realtime": {
+    "status": {
+      "connected": "Live",
+      "connecting": "Verbindung wird aufgebaut…",
+      "reconnecting": "Verbindung wird wiederhergestellt…",
+      "disconnected": "Offline",
+      "disabled": "Live-Updates aus",
+      "error": "Verbindungsfehler"
+    },
+    "tooltip": {
+      "connected": "Echtzeit-Verbindung steht",
+      "connecting": "Echtzeit-Verbindung wird aufgebaut…",
+      "reconnecting": "Verbindung verloren — wird automatisch erneut versucht",
+      "disconnected": "Echtzeit-Verbindung ist geschlossen",
+      "disabled": "Live-Updates sind in dieser Umgebung deaktiviert. Lade die Seite neu, um die neuesten Daten zu sehen.",
+      "error": "Echtzeit-Verbindung fehlgeschlagen: {message}"
+    },
+    "notification": {
+      "reconnecting": "Verbindung verloren — wird wiederhergestellt…",
+      "reconnected": "Du bist wieder online.",
+      "error": "Live-Updates sind aktuell nicht verfügbar. Lade die Seite neu, um die neuesten Aktivitäten zu sehen."
+    }
   }
 }

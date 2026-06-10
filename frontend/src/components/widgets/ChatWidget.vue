@@ -667,8 +667,17 @@ import { useI18n } from 'vue-i18n'
 import { useDateFormat } from '@/composables/useDateFormat'
 import { parseAIResponse } from '@/utils/responseParser'
 import { getMarkdownRenderer } from '@/composables/useMarkdown'
-import { subscribeToSession, type EventSubscription, type WidgetEvent } from '@/services/sseClient'
-import { detectApiUrl } from '@/widget-utils'
+import {
+  subscribeToWidgetSessionRealtime,
+  type WidgetEvent,
+  type WidgetSubscription,
+} from '@/services/realtime/widgetSessionRealtime'
+import type { WidgetTypingHandle } from '@/services/realtime/widgetTypingChannel'
+
+interface WidgetRealtimeRuntime {
+  enabled: boolean
+  wsUrl: string
+}
 
 interface Props {
   widgetId: string
@@ -699,6 +708,12 @@ interface Props {
   humanHandoffEnabled?: boolean
   testMode?: boolean
   internalMode?: boolean
+  /**
+   * Realtime / Centrifugo settings echoed by the public widget config
+   * endpoint. Optional so that internal/test mounts (where there is no
+   * realtime backend) keep working — undefined is treated as "disabled".
+   */
+  realtime?: WidgetRealtimeRuntime
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -727,6 +742,7 @@ const props = withDefaults(defineProps<Props>(), {
   humanHandoffEnabled: false,
   testMode: false,
   internalMode: false,
+  realtime: undefined,
 })
 
 const emit = defineEmits<{
@@ -858,7 +874,11 @@ const widgetUnavailable = ref(false)
 // Human takeover state
 const chatMode = ref<'ai' | 'human' | 'waiting'>('ai')
 const operatorName = ref<string | null>(null)
-let eventSubscription: EventSubscription | null = null
+let eventSubscription: WidgetSubscription | null = null
+// Per-session typing channel handle — opened lazily once the realtime
+// subscription is live (see subscribeToEvents). Carries both directions:
+// visitor publishes its in-progress text, operator typing arrives here.
+let typingChannel: WidgetTypingHandle | null = null
 let operatorTypingTimer: ReturnType<typeof setTimeout> | null = null
 
 // Human handoff (Slack ping) state
@@ -1619,10 +1639,10 @@ const sendMessage = async () => {
 
     isTyping.value = false
 
-    // Subscribe to SSE after first successful message (session now exists on server)
-    // Skip SSE in dashboard mode (test/internal) -- not needed and causes 404s
+    // Subscribe to realtime events after first successful message — the
+    // session row exists on the server now. Skip in dashboard test/internal
+    // mode (no realtime needed and the visitor token endpoint would 404).
     if (!eventSubscription && sessionId.value && !isTestEnvironment.value) {
-      console.debug('[Widget] First message sent, subscribing to SSE')
       subscribeToEvents()
     }
   } catch (error) {
@@ -2000,10 +2020,10 @@ const loadConversationHistory = async (force = false) => {
           chatMode.value = mode
         }
 
-        // Only subscribe to SSE if the session has messages (exists on server)
-        // Skip SSE in dashboard mode (test/internal) -- not needed and causes 404s
+        // Only open the realtime subscription once the session has messages
+        // server-side. Skip in dashboard test/internal mode — no realtime
+        // needed and the visitor token endpoint would 404.
         if (!eventSubscription && session.messageCount > 0 && !isTestEnvironment.value) {
-          console.debug('[Widget] Subscribing to SSE for real-time events')
           subscribeToEvents()
         }
       } else if (loadedMessages.length > 0) {
@@ -2153,7 +2173,8 @@ const renderMessageContent = (value: string, role: 'user' | 'assistant' = 'assis
   return html
 }
 
-// Close SSE connection before page unload to prevent browser warning
+// Close the realtime connection before page unload to avoid the browser's
+// "WebSocket closed without clean shutdown" warning during navigation.
 const handleBeforeUnload = () => {
   if (eventSubscription) {
     eventSubscription.unsubscribe()
@@ -2233,7 +2254,8 @@ onMounted(() => {
   }
 
   loadConversationHistory()
-  // SSE subscription is now handled inside loadConversationHistory based on session mode
+  // The realtime subscription is wired up inside loadConversationHistory()
+  // once we know whether the session already has server-side messages.
 })
 
 onBeforeUnmount(() => {
@@ -2250,13 +2272,23 @@ onBeforeUnmount(() => {
   window.removeEventListener('synaplan-widget-close', handleCloseEvent)
   window.removeEventListener('synaplan-widget-theme-sync', handleThemeSyncEvent)
 
-  // Unsubscribe from SSE events
+  // Best-effort clear so the operator UI doesn't keep showing a stale
+  // typing preview after the visitor closes the page. MUST run before
+  // unsubscribe(), which closes the channel handle from underneath us.
+  if (lastTypingSent && typingChannel) {
+    typingChannel.clear()
+  }
+
+  // Drop the realtime subscription so the WS shuts down cleanly.
+  // `unsubscribe()` also closes the typing channel internally (see
+  // `widgetSessionRealtime.ts`), but we null the local handle here too
+  // so any subsequent publish() calls become trivially no-ops.
   if (eventSubscription) {
     eventSubscription.unsubscribe()
     eventSubscription = null
   }
+  typingChannel = null
 
-  // Clear operator typing timer
   if (operatorTypingTimer) {
     clearTimeout(operatorTypingTimer)
     operatorTypingTimer = null
@@ -2264,7 +2296,10 @@ onBeforeUnmount(() => {
 })
 
 /**
- * Handle incoming SSE events for real-time human operator communication.
+ * Handle realtime events emitted on the visitor's session channel.
+ *
+ * Covers takeover/handback, operator messages, and operator typing
+ * indicators (visitor typing is sent the other direction).
  */
 function handleWidgetEvent(data: WidgetEvent) {
   switch (data.type) {
@@ -2337,48 +2372,84 @@ function handleWidgetEvent(data: WidgetEvent) {
       break
     }
 
-    case 'typing':
-      // Only show typing indicator for operator typing (has operatorId, no text)
-      // User typing events have 'text' field and should be ignored by the widget
-      if (data.operatorId && !data.text) {
-        isTyping.value = true
-        // Scroll to show typing indicator
-        scrollToBottom()
-        // Clear any existing timer and set new one
-        if (operatorTypingTimer) {
-          clearTimeout(operatorTypingTimer)
-        }
-        operatorTypingTimer = setTimeout(() => {
-          isTyping.value = false
-          operatorTypingTimer = null
-        }, 2000)
-      }
-      break
+    // NOTE: operator typing previews used to arrive on this channel
+    // (`event.type === 'typing'`). They now stream over the dedicated
+    // `widgettyping:*` channel — see openVisitorTypingChannel().
   }
 }
 
 /**
- * Subscribe to SSE for real-time messages.
+ * Open the per-session typing channel and wire it to the local UI.
+ *
+ * Operator typing frames flip the bubble indicator on for a couple of
+ * seconds; visitor frames are filtered out by the channel itself (echoes
+ * of our own publishes never reach this callback).
+ */
+function openVisitorTypingChannel(): void {
+  if (!eventSubscription) return
+  if (typingChannel) {
+    typingChannel.close()
+    typingChannel = null
+  }
+  typingChannel = eventSubscription.openTypingChannel((frame) => {
+    if (frame.from !== 'operator') return
+    if (frame.text) {
+      isTyping.value = true
+      scrollToBottom()
+      if (operatorTypingTimer) clearTimeout(operatorTypingTimer)
+      operatorTypingTimer = setTimeout(() => {
+        isTyping.value = false
+        operatorTypingTimer = null
+      }, 2000)
+    } else {
+      // Empty text = explicit clear, drop the indicator immediately so
+      // the visitor doesn't see "typing" lingering after the operator
+      // wiped their input.
+      isTyping.value = false
+      if (operatorTypingTimer) {
+        clearTimeout(operatorTypingTimer)
+        operatorTypingTimer = null
+      }
+    }
+  })
+}
+
+/**
+ * Open a Centrifugo subscription on the visitor session channel.
+ *
+ * The embedded widget runs cross-origin: its api base URL is the Synaplan
+ * backend (not the customer's site), and there is no Pinia store. The
+ * realtime helper is therefore called directly with an explicit runtime
+ * config received from the public widget config endpoint.
  */
 function subscribeToEvents() {
   if (!sessionId.value || !props.widgetId) return
 
-  // Unsubscribe from previous subscription if any
+  const runtime = props.realtime ?? { enabled: false, wsUrl: '' }
+  if (!runtime.enabled) {
+    return
+  }
+
+  // Drop any prior subscription before opening a new one to avoid leaking
+  // a Centrifuge instance when the session id changes mid-flight.
   if (eventSubscription) {
     eventSubscription.unsubscribe()
   }
 
-  eventSubscription = subscribeToSession(
-    props.widgetId,
-    sessionId.value,
-    handleWidgetEvent,
-    (error) => {
+  eventSubscription = subscribeToWidgetSessionRealtime({
+    widgetId: props.widgetId,
+    sessionId: sessionId.value,
+    apiBaseUrl: props.apiUrl,
+    runtime,
+    onEvent: handleWidgetEvent,
+    onError: (msg) => {
       if (!widgetUnavailable.value) {
-        console.debug('[Widget] SSE connection error:', error)
+        console.debug('[Widget] realtime error:', msg)
       }
     },
-    { apiUrl: props.apiUrl }
-  )
+  })
+
+  openVisitorTypingChannel()
 }
 
 const getChatStorageKey = () => {
@@ -2427,63 +2498,51 @@ watch(chatMode, (newMode) => {
   }
 })
 
-// Typing indicator - send typing text to admin dashboard
+// Visitor typing indicator — published over the dedicated `widgettyping:*`
+// Centrifugo channel (no per-keystroke HTTP). The channel handle is opened
+// inside subscribeToEvents() once the realtime subscription is alive; if
+// it isn't yet, publish() degrades to a no-op so we never queue keystrokes.
 let lastTypingSent = ''
 let typingDebounceTimer: ReturnType<typeof setTimeout> | null = null
 
-async function sendTypingUpdate(text: string) {
-  if (!sessionId.value || props.isPreview) return
-
-  // Don't send if text hasn't changed
+function publishVisitorTyping(text: string) {
+  if (props.isPreview) return
+  if (!typingChannel) return
   if (text === lastTypingSent) return
   lastTypingSent = text
-
-  try {
-    const apiUrl = props.apiUrl || detectApiUrl()
-    await fetch(`${apiUrl}/api/v1/widget/${props.widgetId}/typing`, {
-      method: 'POST',
-      headers: buildWidgetHeaders(),
-      body: JSON.stringify({
-        sessionId: sessionId.value,
-        text: text,
-      }),
-    })
-  } catch {
-    // Silently ignore typing errors - not critical
-  }
+  typingChannel.publish(text)
 }
 
-// Watch input and send typing updates (debounced)
 watch(inputMessage, (newValue) => {
-  // Clear any pending timer
   if (typingDebounceTimer) {
     clearTimeout(typingDebounceTimer)
     typingDebounceTimer = null
   }
 
-  // Only send typing updates if user has sent at least one message (session exists)
+  // Only publish once the visitor has sent at least one message (server-
+  // side session row exists, so the operator dashboard has somewhere to
+  // attach the typing preview).
   if (messageCount.value === 0) return
 
   if (!newValue) {
-    // Text cleared (or message sent) - immediately send empty to clear preview
-    sendTypingUpdate('')
+    publishVisitorTyping('')
     return
   }
 
-  // Debounce: wait 300ms before sending to avoid too many requests
+  // Debounce: wait 300ms before publishing so we don't flood the channel
+  // on every keystroke.
   typingDebounceTimer = setTimeout(() => {
-    sendTypingUpdate(newValue)
+    publishVisitorTyping(newValue)
   }, 300)
 })
 
-// Clear typing when component unmounts
 onBeforeUnmount(() => {
+  // The typing channel is closed by the realtime-subscription teardown
+  // hook above; here we only need to drop the local debounce timer so
+  // it does not fire after the channel handle is gone.
   if (typingDebounceTimer) {
     clearTimeout(typingDebounceTimer)
-  }
-  // Send empty typing to clear the preview
-  if (lastTypingSent && sessionId.value) {
-    sendTypingUpdate('')
+    typingDebounceTimer = null
   }
 })
 
