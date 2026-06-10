@@ -155,6 +155,22 @@ final class TaskPlanExecutorTest extends TestCase
         );
     }
 
+    public function testWidgetModeNeverRunsPlannerEvenWhenAiSorted(): void
+    {
+        // "Standard sorting" widgets run the real classifier (source=ai_sorting),
+        // but the embedded widget client cannot render plan/task_* events —
+        // widget conversations must stay on the single-node path (§3.4 invariant).
+        $this->planner->expects(self::never())->method('plan');
+        $this->router->expects(self::once())->method('routeStream')->willReturn(['content' => 'x']);
+
+        $this->executor->executeStream(
+            $this->message(),
+            [],
+            ['intent' => 'chat', 'language' => 'en', 'source' => 'ai_sorting', 'is_widget_mode' => true],
+            static function (): void {},
+        );
+    }
+
     public function testMultiNodePlanRunsDagAndStreamsAssembledText(): void
     {
         $multiNode = TaskPlan::fromArray([

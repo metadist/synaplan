@@ -308,6 +308,10 @@ services:
     App\Service\MediaGenerationServiceInterface:
         alias: App\Service\MediaGenerationService
 
+    App\Service\Media\GeneratedFileRegistrar:
+        arguments:
+            $uploadDir: '%kernel.project_dir%/var/uploads'
+
     # Model Configuration Service
     App\Service\ModelConfigService: ~
 

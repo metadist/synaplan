@@ -22,6 +22,9 @@ use Psr\Log\LoggerInterface;
  *     are sent to the {@see TaskPlanner}. Deterministic/simple branches
  *     (fast-path chat, slash commands, attachments, widget, again) keep using
  *     the proven single-node path — no planner latency, no behaviour change.
+ *     Widget conversations are excluded even when AI-classified ("standard
+ *     sorting" widgets set `is_widget_mode`) — the embed client has no
+ *     task-plan UI.
  *   - If the planner returns a SINGLE-node plan or falls back, we run the
  *     Sprint-2 degenerate path: delegate to InferenceRouter with the exact
  *     legacy classification (behaviour identical), and persist the plan.
@@ -180,6 +183,15 @@ final readonly class TaskPlanExecutor
     {
         // Only AI-sorted messages are candidates for multi-task planning.
         if ('ai_sorting' !== ($classification['source'] ?? null)) {
+            return null;
+        }
+
+        // Widgets with "standard sorting" are AI-sorted too, but the embedded
+        // widget client renders only plain `data` chunks — plan/task_* events
+        // are silently dropped, so a DAG would stay mute until the final text
+        // dump. Widget conversations always take the single-node path
+        // (planning-doc §3.4 invariant).
+        if (!empty($classification['is_widget_mode'])) {
             return null;
         }
 

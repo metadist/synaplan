@@ -177,6 +177,8 @@ This is the key to not breaking anything: handlers stay as-is; the executor feed
 
 `MessageProcessor` already short-circuits when `options['fixed_task_prompt']` is set (lines ~81–124 and ~555–621) and when `is_widget_mode`/`skipSorting`. **The planner is inserted only on the non-fixed, non-widget classification branch.** When `fixed_task_prompt`/`skipSorting` is present we build a **single-node `chat` plan** from the fixed topic and run it through the executor's degenerate path — identical observable behaviour to today. This is an explicit, tested invariant (Phase 2 gate).
 
+**Enforcement note (post-merge hardening):** widgets configured with *standard sorting* (empty `taskPromptTopic`) do run the AI classifier and can come back as `source: ai_sorting` — the fixed-prompt bypass alone does not cover them (`skipSorting` itself is never read by `MessageProcessor`; the effective bypass is the fixed prompt → `source: widget`). `TaskPlanExecutor::planForExecution()` therefore also hard-gates on `classification['is_widget_mode']`, so widget conversations never enter the planner regardless of sorting mode (tested in `TaskPlanExecutorTest::testWidgetModeNeverRunsPlannerEvenWhenAiSorted`).
+
 ### 3.5 Parallelism strategy (progressive)
 
 PHP request handling is synchronous, so we stage parallelism:
