@@ -22,7 +22,7 @@
     "configApiKeys": "Claves API",
     "configApiDocs": "Documentación API",
     "statistics": "Estadísticas",
-    "settings": "Configuración",
+    "settings": "Preferencias",
     "profile": "Perfil",
     "admin": "Panel de administración",
     "adminFeatures": "Estado de funciones",
@@ -278,6 +278,14 @@
     "toolsMailHandler": "Automatización de correo",
     "plugins": "Plugins",
     "files": "Archivos",
+    "filesDescription": "Archivos y conocimiento",
+    "channels": "Canales",
+    "channelsDescription": "Canales conectados",
+    "aiSetup": "Configuración de IA",
+    "aiSetupDescription": "Modelos, instrucciones y enrutamiento",
+    "preferences": "Preferencias",
+    "account": "Cuenta",
+    "accountDescription": "Cuenta y preferencias",
     "filesAndRag": "Archivos & RAG",
     "fileManager": "Gestor de Archivos",
     "semanticSearch": "Búsqueda Semántica",
@@ -294,8 +302,6 @@
     "adminDashboard": "Panel",
     "adminFeatureStatus": "Estado de Funciones",
     "adminSystemConfig": "Configuración del Sistema",
-    "settingsAiTools": "Configuración de IA",
-    "settingsChannels": "Canales",
     "profile": "Perfil",
     "settings": "Configuración"
   },
@@ -1225,7 +1231,7 @@
     "retryLater": "Reintentar"
   },
   "settings": {
-    "title": "Configuración",
+    "title": "Preferencias",
     "subtitle": "Administra tus preferencias y configuración",
     "tabs": {
       "general": "General",
@@ -1237,7 +1243,10 @@
       "easy": "Modo Fácil",
       "easyDesc": "Interfaz simplificada con funciones esenciales",
       "advanced": "Modo Avanzado",
-      "advancedDesc": "Acceso completo a todas las funciones y herramientas"
+      "advancedDesc": "Acceso completo a todas las funciones y herramientas",
+      "lockedTitle": "Función del modo avanzado",
+      "lockedMessage": "\"{feature}\" forma parte del modo avanzado. Cambia al modo avanzado para usarlo; puedes volver cuando quieras desde Preferencias.",
+      "switchCta": "Cambiar al modo avanzado"
     },
     "theme": {
       "title": "Tema",

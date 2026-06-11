@@ -148,14 +148,14 @@ test.describe('@ci @layout UI guard — chat surface', () => {
       const btn = navButtons.nth(i)
       const testid = await btn.getAttribute('data-testid')
 
-      // Phase 0.5 contract: every nav control has a non-empty accessible
-      // name (today via title/aria-label). Phase 2 strengthens this to an
-      // always-visible label NODE (§4.1 #3) — flip the assertion then.
-      const title = (await btn.getAttribute('title')) ?? ''
-      const ariaLabel = (await btn.getAttribute('aria-label')) ?? ''
+      // Phase 2 contract (§4.1 #3): every rail control carries an
+      // ALWAYS-VISIBLE label node — tooltips are additive, never the only
+      // affordance.
+      const label = btn.locator(NAV.railLabel)
+      await expect(label, `${testid}: rail label node missing`).toBeVisible()
       expect(
-        title.trim() !== '' || ariaLabel.trim() !== '',
-        `${testid}: nav control without accessible name`
+        ((await label.textContent()) ?? '').trim() !== '',
+        `${testid}: rail label is empty`
       ).toBe(true)
 
       if (isMobileViewport(page)) {

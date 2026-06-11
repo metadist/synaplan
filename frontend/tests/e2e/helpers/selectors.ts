@@ -63,17 +63,23 @@ export const selectors = {
      * `link-sidebar-v2-<key>`) — decoupled from route paths so URL migrations
      * never rename selectors (navigation IA cleanup, phase 0.5).
      */
-    /** V2 sidebar: chat nav icon opens chat list modal */
+    /** V2 sidebar: History nav item opens the chat list modal */
     sidebarV2ChatNav: '[data-testid="btn-sidebar-v2-nav-chat"]',
     /** V2 sidebar: files nav icon */
     sidebarV2Files: '[data-testid="btn-sidebar-v2-nav-files"]',
-    /** V2 sidebar: settings nav icon (advanced mode only) */
-    sidebarV2Settings: '[data-testid="btn-sidebar-v2-nav-settings"]',
+    /** V2 sidebar: Channels rail item (locked in easy mode, flyout in advanced) */
+    sidebarV2Channels: '[data-testid="btn-sidebar-v2-nav-channels"]',
+    /** V2 sidebar: AI Setup rail item (locked in easy mode, flyout in advanced) */
+    sidebarV2AiSetup: '[data-testid="btn-sidebar-v2-nav-ai-setup"]',
     /** V2 sidebar: admin nav icon (admin only) */
     sidebarV2Admin: '[data-testid="btn-sidebar-v2-nav-admin"]',
+    /** V2 rail: always-visible label node inside each nav button (§4.1 #3) */
+    railLabel: '.v2-rail-label',
     /** V2 flyout: child links (stable keys) */
+    flyoutLinkInbound: '[data-testid="link-sidebar-v2-inbound"]',
     flyoutLinkChatWidget: '[data-testid="link-sidebar-v2-chat-widget"]',
     flyoutLinkMailHandler: '[data-testid="link-sidebar-v2-mail-handler"]',
+    flyoutLinkApiDocs: '[data-testid="link-sidebar-v2-api-docs"]',
     flyoutLinkAiModels: '[data-testid="link-sidebar-v2-ai-models"]',
     flyoutLinkTaskPrompts: '[data-testid="link-sidebar-v2-task-prompts"]',
     flyoutLinkAdminDashboard: '[data-testid="link-sidebar-v2-admin-dashboard"]',
@@ -199,7 +205,8 @@ export const selectors = {
     button: '[data-testid="btn-sidebar-v2-user"]',
     dropdown: '[data-testid="dropdown-sidebar-v2-user"]',
     profileBtn: '[data-testid="btn-sidebar-v2-profile"]',
-    settingsBtn: '[data-testid="btn-sidebar-v2-settings"]',
+    /** Avatar menu entry for the /settings page — labeled "Preferences" since phase 2 */
+    preferencesBtn: '[data-testid="btn-sidebar-v2-preferences"]',
     statisticsBtn: '[data-testid="btn-sidebar-v2-statistics"]',
     subscriptionBtn: '[data-testid="btn-sidebar-v2-subscription"]',
     upgradeBtn: '[data-testid="btn-sidebar-v2-upgrade"]',

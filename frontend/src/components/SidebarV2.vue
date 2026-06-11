@@ -23,7 +23,7 @@
       'transition-transform duration-300 ease-in-out',
       sidebarStore.isMobileOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0',
     ]"
-    style="width: 64px; min-width: 64px"
+    style="width: 80px; min-width: 80px"
     data-testid="comp-sidebar-v2"
   >
     <!--
@@ -48,7 +48,7 @@
     <!-- New Chat Button -->
     <div class="flex items-center justify-center py-3 flex-shrink-0">
       <button
-        class="v2-new-chat-btn w-10 h-10 flex items-center justify-center rounded-xl transition-all duration-200"
+        class="v2-new-chat-btn w-[72px] min-h-[48px] flex flex-col items-center justify-center gap-0.5 py-1.5 rounded-xl transition-all duration-200"
         :class="{ 'v2-new-chat-btn--creating': isCreatingChat }"
         :title="$t('nav.newDescription')"
         :disabled="isCreatingChat"
@@ -56,9 +56,15 @@
         @click="handleQuickNewChat"
       >
         <Icon
-          :icon="isCreatingChat ? 'mdi:loading' : 'mdi:plus'"
-          :class="['w-5 h-5', isCreatingChat && 'animate-spin']"
+          v-if="isCreatingChat"
+          icon="mdi:loading"
+          class="w-6 h-6 animate-spin"
+          aria-hidden="true"
         />
+        <PlusIcon v-else class="w-6 h-6" aria-hidden="true" />
+        <span class="v2-rail-label text-[10px] font-medium leading-tight">
+          {{ $t('nav.new') }}
+        </span>
       </button>
     </div>
 
@@ -69,20 +75,26 @@
         :key="item.path"
         :ref="(el) => setNavBtnRef(el, item.path)"
         :class="[
-          'v2-rail-icon w-10 h-10 flex items-center justify-center relative',
+          'v2-rail-icon w-[72px] min-h-[48px] flex flex-col items-center justify-center gap-0.5 py-1.5 relative',
           isItemActive(item) && 'v2-rail-icon--active',
           item.isUpgrade && 'text-amber-500 dark:text-amber-400',
-          item.requiresAuth && isGuestMode && 'opacity-50',
+          ((item.requiresAuth && isGuestMode) || isItemLocked(item)) && 'opacity-50',
         ]"
         :title="item.description || item.label"
         :data-testid="`btn-sidebar-v2-nav-${item.key}`"
         @click="handleNavClick(item)"
       >
-        <component :is="item.icon" class="w-6 h-6" />
+        <component :is="item.icon" class="w-6 h-6 flex-shrink-0" aria-hidden="true" />
+        <span
+          class="v2-rail-label text-[10px] font-medium leading-tight max-w-full truncate px-0.5"
+        >
+          {{ item.label }}
+        </span>
         <Icon
-          v-if="item.requiresAuth && isGuestMode"
+          v-if="(item.requiresAuth && isGuestMode) || isItemLocked(item)"
           icon="mdi:lock-outline"
-          class="absolute -top-0.5 -right-0.5 w-3.5 h-3.5 text-amber-500"
+          class="absolute top-0.5 right-1.5 w-3.5 h-3.5 text-amber-500"
+          aria-hidden="true"
         />
       </button>
     </nav>
@@ -93,12 +105,15 @@
       class="flex items-center justify-center py-2 flex-shrink-0"
     >
       <button
-        class="v2-upgrade-btn w-10 h-10 flex items-center justify-center rounded-xl"
+        class="v2-upgrade-btn w-[72px] min-h-[48px] flex flex-col items-center justify-center gap-0.5 py-1.5 rounded-xl"
         :title="$t('nav.upgrade')"
         data-testid="btn-sidebar-v2-upgrade"
         @click="handleNavigate('/subscription')"
       >
-        <Icon icon="mdi:auto-fix" class="w-6 h-6" />
+        <RocketLaunchIcon class="w-6 h-6" aria-hidden="true" />
+        <span class="v2-rail-label text-[10px] font-medium leading-tight">
+          {{ $t('nav.upgrade') }}
+        </span>
       </button>
     </div>
 
@@ -106,8 +121,8 @@
     <div class="flex items-center justify-center py-4 flex-shrink-0">
       <button
         ref="userBtnRef"
-        class="v2-rail-icon w-10 h-10 flex items-center justify-center"
-        :title="authStore.user?.email || ''"
+        class="v2-rail-icon w-[72px] min-h-[48px] flex flex-col items-center justify-center gap-0.5 py-1.5"
+        :title="authStore.user?.email || $t('nav.accountDescription')"
         data-testid="btn-sidebar-v2-user"
         @click="toggleUserMenu"
       >
@@ -116,6 +131,9 @@
         >
           {{ initials }}
         </div>
+        <span class="v2-rail-label text-[10px] font-medium leading-tight">
+          {{ $t('nav.account') }}
+        </span>
       </button>
     </div>
   </aside>
@@ -207,20 +225,20 @@
               <button
                 role="menuitem"
                 class="dropdown-item"
-                data-testid="btn-sidebar-v2-settings"
-                @click="handleNavigate('/settings')"
-              >
-                <Cog6ToothIcon class="w-4 h-4" />
-                <span>{{ $t('nav.settings') }}</span>
-              </button>
-              <button
-                role="menuitem"
-                class="dropdown-item"
                 data-testid="btn-sidebar-v2-statistics"
                 @click="handleNavigate('/statistics')"
               >
                 <ChartBarIcon class="w-4 h-4" />
                 <span>{{ $t('nav.statistics') }}</span>
+              </button>
+              <button
+                role="menuitem"
+                class="dropdown-item"
+                data-testid="btn-sidebar-v2-preferences"
+                @click="handleNavigate('/settings')"
+              >
+                <Cog6ToothIcon class="w-4 h-4" />
+                <span>{{ $t('nav.preferences') }}</span>
               </button>
               <button
                 v-if="!authStore.isAdmin && configStore.billing.enabled && authStore.isPro"
@@ -229,7 +247,7 @@
                 data-testid="btn-sidebar-v2-subscription"
                 @click="handleNavigate('/subscription')"
               >
-                <SparklesIcon class="w-4 h-4" />
+                <CreditCardIcon class="w-4 h-4" />
                 <span>{{ $t('nav.subscription') }}</span>
               </button>
             </div>
@@ -613,12 +631,17 @@ import { ref, computed, onMounted, onBeforeUnmount, type Component } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import {
   ChatBubbleLeftRightIcon,
+  ClockIcon,
+  CpuChipIcon,
+  CreditCardIcon,
   FolderIcon,
   MagnifyingGlassIcon,
+  PlusIcon,
+  RocketLaunchIcon,
+  SignalIcon,
   Cog6ToothIcon,
   ChartBarIcon,
   ShieldCheckIcon,
-  SparklesIcon,
   PuzzlePieceIcon,
   UserCircleIcon,
   ArrowRightOnRectangleIcon,
@@ -772,6 +795,12 @@ interface NavItem {
   isUpgrade?: boolean
   requiresAuth?: boolean
   gateFeature?: string
+  /**
+   * Q6: easy mode shows these items with a lock badge instead of hiding
+   * them; tapping offers a one-click switch to Advanced mode. appMode
+   * decorates the rail, it no longer filters it.
+   */
+  lockedInEasyMode?: boolean
   children?: NavChild[]
 }
 
@@ -784,7 +813,7 @@ const navItems = computed<NavItem[]>(() => {
       path: '/',
       label: t('nav.history'),
       description: t('nav.historyDescription'),
-      icon: ChatBubbleLeftRightIcon,
+      icon: ClockIcon,
     },
   ]
 
@@ -792,6 +821,7 @@ const navItems = computed<NavItem[]>(() => {
     key: 'files',
     path: '/files',
     label: t('nav.files'),
+    description: t('nav.filesDescription'),
     icon: FolderIcon,
     requiresAuth: true,
     gateFeature: 'files',
@@ -806,82 +836,66 @@ const navItems = computed<NavItem[]>(() => {
     gateFeature: 'files',
   })
 
-  if (appModeStore.isAdvancedMode || isGuestMode.value) {
-    const settingsChildren: NavChild[] = [
-      {
-        key: 'chat-widget',
-        path: '/tools/chat-widget',
-        label: t('nav.toolsChatWidget'),
-        group: t('nav.settingsChannels'),
-      },
-      {
-        key: 'mail-handler',
-        path: '/tools/mail-handler',
-        label: t('nav.toolsMailHandler'),
-        group: t('nav.settingsChannels'),
-      },
-      {
-        key: 'inbound',
-        path: '/config/inbound',
-        label: t('nav.configInbound'),
-        group: t('nav.settingsChannels'),
-      },
-      {
-        key: 'ai-models',
-        path: '/config/ai-models',
-        label: t('nav.configAiModels'),
-        group: t('nav.settingsAiTools'),
-      },
-      {
-        key: 'api-keys',
-        path: '/config/api-keys',
-        label: t('nav.configApiKeys'),
-        group: t('nav.settingsAiTools'),
-      },
-      {
-        key: 'task-prompts',
-        path: '/config/task-prompts',
-        label: t('nav.configTaskPrompts'),
-        group: t('nav.settingsAiTools'),
-      },
-      {
-        key: 'sorting-prompt',
-        path: '/config/sorting-prompt',
-        label: t('nav.configSortingPrompt'),
-        group: t('nav.settingsAiTools'),
-      },
-      {
-        key: 'doc-summary',
-        path: '/tools/doc-summary',
-        label: t('nav.toolsDocSummary'),
-        group: t('nav.settingsAiTools'),
-      },
-    ]
+  // Channels + AI Setup are always present (Q6: easy mode shows them locked;
+  // guests see them gate-locked). URLs are still the legacy /tools + /config
+  // prefixes — the URL migration is phase 4 of the navigation IA plan.
+  const channelsChildren: NavChild[] = [
+    { key: 'inbound', path: '/config/inbound', label: t('nav.configInbound') },
+    { key: 'chat-widget', path: '/tools/chat-widget', label: t('nav.toolsChatWidget') },
+    { key: 'mail-handler', path: '/tools/mail-handler', label: t('nav.toolsMailHandler') },
+    { key: 'api-keys', path: '/config/api-keys', label: t('nav.configApiKeys') },
+    { key: 'api-docs', path: '/config/api-documentation', label: t('pageTitles.configApiDocs') },
+  ]
 
-    items.push({
-      key: 'settings',
-      path: '/settings',
-      label: t('nav.settings'),
-      icon: Cog6ToothIcon,
-      requiresAuth: true,
-      gateFeature: 'settings',
-      children: isGuestMode.value ? undefined : settingsChildren,
-    })
-  }
+  items.push({
+    key: 'channels',
+    path: '/config/inbound',
+    label: t('nav.channels'),
+    description: t('nav.channelsDescription'),
+    icon: SignalIcon,
+    requiresAuth: true,
+    gateFeature: 'settings',
+    lockedInEasyMode: true,
+    children: isGuestMode.value ? undefined : channelsChildren,
+  })
 
-  if (appModeStore.isAdvancedMode && configStore.plugins.length > 0) {
+  const aiSetupChildren: NavChild[] = [
+    { key: 'ai-models', path: '/config/ai-models', label: t('nav.configAiModels') },
+    { key: 'task-prompts', path: '/config/task-prompts', label: t('nav.configTaskPrompts') },
+    { key: 'sorting-prompt', path: '/config/sorting-prompt', label: t('nav.configSortingPrompt') },
+    // Transitional home (Q3): retires into the in-chat Tools dropdown later.
+    { key: 'doc-summary', path: '/tools/doc-summary', label: t('nav.toolsDocSummary') },
+  ]
+
+  items.push({
+    key: 'ai-setup',
+    path: '/config/ai-models',
+    label: t('nav.aiSetup'),
+    description: t('nav.aiSetupDescription'),
+    icon: CpuChipIcon,
+    requiresAuth: true,
+    gateFeature: 'settings',
+    lockedInEasyMode: true,
+    children: isGuestMode.value ? undefined : aiSetupChildren,
+  })
+
+  if (configStore.plugins.length > 0) {
     items.push({
       key: 'plugins',
       path: '/plugins',
       label: t('nav.plugins'),
       icon: PuzzlePieceIcon,
-      children: configStore.plugins.map((plugin: { name?: string }) => ({
-        key: `plugin-${plugin.name ?? 'unknown'}`,
-        path: `/plugins/${plugin.name}`,
-        label: plugin.name
-          ? plugin.name.charAt(0).toUpperCase() + plugin.name.slice(1)
-          : t('common.unknown'),
-      })),
+      requiresAuth: true,
+      lockedInEasyMode: true,
+      children: isGuestMode.value
+        ? undefined
+        : configStore.plugins.map((plugin: { name?: string }) => ({
+            key: `plugin-${plugin.name ?? 'unknown'}`,
+            path: `/plugins/${plugin.name}`,
+            label: plugin.name
+              ? plugin.name.charAt(0).toUpperCase() + plugin.name.slice(1)
+              : t('common.unknown'),
+          })),
     })
   }
 
@@ -942,11 +956,15 @@ const isItemActive = (item: NavItem): boolean => {
   if (item.path === '/') {
     return route.path === '/' || route.path.startsWith('/chat')
   }
-  if (item.path === '/settings') {
-    return route.path.startsWith('/tools') || route.path.startsWith('/config')
+  if (item.children && item.children.length > 0) {
+    return item.children.some((child) => route.path.startsWith(child.path))
   }
   return route.path.startsWith(item.path)
 }
+
+/** Q6: item is shown but locked while the app is in easy mode. */
+const isItemLocked = (item: NavItem): boolean =>
+  Boolean(item.lockedInEasyMode) && appModeStore.isEasyMode && !isGuestMode.value
 
 const handleQuickNewChat = async () => {
   if (isCreatingChat.value) return
@@ -967,7 +985,7 @@ const handleQuickNewChat = async () => {
 const featureGateOpen = ref(false)
 const featureGateKey = ref('general')
 
-const handleNavClick = (item: NavItem) => {
+const handleNavClick = async (item: NavItem) => {
   userMenuOpen.value = false
 
   if (item.requiresAuth && isGuestMode.value) {
@@ -975,6 +993,20 @@ const handleNavClick = (item: NavItem) => {
     featureGateOpen.value = true
     sidebarStore.closeMobile()
     return
+  }
+
+  // Q6: locked in easy mode — offer the one-click switch to Advanced mode
+  // (mirrors the guest gate pattern), then continue with the original click.
+  if (isItemLocked(item)) {
+    closeFlyout()
+    const confirmed = await dialog.confirm({
+      title: t('settings.appMode.lockedTitle'),
+      message: t('settings.appMode.lockedMessage', { feature: item.label }),
+      confirmText: t('settings.appMode.switchCta'),
+      cancelText: t('common.cancel'),
+    })
+    if (!confirmed) return
+    appModeStore.setMode('advanced')
   }
 
   if (item.path === '/') {

@@ -24,7 +24,7 @@
     "configApiKeys": "API Keys",
     "configApiDocs": "API Documentation",
     "statistics": "Statistics",
-    "settings": "Settings",
+    "settings": "Preferences",
     "profile": "Profile",
     "admin": "Admin Panel",
     "adminFeatures": "Feature Status",
@@ -310,12 +310,18 @@
     "toolsMailHandler": "Email Automation",
     "plugins": "Plugins",
     "files": "Files",
+    "filesDescription": "Files & knowledge",
+    "channels": "Channels",
+    "channelsDescription": "Connected channels",
+    "aiSetup": "AI Setup",
+    "aiSetupDescription": "Models, instructions & routing",
+    "preferences": "Preferences",
+    "account": "Account",
+    "accountDescription": "Account & preferences",
     "filesAndRag": "File Manager",
     "fileManager": "File Manager",
     "semanticSearch": "Semantic Search",
     "settings": "Settings",
-    "settingsChannels": "Channels",
-    "settingsAiTools": "AI Setup",
     "aiConfig": "AI Config",
     "configInbound": "Overview",
     "configAiModels": "AI Models",
@@ -2916,7 +2922,7 @@
     "unlimited": "Unlimited"
   },
   "settings": {
-    "title": "Settings",
+    "title": "Preferences",
     "subtitle": "Manage your preferences and configuration",
     "tabs": {
       "general": "General",
@@ -2928,7 +2934,10 @@
       "easy": "Easy Mode",
       "easyDesc": "Simplified interface with essential features",
       "advanced": "Advanced Mode",
-      "advancedDesc": "Full access to all features and agents"
+      "advancedDesc": "Full access to all features and tools",
+      "lockedTitle": "Advanced mode feature",
+      "lockedMessage": "\"{feature}\" is part of Advanced mode. Switch to Advanced mode to use it — you can change back anytime in Preferences.",
+      "switchCta": "Switch to Advanced mode"
     },
     "theme": {
       "title": "Theme",

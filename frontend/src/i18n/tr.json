@@ -22,7 +22,7 @@
     "configApiKeys": "API Anahtarları",
     "configApiDocs": "API Dokümantasyonu",
     "statistics": "İstatistikler",
-    "settings": "Ayarlar",
+    "settings": "Tercihler",
     "profile": "Profil",
     "admin": "Yönetici Paneli",
     "adminFeatures": "Özellik Durumu",
@@ -278,6 +278,14 @@
     "toolsMailHandler": "E-posta Otomasyonu",
     "plugins": "Eklentiler",
     "files": "Dosyalar",
+    "filesDescription": "Dosyalar ve bilgi",
+    "channels": "Kanallar",
+    "channelsDescription": "Bağlı kanallar",
+    "aiSetup": "AI Yapılandırması",
+    "aiSetupDescription": "Modeller, talimatlar ve yönlendirme",
+    "preferences": "Tercihler",
+    "account": "Hesap",
+    "accountDescription": "Hesap ve tercihler",
     "filesAndRag": "Dosyalar & RAG",
     "fileManager": "Dosya Yöneticisi",
     "semanticSearch": "Anlamsal Arama",
@@ -294,8 +302,6 @@
     "adminDashboard": "Kontrol Paneli",
     "adminFeatureStatus": "Özellik Durumu",
     "adminSystemConfig": "Sistem Yapılandırması",
-    "settingsAiTools": "AI Yapılandırması",
-    "settingsChannels": "Kanallar",
     "profile": "Profil",
     "settings": "Ayarlar"
   },
@@ -1226,7 +1232,7 @@
     "retryLater": "Tekrar Dene"
   },
   "settings": {
-    "title": "Ayarlar",
+    "title": "Tercihler",
     "subtitle": "Tercihlerinizi ve yapılandırmanızı yönetin",
     "tabs": {
       "general": "Genel",
@@ -1238,7 +1244,10 @@
       "easy": "Kolay Mod",
       "easyDesc": "Temel özelliklerle basitleştirilmiş arayüz",
       "advanced": "Gelişmiş Mod",
-      "advancedDesc": "Tüm özelliklere ve araçlara tam erişim"
+      "advancedDesc": "Tüm özelliklere ve araçlara tam erişim",
+      "lockedTitle": "Gelişmiş mod özelliği",
+      "lockedMessage": "\"{feature}\" gelişmiş modun bir parçasıdır. Kullanmak için gelişmiş moda geçin — Tercihler bölümünden istediğiniz zaman geri dönebilirsiniz.",
+      "switchCta": "Gelişmiş moda geç"
     },
     "theme": {
       "title": "Tema",
