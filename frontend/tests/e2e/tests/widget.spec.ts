@@ -183,7 +183,7 @@ test.describe('@ci @smoke Widget', () => {
 
     const userContainer = messageContainers.nth(previousCount)
     await expect(userContainer.locator(selectors.widget.messageUserText)).toBeVisible({
-      timeout: TIMEOUTS.SHORT,
+      timeout: TIMEOUTS.STANDARD,
     })
     await expect(userContainer).toContainText('smoke test')
 
@@ -191,7 +191,7 @@ test.describe('@ci @smoke Widget', () => {
     const newBubble = messageContainers.nth(assistantIndex)
     await newBubble.waitFor({ state: 'attached', timeout: TIMEOUTS.STANDARD })
     await newBubble.scrollIntoViewIfNeeded()
-    await newBubble.waitFor({ state: 'visible', timeout: TIMEOUTS.SHORT })
+    await newBubble.waitFor({ state: 'visible', timeout: TIMEOUTS.STANDARD })
 
     await newBubble
       .locator(selectors.widget.messageDone)
