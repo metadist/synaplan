@@ -21,14 +21,16 @@ const NAV = selectors.nav
 const CHAT = selectors.chat
 
 /**
- * Touch-target floor in px. The current rail uses 40 px buttons (w-10); the
- * redesign raises interactive nav targets to 44 px in phase 6 (bottom tab
- * bar) — bump this constant in that PR.
+ * Touch-target floor in px — §4.3 #1/#2: interactive nav targets are 44 px
+ * minimum since phase 6 (bottom tab bar).
  */
-const MIN_TARGET_PX = 40
+const MIN_TARGET_PX = 44
 
-/** Tailwind `lg` — the sidebar is an off-canvas overlay below this width. */
-const MOBILE_MAX_WIDTH = 1024
+/**
+ * Tailwind `md` — since phase 6 the rail exists only at >= md; below it the
+ * bottom tab bar (MobileNav) is the primary navigation.
+ */
+const MOBILE_MAX_WIDTH = 768
 
 function isMobileViewport(page: Page): boolean {
   const size = page.viewportSize()
@@ -40,16 +42,6 @@ async function ensureAdvancedMode(page: Page) {
   await page.evaluate(() => localStorage.setItem('app_mode', 'advanced'))
   await page.reload()
   await expect(page.locator(CHAT.textInput)).toBeVisible({ timeout: TIMEOUTS.STANDARD })
-}
-
-/** On mobile the rail is off-canvas — open it via the header burger first. */
-async function openRail(page: Page) {
-  if (isMobileViewport(page)) {
-    const burger = page.locator('[data-testid="btn-sidebar-toggle"]')
-    await expect(burger).toBeVisible({ timeout: TIMEOUTS.SHORT })
-    await burger.click()
-  }
-  await expect(page.locator(NAV.sidebar)).toBeVisible({ timeout: TIMEOUTS.SHORT })
 }
 
 /** The #1 mobile breakage: horizontal page overflow. */
@@ -132,14 +124,45 @@ test.describe('@ci @layout UI guard — chat surface', () => {
     await expectInsideViewport(page, CHAT.sendBtn, 'send button')
   })
 
-  test('rail nav controls carry accessible names and meet target size', async ({
+  test('primary nav controls carry visible labels and meet target size', async ({
     page,
     credentials,
   }) => {
     await login(page, credentials)
     await ensureAdvancedMode(page)
-    await openRail(page)
 
+    if (isMobileViewport(page)) {
+      // Phase 6 (§4.3 #2): on mobile the bottom tab bar IS the primary nav.
+      await expect(page.locator(NAV.mobileBar)).toBeVisible({ timeout: TIMEOUTS.SHORT })
+      const tabs = page.locator('[data-testid^="btn-mobile-nav-"]')
+      const count = await tabs.count()
+      expect(count, 'bottom bar renders New/History/Files/More').toBe(4)
+
+      for (let i = 0; i < count; i++) {
+        const tab = tabs.nth(i)
+        const testid = await tab.getAttribute('data-testid')
+
+        const label = tab.locator(NAV.railLabel)
+        await expect(label, `${testid}: tab label node missing`).toBeVisible()
+        expect(((await label.textContent()) ?? '').trim() !== '', `${testid}: label empty`).toBe(
+          true
+        )
+
+        const box = await tab.boundingBox()
+        expect(box, `${testid}: not rendered`).not.toBeNull()
+        if (box) {
+          expect(box.width, `${testid}: tap target too narrow`).toBeGreaterThanOrEqual(
+            MIN_TARGET_PX
+          )
+          expect(box.height, `${testid}: tap target too short`).toBeGreaterThanOrEqual(
+            MIN_TARGET_PX
+          )
+        }
+      }
+      return
+    }
+
+    await expect(page.locator(NAV.sidebar)).toBeVisible({ timeout: TIMEOUTS.SHORT })
     const navButtons = page.locator('[data-testid^="btn-sidebar-v2-nav-"]')
     const count = await navButtons.count()
     expect(count, 'rail renders nav items').toBeGreaterThanOrEqual(2)
@@ -157,18 +180,48 @@ test.describe('@ci @layout UI guard — chat surface', () => {
         ((await label.textContent()) ?? '').trim() !== '',
         `${testid}: rail label is empty`
       ).toBe(true)
+    }
+  })
 
-      if (isMobileViewport(page)) {
-        const box = await btn.boundingBox()
-        expect(box, `${testid}: not rendered`).not.toBeNull()
-        if (box) {
-          expect(box.width, `${testid}: tap target too narrow`).toBeGreaterThanOrEqual(
-            MIN_TARGET_PX
-          )
-          expect(box.height, `${testid}: tap target too short`).toBeGreaterThanOrEqual(
-            MIN_TARGET_PX
-          )
-        }
+  test('More sheet opens with accordion sections and 44px rows (mobile)', async ({
+    page,
+    credentials,
+  }) => {
+    test.skip(!isMobileViewport(page), 'bottom tab bar exists only below md')
+
+    await login(page, credentials)
+    await ensureAdvancedMode(page)
+
+    await page.locator(NAV.mobileMore).click()
+    const sheet = page.locator(NAV.mobileMoreSheet)
+    await expect(sheet).toBeVisible({ timeout: TIMEOUTS.SHORT })
+    await expectNoHorizontalOverflow(page, 'more sheet')
+    await expectInsideViewport(page, NAV.mobileMoreSheet, 'more sheet')
+
+    // §4.4: the sheet carries the remaining sections + the account block.
+    const sections = sheet.locator('[data-testid^="btn-mobile-more-"]')
+    expect(await sections.count(), 'more sheet renders section rows').toBeGreaterThanOrEqual(2)
+    await expect(sheet.locator('[data-testid="section-mobile-more-account"]')).toBeVisible()
+
+    // Accordion: tapping Channels expands its children inline (§4.3 #3).
+    await sheet.locator('[data-testid="btn-mobile-more-channels"]').click()
+    await expect(sheet.locator('[data-testid="link-mobile-more-inbound"]')).toBeVisible({
+      timeout: TIMEOUTS.SHORT,
+    })
+
+    // Touch targets: every visible row in the sheet is >= 44 px tall.
+    const rows = sheet.locator(
+      '[data-testid^="btn-mobile-more-"], [data-testid^="link-mobile-more-"]'
+    )
+    const rowCount = await rows.count()
+    for (let i = 0; i < rowCount; i++) {
+      const row = rows.nth(i)
+      if (!(await row.isVisible())) continue
+      const testid = await row.getAttribute('data-testid')
+      const box = await row.boundingBox()
+      expect(box, `${testid}: not rendered`).not.toBeNull()
+      if (box) {
+        expect(box.height, `${testid}: row too short`).toBeGreaterThanOrEqual(MIN_TARGET_PX)
       }
     }
   })
@@ -194,9 +247,15 @@ test.describe('@ci @layout UI guard — chat surface', () => {
 
   test('history sheet (chat list) opens within the viewport', async ({ page, credentials }) => {
     await login(page, credentials)
-    await openRail(page)
 
-    await page.locator(NAV.sidebarV2ChatNav).click()
+    // Same sheet, two entry points: bottom tab on mobile, rail on desktop.
+    if (isMobileViewport(page)) {
+      await expect(page.locator(NAV.mobileHistory)).toBeVisible({ timeout: TIMEOUTS.SHORT })
+      await page.locator(NAV.mobileHistory).click()
+    } else {
+      await expect(page.locator(NAV.sidebar)).toBeVisible({ timeout: TIMEOUTS.SHORT })
+      await page.locator(NAV.sidebarV2ChatNav).click()
+    }
     await expect(page.locator(NAV.modalChatManager)).toBeVisible({ timeout: TIMEOUTS.SHORT })
     await expectNoHorizontalOverflow(page, 'history sheet')
     await expectInsideViewport(page, NAV.modalChatManager, 'history sheet')
@@ -224,7 +283,7 @@ test.describe('@ci @layout UI guard — key pages', () => {
       expect(box, 'files upload button: not rendered').not.toBeNull()
       if (box) {
         expect(box.height, 'files upload button: tap target too short').toBeGreaterThanOrEqual(
-          MIN_TARGET_PX - 8 // compact secondary button; raised with phase 5 Files rework
+          MIN_TARGET_PX
         )
       }
     }

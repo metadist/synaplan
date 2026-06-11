@@ -58,6 +58,13 @@ export const selectors = {
     sidebarExpand: '[data-testid="btn-sidebar-expand"]',
     /** V2 sidebar: single plus button to start new chat (no toggle/dropdown) */
     sidebarV2NewChat: '[data-testid="btn-sidebar-v2-new-chat"]',
+    /** §4.3 #2: mobile bottom tab bar (replaces the off-canvas drawer) */
+    mobileBar: '[data-testid="nav-mobile-bottom"]',
+    mobileNew: '[data-testid="btn-mobile-nav-new"]',
+    mobileHistory: '[data-testid="btn-mobile-nav-history"]',
+    mobileFiles: '[data-testid="btn-mobile-nav-files"]',
+    mobileMore: '[data-testid="btn-mobile-nav-more"]',
+    mobileMoreSheet: '[data-testid="sheet-mobile-more"]',
     /**
      * V2 sidebar nav testids use STABLE KEYS (`btn-sidebar-v2-nav-<key>`,
      * `link-sidebar-v2-<key>`) — decoupled from route paths so URL migrations

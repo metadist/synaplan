@@ -303,7 +303,9 @@
     "adminFeatureStatus": "Estado de Funciones",
     "adminSystemConfig": "Configuración del Sistema",
     "profile": "Perfil",
-    "settings": "Configuración"
+    "settings": "Configuración",
+    "more": "Más",
+    "moreDescription": "Más secciones y cuenta"
   },
   "chatInput": {
     "placeholder": "Escribe tu mensaje...",

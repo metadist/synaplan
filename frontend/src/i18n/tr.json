@@ -303,7 +303,9 @@
     "adminFeatureStatus": "Özellik Durumu",
     "adminSystemConfig": "Sistem Yapılandırması",
     "profile": "Profil",
-    "settings": "Ayarlar"
+    "settings": "Ayarlar",
+    "more": "Daha fazla",
+    "moreDescription": "Diğer bölümler ve hesap"
   },
   "chatInput": {
     "placeholder": "Mesajınızı yazın...",

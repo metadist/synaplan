@@ -720,6 +720,54 @@
 }
 
 /* ----------------------------------------------------------
+   13b. Mobile bottom tab bar (§4.3 #2 — replaces the drawer)
+   ---------------------------------------------------------- */
+
+.design-v2 .v2-mobile-tabbar {
+  background: rgba(255, 255, 255, 0.97);
+  border-top: 1px solid var(--v2-border);
+  box-shadow: 0 -2px 24px rgba(0, 0, 0, 0.08);
+  /* Keep the tabs above the iOS home-indicator bar. */
+  padding-bottom: env(safe-area-inset-bottom);
+}
+.design-v2.dark .v2-mobile-tabbar {
+  background: rgba(10, 16, 30, 0.97);
+  box-shadow: 0 -2px 24px rgba(0, 0, 0, 0.4);
+}
+
+.design-v2 .v2-mobile-tab {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  flex: 1 1 0;
+  /* 44px minimum touch target (§4.3 #1) with breathing room. */
+  min-height: 56px;
+  padding: 6px 4px;
+  border-radius: 0.75rem;
+  margin: 4px 4px;
+}
+
+/* The New tab keeps the brand accent of the rail's new-chat button, flat. */
+.design-v2 .v2-new-chat-btn-flat {
+  background: rgba(0, 63, 199, 0.1);
+  color: var(--brand);
+  border: 1px solid rgba(0, 63, 199, 0.2);
+}
+.design-v2 .v2-new-chat-btn-flat:active {
+  background: rgba(0, 63, 199, 0.18);
+}
+.design-v2.dark .v2-new-chat-btn-flat {
+  background: rgba(107, 143, 214, 0.08);
+  color: var(--brand-light);
+  border: 1px solid rgba(107, 143, 214, 0.15);
+}
+.design-v2.dark .v2-new-chat-btn-flat:active {
+  background: rgba(107, 143, 214, 0.15);
+}
+
+/* ----------------------------------------------------------
    14. Hover Surface — Glass
    ---------------------------------------------------------- */
 

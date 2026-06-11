@@ -1,48 +1,18 @@
 <template>
-  <!-- Backdrop for mobile -->
-  <Transition
-    enter-active-class="transition-opacity duration-300 ease-in-out"
-    enter-from-class="opacity-0"
-    enter-to-class="opacity-100"
-    leave-active-class="transition-opacity duration-300 ease-in-out"
-    leave-from-class="opacity-100"
-    leave-to-class="opacity-0"
-  >
-    <div
-      v-if="sidebarStore.isMobileOpen"
-      class="fixed inset-0 bg-black/50 z-40 md:hidden"
-      data-testid="section-sidebar-v2-backdrop"
-      @click="(closeFlyout(), sidebarStore.closeMobile())"
-    />
-  </Transition>
-
+  <!--
+    Desktop navigation rail (§4.3 #1). On mobile the rail does not exist —
+    the bottom tab bar (MobileNav.vue) is the primary navigation there.
+  -->
   <aside
-    :class="[
-      'v2-sidebar-rail flex flex-col',
-      'fixed md:relative z-50 md:z-auto',
-      'transition-transform duration-300 ease-in-out',
-      sidebarStore.isMobileOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0',
-    ]"
+    class="v2-sidebar-rail hidden md:flex flex-col"
     style="width: 80px; min-width: 80px"
     data-testid="comp-sidebar-v2"
   >
-    <!--
-      Top section: height-synced with the mobile Header on small screens
-      (h-12 = 48px) so the close button sits exactly where the burger was,
-      and taller on desktop where it hosts the brand logo.
-    -->
+    <!-- Brand logo -->
     <div
-      class="flex flex-col items-center justify-center flex-shrink-0 border-b border-white/[0.04] h-12 md:h-[76px]"
+      class="flex flex-col items-center justify-center flex-shrink-0 border-b border-white/[0.04] h-[76px]"
     >
-      <button
-        class="md:hidden v2-rail-icon w-10 h-10 flex items-center justify-center"
-        aria-label="Close sidebar"
-        data-testid="btn-sidebar-v2-close"
-        @click="sidebarStore.closeMobile()"
-      >
-        <Icon icon="mdi:close" class="w-5 h-5" />
-      </button>
-      <img :src="logoIconSrc" alt="synaplan" class="h-7 w-auto hidden md:block" />
+      <img :src="logoIconSrc" alt="synaplan" class="h-7 w-auto" />
     </div>
 
     <!-- New Chat Button -->
@@ -334,7 +304,7 @@
                     ? 'text-[var(--brand)] bg-[var(--brand)]/[0.06] font-medium'
                     : 'txt-secondary hover:txt-primary hover:bg-black/[0.03] dark:hover:bg-white/[0.03]'
                 "
-                @click="(closeFlyout(), sidebarStore.closeMobile())"
+                @click="closeFlyout()"
               >
                 <span
                   class="w-1.5 h-1.5 rounded-full flex-shrink-0"
@@ -627,22 +597,15 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onBeforeUnmount, type Component } from 'vue'
+import { ref, computed, watch, onMounted, onBeforeUnmount } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import {
   ChatBubbleLeftRightIcon,
-  ClockIcon,
-  CpuChipIcon,
   CreditCardIcon,
-  FolderIcon,
-  MagnifyingGlassIcon,
   PlusIcon,
   RocketLaunchIcon,
-  SignalIcon,
   Cog6ToothIcon,
   ChartBarIcon,
-  ShieldCheckIcon,
-  PuzzlePieceIcon,
   UserCircleIcon,
   ArrowRightOnRectangleIcon,
 } from '@heroicons/vue/24/outline'
@@ -652,10 +615,10 @@ import { useAuthStore } from '../stores/auth'
 import { useAppModeStore } from '../stores/appMode'
 import { useConfigStore } from '../stores/config'
 import { useAuth } from '../composables/useAuth'
+import { useNavItems, type NavChild, type NavItem } from '../composables/useNavItems'
 import { useTheme } from '../composables/useTheme'
 import { useChatsStore, isDefaultChatTitle, type Chat as StoreChat } from '../stores/chats'
 import { useDialog } from '../composables/useDialog'
-import { getFeaturesStatus } from '../services/featuresService'
 import { useI18n } from 'vue-i18n'
 import { useDateFormat } from '@/composables/useDateFormat'
 import MemoriesDialog from './MemoriesDialog.vue'
@@ -671,6 +634,7 @@ const configStore = useConfigStore()
 const chatsStore = useChatsStore()
 const dialog = useDialog()
 const { logout, isImpersonating } = useAuth()
+const { navItems, isItemActive, isItemLocked, isGuestMode, loadFeatureStatus } = useNavItems()
 const { theme } = useTheme()
 const route = useRoute()
 const router = useRouter()
@@ -684,7 +648,16 @@ const navDropdownStyle = ref<Record<string, string>>({})
 const setNavBtnRef = (el: unknown, path: string) => {
   navBtnRefs.value[path] = el as HTMLElement | null
 }
-const chatModalOpen = ref(false)
+/**
+ * The history sheet's open state lives in the sidebar store so the mobile
+ * bottom nav can open the same sheet (the sheet itself renders here).
+ */
+const chatModalOpen = computed({
+  get: () => sidebarStore.chatSheetOpen,
+  set: (value: boolean) => {
+    sidebarStore.chatSheetOpen = value
+  },
+})
 const chatMenuOpenId = ref<number | null>(null)
 const chatMenuStyle = ref<Record<string, string>>({})
 const shareModalOpen = ref(false)
@@ -700,23 +673,17 @@ type FlyoutType = 'nav' | null
 const activeFlyout = ref<FlyoutType>(null)
 const activeFlyoutItem = ref<NavItem | null>(null)
 
-const disabledFeaturesCount = ref(0)
-
-const loadFeatureStatus = async () => {
-  try {
-    if (!import.meta.env.DEV) return
-    if (!authStore.user || !authStore.isAuthenticated) return
-
-    const status = await getFeaturesStatus()
-    if (status && status.features) {
-      disabledFeaturesCount.value = Object.values(status.features).filter((f) => !f.enabled).length
-    } else {
-      disabledFeaturesCount.value = 0
+// Whoever opens the sheet (rail or mobile nav), the list refreshes.
+watch(
+  () => sidebarStore.chatSheetOpen,
+  (open) => {
+    if (open) {
+      chatSearchQuery.value = ''
+      chatMenuOpenId.value = null
+      chatsStore.loadChats()
     }
-  } catch {
-    disabledFeaturesCount.value = 0
   }
-}
+)
 
 onMounted(() => {
   loadFeatureStatus()
@@ -755,7 +722,6 @@ const handleEscape = (event: KeyboardEvent) => {
       return
     }
     closeFlyout()
-    sidebarStore.closeMobile()
   }
 }
 
@@ -773,163 +739,6 @@ const logoIconSrc = computed(
 const initials = computed(() => {
   const email = authStore.user?.email || 'G'
   return email.charAt(0).toUpperCase()
-})
-
-interface NavChild {
-  /** Stable identifier used for data-testid — never derived from the route path */
-  key: string
-  path: string
-  label: string
-  badge?: string
-  group?: string
-}
-
-interface NavItem {
-  /** Stable identifier used for data-testid — never derived from the route path */
-  key: string
-  path: string
-  label: string
-  /** Longer description for title/aria — the visible label stays short */
-  description?: string
-  icon: Component
-  isUpgrade?: boolean
-  requiresAuth?: boolean
-  gateFeature?: string
-  /**
-   * Q6: easy mode shows these items with a lock badge instead of hiding
-   * them; tapping offers a one-click switch to Advanced mode. appMode
-   * decorates the rail, it no longer filters it.
-   */
-  lockedInEasyMode?: boolean
-  children?: NavChild[]
-}
-
-const isGuestMode = computed(() => !authStore.isAuthenticated)
-
-const navItems = computed<NavItem[]>(() => {
-  const items: NavItem[] = [
-    {
-      key: 'chat',
-      path: '/',
-      label: t('nav.history'),
-      description: t('nav.historyDescription'),
-      icon: ClockIcon,
-    },
-  ]
-
-  items.push({
-    key: 'files',
-    path: '/files',
-    label: t('nav.files'),
-    description: t('nav.filesDescription'),
-    icon: FolderIcon,
-    requiresAuth: true,
-    gateFeature: 'files',
-  })
-
-  items.push({
-    key: 'rag',
-    path: '/files/search',
-    label: t('nav.semanticSearch'),
-    icon: MagnifyingGlassIcon,
-    requiresAuth: true,
-    gateFeature: 'files',
-  })
-
-  // Channels + AI Setup are always present (Q6: easy mode shows them locked;
-  // guests see them gate-locked). Canonical §4.6 URLs.
-  const channelsChildren: NavChild[] = [
-    { key: 'inbound', path: '/channels', label: t('nav.configInbound') },
-    { key: 'chat-widget', path: '/channels/widgets', label: t('nav.toolsChatWidget') },
-    { key: 'mail-handler', path: '/channels/email', label: t('nav.toolsMailHandler') },
-    { key: 'api-keys', path: '/channels/api', label: t('nav.configApiKeys') },
-    { key: 'api-docs', path: '/channels/api/docs', label: t('pageTitles.configApiDocs') },
-  ]
-
-  items.push({
-    key: 'channels',
-    path: '/channels',
-    label: t('nav.channels'),
-    description: t('nav.channelsDescription'),
-    icon: SignalIcon,
-    requiresAuth: true,
-    gateFeature: 'settings',
-    lockedInEasyMode: true,
-    children: isGuestMode.value ? undefined : channelsChildren,
-  })
-
-  const aiSetupChildren: NavChild[] = [
-    { key: 'ai-models', path: '/ai/models', label: t('nav.configAiModels') },
-    { key: 'task-prompts', path: '/ai/instructions', label: t('nav.configTaskPrompts') },
-    { key: 'sorting-prompt', path: '/ai/routing', label: t('nav.configSortingPrompt') },
-    // Transitional home (Q3): retires into the in-chat Tools dropdown later.
-    { key: 'doc-summary', path: '/ai/summarizer', label: t('nav.toolsDocSummary') },
-  ]
-
-  items.push({
-    key: 'ai-setup',
-    path: '/ai/models',
-    label: t('nav.aiSetup'),
-    description: t('nav.aiSetupDescription'),
-    icon: CpuChipIcon,
-    requiresAuth: true,
-    gateFeature: 'settings',
-    lockedInEasyMode: true,
-    children: isGuestMode.value ? undefined : aiSetupChildren,
-  })
-
-  if (configStore.plugins.length > 0) {
-    items.push({
-      key: 'plugins',
-      path: '/plugins',
-      label: t('nav.plugins'),
-      icon: PuzzlePieceIcon,
-      requiresAuth: true,
-      lockedInEasyMode: true,
-      children: isGuestMode.value
-        ? undefined
-        : configStore.plugins.map((plugin: { name?: string }) => ({
-            key: `plugin-${plugin.name ?? 'unknown'}`,
-            path: `/plugins/${plugin.name}`,
-            label: plugin.name
-              ? plugin.name.charAt(0).toUpperCase() + plugin.name.slice(1)
-              : t('common.unknown'),
-          })),
-    })
-  }
-
-  if (authStore.isAdmin) {
-    const adminChildren: NavChild[] = [
-      { key: 'admin-dashboard', path: '/admin', label: t('nav.adminDashboard') },
-    ]
-
-    if (import.meta.env.DEV) {
-      const featureStatusItem: NavChild = {
-        key: 'admin-features',
-        path: '/admin/features',
-        label: t('nav.adminFeatureStatus'),
-      }
-      if (disabledFeaturesCount.value > 0) {
-        featureStatusItem.badge = String(disabledFeaturesCount.value)
-      }
-      adminChildren.push(featureStatusItem)
-    }
-    adminChildren.push({
-      key: 'admin-config',
-      path: '/admin/config',
-      label: t('nav.adminSystemConfig'),
-    })
-
-    items.push({
-      key: 'admin',
-      path: '/admin',
-      label: t('nav.admin'),
-      icon: ShieldCheckIcon,
-      children: adminChildren,
-    })
-  }
-
-  return items
 })
 
 const groupedChildren = computed(() => {
@@ -951,20 +760,6 @@ const groupedChildren = computed(() => {
   return groups
 })
 
-const isItemActive = (item: NavItem): boolean => {
-  if (item.path === '/') {
-    return route.path === '/' || route.path.startsWith('/chat')
-  }
-  if (item.children && item.children.length > 0) {
-    return item.children.some((child) => route.path.startsWith(child.path))
-  }
-  return route.path.startsWith(item.path)
-}
-
-/** Q6: item is shown but locked while the app is in easy mode. */
-const isItemLocked = (item: NavItem): boolean =>
-  Boolean(item.lockedInEasyMode) && appModeStore.isEasyMode && !isGuestMode.value
-
 const handleQuickNewChat = async () => {
   if (isCreatingChat.value) return
   isCreatingChat.value = true
@@ -973,7 +768,6 @@ const handleQuickNewChat = async () => {
     await chatsStore.findOrCreateEmptyChat()
     if (route.path !== '/') router.push('/')
     chatModalOpen.value = false
-    sidebarStore.closeMobile()
   } finally {
     setTimeout(() => {
       isCreatingChat.value = false
@@ -990,7 +784,6 @@ const handleNavClick = async (item: NavItem) => {
   if (item.requiresAuth && isGuestMode.value) {
     featureGateKey.value = item.gateFeature || 'general'
     featureGateOpen.value = true
-    sidebarStore.closeMobile()
     return
   }
 
@@ -1010,12 +803,7 @@ const handleNavClick = async (item: NavItem) => {
 
   if (item.path === '/') {
     closeFlyout()
-    chatSearchQuery.value = ''
-    chatMenuOpenId.value = null
-    chatModalOpen.value = !chatModalOpen.value
-    if (chatModalOpen.value) {
-      chatsStore.loadChats()
-    }
+    sidebarStore.toggleChatSheet()
     return
   }
 
@@ -1041,14 +829,12 @@ const handleNavClick = async (item: NavItem) => {
 
   closeFlyout()
   router.push(item.path)
-  sidebarStore.closeMobile()
 }
 
 const handleNavigate = (path: string) => {
   userMenuOpen.value = false
   closeFlyout()
   router.push(path)
-  sidebarStore.closeMobile()
 }
 
 const handleProfileSettings = () => {
@@ -1146,7 +932,6 @@ const handleNewChat = async () => {
     await chatsStore.findOrCreateEmptyChat()
     if (route.path !== '/') router.push('/')
     chatModalOpen.value = false
-    sidebarStore.closeMobile()
   } finally {
     setTimeout(() => {
       isCreatingChat.value = false
@@ -1159,7 +944,6 @@ const handleChatSelect = (chatId: number) => {
   if (route.path !== '/') router.push('/')
   chatModalOpen.value = false
   chatMenuOpenId.value = null
-  sidebarStore.closeMobile()
 }
 
 const handleChatRename = async (chatId: number) => {

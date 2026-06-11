@@ -334,7 +334,9 @@
     "admin": "Admin",
     "adminDashboard": "Dashboard",
     "adminFeatureStatus": "Feature Status",
-    "adminSystemConfig": "System Config"
+    "adminSystemConfig": "System Config",
+    "more": "More",
+    "moreDescription": "More sections and account"
   },
   "chatInput": {
     "placeholder": "Type your message...",

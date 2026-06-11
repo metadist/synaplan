@@ -329,7 +329,9 @@
     "admin": "Admin",
     "adminDashboard": "Dashboard",
     "adminFeatureStatus": "Feature-Status",
-    "adminSystemConfig": "Systemkonfiguration"
+    "adminSystemConfig": "Systemkonfiguration",
+    "more": "Mehr",
+    "moreDescription": "Weitere Bereiche und Konto"
   },
   "chatInput": {
     "attach": "Anhängen",
