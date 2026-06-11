@@ -6,8 +6,8 @@
         class="px-6 py-4 border-b border-light-border/30 dark:border-dark-border/20 bg-chat"
         data-testid="section-header"
       >
-        <h1 class="text-2xl font-semibold txt-primary mb-1">📚 Semantic Search</h1>
-        <p class="txt-secondary text-sm">AI-powered search in your vectorized documents</p>
+        <h1 class="text-2xl font-semibold txt-primary mb-1">{{ $t('rag.title') }}</h1>
+        <p class="txt-secondary text-sm">{{ $t('rag.subtitle') }}</p>
       </div>
 
       <div class="flex-1 overflow-y-auto px-6 py-6 scroll-thin">
@@ -38,7 +38,7 @@
                 </svg>
               </div>
               <div class="text-2xl font-bold txt-primary">{{ stats.total_documents }}</div>
-              <div class="text-sm txt-secondary">Documents</div>
+              <div class="text-sm txt-secondary">{{ $t('rag.statDocuments') }}</div>
             </div>
             <div
               class="surface-card p-4 hover:shadow-lg transition-shadow cursor-default"
@@ -60,7 +60,7 @@
                 </svg>
               </div>
               <div class="text-2xl font-bold txt-primary">{{ stats.total_chunks }}</div>
-              <div class="text-sm txt-secondary">Chunks</div>
+              <div class="text-sm txt-secondary">{{ $t('rag.statChunks') }}</div>
             </div>
             <div
               class="surface-card p-4 hover:shadow-lg transition-shadow cursor-default"
@@ -82,7 +82,7 @@
                 </svg>
               </div>
               <div class="text-2xl font-bold txt-primary">{{ stats.total_groups }}</div>
-              <div class="text-sm txt-secondary">Groups</div>
+              <div class="text-sm txt-secondary">{{ $t('rag.statGroups') }}</div>
             </div>
             <div
               class="surface-card p-4 hover:shadow-lg transition-shadow cursor-default"
@@ -104,7 +104,7 @@
                 </svg>
               </div>
               <div class="text-2xl font-bold txt-primary">{{ stats.avg_chunk_size }}</div>
-              <div class="text-sm txt-secondary">Avg Chars</div>
+              <div class="text-sm txt-secondary">{{ $t('rag.statAvgChars') }}</div>
             </div>
           </div>
 
@@ -122,13 +122,13 @@
                         d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
                       />
                     </svg>
-                    Search Query
+                    {{ $t('rag.searchQuery') }}
                   </span>
                 </label>
                 <input
                   v-model="query"
                   type="text"
-                  placeholder="e.g., 'What is machine learning?' or 'Python programming concepts'"
+                  :placeholder="$t('rag.searchPlaceholder')"
                   class="w-full px-4 py-3 rounded-lg bg-chat border border-light-border/30 dark:border-dark-border/20 txt-primary placeholder:txt-secondary focus:outline-none focus:ring-2 focus:ring-[var(--brand)] transition-all"
                   :disabled="isSearching"
                   data-testid="input-query"
@@ -148,7 +148,7 @@
                           d="M7 12l3-3 3 3 4-4M8 21l4-4 4 4M3 4h18M4 4h16v12a1 1 0 01-1 1H5a1 1 0 01-1-1V4z"
                         />
                       </svg>
-                      Results Limit
+                      {{ $t('rag.resultsLimit') }}
                     </span>
                   </label>
                   <select
@@ -156,10 +156,10 @@
                     class="w-full px-4 py-2.5 rounded-lg bg-chat border border-light-border/30 dark:border-dark-border/20 txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)] cursor-pointer transition-all"
                     data-testid="input-limit"
                   >
-                    <option :value="5">5 results</option>
-                    <option :value="10">10 results</option>
-                    <option :value="20">20 results</option>
-                    <option :value="50">50 results</option>
+                    <option :value="5">{{ $t('rag.nResults', { n: 5 }) }}</option>
+                    <option :value="10">{{ $t('rag.nResults', { n: 10 }) }}</option>
+                    <option :value="20">{{ $t('rag.nResults', { n: 20 }) }}</option>
+                    <option :value="50">{{ $t('rag.nResults', { n: 50 }) }}</option>
                   </select>
                 </div>
 
@@ -174,7 +174,7 @@
                           d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"
                         />
                       </svg>
-                      Min Similarity
+                      {{ $t('rag.minSimilarity') }}
                     </span>
                   </label>
                   <select
@@ -182,10 +182,10 @@
                     class="w-full px-4 py-2.5 rounded-lg bg-chat border border-light-border/30 dark:border-dark-border/20 txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)] cursor-pointer transition-all"
                     data-testid="input-min-score"
                   >
-                    <option :value="0.3">30% (More results)</option>
-                    <option :value="0.5">50% (Balanced)</option>
-                    <option :value="0.7">70% (High quality)</option>
-                    <option :value="0.9">90% (Very strict)</option>
+                    <option :value="0.3">{{ $t('rag.simMore') }}</option>
+                    <option :value="0.5">{{ $t('rag.simBalanced') }}</option>
+                    <option :value="0.7">{{ $t('rag.simHigh') }}</option>
+                    <option :value="0.9">{{ $t('rag.simStrict') }}</option>
                   </select>
                 </div>
 
@@ -200,13 +200,13 @@
                           d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"
                         />
                       </svg>
-                      Group Filter
+                      {{ $t('rag.groupFilter') }}
                     </span>
                   </label>
                   <input
                     v-model="groupKey"
                     type="text"
-                    placeholder="Optional"
+                    :placeholder="$t('rag.optional')"
                     class="w-full px-4 py-2.5 rounded-lg bg-chat border border-light-border/30 dark:border-dark-border/20 txt-primary placeholder:txt-secondary focus:outline-none focus:ring-2 focus:ring-[var(--brand)] transition-all"
                     data-testid="input-group-key"
                   />
@@ -256,7 +256,7 @@
                     ></path>
                   </svg>
                   <span class="font-medium">{{
-                    isSearching ? 'Searching...' : 'Search Documents'
+                    isSearching ? $t('rag.searching') : $t('rag.searchButton')
                   }}</span>
                 </button>
 
@@ -278,8 +278,7 @@
                       d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
                     />
                   </svg>
-                  Found <span class="font-semibold txt-primary">{{ totalResults }}</span> result(s)
-                  in <span class="font-semibold txt-primary">{{ searchTime }}ms</span>
+                  {{ $t('rag.foundSummary', { n: totalResults, ms: searchTime }) }}
                 </div>
               </div>
             </form>
@@ -301,7 +300,7 @@
                   d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"
                 />
               </svg>
-              <h2 class="text-lg font-semibold txt-primary">Search Results</h2>
+              <h2 class="text-lg font-semibold txt-primary">{{ $t('rag.searchResults') }}</h2>
             </div>
 
             <div
@@ -332,13 +331,15 @@
                         d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
                       />
                     </svg>
-                    <span class="font-medium txt-primary"
-                      >{{ (result.score * 100).toFixed(1) }}% Match</span
-                    >
+                    <span class="font-medium txt-primary">{{
+                      $t('rag.match', { pct: (result.score * 100).toFixed(1) })
+                    }}</span>
                   </div>
                 </div>
 
-                <div class="text-sm txt-secondary">ID: {{ result.message_id }}</div>
+                <div class="text-sm txt-secondary">
+                  {{ $t('rag.idLabel', { id: result.message_id }) }}
+                </div>
               </div>
 
               <!-- Result Content -->
@@ -350,7 +351,7 @@
 
               <!-- Result Meta -->
               <div v-if="result.start_line || result.end_line" class="mb-3 text-xs txt-tertiary">
-                Lines {{ result.start_line }}-{{ result.end_line }}
+                {{ $t('rag.lines', { start: result.start_line, end: result.end_line }) }}
               </div>
 
               <!-- Actions -->
@@ -360,14 +361,14 @@
                   data-testid="btn-view-file"
                   @click="viewFile(result.message_id)"
                 >
-                  View File
+                  {{ $t('rag.viewFile') }}
                 </button>
                 <button
                   class="text-sm px-3 py-1.5 rounded-lg hover:bg-[var(--brand)]/10 txt-secondary hover:txt-primary transition-colors"
                   data-testid="btn-find-similar"
                   @click="findSimilarDocs(result.chunk_id)"
                 >
-                  Find Similar
+                  {{ $t('rag.findSimilar') }}
                 </button>
               </div>
             </div>
@@ -392,9 +393,9 @@
                 d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
               />
             </svg>
-            <h3 class="text-lg font-semibold txt-primary mb-2">No results found</h3>
+            <h3 class="text-lg font-semibold txt-primary mb-2">{{ $t('rag.noResultsTitle') }}</h3>
             <p class="txt-secondary text-sm">
-              Try adjusting your search query or lowering the minimum similarity score
+              {{ $t('rag.noResultsHint') }}
             </p>
           </div>
 
@@ -417,16 +418,16 @@
                 d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
               />
             </svg>
-            <h3 class="text-lg font-semibold txt-primary mb-2">No documents vectorized yet</h3>
+            <h3 class="text-lg font-semibold txt-primary mb-2">{{ $t('rag.noDocsTitle') }}</h3>
             <p class="txt-secondary text-sm mb-4">
-              Upload files with "Extract + Vectorize" to enable semantic search
+              {{ $t('rag.noDocsHint') }}
             </p>
             <router-link
               to="/files"
               class="btn-primary px-6 py-2.5 rounded-lg inline-block"
               data-testid="btn-go-files"
             >
-              Go to Files
+              {{ $t('rag.goToFiles') }}
             </router-link>
           </div>
         </div>
@@ -437,11 +438,13 @@
 
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 import MainLayout from '@/components/MainLayout.vue'
 import * as ragService from '@/services/ragService'
 import { useNotification } from '@/composables/useNotification'
 
+const { t } = useI18n()
 const router = useRouter()
 const { success: showSuccess, error: showError } = useNotification()
 
@@ -473,7 +476,7 @@ const loadStats = async () => {
 
 const performSearch = async () => {
   if (!query.value.trim()) {
-    showError('Please enter a search query')
+    showError(t('rag.enterQuery'))
     return
   }
 
@@ -494,17 +497,17 @@ const performSearch = async () => {
       searchTime.value = response.search_time_ms
 
       if (response.results.length === 0) {
-        showError('No results found')
+        showError(t('rag.noResultsTitle'))
       } else {
-        showSuccess(`Found ${response.total_results} result(s)`)
+        showSuccess(t('rag.foundToast', { n: response.total_results }))
       }
     } else {
-      showError(response.error || 'Search failed')
+      showError(response.error || t('rag.searchFailed'))
       results.value = []
     }
   } catch (error) {
     console.error('Search error:', error)
-    showError('Search failed: ' + (error as Error).message)
+    showError(t('rag.searchFailed') + ': ' + (error as Error).message)
     results.value = []
   } finally {
     isSearching.value = false
@@ -513,7 +516,7 @@ const performSearch = async () => {
 
 const viewFile = (messageId: number) => {
   router.push('/files')
-  showSuccess(`Navigate to file with Message ID ${messageId}`)
+  showSuccess(t('rag.navigateToFile', { id: messageId }))
 }
 
 const findSimilarDocs = async (chunkId: number) => {
@@ -522,13 +525,13 @@ const findSimilarDocs = async (chunkId: number) => {
     if (response.success && response.results.length > 0) {
       results.value = response.results
       totalResults.value = response.results.length
-      showSuccess(`Found ${response.results.length} similar document(s)`)
+      showSuccess(t('rag.similarFound', { n: response.results.length }))
     } else {
-      showError('No similar documents found')
+      showError(t('rag.noSimilar'))
     }
   } catch (error) {
     console.error('Find similar error:', error)
-    showError('Failed to find similar documents')
+    showError(t('rag.similarFailed'))
   }
 }
 </script>

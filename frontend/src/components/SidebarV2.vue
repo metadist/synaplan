@@ -50,7 +50,7 @@
       <button
         class="v2-new-chat-btn w-10 h-10 flex items-center justify-center rounded-xl transition-all duration-200"
         :class="{ 'v2-new-chat-btn--creating': isCreatingChat }"
-        :title="$t('chat.newChat')"
+        :title="$t('nav.newDescription')"
         :disabled="isCreatingChat"
         data-testid="btn-sidebar-v2-new-chat"
         @click="handleQuickNewChat"
@@ -74,7 +74,7 @@
           item.isUpgrade && 'text-amber-500 dark:text-amber-400',
           item.requiresAuth && isGuestMode && 'opacity-50',
         ]"
-        :title="item.label"
+        :title="item.description || item.label"
         :data-testid="`btn-sidebar-v2-nav-${item.key}`"
         @click="handleNavClick(item)"
       >
@@ -766,6 +766,8 @@ interface NavItem {
   key: string
   path: string
   label: string
+  /** Longer description for title/aria — the visible label stays short */
+  description?: string
   icon: Component
   isUpgrade?: boolean
   requiresAuth?: boolean
@@ -777,7 +779,13 @@ const isGuestMode = computed(() => !authStore.isAuthenticated)
 
 const navItems = computed<NavItem[]>(() => {
   const items: NavItem[] = [
-    { key: 'chat', path: '/', label: t('nav.chat'), icon: ChatBubbleLeftRightIcon },
+    {
+      key: 'chat',
+      path: '/',
+      label: t('nav.history'),
+      description: t('nav.historyDescription'),
+      icon: ChatBubbleLeftRightIcon,
+    },
   ]
 
   items.push({

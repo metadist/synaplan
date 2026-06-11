@@ -42,13 +42,13 @@
               v-if="isToolDisabled('web-search')"
               class="text-xs px-2 py-0.5 rounded-full bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-200"
             >
-              Setup Required
+              {{ $t('chatInput.tools.setupRequired') }}
             </span>
             <span
               v-else-if="!isLoadingFeatures"
               class="text-xs px-2 py-0.5 rounded-full bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-200"
             >
-              Ready
+              {{ $t('chatInput.tools.ready') }}
             </span>
           </div>
           <div class="text-xs txt-secondary">
@@ -89,13 +89,13 @@
               v-if="isToolDisabled('image-gen')"
               class="text-xs px-2 py-0.5 rounded-full bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-200"
             >
-              Setup Required
+              {{ $t('chatInput.tools.setupRequired') }}
             </span>
             <span
               v-else-if="!isLoadingFeatures"
               class="text-xs px-2 py-0.5 rounded-full bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-200"
             >
-              Ready
+              {{ $t('chatInput.tools.ready') }}
             </span>
           </div>
           <div class="text-xs txt-secondary">
@@ -129,7 +129,7 @@
               v-if="!isLoadingFeatures"
               class="text-xs px-2 py-0.5 rounded-full bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-200"
             >
-              Ready
+              {{ $t('chatInput.tools.ready') }}
             </span>
           </div>
           <div class="text-xs txt-secondary">{{ $t('chatInput.tools.videoGenDesc') }}</div>
