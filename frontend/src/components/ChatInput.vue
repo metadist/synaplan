@@ -305,6 +305,7 @@ import { AudioRecorder } from '@/services/audioRecorder'
 import { WebSpeechService, isWebSpeechSupported } from '@/services/webSpeechService'
 import { useConfigStore } from '@/stores/config'
 import { useI18n } from 'vue-i18n'
+import { useRoute, useRouter } from 'vue-router'
 import { useAutoPersist } from '@/composables/useInputPersistence'
 import { useKeyboardOpen } from '@/composables/useKeyboardOpen'
 import { useChatsStore } from '@/stores/chats'
@@ -374,6 +375,8 @@ const appModeStore = useAppModeStore()
 const authStore = useAuthStore()
 const { warning, error: showError, success } = useNotification()
 const { t, locale } = useI18n()
+const route = useRoute()
+const router = useRouter()
 const isKeyboardOpen = useKeyboardOpen()
 
 /**
@@ -963,10 +966,27 @@ async function loadKnowledgeGroups(): Promise<void> {
   if (!authStore.isAuthenticated) return
   try {
     knowledgeGroups.value = await getFileGroups()
+    applyFolderFromQuery()
   } catch {
     // Non-fatal — the picker still renders with just the "none" option, so a
     // failed load simply means no folders are available to scope to.
   }
+}
+
+/**
+ * §4.8 #2 ("Use in chat"): the Files page deep-links to `/?folder=<name>`.
+ * Preselect that knowledge folder in the picker, then consume the query so
+ * a reload or share of the URL doesn't re-apply it.
+ */
+function applyFolderFromQuery(): void {
+  const folder = route.query.folder
+  if (typeof folder !== 'string' || folder === '') return
+  if (knowledgeGroups.value.some((g) => g.name === folder)) {
+    selectedGroupKey.value = folder
+  }
+  const rest = { ...route.query }
+  delete rest.folder
+  void router.replace({ query: rest })
 }
 
 watch(
@@ -976,6 +996,17 @@ watch(
   },
   {
     immediate: true,
+  }
+)
+
+// "Use in chat" while already on the chat page: the query changes without a
+// remount, so apply it whenever it (re)appears.
+watch(
+  () => route.query.folder,
+  (folder) => {
+    if (typeof folder === 'string' && folder !== '' && knowledgeGroups.value.length > 0) {
+      applyFolderFromQuery()
+    }
   }
 )
 

@@ -14,7 +14,7 @@
     "mailHandler": "Automatización de correo",
     "plugins": "Plugins",
     "files": "Archivos",
-    "ragSearch": "Búsqueda semántica",
+    "ragSearch": "Búsqueda",
     "configInbound": "Canales",
     "configAiModels": "Modelos de IA",
     "configTaskPrompts": "Instrucciones de IA",
@@ -288,7 +288,7 @@
     "accountDescription": "Cuenta y preferencias",
     "filesAndRag": "Archivos & RAG",
     "fileManager": "Gestor de Archivos",
-    "semanticSearch": "Búsqueda Semántica",
+    "semanticSearch": "Búsqueda",
     "aiConfig": "Configuración IA",
     "configInbound": "Resumen",
     "configAiModels": "Modelos IA",
@@ -1370,7 +1370,11 @@
     "uploading": "Subiendo...",
     "uploadProgress": "Progreso de subida",
     "uploadingBytes": "{loaded} de {total} subido",
-    "processingFiles": "Procesando archivos en el servidor..."
+    "processingFiles": "Procesando archivos en el servidor...",
+    "tabFiles": "Archivos",
+    "tabSearch": "Búsqueda",
+    "intro": "Los archivos que subes se convierten en conocimiento consultable para tus chats. Las carpetas pueden usarse como carpetas de conocimiento para acotar una conversación.",
+    "useInChat": "Usar en el chat"
   },
   "config": {
     "aiModels": {
@@ -1709,8 +1713,8 @@
     "saveChanges": "Guardar Cambios"
   },
   "rag": {
-    "title": "Búsqueda Semántica",
-    "subtitle": "Búsqueda con IA en tus documentos indexados",
+    "title": "Búsqueda",
+    "subtitle": "Busca en tus documentos subidos",
     "statDocuments": "Documentos",
     "statChunks": "Fragmentos",
     "statGroups": "Grupos",
@@ -1746,7 +1750,8 @@
     "similarFound": "{n} documento(s) similar(es) encontrado(s)",
     "noSimilar": "No se encontraron documentos similares",
     "similarFailed": "No se pudieron buscar documentos similares",
-    "navigateToFile": "Abriendo Archivos — documento {id}"
+    "navigateToFile": "Abriendo Archivos — documento {id}",
+    "statusLine": "{docs} documentos indexados en {folders} carpetas"
   },
   "cookies": {
     "title": "Configuración de Cookies",

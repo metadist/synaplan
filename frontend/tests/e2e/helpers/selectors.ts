@@ -208,6 +208,10 @@ export const selectors = {
     table: '[data-testid="section-table"]',
     fileRow: '[data-testid="item-file"]',
     emptyState: '[data-testid="state-empty"]',
+    /** §4.8: knowledge-base tabs shared by /files and /files/search */
+    tabsBar: '[data-testid="tabs-files"]',
+    tabBrowse: '[data-testid="tab-files-browse"]',
+    tabSearch: '[data-testid="tab-files-search"]',
   },
   fileSelection: {
     modal: '[data-testid="modal-file-selection"]',

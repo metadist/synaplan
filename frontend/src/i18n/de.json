@@ -16,7 +16,7 @@
     "files": "Dateien",
     "memories": "Erinnerungen",
     "feedback": "Feedback",
-    "ragSearch": "Semantische Suche",
+    "ragSearch": "Suche",
     "configInbound": "Kanäle",
     "configAiModels": "KI-Modelle",
     "configTaskPrompts": "KI-Anweisungen",
@@ -315,7 +315,7 @@
     "accountDescription": "Konto & Einstellungen",
     "filesAndRag": "Dateimanager",
     "fileManager": "Dateimanager",
-    "semanticSearch": "Semantische Suche",
+    "semanticSearch": "Suche",
     "settings": "Einstellungen",
     "aiConfig": "KI-Konfiguration",
     "configInbound": "Übersicht",
@@ -1530,8 +1530,8 @@
     }
   },
   "rag": {
-    "title": "Semantische Suche",
-    "subtitle": "KI-gestützte Suche in deinen indexierten Dokumenten",
+    "title": "Suche",
+    "subtitle": "Durchsuche deine hochgeladenen Dokumente",
     "statDocuments": "Dokumente",
     "statChunks": "Abschnitte",
     "statGroups": "Gruppen",
@@ -1567,7 +1567,8 @@
     "similarFound": "{n} ähnliche(s) Dokument(e) gefunden",
     "noSimilar": "Keine ähnlichen Dokumente gefunden",
     "similarFailed": "Ähnliche Dokumente konnten nicht gefunden werden",
-    "navigateToFile": "Öffne Dateien — Dokument {id}"
+    "navigateToFile": "Öffne Dateien — Dokument {id}",
+    "statusLine": "{docs} Dokumente in {folders} Ordnern indexiert"
   },
   "limitReached": {
     "lifetime": {
@@ -1889,7 +1890,11 @@
     "filterTypeImages": "Bilder",
     "filterTypeAudio": "Audio/Video",
     "filterDateFrom": "Von",
-    "filterDateTo": "Bis"
+    "filterDateTo": "Bis",
+    "tabFiles": "Dateien",
+    "tabSearch": "Suche",
+    "intro": "Hochgeladene Dateien werden durchsuchbares Wissen für deine Chats. Ordner lassen sich als Wissensordner nutzen, um eine Unterhaltung einzugrenzen.",
+    "useInChat": "Im Chat nutzen"
   },
   "fileSelection": {
     "title": "Dateien auswählen oder hochladen",

@@ -5,13 +5,11 @@
       data-testid="page-files-upload"
     >
       <div class="max-w-7xl mx-auto space-y-6">
+        <!-- §4.8: the knowledge base has two tabs — Files (browse) + Search -->
+        <FilesTabs active="files" />
+
         <!-- Storage Quota Widget -->
         <StorageQuotaWidget ref="storageWidget" @upgrade="handleUpgrade" />
-
-        <!-- Cross-promotion: Nextcloud + OpenCloud integrations. Lives only
-             on the Files page (the audience that already cares about
-             file-sharing tooling) and is user-dismissible. -->
-        <FilesIntegrationsBanner />
 
         <!-- Compact Upload Bar -->
         <div
@@ -633,6 +631,19 @@
                     >
                       <TrashIcon class="w-3.5 h-3.5" />
                     </button>
+                    <!-- §4.8 #2: close the loop with chat — open a chat with
+                         this knowledge folder preselected in the picker. -->
+                    <button
+                      v-if="!folder.pending"
+                      type="button"
+                      class="absolute top-1 left-1 p-1.5 rounded-lg text-[var(--brand)] bg-black/[0.03] dark:bg-white/[0.04] opacity-0 group-hover/f:opacity-100 focus:opacity-100 hover:bg-[var(--brand)]/15 transition-all"
+                      :title="$t('files.useInChat')"
+                      :aria-label="$t('files.useInChat')"
+                      :data-testid="`btn-use-in-chat-${folder.name}`"
+                      @click.stop="useFolderInChat(folder.name)"
+                    >
+                      <ChatBubbleLeftRightIcon class="w-3.5 h-3.5" />
+                    </button>
                   </div>
                 </div>
               </div>
@@ -1195,6 +1206,11 @@
             </div>
           </template>
         </div>
+
+        <!-- Cross-promotion: Nextcloud + OpenCloud integrations. Below the
+             user's own content (§4.8 #3 — the promo must not outrank it);
+             user-dismissible. -->
+        <FilesIntegrationsBanner />
       </div>
     </div>
 
@@ -1308,9 +1324,11 @@ import ShareModal from '@/components/ShareModal.vue'
 import ConfirmDialog from '@/components/ConfirmDialog.vue'
 import StorageQuotaWidget from '@/components/StorageQuotaWidget.vue'
 import FilesIntegrationsBanner from '@/components/FilesIntegrationsBanner.vue'
+import FilesTabs from '@/components/files/FilesTabs.vue'
 import FolderMoveMenu from '@/components/FolderMoveMenu.vue'
 import { Icon } from '@iconify/vue'
 import {
+  ChatBubbleLeftRightIcon,
   CloudArrowUpIcon,
   TrashIcon,
   ArrowDownTrayIcon,
@@ -1324,8 +1342,15 @@ import filesService, {
 } from '@/services/filesService'
 import { useNotification } from '@/composables/useNotification'
 import { useFilePersistence } from '@/composables/useInputPersistence'
+import { useRouter } from 'vue-router'
 
 const { t } = useI18n()
+const router = useRouter()
+
+/** §4.8 #2: open a chat with this knowledge folder preselected (chat-input picker). */
+function useFolderInChat(folderName: string): void {
+  router.push({ path: '/', query: { folder: folderName } })
+}
 const { success: showSuccess, error: showError, info: showInfo } = useNotification()
 
 // File persistence - save selected files metadata

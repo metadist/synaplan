@@ -14,7 +14,7 @@
     "mailHandler": "E-posta Otomasyonu",
     "plugins": "Eklentiler",
     "files": "Dosyalar",
-    "ragSearch": "Anlamsal Arama",
+    "ragSearch": "Arama",
     "configInbound": "Kanallar",
     "configAiModels": "AI Modelleri",
     "configTaskPrompts": "AI Talimatları",
@@ -288,7 +288,7 @@
     "accountDescription": "Hesap ve tercihler",
     "filesAndRag": "Dosyalar & RAG",
     "fileManager": "Dosya Yöneticisi",
-    "semanticSearch": "Anlamsal Arama",
+    "semanticSearch": "Arama",
     "aiConfig": "AI Yapılandırması",
     "configInbound": "Genel Bakış",
     "configAiModels": "AI Modelleri",
@@ -1371,7 +1371,11 @@
     "uploading": "Yükleniyor...",
     "uploadProgress": "Yükleme ilerleme",
     "uploadingBytes": "{loaded} / {total} yüklendi",
-    "processingFiles": "Dosyalar sunucuda işleniyor..."
+    "processingFiles": "Dosyalar sunucuda işleniyor...",
+    "tabFiles": "Dosyalar",
+    "tabSearch": "Arama",
+    "intro": "Yüklediğiniz dosyalar sohbetleriniz için aranabilir bilgiye dönüşür. Klasörler bir konuşmayı sınırlamak için bilgi klasörü olarak kullanılabilir.",
+    "useInChat": "Sohbette kullan"
   },
   "config": {
     "aiModels": {
@@ -1710,8 +1714,8 @@
     "saveChanges": "Değişiklikleri Kaydet"
   },
   "rag": {
-    "title": "Anlamsal Arama",
-    "subtitle": "Dizinlenmiş belgelerinizde AI destekli arama",
+    "title": "Arama",
+    "subtitle": "Yüklediğiniz belgelerde arayın",
     "statDocuments": "Belgeler",
     "statChunks": "Parçalar",
     "statGroups": "Gruplar",
@@ -1747,7 +1751,8 @@
     "similarFound": "{n} benzer belge bulundu",
     "noSimilar": "Benzer belge bulunamadı",
     "similarFailed": "Benzer belgeler bulunamadı",
-    "navigateToFile": "Dosyalar açılıyor — belge {id}"
+    "navigateToFile": "Dosyalar açılıyor — belge {id}",
+    "statusLine": "{folders} klasörde {docs} belge dizinlendi"
   },
   "cookies": {
     "title": "Çerez Ayarları",

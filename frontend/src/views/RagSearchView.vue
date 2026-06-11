@@ -1,112 +1,23 @@
 <template>
   <MainLayout>
-    <div class="h-full flex flex-col bg-chat" data-testid="page-rag-search">
-      <!-- Header -->
-      <div
-        class="px-6 py-4 border-b border-light-border/30 dark:border-dark-border/20 bg-chat"
-        data-testid="section-header"
-      >
-        <h1 class="text-2xl font-semibold txt-primary mb-1">{{ $t('rag.title') }}</h1>
-        <p class="txt-secondary text-sm">{{ $t('rag.subtitle') }}</p>
-      </div>
+    <div
+      class="h-full flex flex-col bg-chat overflow-y-auto scroll-thin"
+      data-testid="page-rag-search"
+    >
+      <div class="px-3 py-4 sm:p-4 md:p-8">
+        <div class="max-w-7xl mx-auto space-y-6">
+          <!-- §4.8: the knowledge base has two tabs — Files (browse) + Search -->
+          <FilesTabs active="search" />
 
-      <div class="flex-1 overflow-y-auto px-6 py-6 scroll-thin">
-        <div class="max-w-5xl mx-auto space-y-6">
-          <!-- Stats Cards -->
-          <div
-            v-if="stats"
-            class="grid grid-cols-2 md:grid-cols-4 gap-3"
-            data-testid="section-stats"
-          >
-            <div
-              class="surface-card p-4 hover:shadow-lg transition-shadow cursor-default"
-              data-testid="item-stat-card"
-            >
-              <div class="flex items-center gap-2 mb-2">
-                <svg
-                  class="w-5 h-5 text-[var(--brand)]"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                    stroke-width="2"
-                    d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-                  />
-                </svg>
-              </div>
-              <div class="text-2xl font-bold txt-primary">{{ stats.total_documents }}</div>
-              <div class="text-sm txt-secondary">{{ $t('rag.statDocuments') }}</div>
-            </div>
-            <div
-              class="surface-card p-4 hover:shadow-lg transition-shadow cursor-default"
-              data-testid="item-stat-card"
-            >
-              <div class="flex items-center gap-2 mb-2">
-                <svg
-                  class="w-5 h-5 text-[var(--brand)]"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                    stroke-width="2"
-                    d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"
-                  />
-                </svg>
-              </div>
-              <div class="text-2xl font-bold txt-primary">{{ stats.total_chunks }}</div>
-              <div class="text-sm txt-secondary">{{ $t('rag.statChunks') }}</div>
-            </div>
-            <div
-              class="surface-card p-4 hover:shadow-lg transition-shadow cursor-default"
-              data-testid="item-stat-card"
-            >
-              <div class="flex items-center gap-2 mb-2">
-                <svg
-                  class="w-5 h-5 text-[var(--brand)]"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                    stroke-width="2"
-                    d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"
-                  />
-                </svg>
-              </div>
-              <div class="text-2xl font-bold txt-primary">{{ stats.total_groups }}</div>
-              <div class="text-sm txt-secondary">{{ $t('rag.statGroups') }}</div>
-            </div>
-            <div
-              class="surface-card p-4 hover:shadow-lg transition-shadow cursor-default"
-              data-testid="item-stat-card"
-            >
-              <div class="flex items-center gap-2 mb-2">
-                <svg
-                  class="w-5 h-5 text-[var(--brand)]"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                    stroke-width="2"
-                    d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"
-                  />
-                </svg>
-              </div>
-              <div class="text-2xl font-bold txt-primary">{{ stats.avg_chunk_size }}</div>
-              <div class="text-sm txt-secondary">{{ $t('rag.statAvgChars') }}</div>
-            </div>
-          </div>
+          <!-- §4.8 #4: one compact status line instead of 4 jargon stat cards -->
+          <p v-if="stats" class="text-sm txt-secondary" data-testid="section-stats">
+            {{
+              $t('rag.statusLine', {
+                docs: stats.total_documents,
+                folders: stats.total_groups,
+              })
+            }}
+          </p>
 
           <!-- Search Box -->
           <div class="surface-card p-6" data-testid="section-search">
@@ -441,6 +352,7 @@ import { ref, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 import MainLayout from '@/components/MainLayout.vue'
+import FilesTabs from '@/components/files/FilesTabs.vue'
 import * as ragService from '@/services/ragService'
 import { useNotification } from '@/composables/useNotification'
 
