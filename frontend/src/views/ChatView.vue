@@ -164,10 +164,12 @@
               :error-data="message.errorData"
               :truncated="message.truncated"
               :task-plan="message.taskPlan"
+              :was-multitask="message.wasMultitask"
               :is-guest-mode="isGuestMode"
               @regenerate="handleRegenerate(message, $event)"
               @again="handleAgain"
               @retry="handleRetryMessage(message, $event)"
+              @retry-task="handleTaskRetry"
               @false-positive="openFalsePositiveModal"
               @click-memory="handleClickMemory"
               @continue="handleContinueResponse(message)"
@@ -1849,6 +1851,7 @@ const streamAIResponse = async (
             if (message && Array.isArray(tasks) && tasks.length > 0) {
               processingStatus.value = ''
               processingMetadata.value = {}
+              message.wasMultitask = true
               message.taskPlan = {
                 active: true,
                 replyNode:
@@ -1868,12 +1871,21 @@ const streamAIResponse = async (
             const message = historyStore.messages.find((m) => m.id === messageId)
             if (message) {
               message.taskPlan = null
+              message.wasMultitask = false
             }
           } else if (data.status === 'task_update') {
             const message = historyStore.messages.find((m) => m.id === messageId)
             const card = message?.taskPlan?.cards.find((c) => c.nodeId === data.metadata?.node_id)
             if (card && isTaskCardState(data.metadata?.state)) {
               card.state = data.metadata.state
+              // Failure details: specific error text + (for media nodes) the
+              // resolved prompt powering the per-task retry button.
+              if (typeof data.metadata?.error === 'string' && data.metadata.error) {
+                card.error = data.metadata.error
+              }
+              if (typeof data.metadata?.prompt === 'string' && data.metadata.prompt) {
+                card.prompt = data.metadata.prompt
+              }
             }
           } else if (data.status === 'task_chunk') {
             const message = historyStore.messages.find((m) => m.id === messageId)
@@ -2800,8 +2812,37 @@ const handleAgain = async (backendMessageId: number, modelId?: number) => {
 
   historyStore.markSuperseded(assistantMessage.id)
 
-  // Stream new response directly without creating a duplicate user message
-  await streamAIResponse(userText, { modelId, isAgain: true })
+  // Stream new response directly without creating a duplicate user message.
+  //
+  // With a model pick: `isAgain` skips classification and routes straight to
+  // the picked model (single-prompt "Again with…").
+  //
+  // Without a model pick (multitask "Again"): stream WITHOUT `isAgain` so the
+  // backend re-classifies (`source: ai_sorting`) and the planner can build a
+  // fresh DAG — `isAgain` without a model would silently degrade the turn to
+  // the single-node legacy path.
+  await streamAIResponse(userText, modelId ? { modelId, isAgain: true } : {})
+}
+
+/**
+ * Retry one failed task-plan step with another model. Streams the step's
+ * resolved prompt through the Again path (`isAgain` + modelId): the backend
+ * maps the model tag to the matching media topic (e.g. TEXT2PIC → tools:pic),
+ * so only that sub-task re-runs. The result arrives as a new assistant bubble;
+ * the original turn (with its successful parts) is left untouched.
+ */
+const handleTaskRetry = async (payload: { prompt: string; modelId: number }) => {
+  if (!authStore.isAuthenticated || isGuestMode.value) return
+  if (!payload.prompt || !payload.modelId) return
+
+  // Stop any active audio playback before re-running the step
+  if (currentAudioStreamer) {
+    currentAudioStreamer.stop()
+    currentAudioStreamer = null
+  }
+  isAudioStreaming.value = false
+
+  await streamAIResponse(payload.prompt, { modelId: payload.modelId, isAgain: true })
 }
 
 const handleRegenerate = async (message: Message, modelOption: ModelOption) => {

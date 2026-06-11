@@ -1242,6 +1242,13 @@ class StreamController extends AbstractController
                     $outgoingMessage->setMeta('media_type', $response['metadata']['media_type']);
                 }
 
+                // Multi-task routing: mark the OUT message as a DAG turn so the
+                // frontend can offer the simple "Again" (full re-plan) instead of
+                // the single-model "Again with…" after a reload.
+                if (!empty($response['metadata']['multitask'])) {
+                    $outgoingMessage->setMeta('multitask', '1');
+                }
+
                 $this->persistOriginalMediaMeta(
                     $outgoingMessage,
                     $classification,
@@ -1900,6 +1907,11 @@ class StreamController extends AbstractController
             // so a later history fetch surfaces the right "Audio Model"
             // badge and the right capability for the Again dropdown.
             $this->persistOriginalMediaMeta($outgoingMessage, $classification, $metadata);
+
+            // Mirror the streaming branch: flag DAG turns for the history API.
+            if (!empty($metadata['multitask'])) {
+                $outgoingMessage->setMeta('multitask', '1');
+            }
 
             if (!empty($options['web_search'])) {
                 $message->setMeta('web_search_enabled', 'true');

@@ -29,6 +29,12 @@ use Psr\Log\LoggerInterface;
  */
 final readonly class DagExecutor
 {
+    /** Cap for the error string forwarded to the client on a failed/skipped node. */
+    private const MAX_ERROR_LENGTH = 240;
+
+    /** Cap for the resolved media prompt forwarded on a failed media node (retry payload). */
+    private const MAX_PROMPT_LENGTH = 4000;
+
     public function __construct(
         private RunnerRegistry $registry,
         private ResultAssembler $assembler,
@@ -77,8 +83,9 @@ final readonly class DagExecutor
         foreach ($plan->topologicalOrder() as $node) {
             $blockedBy = $this->unmetDependency($plan, $context, $node->id);
             if (null !== $blockedBy) {
-                $context->setResult($node->id, NodeResult::skipped("dependency '{$blockedBy}' did not complete"));
-                $this->emitState($progressCallback, $node, 'skipped');
+                $result = NodeResult::skipped("dependency '{$blockedBy}' did not complete");
+                $context->setResult($node->id, $result);
+                $this->emitState($progressCallback, $node, 'skipped', $this->failureMetadata($node, $result, $context));
                 continue;
             }
 
@@ -117,8 +124,9 @@ final readonly class DagExecutor
                     }
                     $blocked = $this->settledFailedDependency($context, $node);
                     if (null !== $blocked) {
-                        $context->setResult($node->id, NodeResult::skipped("dependency '{$blocked}' did not complete"));
-                        $this->emitState($progressCallback, $node, 'skipped');
+                        $result = NodeResult::skipped("dependency '{$blocked}' did not complete");
+                        $context->setResult($node->id, $result);
+                        $this->emitState($progressCallback, $node, 'skipped', $this->failureMetadata($node, $result, $context));
                         $progressed = true;
                     }
                 }
@@ -174,8 +182,9 @@ final readonly class DagExecutor
     {
         $runner = $this->registry->get($node->capability);
         if (null === $runner) {
-            $context->setResult($node->id, NodeResult::failed("no runner for capability '{$node->capability->value}'"));
-            $this->emitState($progressCallback, $node, 'failed');
+            $result = NodeResult::failed("no runner for capability '{$node->capability->value}'");
+            $context->setResult($node->id, $result);
+            $this->emitState($progressCallback, $node, 'failed', $this->failureMetadata($node, $result, $context));
             $this->logger->warning('DagExecutor: no runner for capability', [
                 'node' => $node->id,
                 'capability' => $node->capability->value,
@@ -200,7 +209,7 @@ final readonly class DagExecutor
 
         $context->setResult($node->id, $result);
         $this->emitFilesFor($node, $result, $progressCallback);
-        $this->emitState($progressCallback, $node, $result->isSuccessful() ? 'done' : 'failed');
+        $this->emitState($progressCallback, $node, $result->isSuccessful() ? 'done' : 'failed', $this->failureMetadata($node, $result, $context));
     }
 
     /**
@@ -219,7 +228,7 @@ final readonly class DagExecutor
             unset($inflight[$node->id]);
             $context->setResult($node->id, $result);
             $this->emitFilesFor($node, $result, $progressCallback);
-            $this->emitState($progressCallback, $node, $result->isSuccessful() ? 'done' : 'failed');
+            $this->emitState($progressCallback, $node, $result->isSuccessful() ? 'done' : 'failed', $this->failureMetadata($node, $result, $context));
 
             return;
         }
@@ -353,9 +362,12 @@ final readonly class DagExecutor
     /**
      * Emit a per-node state change as a `task_update` SSE event. The frontend
      * uses node_id + state + kind to drive each task card; labels are i18n'd
-     * client-side.
+     * client-side. `$extra` carries failure details (`error`, and for media
+     * nodes the resolved `prompt` so the client can retry with another model).
+     *
+     * @param array<string, mixed> $extra
      */
-    private function emitState(?callable $callback, TaskNode $node, string $state): void
+    private function emitState(?callable $callback, TaskNode $node, string $state, array $extra = []): void
     {
         if (null === $callback) {
             return;
@@ -363,14 +375,65 @@ final readonly class DagExecutor
         $callback([
             'status' => 'task_update',
             'message' => '',
-            'metadata' => [
+            'metadata' => array_merge([
                 'node_id' => $node->id,
                 'capability' => $node->capability->value,
                 'kind' => $node->capability->uiKind(),
                 'state' => $state,
-            ],
+            ], $extra),
             'timestamp' => time(),
         ]);
+    }
+
+    /**
+     * Extra `task_update` metadata for a settled, unsuccessful node: the
+     * (truncated) error string, plus — for failed media nodes — the resolved
+     * generation prompt and media type so the client can offer a one-click
+     * "retry this step with the next model" action.
+     *
+     * @return array<string, mixed>
+     */
+    private function failureMetadata(TaskNode $node, NodeResult $result, NodeContext $context): array
+    {
+        if ($result->isSuccessful()) {
+            return [];
+        }
+
+        $extra = [];
+        if (null !== $result->error && '' !== $result->error) {
+            $extra['error'] = mb_substr($result->error, 0, self::MAX_ERROR_LENGTH);
+        }
+
+        if (NodeStatus::Failed === $result->status && $this->isMediaKind($node)) {
+            $extra['media_type'] = $node->capability->uiKind();
+            $prompt = $this->resolveMediaPrompt($node, $context);
+            if (null !== $prompt) {
+                $extra['prompt'] = $prompt;
+            }
+        }
+
+        return $extra;
+    }
+
+    /**
+     * Resolve the prompt a media node ran with (mirrors {@see mediaRequest()} /
+     * MediaGenerationRunner). Best-effort: input resolution must never break
+     * the failure path it decorates.
+     */
+    private function resolveMediaPrompt(TaskNode $node, NodeContext $context): ?string
+    {
+        try {
+            $inputs = $context->resolveInputs($node);
+        } catch (\Throwable) {
+            return null;
+        }
+
+        $prompt = $this->stringInput($inputs['prompt'] ?? $inputs['text'] ?? null) ?? (string) $context->message->getText();
+        if ('' === trim($prompt)) {
+            return null;
+        }
+
+        return mb_substr($prompt, 0, self::MAX_PROMPT_LENGTH);
     }
 
     private function emitFile(?callable $callback, string $nodeId, string $type, string $url): void

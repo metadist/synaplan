@@ -149,4 +149,90 @@ class InternalEmailServiceTest extends TestCase
         self::assertNotNull($captured);
         self::assertCount(0, $captured->getAttachments());
     }
+
+    // ---- email_me DAG node: sendTaskResultEmail ----
+
+    /**
+     * Service whose mailer captures the (single) sent email into $captured.
+     */
+    private function taskResultService(?\Symfony\Component\Mime\Email &$captured): InternalEmailService
+    {
+        $mailer = $this->createMock(MailerInterface::class);
+        $mailer->expects($this->once())
+            ->method('send')
+            ->willReturnCallback(function ($email) use (&$captured): void {
+                $captured = $email;
+            });
+
+        return new InternalEmailService(
+            $mailer,
+            $this->createMock(Environment::class),
+            $this->createMock(TranslatorInterface::class),
+            $this->createMock(LoggerInterface::class),
+        );
+    }
+
+    /**
+     * The multi-MIME contract: the FIRST image is embedded inline (CID) so
+     * mail clients render it in the body; every other file (audio before the
+     * image, calendar invite after it) is a regular attachment.
+     */
+    public function testTaskResultEmailEmbedsFirstImageAndAttachesRest(): void
+    {
+        $mp3 = sys_get_temp_dir().'/task_'.uniqid().'.mp3';
+        $png = sys_get_temp_dir().'/task_'.uniqid().'.png';
+        $ics = sys_get_temp_dir().'/task_'.uniqid().'.ics';
+        file_put_contents($mp3, 'audio-bytes');
+        file_put_contents($png, 'image-bytes');
+        file_put_contents($ics, 'BEGIN:VCALENDAR');
+
+        $captured = null;
+        $service = $this->taskResultService($captured);
+        $service->sendTaskResultEmail('owner@example.com', 'Your results', "# Spring Poem\n\nRoses are red.", [
+            ['path' => $mp3, 'type' => 'audio'],
+            ['path' => $png, 'type' => 'image'],
+            ['path' => $ics, 'type' => 'document'],
+        ]);
+
+        self::assertNotNull($captured);
+        self::assertSame('Your results', $captured->getSubject());
+        self::assertCount(3, $captured->getAttachments());
+
+        $inline = array_values(array_filter(
+            $captured->getAttachments(),
+            static fn ($part) => 'inline' === $part->getDisposition(),
+        ));
+        self::assertCount(1, $inline, 'exactly the first image must be embedded inline');
+        self::assertStringContainsString('cid:generated-image', (string) $captured->getHtmlBody());
+        // Markdown body rendered to HTML, raw markdown kept as the text part.
+        self::assertStringContainsString('<h1>Spring Poem</h1>', (string) $captured->getHtmlBody());
+        self::assertStringContainsString('# Spring Poem', (string) $captured->getTextBody());
+
+        @unlink($mp3);
+        @unlink($png);
+        @unlink($ics);
+    }
+
+    public function testTaskResultEmailWithTextOnly(): void
+    {
+        $captured = null;
+        $service = $this->taskResultService($captured);
+        $service->sendTaskResultEmail('owner@example.com', 'Your results', 'Just the poem.');
+
+        self::assertNotNull($captured);
+        self::assertCount(0, $captured->getAttachments());
+        self::assertStringNotContainsString('cid:generated-image', (string) $captured->getHtmlBody());
+    }
+
+    public function testTaskResultEmailSkipsMissingFiles(): void
+    {
+        $captured = null;
+        $service = $this->taskResultService($captured);
+        $service->sendTaskResultEmail('owner@example.com', 'Your results', 'Body.', [
+            ['path' => '/tmp/does-not-exist-'.uniqid().'.png', 'type' => 'image'],
+        ]);
+
+        self::assertNotNull($captured);
+        self::assertCount(0, $captured->getAttachments());
+    }
 }

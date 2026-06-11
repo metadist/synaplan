@@ -394,7 +394,11 @@
           -->
           <!-- Multitask routing: live task cards (only while a multi-node plan
                streams). On reload the turn is flattened to normal parts below. -->
-          <TaskPlanBubble v-if="taskPlan?.active" :plan="taskPlan" />
+          <TaskPlanBubble
+            v-if="taskPlan?.active"
+            :plan="taskPlan"
+            @retry-task="emit('retryTask', $event)"
+          />
 
           <MessagePart
             v-for="(part, index) in contentParts"
@@ -751,7 +755,31 @@
               />
             </button>
 
-            <div class="relative">
+            <!-- Multitask (DAG) turn: a single model pick can't represent the
+                 whole plan, so offer one plain "Again" that re-runs the full
+                 pipeline (re-classify + re-plan). -->
+            <button
+              v-if="isMultitaskTurn"
+              type="button"
+              :disabled="isSuperseded || isGuestMode"
+              :class="[
+                'pill text-xs whitespace-nowrap relative',
+                isSuperseded || isGuestMode ? 'opacity-50 cursor-not-allowed' : '',
+              ]"
+              :aria-label="$t('chatMessage.again')"
+              data-testid="btn-message-again"
+              @click.stop="!isGuestMode && handleSimpleAgain()"
+            >
+              <ArrowPathIcon class="w-4 h-4" />
+              <span class="font-medium">{{ $t('chatMessage.again') }}</span>
+              <Icon
+                v-if="isGuestMode"
+                icon="mdi:lock-outline"
+                class="w-3 h-3 text-amber-500 absolute -top-1 -right-1"
+              />
+            </button>
+
+            <div v-else class="relative">
               <!-- Single "Again with… ▾" control: opening the dropdown and
                    picking a model re-runs the prompt (see selectModel). The old
                    standalone "Again with <model>" button was merged into this to
@@ -999,6 +1027,9 @@ interface Props {
   truncated?: boolean
   // Multitask routing: live task-card state while a multi-node plan streams.
   taskPlan?: TaskPlanState | null
+  // Multitask routing: this assistant turn ran the DAG (persisted flag, also
+  // true for live plans). Switches "Again with…" to the simple "Again".
+  wasMultitask?: boolean
   // Status for failed/pending messages
   isGuestMode?: boolean
   status?: 'sent' | 'failed' | 'rate_limited'
@@ -1290,6 +1321,8 @@ const emit = defineEmits<{
   regenerate: [model: ModelOption]
   again: [backendMessageId: number, modelId?: number]
   retry: [messageContent: string]
+  /** Bubbled from a failed task card: re-run that step with another model. */
+  retryTask: [payload: { prompt: string; modelId: number }]
   falsePositive: [text: string, messageId?: number]
   'click-memory': [memory: UserMemory]
   continue: []
@@ -1419,6 +1452,18 @@ const toggleModelDropdown = () => {
 
 const closeModelDropdown = () => {
   modelDropdownOpen.value = false
+}
+
+// Multitask turns get a single "Again" (full re-classify + re-plan) instead of
+// the per-model dropdown — one model pick can't represent a whole DAG.
+const isMultitaskTurn = computed(
+  () => props.taskPlan?.active === true || props.wasMultitask === true
+)
+
+const handleSimpleAgain = () => {
+  if (props.backendMessageId) {
+    emit('again', props.backendMessageId)
+  }
 }
 
 const selectModel = (model: ModelOption) => {

@@ -133,6 +133,12 @@ services:
     App\Service\Multitask\Execution\Parallel\MediaNodeDispatcher:
         alias: App\Service\Multitask\Execution\Parallel\ProcessMediaNodeDispatcher
 
+    # email_me DAG node: resolves upstream file descriptors to absolute paths
+    # under the shared uploads dir before attaching them to the result mail.
+    App\Service\Multitask\Execution\Runner\EmailMeRunner:
+        arguments:
+            $uploadDir: '%kernel.project_dir%/var/uploads'
+
     # Idempotent seeders for production-essential catalog data.
     # Run from docker-entrypoint.sh after migrations (app:seed) and re-runnable from CLI.
     App\Seed\ModelSeeder:

@@ -477,6 +477,119 @@ final class DagExecutorTest extends TestCase
         self::assertSame(['n1'], $cancelled);
     }
 
+    // ---- Failure metadata on task_update (per-task error + retry payload) ----
+
+    /**
+     * @param list<array<string, mixed>> $events
+     *
+     * @return array<string, mixed>|null first task_update metadata matching the state
+     */
+    private function firstUpdateWithState(array $events, string $state): ?array
+    {
+        foreach ($events as $metadata) {
+            if (($metadata['state'] ?? null) === $state) {
+                return $metadata;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * @return list<array<string, mixed>> captured task_update metadata payloads
+     */
+    private function collectUpdates(DagExecutor $executor, TaskPlan $plan): array
+    {
+        $updates = [];
+        $executor->execute($plan, $this->context(), function (array $e) use (&$updates): void {
+            if ('task_update' === $e['status']) {
+                $updates[] = $e['metadata'];
+            }
+        });
+
+        return $updates;
+    }
+
+    public function testFailedNodeEmitsTruncatedErrorWithoutRetryPayload(): void
+    {
+        $longError = str_repeat('e', 300);
+        $runner = $this->runner(fn (): NodeResult => NodeResult::failed($longError));
+
+        $updates = $this->collectUpdates($this->executor($runner), TaskPlan::singleChatPlan('en'));
+        $failed = $this->firstUpdateWithState($updates, 'failed');
+
+        self::assertNotNull($failed);
+        self::assertSame(str_repeat('e', 240), $failed['error']);
+        // Non-media node: no retry payload.
+        self::assertArrayNotHasKey('prompt', $failed);
+        self::assertArrayNotHasKey('media_type', $failed);
+    }
+
+    public function testFailedMediaNodeEmitsPromptAndMediaTypeForRetry(): void
+    {
+        $plan = TaskPlan::fromArray([
+            'version' => 1, 'language' => 'en', 'reply_node' => 'n1',
+            'tasks' => [['id' => 'n1', 'capability' => 'image_generation', 'inputs' => ['prompt' => 'a dog in the rain']]],
+        ]);
+        $runner = $this->runner(fn (): NodeResult => NodeResult::failed('provider 500'));
+
+        $failed = $this->firstUpdateWithState($this->collectUpdates($this->executor($runner), $plan), 'failed');
+
+        self::assertNotNull($failed);
+        self::assertSame('provider 500', $failed['error']);
+        self::assertSame('image', $failed['media_type']);
+        self::assertSame('a dog in the rain', $failed['prompt']);
+    }
+
+    public function testSkippedNodeEmitsDependencyErrorWithoutRetryPayload(): void
+    {
+        $plan = TaskPlan::fromArray([
+            'version' => 1, 'language' => 'en', 'reply_node' => 'n2',
+            'tasks' => [
+                ['id' => 'n1', 'capability' => 'extract_text'],
+                ['id' => 'n2', 'capability' => 'summarize', 'depends_on' => ['n1']],
+            ],
+        ]);
+        $runner = $this->runner(fn (TaskNode $node): NodeResult => match ($node->capability) {
+            Capability::ExtractText => NodeResult::failed('tika down'),
+            default => NodeResult::ok('should be skipped'),
+        });
+
+        $skipped = $this->firstUpdateWithState($this->collectUpdates($this->executor($runner), $plan), 'skipped');
+
+        self::assertNotNull($skipped);
+        self::assertSame('n2', $skipped['node_id']);
+        self::assertSame("dependency 'n1' did not complete", $skipped['error']);
+        self::assertArrayNotHasKey('prompt', $skipped);
+    }
+
+    public function testParallelFailedMediaNodeEmitsRetryPayload(): void
+    {
+        $plan = TaskPlan::fromArray([
+            'version' => 1, 'language' => 'en', 'reply_node' => 'n2',
+            'tasks' => [
+                ['id' => 'n1', 'capability' => 'image_generation', 'inputs' => ['prompt' => 'a dog']],
+                ['id' => 'n2', 'capability' => 'compose_reply', 'depends_on' => ['n1'], 'inputs' => ['attachments' => ['$n1.file']]],
+            ],
+        ]);
+        $dispatcher = $this->dispatcher(fn (): NodeResult => NodeResult::failed('gpu oom'));
+
+        $updates = [];
+        $this->executor($this->textRunner(), parallel: true, dispatcher: $dispatcher)
+            ->execute($plan, $this->context(), function (array $e) use (&$updates): void {
+                if ('task_update' === $e['status']) {
+                    $updates[] = $e['metadata'];
+                }
+            });
+
+        $failed = $this->firstUpdateWithState($updates, 'failed');
+        self::assertNotNull($failed);
+        self::assertSame('n1', $failed['node_id']);
+        self::assertSame('gpu oom', $failed['error']);
+        self::assertSame('image', $failed['media_type']);
+        self::assertSame('a dog', $failed['prompt']);
+    }
+
     public function testParallelAndSequentialProduceSameResult(): void
     {
         $dispatcher = $this->dispatcher(function (MediaNodeRequest $req): NodeResult {
