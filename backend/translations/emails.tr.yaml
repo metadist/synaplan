@@ -1,0 +1,40 @@
+email:
+  password_reset:
+    title: 'Şifrenizi Sıfırlayın'
+    intro: 'Synaplan hesabınız için şifre sıfırlama talebinde bulundunuz.'
+    instruction: 'Şifrenizi sıfırlamak için aşağıdaki düğmeye tıklayın:'
+    button: 'Şifreyi Sıfırla'
+    or_copy: 'Veya bu bağlantıyı kopyalayıp tarayıcınıza yapıştırın:'
+    security_notice:
+      title: 'Güvenlik Uyarısı:'
+      text: 'Bu bağlantı 1 saat içinde geçerliliğini yitirecektir. Bu şifre sıfırlama talebini siz yapmadıysanız, lütfen bu e-postayı dikkate almayın; şifreniz değişmeden kalacaktır.'
+
+  verification:
+    title: 'E-posta Adresinizi Doğrulayın'
+    intro: 'Synaplan''a kaydolduğunuz için teşekkür ederiz!'
+    instruction: 'Lütfen e-posta adresinizi doğrulamak için aşağıdaki düğmeye tıklayın:'
+    button: 'E-postayı Doğrula'
+    or_copy: 'Veya bu bağlantıyı kopyalayıp tarayıcınıza yapıştırın:'
+    expiry: 'Bu bağlantı 24 saat içinde geçerliliğini yitirecektir.'
+    footer_notice: 'Synaplan''da bir hesap oluşturmadıysanız bu e-postayı güvenle yok sayabilirsiniz.'
+
+  welcome:
+    title: 'Synaplan''a Hoş Geldiniz!'
+    greeting: 'Merhaba %name%,'
+    intro: 'E-posta adresiniz başarıyla doğrulandı ve hesabınız artık aktif.'
+    features_intro: 'Artık Synaplan''ın tüm özelliklerini kullanmaya başlayabilirsiniz:'
+    feature_1: 'Yapay zekâ destekli sohbet asistanı'
+    feature_2: 'Belge analizi'
+    feature_3: 'Çok kanallı iletişim'
+    feature_4: 'Ve çok daha fazlası!'
+    button: 'Başlayın'
+
+  task_result:
+    subject: 'Synaplan sonuçlarınız'
+    sent_confirmation: 'Sonuçlar %email% adresine e-postayla gönderildi.'
+
+  footer:
+    support: 'Sorun yaşıyorsanız lütfen destek ekibimizle iletişime geçin.'
+    help: 'Yardıma mı ihtiyacınız var? Belgelerimize göz atın veya destekle iletişime geçin.'
+    company: 'Synaplan'
+    rights: 'Tüm hakları saklıdır'

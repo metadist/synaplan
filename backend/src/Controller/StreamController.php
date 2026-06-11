@@ -1061,8 +1061,9 @@ class StreamController extends AbstractController
                 // MORE than one output file. Only the task-plan executor sets
                 // metadata['files'] (legacy handlers never do), so the single-file
                 // path above is unchanged. The first file is already surfaced via
-                // metadata['file']; here we surface + persist the remaining files.
-                $extraTaskFiles = [];
+                // metadata['file']; here we surface the remaining files and
+                // persist every File entity the reload path needs (issue #1055).
+                $taskFileEntities = [];
                 if (isset($response['metadata']['files']) && is_array($response['metadata']['files'])) {
                     foreach (array_values($response['metadata']['files']) as $idx => $taskFile) {
                         if (0 === $idx || !is_array($taskFile) || empty($taskFile['path'])) {
@@ -1072,15 +1073,8 @@ class StreamController extends AbstractController
                             'type' => is_string($taskFile['type'] ?? null) ? $taskFile['type'] : 'file',
                             'url' => $taskFile['path'],
                         ]);
-                        $entity = $this->registerExistingGeneratedFile(
-                            $user->getId(),
-                            is_string($taskFile['local_path'] ?? null) ? $taskFile['local_path'] : null,
-                            is_string($taskFile['type'] ?? null) ? $taskFile['type'] : '',
-                        );
-                        if ($entity instanceof File) {
-                            $extraTaskFiles[] = $entity;
-                        }
                     }
+                    $taskFileEntities = $this->persistTaskPlanFiles($response['metadata']['files'], $user->getId());
                 }
 
                 if (isset($response['metadata']['links'])) {
@@ -1192,10 +1186,10 @@ class StreamController extends AbstractController
                         $this->em->flush();
                     }
 
-                    // Attach extra multi-task output files (Sprint 3b) so they
+                    // Attach multi-task output files (Sprint 3b) so they
                     // appear in history (getFiles()/files[]) after a reload.
-                    if ([] !== $extraTaskFiles) {
-                        foreach ($extraTaskFiles as $taskFileEntity) {
+                    if ([] !== $taskFileEntities) {
+                        foreach ($taskFileEntities as $taskFileEntity) {
                             $outgoingMessage->addFile($taskFileEntity);
                         }
                         $this->em->flush();
@@ -2302,6 +2296,49 @@ class StreamController extends AbstractController
      * Store AI-generated file in the file system and create File entity
      * Same logic as ChatHandler::storeGeneratedFile.
      */
+    /**
+     * Persist the multi-task output files as File entities so they survive a
+     * page reload — history (`ChatController::getMessages`) serializes only the
+     * Message<->File relation, never the legacy BFILE/BFILEPATH columns.
+     *
+     * The primary file (index 0) also rides the legacy single-file channel,
+     * which the frontend renders inline for image/video/audio on reload —
+     * registering those again would duplicate the media (e.g. a second audio
+     * player). So index 0 is only registered when the legacy channel cannot
+     * render it (document and other types — issue #1055); extra files
+     * (index > 0) are always registered, as before.
+     *
+     * @param array<int|string, mixed> $taskFiles metadata['files'] descriptors from the task-plan executor
+     *
+     * @return list<File>
+     */
+    private function persistTaskPlanFiles(array $taskFiles, int $userId): array
+    {
+        $entities = [];
+
+        foreach (array_values($taskFiles) as $idx => $taskFile) {
+            if (!is_array($taskFile) || empty($taskFile['path'])) {
+                continue;
+            }
+
+            $type = is_string($taskFile['type'] ?? null) ? $taskFile['type'] : '';
+            if (0 === $idx && in_array($type, ['image', 'video', 'audio'], true)) {
+                continue;
+            }
+
+            $entity = $this->registerExistingGeneratedFile(
+                $userId,
+                is_string($taskFile['local_path'] ?? null) ? $taskFile['local_path'] : null,
+                $type,
+            );
+            if ($entity instanceof File) {
+                $entities[] = $entity;
+            }
+        }
+
+        return $entities;
+    }
+
     /**
      * Register a File row for an already-on-disk generated file (multi-task
      * extra output, Sprint 3b). The media/TTS runners save bytes to the user's

@@ -242,6 +242,32 @@ describe('TaskPlanBubble', () => {
     expect(wrapper.find('[data-testid="task-card-retry"]').exists()).toBe(false)
   })
 
+  it('hides the retry button when the pool only contains the failed model', () => {
+    // A single-model pool would "retry" with the very model that just
+    // failed — misleading on non-transient failures, so no button.
+    const aiConfig = useAiConfigStore()
+    aiConfig.models = { TEXT2PIC: [model(190, 'Nano Banana 2', 100)] }
+    aiConfig.defaults = { TEXT2PIC: 190 }
+
+    const wrapper = mount(TaskPlanBubble, {
+      props: {
+        plan: plan([
+          {
+            nodeId: 'n1',
+            capability: 'image_generation',
+            kind: 'image',
+            state: 'failed',
+            error: 'provider 500',
+            prompt: 'a dog in the rain',
+          },
+        ]),
+      },
+      ...mountOptions,
+    })
+
+    expect(wrapper.find('[data-testid="task-card-retry"]').exists()).toBe(false)
+  })
+
   it('does not offer a retry on failed non-media cards', () => {
     const aiConfig = useAiConfigStore()
     aiConfig.models = { TEXT2PIC: [model(190, 'Nano Banana 2', 100)] }

@@ -1902,17 +1902,30 @@ const streamAIResponse = async (
                 typeof data.metadata?.type === 'string' ? data.metadata.type : card.kind
             }
           } else if (
-            (data.status === 'data' ||
-              data.status === 'file' ||
+            data.status === 'data' &&
+            historyStore.messages.find((m) => m.id === messageId)?.taskPlan?.active
+          ) {
+            // Multitask mode: no live single-bubble rendering (the task cards
+            // are the streaming surface), but the assembled answer text — the
+            // executor streams it once after the DAG finishes, and the reply
+            // node has no card of its own (compose_reply is hidden) — must
+            // still accumulate so the 'complete' flush renders it. Dropping it
+            // left the bubble without any answer text until a reload re-fetched
+            // the persisted message (#1057).
+            if (data.chunk) {
+              fullContent += data.chunk
+            }
+          } else if (
+            (data.status === 'file' ||
               data.status === 'audio' ||
               data.status === 'tts_generating' ||
               data.status === 'links') &&
             historyStore.messages.find((m) => m.id === messageId)?.taskPlan?.active
           ) {
             // Multitask mode: the task cards are the live surface, so suppress
-            // the normal single-bubble content/media events. They still flow so
-            // the OUT message text + files persist; history renders the flattened
-            // bubble on reload.
+            // the normal single-bubble media events. They still flow so the
+            // OUT message files persist; history renders the flattened bubble
+            // on reload.
           } else if (data.status === 'data' && data.chunk) {
             if (processingStatus.value) {
               processingStatus.value = ''

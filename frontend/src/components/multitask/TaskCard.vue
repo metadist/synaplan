@@ -70,13 +70,14 @@ const retryTag = computed((): Capability | null => {
 // Next model in the BRANKING-sorted list after the user's default for this
 // capability (round-robin, mirroring useModelSelection.predictedModel). The
 // failed step ran the default model, so "next" is the most useful retry pick.
+// A single-model pool offers nothing: "retry" there would re-run the very
+// model that just failed, which is misleading on non-transient failures.
 const retryModel = computed((): AIModel | null => {
   const tag = retryTag.value
   if (!tag) return null
 
   const options = [...(aiConfigStore.models[tag] ?? [])].sort((a, b) => b.rating - a.rating)
-  if (options.length === 0) return null
-  if (options.length === 1) return options[0]
+  if (options.length <= 1) return null
 
   const defaultId = aiConfigStore.defaults[tag]
   const idx = options.findIndex((m) => m.id === defaultId)

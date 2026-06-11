@@ -77,5 +77,16 @@ test.describe('@ci @multitask Multi-task routing', () => {
       const cardText = (await bubble.locator('[data-testid="task-card-n1"]').innerText()).trim()
       expect(cardText.length).toBeGreaterThan(0)
     })
+
+    await test.step('Assert: the assembled answer text renders without a reload (#1057)', async () => {
+      // The reply node (compose_reply) has no card — its assembled text must
+      // land in the regular message body below the task plan. Before the fix
+      // it was dropped while taskPlan.active and only appeared after a reload.
+      const answerText = bubble.locator(
+        '[data-testid="message-text"]:not([data-testid="task-plan"] [data-testid="message-text"])'
+      )
+      await answerText.first().waitFor({ state: 'visible', timeout: TIMEOUTS.STANDARD })
+      expect((await answerText.first().innerText()).trim().length).toBeGreaterThan(0)
+    })
   })
 })
