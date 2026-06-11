@@ -107,7 +107,7 @@
           {{ $t('channels.apiDocumentationInfo') }}
         </p>
         <router-link
-          to="/config/api-documentation"
+          to="/channels/api/docs"
           class="btn-primary px-6 py-3 rounded-lg font-medium inline-flex items-center gap-2"
         >
           <CommandLineIcon class="w-4 h-4" />

@@ -29,7 +29,7 @@ test.describe('@ci @smoke Inbound-Email-Handler UI', () => {
 
     await test.step('Arrange: login and navigate to mail handler page', async () => {
       await login(page)
-      await page.goto('/tools/mail-handler')
+      await page.goto('/channels/email')
       await page
         .locator(selectors.pages.tools)
         .waitFor({ state: 'visible', timeout: TIMEOUTS.STANDARD })

@@ -264,11 +264,13 @@ const hasWidgetChanges = computed(() => {
   return JSON.stringify(currentWidgetConfig.value) !== JSON.stringify(originalWidgetConfig.value)
 })
 
+// Canonical paths per the §4.6 URL map; legacy /tools/* arrives here only
+// via router redirects, so matching the new tree is sufficient.
 const currentPage = computed(() => {
   const path = route.path
-  if (path.includes('chat-widget')) return 'chat-widget'
-  if (path.includes('doc-summary')) return 'doc-summary'
-  if (path.includes('mail-handler')) return 'mail-handler'
+  if (path.includes('widgets')) return 'chat-widget'
+  if (path.includes('summarizer')) return 'doc-summary'
+  if (path.includes('email')) return 'mail-handler'
   return 'doc-summary'
 })
 

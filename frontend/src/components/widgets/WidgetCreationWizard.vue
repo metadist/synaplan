@@ -183,7 +183,7 @@
                   <Icon icon="heroicons:light-bulb" class="w-4 h-4 flex-shrink-0 mt-0.5" />
                   <span>
                     {{ $t('widgets.noCustomPromptsHint') }}
-                    <a href="/config/task-prompts" class="text-[var(--brand)] hover:underline">
+                    <a href="/ai/instructions" class="text-[var(--brand)] hover:underline">
                       {{ $t('widgets.createTaskPrompt') }}
                     </a>
                   </span>

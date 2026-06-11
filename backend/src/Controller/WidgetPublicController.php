@@ -75,7 +75,7 @@ class WidgetPublicController extends AbstractController
      * that owns the public API surface.
      *
      * Matches the SPA route registered in `frontend/src/router/index.ts`
-     * (`/tools/chat-widget/:widgetId/chats`). The session id is passed via
+     * (`/channels/widgets/:widgetId/chats`). The session id is passed via
      * `?session=` so the dashboard can deep-link directly to the visitor's
      * conversation instead of leaving the operator to scan the list.
      */
@@ -85,7 +85,7 @@ class WidgetPublicController extends AbstractController
         $frontendBase = rtrim((string) $frontendBase, '/');
 
         return sprintf(
-            '%s/tools/chat-widget/%s/chats?session=%s',
+            '%s/channels/widgets/%s/chats?session=%s',
             $frontendBase,
             rawurlencode($widgetId),
             rawurlencode($sessionId),

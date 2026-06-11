@@ -148,47 +148,106 @@ const router = createRouter({
     },
 
     // Protected routes (require authentication)
+    //
+    // Canonical URL tree since the 2026-06 navigation IA cleanup (§4.6):
+    //   /channels/*  — ways conversations reach Synaplan (widgets, email, API)
+    //   /ai/*        — AI machinery (models, instructions, routing, summarizer)
+    //   /files/*     — knowledge base (browse + search)
+    // The old /tools/* and /config/* paths redirect below (kept ≥ 2 releases
+    // for bookmarks/docs; see redirects.spec.ts).
     {
-      path: '/tools',
-      redirect: '/tools/chat-widget',
-      meta: { requiresAuth: true },
+      path: '/channels',
+      name: 'channels',
+      component: () => import('@/views/ConfigView.vue'),
+      meta: { requiresAuth: true, titleKey: 'pageTitles.configInbound' },
     },
     {
-      path: '/tools/chat-widget',
-      name: 'tools-chat-widget',
+      path: '/channels/widgets',
+      name: 'channels-widgets',
       component: () => import('@/views/WidgetsView.vue'),
       meta: { requiresAuth: true, helpId: 'tools.chatWidget', titleKey: 'pageTitles.chatWidget' },
     },
     {
-      path: '/tools/chat-widget/:widgetId/chats',
-      name: 'widget-chats',
-      component: () => import('../views/WidgetSessionsView.vue'),
-      meta: { requiresAuth: true, titleKey: 'pageTitles.widgetChats' },
-    },
-    {
-      path: '/tools/chat-widget/:widgetId',
-      name: 'widget-detail',
-      component: () => import('@/views/WidgetDetailView.vue'),
-      meta: { requiresAuth: true, titleKey: 'pageTitles.widgetDetail' },
-    },
-    {
-      path: '/tools/chat-widget/live-support',
+      path: '/channels/widgets/live-support',
       name: 'live-support',
       component: () => import('../views/LiveSupportView.vue'),
       meta: { requiresAuth: true, titleKey: 'pageTitles.liveSupport' },
     },
     {
-      path: '/tools/doc-summary',
-      name: 'tools-doc-summary',
-      component: () => import('@/views/ToolsView.vue'),
-      meta: { requiresAuth: true, helpId: 'tools.docSummary', titleKey: 'pageTitles.docSummary' },
+      path: '/channels/widgets/:widgetId/chats',
+      name: 'widget-chats',
+      component: () => import('../views/WidgetSessionsView.vue'),
+      meta: { requiresAuth: true, titleKey: 'pageTitles.widgetChats' },
     },
     {
-      path: '/tools/mail-handler',
-      name: 'tools-mail-handler',
+      path: '/channels/widgets/:widgetId',
+      name: 'widget-detail',
+      component: () => import('@/views/WidgetDetailView.vue'),
+      meta: { requiresAuth: true, titleKey: 'pageTitles.widgetDetail' },
+    },
+    {
+      path: '/channels/email',
+      name: 'channels-email',
       component: () => import('@/views/ToolsView.vue'),
       meta: { requiresAuth: true, helpId: 'tools.mailHandler', titleKey: 'pageTitles.mailHandler' },
     },
+    {
+      path: '/channels/api',
+      name: 'channels-api',
+      component: () => import('@/views/ConfigView.vue'),
+      meta: { requiresAuth: true, titleKey: 'pageTitles.configApiKeys' },
+    },
+    {
+      path: '/channels/api/docs',
+      name: 'channels-api-docs',
+      component: () => import('@/views/ConfigView.vue'),
+      meta: { requiresAuth: true, titleKey: 'pageTitles.configApiDocs' },
+    },
+    {
+      path: '/ai/models',
+      name: 'ai-models',
+      component: () => import('@/views/ConfigView.vue'),
+      meta: { requiresAuth: true, titleKey: 'pageTitles.configAiModels' },
+    },
+    {
+      path: '/ai/instructions',
+      name: 'ai-instructions',
+      component: () => import('@/views/ConfigView.vue'),
+      meta: { requiresAuth: true, titleKey: 'pageTitles.configTaskPrompts' },
+    },
+    {
+      path: '/ai/routing',
+      name: 'ai-routing',
+      component: () => import('@/views/ConfigView.vue'),
+      meta: { requiresAuth: true, titleKey: 'pageTitles.configSortingPrompt' },
+    },
+    {
+      // Transitional: the page retires into the chat Tools dropdown (Q3);
+      // the backend POST /api/v1/summary/generate API is a stable contract
+      // (Nextcloud + plugin consumers) and is documented on /channels/api/docs.
+      path: '/ai/summarizer',
+      name: 'ai-summarizer',
+      component: () => import('@/views/ToolsView.vue'),
+      meta: { requiresAuth: true, helpId: 'tools.docSummary', titleKey: 'pageTitles.docSummary' },
+    },
+
+    // --- Transitional redirects (old → new, §4.6; keep ≥ 2 releases) ---
+    { path: '/tools', redirect: '/channels' },
+    { path: '/tools/chat-widget', redirect: '/channels/widgets' },
+    { path: '/tools/chat-widget/live-support', redirect: '/channels/widgets/live-support' },
+    {
+      path: '/tools/chat-widget/:widgetId/chats',
+      redirect: (to) => ({
+        path: `/channels/widgets/${to.params.widgetId}/chats`,
+        query: to.query,
+      }),
+    },
+    {
+      path: '/tools/chat-widget/:widgetId',
+      redirect: (to) => ({ path: `/channels/widgets/${to.params.widgetId}`, query: to.query }),
+    },
+    { path: '/tools/mail-handler', redirect: '/channels/email' },
+    { path: '/tools/doc-summary', redirect: '/ai/summarizer' },
     {
       path: '/plugins/:pluginName',
       name: 'plugin-view',
@@ -233,52 +292,23 @@ const router = createRouter({
       },
     },
     {
-      path: '/rag',
-      name: 'rag',
+      // Search over the knowledge base. Phase 5 of the IA cleanup folds this
+      // into FilesView as a tab; the URL is already canonical (§4.6).
+      path: '/files/search',
+      name: 'files-search',
       component: () => import('@/views/RagSearchView.vue'),
       meta: { requiresAuth: true, titleKey: 'pageTitles.ragSearch' },
     },
-    {
-      path: '/config',
-      redirect: '/config/inbound',
-      meta: { requiresAuth: true },
-    },
-    {
-      path: '/config/inbound',
-      name: 'config-inbound',
-      component: () => import('@/views/ConfigView.vue'),
-      meta: { requiresAuth: true, titleKey: 'pageTitles.configInbound' },
-    },
-    {
-      path: '/config/ai-models',
-      name: 'config-ai-models',
-      component: () => import('@/views/ConfigView.vue'),
-      meta: { requiresAuth: true, titleKey: 'pageTitles.configAiModels' },
-    },
-    {
-      path: '/config/task-prompts',
-      name: 'config-task-prompts',
-      component: () => import('@/views/ConfigView.vue'),
-      meta: { requiresAuth: true, titleKey: 'pageTitles.configTaskPrompts' },
-    },
-    {
-      path: '/config/sorting-prompt',
-      name: 'config-sorting-prompt',
-      component: () => import('@/views/ConfigView.vue'),
-      meta: { requiresAuth: true, titleKey: 'pageTitles.configSortingPrompt' },
-    },
-    {
-      path: '/config/api-keys',
-      name: 'config-api-keys',
-      component: () => import('@/views/ConfigView.vue'),
-      meta: { requiresAuth: true, titleKey: 'pageTitles.configApiKeys' },
-    },
-    {
-      path: '/config/api-documentation',
-      name: 'config-api-documentation',
-      component: () => import('@/views/ConfigView.vue'),
-      meta: { requiresAuth: true, titleKey: 'pageTitles.configApiDocs' },
-    },
+
+    // --- Transitional redirects (old → new, §4.6; keep ≥ 2 releases) ---
+    { path: '/rag', redirect: '/files/search' },
+    { path: '/config', redirect: '/channels' },
+    { path: '/config/inbound', redirect: '/channels' },
+    { path: '/config/ai-models', redirect: '/ai/models' },
+    { path: '/config/task-prompts', redirect: '/ai/instructions' },
+    { path: '/config/sorting-prompt', redirect: '/ai/routing' },
+    { path: '/config/api-keys', redirect: '/channels/api' },
+    { path: '/config/api-documentation', redirect: '/channels/api/docs' },
     {
       path: '/statistics',
       name: 'statistics',
@@ -392,10 +422,26 @@ function detectRedirectLoop(targetPath: string): boolean {
   return false
 }
 
+/**
+ * Maps a route path to a backend feature-status key for the guest gate.
+ *
+ * CHECKPOINT (§4.6): the returned strings ('files', 'settings', 'memories',
+ * 'statistics') are BACKEND feature-status keys (admin → Feature Status) and
+ * MUST stay identical across URL migrations — a wrong key fails silently
+ * (wrong or missing upsell). The new /channels/* and /ai/* prefixes map to
+ * 'settings' exactly like the legacy /config/* and /tools/* paths they
+ * replaced; /files/search inherits 'files' via the /files prefix.
+ */
 function mapPathToFeatureKey(path: string): string {
   if (path.startsWith('/files')) return 'files'
   if (path.startsWith('/memories') || path.startsWith('/feedbacks')) return 'memories'
-  if (path.startsWith('/config') || path.startsWith('/settings') || path.startsWith('/tools'))
+  if (
+    path.startsWith('/config') ||
+    path.startsWith('/settings') ||
+    path.startsWith('/tools') ||
+    path.startsWith('/channels') ||
+    path.startsWith('/ai/')
+  )
     return 'settings'
   if (path.startsWith('/statistics')) return 'statistics'
   return 'general'

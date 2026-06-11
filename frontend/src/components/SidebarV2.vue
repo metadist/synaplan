@@ -829,7 +829,7 @@ const navItems = computed<NavItem[]>(() => {
 
   items.push({
     key: 'rag',
-    path: '/rag',
+    path: '/files/search',
     label: t('nav.semanticSearch'),
     icon: MagnifyingGlassIcon,
     requiresAuth: true,
@@ -837,19 +837,18 @@ const navItems = computed<NavItem[]>(() => {
   })
 
   // Channels + AI Setup are always present (Q6: easy mode shows them locked;
-  // guests see them gate-locked). URLs are still the legacy /tools + /config
-  // prefixes — the URL migration is phase 4 of the navigation IA plan.
+  // guests see them gate-locked). Canonical §4.6 URLs.
   const channelsChildren: NavChild[] = [
-    { key: 'inbound', path: '/config/inbound', label: t('nav.configInbound') },
-    { key: 'chat-widget', path: '/tools/chat-widget', label: t('nav.toolsChatWidget') },
-    { key: 'mail-handler', path: '/tools/mail-handler', label: t('nav.toolsMailHandler') },
-    { key: 'api-keys', path: '/config/api-keys', label: t('nav.configApiKeys') },
-    { key: 'api-docs', path: '/config/api-documentation', label: t('pageTitles.configApiDocs') },
+    { key: 'inbound', path: '/channels', label: t('nav.configInbound') },
+    { key: 'chat-widget', path: '/channels/widgets', label: t('nav.toolsChatWidget') },
+    { key: 'mail-handler', path: '/channels/email', label: t('nav.toolsMailHandler') },
+    { key: 'api-keys', path: '/channels/api', label: t('nav.configApiKeys') },
+    { key: 'api-docs', path: '/channels/api/docs', label: t('pageTitles.configApiDocs') },
   ]
 
   items.push({
     key: 'channels',
-    path: '/config/inbound',
+    path: '/channels',
     label: t('nav.channels'),
     description: t('nav.channelsDescription'),
     icon: SignalIcon,
@@ -860,16 +859,16 @@ const navItems = computed<NavItem[]>(() => {
   })
 
   const aiSetupChildren: NavChild[] = [
-    { key: 'ai-models', path: '/config/ai-models', label: t('nav.configAiModels') },
-    { key: 'task-prompts', path: '/config/task-prompts', label: t('nav.configTaskPrompts') },
-    { key: 'sorting-prompt', path: '/config/sorting-prompt', label: t('nav.configSortingPrompt') },
+    { key: 'ai-models', path: '/ai/models', label: t('nav.configAiModels') },
+    { key: 'task-prompts', path: '/ai/instructions', label: t('nav.configTaskPrompts') },
+    { key: 'sorting-prompt', path: '/ai/routing', label: t('nav.configSortingPrompt') },
     // Transitional home (Q3): retires into the in-chat Tools dropdown later.
-    { key: 'doc-summary', path: '/tools/doc-summary', label: t('nav.toolsDocSummary') },
+    { key: 'doc-summary', path: '/ai/summarizer', label: t('nav.toolsDocSummary') },
   ]
 
   items.push({
     key: 'ai-setup',
-    path: '/config/ai-models',
+    path: '/ai/models',
     label: t('nav.aiSetup'),
     description: t('nav.aiSetupDescription'),
     icon: CpuChipIcon,

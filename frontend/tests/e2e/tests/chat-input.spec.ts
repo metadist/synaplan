@@ -79,7 +79,7 @@ test.describe('Chat input: action row (§4.7)', () => {
   test('@ci Summarizer link row navigates to the summarizer tool (Q3)', async ({ page }) => {
     await page.locator(CHAT.toolsToggle).click()
     await page.locator(CHAT.toolSummarizerLink).click()
-    await expect(page).toHaveURL(/\/tools\/doc-summary/, { timeout: TIMEOUTS.STANDARD })
+    await expect(page).toHaveURL(/\/ai\/summarizer/, { timeout: TIMEOUTS.STANDARD })
   })
 
   test('@ci Knowledge-folder picker opens with None option and Manage link to Files', async ({

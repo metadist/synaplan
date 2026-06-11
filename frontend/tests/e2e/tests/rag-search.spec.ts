@@ -61,7 +61,7 @@ test.describe('@ci @smoke RAG Semantic Search', () => {
     })
 
     await test.step('Act: open /rag and run query', async () => {
-      await page.goto('/rag')
+      await page.goto('/files/search')
       await page.locator(RAG.page).waitFor({ state: 'visible', timeout: TIMEOUTS.STANDARD })
       await page.locator(RAG.queryInput).fill(RAG_SEARCH_PHRASE)
     })

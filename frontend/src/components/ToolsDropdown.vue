@@ -272,7 +272,7 @@ const selectToolCommand = (toolId: string, commandName: string) => {
 
 const goToSummarizer = () => {
   closeDropdown()
-  router.push('/tools/doc-summary')
+  router.push('/ai/summarizer')
 }
 
 const focusNext = () => {

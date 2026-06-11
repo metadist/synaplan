@@ -49,7 +49,7 @@ const allTips: PromoTip[] = [
     titleKey: 'promoTips.chatWidget.title',
     descriptionKey: 'promoTips.chatWidget.description',
     actionKey: 'promoTips.chatWidget.action',
-    actionRoute: '/tools/chat-widget',
+    actionRoute: '/channels/widgets',
     gradient:
       'from-violet-500/10 to-blue-500/10 dark:from-violet-500/[0.07] dark:to-blue-500/[0.07]',
   },
@@ -69,7 +69,7 @@ const allTips: PromoTip[] = [
     titleKey: 'promoTips.aiConfig.title',
     descriptionKey: 'promoTips.aiConfig.description',
     actionKey: 'promoTips.aiConfig.action',
-    actionRoute: '/config/ai-models',
+    actionRoute: '/ai/models',
     gradient:
       'from-orange-500/10 to-amber-500/10 dark:from-orange-500/[0.07] dark:to-amber-500/[0.07]',
   },
@@ -79,7 +79,7 @@ const allTips: PromoTip[] = [
     titleKey: 'promoTips.docSummary.title',
     descriptionKey: 'promoTips.docSummary.description',
     actionKey: 'promoTips.docSummary.action',
-    actionRoute: '/tools/doc-summary',
+    actionRoute: '/ai/summarizer',
     gradient: 'from-pink-500/10 to-rose-500/10 dark:from-pink-500/[0.07] dark:to-rose-500/[0.07]',
   },
   {

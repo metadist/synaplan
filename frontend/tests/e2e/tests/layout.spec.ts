@@ -232,7 +232,7 @@ test.describe('@ci @layout UI guard — key pages', () => {
 
   test('channels page (inbound config) has no overflow', async ({ page, credentials }) => {
     await login(page, credentials)
-    await page.goto('/config/inbound')
+    await page.goto('/channels')
     await expect(page.locator('[data-testid="page-config-inbound"]')).toBeVisible({
       timeout: TIMEOUTS.STANDARD,
     })
@@ -244,7 +244,7 @@ test.describe('@ci @layout UI guard — key pages', () => {
     credentials,
   }) => {
     await login(page, credentials)
-    await page.goto('/config/ai-models')
+    await page.goto('/ai/models')
     await expect(page.locator(selectors.models.page)).toBeVisible({ timeout: TIMEOUTS.STANDARD })
     await expectNoHorizontalOverflow(page, 'ai models')
 
@@ -285,7 +285,7 @@ test.describe('@ci @layout UI guard — axe scans (report-only, phase 0.5)', () 
 
   test('AI models — light and dark', async ({ page, credentials }) => {
     await login(page, credentials)
-    await page.goto('/config/ai-models')
+    await page.goto('/ai/models')
     await expect(page.locator(selectors.models.page)).toBeVisible({ timeout: TIMEOUTS.STANDARD })
     await axeReportOnly(page, 'ai-models', 'light')
     await axeReportOnly(page, 'ai-models', 'dark')

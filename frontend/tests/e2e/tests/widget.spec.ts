@@ -51,7 +51,7 @@ test.describe('@ci @smoke Widget', () => {
       timeout: TIMEOUTS.STANDARD,
     })
 
-    await page.goto('/tools/chat-widget')
+    await page.goto('/channels/widgets')
     await page.waitForSelector(selectors.widgets.page, { timeout: TIMEOUTS.SHORT })
     await updateWidgetSettings(page, widgetName, {
       isActive: false,
@@ -115,7 +115,7 @@ test.describe('@ci @smoke Widget', () => {
     })
 
     await test.step('Arrange: add localhost to whitelist', async () => {
-      await page.goto('/tools/chat-widget')
+      await page.goto('/channels/widgets')
       await page.waitForSelector(selectors.widgets.page, { timeout: TIMEOUTS.SHORT })
 
       const widgetCard = page
@@ -215,7 +215,7 @@ test.describe('@noci @smoke Widget — full flow', () => {
     await createTestWidget(page, widgetName, URLS.TEST_PAGE_URL)
     await updateWidgetSettings(page, widgetName, {})
 
-    await page.goto('/tools/chat-widget')
+    await page.goto('/channels/widgets')
     await page.waitForSelector(selectors.widgets.page, { timeout: TIMEOUTS.LONG })
 
     const testButton = page.locator(selectors.widgets.widgetCard.testButton).first()
