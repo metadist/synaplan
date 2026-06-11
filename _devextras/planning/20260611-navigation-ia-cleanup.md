@@ -1,11 +1,19 @@
 # Navigation & Information Architecture Cleanup — Planning
 
-**Date:** 2026-06-11 (rev. 5 — Q7 superseded: "Task Prompts" → **"AI Instructions"**
-(Furkan); rev. 4: partner review — CI-matrix honesty, staged axe rollout, testid
-decoupling in phase 0.5, feature-key checkpoint, path corrections)
-**Status:** Planning signed off (phase 0 ✅) — no implementation yet
+**Date:** 2026-06-11 (rev. 6 — implementation status; rev. 5 — Q7 superseded:
+"Task Prompts" → **"AI Instructions"** (Furkan); rev. 4: partner review —
+CI-matrix honesty, staged axe rollout, testid decoupling in phase 0.5,
+feature-key checkpoint, path corrections)
+**Status:** **Implemented through phase 7 (partial)** — see §9 implementation log.
+Phases 0.5–6 are fully landed; phase 7 landed except the parts that are
+deliberately deferred (transitional redirects ≥ 2 releases, Summarizer page
+retirement once the in-chat tool has soaked).
 **Scope:** Frontend navigation & related surfaces (`frontend/src`): sidebar, menus, routes, chat-input action row, Files/Search pages, i18n wording in EN / DE / ES / TR, mobile navigation UX.
 **Out of scope:** Backend, widget embed code, plugin internals, any feature behaviour.
+(One scoped exception, decided during phase 4: the backend's widget hand-off
+URL builder + its unit test fixtures moved to the canonical
+`/channels/widgets/...` path — `WidgetPublicController.php`,
+`SlackNotificationServiceTest.php`.)
 
 ---
 
@@ -715,3 +723,34 @@ already propagated into §4/§6. Q2 and Q6 diverge from the original recommendat
 | Dead code | `components/UserMenu.vue`, `components/ChatDropdown.vue` |
 | Tests | Vitest component tests + Playwright e2e referencing `data-testid="btn-sidebar-v2-*"` and old paths — **full per-file impact map in §6.1**; headline: `navigation.spec.ts` rewrite (2/4/6), `selectors.ts` registry (2/4/5), `task-prompts`/`inbound-email-handler`/`widget`/`rag-search` specs (4/5), new `redirects.spec.ts` (4) |
 | UI guard (new, §5) | `frontend/tests/e2e/tests/layout.spec.ts`, `frontend/tests/e2e/playwright.config.ts` (`chromium-mobile` + `@visual` projects), `frontend/tests/e2e/helpers/selectors.ts`, `frontend/package.json` (`test:e2e:mobile` script + axe dep), `frontend/Makefile` (`test-e2e-layout`), `.github/workflows/ci.yml` (**new matrix entry** + visual job + baseline-update dispatch) |
+
+---
+
+## 9. Implementation log (2026-06-11, rev. 6)
+
+All phases implemented on `main`-tracking branch in seven commits, one per
+phase, each gated locally (lint → vue-tsc → Vitest 610 → Playwright chromium
+@ci → chromium-mobile @layout; backend lint/PHPStan/PHPUnit re-run for the
+phase-4 backend touch).
+
+| Phase | Commit summary | Notes / deviations from plan |
+|---|---|---|
+| 0.5 UI guard | `test(e2e): layout UI guard…` | `layout.spec.ts` (overflow / labels / targets / collision / 320px), axe **report-only**, `chromium-mobile` + `chromium-visual` projects, CI matrix entry + `visual-baselines.yml` dispatch, stable testid scheme in `SidebarV2` + `selectors.ts`. B1 (AI-models header) + B2 (ES/TR keys) fixed. |
+| 1 Wording | `feat(frontend): adopt the navigation glossary…` | All §4.2 renames in 4 locales; `config.inbound.*` → `channels.*`; "Agents"/"Inbound"/"RAG" eliminated from UI strings; `RagSearchView` de-hardcoded; "AI Instructions" incl. *aka system prompts* tooltips. |
+| 2 Rail | `feat(frontend): labeled 80px rail…` | 80 px labeled rail, split Channels/AI-Setup flyouts, avatar menu reorder + Preferences, easy-mode lock dialog (Q6), icon map §4.5; `navigation.spec.ts` rewritten. |
+| 3 Chat input | `feat(frontend): three-pill chat input…` | Model / Tools / Knowledge-folder pills; Thinking + Voice reply as toggle rows in Tools with pill badge (Q8); Summarizer link row (Q3); new `KnowledgeFolderPicker.vue`; `chat-input.spec.ts`. |
+| 4 URLs | `feat(frontend): canonical §4.6 URL tree…` | Router rewrite + param/query-preserving redirects; `mapPathToFeatureKey` checkpoint kept (`'settings'`/`'files'` keys unchanged); all in-app links updated; backend hand-off URL + test fixtures (scoped exception, see header); `redirects.spec.ts`. |
+| 5 Files+Search | `feat(frontend): merge Files & Search…` | `FilesTabs.vue` (Browse \| Search) on `/files` + `/files/search`; RAG jargon header + 4 stat cards → 1 status line; integrations banner demoted below list; folder-card "Use in chat" → `/?folder=` deep link consumed by `ChatInput`. |
+| 6 Mobile | `feat(frontend): mobile bottom tab bar…` | `MobileNav.vue` bottom bar (New/History/Files/More, 44 px+, safe-area, normal-flow) + More sheet with accordions & account block; `useNavItems.ts` composable = single nav source; drawer/burger/`Header.vue` deleted; history sheet state shared via sidebar store; standalone Search rail item retired (tab since phase 5); target floor in guard raised to 44 px. |
+| 7 Cleanup (partial) | `chore(frontend): retire dead drawer/menu code…` | `UserMenu.vue`, `ChatDropdown.vue`, drawer store state, burger/`bg-header` CSS, 6 dead `nav.*` keys × 4 locales. **Deliberately left:** transitional redirects (≥ 2 releases — `redirects.spec.ts` is the watchdog), Summarizer page under AI Setup (retires after the in-chat tool soaks), axe flip to blocking (follow-up once findings are triaged). |
+
+**Known non-blockers:** local-only `@subscription` e2e failures (webhook helper
+signs with the CI fake secret `whsec_fakeWebhookSecretForTests`; this dev
+machine's backend has a real Stripe secret — passes in CI, pre-existing).
+Visual baselines for the renamed/new surfaces must be regenerated on the CI
+runner via the `visual-baselines.yml` dispatch after merge (local rendering
+differs by design).
+
+**Follow-ups (not in this change-set):** axe ratchet to blocking per surface;
+Synamail / docs screenshots referencing old paths ride the redirects;
+phase-7 remainder (drop redirects ≥ 2 releases, retire Summarizer page).
