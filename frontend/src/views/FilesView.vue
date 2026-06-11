@@ -350,11 +350,17 @@
                     icon="heroicons:magnifying-glass"
                     class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 txt-secondary pointer-events-none"
                   />
+                  <!--
+                    §4.8 vocabulary: "Search" is reserved for the semantic
+                    Search tab — this field is a keyword FILTER over the list
+                    (backend matches file name + extracted text).
+                  -->
                   <input
                     v-model="searchQuery"
                     type="text"
                     class="w-full pl-9 pr-8 py-2 text-sm rounded-xl bg-black/[0.04] dark:bg-white/[0.04] border border-black/[0.06] dark:border-white/[0.06] txt-primary placeholder:txt-secondary focus:outline-none focus:ring-2 focus:ring-[var(--brand)]/30 transition-all"
                     :placeholder="$t('files.searchPlaceholder')"
+                    :aria-label="$t('files.searchPlaceholder')"
                     data-testid="input-search"
                     @input="onSearchInput"
                   />
