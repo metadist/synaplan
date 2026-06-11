@@ -38,17 +38,14 @@ final class Version20260608130000 extends AbstractMigration
 
     public function up(Schema $schema): void
     {
-        $prompts = $schema->hasTable('BPROMPTS') ? $schema->getTable('BPROMPTS') : null;
-        if (null === $prompts) {
-            return;
-        }
-
-        if (!$prompts->hasColumn('BKEYWORDS')) {
-            $this->addSql('ALTER TABLE BPROMPTS ADD COLUMN BKEYWORDS LONGTEXT DEFAULT NULL AFTER BSELECTION_RULES');
-        }
-        if (!$prompts->hasColumn('BENABLED')) {
-            $this->addSql('ALTER TABLE BPROMPTS ADD COLUMN BENABLED TINYINT(1) NOT NULL DEFAULT 1 AFTER BKEYWORDS');
-        }
+        // NOTE: deliberately no `$schema->hasTable()/hasColumn()` reads. Touching
+        // the injected Schema forces doctrine/migrations' LazySchemaDiffProvider
+        // to introspect + run the DBAL comparator, which throws TableDoesNotExist
+        // on this production DB (MariaDB FK identifier-resolution quirk). MariaDB's
+        // native `ADD COLUMN IF NOT EXISTS` gives the same "add only if missing"
+        // semantics as raw, comparator-free SQL.
+        $this->addSql('ALTER TABLE BPROMPTS ADD COLUMN IF NOT EXISTS BKEYWORDS LONGTEXT DEFAULT NULL AFTER BSELECTION_RULES');
+        $this->addSql('ALTER TABLE BPROMPTS ADD COLUMN IF NOT EXISTS BENABLED TINYINT(1) NOT NULL DEFAULT 1 AFTER BKEYWORDS');
     }
 
     public function down(Schema $schema): void

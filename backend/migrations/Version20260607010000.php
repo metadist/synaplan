@@ -52,12 +52,14 @@ final class Version20260607010000 extends AbstractMigration
 
     public function up(Schema $schema): void
     {
-        if ($schema->hasTable('BMESSAGE_TASKS')) {
-            return;
-        }
-
+        // NOTE: deliberately no `$schema->hasTable(...)` guard. Touching the
+        // injected Schema forces doctrine/migrations' LazySchemaDiffProvider to
+        // introspect + run the DBAL comparator, which throws TableDoesNotExist
+        // on this production DB (MariaDB FK identifier-resolution quirk). Pure
+        // `addSql` migrations never materialize that diff, so we use raw
+        // idempotent DDL (`CREATE TABLE IF NOT EXISTS`) instead of a Schema read.
         $this->addSql(<<<'SQL'
-            CREATE TABLE BMESSAGE_TASKS (
+            CREATE TABLE IF NOT EXISTS BMESSAGE_TASKS (
               BID BIGINT AUTO_INCREMENT NOT NULL,
               BMESSAGEID BIGINT NOT NULL,
               BNODEID VARCHAR(16) NOT NULL,
