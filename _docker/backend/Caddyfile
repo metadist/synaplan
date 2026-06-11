@@ -80,6 +80,22 @@
 	}
 
 	# ------------------------------------------------------------------
+	# Block scanners probing for dotfiles (.env, .git, ...) before they
+	# reach PHP. Bots hammer the raw node IP for leaked secrets (e.g.
+	# GET /api/.env); without this they fall through to @backend_php and
+	# Symfony logs a NotFoundHttpException at ERROR level on every hit.
+	# Returning a clean 404 at the edge keeps the request log readable and
+	# avoids waking the PHP worker for obviously hostile traffic.
+	# Placed before all other handles so it always wins.
+	# ------------------------------------------------------------------
+	@dotfiles {
+		path */.env */.env.* */.git */.git/* /.env /.env.* /.git /.git/*
+	}
+	handle @dotfiles {
+		respond 404
+	}
+
+	# ------------------------------------------------------------------
 	# Realtime / WebSockets — proxied to the local Centrifugo instance.
 	#
 	# Browsers connect to /connection/websocket on the same origin so we

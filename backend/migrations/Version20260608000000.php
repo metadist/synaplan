@@ -21,8 +21,10 @@ use Doctrine\Migrations\AbstractMigration;
  * every SELECT — dropping the columns here would instantly break routing on
  * every node still running the old image. So phase 1 (this migration) only:
  *
- *   1. deletes the leftover granular system topic rows, and
- *   2. normalizes any stray BENABLED=0 to 1, so old code (which filters
+ *   1. deletes the dependent BPROMPTMETA children of those rows (their FK to
+ *      BPROMPTS has no ON DELETE CASCADE, so this must happen first — see up()),
+ *   2. deletes the leftover granular system topic rows, and
+ *   3. normalizes any stray BENABLED=0 to 1, so old code (which filters
  *      `enabled = true`) and new code (no filter) see the SAME topic pool
  *      during the rollout window.
  *
@@ -53,11 +55,40 @@ final class Version20260608000000 extends AbstractMigration
 
     public function up(Schema $schema): void
     {
+        // NOTE: deliberately no reads of the injected `Schema $schema`. Touching
+        // it forces doctrine/migrations' LazySchemaDiffProvider to introspect +
+        // run the DBAL comparator, which throws TableDoesNotExist on this
+        // production DB (a MariaDB FK identifier-resolution quirk). Existence
+        // checks instead go through `$this->connection` (a plain query), which
+        // never materializes that schema diff.
+        $placeholders = implode(', ', array_fill(0, count(self::GRANULAR_TOPICS), '?'));
+
+        // Remove dependent BPROMPTMETA rows FIRST. The FK
+        // BPROMPTMETA.BPROMPTID -> BPROMPTS.BID (FK_D44C7DE359DEE83D, baseline
+        // Version20260417000000) has NO ON DELETE CASCADE, so deleting a parent
+        // prompt that still has meta children fails with a 1451 constraint
+        // violation. Fresh dev/CI installs had no meta for these system prompts,
+        // so this only surfaced on a real deploy (web3). The meta is derived
+        // data of the exact prompts we are discarding below, so dropping it is
+        // safe and intended. Guarded via information_schema so the migration
+        // stays re-runnable on any schema shape.
+        $promptMetaExists = ((int) $this->connection->fetchOne(
+            "SELECT COUNT(*) FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'BPROMPTMETA'",
+        )) > 0;
+        if ($promptMetaExists) {
+            $this->addSql(
+                sprintf(
+                    'DELETE pm FROM BPROMPTMETA pm JOIN BPROMPTS p ON p.BID = pm.BPROMPTID WHERE p.BOWNERID = 0 AND p.BTOPIC IN (%s)',
+                    $placeholders,
+                ),
+                self::GRANULAR_TOPICS,
+            );
+        }
+
         // Remove the leftover granular system topic rows (ownerId=0) so the
         // canonical-only routing pool is restored. User-created prompts are
         // never touched. Deliberately destructive: these rows belong to the
         // retired embedding-routing experiment and are NOT restored by down().
-        $placeholders = implode(', ', array_fill(0, count(self::GRANULAR_TOPICS), '?'));
         $this->addSql(
             sprintf('DELETE FROM BPROMPTS WHERE BOWNERID = 0 AND BTOPIC IN (%s)', $placeholders),
             self::GRANULAR_TOPICS,
@@ -67,11 +98,13 @@ final class Version20260608000000 extends AbstractMigration
         // against this DB: old code still filters `BENABLED = 1`, new code
         // ignores the column. The experiment only ever disabled the granular
         // rows deleted above, so this is a safety net for stray rows. Guarded
-        // so the migration stays re-runnable on healed schemas where phase 2
-        // already dropped the column (see heal-migrations-baseline.sh in the
-        // platform repo).
-        $prompts = $schema->hasTable('BPROMPTS') ? $schema->getTable('BPROMPTS') : null;
-        if (null !== $prompts && $prompts->hasColumn('BENABLED')) {
+        // (via information_schema, NOT the Schema API) so the migration stays
+        // re-runnable on healed schemas where a future phase 2 already dropped
+        // the column — we must NOT recreate it here.
+        $benabledExists = ((int) $this->connection->fetchOne(
+            "SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'BPROMPTS' AND COLUMN_NAME = 'BENABLED'",
+        )) > 0;
+        if ($benabledExists) {
             $this->addSql('UPDATE BPROMPTS SET BENABLED = 1 WHERE BENABLED = 0');
         }
     }

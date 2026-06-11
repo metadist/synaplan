@@ -39,12 +39,12 @@ Real-time widget events were stored in a **node-local filesystem cache**
 
 ### Cluster facts (from `synaplan-platform`)
 
-- Nodes: web1 `10.0.0.2`, web2 `10.0.0.7`, web3 `10.0.0.8`. LB = `web.synaplan.com`
-  round-robin on :80.
+- Nodes: web1 / web2 / web3 (internal IPs: see the private `synaplan-platform`
+  inventory). LB = `web.synaplan.com` round-robin on :80.
 - **MariaDB Galera** cluster — each node talks to its local Galera; DB is replicated
   (shared) → this is why "reload works".
-- **NFS** shared storage `10.0.0.4` (uploads/config), but the app's `var/cache` is
-  per-container (node-local).
+- **NFS** shared storage on a separate storage box (uploads/config), but the app's
+  `var/cache` is per-container (node-local).
 - **No Redis** (deliberately removed; `cache.yaml` was filesystem-only).
 
 ---
@@ -129,16 +129,16 @@ logical endpoint that survives reboots" we want.
 
 - **3 web nodes:** 1 Valkey primary + 2 replicas, **3 Sentinels** (one per node).
   Mirrors the Galera-per-web-node pattern.
-- **Storage box (`10.0.0.4`):** Redis here is **not required**. Keep the Sentinel count
+- **Storage box:** Redis here is **not required**. Keep the Sentinel count
   **odd (3)** for a clean majority — do NOT add a 4th Sentinel (even = worse quorum).
   Optionally host a non-voting extra replica for backups; little SSE benefit.
 - Quorum = 2 of 3 Sentinels → tolerates losing one node and still auto-fails-over.
 
 ```
-web1 10.0.0.2:  Valkey PRIMARY + Sentinel
-web2 10.0.0.7:  Valkey replica + Sentinel   (async replication from primary)
-web3 10.0.0.8:  Valkey replica + Sentinel
-storage 10.0.0.4: (optional non-voting replica, NO sentinel)
+web1:     Valkey PRIMARY + Sentinel
+web2:     Valkey replica + Sentinel   (async replication from primary)
+web3:     Valkey replica + Sentinel
+storage:  (optional non-voting replica, NO sentinel)
 ```
 
 ### Rolling reboot without stopping the cluster

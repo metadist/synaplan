@@ -32,7 +32,7 @@ Synaplan uses a multi-repository architecture:
 | --------- | -------------------------- | ---------------------------------- |
 | Image     | Built locally (dev stage, incl. phpredis) | `ghcr.io/metadist/synaplan:latest` |
 | Database  | Local MariaDB container    | Galera cluster (multi-node)        |
-| Ollama    | Local container            | Shared server (10.0.1.10)          |
+| Ollama    | Local container            | Shared GPU server (internal IP)    |
 | Frontend  | Vite dev server (5173)     | Built assets in Docker image       |
 | Dev tools | phpMyAdmin, MailHog        | None                               |
 | Qdrant    | Docker service (port 6333) | Docker service or external         |
@@ -150,9 +150,8 @@ docker compose exec db bash         # Database
         │                    │                    │
         ▼                    ▼                    ▼
 ┌───────────────┐    ┌───────────────┐    ┌───────────────┐
-│   synweb100   │    │   synweb101   │    │   synweb102   │
-│   (web1)      │    │   (web2)      │    │   (web3)      │
-│   10.0.0.2    │    │   10.0.0.3    │    │   10.0.0.4    │
+│     web1      │    │     web2      │    │     web3      │
+│  <node-ip-1>  │    │  <node-ip-2>  │    │  <node-ip-3>  │
 └───────┬───────┘    └───────┬───────┘    └───────┬───────┘
         │                    │                    │
         └────────────────────┼────────────────────┘
@@ -174,12 +173,12 @@ docker compose exec db bash         # Database
 cd synaplan-platform/
 
 # Start on specific node (sets SYNDBHOST for Galera)
-./startweb1.sh   # On synweb100
-./startweb2.sh   # On synweb101
-./startweb3.sh   # On synweb102
+./startweb1.sh   # On node web1
+./startweb2.sh   # On node web2
+./startweb3.sh   # On node web3
 
 # Or manually:
-export SYNDBHOST=10.0.0.2   # Local Galera node IP
+export SYNDBHOST=<local-galera-node-ip>
 docker compose up --pull always -d
 ```
 
@@ -194,8 +193,8 @@ environment:
   FRONTEND_URL: https://web.synaplan.com
   APP_URL: https://web.synaplan.com
   DATABASE_WRITE_URL: mysql://...@host.docker.internal:3306/synaplan
-  OLLAMA_BASE_URL: http://10.0.1.10:11434        # Shared Ollama server
-  TIKA_URL: http://tika.synaplan.com             # External Tika
+  OLLAMA_BASE_URL: http://<gpu-server-ip>:11434  # Shared Ollama server
+  TIKA_URL: http://<tika-host>                   # External Tika
   QDRANT_URL: http://qdrant:6333                # Qdrant vector database
 ```
 

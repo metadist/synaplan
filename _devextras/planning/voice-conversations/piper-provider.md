@@ -110,8 +110,8 @@ SYNAPLAN_TTS_URL: ${SYNAPLAN_TTS_URL:-http://host.docker.internal:10200}
 
 **Layer 2: `backend/.env`** (production, gitignored):
 ```env
-# Production: TTS service on GPU server 10.0.1.10
-SYNAPLAN_TTS_URL=http://10.0.1.10:10200
+# Production: TTS service on the shared GPU server
+SYNAPLAN_TTS_URL=http://<gpu-server-ip>:10200
 ```
 
 **Layer 3: `SystemConfigService` schema** (Admin UI):

@@ -288,6 +288,24 @@
     }
   }
 
+  /* Selection inside the user bubble: the forced white text becomes invisible
+     against the browser's pale default highlight. Flip it to a white highlight
+     with brand-colored text so the user can actually read what they select to
+     copy. Covers the bubble itself and all descendants; resets the light-mode
+     text-shadow so selected text stays crisp. */
+  .bubble-user::selection,
+  .bubble-user *::selection {
+    background-color: #ffffff !important;
+    color: var(--brand) !important;
+    text-shadow: none !important;
+  }
+  .bubble-user::-moz-selection,
+  .bubble-user *::-moz-selection {
+    background-color: #ffffff !important;
+    color: var(--brand) !important;
+    text-shadow: none !important;
+  }
+
   /* Textfarben */
   .txt-primary {
     color: var(--txt-primary);
