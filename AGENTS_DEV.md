@@ -147,7 +147,8 @@ production-only migration failures that never reproduce in local dev. Internaliz
   fix only needs to run on **one** node.
 - Migrations run on backend container start. On the shared DB the first node to come up
   runs them; the others then see them already applied.
-- Galera node IPs: `web1=10.0.0.2`, `web2=10.0.0.7`, `web3=10.0.0.8`.
+- Node IPs and the cluster inventory live in the **private** `synaplan-platform` repo —
+  never commit them here (this repo is public).
 
 **1. `DATABASE_*_URL` MUST use the `mariadb-` serverVersion prefix**
 - `synaplan-platform/.env` sets `DATABASE_WRITE_URL` / `DATABASE_READ_URL`. The
@@ -157,8 +158,9 @@ production-only migration failures that never reproduce in local dev. Internaliz
   (`AbstractMySQLDriver` does `stripos($version, 'mariadb')`). A bare `12.1.2` falls
   through to the **MySQL** platform, whose introspection mishandles identifiers and
   MariaDB's quoted string defaults → phantom diffs and lowercase `TableDoesNotExist`.
-- The cluster version string is `12.1.2-MariaDB-...` — confirm with `SELECT VERSION();`
-  and keep the number in sync, but the **prefix** is what selects the platform.
+- Confirm the cluster's version string with `SELECT VERSION();` (it reads like
+  `<x.y.z>-MariaDB-...`) and keep the number in sync, but the **prefix** is what selects
+  the platform.
 
 **2. Migrations that may run incrementally on prod MUST NOT touch `Schema $schema`**
 - Reading the injected schema (`$schema->hasTable()/getTable()/hasColumn()`) forces
