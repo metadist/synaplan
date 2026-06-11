@@ -41,6 +41,7 @@ final readonly class TaskPlanner
         'text2sound' => 'Synthesize speech/audio from text (params.format, e.g. mp3).',
         'document_generation' => 'Generate an Office document (CSV/XLSX/DOCX/PPTX).',
         'calendar_event' => 'Create a calendar meeting/invite as a downloadable .ics file. params: title, start (ISO-8601 local datetime, e.g. "2026-06-09T15:00:00"), end (ISO-8601) or duration_minutes, timezone (IANA, e.g. "Europe/Berlin"), location, description, attendees (list of names/emails). Resolve relative times against the current time context below.',
+        'email_me' => 'Email the results to the account owner as one multi-part mail (text + attachments from other nodes). ONLY when the user explicitly asks to be mailed/emailed the result ("mail it to me", "send it to my email"). Inputs: text, attachments. Never the reply node.',
         'compose_reply' => 'Assemble final reply: text + N file attachments from other nodes.',
     ];
 

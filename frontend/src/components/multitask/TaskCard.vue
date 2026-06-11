@@ -2,9 +2,18 @@
 import { computed } from 'vue'
 import { Icon } from '@iconify/vue'
 import type { TaskCard } from '@/stores/history'
+import { useAiConfigStore } from '@/stores/aiConfig'
+import type { AIModel, Capability } from '@/types/ai-models'
 import MessageText from '@/components/MessageText.vue'
 
 const props = defineProps<{ card: TaskCard }>()
+
+const emit = defineEmits<{
+  /** Retry a failed media step with another model (new turn via the Again path). */
+  retry: [payload: { prompt: string; modelId: number }]
+}>()
+
+const aiConfigStore = useAiConfigStore()
 
 const iconForKind = computed(() => {
   switch (props.card.kind) {
@@ -20,6 +29,8 @@ const iconForKind = computed(() => {
       return 'mdi:web'
     case 'extract':
       return 'mdi:text-box-search-outline'
+    case 'email':
+      return 'mdi:email-outline'
     default:
       return 'mdi:text-box-outline'
   }
@@ -41,6 +52,46 @@ const showSkeleton = computed(
 // other kinds (audio/image/video/document/search) hold short status strings
 // where markdown is unnecessary, so we keep the plain text path for them.
 const isProseKind = computed(() => ['text', 'extract'].includes(props.card.kind))
+
+// Model tag matching this card's media kind — the pool the retry button picks from.
+const retryTag = computed((): Capability | null => {
+  switch (props.card.kind) {
+    case 'image':
+      return 'TEXT2PIC'
+    case 'video':
+      return 'TEXT2VID'
+    case 'audio':
+      return 'TEXT2SOUND'
+    default:
+      return null
+  }
+})
+
+// Next model in the BRANKING-sorted list after the user's default for this
+// capability (round-robin, mirroring useModelSelection.predictedModel). The
+// failed step ran the default model, so "next" is the most useful retry pick.
+// A single-model pool offers nothing: "retry" there would re-run the very
+// model that just failed, which is misleading on non-transient failures.
+const retryModel = computed((): AIModel | null => {
+  const tag = retryTag.value
+  if (!tag) return null
+
+  const options = [...(aiConfigStore.models[tag] ?? [])].sort((a, b) => b.rating - a.rating)
+  if (options.length <= 1) return null
+
+  const defaultId = aiConfigStore.defaults[tag]
+  const idx = options.findIndex((m) => m.id === defaultId)
+  return options[(idx + 1) % options.length]
+})
+
+const canRetry = computed(
+  () => props.card.state === 'failed' && !!props.card.prompt && retryModel.value !== null
+)
+
+const handleRetry = () => {
+  if (!props.card.prompt || !retryModel.value) return
+  emit('retry', { prompt: props.card.prompt, modelId: retryModel.value.id })
+}
 </script>
 
 <template>
@@ -93,8 +144,28 @@ const isProseKind = computed(() => ['text', 'extract'].includes(props.card.kind)
     </div>
 
     <!-- Body -->
-    <div v-if="card.state === 'failed'" class="text-sm txt-muted">
-      {{ $t('taskPlan.failedBody') }}
+    <div v-if="card.state === 'failed'" class="space-y-2">
+      <!-- Specific backend error when available, generic copy otherwise -->
+      <p class="text-sm txt-muted break-words" data-testid="task-card-error">
+        {{ card.error || $t('taskPlan.failedBody') }}
+      </p>
+      <button
+        v-if="canRetry"
+        type="button"
+        class="pill text-xs whitespace-nowrap"
+        data-testid="task-card-retry"
+        @click="handleRetry"
+      >
+        <Icon icon="mdi:refresh" class="w-4 h-4" />
+        <span class="font-medium">
+          {{ $t('taskPlan.retryWith', { model: retryModel?.name ?? '' }) }}
+        </span>
+      </button>
+    </div>
+
+    <!-- Skipped: show the dependency reason when the backend provided one -->
+    <div v-else-if="card.state === 'skipped' && card.error" class="text-sm txt-muted break-words">
+      {{ card.error }}
     </div>
 
     <template v-else>

@@ -266,6 +266,92 @@ final readonly class InternalEmailService
     }
 
     /**
+     * Send a multi-task ("email_me" DAG node) result email to the account owner.
+     *
+     * Mirrors {@see sendAiResponseEmail()}: markdown body → HTML via Parsedown,
+     * the FIRST image attachment is embedded inline (CID) for broad client
+     * compatibility, every other file is attached as a regular MIME part.
+     *
+     * @param string                                        $to          Recipient (account owner) address
+     * @param string                                        $subject     Localized subject (caller resolves the locale)
+     * @param string                                        $markdown    Result text in markdown
+     * @param list<array{path: string, type?: string|null}> $attachments Absolute file paths (+ optional media kind)
+     */
+    public function sendTaskResultEmail(string $to, string $subject, string $markdown, array $attachments = []): void
+    {
+        $fromEmail = $_ENV['APP_SENDER_EMAIL'] ?? 'noreply@synaplan.com';
+        $fromName = $_ENV['APP_SENDER_NAME'] ?? 'Synaplan';
+
+        $parsedown = new \Parsedown();
+        $parsedown->setSafeMode(true); // Prevent XSS
+        $htmlBody = $parsedown->text($markdown);
+
+        // Split attachments: first image becomes the inline (CID) hero image.
+        $inlineImagePath = null;
+        $regularPaths = [];
+        foreach ($attachments as $attachment) {
+            $path = $attachment['path'];
+            if ('' === $path || !file_exists($path)) {
+                continue;
+            }
+            if (null === $inlineImagePath && $this->isImageAttachment($path, $attachment['type'] ?? null)) {
+                $inlineImagePath = $path;
+            } else {
+                $regularPaths[] = $path;
+            }
+        }
+
+        if (null !== $inlineImagePath) {
+            $htmlBody .= '<br><br><img src="cid:generated-image" alt="Generated image" style="max-width: 100%; border-radius: 8px;">';
+        }
+
+        $htmlBody .= '<br><br><div style="font-size: 11px; color: #888888; margin-top: 20px; padding-top: 15px; border-top: 1px solid #e0e0e0;">'
+            .'<a href="https://www.synaplan.com/" style="color: #888888;">www.synaplan.com</a></div>';
+
+        $email = (new Email())
+            ->from(sprintf('%s <%s>', $fromName, $fromEmail))
+            ->to($to)
+            ->subject($subject)
+            ->text($markdown)
+            ->html($htmlBody);
+
+        if (null !== $inlineImagePath) {
+            $email->embedFromPath($inlineImagePath, 'generated-image');
+        }
+        foreach ($regularPaths as $path) {
+            $email->attachFromPath($path);
+        }
+
+        try {
+            $this->mailer->send($email);
+            $this->logger->info('Task result email sent', [
+                'to' => $to,
+                'attachment_count' => count($attachments),
+                'has_inline_image' => null !== $inlineImagePath,
+            ]);
+        } catch (\Exception $e) {
+            $this->logger->error('Failed to send task result email', [
+                'to' => $to,
+                'error' => $e->getMessage(),
+            ]);
+            throw $e;
+        }
+    }
+
+    /**
+     * Whether an attachment should be treated as an embeddable image — by
+     * descriptor type first, file extension as fallback.
+     */
+    private function isImageAttachment(string $path, ?string $type): bool
+    {
+        if (is_string($type) && 'image' === strtolower($type)) {
+            return true;
+        }
+
+        return in_array(strtolower(pathinfo($path, PATHINFO_EXTENSION)), ['png', 'jpg', 'jpeg', 'gif', 'webp'], true);
+    }
+
+    /**
      * Send a warning email when the embedding fallback provider activates.
      */
     public function sendEmbeddingFallbackWarning(string $primaryProvider, string $fallbackProvider, string $errorMessage): void

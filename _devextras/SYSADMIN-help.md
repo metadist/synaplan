@@ -434,6 +434,71 @@ as optional housekeeping.
 
 ---
 
+# UPGRADING: MULTI-TASK (DAG) FOLLOW-UP — ONE-TIME PROD STEPS
+
+Two operational steps ship with the DAG follow-up release (simple "Again",
+per-task errors/retry, `email_me`, WhatsApp multi-file). Neither is handled
+by code or migrations — both are environment state.
+
+## 1. Default image model → Nano Banana 2 (BID 190)
+
+`DefaultModelConfigSeeder` already points fresh installs at
+`google:gemini-3.1-flash-image-preview:text2pic` ("Nano Banana 2", BID 190)
+for `TEXT2PIC` and `PIC2PIC`. The seeder **never overwrites existing rows**
+(by design — it must not clobber operator tuning), so environments seeded
+before this release still route DAG "generate image" nodes at the old,
+slower default.
+
+Run once on the production DB:
+
+```sql
+-- Global platform default ONLY (BOWNERID = 0).
+-- Do NOT drop the owner filter: per-user overrides share this table
+-- with BOWNERID = <userId> and must keep the user's own choice.
+UPDATE BCONFIG SET BVALUE = '190'
+WHERE BOWNERID = 0
+  AND BGROUP = 'DEFAULTMODEL'
+  AND BSETTING IN ('TEXT2PIC', 'PIC2PIC');
+
+-- Verify:
+SELECT BOWNERID, BSETTING, BVALUE FROM BCONFIG
+WHERE BGROUP = 'DEFAULTMODEL' AND BSETTING IN ('TEXT2PIC', 'PIC2PIC');
+```
+
+Users can still pick any other model via Settings → AI Models (per-user
+`DEFAULTMODEL` override) and the "Again with…" / failed-task "Retry with…"
+controls — this only changes what the platform falls back to.
+
+## 2. WhatsApp media delivery requires a publicly reachable APP_URL
+
+Outbound WhatsApp media (DAG images/audio/documents, TTS replies) is sent
+as a **link**: the backend builds `${APP_URL}/api/v1/files/uploads/<path>`
+and Meta's servers fetch it. The send is silently skipped when `APP_URL`
+is empty, and fails when Meta cannot reach the URL (private host, broken
+TLS, auth wall). If "no files arrived on WhatsApp", check this BEFORE
+suspecting the code path:
+
+```bash
+# 1. APP_URL set in the backend env?
+docker compose exec backend php -r 'echo $_ENV["APP_URL"] ?? "(unset)", PHP_EOL;'
+
+# 2. Is a served upload reachable from the PUBLIC internet (Meta's view)?
+#    Use a real AI-generated file path (filename like tts_*, generated_*,
+#    or <messageId>_<provider>_<timestamp>.<ext>) — StaticUploadController
+#    serves exactly these patterns WITHOUT auth (by-link), which is what
+#    the WhatsApp media links point at. Other paths require auth and are
+#    not representative.
+curl -sSI "${APP_URL}/api/v1/files/uploads/<relative-path>" | head -1
+# Expect HTTP 200. A redirect to a login page, 401/403, or a timeout means
+# Meta cannot fetch the media → WhatsApp silently delivers no files.
+```
+
+Sanity check after deploy: send "write a poem, read it aloud and make an
+image of it" to the WhatsApp number — expect the text message first, then
+the MP3, then the image as separate WhatsApp messages.
+
+---
+
 # ENVIRONMENT VARIABLES
 
 ## Required (backend/.env)

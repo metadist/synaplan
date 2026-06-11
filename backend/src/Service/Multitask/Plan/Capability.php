@@ -54,6 +54,9 @@ enum Capability: string
     /** Calendar event / meeting invite as a downloadable .ics file (CalendarEventService, no model). */
     case CalendarEvent = 'calendar_event';
 
+    /** Mail the assembled results to the account owner as one multi-MIME email (InternalEmailService, no model). */
+    case EmailMe = 'email_me';
+
     /** Final assembly of text + N file attachments into one OUT message (ResultAssembler, no model). */
     case ComposeReply = 'compose_reply';
 
@@ -80,6 +83,7 @@ enum Capability: string
             self::Text2Sound => 'audio',
             self::DocumentGeneration => 'document',
             self::CalendarEvent => 'document',
+            self::EmailMe => 'email',
             self::ComposeReply => 'hidden',
         };
     }

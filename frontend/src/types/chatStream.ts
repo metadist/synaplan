@@ -81,6 +81,10 @@ export interface StreamEventMetadata {
   state?: string
   kind?: string
   chunk?: string
+  /** Failure details on task_update (failed/skipped): error text + retry payload. */
+  error?: string
+  prompt?: string
+  media_type?: string
   /** Web search (status === 'search_complete'): early sources + query. */
   results_count?: number
   query?: string

@@ -2724,6 +2724,7 @@
     "title": "Task plan",
     "download": "Download",
     "failedBody": "This step couldn't be completed.",
+    "retryWith": "Retry with {model}",
     "state": {
       "pending": "Queued",
       "running": "Working…",
@@ -2738,7 +2739,8 @@
       "audio": "Audio",
       "document": "Document",
       "search": "Web search",
-      "extract": "Text extraction"
+      "extract": "Text extraction",
+      "email": "Email"
     },
     "capability": {
       "extract_text": "Extracting text",
@@ -2752,7 +2754,8 @@
       "video_generation": "Video",
       "text2sound": "Audio",
       "document_generation": "Document",
-      "calendar_event": "Calendar invite"
+      "calendar_event": "Calendar invite",
+      "email_me": "Email result"
     }
   },
   "processing": {

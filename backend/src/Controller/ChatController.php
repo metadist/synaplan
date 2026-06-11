@@ -502,8 +502,13 @@ class ChatController extends AbstractController
             $aiModels = [];
             $webSearchData = null;
             $searchResultsData = [];
+            $wasMultitask = false;
 
             if ('OUT' === $m->getDirection()) {
+                // Multi-task routing: the turn ran the DAG executor, so the
+                // frontend shows the simple "Again" (full re-plan) control.
+                $wasMultitask = '1' === $m->getMeta('multitask');
+
                 // Chat model (used for generating the response)
                 $chatProvider = $m->getMeta('ai_chat_provider');
                 $chatModel = $m->getMeta('ai_chat_model');
@@ -615,6 +620,7 @@ class ChatController extends AbstractController
                 'aiModels' => !empty($aiModels) ? $aiModels : null, // AI model metadata
                 'webSearch' => $webSearchData, // Web search metadata
                 'searchResults' => !empty($searchResultsData) ? $searchResultsData : null, // Actual search results
+                'multitask' => $wasMultitask, // True when the turn ran the multi-task DAG
                 // Generated content (images, videos from AI)
                 'file' => ($m->getFile() && $filePath) ? [
                     'path' => $filePath,

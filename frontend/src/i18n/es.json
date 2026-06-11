@@ -1008,6 +1008,7 @@
     "title": "Plan de tareas",
     "download": "Descargar",
     "failedBody": "Este paso no se pudo completar.",
+    "retryWith": "Reintentar con {model}",
     "state": {
       "pending": "En cola",
       "running": "Trabajando…",
@@ -1022,7 +1023,8 @@
       "audio": "Audio",
       "document": "Documento",
       "search": "Búsqueda web",
-      "extract": "Extracción de texto"
+      "extract": "Extracción de texto",
+      "email": "Correo"
     },
     "capability": {
       "extract_text": "Extrayendo texto",
@@ -1036,7 +1038,8 @@
       "video_generation": "Vídeo",
       "text2sound": "Audio",
       "document_generation": "Documento",
-      "calendar_event": "Invitación de calendario"
+      "calendar_event": "Invitación de calendario",
+      "email_me": "Envío por correo"
     }
   },
   "processing": {

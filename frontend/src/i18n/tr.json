@@ -1008,6 +1008,7 @@
     "title": "Görev planı",
     "download": "İndir",
     "failedBody": "Bu adım tamamlanamadı.",
+    "retryWith": "{model} ile yeniden dene",
     "state": {
       "pending": "Sırada",
       "running": "Çalışıyor…",
@@ -1022,7 +1023,8 @@
       "audio": "Ses",
       "document": "Belge",
       "search": "Web araması",
-      "extract": "Metin çıkarma"
+      "extract": "Metin çıkarma",
+      "email": "E-posta"
     },
     "capability": {
       "extract_text": "Metin çıkarılıyor",
@@ -1036,7 +1038,8 @@
       "video_generation": "Video",
       "text2sound": "Ses",
       "document_generation": "Belge",
-      "calendar_event": "Takvim daveti"
+      "calendar_event": "Takvim daveti",
+      "email_me": "E-posta gönderimi"
     }
   },
   "processing": {

@@ -829,6 +829,7 @@
     "title": "Aufgabenplan",
     "download": "Herunterladen",
     "failedBody": "Dieser Schritt konnte nicht abgeschlossen werden.",
+    "retryWith": "Nochmal mit {model}",
     "state": {
       "pending": "Wartet",
       "running": "Läuft…",
@@ -843,7 +844,8 @@
       "audio": "Audio",
       "document": "Dokument",
       "search": "Websuche",
-      "extract": "Textextraktion"
+      "extract": "Textextraktion",
+      "email": "E-Mail"
     },
     "capability": {
       "extract_text": "Text wird extrahiert",
@@ -857,7 +859,8 @@
       "video_generation": "Video",
       "text2sound": "Audio",
       "document_generation": "Dokument",
-      "calendar_event": "Kalendereinladung"
+      "calendar_event": "Kalendereinladung",
+      "email_me": "E-Mail-Versand"
     }
   },
   "processing": {

@@ -6,6 +6,11 @@ import TaskCard from '@/components/multitask/TaskCard.vue'
 
 const props = defineProps<{ plan: TaskPlanState }>()
 
+const emit = defineEmits<{
+  /** Bubbled from a failed TaskCard: retry that step with another model. */
+  retryTask: [payload: { prompt: string; modelId: number }]
+}>()
+
 const doneCount = computed(() => props.plan.cards.filter((c) => c.state === 'done').length)
 </script>
 
@@ -17,6 +22,11 @@ const doneCount = computed(() => props.plan.cards.filter((c) => c.state === 'don
       <span class="font-medium">· {{ doneCount }}/{{ plan.cards.length }}</span>
     </div>
 
-    <TaskCard v-for="card in plan.cards" :key="card.nodeId" :card="card" />
+    <TaskCard
+      v-for="card in plan.cards"
+      :key="card.nodeId"
+      :card="card"
+      @retry="emit('retryTask', $event)"
+    />
   </div>
 </template>

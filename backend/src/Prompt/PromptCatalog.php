@@ -493,9 +493,15 @@ Allowed topic keys: [KEYLIST]
    meeting note for tomorrow 15:00 with Tom") → one `calendar_event` node.
    Resolve the relative time against the time context into an absolute
    ISO-8601 `start` + IANA `timezone`, fill title/attendees/location/duration.
-8. Independent sub-requests in one message ("summarize this AND draw a cat")
+8. "Mail it to me" / "email me the result" / "schick es mir per Mail" →
+   ADD one `email_me` node that depends on the content nodes and consumes
+   their outputs (`text` + `attachments`). ONLY when the user EXPLICITLY
+   asks for the result by email — never infer it. The reply is still shown
+   in chat: `reply_node` stays the `compose_reply` (or content) node, NEVER
+   the `email_me` node. (Exception: a meeting invite alone → rule 7.)
+9. Independent sub-requests in one message ("summarize this AND draw a cat")
    → parallel nodes with NO dependency between them, joined by `compose_reply`.
-9. Plain question / smalltalk / advice → one `chat` node. `reply_node` = that
+10. Plain question / smalltalk / advice → one `chat` node. `reply_node` = that
    node, no `compose_reply` needed.
 
 ## Canonical multi-step examples (MEMORIZE these patterns)
@@ -542,6 +548,27 @@ User: sends report.docx and writes "What's in there? Summarize it into a short M
     { "id": "n1", "capability": "text2sound", "inputs": { "text": "Hello world" }, "params": { "format": "mp3" } }
   ]
 }
+
+### Poem + MP3 + image, mailed to the user
+User: "Write a spring poem, read it aloud and make a fitting image with it. Mail it to me."
+
+{
+  "version": 1,
+  "language": "en",
+  "reply_node": "n5",
+  "tasks": [
+    { "id": "n1", "capability": "chat", "inputs": { "text": "Write a spring poem." }, "params": { "topic_id": "general" } },
+    { "id": "n2", "capability": "text2sound", "depends_on": ["n1"], "inputs": { "text": "$n1.text" }, "params": { "format": "mp3" } },
+    { "id": "n3", "capability": "image_generation", "depends_on": ["n1"], "inputs": { "prompt": "$n1.text" } },
+    { "id": "n4", "capability": "email_me", "depends_on": ["n1","n2","n3"], "inputs": { "text": "$n1.text", "attachments": ["$n2.file","$n3.file"] } },
+    { "id": "n5", "capability": "compose_reply", "depends_on": ["n1","n2","n3"], "inputs": { "text": "$n1.text", "attachments": ["$n2.file","$n3.file"] } }
+  ]
+}
+
+The `email_me` node is an EXTRA side-channel sink — `compose_reply` does NOT
+depend on it (a failed mail must never kill the chat reply), and `reply_node`
+is still the `compose_reply` node so the chat shows everything. Without the
+explicit "Mail it to me" the plan would be identical MINUS the `email_me` node.
 
 ### Calendar invite ("I need a meeting reminder for tomorrow at 9:00 with Sanam")
 The event fields go in `params`. Resolve the relative time against the time

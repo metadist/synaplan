@@ -8,11 +8,93 @@ vi.mock('@/services/authService', () => ({
   },
 }))
 
+const httpClientMock = vi.hoisted(() => vi.fn())
+vi.mock('@/services/api/httpClient', () => ({
+  httpClient: httpClientMock,
+}))
+
+function chatPayload(id: number) {
+  return {
+    success: true,
+    chat: {
+      id,
+      title: 'New Chat',
+      createdAt: '2026-01-01T00:00:00.000Z',
+      updatedAt: '2026-01-01T00:00:00.000Z',
+      messageCount: 0,
+    },
+  }
+}
+
 describe('Chats Store', () => {
   beforeEach(() => {
     setActivePinia(createPinia())
     localStorage.clear()
     vi.clearAllMocks()
+  })
+
+  describe('createChat', () => {
+    it('selects the newly created chat when the selection did not change mid-flight', async () => {
+      const store = useChatsStore()
+      httpClientMock.mockResolvedValueOnce(chatPayload(7))
+
+      const chat = await store.createChat()
+
+      expect(chat?.id).toBe(7)
+      expect(store.activeChatId).toBe(7)
+      expect(store.chats.map((c) => c.id)).toEqual([7])
+    })
+
+    it('does not steal the selection when the active chat changed while the request was in flight', async () => {
+      const store = useChatsStore()
+
+      let resolveSlow: (value: unknown) => void = () => {}
+      httpClientMock.mockReturnValueOnce(
+        new Promise((resolve) => {
+          resolveSlow = resolve
+        })
+      )
+
+      const pending = store.createChat()
+
+      // While the request is pending the user switches to another chat
+      // (e.g. starts streaming there) …
+      store.setActiveChat(11)
+
+      // … then the slow response arrives.
+      resolveSlow(chatPayload(12))
+      const chat = await pending
+
+      expect(chat?.id).toBe(12)
+      expect(store.activeChatId).toBe(11)
+      // The chat is still added to the list, just not selected.
+      expect(store.chats.map((c) => c.id)).toContain(12)
+    })
+
+    it('lets the faster of two concurrent creates keep the selection (boot auto-create race)', async () => {
+      const store = useChatsStore()
+
+      // Slow request: ChatView boot auto-create for a user without chats.
+      let resolveSlow: (value: unknown) => void = () => {}
+      httpClientMock.mockReturnValueOnce(
+        new Promise((resolve) => {
+          resolveSlow = resolve
+        })
+      )
+      const slowCreate = store.createChat('New Chat')
+
+      // Fast request: the user clicks "New Chat" meanwhile.
+      httpClientMock.mockResolvedValueOnce(chatPayload(11))
+      await store.createChat()
+      expect(store.activeChatId).toBe(11)
+
+      // The slow boot response must not switch the view away from chat 11.
+      resolveSlow(chatPayload(12))
+      await slowCreate
+
+      expect(store.activeChatId).toBe(11)
+      expect(store.chats.map((c) => c.id)).toEqual([12, 11])
+    })
   })
 
   describe('bumpChatActivity', () => {

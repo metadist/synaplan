@@ -164,10 +164,12 @@
               :error-data="message.errorData"
               :truncated="message.truncated"
               :task-plan="message.taskPlan"
+              :was-multitask="message.wasMultitask"
               :is-guest-mode="isGuestMode"
               @regenerate="handleRegenerate(message, $event)"
               @again="handleAgain"
               @retry="handleRetryMessage(message, $event)"
+              @retry-task="handleTaskRetry"
               @false-positive="openFalsePositiveModal"
               @click-memory="handleClickMemory"
               @continue="handleContinueResponse(message)"
@@ -1849,6 +1851,7 @@ const streamAIResponse = async (
             if (message && Array.isArray(tasks) && tasks.length > 0) {
               processingStatus.value = ''
               processingMetadata.value = {}
+              message.wasMultitask = true
               message.taskPlan = {
                 active: true,
                 replyNode:
@@ -1868,12 +1871,21 @@ const streamAIResponse = async (
             const message = historyStore.messages.find((m) => m.id === messageId)
             if (message) {
               message.taskPlan = null
+              message.wasMultitask = false
             }
           } else if (data.status === 'task_update') {
             const message = historyStore.messages.find((m) => m.id === messageId)
             const card = message?.taskPlan?.cards.find((c) => c.nodeId === data.metadata?.node_id)
             if (card && isTaskCardState(data.metadata?.state)) {
               card.state = data.metadata.state
+              // Failure details: specific error text + (for media nodes) the
+              // resolved prompt powering the per-task retry button.
+              if (typeof data.metadata?.error === 'string' && data.metadata.error) {
+                card.error = data.metadata.error
+              }
+              if (typeof data.metadata?.prompt === 'string' && data.metadata.prompt) {
+                card.prompt = data.metadata.prompt
+              }
             }
           } else if (data.status === 'task_chunk') {
             const message = historyStore.messages.find((m) => m.id === messageId)
@@ -1890,17 +1902,30 @@ const streamAIResponse = async (
                 typeof data.metadata?.type === 'string' ? data.metadata.type : card.kind
             }
           } else if (
-            (data.status === 'data' ||
-              data.status === 'file' ||
+            data.status === 'data' &&
+            historyStore.messages.find((m) => m.id === messageId)?.taskPlan?.active
+          ) {
+            // Multitask mode: no live single-bubble rendering (the task cards
+            // are the streaming surface), but the assembled answer text — the
+            // executor streams it once after the DAG finishes, and the reply
+            // node has no card of its own (compose_reply is hidden) — must
+            // still accumulate so the 'complete' flush renders it. Dropping it
+            // left the bubble without any answer text until a reload re-fetched
+            // the persisted message (#1057).
+            if (data.chunk) {
+              fullContent += data.chunk
+            }
+          } else if (
+            (data.status === 'file' ||
               data.status === 'audio' ||
               data.status === 'tts_generating' ||
               data.status === 'links') &&
             historyStore.messages.find((m) => m.id === messageId)?.taskPlan?.active
           ) {
             // Multitask mode: the task cards are the live surface, so suppress
-            // the normal single-bubble content/media events. They still flow so
-            // the OUT message text + files persist; history renders the flattened
-            // bubble on reload.
+            // the normal single-bubble media events. They still flow so the
+            // OUT message files persist; history renders the flattened bubble
+            // on reload.
           } else if (data.status === 'data' && data.chunk) {
             if (processingStatus.value) {
               processingStatus.value = ''
@@ -2800,8 +2825,37 @@ const handleAgain = async (backendMessageId: number, modelId?: number) => {
 
   historyStore.markSuperseded(assistantMessage.id)
 
-  // Stream new response directly without creating a duplicate user message
-  await streamAIResponse(userText, { modelId, isAgain: true })
+  // Stream new response directly without creating a duplicate user message.
+  //
+  // With a model pick: `isAgain` skips classification and routes straight to
+  // the picked model (single-prompt "Again with…").
+  //
+  // Without a model pick (multitask "Again"): stream WITHOUT `isAgain` so the
+  // backend re-classifies (`source: ai_sorting`) and the planner can build a
+  // fresh DAG — `isAgain` without a model would silently degrade the turn to
+  // the single-node legacy path.
+  await streamAIResponse(userText, modelId ? { modelId, isAgain: true } : {})
+}
+
+/**
+ * Retry one failed task-plan step with another model. Streams the step's
+ * resolved prompt through the Again path (`isAgain` + modelId): the backend
+ * maps the model tag to the matching media topic (e.g. TEXT2PIC → tools:pic),
+ * so only that sub-task re-runs. The result arrives as a new assistant bubble;
+ * the original turn (with its successful parts) is left untouched.
+ */
+const handleTaskRetry = async (payload: { prompt: string; modelId: number }) => {
+  if (!authStore.isAuthenticated || isGuestMode.value) return
+  if (!payload.prompt || !payload.modelId) return
+
+  // Stop any active audio playback before re-running the step
+  if (currentAudioStreamer) {
+    currentAudioStreamer.stop()
+    currentAudioStreamer = null
+  }
+  isAudioStreaming.value = false
+
+  await streamAIResponse(payload.prompt, { modelId: payload.modelId, isAgain: true })
 }
 
 const handleRegenerate = async (message: Message, modelOption: ModelOption) => {
