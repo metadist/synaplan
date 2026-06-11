@@ -1,0 +1,10 @@
+{
+  "title": "Contact profiles",
+  "intro": "Rolling AI profiles of your mailing partners, created from the Synamail Outlook add-in. They live only in your workspace — delete any of them here at any time.",
+  "loading": "Loading profiles…",
+  "empty": "No profiles yet. Open an email in Outlook and use Contact AI Profiling in the Synamail add-in.",
+  "updated": "Updated",
+  "emails": "emails",
+  "delete": "Delete profile",
+  "confirmDelete": "Delete this profile permanently?"
+}

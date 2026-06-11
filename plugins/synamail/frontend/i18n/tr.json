@@ -1,0 +1,10 @@
+{
+  "title": "Kişi profilleri",
+  "intro": "Synamail Outlook eklentisiyle oluşturulan, e-posta bağlantılarınızın sürekli güncellenen yapay zekâ profilleri. Yalnızca kendi çalışma alanınızda saklanır — istediğiniz profili buradan istediğiniz an silebilirsiniz.",
+  "loading": "Profiller yükleniyor…",
+  "empty": "Henüz profil yok. Outlook'ta bir e-posta açın ve Synamail eklentisinde Contact AI Profiling özelliğini kullanın.",
+  "updated": "Güncellendi",
+  "emails": "e-posta",
+  "delete": "Profili sil",
+  "confirmDelete": "Bu profil kalıcı olarak silinsin mi?"
+}
