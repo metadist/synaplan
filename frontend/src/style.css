@@ -295,13 +295,13 @@
      text-shadow so selected text stays crisp. */
   .bubble-user::selection,
   .bubble-user *::selection {
-    background: #ffffff !important;
+    background-color: #ffffff !important;
     color: var(--brand) !important;
     text-shadow: none !important;
   }
   .bubble-user::-moz-selection,
   .bubble-user *::-moz-selection {
-    background: #ffffff !important;
+    background-color: #ffffff !important;
     color: var(--brand) !important;
     text-shadow: none !important;
   }
