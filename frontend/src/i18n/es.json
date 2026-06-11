@@ -350,7 +350,11 @@
       "imageGen": "Generación de Imágenes",
       "imageGenDesc": "Crear imágenes desde texto",
       "videoGen": "Generación de Video",
-      "videoGenDesc": "Generar videos desde texto"
+      "videoGenDesc": "Generar videos desde texto",
+      "thinkingDesc": "Muestra el razonamiento del modelo antes de la respuesta",
+      "thinkingUnsupported": "El modelo seleccionado no admite razonamiento",
+      "summarizer": "Resumidor",
+      "summarizerDesc": "Resumir documentos — abre la herramienta"
     },
     "modelDropdown": {
       "default": "Estándar"

@@ -384,7 +384,11 @@
       "imageGen": "Image Generation",
       "imageGenDesc": "Create images from text",
       "videoGen": "Video Generation",
-      "videoGenDesc": "Generate videos from text"
+      "videoGenDesc": "Generate videos from text",
+      "thinkingDesc": "Show the model's reasoning before the answer",
+      "thinkingUnsupported": "The selected model does not support reasoning",
+      "summarizer": "Summarizer",
+      "summarizerDesc": "Summarize documents — opens the tool"
     },
     "modelDropdown": {
       "default": "Default"

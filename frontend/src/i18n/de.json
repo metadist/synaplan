@@ -379,7 +379,11 @@
       "imageGen": "Bilderzeugung",
       "imageGenDesc": "Bilder aus Text erstellen",
       "videoGen": "Videoerzeugung",
-      "videoGenDesc": "Videos aus Text erstellen"
+      "videoGenDesc": "Videos aus Text erstellen",
+      "thinkingDesc": "Zeigt die Denkschritte des Modells vor der Antwort",
+      "thinkingUnsupported": "Das gewählte Modell unterstützt kein Reasoning",
+      "summarizer": "Zusammenfasser",
+      "summarizerDesc": "Dokumente zusammenfassen — öffnet das Tool"
     },
     "modelDropdown": {
       "default": "Standard"

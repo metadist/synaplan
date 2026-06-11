@@ -350,7 +350,11 @@
       "imageGen": "Görsel Oluşturma",
       "imageGenDesc": "Metinden görsel oluştur",
       "videoGen": "Video Oluşturma",
-      "videoGenDesc": "Metinden video oluştur"
+      "videoGenDesc": "Metinden video oluştur",
+      "thinkingDesc": "Modelin yanıttan önceki akıl yürütmesini gösterir",
+      "thinkingUnsupported": "Seçili model akıl yürütmeyi desteklemiyor",
+      "summarizer": "Özetleyici",
+      "summarizerDesc": "Belgeleri özetler — aracı açar"
     },
     "modelDropdown": {
       "default": "Standart"

@@ -213,6 +213,11 @@
         class="mt-3 flex items-center gap-2"
         data-testid="section-chat-secondary-actions"
       >
+        <!-- §4.7: exactly three pills — Model, Tools, Knowledge folder.
+             Thinking + Voice reply live INSIDE the Tools dropdown as toggles;
+             "Manage folders…" lives INSIDE the folder picker. Labels stay
+             visible on mobile (no hidden sm:inline). -->
+
         <!-- Model dropdown: show gated pill in guest mode -->
         <template v-if="isGuestMode">
           <button
@@ -221,7 +226,7 @@
             @click="emit('guestFeatureGate', 'models')"
           >
             <Icon icon="mdi:tune-vertical" class="w-4 h-4 md:w-5 md:h-5" />
-            <span class="text-xs md:text-sm font-medium hidden sm:inline">Model</span>
+            <span class="text-xs md:text-sm font-medium">Model</span>
             <Icon icon="mdi:lock-outline" class="w-3 h-3 text-amber-500" />
           </button>
         </template>
@@ -235,84 +240,31 @@
             @click="emit('guestFeatureGate', 'tools')"
           >
             <Icon icon="mdi:toolbox-outline" class="w-4 h-4 md:w-5 md:h-5" />
-            <span class="text-xs md:text-sm font-medium hidden sm:inline">Tools</span>
+            <span class="text-xs md:text-sm font-medium">Tools</span>
             <Icon icon="mdi:lock-outline" class="w-3 h-3 text-amber-500" />
           </button>
         </template>
         <ToolsDropdown
           v-else
           :active-command="activeCommand"
+          :thinking-enabled="thinkingEnabled"
+          :voice-reply="voiceReply"
+          :supports-reasoning="supportsReasoning"
           class="flex-shrink-0"
           @insert-command="handleInsertCommand"
+          @toggle-thinking="toggleThinking"
+          @toggle-voice-reply="toggleVoiceReply"
         />
 
-        <!-- Knowledge-base folder (RAG group) picker: scope the chat to a folder.
-             Rendered only in advanced mode (this whole block is gated by
-             `!appModeStore.isEasyMode` above) and only for signed-in users.
-             When there are no groups yet the picker just shows the "none"
-             option and the "Manage" button links to the Files page to create
-             one. -->
-        <select
+        <!-- Knowledge-base folder (RAG group) picker: scope the chat to a
+             folder. Signed-in users only; its panel carries the "Manage
+             folders…" link row to the Files page. -->
+        <KnowledgeFolderPicker
           v-if="!isGuestMode"
           v-model="selectedGroupKey"
-          :class="[
-            'pill flex-shrink-0 text-xs md:text-sm font-medium max-w-[40vw] md:max-w-[180px] truncate',
-            selectedGroupKey && 'pill--active',
-          ]"
-          :aria-label="$t('chatInput.knowledgeGroup')"
-          :title="$t('chatInput.knowledgeGroup')"
-          data-testid="select-chat-knowledge-group"
-        >
-          <option value="">{{ $t('chatInput.knowledgeGroupNone') }}</option>
-          <option v-for="g in knowledgeGroups" :key="g.name" :value="g.name">
-            {{ g.name }} ({{ g.count }})
-          </option>
-        </select>
-
-        <button
-          v-if="!isGuestMode"
-          type="button"
-          class="pill flex-shrink-0"
-          :aria-label="$t('chatInput.manageKnowledgeGroups')"
-          :title="$t('chatInput.manageKnowledgeGroups')"
-          data-testid="btn-manage-knowledge-groups"
-          @click="goToKnowledgeFiles"
-        >
-          <Icon icon="mdi:folder-cog-outline" class="w-4 h-4 md:w-5 md:h-5" />
-        </button>
-
-        <button
-          type="button"
-          :disabled="!isGuestMode && !supportsReasoning"
-          :class="[
-            'pill flex-shrink-0',
-            !isGuestMode && thinkingEnabled && 'pill--active',
-            isGuestMode && 'opacity-50',
-            !isGuestMode && !supportsReasoning && 'opacity-50 cursor-not-allowed',
-          ]"
-          :aria-label="$t('chatInput.thinking')"
-          data-testid="btn-chat-thinking"
-          @click="isGuestMode ? emit('guestFeatureGate', 'models') : toggleThinking()"
-        >
-          <Icon icon="mdi:brain" class="w-4 h-4 md:w-5 md:h-5" />
-          <span class="text-xs md:text-sm font-medium hidden sm:inline">{{
-            $t('chatInput.thinking')
-          }}</span>
-          <Icon v-if="isGuestMode" icon="mdi:lock-outline" class="w-3 h-3 text-amber-500" />
-        </button>
-        <button
-          type="button"
-          :class="['pill flex-shrink-0', voiceReply && 'pill--active']"
-          :aria-label="$t('chatInput.voiceReply')"
-          :title="$t('chatInput.voiceReplyTooltip')"
-          data-testid="btn-chat-voice-reply"
-          @click="toggleVoiceReply"
-        >
-          <Icon icon="mdi:volume-high" class="w-4 h-4 md:w-5 md:h-5" />
-          <span class="text-xs md:text-sm font-medium hidden sm:inline">{{
-            $t('chatInput.voiceReply')
-          }}</span>
-        </button>
+          :groups="knowledgeGroups"
+          class="flex-shrink-0"
+        />
       </div>
     </div>
 
@@ -340,6 +292,7 @@ import CommandPalette from './CommandPalette.vue'
 import FileMentionPalette from './FileMentionPalette.vue'
 import ToolsDropdown from './ToolsDropdown.vue'
 import ModelDropdown from './ModelDropdown.vue'
+import KnowledgeFolderPicker from './KnowledgeFolderPicker.vue'
 import FileSelectionModal from './FileSelectionModal.vue'
 import { parseCommand } from '../commands/parse'
 import { useCommandsStore, type Command } from '@/stores/commands'
@@ -352,7 +305,6 @@ import { AudioRecorder } from '@/services/audioRecorder'
 import { WebSpeechService, isWebSpeechSupported } from '@/services/webSpeechService'
 import { useConfigStore } from '@/stores/config'
 import { useI18n } from 'vue-i18n'
-import { useRouter } from 'vue-router'
 import { useAutoPersist } from '@/composables/useInputPersistence'
 import { useKeyboardOpen } from '@/composables/useKeyboardOpen'
 import { useChatsStore } from '@/stores/chats'
@@ -422,13 +374,7 @@ const appModeStore = useAppModeStore()
 const authStore = useAuthStore()
 const { warning, error: showError, success } = useNotification()
 const { t, locale } = useI18n()
-const router = useRouter()
 const isKeyboardOpen = useKeyboardOpen()
-
-/** Open the Files page where knowledge folders (RAG groups) are created/managed. */
-function goToKnowledgeFiles(): void {
-  router.push('/files')
-}
 
 /**
  * Get the speech recognition language code from the current UI locale.

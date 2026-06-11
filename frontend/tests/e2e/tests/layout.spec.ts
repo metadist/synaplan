@@ -187,10 +187,9 @@ test.describe('@ci @layout UI guard — chat surface', () => {
     // never navigates — so it must contain no link elements at all.
     await expect(actionRow.locator('a, [role="link"]')).toHaveCount(0)
 
-    // Grandfathered exception (phase 0.5 baseline): the manage-folders button
-    // still router.push()es to /files. Phase 3 removes it — flip this
-    // assertion to toHaveCount(0) in that PR so its return would fail CI.
-    await expect(actionRow.locator('[data-testid="btn-manage-knowledge-groups"]')).toHaveCount(1)
+    // Phase 3 removed the standalone manage-folders navigation pill (it lives
+    // inside the folder picker as a marked link row now). Its return = red CI.
+    await expect(actionRow.locator('[data-testid="btn-manage-knowledge-groups"]')).toHaveCount(0)
   })
 
   test('history sheet (chat list) opens within the viewport', async ({ page, credentials }) => {
