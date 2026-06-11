@@ -3,7 +3,6 @@ import { ref, watch } from 'vue'
 
 export const useSidebarStore = defineStore('sidebar', () => {
   const isOpen = ref(false)
-  const isMobileOpen = ref(false)
   const isCollapsed = ref(localStorage.getItem('sidebar-collapsed') === 'true')
   const showChats = ref(localStorage.getItem('sidebar-show-chats') !== 'false')
 
@@ -77,21 +76,8 @@ export const useSidebarStore = defineStore('sidebar', () => {
     chatDisclosure.value[section] = !chatDisclosure.value[section]
   }
 
-  const openMobile = () => {
-    isMobileOpen.value = true
-  }
-
-  const closeMobile = () => {
-    isMobileOpen.value = false
-  }
-
-  const toggleMobile = () => {
-    isMobileOpen.value = !isMobileOpen.value
-  }
-
   return {
     isOpen,
-    isMobileOpen,
     isCollapsed,
     showChats,
     chatDisclosure,
@@ -105,8 +91,5 @@ export const useSidebarStore = defineStore('sidebar', () => {
     openChatSheet,
     closeChatSheet,
     toggleChatSheet,
-    openMobile,
-    closeMobile,
-    toggleMobile,
   }
 })

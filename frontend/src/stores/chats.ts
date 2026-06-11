@@ -329,7 +329,7 @@ export const useChatsStore = defineStore('chats', () => {
   /**
    * Mark a chat as recently active so it re-sorts to the top of sidebar lists.
    *
-   * Sidebars (`SidebarV2`, `ChatDropdown`) order chats by `updatedAt DESC` so
+   * The history sheet (`SidebarV2`) orders chats by `updatedAt DESC` so
    * the most recently active conversation is always at the top. The backend
    * keeps `updatedAt` in sync, but local in-memory chats only see that change
    * after a full reload. Whenever a new message lands on a chat (web SSE,
