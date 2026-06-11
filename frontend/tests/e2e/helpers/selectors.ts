@@ -58,20 +58,25 @@ export const selectors = {
     sidebarExpand: '[data-testid="btn-sidebar-expand"]',
     /** V2 sidebar: single plus button to start new chat (no toggle/dropdown) */
     sidebarV2NewChat: '[data-testid="btn-sidebar-v2-new-chat"]',
-    /** V2 sidebar: chat nav icon opens chat list modal (path "/" → testid "btn-sidebar-v2--") */
-    sidebarV2ChatNav: '[data-testid="btn-sidebar-v2--"]',
+    /**
+     * V2 sidebar nav testids use STABLE KEYS (`btn-sidebar-v2-nav-<key>`,
+     * `link-sidebar-v2-<key>`) — decoupled from route paths so URL migrations
+     * never rename selectors (navigation IA cleanup, phase 0.5).
+     */
+    /** V2 sidebar: chat nav icon opens chat list modal */
+    sidebarV2ChatNav: '[data-testid="btn-sidebar-v2-nav-chat"]',
     /** V2 sidebar: files nav icon */
-    sidebarV2Files: '[data-testid="btn-sidebar-v2--files"]',
+    sidebarV2Files: '[data-testid="btn-sidebar-v2-nav-files"]',
     /** V2 sidebar: settings nav icon (advanced mode only) */
-    sidebarV2Settings: '[data-testid="btn-sidebar-v2--settings"]',
+    sidebarV2Settings: '[data-testid="btn-sidebar-v2-nav-settings"]',
     /** V2 sidebar: admin nav icon (admin only) */
-    sidebarV2Admin: '[data-testid="btn-sidebar-v2--admin"]',
-    /** V2 flyout: child links (generated from route path) */
-    flyoutLinkChatWidget: '[data-testid="link-sidebar-v2-tools-chat-widget"]',
-    flyoutLinkMailHandler: '[data-testid="link-sidebar-v2-tools-mail-handler"]',
-    flyoutLinkAiModels: '[data-testid="link-sidebar-v2-config-ai-models"]',
-    flyoutLinkTaskPrompts: '[data-testid="link-sidebar-v2-config-task-prompts"]',
-    flyoutLinkAdminDashboard: '[data-testid="link-sidebar-v2-admin"]',
+    sidebarV2Admin: '[data-testid="btn-sidebar-v2-nav-admin"]',
+    /** V2 flyout: child links (stable keys) */
+    flyoutLinkChatWidget: '[data-testid="link-sidebar-v2-chat-widget"]',
+    flyoutLinkMailHandler: '[data-testid="link-sidebar-v2-mail-handler"]',
+    flyoutLinkAiModels: '[data-testid="link-sidebar-v2-ai-models"]',
+    flyoutLinkTaskPrompts: '[data-testid="link-sidebar-v2-task-prompts"]',
+    flyoutLinkAdminDashboard: '[data-testid="link-sidebar-v2-admin-dashboard"]',
     /** V2 chat list modal */
     modalChatManager: '[data-testid="modal-chat-manager"]',
     /** V2 chat list: container visible when at least one chat exists; use to wait before targeting rows */
@@ -178,8 +183,7 @@ export const selectors = {
   },
   files: {
     page: '[data-testid="page-files-upload"]',
-    filePicker: '[data-testid="section-file-picker"]',
-    selectButton: '[data-testid="btn-select-files"]',
+    uploadForm: '[data-testid="section-upload-form"]',
     fileInput: '[data-testid="input-files"]',
     uploadButton: '[data-testid="btn-upload"]',
     table: '[data-testid="section-table"]',

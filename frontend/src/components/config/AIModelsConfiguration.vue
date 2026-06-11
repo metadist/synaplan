@@ -5,14 +5,14 @@
       :class="openDropdown ? 'z-20' : 'z-0'"
       data-testid="section-default-config"
     >
-      <div class="flex items-center justify-between mb-6">
-        <h2 class="text-2xl font-semibold txt-primary flex items-center gap-2">
-          <CpuChipIcon class="w-6 h-6 text-[var(--brand)]" />
+      <div class="flex flex-col gap-3 mb-6 sm:flex-row sm:items-center sm:justify-between">
+        <h2 class="text-2xl font-semibold txt-primary flex items-center gap-2 min-w-0">
+          <CpuChipIcon class="w-6 h-6 flex-shrink-0 text-[var(--brand)]" />
           {{ $t('config.aiModels.defaultConfigTitle') }}
         </h2>
         <button
           type="button"
-          class="inline-flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium border border-light-border/30 dark:border-dark-border/20 txt-secondary hover:txt-primary hover:border-[var(--brand)]/50 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+          class="self-start sm:self-auto flex-shrink-0 inline-flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium border border-light-border/30 dark:border-dark-border/20 txt-secondary hover:txt-primary hover:border-[var(--brand)]/50 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
           :disabled="resetting"
           data-testid="btn-reset-defaults"
           @click="confirmResetDefaults"
