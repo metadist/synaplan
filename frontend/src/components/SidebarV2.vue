@@ -75,7 +75,7 @@
           item.requiresAuth && isGuestMode && 'opacity-50',
         ]"
         :title="item.label"
-        :data-testid="`btn-sidebar-v2-${item.path.replace(/\//g, '-')}`"
+        :data-testid="`btn-sidebar-v2-nav-${item.key}`"
         @click="handleNavClick(item)"
       >
         <component :is="item.icon" class="w-6 h-6" />
@@ -309,7 +309,7 @@
                 v-for="child in section.items"
                 :key="child.path"
                 :to="child.path"
-                :data-testid="`link-sidebar-v2${child.path.replace(/\//g, '-')}`"
+                :data-testid="`link-sidebar-v2-${child.key}`"
                 class="flex items-center gap-2.5 px-3 py-2 text-sm transition-colors"
                 :class="
                   route.path === child.path
@@ -753,6 +753,8 @@ const initials = computed(() => {
 })
 
 interface NavChild {
+  /** Stable identifier used for data-testid — never derived from the route path */
+  key: string
   path: string
   label: string
   badge?: string
@@ -760,6 +762,8 @@ interface NavChild {
 }
 
 interface NavItem {
+  /** Stable identifier used for data-testid — never derived from the route path */
+  key: string
   path: string
   label: string
   icon: Component
@@ -772,9 +776,12 @@ interface NavItem {
 const isGuestMode = computed(() => !authStore.isAuthenticated)
 
 const navItems = computed<NavItem[]>(() => {
-  const items: NavItem[] = [{ path: '/', label: t('nav.chat'), icon: ChatBubbleLeftRightIcon }]
+  const items: NavItem[] = [
+    { key: 'chat', path: '/', label: t('nav.chat'), icon: ChatBubbleLeftRightIcon },
+  ]
 
   items.push({
+    key: 'files',
     path: '/files',
     label: t('nav.files'),
     icon: FolderIcon,
@@ -783,6 +790,7 @@ const navItems = computed<NavItem[]>(() => {
   })
 
   items.push({
+    key: 'rag',
     path: '/rag',
     label: t('nav.semanticSearch'),
     icon: MagnifyingGlassIcon,
@@ -793,33 +801,49 @@ const navItems = computed<NavItem[]>(() => {
   if (appModeStore.isAdvancedMode || isGuestMode.value) {
     const settingsChildren: NavChild[] = [
       {
+        key: 'chat-widget',
         path: '/tools/chat-widget',
         label: t('nav.toolsChatWidget'),
         group: t('nav.settingsChannels'),
       },
       {
+        key: 'mail-handler',
         path: '/tools/mail-handler',
         label: t('nav.toolsMailHandler'),
         group: t('nav.settingsChannels'),
       },
-      { path: '/config/inbound', label: t('nav.configInbound'), group: t('nav.settingsChannels') },
       {
+        key: 'inbound',
+        path: '/config/inbound',
+        label: t('nav.configInbound'),
+        group: t('nav.settingsChannels'),
+      },
+      {
+        key: 'ai-models',
         path: '/config/ai-models',
         label: t('nav.configAiModels'),
         group: t('nav.settingsAiTools'),
       },
-      { path: '/config/api-keys', label: t('nav.configApiKeys'), group: t('nav.settingsAiTools') },
       {
+        key: 'api-keys',
+        path: '/config/api-keys',
+        label: t('nav.configApiKeys'),
+        group: t('nav.settingsAiTools'),
+      },
+      {
+        key: 'task-prompts',
         path: '/config/task-prompts',
         label: t('nav.configTaskPrompts'),
         group: t('nav.settingsAiTools'),
       },
       {
+        key: 'sorting-prompt',
         path: '/config/sorting-prompt',
         label: t('nav.configSortingPrompt'),
         group: t('nav.settingsAiTools'),
       },
       {
+        key: 'doc-summary',
         path: '/tools/doc-summary',
         label: t('nav.toolsDocSummary'),
         group: t('nav.settingsAiTools'),
@@ -827,6 +851,7 @@ const navItems = computed<NavItem[]>(() => {
     ]
 
     items.push({
+      key: 'settings',
       path: '/settings',
       label: t('nav.settings'),
       icon: Cog6ToothIcon,
@@ -838,10 +863,12 @@ const navItems = computed<NavItem[]>(() => {
 
   if (appModeStore.isAdvancedMode && configStore.plugins.length > 0) {
     items.push({
+      key: 'plugins',
       path: '/plugins',
       label: t('nav.plugins'),
       icon: PuzzlePieceIcon,
       children: configStore.plugins.map((plugin: { name?: string }) => ({
+        key: `plugin-${plugin.name ?? 'unknown'}`,
         path: `/plugins/${plugin.name}`,
         label: plugin.name
           ? plugin.name.charAt(0).toUpperCase() + plugin.name.slice(1)
@@ -851,10 +878,13 @@ const navItems = computed<NavItem[]>(() => {
   }
 
   if (authStore.isAdmin) {
-    const adminChildren: NavChild[] = [{ path: '/admin', label: t('nav.adminDashboard') }]
+    const adminChildren: NavChild[] = [
+      { key: 'admin-dashboard', path: '/admin', label: t('nav.adminDashboard') },
+    ]
 
     if (import.meta.env.DEV) {
       const featureStatusItem: NavChild = {
+        key: 'admin-features',
         path: '/admin/features',
         label: t('nav.adminFeatureStatus'),
       }
@@ -863,9 +893,14 @@ const navItems = computed<NavItem[]>(() => {
       }
       adminChildren.push(featureStatusItem)
     }
-    adminChildren.push({ path: '/admin/config', label: t('nav.adminSystemConfig') })
+    adminChildren.push({
+      key: 'admin-config',
+      path: '/admin/config',
+      label: t('nav.adminSystemConfig'),
+    })
 
     items.push({
+      key: 'admin',
       path: '/admin',
       label: t('nav.admin'),
       icon: ShieldCheckIcon,

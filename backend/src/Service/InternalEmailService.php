@@ -116,7 +116,7 @@ final readonly class InternalEmailService
             ], $locale));
 
         try {
-            $this->mailer->send($email);
+            $this->sendWithRetry($email);
             $this->logger->info('Password reset email sent', ['to' => $to, 'locale' => $locale]);
         } catch (\Exception $e) {
             $this->logger->error('Failed to send password reset email', [
@@ -149,7 +149,7 @@ final readonly class InternalEmailService
             ], $locale));
 
         try {
-            $this->mailer->send($email);
+            $this->sendWithRetry($email);
             $this->logger->info('Welcome email sent', ['to' => $to, 'locale' => $locale]);
         } catch (\Exception $e) {
             $this->logger->error('Failed to send welcome email', [
@@ -281,7 +281,7 @@ final readonly class InternalEmailService
         }
 
         try {
-            $this->mailer->send($email);
+            $this->sendWithRetry($email);
             $this->logger->info('AI response email sent', [
                 'to' => $to,
                 'subject' => $subject,
@@ -356,7 +356,7 @@ final readonly class InternalEmailService
         }
 
         try {
-            $this->mailer->send($email);
+            $this->sendWithRetry($email);
             $this->logger->info('Task result email sent', [
                 'to' => $to,
                 'attachment_count' => count($attachments),
@@ -434,7 +434,7 @@ final readonly class InternalEmailService
             ->html($html);
 
         try {
-            $this->mailer->send($email);
+            $this->sendWithRetry($email);
             $this->logger->info('Embedding fallback warning email sent', ['to' => $adminEmail]);
         } catch (\Exception $e) {
             $this->logger->warning('Failed to send embedding fallback warning email', [
