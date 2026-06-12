@@ -274,6 +274,145 @@ class MessageControllerTest extends WebTestCase
         }
     }
 
+    public function testGetMessageWithoutAuth(): void
+    {
+        self::ensureKernelShutdown();
+        $client = static::createClient();
+        $client->request('GET', '/api/v1/messages/123');
+
+        $this->assertResponseStatusCodeSame(Response::HTTP_UNAUTHORIZED);
+    }
+
+    public function testGetMessageNotFound(): void
+    {
+        $this->client->request(
+            'GET',
+            '/api/v1/messages/999999999',
+            [],
+            [],
+            [
+                'CONTENT_TYPE' => 'application/json',
+                'HTTP_AUTHORIZATION' => 'Bearer '.$this->token,
+            ]
+        );
+
+        $this->assertResponseStatusCodeSame(Response::HTTP_NOT_FOUND);
+    }
+
+    /**
+     * Issue #1070: GET /messages/{id} must return the same row shape as the
+     * chat history endpoint (shared MessageApiFormatter), including the
+     * generated file and the AI model metadata — the frontend reconciles
+     * the streamed state against this payload after SSE `complete`.
+     */
+    public function testGetMessageReturnsPersistedRowShape(): void
+    {
+        $message = new Message();
+        $message->setUserId($this->user->getId());
+        $message->setTrackingId(time());
+        $message->setProviderIndex('test');
+        $message->setUnixTimestamp(time());
+        $message->setDateTime(date('YmdHis'));
+        $message->setMessageType('WEB');
+        $message->setTopic('general');
+        $message->setLanguage('en');
+        $message->setText('Voice reply answer');
+        $message->setDirection('OUT');
+        $message->setStatus('complete');
+        // TTS audio persisted on the OUT message (voice reply / DAG turn)
+        $message->setFile(1);
+        $message->setFilePath('/api/v1/files/uploads/13/000/tts_reply.mp3');
+        $message->setFileType('audio');
+
+        $this->em->persist($message);
+        $this->em->flush();
+
+        // Metas require the message id (MessageMeta.messageId is non-null),
+        // so they are attached after the initial flush — same order as the
+        // StreamController persistence path.
+        $message->setMeta('ai_audio_provider', 'piper');
+        $message->setMeta('ai_audio_model', 'piper-multi');
+        $message->setMeta('multitask', '1');
+        $this->em->flush();
+
+        $this->client->request(
+            'GET',
+            '/api/v1/messages/'.$message->getId(),
+            [],
+            [],
+            [
+                'CONTENT_TYPE' => 'application/json',
+                'HTTP_AUTHORIZATION' => 'Bearer '.$this->token,
+            ]
+        );
+
+        $this->assertResponseIsSuccessful();
+
+        $response = json_decode($this->client->getResponse()->getContent(), true);
+        $this->assertTrue($response['success']);
+
+        $row = $response['message'];
+        $this->assertSame($message->getId(), $row['id']);
+        $this->assertSame('Voice reply answer', $row['text']);
+        $this->assertSame('OUT', $row['direction']);
+        $this->assertSame('general', $row['topic']);
+        $this->assertTrue($row['multitask']);
+        $this->assertSame(
+            ['path' => '/api/v1/files/uploads/13/000/tts_reply.mp3', 'type' => 'audio'],
+            $row['file']
+        );
+        $this->assertSame('piper', $row['aiModels']['audio']['provider']);
+        $this->assertSame('piper-multi', $row['aiModels']['audio']['model']);
+    }
+
+    public function testGetMessageOfAnotherUserReturns404(): void
+    {
+        $otherUser = $this->em->getRepository(User::class)->findOneBy(['mail' => 'admin@synaplan.com']);
+        if (!$otherUser) {
+            $this->markTestSkipped('Fixture user admin@synaplan.com not found.');
+        }
+
+        $message = new Message();
+        $message->setUserId($otherUser->getId());
+        $message->setTrackingId(time());
+        $message->setProviderIndex('test');
+        $message->setUnixTimestamp(time());
+        $message->setDateTime(date('YmdHis'));
+        $message->setMessageType('WEB');
+        $message->setFile(0);
+        $message->setTopic('general');
+        $message->setLanguage('en');
+        $message->setText('Not yours');
+        $message->setDirection('OUT');
+        $message->setStatus('complete');
+
+        $this->em->persist($message);
+        $this->em->flush();
+        $messageId = $message->getId();
+
+        try {
+            $this->client->request(
+                'GET',
+                '/api/v1/messages/'.$messageId,
+                [],
+                [],
+                [
+                    'CONTENT_TYPE' => 'application/json',
+                    'HTTP_AUTHORIZATION' => 'Bearer '.$this->token,
+                ]
+            );
+
+            $this->assertResponseStatusCodeSame(Response::HTTP_NOT_FOUND);
+        } finally {
+            // tearDown only cleans up the demo user's messages.
+            $leftover = $this->em->find(Message::class, $messageId);
+            if ($leftover) {
+                $this->em->remove($leftover);
+                $this->em->flush();
+            }
+        }
+    }
+
     public function testEnhanceWithoutAuth(): void
     {
         self::ensureKernelShutdown();

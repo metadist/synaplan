@@ -14,6 +14,11 @@ class TestProvider implements ChatProviderInterface, EmbeddingProviderInterface,
 {
     private const FAKE_TOKENS_PER_EMBED = 8;
 
+    public function __construct(
+        private readonly string $uploadDir = '/var/www/backend/var/uploads',
+    ) {
+    }
+
     public function getName(): string
     {
         return 'test';
@@ -483,7 +488,21 @@ class TestProvider implements ChatProviderInterface, EmbeddingProviderInterface,
     // TextToSpeechProviderInterface
     public function synthesize(string $text, array $options = []): string
     {
-        return '/tmp/test_audio.mp3';
+        // Write a real (silent) MP3 frame into the upload dir root —
+        // AiFacade::moveToUserPath() expects the returned filename to
+        // exist there so it can move it into the user path. Returning a
+        // non-existent path made every voice-reply turn on the test
+        // provider fail silently in the move step (issue #1070 E2E).
+        if (!is_dir($this->uploadDir)) {
+            mkdir($this->uploadDir, 0775, true);
+        }
+
+        $filename = 'tts_test_'.uniqid().'.mp3';
+        // Single silent MPEG-1 Layer III frame (128 kbit/s, 44.1 kHz).
+        $frame = "\xFF\xFB\x90\x64".str_repeat("\x00", 413);
+        file_put_contents($this->uploadDir.'/'.$filename, $frame);
+
+        return $filename;
     }
 
     public function synthesizeStream(string $text, array $options = []): \Generator

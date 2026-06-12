@@ -1198,6 +1198,12 @@ const handleContinueResponse = async (message: Message) => {
 
         message.isStreaming = false
         historyStore.finishStreamingMessage(message.id)
+
+        // Issue #1070: reconcile against the persisted message so files /
+        // media / metadata reflect the authoritative backend state.
+        if (message.backendMessageId) {
+          void historyStore.reconcileMessage(message.id, message.backendMessageId)
+        }
       } else if (data.status === 'error') {
         message.truncated = true
         message.isStreaming = false
@@ -2382,6 +2388,16 @@ const streamAIResponse = async (
             chatsStore.bumpChatActivity(chatId)
 
             historyStore.finishStreamingMessage(messageId)
+
+            // Issue #1070: the streamed state is only a live preview — the
+            // persisted message is the single source of truth for files,
+            // media and metadata. Re-fetch it once so anything the SSE
+            // accumulation missed (e.g. TTS audio in a multitask turn,
+            // where the `audio` event is suppressed while task cards
+            // stream) renders without a page reload.
+            if (data.messageId) {
+              void historyStore.reconcileMessage(messageId, data.messageId)
+            }
 
             // Phase 2c: schedule a couple of polls for backgrounded memory
             // extraction results. The worker writes to the source message

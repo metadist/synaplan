@@ -89,4 +89,73 @@ test.describe('@ci @multitask Multi-task routing', () => {
       expect((await answerText.first().innerText()).trim().length).toBeGreaterThan(0)
     })
   })
+
+  /**
+   * Issue #1070 acceptance: a multi-step DAG turn with voice reply (text +
+   * TTS) must show the audio player BOTH live (without a reload) and after
+   * a page reload.
+   *
+   * Live, the `audio` SSE event is suppressed while task cards stream
+   * (taskPlan.active), so the player only appears because the frontend
+   * re-fetches the persisted message after `complete` and reconciles it
+   * (GET /api/v1/messages/{id} — the single authoritative source).
+   */
+  test('TTS audio in a DAG turn is visible live and after reload (#1070)', async ({
+    page,
+    credentials,
+  }) => {
+    await login(page, credentials)
+    const chat = new ChatHelper(page)
+
+    const toggleToolsPanel = async (open: boolean) => {
+      await page.locator(selectors.chat.toolsToggle).click()
+      await page
+        .locator(selectors.chat.toolsPanel)
+        .waitFor({ state: open ? 'visible' : 'hidden', timeout: TIMEOUTS.SHORT })
+    }
+
+    await test.step('Arrange: start a new chat and enable voice reply', async () => {
+      await chat.startNewChat()
+      await toggleToolsPanel(true)
+      await page.locator(selectors.chat.toolVoiceReply).click()
+      await expect(page.locator(selectors.chat.toolsActiveBadge)).toBeVisible({
+        timeout: TIMEOUTS.SHORT,
+      })
+      await toggleToolsPanel(false)
+    })
+
+    const previousCount = await chat.conversationBubbles().count()
+
+    await test.step('Act: send a multi-task prompt with voice reply on', async () => {
+      await page.locator(selectors.chat.textInput).fill(MULTITASK_PROMPT)
+      await page.locator(selectors.chat.sendBtn).click()
+    })
+
+    const bubble = chat.conversationBubbles().nth(previousCount)
+    await bubble.waitFor({ state: 'visible', timeout: TIMEOUTS.STANDARD })
+
+    await test.step('Assert: the DAG turn streams task cards and completes', async () => {
+      await bubble
+        .locator('[data-testid="task-plan"]')
+        .waitFor({ state: 'visible', timeout: TIMEOUTS.LONG })
+      await bubble
+        .locator(selectors.chat.messageDone)
+        .waitFor({ state: 'visible', timeout: TIMEOUTS.VERY_LONG })
+    })
+
+    await test.step('Assert: the audio player is visible WITHOUT a reload', async () => {
+      await bubble
+        .locator(selectors.chat.messageAudio)
+        .waitFor({ state: 'visible', timeout: TIMEOUTS.STANDARD })
+    })
+
+    await test.step('Assert: the audio player is still visible after a reload', async () => {
+      await page.reload()
+      const reloadedBubble = chat.conversationBubbles().nth(previousCount)
+      await reloadedBubble.waitFor({ state: 'visible', timeout: TIMEOUTS.STANDARD })
+      await reloadedBubble
+        .locator(selectors.chat.messageAudio)
+        .waitFor({ state: 'visible', timeout: TIMEOUTS.STANDARD })
+    })
+  })
 })
