@@ -121,6 +121,36 @@
         </Transition>
       </button>
 
+      <!-- Enhance lives here on mobile only — the in-shell sparkles button is
+           desktop-only because it crowds the narrow input (§4.7 follow-up).
+           v-if (not a hidden class): .dropdown-item's unlayered display rule
+           would beat md:hidden, and hidden rows must not join focus cycling. -->
+      <button
+        v-if="isMobileViewport"
+        ref="itemRefs"
+        :class="[
+          'dropdown-item',
+          enhanceEnabled && 'dropdown-item--active',
+          !enhanceAvailable && 'opacity-60',
+        ]"
+        type="button"
+        :disabled="enhanceLoading"
+        data-testid="btn-tool-enhance"
+        @click="handleEnhance"
+        @keydown.down.prevent="focusNext"
+        @keydown.up.prevent="focusPrevious"
+      >
+        <Icon v-if="enhanceLoading" icon="mdi:loading" class="w-5 h-5 flex-shrink-0 animate-spin" />
+        <Icon v-else icon="mdi:creation" class="w-5 h-5 flex-shrink-0" />
+        <div class="flex-1 min-w-0">
+          <span class="text-sm font-medium">{{ $t('chatInput.enhance') }}</span>
+          <div class="text-xs txt-secondary">{{ $t('chatInput.tools.enhanceDesc') }}</div>
+        </div>
+        <Transition name="check-fade">
+          <CheckIcon v-if="enhanceEnabled" class="w-5 h-5 flex-shrink-0 text-[var(--brand)]" />
+        </Transition>
+      </button>
+
       <!-- Q3: the pre-configured Summarizer stays reachable from chat; this is
            a clearly marked link row (same pattern as "Manage folders…"). -->
       <div class="border-t border-light-border/20 dark:border-dark-border/20 my-1" />
@@ -163,6 +193,10 @@ interface Props {
   thinkingEnabled?: boolean
   voiceReply?: boolean
   supportsReasoning?: boolean
+  enhanceEnabled?: boolean
+  enhanceLoading?: boolean
+  /** Enhance needs text in the input to act on. */
+  enhanceAvailable?: boolean
 }
 
 const props = defineProps<Props>()
@@ -171,6 +205,7 @@ const emit = defineEmits<{
   insertCommand: [command: Command]
   toggleThinking: []
   toggleVoiceReply: []
+  toggleEnhance: []
 }>()
 
 /** Feature-gated tools that insert a slash command into the input. */
@@ -205,6 +240,11 @@ const itemRefs = ref<HTMLElement[]>([])
 const dropdownRef = ref<HTMLElement | null>(null)
 const featuresStatus = ref<Record<string, Feature>>({})
 const isLoadingFeatures = ref(true)
+
+// Same breakpoint as ChatInput's isMobile (innerWidth < 768).
+const mobileMq = window.matchMedia('(max-width: 767px)')
+const isMobileViewport = ref(mobileMq.matches)
+const onMobileMqChange = (e: MediaQueryListEvent) => (isMobileViewport.value = e.matches)
 
 const activeToggleCount = computed(
   () => Number(props.thinkingEnabled ?? false) + Number(props.voiceReply ?? false)
@@ -275,6 +315,12 @@ const goToSummarizer = () => {
   router.push('/ai/summarizer')
 }
 
+// Close after triggering so the rewritten text in the input is visible.
+const handleEnhance = () => {
+  emit('toggleEnhance')
+  closeDropdown()
+}
+
 const focusNext = () => {
   const currentIndex = itemRefs.value.findIndex((el) => el === document.activeElement)
   const nextIndex = (currentIndex + 1) % itemRefs.value.length
@@ -309,8 +355,14 @@ const handleClickOutside = (e: MouseEvent) => {
   closeDropdown()
 }
 
-onMounted(() => document.addEventListener('click', handleClickOutside))
-onBeforeUnmount(() => document.removeEventListener('click', handleClickOutside))
+onMounted(() => {
+  document.addEventListener('click', handleClickOutside)
+  mobileMq.addEventListener('change', onMobileMqChange)
+})
+onBeforeUnmount(() => {
+  document.removeEventListener('click', handleClickOutside)
+  mobileMq.removeEventListener('change', onMobileMqChange)
+})
 </script>
 
 <style scoped>

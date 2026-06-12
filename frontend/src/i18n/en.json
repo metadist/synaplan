@@ -384,7 +384,8 @@
       "thinkingDesc": "Show the model's reasoning before the answer",
       "thinkingUnsupported": "The selected model does not support reasoning",
       "summarizer": "Summarizer",
-      "summarizerDesc": "Summarize documents — opens the tool"
+      "summarizerDesc": "Summarize documents — opens the tool",
+      "enhanceDesc": "Rewrite your message with AI before sending"
     },
     "modelDropdown": {
       "default": "Default"

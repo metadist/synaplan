@@ -350,7 +350,8 @@
       "thinkingDesc": "Modelin yanıttan önceki akıl yürütmesini gösterir",
       "thinkingUnsupported": "Seçili model akıl yürütmeyi desteklemiyor",
       "summarizer": "Özetleyici",
-      "summarizerDesc": "Belgeleri özetler — aracı açar"
+      "summarizerDesc": "Belgeleri özetler — aracı açar",
+      "enhanceDesc": "Mesajını göndermeden önce yapay zekâ ile iyileştir"
     },
     "modelDropdown": {
       "default": "Standart"

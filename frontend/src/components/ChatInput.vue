@@ -250,10 +250,14 @@
           :thinking-enabled="thinkingEnabled"
           :voice-reply="voiceReply"
           :supports-reasoning="supportsReasoning"
+          :enhance-enabled="enhanceEnabled"
+          :enhance-loading="enhanceLoading"
+          :enhance-available="message.trim().length > 0"
           class="flex-shrink-0"
           @insert-command="handleInsertCommand"
           @toggle-thinking="toggleThinking"
           @toggle-voice-reply="toggleVoiceReply"
+          @toggle-enhance="toggleEnhance"
         />
 
         <!-- Knowledge-base folder (RAG group) picker: scope the chat to a
@@ -416,8 +420,12 @@ const showMicrophoneButton = computed(() => {
   return webSpeechSupported || speechToTextAvailable
 })
 
-/** Icon-only enhance control inside the input shell; visible when there is text to act on. */
-const showEnhanceInInput = computed(() => message.value.trim().length > 0)
+/**
+ * Icon-only enhance control inside the input shell; visible when there is
+ * text to act on. Desktop only — on mobile it crowds the narrow input, so the
+ * control moves into the Tools dropdown instead.
+ */
+const showEnhanceInInput = computed(() => message.value.trim().length > 0 && !isMobile.value)
 
 /** Reserve horizontal space so the textarea does not sit under the absolute action buttons. */
 const textareaPaddingRightPx = computed(() => {

@@ -1033,7 +1033,11 @@
 .design-v2.dark [data-testid='comp-chat-input-shell'] textarea {
   background: transparent !important;
   border-color: transparent !important;
-  border-radius: 1rem;
+  /* No own rounded box — the outer shell is the single visible field.
+     appearance: none kills native mobile textarea chrome (iOS/Samsung). */
+  border-radius: 0;
+  appearance: none;
+  -webkit-appearance: none;
 }
 .design-v2 [data-testid='comp-chat-input-shell'] textarea:focus,
 .design-v2.dark [data-testid='comp-chat-input-shell'] textarea:focus {

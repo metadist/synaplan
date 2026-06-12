@@ -76,6 +76,28 @@ test.describe('Chat input: action row (§4.7)', () => {
     await expect(page.locator(CHAT.toolsActiveBadge)).toHaveCount(0)
   })
 
+  test('@ci @layout Enhance sits in-shell on desktop and inside Tools on mobile', async ({
+    page,
+  }) => {
+    const isMobile = (page.viewportSize()?.width ?? 1280) < 768
+
+    // The control only appears once there is text to act on.
+    await page.locator(CHAT.textInput).fill('Wo wohnt der Esel?')
+
+    if (isMobile) {
+      // No in-shell sparkles button crowding the narrow input…
+      await expect(page.locator(CHAT.enhanceButton)).toHaveCount(0)
+      // …the control lives in the Tools dropdown instead.
+      await page.locator(CHAT.toolsToggle).click()
+      await expect(page.locator(CHAT.toolEnhance)).toBeVisible({ timeout: TIMEOUTS.SHORT })
+    } else {
+      await expect(page.locator(CHAT.enhanceButton)).toBeVisible({ timeout: TIMEOUTS.SHORT })
+      await page.locator(CHAT.toolsToggle).click()
+      await expect(page.locator(CHAT.toolsPanel)).toBeVisible({ timeout: TIMEOUTS.SHORT })
+      await expect(page.locator(CHAT.toolEnhance)).toBeHidden()
+    }
+  })
+
   test('@ci Summarizer link row navigates to the summarizer tool (Q3)', async ({ page }) => {
     await page.locator(CHAT.toolsToggle).click()
     await page.locator(CHAT.toolSummarizerLink).click()

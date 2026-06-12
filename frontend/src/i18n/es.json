@@ -350,7 +350,8 @@
       "thinkingDesc": "Muestra el razonamiento del modelo antes de la respuesta",
       "thinkingUnsupported": "El modelo seleccionado no admite razonamiento",
       "summarizer": "Resumidor",
-      "summarizerDesc": "Resumir documentos — abre la herramienta"
+      "summarizerDesc": "Resumir documentos — abre la herramienta",
+      "enhanceDesc": "Reescribe tu mensaje con IA antes de enviarlo"
     },
     "modelDropdown": {
       "default": "Estándar"
