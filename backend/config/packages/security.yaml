@@ -67,7 +67,10 @@ security:
         - { path: ^/api/v1/auth/logout, roles: IS_AUTHENTICATED_FULLY }
         - { path: ^/api/v1/auth/revoke-all, roles: IS_AUTHENTICATED_FULLY }
 
-        # Public test endpoints
+        # Health monitoring (API-Key protected probe)
+        - { path: ^/api/health/probe, roles: IS_AUTHENTICATED_FULLY }
+
+        # Public health + test endpoints
         - { path: ^/api/health, roles: PUBLIC_ACCESS }
         - { path: ^/api/test, roles: PUBLIC_ACCESS }
 

@@ -107,6 +107,7 @@ export default defineConfig(({ mode }) => ({
         entryFileNames: '[name].js',
         chunkFileNames: 'chunks/[name]-[hash].js',
         assetFileNames: 'assets/[name]-[hash][extname]',
+        strictExecutionOrder: true,
       },
     },
 
