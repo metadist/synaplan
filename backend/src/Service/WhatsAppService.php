@@ -3,6 +3,7 @@
 namespace App\Service;
 
 use App\AI\Service\AiFacade;
+use App\AI\Stream\StreamChunk;
 use App\DTO\WhatsApp\IncomingMessageDto;
 use App\Entity\Chat;
 use App\Entity\File;
@@ -771,20 +772,9 @@ final class WhatsAppService
         // 7. AI Pipeline Processing (use streaming mode to support TTS/media generation)
         $collectedResponse = '';
         $streamCallback = function (string|array $chunk, array $metadata = []) use (&$collectedResponse): void {
-            if (is_array($chunk)) {
-                $type = $chunk['type'] ?? 'content';
-
-                // Skip finish signal (WhatsApp doesn't need truncation UI)
-                if ('finish' === $type) {
-                    return;
-                }
-
-                if ('content' === $type && isset($chunk['content'])) {
-                    $collectedResponse .= $chunk['content'];
-                }
-            } else {
-                $collectedResponse .= $chunk;
-            }
+            // Centralized chunk filter: only visible answer text is collected,
+            // reasoning/finish chunks are dropped (issue #1067).
+            $collectedResponse .= StreamChunk::visibleText($chunk);
         };
 
         // For image messages WITHOUT caption, force image description mode
