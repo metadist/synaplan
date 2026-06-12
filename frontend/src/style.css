@@ -1,5 +1,14 @@
 @import 'tailwindcss';
 
+/*
+ * Tailwind v4 defaults `dark:` to the prefers-color-scheme MEDIA query.
+ * Our theme is a user setting (useTheme toggles `.dark` on <html>, also for
+ * "system"), so `dark:` must follow that class — otherwise OS-dark + app-light
+ * renders hybrid colors (dark badge tints on light cards, dark sheets with
+ * light-mode text).
+ */
+@custom-variant dark (&:where(.dark, .dark *));
+
 @theme {
   --color-light-border: rgb(0 0 0);
   --color-dark-border: rgb(255 255 255);

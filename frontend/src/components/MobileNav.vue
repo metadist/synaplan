@@ -81,7 +81,7 @@
         @click.self="moreOpen = false"
       >
         <div
-          class="w-full max-h-[85dvh] flex flex-col rounded-t-2xl shadow-2xl overflow-hidden bg-white/97 dark:bg-[#0e1628]/97 backdrop-blur-xl border-t border-white/20 dark:border-white/[0.08]"
+          class="w-full max-h-[85dvh] flex flex-col rounded-t-2xl shadow-2xl overflow-hidden bg-white/95 dark:bg-[#0e1628]/95 backdrop-blur-xl border-t border-white/20 dark:border-white/[0.08]"
           data-testid="sheet-mobile-more"
           @click.stop
         >
@@ -110,7 +110,7 @@
               <button
                 class="w-full min-h-[44px] flex items-center gap-3 px-3 py-2.5 rounded-xl transition-colors hover:bg-black/[0.03] dark:hover:bg-white/[0.03]"
                 :class="[
-                  isItemActive(item) && 'text-[var(--brand)]',
+                  isItemActive(item) ? 'text-[var(--brand)]' : 'txt-primary',
                   ((item.requiresAuth && isGuestMode) || isItemLocked(item)) && 'opacity-60',
                 ]"
                 :title="item.description || item.label"
@@ -191,7 +191,7 @@
                 </router-link>
                 <router-link
                   to="/login"
-                  class="more-account-row"
+                  class="more-account-row txt-primary"
                   data-testid="btn-mobile-more-login"
                   @click="moreOpen = false"
                 >
@@ -206,7 +206,7 @@
                   {{ authStore.user?.email || '' }}
                 </p>
                 <button
-                  class="more-account-row"
+                  class="more-account-row txt-primary"
                   data-testid="btn-mobile-more-profile"
                   @click="handleNavigate('/profile')"
                 >
@@ -215,7 +215,7 @@
                 </button>
                 <button
                   v-if="isMemoryServiceAvailable"
-                  class="more-account-row"
+                  class="more-account-row txt-primary"
                   :class="{ 'opacity-60': !memoriesEnabledForUser }"
                   data-testid="btn-mobile-more-memories"
                   @click="handleOpenMemories"
@@ -229,7 +229,7 @@
                   />
                 </button>
                 <button
-                  class="more-account-row"
+                  class="more-account-row txt-primary"
                   data-testid="btn-mobile-more-statistics"
                   @click="handleNavigate('/statistics')"
                 >
@@ -237,7 +237,7 @@
                   <span>{{ $t('nav.statistics') }}</span>
                 </button>
                 <button
-                  class="more-account-row"
+                  class="more-account-row txt-primary"
                   data-testid="btn-mobile-more-preferences"
                   @click="handleNavigate('/settings')"
                 >
@@ -246,7 +246,7 @@
                 </button>
                 <button
                   v-if="!authStore.isAdmin && configStore.billing.enabled && authStore.isPro"
-                  class="more-account-row"
+                  class="more-account-row txt-primary"
                   data-testid="btn-mobile-more-subscription"
                   @click="handleNavigate('/subscription')"
                 >
