@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Service\Multitask\Execution\Runner;
 
 use App\AI\Service\AiFacade;
+use App\AI\Stream\StreamChunk;
 use App\Service\ModelConfigService;
 use App\Service\Multitask\Execution\NodeContext;
 use App\Service\Multitask\Execution\NodeResult;
@@ -78,12 +79,14 @@ final readonly class ChatRunner implements TaskRunner
 
         // Stream tokens into the node's card (task_chunk) while accumulating the
         // full text so dependent nodes + assembly still receive the complete output.
+        // Only visible answer text passes through — structured reasoning chunks
+        // (chain-of-thought from thinking models) must never reach the user (#1067).
         $full = '';
         try {
             $response = $this->aiFacade->chatStream(
                 $messages,
                 static function ($chunk) use (&$full, $context): void {
-                    $piece = is_array($chunk) ? (string) ($chunk['content'] ?? '') : (string) $chunk;
+                    $piece = StreamChunk::visibleText($chunk);
                     if ('' === $piece) {
                         return;
                     }

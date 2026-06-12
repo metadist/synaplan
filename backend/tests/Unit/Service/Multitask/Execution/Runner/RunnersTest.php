@@ -126,6 +126,43 @@ final class RunnersTest extends TestCase
         self::assertSame('long input text', $captured[1]['content']);
     }
 
+    /**
+     * Regression for issue #1067: structured reasoning chunks (chain-of-thought
+     * from thinking models like gpt-oss) must neither be streamed to the task
+     * card nor end up in the node output — only the visible answer text counts.
+     */
+    public function testChatRunnerDropsReasoningChunks(): void
+    {
+        $aiFacade = $this->createMock(AiFacade::class);
+        $modelConfig = $this->createMock(ModelConfigService::class);
+
+        $aiFacade->method('chatStream')->willReturnCallback(function (array $messages, callable $cb): array {
+            $cb(['type' => 'reasoning', 'content' => 'The instruction: answer in German, no preamble. ']);
+            $cb(['type' => 'content', 'content' => 'Heute wird es ']);
+            $cb(['type' => 'content', 'content' => 'sonnig.']);
+            $cb(['type' => 'finish', 'finish_reason' => 'stop']);
+
+            return [];
+        });
+
+        $runner = new ChatRunner($aiFacade, $modelConfig, $this->createMock(VectorSearchService::class), $this->createMock(LoggerInterface::class));
+        $node = new TaskNode('n2', Capability::Chat, [], ['text' => 'wie wird das Wetter heute?']);
+
+        $context = $this->context($this->message('wie wird das Wetter heute?'));
+        $streamed = '';
+        $context->setChunkSink(static function (string $nodeId, string $chunk) use (&$streamed): void {
+            $streamed .= $chunk;
+        });
+        $context->beginNode('n2');
+
+        $result = $runner->run($node, $context);
+
+        self::assertTrue($result->isSuccessful());
+        self::assertSame('Heute wird es sonnig.', $result->text);
+        self::assertSame('Heute wird es sonnig.', $streamed);
+        self::assertStringNotContainsString('The instruction', (string) $result->text);
+    }
+
     public function testChatRunnerFailsOnEmptyInput(): void
     {
         $runner = new ChatRunner($this->createMock(AiFacade::class), $this->createMock(ModelConfigService::class), $this->createMock(VectorSearchService::class), $this->createMock(LoggerInterface::class));
