@@ -174,6 +174,11 @@ test.describe('@ci @smoke Widget', () => {
     const input = widgetHost.locator(selectors.widget.input)
     await expect(input).toBeVisible({ timeout: TIMEOUTS.SHORT })
 
+    // The widget seeds its configured welcome message asynchronously after
+    // opening. Wait for it before taking the base count — otherwise
+    // nth(previousCount) can point at the late-arriving welcome bubble
+    // instead of the user message (CI-speed race, chromium-only flake).
+    await expect(messageContainers.first()).toBeVisible({ timeout: TIMEOUTS.STANDARD })
     const previousCount = await countWidgetMessages(page)
 
     await test.step('Act: send smoke test message', async () => {
