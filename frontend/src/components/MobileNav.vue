@@ -396,13 +396,26 @@ const handleSectionClick = async (item: NavItem) => {
     return
   }
 
-  moreOpen.value = false
-  router.push(item.path)
+  try {
+    await router.push(item.path)
+  } finally {
+    moreOpen.value = false
+  }
 }
 
-const handleNavigate = (path: string) => {
-  moreOpen.value = false
-  router.push(path)
+/**
+ * Account rows navigate via router.push. Await it and only close the sheet
+ * after the route actually resolved: on slow connections (phone on a LAN
+ * dev server) the lazy route chunk can take a while, and closing the sheet
+ * immediately makes a pending navigation look like a dead tap. Failures
+ * (chunk load errors) are handled centrally in router.onError.
+ */
+const handleNavigate = async (path: string) => {
+  try {
+    await router.push(path)
+  } finally {
+    moreOpen.value = false
+  }
 }
 
 const handleOpenMemories = () => {
@@ -449,6 +462,17 @@ onBeforeUnmount(() => document.removeEventListener('keydown', handleEscape))
   border-radius: 0.75rem;
   font-size: 0.875rem;
   transition: background-color 0.15s ease;
+}
+
+/*
+ * Real mobile browsers apply double-tap-zoom heuristics to plain elements;
+ * `manipulation` removes the tap delay / zoom ambiguity so a tap on a row
+ * always fires the click handler immediately.
+ */
+[data-testid='sheet-mobile-more'] button,
+[data-testid='sheet-mobile-more'] a {
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
 }
 
 .more-account-row:hover {

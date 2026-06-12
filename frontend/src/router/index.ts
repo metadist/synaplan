@@ -532,13 +532,30 @@ router.beforeEach(async (to, from, next) => {
 })
 
 // Global error handler for lazy-loaded components
-router.onError((error) => {
+const CHUNK_RELOAD_FLAG = 'synaplan:chunk-reload-at'
+router.onError((error, to) => {
   console.error('Router error:', error)
 
-  // Handle chunk load failures (e.g., after deployment)
-  if (error.message.includes('Failed to fetch dynamically imported module')) {
-    window.location.reload()
-    return
+  // Chunk load failure (stale client after a deployment or dev-server
+  // restart): the app shell can no longer import the route's lazy chunk.
+  // Reload INTO the target route — a plain reload() would silently drop the
+  // navigation and leave the user on the old page, which reads as "the
+  // button does nothing". Message text differs per browser engine.
+  const message = String((error as Error)?.message ?? '')
+  const isChunkLoadFailure =
+    message.includes('Failed to fetch dynamically imported module') || // Chromium
+    message.includes('Importing a module script failed') || // WebKit / iOS Safari
+    message.includes('error loading dynamically imported module') // Firefox
+
+  if (isChunkLoadFailure) {
+    // One forced reload per 10s — if the chunk is still broken after a fresh
+    // load, fall through to the error screen instead of reload-looping.
+    const lastReload = Number(sessionStorage.getItem(CHUNK_RELOAD_FLAG) ?? 0)
+    if (Date.now() - lastReload > 10_000) {
+      sessionStorage.setItem(CHUNK_RELOAD_FLAG, String(Date.now()))
+      window.location.href = to?.fullPath ?? window.location.href
+      return
+    }
   }
 
   useGlobalErrorStore().setError({

@@ -224,6 +224,15 @@ test.describe('@ci @layout UI guard — chat surface', () => {
         expect(box.height, `${testid}: row too short`).toBeGreaterThanOrEqual(MIN_TARGET_PX)
       }
     }
+
+    // Account rows navigate (regression: dead Subscription tap). Preferences
+    // exists for every user level, and shares handleNavigate with the
+    // Subscription/Upgrade rows.
+    const preferencesRow = sheet.locator('[data-testid="btn-mobile-more-preferences"]')
+    await preferencesRow.scrollIntoViewIfNeeded()
+    await preferencesRow.tap()
+    await expect(page).toHaveURL(/\/settings/, { timeout: TIMEOUTS.STANDARD })
+    await expect(sheet).toBeHidden({ timeout: TIMEOUTS.SHORT })
   })
 
   test('chat-input action row does not navigate (menu collision guard)', async ({

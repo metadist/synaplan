@@ -1117,7 +1117,7 @@ const confirmResetDefaults = async () => {
       success(t('config.aiModels.resetDefaultsSuccess'))
       await loadData()
     }
-  } catch (err) {
+  } catch {
     showError(t('config.aiModels.resetDefaultsError'))
   } finally {
     resetting.value = false

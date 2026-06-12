@@ -671,6 +671,8 @@
   display: flex;
   flex-direction: column;
   align-items: center;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
   justify-content: center;
   gap: 2px;
   flex: 1 1 0;
