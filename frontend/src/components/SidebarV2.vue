@@ -1,64 +1,40 @@
 <template>
-  <!-- Backdrop for mobile -->
-  <Transition
-    enter-active-class="transition-opacity duration-300 ease-in-out"
-    enter-from-class="opacity-0"
-    enter-to-class="opacity-100"
-    leave-active-class="transition-opacity duration-300 ease-in-out"
-    leave-from-class="opacity-100"
-    leave-to-class="opacity-0"
-  >
-    <div
-      v-if="sidebarStore.isMobileOpen"
-      class="fixed inset-0 bg-black/50 z-40 md:hidden"
-      data-testid="section-sidebar-v2-backdrop"
-      @click="(closeFlyout(), sidebarStore.closeMobile())"
-    />
-  </Transition>
-
+  <!--
+    Desktop navigation rail (§4.3 #1). On mobile the rail does not exist —
+    the bottom tab bar (MobileNav.vue) is the primary navigation there.
+  -->
   <aside
-    :class="[
-      'v2-sidebar-rail flex flex-col',
-      'fixed md:relative z-50 md:z-auto',
-      'transition-transform duration-300 ease-in-out',
-      sidebarStore.isMobileOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0',
-    ]"
-    style="width: 64px; min-width: 64px"
+    class="v2-sidebar-rail hidden md:flex flex-col"
+    style="width: 80px; min-width: 80px"
     data-testid="comp-sidebar-v2"
   >
-    <!--
-      Top section: height-synced with the mobile Header on small screens
-      (h-12 = 48px) so the close button sits exactly where the burger was,
-      and taller on desktop where it hosts the brand logo.
-    -->
+    <!-- Brand logo -->
     <div
-      class="flex flex-col items-center justify-center flex-shrink-0 border-b border-white/[0.04] h-12 md:h-[76px]"
+      class="flex flex-col items-center justify-center flex-shrink-0 border-b border-white/[0.04] h-[76px]"
     >
-      <button
-        class="md:hidden v2-rail-icon w-10 h-10 flex items-center justify-center"
-        aria-label="Close sidebar"
-        data-testid="btn-sidebar-v2-close"
-        @click="sidebarStore.closeMobile()"
-      >
-        <Icon icon="mdi:close" class="w-5 h-5" />
-      </button>
-      <img :src="logoIconSrc" alt="synaplan" class="h-7 w-auto hidden md:block" />
+      <img :src="logoIconSrc" alt="synaplan" class="h-7 w-auto" />
     </div>
 
     <!-- New Chat Button -->
     <div class="flex items-center justify-center py-3 flex-shrink-0">
       <button
-        class="v2-new-chat-btn w-10 h-10 flex items-center justify-center rounded-xl transition-all duration-200"
+        class="v2-new-chat-btn w-[72px] min-h-[48px] flex flex-col items-center justify-center gap-0.5 py-1.5 rounded-xl transition-all duration-200"
         :class="{ 'v2-new-chat-btn--creating': isCreatingChat }"
-        :title="$t('chat.newChat')"
+        :title="$t('nav.newDescription')"
         :disabled="isCreatingChat"
         data-testid="btn-sidebar-v2-new-chat"
         @click="handleQuickNewChat"
       >
         <Icon
-          :icon="isCreatingChat ? 'mdi:loading' : 'mdi:plus'"
-          :class="['w-5 h-5', isCreatingChat && 'animate-spin']"
+          v-if="isCreatingChat"
+          icon="mdi:loading"
+          class="w-6 h-6 animate-spin"
+          aria-hidden="true"
         />
+        <PlusIcon v-else class="w-6 h-6" aria-hidden="true" />
+        <span class="v2-rail-label text-[10px] font-medium leading-tight">
+          {{ $t('nav.new') }}
+        </span>
       </button>
     </div>
 
@@ -69,20 +45,26 @@
         :key="item.path"
         :ref="(el) => setNavBtnRef(el, item.path)"
         :class="[
-          'v2-rail-icon w-10 h-10 flex items-center justify-center relative',
+          'v2-rail-icon w-[72px] min-h-[48px] flex flex-col items-center justify-center gap-0.5 py-1.5 relative',
           isItemActive(item) && 'v2-rail-icon--active',
           item.isUpgrade && 'text-amber-500 dark:text-amber-400',
-          item.requiresAuth && isGuestMode && 'opacity-50',
+          ((item.requiresAuth && isGuestMode) || isItemLocked(item)) && 'opacity-50',
         ]"
-        :title="item.label"
-        :data-testid="`btn-sidebar-v2-${item.path.replace(/\//g, '-')}`"
+        :title="item.description || item.label"
+        :data-testid="`btn-sidebar-v2-nav-${item.key}`"
         @click="handleNavClick(item)"
       >
-        <component :is="item.icon" class="w-6 h-6" />
+        <component :is="item.icon" class="w-6 h-6 flex-shrink-0" aria-hidden="true" />
+        <span
+          class="v2-rail-label text-[10px] font-medium leading-tight max-w-full truncate px-0.5"
+        >
+          {{ item.label }}
+        </span>
         <Icon
-          v-if="item.requiresAuth && isGuestMode"
+          v-if="(item.requiresAuth && isGuestMode) || isItemLocked(item)"
           icon="mdi:lock-outline"
-          class="absolute -top-0.5 -right-0.5 w-3.5 h-3.5 text-amber-500"
+          class="absolute top-0.5 right-1.5 w-3.5 h-3.5 text-amber-500"
+          aria-hidden="true"
         />
       </button>
     </nav>
@@ -93,12 +75,15 @@
       class="flex items-center justify-center py-2 flex-shrink-0"
     >
       <button
-        class="v2-upgrade-btn w-10 h-10 flex items-center justify-center rounded-xl"
+        class="v2-upgrade-btn w-[72px] min-h-[48px] flex flex-col items-center justify-center gap-0.5 py-1.5 rounded-xl"
         :title="$t('nav.upgrade')"
         data-testid="btn-sidebar-v2-upgrade"
         @click="handleNavigate('/subscription')"
       >
-        <Icon icon="mdi:auto-fix" class="w-6 h-6" />
+        <RocketLaunchIcon class="w-6 h-6" aria-hidden="true" />
+        <span class="v2-rail-label text-[10px] font-medium leading-tight">
+          {{ $t('nav.upgrade') }}
+        </span>
       </button>
     </div>
 
@@ -106,8 +91,8 @@
     <div class="flex items-center justify-center py-4 flex-shrink-0">
       <button
         ref="userBtnRef"
-        class="v2-rail-icon w-10 h-10 flex items-center justify-center"
-        :title="authStore.user?.email || ''"
+        class="v2-rail-icon w-[72px] min-h-[48px] flex flex-col items-center justify-center gap-0.5 py-1.5"
+        :title="authStore.user?.email || $t('nav.accountDescription')"
         data-testid="btn-sidebar-v2-user"
         @click="toggleUserMenu"
       >
@@ -116,6 +101,9 @@
         >
           {{ initials }}
         </div>
+        <span class="v2-rail-label text-[10px] font-medium leading-tight">
+          {{ $t('nav.account') }}
+        </span>
       </button>
     </div>
   </aside>
@@ -207,20 +195,20 @@
               <button
                 role="menuitem"
                 class="dropdown-item"
-                data-testid="btn-sidebar-v2-settings"
-                @click="handleNavigate('/settings')"
-              >
-                <Cog6ToothIcon class="w-4 h-4" />
-                <span>{{ $t('nav.settings') }}</span>
-              </button>
-              <button
-                role="menuitem"
-                class="dropdown-item"
                 data-testid="btn-sidebar-v2-statistics"
                 @click="handleNavigate('/statistics')"
               >
                 <ChartBarIcon class="w-4 h-4" />
                 <span>{{ $t('nav.statistics') }}</span>
+              </button>
+              <button
+                role="menuitem"
+                class="dropdown-item"
+                data-testid="btn-sidebar-v2-preferences"
+                @click="handleNavigate('/settings')"
+              >
+                <Cog6ToothIcon class="w-4 h-4" />
+                <span>{{ $t('nav.preferences') }}</span>
               </button>
               <button
                 v-if="!authStore.isAdmin && configStore.billing.enabled && authStore.isPro"
@@ -229,7 +217,7 @@
                 data-testid="btn-sidebar-v2-subscription"
                 @click="handleNavigate('/subscription')"
               >
-                <SparklesIcon class="w-4 h-4" />
+                <CreditCardIcon class="w-4 h-4" />
                 <span>{{ $t('nav.subscription') }}</span>
               </button>
             </div>
@@ -309,14 +297,14 @@
                 v-for="child in section.items"
                 :key="child.path"
                 :to="child.path"
-                :data-testid="`link-sidebar-v2${child.path.replace(/\//g, '-')}`"
+                :data-testid="`link-sidebar-v2-${child.key}`"
                 class="flex items-center gap-2.5 px-3 py-2 text-sm transition-colors"
                 :class="
                   route.path === child.path
                     ? 'text-[var(--brand)] bg-[var(--brand)]/[0.06] font-medium'
                     : 'txt-secondary hover:txt-primary hover:bg-black/[0.03] dark:hover:bg-white/[0.03]'
                 "
-                @click="(closeFlyout(), sidebarStore.closeMobile())"
+                @click="closeFlyout()"
               >
                 <span
                   class="w-1.5 h-1.5 rounded-full flex-shrink-0"
@@ -609,17 +597,15 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onBeforeUnmount, type Component } from 'vue'
+import { ref, computed, watch, onMounted, onBeforeUnmount } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import {
   ChatBubbleLeftRightIcon,
-  FolderIcon,
-  MagnifyingGlassIcon,
+  CreditCardIcon,
+  PlusIcon,
+  RocketLaunchIcon,
   Cog6ToothIcon,
   ChartBarIcon,
-  ShieldCheckIcon,
-  SparklesIcon,
-  PuzzlePieceIcon,
   UserCircleIcon,
   ArrowRightOnRectangleIcon,
 } from '@heroicons/vue/24/outline'
@@ -629,10 +615,10 @@ import { useAuthStore } from '../stores/auth'
 import { useAppModeStore } from '../stores/appMode'
 import { useConfigStore } from '../stores/config'
 import { useAuth } from '../composables/useAuth'
+import { useNavItems, type NavChild, type NavItem } from '../composables/useNavItems'
 import { useTheme } from '../composables/useTheme'
 import { useChatsStore, isDefaultChatTitle, type Chat as StoreChat } from '../stores/chats'
 import { useDialog } from '../composables/useDialog'
-import { getFeaturesStatus } from '../services/featuresService'
 import { useI18n } from 'vue-i18n'
 import { useDateFormat } from '@/composables/useDateFormat'
 import MemoriesDialog from './MemoriesDialog.vue'
@@ -648,6 +634,7 @@ const configStore = useConfigStore()
 const chatsStore = useChatsStore()
 const dialog = useDialog()
 const { logout, isImpersonating } = useAuth()
+const { navItems, isItemActive, isItemLocked, isGuestMode, loadFeatureStatus } = useNavItems()
 const { theme } = useTheme()
 const route = useRoute()
 const router = useRouter()
@@ -661,7 +648,16 @@ const navDropdownStyle = ref<Record<string, string>>({})
 const setNavBtnRef = (el: unknown, path: string) => {
   navBtnRefs.value[path] = el as HTMLElement | null
 }
-const chatModalOpen = ref(false)
+/**
+ * The history sheet's open state lives in the sidebar store so the mobile
+ * bottom nav can open the same sheet (the sheet itself renders here).
+ */
+const chatModalOpen = computed({
+  get: () => sidebarStore.chatSheetOpen,
+  set: (value: boolean) => {
+    sidebarStore.chatSheetOpen = value
+  },
+})
 const chatMenuOpenId = ref<number | null>(null)
 const chatMenuStyle = ref<Record<string, string>>({})
 const shareModalOpen = ref(false)
@@ -677,23 +673,17 @@ type FlyoutType = 'nav' | null
 const activeFlyout = ref<FlyoutType>(null)
 const activeFlyoutItem = ref<NavItem | null>(null)
 
-const disabledFeaturesCount = ref(0)
-
-const loadFeatureStatus = async () => {
-  try {
-    if (!import.meta.env.DEV) return
-    if (!authStore.user || !authStore.isAuthenticated) return
-
-    const status = await getFeaturesStatus()
-    if (status && status.features) {
-      disabledFeaturesCount.value = Object.values(status.features).filter((f) => !f.enabled).length
-    } else {
-      disabledFeaturesCount.value = 0
+// Whoever opens the sheet (rail or mobile nav), the list refreshes.
+watch(
+  () => sidebarStore.chatSheetOpen,
+  (open) => {
+    if (open) {
+      chatSearchQuery.value = ''
+      chatMenuOpenId.value = null
+      chatsStore.loadChats()
     }
-  } catch {
-    disabledFeaturesCount.value = 0
   }
-}
+)
 
 onMounted(() => {
   loadFeatureStatus()
@@ -732,7 +722,6 @@ const handleEscape = (event: KeyboardEvent) => {
       return
     }
     closeFlyout()
-    sidebarStore.closeMobile()
   }
 }
 
@@ -750,130 +739,6 @@ const logoIconSrc = computed(
 const initials = computed(() => {
   const email = authStore.user?.email || 'G'
   return email.charAt(0).toUpperCase()
-})
-
-interface NavChild {
-  path: string
-  label: string
-  badge?: string
-  group?: string
-}
-
-interface NavItem {
-  path: string
-  label: string
-  icon: Component
-  isUpgrade?: boolean
-  requiresAuth?: boolean
-  gateFeature?: string
-  children?: NavChild[]
-}
-
-const isGuestMode = computed(() => !authStore.isAuthenticated)
-
-const navItems = computed<NavItem[]>(() => {
-  const items: NavItem[] = [{ path: '/', label: t('nav.chat'), icon: ChatBubbleLeftRightIcon }]
-
-  items.push({
-    path: '/files',
-    label: t('nav.files'),
-    icon: FolderIcon,
-    requiresAuth: true,
-    gateFeature: 'files',
-  })
-
-  items.push({
-    path: '/rag',
-    label: t('nav.semanticSearch'),
-    icon: MagnifyingGlassIcon,
-    requiresAuth: true,
-    gateFeature: 'files',
-  })
-
-  if (appModeStore.isAdvancedMode || isGuestMode.value) {
-    const settingsChildren: NavChild[] = [
-      {
-        path: '/tools/chat-widget',
-        label: t('nav.toolsChatWidget'),
-        group: t('nav.settingsChannels'),
-      },
-      {
-        path: '/tools/mail-handler',
-        label: t('nav.toolsMailHandler'),
-        group: t('nav.settingsChannels'),
-      },
-      { path: '/config/inbound', label: t('nav.configInbound'), group: t('nav.settingsChannels') },
-      {
-        path: '/config/ai-models',
-        label: t('nav.configAiModels'),
-        group: t('nav.settingsAiTools'),
-      },
-      { path: '/config/api-keys', label: t('nav.configApiKeys'), group: t('nav.settingsAiTools') },
-      {
-        path: '/config/task-prompts',
-        label: t('nav.configTaskPrompts'),
-        group: t('nav.settingsAiTools'),
-      },
-      {
-        path: '/config/sorting-prompt',
-        label: t('nav.configSortingPrompt'),
-        group: t('nav.settingsAiTools'),
-      },
-      {
-        path: '/tools/doc-summary',
-        label: t('nav.toolsDocSummary'),
-        group: t('nav.settingsAiTools'),
-      },
-    ]
-
-    items.push({
-      path: '/settings',
-      label: t('nav.settings'),
-      icon: Cog6ToothIcon,
-      requiresAuth: true,
-      gateFeature: 'settings',
-      children: isGuestMode.value ? undefined : settingsChildren,
-    })
-  }
-
-  if (appModeStore.isAdvancedMode && configStore.plugins.length > 0) {
-    items.push({
-      path: '/plugins',
-      label: t('nav.plugins'),
-      icon: PuzzlePieceIcon,
-      children: configStore.plugins.map((plugin: { name?: string }) => ({
-        path: `/plugins/${plugin.name}`,
-        label: plugin.name
-          ? plugin.name.charAt(0).toUpperCase() + plugin.name.slice(1)
-          : t('common.unknown'),
-      })),
-    })
-  }
-
-  if (authStore.isAdmin) {
-    const adminChildren: NavChild[] = [{ path: '/admin', label: t('nav.adminDashboard') }]
-
-    if (import.meta.env.DEV) {
-      const featureStatusItem: NavChild = {
-        path: '/admin/features',
-        label: t('nav.adminFeatureStatus'),
-      }
-      if (disabledFeaturesCount.value > 0) {
-        featureStatusItem.badge = String(disabledFeaturesCount.value)
-      }
-      adminChildren.push(featureStatusItem)
-    }
-    adminChildren.push({ path: '/admin/config', label: t('nav.adminSystemConfig') })
-
-    items.push({
-      path: '/admin',
-      label: t('nav.admin'),
-      icon: ShieldCheckIcon,
-      children: adminChildren,
-    })
-  }
-
-  return items
 })
 
 const groupedChildren = computed(() => {
@@ -895,16 +760,6 @@ const groupedChildren = computed(() => {
   return groups
 })
 
-const isItemActive = (item: NavItem): boolean => {
-  if (item.path === '/') {
-    return route.path === '/' || route.path.startsWith('/chat')
-  }
-  if (item.path === '/settings') {
-    return route.path.startsWith('/tools') || route.path.startsWith('/config')
-  }
-  return route.path.startsWith(item.path)
-}
-
 const handleQuickNewChat = async () => {
   if (isCreatingChat.value) return
   isCreatingChat.value = true
@@ -913,7 +768,6 @@ const handleQuickNewChat = async () => {
     await chatsStore.findOrCreateEmptyChat()
     if (route.path !== '/') router.push('/')
     chatModalOpen.value = false
-    sidebarStore.closeMobile()
   } finally {
     setTimeout(() => {
       isCreatingChat.value = false
@@ -924,24 +778,32 @@ const handleQuickNewChat = async () => {
 const featureGateOpen = ref(false)
 const featureGateKey = ref('general')
 
-const handleNavClick = (item: NavItem) => {
+const handleNavClick = async (item: NavItem) => {
   userMenuOpen.value = false
 
   if (item.requiresAuth && isGuestMode.value) {
     featureGateKey.value = item.gateFeature || 'general'
     featureGateOpen.value = true
-    sidebarStore.closeMobile()
     return
+  }
+
+  // Q6: locked in easy mode — offer the one-click switch to Advanced mode
+  // (mirrors the guest gate pattern), then continue with the original click.
+  if (isItemLocked(item)) {
+    closeFlyout()
+    const confirmed = await dialog.confirm({
+      title: t('settings.appMode.lockedTitle'),
+      message: t('settings.appMode.lockedMessage', { feature: item.label }),
+      confirmText: t('settings.appMode.switchCta'),
+      cancelText: t('common.cancel'),
+    })
+    if (!confirmed) return
+    appModeStore.setMode('advanced')
   }
 
   if (item.path === '/') {
     closeFlyout()
-    chatSearchQuery.value = ''
-    chatMenuOpenId.value = null
-    chatModalOpen.value = !chatModalOpen.value
-    if (chatModalOpen.value) {
-      chatsStore.loadChats()
-    }
+    sidebarStore.toggleChatSheet()
     return
   }
 
@@ -967,14 +829,12 @@ const handleNavClick = (item: NavItem) => {
 
   closeFlyout()
   router.push(item.path)
-  sidebarStore.closeMobile()
 }
 
 const handleNavigate = (path: string) => {
   userMenuOpen.value = false
   closeFlyout()
   router.push(path)
-  sidebarStore.closeMobile()
 }
 
 const handleProfileSettings = () => {
@@ -1072,7 +932,6 @@ const handleNewChat = async () => {
     await chatsStore.findOrCreateEmptyChat()
     if (route.path !== '/') router.push('/')
     chatModalOpen.value = false
-    sidebarStore.closeMobile()
   } finally {
     setTimeout(() => {
       isCreatingChat.value = false
@@ -1085,7 +944,6 @@ const handleChatSelect = (chatId: number) => {
   if (route.path !== '/') router.push('/')
   chatModalOpen.value = false
   chatMenuOpenId.value = null
-  sidebarStore.closeMobile()
 }
 
 const handleChatRename = async (chatId: number) => {

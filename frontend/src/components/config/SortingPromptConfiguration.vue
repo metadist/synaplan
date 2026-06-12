@@ -26,7 +26,7 @@
             <p class="text-sm txt-secondary leading-relaxed">
               {{ $t('config.routing.customCalloutBody') }}
               <router-link
-                to="/config/task-prompts"
+                to="/ai/instructions"
                 class="text-[var(--brand)] hover:underline font-medium"
               >
                 {{ $t('config.routing.customCalloutLink') }}
@@ -473,7 +473,7 @@ const { success, error: showError, warning } = useNotification()
 const { t, locale } = useI18n()
 const markdownRenderer = getMarkdownRenderer()
 
-const getPromptLink = (topic: string) => `/config/task-prompts?topic=${encodeURIComponent(topic)}`
+const getPromptLink = (topic: string) => `/ai/instructions?topic=${encodeURIComponent(topic)}`
 
 // --- AI-fallback markdown rendering (kept verbatim from previous component) -
 const renderedPromptText = computed(

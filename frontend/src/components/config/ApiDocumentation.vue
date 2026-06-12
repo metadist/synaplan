@@ -1,7 +1,7 @@
 <template>
   <div class="space-y-6" data-testid="page-api-documentation">
     <div v-if="loading" class="surface-card p-8 text-center">
-      <p class="txt-secondary">{{ $t('config.inbound.apiDocumentation.loading') }}</p>
+      <p class="txt-secondary">{{ $t('channels.apiDocumentation.loading') }}</p>
     </div>
 
     <div v-else-if="error" class="surface-card p-6">
@@ -12,11 +12,11 @@
       <!-- API Info -->
       <div class="surface-card p-6">
         <h2 class="text-xl font-semibold txt-primary mb-2">
-          {{ apiSpec.info?.title || $t('config.inbound.apiDocumentation.title') }}
+          {{ apiSpec.info?.title || $t('channels.apiDocumentation.title') }}
         </h2>
         <p class="txt-secondary mb-4">{{ apiSpec.info?.description || '' }}</p>
         <div class="flex items-center gap-4 text-sm">
-          <span class="txt-secondary">{{ $t('config.inbound.apiDocumentation.version') }}</span>
+          <span class="txt-secondary">{{ $t('channels.apiDocumentation.version') }}</span>
           <span class="pill pill--active">{{ apiSpec.info?.version || '1.0.0' }}</span>
         </div>
       </div>
@@ -73,7 +73,7 @@
             <!-- Parameters -->
             <div v-if="path.parameters && path.parameters.length > 0">
               <h4 class="text-sm font-semibold txt-primary mb-3">
-                {{ $t('config.inbound.apiDocumentation.parameters') }}
+                {{ $t('channels.apiDocumentation.parameters') }}
               </h4>
               <div class="space-y-2">
                 <div
@@ -87,11 +87,11 @@
                         param.name
                       }}</code>
                       <span v-if="param.required" class="ml-2 text-xs text-red-500">{{
-                        $t('config.inbound.apiDocumentation.required')
+                        $t('channels.apiDocumentation.required')
                       }}</span>
                       <p class="text-xs txt-secondary mt-1">{{ param.description || '' }}</p>
                       <span class="text-xs txt-tertiary mt-1 inline-block">
-                        {{ $t('config.inbound.apiDocumentation.type') }}
+                        {{ $t('channels.apiDocumentation.type') }}
                         <code>{{ getTypeString(param.schema) }}</code>
                         <span v-if="param.in"> in {{ param.in }}</span>
                       </span>
@@ -104,11 +104,11 @@
             <!-- Request Body -->
             <div v-if="path.requestBody">
               <h4 class="text-sm font-semibold txt-primary mb-3">
-                {{ $t('config.inbound.apiDocumentation.requestBody') }}
+                {{ $t('channels.apiDocumentation.requestBody') }}
               </h4>
               <div v-if="path.requestBody.required" class="mb-2">
                 <span class="text-xs text-red-500">{{
-                  $t('config.inbound.apiDocumentation.required')
+                  $t('channels.apiDocumentation.required')
                 }}</span>
               </div>
               <div v-if="path.requestBody.description" class="mb-3">
@@ -122,7 +122,7 @@
                 >
                   <div class="flex items-center gap-2">
                     <span class="text-xs font-semibold txt-primary">{{
-                      $t('config.inbound.apiDocumentation.contentType')
+                      $t('channels.apiDocumentation.contentType')
                     }}</span>
                     <code class="text-xs font-mono txt-primary">{{ contentType }}</code>
                   </div>
@@ -137,7 +137,7 @@
                     class="code-block p-4 font-mono text-xs overflow-x-auto"
                   >
                     <div class="text-xs txt-secondary mb-1">
-                      {{ $t('config.inbound.apiDocumentation.example') }}
+                      {{ $t('channels.apiDocumentation.example') }}
                     </div>
                     <pre>{{ JSON.stringify(content.example, null, 2) }}</pre>
                   </div>
@@ -148,7 +148,7 @@
             <!-- Responses -->
             <div v-if="path.responses">
               <h4 class="text-sm font-semibold txt-primary mb-3">
-                {{ $t('config.inbound.apiDocumentation.responses') }}
+                {{ $t('channels.apiDocumentation.responses') }}
               </h4>
               <div class="space-y-3">
                 <div
@@ -173,7 +173,7 @@
                     >
                       <div class="flex items-center gap-2">
                         <span class="text-xs font-semibold txt-primary">{{
-                          $t('config.inbound.apiDocumentation.contentType')
+                          $t('channels.apiDocumentation.contentType')
                         }}</span>
                         <code class="text-xs font-mono txt-primary">{{ contentType }}</code>
                       </div>
@@ -188,7 +188,7 @@
                         class="code-block p-4 font-mono text-xs overflow-x-auto"
                       >
                         <div class="text-xs txt-secondary mb-1">
-                          {{ $t('config.inbound.apiDocumentation.example') }}
+                          {{ $t('channels.apiDocumentation.example') }}
                         </div>
                         <pre>{{ JSON.stringify(content.example, null, 2) }}</pre>
                       </div>
@@ -196,7 +196,7 @@
                   </div>
                   <div v-if="response.headers" class="mt-3">
                     <div class="text-xs font-semibold txt-primary mb-2">
-                      {{ $t('config.inbound.apiDocumentation.headers') }}
+                      {{ $t('channels.apiDocumentation.headers') }}
                     </div>
                     <div class="space-y-1">
                       <div
@@ -216,11 +216,11 @@
             <!-- Security -->
             <div v-if="path.security && path.security.length > 0">
               <h4 class="text-sm font-semibold txt-primary mb-3">
-                {{ $t('config.inbound.apiDocumentation.authentication') }}
+                {{ $t('channels.apiDocumentation.authentication') }}
               </h4>
               <div class="p-3 surface-chip rounded-lg space-y-2">
                 <p class="text-sm txt-secondary">
-                  {{ $t('config.inbound.apiDocumentation.requiresAuth') }}
+                  {{ $t('channels.apiDocumentation.requiresAuth') }}
                 </p>
                 <div class="flex flex-wrap gap-2">
                   <span v-for="(sec, idx) in path.security" :key="idx">
@@ -366,7 +366,7 @@ const loadApiSpec = async () => {
     apiSpec.value = spec
   } catch (err: unknown) {
     console.error('Failed to load API spec:', err)
-    error.value = getErrorMessage(err) || t('config.inbound.apiDocumentation.loadError')
+    error.value = getErrorMessage(err) || t('channels.apiDocumentation.loadError')
   } finally {
     loading.value = false
   }

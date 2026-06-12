@@ -94,7 +94,7 @@ export async function createTestWidget(
   name: string,
   websiteUrl: string = WIDGET_TEST_URLS.EXAMPLE_DOMAIN
 ): Promise<{ widgetId: string; name: string }> {
-  await page.goto('/tools/chat-widget')
+  await page.goto('/channels/widgets')
   await page.waitForSelector(selectors.widgets.page, { timeout: TIMEOUTS.LONG })
   await page.click(selectors.widgets.createButton)
   await page.waitForSelector(selectors.widgets.simpleForm.modal, { timeout: TIMEOUTS.SHORT })

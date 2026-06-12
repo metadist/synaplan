@@ -320,7 +320,7 @@ jobs:
           retention-days: 1
 
   e2e:
-    name: E2E Tests (${{ matrix.browser }}${{ matrix.auth_method == 'oidc' && ' OIDC' || matrix.auth_method == 'oidc-redirect' && ' OIDC Redirect' || '' }})
+    name: E2E Tests (${{ matrix.browser }}${{ matrix.variant && format(' {0}', matrix.variant) || '' }}${{ matrix.auth_method == 'oidc' && ' OIDC' || matrix.auth_method == 'oidc-redirect' && ' OIDC Redirect' || '' }})
     runs-on: ubuntu-latest
     needs: [docker-build]
     strategy:
@@ -329,23 +329,35 @@ jobs:
         include:
           # Standard password auth (both browsers) — exclude @oidc tests (no Keycloak running)
           - browser: chromium
+            variant: ""
             auth_method: password
             compose_profiles: ""
             npm_script: "test:e2e"
             grep_filter: "@ci"
           - browser: firefox
+            variant: ""
             auth_method: password
             compose_profiles: ""
             npm_script: "test:e2e:firefox"
             grep_filter: "@ci"
+          # Mobile viewport layout guard (chromium device emulation; runs the
+          # @layout suite only — see frontend/tests/e2e/playwright.config.ts)
+          - browser: chromium
+            variant: "Mobile"
+            auth_method: password
+            compose_profiles: ""
+            npm_script: "test:e2e:mobile"
+            grep_filter: "@ci"
           # OIDC auth (chromium only — auth flow testing, not browser compat)
           - browser: chromium
+            variant: ""
             auth_method: oidc
             compose_profiles: "--profile oidc"
             npm_script: "test:e2e:oidc"
             grep_filter: "@oidc"
           # OIDC auto-redirect (starts app with OIDC_AUTO_REDIRECT=true)
           - browser: chromium
+            variant: ""
             auth_method: oidc-redirect
             compose_profiles: "--profile oidc"
             npm_script: "test:e2e:oidc-redirect"
@@ -469,7 +481,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
-          name: playwright-results-${{ matrix.browser }}-${{ matrix.auth_method }}
+          name: playwright-results-${{ matrix.browser }}${{ matrix.variant && format('-{0}', matrix.variant) || '' }}-${{ matrix.auth_method }}
           path: |
             frontend/tests/e2e/test-results/
             frontend/tests/e2e/reports/
@@ -482,6 +494,97 @@ jobs:
           COMPOSE="docker compose -f docker-compose.test.yml -f docker-compose.test.ci.yml"
           PROFILE="${{ matrix.compose_profiles }}"
           $COMPOSE $PROFILE down -v
+
+  e2e-visual:
+    # Layer 3 of the UI guard: hard-capped visual snapshots (@visual project).
+    # Skips gracefully while no baselines are committed — generate them with
+    # the "Update visual baselines" workflow dispatch (same runner image,
+    # never from a laptop).
+    name: E2E Visual Snapshots
+    runs-on: ubuntu-latest
+    needs: [docker-build]
+    env:
+      APP_IMAGE: synaplan-test:ci
+      APP_URL: http://localhost:8001
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+
+      - name: Check for committed baselines
+        id: baselines
+        run: |
+          if compgen -G "frontend/tests/e2e/tests/*-snapshots" > /dev/null; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+            echo "No visual baselines committed yet — skipping (run the 'Update visual baselines' dispatch to create them)."
+          fi
+
+      - name: Download Docker image artifact
+        if: steps.baselines.outputs.exists == 'true'
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        with:
+          name: docker-image
+          path: /tmp
+
+      - name: Load Docker image
+        if: steps.baselines.outputs.exists == 'true'
+        run: |
+          docker load -i /tmp/docker-image.tar
+          IMAGE_TAG=$(docker images --format "{{.Repository}}:{{.Tag}}" | head -n 1)
+          docker tag $IMAGE_TAG synaplan-test:ci
+
+      - name: Start test services
+        if: steps.baselines.outputs.exists == 'true'
+        run: |
+          COMPOSE="docker compose -f docker-compose.test.yml -f docker-compose.test.ci.yml"
+          n=0; until $COMPOSE pull; do n=$((n+1)); [ "$n" -ge 4 ] && exit 1; sleep $((n*15)); done
+          $COMPOSE up -d
+          $COMPOSE up --wait || { $COMPOSE ps; $COMPOSE logs; exit 1; }
+
+      - name: Setup Node.js
+        if: steps.baselines.outputs.exists == 'true'
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
+        with:
+          node-version: "22"
+          cache: "npm"
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install Playwright dependencies
+        if: steps.baselines.outputs.exists == 'true'
+        working-directory: frontend
+        run: npm ci
+
+      - name: Install Playwright browsers
+        if: steps.baselines.outputs.exists == 'true'
+        working-directory: frontend
+        run: |
+          sudo sed -i '/azure\.archive\.ubuntu\.com/d' /etc/apt/apt-mirrors.txt
+          npx playwright install --with-deps chromium
+
+      - name: Run visual snapshot tests
+        if: steps.baselines.outputs.exists == 'true'
+        working-directory: frontend
+        env:
+          BASE_URL: http://localhost:8001
+        run: npm run test:e2e:visual
+
+      - name: Upload results
+        if: always() && steps.baselines.outputs.exists == 'true'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: playwright-results-visual
+          path: |
+            frontend/tests/e2e/test-results/
+            frontend/tests/e2e/reports/
+          retention-days: 7
+          if-no-files-found: ignore
+
+      - name: Stop test services
+        if: always() && steps.baselines.outputs.exists == 'true'
+        run: |
+          docker compose -f docker-compose.test.yml -f docker-compose.test.ci.yml down -v
 
   docker-push:
     name: Push Docker Image
@@ -552,7 +655,7 @@ jobs:
   all-checks-passed:
     name: All Checks Passed
     runs-on: ubuntu-latest
-    needs: [lint, backend, frontend, docker-build, e2e, docker-push, cloudflare-deploy]
+    needs: [lint, backend, frontend, docker-build, e2e, e2e-visual, docker-push, cloudflare-deploy]
     if: always()
     steps:
       - name: Check for failures
@@ -563,6 +666,7 @@ jobs:
             needs.frontend.result != 'success' ||
             needs.docker-build.result != 'success' ||
             needs.e2e.result != 'success' ||
+            needs.e2e-visual.result != 'success' ||
             (needs.docker-push.result != 'success' && needs.docker-push.result != 'skipped') ||
             (needs.cloudflare-deploy.result != 'success' && needs.cloudflare-deploy.result != 'skipped')
           )

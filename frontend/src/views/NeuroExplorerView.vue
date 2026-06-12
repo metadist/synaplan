@@ -261,7 +261,7 @@ const categories: Omit<CategoryNode, 'position'>[] = [
     label: 'Chat Widgets',
     description: 'Embeddable AI chat widgets',
     color: '#6366f1',
-    route: '/tools/chat-widget',
+    route: '/channels/widgets',
   },
   {
     id: 'memories',
@@ -289,7 +289,7 @@ const categories: Omit<CategoryNode, 'position'>[] = [
     label: 'RAG Search',
     description: 'Retrieval-augmented generation',
     color: '#8b5cf6',
-    route: '/rag',
+    route: '/files/search',
   },
   {
     id: 'settings',
@@ -943,7 +943,7 @@ async function openNode(node: CategoryNode) {
         id: w.widgetId,
         name: w.name,
         subtitle: w.widgetId,
-        route: `/tools/chat-widget/${w.widgetId}`,
+        route: `/channels/widgets/${w.widgetId}`,
       }))
     } else if (node.id === 'memories') {
       const cats = await getCategories()
@@ -958,11 +958,11 @@ async function openNode(node: CategoryNode) {
     } else if (node.id === 'files') {
       panelItems.value = [{ id: 'open', name: t('neuroExplorer.openFiles'), route: '/files' }]
     } else if (node.id === 'rag') {
-      panelItems.value = [{ id: 'open', name: t('neuroExplorer.openRag'), route: '/rag' }]
+      panelItems.value = [{ id: 'open', name: t('neuroExplorer.openRag'), route: '/files/search' }]
     } else if (node.id === 'settings') {
       panelItems.value = [
-        { id: 'inbound', name: t('neuroExplorer.settingsInbound'), route: '/config/inbound' },
-        { id: 'ai', name: t('neuroExplorer.settingsAi'), route: '/config/ai-models' },
+        { id: 'inbound', name: t('neuroExplorer.settingsInbound'), route: '/channels' },
+        { id: 'ai', name: t('neuroExplorer.settingsAi'), route: '/ai/models' },
         { id: 'users', name: t('neuroExplorer.settingsUsers'), route: '/config/users' },
       ]
     }

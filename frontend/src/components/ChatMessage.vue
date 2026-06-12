@@ -640,7 +640,7 @@
                     <div v-if="topic" class="flex items-center justify-between gap-2">
                       <span class="text-xs txt-tertiary">{{ t('chatMessage.infoTopic') }}</span>
                       <router-link
-                        :to="`/config/task-prompts?topic=${topic}`"
+                        :to="`/ai/instructions?topic=${topic}`"
                         class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-medium bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/20 transition-colors"
                         @click="closeInfoPopover"
                       >
@@ -1409,13 +1409,13 @@ const showModelDetails = (modelType?: 'chat' | 'sorting' | 'audio') => {
       audio: props.aiModels?.audio ? 'CHAT' : 'TEXT2SOUND',
     }
     const capability = capabilityMap[mediaHint.value ?? ''] ?? 'CHAT'
-    router.push({ path: '/config/ai-models', query: { highlight: capability } })
+    router.push({ path: '/ai/models', query: { highlight: capability } })
   } else if (modelType === 'sorting') {
-    router.push({ path: '/config/ai-models', query: { highlight: 'SORT' } })
+    router.push({ path: '/ai/models', query: { highlight: 'SORT' } })
   } else if (modelType === 'audio') {
-    router.push({ path: '/config/ai-models', query: { highlight: 'TEXT2SOUND' } })
+    router.push({ path: '/ai/models', query: { highlight: 'TEXT2SOUND' } })
   } else {
-    router.push('/config/ai-models')
+    router.push('/ai/models')
   }
 }
 

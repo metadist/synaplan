@@ -58,20 +58,38 @@ export const selectors = {
     sidebarExpand: '[data-testid="btn-sidebar-expand"]',
     /** V2 sidebar: single plus button to start new chat (no toggle/dropdown) */
     sidebarV2NewChat: '[data-testid="btn-sidebar-v2-new-chat"]',
-    /** V2 sidebar: chat nav icon opens chat list modal (path "/" → testid "btn-sidebar-v2--") */
-    sidebarV2ChatNav: '[data-testid="btn-sidebar-v2--"]',
+    /** §4.3 #2: mobile bottom tab bar (replaces the off-canvas drawer) */
+    mobileBar: '[data-testid="nav-mobile-bottom"]',
+    mobileNew: '[data-testid="btn-mobile-nav-new"]',
+    mobileHistory: '[data-testid="btn-mobile-nav-history"]',
+    mobileFiles: '[data-testid="btn-mobile-nav-files"]',
+    mobileMore: '[data-testid="btn-mobile-nav-more"]',
+    mobileMoreSheet: '[data-testid="sheet-mobile-more"]',
+    /**
+     * V2 sidebar nav testids use STABLE KEYS (`btn-sidebar-v2-nav-<key>`,
+     * `link-sidebar-v2-<key>`) — decoupled from route paths so URL migrations
+     * never rename selectors (navigation IA cleanup, phase 0.5).
+     */
+    /** V2 sidebar: History nav item opens the chat list modal */
+    sidebarV2ChatNav: '[data-testid="btn-sidebar-v2-nav-chat"]',
     /** V2 sidebar: files nav icon */
-    sidebarV2Files: '[data-testid="btn-sidebar-v2--files"]',
-    /** V2 sidebar: settings nav icon (advanced mode only) */
-    sidebarV2Settings: '[data-testid="btn-sidebar-v2--settings"]',
+    sidebarV2Files: '[data-testid="btn-sidebar-v2-nav-files"]',
+    /** V2 sidebar: Channels rail item (locked in easy mode, flyout in advanced) */
+    sidebarV2Channels: '[data-testid="btn-sidebar-v2-nav-channels"]',
+    /** V2 sidebar: AI Setup rail item (locked in easy mode, flyout in advanced) */
+    sidebarV2AiSetup: '[data-testid="btn-sidebar-v2-nav-ai-setup"]',
     /** V2 sidebar: admin nav icon (admin only) */
-    sidebarV2Admin: '[data-testid="btn-sidebar-v2--admin"]',
-    /** V2 flyout: child links (generated from route path) */
-    flyoutLinkChatWidget: '[data-testid="link-sidebar-v2-tools-chat-widget"]',
-    flyoutLinkMailHandler: '[data-testid="link-sidebar-v2-tools-mail-handler"]',
-    flyoutLinkAiModels: '[data-testid="link-sidebar-v2-config-ai-models"]',
-    flyoutLinkTaskPrompts: '[data-testid="link-sidebar-v2-config-task-prompts"]',
-    flyoutLinkAdminDashboard: '[data-testid="link-sidebar-v2-admin"]',
+    sidebarV2Admin: '[data-testid="btn-sidebar-v2-nav-admin"]',
+    /** V2 rail: always-visible label node inside each nav button (§4.1 #3) */
+    railLabel: '.v2-rail-label',
+    /** V2 flyout: child links (stable keys) */
+    flyoutLinkInbound: '[data-testid="link-sidebar-v2-inbound"]',
+    flyoutLinkChatWidget: '[data-testid="link-sidebar-v2-chat-widget"]',
+    flyoutLinkMailHandler: '[data-testid="link-sidebar-v2-mail-handler"]',
+    flyoutLinkApiDocs: '[data-testid="link-sidebar-v2-api-docs"]',
+    flyoutLinkAiModels: '[data-testid="link-sidebar-v2-ai-models"]',
+    flyoutLinkTaskPrompts: '[data-testid="link-sidebar-v2-task-prompts"]',
+    flyoutLinkAdminDashboard: '[data-testid="link-sidebar-v2-admin-dashboard"]',
     /** V2 chat list modal */
     modalChatManager: '[data-testid="modal-chat-manager"]',
     /** V2 chat list: container visible when at least one chat exists; use to wait before targeting rows */
@@ -131,6 +149,21 @@ export const selectors = {
     againDropdown: '[data-testid="btn-message-again"]',
     againDropdownPanel: '[data-testid="dropdown-again-models"]',
     againDropdownItem: 'button.dropdown-item',
+    /** Action row under the input (§4.7): exactly Model / Tools / Knowledge folder */
+    secondaryActions: '[data-testid="section-chat-secondary-actions"]',
+    modelToggle: '[data-testid="btn-model-toggle"]',
+    toolsToggle: '[data-testid="btn-tools-toggle"]',
+    toolsPanel: '[data-testid="dropdown-tools-panel"]',
+    toolsActiveBadge: '[data-testid="badge-tools-active"]',
+    toolThinking: '[data-testid="btn-tool-thinking"]',
+    toolVoiceReply: '[data-testid="btn-tool-voice-reply"]',
+    toolEnhance: '[data-testid="btn-tool-enhance"]',
+    enhanceButton: '[data-testid="btn-chat-enhance"]',
+    toolSummarizerLink: '[data-testid="link-tool-summarizer"]',
+    knowledgeFolderBtn: '[data-testid="btn-knowledge-folder"]',
+    knowledgeFolderPanel: '[data-testid="dropdown-knowledge-folder"]',
+    knowledgeFolderNone: '[data-testid="opt-knowledge-folder-none"]',
+    manageFoldersLink: '[data-testid="link-manage-knowledge-folders"]',
   },
   share: {
     shareButton: '[data-testid="btn-chat-share"]',
@@ -178,13 +211,16 @@ export const selectors = {
   },
   files: {
     page: '[data-testid="page-files-upload"]',
-    filePicker: '[data-testid="section-file-picker"]',
-    selectButton: '[data-testid="btn-select-files"]',
+    uploadForm: '[data-testid="section-upload-form"]',
     fileInput: '[data-testid="input-files"]',
     uploadButton: '[data-testid="btn-upload"]',
     table: '[data-testid="section-table"]',
     fileRow: '[data-testid="item-file"]',
     emptyState: '[data-testid="state-empty"]',
+    /** §4.8: knowledge-base tabs shared by /files and /files/search */
+    tabsBar: '[data-testid="tabs-files"]',
+    tabBrowse: '[data-testid="tab-files-browse"]',
+    tabSearch: '[data-testid="tab-files-search"]',
   },
   fileSelection: {
     modal: '[data-testid="modal-file-selection"]',
@@ -195,7 +231,8 @@ export const selectors = {
     button: '[data-testid="btn-sidebar-v2-user"]',
     dropdown: '[data-testid="dropdown-sidebar-v2-user"]',
     profileBtn: '[data-testid="btn-sidebar-v2-profile"]',
-    settingsBtn: '[data-testid="btn-sidebar-v2-settings"]',
+    /** Avatar menu entry for the /settings page — labeled "Preferences" since phase 2 */
+    preferencesBtn: '[data-testid="btn-sidebar-v2-preferences"]',
     statisticsBtn: '[data-testid="btn-sidebar-v2-statistics"]',
     subscriptionBtn: '[data-testid="btn-sidebar-v2-subscription"]',
     upgradeBtn: '[data-testid="btn-sidebar-v2-upgrade"]',

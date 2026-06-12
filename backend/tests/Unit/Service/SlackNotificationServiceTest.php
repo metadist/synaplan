@@ -104,7 +104,7 @@ final class SlackNotificationServiceTest extends TestCase
             widget: $widget,
             session: $session,
             webhookUrl: 'https://hooks.slack.com/services/T/B/secret',
-            takeoverUrl: 'https://app.example/tools/chat-widget/wdg_test/chats?session=sess_abc',
+            takeoverUrl: 'https://app.example/channels/widgets/wdg_test/chats?session=sess_abc',
             lastUserMessage: 'I need a real person please',
             triggerReason: 'manual button click',
             customFieldValues: ['email' => 'visitor@example.com'],
@@ -129,7 +129,7 @@ final class SlackNotificationServiceTest extends TestCase
             }
         }
         $this->assertNotNull($takeoverButton, 'Slack payload MUST include a takeover button');
-        $this->assertSame('https://app.example/tools/chat-widget/wdg_test/chats?session=sess_abc', $takeoverButton['url']);
+        $this->assertSame('https://app.example/channels/widgets/wdg_test/chats?session=sess_abc', $takeoverButton['url']);
         $this->assertSame('primary', $takeoverButton['style']);
     }
 
@@ -146,7 +146,7 @@ final class SlackNotificationServiceTest extends TestCase
             widget: $widget,
             session: $session,
             webhookUrl: 'https://attacker.example/exfil',
-            takeoverUrl: 'https://app.example/tools/chat-widget/wdg_x/chats?session=sess_x',
+            takeoverUrl: 'https://app.example/channels/widgets/wdg_x/chats?session=sess_x',
         );
 
         $this->assertFalse($delivered);
@@ -168,7 +168,7 @@ final class SlackNotificationServiceTest extends TestCase
             widget: $widget,
             session: $session,
             webhookUrl: 'https://hooks.slack.com/services/T/B/secret',
-            takeoverUrl: 'https://app.example/tools/chat-widget/wdg_x/chats?session=sess_x',
+            takeoverUrl: 'https://app.example/channels/widgets/wdg_x/chats?session=sess_x',
         );
 
         // MUST NOT throw — caller is the live widget button click flow.

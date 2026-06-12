@@ -264,11 +264,13 @@ const hasWidgetChanges = computed(() => {
   return JSON.stringify(currentWidgetConfig.value) !== JSON.stringify(originalWidgetConfig.value)
 })
 
+// Canonical paths per the §4.6 URL map; legacy /tools/* arrives here only
+// via router redirects, so matching the new tree is sufficient.
 const currentPage = computed(() => {
   const path = route.path
-  if (path.includes('chat-widget')) return 'chat-widget'
-  if (path.includes('doc-summary')) return 'doc-summary'
-  if (path.includes('mail-handler')) return 'mail-handler'
+  if (path.includes('widgets')) return 'chat-widget'
+  if (path.includes('summarizer')) return 'doc-summary'
+  if (path.includes('email')) return 'mail-handler'
   return 'doc-summary'
 })
 
@@ -333,8 +335,8 @@ const getPageTitle = () => {
 
 const getPageDescription = () => {
   const descriptions: Record<string, string> = {
-    'chat-widget': 'Create and manage chat widgets for your website',
-    'doc-summary': 'Automatically summarize documents and extract key information',
+    'chat-widget': t('tools.chatWidgetDescription'),
+    'doc-summary': t('tools.docSummaryDescription'),
   }
   return descriptions[currentPage.value] || ''
 }
@@ -458,7 +460,7 @@ const handleGenerateSummary = async (text: string, config: SummaryConfig) => {
 
     if (response.success && response.summary) {
       summaryResult.value = response
-      success('Summary generated successfully!')
+      success(t('tools.summarySuccess'))
       // Automatically open modal after generation
       isSummaryModalOpen.value = true
     } else {
@@ -515,7 +517,7 @@ const saveMailHandler = async (
       !smtpConfig.smtpUsername ||
       !smtpConfig.smtpPassword
     ) {
-      showError('SMTP configuration is required for email forwarding')
+      showError(t('mail.smtpRequired'))
       return
     }
 
@@ -549,11 +551,11 @@ const saveMailHandler = async (
     if (!currentMailHandlerId.value) {
       // Creating new handler - passwords are required
       if (!config.password || config.password === '••••••••') {
-        showError('IMAP/POP3 password is required for new handlers')
+        showError(t('mail.imapPasswordRequired'))
         return
       }
       if (!smtpConfig.smtpPassword || smtpConfig.smtpPassword === '••••••••') {
-        showError('SMTP password is required for new handlers')
+        showError(t('mail.smtpPasswordRequired'))
         return
       }
       payload.password = config.password
@@ -579,13 +581,13 @@ const saveMailHandler = async (
       if (index > -1) {
         mailHandlers.value[index] = updated
       }
-      success('Mail handler updated successfully!')
+      success(t('mail.handlerUpdated'))
     } else {
       // Create new
       const newHandler = await inboundEmailHandlersApi.create(payload as CreateHandlerRequest)
       mailHandlers.value.push(newHandler)
       savedHandlerId = newHandler.id
-      success('Mail handler created successfully!')
+      success(t('mail.handlerCreated'))
     }
 
     // Automatic connection test after save

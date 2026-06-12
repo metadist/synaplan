@@ -4,6 +4,8 @@ namespace App\Service;
 
 use Parsedown;
 use Psr\Log\LoggerInterface;
+use Symfony\Component\Mailer\Exception\TransportExceptionInterface;
+use Symfony\Component\Mailer\Exception\UnexpectedResponseException;
 use Symfony\Component\Mailer\MailerInterface;
 use Symfony\Component\Mime\Email;
 use Symfony\Contracts\Translation\TranslatorInterface;
@@ -24,6 +26,37 @@ final readonly class InternalEmailService
         private TranslatorInterface $translator,
         private LoggerInterface $logger,
     ) {
+    }
+
+    /**
+     * Send with ONE retry on transient transport failures.
+     *
+     * In long-running processes (FrankenPHP workers, messenger consumers) the
+     * SMTP connection is kept open between sends. AWS SES closes connections
+     * idle for ~10s — a hard limit below Symfony's default 100s ping threshold
+     * — so the next send on a reused connection fails with
+     * "451 4.4.2 Timeout waiting for data from client." even though nothing is
+     * wrong with the message. A failed attempt resets the transport's idle
+     * clock, which makes the retry NOOP-ping first, detect the dead socket and
+     * reconnect — so a single retry reliably recovers.
+     *
+     * Permanent SMTP rejections (5xx) are NOT retried.
+     */
+    private function sendWithRetry(Email $email): void
+    {
+        try {
+            $this->mailer->send($email);
+        } catch (TransportExceptionInterface $e) {
+            if ($e instanceof UnexpectedResponseException && $e->getCode() >= 500) {
+                throw $e;
+            }
+
+            $this->logger->warning('Transient mail transport failure, retrying once on a fresh connection', [
+                'error' => $e->getMessage(),
+            ]);
+
+            $this->mailer->send($email);
+        }
     }
 
     /**
@@ -49,7 +82,7 @@ final readonly class InternalEmailService
             ], $locale));
 
         try {
-            $this->mailer->send($email);
+            $this->sendWithRetry($email);
             $this->logger->info('Verification email sent', ['to' => $to, 'locale' => $locale]);
         } catch (\Exception $e) {
             $this->logger->error('Failed to send verification email', [
@@ -83,7 +116,7 @@ final readonly class InternalEmailService
             ], $locale));
 
         try {
-            $this->mailer->send($email);
+            $this->sendWithRetry($email);
             $this->logger->info('Password reset email sent', ['to' => $to, 'locale' => $locale]);
         } catch (\Exception $e) {
             $this->logger->error('Failed to send password reset email', [
@@ -116,7 +149,7 @@ final readonly class InternalEmailService
             ], $locale));
 
         try {
-            $this->mailer->send($email);
+            $this->sendWithRetry($email);
             $this->logger->info('Welcome email sent', ['to' => $to, 'locale' => $locale]);
         } catch (\Exception $e) {
             $this->logger->error('Failed to send welcome email', [
@@ -248,7 +281,7 @@ final readonly class InternalEmailService
         }
 
         try {
-            $this->mailer->send($email);
+            $this->sendWithRetry($email);
             $this->logger->info('AI response email sent', [
                 'to' => $to,
                 'subject' => $subject,
@@ -323,7 +356,7 @@ final readonly class InternalEmailService
         }
 
         try {
-            $this->mailer->send($email);
+            $this->sendWithRetry($email);
             $this->logger->info('Task result email sent', [
                 'to' => $to,
                 'attachment_count' => count($attachments),
@@ -401,7 +434,7 @@ final readonly class InternalEmailService
             ->html($html);
 
         try {
-            $this->mailer->send($email);
+            $this->sendWithRetry($email);
             $this->logger->info('Embedding fallback warning email sent', ['to' => $adminEmail]);
         } catch (\Exception $e) {
             $this->logger->warning('Failed to send embedding fallback warning email', [

@@ -19,6 +19,8 @@
     "test:e2e:oidc": "AUTH_METHOD=oidc playwright test --config=tests/e2e/playwright.config.ts --project=chromium",
     "test:e2e:oidc-button": "AUTH_METHOD=oidc playwright test --config=tests/e2e/playwright.config.ts --project=chromium --grep @oidc-button",
     "test:e2e:oidc-redirect": "AUTH_METHOD=oidc playwright test --config=tests/e2e/playwright.config.ts --project=chromium-oidc-redirect",
+    "test:e2e:mobile": "playwright test --config=tests/e2e/playwright.config.ts --project=chromium-mobile",
+    "test:e2e:visual": "playwright test --config=tests/e2e/playwright.config.ts --project=chromium-visual",
     "test:e2e:ui": "playwright test --config=tests/e2e/playwright.config.ts --ui",
     "test:e2e:report": "playwright show-report tests/e2e/reports/html",
     "lint": "eslint .",
@@ -49,6 +51,7 @@
     "zod": "^4.2.1"
   },
   "devDependencies": {
+    "@axe-core/playwright": "^4.11.3",
     "@eslint/js": "10.0.1",
     "@playwright/test": "1.60.0",
     "@tailwindcss/postcss": "4.3.0",

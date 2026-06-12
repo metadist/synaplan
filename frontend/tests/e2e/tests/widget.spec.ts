@@ -51,7 +51,7 @@ test.describe('@ci @smoke Widget', () => {
       timeout: TIMEOUTS.STANDARD,
     })
 
-    await page.goto('/tools/chat-widget')
+    await page.goto('/channels/widgets')
     await page.waitForSelector(selectors.widgets.page, { timeout: TIMEOUTS.SHORT })
     await updateWidgetSettings(page, widgetName, {
       isActive: false,
@@ -115,7 +115,7 @@ test.describe('@ci @smoke Widget', () => {
     })
 
     await test.step('Arrange: add localhost to whitelist', async () => {
-      await page.goto('/tools/chat-widget')
+      await page.goto('/channels/widgets')
       await page.waitForSelector(selectors.widgets.page, { timeout: TIMEOUTS.SHORT })
 
       const widgetCard = page
@@ -174,6 +174,11 @@ test.describe('@ci @smoke Widget', () => {
     const input = widgetHost.locator(selectors.widget.input)
     await expect(input).toBeVisible({ timeout: TIMEOUTS.SHORT })
 
+    // The widget seeds its configured welcome message asynchronously after
+    // opening. Wait for it before taking the base count — otherwise
+    // nth(previousCount) can point at the late-arriving welcome bubble
+    // instead of the user message (CI-speed race, chromium-only flake).
+    await expect(messageContainers.first()).toBeVisible({ timeout: TIMEOUTS.STANDARD })
     const previousCount = await countWidgetMessages(page)
 
     await test.step('Act: send smoke test message', async () => {
@@ -215,7 +220,7 @@ test.describe('@noci @smoke Widget — full flow', () => {
     await createTestWidget(page, widgetName, URLS.TEST_PAGE_URL)
     await updateWidgetSettings(page, widgetName, {})
 
-    await page.goto('/tools/chat-widget')
+    await page.goto('/channels/widgets')
     await page.waitForSelector(selectors.widgets.page, { timeout: TIMEOUTS.LONG })
 
     const testButton = page.locator(selectors.widgets.widgetCard.testButton).first()

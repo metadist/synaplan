@@ -9,7 +9,7 @@
       @keydown.escape="closeDropdown"
     >
       <Icon icon="mdi:robot-outline" class="w-4 h-4 md:w-5 md:h-5" />
-      <span class="text-xs md:text-sm font-medium hidden sm:inline truncate max-w-[120px]">
+      <span class="text-xs md:text-sm font-medium truncate max-w-[22vw] sm:max-w-[120px]">
         {{ selectedModelName }}
       </span>
       <ModelCostBadge v-if="selectedModelObj" :model="selectedModelObj" :peers="chatModels" />

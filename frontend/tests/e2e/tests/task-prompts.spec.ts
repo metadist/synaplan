@@ -4,7 +4,7 @@ import { selectors } from '../helpers/selectors'
 import { CREDENTIALS } from '../config/credentials'
 import { TIMEOUTS } from '../config/config'
 
-const PAGE = '/config/task-prompts'
+const PAGE = '/ai/instructions'
 const SEL = selectors.taskPrompts
 
 test.describe('@ci Task Prompts', () => {

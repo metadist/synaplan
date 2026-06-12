@@ -9,9 +9,14 @@
       @keydown.escape="closeDropdown"
     >
       <WrenchScrewdriverIcon class="w-4 h-4 md:w-5 md:h-5" />
-      <span class="text-xs md:text-sm font-medium hidden sm:inline">{{
-        $t('chatInput.tools.label')
-      }}</span>
+      <span class="text-xs md:text-sm font-medium">{{ $t('chatInput.tools.label') }}</span>
+      <!-- Q8: active toggles (Thinking / Voice reply) surface on the pill as a dot -->
+      <span
+        v-if="activeToggleCount > 0"
+        class="w-1.5 h-1.5 rounded-full bg-[var(--brand)] flex-shrink-0"
+        data-testid="badge-tools-active"
+        aria-hidden="true"
+      />
       <ChevronUpIcon class="w-4 h-4" />
     </button>
     <div
@@ -20,131 +25,164 @@
       data-testid="dropdown-tools-panel"
       @keydown.escape="closeDropdown"
     >
-      <!-- Web Search Tool -->
+      <!-- Command tools: insert a /command into the input -->
       <button
+        v-for="tool in commandTools"
         ref="itemRefs"
+        :key="tool.id"
         :class="[
           'dropdown-item',
-          isToolActive('search') && 'dropdown-item--active',
-          isToolDisabled('web-search') && 'opacity-60',
+          isToolActive(tool.command) && 'dropdown-item--active',
+          isToolDisabled(tool.id) && 'opacity-60',
         ]"
         type="button"
-        data-testid="btn-tool-web-search"
-        @click="selectToolCommand('web-search', 'search')"
+        :data-testid="`btn-tool-${tool.id}`"
+        @click="selectToolCommand(tool.id, tool.command)"
         @keydown.down.prevent="focusNext"
         @keydown.up.prevent="focusPrevious"
       >
-        <Icon icon="mdi:web" class="w-5 h-5 flex-shrink-0" />
+        <Icon :icon="tool.icon" class="w-5 h-5 flex-shrink-0" />
         <div class="flex-1 min-w-0">
           <div class="flex items-center gap-2">
-            <span class="text-sm font-medium">{{ $t('chatInput.tools.webSearch') }}</span>
+            <span class="text-sm font-medium">{{ $t(tool.labelKey) }}</span>
             <span
-              v-if="isToolDisabled('web-search')"
+              v-if="isToolDisabled(tool.id)"
               class="text-xs px-2 py-0.5 rounded-full bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-200"
             >
-              Setup Required
+              {{ $t('chatInput.tools.setupRequired') }}
             </span>
             <span
               v-else-if="!isLoadingFeatures"
               class="text-xs px-2 py-0.5 rounded-full bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-200"
             >
-              Ready
+              {{ $t('chatInput.tools.ready') }}
             </span>
           </div>
           <div class="text-xs txt-secondary">
-            {{
-              isToolDisabled('web-search')
-                ? getToolMessage('web-search')
-                : $t('chatInput.tools.webSearchDesc')
-            }}
+            {{ isToolDisabled(tool.id) ? getToolMessage(tool.id) : $t(tool.descKey) }}
           </div>
         </div>
         <Transition name="check-fade">
           <CheckIcon
-            v-if="isToolActive('search')"
+            v-if="isToolActive(tool.command)"
             class="w-5 h-5 flex-shrink-0 text-[var(--brand)]"
           />
         </Transition>
       </button>
 
-      <!-- Image Generation Tool -->
+      <!-- §4.7 #2: behaviour toggles live here, not as standalone pills -->
+      <div class="border-t border-light-border/20 dark:border-dark-border/20 my-1" />
+
       <button
         ref="itemRefs"
         :class="[
           'dropdown-item',
-          isToolActive('pic') && 'dropdown-item--active',
-          isToolDisabled('image-gen') && 'opacity-60',
+          thinkingEnabled && 'dropdown-item--active',
+          !supportsReasoning && 'opacity-60',
         ]"
         type="button"
-        data-testid="btn-tool-image-gen"
-        @click="selectToolCommand('image-gen', 'pic')"
+        data-testid="btn-tool-thinking"
+        @click="emit('toggleThinking')"
         @keydown.down.prevent="focusNext"
         @keydown.up.prevent="focusPrevious"
       >
-        <Icon icon="mdi:image" class="w-5 h-5 flex-shrink-0" />
+        <Icon icon="mdi:lightbulb-on-outline" class="w-5 h-5 flex-shrink-0" />
         <div class="flex-1 min-w-0">
-          <div class="flex items-center gap-2">
-            <span class="text-sm font-medium">{{ $t('chatInput.tools.imageGen') }}</span>
-            <span
-              v-if="isToolDisabled('image-gen')"
-              class="text-xs px-2 py-0.5 rounded-full bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-200"
-            >
-              Setup Required
-            </span>
-            <span
-              v-else-if="!isLoadingFeatures"
-              class="text-xs px-2 py-0.5 rounded-full bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-200"
-            >
-              Ready
-            </span>
-          </div>
+          <span class="text-sm font-medium">{{ $t('chatInput.thinking') }}</span>
           <div class="text-xs txt-secondary">
             {{
-              isToolDisabled('image-gen')
-                ? getToolMessage('image-gen')
-                : $t('chatInput.tools.imageGenDesc')
+              supportsReasoning
+                ? $t('chatInput.tools.thinkingDesc')
+                : $t('chatInput.tools.thinkingUnsupported')
             }}
           </div>
         </div>
         <Transition name="check-fade">
-          <CheckIcon v-if="isToolActive('pic')" class="w-5 h-5 flex-shrink-0 text-[var(--brand)]" />
+          <CheckIcon v-if="thinkingEnabled" class="w-5 h-5 flex-shrink-0 text-[var(--brand)]" />
         </Transition>
       </button>
 
-      <!-- Video Generation Tool -->
       <button
         ref="itemRefs"
-        :class="['dropdown-item', isToolActive('vid') && 'dropdown-item--active']"
+        :class="['dropdown-item', voiceReply && 'dropdown-item--active']"
         type="button"
-        data-testid="btn-tool-video-gen"
-        @click="selectToolCommand('video-gen', 'vid')"
+        data-testid="btn-tool-voice-reply"
+        @click="emit('toggleVoiceReply')"
         @keydown.down.prevent="focusNext"
         @keydown.up.prevent="focusPrevious"
       >
-        <Icon icon="mdi:video" class="w-5 h-5 flex-shrink-0" />
+        <Icon icon="mdi:volume-high" class="w-5 h-5 flex-shrink-0" />
         <div class="flex-1 min-w-0">
-          <div class="flex items-center gap-2">
-            <span class="text-sm font-medium">{{ $t('chatInput.tools.videoGen') }}</span>
-            <span
-              v-if="!isLoadingFeatures"
-              class="text-xs px-2 py-0.5 rounded-full bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-200"
-            >
-              Ready
-            </span>
-          </div>
-          <div class="text-xs txt-secondary">{{ $t('chatInput.tools.videoGenDesc') }}</div>
+          <span class="text-sm font-medium">{{ $t('chatInput.voiceReply') }}</span>
+          <div class="text-xs txt-secondary">{{ $t('chatInput.voiceReplyTooltip') }}</div>
         </div>
         <Transition name="check-fade">
-          <CheckIcon v-if="isToolActive('vid')" class="w-5 h-5 flex-shrink-0 text-[var(--brand)]" />
+          <CheckIcon v-if="voiceReply" class="w-5 h-5 flex-shrink-0 text-[var(--brand)]" />
         </Transition>
+      </button>
+
+      <!-- Enhance lives here on mobile only — the in-shell sparkles button is
+           desktop-only because it crowds the narrow input (§4.7 follow-up).
+           v-if (not a hidden class): .dropdown-item's unlayered display rule
+           would beat md:hidden, and hidden rows must not join focus cycling. -->
+      <button
+        v-if="isMobileViewport"
+        ref="itemRefs"
+        :class="[
+          'dropdown-item',
+          enhanceEnabled && 'dropdown-item--active',
+          !enhanceAvailable && 'opacity-60',
+        ]"
+        type="button"
+        :disabled="enhanceLoading"
+        data-testid="btn-tool-enhance"
+        @click="handleEnhance"
+        @keydown.down.prevent="focusNext"
+        @keydown.up.prevent="focusPrevious"
+      >
+        <Icon v-if="enhanceLoading" icon="mdi:loading" class="w-5 h-5 flex-shrink-0 animate-spin" />
+        <Icon v-else icon="mdi:creation" class="w-5 h-5 flex-shrink-0" />
+        <div class="flex-1 min-w-0">
+          <span class="text-sm font-medium">{{ $t('chatInput.enhance') }}</span>
+          <div class="text-xs txt-secondary">{{ $t('chatInput.tools.enhanceDesc') }}</div>
+        </div>
+        <Transition name="check-fade">
+          <CheckIcon v-if="enhanceEnabled" class="w-5 h-5 flex-shrink-0 text-[var(--brand)]" />
+        </Transition>
+      </button>
+
+      <!-- Q3: the pre-configured Summarizer stays reachable from chat; this is
+           a clearly marked link row (same pattern as "Manage folders…"). -->
+      <div class="border-t border-light-border/20 dark:border-dark-border/20 my-1" />
+
+      <button
+        ref="itemRefs"
+        class="dropdown-item"
+        type="button"
+        data-testid="link-tool-summarizer"
+        @click="goToSummarizer"
+        @keydown.down.prevent="focusNext"
+        @keydown.up.prevent="focusPrevious"
+      >
+        <Icon icon="mdi:file-document-outline" class="w-5 h-5 flex-shrink-0" />
+        <div class="flex-1 min-w-0">
+          <span class="text-sm font-medium">{{ $t('chatInput.tools.summarizer') }}</span>
+          <div class="text-xs txt-secondary">{{ $t('chatInput.tools.summarizerDesc') }}</div>
+        </div>
+        <ArrowTopRightOnSquareIcon class="w-4 h-4 flex-shrink-0 txt-secondary" />
       </button>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onBeforeUnmount } from 'vue'
-import { WrenchScrewdriverIcon, ChevronUpIcon, CheckIcon } from '@heroicons/vue/24/outline'
+import { computed, ref, onMounted, onBeforeUnmount } from 'vue'
+import {
+  ArrowTopRightOnSquareIcon,
+  WrenchScrewdriverIcon,
+  ChevronUpIcon,
+  CheckIcon,
+} from '@heroicons/vue/24/outline'
 import { Icon } from '@iconify/vue'
 import { type Command, useCommandsStore } from '@/stores/commands'
 import { getFeaturesStatus, type Feature } from '@/services/featuresService'
@@ -152,13 +190,48 @@ import { useRouter } from 'vue-router'
 
 interface Props {
   activeCommand?: string | null
+  thinkingEnabled?: boolean
+  voiceReply?: boolean
+  supportsReasoning?: boolean
+  enhanceEnabled?: boolean
+  enhanceLoading?: boolean
+  /** Enhance needs text in the input to act on. */
+  enhanceAvailable?: boolean
 }
 
 const props = defineProps<Props>()
 
 const emit = defineEmits<{
   insertCommand: [command: Command]
+  toggleThinking: []
+  toggleVoiceReply: []
+  toggleEnhance: []
 }>()
+
+/** Feature-gated tools that insert a slash command into the input. */
+const commandTools = [
+  {
+    id: 'web-search',
+    command: 'search',
+    icon: 'mdi:web',
+    labelKey: 'chatInput.tools.webSearch',
+    descKey: 'chatInput.tools.webSearchDesc',
+  },
+  {
+    id: 'image-gen',
+    command: 'pic',
+    icon: 'mdi:image',
+    labelKey: 'chatInput.tools.imageGen',
+    descKey: 'chatInput.tools.imageGenDesc',
+  },
+  {
+    id: 'video-gen',
+    command: 'vid',
+    icon: 'mdi:video',
+    labelKey: 'chatInput.tools.videoGen',
+    descKey: 'chatInput.tools.videoGenDesc',
+  },
+] as const
 
 const router = useRouter()
 const commandsStore = useCommandsStore()
@@ -167,6 +240,15 @@ const itemRefs = ref<HTMLElement[]>([])
 const dropdownRef = ref<HTMLElement | null>(null)
 const featuresStatus = ref<Record<string, Feature>>({})
 const isLoadingFeatures = ref(true)
+
+// Same breakpoint as ChatInput's isMobile (innerWidth < 768).
+const mobileMq = window.matchMedia('(max-width: 767px)')
+const isMobileViewport = ref(mobileMq.matches)
+const onMobileMqChange = (e: MediaQueryListEvent) => (isMobileViewport.value = e.matches)
+
+const activeToggleCount = computed(
+  () => Number(props.thinkingEnabled ?? false) + Number(props.voiceReply ?? false)
+)
 
 const isToolActive = (commandName: string): boolean => {
   return props.activeCommand === commandName
@@ -228,6 +310,17 @@ const selectToolCommand = (toolId: string, commandName: string) => {
   closeDropdown()
 }
 
+const goToSummarizer = () => {
+  closeDropdown()
+  router.push('/ai/summarizer')
+}
+
+// Close after triggering so the rewritten text in the input is visible.
+const handleEnhance = () => {
+  emit('toggleEnhance')
+  closeDropdown()
+}
+
 const focusNext = () => {
   const currentIndex = itemRefs.value.findIndex((el) => el === document.activeElement)
   const nextIndex = (currentIndex + 1) % itemRefs.value.length
@@ -262,8 +355,14 @@ const handleClickOutside = (e: MouseEvent) => {
   closeDropdown()
 }
 
-onMounted(() => document.addEventListener('click', handleClickOutside))
-onBeforeUnmount(() => document.removeEventListener('click', handleClickOutside))
+onMounted(() => {
+  document.addEventListener('click', handleClickOutside)
+  mobileMq.addEventListener('change', onMobileMqChange)
+})
+onBeforeUnmount(() => {
+  document.removeEventListener('click', handleClickOutside)
+  mobileMq.removeEventListener('change', onMobileMqChange)
+})
 </script>
 
 <style scoped>

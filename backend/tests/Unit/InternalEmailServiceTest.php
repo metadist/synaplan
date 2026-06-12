@@ -5,6 +5,8 @@ namespace App\Tests\Unit;
 use App\Service\InternalEmailService;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
+use Symfony\Component\Mailer\Exception\TransportException;
+use Symfony\Component\Mailer\Exception\UnexpectedResponseException;
 use Symfony\Component\Mailer\MailerInterface;
 use Symfony\Contracts\Translation\TranslatorInterface;
 use Twig\Environment;
@@ -234,5 +236,89 @@ class InternalEmailServiceTest extends TestCase
 
         self::assertNotNull($captured);
         self::assertCount(0, $captured->getAttachments());
+    }
+
+    // ---- transient SMTP failure retry (AWS SES idle-timeout, see sendWithRetry) ----
+
+    private function serviceWithMailer(MailerInterface $mailer): InternalEmailService
+    {
+        return new InternalEmailService(
+            $mailer,
+            $this->createMock(Environment::class),
+            $this->createMock(TranslatorInterface::class),
+            $this->createMock(LoggerInterface::class),
+        );
+    }
+
+    /**
+     * The SES stale-connection failure ("451 4.4.2 Timeout waiting for data
+     * from client.") must be retried once — the retry runs on a fresh
+     * connection and succeeds, so the caller never sees the error.
+     */
+    public function testTransient451IsRetriedOnceAndSucceeds(): void
+    {
+        $calls = 0;
+        $mailer = $this->createMock(MailerInterface::class);
+        $mailer->expects($this->exactly(2))
+            ->method('send')
+            ->willReturnCallback(function () use (&$calls): void {
+                if (1 === ++$calls) {
+                    throw new UnexpectedResponseException('Expected response code "250" but got code "451", with message "451 4.4.2 Timeout waiting for data from client.".', 451);
+                }
+            });
+
+        $this->serviceWithMailer($mailer)
+            ->sendTaskResultEmail('owner@example.com', 'Your results', 'Body.');
+    }
+
+    /** Socket-level failures (connection reset, EOF) are transient too. */
+    public function testSocketLevelTransportFailureIsRetried(): void
+    {
+        $calls = 0;
+        $mailer = $this->createMock(MailerInterface::class);
+        $mailer->expects($this->exactly(2))
+            ->method('send')
+            ->willReturnCallback(function () use (&$calls): void {
+                if (1 === ++$calls) {
+                    throw new TransportException('Connection to "smtp.example.com:587" has been closed unexpectedly.');
+                }
+            });
+
+        $this->serviceWithMailer($mailer)
+            ->sendTaskResultEmail('owner@example.com', 'Your results', 'Body.');
+    }
+
+    /** Permanent SMTP rejections (5xx) must NOT be retried. */
+    public function testPermanent5xxIsNotRetried(): void
+    {
+        $mailer = $this->createMock(MailerInterface::class);
+        $mailer->expects($this->once())
+            ->method('send')
+            ->willThrowException(new UnexpectedResponseException(
+                'Expected response code "250" but got code "554", with message "554 Message rejected".',
+                554,
+            ));
+
+        $this->expectException(UnexpectedResponseException::class);
+
+        $this->serviceWithMailer($mailer)
+            ->sendTaskResultEmail('owner@example.com', 'Your results', 'Body.');
+    }
+
+    /** If the retry fails as well, the error propagates to the caller. */
+    public function testSecondFailurePropagates(): void
+    {
+        $mailer = $this->createMock(MailerInterface::class);
+        $mailer->expects($this->exactly(2))
+            ->method('send')
+            ->willThrowException(new UnexpectedResponseException(
+                'Expected response code "250" but got code "451", with message "451 4.4.2 Timeout waiting for data from client.".',
+                451,
+            ));
+
+        $this->expectException(UnexpectedResponseException::class);
+
+        $this->serviceWithMailer($mailer)
+            ->sendTaskResultEmail('owner@example.com', 'Your results', 'Body.');
     }
 }

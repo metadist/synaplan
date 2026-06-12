@@ -51,21 +51,21 @@
             >
             <router-link
               data-testid="link-route"
-              to="/tools/chat-widget"
+              to="/channels/widgets"
               class="px-4 py-2 rounded surface-chip hover-surface txt-primary text-sm"
-              >/tools/chat-widget</router-link
+              >/channels/widgets</router-link
             >
             <router-link
               data-testid="link-route"
-              to="/tools/doc-summary"
+              to="/ai/summarizer"
               class="px-4 py-2 rounded surface-chip hover-surface txt-primary text-sm"
-              >/tools/doc-summary</router-link
+              >/ai/summarizer</router-link
             >
             <router-link
               data-testid="link-route"
-              to="/tools/mail-handler"
+              to="/channels/email"
               class="px-4 py-2 rounded surface-chip hover-surface txt-primary text-sm"
-              >/tools/mail-handler</router-link
+              >/channels/email</router-link
             >
             <router-link
               data-testid="link-route"
@@ -75,33 +75,33 @@
             >
             <router-link
               data-testid="link-route"
-              to="/config/inbound"
+              to="/channels"
               class="px-4 py-2 rounded surface-chip hover-surface txt-primary text-sm"
-              >/config/inbound</router-link
+              >/channels</router-link
             >
             <router-link
               data-testid="link-route"
-              to="/config/ai-models"
+              to="/ai/models"
               class="px-4 py-2 rounded surface-chip hover-surface txt-primary text-sm"
-              >/config/ai-models</router-link
+              >/ai/models</router-link
             >
             <router-link
               data-testid="link-route"
-              to="/config/task-prompts"
+              to="/ai/instructions"
               class="px-4 py-2 rounded surface-chip hover-surface txt-primary text-sm"
-              >/config/task-prompts</router-link
+              >/ai/instructions</router-link
             >
             <router-link
               data-testid="link-route"
-              to="/config/sorting-prompt"
+              to="/ai/routing"
               class="px-4 py-2 rounded surface-chip hover-surface txt-primary text-sm"
-              >/config/sorting-prompt</router-link
+              >/ai/routing</router-link
             >
             <router-link
               data-testid="link-route"
-              to="/config/api-keys"
+              to="/channels/api"
               class="px-4 py-2 rounded surface-chip hover-surface txt-primary text-sm"
-              >/config/api-keys</router-link
+              >/channels/api</router-link
             >
             <router-link
               data-testid="link-route"
