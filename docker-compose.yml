@@ -45,6 +45,9 @@ services:
   # Widget Build Watcher (dev only)
   # Memory-limited to prevent unbounded growth from Chokidar polling (#515).
   # Container auto-restarts on OOM thanks to restart policy.
+  # 6g: the Rolldown-based Vite (>= 8.0.16) peaks above the old 4g cap while
+  # rendering chunks (native binary + JS heap), which OOM-killed every build
+  # and left dist-widget without widget.js.
   frontend-widgets:
     image: node:22@sha256:1031993481795705055273f2eef0c24597abdcb277d6e058c82f78cbbdef92a6
     container_name: synaplan-frontend-widgets
@@ -52,9 +55,9 @@ services:
     command: sh -c "npm ci && npm run build:widget -- --watch"
     environment:
       NODE_ENV: development
-      NODE_OPTIONS: '--max-old-space-size=3072'
-    mem_limit: 4g
-    memswap_limit: 4g
+      NODE_OPTIONS: '--max-old-space-size=4096'
+    mem_limit: 6g
+    memswap_limit: 6g
     volumes:
       - ./frontend:/app
       # Anonymous volume to prevent host node_modules from being mounted
