@@ -207,6 +207,27 @@ make test    # Run tests
 | MailHog | http://localhost:8025 |
 | Ollama | http://localhost:11435 |
 
+### GPU Support for Local AI Models
+
+To use Ollama with your NVIDIA GPU, create a `docker-compose.override.yml`:
+
+```yaml
+services:
+  ollama:
+    runtime: nvidia
+    environment:
+      NVIDIA_VISIBLE_DEVICES: all
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+```
+
+Requires NVIDIA driver 550+ (for CUDA 13 compatibility with current Ollama images).
+
 ---
 
 ## Test Users
