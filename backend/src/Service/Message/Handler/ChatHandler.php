@@ -1708,7 +1708,7 @@ final readonly class ChatHandler implements MessageHandlerInterface
             $formatted .= "\n";
         }
 
-        $formatted .= "\nPlease use this information to answer the user's question. Cite sources using [1], [2], etc. when referencing specific information.\n\n";
+        $formatted .= "\nPlease use this information to answer the user's question. Cite sources using bare bracket numbers only, e.g. [1], [2], [3]. Do NOT append any suffix such as †source, ↑source, or ‡source inside the brackets.\n\n";
 
         return $formatted;
     }

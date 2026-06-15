@@ -954,6 +954,7 @@ import TaskPlanBubble from '@/components/multitask/TaskPlanBubble.vue'
 import type { AgainData } from '@/types/ai-models'
 import { mediaHintFromClassificationTopic } from '@/utils/mediaGenerationHint'
 import { chatBadgeIcon, chatBadgeLabel } from '@/utils/chatModelBadge'
+import { replaceCitationMarkers } from '@/utils/citationLinks'
 
 const { t } = useI18n()
 const { error: showError } = useNotification()
@@ -1178,14 +1179,8 @@ const contentParts = computed(() => {
     if (part.type === 'text' && part.content) {
       let processedContent = part.content
 
-      // Replace [1], [2], etc. with clickable spans for search results
-      processedContent = processedContent.replace(/\[(\d+)\]/g, (match, num) => {
-        const index = parseInt(num) - 1
-        if (index >= 0 && index < props.searchResults!.length) {
-          return `<a href="#" class="source-ref inline-flex items-center justify-center w-5 h-5 rounded-full bg-[var(--brand-alpha-light)] text-[var(--brand)] text-xs font-bold hover:bg-[var(--brand)] hover:text-white transition-all mx-0.5 no-underline" data-source-index="${index}" onclick="event.preventDefault()">${num}</a>`
-        }
-        return match
-      })
+      // Replace [1], [2], [1†source], [1↑source], [1‡source], etc. with clickable spans for search results
+      processedContent = replaceCitationMarkers(processedContent, props.searchResults!.length)
 
       return {
         ...part,
