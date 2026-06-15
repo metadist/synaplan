@@ -85,7 +85,7 @@ class FeedbackConfigServiceTest extends TestCase
             });
 
         $this->assertSame(FeedbackConstants::LIMIT_PER_NAMESPACE, $this->service->getLimitPerNamespace());
-        $this->assertSame(10, $this->service->getMaxChatMemories()); // default is 10
+        $this->assertSame(5, $this->service->getMaxChatMemories()); // default is 5
     }
 
     public function testCachesValuesPerRequest(): void

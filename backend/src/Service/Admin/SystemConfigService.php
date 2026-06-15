@@ -918,7 +918,7 @@ final readonly class SystemConfigService
             'MAX_CHAT_MEMORIES' => [
                 'tab' => 'vectordb', 'section' => 'qdrant_search', 'type' => 'number',
                 'sensitive' => false, 'description' => 'Max memories loaded into chat context',
-                'default' => '10',
+                'default' => '5',
                 'source' => 'database',
             ],
         ];

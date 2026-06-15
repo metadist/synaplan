@@ -66,7 +66,7 @@ final class FeedbackConfigService
 
     public function getMaxChatMemories(): int
     {
-        return $this->getInt('MAX_CHAT_MEMORIES', 10);
+        return $this->getInt('MAX_CHAT_MEMORIES', 5);
     }
 
     // --- Helpers ---
