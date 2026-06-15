@@ -36,6 +36,13 @@ final readonly class MessagePreProcessor
     public const AUDIO_EXTENSIONS = ['ogg', 'mp3', 'wav', 'm4a', 'opus', 'flac', 'webm', 'amr'];
     public const IMAGE_EXTENSIONS = ['jpg', 'jpeg', 'png', 'webp', 'gif'];
 
+    // Issue #983: video files (MP4/MOV/AVI/MKV) are analysed by transcribing
+    // their audio track AND describing a representative key frame via Vision
+    // AI (both handled by FileProcessor::extractText). `webm` is intentionally
+    // NOT listed here — browser voice notes are audio/webm and must stay on
+    // the audio-only path.
+    public const VIDEO_EXTENSIONS = ['mp4', 'mov', 'avi', 'mkv'];
+
     private const OFFICE_EXT_TO_MIME = [
         'xls' => 'application/vnd.ms-excel',
         'xlsx' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
@@ -273,6 +280,46 @@ final readonly class MessagePreProcessor
                 $messageFile->setStatus('error');
             }
         }
+
+        // Video: transcribe audio track + describe a key frame (issue #983).
+        // FileProcessor::extractText() owns the combined extraction; this is
+        // the same pipeline the web/widget upload endpoints already use, so
+        // behaviour stays consistent across entry points.
+        elseif (in_array($fileType, self::VIDEO_EXTENSIONS)) {
+            $messageFile->setStatus('extracting');
+
+            try {
+                [$text, $extractMeta] = $this->fileProcessor->extractText(
+                    $filePath,
+                    $fileType,
+                    $messageFile->getUserId(),
+                );
+
+                if ('' !== trim((string) $text)) {
+                    $messageFile->setFileText($text);
+                    $messageFile->setStatus('processed');
+                    $this->logger->info('PreProcessor: Video analyzed', [
+                        'file_id' => $messageFile->getId(),
+                        'text_length' => strlen($text),
+                        'strategy' => $extractMeta['strategy'] ?? 'unknown',
+                    ]);
+                } else {
+                    $messageFile->setStatus('error');
+                    $this->logger->warning('PreProcessor: Video extraction produced empty text', [
+                        'file_id' => $messageFile->getId(),
+                        'strategy' => $extractMeta['strategy'] ?? 'unknown',
+                    ]);
+                }
+            } catch (\Throwable $e) {
+                $messageFile->setStatus('error');
+                $this->logger->error('PreProcessor: Video extraction failed', [
+                    'file_id' => $messageFile->getId(),
+                    'error' => $e->getMessage(),
+                ]);
+            }
+
+            $this->billFileAnalysis($messageFile, $message, 'video');
+        }
     }
 
     /**
@@ -437,6 +484,35 @@ final readonly class MessagePreProcessor
                     'error' => $e->getMessage(),
                 ]);
                 // Don't fail the entire process, just skip vision analysis
+            }
+        }
+
+        // Video: transcribe audio track + describe a key frame (issue #983).
+        if (in_array($fileType, self::VIDEO_EXTENSIONS)) {
+            $this->logger->info('PreProcessor: Analyzing video', [
+                'file' => basename($fullPath),
+                'type' => $fileType,
+            ]);
+
+            try {
+                [$text] = $this->fileProcessor->extractText(
+                    $filePath,
+                    $fileType,
+                    $message->getUserId(),
+                );
+
+                if ('' !== trim((string) $text)) {
+                    $message->setFileText($text);
+                    $this->logger->info('PreProcessor: Video analyzed successfully', [
+                        'text_length' => strlen($text),
+                    ]);
+                }
+            } catch (\Throwable $e) {
+                $this->logger->error('PreProcessor: Video extraction failed', [
+                    'file' => basename($fullPath),
+                    'error' => $e->getMessage(),
+                ]);
+                // Don't fail the entire process, just skip video analysis
             }
         }
     }

@@ -48,6 +48,14 @@ final readonly class FileProcessor
     ];
 
     /**
+     * Video formats that get both audio-track transcription AND a visual
+     * key-frame description (issue #983). `webm` is deliberately excluded:
+     * browser voice notes are recorded as audio/webm, so it stays on the
+     * audio-only transcription path to avoid a needless vision call.
+     */
+    private const VIDEO_EXTENSIONS = ['mp4', 'mov', 'avi', 'mkv'];
+
+    /**
      * Audio formats supported by external APIs (OpenAI/Groq Whisper).
      * Formats not in this list need to be converted before sending.
      *
@@ -77,6 +85,7 @@ final readonly class FileProcessor
         private TextCleaner $textCleaner,
         private AiFacade $aiFacade,
         private WhisperService $whisperService,
+        private VideoAnalysisService $videoAnalysisService,
         private LoggerInterface $logger,
         private string $uploadDir,
         private int $tikaMinLength,
@@ -129,6 +138,12 @@ final readonly class FileProcessor
 
         // Strategy 3: Audio/Video files -> Whisper transcription
         if ($this->isTranscribableMedia($ext)) {
+            // Real videos additionally get a visual key-frame description so
+            // silent or mostly-visual clips still produce usable content.
+            if ($this->isVideo($ext)) {
+                return $this->extractFromVideo($relativePath, $absolutePath, $meta, $userId);
+            }
+
             return $this->extractFromAudio($absolutePath, $meta, $userId);
         }
 
@@ -371,6 +386,79 @@ final readonly class FileProcessor
     private function isTranscribableMedia(string $ext): bool
     {
         return in_array($ext, self::TRANSCRIBABLE_MEDIA_EXTENSIONS, true);
+    }
+
+    /**
+     * Check if the extension is a video format that should also receive a
+     * visual key-frame description on top of audio transcription.
+     */
+    private function isVideo(string $ext): bool
+    {
+        return in_array($ext, self::VIDEO_EXTENSIONS, true);
+    }
+
+    /**
+     * Extract text from a video file: transcribe its audio track (reusing
+     * the full local/external speech-to-text pipeline) AND describe a
+     * representative key frame via Vision AI (issue #983).
+     *
+     * The two results are merged into one labelled block so the chat model
+     * can both "read" what was said and "see" what was shown. Either part
+     * may be empty (a silent clip yields visual-only; a video the vision
+     * provider cannot read yields transcript-only); only when BOTH are
+     * empty does extraction count as failed.
+     *
+     * @param string   $relativePath relative path from the upload dir (for Vision AI)
+     * @param string   $absolutePath resolved absolute path (for audio extraction)
+     * @param array    $baseMeta     base metadata for logging
+     * @param int|null $userId       owner used for provider selection
+     *
+     * @return array [extractedText, meta]
+     */
+    private function extractFromVideo(string $relativePath, string $absolutePath, array $baseMeta, ?int $userId = null): array
+    {
+        // 1. Audio track -> transcript (handles ffmpeg -vn extraction and
+        //    the local-Whisper -> external-API fallback chain).
+        [$transcript, $audioMeta] = $this->extractFromAudio($absolutePath, $baseMeta, $userId);
+        $transcript = trim((string) $transcript);
+
+        // 2. Representative frame -> visual description (fault tolerant).
+        $visual = trim((string) $this->videoAnalysisService->describeKeyFrame($relativePath, $userId));
+
+        $parts = [];
+        if ('' !== $visual) {
+            $parts[] = "[Visual description]\n".$visual;
+        }
+        if ('' !== $transcript) {
+            $parts[] = "[Audio transcript]\n".$transcript;
+        }
+
+        $combined = trim(implode("\n\n", $parts));
+
+        $strategy = match (true) {
+            '' !== $visual && '' !== $transcript => 'video_transcript_vision',
+            '' !== $transcript => 'video_transcript',
+            '' !== $visual => 'video_vision',
+            default => 'video_failed',
+        };
+
+        $meta = [
+            'strategy' => $strategy,
+            'has_transcript' => '' !== $transcript,
+            'has_visual' => '' !== $visual,
+            'audio_strategy' => $audioMeta['strategy'] ?? null,
+        ] + $baseMeta;
+
+        if ('' === $combined) {
+            $this->logger->warning('FileProcessor: Video produced neither transcript nor visual description', $baseMeta);
+        } else {
+            $this->logger->info('FileProcessor: Video extraction complete', [
+                'strategy' => $strategy,
+                'bytes' => strlen($combined),
+            ] + $baseMeta);
+        }
+
+        return [$combined, $meta];
     }
 
     /**

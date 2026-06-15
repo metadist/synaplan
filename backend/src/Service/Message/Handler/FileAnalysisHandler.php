@@ -128,7 +128,7 @@ final readonly class FileAnalysisHandler implements MessageHandlerInterface
                 ]);
 
                 return [
-                    'content' => 'This file type cannot be analyzed. Supported types include documents (such as PDF, Word, Excel), images (such as JPG, PNG, GIF), and audio files (such as MP3, OGG, WAV).',
+                    'content' => 'This file type cannot be analyzed. Supported types include documents (such as PDF, Word, Excel), images (such as JPG, PNG, GIF), audio files (such as MP3, OGG, WAV), and videos (such as MP4, MOV).',
                     'metadata' => ['error' => 'unsupported_file_type'],
                 ];
         }
@@ -220,7 +220,7 @@ final readonly class FileAnalysisHandler implements MessageHandlerInterface
                     'file_types' => array_map(static fn (array $f): ?string => $f['type'], $filesInfo),
                 ]);
 
-                $streamCallback('This file type cannot be analyzed. Supported types include documents (such as PDF, Word, Excel), images (such as JPG, PNG, GIF), and audio files (such as MP3, OGG, WAV).');
+                $streamCallback('This file type cannot be analyzed. Supported types include documents (such as PDF, Word, Excel), images (such as JPG, PNG, GIF), audio files (such as MP3, OGG, WAV), and videos (such as MP4, MOV).');
 
                 return [
                     'metadata' => ['error' => 'unsupported_file_type'],
@@ -1060,6 +1060,7 @@ final readonly class FileAnalysisHandler implements MessageHandlerInterface
         $isImage = in_array($normalizedType, MessagePreProcessor::IMAGE_EXTENSIONS, true);
         $isAudio = in_array($normalizedType, MessagePreProcessor::AUDIO_EXTENSIONS, true);
         $isDocument = in_array($normalizedType, MessagePreProcessor::DOCUMENT_EXTENSIONS, true);
+        $isVideo = in_array($normalizedType, MessagePreProcessor::VIDEO_EXTENSIONS, true);
 
         // Normalize path to be relative to the upload directory (var/uploads).
         // DB values should be stored relative; older/legacy values may contain "/uploads/" or full URLs.
@@ -1075,6 +1076,7 @@ final readonly class FileAnalysisHandler implements MessageHandlerInterface
             'is_image' => $isImage,
             'is_audio' => $isAudio,
             'is_document' => $isDocument,
+            'is_video' => $isVideo,
         ];
     }
 
@@ -1135,7 +1137,12 @@ final readonly class FileAnalysisHandler implements MessageHandlerInterface
                 continue;
             }
 
-            if ($info['is_document']) {
+            // Videos are analysed into a combined transcript + visual
+            // description by the preprocessor, so by the time they reach
+            // here they behave exactly like a text-bearing document
+            // (issue #983). Bucketing them with documents lets the existing
+            // #978 multi-file chat path answer questions about them.
+            if ($info['is_document'] || $info['is_video']) {
                 if ('' !== trim((string) ($info['text'] ?? ''))) {
                     $documentsWithText[] = $info;
                 } else {
@@ -1216,6 +1223,16 @@ final readonly class FileAnalysisHandler implements MessageHandlerInterface
                 $documents[] = $this->wrapAudioAsTranscriptDocument($audio);
             }
 
+            // Fold any images that already carry extracted text into the
+            // bundle too, so combinations like image + video (issue #983)
+            // no longer silently drop the image. Images without usable
+            // text stay out — the document path cannot "see" raw pixels.
+            foreach ($images as $image) {
+                if ('' !== trim((string) ($image['text'] ?? ''))) {
+                    $documents[] = $this->wrapImageAsTextDocument($image);
+                }
+            }
+
             return ['kind' => 'documents', 'documents' => $documents];
         }
 
@@ -1271,6 +1288,36 @@ final readonly class FileAnalysisHandler implements MessageHandlerInterface
             'is_image' => false,
             'is_audio' => false,
             'is_document' => true,
+            'is_video' => false,
+        ];
+    }
+
+    /**
+     * Treat an image that already has extracted text (OCR / vision output)
+     * as a virtual document so it can ride along in a mixed bundle (e.g.
+     * image + video, issue #983) instead of being dropped by the
+     * document-priority routing.
+     *
+     * @param array<string, mixed> $image
+     *
+     * @return array<string, mixed>
+     */
+    private function wrapImageAsTextDocument(array $image): array
+    {
+        $name = (string) ($image['name'] ?? 'image');
+        $type = (string) ($image['type'] ?? 'image');
+
+        return [
+            'id' => $image['id'] ?? null,
+            'name' => $name.' (image text)',
+            'type' => $type.' image',
+            'path' => $image['path'] ?? '',
+            'text' => "Text extracted from image:\n".trim((string) ($image['text'] ?? '')),
+            'status' => $image['status'] ?? null,
+            'is_image' => false,
+            'is_audio' => false,
+            'is_document' => true,
+            'is_video' => false,
         ];
     }
 

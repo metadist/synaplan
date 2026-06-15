@@ -433,8 +433,9 @@ final readonly class MessageClassifier
     }
 
     /**
-     * True if the message has at least one attached document or audio file (not images only).
-     * Routes to FileAnalysisHandler so ANALYZE default model is used (#595).
+     * True if the message has at least one attached document, audio or
+     * video file (not images only). Routes to FileAnalysisHandler so the
+     * ANALYZE default model is used (#595, video added in #983).
      */
     private function messageHasDocumentOrAudioAttachment(Message $message): bool
     {
@@ -453,7 +454,8 @@ final readonly class MessageClassifier
             $ext = strtolower(pathinfo($message->getFilePath(), PATHINFO_EXTENSION));
 
             return in_array($ext, MessagePreProcessor::DOCUMENT_EXTENSIONS, true)
-                || in_array($ext, MessagePreProcessor::AUDIO_EXTENSIONS, true);
+                || in_array($ext, MessagePreProcessor::AUDIO_EXTENSIONS, true)
+                || in_array($ext, MessagePreProcessor::VIDEO_EXTENSIONS, true);
         }
 
         return false;
@@ -470,7 +472,8 @@ final readonly class MessageClassifier
         }
 
         return in_array($ext, MessagePreProcessor::DOCUMENT_EXTENSIONS, true)
-            || in_array($ext, MessagePreProcessor::AUDIO_EXTENSIONS, true);
+            || in_array($ext, MessagePreProcessor::AUDIO_EXTENSIONS, true)
+            || in_array($ext, MessagePreProcessor::VIDEO_EXTENSIONS, true);
     }
 
     /**
