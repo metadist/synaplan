@@ -120,6 +120,10 @@ final readonly class FileAnalysisHandler implements MessageHandlerInterface
             case 'audio_not_transcribed':
                 return $this->buildAudioNotTranscribedError($route['audio_files']);
 
+            case 'video_transcription_pending':
+            case 'video_transcription_failed':
+                return $this->buildVideoTranscriptionError($route);
+
             case 'unsupported':
             default:
                 $this->logger->warning('FileAnalysisHandler: Unsupported file types only', [
@@ -209,6 +213,13 @@ final readonly class FileAnalysisHandler implements MessageHandlerInterface
 
             case 'audio_not_transcribed':
                 $error = $this->buildAudioNotTranscribedError($route['audio_files']);
+                $streamCallback($error['content']);
+
+                return ['metadata' => $error['metadata']];
+
+            case 'video_transcription_pending':
+            case 'video_transcription_failed':
+                $error = $this->buildVideoTranscriptionError($route);
                 $streamCallback($error['content']);
 
                 return ['metadata' => $error['metadata']];
@@ -1060,6 +1071,7 @@ final readonly class FileAnalysisHandler implements MessageHandlerInterface
         $isImage = in_array($normalizedType, MessagePreProcessor::IMAGE_EXTENSIONS, true);
         $isAudio = in_array($normalizedType, MessagePreProcessor::AUDIO_EXTENSIONS, true);
         $isDocument = in_array($normalizedType, MessagePreProcessor::DOCUMENT_EXTENSIONS, true);
+        $isVideo = in_array($normalizedType, MessagePreProcessor::VIDEO_EXTENSIONS, true);
 
         // Normalize path to be relative to the upload directory (var/uploads).
         // DB values should be stored relative; older/legacy values may contain "/uploads/" or full URLs.
@@ -1075,6 +1087,7 @@ final readonly class FileAnalysisHandler implements MessageHandlerInterface
             'is_image' => $isImage,
             'is_audio' => $isAudio,
             'is_document' => $isDocument,
+            'is_video' => $isVideo,
         ];
     }
 
@@ -1112,6 +1125,7 @@ final readonly class FileAnalysisHandler implements MessageHandlerInterface
      *     audio?: list<array<string, mixed>>,
      *     images?: list<array<string, mixed>>,
      *     audio_files?: list<array<string, mixed>>,
+     *     video_files?: list<array<string, mixed>>,
      *     pending_documents?: list<array<string, mixed>>,
      *     failed_documents?: list<array<string, mixed>>
      * }
@@ -1123,6 +1137,9 @@ final readonly class FileAnalysisHandler implements MessageHandlerInterface
         $documentsFailed = [];
         $audioWithText = [];
         $audioMissingText = [];
+        $videoWithText = [];
+        $videoPending = [];
+        $videoFailed = [];
         $images = [];
 
         foreach ($filesInfo as $info) {
@@ -1131,6 +1148,28 @@ final readonly class FileAnalysisHandler implements MessageHandlerInterface
                     $audioWithText[] = $info;
                 } else {
                     $audioMissingText[] = $info;
+                }
+                continue;
+            }
+
+            // Issue #722: a video carries its transcript in BFILETEXT after
+            // FileProcessor extracted the audio track and ran Whisper. Treat
+            // it like a document so the user gets a summary/answer rather
+            // than the old "unsupported file type" dead end.
+            if ($info['is_video'] ?? false) {
+                if ('' !== trim((string) ($info['text'] ?? ''))) {
+                    $videoWithText[] = $info;
+                } else {
+                    $isStillExtracting = in_array(
+                        (string) ($info['status'] ?? ''),
+                        ['uploaded', 'extracting'],
+                        true
+                    );
+                    if ($isStillExtracting) {
+                        $videoPending[] = $info;
+                    } else {
+                        $videoFailed[] = $info;
+                    }
                 }
                 continue;
             }
@@ -1189,11 +1228,28 @@ final readonly class FileAnalysisHandler implements MessageHandlerInterface
             ];
         }
 
+        // Video transcription is the slowest media path (ffmpeg audio extract
+        // + Whisper), so surface "still preparing" before acting on a partial
+        // bundle, mirroring the audio/document guards above (issue #722).
+        if ([] !== $videoPending) {
+            return [
+                'kind' => 'video_transcription_pending',
+                'video_files' => $videoPending,
+            ];
+        }
+
         if ([] !== $documentsPending) {
             return [
                 'kind' => 'document_extraction_pending',
                 'pending_documents' => $documentsPending,
                 'failed_documents' => $documentsFailed,
+            ];
+        }
+
+        if ([] !== $videoFailed) {
+            return [
+                'kind' => 'video_transcription_failed',
+                'video_files' => $videoFailed,
             ];
         }
 
@@ -1210,8 +1266,11 @@ final readonly class FileAnalysisHandler implements MessageHandlerInterface
         //    audio into the document set as a virtual transcript file so
         //    the chat model still sees the spoken content alongside the
         //    PDFs/MDs the user attached.
-        if ([] !== $documentsWithText) {
+        if ([] !== $documentsWithText || [] !== $videoWithText) {
             $documents = $documentsWithText;
+            foreach ($videoWithText as $video) {
+                $documents[] = $this->wrapVideoAsTranscriptDocument($video);
+            }
             foreach ($audioWithText as $audio) {
                 $documents[] = $this->wrapAudioAsTranscriptDocument($audio);
             }
@@ -1271,6 +1330,38 @@ final readonly class FileAnalysisHandler implements MessageHandlerInterface
             'is_image' => false,
             'is_audio' => false,
             'is_document' => true,
+            'is_video' => false,
+        ];
+    }
+
+    /**
+     * Treat a transcribed video attachment as a virtual "transcript"
+     * document so the chat-model prompt builder summarises/answers from
+     * the spoken content of the video (issue #722). Unlike a voice note
+     * (which is answered conversationally), a video upload is something
+     * the user wants explained, so the document/summary path is the
+     * correct destination.
+     *
+     * @param array<string, mixed> $video
+     *
+     * @return array<string, mixed>
+     */
+    private function wrapVideoAsTranscriptDocument(array $video): array
+    {
+        $name = (string) ($video['name'] ?? 'video');
+        $type = (string) ($video['type'] ?? 'video');
+
+        return [
+            'id' => $video['id'] ?? null,
+            'name' => $name.' (video transcript)',
+            'type' => $type.' transcript',
+            'path' => $video['path'] ?? '',
+            'text' => "Video transcript:\n".trim((string) ($video['text'] ?? '')),
+            'status' => $video['status'] ?? null,
+            'is_image' => false,
+            'is_audio' => false,
+            'is_document' => true,
+            'is_video' => false,
         ];
     }
 
@@ -1328,6 +1419,36 @@ final readonly class FileAnalysisHandler implements MessageHandlerInterface
     }
 
     /**
+     * Build the user-facing error for video attachments whose transcript
+     * is still being produced or could not be produced at all (issue #722).
+     *
+     * @param array{kind: string, video_files?: list<array<string, mixed>>} $route
+     *
+     * @return array{content: string, metadata: array<string, mixed>}
+     */
+    private function buildVideoTranscriptionError(array $route): array
+    {
+        $videoFiles = $route['video_files'] ?? [];
+        $isStillProcessing = 'video_transcription_pending' === $route['kind'];
+
+        $this->logger->error('FileAnalysisHandler: Video(s) without transcript', [
+            'files' => $this->describeFileList($videoFiles),
+            'still_processing' => $isStillProcessing,
+        ]);
+
+        return [
+            'content' => $isStillProcessing
+                ? 'The video is still being processed — its audio is being transcribed. Please wait a moment and send your question again. Longer videos can take a little while.'
+                : "I couldn't get any speech from this video. It may have no spoken audio, be silent, or be in a format I can't transcribe. Try a different file or describe what you need.",
+            'metadata' => [
+                'error' => $isStillProcessing
+                    ? 'video_transcription_in_progress'
+                    : 'video_transcription_failed',
+            ],
+        ];
+    }
+
+    /**
      * Log a compact summary that covers every attached file. The old
      * single-file logging missed everything past the first row, which
      * made it hard to spot multi-file dropping in production logs.
@@ -1347,6 +1468,7 @@ final readonly class FileAnalysisHandler implements MessageHandlerInterface
                 'is_image' => $info['is_image'] ?? false,
                 'is_audio' => $info['is_audio'] ?? false,
                 'is_document' => $info['is_document'] ?? false,
+                'is_video' => $info['is_video'] ?? false,
                 'has_extracted_text' => '' !== trim((string) ($info['text'] ?? '')),
                 'extracted_text_length' => strlen((string) ($info['text'] ?? '')),
                 'status' => $info['status'] ?? null,
