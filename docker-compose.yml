@@ -37,7 +37,8 @@ services:
        # Anonymous volume to prevent host node_modules from being mounted (avoids platform-specific binary conflicts)
       - /app/node_modules
     depends_on:
-      - backend
+      backend:
+        condition: service_healthy
     restart: unless-stopped
     networks:
       - synaplan-network
@@ -118,6 +119,7 @@ services:
       DATABASE_WRITE_URL: mysql://synaplan_user:synaplan_password@db:3306/synaplan?serverVersion=mariadb-12.2.2&charset=utf8mb4
       DATABASE_READ_URL: mysql://synaplan_user:synaplan_password@db:3306/synaplan?serverVersion=mariadb-12.2.2&charset=utf8mb4
       OLLAMA_BASE_URL: http://ollama:11434
+      QDRANT_URL: http://qdrant:6333
       TRITON_SERVER_URL: ${TRITON_SERVER_URL:-}
       TIKA_BASE_URL: http://tika:9998
       AI_DEFAULT_PROVIDER: ollama
@@ -242,6 +244,7 @@ services:
       DATABASE_WRITE_URL: mysql://synaplan_user:synaplan_password@db:3306/synaplan?serverVersion=mariadb-12.2.2&charset=utf8mb4
       DATABASE_READ_URL: mysql://synaplan_user:synaplan_password@db:3306/synaplan?serverVersion=mariadb-12.2.2&charset=utf8mb4
       OLLAMA_BASE_URL: http://ollama:11434
+      QDRANT_URL: http://qdrant:6333
       TIKA_BASE_URL: http://tika:9998
       AI_DEFAULT_PROVIDER: ollama
       TOKEN_SECRET: 'change_me_in_production_use_openssl_rand_hex_32'
