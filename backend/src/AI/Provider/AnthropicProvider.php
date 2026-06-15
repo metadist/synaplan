@@ -738,20 +738,17 @@ class AnthropicProvider implements ChatProviderInterface, VisionProviderInterfac
                         $deltaType = $delta['type'] ?? '';
 
                         if ('text_delta' === $deltaType) {
-                            $text = $delta['text'] ?? '';
-
-                            if ('thinking' === $currentBlockType) {
-                                $callback([
-                                    'type' => 'reasoning',
-                                    'content' => $text,
-                                ]);
-                            } else {
-                                $callback([
-                                    'type' => 'content',
-                                    'content' => $text,
-                                ]);
-                            }
+                            $callback([
+                                'type' => 'content',
+                                'content' => $delta['text'] ?? '',
+                            ]);
+                        } elseif ('thinking_delta' === $deltaType) {
+                            $callback([
+                                'type' => 'reasoning',
+                                'content' => $delta['thinking'] ?? '',
+                            ]);
                         }
+                        // signature_delta carries integrity data only — no forwarding needed
                         break;
 
                     case 'content_block_stop':
